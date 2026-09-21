@@ -1,6 +1,6 @@
 ---
 type: development-planning
-status: 用户已确认，Git基础协作落地中
+status: 用户已确认，Git基础协作已落地，远端CI待授权
 created: 2026-09-21
 updated: 2026-09-21
 public_level: 仅内部依据
