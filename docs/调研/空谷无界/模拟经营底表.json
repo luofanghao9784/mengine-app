@@ -1,0 +1,443 @@
+{
+  "metadata": {
+    "version": 1,
+    "dataKind": "全部为人工编制的模拟数据，不是空谷实际经营记录",
+    "asOf": "2026-09-20T09:00:00+08:00",
+    "salesCutoff": "2026-09-19T23:59:59+08:00",
+    "timezone": "Asia/Shanghai",
+    "moneyUnit": "人民币分",
+    "currentPeriod": [
+      "2026-09-13",
+      "2026-09-19"
+    ],
+    "previousPeriod": [
+      "2026-09-06",
+      "2026-09-12"
+    ],
+    "areaSquareMetersFromUser": 300,
+    "userSpendRangeYuan": [
+      30,
+      40
+    ],
+    "notDerivedFromPublicReporting": [
+      "销售额",
+      "订单数",
+      "会员",
+      "研发记录",
+      "排班",
+      "库存",
+      "活动报价"
+    ],
+    "scopeNotes": [
+      "客单价演示暂采用零售净销售额/完成订单；用户给出的30—40元范围不证明真实客单分母。",
+      "净销售额为模拟折扣与退款调整后的含税展示额；未纳入预付充值。",
+      "活动套餐含饮品收入全记活动业务，套餐饮品不重复计入零售。",
+      "订单不是客流、人数或杯数。",
+      "没有读取POS、会员系统、企微或真实财务。"
+    ]
+  },
+  "dailyRetail": [
+    {
+      "date": "2026-09-01",
+      "completedOrders": 122,
+      "netSalesFen": 427000,
+      "averageNetOrderFen": 3500
+    },
+    {
+      "date": "2026-09-02",
+      "completedOrders": 138,
+      "netSalesFen": 496800,
+      "averageNetOrderFen": 3600
+    },
+    {
+      "date": "2026-09-03",
+      "completedOrders": 148,
+      "netSalesFen": 518000,
+      "averageNetOrderFen": 3500
+    },
+    {
+      "date": "2026-09-04",
+      "completedOrders": 170,
+      "netSalesFen": 612000,
+      "averageNetOrderFen": 3600
+    },
+    {
+      "date": "2026-09-05",
+      "completedOrders": 230,
+      "netSalesFen": 851000,
+      "averageNetOrderFen": 3700
+    },
+    {
+      "date": "2026-09-06",
+      "completedOrders": 216,
+      "netSalesFen": 777600,
+      "averageNetOrderFen": 3600
+    },
+    {
+      "date": "2026-09-07",
+      "completedOrders": 126,
+      "netSalesFen": 441000,
+      "averageNetOrderFen": 3500
+    },
+    {
+      "date": "2026-09-08",
+      "completedOrders": 134,
+      "netSalesFen": 469000,
+      "averageNetOrderFen": 3500
+    },
+    {
+      "date": "2026-09-09",
+      "completedOrders": 143,
+      "netSalesFen": 514800,
+      "averageNetOrderFen": 3600
+    },
+    {
+      "date": "2026-09-10",
+      "completedOrders": 150,
+      "netSalesFen": 540000,
+      "averageNetOrderFen": 3600
+    },
+    {
+      "date": "2026-09-11",
+      "completedOrders": 176,
+      "netSalesFen": 633600,
+      "averageNetOrderFen": 3600
+    },
+    {
+      "date": "2026-09-12",
+      "completedOrders": 244,
+      "netSalesFen": 902800,
+      "averageNetOrderFen": 3700
+    },
+    {
+      "date": "2026-09-13",
+      "completedOrders": 226,
+      "netSalesFen": 836200,
+      "averageNetOrderFen": 3700
+    },
+    {
+      "date": "2026-09-14",
+      "completedOrders": 142,
+      "netSalesFen": 511200,
+      "averageNetOrderFen": 3600
+    },
+    {
+      "date": "2026-09-15",
+      "completedOrders": 146,
+      "netSalesFen": 525600,
+      "averageNetOrderFen": 3600
+    },
+    {
+      "date": "2026-09-16",
+      "completedOrders": 159,
+      "netSalesFen": 572400,
+      "averageNetOrderFen": 3600
+    },
+    {
+      "date": "2026-09-17",
+      "completedOrders": 172,
+      "netSalesFen": 636400,
+      "averageNetOrderFen": 3700
+    },
+    {
+      "date": "2026-09-18",
+      "completedOrders": 196,
+      "netSalesFen": 725200,
+      "averageNetOrderFen": 3700
+    },
+    {
+      "date": "2026-09-19",
+      "completedOrders": 266,
+      "netSalesFen": 1010800,
+      "averageNetOrderFen": 3800
+    }
+  ],
+  "weeklyCategorySales": [
+    {
+      "category": "经典咖啡",
+      "netSalesFen": 2216188
+    },
+    {
+      "category": "季节特调",
+      "netSalesFen": 770848
+    },
+    {
+      "category": "茶与非咖",
+      "netSalesFen": 674492
+    },
+    {
+      "category": "甜品",
+      "netSalesFen": 915382
+    },
+    {
+      "category": "零售小物",
+      "netSalesFen": 240890
+    }
+  ],
+  "weeklyChannels": [
+    {
+      "channel": "门店点单",
+      "orders": 1035,
+      "netSalesFen": 3815167
+    },
+    {
+      "channel": "自提",
+      "orders": 204,
+      "netSalesFen": 751975
+    },
+    {
+      "channel": "配送",
+      "orders": 68,
+      "netSalesFen": 250658
+    }
+  ],
+  "events": [
+    {
+      "id": "EV-DEMO-01",
+      "client": "合成企业A",
+      "eventDate": "2026-09-09",
+      "type": "小型分享会",
+      "status": "已履约（模拟）",
+      "contractFen": 420000,
+      "cashReceivedFen": 420000,
+      "receivedDate": "2026-09-09",
+      "recognizedSalesFen": 420000,
+      "attendees": 24
+    },
+    {
+      "id": "EV-DEMO-02",
+      "client": "合成企业B",
+      "eventDate": "2026-09-15",
+      "type": "品牌沙龙",
+      "status": "已履约（模拟）",
+      "contractFen": 480000,
+      "cashReceivedFen": 480000,
+      "receivedDate": "2026-09-15",
+      "recognizedSalesFen": 480000,
+      "attendees": 28
+    },
+    {
+      "id": "EV-DEMO-03",
+      "client": "合成企业C",
+      "eventDate": "2026-09-18",
+      "type": "企业交流会",
+      "status": "已履约（模拟）",
+      "contractFen": 660000,
+      "cashReceivedFen": 330000,
+      "receivedDate": "2026-09-18",
+      "recognizedSalesFen": 660000,
+      "attendees": 36,
+      "unpaidFen": 330000,
+      "dueDate": "2026-09-22"
+    },
+    {
+      "id": "EV-DEMO-04",
+      "client": "合成企业D",
+      "eventDate": "2026-09-25",
+      "type": "秋日读书会",
+      "status": "已预订、未履约（模拟）",
+      "contractFen": 600000,
+      "cashReceivedFen": 240000,
+      "receivedDate": "2026-09-17",
+      "recognizedSalesFen": 0,
+      "attendees": 30
+    }
+  ],
+  "customers": {
+    "window": [
+      "2026-09-13",
+      "2026-09-19"
+    ],
+    "identifiedMemberOrders": 840,
+    "unidentifiedOrders": 467,
+    "uniquePurchasingMembers": 640,
+    "segments": [
+      {
+        "name": "既有活跃会员",
+        "people": 280
+      },
+      {
+        "name": "本期新增购买会员",
+        "people": 210
+      },
+      {
+        "name": "既有低频回访会员",
+        "people": 150
+      }
+    ],
+    "cohort30Day": {
+      "firstPurchaseRange": [
+        "2026-08-01",
+        "2026-08-15"
+      ],
+      "observationCompleteBy": "2026-09-14",
+      "firstTimeMembers": 180,
+      "returnedWithin30Days": 54,
+      "ratePercent": 30
+    },
+    "reactivationCandidates": 120,
+    "outboundMessagesSent": 0,
+    "privacy": "使用合成编号，不含真实姓名、电话、微信、精确住址或推断的个人敏感属性"
+  },
+  "feedback": {
+    "sampleSize": 40,
+    "sampleDescription": "自愿填写的合成问卷，不代表所有顾客；主题多选",
+    "themes": [
+      {
+        "label": "希望更低甜度",
+        "responses": 16
+      },
+      {
+        "label": "希望植物奶选项",
+        "responses": 9
+      },
+      {
+        "label": "提及等候较长",
+        "responses": 12
+      },
+      {
+        "label": "关注座位舒适度",
+        "responses": 7
+      }
+    ],
+    "waitSampleMinutes": [
+      3,
+      4,
+      4,
+      4,
+      5,
+      5,
+      5,
+      6,
+      6,
+      6,
+      7,
+      7,
+      8,
+      8,
+      9,
+      9,
+      10,
+      11,
+      12,
+      14
+    ],
+    "waitSampleDescription": "独立的20单周六下午人工计时样例，不代表全天"
+  },
+  "researchAndDevelopment": [
+    {
+      "id": "RD-DEMO-01",
+      "name": "刺梨冷萃",
+      "kind": "拟议新品，非真实菜单",
+      "stage": "第二轮试饮",
+      "trialParticipants": 12,
+      "preferredV2": 9,
+      "proposedPriceFen": 3400,
+      "estimatedIngredientCostFen": 890,
+      "nextStep": "补齐出杯稳定性记录，再决定小批量试售",
+      "owner": "研发负责人（合成角色）",
+      "nextDate": "2026-09-22"
+    },
+    {
+      "id": "RD-DEMO-02",
+      "name": "桂花燕麦拿铁",
+      "kind": "拟议新品，非真实菜单",
+      "stage": "配方打样",
+      "trialParticipants": 0,
+      "proposedPriceFen": 3600,
+      "estimatedIngredientCostFen": 1040,
+      "nextStep": "核对燕麦奶与桂花原料信息并安排内部试饮",
+      "owner": "吧台负责人（合成角色）",
+      "nextDate": "2026-09-23"
+    },
+    {
+      "id": "RD-DEMO-03",
+      "name": "山野抹茶拿铁",
+      "kind": "拟议新品，非真实菜单",
+      "stage": "原料比较",
+      "trialParticipants": 0,
+      "proposedPriceFen": 3600,
+      "estimatedIngredientCostFen": 980,
+      "nextStep": "比较两个供应样本，记录风味、成本与稳定性",
+      "owner": "采购负责人（合成角色）",
+      "nextDate": "2026-09-24"
+    }
+  ],
+  "inventoryScenario": {
+    "description": "独立的未来7天备货情景，不反推本期真实杯量",
+    "forecastCoffeeCups7Days": 820,
+    "coffeeDoseGrams": 18,
+    "extraLossRate": 0.04,
+    "roastedCoffeeOnHandKg": 6.8,
+    "leadTimeDays": 3,
+    "supplierPriceOldFenPerKg": 12800,
+    "supplierPriceNewFenPerKg": 13600,
+    "supplierLabel": "合成供应商A",
+    "definition": "额外损耗按净配方用量加4%计算，采购对象为烘焙豆"
+  },
+  "eventPipeline": {
+    "asOf": "2026-09-20",
+    "exclusiveStages": [
+      {
+        "stage": "初步咨询",
+        "count": 5
+      },
+      {
+        "stage": "已给方案",
+        "count": 3
+      },
+      {
+        "stage": "待确认档期",
+        "count": 2
+      },
+      {
+        "stage": "已预订未履约",
+        "count": 1
+      }
+    ],
+    "note": "11条当前合成商机状态互斥；不是各阶段累计转化率，金额不计收入"
+  },
+  "marketing": {
+    "contentCandidates": 6,
+    "readyForReview": 4,
+    "rightsOrDetailsMissing": 2,
+    "published": 0,
+    "note": "仅模拟内容准备情况，没有对外发布或发送"
+  },
+  "computed": {
+    "currentRetailNetSalesFen": 4817800,
+    "currentRetailOrders": 1307,
+    "currentAverageNetOrderYuan": 36.86,
+    "previousRetailNetSalesFen": 4278800,
+    "previousRetailOrders": 1189,
+    "retailGrowthPercent": 12.6,
+    "mtdRetailNetSalesFen": 12001400,
+    "currentCompletedEventSalesFen": 1140000,
+    "currentCombinedSalesFen": 5957800,
+    "currentEventCashReceivedFen": 1050000,
+    "currentEventCashCompositionFen": {
+      "completedEvents": 810000,
+      "futureEventDeposit": 240000
+    },
+    "completedEventOutstandingFen": 330000,
+    "futureEventDepositFen": 240000,
+    "mtdCompletedEventSalesFen": 1560000,
+    "mtdCombinedSalesFen": 13561400,
+    "waitMedianMinutes": 6.5,
+    "roastedCoffeeNeed7DaysKg": 15.3504,
+    "roastedCoffeeAdditionalKg": 8.5504,
+    "roastedCoffeeCoverageDays": 3.1,
+    "priceIncreaseIngredientCostFenPerCup": 14.98
+  },
+  "validation": [
+    "每日销售额等于完成订单乘以每日平均实收",
+    "周产品构成合计等于周零售额",
+    "周渠道订单与金额均可对齐",
+    "会员订单与未识别订单可对齐",
+    "客户分组互斥合计640",
+    "30天新客复购采用已完成观察窗的独立队列",
+    "已履约活动收入与未来订金分开",
+    "全部客单样例在30—40元区间",
+    "不把9月20日未结束的一天作为完整实绩"
+  ]
+}

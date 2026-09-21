@@ -1,0 +1,70 @@
+{
+  "import_date": "2026-09-17",
+  "scope": "开发启动资料导入；哈希用于记录交接时的版本，不限制后续工作文档更新。",
+  "files": [
+    {
+      "source": "/Users/dim/Library/Mobile Documents/iCloud~md~obsidian/Documents/Dim Vault/10 项目/企业AI办公系统/企业AI办公系统 产品需求基线 V0.1.md",
+      "target": "docs/产品/产品需求基线-V0.1.md",
+      "source_sha256": "8da6d1da8a86419616eeec49dcec8345aae87d4b125fd6d02eb280e254ac66ff",
+      "imported_sha256": "664c45be7690bc338567266efb60692c57c884821d98b740ea4b277be410a366",
+      "mode": "markdown-adapted",
+      "changes": "保留业务内容与需求状态；转换双链并增加交接说明。商业文档改为成本副本相对链接；项目地图改为归档快照。"
+    },
+    {
+      "source": "/Users/dim/Library/Mobile Documents/iCloud~md~obsidian/Documents/Dim Vault/10 项目/企业AI办公系统/企业AI办公系统 立项说明.md",
+      "target": "docs/产品/立项说明.md",
+      "source_sha256": "238646b67d32ef1a320d60f2f9d28e5592b7155b348b3bd89efe34633e4fa7b5",
+      "imported_sha256": "6cd02965e3d35e0f64e1aea4cc64e68bd47b9ba18e17714c487e5a02e7050ff9",
+      "mode": "markdown-adapted",
+      "changes": "保留业务内容与需求状态；转换双链并增加交接说明。商业文档改为成本副本相对链接；项目地图改为归档快照。"
+    },
+    {
+      "source": "/Users/dim/Library/Mobile Documents/iCloud~md~obsidian/Documents/Dim Vault/10 项目/企业AI办公系统/企业AI办公系统 技术选型与待确认事项.md",
+      "target": "docs/技术/技术选型与待确认事项.md",
+      "source_sha256": "43d8c90dc21c38e5b994d02e7a177465631f3811dbd996e24f054310bf036d92",
+      "imported_sha256": "04d5958c7d113bae66d0611b620cb8b9c550e5b4ba7644d90edce68cd3684af1",
+      "mode": "markdown-adapted",
+      "changes": "保留业务内容与需求状态；转换双链并增加交接说明。商业文档改为成本副本相对链接；项目地图改为归档快照。"
+    },
+    {
+      "source": "/Users/dim/Library/Mobile Documents/iCloud~md~obsidian/Documents/Dim Vault/40 商业化/企业AI办公系统 服务与收费边界.md",
+      "target": "docs/商业/服务与收费边界.md",
+      "source_sha256": "cc26c1e923b7df8e9baf49ba7a242eeef472e90284e9e2a6f4b609971b1fdbba",
+      "imported_sha256": "37c0ac35e844a9699441e2a8265caa578d313c5b92b262cf1663b6094ac669c4",
+      "mode": "markdown-adapted",
+      "changes": "保留业务内容与需求状态；转换双链并增加交接说明。商业文档改为成本副本相对链接；项目地图改为归档快照。"
+    },
+    {
+      "source": "/Users/dim/Library/Mobile Documents/iCloud~md~obsidian/Documents/Dim Vault/90 归档/企业AI办公系统/2026-09-17 企业AI办公系统 产品方向与需求决策归档.md",
+      "target": "docs/归档/2026-09-17-产品方向与需求决策归档.md",
+      "source_sha256": "265f3be46634c910361a3ad6d82a67986f83a9cd3533c6dcd902b34f68f91872",
+      "imported_sha256": "0c02e47a879fde4dcc11e7c2ad7b3f549bdf7844c2280ed777e5e06759ac2120",
+      "mode": "markdown-adapted",
+      "changes": "保留业务内容与需求状态；转换双链并增加交接说明。商业文档改为成本副本相对链接；项目地图改为归档快照。"
+    },
+    {
+      "source": "/Users/dim/Library/Mobile Documents/iCloud~md~obsidian/Documents/Dim Vault/10 项目/企业AI办公系统/企业AI办公系统 项目地图.md",
+      "target": "docs/归档/2026-09-17-知识库项目地图快照.md",
+      "source_sha256": "98db9cf1475fbaefd621f5e691da32b71adf98787b25ea88a32a883b35db7bfb",
+      "imported_sha256": "049f665e98a019d5a97ee8cdd281a66100e8c180e0bed0f91c47f67e038f4adc",
+      "mode": "markdown-adapted",
+      "changes": "保留业务内容与需求状态；转换双链并增加交接说明。商业文档改为成本副本相对链接；项目地图改为归档快照。"
+    },
+    {
+      "source": "/Users/dim/.codex/artifacts/enterprise-ai-cost/output/pdf/企业AI服务成本核算.pdf",
+      "target": "docs/商业/成本测算/企业AI服务成本核算.pdf",
+      "source_sha256": "36fc5d51bf933367ccc197bc668e04eef3193d56d3c8134161d039ec74cb280d",
+      "imported_sha256": "36fc5d51bf933367ccc197bc668e04eef3193d56d3c8134161d039ec74cb280d",
+      "mode": "binary-copy",
+      "changes": "原样复制，未修改、重算或审核内容。"
+    },
+    {
+      "source": "/Users/dim/.codex/artifacts/enterprise-ai-cost/outputs/20260914-cost-model/企业AI服务成本测算.xlsx",
+      "target": "docs/商业/成本测算/企业AI服务成本测算.xlsx",
+      "source_sha256": "c7b36154b6680d904ee72d7296ef8b8b11179fa931ce288912fffa284af4d54b",
+      "imported_sha256": "c7b36154b6680d904ee72d7296ef8b8b11179fa931ce288912fffa284af4d54b",
+      "mode": "binary-copy",
+      "changes": "原样复制，未修改、重算或审核内容。"
+    }
+  ]
+}

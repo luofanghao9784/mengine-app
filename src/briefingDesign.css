@@ -1,0 +1,322 @@
+.briefing-designed {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+}
+.briefing-grid .briefing-card .briefing-designed .briefing-card-eyebrow {
+  margin-bottom: 6px;
+  min-height: 18px;
+  height: 18px;
+}
+.briefing-grid .briefing-card .briefing-designed h3 {
+  margin: 0 0 9px;
+  font-size: 19px;
+  line-height: 1.4;
+  -webkit-line-clamp: 2;
+}
+.briefing-designed-main {
+  display: flex;
+  gap: 18px;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+.briefing-designed-copy {
+  flex: 1;
+  min-width: 0;
+}
+.briefing-evidence {
+  margin: 0;
+  color: #617087;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.briefing-primary-advice {
+  margin: 0 0 12px;
+  font-size: 18px;
+  line-height: 1.6;
+  font-weight: 500;
+  color: #294d80;
+}
+.briefing-takeaway {
+  margin: 12px 0 0;
+  font-size: 14px;
+  line-height: 1.65;
+  color: #3d5270;
+}
+.briefing-designed-footer {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+  align-items: baseline;
+  padding-top: 10px;
+  margin-top: auto;
+  min-width: 0;
+}
+.briefing-designed-footer .briefing-source {
+  margin: 0;
+  padding: 0 18px 0 0;
+  font-size: 11px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.briefing-file-summary {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: #5c7494;
+}
+.briefing-designed-files {
+  flex-shrink: 0;
+  align-self: center;
+}
+.briefing-designed .briefing-document-stack {
+  --cover-width: 76px;
+  --cover-height: 112px;
+  --cover-step: 9px;
+}
+.briefing-designed .briefing-document-cover {
+  padding: 10px 8px;
+}
+.briefing-designed .briefing-document-cover strong {
+  font-size: 10px;
+  line-height: 1.4;
+  margin: 7px 0 auto;
+}
+.briefing-designed .briefing-document-cover small,
+.briefing-designed .document-cover-rule {
+  display: none;
+}
+.briefing-designed-number {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 16px;
+}
+.briefing-designed-number strong {
+  font-size: 38px;
+  font-weight: 500;
+  line-height: 1;
+}
+.briefing-designed-number span {
+  font-size: 13px;
+  color: #617087;
+}
+.briefing-reasoning {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+.briefing-reasoning strong {
+  color: #617087;
+  font-size: 12px;
+  font-weight: 500;
+}
+.briefing-reasoning p {
+  margin: 4px 0 0;
+  font-size: 14px;
+  line-height: 1.65;
+}
+.design-comparison .briefing-reasoning {
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+.design-comparison .briefing-reasoning > div + div {
+  border-left: 1px solid #e2e8f0;
+  padding-left: 20px;
+}
+.design-comparison .briefing-reasoning strong {
+  font-size: 15px;
+  color: #35547b;
+}
+.design-digest .briefing-reasoning {
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-top: 14px;
+}
+.design-digest .briefing-reasoning p {
+  font-size: 13px;
+  line-height: 1.5;
+}
+.design-brief .briefing-reasoning {
+  margin-top: 12px;
+}
+.design-brief .briefing-reasoning strong {
+  display: none;
+}
+.design-brief .briefing-reasoning p {
+  color: #617087;
+}
+.briefing-person-role {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  font-weight: 400;
+  color: #617087;
+}
+.briefing-visual-chart {
+  margin: 6px 0 0;
+  min-width: 0;
+}
+.briefing-chart-period {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 5px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #617087;
+}
+.briefing-chart-period span {
+  flex-shrink: 0;
+}
+.briefing-visual-chart svg {
+  display: block;
+  width: 100%;
+  /* Keep transient resize frames inside the chart's reserved area. */
+  overflow: hidden;
+}
+.briefing-visual-chart text {
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 400;
+}
+.briefing-grid .briefing-card:has(.briefing-designed) {
+  container-type: size;
+}
+.briefing-grid .briefing-card[data-size='1×1'] .briefing-designed-main {
+  gap: 9px;
+}
+.briefing-grid .briefing-card[data-size='1×1'] .briefing-designed-files {
+  display: none;
+}
+.briefing-grid .briefing-card[data-size='1×1'] .briefing-designed h3 {
+  font-size: 17px;
+  margin-bottom: 6px;
+}
+.briefing-grid .briefing-card[data-size='1×1'] .briefing-evidence {
+  font-size: 13px;
+}
+.briefing-grid .briefing-card[data-size='1×1'] .has-chart .briefing-evidence {
+  display: none;
+}
+.briefing-grid .briefing-card[data-size='1×1'] .briefing-visual-chart {
+  margin-top: 2px;
+}
+.briefing-grid .briefing-card[data-size='1×1'] .briefing-designed-footer {
+  padding-top: 7px;
+}
+.briefing-grid .briefing-card[data-size='1×1'] .briefing-file-summary {
+  display: none;
+}
+.briefing-grid .briefing-card[data-size='1×1'] .briefing-primary-advice {
+  font-size: 15px;
+  line-height: 1.55;
+  margin-bottom: 8px;
+}
+.briefing-grid .briefing-card[data-size='1×1'] .briefing-takeaway {
+  display: none;
+}
+.briefing-grid .briefing-card[data-size='1×1'] .design-digest .briefing-reasoning {
+  display: none;
+}
+.briefing-grid .briefing-card[data-size='2×1'] .briefing-designed h3 {
+  -webkit-line-clamp: 1;
+}
+.briefing-grid .briefing-card[data-size='2×1'] .briefing-designed .briefing-document-stack {
+  --cover-width: 70px;
+  --cover-height: 96px;
+}
+.briefing-grid .briefing-card[data-size='2×1'] .has-chart .briefing-evidence {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.briefing-grid .briefing-card[data-size='1×2'] .briefing-designed-main {
+  flex-direction: column;
+  gap: 12px;
+}
+.briefing-grid .briefing-card[data-size='1×2'] .briefing-designed-files {
+  align-self: flex-end;
+}
+.briefing-grid .briefing-card[data-size='1×2'] .design-digest .briefing-reasoning {
+  grid-template-columns: 1fr;
+}
+.briefing-grid .briefing-card[data-size='1×2'] .briefing-document-stack {
+  --cover-width: 61px;
+  --cover-height: 86px;
+}
+.briefing-grid .briefing-card[data-size='1×2'] .design-comparison .briefing-reasoning {
+  grid-template-columns: 1fr;
+}
+.briefing-grid .briefing-card[data-size='1×2'] .design-comparison .briefing-reasoning > div + div {
+  border-left: 0;
+  padding-left: 0;
+}
+.briefing-grid .briefing-card[data-size='2×2'] .briefing-designed h3 {
+  font-size: 24px;
+}
+.briefing-grid .briefing-card[data-size='2×2'] .briefing-designed-main {
+  padding-top: 8px;
+}
+.briefing-grid .briefing-card[data-size='2×2'] .briefing-designed-files {
+  align-self: flex-end;
+  margin-bottom: 8px;
+}
+.briefing-grid .briefing-card[data-size='2×2'] .briefing-designed.has-chart .briefing-document-stack {
+  --cover-width: 61px;
+  --cover-height: 86px;
+}
+.briefing-reference .briefing-designed {
+  min-height: 240px;
+}
+.briefing-reference .briefing-designed-main {
+  padding-bottom: 14px;
+}
+/* At the smallest square-unit breakpoints, reserve the chart and source rows
+   before showing supporting prose. Full facts remain in the conversation card. */
+@container (max-height: 250px) {
+  .briefing-designed.has-chart .briefing-evidence {
+    display: none;
+  }
+  .briefing-grid .briefing-card .briefing-designed.has-chart h3 {
+    -webkit-line-clamp: 1;
+  }
+}
+@container (max-width: 280px) {
+  .briefing-grid
+    .briefing-card[data-size='1×2']
+    .design-analysis:has(.briefing-reasoning)
+    .briefing-designed-files,
+  .briefing-grid
+    .briefing-card[data-size='1×2']
+    .design-recommendation:has(.briefing-reasoning)
+    .briefing-designed-files,
+  .briefing-grid
+    .briefing-card[data-size='1×2']
+    .design-insight:has(.briefing-reasoning)
+    .briefing-designed-files {
+    display: none;
+  }
+
+  .briefing-designed.has-chart .briefing-designed-files {
+    display: none;
+  }
+}
+@container (max-width: 240px) {
+  .briefing-designed-files {
+    display: none;
+  }
+  .briefing-reasoning {
+    gap: 10px;
+    margin-top: 12px;
+  }
+  .briefing-reasoning p {
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  .briefing-file-summary {
+    display: none;
+  }
+}

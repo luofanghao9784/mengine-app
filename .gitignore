@@ -1,0 +1,53 @@
+# 本地系统与编辑器状态
+.DS_Store
+Thumbs.db
+.idea/
+.worktrees/
+
+# 官网由独立仓库管理，不纳入主项目或作为嵌套 gitlink
+/website/
+
+# 本地环境与凭据；仅保留示例配置
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+.npmrc
+.netrc
+
+# 依赖与构建产物；技术栈确定后按需调整
+node_modules/
+dist/
+build/
+.next/
+.turbo/
+.cache/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# 检查与测试产物
+coverage/
+playwright-report/
+test-results/
+.pytest_cache/
+
+# 本地运行文件与客户原始数据
+*.log
+logs/
+tmp/
+.local/
+/data/
+/uploads/
+/storage/
+/backups/
+/customer-data/
+/交付包/
+
+# 保留源代码、迁移、合成测试样本、示例环境与包管理锁文件

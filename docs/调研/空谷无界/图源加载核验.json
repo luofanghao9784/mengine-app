@@ -1,0 +1,60 @@
+{
+  "checkedAt": "2026-09-20T07:45:19.353Z",
+  "method": "Playwright Chromium，原站URL直接加载；未下载原图",
+  "images": [
+    {
+      "id": "I01",
+      "loaded": true,
+      "width": 600,
+      "height": 400
+    },
+    {
+      "id": "I02",
+      "loaded": true,
+      "width": 600,
+      "height": 400
+    },
+    {
+      "id": "I03",
+      "loaded": true,
+      "width": 1080,
+      "height": 720
+    },
+    {
+      "id": "I04",
+      "loaded": true,
+      "width": 6720,
+      "height": 4480
+    },
+    {
+      "id": "I05",
+      "loaded": true,
+      "width": 1318,
+      "height": 647
+    },
+    {
+      "id": "I06",
+      "loaded": true,
+      "width": 700,
+      "height": 525
+    },
+    {
+      "id": "I07",
+      "loaded": true,
+      "width": 700,
+      "height": 525
+    },
+    {
+      "id": "I08",
+      "loaded": true,
+      "width": 768,
+      "height": 116
+    },
+    {
+      "id": "I09",
+      "loaded": true,
+      "width": 737,
+      "height": 279
+    }
+  ]
+}

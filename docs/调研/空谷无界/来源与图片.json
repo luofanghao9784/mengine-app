@@ -1,0 +1,282 @@
+{
+  "researchDate": "2026-09-20",
+  "scope": "资料收集与内容设计；尚未替换前端演示数据",
+  "userFacts": {
+    "areaSquareMeters": 300,
+    "areaScope": "室内外合计",
+    "positioning": "装修精美、有格调",
+    "spendPerGuestYuanRange": [
+      30,
+      40
+    ],
+    "demoObjective": "广泛展示信息整合和有依据的 AI 分析"
+  },
+  "sources": [
+    {
+      "id": "S01",
+      "title": "打造跨界融合“文化新空间”——探访贵阳高新区空谷无界咖啡店",
+      "publisher": "贵阳日报",
+      "publishedAt": "2025-11-24",
+      "eventDate": "2025-08",
+      "url": "https://rb.gywb.cn/epaper/gyrb/html/2025-11/24/content_16705.htm",
+      "verification": "原文 HTML 已读取；检索工具访问不稳定",
+      "factSummary": "报道记载其于2025年8月开业，具有咖啡、阅读及商务交流等场景，曾承接发布会、婚礼、招商沙龙。",
+      "use": "企业背景",
+      "boundary": "创始人与经营介绍均按报道当时记载；扩张计划不是当前已落地事实。"
+    },
+    {
+      "id": "S02",
+      "title": "咖啡厅里聊营商 贵阳高新区首期政企沙龙搭建“零距离”对话新平台",
+      "publisher": "国际在线",
+      "publishedAt": "2025-11-10",
+      "eventDate": "2025-11-07",
+      "url": "https://gz.cri.cn/n/20251110/c909cedb-fd9e-a7f2-72eb-f733edd3433f.html",
+      "verification": "原文与图片地址已读取",
+      "factSummary": "空谷无界是一次政企沙龙的活动场所。",
+      "use": "历史活动案例和门店真实场景",
+      "boundary": "参会单位不是已确认付费客户；不能据报道补造合同和收入。"
+    },
+    {
+      "id": "S03",
+      "title": "贵阳高新区举办开放型经济专题沙龙政企面对面共探出海新路径",
+      "publisher": "贵阳网·贵阳高新频道",
+      "publishedAt": "2026-03-26",
+      "eventDate": "2026-03-25",
+      "url": "https://www.gywb.cn/pages/2026/03/26/8270a71f8c094d4ca4e40d2f32271728.html",
+      "verification": "检索正文与原始页面图片地址已核对；网页服务存在403或脚本渲染差异",
+      "factSummary": "报道中的开放型经济专题沙龙在空谷无界咖啡馆会议室举行。",
+      "use": "企业活动场景",
+      "boundary": "只支持存在会议场景，不支持当前座位数、报价与营收。"
+    },
+    {
+      "id": "S04",
+      "title": "贵阳高新区举办赛峰飞机发动机贵阳公司叶片生产上下游配套企业对接活动",
+      "publisher": "贵阳网·贵阳高新频道",
+      "publishedAt": "2026-05-07",
+      "eventDate": "2026-04-28",
+      "url": "https://www.gywb.cn/pages/2026/05/07/4f49e1fcfccc443f8094d25965618e7e.html",
+      "verification": "检索正文与原始页面图片地址已核对；网页服务存在403或脚本渲染差异",
+      "factSummary": "空谷无界承载了这次产业链企业交流活动。",
+      "use": "历史活动图文资讯",
+      "boundary": "真实活动与虚构企业商机须分开，不把真实单位放入模拟欠款、投诉或客户名单。"
+    },
+    {
+      "id": "S05",
+      "title": "2026贵阳国际咖啡博览会9月24日启幕",
+      "publisher": "贵州网",
+      "publishedAt": "2026-09-14",
+      "eventDate": "2026-09-24/2026-09-26",
+      "url": "https://news.gzw.net/guiyang/26/0914/69057149.shtml",
+      "verification": "原文正文及宣传图片地址已读取",
+      "factSummary": "报道预告9月24日至26日在贵阳国际会议展览中心举办咖啡博览会。",
+      "use": "近期行业资讯，选品与供应链讨论入口",
+      "boundary": "截至调研日尚未举办；活动安排来自单篇预告，参访前再次核对；没有空谷参展或报名证据。"
+    },
+    {
+      "id": "S06",
+      "title": "云南省咖啡价格监测分析周报（2026年8月31日—9月6日）",
+      "publisher": "农小蜂",
+      "publishedAt": "2026-09-09",
+      "eventDate": "2026-08-31/2026-09-06",
+      "url": "https://www.abeedata.com/home/article/detail/id/32271",
+      "verification": "原文正文、表格及图表地址已读取",
+      "factSummary": "报告中的商业生豆周均价39.46元/公斤，精品生豆104.92元/公斤，较上周分别下降0.70%和1.63%。",
+      "use": "采购资讯与成本敏感性分析",
+      "boundary": "采样行情，不是空谷供应商报价；生豆不同于烘焙豆，不能把跌幅直接套到门店成本。"
+    },
+    {
+      "id": "S07",
+      "title": "贵州食材融入咖啡风味！“超级引力咖啡节”玩出新花样",
+      "publisher": "多彩贵州网官方账号（新浪承载）",
+      "publishedAt": "2026-07-18",
+      "eventDate": "2026-07-16/2026-07-19",
+      "url": "https://finance.sina.cn/2026-07-18/detail-iniifhua1581420.d.html",
+      "verification": "正文及新闻配图地址已读取",
+      "factSummary": "报道展示了贵州本土食材与咖啡结合的多个品牌产品。",
+      "use": "新品研发灵感与真实图文资讯",
+      "boundary": "报道产品属于其他品牌；不能把其名称、照片、配方和销量冒充空谷产品。"
+    },
+    {
+      "id": "S08",
+      "title": "日咖夜酒：贵阳城市消费新味道",
+      "publisher": "贵州日报",
+      "publishedAt": "2026-09-09",
+      "eventDate": "2026-09-04及此前",
+      "url": "https://szb.eyesnews.cn/pc/cont/202609/09/content_188264.html",
+      "verification": "原文正文及图片地址已读取",
+      "factSummary": "报道讨论贵阳饮品与不同营业时段、生活方式场景的结合。",
+      "use": "空间与时段经营的行业观察",
+      "boundary": "不推定空谷卖酒、具备夜间业态或应该延长营业；它店营收不作空谷标杆。"
+    },
+    {
+      "id": "S09",
+      "title": "新饮品里感受消费新场景（探访）",
+      "publisher": "人民网·人民日报",
+      "publishedAt": "2026-09-03",
+      "eventDate": null,
+      "url": "https://finance.people.com.cn/n1/2026/0903/c1004-40791391.html",
+      "verification": "原文正文已核对；未确认适用正文照片",
+      "factSummary": "报道关注贵阳特色饮品与城市、山野旅游场景的结合。",
+      "use": "纯文字资讯和顾客到店动机研究",
+      "boundary": "文中其他品牌游客占比不能移植到空谷；不使用网站Logo或页面按钮冒充新闻图片。"
+    },
+    {
+      "id": "S10",
+      "title": "“云贵咖路相逢·双冠啡同凡响”网络主题传播活动在贵阳举办",
+      "publisher": "云南网，来源知知贵阳",
+      "publishedAt": "2025-11-27",
+      "eventDate": "2025-11-24",
+      "url": "https://society.yunnan.cn/system/2025/11/27/033745655.shtml",
+      "verification": "原文正文已读取",
+      "factSummary": "活动探访包含空谷无界，报道将其描述为咖啡与文化空间结合的场景。",
+      "use": "品牌背景与云贵产业交流历史资料",
+      "boundary": "不冒充近期消息；多店混排照片未经单独确认不标为空谷门店。"
+    }
+  ],
+  "images": [
+    {
+      "id": "I01",
+      "sourceId": "S02",
+      "url": "https://v2.cri.cn/60d1c4b8-7330-4ba1-baa5-0f8fbfd4cb82/image/0a9baa9a9968482082449b9157714f41.600x400.jpg",
+      "kind": "原文活动现场照片",
+      "caption": "空谷无界政企沙龙历史现场，2025-11-07",
+      "credit": "国际在线原文配图；单幅摄影署名未核实",
+      "visualStatus": "已逐图查看浏览器截图，与原文图注交叉核对",
+      "reuseStatus": "公开可访问，未取得转发包或公开发布使用许可",
+      "suggestedFit": "2×1或2×2；保留人物与场景关系",
+      "dimensions": [
+        600,
+        400
+      ],
+      "selected": true
+    },
+    {
+      "id": "I02",
+      "sourceId": "S02",
+      "url": "https://v2.cri.cn/60d1c4b8-7330-4ba1-baa5-0f8fbfd4cb82/image/3ae89b8186044164b656a084480dddeb.600x400.jpg",
+      "kind": "原文活动现场照片",
+      "caption": "空谷无界政企交流历史现场，2025-11-07",
+      "credit": "国际在线原文配图；单幅摄影署名未核实",
+      "visualStatus": "已逐图查看浏览器截图，与原文图注交叉核对",
+      "reuseStatus": "公开可访问，未取得转发包或公开发布使用许可",
+      "suggestedFit": "2×1；不作为当前团队合照",
+      "dimensions": [
+        600,
+        400
+      ],
+      "selected": true
+    },
+    {
+      "id": "I03",
+      "sourceId": "S04",
+      "url": "https://www.gywb.cn/upload/news/image/2026/05/07/c98af6dbec204a80bb63d6400fad93e3.jpg",
+      "kind": "原文活动现场照片",
+      "caption": "空谷无界产业链对接活动历史现场，2026-04-28",
+      "credit": "贵阳网原文配图；记者李雯文，摄影署名未单独标明",
+      "visualStatus": "已逐图查看浏览器截图，与原文图注交叉核对",
+      "reuseStatus": "公开可访问，未取得转发包或公开发布使用许可",
+      "suggestedFit": "2×1或2×2；适合活动资料入口",
+      "dimensions": [
+        1080,
+        720
+      ],
+      "selected": true
+    },
+    {
+      "id": "I04",
+      "sourceId": "S03",
+      "url": "https://www.gywb.cn/upload/news/image/2026/03/26/11214af53e90483eb122f6ba295d82c9.png?h=4480&w=6720",
+      "kind": "原文活动现场照片",
+      "caption": "开放型经济专题沙龙历史现场，2026-03-25",
+      "credit": "贵阳网原文配图；单幅摄影署名未核实",
+      "visualStatus": "已逐图查看浏览器截图，与原文图注交叉核对",
+      "reuseStatus": "公开可访问，未取得转发包或公开发布使用许可",
+      "suggestedFit": "2×2；注意原图体积",
+      "dimensions": [
+        6720,
+        4480
+      ],
+      "selected": true
+    },
+    {
+      "id": "I05",
+      "sourceId": "S05",
+      "url": "https://gzw-img.sjw.net/uploads/202609/01a09ed834ac7368aa5ed25be4df0869.png",
+      "kind": "活动宣传图",
+      "caption": "2026贵阳国际咖啡博览会原文宣传图；不是已举办的现场照片",
+      "credit": "贵州网原文配图；图像设计者未单独标明",
+      "visualStatus": "已逐图查看浏览器截图，与原文图注交叉核对",
+      "reuseStatus": "公开可访问，未取得转发包或公开发布使用许可",
+      "suggestedFit": "按原图比例完整展示，不能裁掉时间与地点",
+      "dimensions": [
+        1318,
+        647
+      ],
+      "selected": true
+    },
+    {
+      "id": "I06",
+      "sourceId": "S07",
+      "url": "https://k.sinaimg.cn/n/spider20260718/587/w1707h1280/20260718/d3e3-87bdb436c6ae43d824490f83a63533a6.jpg/w700d1q75cms.jpg?by=cms_fixed_width",
+      "kind": "原文新闻照片",
+      "caption": "超级引力咖啡节报道配图，2026年7月；非空谷门店或产品",
+      "credit": "多彩贵州网官方账号／新浪原文配图",
+      "visualStatus": "已逐图查看浏览器截图，与原文图注交叉核对",
+      "reuseStatus": "公开可访问，未取得转发包或公开发布使用许可",
+      "suggestedFit": "2×1或2×2；保留原始品牌归属",
+      "dimensions": [
+        700,
+        525
+      ],
+      "selected": true
+    },
+    {
+      "id": "I07",
+      "sourceId": "S07",
+      "url": "https://k.sinaimg.cn/n/spider20260718/587/w1707h1280/20260718/705b-e05c97d53b3ff0592983061a70a6ba00.jpg/w700d1q75cms.jpg?by=cms_fixed_width",
+      "kind": "原文新闻照片",
+      "caption": "Echo cafe 的 Amani 饮品，2026年7月报道原图；不是空谷新品",
+      "credit": "多彩贵州网官方账号／新浪原文配图",
+      "visualStatus": "已逐图查看浏览器截图，与原文图注交叉核对",
+      "reuseStatus": "公开可访问，未取得转发包或公开发布使用许可",
+      "suggestedFit": "2×2；确认主体后再写精确图注",
+      "dimensions": [
+        700,
+        525
+      ],
+      "selected": true
+    },
+    {
+      "id": "I08",
+      "sourceId": "S08",
+      "url": "https://szb.eyesnews.cn/pc/pic/202609/09/78111a8e-d1cc-475f-9cd7-bd5bd3007bdc.jpg.1",
+      "kind": "待检查的原文图片链接",
+      "caption": "排除素材：酒博会倒计时横幅，与日咖夜酒报道正文配图需求不符",
+      "credit": "贵州日报原文图片链接",
+      "visualStatus": "已排除：实际为酒博会倒计时横幅，不是报道正文现场照片",
+      "reuseStatus": "原站声明未经授权不得复制转载或建立镜像",
+      "suggestedFit": "不得作为该新闻的配图；该新闻改用纯文字卡",
+      "dimensions": [
+        768,
+        116
+      ],
+      "selected": false
+    },
+    {
+      "id": "I09",
+      "sourceId": "S06",
+      "url": "https://ynmaker.oss-cn-shenzhen.aliyuncs.com/Upload/Editor/2026-09-09/6aa0b4ec839f8.png",
+      "kind": "报告原始数据图",
+      "caption": "报告中的美国C型咖啡期货价格变化图；不是门店采购价",
+      "credit": "农小蜂原文图表",
+      "visualStatus": "已逐图查看浏览器截图，与原文图注交叉核对",
+      "reuseStatus": "公开可访问，未取得转发包或公开发布使用许可",
+      "suggestedFit": "适合来源阅读，画报优先自绘少量事实数据并链接报告",
+      "dimensions": [
+        737,
+        279
+      ],
+      "selected": true
+    }
+  ]
+}
