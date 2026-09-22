@@ -464,3 +464,12 @@
 - 验证包含长按同触点拖动、取消与保存、长按前小幅滑动后停住、多指、编辑中正常滚动、短按与轻微抖动打开会话、键盘移动、缩放、撤销及持久布局。已查看桌面拖动、手机拖动及编辑截图，位于 `.local/briefing-direct-drag/`。
 - 使用隔离 Chromium 及触控模拟，未改变用户浏览器存储；真实手机／平板手感与用户体验验收仍未完成。当前前端 Demo，无后端或部署变更。
 - 复查命令：`npm run build`、`npm test`、`npx playwright test tests/e2e/briefing-move.spec.ts tests/e2e/briefing-refresh.spec.ts tests/e2e/briefing-swipe.spec.ts tests/e2e/briefing-packing.spec.ts tests/e2e/konggu.spec.ts`。
+
+## 活跃会话进入智能画报（2026-09-21）
+
+- 新增“活跃会话”类型和最新回复预览模板，支持会话标题、时间、空间及继续对话提示。独立新会话有 AI 回复后出现，每个会话一张卡；点击直接继续原会话，不新增自引用消息。默认空谷保留原40张内容卡，另展示3条预置独立会话。
+- 原画报内容会话和优化会话不重复生成；未发送草稿和只有用户消息的会话不产生卡片。回复更新后在最新视图前移，保留关注、隐藏和尺寸配置；已有手动排列整体后移。归档退出画报，隐藏只影响卡片，原会话保留。
+- `npm run build` 与相关源文件、测试格式检查通过。60 项单元检查通过，含新增6项会话同步、去重、权限、时间、归档偏好与已保存布局更新规则；最终29项浏览器流程一次完整通过：4项活跃会话、8项拖动防误触、5项刷新、5项分类滑动、1项断点拼版、6项空谷业务回归。构建仍有原有大于500KB的体积提示，构建成功。
+- 浏览器验证了从会话入口发送、回复卡片显示、打开仍为原会话且消息数不变、连续更新一张卡、类型筛选、归档、手动布局后新回复／新会话前移、隐藏、刷新保留，以及320／390px的阅读和触屏长按拖动。修复了入场动画导致小按钮在按下后位移、关注点击落空的问题，增加立即关注生效断言。
+- 已查看桌面、手机截图，保存在 `.local/briefing-conversations/`。使用隔离 Chromium 与触控模拟，未清空用户浏览器存储；真实手机手感和用户体验验收未完成。仍为预编写回复的前端 Demo，未接入真实模型、后端或部署。
+- 复查命令：`npm run build`、`npm test`、`npx playwright test tests/e2e/briefing-chats.spec.ts tests/e2e/briefing-move.spec.ts tests/e2e/briefing-refresh.spec.ts tests/e2e/briefing-swipe.spec.ts tests/e2e/briefing-packing.spec.ts tests/e2e/konggu.spec.ts`。
