@@ -453,7 +453,7 @@ button {
   position: absolute;
   inset: -14px -24px;
   z-index: -1;
-  background: color-mix(in srgb, var(--canvas) 50%, transparent);
+  background: color-mix(in srgb, var(--canvas) 20%, transparent);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   mask-image: radial-gradient(ellipse, #000 20%, #0000 72%);
@@ -463,7 +463,7 @@ button {
 .profile-label::after,
 .deck-stack-hint::after {
   inset: -8px -16px;
-  background: color-mix(in srgb, var(--canvas) 70%, transparent);
+  background: color-mix(in srgb, var(--canvas) 28%, transparent);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   mask-image: radial-gradient(ellipse, #000 25%, #0000 75%);
