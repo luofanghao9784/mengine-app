@@ -215,6 +215,8 @@ function HiddenCards({
 }
 
 const tabs = ['推荐', '关注', '日期', '类型', '空间'] as const;
+// Temporarily hide conversation summaries on the briefing surface; retain their data and chats.
+const visibleTypes = magazineTypes.filter((type) => type !== '会话');
 export function Briefing() {
   const { state } = useDemo();
   const ui = useUI();
@@ -223,7 +225,8 @@ export function Briefing() {
   const [tab, setTab] = useState<(typeof tabs)[number]>(
     saved?.tab === '最新' ? '推荐' : saved?.tab || (routeScope ? '空间' : '推荐'),
   );
-  const [type, setType] = useState(magazineFilter(saved?.type || '全部'));
+  const savedType = magazineFilter(saved?.type || '全部');
+  const [type, setType] = useState(savedType === '会话' ? '全部' : savedType);
   const [scope, setScope] = useState(saved?.scope || routeScope || 'all');
   const [day, setDay] = useState(saved?.day || '');
   const [detail, setDetail] = useState<BriefingReference | null>(null);
@@ -236,7 +239,9 @@ export function Briefing() {
   view.current = { ...view.current, tab, type, scope, day };
   const pageRef = useRef<HTMLDivElement>(null);
   const [{ columns, unit, ready: gridReady }, setGrid] = useState({ columns: 5, unit: 248, ready: false });
-  const live = (state.briefing?.cards || []).filter((c) => tab === '日期' || c.active);
+  const live = (state.briefing?.cards || []).filter(
+    (c) => magazineType(c.data) !== '会话' && (tab === '日期' || c.active),
+  );
   const dates = [...new Set(live.flatMap((c) => c.history.map((h) => localDate(h.at))))].sort().reverse();
   const entries = live
     .filter((c) => tab !== '关注' || c.pinned)
@@ -247,6 +252,7 @@ export function Briefing() {
     })
     .filter(
       ({ data }) =>
+        magazineType(data) !== '会话' &&
         (tab !== '类型' || type === '全部' || magazineType(data) === type) &&
         (tab !== '空间' || scope === 'all' || data.space === scope),
     );
@@ -258,14 +264,13 @@ export function Briefing() {
   const groups: BriefingGroup[] =
     tab === '推荐'
       ? [
-          { id: 'priority', label: '正在跟进', entries: [] },
           { id: 'unread', label: '为你推荐', entries: [] },
           { id: 'read', label: '已读', entries: [] },
         ]
           .map((group) => ({
             ...group,
             entries: recommendations
-              .filter((r) => r.group === group.id)
+              .filter((r) => r.group === group.id || (group.id === 'unread' && r.group === 'priority'))
               .flatMap((r) => {
                 const entry = entries.find((e) => e.card.id === r.id);
                 return entry ? [entry] : [];
@@ -460,7 +465,7 @@ export function Briefing() {
       >
         {tab === '类型' && (
           <div className="briefing-filters" aria-label="内容类型">
-            {['全部', ...magazineTypes].map((t) => (
+            {['全部', ...visibleTypes].map((t) => (
               <button key={t} aria-pressed={type === t} onClick={() => setType(t)}>
                 {t}
               </button>

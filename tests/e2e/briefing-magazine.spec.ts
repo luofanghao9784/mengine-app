@@ -4,31 +4,23 @@ const key = 'enterprise-ai-demo-konggu-v1';
 test.beforeEach(async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/#/briefing');
-  await expect(page.locator('.briefing-grid .briefing-card')).toHaveCount(43);
+  await expect(page.locator('.briefing-grid .briefing-card')).toHaveCount(40);
 });
 
-test('六类筛选一致，照片和关键数字可见，打开原卡保留完整事实', async ({ page }) => {
-  const first = page.locator('[data-card-id="conversation:kg-review"]');
-  await expect(first.locator('.magazine-value')).toContainText('59,578');
-  const photo = page.locator('[data-card-id="conversation:kg-development"] .magazine-photo img');
+test('五类筛选一致，照片和关键数字可见，打开原卡保留完整事实', async ({ page }) => {
+  const first = page.locator('[data-card-id="konggu:C01"]');
+  await expect(first.locator('.magazine-value')).toContainText('48,178');
+  const photo = page.locator('[data-card-id="konggu:C15"] .magazine-photo img');
   await expect
     .poll(() => photo.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0))
     .toBe(true);
-  await expect(
-    page.locator('[data-card-id="conversation:kg-development"] .briefing-photo-credit'),
-  ).toContainText('AI 示意配图');
+  await expect(page.locator('[data-card-id="konggu:C15"] .briefing-photo-credit')).toContainText(
+    'AI 示意配图',
+  );
   await page.getByRole('tab', { name: '类型', exact: true }).click();
   const filters = page.getByLabel('内容类型');
-  await expect(filters.getByRole('button')).toHaveText([
-    '全部',
-    '资讯',
-    '数据',
-    '洞察',
-    '建议',
-    '成果',
-    '会话',
-  ]);
-  for (const type of ['资讯', '数据', '洞察', '建议', '成果', '会话']) {
+  await expect(filters.getByRole('button')).toHaveText(['全部', '资讯', '数据', '洞察', '建议', '成果']);
+  for (const type of ['资讯', '数据', '洞察', '建议', '成果']) {
     await filters.getByRole('button', { name: type, exact: true }).click();
     const badges = await page.locator('.briefing-grid .magazine-type').allTextContents();
     expect(badges.length).toBeGreaterThan(0);
@@ -76,7 +68,7 @@ test('四种卡片规格及窄屏保留类型和完整文本行，来源不与�
         ),
       )
       .toEqual([]);
-    expect(await page.locator('.briefing-grid .magazine-type').count()).toBe(43);
+    expect(await page.locator('.briefing-grid .magazine-type').count()).toBe(40);
     if (width === 1440 || width === 390)
       await page.screenshot({ path: `.local/briefing-magazine/briefing-${width}.png` });
     if (width === 1440) {

@@ -8,14 +8,14 @@ test.beforeEach(async ({ page }) => {
   await page.goto('/#/briefing');
 });
 
-test('默认空谷40张内容卡加3张活跃会话，原文配图、独立存储与四期内容分组', async ({ page }) => {
+test('默认空谷40张内容卡，原文配图、独立存储与四期内容分组', async ({ page }) => {
   await expect(page).toHaveTitle('空谷无界 · AI工作空间');
-  await expect(page.locator('.briefing-grid .briefing-card')).toHaveCount(43);
-  await expect(page.locator('.briefing-grid .template-conversation')).toHaveCount(3);
+  await expect(page.locator('.briefing-grid .briefing-card')).toHaveCount(40);
+  await expect(page.locator('.briefing-grid .template-conversation')).toHaveCount(0);
   expect((await state(page)).materials).toHaveLength(45);
   await expect(page.getByRole('tab', { name: '推荐', exact: true })).toHaveAttribute('aria-selected', 'true');
   await page.getByRole('tab', { name: '日期', exact: true }).click();
-  await expect(page.locator('.briefing-date-divider')).toHaveCount(5);
+  await expect(page.locator('.briefing-date-divider')).toHaveCount(4);
   await page.getByRole('tab', { name: '推荐', exact: true }).click();
   await expect(page.getByRole('tabpanel', { name: '推荐画报', exact: true })).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem('enterprise-ai-demo-v1'))).toBe(

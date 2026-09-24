@@ -108,7 +108,7 @@ test('已读超过三张折叠，关注已读仍跟进且不会重复成新卡',
   await page.getByRole('button', { name: '展开其余 1 张已读卡片' }).click();
   await expect(page.locator('[data-recommendation-group="read"] .briefing-card')).toHaveCount(4);
   await expect(
-    page.locator('[data-recommendation-group="priority"] [data-card-id="konggu:C05"]'),
+    page.locator('[data-recommendation-group="unread"] [data-card-id="konggu:C05"]'),
   ).toHaveAttribute('data-read', 'true');
 });
 
