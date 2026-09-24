@@ -152,26 +152,7 @@ export function BriefingDetail({
               <X size={20} />
             </button>
           </header>
-          <div className="briefing-detail-reading">
-            <div className="briefing-detail-scroll">
-              <BriefingArticle
-                reference={reference}
-                titleId="briefing-detail-title"
-                onSource={(id) => {
-                  const doc = state.materials.find((d) => d.id === id);
-                  if (doc) {
-                    dialog.current?.close();
-                    ui.go(`library/${doc.space}/${id}`);
-                  }
-                }}
-              />
-            </div>
-            <button className="briefing-conversation-cta" onClick={() => openChat()}>
-              <MessageSquare size={20} strokeWidth={1.65} aria-hidden="true" />
-              <span>发起会话</span>
-            </button>
-          </div>
-          <div className="briefing-detail-bottom">
+          <div className="briefing-detail-status">
             {feedback?.value === 'useless' && (
               <div className="briefing-feedback-receipt">
                 <span>
@@ -193,6 +174,25 @@ export function BriefingDetail({
                 {error}
               </p>
             )}
+          </div>
+          <div className="briefing-detail-reading">
+            <div className="briefing-detail-scroll">
+              <BriefingArticle
+                reference={reference}
+                titleId="briefing-detail-title"
+                onSource={(id) => {
+                  const doc = state.materials.find((d) => d.id === id);
+                  if (doc) {
+                    dialog.current?.close();
+                    ui.go(`library/${doc.space}/${id}`);
+                  }
+                }}
+              />
+            </div>
+            <button className="briefing-conversation-cta" onClick={() => openChat()}>
+              <MessageSquare size={20} strokeWidth={1.65} aria-hidden="true" />
+              <span>发起会话</span>
+            </button>
           </div>
         </div>
         <div className="briefing-detail-resizer is-left" {...sizing.handle('left')} />

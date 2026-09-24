@@ -248,7 +248,7 @@ export function animateDetailToSource(
   const scroll = copy.querySelector<HTMLElement>('.briefing-detail-scroll');
   if (reading) Object.assign(reading.style, { width: '100%', height: 'auto', minHeight: '0', flex: '1' });
   if (scroll) Object.assign(scroll.style, { width: '100%', height: '100%' });
-  copy.querySelector('.briefing-detail-bottom')?.remove();
+  copy.querySelector('.briefing-detail-status')?.remove();
   copy.querySelector('.briefing-conversation-cta')?.remove();
   const options: KeyframeAnimationOptions = { duration, fill: 'both' };
   const move = (node: Element, from: Keyframe, to: Keyframe) =>

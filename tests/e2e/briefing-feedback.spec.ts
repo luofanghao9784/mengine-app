@@ -346,9 +346,13 @@ test('悬浮会话不随正文滚动，末尾来源在窄屏、调宽和反馈�
   await checkClearance();
   await page.setViewportSize({ width: 320, height: 640 });
   await checkClearance();
-  const footer = (await detail(page).locator('.briefing-detail-bottom').boundingBox())!;
-  const button = (await cta.boundingBox())!;
-  expect(button.y + button.height).toBeLessThan(footer.y);
+  const header = (await detail(page).locator('.briefing-detail-top').boundingBox())!;
+  const receipt = (await detail(page).locator('.briefing-feedback-receipt').boundingBox())!;
+  const body = (await reading.boundingBox())!;
+  expect(receipt.y).toBeGreaterThanOrEqual(header.y + header.height - 1);
+  expect(receipt.y + receipt.height).toBeLessThanOrEqual(body.y);
+  await expect(detail(page).getByRole('button', { name: '修改', exact: true })).toBeInViewport({ ratio: 1 });
+  await expect(detail(page).getByRole('button', { name: '撤销', exact: true })).toBeInViewport({ ratio: 1 });
   await page.screenshot({ path: '.local/feedback/capsule-bottom-320-receipt.png', animations: 'disabled' });
 });
 

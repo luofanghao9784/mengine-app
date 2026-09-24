@@ -195,14 +195,14 @@
 .briefing-detail-sources > button svg {
   flex-shrink: 0;
 }
-.briefing-detail-bottom {
-  border-top: 1px solid #edf0f4;
+.briefing-detail-status {
+  border-bottom: 1px solid #edf0f4;
   background: #fff;
   flex-shrink: 0;
   max-height: 48%;
   overflow-y: auto;
 }
-.briefing-detail-bottom:empty {
+.briefing-detail-status:empty {
   display: none;
 }
 .briefing-feedback-actions {
@@ -381,7 +381,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 26px 0;
+  padding: 0 32px 10px;
   color: #738197;
   font-size: 12px;
 }
