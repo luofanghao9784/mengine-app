@@ -13,7 +13,7 @@ root = Path(__file__).resolve().parent.parent
 subprocess.run(["npm.cmd" if os.name == "nt" else "npm", "run", "build"], cwd=root, check=True)
 
 files = {}
-for folder in ("src", "public", "tests", "dist"):
+for folder in ("src", "public", "tests", "dist", "contracts"):
     for path in sorted((root / folder).rglob("*")):
         if path.is_symlink():
             raise RuntimeError(f"Refusing to package symlink: {path.relative_to(root)}")
@@ -22,6 +22,7 @@ for folder in ("src", "public", "tests", "dist"):
 
 for name in (
     "package.json", "package-lock.json", "index.html", "tsconfig.json",
+    "workspace/index.html", "tenant-admin/index.html", "platform-admin/index.html",
     "vite.config.ts", "playwright.config.ts", ".editorconfig", ".prettierrc.json",
     ".gitignore", "scripts/serve-demo.mjs",
 ):

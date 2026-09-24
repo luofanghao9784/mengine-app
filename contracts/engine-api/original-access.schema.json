@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dreamcore:original-access:1.3",
+  "$defs": {
+    "listResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "type": "array",
+          "maxItems": 3,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "materialId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "versionId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "filename": {
+                "type": "string",
+                "maxLength": 180
+              },
+              "version": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "bytes": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 262144
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "read": {
+                "type": "boolean"
+              }
+            },
+            "required": ["materialId", "versionId", "filename", "version", "bytes", "sha256", "read"]
+          }
+        }
+      },
+      "required": ["items"]
+    },
+    "readRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "versionId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": ["versionId"]
+    },
+    "readResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "versionId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "contentBase64": {
+          "type": "string",
+          "maxLength": 349528
+        }
+      },
+      "required": ["versionId", "sha256", "contentBase64"]
+    }
+  }
+}

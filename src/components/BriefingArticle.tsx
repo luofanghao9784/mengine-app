@@ -2,6 +2,8 @@ import { ChevronRight, FileText } from 'lucide-react';
 import { canReadCardData, type BriefingReference } from '../briefing';
 import { buildBriefingArticle } from '../briefingArticle';
 import { briefingPresentation } from '../briefingPresentation';
+import { magazineHeadline } from '../briefingMagazine';
+import { briefingSource, briefingTime } from '../briefingTypography';
 import { useDemo } from '../store';
 import { BriefingChart } from './BriefingChart';
 import { SourceImage, SourceLinks } from './SourceDetails';
@@ -26,17 +28,8 @@ export function BriefingArticle({
   const points = presentation?.points || data.items?.map((item) => ({ label: item.label, text: item.value }));
   return (
     <article className={`briefing-detail-article${embedded ? ' briefing-article-embedded' : ''}`}>
-      <time dateTime={reference.asOf}>
-        {new Date(reference.asOf).toLocaleString('zh-CN', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: false,
-        })}
-      </time>
-      <h2 id={titleId}>{reference.config.title}</h2>
+      <time dateTime={reference.asOf}>内容截至 {briefingTime(reference.asOf, true)}</time>
+      <h2 id={titleId}>{magazineHeadline(data, reference.config.title)}</h2>
       <SourceImage photo={data.photo} />
       <p className="briefing-detail-lead">{data.fact}</p>
       {data.value && !presentation?.chart && (
@@ -81,7 +74,7 @@ export function BriefingArticle({
       </div>
       <div className="briefing-detail-sources">
         <span>依据</span>
-        <p>{data.source}</p>
+        <p>{briefingSource(data.source)}</p>
         <SourceLinks links={data.sourceLinks} />
         {data.refs?.map((id) => {
           const doc = state.materials.find((d) => d.id === id);

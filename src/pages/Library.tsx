@@ -15,8 +15,8 @@ import {
 } from 'lucide-react';
 import { useDemo, useUI, type LibraryView } from '../store';
 import { latest, spaceName, type Material } from '../model';
+import { createDemoMaterialReadModel } from '../data/materialReadModel';
 import {
-  canReadMaterial,
   canManageFolder,
   folderTrail,
   libraryPath,
@@ -53,9 +53,10 @@ function MaterialCover({ material }: { material: Material }) {
 
 export function Library({ scope, docId }: { scope: string; docId?: string }) {
   const { state } = useDemo();
+  const materials = createDemoMaterialReadModel(() => state);
   const ui = useUI();
   const params = new URLSearchParams(ui.route.split('?')[1]);
-  const doc = state.materials.find((d) => d.id === docId && canReadMaterial(state, d));
+  const doc = materials.findVisible(docId);
   const direct =
     !!docId && !params.has('folder') && !params.has('view') && !params.has('q') && !params.has('status');
   const folderId = params.get('folder') || (direct && doc?.space === scope ? doc.folderId : undefined);
@@ -156,7 +157,7 @@ export function Library({ scope, docId }: { scope: string; docId?: string }) {
       </div>
     );
   const searching = !!query.trim() || status !== '全部';
-  const visibleDocs = state.materials.filter((material) => canReadMaterial(state, material));
+  const visibleDocs = materials.listVisible();
   const inScope = visibleDocs.filter((material) =>
     enterpriseRoot ? material.space !== 'personal' : material.space === scope,
   );

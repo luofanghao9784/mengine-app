@@ -3,9 +3,42 @@ import assert from 'node:assert/strict';
 import { createKongguSeed } from '../src/kongguSeed.ts';
 import { addMessage } from '../src/model.ts';
 import { openBriefingChat, syncBriefing } from '../src/briefing.ts';
-import { magazineFilter, magazineType, magazineTypes, magazineView } from '../src/briefingMagazine.ts';
+import {
+  magazineFilter,
+  magazineHeadline,
+  magazineType,
+  magazineTypes,
+  magazineView,
+} from '../src/briefingMagazine.ts';
+import { briefingPeriod, briefingSource, briefingTime } from '../src/briefingTypography.ts';
 
 const fixture = () => syncBriefing(createKongguSeed(), '2026-09-24T01:00:00.000Z');
+
+test('混合日期卡片明确区分今天、往期、跨年及完整快照时间', () => {
+  const now = new Date(2026, 8, 24, 9, 0);
+  const at = (y: number, m: number, d: number, h = 9, minute = 26) =>
+    new Date(y, m - 1, d, h, minute).toISOString();
+  assert.equal(briefingTime(at(2026, 9, 24), false, now), '今天 09:26');
+  assert.equal(briefingTime(at(2026, 9, 20), false, now), '9月20日 09:26');
+  assert.equal(briefingTime(at(2025, 9, 20), false, now), '2025年9月20日 09:26');
+  assert.equal(briefingTime(at(2026, 9, 20), true, now), '2026年9月20日 09:26');
+  assert.equal(briefingTime(at(2026, 9, 23, 23, 59), false, new Date(2026, 8, 24, 0, 1)), '9月23日 23:59');
+  assert.equal(briefingTime('invalid', false, now), '时间待核实');
+  assert.equal(briefingPeriod('9/13—9/19 · 零售净销售额'), '统计期：9月13日—9月19日 · 零售净销售额');
+  assert.equal(briefingPeriod('截至 9/19 · 未到账余额'), '截至 9月19日 · 未到账余额');
+  assert.equal(briefingPeriod('拟议计划 · 不代表已批准'), '拟议计划 · 不代表已批准');
+  assert.equal(briefingSource('贵州网 · 原文 2026-09-14'), '贵州网 · 发布于2026年9月14日');
+});
+
+test('统一显示标题尊重自定义标题与历史内容，不改写事实或快照', () => {
+  const state = fixture();
+  const original = structuredClone(state);
+  const data = state.briefing!.cards.find((c) => c.id === 'konggu:C01')!.data;
+  assert.equal(magazineHeadline(data), '过去7天，零售向上。');
+  assert.equal(magazineHeadline(data, '我的零售复盘'), '我的零售复盘');
+  assert.equal(magazineHeadline({ ...data, fact: '已更新，须重新核对' }), data.title);
+  assert.deepEqual(state, original);
+});
 
 test('六类展示、旧筛选恢复与原卡会话相互独立，读取不修改存储', () => {
   const state = fixture();

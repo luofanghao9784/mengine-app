@@ -1,0 +1,45 @@
+{
+  "version": "1.0",
+  "items": [
+    {
+      "id": "source-review",
+      "version": "1.0.0",
+      "title": "资料核对",
+      "file": "source-review.md",
+      "sha256": "9588866c2622a45804635701b6774b0c9188f7925be66ef2a7ed7b7c78b3a7e4",
+      "tools": ["search_sources"],
+      "source": "dreamcore-bundled",
+      "license": "project-internal"
+    },
+    {
+      "id": "public-research",
+      "version": "1.0.0",
+      "title": "公开资料查找与阅读",
+      "file": "public-research.md",
+      "sha256": "ece85e60e12e361e2b202694f42698cf3a7060eed568c388ed2f98d3b9fcfb98",
+      "tools": ["public_search", "read_public_page"],
+      "source": "dreamcore-bundled",
+      "license": "project-internal"
+    },
+    {
+      "id": "candidate-trials",
+      "version": "1.0.0",
+      "title": "候选工具隔离试验",
+      "file": "candidate-trials.md",
+      "sha256": "35f71c6a6bfd17ceed3baba989e2a6b65817965bef19beb5c58f0dbc567642dd",
+      "tools": ["candidate_tool"],
+      "source": "dreamcore-bundled",
+      "license": "project-internal"
+    },
+    {
+      "id": "file-processing",
+      "version": "1.1.0",
+      "title": "完整文件统计与文稿提取",
+      "file": "file-processing.md",
+      "sha256": "cb9bdf4c267492b0647e09f30eee88e797d22917636487bb4278b004e1175cd0",
+      "tools": ["process_original"],
+      "source": "dreamcore-bundled",
+      "license": "project-internal"
+    }
+  ]
+}

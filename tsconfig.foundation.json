@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "contracts/**/*.ts",
+    "src/data/**/*.ts",
+    "scripts/verify-foundation.ts",
+    "tests/system-client.test.ts",
+    "tests/material-read-model.test.ts"
+  ]
+}

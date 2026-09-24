@@ -1,0 +1,17 @@
+{
+  "contractVersion": "1.0",
+  "service": "dreamcore-platform",
+  "stage": "foundation",
+  "dataSource": "live",
+  "engine": {
+    "contractVersion": "1.0",
+    "engineVersion": "0.1.0",
+    "runtimeMode": "contract-only",
+    "capabilities": []
+  },
+  "integrations": {
+    "harness": "not-configured",
+    "weknora": "not-configured",
+    "jev": "not-configured"
+  }
+}

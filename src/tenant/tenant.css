@@ -1,0 +1,125 @@
+.tenant-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.tenant-tabs .button {
+  white-space: nowrap;
+}
+.tenant-rows {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.tenant-rows > li {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 20px 28px;
+  border-top: 1px solid var(--line);
+}
+.tenant-person {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-width: 180px;
+  overflow-wrap: anywhere;
+}
+.tenant-person small {
+  color: var(--muted);
+  font-size: var(--font-caption);
+}
+.tenant-grants > li {
+  padding: 16px 0;
+}
+.tenant-records {
+  padding: 0 28px;
+}
+.tenant-records strong {
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
+.tenant-settings {
+  padding: 28px;
+}
+.tenant-settings dl {
+  display: grid;
+  grid-template-columns: 90px 1fr;
+  gap: 18px;
+  margin: 24px 0;
+}
+.tenant-settings dt {
+  color: var(--muted);
+}
+.tenant-settings dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.tenant-settings p {
+  margin-top: 24px;
+  line-height: 1.8;
+}
+.tenant-space-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.tenant-space-heading h3 {
+  margin: 0;
+}
+.platform-form p {
+  line-height: 1.8;
+}
+@media (max-width: 600px) {
+  .tenant-tabs {
+    gap: 4px;
+  }
+  .tenant-tabs .button {
+    font-size: 12px;
+    padding: 10px;
+  }
+  .tenant-rows > li {
+    padding: 16px 20px;
+  }
+  .tenant-person {
+    flex-basis: 100%;
+  }
+  .tenant-grants > li {
+    padding: 16px 0;
+  }
+  .tenant-records {
+    padding: 0 20px;
+  }
+  .tenant-settings {
+    padding: 20px;
+  }
+  .tenant-settings dl {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .tenant-settings dd {
+    margin-bottom: 12px;
+  }
+}
+
+.tenant-modal-fields {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+/* Theme input selectors have two :not() clauses; keep the search field border on its wrapper. */
+.tenant-section .platform-search input:not([type='checkbox']):not([type='file']),
+.tenant-modal-fields .platform-search input:not([type='checkbox']):not([type='file']) {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+@media (max-width: 600px) {
+  .tenant-section .platform-search {
+    flex-basis: calc(100% - 74px);
+  }
+}

@@ -1,0 +1,156 @@
+{
+  "type": "object",
+  "properties": {
+    "contractVersion": {
+      "const": "1.0"
+    },
+    "service": {
+      "const": "dreamcore-platform"
+    },
+    "stage": {
+      "const": "foundation"
+    },
+    "dataSource": {
+      "enum": [
+        "live",
+        "demo"
+      ]
+    },
+    "engine": {
+      "$ref": "https://dreamcore.invalid/contracts/engine/capabilities.v1.json"
+    },
+    "integrations": {
+      "type": "object",
+      "properties": {
+        "harness": {
+          "enum": [
+            "not-configured",
+            "verification",
+            "configured"
+          ]
+        },
+        "weknora": {
+          "const": "not-configured"
+        },
+        "jev": {
+          "const": "not-configured"
+        }
+      },
+      "required": [
+        "harness",
+        "weknora",
+        "jev"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "contractVersion",
+    "service",
+    "stage",
+    "dataSource",
+    "engine",
+    "integrations"
+  ],
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dreamcore.invalid/contracts/public/system-info.v1.json",
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "engine": {
+            "properties": {
+              "runtimeMode": {
+                "const": "contract-only"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "integrations": {
+            "properties": {
+              "harness": {
+                "const": "not-configured"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "engine": {
+            "properties": {
+              "runtimeMode": {
+                "const": "local-retrieval"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "integrations": {
+            "properties": {
+              "harness": {
+                "const": "not-configured"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "engine": {
+            "properties": {
+              "runtimeMode": {
+                "const": "agent-verification"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "integrations": {
+            "properties": {
+              "harness": {
+                "const": "verification"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "engine": {
+            "properties": {
+              "runtimeMode": {
+                "const": "agent-live"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "integrations": {
+            "properties": {
+              "harness": {
+                "const": "configured"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,81 @@
+{
+  "type": "object",
+  "properties": {
+    "contractVersion": {
+      "const": "1.0"
+    },
+    "engineVersion": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "runtimeMode": {
+      "enum": [
+        "contract-only",
+        "local-retrieval",
+        "agent-verification",
+        "agent-live"
+      ]
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "source-lookup",
+          "agent-task"
+        ]
+      },
+      "maxItems": 2,
+      "uniqueItems": true
+    }
+  },
+  "required": [
+    "contractVersion",
+    "engineVersion",
+    "runtimeMode",
+    "capabilities"
+  ],
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dreamcore.invalid/contracts/engine/capabilities.v1.json",
+  "oneOf": [
+    {
+      "properties": {
+        "runtimeMode": {
+          "const": "contract-only"
+        },
+        "capabilities": {
+          "const": []
+        }
+      }
+    },
+    {
+      "properties": {
+        "runtimeMode": {
+          "const": "local-retrieval"
+        },
+        "capabilities": {
+          "const": [
+            "source-lookup"
+          ]
+        }
+      }
+    },
+    {
+      "properties": {
+        "runtimeMode": {
+          "enum": [
+            "agent-verification",
+            "agent-live"
+          ]
+        },
+        "capabilities": {
+          "const": [
+            "source-lookup",
+            "agent-task"
+          ]
+        }
+      }
+    }
+  ]
+}

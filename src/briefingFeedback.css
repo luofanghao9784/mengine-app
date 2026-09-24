@@ -26,7 +26,8 @@
 .briefing-detail {
   --feedback-gutter: 76px;
   width: min(876px, calc(100vw - 48px));
-  max-width: none;
+  /* Clamp immediately while the resize listener updates the preferred width. */
+  max-width: calc(100vw - 48px);
   height: min(820px, calc(100dvh - 56px));
   max-height: none;
   padding: 0;
@@ -94,7 +95,7 @@
   padding-bottom: 100px;
 }
 .briefing-detail-article {
-  padding: 12px 36px 36px;
+  padding: 12px 32px 32px;
   font-family: 'Songti SC', 'Noto Serif SC', STSong, serif;
 }
 .briefing-detail-article > time {
@@ -102,8 +103,8 @@
   color: #8290a0;
 }
 .briefing-detail-article h2 {
-  font-size: clamp(23px, 3vw, 31px);
-  line-height: 1.45;
+  font-size: 32px;
+  line-height: 1.35;
   font-weight: 600;
   margin: 12px 0 24px;
 }
@@ -646,6 +647,7 @@
 @media (max-width: 600px) {
   .briefing-detail {
     width: calc(100vw - 16px);
+    max-width: calc(100vw - 16px);
     --feedback-gutter: 64px;
     height: calc(100dvh - 24px);
   }
@@ -659,7 +661,7 @@
     padding: 12px 18px 24px;
   }
   .briefing-detail-article h2 {
-    font-size: 23px;
+    font-size: 24px;
   }
   .briefing-detail-article p {
     font-size: 15px;

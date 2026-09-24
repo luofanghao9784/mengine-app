@@ -25,6 +25,7 @@ import { Workspace } from './pages/Workspace';
 import { Briefing } from './pages/Briefing';
 import { Applications } from './pages/Tools';
 import { localDate } from './briefing';
+import { PageHeader } from './shared/layout';
 import { useAutoHideScrollbars } from './useAutoHideScrollbars';
 
 const normalizeRoute = (path: string) => {
@@ -228,39 +229,42 @@ export default function App() {
             inert={conversationOpen}
             aria-hidden={conversationOpen || undefined}
           >
-            <header
-              className={`topbar ${page === 'briefing' ? 'briefing-topbar' : page === 'library' ? 'library-topbar' : ''}`}
-            >
-              <div className="row min-zero topbar-heading">
-                <button
-                  className="mobile-brand"
-                  aria-label="关于 AI Dreamcore 梦核工作空间"
-                  onClick={() => setDialog({ kind: 'help' })}
-                >
-                  <DreamcoreLogo />
-                </button>
-                {page === 'briefing' ? (
-                  <div className="briefing-title-group">
-                    <h1 className="topbar-title">{title}</h1>
-                    <time className="briefing-edition" dateTime={localDate(new Date().toISOString())}>
-                      {new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })}{' '}
-                      {new Date().toLocaleDateString('zh-CN', { weekday: 'long' })}
-                    </time>
-                  </div>
-                ) : (
-                  <h1 className="topbar-title" title={title}>
-                    {title}
-                  </h1>
-                )}
-              </div>
-              <div className="topbar-actions" ref={setActionsTarget} />
-              <div className="row topbar-meta">
-                <button className="mode-label" onClick={() => setDialog({ kind: 'help' })}>
-                  <span className="tiny-dot" />
-                  {state.scenario === 'konggu' ? '空谷无界 · 演示' : '演示模式'}
-                </button>
-              </div>
-            </header>
+            <PageHeader
+              className={page === 'briefing' ? 'briefing-topbar' : page === 'library' ? 'library-topbar' : ''}
+              heading={
+                <>
+                  <button
+                    className="mobile-brand"
+                    aria-label="关于 AI Dreamcore 梦核工作空间"
+                    onClick={() => setDialog({ kind: 'help' })}
+                  >
+                    <DreamcoreLogo />
+                  </button>
+                  {page === 'briefing' ? (
+                    <div className="briefing-title-group">
+                      <h1 className="topbar-title">{title}</h1>
+                      <time className="briefing-edition" dateTime={localDate(new Date().toISOString())}>
+                        {new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })}{' '}
+                        {new Date().toLocaleDateString('zh-CN', { weekday: 'long' })}
+                      </time>
+                    </div>
+                  ) : (
+                    <h1 className="topbar-title" title={title}>
+                      {title}
+                    </h1>
+                  )}
+                </>
+              }
+              actionsRef={setActionsTarget}
+              meta={
+                <>
+                  <button className="mode-label" onClick={() => setDialog({ kind: 'help' })}>
+                    <span className="tiny-dot" />
+                    {state.scenario === 'konggu' ? '空谷无界 · 演示' : '演示模式'}
+                  </button>
+                </>
+              }
+            />
             {storageError && (
               <div className="storage-error">浏览器存储空间不足，当前修改仅在本次打开期间保留。</div>
             )}

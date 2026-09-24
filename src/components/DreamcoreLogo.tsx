@@ -1,3 +1,4 @@
+import symbolUrl from '/favicon.svg?url';
 /** The original orbit mark and wordmark from website/dist/index.html. */
 export function DreamcoreLogo({ wordmark = false }: { wordmark?: boolean }) {
   return (
@@ -6,7 +7,7 @@ export function DreamcoreLogo({ wordmark = false }: { wordmark?: boolean }) {
       role="img"
       aria-label="AI Dreamcore · 梦核工作空间"
     >
-      <img className="dreamcore-symbol" src="./favicon.svg" alt="" />
+      <img className="dreamcore-symbol" src={symbolUrl} alt="" />
       {wordmark && (
         <span className="dreamcore-wordmark" aria-hidden="true">
           AI Dreamcore

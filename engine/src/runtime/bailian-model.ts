@@ -1,0 +1,52 @@
+import { RuntimeError } from './ports.js';
+import { ChatCompletionsModel } from './chat-completions-model.js';
+
+// Non-thinking text/tool calling snapshots reviewed against the official API docs.
+// This list is an adapter capability boundary, not a claim of live quality acceptance.
+export const BAILIAN_MODELS = Object.freeze([
+  'qwen3.7-plus-2026-05-26',
+  'qwen3.7-flash-2026-07-15',
+  'qwen3.8-max-0902',
+]);
+export class BailianModel extends ChatCompletionsModel {
+  constructor(config: {
+    model: string;
+    apiKey: string;
+    workspaceId: string;
+    localVerification?: boolean;
+    endpoint?: string;
+    timeoutMs?: number;
+  }) {
+    if (
+      !BAILIAN_MODELS.includes(config.model) ||
+      !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(config.workspaceId)
+    )
+      throw new RuntimeError('INVALID_MODEL_CONFIG');
+    const path = '/compatible-mode/v1/chat/completions';
+    let endpoint = new URL(`https://${config.workspaceId}.cn-beijing.maas.aliyuncs.com${path}`);
+    // Test-only loopback transport is never exposed through production environment variables.
+    if (config.localVerification) {
+      try {
+        endpoint = new URL(config.endpoint ?? '');
+      } catch {
+        throw new RuntimeError('INVALID_MODEL_CONFIG');
+      }
+      if (
+        endpoint.protocol !== 'http:' ||
+        endpoint.hostname !== '127.0.0.1' ||
+        endpoint.pathname !== path ||
+        endpoint.search ||
+        endpoint.hash ||
+        endpoint.username ||
+        endpoint.password
+      )
+        throw new RuntimeError('INVALID_MODEL_CONFIG');
+    } else if (config.endpoint !== undefined) throw new RuntimeError('INVALID_MODEL_CONFIG');
+    super({
+      ...config,
+      endpoint,
+      timeoutMs: config.timeoutMs ?? 12000,
+      modeParameters: { enable_thinking: false },
+    });
+  }
+}

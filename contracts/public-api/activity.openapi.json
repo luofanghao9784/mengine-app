@@ -1,0 +1,185 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "梦核共享资料动态",
+    "version": "1.0.0"
+  },
+  "security": [
+    {
+      "sessionCookie": []
+    }
+  ],
+  "paths": {
+    "/api/v1/tenants/{tenant}/activity": {
+      "get": {
+        "description": "先按当前企业及共享空间权限过滤，再按版本保存时间与 ID 降序翻页。私人会话/文稿/资料不参与。无全企业事件总数。",
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "minimum": 1,
+              "maximum": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获准事件及下一游标；Cache-Control: private, no-store",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "无效参数"
+          },
+          "401": {
+            "description": "未登录或账号不可用"
+          },
+          "403": {
+            "description": "企业或成员不可用"
+          },
+          "404": {
+            "description": "所选共享空间不可访问"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "SESSION"
+      }
+    },
+    "schemas": {
+      "Item": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "folderId": {
+            "type": ["string", "null"],
+            "format": "uuid"
+          },
+          "materialId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "filename": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 180
+          },
+          "actorName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "kind": {
+            "enum": ["MATERIAL_UPLOADED", "MATERIAL_UPDATED", "DOCUMENT_PUBLISHED", "DOCUMENT_UPDATED"]
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "workspaceId",
+          "workspaceName",
+          "folderId",
+          "materialId",
+          "version",
+          "filename",
+          "actorName",
+          "kind",
+          "occurredAt"
+        ]
+      },
+      "Page": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceId": {
+            "type": ["string", "null"],
+            "format": "uuid"
+          },
+          "items": {
+            "type": "array",
+            "maxItems": 50,
+            "items": {
+              "$ref": "#/components/schemas/Item"
+            }
+          },
+          "nextCursor": {
+            "type": ["string", "null"],
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": ["tenantId", "workspaceId", "items", "nextCursor"]
+      }
+    }
+  }
+}

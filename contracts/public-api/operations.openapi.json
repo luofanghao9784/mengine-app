@@ -1,0 +1,382 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Dreamcore Operations API",
+    "version": "1.0.0"
+  },
+  "security": [
+    {
+      "sessionCookie": []
+    }
+  ],
+  "paths": {
+    "/api/platform-admin/v1/operations": {
+      "get": {
+        "summary": "平台管理员的全平台汇总（含停用企业）",
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "enum": [7, 30],
+              "default": 7
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "private, no-store；任务按创建时间 [from, checkedAt) 选择并汇总当前状态；原件存储为全部已保存版本。模型用量仅成功任务最后一次尝试上报值，不是费用账单。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Overview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "仅支持 7 或 30 天"
+          },
+          "401": {
+            "description": "需要有效账号与会话"
+          },
+          "403": {
+            "description": "角色、企业或成员权限不满足"
+          },
+          "404": {
+            "description": "总台指定企业不存在"
+          }
+        }
+      }
+    },
+    "/api/platform-admin/v1/tenants/{tenant}/operations": {
+      "get": {
+        "summary": "平台管理员的单企业运行汇总",
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "enum": [7, 30],
+              "default": 7
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "private, no-store；任务按创建时间 [from, checkedAt) 选择并汇总当前状态；原件存储为全部已保存版本。模型用量仅成功任务最后一次尝试上报值，不是费用账单。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Overview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "仅支持 7 或 30 天"
+          },
+          "401": {
+            "description": "需要有效账号与会话"
+          },
+          "403": {
+            "description": "角色、企业或成员权限不满足"
+          },
+          "404": {
+            "description": "总台指定企业不存在"
+          }
+        }
+      }
+    },
+    "/api/tenant-admin/v1/tenants/{tenant}/operations": {
+      "get": {
+        "summary": "有效企业管理员的本企业运行汇总",
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "enum": [7, 30],
+              "default": 7
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "private, no-store；任务按创建时间 [from, checkedAt) 选择并汇总当前状态；原件存储为全部已保存版本。模型用量仅成功任务最后一次尝试上报值，不是费用账单。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Overview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "仅支持 7 或 30 天"
+          },
+          "401": {
+            "description": "需要有效账号与会话"
+          },
+          "403": {
+            "description": "角色、企业或成员权限不满足"
+          },
+          "404": {
+            "description": "总台指定企业不存在"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "DREAMCORE_SESSION"
+      }
+    },
+    "schemas": {
+      "Tasks": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "queued": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "running": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "succeeded": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "failed": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "cancelled": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "interrupted": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "retryStarts": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "total",
+          "queued",
+          "running",
+          "succeeded",
+          "failed",
+          "cancelled",
+          "interrupted",
+          "retryStarts"
+        ],
+        "additionalProperties": false
+      },
+      "Storage": {
+        "type": "object",
+        "properties": {
+          "materials": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "versions": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "originalBytes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": ["materials", "versions", "originalBytes"],
+        "additionalProperties": false
+      },
+      "ModelUsage": {
+        "type": "object",
+        "properties": {
+          "executionClass": {
+            "enum": ["live", "verification"]
+          },
+          "succeededTasks": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "reportedTasks": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "modelCalls": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "inputTokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "outputTokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "executionClass",
+          "succeededTasks",
+          "reportedTasks",
+          "modelCalls",
+          "inputTokens",
+          "outputTokens"
+        ],
+        "additionalProperties": false
+      },
+      "Failure": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "enum": [
+              "TASK_SOURCE_UNAVAILABLE",
+              "TASK_RUNTIME_INCOMPATIBLE",
+              "TASK_RUNTIME_UNAVAILABLE",
+              "TASK_MODEL_FAILED",
+              "TASK_LIMIT",
+              "TASK_TOOL_FAILED",
+              "MODEL_NOT_CONFIGURED",
+              "PUBLIC_WEB_NOT_CONFIGURED",
+              "TASK_FILE_UNSUPPORTED",
+              "TASK_FILE_ENCODING",
+              "TASK_FILE_INVALID",
+              "TASK_FILE_LIMIT",
+              "TASK_FILE_DATA",
+              "TASK_INTERRUPTED",
+              "OTHER"
+            ]
+          },
+          "tasks": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "lastOccurredAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": ["code", "tasks", "lastOccurredAt"],
+        "additionalProperties": false
+      },
+      "Overview": {
+        "type": "object",
+        "properties": {
+          "tenantId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "days": {
+            "type": "integer",
+            "enum": [7, 30]
+          },
+          "from": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "tasks": {
+            "$ref": "#/components/schemas/Tasks"
+          },
+          "storage": {
+            "$ref": "#/components/schemas/Storage"
+          },
+          "models": {
+            "type": "array",
+            "maxItems": 2,
+            "items": {
+              "$ref": "#/components/schemas/ModelUsage"
+            }
+          },
+          "errors": {
+            "type": "array",
+            "maxItems": 15,
+            "items": {
+              "$ref": "#/components/schemas/Failure"
+            }
+          }
+        },
+        "required": ["tenantId", "days", "from", "checkedAt", "tasks", "storage", "models", "errors"],
+        "additionalProperties": false
+      }
+    }
+  }
+}

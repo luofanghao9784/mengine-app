@@ -1,0 +1,141 @@
+.private-documents {
+  max-width: 1080px;
+  margin: 0 auto;
+}
+.document-breadcrumb {
+  margin: 12px 0;
+}
+.document-list {
+  display: grid;
+  gap: 12px;
+  margin: 24px 0;
+}
+.document-list a {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: white;
+  color: inherit;
+  text-decoration: none;
+  border: 1px solid var(--line);
+  padding: 20px;
+  border-radius: 16px;
+}
+.document-list strong {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+.document-list time,
+.document-list span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.document-editor {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  padding: 24px;
+  margin-top: 24px;
+}
+.document-version-bar,
+.document-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 20px;
+}
+.document-version-bar {
+  color: var(--muted);
+  font-size: 12px;
+}
+.document-editor fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.document-editor textarea {
+  width: 100%;
+  min-height: 420px;
+  line-height: 1.8;
+  resize: vertical;
+}
+.document-editor input {
+  width: 100%;
+}
+.save-document {
+  display: inline-block;
+}
+@media (max-width: 650px) {
+  .document-editor {
+    padding: 16px;
+  }
+  .document-list a {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .document-list time {
+    width: 100%;
+  }
+  .document-actions .button {
+    flex: 1 1 130px;
+  }
+}
+.document-publications {
+  margin: 24px 0;
+  padding: 20px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.publication-history {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.publication-history li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  font-size: 13px;
+}
+.publication-history strong {
+  overflow-wrap: anywhere;
+}
+.publication-history time {
+  color: var(--muted);
+}
+.publication-fields {
+  border: 0;
+  padding: 0;
+  margin: 0 0 16px;
+  min-width: 0;
+}
+.publication-fields select {
+  width: 100%;
+}
+.publication-destination nav,
+.publication-choices {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+.publication-choices .button {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+.publication-confirm {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  line-height: 1.6;
+}
+.publication-confirm input {
+  flex: 0 0 16px;
+  width: 16px;
+  margin-top: 4px;
+}

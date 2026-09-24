@@ -1,0 +1,355 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Dreamcore Private Briefing API",
+    "version": "1.0.0",
+    "description": "从实际成功的私人 AGENT 会话派生卡片；同一会话在当前筛选范围只保留最后一次成功回复。date 按指定 IANA zone 的本地日筛选，不代表自动分析或共享发布；关注、隐藏和尺寸偏好跨日期共用。管理员无内容旁路。"
+  },
+  "security": [
+    {
+      "sessionCookie": []
+    }
+  ],
+  "paths": {
+    "/api/v1/tenants/{tenant}/briefing": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "本人画报；先按权限、日期、空间、视图过滤，再分页",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "view",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["LATEST", "FOCUSED", "HIDDEN"],
+              "default": "LATEST"
+            }
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "zone",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "Asia/Shanghai"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000,
+              "default": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 30,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "经当前权限验证，Cache-Control: private, no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "日期、时区、分页、请求体无效"
+          },
+          "401": {
+            "description": "需要登录"
+          },
+          "403": {
+            "description": "企业或成员不可用，或 CSRF 拒绝"
+          },
+          "404": {
+            "description": "非本人会话、无成功成果或空间不可访问"
+          },
+          "409": {
+            "description": "幂等键冲突或偏好版本冲突"
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/briefing/{conversation}": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "conversation",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "summary": "修改本人卡片偏好，幂等键和乐观版本防止重复或覆盖",
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Update"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "经当前权限验证，Cache-Control: private, no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Preference"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "日期、时区、分页、请求体无效"
+          },
+          "401": {
+            "description": "需要登录"
+          },
+          "403": {
+            "description": "企业或成员不可用，或 CSRF 拒绝"
+          },
+          "404": {
+            "description": "非本人会话、无成功成果或空间不可访问"
+          },
+          "409": {
+            "description": "幂等键冲突或偏好版本冲突"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "SESSION"
+      }
+    },
+    "schemas": {
+      "Preference": {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
+          },
+          "pinned": {
+            "type": "boolean"
+          },
+          "hidden": {
+            "type": "boolean"
+          },
+          "size": {
+            "type": "string",
+            "enum": ["STANDARD", "WIDE"]
+          }
+        },
+        "required": ["revision", "pinned", "hidden", "size"],
+        "additionalProperties": false
+      },
+      "Card": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "taskId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceName": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "excerpt": {
+            "type": "string",
+            "maxLength": 600
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "executionClass": {
+            "type": "string",
+            "enum": ["verification", "live"]
+          },
+          "engineVersion": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "artifactCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 8
+          },
+          "citationCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10
+          },
+          "originalCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3
+          },
+          "preference": {
+            "$ref": "#/components/schemas/Preference"
+          }
+        },
+        "required": [
+          "conversationId",
+          "taskId",
+          "workspaceId",
+          "workspaceName",
+          "title",
+          "excerpt",
+          "truncated",
+          "completedAt",
+          "executionClass",
+          "engineVersion",
+          "artifactCount",
+          "citationCount",
+          "originalCount",
+          "preference"
+        ],
+        "additionalProperties": false
+      },
+      "Page": {
+        "type": "object",
+        "properties": {
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "view": {
+            "type": "string",
+            "enum": ["LATEST", "FOCUSED", "HIDDEN"]
+          },
+          "date": {
+            "type": ["string", "null"],
+            "format": "date"
+          },
+          "zone": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "maxItems": 30,
+            "items": {
+              "$ref": "#/components/schemas/Card"
+            }
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "required": ["tenantId", "view", "date", "zone", "items", "hasMore"],
+        "additionalProperties": false
+      },
+      "Update": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
+          },
+          "pinned": {
+            "type": "boolean"
+          },
+          "hidden": {
+            "type": "boolean"
+          },
+          "size": {
+            "type": "string",
+            "enum": ["STANDARD", "WIDE"]
+          }
+        },
+        "required": ["requestId", "expectedRevision", "pinned", "hidden", "size"],
+        "additionalProperties": false
+      }
+    }
+  }
+}

@@ -1,0 +1,232 @@
+.live-conversations {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.conversation-list,
+.conversation-reader {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  padding: 22px;
+  min-width: 0;
+}
+.conversation-list h2,
+.conversation-reader h2 {
+  font-size: 17px;
+  margin: 0 0 8px;
+  overflow-wrap: anywhere;
+}
+.conversation-list > a {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 14px 10px;
+  margin: 5px 0;
+  border-radius: 12px;
+  color: inherit;
+  text-decoration: none;
+  font-size: 14px;
+}
+.conversation-list > a span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.conversation-list > a.selected,
+.conversation-list > a:hover {
+  background: #eef4fd;
+}
+.conversation-list .platform-pagination {
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.conversation-reader > header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 12px;
+}
+.conversation-intro {
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--muted);
+  line-height: 1.8;
+}
+.conversation-intro p {
+  max-width: 480px;
+  margin: auto;
+}
+.conversation-messages {
+  min-height: 180px;
+}
+.conversation-turn {
+  padding: 18px 0;
+}
+.conversation-user {
+  background: #edf3fc;
+  border-radius: 16px;
+  padding: 15px 18px;
+  margin: 0 0 20px auto;
+  width: fit-content;
+  max-width: 90%;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.conversation-result {
+  line-height: 1.8;
+  font-size: 14px;
+}
+.conversation-sources {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0;
+}
+.conversation-sources button {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 14px;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  color: inherit;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.conversation-sources small {
+  color: var(--muted);
+}
+.conversation-sources span {
+  font-size: 13px;
+  white-space: pre-wrap;
+}
+.conversation-composer {
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+}
+.conversation-composer textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 88px;
+}
+.conversation-send {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+.conversation-send small {
+  color: var(--muted);
+  font-size: 12px;
+}
+@media (max-width: 900px) {
+  .live-conversations {
+    grid-template-columns: 1fr;
+  }
+  .conversation-list > a {
+    display: inline-flex;
+    max-width: 220px;
+  }
+  .conversation-list {
+    padding: 18px;
+  }
+  .conversation-list .platform-pagination {
+    justify-content: flex-end;
+  }
+  .conversation-reader {
+    padding: 18px;
+  }
+  .conversation-send {
+    flex-wrap: wrap;
+  }
+}
+.conversation-reader > header {
+  align-items: center;
+}
+.conversation-composer fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.conversation-list .platform-pagination {
+  gap: 6px;
+}
+.conversation-list .platform-pagination button {
+  padding: 6px 8px;
+}
+
+.conversation-reply {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.7;
+}
+
+.conversation-web-sources {
+  display: grid;
+  gap: 10px;
+}
+.conversation-web-sources details,
+.conversation-skills {
+  padding: 10px 12px;
+  border: 1px solid var(--border, #e5e5e5);
+  border-radius: 10px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.conversation-web-sources summary,
+.conversation-skills summary {
+  cursor: pointer;
+}
+.conversation-web-sources p {
+  white-space: pre-wrap;
+  max-height: 240px;
+  overflow: auto;
+}
+.conversation-composer input {
+  width: 100%;
+  min-width: 0;
+}
+
+.original-selection,
+.original-picker-list {
+  display: grid;
+  gap: 10px;
+}
+.original-selection > div,
+.original-picker-list > div {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.original-selection span,
+.original-picker-list button {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.original-picker-list > button {
+  justify-content: flex-start;
+  text-align: left;
+  white-space: normal;
+}
+.original-picker-path {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 12px 0;
+  gap: 4px;
+}
+.conversation-originals p {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  overflow-wrap: anywhere;
+}
+.conversation-originals span {
+  color: var(--text-secondary, #64748b);
+  font-size: 12px;
+}

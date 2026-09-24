@@ -24,6 +24,7 @@ secrets/
 node_modules/
 dist/
 build/
+target/
 .next/
 .turbo/
 .cache/

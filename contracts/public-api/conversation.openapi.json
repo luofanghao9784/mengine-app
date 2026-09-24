@@ -1,0 +1,1067 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Dreamcore Private Conversation API",
+    "version": "1.4.0",
+    "description": "私人会话及可恢复任务。默认 SOURCE_LOOKUP；显式启用后支持 AGENT，区分 verification 联调与 live 模型。事件轮询，不承诺 token 流。来源、回复、下载均重新检查当前权限，成果不自动共享。"
+  },
+  "security": [
+    {
+      "sessionCookie": []
+    }
+  ],
+  "paths": {
+    "/api/v1/tenants/{tenant}/conversations": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "列出本人当前仍有权访问的私人会话",
+        "responses": {
+          "200": {
+            "description": "经当前权限校验，Cache-Control: private, no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "无效格式、模式或参数"
+          },
+          "401": {
+            "description": "需要登录"
+          },
+          "403": {
+            "description": "企业不可用、无成员权限或 CSRF 拒绝"
+          },
+          "404": {
+            "description": "会话不存在、非本人或空间已撤权"
+          },
+          "409": {
+            "description": "请求键冲突、任务版本变化或已有运行任务"
+          },
+          "503": {
+            "description": "执行服务未启用"
+          }
+        },
+        "parameters": [
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000,
+              "default": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            }
+          }
+        ]
+      },
+      "post": {
+        "summary": "首个请求创建私人会话并入队",
+        "responses": {
+          "202": {
+            "description": "接受请求不等于任务成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "无效格式、模式或参数"
+          },
+          "401": {
+            "description": "需要登录"
+          },
+          "403": {
+            "description": "企业不可用、无成员权限或 CSRF 拒绝"
+          },
+          "404": {
+            "description": "会话不存在、非本人或空间已撤权"
+          },
+          "409": {
+            "description": "请求键冲突、任务版本变化或已有运行任务"
+          },
+          "503": {
+            "description": "执行服务未启用"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Send"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/conversations/{conversation}": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "conversation",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "读取最新或较早的有界任务记录及固定来源",
+        "responses": {
+          "200": {
+            "description": "经当前权限校验，Cache-Control: private, no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "无效格式、模式或参数"
+          },
+          "401": {
+            "description": "需要登录"
+          },
+          "403": {
+            "description": "企业不可用、无成员权限或 CSRF 拒绝"
+          },
+          "404": {
+            "description": "会话不存在、非本人或空间已撤权"
+          },
+          "409": {
+            "description": "请求键冲突、任务版本变化或已有运行任务"
+          },
+          "503": {
+            "description": "执行服务未启用"
+          }
+        },
+        "parameters": [
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000,
+              "default": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenant}/conversations/{conversation}/tasks": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "conversation",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "summary": "在固定空间的会话中继续检索",
+        "responses": {
+          "202": {
+            "description": "接受请求不等于任务成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "无效格式、模式或参数"
+          },
+          "401": {
+            "description": "需要登录"
+          },
+          "403": {
+            "description": "企业不可用、无成员权限或 CSRF 拒绝"
+          },
+          "404": {
+            "description": "会话不存在、非本人或空间已撤权"
+          },
+          "409": {
+            "description": "请求键冲突、任务版本变化或已有运行任务"
+          },
+          "503": {
+            "description": "执行服务未启用"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Send"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/conversations/{conversation}/tasks/{task}": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "conversation",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "task",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "summary": "取消或明确重试，必须携带当前 revision",
+        "responses": {
+          "200": {
+            "description": "接受请求不等于任务成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "无效格式、模式或参数"
+          },
+          "401": {
+            "description": "需要登录"
+          },
+          "403": {
+            "description": "企业不可用、无成员权限或 CSRF 拒绝"
+          },
+          "404": {
+            "description": "会话不存在、非本人或空间已撤权"
+          },
+          "409": {
+            "description": "请求键冲突、任务版本变化或已有运行任务"
+          },
+          "503": {
+            "description": "执行服务未启用"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Action"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "按已成功 AGENT 任务定位历史回复；仍检查本人、企业、空间和来源当前权限",
+        "responses": {
+          "200": {
+            "description": "经当前权限校验，Cache-Control: private, no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "无效格式、模式或参数"
+          },
+          "401": {
+            "description": "需要登录"
+          },
+          "403": {
+            "description": "企业不可用、无成员权限或 CSRF 拒绝"
+          },
+          "404": {
+            "description": "会话不存在、非本人或空间已撤权"
+          },
+          "409": {
+            "description": "请求键冲突、任务版本变化或已有运行任务"
+          },
+          "503": {
+            "description": "执行服务未启用"
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/conversations/{conversation}/events": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "conversation",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "按单调游标增量读取任务状态，每次复核权限",
+        "responses": {
+          "200": {
+            "description": "经当前权限校验，Cache-Control: private, no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Events"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "无效格式、模式或参数"
+          },
+          "401": {
+            "description": "需要登录"
+          },
+          "403": {
+            "description": "企业不可用、无成员权限或 CSRF 拒绝"
+          },
+          "404": {
+            "description": "会话不存在、非本人或空间已撤权"
+          },
+          "409": {
+            "description": "请求键冲突、任务版本变化或已有运行任务"
+          },
+          "503": {
+            "description": "执行服务未启用"
+          }
+        },
+        "parameters": [
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenant}/conversations/{conversation}/tasks/{task}/artifacts/{artifact}": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "conversation",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "task",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "artifact",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "下载本人任务实际工具产物；当前资料授权仍有效才返回，最大 64 KiB",
+        "responses": {
+          "200": {
+            "description": "no-store; attachment; X-Content-SHA256",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "403": {
+            "description": "企业或成员不可用"
+          },
+          "404": {
+            "description": "非本人、空间撤权或成果不存在"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "DREAMCORE_SESSION"
+      }
+    },
+    "schemas": {
+      "Conversation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": ["id", "tenantId", "workspaceId", "title", "updatedAt"],
+        "additionalProperties": false
+      },
+      "Chunk": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "tenantId",
+          "workspaceId",
+          "materialId",
+          "versionId",
+          "runId",
+          "version",
+          "filename",
+          "locator",
+          "method",
+          "content"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "materialId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "versionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "runId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "filename": {
+            "type": "string"
+          },
+          "locator": {
+            "type": "string"
+          },
+          "method": {
+            "enum": ["TEXT", "TABLE", "OCR"]
+          },
+          "content": {
+            "type": "string"
+          }
+        }
+      },
+      "Task": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "mode": {
+            "enum": ["SOURCE_LOOKUP", "AGENT"]
+          },
+          "status": {
+            "enum": ["QUEUED", "RUNNING", "SUCCEEDED", "FAILED", "CANCELLED", "INTERRUPTED"]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "attempt": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "summaryCode": {
+            "enum": [null, "SOURCES_FOUND", "NO_SOURCES"]
+          },
+          "errorCode": {
+            "type": ["string", "null"]
+          },
+          "engineVersion": {
+            "type": ["string", "null"]
+          },
+          "sourcesUnavailable": {
+            "type": "boolean"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Chunk"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reply": {
+            "type": ["string", "null"],
+            "maxLength": 16000
+          },
+          "executionClass": {
+            "enum": [null, "verification", "live"]
+          },
+          "modelName": {
+            "type": ["string", "null"],
+            "maxLength": 80
+          },
+          "artifacts": {
+            "type": "array",
+            "maxItems": 8,
+            "items": {
+              "$ref": "#/components/schemas/Artifact"
+            }
+          },
+          "publicQuery": {
+            "type": ["string", "null"],
+            "maxLength": 2048
+          },
+          "webSources": {
+            "type": "array",
+            "maxItems": 3,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "url": {
+                  "type": "string",
+                  "pattern": "^https://",
+                  "maxLength": 2048
+                },
+                "title": {
+                  "type": "string",
+                  "maxLength": 160
+                },
+                "excerpt": {
+                  "type": "string",
+                  "maxLength": 4000
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "retrievedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "kind": {
+                  "enum": ["SEARCH", "PAGE"]
+                },
+                "truncated": {
+                  "type": "boolean"
+                }
+              },
+              "required": ["id", "url", "title", "excerpt", "sha256", "retrievedAt", "kind", "truncated"]
+            }
+          },
+          "skills": {
+            "type": "array",
+            "maxItems": 8,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                },
+                "version": {
+                  "type": "string",
+                  "pattern": "^[0-9]{1,8}\\.[0-9]{1,8}\\.[0-9]{1,8}$"
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              },
+              "required": ["id", "version", "sha256"]
+            }
+          },
+          "originals": {
+            "type": "array",
+            "maxItems": 3,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "materialId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "versionId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "filename": {
+                  "type": "string",
+                  "maxLength": 180
+                },
+                "version": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "bytes": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 262144
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "read": {
+                  "type": "boolean"
+                }
+              },
+              "required": ["materialId", "versionId", "filename", "version", "bytes", "sha256", "read"]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "prompt",
+          "mode",
+          "status",
+          "revision",
+          "attempt",
+          "summaryCode",
+          "errorCode",
+          "engineVersion",
+          "sourcesUnavailable",
+          "sources",
+          "createdAt",
+          "reply",
+          "executionClass",
+          "modelName",
+          "artifacts",
+          "publicQuery",
+          "webSources",
+          "skills",
+          "originals"
+        ],
+        "additionalProperties": false
+      },
+      "Detail": {
+        "type": "object",
+        "properties": {
+          "conversation": {
+            "$ref": "#/components/schemas/Conversation"
+          },
+          "tasks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Task"
+            }
+          },
+          "hasMore": {
+            "type": "boolean"
+          },
+          "cursor": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": ["conversation", "tasks", "hasMore", "cursor"],
+        "additionalProperties": false
+      },
+      "Page": {
+        "type": "object",
+        "properties": {
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Conversation"
+            }
+          },
+          "hasMore": {
+            "type": "boolean"
+          },
+          "agentMode": {
+            "enum": ["off", "verification", "live"]
+          },
+          "publicWebEnabled": {
+            "type": "boolean"
+          }
+        },
+        "required": ["tenantId", "enabled", "items", "hasMore", "agentMode", "publicWebEnabled"],
+        "additionalProperties": false
+      },
+      "Event": {
+        "type": "object",
+        "properties": {
+          "seq": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "taskId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "enum": ["QUEUED", "RUNNING", "SUCCEEDED", "FAILED", "CANCELLED", "INTERRUPTED"]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": ["seq", "taskId", "kind", "revision"],
+        "additionalProperties": false
+      },
+      "Events": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Event"
+            }
+          },
+          "cursor": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "required": ["conversationId", "items", "cursor", "hasMore"],
+        "additionalProperties": false
+      },
+      "Send": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "description": "最多 8 个空白分隔关键词；SOURCE_LOOKUP 不作自然语言生成"
+          },
+          "mode": {
+            "enum": ["SOURCE_LOOKUP", "AGENT"]
+          },
+          "publicQuery": {
+            "type": "string",
+            "maxLength": 2048,
+            "description": "仅 AGENT，需服务启用。用户明确填写的公开关键词（最多200字）或HTTPS网址；默认不联网。"
+          },
+          "originals": {
+            "type": "array",
+            "maxItems": 3,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "materialId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "versionId": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              },
+              "required": ["materialId", "versionId"]
+            },
+            "description": "仅 AGENT verification；同一任务空间的明确版本，单份 256 KiB、合计 512 KiB。非空时原件读取和片段检索均限于所选版本。"
+          }
+        },
+        "required": ["requestId", "prompt", "mode"],
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "mode": {
+                  "const": "SOURCE_LOOKUP"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "prompt": {
+                  "maxLength": 200
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "mode": {
+                  "const": "SOURCE_LOOKUP"
+                }
+              },
+              "required": ["mode"]
+            },
+            "then": {
+              "not": {
+                "required": ["publicQuery"]
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "mode": {
+                  "const": "SOURCE_LOOKUP"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "originals": {
+                  "maxItems": 0
+                }
+              }
+            }
+          }
+        ]
+      },
+      "Action": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "action": {
+            "enum": ["CANCEL", "RETRY"]
+          }
+        },
+        "required": ["requestId", "expectedRevision", "action"],
+        "additionalProperties": false
+      },
+      "Artifact": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "filename": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 65536
+          }
+        },
+        "required": ["id", "filename", "sha256", "bytes"]
+      }
+    }
+  }
+}

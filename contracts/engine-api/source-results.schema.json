@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dreamcore.invalid/contracts/engine/source-results.v1.json",
+  "$defs": {
+    "request": {
+      "type": "object",
+      "properties": {
+        "contractVersion": {
+          "const": "1.0"
+        },
+        "taskId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "attemptId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "sourceIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "maxItems": 10,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "contractVersion",
+        "taskId",
+        "attemptId",
+        "sourceIds"
+      ],
+      "additionalProperties": false
+    },
+    "result": {
+      "type": "object",
+      "properties": {
+        "contractVersion": {
+          "const": "1.0"
+        },
+        "taskId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "attemptId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "sourceIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "maxItems": 10,
+          "uniqueItems": true
+        },
+        "engineVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9.\\-]+$"
+        },
+        "mode": {
+          "const": "SOURCE_LOOKUP"
+        },
+        "summaryCode": {
+          "enum": [
+            "SOURCES_FOUND",
+            "NO_SOURCES"
+          ]
+        }
+      },
+      "required": [
+        "contractVersion",
+        "taskId",
+        "attemptId",
+        "sourceIds",
+        "engineVersion",
+        "mode",
+        "summaryCode"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "description": "POST /internal/v1/source-results；Bearer 服务间密钥。只接收当前任务的授权来源 ID，不接收正文或凭据。平台校验 taskId/attemptId/sourceIds 原样返回与 summaryCode 一致性。"
+}

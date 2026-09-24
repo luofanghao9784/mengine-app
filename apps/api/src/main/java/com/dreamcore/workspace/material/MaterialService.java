@@ -1,0 +1,165 @@
+package com.dreamcore.workspace.material;
+
+import com.dreamcore.workspace.identity.*;
+import java.io.IOException;
+import java.text.Normalizer;
+import java.time.Instant;
+import java.util.*;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.web.multipart.MultipartFile;
+
+@Service
+public class MaterialService {
+    public record Crumb(UUID id, String name) {}
+    public record Entry(UUID id, UUID tenantId, UUID workspaceId, String workspaceName, UUID folderId, String kind,
+                        String name, int version, Long sizeBytes, Instant updatedAt, List<String> path, boolean canMaintain) {}
+    public record Page(UUID tenantId, UUID workspaceId, UUID folderId, List<Crumb> trail, boolean canMaintain,
+                       long maxUploadBytes, List<Entry> items, boolean hasMore) {}
+    public record Version(UUID id, int number, String filename, long sizeBytes, String sha256, UUID createdBy, Instant createdAt, String origin) {}
+    public record Detail(Entry document, List<Version> versions, boolean hasMore) {}
+    public record Download(String filename, byte[] bytes) {}
+    private final JdbcTemplate db; private final IdentityService identities; private final IdentityAudit audit;
+    private final com.dreamcore.workspace.knowledge.KnowledgeService knowledge;
+    private final MaterialAccess access; private final ObjectStore store; private final int maxBytes;
+    public MaterialService(JdbcTemplate db, IdentityService identities, IdentityAudit audit, MaterialAccess access, ObjectStore store, com.dreamcore.workspace.knowledge.KnowledgeService knowledge,
+                            @Value("${dreamcore.material.max-bytes:20971520}") int maxBytes) {
+        this.db=db; this.identities=identities; this.audit=audit; this.access=access; this.store=store; this.maxBytes=maxBytes;this.knowledge=knowledge;
+    }
+    public static String name(String value) {
+        if(value==null) throw IdentityException.invalid();
+        String cleaned=Normalizer.normalize(value.strip(),Normalizer.Form.NFC);
+        if(cleaned.isBlank() || cleaned.length()>180 || cleaned.equals(".") || cleaned.equals("..") || cleaned.codePoints().anyMatch(c -> c==47 || c==92 || Character.isISOControl(c) || Character.getType(c)==Character.FORMAT)) throw new IdentityException(400,"MATERIAL_NAME_INVALID");
+        return cleaned;
+    }
+    private void paging(int offset,int limit) { if(offset<0 || offset>100000 || limit<1 || limit>100) throw IdentityException.invalid(); }
+    private IdentityException missing() { return new IdentityException(404,"MATERIAL_NOT_FOUND"); }
+    private List<Crumb> trail(UUID tenant,UUID workspace,UUID folder) {
+        var result=new ArrayList<Crumb>(); var seen=new HashSet<UUID>();
+        while(folder!=null) {
+            if(!seen.add(folder) || result.size()>=32) throw new IdentityException(409,"MATERIAL_FOLDER_DEPTH");
+            var rows=db.queryForList("SELECT id,name,parent_id FROM material_folders WHERE tenant_id=? AND workspace_id=? AND id=?",tenant,workspace,folder);
+            if(rows.isEmpty()) throw missing(); var row=rows.getFirst();
+            result.add(new Crumb((UUID)row.get("id"),(String)row.get("name"))); folder=(UUID)row.get("parent_id");
+        }
+        Collections.reverse(result); return result;
+    }
+    private RowMapper<Entry> entry(UUID tenant,UUID actor) {
+        return (r,n)-> {
+            UUID workspace=r.getObject("workspace_id",UUID.class),folder=r.getObject("parent_id",UUID.class);
+            var path=new ArrayList<String>(); path.add(r.getString("workspace_name"));
+            trail(tenant,workspace,folder).forEach(c->path.add(c.name())); path.add(r.getString("name"));
+            return new Entry(r.getObject("id",UUID.class),tenant,workspace,r.getString("workspace_name"),folder,r.getString("kind"),
+                r.getString("name"),r.getInt("version"),(Long)r.getObject("size_bytes"),r.getTimestamp("updated_at").toInstant(),path,r.getBoolean("can_maintain"));
+        };
+    }
+    private static final String ENTRIES="""
+        WITH entries AS (
+          SELECT f.id,f.tenant_id,f.workspace_id,f.parent_id,'FOLDER' AS kind,f.name,0 AS version,NULL::bigint AS size_bytes,f.created_at AS updated_at
+          FROM material_folders f
+          UNION ALL
+          SELECT m.id,m.tenant_id,m.workspace_id,m.folder_id,'DOCUMENT',m.name,m.current_version,v.size_bytes,m.updated_at
+          FROM materials m JOIN material_versions v ON v.tenant_id=m.tenant_id AND v.workspace_id=m.workspace_id AND v.material_id=m.id AND v.number=m.current_version
+        )
+        SELECT e.*,w.name AS workspace_name,(w.kind='PERSONAL' OR coalesce(g.can_maintain,false)) AS can_maintain
+        FROM entries e JOIN workspaces w ON w.tenant_id=e.tenant_id AND w.id=e.workspace_id
+        LEFT JOIN workspace_members g ON g.tenant_id=w.tenant_id AND g.workspace_id=w.id AND g.account_id=?
+        WHERE e.tenant_id=? AND ((w.kind='PERSONAL' AND w.owner_id=?) OR (w.kind='SHARED' AND g.account_id IS NOT NULL))
+        """;
+    @Transactional
+    public Page list(UUID actor,UUID tenant,UUID workspace,UUID folder,String q,int offset,int limit) {
+        paging(offset,limit); if(q.length()>180 || (workspace==null && folder!=null)) throw IdentityException.invalid();
+        identities.member(actor,tenant,false);
+        var space=workspace==null ? null : access.require(actor,tenant,workspace,false);
+        var crumbs=workspace==null ? List.<Crumb>of() : trail(tenant,workspace,folder);
+        String query=q.strip();
+        var items=db.query(ENTRIES+" AND "+(workspace==null?"w.kind='SHARED' AND e.kind='DOCUMENT'":"e.workspace_id=?")+
+            " AND (?<>'' OR ? OR e.parent_id IS NOT DISTINCT FROM ?::uuid) AND strpos(lower(e.name),lower(?))>0 ORDER BY CASE WHEN e.kind='FOLDER' THEN 0 ELSE 1 END,e.updated_at DESC,e.id LIMIT ? OFFSET ?",
+            entry(tenant,actor), workspace==null ? new Object[]{actor,tenant,actor,query,true,folder,query,limit+1,offset} :
+                new Object[]{actor,tenant,actor,workspace,query,false,folder,query,limit+1,offset});
+        return new Page(tenant,workspace,folder,crumbs,space!=null&&space.canMaintain(),maxBytes,items.stream().limit(limit).toList(),items.size()>limit);
+    }
+    private Entry document(UUID actor,UUID tenant,UUID workspace,UUID id) {
+        var rows=db.query(ENTRIES+" AND e.workspace_id=? AND e.id=? AND e.kind='DOCUMENT'",entry(tenant,actor),actor,tenant,actor,workspace,id);
+        if(rows.isEmpty()) throw missing(); return rows.getFirst();
+    }
+    @Transactional
+    public Detail detail(UUID actor,UUID tenant,UUID workspace,UUID id,int offset,int limit) {
+        paging(offset,limit); access.require(actor,tenant,workspace,false); Entry doc=document(actor,tenant,workspace,id);
+        var versions=db.query("SELECT v.*,CASE WHEN p.id IS NULL THEN 'UPLOAD' ELSE 'DOCUMENT_PUBLICATION' END AS origin FROM material_versions v LEFT JOIN document_publications p ON p.material_version_id=v.id WHERE v.tenant_id=? AND v.workspace_id=? AND v.material_id=? ORDER BY v.number DESC LIMIT ? OFFSET ?",
+            (r,n)->new Version(r.getObject("id",UUID.class),r.getInt("number"),r.getString("filename"),r.getLong("size_bytes"),r.getString("sha256"),
+                r.getObject("created_by",UUID.class),r.getTimestamp("created_at").toInstant(),r.getString("origin")),tenant,workspace,id,limit+1,offset);
+        return new Detail(doc,versions.stream().limit(limit).toList(),versions.size()>limit);
+    }
+    @Transactional
+    public Crumb createFolder(UUID actor,UUID tenant,UUID workspace,UUID parent,String suppliedName,UUID key) {
+        String name=name(suppliedName),fingerprint=IdentityService.hash(tenant+"\n"+workspace+"\n"+parent+"\n"+name);
+        UUID prior=identities.priorRequest(actor,key,"MATERIAL_FOLDER_CREATE",fingerprint);
+        access.require(actor,tenant,workspace,true);
+        if(prior!=null) return trail(tenant,workspace,prior).getLast();
+        if(trail(tenant,workspace,parent).size()>=32) throw new IdentityException(409,"MATERIAL_FOLDER_DEPTH");
+        UUID id=UUID.randomUUID();
+        db.update("INSERT INTO material_folders(id,tenant_id,workspace_id,parent_id,name,created_by) VALUES (?,?,?,?,?,?)",id,tenant,workspace,parent,name,actor);
+        identities.remember(actor,key,"MATERIAL_FOLDER_CREATE",fingerprint,id); audit.record(actor,tenant,"MATERIAL_FOLDER_CREATE",id,"SUCCESS");
+        return new Crumb(id,name);
+    }
+    @Transactional
+    public Entry upload(UUID actor,UUID tenant,UUID workspace,UUID folder,UUID material,Integer expectedVersion,UUID key,MultipartFile file) {
+        // Preliminary authorization before reading file bytes; recheck under lock after the request lock.
+        access.check(actor,tenant,workspace,true,false);
+        String filename=name(file.getOriginalFilename());
+        if(file.getSize()>maxBytes) throw new IdentityException(413,"MATERIAL_TOO_LARGE");
+        byte[] bytes;
+        try(var input=file.getInputStream()) {
+            bytes=input.readNBytes(maxBytes+1);
+        } catch(IOException error) { throw new IdentityException(503,"MATERIAL_UPLOAD_FAILED"); }
+        if(bytes.length>maxBytes) throw new IdentityException(413,"MATERIAL_TOO_LARGE");
+        if((material==null && expectedVersion!=null) || (material!=null && (expectedVersion==null || expectedVersion<1 || folder!=null))) throw IdentityException.invalid();
+        String hash=ObjectStore.sha256(bytes),fingerprint=IdentityService.hash(tenant+"\n"+workspace+"\n"+folder+"\n"+material+"\n"+expectedVersion+"\n"+filename+"\n"+hash);
+        UUID prior=identities.priorRequest(actor,key,"MATERIAL_UPLOAD",fingerprint);
+        access.require(actor,tenant,workspace,true);
+        if(prior!=null) return document(actor,tenant,workspace,prior);
+        Entry result=storeGenerated(actor,tenant,workspace,folder,material,expectedVersion,filename,bytes);
+        identities.remember(actor,key,"MATERIAL_UPLOAD",fingerprint,result.id());return result;
+    }
+    /** Internal platform operation; callers own their request idempotency. Not exposed as an HTTP upload bypass. */
+    @Transactional public Entry storeGenerated(UUID actor,UUID tenant,UUID workspace,UUID folder,UUID material,Integer expectedVersion,String suppliedFilename,byte[] bytes){
+        access.require(actor,tenant,workspace,true);String filename=name(suppliedFilename);
+        if(bytes.length>maxBytes)throw new IdentityException(413,"MATERIAL_TOO_LARGE");
+        if((material==null && expectedVersion!=null) || (material!=null && (expectedVersion==null || expectedVersion<1 || folder!=null)))throw IdentityException.invalid();
+        String hash=ObjectStore.sha256(bytes);
+        int number=1;
+        if(material!=null) {
+            db.queryForList("SELECT id FROM materials WHERE tenant_id=? AND workspace_id=? AND id=? FOR UPDATE",tenant,workspace,material);
+            Entry current=document(actor,tenant,workspace,material);
+            if(current.version()!=expectedVersion) throw new IdentityException(409,"MATERIAL_VERSION_CONFLICT");
+            number=Math.addExact(current.version(),1);
+        } else trail(tenant,workspace,folder);
+        UUID id=material==null?UUID.randomUUID():material,object=store.put(bytes);
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override public void afterCompletion(int status) { if(status!=STATUS_COMMITTED) store.discard(object); }
+        });
+        if(material==null) db.update("INSERT INTO materials(id,tenant_id,workspace_id,folder_id,name,created_by) VALUES (?,?,?,?,?,?)",id,tenant,workspace,folder,filename,actor);
+        else db.update("UPDATE materials SET current_version=?,updated_at=now() WHERE tenant_id=? AND workspace_id=? AND id=?",number,tenant,workspace,id);
+        UUID versionId=UUID.randomUUID();
+        db.update("INSERT INTO material_versions(id,tenant_id,workspace_id,material_id,number,filename,size_bytes,sha256,object_id,created_by) VALUES (?,?,?,?,?,?,?,?,?,?)",
+            versionId,tenant,workspace,id,number,filename,bytes.length,hash,object,actor);
+        knowledge.onUpload(actor,tenant,workspace,id,versionId);
+        audit.record(actor,tenant,material==null?"MATERIAL_UPLOAD":"MATERIAL_VERSION",id,"SUCCESS");
+        return document(actor,tenant,workspace,id);
+    }
+    @Transactional
+    public Download download(UUID actor,UUID tenant,UUID workspace,UUID material,UUID version) {
+        access.require(actor,tenant,workspace,false);
+        var rows=db.queryForList("SELECT filename,object_id,size_bytes,sha256 FROM material_versions WHERE tenant_id=? AND workspace_id=? AND material_id=? AND id=?",tenant,workspace,material,version);
+        if(rows.isEmpty()) throw missing(); var row=rows.getFirst();
+        byte[] bytes=store.read((UUID)row.get("object_id"),(Long)row.get("size_bytes"),(String)row.get("sha256"));
+        audit.record(actor,tenant,"MATERIAL_DOWNLOAD",version,"SUCCESS");
+        return new Download((String)row.get("filename"),bytes);
+    }
+}

@@ -8,7 +8,8 @@ import {
   MessagesSquare,
 } from 'lucide-react';
 import type { CardConfig, CardData } from '../briefing';
-import { magazineType, magazineView } from '../briefingMagazine';
+import { magazineHeadline, magazineType, magazineView } from '../briefingMagazine';
+import { briefingSource, briefingTime } from '../briefingTypography';
 import { briefingPhoto, briefingDocuments, briefingPeople } from '../briefingMedia';
 import { useDemo } from '../store';
 import { BriefingChart } from './BriefingChart';
@@ -40,11 +41,11 @@ export function BriefingMagazineBody({
   const hasPhoto = photo && photo.src !== failedPhoto;
   const documents = type === '成果' ? briefingDocuments(state, data) : [];
   const people = briefingPeople(state, data);
-  const headline = config.title === data.title ? view.headline || config.title : config.title;
+  const headline = magazineHeadline(data, config.title);
   const tall = config.size.endsWith('2') && !config.compact;
   return (
     <div
-      className={`briefing-magazine magazine-${type}${hasPhoto ? ' magazine-with-photo' : ''}${view.chart ? ' magazine-with-chart' : ''}${view.value ? ' magazine-with-value' : ''}${documents.length ? ' magazine-with-document' : ''}${config.compact ? ' magazine-compact' : ''}`}
+      className={`briefing-magazine magazine-${type}${hasPhoto ? ' magazine-with-photo' : ''}${view.chart ? ' magazine-with-chart' : ''}${view.value ? ' magazine-with-value' : ''}${view.note ? ' magazine-with-note' : ''}${documents.length ? ' magazine-with-document' : ''}${config.compact ? ' magazine-compact' : ''}`}
       data-magazine-type={type}
     >
       {hasPhoto && (
@@ -65,8 +66,8 @@ export function BriefingMagazineBody({
           <Icon size={14} aria-hidden="true" />
           {type}
         </span>
-        <time dateTime={at}>
-          {new Date(at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })}
+        <time dateTime={at} title={`内容时间：${briefingTime(at, true)}`}>
+          {briefingTime(at)}
         </time>
         {people.length > 0 && (
           <span
@@ -79,7 +80,6 @@ export function BriefingMagazineBody({
       <div className="magazine-main">
         <div className="magazine-copy">
           <h3 title={headline}>{headline}</h3>
-          {type === '会话' && <span className="magazine-live">活跃会话 · AI 最新回复</span>}
           {view.value && (
             <div className="magazine-value">
               <strong>{view.value}</strong>
@@ -131,7 +131,8 @@ export function BriefingMagazineBody({
       </div>
       <div className="magazine-footer">
         <small className="briefing-source" title={data.source}>
-          {data.source}
+          {briefingSource(data.source)}
+          {type === '会话' && ' · AI 最新回复'}
         </small>
         {hasPhoto && (
           <span className="briefing-photo-credit" title={photo.credit}>

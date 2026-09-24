@@ -45,7 +45,7 @@ const editions: Record<string, Partial<MagazineView>> = {
   'konggu:C01': {
     headline: '过去7天，零售向上。',
     summary: '1,307单 · 较上期增长12.6%',
-    note: '模拟零售净销售额 · 9/13—9/19',
+    note: '模拟零售净销售额',
   },
   'konggu:C02': {
     headline: '增长，从订单与客单拆起。',
@@ -179,4 +179,10 @@ export function magazineView(data: CardData): MagazineView {
     if (edition?.fact === data.fact) Object.assign(view, edition.view);
   }
   return view;
+}
+
+// One display title for the grid, reading article and retained conversation reference.
+// A user's custom title always takes priority over the editorial default.
+export function magazineHeadline(data: CardData, title = data.title): string {
+  return title !== data.title ? title : magazineView(data).headline || title;
 }

@@ -1,0 +1,312 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Dreamcore Foundation API",
+    "version": "1.0.0",
+    "description": "M1-A1 \u8fd0\u884c\u72b6\u6001\u5951\u7ea6\uff1bM2-A1 \u8eab\u4efd\u4e0e\u79df\u6237\u63a5\u53e3\u89c1\u540c\u76ee\u5f55 identity.openapi.json\u3002"
+  },
+  "paths": {
+    "/api/v1/system/info": {
+      "get": {
+        "operationId": "getSystemInfo",
+        "responses": {
+          "200": {
+            "description": "\u57fa\u7840\u670d\u52a1\u4e0e\u771f\u5b9e\u5f15\u64ce\u63e1\u624b\u7ed3\u679c",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemInfo"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "\u5f15\u64ce\u534f\u8bae\u4e0d\u517c\u5bb9",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "\u5f15\u64ce\u8fde\u63a5\u5931\u8d25\u6216\u8d85\u65f6",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "SystemInfo": {
+        "type": "object",
+        "properties": {
+          "contractVersion": {
+            "const": "1.0"
+          },
+          "service": {
+            "const": "dreamcore-platform"
+          },
+          "stage": {
+            "const": "foundation"
+          },
+          "dataSource": {
+            "enum": [
+              "live",
+              "demo"
+            ]
+          },
+          "engine": {
+            "$ref": "#/components/schemas/EngineCapabilities"
+          },
+          "integrations": {
+            "type": "object",
+            "properties": {
+              "harness": {
+                "enum": [
+                  "not-configured",
+                  "verification",
+                  "configured"
+                ]
+              },
+              "weknora": {
+                "const": "not-configured"
+              },
+              "jev": {
+                "const": "not-configured"
+              }
+            },
+            "required": [
+              "harness",
+              "weknora",
+              "jev"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "contractVersion",
+          "service",
+          "stage",
+          "dataSource",
+          "engine",
+          "integrations"
+        ],
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "engine": {
+                  "properties": {
+                    "runtimeMode": {
+                      "const": "contract-only"
+                    }
+                  }
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "integrations": {
+                  "properties": {
+                    "harness": {
+                      "const": "not-configured"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "engine": {
+                  "properties": {
+                    "runtimeMode": {
+                      "const": "local-retrieval"
+                    }
+                  }
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "integrations": {
+                  "properties": {
+                    "harness": {
+                      "const": "not-configured"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "engine": {
+                  "properties": {
+                    "runtimeMode": {
+                      "const": "agent-verification"
+                    }
+                  }
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "integrations": {
+                  "properties": {
+                    "harness": {
+                      "const": "verification"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "engine": {
+                  "properties": {
+                    "runtimeMode": {
+                      "const": "agent-live"
+                    }
+                  }
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "integrations": {
+                  "properties": {
+                    "harness": {
+                      "const": "configured"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "EngineCapabilities": {
+        "type": "object",
+        "properties": {
+          "contractVersion": {
+            "const": "1.0"
+          },
+          "engineVersion": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "runtimeMode": {
+            "enum": [
+              "contract-only",
+              "local-retrieval",
+              "agent-verification",
+              "agent-live"
+            ]
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "source-lookup",
+                "agent-task"
+              ]
+            },
+            "maxItems": 2,
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "contractVersion",
+          "engineVersion",
+          "runtimeMode",
+          "capabilities"
+        ],
+        "additionalProperties": false,
+        "oneOf": [
+          {
+            "properties": {
+              "runtimeMode": {
+                "const": "contract-only"
+              },
+              "capabilities": {
+                "const": []
+              }
+            }
+          },
+          {
+            "properties": {
+              "runtimeMode": {
+                "const": "local-retrieval"
+              },
+              "capabilities": {
+                "const": [
+                  "source-lookup"
+                ]
+              }
+            }
+          },
+          {
+            "properties": {
+              "runtimeMode": {
+                "enum": [
+                  "agent-verification",
+                  "agent-live"
+                ]
+              },
+              "capabilities": {
+                "const": [
+                  "source-lookup",
+                  "agent-task"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "ApiError": {
+        "type": "object",
+        "properties": {
+          "contractVersion": {
+            "const": "1.0"
+          },
+          "code": {
+            "enum": [
+              "ENGINE_UNAVAILABLE",
+              "ENGINE_INCOMPATIBLE"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "retryable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "contractVersion",
+          "code",
+          "message",
+          "retryable"
+        ],
+        "additionalProperties": false
+      }
+    }
+  }
+}

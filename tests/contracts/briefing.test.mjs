@@ -1,0 +1,47 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import Ajv2020 from 'ajv/dist/2020.js';
+const spec = JSON.parse(
+  await readFile(new URL('../../contracts/public-api/briefing.openapi.json', import.meta.url), 'utf8'),
+);
+const ajv = new Ajv2020({ strict: false, formats: { uuid: true, 'date-time': true, date: true } });
+const id = '00000000-0000-4000-8000-000000000001';
+test('briefing preferences require CSRF, idempotency, revision and no caller-supplied owner', () => {
+  const route = spec.paths['/api/v1/tenants/{tenant}/briefing/{conversation}'].post;
+  assert.ok(route.parameters.some((p) => p.name === 'X-CSRF-TOKEN' && p.required));
+  const check = ajv.compile(spec.components.schemas.Update);
+  const valid = { requestId: id, expectedRevision: 0, pinned: true, hidden: false, size: 'WIDE' };
+  assert.ok(check(valid));
+  for (const bad of [
+    { ...valid, ownerId: id },
+    { ...valid, requestId: undefined },
+    { ...valid, expectedRevision: undefined },
+    { ...valid, expectedRevision: -1 },
+    { ...valid, size: 'UNLIMITED' },
+  ])
+    assert.equal(check(bad), false);
+});
+test('briefing result bounds apply to Unicode excerpts and truthful execution class', () => {
+  const check = ajv.compile({ ...spec.components.schemas.Card, components: spec.components });
+  const valid = {
+    conversationId: id,
+    taskId: id,
+    workspaceId: id,
+    workspaceName: 'test',
+    title: 'test',
+    excerpt: '😀'.repeat(600),
+    truncated: true,
+    completedAt: '2026-09-23T00:00:00Z',
+    executionClass: 'verification',
+    engineVersion: '0.8.0',
+    artifactCount: 1,
+    citationCount: 0,
+    originalCount: 0,
+    preference: { revision: 0, pinned: false, hidden: false, size: 'STANDARD' },
+  };
+  assert.ok(check(valid));
+  assert.equal(check({ ...valid, excerpt: '😀'.repeat(601) }), false);
+  assert.equal(check({ ...valid, executionClass: 'pretend-live' }), false);
+  assert.equal(check({ ...valid, artifactCount: 9 }), false);
+});

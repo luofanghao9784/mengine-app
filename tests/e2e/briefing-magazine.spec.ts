@@ -32,16 +32,37 @@ test('五类筛选一致，照片和关键数字可见，打开原卡保留完�
       JSON.parse(localStorage.getItem(key)!).briefing.cards.find((c: any) => c.id === 'konggu:C17').data,
     key,
   );
+  const headline = await page.locator('[data-card-id="konggu:C17"] h3').innerText();
   await page.locator('[data-card-id="konggu:C17"] .briefing-card-main').click();
   const detail = page.locator('.briefing-detail');
+  await expect(detail.locator('h2')).toHaveText(headline);
   await expect(detail).toContainText(facts.fact);
   await expect(detail).toContainText(facts.advice);
   await detail.getByRole('button', { name: '发起会话', exact: true }).click();
   await expect(page.locator('.deck-source')).toContainText(facts.fact);
   await expect(page.locator('.deck-source')).toContainText(facts.advice);
+  await expect(page.locator('.deck-source h2')).toHaveText(headline);
+  await expect(page.getByLabel('会话中的画报原卡片').locator('h3')).toHaveText(headline);
   await expect(
     page.getByLabel('会话中的画报原卡片').locator('.magazine-full-content, .briefing-article'),
   ).toHaveCount(0);
+});
+
+test('推荐保留完整卡片日期、统计周期与原文日期，阅读和刷新不改时间', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-09-24T12:00:00+08:00'));
+  await page.reload();
+  const old = page.locator('[data-card-id="konggu:C01"]');
+  const at = await old.locator('time').getAttribute('datetime');
+  await expect(old.locator('time')).toContainText('9月20日');
+  await expect(old.locator('.briefing-chart-period')).toContainText('统计期：9月13日—9月19日');
+  await expect(page.locator('[data-card-id="konggu:C30"] .briefing-source')).toContainText(
+    '发布于2026年9月14日',
+  );
+  await old.locator('.briefing-card-main').click();
+  await expect(page.locator('.briefing-detail-article > time')).toContainText('内容截至 2026年9月20日');
+  await page.getByRole('button', { name: '关闭卡片详情' }).click();
+  await page.getByRole('button', { name: '刷新智能画报（演示）', exact: true }).click();
+  await expect(old.locator('time')).toHaveAttribute('datetime', at!);
 });
 
 test('四种卡片规格及窄屏保留类型和完整文本行，来源不与正文相撞', async ({ page }) => {
@@ -59,7 +80,10 @@ test('四种卡片规格及窄屏保留类型和完整文本行，来源不与�
               if (getComputedStyle(e).display === 'none') continue;
               const r = e.getBoundingClientRect(),
                 label = `${c.getAttribute('data-card-id')}:${e.className}`;
-              if (r.bottom > footer.top + 1) errors.push(`${label}:footer overlap`);
+              if (r.bottom > footer.top + 1)
+                errors.push(
+                  `${label}:footer overlap ${Math.round(r.bottom - footer.top)}px; card ${Math.round(c.getBoundingClientRect().width)}×${Math.round(c.getBoundingClientRect().height)}`,
+                );
               if (e.matches('p') && r.height < Number.parseFloat(getComputedStyle(e).lineHeight) - 1)
                 errors.push(`${label}:partial line`);
             }

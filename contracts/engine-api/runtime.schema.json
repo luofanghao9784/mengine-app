@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dreamcore.invalid/contracts/engine/runtime.v1.json",
+  "type": "object",
+  "properties": {
+    "contractVersion": {
+      "const": "1.0"
+    },
+    "engineVersion": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9.\\-]{1,64}$"
+    },
+    "runtimeMode": {
+      "enum": ["contract-only", "local-retrieval", "agent-verification", "agent-live"]
+    },
+    "protocols": {
+      "type": "object",
+      "properties": {
+        "sourceLookup": {
+          "type": "string",
+          "pattern": "^[0-9]{1,7}\\.[0-9]{1,7}$",
+          "maxLength": 15
+        },
+        "agentTask": {
+          "type": "string",
+          "pattern": "^[0-9]{1,7}\\.[0-9]{1,7}$",
+          "maxLength": 15
+        },
+        "platformCallbacks": {
+          "type": "string",
+          "pattern": "^[0-9]{1,7}\\.[0-9]{1,7}$",
+          "maxLength": 15
+        }
+      },
+      "required": ["sourceLookup", "agentTask", "platformCallbacks"],
+      "additionalProperties": false
+    }
+  },
+  "required": ["contractVersion", "engineVersion", "runtimeMode", "protocols"],
+  "additionalProperties": false
+}

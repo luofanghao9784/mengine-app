@@ -1,0 +1,6 @@
+{
+  "contractVersion": "1.0",
+  "code": "ENGINE_UNAVAILABLE",
+  "message": "引擎暂不可用，请稍后重试。",
+  "retryable": true
+}

@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { chartDescription, type BriefingChart as Chart } from '../briefingPresentation';
+import { briefingPeriod } from '../briefingTypography';
 
 const blue = '#356cd4',
   light = '#98b6e8',
@@ -341,7 +342,7 @@ export function BriefingChart({ chart, spacious }: { chart: Chart; spacious: boo
   return (
     <div ref={ref} className="briefing-visual-chart" data-chart-kind={chart.kind}>
       <div className="briefing-chart-period">
-        {chart.period}
+        {briefingPeriod(chart.period)}
         {!['timeline', 'heatmap'].includes(chart.kind) && <span>{chart.unit}</span>}
       </div>
       <svg

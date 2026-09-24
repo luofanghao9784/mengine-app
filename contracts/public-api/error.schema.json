@@ -1,0 +1,30 @@
+{
+  "type": "object",
+  "properties": {
+    "contractVersion": {
+      "const": "1.0"
+    },
+    "code": {
+      "enum": [
+        "ENGINE_UNAVAILABLE",
+        "ENGINE_INCOMPATIBLE"
+      ]
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1
+    },
+    "retryable": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "contractVersion",
+    "code",
+    "message",
+    "retryable"
+  ],
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dreamcore.invalid/contracts/public/error.v1.json"
+}

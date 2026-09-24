@@ -1,0 +1,906 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Dreamcore Private Document API",
+    "version": "1.1.0",
+    "description": "从成功的本人 Agent 回复或 UTF-8 TXT/Markdown 产物创建个人文稿；首次保存后永久关联原任务和来源，编辑不解除依赖。读写及缓存导出始终复核当前来源权限；不自动发布企业资料。 明确发布到有维护权限的共享空间后生成独立企业资料副本，副本按目标权限读取；源文稿、原件和私人会话不额外授权。"
+  },
+  "security": [
+    {
+      "sessionCookie": []
+    }
+  ],
+  "paths": {
+    "/api/v1/tenants/{tenant}/documents": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "parameters": [
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000,
+              "default": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 30,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "经当前本人/来源权限复核，Cache-Control private/no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数或正文无效"
+          },
+          "401": {
+            "description": "需要登录"
+          },
+          "403": {
+            "description": "身份或企业不可用，或 CSRF 拒绝"
+          },
+          "404": {
+            "description": "文稿/来源不存在或无权访问"
+          },
+          "409": {
+            "description": "幂等键或版本冲突"
+          }
+        }
+      },
+      "post": {
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Create"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "经当前本人/来源权限复核，Cache-Control private/no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数或正文无效"
+          },
+          "401": {
+            "description": "需要登录"
+          },
+          "403": {
+            "description": "身份或企业不可用，或 CSRF 拒绝"
+          },
+          "404": {
+            "description": "文稿/来源不存在或无权访问"
+          },
+          "409": {
+            "description": "幂等键或版本冲突"
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/documents/{id}": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "parameters": [
+          {
+            "name": "version",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "经当前本人/来源权限复核，Cache-Control private/no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数或正文无效"
+          },
+          "401": {
+            "description": "需要登录"
+          },
+          "403": {
+            "description": "身份或企业不可用，或 CSRF 拒绝"
+          },
+          "404": {
+            "description": "文稿/来源不存在或无权访问"
+          },
+          "409": {
+            "description": "幂等键或版本冲突"
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/documents/{id}/versions": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Save"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "经当前本人/来源权限复核，Cache-Control private/no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数或正文无效"
+          },
+          "401": {
+            "description": "需要登录"
+          },
+          "403": {
+            "description": "身份或企业不可用，或 CSRF 拒绝"
+          },
+          "404": {
+            "description": "文稿/来源不存在或无权访问"
+          },
+          "409": {
+            "description": "幂等键或版本冲突"
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/documents/{id}/versions/{version}/exports/{format}": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "version",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          }
+        },
+        {
+          "name": "format",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "enum": [
+              "docx",
+              "pdf"
+            ]
+          }
+        }
+      ],
+      "get": {
+        "summary": "下载指定不可变版本；首次生成并缓存，每次重新授权",
+        "responses": {
+          "200": {
+            "description": "附件二进制，最多 2 MiB；Content-Length 与 X-Content-SHA256 必需，private/no-store",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "application/vnd.openxmlformats-officedocument.wordprocessingml.document": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "格式或版本参数无效"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "403": {
+            "description": "企业/成员不可用"
+          },
+          "404": {
+            "description": "文稿或来源不可访问"
+          },
+          "413": {
+            "description": "导出超过页数或产物大小限制"
+          },
+          "422": {
+            "description": "PDF 字体不支持部分字符；不缓存不完整结果"
+          },
+          "503": {
+            "description": "导出繁忙或不可用；不修改已保存正文"
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/documents/{id}/versions/{version}/publications": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "version",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      ],
+      "post": {
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Publish"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "固定来源版本和企业资料版本的发布回执；重复同一来源版本/目标不重复发布。返回 private/no-store。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Publication"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数或正文无效"
+          },
+          "401": {
+            "description": "需要登录"
+          },
+          "403": {
+            "description": "身份或企业不可用，或 CSRF 拒绝"
+          },
+          "404": {
+            "description": "文稿/来源不存在或无权访问"
+          },
+          "409": {
+            "description": "幂等键或版本冲突"
+          },
+          "413": {
+            "description": "导出大小或资源超限"
+          },
+          "422": {
+            "description": "PDF 字形不支持"
+          },
+          "503": {
+            "description": "导出不可用"
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/documents/{id}/publications": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "offset",
+          "in": "query",
+          "schema": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000,
+            "default": 0
+          }
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "schema": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30,
+            "default": 20
+          }
+        }
+      ],
+      "get": {
+        "parameters": [
+          {
+            "name": "version",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "经当前本人/来源权限复核，Cache-Control private/no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicationPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数或正文无效"
+          },
+          "401": {
+            "description": "需要登录"
+          },
+          "403": {
+            "description": "身份或企业不可用，或 CSRF 拒绝"
+          },
+          "404": {
+            "description": "文稿/来源不存在或无权访问"
+          },
+          "409": {
+            "description": "幂等键或版本冲突"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "SESSION"
+      }
+    },
+    "schemas": {
+      "Document": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sourceWorkspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "conversationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "taskId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "artifactId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "workspaceId",
+          "sourceWorkspaceId",
+          "conversationId",
+          "taskId",
+          "artifactId",
+          "revision",
+          "title",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "Version": {
+        "type": "object",
+        "properties": {
+          "number": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32768
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "number",
+          "title",
+          "body",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "Detail": {
+        "type": "object",
+        "properties": {
+          "document": {
+            "$ref": "#/components/schemas/Document"
+          },
+          "version": {
+            "$ref": "#/components/schemas/Version"
+          }
+        },
+        "required": [
+          "document",
+          "version"
+        ],
+        "additionalProperties": false
+      },
+      "Page": {
+        "type": "object",
+        "properties": {
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "items": {
+            "type": "array",
+            "maxItems": 30,
+            "items": {
+              "$ref": "#/components/schemas/Document"
+            }
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "tenantId",
+          "items",
+          "hasMore"
+        ],
+        "additionalProperties": false
+      },
+      "Create": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "conversationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "taskId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "artifactId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "requestId",
+          "conversationId",
+          "taskId"
+        ],
+        "additionalProperties": false
+      },
+      "Save": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32768
+          }
+        },
+        "required": [
+          "requestId",
+          "expectedRevision",
+          "title",
+          "body"
+        ],
+        "additionalProperties": false
+      },
+      "Publication": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "documentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "materialId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "materialVersionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "documentVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "materialVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "folderId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "filename": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 180
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "docx",
+              "pdf"
+            ]
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "documentId",
+          "workspaceId",
+          "materialId",
+          "materialVersionId",
+          "documentVersion",
+          "materialVersion",
+          "folderId",
+          "filename",
+          "format",
+          "sha256",
+          "publishedAt"
+        ],
+        "additionalProperties": false
+      },
+      "PublicationPage": {
+        "type": "object",
+        "properties": {
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "documentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "items": {
+            "type": "array",
+            "maxItems": 30,
+            "items": {
+              "$ref": "#/components/schemas/Publication"
+            }
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "tenantId",
+          "documentId",
+          "items",
+          "hasMore"
+        ],
+        "additionalProperties": false
+      },
+      "Publish": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "folderId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "materialId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedMaterialVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "docx",
+              "pdf"
+            ]
+          },
+          "acknowledgeIndependentCopy": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "requestId",
+          "workspaceId",
+          "format",
+          "acknowledgeIndependentCopy"
+        ],
+        "additionalProperties": false,
+        "oneOf": [
+          {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "materialId"
+                  ]
+                },
+                {
+                  "required": [
+                    "expectedMaterialVersion"
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "required": [
+              "materialId",
+              "expectedMaterialVersion"
+            ],
+            "properties": {
+              "folderId": {
+                "type": "null"
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

@@ -4,6 +4,8 @@
   --magazine-tint: #eff3eb;
   --briefing-ink: #202c3c;
   --briefing-muted: #657184;
+  --magazine-title-size: 24px;
+  --magazine-value-size: 36px;
   container-type: size;
 }
 .briefing-card:has(.magazine-数据) {
@@ -26,6 +28,9 @@
   --magazine-color: #4d659b;
   --magazine-tint: #eff3fc;
 }
+.briefing-grid .briefing-card[data-size]:has(.briefing-magazine) .briefing-card-main {
+  padding: 20px;
+}
 .briefing-magazine {
   display: flex;
   flex-direction: column;
@@ -40,9 +45,12 @@
   flex: none;
   gap: 8px;
   margin: 0;
-  min-height: 25px;
+  padding: 0;
+  min-height: 26px;
+  align-items: center;
+  letter-spacing: 0;
   height: auto;
-  font-size: 11px;
+  font-size: 12px;
 }
 .magazine-type {
   display: inline-flex;
@@ -62,12 +70,15 @@
 }
 .magazine-eyebrow time {
   margin-left: auto;
-  font-size: 11px;
+  font-size: 12px;
+  line-height: 18px;
+  text-align: right;
+  letter-spacing: 0;
 }
 .magazine-main {
   display: flex;
   flex: 1;
-  gap: 16px;
+  gap: 12px;
   min-height: 0;
 }
 .magazine-copy {
@@ -76,32 +87,27 @@
   flex: 1;
   min-width: 0;
   min-height: 0;
-  gap: 10px;
+  gap: 8px;
 }
 .briefing-card .briefing-magazine h3,
 .briefing-grid .briefing-card[data-size] .briefing-magazine h3 {
   font-family: 'Songti SC', 'STSong', serif;
-  font-size: clamp(23px, 9cqi, 38px);
-  line-height: 1.24;
-  letter-spacing: -0.5px;
+  font-size: var(--magazine-title-size);
+  line-height: 1.35;
+  letter-spacing: 0;
   font-weight: 600;
   margin: 0;
+  max-width: none;
   flex-shrink: 0;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow: hidden;
-  text-wrap: balance;
-}
-.briefing-grid .briefing-card[data-size='2×1'] .briefing-magazine h3 {
-  font-size: clamp(23px, 5.5cqi, 32px);
-}
-.briefing-grid .briefing-card[data-size='2×2'] .briefing-magazine h3 {
-  font-size: clamp(29px, 7.5cqi, 44px);
+  text-wrap: pretty;
 }
 .briefing-card .briefing-magazine p {
-  font-size: 13px;
-  line-height: 1.7;
+  font-size: 14px;
+  line-height: 1.6;
   margin: 0;
   color: var(--briefing-muted);
 }
@@ -113,7 +119,7 @@
   flex-shrink: 0;
 }
 .briefing-card .briefing-magazine .magazine-note {
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.55;
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -130,28 +136,15 @@
 }
 .magazine-value strong {
   font:
-    400 clamp(36px, 16cqi, 64px)/1.06 Georgia,
+    400 var(--magazine-value-size)/1.1 Georgia,
     'Times New Roman',
     serif;
-  letter-spacing: -1.5px;
+  letter-spacing: -0.5px;
+  font-variant-numeric: lining-nums tabular-nums;
 }
 .magazine-value span {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--briefing-muted);
-}
-.magazine-live {
-  font-size: 11px;
-  color: var(--magazine-color);
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-.magazine-live::before {
-  content: '';
-  width: 5px;
-  height: 5px;
-  background: currentColor;
-  border-radius: 50%;
 }
 .magazine-footer {
   flex: none;
@@ -161,22 +154,24 @@
   z-index: 1;
 }
 .briefing-card .briefing-magazine .briefing-source {
-  display: block;
-  font-size: 11px;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: 12px;
   line-height: 1.5;
-  white-space: nowrap;
+  white-space: normal;
   overflow: hidden;
-  text-overflow: ellipsis;
   padding: 0 23px 0 0;
   margin: 0;
 }
 .briefing-card .briefing-magazine .briefing-photo-credit {
-  display: block;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.5;
-  white-space: nowrap;
+  white-space: normal;
   overflow: hidden;
-  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   padding-right: 23px;
   margin-top: 3px;
 }
@@ -226,11 +221,11 @@
   border-radius: 50%;
   background: var(--magazine-tint);
   color: var(--magazine-color);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
 }
 .magazine-steps span {
-  font-size: 11px;
+  font-size: 12px;
 }
 .briefing-magazine .briefing-visual-chart {
   margin: 0;
@@ -246,18 +241,10 @@
   flex: 1;
 }
 .briefing-magazine .briefing-chart-period {
-  font-size: 11px;
+  font-size: 12px;
   margin-bottom: 5px;
   color: var(--briefing-muted);
   flex: none;
-}
-.magazine-with-chart .magazine-copy {
-  gap: 7px;
-}
-.magazine-with-chart .magazine-summary {
-  flex: none;
-  -webkit-line-clamp: 1;
-  font-size: 11px;
 }
 .magazine-documents {
   align-self: center;
@@ -266,7 +253,7 @@
 }
 .magazine-documents > span {
   display: block;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--briefing-muted);
   margin-top: 10px;
 }
@@ -290,7 +277,7 @@
   -webkit-line-clamp: 3;
 }
 .briefing-card .briefing-magazine .briefing-document-cover small {
-  font-size: 11px;
+  font-size: 12px;
 }
 .briefing-grid .briefing-card[data-size='1×2'] .magazine-with-document .magazine-main {
   flex-direction: column;
@@ -301,9 +288,6 @@
 }
 .briefing-grid .briefing-card[data-size='1×1'] .magazine-documents {
   display: none;
-}
-.briefing-grid .briefing-card[data-size='2×1'] .magazine-with-document h3 {
-  font-size: clamp(22px, 5.2cqi, 30px);
 }
 .briefing-grid .briefing-card[data-size='2×1'] .magazine-documents .briefing-document-stack {
   --cover-width: 68px;
@@ -346,8 +330,7 @@
   background: #fffffff0;
   text-shadow: none;
 }
-.briefing-grid .magazine-with-photo .magazine-copy p,
-.briefing-grid .magazine-with-photo .magazine-live {
+.briefing-grid .magazine-with-photo .magazine-copy p {
   color: #fffffff0;
   text-shadow: 0 1px 8px #0007;
 }
@@ -358,120 +341,66 @@
 .briefing-grid .magazine-with-photo h3 {
   text-shadow: 0 2px 16px #0004;
 }
-.briefing-grid .briefing-card[data-size='2×2'] .magazine-with-photo h3 {
-  font-size: clamp(34px, 9cqi, 52px);
-  max-width: 90%;
-}
 .briefing-grid .briefing-card:has(.magazine-with-photo) .briefing-conversation-mark {
   color: #d4e4ff;
 }
 .briefing-card .magazine-compact .magazine-summary {
   -webkit-line-clamp: 1;
 }
-@container (max-height:400px) {
+/* Two type scales, chosen by available space rather than the media template. */
+@container (min-width:380px) and (min-height:380px) {
   .briefing-magazine {
-    gap: 8px;
+    --magazine-title-size: 32px;
+    --magazine-value-size: 48px;
   }
-  .briefing-magazine .magazine-copy {
-    gap: 7px;
+}
+/* Short cards reduce secondary content, keeping time, units and qualifications. */
+@container (max-height:300px) {
+  .briefing-card .briefing-magazine .magazine-summary {
+    -webkit-line-clamp: 1;
   }
-  .briefing-grid .briefing-card[data-size] .briefing-magazine h3 {
-    font-size: 26px;
+  .briefing-grid .briefing-card[data-size] .magazine-with-note h3 {
+    -webkit-line-clamp: 1;
   }
+  .briefing-card .magazine-with-chart .magazine-summary,
+  .briefing-magazine .magazine-dots,
+  .briefing-magazine .magazine-steps {
+    display: none;
+  }
+  .briefing-grid .briefing-card[data-size] .magazine-with-value h3,
   .briefing-grid .briefing-card[data-size] .magazine-with-chart h3 {
     -webkit-line-clamp: 1;
   }
-  .briefing-magazine .magazine-value strong {
-    font-size: 44px;
-  }
-  .briefing-magazine .magazine-live {
+  .briefing-magazine .magazine-documents {
     display: none;
   }
+  .briefing-magazine .briefing-visual-chart svg {
+    min-height: 40px;
+  }
+}
+@container (max-width:300px) and (max-height:300px) {
   .briefing-card .magazine-with-value .magazine-summary {
-    -webkit-line-clamp: 1;
+    display: none;
+  }
+  .briefing-card .magazine-with-chart.magazine-with-value .briefing-visual-chart svg {
+    display: none;
   }
 }
 @container (max-height:260px) {
   .briefing-magazine {
     gap: 8px;
   }
-  .briefing-magazine .magazine-copy {
-    gap: 6px;
-  }
-  .briefing-grid .briefing-card[data-size] .briefing-magazine h3 {
-    font-size: 22px;
-  }
-  .briefing-grid .briefing-card[data-size] .magazine-with-chart h3 {
-    -webkit-line-clamp: 1;
-    font-size: 20px;
-  }
-  .briefing-magazine .magazine-value strong {
-    font-size: 36px;
-  }
-  .briefing-card .briefing-magazine.magazine-with-chart .magazine-summary {
-    display: none;
-  }
-  .briefing-magazine .magazine-live {
-    display: none;
-  }
-  .briefing-magazine .magazine-steps {
-    margin-block: 2px;
-  }
-  .briefing-card .briefing-magazine .magazine-summary {
-    -webkit-line-clamp: 2;
-    font-size: 12px;
-  }
-  .briefing-card .briefing-magazine.magazine-with-value .magazine-summary {
-    -webkit-line-clamp: 1;
-  }
-  .briefing-card .briefing-magazine .magazine-note {
-    -webkit-line-clamp: 2;
-  }
-  .briefing-magazine .magazine-dots {
-    gap: 5px;
-    grid-template-columns: repeat(6, 10px);
-  }
-  .briefing-magazine .magazine-dots i {
-    width: 10px;
-    height: 10px;
-  }
 }
 @container (max-width:230px) {
   .briefing-magazine .magazine-documents {
     display: none;
   }
+  .briefing-magazine .magazine-eyebrow {
+    flex-wrap: wrap;
+  }
   .briefing-magazine .magazine-eyebrow time {
-    display: none;
-  }
-  .briefing-magazine .magazine-type {
-    padding: 3px 6px;
-  }
-  .briefing-grid .briefing-card[data-size] .briefing-magazine h3 {
-    font-size: 21px;
-  }
-  .briefing-card .briefing-magazine .magazine-note {
-    font-size: 11px;
-  }
-}
-@container (max-height:200px) {
-  .briefing-grid .briefing-card[data-size] .briefing-magazine h3 {
-    font-size: 19px;
-    -webkit-line-clamp: 1;
-  }
-  .briefing-magazine {
-    gap: 5px;
-  }
-  .briefing-card .briefing-magazine .magazine-summary {
-    -webkit-line-clamp: 1;
-  }
-  .briefing-magazine .magazine-value strong {
-    font-size: 30px;
-  }
-  .briefing-magazine .magazine-steps {
-    display: none;
-  }
-  .briefing-magazine .magazine-documents {
-    display: none;
+    flex: 1;
+    min-width: 90px;
   }
 }
 
