@@ -6355,9 +6355,25 @@ html[data-briefing-slide]::view-transition-new(briefing-composer) {
   -webkit-user-drag: none;
 }
 @media (hover: hover) and (pointer: fine) {
-  .briefing-card-main {
+  .briefing-page.can-arrange .briefing-card-main {
     cursor: grab;
   }
+}
+.briefing-follow-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-bottom: 12px;
+}
+.briefing-follow-controls .briefing-view-note {
+  margin: 0;
+}
+.briefing-follow-controls > button {
+  padding: 6px 0;
+  color: var(--accent);
+  font-size: 13px;
 }
 .briefing-page.is-editing .briefing-card-tools,
 .briefing-page.is-editing .briefing-resize-handle {

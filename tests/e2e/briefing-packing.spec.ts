@@ -53,7 +53,7 @@ for (const savedColumns of [0, 5, 2]) {
       await expect(page.locator('.briefing-grid .briefing-card').first()).toBeVisible();
     }
     const before = await page.evaluate((key) => localStorage.getItem(key), storageKey);
-    for (const width of [1418, 1280, 1024, 768, 540, 390, 320, 768, 1024, 1280, 1440]) {
+    for (const width of [1418, 1280, 1024, 927, 768, 540, 390, 320, 768, 1024, 1280, 1440]) {
       await page.setViewportSize({ width, height: 900 });
       await expect
         .poll(() =>

@@ -1,5 +1,6 @@
 import { withBriefingArticle } from '../briefingArticle';
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
 import { RotateCcw, Newspaper, MessageSquare, RefreshCw, ArrowDown, Check } from 'lucide-react';
 import { useDemo, useUI } from '../store';
 import {
@@ -16,6 +17,8 @@ import { BriefingCardPeople } from '../components/BriefingMedia';
 import { Button, Empty, Modal, PageActions } from '../components/ui';
 import { useBriefingTabs } from '../components/useBriefingTabs';
 import { useBriefingRefresh } from '../components/useBriefingRefresh';
+import { useBriefingFollowLayout } from '../components/useBriefingFollowLayout';
+import { BriefingResizeHandle } from '../components/BriefingResize';
 import { BriefingMagazineBody } from '../components/BriefingMagazineBody';
 import { magazineType, magazineTypes, magazineFilter } from '../briefingMagazine';
 import { briefingConversation } from '../briefingChats';
@@ -41,9 +44,11 @@ function Card({
   at,
   placement,
   onOpen,
+  follow,
 }: BriefingEntry & {
   placement: Placement;
   onOpen: (reference: BriefingReference, trigger: HTMLButtonElement) => void;
+  follow?: ReturnType<typeof useBriefingFollowLayout>;
 }) {
   const { state } = useDemo();
   const config = { ...cardConfig(card), title: card.config?.title || data.title, size: placement.size };
@@ -51,7 +56,7 @@ function Card({
   const read = isBriefingRead(state, data);
   return (
     <article
-      className={`briefing-card template-${data.template} ${read ? 'is-read' : ''}`}
+      className={`briefing-card template-${data.template} ${read ? 'is-read' : ''} ${follow?.resize.preview?.id === card.id ? 'is-resizing' : ''} ${follow?.move.preview?.id === card.id ? (follow.move.preview.pointer ? 'is-moving' : 'is-keyboard-moving') : ''}`}
       data-card-id={card.id}
       data-size={config.size}
       data-read={read}
@@ -63,7 +68,21 @@ function Card({
       <button
         className="briefing-card-main"
         aria-label={`${config.title}${read ? '，已读' : ''}${hasChat ? '，已有会话' : ''}`}
+        aria-describedby={follow ? 'briefing-move-help' : undefined}
+        aria-keyshortcuts={follow ? 'Alt+Enter' : undefined}
+        onPointerDown={follow ? (event) => follow.move.start(event, card.id, 'following') : undefined}
+        onKeyDown={
+          follow
+            ? (event) => {
+                if (event.altKey && event.key === 'Enter' && !follow.move.preview) {
+                  event.preventDefault();
+                  follow.move.startKeyboard(event.currentTarget, card.id, 'following');
+                } else follow.move.keyDown(event, card.id);
+              }
+            : undefined
+        }
         onClick={(e) =>
+          !follow?.edit.editing &&
           onOpen(
             withBriefingArticle({
               cardId: card.id,
@@ -83,6 +102,16 @@ function Card({
         )}
       </button>
       <BriefingCardPeople data={data} />
+      {follow && (
+        <BriefingResizeHandle
+          id={card.id}
+          title={config.title}
+          size={placement.size}
+          resize={follow.resize}
+          disabled={!!follow.move.preview}
+          position={{ groupId: 'following', row: placement.row, col: placement.col }}
+        />
+      )}
     </article>
   );
 }
@@ -242,13 +271,27 @@ export function Briefing() {
               }),
           }))
           .filter((g) => g.entries.length)
-      : normalGroups();
+      : tab === '关注'
+        ? entries.length
+          ? [{ id: 'following', label: '我的关注', entries }]
+          : []
+        : normalGroups();
   const viewKey = JSON.stringify([ui.route, tab, type, scope, day]);
+  const follow = useBriefingFollowLayout({
+    page: pageRef,
+    columns,
+    unit,
+    viewKey,
+    enabled: tab === '关注',
+    blocked: ui.conversationOpen || !!detail || !!hiddenGroup,
+    entries,
+  });
+  const arranging = !!follow.move.preview || !!follow.resize.preview || follow.edit.editing;
   const refresh = useBriefingRefresh({
     page: pageRef,
     ready: gridReady,
     viewKey,
-    blocked: ui.conversationOpen || !!detail || !!hiddenGroup,
+    blocked: ui.conversationOpen || !!detail || !!hiddenGroup || arranging,
     onRefresh: () => {
       setRecommendations(recommendBriefing(state));
       setReadExpanded(false);
@@ -258,7 +301,7 @@ export function Briefing() {
     page: pageRef,
     index: tabs.indexOf(tab),
     count: tabs.length,
-    blocked: ui.conversationOpen || !!detail || !!hiddenGroup || refresh.active,
+    blocked: ui.conversationOpen || !!detail || !!hiddenGroup || refresh.active || arranging,
     onSelect: (index) => {
       view.current.scrollTop = 0;
       pageRef.current?.closest('main')?.scrollTo({ top: 0, behavior: 'instant' });
@@ -312,12 +355,34 @@ export function Briefing() {
   }, []);
   return (
     <div
-      className={`briefing-page ${refresh.active ? 'is-refreshing' : ''}`}
+      className={`briefing-page ${tab === '关注' ? 'can-arrange' : ''} ${follow.resize.preview ? 'is-resizing' : ''} ${follow.move.preview ? 'is-moving' : ''} ${follow.edit.editing ? 'is-editing' : ''} ${refresh.active ? 'is-refreshing' : ''}`}
       ref={pageRef}
       data-briefing-arriving={refresh.arriving || undefined}
       data-refresh-phase={refresh.phase}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape' && follow.edit.editing && !follow.move.preview && !follow.resize.preview)
+          follow.finishEditing();
+      }}
       style={{ '--briefing-columns': columns, '--briefing-unit': `${unit}px` } as CSSProperties}
     >
+      {tab === '关注' && (
+        <>
+          <span id="briefing-move-help" className="briefing-sr-only">
+            拖动卡片调整位置，松手保存，Esc 取消。触屏长按后拖动。Alt 加回车拿起卡片，方向键移动，回车放下。
+          </span>
+          <span id="briefing-resize-help" className="briefing-sr-only">
+            拖动右下角调整大小，松手保存，Esc 取消；也可聚焦此按钮后使用方向键调整大小。
+          </span>
+          <span role="status" className="briefing-sr-only">
+            {follow.move.announcement || follow.resize.announcement}
+          </span>
+          {follow.resize.preview && (
+            <div ref={follow.resize.hint} className="briefing-resize-hint" aria-hidden="true">
+              {follow.resize.preview.size}
+            </div>
+          )}
+        </>
+      )}
       <PageActions>
         <div role="tablist" aria-label="画报分类" className="briefing-tabs">
           {tabs.map((t, index) => (
@@ -326,7 +391,7 @@ export function Briefing() {
               role="tab"
               aria-selected={tab === t}
               aria-controls="briefing-panel"
-              disabled={refresh.active}
+              disabled={refresh.active || arranging}
               onClick={() => selectTab(index)}
             >
               {t}
@@ -335,16 +400,30 @@ export function Briefing() {
         </div>
       </PageActions>
       <PageActions placement="meta">
-        <button
-          className="briefing-refresh-button"
-          aria-label="刷新智能画报（演示）"
-          title="刷新画报并调整已读位置"
-          disabled={refresh.active || !!detail || !!hiddenGroup}
-          onClick={refresh.refresh}
-        >
-          <RefreshCw size={17} />
-        </button>
+        {follow.edit.editing ? (
+          <button className="briefing-edit-done" onClick={follow.finishEditing}>
+            完成
+          </button>
+        ) : (
+          <button
+            className="briefing-refresh-button"
+            aria-label="刷新智能画报（演示）"
+            title="刷新画报并调整已读位置"
+            disabled={refresh.active || !!detail || !!hiddenGroup || arranging}
+            onClick={refresh.refresh}
+          >
+            <RefreshCw size={17} />
+          </button>
+        )}
       </PageActions>
+      {follow.undo &&
+        createPortal(
+          <div className="briefing-layout-notice" role="status">
+            <span>{follow.undo.text}</span>
+            <button onClick={follow.restore}>撤销</button>
+          </div>,
+          document.body,
+        )}
       <div className="briefing-refresh-space" style={{ height: `${refresh.distance}px` }} aria-hidden="true">
         <div className="briefing-refresh-indicator">
           {refresh.phase === 'refreshing' ? (
@@ -429,7 +508,14 @@ export function Briefing() {
           </div>
         )}
         {tab === '关注' && entries.length > 0 && (
-          <p className="briefing-view-note">持续跟进的内容，也会保留在推荐中。</p>
+          <div className="briefing-follow-controls">
+            <p className="briefing-view-note">拖动卡片调整位置，拖动右下角调整大小；触屏长按后调整。</p>
+            {follow.hasLayout && (
+              <button disabled={arranging} onClick={follow.reset}>
+                恢复自动排列
+              </button>
+            )}
+          </div>
         )}
         {groups.map((group) => {
           const allVisible = group.entries.filter((e) => !e.card.hidden);
@@ -445,14 +531,8 @@ export function Briefing() {
             ...entry,
             card: { ...entry.card, config: undefined },
           }));
-          const placements = layoutBriefingSpread(
-            automatic,
-            columns,
-            false,
-            {},
-            undefined,
-            undefined,
-            tab === '推荐',
+          const placements = (
+            tab === '关注' ? follow.placements : layoutBriefingSpread(automatic, columns)
           ).map((p) => ({ ...p, entry: visible.find((e) => e.card.id === p.entry.card.id)! }));
           const piles = hiddenPilePositions(placements, columns, hiddenDays.length);
           return (
@@ -483,6 +563,7 @@ export function Briefing() {
                     key={placement.entry.card.id}
                     {...placement.entry}
                     placement={placement}
+                    follow={tab === '关注' ? follow : undefined}
                     onOpen={(reference, trigger) => {
                       detailTrigger.current = trigger;
                       setDetail(reference);

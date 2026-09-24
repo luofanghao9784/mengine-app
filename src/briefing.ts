@@ -82,6 +82,13 @@ export type BriefingState = {
   version: 1;
   cards: BriefingCard[];
   layouts?: Record<string, import('./briefingLayout.ts').BriefingSavedLayout>;
+  followLayouts?: Record<
+    string,
+    {
+      sizes: Record<string, CardSize>;
+      layout: import('./briefingLayout.ts').BriefingSavedLayout;
+    }
+  >;
   interactions?: Record<string, Record<string, import('./briefingFeedback.ts').CardInteraction>>;
   shares?: import('./briefingFeedback.ts').BriefingShare[];
 };
