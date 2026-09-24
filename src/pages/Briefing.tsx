@@ -60,6 +60,7 @@ function Card({
       data-card-id={card.id}
       data-size={config.size}
       data-read={read}
+      data-layout-editable={!!follow}
       style={{
         gridColumn: `${placement.col + 1} / span ${placement.width}`,
         gridRow: `${placement.row + 1} / span ${placement.height}`,
