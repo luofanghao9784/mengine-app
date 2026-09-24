@@ -568,6 +568,7 @@ test('财务版式样例明确合成来源，四周金额与合计一致', () =>
   assert.equal(s.briefing!.cards.find((c) => c.id === d.id)!.active, false);
 });
 
+import { magazineType } from '../src/briefingMagazine.ts';
 import { hiddenPilePositions, groupBriefingEntries, layoutBriefingSpread } from '../src/briefingLayout.ts';
 
 test('画报拼版按日期分组、视觉与键盘同序、不重叠，手动规格优先且不改内容', () => {
@@ -621,7 +622,10 @@ test('画报拼版按日期分组、视觉与键盘同序、不重叠，手动�
   assert.deepEqual(s, before);
   for (const view of ['类型', '空间'] as const) {
     for (const group of groupBriefingEntries(entries, view)) {
-      assert.equal(new Set(group.entries.map((e) => (view === '类型' ? e.data.type : e.data.space))).size, 1);
+      assert.equal(
+        new Set(group.entries.map((e) => (view === '类型' ? magazineType(e.data) : e.data.space))).size,
+        1,
+      );
       assert.equal(group.day, undefined);
     }
   }

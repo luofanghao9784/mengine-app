@@ -162,7 +162,7 @@ test('键盘连续移动、缩放保留落点，视图独立，窄屏适配后�
   expect(resized.col).toBe(beforeResize.col);
   expect(resized.size).toBe('1×1');
   const latest = await layout(page);
-  await page.getByRole('tab', { name: '日期', exact: true }).click();
+  await page.getByRole('tab', { name: '类型', exact: true }).click();
   await keyboardMove(page, 'konggu:C01', 'ArrowDown');
   await page.getByRole('tab', { name: '最新', exact: true }).click();
   expect(await layout(page)).toEqual(latest);

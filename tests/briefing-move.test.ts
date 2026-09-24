@@ -66,7 +66,7 @@ test('拖移优先落点，保留不冲突邻卡，连续移动和刷新重放�
   }
   assert.deepEqual(entries, before);
 });
-test('改列数按保存的阅读顺序适配，返回原列数恢复坐标，不持久化窄屏折算', () => {
+test('改列数同组紧凑补位，返回原列数恢复坐标，不持久化窄屏折算', () => {
   const entries = fixture();
   const initial = layoutBriefingSpread(entries, 5);
   const moved = layoutBriefingSpread(
@@ -82,13 +82,40 @@ test('改列数按保存的阅读顺序适配，返回原列数恢复坐标，�
   for (const columns of [1, 2, 3, 4]) {
     const layout = layoutBriefingSpread(entries, columns, false, {}, undefined, saved);
     check(layout, columns);
-    assert.deepEqual(
-      layout.map((p) => p.entry.card.id),
-      saved.order,
-    );
+    assert.deepEqual(new Set(layout.map((p) => p.entry.card.id)), new Set(saved.order));
+    for (const p of layout) {
+      const configured = p.entry.card.config!.size;
+      assert.equal(p.size, columns === 1 ? `1×${configured[2]}` : configured);
+    }
   }
   assert.deepEqual(saved, before);
   assert.deepEqual(layoutBriefingSpread(entries, 5, false, {}, undefined, saved), moved);
+});
+test('保存布局缩窄或展开时允许后方小卡补洞，不改写手动偏好与内容', () => {
+  for (const [from, to, sizes] of [
+    [5, 2, ['1×1', '2×2', '1×1']],
+    [2, 3, ['2×2', '2×1', '1×1', '1×1']],
+  ] as [number, number, CardSize[]][]) {
+    const entries = fixture().slice(0, sizes.length);
+    entries.forEach((entry, index) => (entry.card.config!.size = sizes[index]));
+    const initial = layoutBriefingSpread(entries, from);
+    const saved = saveBriefingLayout(initial, from, [entries[0].card.id]);
+    const before = structuredClone({ entries, saved });
+    for (const preserveOrder of [false, true]) {
+      const packed = layoutBriefingSpread(entries, to, false, {}, undefined, saved, preserveOrder);
+      check(packed, to);
+      const occupied = new Set<number>();
+      for (const p of packed)
+        for (let y = 0; y < p.height; y++)
+          for (let x = 0; x < p.width; x++) occupied.add((p.row + y) * to + p.col + x);
+      const last = packed.at(-1)!;
+      for (let cell = 0; cell < last.row * to + last.col; cell++)
+        assert.ok(occupied.has(cell), `${from} → ${to}: middle cell ${cell} should be filled`);
+      assert.ok(packed.every((p) => p.size === p.entry.card.config!.size));
+    }
+    assert.deepEqual({ entries, saved }, before);
+    assert.deepEqual(layoutBriefingSpread(entries, from, false, {}, undefined, saved), initial);
+  }
 });
 test('保存布局不恢复隐藏或失权卡片，新卡加入不冲掉既有位置，缩放保留当前起点', () => {
   const entries = fixture();

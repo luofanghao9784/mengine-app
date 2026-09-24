@@ -87,7 +87,7 @@ export type LibraryView = {
   scrollTop: number;
 };
 export type BriefingView = {
-  tab: '最新' | '关注' | '日期' | '类型' | '空间';
+  tab: '推荐' | '最新' | '关注' | '日期' | '类型' | '空间';
   type: string;
   scope: string;
   day: string;
@@ -98,6 +98,9 @@ export type ConversationOrigin = {
   element: HTMLElement;
   reference: BriefingReference;
   visual?: import('./components/conversationMotion').BriefingVisual;
+  surface?: 'detail';
+  readingScroll?: number;
+  returnFocus?: HTMLElement;
 };
 export type DraftConversationOrigin = {
   visual: import('./components/conversationMotion').BriefingVisual;

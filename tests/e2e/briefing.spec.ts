@@ -94,32 +94,6 @@ test('独立优化会话解析草案、预览保存与刷新恢复，不制造�
   await expect(page).toHaveURL(url);
 });
 
-test('留存快照与最新结果区分，回看不恢复旧任务状态', async ({ page }) => {
-  // Simulate a previously observed day; do not invent unobserved snapshots in product code.
-  await page.evaluate(() => {
-    const key = 'enterprise-ai-demo-v1';
-    const s = JSON.parse(localStorage.getItem(key)!);
-    const c = s.briefing.cards.find((x: any) => x.id === 'dream');
-    c.updatedAt = '2026-09-18T01:00:00.000Z';
-    c.history[0].at = c.updatedAt;
-    localStorage.setItem(key, JSON.stringify(s));
-  });
-  await page.reload();
-  await main(page, 'dream').click();
-  await page.getByRole('button', { name: '按当前方案处理', exact: true }).click();
-  await go(page);
-  await expect(card(page, 'dream')).toContainText('已按月份归类');
-  await page.getByRole('tab', { name: '日期', exact: true }).click();
-  await page.getByLabel('回看日期', { exact: true }).fill('2026-09-18');
-  await expect(card(page, 'dream')).toContainText('等待确认');
-  await main(page, 'dream').click();
-  await expect(
-    page.getByText('来源已有更新，上方讨论仍保留当时内容。下方事项操作使用当前状态。', { exact: true }),
-  ).toBeVisible();
-  await expect(page.getByText('已完成当前批次', { exact: true })).toBeVisible();
-  expect((await state(page)).dream.status).toBe('done');
-});
-
 test('卡片键盘与触屏操作可达，四种规格及窄屏没有正文溢出', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));

@@ -96,7 +96,7 @@ test('画报内容双向滑入滑出，标题和悬浮输入保持原位，快�
   await settled(page);
   await page.getByRole('tab', { name: '关注', exact: true }).click();
   await expect(page.locator('html')).toHaveAttribute('data-briefing-slide', 'previous');
-  await page.getByRole('tab', { name: '日期', exact: true }).click();
+  await page.getByRole('tab', { name: '会话', exact: true }).click();
   await page.getByRole('tab', { name: '空间', exact: true }).click();
   await expect(active(page)).toHaveText('空间');
   await page.getByRole('navigation').getByRole('button', { name: '资料库', exact: true }).click();

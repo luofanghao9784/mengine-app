@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 const key = 'enterprise-ai-demo-v1';
 
-test('四期内容可按日期与类型查看，图表保留自己的单位，进入会话可核对来源', async ({ page }) => {
+test('四期内容在最新按日期分组并可按类型查看，图表保留自己的单位，进入会话可核对来源', async ({ page }) => {
   await page.goto('/#/briefing');
   await expect(page.locator('.briefing-grid .briefing-card')).toHaveCount(46);
   const examples = await page.locator('.briefing-grid [data-card-id^="demo:"]').count();
@@ -14,14 +14,6 @@ test('四期内容可按日期与类型查看，图表保留自己的单位，�
     /8\/27 8条.*9\/17 15条/,
   );
   await expect(trend).not.toContainText('万元');
-  await page.getByRole('tab', { name: '日期', exact: true }).click();
-  await page.getByLabel('回看日期', { exact: true }).fill('2026-09-18');
-  await expect(page.locator('.briefing-grid [data-card-id^="demo:"]')).toHaveCount(16);
-  await expect(page.locator('[data-card-id="demo:opportunity-funnel"]')).toHaveCount(0);
-  await page.getByLabel('回看日期', { exact: true }).fill('2026-09-17');
-  await expect(page.locator('.briefing-grid [data-card-id^="demo:"]')).toHaveCount(8);
-  await page.getByLabel('回看日期', { exact: true }).fill('2026-09-16');
-  await expect(page.locator('.briefing-grid [data-card-id^="demo:"]')).toHaveCount(0);
   await page.getByRole('tab', { name: '类型', exact: true }).click();
   await page.getByRole('button', { name: '成果交付', exact: true }).click();
   await expect(page.locator('.briefing-grid .briefing-card')).toHaveCount(5);

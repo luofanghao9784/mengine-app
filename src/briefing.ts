@@ -1,3 +1,5 @@
+import { buildBriefingArticle, type BriefingArticleData } from './briefingArticle.ts';
+import { commitCustomFeedback } from './briefingFeedback.ts';
 import {
   addChat,
   addMessage,
@@ -80,15 +82,25 @@ export type BriefingState = {
   version: 1;
   cards: BriefingCard[];
   layouts?: Record<string, import('./briefingLayout.ts').BriefingSavedLayout>;
+  interactions?: Record<string, Record<string, import('./briefingFeedback.ts').CardInteraction>>;
+  shares?: import('./briefingFeedback.ts').BriefingShare[];
 };
-export type BriefingReference = { cardId: string; asOf: string; snapshot: CardData; config: CardConfig };
+export type BriefingReference = {
+  cardId: string;
+  asOf: string;
+  snapshot: CardData;
+  config: CardConfig;
+  article?: BriefingArticleData;
+};
 export type BriefingChatContext = {
   cardId: string;
   purpose: 'content' | 'optimize';
   snapshot: CardData;
+  article?: BriefingArticleData;
   asOf: string;
   draft?: CardConfig;
   display?: CardConfig;
+  feedback?: { pending: boolean; refVersions: Record<string, string> };
 };
 
 export function followupRows(s: DemoState, scope: string) {
@@ -393,7 +405,7 @@ export function openBriefingChat(
   s: DemoState,
   id: string,
   purpose: 'content' | 'optimize',
-  snapshot?: { at: string; data: CardData },
+  snapshot?: { at: string; data: CardData; article?: BriefingArticleData },
   displayConfig?: CardConfig,
 ) {
   syncBriefing(s);
@@ -416,6 +428,7 @@ export function openBriefingChat(
   const data = snapshot?.data || card.data;
   if (!canReadCardData(s, data)) throw new Error('该快照的来源已不可访问。');
   const at = snapshot?.at || card.updatedAt;
+  const article = structuredClone(snapshot?.article || buildBriefingArticle(data));
   let chat = s.chats.find((c) => c.id === card[key]);
   if (!chat && purpose === 'content') {
     if (data.sourceKind === 'collaboration')
@@ -473,6 +486,7 @@ export function openBriefingChat(
       asOf: at,
       snapshot: structuredClone(data),
       config: structuredClone(config),
+      article,
     };
   }
   const draft = purpose === 'optimize' ? chat.briefingContext?.draft || structuredClone(config) : undefined;
@@ -480,6 +494,7 @@ export function openBriefingChat(
     cardId: id,
     purpose,
     snapshot: structuredClone(data),
+    article,
     asOf: at,
     draft,
     display: structuredClone(config),
@@ -489,6 +504,17 @@ export function openBriefingChat(
 export function replyToBriefing(s: DemoState, chatId: string, text: string) {
   const chat = s.chats.find((c) => c.id === chatId)!;
   const ctx = chat.briefingContext!;
+  if (ctx.purpose === 'optimize' && ctx.feedback) {
+    const submitted = commitCustomFeedback(s, chatId, text);
+    addMessage(
+      chat,
+      'assistant',
+      submitted
+        ? '已记录这次“没用”的具体原因，并关联到你刚才阅读的卡片版本。你可以继续补充希望怎样调整。当前为前端演示，尚未自动修改内容或推荐策略。'
+        : '补充说明已保留在这张卡片的调整会话中。当前为前端演示，内容核查与自动调优将在引擎接入后执行。',
+    );
+    return;
+  }
   if (ctx.purpose === 'optimize') {
     const card = s.briefing!.cards.find((c) => c.id === ctx.cardId)!;
     const draft = (ctx.draft ||= structuredClone(cardConfig(card)));

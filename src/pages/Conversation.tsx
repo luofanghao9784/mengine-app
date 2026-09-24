@@ -42,11 +42,13 @@ function Composer({
   space,
   chatId,
   large = false,
+  feedback = false,
 }: {
   onSend: (text: string) => void;
   space: string;
   chatId?: string;
   large?: boolean;
+  feedback?: boolean;
 }) {
   const { state } = useDemo();
   const ui = useUI();
@@ -62,11 +64,16 @@ function Composer({
     <div className={`composer-wrap ${large ? 'large' : ''}`}>
       <div className="composer">
         <textarea
-          aria-label={large ? '描述你的工作需求' : '继续对话'}
+          autoFocus={feedback}
+          aria-label={feedback ? '说明没用的原因' : large ? '描述你的工作需求' : '继续对话'}
           value={value}
           onChange={(e) => setValue(e.target.value)}
           placeholder={
-            large ? '描述你想完成的工作，剩下的我们一起推进…' : '继续描述你的想法，或选择上方建议…'
+            feedback
+              ? '这张卡片哪里没帮到你？也可以直接说希望它怎样调整。'
+              : large
+                ? '描述你想完成的工作，剩下的我们一起推进…'
+                : '继续描述你的想法，或选择上方建议…'
           }
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -463,7 +470,12 @@ export function Conversation({ chatId }: { chatId: string }) {
           <div ref={bottom} />
         </div>
       </div>
-      <Composer space={chat.space} chatId={chat.id} onSend={send} />
+      <Composer
+        feedback={!!chat.briefingContext?.feedback}
+        space={chat.space}
+        chatId={chat.id}
+        onSend={send}
+      />
     </>
   );
 }

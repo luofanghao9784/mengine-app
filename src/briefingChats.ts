@@ -1,5 +1,5 @@
 import type { Chat, DemoState } from './model.ts';
-import type { CardData } from './briefing.ts';
+import type { BriefingCard, CardData } from './briefing.ts';
 import { canReadMaterial, visibleSpaces } from './libraryModel.ts';
 
 // Legacy normal/builder chats predate origin tracking. Exclude every known card
@@ -68,4 +68,50 @@ export function conversationBriefingSources(state: DemoState, now: string): Card
       };
       return readableConversationReply(state, data) ? [data] : [];
     });
+}
+
+// The conversation view includes content discussions, not card-design sessions.
+// Source-card messages establish context; they are not new AI replies.
+export function briefingConversation(state: DemoState, card: BriefingCard) {
+  const chat = state.chats.find((chat) => chat.id === card.chatId);
+  if (
+    !chat ||
+    chat.archived ||
+    chat.kind === 'briefing-optimize' ||
+    chat.briefingContext?.purpose === 'optimize' ||
+    (!['none', 'personal'].includes(chat.space) &&
+      !visibleSpaces(state).some((space) => space.id === chat.space))
+  )
+    return undefined;
+  const reply = chat.messages.findLast(
+    (message) => message.role === 'assistant' && message.text.trim() && !message.briefing,
+  );
+  const refs = [
+    ...new Set([
+      ...(reply?.refs || []),
+      ...(reply?.doc ? [reply.doc] : []),
+      ...Object.keys(reply?.refVersions || {}),
+    ]),
+  ];
+  if (
+    !refs.every((id) =>
+      state.materials.some(
+        (doc) =>
+          doc.id === id &&
+          canReadMaterial(state, doc) &&
+          (!reply?.refVersions?.[id] ||
+            doc.versions.some((version) => version.id === reply.refVersions![id])),
+      ),
+    )
+  )
+    return undefined;
+  return {
+    chatId: chat.id,
+    // Untimed legacy replies retain their first observed card time. Merely
+    // opening a chat, changing its title or sending a user message cannot bump it.
+    at: reply
+      ? reply.createdAt ||
+        (card.data.sourceKind === 'conversation' ? card.updatedAt : card.history[0]?.at || card.updatedAt)
+      : '',
+  };
 }

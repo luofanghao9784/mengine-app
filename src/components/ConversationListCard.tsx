@@ -5,7 +5,7 @@ import { DeckCard, type DeckCardProps } from './DeckCard';
 import { ConversationList } from './ConversationList';
 import { IconButton } from './ui';
 
-type Props = Pick<DeckCardProps, 'active' | 'folded' | 'covered' | 'onExpand'> & {
+type Props = Pick<DeckCardProps, 'active' | 'folded' | 'covered' | 'clipped' | 'onExpand'> & {
   onSelect?: () => void;
 };
 export function ConversationListCard({ onSelect, ...props }: Props) {

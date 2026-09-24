@@ -6,6 +6,7 @@ type Options = {
   ready: boolean;
   blocked: boolean;
   viewKey: string;
+  onRefresh?: () => void;
 };
 const TRIGGER = 64;
 const distanceFor = (raw: number) => 108 * (1 - Math.exp(-Math.max(0, raw) / 145));
@@ -112,8 +113,9 @@ export function useBriefingRefresh(options: Options) {
     timers.current.push(
       setTimeout(() => {
         if (generation.current !== token) return;
+        latest.current.onRefresh?.();
         change('done', 54);
-        setAnnouncement('刷新演示完成，当前内容和手动布局已保留');
+        setAnnouncement('已刷新画报排列，内容与历史记录已保留');
         timers.current.push(
           setTimeout(() => {
             if (generation.current !== token) return;

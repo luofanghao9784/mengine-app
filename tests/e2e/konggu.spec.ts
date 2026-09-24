@@ -13,7 +13,11 @@ test('默认空谷40张内容卡加3张活跃会话，原文配图、独立存�
   await expect(page.locator('.briefing-grid .briefing-card')).toHaveCount(43);
   await expect(page.locator('.briefing-grid .template-conversation')).toHaveCount(3);
   expect((await state(page)).materials).toHaveLength(45);
-  expect(await page.locator('.briefing-date-divider').count()).toBe(5);
+  await expect(page.getByRole('tab', { name: '推荐', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await page.getByRole('tab', { name: '日期', exact: true }).click();
+  await expect(page.locator('.briefing-date-divider')).toHaveCount(5);
+  await page.getByRole('tab', { name: '推荐', exact: true }).click();
+  await expect(page.getByRole('tabpanel', { name: '推荐画报', exact: true })).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem('enterprise-ai-demo-v1'))).toBe(
     '{"legacy":"keep me"}',
   );
@@ -71,28 +75,33 @@ test('从研发会话生成有资料依据的个人草稿，并保留版本修�
   await expect(page.locator('.chat-main')).toContainText('关联资料已有新版本');
 });
 
-test('关注、隐藏、优化及刷新保留卡片配置和原始日期', async ({ page }) => {
+test('详情关注与调整反馈保留原始日期，旧版标题配置和隐藏记录继续生效', async ({ page }) => {
   const before = (await state(page)).briefing.cards.find((c: any) => c.id === 'konggu:C01').updatedAt;
+  // Seed saved preferences from the previous interface; there is no grid action menu now.
+  await page.evaluate((key) => {
+    const s = JSON.parse(localStorage.getItem(key)!);
+    const c = s.briefing.cards.find((c: any) => c.id === 'konggu:C01');
+    c.config = { ...c.config, title: '空谷本周零售' };
+    s.briefing.cards.find((c: any) => c.id === 'konggu:C02').hidden = true;
+    localStorage.setItem(key, JSON.stringify(s));
+  }, key);
+  await page.reload();
   await card(page, 'C01').hover();
-  await card(page, 'C01')
-    .getByRole('button', { name: /^固定到关注 / })
-    .click();
-  await expect(card(page, 'C01').getByRole('button', { name: /^取消关注 / })).toHaveAttribute(
+  await expect(page.locator('.briefing-card-tools, .briefing-card-menu')).toHaveCount(0);
+  await card(page, 'C01').locator('.briefing-card-main').click();
+  const detail = page.locator('.briefing-detail');
+  await detail.getByRole('button', { name: '关注', exact: true }).click();
+  await expect(detail.getByRole('button', { name: '关注', exact: true })).toHaveAttribute(
     'aria-pressed',
     'true',
   );
-  await card(page, 'C01')
-    .getByRole('button', { name: /^卡片操作 / })
-    .click();
-  await page.getByRole('button', { name: '让 AI 优化卡片', exact: true }).click();
-  await page.getByLabel('卡片标题', { exact: true }).fill('空谷本周零售');
-  await page.getByRole('button', { name: '保存卡片样式', exact: true }).click();
-  await page.getByRole('button', { name: '返回智能画报', exact: true }).click();
-  await card(page, 'C02').hover();
-  await card(page, 'C02')
-    .getByRole('button', { name: /^卡片操作 / })
-    .click();
-  await page.getByRole('button', { name: '隐藏卡片', exact: true }).click();
+  await detail.getByRole('button', { name: '没用', exact: true }).click();
+  await page.getByRole('button', { name: '告诉 AI 如何优化', exact: true }).click();
+  await page.getByLabel('说明没用的原因').fill('希望补充工作日与周末的对比');
+  await page.getByRole('button', { name: '发送消息', exact: true }).click();
+  await page.getByRole('button', { name: '返回画报', exact: true }).click();
+  await expect(page.locator('.conversation-overlay')).toHaveCount(0);
+  await expect(page).toHaveURL(/#\/briefing$/);
   await page.reload();
   await expect(card(page, 'C01').getByRole('heading')).toHaveText('空谷本周零售');
   await expect(card(page, 'C02')).toHaveCount(0);

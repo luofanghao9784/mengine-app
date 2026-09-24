@@ -13,7 +13,9 @@
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "test:e2e": "playwright test",
     "test:e2e:konggu": "playwright test tests/e2e/konggu.spec.ts",
-    "format": "prettier --write src tests vite.config.ts playwright.config.ts"
+    "format": "prettier --write src tests vite.config.ts playwright.config.ts",
+    "test:e2e:briefing-feedback": "playwright test tests/e2e/briefing-feedback.spec.ts tests/e2e/briefing-chats.spec.ts tests/e2e/konggu.spec.ts",
+    "test:e2e:frontend": "playwright test tests/e2e/briefing-feedback.spec.ts tests/e2e/briefing-chats.spec.ts tests/e2e/briefing-magazine.spec.ts tests/e2e/konggu.spec.ts tests/e2e/conversation-deck-layout.spec.ts tests/e2e/conversation-responsive.spec.ts tests/e2e/conversation-reveal.spec.ts tests/e2e/conversation-stack-hint.spec.ts tests/e2e/conversation-elastic-scroll.spec.ts"
   },
   "dependencies": {
     "lucide-react": "^1.47.0",

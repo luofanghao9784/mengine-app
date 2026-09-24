@@ -77,7 +77,15 @@ export function BriefingChart({ chart, spacious }: { chart: Chart; spacious: boo
       dot(x(i), y(d.value), 3);
       const anchor = i === 0 ? 'start' : i === rows.length - 1 ? 'end' : 'middle';
       text(x(i), y(d.value) - 8, number(d.value), anchor);
-      text(x(i), height - 3, d.label, anchor, muted);
+      // Narrow reading cards keep endpoints and the middle tick legible.
+      if (
+        !small ||
+        rows.length <= 4 ||
+        i === 0 ||
+        i === rows.length - 1 ||
+        i === Math.floor((rows.length - 1) / 2)
+      )
+        text(x(i), height - 3, d.label, anchor, muted);
     });
   } else if (chart.kind === 'stacked') {
     let offset = 0;

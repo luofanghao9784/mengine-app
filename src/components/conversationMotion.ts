@@ -1,5 +1,10 @@
-export type BriefingVisual = { element: HTMLElement; rect: DOMRect };
+export type BriefingVisual = {
+  element: HTMLElement;
+  rect: DOMRect;
+  scrollOffsets?: { index: number; top: number; left: number }[];
+};
 
+export const captureDetailVisual = (source: HTMLElement) => captureVisual(source, false);
 export const captureDraftVisual = (source: HTMLElement) => captureVisual(source, false);
 export const captureBriefingVisual = (source: HTMLElement) => captureVisual(source, true);
 
@@ -54,7 +59,10 @@ function captureVisual(source: HTMLElement, briefing: boolean): BriefingVisual {
   });
   element.inert = true;
   element.append(copy);
-  return { element, rect };
+  const scrollOffsets = originals.flatMap((node, index) =>
+    node.scrollTop || node.scrollLeft ? [{ index, top: node.scrollTop, left: node.scrollLeft }] : [],
+  );
+  return { element, rect, scrollOffsets };
 }
 
 const layoutProperties = [
@@ -173,7 +181,7 @@ export function animateBriefingMorph(
     height: `${target.height}px`,
   };
   const reference = conversation.querySelector<HTMLElement>(
-    '[data-current-origin] .briefing-reference > .briefing-card, .deck-source-scroll > .briefing-card, .new-conversation-composer .draft-composer',
+    '[data-current-origin] .briefing-reference > .briefing-card, .deck-source-scroll > .briefing-detail-article, .new-conversation-composer .draft-composer',
   );
   const referenceRect = reference?.getBoundingClientRect();
   const contentTransform = referenceRect?.width
@@ -216,6 +224,95 @@ export function animateBriefingMorph(
   ];
   if (reference && referenceRect?.width) {
     animations.push(...matchContent(element.firstElementChild as HTMLElement, reference, move));
+  }
+  return animations;
+}
+
+// The detail card travels to the source pane, while the chat arrives alongside it.
+// This is an entry-only handoff: dismissing the workspace returns to the page.
+export function animateDetailToSource(
+  surface: HTMLElement,
+  destination: HTMLElement,
+  visual: BriefingVisual,
+  duration: number,
+): Animation[] {
+  const { element, rect } = visual;
+  const target = destination.getBoundingClientRect();
+  surface.replaceChildren(element);
+  surface.style.display = 'block';
+  surface.dataset.destination = 'source';
+  const copy = element.firstElementChild as HTMLElement;
+  Object.assign(element.style, { width: '100%', height: '100%' });
+  Object.assign(copy.style, { width: '100%', height: '100%', maxHeight: 'none', boxShadow: 'none' });
+  const reading = copy.querySelector<HTMLElement>('.briefing-detail-reading');
+  const scroll = copy.querySelector<HTMLElement>('.briefing-detail-scroll');
+  if (reading) Object.assign(reading.style, { width: '100%', height: 'auto', minHeight: '0', flex: '1' });
+  if (scroll) Object.assign(scroll.style, { width: '100%', height: '100%' });
+  copy.querySelector('.briefing-detail-bottom')?.remove();
+  copy.querySelector('.briefing-conversation-cta')?.remove();
+  const options: KeyframeAnimationOptions = { duration, fill: 'both' };
+  const move = (node: Element, from: Keyframe, to: Keyframe) =>
+    node.animate(
+      [
+        { ...from, offset: 0, easing: 'cubic-bezier(.22,.8,.2,1)' },
+        { ...to, offset: 0.82 },
+        { ...to, offset: 1 },
+      ],
+      options,
+    );
+  const animations = [
+    surface.animate(
+      [
+        {
+          left: `${rect.left}px`,
+          top: `${rect.top}px`,
+          width: `${rect.width}px`,
+          height: `${rect.height}px`,
+          opacity: 1,
+          borderRadius: '26px',
+          offset: 0,
+          easing: 'cubic-bezier(.22,.8,.2,1)',
+        },
+        {
+          left: `${target.left}px`,
+          top: `${target.top}px`,
+          width: `${target.width}px`,
+          height: `${target.height}px`,
+          opacity: 1,
+          borderRadius: '24px',
+          offset: 0.82,
+        },
+        {
+          left: `${target.left}px`,
+          top: `${target.top}px`,
+          width: `${target.width}px`,
+          height: `${target.height}px`,
+          opacity: 0,
+          borderRadius: '24px',
+          offset: 1,
+        },
+      ],
+      options,
+    ),
+    destination.animate(
+      [
+        { opacity: 0, offset: 0 },
+        { opacity: 0, offset: 0.8 },
+        { opacity: 1, offset: 1 },
+      ],
+      options,
+    ),
+  ];
+  const header = copy.querySelector<HTMLElement>('.briefing-detail-top');
+  if (header) animations.push(move(header, { opacity: 1 }, { opacity: 0 }));
+  const article = copy.querySelector<HTMLElement>('.briefing-detail-article');
+  const targetArticle = destination.querySelector<HTMLElement>('.briefing-detail-article');
+  if (article && targetArticle) animations.push(...matchContent(article, targetArticle, move));
+  // Scrolling containers only accept their offset after the snapshot is mounted.
+  // Restore the reading position so opening a long article does not flash its top.
+  if (scroll) {
+    const offset = visual.scrollOffsets?.find((item) => item.top > 0);
+    scroll.scrollTop = offset?.top || 0;
   }
   return animations;
 }

@@ -20,6 +20,10 @@ async function toBriefing(page: Page) {
   await page.getByRole('navigation').getByRole('button', { name: '智能画报', exact: true }).click();
   await expect(page).toHaveURL(/#\/briefing$/);
   await expect(page.locator('.conversation-overlay')).toHaveCount(0);
+  if (await page.getByRole('button', { name: '关闭卡片详情' }).count())
+    await page.getByRole('button', { name: '关闭卡片详情' }).click();
+  await page.getByRole('button', { name: '刷新智能画报（演示）', exact: true }).click();
+  await expect(page.locator('.briefing-page')).toHaveAttribute('data-refresh-phase', 'idle');
 }
 async function newChat(page: Page, text: string) {
   await page.getByRole('navigation').getByRole('button', { name: '会话', exact: true }).click();
@@ -49,9 +53,11 @@ test('会话入口发送后显示最新回复卡片，点击复用原会话且�
   const firstReply = chat.messages.at(-1).text;
   await expect(c.locator('.briefing-reply-preview')).toHaveText(firstReply);
   await expect(c).toContainText('AI 最新回复');
-  await expect(c).toContainText('继续对话');
+  await expect(c).not.toContainText('继续对话');
+  await expect(c.getByRole('img', { name: '已有会话' })).toBeVisible();
   const before = await state(page);
   await c.locator('.briefing-card-main').click();
+  await page.locator('.briefing-detail').getByRole('button', { name: '发起会话', exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`#/chat/${chat.id}$`));
   const reopened = await state(page);
   expect(reopened.chats).toEqual(before.chats);
@@ -74,19 +80,22 @@ test('画报拓展和优化会话不重复生成，会话类型和归档退出�
   const count = await cards(page).count();
   const original = page.locator('[data-card-id="konggu:C01"]');
   await original.locator('.briefing-card-main').click();
+  await page.locator('.briefing-detail').getByRole('button', { name: '发起会话', exact: true }).click();
   await page.getByLabel('继续对话', { exact: true }).fill('请核对销售增长');
   await page.getByRole('button', { name: '发送消息', exact: true }).click();
   await toBriefing(page);
   await expect(cards(page)).toHaveCount(count);
-  await original.hover();
-  await original.getByRole('button', { name: /^卡片操作 / }).click();
-  await page.getByRole('button', { name: '让 AI 优化卡片', exact: true }).click();
+  await original.locator('.briefing-card-main').click();
+  await page.locator('.briefing-detail').getByRole('button', { name: '没用', exact: true }).click();
+  await page.getByRole('button', { name: '告诉 AI 如何优化', exact: true }).click();
+  await expect(page.getByLabel('卡片调整上下文')).toBeVisible();
   await toBriefing(page);
   await expect(cards(page)).toHaveCount(count);
   await page.getByRole('tab', { name: '类型', exact: true }).click();
-  await page.getByRole('button', { name: '活跃会话', exact: true }).click();
+  await page.getByLabel('内容类型').getByRole('button', { name: '会话', exact: true }).click();
   await expect(page.locator('.briefing-grid .briefing-card')).toHaveCount(count);
   await card(page, 'kg-review').locator('.briefing-card-main').click();
+  await page.locator('.briefing-detail').getByRole('button', { name: '发起会话', exact: true }).click();
   await page.getByRole('button', { name: '会话选项', exact: true }).click();
   await page.getByRole('button', { name: '归档会话', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: '确认并继续', exact: true }).click();
@@ -95,27 +104,29 @@ test('画报拓展和优化会话不重复生成，会话类型和归档退出�
   expect((await state(page)).chats.find((c: any) => c.id === 'kg-review').archived).toBe(true);
 });
 
-test('保存手动布局后，新会话和新回复仍前移，隐藏和原会话分别保留', async ({ page }) => {
+test('自动排列下新会话和新回复在刷新后前移，隐藏和原会话分别保留', async ({ page }) => {
   const older = await newChat(page, '第一次核对销售金额');
   const newer = await newChat(page, '第二次核对采购库存');
   const c = card(page, older.id);
-  await c.hover();
-  await c.getByRole('button', { name: /^卡片操作 / }).click();
-  await c.getByRole('button', { name: '用方向键调整位置', exact: true }).click();
-  await expect(c).toHaveClass(/is-keyboard-moving/);
-  await c.locator('.briefing-card-main').press('ArrowDown');
-  await c.locator('.briefing-card-main').press('Enter');
-  expect(Object.keys((await state(page)).briefing.layouts)).not.toHaveLength(0);
+  await expect(page.locator('.briefing-resize-handle')).toHaveCount(0);
   await c.locator('.briefing-card-main').click();
+  await page.locator('.briefing-detail').getByRole('button', { name: '发起会话', exact: true }).click();
   await page.getByLabel('继续对话', { exact: true }).fill('现在核对读书会活动');
   await page.getByRole('button', { name: '发送消息', exact: true }).click();
   await toBriefing(page);
   await expect(cards(page).first()).toHaveAttribute('data-card-id', `conversation:${older.id}`);
   const latest = await newChat(page, '第三次核对顾客回访');
   await expect(cards(page).first()).toHaveAttribute('data-card-id', `conversation:${latest.id}`);
-  await c.hover();
-  await c.getByRole('button', { name: /^卡片操作 / }).click();
-  await c.getByRole('button', { name: '隐藏卡片', exact: true }).click();
+  // Historical hidden records remain respected after the grid's old menu is removed.
+  await page.evaluate(
+    ({ key, id }) => {
+      const s = JSON.parse(localStorage.getItem(key)!);
+      s.briefing.cards.find((c: any) => c.id === `conversation:${id}`).hidden = true;
+      localStorage.setItem(key, JSON.stringify(s));
+    },
+    { key, id: older.id },
+  );
+  await page.reload();
   await expect(c).toHaveCount(0);
   const snapshot = await state(page);
   expect(snapshot.chats.find((item: any) => item.id === older.id).archived).toBe(false);
@@ -124,7 +135,7 @@ test('保存手动布局后，新会话和新回复仍前移，隐藏和原会�
   await expect(card(page, newer.id)).toHaveCount(1);
 });
 
-test('手机会话卡片内容不溢出，长按拖动及完成退出继续会话可用', async ({ browser }) => {
+test('手机会话卡片内容不溢出，详情进入会话可用', async ({ browser }) => {
   const context = await browser.newContext({
     isMobile: true,
     hasTouch: true,
@@ -143,18 +154,8 @@ test('手机会话卡片内容不溢出，长按拖动及完成退出继续会�
   }
   await settled(page);
   await page.screenshot({ path: '.local/briefing-conversations/mobile.png' });
-  const client = await context.newCDPSession(page);
-  const box = (await c.boundingBox())!;
-  const x = box.x + 90,
-    y = box.y + 105;
-  await client.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
-  await expect(page.getByRole('button', { name: '完成', exact: true })).toBeVisible();
-  await client.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: y + 300 }] });
-  await expect(c).toHaveClass(/is-moving/);
-  await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-  await expect(c).not.toHaveClass(/is-moving/);
-  await page.getByRole('button', { name: '完成', exact: true }).tap();
   await c.locator('.briefing-card-main').tap();
+  await page.locator('.briefing-detail').getByRole('button', { name: '发起会话', exact: true }).tap();
   await expect(page).toHaveURL(/#\/chat\/kg-review$/);
   expect((await state(page)).chats).toHaveLength(3);
   await context.close();

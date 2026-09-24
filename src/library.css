@@ -38,6 +38,26 @@
 .library-topbar:has(.library-tabs) .topbar-meta {
   grid-column: 6;
 }
+@media (min-width: 1920px) {
+  .library-topbar:has(.library-tabs) {
+    grid-template-columns: minmax(0, 1fr) minmax(180px, 260px) auto auto;
+  }
+  .library-topbar:has(.library-tabs) .topbar-heading {
+    display: contents;
+  }
+  .library-topbar .library-tabs {
+    grid-column: 1;
+  }
+  .library-topbar .library-header-search {
+    grid-column: 2;
+  }
+  .library-topbar .library-header-buttons {
+    grid-column: 3;
+  }
+  .library-topbar:has(.library-tabs) .topbar-meta {
+    grid-column: 4;
+  }
+}
 .library-redesign .library-toolbar {
   flex-wrap: wrap;
   justify-content: space-between;

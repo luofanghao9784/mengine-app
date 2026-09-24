@@ -1,9 +1,9 @@
 import { test, expect, type Page } from '@playwright/test';
 
-const storageKey = 'enterprise-ai-demo-v1';
-const card = (p: Page, id = 'followup:personal') => p.locator(`.briefing-grid [data-card-id="${id}"]`);
+const storageKey = 'enterprise-ai-demo-konggu-v1';
+const card = (p: Page, id = 'conversation:kg-review') => p.locator(`.briefing-grid [data-card-id="${id}"]`);
 const state = (p: Page) => p.evaluate((key) => JSON.parse(localStorage.getItem(key)!), storageKey);
-const position = (p: Page, id = 'followup:personal') =>
+const position = (p: Page, id = 'conversation:kg-review') =>
   card(p, id).evaluate((el) => {
     const rect = el.getBoundingClientRect();
     return {
@@ -13,7 +13,11 @@ const position = (p: Page, id = 'followup:personal') =>
       row: el.style.gridRowStart,
     };
   });
-const staysAt = async (p: Page, original: Awaited<ReturnType<typeof position>>, id = 'followup:personal') => {
+const staysAt = async (
+  p: Page,
+  original: Awaited<ReturnType<typeof position>>,
+  id = 'conversation:kg-review',
+) => {
   const current = await position(p, id);
   expect(current.col).toBe(original.col);
   expect(current.row).toBe(original.row);
@@ -32,7 +36,7 @@ const settled = (p: Page) =>
         ),
     )
     .toBe(0);
-const start = async (p: Page, id = 'followup:personal') => {
+const start = async (p: Page, id = 'conversation:kg-review') => {
   const c = card(p, id);
   await c.hover();
   const handle = c.locator('.briefing-resize-handle');
@@ -50,8 +54,8 @@ const start = async (p: Page, id = 'followup:personal') => {
 test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 1418, height: 1000 });
   await page.goto('/#/briefing');
-  await page.evaluate(() => localStorage.clear());
-  await page.reload();
+  await expect(card(page)).toBeVisible();
+  await settled(page);
 });
 
 test('弧形把手取代尺寸菜单，拖动实时重排，松手才保存且不进入会话', async ({ page }) => {
@@ -61,7 +65,9 @@ test('弧形把手取代尺寸菜单，拖动实时重排，松手才保存且�
   await c.getByRole('button', { name: /^卡片操作 / }).click();
   await expect(page.getByRole('button', { name: /^尺寸 / })).toHaveCount(0);
   await page.keyboard.press('Escape');
-  const neighbours = page.locator('.briefing-grid [data-card-id]:not([data-card-id="followup:personal"])');
+  const neighbours = page.locator(
+    '.briefing-grid [data-card-id]:not([data-card-id="conversation:kg-review"])',
+  );
   const positions = () =>
     neighbours.evaluateAll((els) =>
       els.map((el) => [
@@ -83,7 +89,7 @@ test('弧形把手取代尺寸菜单，拖动实时重排，松手才保存且�
   await settled(page);
   await staysAt(page, original);
   const after = await state(page);
-  const oldCard = before.briefing.cards.find((c: any) => c.id === 'followup:personal');
+  const oldCard = before.briefing.cards.find((c: any) => c.id === 'conversation:kg-review');
   const newCard = after.briefing.cards.find((c: any) => c.id === oldCard.id);
   expect(newCard.config.size).toBe('1×2');
   expect(newCard.history).toEqual(oldCard.history);
@@ -124,7 +130,7 @@ test('快速往返时动画接续当前位置，文字不缩放，Esc 回滚未�
   await expect(c.locator('.briefing-resize-handle')).toBeFocused();
 });
 
-test('最右列保持原位不换行，可向下增高，日期视图沿用已保存尺寸', async ({ page }) => {
+test('最右列保持原位不换行，可向下增高，类型视图沿用已保存尺寸', async ({ page }) => {
   const id = await page
     .locator('.briefing-grid [data-size="1×1"]')
     .evaluateAll(
@@ -144,65 +150,9 @@ test('最右列保持原位不换行，可向下增高，日期视图沿用已�
   await c.locator('.briefing-resize-handle').press('ArrowRight');
   await expect(c).toHaveAttribute('data-size', '1×2');
   expect((await state(page)).briefing.cards.find((c: any) => c.id === id).config.size).toBe('1×2');
-  await page.getByRole('tab', { name: '日期', exact: true }).click();
+  await page.getByRole('tab', { name: '类型', exact: true }).click();
   await expect(c).toHaveAttribute('data-size', '1×2');
   await expect(c.locator('.briefing-resize-handle')).toHaveCount(1);
-});
-
-test('旧日期可拖拽及键盘调尺寸，取消不保存，刷新保留且不改历史事实', async ({ page }) => {
-  await page.evaluate(() => {
-    const key = 'enterprise-ai-demo-v1';
-    const s = JSON.parse(localStorage.getItem(key)!);
-    const c = s.briefing.cards.find((x: any) => x.id === 'dream');
-    c.updatedAt = '2026-09-18T01:00:00.000Z';
-    c.history[0].at = c.updatedAt;
-    localStorage.setItem(key, JSON.stringify(s));
-  });
-  await page.reload();
-  const c = card(page, 'dream');
-  await c.locator('.briefing-card-main').click();
-  await page.getByRole('button', { name: '按当前方案处理', exact: true }).click();
-  await page.goto('/#/briefing');
-  await expect(c).toContainText('已按月份归类');
-  await page.getByRole('tab', { name: '日期', exact: true }).click();
-  await page.getByLabel('回看日期', { exact: true }).fill('2026-09-18');
-  await expect(c).toContainText('等待确认');
-  const before = await state(page);
-  await c.evaluate((el) => el.scrollIntoView({ block: 'center' }));
-  const pointer = await start(page, 'dream');
-  const original = await position(page, 'dream');
-  await page.mouse.move(pointer.x + pointer.pitch * 0.8, pointer.y + pointer.pitch * 0.8, { steps: 8 });
-  await expect(c).toHaveAttribute('data-size', '2×2');
-  await staysAt(page, original, 'dream');
-  expect(await state(page)).toEqual(before);
-  await page.keyboard.press('Escape');
-  await page.mouse.up();
-  await expect(c).toHaveAttribute('data-size', '1×1');
-  expect(await state(page)).toEqual(before);
-  await settled(page);
-  await c.evaluate((el) => el.scrollIntoView({ block: 'center' }));
-  const retry = await start(page, 'dream');
-  await page.mouse.move(retry.x + retry.pitch * 0.8, retry.y + retry.pitch * 0.8, { steps: 8 });
-  await page.mouse.up();
-  await settled(page);
-  await expect(c).toHaveAttribute('data-size', '2×2');
-  await staysAt(page, original, 'dream');
-  await c.locator('.briefing-resize-handle').press('ArrowUp');
-  await expect(c).toHaveAttribute('data-size', '2×1');
-  await staysAt(page, original, 'dream');
-  const after = await state(page);
-  const oldCard = before.briefing.cards.find((x: any) => x.id === 'dream');
-  oldCard.config = { ...(oldCard.config || { title: oldCard.data.title, compact: false }), size: '2×1' };
-  expect(after).toEqual(before);
-  await expect(c).toContainText('等待确认');
-  await page.getByRole('tab', { name: '最新', exact: true }).click();
-  await expect(c).toHaveAttribute('data-size', '2×1');
-  await expect(c).toContainText('已按月份归类');
-  await page.reload();
-  await page.getByRole('tab', { name: '日期', exact: true }).click();
-  await page.getByLabel('回看日期', { exact: true }).fill('2026-09-18');
-  await expect(c).toHaveAttribute('data-size', '2×1');
-  await expect(c).toContainText('等待确认');
 });
 
 test('键盘方向键调整四种规格，减少动态效果时直接完成排列', async ({ page }) => {
@@ -222,7 +172,9 @@ test('键盘方向键调整四种规格，减少动态效果时直接完成排�
     await staysAt(page, original);
     expect(await c.evaluate((el) => el.getAnimations().length)).toBe(0);
   }
-  await expect(page.getByRole('status')).toHaveText('卡片已调整为 2×1');
+  await expect(page.getByRole('status').filter({ hasText: '卡片已调整为 2×1' })).toHaveText(
+    '卡片已调整为 2×1',
+  );
   await expect(handle).toBeFocused();
 });
 
@@ -236,8 +188,8 @@ test('连续调整同组不同卡片各自原位保存，取消下一次预览�
     .locator('[data-card-id]')
     .evaluateAll(
       (els) =>
-        (els.find((el) => el.getAttribute('data-card-id') !== 'followup:personal') as HTMLElement).dataset
-          .cardId!,
+        (els.find((el) => el.getAttribute('data-card-id') !== 'conversation:kg-review') as HTMLElement)
+          .dataset.cardId!,
     );
   const next = card(page, nextId);
   const previousSize = (await next.getAttribute('data-size'))!;
@@ -300,15 +252,24 @@ test('触屏可拖动竖向把手，单列不产生两格宽卡，pointercancel 
   const context = await browser.newContext({ hasTouch: true, viewport: { width: 390, height: 844 } });
   const page = await context.newPage();
   await page.goto('/#/briefing');
-  const target = card(page, 'dream');
+  const target = card(page, 'konggu:C13');
   await target.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+  const client = await context.newCDPSession(page);
+  const box = (await target.boundingBox())!;
+  await client.send('Input.dispatchTouchEvent', {
+    type: 'touchStart',
+    touchPoints: [{ x: box.x + 70, y: box.y + 100 }],
+  });
+  await expect(page.getByRole('button', { name: '完成', exact: true })).toBeVisible();
+  await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await target.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+  await settled(page);
   const handle = target.locator('.briefing-resize-handle');
   await expect(handle).toHaveCSS('opacity', '1');
   const b = (await handle.boundingBox())!;
   const x = b.x + b.width - 7,
     y = b.y + b.height - 7;
   const before = await state(page);
-  const client = await context.newCDPSession(page);
   await client.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
   await client.send('Input.dispatchTouchEvent', {
     type: 'touchMove',

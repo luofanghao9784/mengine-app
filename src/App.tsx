@@ -73,6 +73,7 @@ export default function App() {
   } | null>(null);
   const libraryViews = useRef<Record<string, LibraryView>>({});
   const deckWidths = useRef<Record<string, number>>({});
+  const deckOrders = useRef<Record<string, string[]>>({});
   const conversationListState = useRef({ width: 240, folded: [] as string[], scrollTop: 0 });
   const filePreferences = useRef<Record<string, { extra: string[]; hidden: string[] }>>({});
   const briefingViews = useRef<Record<string, BriefingView>>({});
@@ -297,6 +298,7 @@ export default function App() {
             }}
             previewRequest={previewRequest}
             widths={deckWidths}
+            orders={deckOrders}
             filePreferences={filePreferences}
             newConversationRequest={newConversationRequest}
           />

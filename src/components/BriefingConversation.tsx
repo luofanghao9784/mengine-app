@@ -2,7 +2,7 @@ import { BriefingCardPeople } from './BriefingMedia';
 import { ArrowLeft, Sparkles } from 'lucide-react';
 import { useDemo, useUI } from '../store';
 import { addMessage, resolveRequest, spaceName, type Chat } from '../model';
-import { cardConfig, cardSizes, type CardSize } from '../briefing';
+import { cardConfig } from '../briefing';
 import { BriefingCardBody } from '../pages/Briefing';
 import { libraryPath, locationNames } from '../libraryModel';
 import { Button, Field } from './ui';
@@ -18,6 +18,23 @@ export function BriefingConversation({ chat }: { chat: Chat }) {
       ? state.requests.find((r) => r.id === ctx.snapshot.sourceId)
       : undefined;
   if (!card) return <p className="subtle">当前来源已不可用，历史会话保留。</p>;
+  if (ctx.purpose === 'optimize' && ctx.feedback) {
+    return (
+      <section className="briefing-feedback-context" aria-label="卡片调整上下文">
+        <strong>{ctx.feedback.pending ? '等待你的具体原因' : '反馈已关联到这张卡片'}</strong>
+        <p>{ctx.snapshot.title}</p>
+        <p className="subtle">
+          {spaceName(state, ctx.snapshot.space)} · {new Date(ctx.asOf).toLocaleString('zh-CN')}
+          <br />
+          {ctx.snapshot.source}
+        </p>
+        <SourceLinks links={ctx.snapshot.sourceLinks} />
+        <Button icon={ArrowLeft} onClick={ui.returnToBriefing}>
+          返回画报
+        </Button>
+      </section>
+    );
+  }
   if (ctx.purpose === 'optimize') {
     const config = ctx.draft || cardConfig(card);
     const update = (patch: Partial<typeof config>) =>
@@ -33,17 +50,6 @@ export function BriefingConversation({ chat }: { chat: Chat }) {
         </div>
         <Field label="卡片标题">
           <input value={config.title} maxLength={28} onChange={(e) => update({ title: e.target.value })} />
-        </Field>
-        <Field label="卡片尺寸">
-          <select
-            aria-label="卡片尺寸"
-            value={config.size}
-            onChange={(e) => update({ size: e.target.value as CardSize })}
-          >
-            {cardSizes.map((size) => (
-              <option key={size}>{size}</option>
-            ))}
-          </select>
         </Field>
         <label className="check-row">
           <input

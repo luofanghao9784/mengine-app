@@ -1,8 +1,9 @@
 import { cardConfig, localDate, type BriefingCard, type CardData, type CardSize } from './briefing.ts';
 import { briefingPresentation } from './briefingPresentation.ts';
+import { magazineType } from './briefingMagazine.ts';
 
-export type BriefingEntry = { card: BriefingCard; data: CardData; at: string };
-export type BriefingView = '最新' | '关注' | '日期' | '类型' | '空间';
+export type BriefingEntry = { card: BriefingCard; data: CardData; at: string; conversationAt?: string };
+export type BriefingView = '最新' | '关注' | '日期' | '会话' | '类型' | '空间';
 // Compare local calendar dates as UTC day numbers, avoiding DST / elapsed-hour rounding.
 export function relativeBriefingDay(day: string, today = localDate(new Date().toISOString())) {
   const days = (Date.parse(today + 'T00:00:00Z') - Date.parse(day + 'T00:00:00Z')) / 86_400_000;
@@ -22,7 +23,7 @@ export type BriefingSavedLayout = {
   columns: number;
   order: string[];
   manual?: string[];
-  positions: (BriefingLayoutAnchor & { size: CardSize; at?: string })[];
+  positions: (BriefingLayoutAnchor & { size: CardSize; at?: string; conversationAt?: string })[];
 };
 export function saveBriefingLayout(
   placements: Placement[],
@@ -39,6 +40,7 @@ export function saveBriefingLayout(
       col: p.col,
       size: p.size,
       at: p.entry.at,
+      conversationAt: p.entry.conversationAt,
     })),
   };
 }
@@ -98,6 +100,12 @@ export function groupBriefingEntries(
   closed = false,
   spaces: Record<string, string> = {},
 ) {
+  if (view === '会话' && !closed) {
+    const sorted = [...entries].sort((a, b) =>
+      (b.conversationAt || '').localeCompare(a.conversationAt || ''),
+    );
+    return sorted.length ? [{ id: 'conversations', label: '最近回复', entries: sorted }] : [];
+  }
   const chronological = closed || view === '最新' || view === '日期';
   const sorted = [...entries].sort((a, b) => b.at.localeCompare(a.at));
   const groups: BriefingGroup[] = [];
@@ -105,7 +113,7 @@ export function groupBriefingEntries(
     const id = chronological
       ? localDate(entry.at)
       : view === '类型'
-        ? entry.data.type
+        ? magazineType(entry.data)
         : view === '空间'
           ? entry.data.space
           : topic(entry.data);
@@ -148,7 +156,9 @@ export function layoutBriefingSpread(
   sizeOverrides: Record<string, CardSize> = {},
   anchor?: BriefingLayoutAnchor,
   saved?: BriefingSavedLayout,
+  preserveOrder = false,
 ): Placement[] {
+  const reflowing = !!saved && saved.columns !== columns;
   const retained = saved?.columns === columns ? saved.positions : [];
   const pending = entries.map((entry) => {
     const override = sizeOverrides[entry.card.id];
@@ -222,8 +232,9 @@ export function layoutBriefingSpread(
       cursor++;
       continue;
     }
-    // At another breakpoint, retain the saved reading order as cards reflow.
-    const ordered = !!saved && saved.columns !== columns;
+    // At another breakpoint, saved order is a fitting priority, not a reason
+    // to leave holes. Repack within this group without overwriting its layout.
+    const ordered = preserveOrder && !reflowing;
     let index = ordered
       ? fits(pending[0].preferred)
         ? 0
@@ -279,4 +290,27 @@ export function hiddenPilePositions(placements: Placement[], columns: number, co
     occupied.add(cursor++);
     return position;
   });
+}
+
+// Keep manual positioning until the set of conversations or a reply changes.
+// Then reply order wins over saved coordinates, including on another breakpoint.
+export function refreshConversationTabLayout(
+  entries: BriefingEntry[],
+  columns: number,
+  saved?: BriefingSavedLayout,
+): BriefingSavedLayout | undefined {
+  if (!saved) return undefined;
+  const current =
+    saved.positions.length === entries.length &&
+    entries.every((entry) =>
+      saved.positions.some(
+        (position) => position.id === entry.card.id && position.conversationAt === entry.conversationAt,
+      ),
+    );
+  if (current) return saved;
+  const ordered = [...entries].sort((a, b) => (b.conversationAt || '').localeCompare(a.conversationAt || ''));
+  return saveBriefingLayout(
+    layoutBriefingSpread(ordered, columns, false, {}, undefined, undefined, true),
+    columns,
+  );
 }

@@ -1,11 +1,15 @@
-import { useRef, type CSSProperties, type ReactNode, type RefObject } from 'react';
+import { Children, isValidElement, useRef, type CSSProperties, type ReactNode, type RefObject } from 'react';
+import { deckLimits } from '../conversationDeck';
 
-const limits: Record<string, [number, number, number]> = {
-  list: [208, 340, 240],
-  conversation: [420, 760, 560],
-  source: [300, 580, 360],
-  file: [320, 680, 400],
-};
+// Reorder the keyed elements themselves, so Tab and reading order match the
+// visual layout without remounting readers or losing their selected versions.
+export function OrderedDeckCards({ children, order }: { children: ReactNode; order: string[] }) {
+  return Children.toArray(children).sort((a, b) => {
+    const rank = (child: ReactNode) =>
+      isValidElement<{ id: string }>(child) ? order.indexOf(child.props.id) : -1;
+    return rank(a) - rank(b);
+  });
+}
 
 export type DeckCardProps = {
   id: string;
@@ -13,14 +17,19 @@ export type DeckCardProps = {
   label: string;
   kind: string;
   width?: number;
+  defaultWidth?: number;
+  order?: number;
+  onResetWidth?: () => void;
   onWidth: (width: number) => void;
   children: ReactNode;
   active: boolean;
   cardRef?: RefObject<HTMLElement | null>;
   folded?: boolean;
   covered?: boolean;
+  clipped?: boolean;
   onExpand?: () => void;
   tabLabel?: string;
+  stackTitle?: string;
 };
 export function DeckCard({
   id,
@@ -28,29 +37,40 @@ export function DeckCard({
   label,
   kind,
   width,
+  defaultWidth,
+  order = 0,
+  onResetWidth,
   onWidth,
   children,
   active,
   cardRef,
   folded,
   covered,
+  clipped,
   onExpand,
   tabLabel,
+  stackTitle,
 }: DeckCardProps) {
-  const [min, max, initial] = limits[kind];
+  const [min, max, fallback] = deckLimits[kind];
+  const initial = defaultWidth ?? fallback;
   const drag = useRef<{ x: number; width: number } | null>(null);
   const value = width || initial;
   const resize = (next: number) => onWidth(Math.max(min, Math.min(max, next)));
+  const needsReveal = covered || clipped;
   return (
     <section
       ref={cardRef}
       id={id === 'list' ? 'conversation-list' : undefined}
       className={`deck-card deck-${kind} ${className} ${active ? 'mobile-active' : ''} ${folded ? 'is-folded' : ''}`}
       data-folded={folded || undefined}
+      data-needs-reveal={needsReveal || undefined}
+      data-clipped={clipped || undefined}
       data-deck-id={id}
+      data-deck-title={stackTitle || tabLabel || label}
+      data-deck-order={order}
       aria-label={label}
       tabIndex={-1}
-      style={{ '--card-width': `${value}px` } as CSSProperties}
+      style={{ '--card-width': `${value}px`, order } as CSSProperties}
     >
       <div className="deck-card-content" inert={covered || undefined}>
         {children}
@@ -60,8 +80,8 @@ export function DeckCard({
           className="deck-fold-tab"
           aria-label={`展开${tabLabel || label}`}
           onClick={onExpand}
-          tabIndex={folded ? 0 : -1}
-          aria-hidden={!folded}
+          tabIndex={needsReveal ? 0 : -1}
+          aria-hidden={!needsReveal}
         />
       )}
       <div
@@ -78,7 +98,10 @@ export function DeckCard({
           if (event.button !== 0) return;
           event.preventDefault();
           event.currentTarget.setPointerCapture(event.pointerId);
-          drag.current = { x: event.clientX, width: value };
+          drag.current = {
+            x: event.clientX,
+            width: event.currentTarget.parentElement!.getBoundingClientRect().width,
+          };
         }}
         onPointerMove={(event) => {
           if (drag.current) resize(drag.current.width + event.clientX - drag.current.x);
@@ -94,7 +117,7 @@ export function DeckCard({
         onLostPointerCapture={() => {
           drag.current = null;
         }}
-        onDoubleClick={() => onWidth(initial)}
+        onDoubleClick={() => (onResetWidth ? onResetWidth() : onWidth(initial))}
         onKeyDown={(event) => {
           if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
           event.preventDefault();
