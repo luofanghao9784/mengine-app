@@ -1,4 +1,4 @@
-/** Operations 1.0.0: current state of tasks created in [from, checkedAt); not a billing ledger. */
+/** Operations 1.1.0: current state of tasks created in [from, checkedAt); not a billing ledger. */
 export type OperationsDays = 7 | 30;
 export type OperationsErrorCode =
   | 'TASK_SOURCE_UNAVAILABLE'
@@ -43,5 +43,21 @@ export interface OperationsOverview {
     outputTokens: number | null;
   }[];
   /** Current failed/interrupted tasks; a successfully retried task leaves this view. */
+  /** Attempts started in [from, checkedAt), including retries. V15 onward, no historic backfill. */
+  attemptUsage: {
+    executionClass: 'live' | 'verification';
+    attempts: number;
+    meteredAttempts: number;
+    running: number;
+    succeeded: number;
+    failed: number;
+    cancelled: number;
+    interrupted: number;
+    requests: number;
+    pendingRequests: number;
+    reportedRequests: number;
+    inputTokens: number | null;
+    outputTokens: number | null;
+  }[];
   errors: { code: OperationsErrorCode; tasks: number; lastOccurredAt: string }[];
 }

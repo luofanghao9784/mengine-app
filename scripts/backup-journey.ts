@@ -118,6 +118,14 @@ export async function backupJourney(options: {
       VALUES ('${task}','${tenant}','${personal}','${conversation}','${owner}','合成备份测试','AGENT','SUCCEEDED','verification','合成测试文稿；不是模型调用结果。',now());
       INSERT INTO conversation_artifacts(id,tenant_id,workspace_id,task_id,filename,sha256,content)
       VALUES ('${artifact}','${tenant}','${personal}','${task}','backup-fixture.txt','${createHash('sha256').update(artifactBytes).digest('hex')}',decode('${artifactBytes.toString('hex')}','hex')); COMMIT;`);
+    const priorAttempt = randomUUID(),
+      lastAttempt = randomUUID();
+    sql(`UPDATE conversation_tasks SET attempt=2,model_calls=1,token_usage='{"inputTokens":40,"outputTokens":5}'::jsonb WHERE id='${task}';
+      INSERT INTO agent_attempt_usage(attempt_id,task_id,tenant_id,workspace_id,attempt_number,execution_class,status,metering_enabled,finished_at)
+      VALUES ('${priorAttempt}','${task}','${tenant}','${personal}',1,'verification','CANCELLED',true,now()),
+      ('${lastAttempt}','${task}','${tenant}','${personal}',2,'verification','SUCCEEDED',true,now());
+      INSERT INTO agent_model_requests(task_id,attempt_id,sequence,max_output_tokens,outcome,input_tokens,output_tokens)
+      VALUES ('${task}','${priorAttempt}',1,2048,'PENDING',NULL,NULL),('${task}','${lastAttempt}',1,2048,'RETURNED',40,5);`);
     const created = await post(user, root + '/documents', {
       requestId: randomUUID(),
       conversationId: conversation,
@@ -213,6 +221,8 @@ export async function backupJourney(options: {
     const signed = JSON.parse(await readFile(join(bundle, 'manifest.json'), 'utf8'));
     assert.ok(signed.manifest.tables.private_document_exports.rows >= 2);
     assert.ok(signed.manifest.tables.conversation_artifacts.rows >= 1);
+    assert.equal(signed.manifest.tables.agent_attempt_usage.rows, 2);
+    assert.equal(signed.manifest.tables.agent_model_requests.rows, 2);
     assert.ok(signed.manifest.tables.document_publications.rows >= 1);
     assert.ok(signed.manifest.tables.knowledge_chunks.rows >= 1);
     assert.equal(signed.manifest.tables.spring_session, undefined);
@@ -274,6 +284,19 @@ export async function backupJourney(options: {
       [restoredPlatform, accounts.platform],
     ] as const)
       await post(ctx.request, '/api/v1/auth/login', { email: account.email, password: account.password });
+    const usageResponse = await restoredPlatform.request.get(
+      `/api/platform-admin/v1/tenants/${tenant}/operations`,
+    );
+    assert.equal(usageResponse.status(), 200);
+    const usage = (await usageResponse.json()).attemptUsage[0];
+    assert.equal(usage.attempts, 2);
+    assert.equal(usage.cancelled, 1);
+    assert.equal(usage.succeeded, 1);
+    assert.equal(usage.requests, 2);
+    assert.equal(usage.pendingRequests, 1);
+    assert.equal(usage.reportedRequests, 1);
+    assert.equal(usage.inputTokens, 40);
+    assert.equal(usage.outputTokens, 5);
     for (const [path, expected] of snapshots) {
       const response = await restoredMember.request.get(path);
       assert.equal(response.status(), 200, path);

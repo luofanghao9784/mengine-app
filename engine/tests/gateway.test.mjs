@@ -1,3 +1,4 @@
+import { usageFixture } from './fixtures/usage.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
@@ -120,6 +121,7 @@ test(
       assert.ok(req.url.startsWith(`/internal/v1/agent-access/${taskId}/`));
       await body(req);
       checks++;
+      if (usageFixture(req, res)) return;
       json(
         res,
         req.url.endsWith('/check')
@@ -165,8 +167,9 @@ test(
   { timeout: 10000 },
   async (t) => {
     let allowed = true;
-    const platform = createServer((req, res) =>
-      json(res, { allowed, executionClass: 'verification' }, allowed ? 200 : 403),
+    const platform = createServer(
+      (req, res) =>
+        usageFixture(req, res) || json(res, { allowed, executionClass: 'verification' }, allowed ? 200 : 403),
     );
     const url = await listen(platform);
     t.after(() => close(platform));

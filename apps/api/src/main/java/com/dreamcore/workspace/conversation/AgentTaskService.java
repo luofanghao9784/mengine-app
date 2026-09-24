@@ -14,9 +14,9 @@ public class AgentTaskService {
     public record Download(String filename,String sha256,byte[] bytes) {}
     private final JdbcTemplate db;private final ConversationService conversations;private final KnowledgeService knowledge;private final AgentSettings settings;
     private final org.springframework.transaction.support.TransactionTemplate transactions;private final IdentityAudit audit;
-    private final TaskOriginals originals;
+    private final TaskOriginals originals;private final AgentUsageLedger usage;
     private final JsonMapper json=new JsonMapper();
-    public AgentTaskService(JdbcTemplate db,ConversationService conversations,KnowledgeService knowledge,AgentSettings settings,org.springframework.transaction.PlatformTransactionManager manager,IdentityAudit audit,TaskOriginals originals){this.originals=originals;this.transactions=new org.springframework.transaction.support.TransactionTemplate(manager);this.audit=audit;this.db=db;this.conversations=conversations;this.knowledge=knowledge;this.settings=settings;}
+    public AgentTaskService(JdbcTemplate db,ConversationService conversations,KnowledgeService knowledge,AgentSettings settings,org.springframework.transaction.PlatformTransactionManager manager,IdentityAudit audit,TaskOriginals originals,AgentUsageLedger usage){this.usage=usage;this.originals=originals;this.transactions=new org.springframework.transaction.support.TransactionTemplate(manager);this.audit=audit;this.db=db;this.conversations=conversations;this.knowledge=knowledge;this.settings=settings;}
     private IdentityException denied(){return new IdentityException(403,"TASK_ACCESS_DENIED");}
     /** Bearer is the unpredictable, short-lived attempt capability. Owner/tenant/scope come only from the DB. */
     private ConversationService.Job authorized(UUID task,UUID attempt){
@@ -38,6 +38,8 @@ public class AgentTaskService {
     }
     private List<UUID> grants(ConversationService.Job job){return db.queryForList("SELECT chunk_id FROM conversation_agent_grants WHERE task_id=? AND attempt_id=? ORDER BY chunk_id",UUID.class,job.id(),job.token());}
     @Transactional public Map<String,Object> check(UUID task,UUID attempt){authorized(task,attempt);String query=db.queryForObject("SELECT public_query FROM conversation_tasks WHERE id=?",String.class,task);return Map.of("allowed",true,"executionClass",settings.mode(),"publicQuery",query==null?"":query,"candidateTrialsAllowed",settings.candidateTrialsEnabled() && query!=null);}
+    @Transactional public Map<String,Object> openUsage(UUID task,UUID attempt){authorized(task,attempt);return usage.open(task,attempt);}
+    @Transactional public void startUsage(UUID task,UUID attempt,AgentUsageLedger.Start request){authorized(task,attempt);usage.start(task,attempt,request);}
     @Transactional public List<Input> search(UUID task,UUID attempt,String query){
         var job=authorized(task,attempt);if(query==null)throw IdentityException.invalid();
         var known=new HashSet<>(grants(job));var result=new ArrayList<Input>();
@@ -62,6 +64,7 @@ public class AgentTaskService {
            r.originalIds()==null || r.originalIds().size()>3 || new HashSet<>(r.originalIds()).size()!=r.originalIds().size() || !new HashSet<>(r.originalIds()).equals(new HashSet<>(originals.readIds(job.id(),job.token()))) ||
            r.tools()==null || r.tools().size()>8 || r.artifacts()==null || r.artifacts().size()>8)incompatible();
         if(r.usage()!=null && (r.usage().inputTokens()<0 || r.usage().outputTokens()<0 || r.usage().inputTokens()>1000000 || r.usage().outputTokens()>1000000))incompatible();
+        usage.validateResult(job.id(),job.token(),r.modelCalls(),r.usage());
         var calls=new HashSet<String>();boolean code=false;
         for(var tool:r.tools()){
             if(tool==null || tool.callId()==null || !tool.callId().matches("[!-~]{1,128}") || !calls.add(tool.callId()) || !"succeeded".equals(tool.status()) || tool.name()==null || !Set.of("search_sources","run_javascript","find_skills","activate_skill","public_search","read_public_page","candidate_tool","list_originals","read_original","process_original").contains(tool.name()))incompatible();
@@ -85,6 +88,7 @@ public class AgentTaskService {
         for(UUID source:r.sourceIds())db.update("INSERT INTO conversation_sources(tenant_id,workspace_id,task_id,chunk_id,ordinal) VALUES (?,?,?,?,?)",job.tenant(),job.space(),job.id(),source,ordinal++);
         for(var file:files)db.update("INSERT INTO conversation_artifacts(id,tenant_id,workspace_id,task_id,filename,sha256,content) VALUES (?,?,?,?,?,?,?)",UUID.randomUUID(),job.tenant(),job.space(),job.id(),file.filename(),file.sha256(),file.bytes());
         db.update("UPDATE conversation_tasks SET status='SUCCEEDED',revision=revision+1,reply=?,model_name=?,model_calls=?,token_usage=CAST(? AS jsonb),tool_receipts=CAST(? AS jsonb),engine_version=?,web_sources=CAST(? AS jsonb),skills=CAST(? AS jsonb),lease_token=NULL,lease_until=NULL,finished_at=now() WHERE id=?",r.text(),r.modelName(),r.modelCalls(),json.writeValueAsString(r.usage()),json.writeValueAsString(r.tools()),r.engineVersion(),json.writeValueAsString(r.webSources()),json.writeValueAsString(r.skills()),job.id());
+        usage.terminal(job.id(),job.token(),"SUCCEEDED");
         int revision=db.queryForObject("SELECT revision FROM conversation_tasks WHERE id=?",Integer.class,job.id());conversations.event(job.tenant(),job.space(),job.conversation(),job.id(),"SUCCEEDED",revision);audit.record(job.actor(),job.tenant(),"TASK_COMPLETE",job.id(),"SUCCESS");
     }
     private void validateResearch(ConversationService.Job job,AgentResult result){

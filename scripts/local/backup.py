@@ -158,8 +158,8 @@ def offline_database(root, initialize=False):
 
 
 def facts(sql):
-    if sql("SELECT string_agg(CASE WHEN success THEN version ELSE 'FAILED' END,',' ORDER BY installed_rank) FROM flyway_schema_history") != ','.join(map(str, range(1, 15))):
-        fail('备份要求已完成 V14 的当前试用结构。')
+    if sql("SELECT string_agg(CASE WHEN success THEN version ELSE 'FAILED' END,',' ORDER BY installed_rank) FROM flyway_schema_history") != ','.join(map(str, range(1, 16))):
+        fail('备份要求已完成 V15 的当前试用结构。')
     if sql("SELECT (SELECT count(*) FROM conversation_tasks WHERE status IN ('QUEUED','RUNNING')) + (SELECT count(*) FROM knowledge_runs WHERE status IN ('QUEUED','RUNNING'))") != '0':
         fail('仍有排队或运行中的任务；先启动原环境完成或取消任务，再停止并备份。')
     if sql('SELECT count(*) FROM platform_roles') == '0':

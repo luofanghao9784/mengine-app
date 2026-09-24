@@ -23,7 +23,7 @@ const shape = (v: unknown, fields: string): v is Record<string, unknown> =>
   record(v) && Object.keys(v).sort().join(',') === fields.split(' ').sort().join(',');
 export function isOperations(v: unknown): v is OperationsOverview {
   if (
-    !shape(v, 'tenantId days from checkedAt tasks storage models errors') ||
+    !shape(v, 'tenantId days from checkedAt tasks storage models errors attemptUsage') ||
     !(v.tenantId === null || uuid(v.tenantId)) ||
     ![7, 30].includes(Number(v.days)) ||
     typeof v.days !== 'number' ||
@@ -36,6 +36,8 @@ export function isOperations(v: unknown): v is OperationsOverview {
     !Object.values(v.storage).every(count) ||
     !Array.isArray(v.models) ||
     v.models.length > 2 ||
+    !Array.isArray(v.attemptUsage) ||
+    v.attemptUsage.length > 2 ||
     !Array.isArray(v.errors) ||
     v.errors.length > 15
   )
@@ -67,6 +69,33 @@ export function isOperations(v: unknown): v is OperationsOverview {
       return false;
     classes.add(m.executionClass);
     successes += m.succeededTasks;
+  }
+  const attemptClasses = new Set();
+  for (const a of v.attemptUsage) {
+    if (
+      !shape(
+        a,
+        'executionClass attempts meteredAttempts running succeeded failed cancelled interrupted requests pendingRequests reportedRequests inputTokens outputTokens',
+      ) ||
+      !['live', 'verification'].includes(String(a.executionClass)) ||
+      attemptClasses.has(a.executionClass)
+    )
+      return false;
+    const { executionClass, inputTokens, outputTokens, ...counts } = a;
+    if (!Object.values(counts).every(count)) return false;
+    const row = a as OperationsOverview['attemptUsage'][number];
+    if (
+      row.attempts < 1 ||
+      row.meteredAttempts > row.attempts ||
+      row.attempts !== row.running + row.succeeded + row.failed + row.cancelled + row.interrupted ||
+      row.requests > row.meteredAttempts * 8 ||
+      row.pendingRequests + row.reportedRequests > row.requests ||
+      (row.reportedRequests === 0
+        ? inputTokens !== null || outputTokens !== null
+        : !count(inputTokens) || !count(outputTokens))
+    )
+      return false;
+    attemptClasses.add(executionClass);
   }
   for (const e of v.errors) {
     if (

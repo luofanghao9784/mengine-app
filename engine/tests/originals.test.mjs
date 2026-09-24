@@ -1,3 +1,4 @@
+import { usageFixture } from './fixtures/usage.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID, createHash } from 'node:crypto';
@@ -129,6 +130,7 @@ test('actual Harness and sandbox process a whole selected original without sendi
   };
   const platform = createServer(async (req, res) => {
     const input = await body(req);
+    if (usageFixture(req, res)) return;
     if (req.url.endsWith('/check')) return json(res, { allowed: true, executionClass: 'verification' });
     if (req.url.endsWith('/originals')) return json(res, { items: [selected] });
     assert.equal(input.versionId, versionId);
@@ -173,6 +175,7 @@ test('loaded originals require explicit handles; unselected, unread and duplicat
   }));
   const platform = createServer(async (req, res) => {
     const input = await body(req);
+    if (usageFixture(req, res)) return;
     if (req.url.endsWith('/check')) return json(res, { allowed: true, executionClass: 'verification' });
     if (req.url.endsWith('/originals')) return json(res, { items: selected });
     assert.equal(input.versionId, selected[0].versionId);
@@ -257,6 +260,7 @@ test(
     const platform = createServer(async (req, res) => {
       await body(req);
       if (!allowed) return json(res, { code: 'TASK_ACCESS_DENIED' }, 403);
+      if (usageFixture(req, res)) return;
       if (req.url.endsWith('/check')) return json(res, { allowed: true, executionClass: 'verification' });
       if (req.url.endsWith('/originals')) return json(res, { items: [selected] });
       json(res, { versionId: id, sha256: selected.sha256, contentBase64: bytes.toString('base64') });

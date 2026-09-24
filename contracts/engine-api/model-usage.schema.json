@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dreamcore:model-usage:1.0",
+  "$defs": {
+    "Policy": {
+      "type": "object",
+      "properties": {
+        "contractVersion": {
+          "const": "1.0"
+        },
+        "maxModelCalls": {
+          "const": 8
+        },
+        "maxOutputTokens": {
+          "const": 2048
+        }
+      },
+      "required": ["contractVersion", "maxModelCalls", "maxOutputTokens"],
+      "additionalProperties": false
+    },
+    "Start": {
+      "type": "object",
+      "properties": {
+        "sequence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
+        },
+        "maxOutputTokens": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2048
+        }
+      },
+      "required": ["sequence", "maxOutputTokens"],
+      "additionalProperties": false
+    },
+    "Receipt": {
+      "type": "object",
+      "properties": {
+        "sequence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
+        },
+        "outcome": {
+          "enum": ["RETURNED", "FAILED", "CANCELLED"]
+        },
+        "inputTokens": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "outputTokens": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": ["sequence", "outcome", "inputTokens", "outputTokens"],
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "properties": {
+            "inputTokens": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000000
+            },
+            "outputTokens": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000000
+            }
+          }
+        },
+        {
+          "properties": {
+            "inputTokens": {
+              "type": "null"
+            },
+            "outputTokens": {
+              "type": "null"
+            }
+          }
+        }
+      ]
+    },
+    "Accepted": {
+      "type": "object",
+      "properties": {
+        "accepted": {
+          "const": true
+        }
+      },
+      "required": ["accepted"],
+      "additionalProperties": false
+    }
+  }
+}

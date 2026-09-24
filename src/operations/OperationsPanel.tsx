@@ -110,6 +110,50 @@ function Snapshot({ value }: { value: OperationsOverview }) {
         </p>
       </div>
       <div className="operations-block">
+        <h3>各次尝试的模型用量</h3>
+        <p className="operations-note">
+          按尝试开始时间统计，包含失败、取消和重试。仅覆盖启用记录后的尝试，历史记录不补算。请求数是调用前登记数，不代表供应商实际接收数。
+        </p>
+        {value.attemptUsage.length ? (
+          <div className="operations-models">
+            {value.attemptUsage.map((m) => (
+              <article key={m.executionClass} className="operations-model">
+                <h4>{m.executionClass === 'verification' ? '本地验证（合成模型）' : '正式模型调用'}</h4>
+                <p>
+                  {number(m.attempts)} 次尝试 · {number(m.requests)} 次登记请求
+                </p>
+                <p className="operations-note">
+                  成功 {number(m.succeeded)} · 失败 {number(m.failed)} · 取消 {number(m.cancelled)} · 中断{' '}
+                  {number(m.interrupted)} · 执行中 {number(m.running)}
+                </p>
+                <dl>
+                  <div>
+                    <dt>已上报输入 Token</dt>
+                    <dd>{m.inputTokens === null ? '未知' : number(m.inputTokens)}</dd>
+                  </div>
+                  <div>
+                    <dt>已上报输出 Token</dt>
+                    <dd>{m.outputTokens === null ? '未知' : number(m.outputTokens)}</dd>
+                  </div>
+                </dl>
+                <p className="operations-note">
+                  用量已知 {number(m.reportedRequests)} / {number(m.requests)} 次请求；未知{' '}
+                  {number(m.requests - m.reportedRequests)} 次，其中未收到回执 {number(m.pendingRequests)}{' '}
+                  次。未启用计量 {number(m.attempts - m.meteredAttempts)} 次尝试。
+                </p>
+                <p className="operations-note">
+                  单次尝试最多 8 次模型请求，每次最多申请 2,048 个输出
+                  Token。这是执行限制，不能作为费用上限或账单。
+                </p>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="operations-empty">该时段暂无尝试级记录。</p>
+        )}
+      </div>
+      <details className="operations-block">
+        <summary>成功任务的历史回执（旧口径）</summary>
         <h3>成功任务的模型用量</h3>
         <p className="operations-note">
           仅汇总成功 Agent 任务最后一次尝试上报的调用量。失败、中断和此前尝试的消耗未完整计入，不能作为账单。
@@ -145,7 +189,7 @@ function Snapshot({ value }: { value: OperationsOverview }) {
         ) : (
           <p className="operations-empty">该时段暂无成功 Agent 任务，模型用量不可得。</p>
         )}
-      </div>
+      </details>
       <div className="operations-block">
         <h3>当前异常</h3>
         <p className="operations-note">

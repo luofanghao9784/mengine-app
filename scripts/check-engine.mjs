@@ -77,7 +77,7 @@ try {
       ? value.runtimeMode === 'contract-only' || value.protocols.sourceLookup !== '1.0'
       : value.runtimeMode !== values.mode ||
         value.protocols.agentTask !== '1.4' ||
-        value.protocols.platformCallbacks !== '1.3'
+        !['1.3', '1.4'].includes(value.protocols.platformCallbacks)
   )
     throw Error('incompatible task mode');
   console.log(JSON.stringify({ status: 'compatible', ...value }));

@@ -1,3 +1,4 @@
+import { usageFixture } from './fixtures/usage.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
@@ -241,13 +242,15 @@ test('Harness candidate gates deny absent grant, absent adapter, inactive guide 
   const { AgentTasks } = await import('../dist/runtime/agent-task.js');
   const { listen, close, json } = await import('./fixtures/agent.mjs');
   let grant = true;
-  const server = createServer((req, res) =>
-    json(res, {
-      allowed: true,
-      executionClass: 'verification',
-      publicQuery: 'public-only',
-      candidateTrialsAllowed: grant,
-    }),
+  const server = createServer(
+    (req, res) =>
+      usageFixture(req, res) ||
+      json(res, {
+        allowed: true,
+        executionClass: 'verification',
+        publicQuery: 'public-only',
+        candidateTrialsAllowed: grant,
+      }),
   );
   const url = await listen(server);
   t.after(() => close(server));
@@ -314,13 +317,15 @@ test('platform revocation interrupts candidate trial and publishes no late artif
     started,
     closed = false;
   const began = new Promise((resolve) => (started = resolve));
-  const server = createServer((req, res) =>
-    json(res, {
-      allowed: true,
-      executionClass: 'verification',
-      publicQuery: 'ini',
-      candidateTrialsAllowed: grant,
-    }),
+  const server = createServer(
+    (req, res) =>
+      usageFixture(req, res) ||
+      json(res, {
+        allowed: true,
+        executionClass: 'verification',
+        publicQuery: 'ini',
+        candidateTrialsAllowed: grant,
+      }),
   );
   const url = await listen(server);
   t.after(() => close(server));

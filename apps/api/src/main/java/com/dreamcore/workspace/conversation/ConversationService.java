@@ -19,8 +19,8 @@ public class ConversationService {
     public record Events(UUID conversationId,List<Event> items,long cursor,boolean hasMore) {}
     public record Job(UUID id,UUID tenant,UUID space,UUID conversation,UUID actor,String prompt,UUID token,String mode) {}
     private final tools.jackson.databind.json.JsonMapper json=new tools.jackson.databind.json.JsonMapper();
-    private final JdbcTemplate db;private final IdentityService identities;private final MaterialAccess access;private final KnowledgeService knowledge;private final IdentityAudit audit;private final boolean enabled;private final AgentSettings agentSettings;private final TaskOriginals originals;
-    public ConversationService(JdbcTemplate db,IdentityService identities,MaterialAccess access,KnowledgeService knowledge,IdentityAudit audit,@Value("${dreamcore.tasks.enabled:false}") boolean enabled,AgentSettings agentSettings,TaskOriginals originals) {this.originals=originals;this.agentSettings=agentSettings;this.db=db;this.identities=identities;this.access=access;this.knowledge=knowledge;this.audit=audit;this.enabled=enabled;}
+    private final JdbcTemplate db;private final IdentityService identities;private final MaterialAccess access;private final KnowledgeService knowledge;private final IdentityAudit audit;private final boolean enabled;private final AgentSettings agentSettings;private final TaskOriginals originals;private final AgentUsageLedger usage;
+    public ConversationService(JdbcTemplate db,IdentityService identities,MaterialAccess access,KnowledgeService knowledge,IdentityAudit audit,@Value("${dreamcore.tasks.enabled:false}") boolean enabled,AgentSettings agentSettings,TaskOriginals originals,AgentUsageLedger usage) {this.usage=usage;this.originals=originals;this.agentSettings=agentSettings;this.db=db;this.identities=identities;this.access=access;this.knowledge=knowledge;this.audit=audit;this.enabled=enabled;}
     private final RowMapper<Conversation> mapper=(r,n)->new Conversation(r.getObject("id",UUID.class),r.getObject("tenant_id",UUID.class),r.getObject("workspace_id",UUID.class),r.getString("title"),r.getTimestamp("updated_at").toInstant());
     private void paging(int offset,int limit){if(offset<0 || offset>100000 || limit<1 || limit>50)throw IdentityException.invalid();}
     Conversation require(UUID actor,UUID tenant,UUID id,boolean lock) {
@@ -99,6 +99,7 @@ public class ConversationService {
         if(!cancel){if(!enabled)throw new IdentityException(503,"TASK_RUNTIME_UNAVAILABLE");if(db.queryForObject("SELECT count(*) FROM conversation_tasks WHERE conversation_id=? AND status IN ('QUEUED','RUNNING')",Integer.class,conversation)>0)throw new IdentityException(409,"CONVERSATION_BUSY");}
         if(!cancel){var files=originals.list(actor,tenant,c.workspaceId(),task);if(!files.isEmpty() && !"verification".equals(agentSettings.mode()))throw new IdentityException(403,"TASK_ORIGINALS_DISABLED");}
         String next=cancel?"CANCELLED":"QUEUED";
+        if(cancel)usage.terminal(task,(UUID)row.get("lease_token"),"CANCELLED");
         db.update("UPDATE conversation_tasks SET status=?,revision=revision+1,lease_token=NULL,lease_until=NULL,summary_code=NULL,error_code=NULL,engine_version=NULL,reply=NULL,model_name=NULL,model_calls=NULL,token_usage=NULL,tool_receipts=NULL,web_sources='[]',skills='[]',finished_at=CASE WHEN ? THEN now() ELSE NULL END WHERE id=?",next,cancel,task);
         event(tenant,c.workspaceId(),conversation,task,next,revision+1);identities.remember(actor,key,"CONVERSATION_ACTION",fingerprint,task);audit.record(actor,tenant,"TASK_"+action,task,"SUCCESS");return detail(actor,tenant,conversation,0,20);
     }
@@ -109,10 +110,11 @@ public class ConversationService {
     }
     @Transactional public Job claim() {
         var expired=db.queryForList("UPDATE conversation_tasks SET status='INTERRUPTED',revision=revision+1,error_code='TASK_INTERRUPTED',lease_token=NULL,lease_until=NULL,finished_at=now() WHERE status='RUNNING' AND lease_until<now() RETURNING *");
-        for(var row:expired)event((UUID)row.get("tenant_id"),(UUID)row.get("workspace_id"),(UUID)row.get("conversation_id"),(UUID)row.get("id"),"INTERRUPTED",(Integer)row.get("revision"));
+        for(var row:expired){usage.expired((UUID)row.get("id"));event((UUID)row.get("tenant_id"),(UUID)row.get("workspace_id"),(UUID)row.get("conversation_id"),(UUID)row.get("id"),"INTERRUPTED",(Integer)row.get("revision"));}
         var rows=db.queryForList("SELECT * FROM conversation_tasks WHERE status='QUEUED' ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1");if(rows.isEmpty())return null;
         var row=rows.getFirst();UUID id=(UUID)row.get("id"),token=UUID.randomUUID();db.update("UPDATE conversation_tasks SET status='RUNNING',revision=revision+1,attempt=attempt+1,lease_token=?,lease_until=now()+CASE WHEN mode='AGENT' THEN interval '60 seconds' ELSE interval '30 seconds' END WHERE id=?",token,id);
         var job=new Job(id,(UUID)row.get("tenant_id"),(UUID)row.get("workspace_id"),(UUID)row.get("conversation_id"),(UUID)row.get("requested_by"),(String)row.get("prompt"),token,(String)row.get("mode"));
+        usage.claim(job,(Integer)row.get("attempt")+1,(String)row.get("execution_class"));
         event(job.tenant(),job.space(),job.conversation(),id,"RUNNING",(Integer)row.get("revision")+1);return job;
     }
     boolean owned(Job job){return !db.queryForList("SELECT id FROM conversation_tasks WHERE id=? AND status='RUNNING' AND lease_token=? AND lease_until>now() FOR UPDATE",job.id(),job.token()).isEmpty();}
@@ -133,6 +135,6 @@ public class ConversationService {
     @Transactional public void fail(Job job,String reason) {
         String code=Set.of("TASK_SOURCE_UNAVAILABLE","TASK_RUNTIME_INCOMPATIBLE","TASK_RUNTIME_UNAVAILABLE","TASK_MODEL_FAILED","TASK_LIMIT","TASK_TOOL_FAILED","MODEL_NOT_CONFIGURED","PUBLIC_WEB_NOT_CONFIGURED","TASK_FILE_UNSUPPORTED","TASK_FILE_ENCODING","TASK_FILE_INVALID","TASK_FILE_LIMIT","TASK_FILE_DATA").contains(reason)?reason:"TASK_RUNTIME_UNAVAILABLE";
         var revisions=db.queryForList("UPDATE conversation_tasks SET status='FAILED',revision=revision+1,error_code=?,lease_token=NULL,lease_until=NULL,finished_at=now() WHERE id=? AND status='RUNNING' AND lease_token=? AND lease_until>now() RETURNING revision",Integer.class,code,job.id(),job.token());
-        if(!revisions.isEmpty())event(job.tenant(),job.space(),job.conversation(),job.id(),"FAILED",revisions.getFirst());
+        if(!revisions.isEmpty()){usage.terminal(job.id(),job.token(),"FAILED");event(job.tenant(),job.space(),job.conversation(),job.id(),"FAILED",revisions.getFirst());}
     }
 }

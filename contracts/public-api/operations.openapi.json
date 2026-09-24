@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Dreamcore Operations API",
-    "version": "1.0.0"
+    "version": "1.1.0"
   },
   "security": [
     {
@@ -26,7 +26,7 @@
         ],
         "responses": {
           "200": {
-            "description": "private, no-store；任务按创建时间 [from, checkedAt) 选择并汇总当前状态；原件存储为全部已保存版本。模型用量仅成功任务最后一次尝试上报值，不是费用账单。",
+            "description": "private, no-store；任务按创建时间 [from, checkedAt) 选择并汇总当前状态；原件存储为全部已保存版本。模型用量仅成功任务最后一次尝试上报值，不是费用账单。 attemptUsage 按尝试开始时间统计，含失败、取消、重试及未知用量；仅覆盖 V15 后记录，不补算历史。",
             "content": {
               "application/json": {
                 "schema": {
@@ -75,7 +75,7 @@
         ],
         "responses": {
           "200": {
-            "description": "private, no-store；任务按创建时间 [from, checkedAt) 选择并汇总当前状态；原件存储为全部已保存版本。模型用量仅成功任务最后一次尝试上报值，不是费用账单。",
+            "description": "private, no-store；任务按创建时间 [from, checkedAt) 选择并汇总当前状态；原件存储为全部已保存版本。模型用量仅成功任务最后一次尝试上报值，不是费用账单。 attemptUsage 按尝试开始时间统计，含失败、取消、重试及未知用量；仅覆盖 V15 后记录，不补算历史。",
             "content": {
               "application/json": {
                 "schema": {
@@ -124,7 +124,7 @@
         ],
         "responses": {
           "200": {
-            "description": "private, no-store；任务按创建时间 [from, checkedAt) 选择并汇总当前状态；原件存储为全部已保存版本。模型用量仅成功任务最后一次尝试上报值，不是费用账单。",
+            "description": "private, no-store；任务按创建时间 [from, checkedAt) 选择并汇总当前状态；原件存储为全部已保存版本。模型用量仅成功任务最后一次尝试上报值，不是费用账单。 attemptUsage 按尝试开始时间统计，含失败、取消、重试及未知用量；仅覆盖 V15 后记录，不补算历史。",
             "content": {
               "application/json": {
                 "schema": {
@@ -372,9 +372,124 @@
             "items": {
               "$ref": "#/components/schemas/Failure"
             }
+          },
+          "attemptUsage": {
+            "type": "array",
+            "maxItems": 2,
+            "items": {
+              "$ref": "#/components/schemas/AttemptUsage"
+            }
           }
         },
-        "required": ["tenantId", "days", "from", "checkedAt", "tasks", "storage", "models", "errors"],
+        "required": [
+          "tenantId",
+          "days",
+          "from",
+          "checkedAt",
+          "tasks",
+          "storage",
+          "models",
+          "errors",
+          "attemptUsage"
+        ],
+        "additionalProperties": false
+      },
+      "AttemptUsage": {
+        "type": "object",
+        "properties": {
+          "attempts": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "meteredAttempts": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "running": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "succeeded": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "failed": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "cancelled": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "interrupted": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "requests": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "pendingRequests": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "reportedRequests": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "executionClass": {
+            "enum": ["live", "verification"]
+          },
+          "inputTokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "outputTokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "attempts",
+          "meteredAttempts",
+          "running",
+          "succeeded",
+          "failed",
+          "cancelled",
+          "interrupted",
+          "requests",
+          "pendingRequests",
+          "reportedRequests",
+          "executionClass",
+          "inputTokens",
+          "outputTokens"
+        ],
         "additionalProperties": false
       }
     }

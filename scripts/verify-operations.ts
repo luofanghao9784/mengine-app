@@ -241,6 +241,12 @@ try {
   seed(a, spaceA, 'INTERRUPTED', 'AGENT', 'verification', 'TASK_INTERRUPTED');
   seed(a, spaceA, 'SUCCEEDED', 'AGENT', 'live', null, 10, '{"inputTokens":900,"outputTokens":60}');
   seed(b, spaceB, 'SUCCEEDED', 'SOURCE_LOOKUP', null, null);
+  sql(`INSERT INTO agent_attempt_usage(attempt_id,task_id,tenant_id,workspace_id,attempt_number,execution_class,status,metering_enabled)
+    SELECT gen_random_uuid(),id,tenant_id,workspace_id,1,execution_class,status,true FROM conversation_tasks WHERE tenant_id='${a}' AND status='FAILED';
+    INSERT INTO agent_model_requests(task_id,attempt_id,sequence,max_output_tokens,outcome,input_tokens,output_tokens)
+    SELECT task_id,attempt_id,1,2048,'FAILED',40,5 FROM agent_attempt_usage WHERE tenant_id='${a}';
+    INSERT INTO agent_model_requests(task_id,attempt_id,sequence,max_output_tokens)
+    SELECT task_id,attempt_id,2,2048 FROM agent_attempt_usage WHERE tenant_id='${a}';`);
   const spec = JSON.parse(
     await readFile(new URL('../contracts/public-api/operations.openapi.json', import.meta.url), 'utf8'),
   );
@@ -299,20 +305,26 @@ try {
   await tp.goto(`/tenant-admin/#tenant=${a}`);
   await tp.getByRole('button', { name: '运行概览', exact: true }).click();
   await expect(metric(tp, '创建任务')).toHaveText('5');
+  await tp.getByText('成功任务的历史回执（旧口径）', { exact: true }).click();
   await expect(
-    tp.locator('.operations-model').filter({ has: tp.getByText('正式模型调用', { exact: true }) }),
+    tp.locator('details .operations-model').filter({ has: tp.getByText('正式模型调用', { exact: true }) }),
   ).toContainText('未上报');
+  await expect(tp.getByText('1 次尝试 · 2 次登记请求', { exact: true })).toBeVisible();
+  await expect(tp.getByText(/用量已知 1 \/ 2 次请求；未知 1 次/)).toBeVisible();
   await expect(tp.getByText('模型请求未完成', { exact: true })).toBeVisible();
   assert.ok(!(await tp.locator('.operations-panel').innerText()).includes('private-'));
   await tp.getByLabel('统计范围').selectOption('30');
   await expect(metric(tp, '创建任务')).toHaveText('6');
   await expect(
-    tp.locator('.operations-model').filter({ has: tp.getByText('正式模型调用', { exact: true }) }),
+    tp.locator('details .operations-model').filter({ has: tp.getByText('正式模型调用', { exact: true }) }),
   ).toContainText('1 / 2');
   await tp.screenshot({ path: fileURLToPath(new URL('tenant.png', artifacts)), fullPage: true });
   await tp.setViewportSize({ width: 390, height: 844 });
   assert.ok(await tp.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
   await tp.screenshot({ path: fileURLToPath(new URL('tenant-mobile.png', artifacts)), fullPage: true });
+  await tp.getByRole('heading', { name: '各次尝试的模型用量', exact: true }).scrollIntoViewIfNeeded();
+  await tp.screenshot({ path: fileURLToPath(new URL('tenant-usage-mobile.png', artifacts)), fullPage: true });
+  assert.ok(await tp.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
   await tp.locator('.operations-errors').scrollIntoViewIfNeeded();
   await tp.screenshot({
     path: fileURLToPath(new URL('tenant-mobile-errors.png', artifacts)),
@@ -350,6 +362,7 @@ try {
   await tp.unroute(pattern);
   await expect(metric(tp, '创建任务')).toHaveText('1');
   // Unknown/missing data stays an unavailable view instead of invented zero metrics.
+  await tp.getByText('成功任务的历史回执（旧口径）', { exact: true }).click();
   await expect(tp.getByText('该时段暂无成功 Agent 任务，模型用量不可得。', { exact: true })).toBeVisible();
   const bPattern = `**${bPath}?*`;
   await tp.route(bPattern, async (route) => {
@@ -390,6 +403,7 @@ try {
           'all-roles',
           'private-content-denied',
           'unknown-usage',
+          'attempt-ledger-known-and-pending',
           '7-and-30-days',
           'desktop-and-mobile',
           'failed-load-retry',

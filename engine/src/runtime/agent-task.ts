@@ -1,3 +1,4 @@
+import { meteredModel } from './metered-model.js';
 import { ENGINE_VERSION } from '../release.js';
 import { originalRecipeTool } from './file-recipes.js';
 import { OriginalInputs } from './original-inputs.js';
@@ -26,7 +27,7 @@ export interface AgentConfiguration {
   platformBaseUrl: string;
   executionClass: 'live' | 'verification';
   modelName: string;
-  createModel(): ModelPort & { usage?: { inputTokens: number; outputTokens: number } | null };
+  createModel(): import('./metered-model.js').UsageModel;
   /** Only the local verification fixture supplies a sandbox; live code remains disabled. */
   sandbox?: TaskSandbox;
   publicWeb?: { reader: PublicReader; search?: PublicSearch };
@@ -113,6 +114,14 @@ export class AgentTasks {
     let monitoring: Promise<void> | undefined;
     try {
       await authorize();
+      const policy = await invoke('model-usage/open', {});
+      if (
+        !isRecord(policy) ||
+        policy.contractVersion !== '1.0' ||
+        policy.maxModelCalls !== 8 ||
+        policy.maxOutputTokens !== 2048
+      )
+        throw new RuntimeError('TASK_RUNTIME_INCOMPATIBLE');
       monitoring = (async () => {
         while (!signal.aborted) {
           await delay(400, undefined, { signal });
@@ -140,10 +149,22 @@ export class AgentTasks {
       const activated = new Map<string, SkillReceipt>();
       const publicTools = new Set(['public_search', 'read_public_page']);
       const backend = this.config.createModel();
+      const metered = meteredModel(backend, (action, body, receipt) =>
+        receipt
+          ? postJson(
+              new URL(`/internal/v1/agent-access/${task.taskId}/${action}`, this.platform),
+              task.attemptId,
+              body,
+              AbortSignal.timeout(1500),
+              4096,
+              1500,
+            )
+          : invoke(action, body, 4096),
+      );
       const model: ModelPort = {
         async *generate(request) {
           await authorize();
-          yield* backend.generate({
+          yield* metered.generate({
             ...request,
             tools: request.tools.filter(
               (t) =>

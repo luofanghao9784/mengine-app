@@ -31,6 +31,12 @@ class RuntimeCompatibilityTest {
     Map<String,Object> descriptor(String mode,String protocol){return new HashMap<>(Map.of("contractVersion","1.0","engineVersion","0.9.1","runtimeMode",mode,"protocols",Map.of("sourceLookup","1.0","agentTask",protocol,"platformCallbacks","1.3")));}
     EngineTaskRuntime runtime(boolean legacy){return new EngineTaskRuntime(endpoint,token,"verification",legacy);}
     IdentityException agent(boolean legacy){return assertThrows(IdentityException.class,()->runtime(legacy).executeAgent(UUID.randomUUID(),UUID.randomUUID(),"private prompt",()->true));}
+    @Test void meteringCallbackVersionIsAcceptedButUnknownVersionsAreNot(){
+        var v=descriptor("agent-verification","1.4");v.put("protocols",Map.of("sourceLookup","1.0","agentTask","1.4","platformCallbacks","1.4"));descriptor=v;
+        agent(false);assertEquals(1,posts.get());
+        v.put("protocols",Map.of("sourceLookup","1.0","agentTask","1.4","platformCallbacks","1.5"));
+        assertEquals("TASK_RUNTIME_INCOMPATIBLE",agent(false).code);assertEquals(1,posts.get());
+    }
     @Test void incompatibleAgentProtocolNeverSendsPrompt(){descriptor=descriptor("agent-verification","2.0");assertEquals("TASK_RUNTIME_INCOMPATIBLE",agent(false).code);assertEquals(0,posts.get());}
     @Test void wrongExecutionClassNeverCallsModel(){descriptor=descriptor("agent-live","1.4");assertEquals("TASK_RUNTIME_INCOMPATIBLE",agent(false).code);assertEquals(0,posts.get());}
     @Test void missingRuntimeDoesNotImplicitlyEnableLegacy(){runtimeStatus=404;agent(false);assertEquals(0,posts.get());}

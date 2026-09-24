@@ -22,6 +22,7 @@ const value = {
     interrupted: 0,
     retryStarts: 0,
   },
+  attemptUsage: [],
   storage: { materials: 0, versions: 0, originalBytes: 0 },
   models: [],
   errors: [],

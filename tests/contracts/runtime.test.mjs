@@ -72,6 +72,11 @@ test('operator preflight rejects incompatible versions, modes and oversized repl
     return status;
   }
   assert.equal(await check(), 0);
+  body = { ...descriptor, protocols: { ...descriptor.protocols, platformCallbacks: '1.4' } };
+  assert.equal(await check(), 0);
+  body = { ...descriptor, protocols: { ...descriptor.protocols, platformCallbacks: '1.5' } };
+  assert.equal(await check(), 1);
+  body = descriptor;
   assert.equal(await check('agent-live'), 1);
   assert.equal(await check('agent-verification', '0.9.0'), 1);
   body = { ...descriptor, protocols: { ...descriptor.protocols, agentTask: '2.0' } };

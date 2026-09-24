@@ -1,3 +1,4 @@
+import { usageFixture } from './fixtures/usage.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, cp, writeFile, rm, symlink } from 'node:fs/promises';
@@ -220,8 +221,10 @@ test('actual Harness activates catalog before exposing web tools and never sends
   const { createServer } = await import('node:http');
   const { randomUUID } = await import('node:crypto');
   const { listen, close, json, fixtureEngine } = await import('./fixtures/agent.mjs');
-  const platform = createServer((req, res) =>
-    json(res, { allowed: true, executionClass: 'verification', publicQuery: 'public-only' }),
+  const platform = createServer(
+    (req, res) =>
+      usageFixture(req, res) ||
+      json(res, { allowed: true, executionClass: 'verification', publicQuery: 'public-only' }),
   );
   const url = await listen(platform);
   t.after(() => close(platform));
@@ -254,8 +257,10 @@ test('model cannot bypass activation or supply arbitrary queries/URLs; no task g
   const { listen, close, json } = await import('./fixtures/agent.mjs');
   let query = 'public-only',
     wire = 0;
-  const server = createServer((req, res) =>
-    json(res, { allowed: true, executionClass: 'verification', publicQuery: query }),
+  const server = createServer(
+    (req, res) =>
+      usageFixture(req, res) ||
+      json(res, { allowed: true, executionClass: 'verification', publicQuery: query }),
   );
   const url = await listen(server);
   t.after(() => close(server));
@@ -336,12 +341,14 @@ test('revocation aborts an in-flight public read and cannot publish late snapsho
     calls = 0;
   let started;
   const reading = new Promise((resolve) => (started = resolve));
-  const server = createServer((req, res) =>
-    json(
-      res,
-      { allowed, executionClass: 'verification', publicQuery: 'https://example.com/' },
-      allowed ? 200 : 403,
-    ),
+  const server = createServer(
+    (req, res) =>
+      usageFixture(req, res) ||
+      json(
+        res,
+        { allowed, executionClass: 'verification', publicQuery: 'https://example.com/' },
+        allowed ? 200 : 403,
+      ),
   );
   const url = await listen(server);
   t.after(() => close(server));

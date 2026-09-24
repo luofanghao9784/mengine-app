@@ -543,6 +543,17 @@ try {
     }
   }
   assert.equal(engine.stats.calls, 34);
+  const accountingResponse = await platform.get(`/api/platform-admin/v1/tenants/${tenant}/operations`);
+  assert.equal(accountingResponse.status(), 200);
+  const accounting = (await accountingResponse.json()).attemptUsage;
+  assert.equal(accounting.length, 1);
+  assert.equal(accounting[0].executionClass, 'verification');
+  assert.equal(accounting[0].requests, 34);
+  assert.equal(accounting[0].reportedRequests, 33);
+  assert.equal(accounting[0].pendingRequests, 0);
+  assert.equal(accounting[0].cancelled, 1);
+  assert.equal(accounting[0].inputTokens, 330);
+  assert.equal(accounting[0].outputTokens, 165);
   await screenshot(page, 'file-recipes-desktop.png');
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator('.conversation-turn').last().scrollIntoViewIfNeeded();
@@ -575,7 +586,7 @@ try {
         browserVersion: browser!.version(),
         modelProvider,
         verified: [
-          'real PostgreSQL V14',
+          'real PostgreSQL V15',
           'shared material activity without private lineage, exact version download, workspace filter and focus revocation',
           'real XLSX result snapshot, exact decimals and pinned v1 after v2 upload, source metadata and hash, reload download and suspension refusal',
           'independent shared publication, real recipient reads and parsing, explicit target versions, uncertain retries and target revocation',
@@ -598,6 +609,7 @@ try {
         ],
         cloudModelCalled: false,
         sandbox: executor?.isolation ?? 'local-macos-prototype',
+        attemptUsage: accounting,
         modelRequests: engine.stats.calls,
         taskStatus: task.status,
         cancelStatus: cancelled.tasks.at(-1).status,

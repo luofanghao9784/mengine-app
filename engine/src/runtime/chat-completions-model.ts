@@ -1,9 +1,11 @@
 import { RuntimeError, type ModelPart, type ModelPort } from './ports.js';
+import type { TokenUsage } from './metered-model.js';
 import { isRecord, postJson } from './http-json.js';
 
 /** Shared wire format only. Each provider validates its own endpoint and capabilities. */
 export class ChatCompletionsModel implements ModelPort {
   usage: { inputTokens: number; outputTokens: number } | null = null;
+  lastUsage: TokenUsage | null = null;
   private usageIncomplete = false;
   constructor(
     private readonly config: {
@@ -25,6 +27,7 @@ export class ChatCompletionsModel implements ModelPort {
       throw new RuntimeError('INVALID_MODEL_CONFIG');
   }
   async *generate(request: Parameters<ModelPort['generate']>[0]): AsyncIterable<ModelPart> {
+    this.lastUsage = null;
     const messages = request.messages.flatMap((message) => {
       const tools = message.content.filter((b) => b.type === 'tool_result');
       if (tools.length) {
@@ -73,7 +76,34 @@ export class ChatCompletionsModel implements ModelPort {
       request.signal,
       131072,
       this.config.timeoutMs,
-    );
+    ).catch((error) => {
+      this.usageIncomplete = true;
+      this.usage = null;
+      throw error;
+    });
+    if (
+      isRecord(body) &&
+      isRecord(body.usage) &&
+      Number.isSafeInteger(body.usage.prompt_tokens) &&
+      Number.isSafeInteger(body.usage.completion_tokens) &&
+      (body.usage.prompt_tokens as number) >= 0 &&
+      (body.usage.completion_tokens as number) >= 0 &&
+      (body.usage.prompt_tokens as number) <= 1000000 &&
+      (body.usage.completion_tokens as number) <= 1000000
+    ) {
+      this.lastUsage = {
+        inputTokens: body.usage.prompt_tokens as number,
+        outputTokens: body.usage.completion_tokens as number,
+      };
+      if (!this.usageIncomplete)
+        this.usage = {
+          inputTokens: (this.usage?.inputTokens ?? 0) + (body.usage.prompt_tokens as number),
+          outputTokens: (this.usage?.outputTokens ?? 0) + (body.usage.completion_tokens as number),
+        };
+    } else {
+      this.usageIncomplete = true;
+      this.usage = null;
+    }
     if (
       !isRecord(body) ||
       !Array.isArray(body.choices) ||
@@ -119,22 +149,6 @@ export class ChatCompletionsModel implements ModelPort {
         name: call.function.name,
         arguments: call.function.arguments,
       });
-    }
-    if (
-      isRecord(body.usage) &&
-      Number.isSafeInteger(body.usage.prompt_tokens) &&
-      Number.isSafeInteger(body.usage.completion_tokens) &&
-      (body.usage.prompt_tokens as number) >= 0 &&
-      (body.usage.completion_tokens as number) >= 0 &&
-      !this.usageIncomplete
-    ) {
-      this.usage = {
-        inputTokens: (this.usage?.inputTokens ?? 0) + (body.usage.prompt_tokens as number),
-        outputTokens: (this.usage?.outputTokens ?? 0) + (body.usage.completion_tokens as number),
-      };
-    } else {
-      this.usageIncomplete = true;
-      this.usage = null;
     }
     yield* parts;
     yield { type: 'finish', reason: choice.finish_reason as 'stop' | 'tool_calls' | 'length' };

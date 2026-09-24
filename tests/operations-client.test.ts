@@ -19,6 +19,7 @@ const value = {
     interrupted: 0,
     retryStarts: 0,
   },
+  attemptUsage: [],
   storage: { materials: 1, versions: 2, originalBytes: 12 },
   models: [
     {
@@ -91,4 +92,35 @@ test('unknown usage is not turned into zero and verification stays separate', ()
     }),
   );
   assert.equal(isOperations({ ...value, models: [{ ...value.models[0], executionClass: 'other' }] }), false);
+});
+
+test('attempt usage retains incomplete coverage and rejects impossible counts or content fields', () => {
+  const row = {
+    executionClass: 'live',
+    attempts: 2,
+    meteredAttempts: 1,
+    running: 0,
+    succeeded: 1,
+    failed: 1,
+    cancelled: 0,
+    interrupted: 0,
+    requests: 2,
+    pendingRequests: 1,
+    reportedRequests: 1,
+    inputTokens: 0,
+    outputTokens: 0,
+  };
+  assert.ok(isOperations({ ...value, attemptUsage: [row] }));
+  for (const bad of [
+    { ...row, attempts: 1 },
+    { ...row, meteredAttempts: 3 },
+    { ...row, requests: 9 },
+    { ...row, pendingRequests: 2 },
+    { ...row, inputTokens: null },
+    { ...row, reportedRequests: 0 },
+    { ...row, prompt: 'private' },
+    { ...row, requests: -1 },
+  ])
+    assert.equal(isOperations({ ...value, attemptUsage: [bad] }), false);
+  assert.equal(isOperations({ ...value, attemptUsage: [row, row] }), false);
 });

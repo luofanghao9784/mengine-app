@@ -106,7 +106,7 @@ test('runtime protocol manifest is authenticated and pins the artifact before an
   const manifest = await response.json();
   assert.equal(manifest.engineVersion, ENGINE_VERSION);
   assert.equal(manifest.runtimeMode, 'agent-verification');
-  assert.deepEqual(manifest.protocols, { sourceLookup: '1.0', agentTask: '1.4', platformCallbacks: '1.3' });
+  assert.deepEqual(manifest.protocols, { sourceLookup: '1.0', agentTask: '1.4', platformCallbacks: '1.4' });
   for (const path of ['/internal/v1/source-results', '/internal/v1/agent-results']) {
     const stale = await fetch(base + path, {
       method: 'POST',

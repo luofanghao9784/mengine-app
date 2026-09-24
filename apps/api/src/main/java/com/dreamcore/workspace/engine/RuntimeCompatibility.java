@@ -15,7 +15,7 @@ public final class RuntimeCompatibility {
                 || value.protocols().values().stream().anyMatch(v -> v == null || !v.matches("[0-9]{1,7}\\.[0-9]{1,7}")))
             throw incompatible();
         if(agent) {
-            if(!"1.4".equals(value.protocols().get("agentTask")) || !"1.3".equals(value.protocols().get("platformCallbacks"))
+            if(!"1.4".equals(value.protocols().get("agentTask")) || !Set.of("1.3","1.4").contains(value.protocols().get("platformCallbacks"))
                     || executionClass == null || !Set.of("live", "verification").contains(executionClass)
                     || !("agent-" + executionClass).equals(value.runtimeMode())) throw incompatible();
         } else if(!"1.0".equals(value.protocols().get("sourceLookup"))) throw incompatible();

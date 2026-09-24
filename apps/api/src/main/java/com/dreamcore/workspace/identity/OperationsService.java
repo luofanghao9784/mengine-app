@@ -15,9 +15,10 @@ public class OperationsService {
     public record Tasks(long total, long queued, long running, long succeeded, long failed, long cancelled, long interrupted, long retryStarts) {}
     public record Storage(long materials, long versions, long originalBytes) {}
     public record ModelUsage(String executionClass, long succeededTasks, long reportedTasks, long modelCalls, Long inputTokens, Long outputTokens) {}
+    public record AttemptUsage(String executionClass,long attempts,long meteredAttempts,long running,long succeeded,long failed,long cancelled,long interrupted,long requests,long pendingRequests,long reportedRequests,Long inputTokens,Long outputTokens) {}
     public record Failure(String code, long tasks, Instant lastOccurredAt) {}
     public record Overview(UUID tenantId, int days, Instant from, Instant checkedAt, Tasks tasks, Storage storage,
-                           List<ModelUsage> models, List<Failure> errors) {}
+                           List<ModelUsage> models, List<Failure> errors, List<AttemptUsage> attemptUsage) {}
     private final JdbcTemplate db;
     private final IdentityService identities;
     private final JsonMapper json = new JsonMapper();
@@ -48,6 +49,7 @@ public class OperationsService {
         if(tenant!=null)args.add(tenant);
         String storageScope=tenant==null?"":" WHERE tenant_id=?";
         if(tenant!=null)args.add(tenant);
+        args.add(Timestamp.from(from));args.add(Timestamp.from(end));if(tenant!=null)args.add(tenant);
         // All aggregates use one SQL statement/snapshot, independent of concurrent task transitions.
         String sql="""
             WITH cohort AS MATERIALIZED (
@@ -76,17 +78,36 @@ public class OperationsService {
             ), storage AS (
               SELECT count(DISTINCT material_id) materials,count(*) versions,coalesce(sum(size_bytes),0) original_bytes
               FROM material_versions %s
+            ), attempt_totals AS (
+              SELECT a.execution_class AS "executionClass",count(*) AS attempts,
+                count(*) FILTER(WHERE a.metering_enabled) AS "meteredAttempts",
+                count(*) FILTER(WHERE a.status='RUNNING') AS running,
+                count(*) FILTER(WHERE a.status='SUCCEEDED') AS succeeded,
+                count(*) FILTER(WHERE a.status='FAILED') AS failed,
+                count(*) FILTER(WHERE a.status='CANCELLED') AS cancelled,
+                count(*) FILTER(WHERE a.status='INTERRUPTED') AS interrupted,
+                coalesce(sum(r.requests),0) AS requests,coalesce(sum(r.pending),0) AS "pendingRequests",
+                coalesce(sum(r.reported),0) AS "reportedRequests",
+                sum(r.input) AS "inputTokens",sum(r.output) AS "outputTokens"
+              FROM agent_attempt_usage a LEFT JOIN LATERAL (
+                SELECT count(*) AS requests,count(*) FILTER(WHERE outcome='PENDING') AS pending,
+                  count(input_tokens) AS reported,sum(input_tokens) AS input,sum(output_tokens) AS output
+                FROM agent_model_requests WHERE attempt_id=a.attempt_id
+              ) r ON true
+              WHERE a.started_at>=? AND a.started_at<? %s GROUP BY a.execution_class
             )
             SELECT totals.*,storage.*,
               coalesce((SELECT jsonb_agg(to_jsonb(m) ORDER BY m."executionClass") FROM model_totals m),'[]') models,
-              coalesce((SELECT jsonb_agg(to_jsonb(e) ORDER BY e.tasks DESC,e.code) FROM errors e),'[]') errors
+              coalesce((SELECT jsonb_agg(to_jsonb(e) ORDER BY e.tasks DESC,e.code) FROM errors e),'[]') errors,
+              coalesce((SELECT jsonb_agg(to_jsonb(a) ORDER BY a."executionClass") FROM attempt_totals a),'[]') attempt_usage
             FROM totals CROSS JOIN storage
-            """.formatted(taskScope,storageScope);
+            """.formatted(taskScope,storageScope,taskScope);
         db.execute("SET LOCAL statement_timeout='3s'");
         return db.queryForObject(sql,(r,n)->new Overview(tenant,days,from,end,
             new Tasks(r.getLong("total"),r.getLong("queued"),r.getLong("running"),r.getLong("succeeded"),r.getLong("failed"),r.getLong("cancelled"),r.getLong("interrupted"),r.getLong("retry_starts")),
             new Storage(r.getLong("materials"),r.getLong("versions"),r.getLong("original_bytes")),
             Arrays.asList(json.readValue(r.getString("models"),ModelUsage[].class)),
-            Arrays.asList(json.readValue(r.getString("errors"),Failure[].class))),args.toArray());
+            Arrays.asList(json.readValue(r.getString("errors"),Failure[].class)),
+            Arrays.asList(json.readValue(r.getString("attempt_usage"),AttemptUsage[].class))),args.toArray());
     }
 }

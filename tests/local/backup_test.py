@@ -149,8 +149,8 @@ class BackupBoundaryTest(unittest.TestCase):
         self.assertFalse((target / 'config.json').exists())
 
     def test_queued_work_or_incompatible_schema_prevents_snapshot(self):
-        versions = ','.join(map(str, range(1, 15)))
-        for schema, active in [(versions, '1'), (versions + ',15', '0')]:
+        versions = ','.join(map(str, range(1, 16)))
+        for schema, active in [(versions, '1'), (versions + ',16', '0')]:
             def sql(query):
                 if 'flyway_schema_history' in query:
                     return schema
