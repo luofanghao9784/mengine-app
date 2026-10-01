@@ -216,11 +216,21 @@ try {
   });
   await page.goto(url + 'workspace/#tenant=' + tenant);
   await expect(page.getByRole('tab', { name: '推荐', exact: true })).toHaveAttribute('aria-selected', 'true');
-  await page.getByLabel('新的工作需求', { exact: true }).fill('保留草稿，展开后才发送');
-  await page.getByRole('button', { name: '进入会话，继续编辑', exact: true }).click();
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  const launcher = page.getByLabel('新的工作需求', { exact: true });
+  await launcher.dispatchEvent('compositionstart');
+  await launcher.fill('保留草稿，展开后才发送');
+  await expect(launcher).toBeVisible();
+  assert.equal(writes.length, 0);
+  await launcher.dispatchEvent('compositionend', { data: '保留草稿，展开后才发送' });
+  await expect(page.getByLabel('工作要求', { exact: true })).toBeFocused();
   await expect(page.getByLabel('工作要求', { exact: true })).toHaveValue('保留草稿，展开后才发送');
   await expect(page.getByLabel('任务方式', { exact: true })).toHaveCount(0);
   assert.equal(writes.length, 0);
+  await expect(page.locator('.live-viewport-morph')).toHaveCount(0);
+  await expect
+    .poll(() => page.locator('[data-deck-id=conversation]').evaluate((e) => getComputedStyle(e).opacity))
+    .toBe('1');
   await page.screenshot({ path: resolve(artifacts, 'new-conversation-desktop.png') });
   await page.getByRole('button', { name: '开始任务', exact: true }).click();
   await expect(page.getByRole('button', { name: '重试上次发送', exact: true })).toBeEnabled();
@@ -230,6 +240,12 @@ try {
   assert.equal(writes.length, 2);
   assert.equal(writes[0].mode, 'AGENT');
   assert.deepEqual(writes[0], writes[1]);
+  await page.getByRole('button', { name: '新会话', exact: true }).click();
+  await expect(page).toHaveURL(/from=briefing/);
+  await page.getByRole('link', { name: convo.title, exact: true }).click();
+  await expect(page).toHaveURL(/from=briefing/);
+  await expect(page.locator('.workspace-briefing-background')).toHaveCount(1);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.getByRole('button', { name: '关闭会话视窗', exact: true }).click();
   await page.locator('.recommendation-card').getByRole('button').first().click();
   await expect(page.locator('.live-reading-dialog')).toContainText('本周工作重点');
@@ -259,6 +275,13 @@ try {
   await reader.getByRole('button', { name: /^全屏查看/ }).click();
   const modal = page.getByRole('dialog', { name: /资料来源 门店/ });
   await expect(modal).toBeVisible();
+  assert.ok(await modal.evaluate((e) => e.matches(':popover-open')));
+  assert.ok(
+    await modal.evaluate((e) => {
+      const r = e.getBoundingClientRect();
+      return r.x >= 0 && r.y >= 0 && r.right <= innerWidth && r.bottom <= innerHeight;
+    }),
+  );
   for (const key of ['Tab', 'Shift+Tab', 'Tab', 'Tab']) {
     await page.keyboard.press(key);
     assert.ok(await modal.evaluate((e) => e.contains(document.activeElement)));
@@ -296,7 +319,7 @@ try {
   assert.deepEqual(unknown, []);
   assert.deepEqual(errors, []);
   console.log(
-    'PASS: natural-language send + uncertain retry, briefing handoff/version guard, multiple readers, same-node fullscreen, reorder, mobile tabs, permission revocation.',
+    'PASS: IME draft handoff + normal motion, contextual navigation, natural-language send + uncertain retry, briefing handoff/version guard, multiple readers, same-node fullscreen, reorder, mobile tabs, permission revocation.',
   );
 } catch (error) {
   console.error({ unknown, errors });

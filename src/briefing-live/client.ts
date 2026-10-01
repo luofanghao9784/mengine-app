@@ -52,16 +52,39 @@ export function createBriefingClient(fetcher: typeof fetch = fetch) {
   const request = createIdentityRequest(fetcher);
   const root = (tenant: string) => `/api/v1/tenants/${id(tenant)}/briefing`;
   return {
+    preference(tenant: string, conversation: string, signal?: AbortSignal) {
+      return request(
+        root(tenant) + '/' + id(conversation) + '/preference',
+        'GET',
+        isPreference,
+        undefined,
+        signal,
+      );
+    },
     layout(tenant: string, signal?: AbortSignal) {
-      return request(root(tenant) + '/layout', 'GET', (v): v is BriefingLayout =>
-        record(v) && v.tenantId === tenant && count(v.revision), undefined, signal);
+      return request(
+        root(tenant) + '/layout',
+        'GET',
+        (v): v is BriefingLayout => record(v) && v.tenantId === tenant && count(v.revision),
+        undefined,
+        signal,
+      );
     },
     move(tenant: string, body: BriefingLayoutMove) {
-      return request(root(tenant) + '/layout', 'POST', (v): v is BriefingLayoutReceipt =>
-        record(v) && uuid(v.id) && v.conversationId === body.conversationId &&
-        v.anchorId === body.anchorId && v.direction === body.direction &&
-        count(v.appliedRevision) && count(v.currentRevision) && v.currentRevision >= v.appliedRevision,
-        body);
+      return request(
+        root(tenant) + '/layout',
+        'POST',
+        (v): v is BriefingLayoutReceipt =>
+          record(v) &&
+          uuid(v.id) &&
+          v.conversationId === body.conversationId &&
+          v.anchorId === body.anchorId &&
+          v.direction === body.direction &&
+          count(v.appliedRevision) &&
+          count(v.currentRevision) &&
+          v.currentRevision >= v.appliedRevision,
+        body,
+      );
     },
     list(tenant: string, filter: BriefingFilter, offset = 0, signal?: AbortSignal) {
       const query = new URLSearchParams({

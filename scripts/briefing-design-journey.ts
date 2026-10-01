@@ -18,6 +18,9 @@ let settings = { revision: 0, enabled: true },
   failSetting = true,
   changedTask = false,
   restricted = false;
+const feedbacks = new Map<string, any>(),
+  feedbackReceipts = new Map<string, any>();
+let loseFeedbackReply = true;
 const settingKeys: string[] = [],
   receipts = new Map<string, typeof settings>();
 const items = Array.from({ length: 23 }, (_, i) => {
@@ -225,7 +228,38 @@ try {
       });
       return ok(preference);
     }
-    if (path.endsWith('/feedback') && method === 'GET') return ok({ feedback: null });
+    if (/\/briefing\/[^/]+\/preference$/.test(path)) return ok(preference);
+    if (path.endsWith('/feedback') && method === 'GET')
+      return ok({ feedback: feedbacks.get(u.searchParams.get('taskId')!) || null });
+    if (/\/feedback(?:\/[^/]+(?:\/withdraw)?)?$/.test(path) && method === 'POST') {
+      if (feedbackReceipts.has(body.requestId)) return ok(feedbackReceipts.get(body.requestId));
+      const previous = [...feedbacks.values()].find((f) => path.includes(f.id));
+      const target = body.target || previous.target;
+      const feedback = {
+        id: previous?.id || uid(900),
+        tenantId: tenant,
+        workspaceId: workspace,
+        target,
+        revision: previous ? previous.revision + 1 : 1,
+        status: path.endsWith('/withdraw') ? 'WITHDRAWN' : 'ACTIVE',
+        assessment: body.assessment || previous.assessment,
+        snapshot: {
+          taskState: 'SUCCEEDED',
+          executionClass: 'verification',
+          contentSha256: 'a'.repeat(64),
+          sourceVersionCount: 0,
+        },
+        createdAt: now,
+        updatedAt: now,
+      };
+      feedbacks.set(target.taskId, feedback);
+      feedbackReceipts.set(body.requestId, feedback);
+      if (loseFeedbackReply) {
+        loseFeedbackReply = false;
+        return route.abort('failed');
+      }
+      return ok(feedback);
+    }
     unknown.push(method + ' ' + path);
     return route.fulfill({
       status: 404,
@@ -238,6 +272,54 @@ try {
   await expect(page.getByRole('tab', { name: '推荐', exact: true })).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByRole('tab', { name: '类型', exact: true })).toBeDisabled();
   await expect(cards).toHaveCount(20);
+  // Full shortcuts, exact-version feedback, lost receipt, reason popover, and focused preference preservation.
+  const firstCard = cards.first();
+  await firstCard.hover();
+  for (const name of ['有用', '没用', '关注', '转发'])
+    await expect(firstCard.getByRole('button', { name, exact: true })).toBeVisible();
+  await firstCard.getByRole('button', { name: '有用', exact: true }).click();
+  await firstCard.getByRole('button', { name: '重试本次评价', exact: true }).click();
+  await expect(firstCard.getByRole('button', { name: '有用', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  const feedbackWrites = requests.filter((r) => r.method === 'POST' && r.path.endsWith('/feedback'));
+  assert.equal(feedbackWrites.length, 2);
+  assert.deepEqual(feedbackWrites[0].body, feedbackWrites[1].body);
+  assert.deepEqual(feedbackWrites[0].body.target, items[0].feedbackTarget);
+  await page.screenshot({ path: resolve(artifacts, 'feedback-rail.png') });
+  await firstCard.getByRole('button', { name: '没用', exact: true }).click();
+  const reasonPanel = page.getByRole('dialog', { name: '选择没用的原因', exact: true });
+  await expect(reasonPanel).toBeVisible();
+  assert.ok(await reasonPanel.evaluate((e) => e.matches(':popover-open')));
+  await reasonPanel.getByRole('button', { name: '信息不准确', exact: true }).click();
+  await expect(firstCard.getByRole('button', { name: '没用', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  assert.equal(feedbacks.get(uid(100)).assessment.reasons[0], 'INACCURATE');
+  await firstCard.getByRole('button', { name: '没用', exact: true }).click();
+  await reasonPanel.getByRole('button', { name: '其他原因', exact: true }).click();
+  await reasonPanel.getByLabel('改进建议').fill('请在结论前注明统计范围');
+  await reasonPanel.getByRole('button', { name: '提交建议', exact: true }).click();
+  await expect(reasonPanel).toHaveCount(0);
+  assert.equal(feedbacks.get(uid(100)).assessment.suggestion, '请在结论前注明统计范围');
+  preference.size = 'WIDE';
+  await firstCard.getByRole('button', { name: '关注', exact: true }).click();
+  await expect(firstCard.getByRole('button', { name: '取消关注', exact: true })).toBeEnabled();
+  assert.equal(preference.size, 'WIDE');
+  assert.equal(preference.pinned, true);
+  await firstCard.getByRole('button', { name: /^阅读：/ }).click();
+  const detail = page.locator('.live-reading-dialog');
+  const widthBefore = await detail.evaluate((e) => e.getBoundingClientRect().width);
+  await detail.getByRole('separator', { name: '调整画报详情宽度（右侧）' }).press('ArrowRight');
+  assert.ok((await detail.evaluate((e) => e.getBoundingClientRect().width)) > widthBefore);
+  await detail.getByRole('button', { name: '没用', exact: true }).click();
+  await expect(reasonPanel).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(reasonPanel).toHaveCount(0);
+  await expect(detail).toBeVisible();
+  await detail.getByRole('button', { name: '关闭卡片详情', exact: true }).click();
   const before = await cards.evaluateAll((xs) =>
     xs.map((x) => ({
       id: x.getAttribute('data-content-id'),
@@ -246,7 +328,10 @@ try {
     })),
   );
   for (let n = 0; n < 5; n++) {
-    await cards.nth(n).getByRole('button').click();
+    await cards
+      .nth(n)
+      .getByRole('button', { name: /^阅读：/ })
+      .click();
     await expect(page.locator('.live-reading-dialog')).toContainText('已核对的完整原文');
     await expect(cards.nth(n)).toHaveAttribute('data-read', 'true');
     await page.getByRole('button', { name: '关闭卡片详情', exact: true }).click();
@@ -266,14 +351,20 @@ try {
   await page.getByRole('button', { name: '上一页', exact: true }).click();
   await expect(cards).toHaveCount(20);
   changedTask = true;
-  await cards.nth(5).getByRole('button').click();
+  await cards
+    .nth(5)
+    .getByRole('button', { name: /^阅读：/ })
+    .click();
   await expect(page.locator('.live-reading-dialog')).toContainText('这份成果已更新');
   await expect(page.locator('.live-reading-dialog')).not.toContainText('已核对的完整原文');
   assert.equal(opened.size, 5);
   await page.getByRole('button', { name: '关闭卡片详情', exact: true }).click();
   changedTask = false;
   restricted = true;
-  await cards.nth(5).getByRole('button').click();
+  await cards
+    .nth(5)
+    .getByRole('button', { name: /^阅读：/ })
+    .click();
   await expect(page.locator('.live-reading-dialog')).toContainText('资料权限已变化');
   await expect(page.locator('.live-reading-dialog')).not.toContainText('已核对的完整原文');
   assert.equal(opened.size, 5);
@@ -302,16 +393,26 @@ try {
   );
   await page.screenshot({ path: resolve(artifacts, 'desktop.png'), fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
-  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
-  await cards.first().getByRole('button').click();
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await cards
+    .first()
+    .getByRole('button', { name: /^阅读：/ })
+    .click();
   await expect(page.locator('.live-reading-dialog')).toContainText('已核对的完整原文');
   await expect(page.getByRole('link', { name: '继续会话', exact: true })).toHaveAttribute(
     'href',
     new RegExp('briefingTask=' + uid(100)),
   );
-  await page.getByRole('button', { name: '评价 / 建议', exact: true }).click();
+  await page
+    .locator('.live-reading-dialog')
+    .getByRole('button', { name: '评价记录与建议', exact: true })
+    .click();
   await expect(page.locator('.feedback-panel')).toContainText('这条画报对你有用吗');
   await page.screenshot({ path: resolve(artifacts, 'mobile-reader.png'), fullPage: false });
+  await page
+    .getByRole('dialog', { name: '评价与建议', exact: true })
+    .getByRole('button', { name: '关闭弹窗' })
+    .click();
   await page.getByRole('button', { name: '关闭卡片详情', exact: true }).click();
   await page.screenshot({ path: resolve(artifacts, 'mobile.png'), fullPage: true });
   assert.deepEqual(unknown, [], 'Every API request must remain inside the synthetic fixture');
@@ -329,6 +430,10 @@ try {
         'settings lost receipt same key',
         'server date and workspace filtering',
         'feedback entry',
+        'feedback lost receipt exact key and version',
+        'negative reasons and custom suggestion',
+        'follow preserves width',
+        'reader resize and nested Escape',
         'mobile fit',
       ],
       artifacts,

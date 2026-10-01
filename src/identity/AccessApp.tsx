@@ -523,7 +523,7 @@ function GuardedAccessShell({
   return (
     <PageActionsContext.Provider value={actionsTarget}>
       <div
-        className={`access-shell ${surface === 'workspace' ? 'workspace-shell' : ''} ${surface === 'workspace' && conversations ? 'workspace-conversations' : ''} ${surface === 'workspace' && briefing ? 'workspace-briefing' : ''}`}
+        className={`access-shell ${surface === 'workspace' ? 'workspace-shell' : ''} ${surface === 'workspace' && conversations ? `workspace-conversations ${fromBriefing ? 'workspace-contextual' : ''}` : ''} ${surface === 'workspace' && briefing ? 'workspace-briefing' : ''}`}
       >
         <aside className="access-sidebar" aria-label="工作导航">
           <a href={surfaceHref('workspace')} className="access-brand" aria-label="梦擎工作空间">
@@ -766,6 +766,26 @@ function GuardedAccessShell({
               <strong>{identity.account.displayName}</strong>
               <p>{identity.account.email}</p>
             </div>
+            {surface === 'workspace' && eligible.length > 1 && (
+              <label className="field">
+                <span>切换企业</span>
+                <select
+                  aria-label="切换企业"
+                  disabled={pendingRequest}
+                  value={tenant}
+                  onChange={(e) => {
+                    choose(e.target.value);
+                    setAccountOpen(false);
+                  }}
+                >
+                  {eligible.map((m) => (
+                    <option key={m.tenantId} value={m.tenantId}>
+                      {m.tenantName}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             <div className="access-account-actions">
               <Button onClick={onInvite}>接受另一企业邀请</Button>
               <Button icon={LogOut} onClick={() => void logout().catch(() => {})}>
@@ -867,6 +887,16 @@ function WorkspaceConversationPages({
       )}
       {conversations && (
         <div className={overlay ? 'workspace-conversation-overlay' : 'workspace-conversation-page'}>
+          {overlay && (
+            <button
+              type="button"
+              className="workspace-conversation-scrim"
+              aria-label="返回智能画报"
+              onClick={() => {
+                if (!requestNavigationLocked()) location.hash = briefingHref(tenant);
+              }}
+            />
+          )}
           <Conversations tenant={tenant} />
         </div>
       )}

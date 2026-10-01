@@ -1,7 +1,11 @@
 import { useContext, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { MessageSquare, ThumbsUp, X } from 'lucide-react';
+import { useBriefingDetailWidth } from '../components/useBriefingDetailWidth';
+import type { FeedbackTarget } from '../../contracts/public-api/feedback';
+import { FeedbackActions } from './FeedbackActions';
 import { RequestPending } from '../shared/request-guard';
+import { prepareViewportMotion } from '../conversation/viewport-motion';
 import { briefingConversationHref } from '../conversation/briefing-context';
 import { TaskReadingBody, type ReadingTask } from './TaskReadingBody';
 import { RailButton, BriefingStatusMarks } from './Magazine';
@@ -17,6 +21,7 @@ export function ReadingDialog({
   children,
   preface,
   feedback,
+  feedbackTarget,
   actions,
   pinned = false,
 }: {
@@ -30,6 +35,7 @@ export function ReadingDialog({
   children?: ReactNode;
   preface?: ReactNode;
   feedback?: ReactNode;
+  feedbackTarget?: FeedbackTarget;
   actions?: ReactNode;
   pinned?: boolean;
 }) {
@@ -37,11 +43,16 @@ export function ReadingDialog({
     feedbackRef = useRef<HTMLDivElement>(null);
   const pending = useContext(RequestPending),
     titleId = useId();
+  const sizing = useBriefingDetailWidth();
   const [showFeedback, setShowFeedback] = useState(false);
   useEffect(() => {
     const element = ref.current;
+    const trigger = document.activeElement;
     element?.showModal();
-    return () => element?.close();
+    return () => {
+      element?.close();
+      if (trigger instanceof HTMLElement && trigger.isConnected) trigger.focus({ preventScroll: true });
+    };
   }, []);
   const close = () => {
     if (!pending) onClose();
@@ -50,9 +61,11 @@ export function ReadingDialog({
     <dialog
       ref={ref}
       className="live-reading-dialog"
+      style={{ width: sizing.width + sizing.gutter, paddingRight: sizing.gutter }}
       aria-labelledby={titleId}
       onCancel={(e) => {
         e.preventDefault();
+        e.stopPropagation();
         close();
       }}
       onClick={(e) => {
@@ -96,7 +109,17 @@ export function ReadingDialog({
             href={briefingConversationHref(tenant, task)}
             onClick={(e) => {
               if (pending) e.preventDefault();
-              else onClose();
+              else {
+                const card = ref.current?.querySelector<HTMLElement>('.live-reading-card');
+                if (card)
+                  prepareViewportMotion(
+                    tenant,
+                    card,
+                    'briefing',
+                    card.querySelector('.live-reading-scroll')?.scrollTop || 0,
+                  );
+                onClose();
+              }
             }}
           >
             <MessageSquare size={20} strokeWidth={1.65} />
@@ -104,23 +127,35 @@ export function ReadingDialog({
           </a>
         )}
       </div>
+      <div className="live-reading-resizer is-left" {...sizing.handle('left')} />
+      <div
+        className="live-reading-resizer is-right"
+        style={{ right: sizing.gutter - 6 }}
+        {...sizing.handle('right')}
+      />
       <aside className="live-reading-rail" aria-label="卡片快捷操作">
-        {feedback && (
-          <RailButton
-            label="评价 / 建议"
-            icon={ThumbsUp}
-            active={showFeedback}
-            aria-expanded={showFeedback}
-            disabled={pending}
-            onClick={() => {
-              setShowFeedback((v) => !v);
-              requestAnimationFrame(() =>
-                feedbackRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }),
-              );
-            }}
-          />
+        {feedbackTarget ? (
+          <FeedbackActions tenant={tenant} target={feedbackTarget}>
+            {actions}
+          </FeedbackActions>
+        ) : (
+          feedback && (
+            <RailButton
+              label="评价 / 建议"
+              icon={ThumbsUp}
+              active={showFeedback}
+              aria-expanded={showFeedback}
+              disabled={pending}
+              onClick={() => {
+                setShowFeedback((v) => !v);
+                requestAnimationFrame(() =>
+                  feedbackRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }),
+                );
+              }}
+            />
+          )
         )}
-        {actions}
+        {!feedbackTarget && actions}
       </aside>
     </dialog>,
     document.body,

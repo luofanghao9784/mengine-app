@@ -2,6 +2,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useId,
   useRef,
   type ButtonHTMLAttributes,
   type ReactNode,
@@ -100,24 +101,32 @@ export function Modal({
   children,
   onClose,
   wide = false,
+  className = '',
 }: {
   title: string;
   children: ReactNode;
   onClose: () => void;
   wide?: boolean;
+  className?: string;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
   useEffect(() => {
     const el = ref.current;
+    const trigger = document.activeElement;
     el?.showModal();
-    return () => el?.close();
+    return () => {
+      el?.close();
+      if (trigger instanceof HTMLElement && trigger.isConnected) trigger.focus({ preventScroll: true });
+    };
   }, []);
-  return (
+  return createPortal(
     <dialog
       ref={ref}
-      className={`modal ${wide ? 'wide' : ''}`}
+      className={`modal ${wide ? 'wide' : ''} ${className}`}
       onCancel={(e) => {
         e.preventDefault();
+        e.stopPropagation();
         onClose();
       }}
       onClick={(e) => {
@@ -127,14 +136,15 @@ export function Modal({
             onClose();
         }
       }}
-      aria-labelledby="modal-title"
+      aria-labelledby={titleId}
     >
       <header>
-        <h2 id="modal-title">{title}</h2>
+        <h2 id={titleId}>{title}</h2>
         <IconButton icon={X} label="关闭弹窗" onClick={onClose} />
       </header>
       <div className="modal-content">{children}</div>
-    </dialog>
+    </dialog>,
+    document.body,
   );
 }
 export function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {

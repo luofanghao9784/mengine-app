@@ -71,6 +71,7 @@ export async function materialJourney({
   }
   await client.goto(location());
   await expect(client.getByRole('heading', { name: '资料库', exact: true })).toBeVisible();
+  await client.getByRole('button', { name: '资料操作', exact: true }).click();
   await client.getByRole('button', { name: '新建文件夹', exact: true }).click();
   await client.getByLabel('文件夹名称').fill('开发草稿');
   await client.getByRole('button', { name: '创建文件夹', exact: true }).click();
@@ -82,6 +83,11 @@ export async function materialJourney({
   await client.reload();
   await expect(client.locator('.material-entry')).toContainText('自用进展.md');
   await client.locator('.material-entry').filter({ hasText: '自用进展.md' }).click();
+  await expect(client.getByRole('tab', { name: '正文', exact: true })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await client.getByRole('tab', { name: '历史版本', exact: true }).click();
   await client.getByRole('button', { name: '上传新版本', exact: true }).click();
   await client.getByLabel(/^选择文件/).setInputFiles(payload('自用进展修订.md', updated));
   await client.evaluate(() => window.dispatchEvent(new Event('focus')));
@@ -177,6 +183,11 @@ export async function materialJourney({
   await client.screenshot({ path: join(artifacts, 'library-mobile.png'), fullPage: true });
   assert.ok(await client.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
   await client.locator('.material-entry').filter({ hasText: '自用进展.md' }).click();
+  await expect(client.getByRole('tab', { name: '正文', exact: true })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await client.getByRole('tab', { name: '历史版本', exact: true }).click();
   await expect(client.getByRole('button', { name: '下载 v2', exact: true })).toBeVisible();
   await client.screenshot({ path: join(artifacts, 'versions-mobile.png'), fullPage: true });
   assert.ok(await client.evaluate(() => document.documentElement.scrollWidth <= innerWidth));

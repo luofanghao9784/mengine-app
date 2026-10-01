@@ -84,6 +84,14 @@ public class BriefingService {
         return rows.isEmpty()?new Preference(0,false,false,"STANDARD"):rows.getFirst();
     }
     @Transactional
+    public Preference readPreference(UUID actor, UUID tenant, UUID conversation) {
+        identities.member(actor,tenant,false);departure.requirePrivateRead(actor,tenant);
+        var spaces=db.queryForList("SELECT workspace_id FROM conversations c WHERE c.tenant_id=? AND c.owner_id=? AND c.purpose='BUSINESS' AND c.id=? AND EXISTS(SELECT 1 FROM conversation_tasks t WHERE t.conversation_id=c.id AND t.status='SUCCEEDED' AND t.mode='AGENT')",UUID.class,tenant,actor,conversation);
+        if(spaces.isEmpty())throw missing();
+        access.require(actor,tenant,spaces.getFirst(),false);
+        return preference(conversation);
+    }
+    @Transactional
     public Preference update(UUID actor,UUID tenant,UUID conversation,UUID requestId,int expectedRevision,boolean pinned,boolean hidden,String size) {
         if(expectedRevision<0 || size==null || !Set.of("STANDARD","WIDE").contains(size))throw IdentityException.invalid();
         String fingerprint=IdentityService.hash(tenant+"\n"+conversation+"\n"+expectedRevision+"\n"+pinned+"\n"+hidden+"\n"+size);

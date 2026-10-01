@@ -71,6 +71,7 @@ export async function objectLifecycleJourney(
       task = original.tasks.at(-1);
     assert.equal(task.status, 'WAITING_CAPABILITY');
     const visit = async () => {
+      await page.getByRole('button', { name: '资料操作', exact: true }).click();
       await page.getByRole('button', { name: '内容回收与清理', exact: true }).click();
       await expect(page.getByRole('heading', { name: '内容回收与清理', exact: true })).toBeVisible();
       await page.getByLabel('维护范围', { exact: true }).selectOption(space);

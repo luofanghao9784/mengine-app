@@ -61,11 +61,16 @@
   padding: 8px 10px 8px 18px;
   z-index: 4;
 }
-.workspace-composer input:not([type]) {
+.workspace-composer textarea {
   border: 0;
   padding: 7px 0;
   background: transparent;
-  outline-offset: 4px;
+  outline: 0;
+  resize: none;
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  line-height: 1.6;
 }
 .workspace-composer button {
   display: grid;
@@ -180,37 +185,119 @@
     grid-template-columns: 1fr;
   }
 }
-.workspace-conversation-page {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-  height: 100%;
+/* The viewport owns a single toolbar, over the entire main canvas like the Demo. */
+.workspace-conversations {
+  background: var(--canvas);
 }
-.workspace-briefing-background {
-  min-width: 0;
+.workspace-conversations .access-main > .topbar {
+  visibility: hidden;
 }
+.workspace-conversations .access-sidebar {
+  z-index: 60;
+  background: transparent;
+}
+.workspace-conversation-page,
 .workspace-conversation-overlay {
   position: fixed;
-  inset: 80px 16px 16px 108px;
-  z-index: 45;
+  inset: 0 0 0 var(--sidebar-width, 108px);
+  z-index: 40;
   display: flex;
   flex-direction: column;
+  padding-bottom: 26px;
   isolation: isolate;
 }
-.workspace-conversation-overlay::before {
-  content: '';
+.workspace-conversation-page {
+  background: var(--canvas);
+}
+.workspace-conversation-scrim {
   position: fixed;
-  inset: 80px 0 0 108px;
+  inset: 0;
   z-index: -1;
+  border: 0;
+  border-radius: 0;
   background: #e9edf25c;
   backdrop-filter: blur(10px);
 }
+.workspace-conversation-page .live-conversations,
+.workspace-conversation-overlay .live-conversations {
+  height: 100%;
+  min-height: 0;
+}
+.workspace-conversation-page .live-deck-toolbar,
+.workspace-conversation-overlay .live-deck-toolbar {
+  height: 80px;
+  padding: 0 24px 0 16px;
+}
+.workspace-conversations .live-deck-caption {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+.workspace-conversations .live-deck-arrows .icon-button {
+  width: 32px;
+  height: 32px;
+  background: #ffffffbd;
+}
+.workspace-conversations .live-deck-arrows .icon-button:last-child {
+  margin-left: 8px;
+}
 @media (max-width: 800px) {
+  .workspace-conversation-page,
   .workspace-conversation-overlay {
-    inset: 72px 0 74px;
+    inset: 0 0 calc(74px + env(safe-area-inset-bottom));
+    padding-bottom: 8px;
   }
-  .workspace-conversation-overlay::before {
-    inset: 72px 0 64px;
+  .workspace-conversation-page .live-deck-toolbar,
+  .workspace-conversation-overlay .live-deck-toolbar {
+    height: 64px;
+    padding-inline: 12px;
   }
+}
+
+.workspace-composer.is-collapsed {
+  width: 52px;
+  padding: 7px;
+}
+.workspace-composer.is-collapsed textarea,
+.workspace-composer button[hidden] {
+  display: none;
+}
+.workspace-composer {
+  transition:
+    width 180ms ease,
+    border-radius 180ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .workspace-composer {
+    transition: none;
+  }
+}
+
+@media (min-width: 801px) {
+  .workspace-conversations .access-main > .topbar > .topbar-meta {
+    position: fixed;
+    visibility: visible;
+    z-index: 50;
+    right: 190px;
+    top: 24px;
+  }
+}
+.live-conversation-group > summary {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px;
+  color: #8290a2;
+  font-size: 12px;
+  cursor: pointer;
+  list-style: none;
+}
+.live-conversation-group > summary::before {
+  content: '›';
+  font-size: 16px;
+  transform: rotate(90deg);
+}
+.live-conversation-group:not([open]) > summary::before {
+  transform: none;
 }

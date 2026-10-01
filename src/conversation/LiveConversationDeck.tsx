@@ -1,5 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { ArrowLeft, ArrowRight, Maximize2, Minimize2, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, RefreshCw, Maximize2, Minimize2, X } from 'lucide-react';
+import { animateBriefingMorph } from '../components/conversationMotion';
+import { takeViewportMotion } from './viewport-motion';
+import { requestNavigationLocked } from '../shared/request-guard';
 import { IconButton } from '../shared/ui';
 import { DeckCard, OrderedDeckCards } from '../components/DeckCard';
 import { DeckStackHint } from '../components/DeckStackHint';
@@ -22,21 +25,82 @@ export type CompanionCard = {
 
 /** Demo presentation primitives with live, independently authorized readers. */
 export function LiveConversationDeck({
+  tenant,
   navigation,
   children,
   title,
   cards,
   reveal,
   onClose,
+  onRefresh,
 }: {
+  tenant: string;
   navigation: ReactNode;
   children: ReactNode;
   title: string;
   cards: CompanionCard[];
   reveal?: { id: string; sequence: number };
   onClose: () => void;
+  onRefresh: () => void;
 }) {
   const [active, setActive] = useState('conversation');
+  const root = useRef<HTMLDivElement>(null);
+  const close = () => {
+    if (requestNavigationLocked()) return;
+    const element = root.current;
+    if (!element || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      onClose();
+      return;
+    }
+    element.inert = true;
+    const animation = element.animate([{ opacity: 1 }, { opacity: 0 }], {
+      duration: 160,
+      easing: 'ease-out',
+      fill: 'forwards',
+    });
+    void animation.finished.then(onClose).catch(() => {});
+  };
+  useLayoutEffect(() => {
+    const origin = takeViewportMotion(tenant);
+    if (!origin) return;
+    let surface: HTMLDivElement | undefined;
+    let animations: Animation[] = [];
+    let readingObserver: MutationObserver | undefined;
+    const frame = requestAnimationFrame(() => {
+      const target = root.current?.querySelector<HTMLElement>(
+        origin.target === 'composer' ? '[data-deck-id=conversation]' : '[data-deck-id=briefing]',
+      );
+      if (!target || !target.getClientRects().length) return;
+      surface = document.createElement('div');
+      surface.className = 'live-viewport-morph';
+      surface.setAttribute('aria-hidden', 'true');
+      surface.inert = true;
+      document.body.append(surface);
+      if (origin.target === 'briefing' && origin.scroll > 0) {
+        const restoreReading = () => {
+          const reader = target.querySelector<HTMLElement>('.live-source-reader');
+          if (reader && reader.scrollHeight > reader.clientHeight) {
+            reader.scrollTop = origin.scroll;
+            readingObserver?.disconnect();
+          }
+        };
+        readingObserver = new MutationObserver(restoreReading);
+        readingObserver.observe(target, { childList: true, subtree: true });
+        restoreReading();
+      }
+      animations = animateBriefingMorph(surface, target, origin.visual, target.getBoundingClientRect(), 340);
+      void Promise.all(animations.map((a) => a.finished.catch(() => {}))).then(() => {
+        surface?.remove();
+        animations.forEach((a) => a.cancel());
+      });
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+      readingObserver?.disconnect();
+      animations.forEach((a) => a.cancel());
+      surface?.remove();
+    };
+  }, [tenant]);
   const [fullscreen, setFullscreen] = useState<string>();
   const [widths, setWidths] = useState<Record<string, number>>({});
   const [order, setOrder] = useState<string[]>([]);
@@ -107,6 +171,8 @@ export function LiveConversationDeck({
     if (!dialog) return;
     dialog.setAttribute('role', 'dialog');
     dialog.setAttribute('aria-modal', 'true');
+    dialog.setAttribute('popover', 'manual');
+    dialog.showPopover();
     // Keep the same reader node, its version and scroll position while full screen.
     const suspended: HTMLElement[] = [];
     let branch = dialog;
@@ -129,9 +195,11 @@ export function LiveConversationDeck({
       ).filter((e) => e.getClientRects().length && !e.closest('[inert]'));
     const first = () => (controls()[0] || dialog).focus({ preventScroll: true });
     const contain = (e: FocusEvent) => {
+      if (document.querySelector('dialog[open]')) return;
       if (!dialog.contains(e.target as Node)) first();
     };
     const keydown = (e: KeyboardEvent) => {
+      if (document.querySelector('dialog[open]')) return;
       if (e.key === 'Escape') {
         e.preventDefault();
         e.stopPropagation();
@@ -152,6 +220,8 @@ export function LiveConversationDeck({
     return () => {
       document.removeEventListener('keydown', keydown, true);
       document.removeEventListener('focusin', contain, true);
+      dialog.hidePopover();
+      dialog.removeAttribute('popover');
       dialog.removeAttribute('role');
       dialog.removeAttribute('aria-modal');
       suspended.forEach((e) => {
@@ -172,7 +242,7 @@ export function LiveConversationDeck({
       )
         return;
       event.preventDefault();
-      onClose();
+      close();
     };
     document.addEventListener('keydown', keydown);
     return () => document.removeEventListener('keydown', keydown);
@@ -196,11 +266,14 @@ export function LiveConversationDeck({
   });
   return (
     <div
+      ref={root}
+      role="region"
+      aria-label="会话视窗"
       className={`live-conversations live-demo-deck ${fullscreen ? 'has-fullscreen-reader' : ''}`}
       style={{ '--deck-padding': `${deckSpacing.padding}px` } as CSSProperties}
     >
       <header className="live-deck-toolbar">
-        <span className="live-deck-caption">会话视窗</span>
+        <h1 className="live-deck-caption">会话视窗</h1>
         <div className="deck-mobile-tabs" aria-label="会话卡片切换">
           <button type="button" aria-pressed={active === 'list'} onClick={() => show('list')}>
             列表
@@ -212,6 +285,7 @@ export function LiveConversationDeck({
           ))}
         </div>
         <div className="live-deck-arrows">
+          <IconButton icon={RefreshCw} label="刷新会话" onClick={onRefresh} />
           <IconButton
             icon={ArrowLeft}
             label="向左查看卡片"
@@ -224,7 +298,7 @@ export function LiveConversationDeck({
             disabled={!canScrollRight}
             onClick={() => scroller.current?.scrollBy({ left: 380, behavior: 'smooth' })}
           />
-          <IconButton icon={X} label="关闭会话视窗" onClick={onClose} />
+          <IconButton icon={X} label="关闭会话视窗" onClick={close} />
         </div>
       </header>
       <div

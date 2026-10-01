@@ -1,9 +1,10 @@
 import { useContext, useState } from 'react';
-import { Send, Users } from 'lucide-react';
+import { Send, Users, Share2 } from 'lucide-react';
 import type { ForwardBatch, ForwardRequest } from '../../contracts/public-api/forwarding';
 import { Button, Field, Modal, Empty } from '../shared/ui';
 import { Failure, Loading, SubmitError, useRemote, useSubmission } from '../shared/admin';
 import { RequestPending, useRequestLock } from '../shared/request-guard';
+import { RailButton } from '../briefing-live/Magazine';
 import { useSession } from '../identity/session';
 import { forwardingClient as api } from './client';
 import './forwarding.css';
@@ -11,19 +12,25 @@ export function ForwardPublicationButton({
   tenant,
   publicationId,
   materialVersionId,
+  compact = false,
 }: {
   tenant: string;
   publicationId: string;
   materialVersionId: string;
+  compact?: boolean;
 }) {
   const [open, setOpen] = useState(false),
     [locked, setLocked] = useState(false);
   const pending = useContext(RequestPending);
   return (
     <>
-      <Button icon={Send} disabled={pending} onClick={() => setOpen(true)}>
-        站内转发
-      </Button>
+      {compact ? (
+        <RailButton label="转发" icon={Share2} disabled={pending} onClick={() => setOpen(true)} />
+      ) : (
+        <Button icon={Send} disabled={pending} onClick={() => setOpen(true)}>
+          站内转发
+        </Button>
+      )}
       {open && (
         <Modal
           title="转发已发布的企业副本"

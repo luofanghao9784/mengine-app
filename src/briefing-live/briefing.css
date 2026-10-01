@@ -229,75 +229,17 @@
 }
 .live-card-action-rail {
   position: absolute;
-  right: 6px;
-  top: -23px;
-  display: flex;
-  gap: 7px;
+  right: 8px;
+  top: 18px;
   opacity: 0;
   pointer-events: none;
   transition: opacity 160ms;
+  z-index: 5;
 }
-.live-briefing-card:is(:hover, :focus-within) .live-card-action-rail {
+.live-briefing-card:is(:hover, :focus-within) .live-card-action-rail,
+.live-card-action-rail:has(:popover-open) {
   opacity: 1;
   pointer-events: auto;
-}
-.live-rail-button {
-  position: relative;
-  display: inline-grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  flex-shrink: 0;
-  border: 1px solid #fff9;
-  border-radius: 50%;
-  background: #fffffff0;
-  color: #526376;
-  box-shadow: 0 4px 18px #28374e15;
-  backdrop-filter: blur(4px);
-  cursor: pointer;
-}
-.live-rail-button:hover,
-.live-rail-button.is-active {
-  color: var(--accent, #356fe5);
-  background: #f0f5ff;
-}
-.live-rail-button:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-.live-rail-button > span {
-  display: none;
-  position: absolute;
-  right: calc(100% + 8px);
-  top: 50%;
-  transform: translateY(-50%);
-  border: 1px solid #fff9;
-  border-radius: 12px;
-  padding: 8px 12px;
-  background: #fffffff2;
-  box-shadow: 0 4px 20px #26374a12;
-  font: 12px/1.4 system-ui;
-  color: #34465e;
-  white-space: nowrap;
-  pointer-events: none;
-}
-.live-rail-button:is(:hover, :focus-visible) > span {
-  display: block;
-}
-.live-card-action-rail .live-rail-button {
-  width: 34px;
-  height: 34px;
-}
-.live-card-action-rail .live-rail-button svg {
-  width: 16px;
-  height: 16px;
-}
-.live-card-action-rail .live-rail-button > span {
-  top: auto;
-  bottom: calc(100% + 8px);
-  right: 0;
-  transform: none;
 }
 .live-briefing-card .access-alert {
   margin: 0 16px 16px;
@@ -368,7 +310,7 @@
 }
 .live-reading-dialog::backdrop {
   background: #27425c16;
-  backdrop-filter: blur(3px);
+  backdrop-filter: blur(12px);
 }
 .live-reading-card {
   position: relative;
@@ -585,9 +527,8 @@
     pointer-events: auto;
   }
   .live-reading-dialog {
-    width: calc(100vw - 24px);
+    max-width: calc(100vw - 16px);
     height: calc(100dvh - 32px);
-    padding: 0 0 58px;
   }
   .live-reading-card {
     border-radius: 20px;
@@ -627,4 +568,201 @@
   .live-card-action-rail {
     transition: none;
   }
+}
+
+.live-feedback-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.live-feedback-actions .nav-item {
+  width: 44px;
+}
+.live-feedback-actions .nav-link {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #ffffffed;
+  box-shadow: 0 4px 18px #28374e12;
+}
+.live-feedback-actions .nav-label {
+  left: auto;
+  right: calc(100% + 10px);
+}
+.live-feedback-actions[data-label-side='right'] .nav-label {
+  right: auto;
+  left: calc(100% + 10px);
+}
+.live-feedback-actions .nav-link.active .nav-symbol svg {
+  fill: currentColor;
+}
+.live-feedback-actions button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.live-feedback-actions .workspace-more-actions > .icon-button {
+  width: 44px;
+  height: 44px;
+  background: #ffffffed;
+  box-shadow: 0 4px 18px #28374e12;
+}
+.live-feedback-receipt {
+  display: block;
+  max-width: 150px;
+  font: 11px/1.5 system-ui;
+  color: var(--muted);
+  margin-top: 8px;
+  background: #fffffff0;
+  border-radius: 8px;
+  padding: 4px 7px;
+}
+.live-feedback-error {
+  width: 180px;
+  background: #fff;
+  padding: 10px;
+  border-radius: 12px;
+  font: 12px/1.5 system-ui;
+}
+.live-card-action-rail .live-feedback-receipt {
+  position: absolute;
+  right: 48px;
+  bottom: 0;
+  white-space: nowrap;
+}
+.live-reading-rail .live-feedback-actions {
+  gap: 12px;
+}
+.live-reading-resizer {
+  position: absolute;
+  top: 30px;
+  bottom: 30px;
+  width: 12px;
+  border-radius: 8px;
+  cursor: col-resize;
+  touch-action: none;
+}
+.live-reading-resizer.is-left {
+  left: -6px;
+}
+.live-reading-resizer:hover,
+.live-reading-resizer:focus-visible {
+  background: #1769e010;
+  outline: none;
+}
+.live-reading-resizer::after {
+  content: '';
+  position: absolute;
+  top: calc(50% - 18px);
+  left: 5px;
+  width: 3px;
+  height: 36px;
+  border-radius: 8px;
+  background: #a7b9cf;
+  opacity: 0;
+}
+.live-reading-resizer:hover::after,
+.live-reading-resizer:focus-visible::after {
+  opacity: 1;
+}
+.live-reading-dialog[open] {
+  animation: live-reading-enter 180ms ease-out;
+}
+@keyframes live-reading-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (max-width: 650px) {
+  .live-card-action-rail {
+    position: static;
+    padding: 0 14px 12px;
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .live-card-action-rail .live-feedback-actions {
+    flex-direction: row;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+  .live-feedback-actions .nav-link,
+  .live-feedback-actions .workspace-more-actions > .icon-button {
+    width: 36px;
+    height: 36px;
+  }
+  .live-feedback-actions .nav-item {
+    width: 36px;
+  }
+  .live-feedback-actions .nav-symbol > svg {
+    width: 18px;
+  }
+  .live-reading-rail {
+    right: 4px;
+    bottom: 0;
+    flex-direction: column;
+  }
+  .live-reading-rail .live-feedback-actions {
+    flex-direction: column;
+  }
+  .live-reading-article {
+    padding-inline: 16px;
+  }
+  .live-reading-article h2 {
+    font-size: 24px;
+  }
+}
+@media (hover: none) {
+  .live-card-action-rail {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .live-reading-dialog[open] {
+    animation: none;
+  }
+}
+
+.live-reading-rail .live-feedback-receipt {
+  position: absolute;
+  right: 62px;
+  bottom: 0;
+  width: max-content;
+}
+.live-reading-rail .live-feedback-error {
+  position: absolute;
+  right: 62px;
+  bottom: 0;
+}
+
+@media (min-width: 651px) {
+  .live-card-action-rail {
+    right: -16px;
+  }
+  .live-card-action-rail .live-feedback-actions {
+    gap: 4px;
+  }
+  .live-card-action-rail .nav-item,
+  .live-card-action-rail .nav-link,
+  .live-card-action-rail .workspace-more-actions > .icon-button {
+    width: 32px;
+    height: 32px;
+    margin: 0;
+  }
+  .live-card-action-rail .nav-symbol > svg {
+    width: 18px;
+  }
+  .live-card-action-rail .live-negative-action {
+    height: 32px;
+  }
+}
+.live-card-action-rail .live-feedback-error {
+  position: absolute;
+  right: 48px;
+  top: 0;
+  width: 230px;
+  box-shadow: 0 8px 30px #2336511a;
 }

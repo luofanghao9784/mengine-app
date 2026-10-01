@@ -181,7 +181,7 @@ export function animateBriefingMorph(
     height: `${target.height}px`,
   };
   const reference = conversation.querySelector<HTMLElement>(
-    '[data-current-origin] .briefing-reference > .briefing-card, .deck-source-scroll > .briefing-detail-article, .new-conversation-composer .draft-composer',
+    '[data-current-origin] .briefing-reference > .briefing-card, .deck-source-scroll > .briefing-detail-article, .new-conversation-composer .draft-composer, .live-composer-surface, .live-source-reader',
   );
   const referenceRect = reference?.getBoundingClientRect();
   const contentTransform = referenceRect?.width

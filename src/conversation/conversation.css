@@ -52,40 +52,6 @@
   overscroll-behavior: contain;
   scrollbar-width: thin;
 }
-.live-deck-card {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
-  min-width: 0;
-  height: 100%;
-  background: #fff;
-  border: 1px solid var(--live-card-edge);
-  border-radius: 24px;
-  box-shadow:
-    -2px 0 8px #1e355b08,
-    0 4px 14px #1e355b0b;
-}
-.live-deck-card[hidden] {
-  display: none;
-}
-.live-card-list {
-  width: var(--live-card-width, 240px);
-}
-.live-card-conversation {
-  width: var(--live-card-width, 680px);
-  flex: 1 0 440px;
-}
-.live-card-conversation[data-custom-width] {
-  flex: 0 0 var(--live-card-width);
-}
-.live-deck-scroller:has(.live-card-source) .live-card-conversation {
-  flex: 0 0 var(--live-card-width, 680px);
-}
-.live-card-source {
-  width: var(--live-card-width, 460px);
-  max-width: calc(100% - 24px);
-}
 .live-card-heading {
   display: flex;
   align-items: center;
@@ -209,36 +175,6 @@
 .live-conversation-list .platform-pagination button {
   font-size: 11px;
   padding: 5px 8px;
-}
-.live-card-resizer {
-  position: absolute;
-  width: 12px;
-  right: -7px;
-  top: 32px;
-  bottom: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 3;
-  border-radius: 8px;
-  cursor: col-resize;
-  touch-action: none;
-}
-.live-card-resizer span {
-  width: 3px;
-  height: 36px;
-  border-radius: 8px;
-  background: #a7b9cf;
-  opacity: 0;
-}
-.live-card-resizer:hover,
-.live-card-resizer:focus-visible {
-  background: #1769e010;
-  outline: 0;
-}
-.live-card-resizer:hover span,
-.live-card-resizer:focus-visible span {
-  opacity: 1;
 }
 .live-conversations .conversation-reader {
   display: flex;
@@ -625,23 +561,6 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.live-card-source.is-fullscreen {
-  position: fixed;
-  inset: 24px;
-  width: auto;
-  height: auto;
-  max-width: none;
-  z-index: 85;
-  box-shadow:
-    0 0 0 100vmax #e9edf2e8,
-    0 15px 70px #19396920;
-}
-.live-card-source.is-fullscreen .live-card-resizer {
-  display: none;
-}
-.live-card-source.is-fullscreen .live-source-reader {
-  padding-inline: max(24px, calc((100% - 880px) / 2));
-}
 .live-conversations .conversation-history-note {
   padding: 16px 22px;
   color: #8190a3;
@@ -720,50 +639,6 @@
 .live-conversations .conversation-attempts details {
   margin-bottom: 10px;
   overflow-wrap: anywhere;
-}
-@media (max-width: 900px) {
-  .live-deck-toolbar > .icon-button,
-  .live-deck-caption,
-  .live-deck-arrows {
-    display: none;
-  }
-  .live-deck-tabs {
-    display: flex;
-    gap: 4px;
-    flex-wrap: wrap;
-  }
-  .live-deck-tabs button {
-    padding: 6px 12px;
-    border-radius: 999px;
-    color: #7c8899;
-    font-size: 12px;
-  }
-  .live-deck-tabs button[aria-pressed='true'] {
-    background: #e8effb;
-    color: #456b9a;
-  }
-  .live-deck-scroller {
-    display: block;
-    overflow: hidden;
-    padding: 3px 8px 10px;
-  }
-  .live-deck-card {
-    display: none;
-    width: 100%;
-    max-width: none;
-  }
-  .live-deck-card.is-mobile-active {
-    display: flex;
-  }
-  .live-deck-card[hidden] {
-    display: none;
-  }
-  .live-card-resizer {
-    display: none;
-  }
-  .live-card-source.is-fullscreen {
-    inset: 12px;
-  }
 }
 @media (max-width: 600px) {
   .live-conversations {
@@ -876,11 +751,11 @@
   height: auto;
   max-width: none;
   z-index: 100;
+  padding: 0;
+  color: var(--live-ink);
   margin: 0 !important;
   translate: none;
-  box-shadow:
-    0 0 0 100vmax #e9edf2ed,
-    0 15px 70px #19396920;
+  box-shadow: 0 15px 70px #19396920;
 }
 .live-demo-deck .live-reader-fullscreen .deck-resizer,
 .live-demo-deck .live-reader-fullscreen .deck-fold-tab {
@@ -968,15 +843,134 @@
 @keyframes live-deck-enter {
   from {
     opacity: 0;
-    translate: 0 8px;
   }
   to {
     opacity: 1;
-    translate: 0;
   }
 }
 @media (prefers-reduced-motion: reduce) {
   .live-demo-deck {
     animation: none;
   }
+}
+
+.live-reader-fullscreen::backdrop {
+  background: #e9edf2db;
+  backdrop-filter: blur(10px);
+}
+
+.live-conversation-list .live-new-conversation {
+  justify-content: center;
+  border-radius: 999px;
+  background: #f3f7fd;
+  color: #6d8fbe;
+}
+.live-conversations .conversation-intro {
+  max-width: 540px;
+}
+.live-conversations .conversation-intro h3 {
+  font-size: 20px;
+}
+.live-inline-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 24px;
+}
+.live-inline-suggestions small {
+  width: 100%;
+  color: #8994a2;
+  margin-bottom: 3px;
+}
+.live-inline-suggestions button {
+  padding: 5px 11px;
+  border: 1px solid #edf0f4;
+  border-radius: 999px;
+  color: #7c8797;
+  font-size: 12px;
+}
+.live-inline-suggestions button:hover {
+  background: #f4f8ff;
+  color: var(--accent);
+}
+.live-intro-capability {
+  margin-top: 14px !important;
+}
+.live-composer-tools {
+  padding-bottom: 12px;
+}
+.live-composer-tools .button {
+  font-size: 12px;
+  padding: 5px 8px;
+  border: 0;
+  background: transparent;
+  color: #6286b7;
+}
+.live-composer-tools .field {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex: 0 1 auto;
+  color: #8794a6;
+  gap: 6px;
+}
+.live-conversations .live-composer-tools select {
+  background: transparent;
+  font-size: 12px;
+  padding-left: 0;
+  max-width: 240px;
+}
+.live-conversations .live-composer-submit {
+  background: #8aa9e2;
+}
+.live-conversations .conversation-send {
+  justify-content: flex-end;
+  opacity: 0.75;
+}
+.live-demo-deck .deck-scroller {
+  padding-bottom: 20px;
+}
+.live-conversations .conversation-reader > header {
+  min-height: 62px;
+}
+.live-conversations .conversation-reply .document-text {
+  white-space: normal;
+}
+@media (max-width: 600px) {
+  .live-composer-tools .field {
+    flex: 1;
+  }
+  .live-composer-tools .button {
+    padding-inline: 3px;
+    white-space: nowrap;
+  }
+}
+
+.live-viewport-morph {
+  position: fixed;
+  z-index: 70;
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: 26px;
+  background: #fff;
+  box-shadow: 0 8px 36px #1e355b20;
+}
+.live-conversations .feedback-panel {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin: 14px 0;
+}
+.live-conversations .feedback-heading > div:first-child {
+  display: none;
+}
+.live-conversations .feedback-heading {
+  justify-content: flex-start;
+}
+.live-conversations .feedback-toolbar .button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 6px 8px;
 }

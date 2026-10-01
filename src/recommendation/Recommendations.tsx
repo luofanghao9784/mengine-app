@@ -1,6 +1,6 @@
 import { ForwardPublicationButton } from '../forwarding/ForwardPublicationButton';
 import { useContext, useEffect, useRef, useState } from 'react';
-import { Download, RefreshCw, Newspaper } from 'lucide-react';
+import { Download, RefreshCw, Newspaper, Share2, Star } from 'lucide-react';
 import type { RecommendationItem } from '../../contracts/public-api/recommendation';
 import { Failure, Loading, Pager, SubmitError, useRemote, useSubmission } from '../shared/admin';
 import { RequestPending, useRequestLock } from '../shared/request-guard';
@@ -8,7 +8,9 @@ import { Button, Empty } from '../shared/ui';
 import { useSession } from '../identity/session';
 import { materialClient } from '../material/client';
 import { conversationHref } from '../conversation/Conversations';
-import { FeedbackPanel } from '../feedback/FeedbackPanel';
+import { FeedbackActions } from '../briefing-live/FeedbackActions';
+import { FollowButton } from '../briefing-live/FollowButton';
+import { Modal } from '../shared/ui';
 import { recommendationClient as api } from './client';
 import { usePackedRecommendations } from './usePackedRecommendations';
 import { MagazineBody, RailButton } from '../briefing-live/Magazine';
@@ -134,7 +136,9 @@ function RecommendationCard({ tenant, item }: { tenant: string; item: Recommenda
     [busy, setBusy] = useState(false),
     [error, setError] = useState<unknown>(),
     [errorAction, setErrorAction] = useState<'open' | 'download'>('open'),
-    [opened, setOpened] = useState(c.openedAt);
+    [opened, setOpened] = useState(c.openedAt),
+    [pinned, setPinned] = useState(c.pinned),
+    [shareInfo, setShareInfo] = useState(false);
   const download = useRef<AbortController | null>(null),
     current = useRef(true);
   useEffect(() => {
@@ -199,23 +203,24 @@ function RecommendationCard({ tenant, item }: { tenant: string; item: Recommenda
       if (current.current) setBusy(false);
     }
   };
-  const feedback = item.feedbackTarget && (
-    <FeedbackPanel
-      tenant={tenant}
-      target={item.feedbackTarget}
-      onOpenConversation={(id) => {
-        location.hash = conversationHref(tenant, id);
-      }}
-      onOpenExperience={(workspace, id) => {
-        location.hash =
-          '#' + new URLSearchParams({ tenant, view: 'experiences', scope: workspace, experience: id });
-      }}
-      label={
-        c.kind === 'PUBLICATION'
-          ? '只评价这份独立企业副本，不涉及发布者的私人会话；你的反馈仅自己可见。'
-          : undefined
-      }
-    />
+  const actions = (
+    <>
+      {c.kind === 'TASK' && c.conversationId ? (
+        <FollowButton tenant={tenant} conversation={c.conversationId} pinned={pinned} changed={setPinned} />
+      ) : (
+        <RailButton label="企业副本暂不支持关注" icon={Star} disabled />
+      )}
+      {c.kind === 'PUBLICATION' && item.feedbackTarget?.kind === 'PUBLICATION' ? (
+        <ForwardPublicationButton
+          tenant={tenant}
+          publicationId={item.feedbackTarget.publicationId}
+          materialVersionId={item.feedbackTarget.materialVersionId}
+          compact
+        />
+      ) : (
+        <RailButton label="转发" icon={Share2} disabled={pending} onClick={() => setShareInfo(true)} />
+      )}
+    </>
   );
   return (
     <>
@@ -243,11 +248,18 @@ function RecommendationCard({ tenant, item }: { tenant: string; item: Recommenda
             workspace={c.workspaceName}
             date={c.createdAt}
             publication={c.kind === 'PUBLICATION'}
-            pinned={c.pinned}
+            pinned={pinned}
             verification={c.executionClass === 'verification'}
             footer={c.kind === 'PUBLICATION' ? <span>v{c.materialVersion}</span> : undefined}
           />
         </button>
+        {!reading && item.feedbackTarget && (
+          <div className="live-card-action-rail">
+            <FeedbackActions tenant={tenant} target={item.feedbackTarget}>
+              {actions}
+            </FeedbackActions>
+          </div>
+        )}
         {!reading && <SubmitError error={error} uncertain={false} />}
       </article>
       {reading && (
@@ -271,7 +283,7 @@ function RecommendationCard({ tenant, item }: { tenant: string; item: Recommenda
             void recordOpen();
           }}
           onClose={() => setReading(false)}
-          pinned={c.pinned}
+          pinned={pinned}
           preface={
             item.presentation.style === 'TABLE_FIRST' ? (
               <table className="recommendation-context-table">
@@ -294,27 +306,19 @@ function RecommendationCard({ tenant, item }: { tenant: string; item: Recommenda
               <p className="recommendation-context-reason">{item.reason}</p>
             ) : undefined
           }
-          feedback={feedback}
+          feedbackTarget={item.feedbackTarget || undefined}
           actions={
-            c.kind === 'PUBLICATION' ? (
-              <>
+            <>
+              {actions}
+              {c.kind === 'PUBLICATION' && (
                 <RailButton
                   label={busy ? '正在下载…' : '下载发布副本'}
                   icon={Download}
                   disabled={pending || busy}
                   onClick={() => void save()}
                 />
-                {item.feedbackTarget?.kind === 'PUBLICATION' && (
-                  <div className="live-reading-forward">
-                    <ForwardPublicationButton
-                      tenant={tenant}
-                      publicationId={item.feedbackTarget.publicationId}
-                      materialVersionId={item.feedbackTarget.materialVersionId}
-                    />
-                  </div>
-                )}
-              </>
-            ) : undefined
+              )}
+            </>
           }
         >
           {c.kind === 'PUBLICATION' && (
@@ -359,6 +363,16 @@ function RecommendationCard({ tenant, item }: { tenant: string; item: Recommenda
             <p>{opened ? '你已打开过此版本' : '尚无此版本的打开记录'} · 业务效果未评估</p>
           </details>
         </ReadingDialog>
+      )}
+      {shareInfo && (
+        <Modal title="转发这份成果" onClose={() => setShareInfo(false)}>
+          <p>
+            这份成果来自你的私人会话。先在会话中保存为文稿并发布到有权共享的空间，随后即可从企业副本转发给已获权同事。
+          </p>
+          <a className="button primary" href={conversationHref(tenant, c.conversationId || undefined)}>
+            打开会话并保存成果
+          </a>
+        </Modal>
       )}
     </>
   );

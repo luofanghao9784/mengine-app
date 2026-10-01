@@ -22,4 +22,7 @@ public class BriefingController {
     @PostMapping("/{conversation}") public BriefingService.Preference update(Authentication auth,@PathVariable UUID tenant,@PathVariable UUID conversation,@Valid @RequestBody Update body) {
         return service.update(UUID.fromString(auth.getName()),tenant,conversation,body.requestId(),body.expectedRevision(),body.pinned(),body.hidden(),body.size());
     }
+    @GetMapping("/{conversation}/preference") public BriefingService.Preference preference(Authentication auth,@PathVariable UUID tenant,@PathVariable UUID conversation) {
+        return service.readPreference(UUID.fromString(auth.getName()),tenant,conversation);
+    }
 }

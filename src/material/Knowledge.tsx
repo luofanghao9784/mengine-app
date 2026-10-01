@@ -145,6 +145,7 @@ export function Citation({
 }) {
   const { session } = useSession();
   const [attempt, setAttempt] = useState(0);
+  const [view, setView] = useState<'citation' | 'content'>('citation');
   const data = useRemote(
     (signal) => api.citation(tenant, id, signal),
     [tenant, id, attempt, session.identity, verification],
@@ -174,7 +175,37 @@ export function Citation({
               <p className="muted">引用固定在此文件版本和解析批次，后续更新不会覆盖这里的内容。</p>
             </>
           )}
-          <Fragment chunk={data.value} />
+          {embedded && (
+            <div className="live-reader-tabs" role="tablist" aria-label="资料内容范围">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={view === 'citation'}
+                onClick={() => setView('citation')}
+              >
+                本次引用
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={view === 'content'}
+                onClick={() => setView('content')}
+              >
+                文件正文
+              </button>
+            </div>
+          )}
+          {view === 'content' && embedded ? (
+            <AnalysisPanel
+              tenant={tenant}
+              space={data.value.workspaceId}
+              material={data.value.materialId}
+              version={data.value.versionId}
+              verification={verification}
+            />
+          ) : (
+            <Fragment chunk={data.value} />
+          )}
         </>
       )}
     </>

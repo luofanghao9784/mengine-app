@@ -1,5 +1,6 @@
 import { FileText, MessageSquare, Star, type LucideIcon } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
+import { NavIconButton, useNavHover } from '../components/NavIconButton';
 
 /** Presentation only: all labels and state must come from an authorized API result. */
 export function BriefingStatusMarks({
@@ -80,16 +81,20 @@ export function RailButton({
   children,
   ...props
 }: React.ButtonHTMLAttributes<HTMLButtonElement> & { label: string; icon: LucideIcon; active?: boolean }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const { expanded, interaction } = useNavHover(ref);
   return (
-    <button
-      {...props}
-      className={'live-rail-button ' + (active ? 'is-active' : '')}
-      aria-label={label}
-      title={label}
-    >
-      <Icon size={20} strokeWidth={1.65} aria-hidden="true" />
-      <span>{label}</span>
-      {children}
-    </button>
+    <div ref={ref} className="live-rail-action">
+      <NavIconButton
+        {...props}
+        type="button"
+        label={label}
+        Icon={Icon}
+        active={active}
+        expanded={expanded === 'action'}
+        interaction={interaction('action')}
+        accessory={children}
+      />
+    </div>
   );
 }

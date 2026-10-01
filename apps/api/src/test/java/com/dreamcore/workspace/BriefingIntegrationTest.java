@@ -88,6 +88,20 @@ class BriefingIntegrationTest {
         denied(403,()->briefing.list(owner,other,null,"LATEST",null,"UTC",0,20));
         denied(403,()->briefing.update(owner,other,id,UUID.randomUUID(),0,true,false,"WIDE"));
     }
+    @Test void recommendationFollowReadsExactPreferenceWithoutCrossOwnerAccess(){
+        UUID id=success(owner,space,null,"关注设置",null).conversation().id();
+        assertEquals(new BriefingService.Preference(0,false,false,"STANDARD"),briefing.readPreference(owner,tenant,id));
+        briefing.update(owner,tenant,id,UUID.randomUUID(),0,false,true,"WIDE");
+        var current=briefing.readPreference(owner,tenant,id);
+        assertTrue(current.hidden());assertEquals("WIDE",current.size());
+        var saved=briefing.update(owner,tenant,id,UUID.randomUUID(),current.revision(),true,current.hidden(),current.size());
+        assertTrue(saved.pinned());assertTrue(saved.hidden());assertEquals("WIDE",saved.size());
+        for(UUID actor:List.of(reader,admin))denied(404,()->briefing.readPreference(actor,tenant,id));
+        denied(403,()->briefing.readPreference(owner,other,id));
+        denied(404,()->briefing.readPreference(owner,tenant,UUID.randomUUID()));
+        db.update("DELETE FROM workspace_members WHERE workspace_id=? AND account_id=?",space,owner);
+        denied(404,()->briefing.readPreference(owner,tenant,id));
+    }
     @Test void concurrentPreferenceUpdatesCannotSilentlyOverwriteEachOther() throws Exception {
         UUID id=success(owner,space,null,"并发编辑",null).conversation().id();
         var start=new java.util.concurrent.CountDownLatch(1);

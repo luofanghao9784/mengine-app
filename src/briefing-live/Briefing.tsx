@@ -1,11 +1,12 @@
 import { ForwardInbox } from '../forwarding/ForwardInbox';
 import { Recommendations } from '../recommendation/Recommendations';
-import { FeedbackPanel } from '../feedback/FeedbackPanel';
+import { FeedbackActions } from './FeedbackActions';
+import { MoreActions } from '../shared/MoreActions';
 import { RequestPending, useRequestLock } from '../shared/request-guard';
 import { useContext } from 'react';
 import { Attention } from '../attention/Attention';
 import { useEffect, useRef, useState } from 'react';
-import { Eye, EyeOff, Newspaper, Star, RefreshCw, Expand, Minimize } from 'lucide-react';
+import { Eye, EyeOff, Newspaper, Star, RefreshCw, Expand, Minimize, Share2 } from 'lucide-react';
 import { MagazineBody, RailButton } from './Magazine';
 import { ReadingDialog } from './ReadingDialog';
 import type {
@@ -15,7 +16,7 @@ import type {
   BriefingLayoutMove,
 } from '../../contracts/public-api/briefing';
 import { identityClient, useSession } from '../identity/session';
-import { Button, Empty, Field, PageActions } from '../shared/ui';
+import { Button, Empty, Field, PageActions, Modal } from '../shared/ui';
 import { Failure, Loading, Pager, SubmitError, useRemote, useSubmission } from '../shared/admin';
 import { conversationHref } from '../conversation/Conversations';
 import { briefingClient as api } from './client';
@@ -324,7 +325,8 @@ function Card({
   drop: (anchor: string) => void;
 }) {
   const pendingRequest = useContext(RequestPending);
-  const [reading, setReading] = useState(false);
+  const [reading, setReading] = useState(false),
+    [shareInfo, setShareInfo] = useState(false);
   const drag = useRef<{ x: number; y: number; moved: boolean } | undefined>(undefined);
   const ignoreClick = useRef(false);
   const submission = useSubmission<Omit<BriefingPreference, 'revision'> & { expectedRevision: number }>();
@@ -343,26 +345,14 @@ function Card({
         changed();
       },
     );
-  const feedback = (
-    <FeedbackPanel
-      tenant={tenant}
-      target={{
-        kind: 'BRIEFING',
-        taskId: card.taskId,
-        taskRevision: card.taskRevision,
-        attempt: card.attempt,
-        presentationVersion: 'briefing-basic-v1',
-        presentationRevision: card.preference.revision,
-      }}
-      onOpenConversation={(id) => {
-        location.hash = conversationHref(tenant, id);
-      }}
-      onOpenExperience={(workspace, id) => {
-        location.hash =
-          '#' + new URLSearchParams({ tenant, view: 'experiences', scope: workspace, experience: id });
-      }}
-    />
-  );
+  const feedbackTarget = {
+    kind: 'BRIEFING' as const,
+    taskId: card.taskId,
+    taskRevision: card.taskRevision,
+    attempt: card.attempt,
+    presentationVersion: 'briefing-basic-v1' as const,
+    presentationRevision: card.preference.revision,
+  };
   const actions = (
     <>
       <RailButton
@@ -373,18 +363,21 @@ function Card({
         disabled={submission.busy || (pendingRequest && !submission.uncertain)}
         onClick={() => edit({ pinned: !card.preference.pinned })}
       />
-      <RailButton
-        label={card.preference.hidden ? '恢复显示' : '隐藏'}
-        icon={card.preference.hidden ? Eye : EyeOff}
-        disabled={submission.busy || pendingRequest}
-        onClick={() => edit({ hidden: !card.preference.hidden })}
-      />
-      <RailButton
-        label={card.preference.size === 'WIDE' ? '标准卡片' : '加宽卡片'}
-        icon={card.preference.size === 'WIDE' ? Minimize : Expand}
-        disabled={submission.busy || pendingRequest}
-        onClick={() => edit({ size: card.preference.size === 'WIDE' ? 'STANDARD' : 'WIDE' })}
-      />
+      <RailButton label="转发" icon={Share2} disabled={pendingRequest} onClick={() => setShareInfo(true)} />
+      <MoreActions label="卡片设置">
+        <RailButton
+          label={card.preference.hidden ? '恢复显示' : '隐藏'}
+          icon={card.preference.hidden ? Eye : EyeOff}
+          disabled={submission.busy || pendingRequest}
+          onClick={() => edit({ hidden: !card.preference.hidden })}
+        />
+        <RailButton
+          label={card.preference.size === 'WIDE' ? '标准卡片' : '加宽卡片'}
+          icon={card.preference.size === 'WIDE' ? Minimize : Expand}
+          disabled={submission.busy || pendingRequest}
+          onClick={() => edit({ size: card.preference.size === 'WIDE' ? 'STANDARD' : 'WIDE' })}
+        />
+      </MoreActions>
     </>
   );
   return (
@@ -463,9 +456,13 @@ function Card({
             </>
           )}
         </div>
-        <div className="live-card-action-rail" aria-label="卡片设置">
-          {actions}
-        </div>
+        {!reading && (
+          <div className="live-card-action-rail">
+            <FeedbackActions tenant={tenant} target={feedbackTarget}>
+              {actions}
+            </FeedbackActions>
+          </div>
+        )}
         <SubmitError error={submission.error} uncertain={submission.uncertain} />
       </article>
       {reading && (
@@ -483,14 +480,17 @@ function Card({
           }}
           pinned={card.preference.pinned}
           onClose={() => setReading(false)}
-          feedback={
-            <>
-              <SubmitError error={submission.error} uncertain={submission.uncertain} />
-              {feedback}
-            </>
-          }
+          feedbackTarget={feedbackTarget}
           actions={actions}
         />
+      )}
+      {shareInfo && (
+        <Modal title="转发这份成果" onClose={() => setShareInfo(false)}>
+          <p>这份成果来自你的私人会话。先保存为文稿并发布到有权共享的空间，再转发企业副本给已获权同事。</p>
+          <a className="button primary" href={conversationHref(tenant, card.conversationId)}>
+            打开会话并保存成果
+          </a>
+        </Modal>
       )}
     </>
   );

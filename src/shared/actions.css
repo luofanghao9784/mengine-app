@@ -1,0 +1,91 @@
+/* Floating controls share the Demo's circular icon / label grammar. */
+.workspace-action-popover {
+  position: fixed;
+  pointer-events: auto;
+  inset: auto;
+  margin: 0;
+  width: min(288px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  overflow: auto;
+  padding: 14px;
+  border: 1px solid #e4e8ee;
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: 0 12px 48px #1e355b24;
+  color: #35465e;
+  font: 13px/1.6 system-ui;
+}
+.workspace-action-popover > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.workspace-action-popover > header .button {
+  padding: 4px;
+  border: 0;
+  background: transparent;
+}
+.workspace-action-popover > button,
+.workspace-action-popover > a,
+.workspace-action-list > .button,
+.workspace-action-list > a {
+  display: flex;
+  width: 100%;
+  justify-content: flex-start;
+  text-align: left;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+}
+.workspace-action-popover > button:hover,
+.workspace-action-list > :is(button, a):hover {
+  background: #f2f6fd;
+}
+.workspace-action-popover > button[aria-pressed='true'] {
+  color: var(--accent);
+  background: var(--selected);
+}
+.workspace-action-popover textarea {
+  width: 100%;
+  resize: vertical;
+}
+.workspace-action-popover p {
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+.workspace-more-actions {
+  display: inline-flex;
+  align-items: center;
+}
+.workspace-more-actions > .icon-button {
+  border-radius: 50%;
+}
+.workspace-action-list .live-rail-action .nav-link {
+  width: 100%;
+  border-radius: 10px;
+  justify-content: flex-start;
+  background: transparent;
+  box-shadow: none;
+}
+.workspace-action-list .live-rail-action .nav-symbol {
+  width: 24px;
+  height: 24px;
+}
+.workspace-action-list .live-rail-action .nav-label {
+  position: static;
+  opacity: 1;
+  transform: none;
+  padding: 0;
+  font-size: 13px;
+  visibility: visible;
+}
+.workspace-action-list .live-rail-action .nav-label::before,
+.workspace-action-list .live-rail-action .nav-label::after {
+  display: none;
+}

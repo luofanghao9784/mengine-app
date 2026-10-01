@@ -42,6 +42,7 @@ export async function sourceJourney(
   const first = await upload(),
     second = await upload(first.id);
   await page.goto(`/workspace/#tenant=${tenant}&view=library&scope=${workspace}`);
+  await page.getByRole('button', { name: '资料操作', exact: true }).click();
   await page.getByRole('button', { name: '数据来源', exact: true }).click();
   await page.getByRole('button', { name: '登记人工来源', exact: true }).click();
   await page.getByLabel('来源名称', { exact: true }).fill('每月人工业务报表');

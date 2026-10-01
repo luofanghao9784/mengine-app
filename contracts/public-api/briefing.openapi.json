@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Dreamcore Private Briefing API",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "从实际成功的私人 AGENT 会话派生卡片；同一会话在当前筛选范围只保留最后一次成功回复。date 按指定 IANA zone 的本地日筛选，不代表自动分析或共享发布；关注、隐藏和尺寸偏好跨日期共用。管理员无内容旁路。"
   },
   "security": [
@@ -253,6 +253,55 @@
           },
           "409": {
             "description": "BRIEFING_LAYOUT_CHANGED 或幂等冲突"
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/briefing/{conversation}/preference": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "conversation",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "读取本人会话当前关注、隐藏和尺寸设置；不返回会话内容，用于保留其他设置的局部交互",
+        "responses": {
+          "200": {
+            "description": "经当前权限验证，Cache-Control: private, no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Preference"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "日期、时区、分页、请求体无效"
+          },
+          "401": {
+            "description": "需要登录"
+          },
+          "403": {
+            "description": "企业或成员不可用，或 CSRF 拒绝"
+          },
+          "404": {
+            "description": "非本人会话、无成功成果或空间不可访问"
           }
         }
       }

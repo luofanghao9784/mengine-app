@@ -14,6 +14,8 @@ import {
   ListChecks,
   MessageCircle,
   Plus,
+  Paperclip,
+  ChevronDown,
   RefreshCw,
   Search,
   Sparkles,
@@ -36,6 +38,8 @@ import { LiveConversationDeck } from './LiveConversationDeck';
 import type { ReactNode } from 'react';
 import { Failure, Loading, Pager, SubmitError, useRemote, useSubmission } from '../shared/admin';
 import { Citation } from '../material/Knowledge';
+import { ActionPopover } from '../shared/ActionPopover';
+import { libraryHref } from '../material/Library';
 import { OriginalPicker } from './OriginalPicker';
 import { taskErrorMessage } from './task-errors';
 import { conversationClient as api, isOriginal } from './client';
@@ -127,7 +131,7 @@ export function Conversations({ tenant }: { tenant: string }) {
                 icon={Plus}
                 disabled={pendingRequest}
                 onClick={() => {
-                  location.hash = conversationHref(tenant);
+                  location.hash = retainConversationContext(conversationHref(tenant), location.hash);
                 }}
               >
                 新会话
@@ -136,16 +140,16 @@ export function Conversations({ tenant }: { tenant: string }) {
                 {context.value.workspaces.map((space) => {
                   const conversations = list.value!.items.filter((item) => item.workspaceId === space.id);
                   return conversations.length ? (
-                    <section className="live-conversation-group" key={space.id}>
-                      <h3>
+                    <details className="live-conversation-group" key={space.id} open>
+                      <summary>
                         <Folder size={14} />
                         {space.kind === 'PERSONAL' ? '个人空间' : space.name}
-                      </h3>
+                      </summary>
                       {conversations.map((c) => (
                         <a
                           key={c.id}
                           className={selected === c.id ? 'selected' : ''}
-                          href={conversationHref(tenant, c.id)}
+                          href={retainConversationContext(conversationHref(tenant, c.id), hash)}
                           aria-current={selected === c.id ? 'page' : undefined}
                           onClick={(event) => {
                             if (pendingRequest) event.preventDefault();
@@ -155,7 +159,7 @@ export function Conversations({ tenant }: { tenant: string }) {
                           <span title={c.title}>{c.title}</span>
                         </a>
                       ))}
-                    </section>
+                    </details>
                   ) : null;
                 })}
                 {list.value.items.some(
@@ -171,7 +175,7 @@ export function Conversations({ tenant }: { tenant: string }) {
                         <a
                           key={c.id}
                           className={selected === c.id ? 'selected' : ''}
-                          href={conversationHref(tenant, c.id)}
+                          href={retainConversationContext(conversationHref(tenant, c.id), hash)}
                           aria-current={selected === c.id ? 'page' : undefined}
                           onClick={(event) => {
                             if (pendingRequest) event.preventDefault();
@@ -187,13 +191,15 @@ export function Conversations({ tenant }: { tenant: string }) {
                   <p className="live-list-empty">从一件具体的工作开始。发送后，会话会保存在这里。</p>
                 )}
               </div>
-              <Pager
-                page={page}
-                next={list.value.hasMore}
-                onPage={(next) => {
-                  if (!pendingRequest) setPage(next);
-                }}
-              />
+              {(page > 0 || list.value.hasMore) && (
+                <Pager
+                  page={page}
+                  next={list.value.hasMore}
+                  onPage={(next) => {
+                    if (!pendingRequest) setPage(next);
+                  }}
+                />
+              )}
             </nav>
           }
         />
@@ -304,9 +310,13 @@ function ConversationView({
   if (selected && !data.value) return <Loading />;
   return (
     <LiveConversationDeck
+      tenant={tenant}
       navigation={navigation}
       title={data.value?.conversation.title || '新会话'}
       reveal={reveal}
+      onRefresh={() => {
+        if (!requestNavigationLocked()) refresh();
+      }}
       onClose={() => {
         if (!requestNavigationLocked()) location.hash = '#tenant=' + tenant + '&view=briefing';
       }}
@@ -344,14 +354,16 @@ function ConversationView({
       <section className={`conversation-reader ${!selected ? 'is-new-conversation' : ''}`}>
         <header className="deck-card-header live-card-heading">
           <div>
-            <h2>{data.value?.conversation.title || '开始新会话'}</h2>
-            <p className="muted">
-              {agentMode === 'off'
-                ? '模型暂不可用 · 任务可保存等待'
-                : agentMode === 'verification'
-                  ? '联调验证 · 未调用真实模型'
-                  : '描述需求，让 AI 协助完成工作'}
-            </p>
+            <h2>{data.value?.conversation.title || '新会话'}</h2>
+            {agentMode !== 'live' && (
+              <p className="muted">
+                {agentMode === 'off'
+                  ? '模型暂不可用 · 任务可保存等待'
+                  : agentMode === 'verification'
+                    ? '联调验证 · 未调用真实模型'
+                    : '描述需求，让 AI 协助完成工作'}
+              </p>
+            )}
           </div>
           <Badge>私人会话</Badge>
         </header>
@@ -371,9 +383,6 @@ function ConversationView({
           ))}
           {!data.value && (
             <section className="conversation-intro" aria-label="新会话启动建议">
-              <div className="live-intro-mark">
-                <Sparkles size={24} strokeWidth={1.5} />
-              </div>
               <h3>从一件具体的工作开始</h3>
               <p>选一个方向，或直接写下你想完成的事。</p>
               <div className="live-starter-grid">
@@ -420,6 +429,18 @@ function ConversationView({
                   </button>
                 ))}
               </div>
+              <div className="live-inline-suggestions" aria-label="提示词建议">
+                <small>也可以这样开始</small>
+                {['总结一份资料', '准备一份周报', '规划下一步'].map((text) => (
+                  <button
+                    type="button"
+                    key={text}
+                    onClick={() => setSuggestion({ text, sequence: (suggestion?.sequence || 0) + 1 })}
+                  >
+                    {text}
+                  </button>
+                ))}
+              </div>
               <p className="live-intro-capability">
                 {agentMode === 'off'
                   ? '模型暂不可用。你可以先写下需求，发送后保存为等待中的任务。'
@@ -430,7 +451,7 @@ function ConversationView({
               </p>
             </section>
           )}
-          {data.value && !focused && (
+          {data.value && !focused && (page > 0 || data.value.hasMore) && (
             <Pager
               page={page}
               next={data.value.hasMore}
@@ -445,7 +466,7 @@ function ConversationView({
             正在查看指定任务及其当前状态。
             <Button
               onClick={() => {
-                location.hash = conversationHref(tenant, selected);
+                location.hash = retainConversationContext(conversationHref(tenant, selected), location.hash);
               }}
             >
               返回最新对话并继续
@@ -759,7 +780,7 @@ function TaskCard({
                 presentationRevision: 0,
               }}
               onOpenConversation={(id) => {
-                location.hash = conversationHref(tenant, id);
+                location.hash = retainConversationContext(conversationHref(tenant, id), location.hash);
               }}
               onOpenExperience={(workspace, id) => {
                 location.hash =
@@ -937,6 +958,25 @@ function Composer({
     [error, setError] = useState<unknown>();
   const textarea = useRef<HTMLTextAreaElement>(null);
   const controller = useRef<AbortController | null>(null);
+  const toolsAnchor = useRef<HTMLDivElement>(null);
+  const [toolsOpen, setToolsOpen] = useState(false);
+  useEffect(() => {
+    const focus = initial.current.focus;
+    if (!record(focus) || !textarea.current || pending) return;
+    const node = textarea.current;
+    node.focus({ preventScroll: true });
+    node.setSelectionRange(
+      Number(focus.start) || 0,
+      Number(focus.end) || 0,
+      focus.direction === 'backward' ? 'backward' : focus.direction === 'forward' ? 'forward' : 'none',
+    );
+    delete initial.current.focus;
+  }, []);
+  useEffect(() => {
+    if (!textarea.current) return;
+    textarea.current.style.height = 'auto';
+    textarea.current.style.height = Math.min(160, Math.max(70, textarea.current.scrollHeight)) + 'px';
+  }, [text]);
   useEffect(() => {
     if (!suggestion || busy || pending) return;
     setText(suggestion.text);
@@ -1011,16 +1051,45 @@ function Composer({
                 rows={3}
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                placeholder={
-                  mode === 'AGENT'
-                    ? '描述需要整理、分析的工作和所需结果'
-                    : '例如：项目进度（多个关键词用空格分开）'
-                }
+                placeholder="有什么工作想交给 AI？"
               />
             </Field>
           </div>
           <div className="live-composer-tools">
+            <div ref={toolsAnchor}>
+              <Button
+                icon={Paperclip}
+                variant="ghost"
+                aria-expanded={toolsOpen}
+                onClick={() => setToolsOpen(!toolsOpen)}
+              >
+                添加资料
+              </Button>
+              {toolsOpen && (
+                <ActionPopover anchor={toolsAnchor} label="添加资料" onClose={() => setToolsOpen(false)}>
+                  {agentMode === 'verification' && (
+                    <Button
+                      icon={Files}
+                      onClick={() => {
+                        setToolsOpen(false);
+                        setPicking(true);
+                      }}
+                    >
+                      选择原件版本
+                    </Button>
+                  )}
+                  <a className="button ghost" href={libraryHref(tenant, space || location)}>
+                    在资料库上传与管理
+                  </a>
+                  <p>
+                    AI 会检索当前资料范围内已解析的内容。
+                    {agentMode !== 'verification' && '上传完成后可返回此草稿继续。'}
+                  </p>
+                </ActionPopover>
+              )}
+            </div>
             <Field label="资料范围">
+              <Folder size={15} aria-hidden="true" />
               <select
                 value={space || location}
                 disabled={!!space}
@@ -1039,11 +1108,8 @@ function Composer({
               </select>
             </Field>
           </div>
-          {mode === 'AGENT' && agentMode === 'verification' && (
+          {mode === 'AGENT' && agentMode === 'verification' && originals.length > 0 && (
             <div className="original-selection">
-              <Button disabled={!allowed} onClick={() => setPicking(true)}>
-                选择原件版本
-              </Button>
               {originals.map((file) => (
                 <div key={file.versionId}>
                   <span>

@@ -1,8 +1,9 @@
+import { MoreActions } from '../shared/MoreActions';
 import { ObjectLifecycleWorkspace } from '../objectlifecycle/ObjectLifecycleWorkspace';
 import { ExportBatchPanel } from '../export/ExportBatchPanel';
 import { requestNavigationLocked } from '../shared/request-guard';
 import { documentsHref } from '../documents/routes';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   FileText,
   Folder,
@@ -48,22 +49,24 @@ export function LiveLibrary({ tenant }: { tenant: string }) {
     (signal) => identityClient.context(tenant, signal),
     [tenant, attempt, session.identity],
   );
+  const managementActions = (
+    <>
+      <Button onClick={() => setContentLifecycleOpen(true)}>内容回收与清理</Button>
+      <Button
+        icon={FileText}
+        onClick={() => {
+          location.hash = documentsHref(tenant);
+        }}
+      >
+        个人文稿
+      </Button>
+      <Button variant="ghost" icon={RefreshCw} onClick={() => setAttempt((x) => x + 1)}>
+        刷新
+      </Button>
+    </>
+  );
   return (
     <>
-      <PageActions>
-        <Button onClick={() => setContentLifecycleOpen(true)}>内容回收与清理</Button>
-        <Button
-          icon={FileText}
-          onClick={() => {
-            location.hash = documentsHref(tenant);
-          }}
-        >
-          个人文稿
-        </Button>
-        <Button variant="ghost" icon={RefreshCw} onClick={() => setAttempt((x) => x + 1)}>
-          刷新
-        </Button>
-      </PageActions>
       {contentLifecycleOpen && (
         <Modal
           title="内容回收与清理"
@@ -79,12 +82,20 @@ export function LiveLibrary({ tenant }: { tenant: string }) {
       ) : !context.value ? (
         <Loading />
       ) : (
-        <LibraryContents tenant={tenant} context={context.value} />
+        <LibraryContents tenant={tenant} context={context.value} managementActions={managementActions} />
       )}
     </>
   );
 }
-function LibraryContents({ tenant, context }: { tenant: string; context: TenantContext }) {
+function LibraryContents({
+  tenant,
+  context,
+  managementActions,
+}: {
+  tenant: string;
+  context: TenantContext;
+  managementActions: ReactNode;
+}) {
   const [hash, setHash] = useState(location.hash);
   useEffect(() => {
     const change = () => {
@@ -105,24 +116,26 @@ function LibraryContents({ tenant, context }: { tenant: string; context: TenantC
   const allowed = enterprise || all || !!selected;
   return (
     <>
-      <div className="material-tabs" aria-label="资料范围">
-        <Button
-          variant={selected?.kind === 'PERSONAL' ? 'primary' : 'ghost'}
-          onClick={() => {
-            location.hash = libraryHref(tenant);
-          }}
-        >
-          个人空间
-        </Button>
-        <Button
-          variant={selected?.kind === 'SHARED' || enterprise || all ? 'primary' : 'ghost'}
-          onClick={() => {
-            location.hash = libraryHref(tenant, 'enterprise');
-          }}
-        >
-          企业资料库
-        </Button>
-      </div>
+      <PageActions>
+        <div className="material-tabs" aria-label="资料范围">
+          <Button
+            variant={selected?.kind === 'PERSONAL' ? 'primary' : 'ghost'}
+            onClick={() => {
+              location.hash = libraryHref(tenant);
+            }}
+          >
+            个人空间
+          </Button>
+          <Button
+            variant={selected?.kind === 'SHARED' || enterprise || all ? 'primary' : 'ghost'}
+            onClick={() => {
+              location.hash = libraryHref(tenant, 'enterprise');
+            }}
+          >
+            企业资料库
+          </Button>
+        </div>
+      </PageActions>
       {!allowed || (folder && !uuid(folder)) ? (
         <Empty icon={Folder} title="此位置暂不可用" text="空间或文件夹不存在，或你没有查看权限。" />
       ) : (
@@ -134,6 +147,7 @@ function LibraryContents({ tenant, context }: { tenant: string; context: TenantC
           folder={folder}
           enterprise={enterprise}
           all={all}
+          managementActions={managementActions}
         />
       )}
     </>
@@ -146,7 +160,9 @@ function LibraryListing({
   folder,
   enterprise,
   all,
+  managementActions,
 }: {
+  managementActions: ReactNode;
   tenant: string;
   context: TenantContext;
   workspace: string | null;
@@ -212,19 +228,22 @@ function LibraryListing({
         />
       )}
       <PageActions>
-        {workspace && data.value?.canMaintain && (
-          <Button onClick={() => setMaintenanceOpen(true)}>维护与回收站</Button>
-        )}
-        {workspace && data.value && (
-          <Button icon={LibraryBig} onClick={() => setSourcesOpen(true)}>
-            数据来源
-          </Button>
-        )}
-        {data.value?.canMaintain && (
-          <Button icon={FolderPlus} onClick={() => setModal('folder')}>
-            新建文件夹
-          </Button>
-        )}
+        <MoreActions label="资料操作">
+          {managementActions}
+          {workspace && data.value?.canMaintain && (
+            <Button onClick={() => setMaintenanceOpen(true)}>维护与回收站</Button>
+          )}
+          {workspace && data.value && (
+            <Button icon={LibraryBig} onClick={() => setSourcesOpen(true)}>
+              数据来源
+            </Button>
+          )}
+          {data.value?.canMaintain && (
+            <Button icon={FolderPlus} onClick={() => setModal('folder')}>
+              新建文件夹
+            </Button>
+          )}
+        </MoreActions>
         {(data.value?.canMaintain || enterprise || all) && (
           <Button
             variant="primary"
@@ -399,6 +418,7 @@ function LibraryListing({
                         ? item.name.split('.').at(-1)?.toUpperCase()
                         : '文件'}
                   </span>
+                  {item.kind === 'DOCUMENT' && <strong>{item.name}</strong>}
                 </div>
                 <div className="material-entry-body">
                   <strong>{item.name}</strong>
@@ -426,7 +446,9 @@ function LibraryListing({
               }
             />
           )}
-          <Pager page={page} next={data.value.hasMore} onPage={setPage} />
+          {(page > 0 || data.value.hasMore) && (
+            <Pager page={page} next={data.value.hasMore} onPage={setPage} />
+          )}
         </>
       )}
       {contentSearch && (
@@ -701,6 +723,7 @@ function DocumentDialog({
     [attempt, setAttempt] = useState(0),
     [upload, setUpload] = useState<number>();
   const [analysis, setAnalysis] = useState<MaterialVersion>();
+  const [tab, setTab] = useState<'content' | 'versions' | 'properties'>('content');
   const [error, setError] = useState<unknown>(),
     [busy, setBusy] = useState(false);
   const [denial, setDenial] = useState<unknown>();
@@ -776,7 +799,7 @@ function DocumentDialog({
       />
     );
   return (
-    <Modal title="资料与历史版本" onClose={close} wide>
+    <Modal title="资料与历史版本" onClose={close} wide className="live-material-reader">
       {failure ? (
         <Failure
           error={failure}
@@ -797,10 +820,41 @@ function DocumentDialog({
             </div>
             <Badge>v{data.value.document.version}</Badge>
           </div>
-          <p className="material-caption">
-            原件已保存。可查看各版本的解析内容；下载后可使用本机应用编辑，再上传新版本。
-          </p>
-          {data.value.document.canMaintain && (
+          <div className="live-reader-tabs" role="tablist" aria-label="资料阅读方式">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === 'content'}
+              onClick={() => setTab('content')}
+            >
+              正文
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === 'versions'}
+              onClick={() => setTab('versions')}
+            >
+              历史版本
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === 'properties'}
+              onClick={() => setTab('properties')}
+            >
+              资料信息
+            </button>
+          </div>
+          {tab === 'properties' && (
+            <div className="live-material-properties">
+              <p>原件已保存。正文显示文件解析内容；下载原件可核对版式或编辑后上传新版本。</p>
+              <p>位置：{data.value.document.path.join(' / ')}</p>
+              <p>当前版本：v{data.value.document.version}</p>
+              <p>{data.value.document.canMaintain ? '可阅读、下载与维护' : '可阅读与下载'}</p>
+            </div>
+          )}
+          {tab !== 'content' && data.value.document.canMaintain && (
             <Button icon={Upload} onClick={() => setUpload(data.value!.document.version)}>
               上传新版本
             </Button>
@@ -810,46 +864,82 @@ function DocumentDialog({
               {message(error)}
             </p>
           )}
-          <ul className="material-versions">
-            {data.value.versions.map((v) => (
-              <li key={v.id}>
-                <div>
-                  <strong>
-                    v{v.number} · {v.filename}
-                    {v.origin === 'DOCUMENT_PUBLICATION' ? ' · 文稿发布' : ''}
-                  </strong>
-                  <small>
-                    {size(v.sizeBytes)} · {new Date(v.createdAt).toLocaleString('zh-CN')}
-                  </small>
-                  <details className="material-checksum">
-                    <summary>文件校验信息</summary>
-                    <small>SHA-256：{v.sha256}</small>
-                  </details>
-                </div>
-                <Button onClick={() => setAnalysis(analysis?.id === v.id ? undefined : v)}>
-                  查看 v{v.number} 解析
-                </Button>
-                <Button icon={Download} disabled={busy} onClick={() => void download(v)}>
-                  下载 v{v.number}
-                </Button>
-              </li>
-            ))}
-          </ul>
-          <Pager page={page} next={data.value.hasMore} onPage={setPage} />
-          {analysis && (
-            <p className="material-caption">
-              当前预览：v{analysis.number} · {analysis.filename}
-            </p>
+          {tab === 'versions' && (
+            <ul className="material-versions">
+              {data.value.versions.map((v) => (
+                <li key={v.id}>
+                  <div>
+                    <strong>
+                      v{v.number} · {v.filename}
+                      {v.origin === 'DOCUMENT_PUBLICATION' ? ' · 文稿发布' : ''}
+                    </strong>
+                    <small>
+                      {size(v.sizeBytes)} · {new Date(v.createdAt).toLocaleString('zh-CN')}
+                    </small>
+                    <details className="material-checksum">
+                      <summary>文件校验信息</summary>
+                      <small>SHA-256：{v.sha256}</small>
+                    </details>
+                  </div>
+                  <Button
+                    onClick={() => {
+                      setAnalysis(v);
+                      setTab('content');
+                    }}
+                  >
+                    查看 v{v.number} 解析
+                  </Button>
+                  <Button icon={Download} disabled={busy} onClick={() => void download(v)}>
+                    下载 v{v.number}
+                  </Button>
+                </li>
+              ))}
+            </ul>
           )}
-          {analysis && (
-            <AnalysisPanel
-              key={analysis.id}
-              tenant={tenant}
-              space={entry.workspaceId}
-              material={entry.id}
-              version={analysis.id}
-              verification={verification}
-            />
+          {tab === 'versions' && (page > 0 || data.value.hasMore) && (
+            <Pager page={page} next={data.value.hasMore} onPage={setPage} />
+          )}
+          {tab === 'content' && (analysis || data.value.versions[0]) && (
+            <>
+              <div className="live-reader-version-bar">
+                <label>
+                  阅读版本{' '}
+                  <select
+                    aria-label="阅读资料版本"
+                    value={(analysis || data.value.versions[0]).id}
+                    onChange={(e) => setAnalysis(data.value!.versions.find((v) => v.id === e.target.value))}
+                  >
+                    {analysis && !data.value.versions.some((v) => v.id === analysis.id) && (
+                      <option value={analysis.id}>
+                        v{analysis.number} · {analysis.filename}
+                      </option>
+                    )}
+                    {data.value.versions.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        v{v.number} · {v.filename}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <Button
+                  icon={Download}
+                  disabled={busy}
+                  onClick={() => void download(analysis || data.value!.versions[0])}
+                >
+                  下载原件
+                </Button>
+              </div>
+              <div className="live-material-body">
+                <AnalysisPanel
+                  key={(analysis || data.value.versions[0]).id}
+                  tenant={tenant}
+                  space={entry.workspaceId}
+                  material={entry.id}
+                  version={(analysis || data.value.versions[0]).id}
+                  verification={verification}
+                />
+              </div>
+            </>
           )}
         </>
       )}

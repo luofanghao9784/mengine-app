@@ -23,15 +23,13 @@ export async function knowledgeJourney({
   const base = `/api/v1/tenants/${tenant}/workspaces/${personal}`;
   await page.goto(`/workspace/#tenant=${tenant}&view=library&scope=personal`);
   await page.getByRole('button', { name: '上传资料', exact: true }).click();
-  await page
-    .getByLabel(/^选择文件/)
-    .setInputFiles({
-      name: '梦核解析验收.csv',
-      mimeType: 'text/csv',
-      buffer: Buffer.from(
-        '项目,金额\n梦核验收,00123.4500\n防注入,<script>window.__parserInjected=true</script>\n',
-      ),
-    });
+  await page.getByLabel(/^选择文件/).setInputFiles({
+    name: '梦核解析验收.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from(
+      '项目,金额\n梦核验收,00123.4500\n防注入,<script>window.__parserInjected=true</script>\n',
+    ),
+  });
   await page.getByRole('button', { name: '保存原文件', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   const list = await (await memberContext.request.get(base + '/library')).json();
@@ -45,7 +43,7 @@ export async function knowledgeJourney({
     })
     .toBe('READY');
   await page.locator('.material-entry').filter({ hasText: '梦核解析验收.csv' }).click();
-  await page.getByRole('button', { name: '查看 v1 解析', exact: true }).click();
+  await expect(page.getByRole('tab', { name: '正文', exact: true })).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByLabel('版本解析内容')).toContainText('00123.4500');
   await expect(page.getByLabel('版本解析内容')).toContainText(
     '<script>window.__parserInjected=true</script>',
@@ -100,17 +98,15 @@ export async function knowledgeJourney({
   await page.unrouteAll();
   await page.getByRole('button', { name: '关闭弹窗', exact: true }).click();
   await page.getByRole('button', { name: '上传资料', exact: true }).click();
-  await page
-    .getByLabel(/^选择文件/)
-    .setInputFiles({
-      name: '暂不支持.pptx',
-      mimeType: 'application/octet-stream',
-      buffer: Buffer.from('synthetic unsupported'),
-    });
+  await page.getByLabel(/^选择文件/).setInputFiles({
+    name: '暂不支持.pptx',
+    mimeType: 'application/octet-stream',
+    buffer: Buffer.from('synthetic unsupported'),
+  });
   await page.getByRole('button', { name: '保存原文件', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.locator('.material-entry').filter({ hasText: '暂不支持.pptx' }).click();
-  await page.getByRole('button', { name: '查看 v1 解析', exact: true }).click();
+  await expect(page.getByRole('tab', { name: '正文', exact: true })).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByLabel('版本解析内容')).toContainText('暂不支持此格式', { timeout: 30000 });
   await page.getByRole('button', { name: '关闭弹窗', exact: true }).click();
   // Shared source may have been cancelled by the earlier permission journey; explicit maintenance permits retry.
