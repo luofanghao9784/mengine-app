@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createMaterialClient, isEntry } from '../src/material/client.ts';
+import { createMaterialClient, isEntry, isUploadReceipt } from '../src/material/client.ts';
 import { IdentityError } from '../src/identity/client.ts';
 import { isGrant, isMember } from '../src/tenant/client.ts';
 const tenant = '00000000-0000-4000-8000-000000000001',
@@ -19,6 +19,20 @@ const entry = {
   updatedAt: '2026-09-22T00:00:00Z',
   path: ['合成空间', '合成.txt'],
   canMaintain: false,
+};
+const receipt = {
+  ...entry,
+  receiptStatus: 'EXACT',
+  currentVersion: 1,
+  acceptedVersion: {
+    id,
+    number: 1,
+    filename: entry.name,
+    sizeBytes: 3,
+    sha256: 'a'.repeat(64),
+    createdBy: id,
+    createdAt: entry.updatedAt,
+  },
 };
 const page = {
   tenantId: tenant,
@@ -55,7 +69,7 @@ test('multipart keeps browser boundary and sends fresh CSRF without embedding se
     requests.push({ path: String(path), init });
     return String(path).endsWith('/csrf')
       ? response({ token: 'synthetic-csrf', headerName: 'X-CSRF-TOKEN' })
-      : response(entry, 201);
+      : response(receipt, 201);
   });
   const file = new File(['abc'], '合成.txt');
   await client.upload(tenant, space, { requestId: id, folderId: null }, file);
@@ -69,6 +83,7 @@ test('multipart keeps browser boundary and sends fresh CSRF without embedding se
   assert.equal(sent.cache, 'no-store');
   const form = sent.body as FormData;
   assert.equal(await (form.get('file') as File).text(), 'abc');
+  assert.equal((form.get('file') as File).name, file.name);
   assert.deepEqual(JSON.parse(await (form.get('metadata') as Blob).text()), {
     requestId: id,
     folderId: null,
@@ -82,7 +97,7 @@ test('uncertain upload never replays automatically and explicit retry uses the s
     sends++;
     keys.push(JSON.parse(await ((init!.body as FormData).get('metadata') as Blob).text()).requestId);
     if (sends === 1) throw new TypeError('synthetic lost response');
-    return response(entry, 201);
+    return response(receipt, 201);
   });
   const file = new File(['abc'], '合成.txt');
   await assert.rejects(
@@ -135,4 +150,21 @@ test('maintenance permission is explicit and not inferred from tenant role', () 
   assert.ok(isGrant({ ...person, canMaintain: false }));
   assert.ok(isGrant({ ...person, canMaintain: true }));
   assert.ok(isMember({ ...person, role: 'TENANT_ADMIN', version: 0 }));
+});
+
+test('upload receipts distinguish accepted version from current version and refuse malformed exact claims', () => {
+  assert.ok(isUploadReceipt(receipt));
+  assert.ok(isUploadReceipt({ ...receipt, currentVersion: 2 }));
+  assert.ok(isUploadReceipt({ ...receipt, receiptStatus: 'HISTORICAL_UNKNOWN', acceptedVersion: null }));
+  assert.equal(isUploadReceipt(entry), false);
+  assert.equal(isUploadReceipt({ ...receipt, currentVersion: 0 }), false);
+  assert.equal(isUploadReceipt({ ...receipt, acceptedVersion: null }), false);
+  assert.equal(
+    isUploadReceipt({ ...receipt, acceptedVersion: { ...receipt.acceptedVersion, number: 2 } }),
+    false,
+  );
+  assert.equal(
+    isUploadReceipt({ ...receipt, acceptedVersion: { ...receipt.acceptedVersion, sizeBytes: 5 } }),
+    false,
+  );
 });

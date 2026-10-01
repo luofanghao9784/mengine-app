@@ -1,0 +1,2090 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "methods",
+    "version": "1.0",
+    "description": "Manual normal method maintenance, not independent self-evolution. Scope adoption requires current authority and an explicit synthetic-evidence limitation acknowledgment. Default .55/.25/.20; normalize finite weights; full authorized pool <=1000 before paging. Workspace > tenant > builtin; tie by time descending then UUID ascending. No task replay on stop/rollback. Published comparisons require current immutable standard and samples; business quality remains unvalidated."
+  },
+  "security": [
+    {
+      "session": []
+    }
+  ],
+  "paths": {
+    "/api/platform-admin/v1/methods": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Current authorized projection; immutable history where documented.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Families"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          }
+        ]
+      },
+      "post": {
+        "responses": {
+          "201": {
+            "description": "Current authorized projection; immutable history where documented.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Family"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Create"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/platform-admin/v1/methods/{id}": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Current authorized projection; immutable history where documented.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Family"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/platform-admin/v1/methods/{id}/candidates": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Current authorized projection; immutable history where documented.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Family"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Candidate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/platform-admin/v1/methods/comparisons": {
+      "post": {
+        "responses": {
+          "201": {
+            "description": "Current authorized projection; immutable history where documented.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Comparison"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Compare"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/platform-admin/v1/methods/{id}/comparisons": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Current authorized projection; immutable history where documented.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Comparisons"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          }
+        ]
+      }
+    },
+    "/api/platform-admin/v1/methods/{id}/publish": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Current authorized projection; immutable history where documented.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Family"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Publish"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/platform-admin/v1/methods/sample-suite": {
+      "post": {
+        "responses": {
+          "201": {
+            "description": "Current authorized projection; immutable history where documented.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Suite"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuiteRequest"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenant}/methods": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Current authorized projection; immutable history where documented.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Families"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenant}/methods/selection": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Current authorized projection; immutable history where documented.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Selection"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      },
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Current authorized projection; immutable history where documented.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Selection"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Input, session, scope, missing evidence or optimistic conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Adopt"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "session": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "JSESSIONID"
+      }
+    },
+    "schemas": {
+      "Evidence": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "TASK",
+              "FEEDBACK",
+              "MATERIAL_VERSION"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "attempt": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "revision",
+          "attempt"
+        ]
+      },
+      "Criterion": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{0,39}$"
+          },
+          "dimension": {
+            "type": "string",
+            "enum": [
+              "FACT",
+              "CONTENT_QUALITY",
+              "USER_EFFECT",
+              "RUNTIME"
+            ]
+          },
+          "strength": {
+            "type": "string",
+            "enum": [
+              "REQUIRED",
+              "QUALITY",
+              "PREFERENCE"
+            ]
+          },
+          "check": {
+            "type": "string",
+            "enum": [
+              "EVIDENCE_AVAILABLE",
+              "TASK_SUCCEEDED",
+              "SYNTHETIC_EQUALS",
+              "MANUAL"
+            ]
+          },
+          "requirement": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "dimension",
+          "strength",
+          "check",
+          "requirement"
+        ]
+      },
+      "Content": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "purpose": {
+            "type": "string",
+            "enum": [
+              "REGRESSION",
+              "DEVELOPMENT"
+            ]
+          },
+          "description": {
+            "type": "string"
+          },
+          "criteria": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Criterion"
+            }
+          },
+          "input": {
+            "type": "string"
+          },
+          "expected": {
+            "type": "string"
+          },
+          "observed": {
+            "type": "string"
+          },
+          "unknowns": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "purpose",
+          "description",
+          "criteria",
+          "input",
+          "expected",
+          "observed",
+          "unknowns"
+        ]
+      },
+      "Version": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "content": {
+            "$ref": "#/components/schemas/Content"
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Evidence"
+            }
+          },
+          "originKey": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "SYNTHETIC",
+              "NO_MODEL",
+              "VERIFICATION",
+              "LIVE",
+              "UNKNOWN"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "revision",
+          "content",
+          "evidence",
+          "originKey",
+          "mode",
+          "createdAt"
+        ]
+      },
+      "Asset": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "workspaceId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "STANDARD",
+              "SAMPLE"
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "WITHDRAWN"
+            ]
+          },
+          "version": {
+            "$ref": "#/components/schemas/Version"
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "workspaceId",
+          "kind",
+          "revision",
+          "status",
+          "version"
+        ]
+      },
+      "Error": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "contractVersion": {
+            "type": "string",
+            "enum": [
+              "1.0"
+            ]
+          },
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "retryable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "contractVersion",
+          "code",
+          "message",
+          "retryable"
+        ]
+      },
+      "Configuration": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "relevanceWeight": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "recencyWeight": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "importanceWeight": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "relevanceWeight",
+          "recencyWeight",
+          "importanceWeight"
+        ]
+      },
+      "MethodVersion": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "familyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "baseVersion": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "configuration": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Configuration"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "configurationSha": {
+            "type": "string"
+          },
+          "compatibility": {
+            "type": "string",
+            "enum": [
+              "ranking-v1"
+            ]
+          },
+          "rationale": {
+            "type": "string"
+          },
+          "published": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "bodyAvailable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "familyId",
+          "number",
+          "baseVersion",
+          "configuration",
+          "configurationSha",
+          "compatibility",
+          "rationale",
+          "published",
+          "createdAt",
+          "bodyAvailable"
+        ]
+      },
+      "Family": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "RANKING_V1"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "headVersion": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "publishedVersion": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "versions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MethodVersion"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "revision",
+          "headVersion",
+          "publishedVersion",
+          "versions"
+        ]
+      },
+      "Families": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Family"
+            }
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "hasMore"
+        ]
+      },
+      "CaseResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "sampleVersion": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expected": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "baseline": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "candidate": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "baselinePass": {
+            "type": "boolean"
+          },
+          "candidatePass": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "sampleVersion",
+          "expected",
+          "baseline",
+          "candidate",
+          "baselinePass",
+          "candidatePass"
+        ]
+      },
+      "Comparison": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "candidateVersion": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "baselineVersion": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "standardVersion": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sampleVersions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "cases": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CaseResult"
+            }
+          },
+          "denominator": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "baselinePass": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "candidatePass": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "conclusion": {
+            "type": "string",
+            "enum": [
+              "IMPROVED_ON_SAMPLES",
+              "NO_CHANGE",
+              "REGRESSION",
+              "TRADEOFF"
+            ]
+          },
+          "validity": {
+            "type": "string",
+            "enum": [
+              "CURRENT",
+              "STALE",
+              "DETAILS_UNAVAILABLE"
+            ]
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "SYNTHETIC"
+            ]
+          },
+          "businessQuality": {
+            "type": "string",
+            "enum": [
+              "NOT_VALIDATED"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "candidateVersion",
+          "baselineVersion",
+          "standardVersion",
+          "sampleVersions",
+          "cases",
+          "denominator",
+          "baselinePass",
+          "candidatePass",
+          "conclusion",
+          "validity",
+          "mode",
+          "businessQuality",
+          "createdAt"
+        ]
+      },
+      "Comparisons": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Comparison"
+            }
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "hasMore"
+        ]
+      },
+      "MethodRef": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "versionId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "adoptionRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "BUILTIN",
+              "TENANT",
+              "WORKSPACE"
+            ]
+          },
+          "workspaceId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "configurationSha": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "versionId",
+          "adoptionRevision",
+          "scope",
+          "workspaceId",
+          "configurationSha"
+        ]
+      },
+      "AdoptionEvent": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "ADOPT",
+              "STOP",
+              "ROLLBACK"
+            ]
+          },
+          "versionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "actor": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "revision",
+          "action",
+          "versionId",
+          "actor",
+          "createdAt"
+        ]
+      },
+      "Adoption": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "STOPPED"
+            ]
+          },
+          "versionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "effectiveFallback": {
+            "type": "string",
+            "enum": [
+              "BUILTIN",
+              "TENANT_THEN_BUILTIN"
+            ]
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdoptionEvent"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "workspaceId",
+          "revision",
+          "status",
+          "versionId",
+          "effectiveFallback",
+          "history"
+        ]
+      },
+      "Selection": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "adoption": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Adoption"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "effective": {
+            "$ref": "#/components/schemas/MethodRef"
+          },
+          "configuration": {
+            "$ref": "#/components/schemas/Configuration"
+          },
+          "canAdopt": {
+            "type": "boolean"
+          },
+          "adoptedVersion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MethodVersion"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "adoption",
+          "effective",
+          "configuration",
+          "canAdopt",
+          "adoptedVersion"
+        ]
+      },
+      "CandidateInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "relevance": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "recency": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "importance": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "workspaceId",
+          "relevance",
+          "recency",
+          "importance",
+          "createdAt"
+        ]
+      },
+      "Create": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "configuration": {
+            "$ref": "#/components/schemas/Configuration"
+          },
+          "rationale": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "requestId",
+          "title",
+          "configuration",
+          "rationale"
+        ]
+      },
+      "Candidate": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "configuration": {
+            "$ref": "#/components/schemas/Configuration"
+          },
+          "rationale": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "requestId",
+          "expectedRevision",
+          "configuration",
+          "rationale"
+        ]
+      },
+      "Compare": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "candidateVersion": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "baselineVersion": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "standardVersion": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sampleVersions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "minItems": 1,
+            "maxItems": 50,
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "requestId",
+          "candidateVersion",
+          "baselineVersion",
+          "standardVersion",
+          "sampleVersions"
+        ]
+      },
+      "Publish": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "candidateVersion": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "comparisonId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "requestId",
+          "expectedRevision",
+          "candidateVersion",
+          "comparisonId"
+        ]
+      },
+      "Adopt": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "ADOPT",
+              "STOP",
+              "ROLLBACK"
+            ]
+          },
+          "versionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "limitationsAccepted": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "requestId",
+          "workspaceId",
+          "expectedRevision",
+          "action",
+          "versionId",
+          "limitationsAccepted"
+        ]
+      },
+      "SuiteRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/CandidateInput"
+                },
+                "minItems": 1,
+                "maxItems": 1000
+              }
+            },
+            "required": [
+              "items"
+            ]
+          },
+          "expected": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "required": [
+              "items"
+            ]
+          }
+        },
+        "required": [
+          "requestId",
+          "title",
+          "input",
+          "expected"
+        ]
+      },
+      "Suite": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "standard": {
+            "$ref": "#/components/schemas/Asset"
+          },
+          "sample": {
+            "$ref": "#/components/schemas/Asset"
+          }
+        },
+        "required": [
+          "standard",
+          "sample"
+        ]
+      }
+    }
+  }
+}

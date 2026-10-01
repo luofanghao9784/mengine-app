@@ -1,0 +1,2810 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Effective departures and scoped exit archives",
+    "version": "1.0.0",
+    "description": "V29 is preparation only. V34 effective facts gate current business. Exit ZIP inventories cover chosen authorized shared material versions and independent experience only; never attest full-tenant migration. Private bodies remain private. Temporary archives are bounded and physically removed at fixed expiry."
+  },
+  "paths": {
+    "/api/v1/tenants/{tenant}/departures": {
+      "get": {
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current-authorized response; queued is not success.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SummaryPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "401": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "403": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "404": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "409": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "410": {
+            "description": "Current permission, fixed revision or state rejected."
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/departures/options": {
+      "get": {
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "targetAccountId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "memberOffset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "responsibilityOffset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current-authorized response; queued is not success.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Options"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "401": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "403": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "404": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "409": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "410": {
+            "description": "Current permission, fixed revision or state rejected."
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/departures/export-scopes": {
+      "get": {
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          },
+          {
+            "name": "exporterAccountId",
+            "in": "query",
+            "required": false,
+            "description": "Defaults to caller; scopes require caller read access and recipient current read plus bulk-export capability.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current-authorized response; queued is not success.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportScopes"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "401": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "403": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "404": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "409": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "410": {
+            "description": "Current permission, fixed revision or state rejected."
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/departures/successors": {
+      "get": {
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "workspaceId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current-authorized response; queued is not success.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Candidates"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "401": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "403": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "404": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "409": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "410": {
+            "description": "Current permission, fixed revision or state rejected."
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/departures/offboard": {
+      "post": {
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Current-authorized response; queued is not success.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/View"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "401": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "403": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "404": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "409": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "410": {
+            "description": "Current permission, fixed revision or state rejected."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OffboardInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/departures/exit": {
+      "post": {
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Current-authorized response; queued is not success.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/View"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "401": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "403": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "404": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "409": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "410": {
+            "description": "Current permission, fixed revision or state rejected."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExitInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/departures/handovers": {
+      "post": {
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Current-authorized response; queued is not success.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Handover"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "401": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "403": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "404": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "409": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "410": {
+            "description": "Current permission, fixed revision or state rejected."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HandoverInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/departures/{id}": {
+      "post": {
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current-authorized response; queued is not success.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/View"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "401": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "403": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "404": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "409": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "410": {
+            "description": "Current permission, fixed revision or state rejected."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DepartureCommand"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current-authorized response; queued is not success.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/View"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "401": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "403": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "404": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "409": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "410": {
+            "description": "Current permission, fixed revision or state rejected."
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/departure-exports": {
+      "post": {
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Current-authorized response; queued is not success.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Inventory"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "401": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "403": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "404": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "409": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "410": {
+            "description": "Current permission, fixed revision or state rejected."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InventoryInput"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "executionId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current-authorized response; queued is not success.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "401": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "403": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "404": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "409": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "410": {
+            "description": "Current permission, fixed revision or state rejected."
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/departure-exports/{id}": {
+      "get": {
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current-authorized response; queued is not success.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Inventory"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "401": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "403": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "404": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "409": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "410": {
+            "description": "Current permission, fixed revision or state rejected."
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/departure-exports/{id}/parts": {
+      "get": {
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current-authorized response; queued is not success.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PartPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "401": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "403": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "404": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "409": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "410": {
+            "description": "Current permission, fixed revision or state rejected."
+          }
+        }
+      },
+      "post": {
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Current-authorized response; queued is not success.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Part"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "401": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "403": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "404": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "409": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "410": {
+            "description": "Current permission, fixed revision or state rejected."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NextPart"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/departure-exports/parts/{id}": {
+      "get": {
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current-authorized response; queued is not success.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Part"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "401": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "403": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "404": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "409": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "410": {
+            "description": "Current permission, fixed revision or state rejected."
+          }
+        }
+      },
+      "post": {
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current-authorized response; queued is not success.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Part"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "401": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "403": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "404": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "409": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "410": {
+            "description": "Current permission, fixed revision or state rejected."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartCommand"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/departure-exports/parts/{id}/cleanup": {
+      "get": {
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current-authorized response; queued is not success.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CleanupReceipt"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "401": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "403": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "404": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "409": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "410": {
+            "description": "Current permission, fixed revision or state rejected."
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/departure-exports/parts/{id}/download": {
+      "get": {
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current-authorized response; queued is not success.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/zip": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "401": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "403": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "404": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "409": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "410": {
+            "description": "Current permission, fixed revision or state rejected."
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/departure-exports/cleanup": {
+      "get": {
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "executionId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current-authorized response; queued is not success.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CleanupReceiptPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "401": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "403": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "404": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "409": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "410": {
+            "description": "Current permission, fixed revision or state rejected."
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/departures/business-status": {
+      "get": {
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current-authorized response; queued is not success.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BusinessStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "401": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "403": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "404": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "409": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "410": {
+            "description": "Current permission, fixed revision or state rejected."
+          }
+        }
+      }
+    },
+    "/api/v1/platform/tenants/{tenant}/departure-status": {
+      "get": {
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current-authorized response; queued is not success.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BusinessStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "401": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "403": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "404": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "409": {
+            "description": "Current permission, fixed revision or state rejected."
+          },
+          "410": {
+            "description": "Current permission, fixed revision or state rejected."
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "DREAMCORE_SESSION"
+      }
+    },
+    "parameters": {
+      "CsrfHeader": {
+        "name": "X-CSRF-TOKEN",
+        "in": "header",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "schemas": {
+      "ExportGrant": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "accountId",
+          "workspaceId"
+        ],
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "OffboardInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requestId",
+          "targetAccountId",
+          "expectedMemberRevision",
+          "reason",
+          "acceptScheduledCleanup"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "targetAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedMemberRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "acceptScheduledCleanup": {
+            "const": true
+          }
+        }
+      },
+      "ExitInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requestId",
+          "expectedTenantRevision",
+          "reason",
+          "exportGrants",
+          "acceptScheduledCleanup"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedTenantRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "exportGrants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExportGrant"
+            },
+            "maxItems": 200,
+            "uniqueItems": true
+          },
+          "acceptScheduledCleanup": {
+            "const": true
+          }
+        }
+      },
+      "DepartureCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requestId",
+          "expectedRevision",
+          "action"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "RETRY",
+              "CANCEL_OFFBOARD"
+            ]
+          }
+        }
+      },
+      "HandoverInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requestId",
+          "kind",
+          "workspaceId",
+          "objectId",
+          "fromAccountId",
+          "toAccountId",
+          "expectedRevision"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "WORKSPACE_OWNER",
+              "SOURCE_CONTACT"
+            ]
+          },
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "objectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fromAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "toAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "Handover": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "kind",
+          "workspaceId",
+          "objectId",
+          "fromAccountId",
+          "toAccountId",
+          "resultingRevision",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "WORKSPACE_OWNER",
+              "SOURCE_CONTACT"
+            ]
+          },
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "objectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fromAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "toAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "resultingRevision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Summary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "tenantId",
+          "kind",
+          "targetAccountId",
+          "state",
+          "revision",
+          "effectiveAt",
+          "deadline",
+          "completedAt",
+          "errorCode"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "MEMBER_OFFBOARD",
+              "TENANT_EXIT"
+            ]
+          },
+          "targetAccountId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "ISOLATING",
+              "ISOLATED",
+              "EXPORT_WINDOW",
+              "RESTORING",
+              "CLEANING",
+              "COMPLETE",
+              "FAILED",
+              "CANCELLED"
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "effectiveAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deadline": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "errorCode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "View": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "execution",
+          "targetName",
+          "reason",
+          "policyKey",
+          "policyRevision",
+          "stopComplete",
+          "isolationComplete",
+          "materialsComplete",
+          "objectsComplete",
+          "cancelledAt",
+          "workerAttempts",
+          "backupState",
+          "canCancel",
+          "canRetry",
+          "exportGrants",
+          "materialProgress",
+          "coverage"
+        ],
+        "properties": {
+          "execution": {
+            "$ref": "#/components/schemas/Summary"
+          },
+          "targetName": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "policyKey": {
+            "type": "string",
+            "enum": [
+              "OFFBOARD_ISOLATION",
+              "TENANT_EXIT_WINDOW"
+            ]
+          },
+          "policyRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "stopComplete": {
+            "type": "boolean"
+          },
+          "isolationComplete": {
+            "type": "boolean"
+          },
+          "materialsComplete": {
+            "type": "boolean"
+          },
+          "objectsComplete": {
+            "type": "boolean"
+          },
+          "cancelledAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "workerAttempts": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "backupState": {
+            "const": "PENDING_VERIFICATION"
+          },
+          "canCancel": {
+            "type": "boolean"
+          },
+          "canRetry": {
+            "type": "boolean"
+          },
+          "exportGrants": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "accountId",
+                "workspaceId",
+                "workspaceName"
+              ],
+              "properties": {
+                "accountId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "workspaceId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "workspaceName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            },
+            "maxItems": 200
+          },
+          "materialProgress": {
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "discovered",
+                  "isolated",
+                  "queued",
+                  "purged",
+                  "failed",
+                  "remaining",
+                  "discoveryComplete",
+                  "complete"
+                ],
+                "properties": {
+                  "discovered": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "isolated": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "queued": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "purged": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "failed": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "remaining": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "discoveryComplete": {
+                    "type": "boolean"
+                  },
+                  "complete": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "coverage": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            },
+            "maxItems": 20
+          }
+        }
+      },
+      "Options": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "tenantRevision",
+          "members",
+          "membersHaveMore",
+          "responsibilities",
+          "responsibilitiesHaveMore",
+          "canOffboard",
+          "canExit"
+        ],
+        "properties": {
+          "tenantRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "name",
+                "status",
+                "revision"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "ACTIVE",
+                    "DISABLED"
+                  ]
+                },
+                "revision": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "maxItems": 20
+          },
+          "membersHaveMore": {
+            "type": "boolean"
+          },
+          "responsibilities": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "workspaceId",
+                "workspaceName",
+                "objectId",
+                "name",
+                "responsibleId",
+                "revision"
+              ],
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "WORKSPACE_OWNER",
+                    "SOURCE_CONTACT"
+                  ]
+                },
+                "workspaceId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "workspaceName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                },
+                "objectId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                },
+                "responsibleId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "revision": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "maxItems": 20
+          },
+          "responsibilitiesHaveMore": {
+            "type": "boolean"
+          },
+          "canOffboard": {
+            "type": "boolean"
+          },
+          "canExit": {
+            "type": "boolean"
+          }
+        }
+      },
+      "InventoryInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requestId",
+          "executionId",
+          "workspaceId",
+          "includeHistory"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "executionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "includeHistory": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NextPart": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requestId"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "PartCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requestId",
+          "expectedRevision",
+          "action"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "RETRY",
+              "REMOVE"
+            ]
+          }
+        }
+      },
+      "Inventory": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "executionId",
+          "workspaceId",
+          "includeHistory",
+          "state",
+          "revision",
+          "itemCount",
+          "pending",
+          "included",
+          "failed",
+          "selectedScopeComplete",
+          "fullTenantMigration",
+          "createdAt",
+          "coverage"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "executionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "includeHistory": {
+            "type": "boolean"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "READY",
+              "EXPIRED",
+              "REVOKED"
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "itemCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "pending": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "included": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "failed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "selectedScopeComplete": {
+            "type": "boolean"
+          },
+          "fullTenantMigration": {
+            "const": false
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "coverage": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            },
+            "maxItems": 20
+          }
+        }
+      },
+      "Item": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ordinal",
+          "kind",
+          "objectId",
+          "versionId",
+          "version",
+          "state",
+          "filename",
+          "sha256",
+          "errorCode"
+        ],
+        "properties": {
+          "ordinal": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "MATERIAL_VERSION",
+              "EXPERIENCE_VERSION"
+            ]
+          },
+          "objectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "versionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "INCLUDED",
+              "FAILED"
+            ]
+          },
+          "filename": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 250
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sha256": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "errorCode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "Part": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "setId",
+          "number",
+          "state",
+          "revision",
+          "requestedCount",
+          "bytes",
+          "sha256",
+          "generatedAt",
+          "expiresAt",
+          "errorCode",
+          "cleanupState",
+          "cleanedAt",
+          "removedBytes",
+          "canDownload",
+          "items"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "setId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "GENERATING",
+              "READY",
+              "PARTIAL",
+              "FAILED",
+              "EXPIRED",
+              "REVOKED",
+              "REMOVED"
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "requestedCount": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 41943040
+          },
+          "sha256": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "generatedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expiresAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "errorCode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cleanupState": {
+            "type": "string",
+            "enum": [
+              "NONE",
+              "PENDING",
+              "FAILED",
+              "COMPLETE"
+            ]
+          },
+          "cleanedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "removedBytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "canDownload": {
+            "type": "boolean"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Item"
+            },
+            "maxItems": 50
+          }
+        }
+      },
+      "CleanupReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "partId",
+          "state",
+          "cleanupState",
+          "attempts",
+          "completedAt",
+          "removedBytes",
+          "backupState"
+        ],
+        "properties": {
+          "partId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "GENERATING",
+              "READY",
+              "PARTIAL",
+              "FAILED",
+              "EXPIRED",
+              "REVOKED",
+              "REMOVED"
+            ]
+          },
+          "cleanupState": {
+            "type": "string",
+            "enum": [
+              "NONE",
+              "PENDING",
+              "FAILED",
+              "COMPLETE"
+            ]
+          },
+          "attempts": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "completedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "removedBytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "backupState": {
+            "const": "PENDING_VERIFICATION"
+          }
+        }
+      },
+      "SummaryPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "hasMore"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Summary"
+            },
+            "maxItems": 20
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        }
+      },
+      "InventoryPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "hasMore"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Inventory"
+            },
+            "maxItems": 20
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PartPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "hasMore"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Part"
+            },
+            "maxItems": 20
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        }
+      },
+      "CleanupReceiptPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "hasMore"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CleanupReceipt"
+            },
+            "maxItems": 20
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Candidates": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "name"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            }
+          }
+        },
+        "maxItems": 20
+      },
+      "ExportScopes": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "workspaceId",
+            "name"
+          ],
+          "properties": {
+            "workspaceId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            }
+          }
+        },
+        "maxItems": 20
+      },
+      "BusinessStatus": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "tenantId",
+          "businessEnabled",
+          "exitState",
+          "exportDeadline",
+          "canExport"
+        ],
+        "properties": {
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "businessEnabled": {
+            "type": "boolean"
+          },
+          "exitState": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "ISOLATING",
+                  "ISOLATED",
+                  "EXPORT_WINDOW",
+                  "RESTORING",
+                  "CLEANING",
+                  "COMPLETE",
+                  "FAILED",
+                  "CANCELLED"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "exportDeadline": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "canExport": {
+            "type": "boolean"
+          }
+        }
+      }
+    }
+  }
+}

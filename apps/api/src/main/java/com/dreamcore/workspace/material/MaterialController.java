@@ -38,14 +38,14 @@ public class MaterialController {
         return service.createFolder(actor(auth),tenant,workspace,body.parentId(),body.name(),body.requestId());
     }
     @PostMapping(value="/workspaces/{workspace}/materials",consumes=MediaType.MULTIPART_FORM_DATA_VALUE) @ResponseStatus(HttpStatus.CREATED)
-    public MaterialService.Entry upload(Authentication auth,@PathVariable UUID tenant,@PathVariable UUID workspace,
+    public MaterialService.UploadReceipt upload(Authentication auth,@PathVariable UUID tenant,@PathVariable UUID workspace,
             @Valid @RequestPart("metadata") UploadRequest metadata,@RequestPart("file") MultipartFile file) {
-        return service.upload(actor(auth),tenant,workspace,metadata.folderId(),null,metadata.expectedVersion(),metadata.requestId(),file);
+        return service.uploadReceipt(actor(auth),tenant,workspace,metadata.folderId(),null,metadata.expectedVersion(),metadata.requestId(),file);
     }
     @PostMapping(value="/workspaces/{workspace}/materials/{material}/versions",consumes=MediaType.MULTIPART_FORM_DATA_VALUE) @ResponseStatus(HttpStatus.CREATED)
-    public MaterialService.Entry version(Authentication auth,@PathVariable UUID tenant,@PathVariable UUID workspace,@PathVariable UUID material,
+    public MaterialService.UploadReceipt version(Authentication auth,@PathVariable UUID tenant,@PathVariable UUID workspace,@PathVariable UUID material,
             @Valid @RequestPart("metadata") UploadRequest metadata,@RequestPart("file") MultipartFile file) {
-        return service.upload(actor(auth),tenant,workspace,metadata.folderId(),material,metadata.expectedVersion(),metadata.requestId(),file);
+        return service.uploadReceipt(actor(auth),tenant,workspace,metadata.folderId(),material,metadata.expectedVersion(),metadata.requestId(),file);
     }
     @GetMapping("/workspaces/{workspace}/materials/{material}")
     public MaterialService.Detail detail(Authentication auth,@PathVariable UUID tenant,@PathVariable UUID workspace,@PathVariable UUID material,

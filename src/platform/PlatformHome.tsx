@@ -1,3 +1,11 @@
+import { DepartureStatus } from '../departure/DepartureStatus';
+import { ObjectLifecycleWorkspace } from '../objectlifecycle/ObjectLifecycleWorkspace';
+import { EvaluationWorkspace } from '../evaluation/EvaluationWorkspace';
+import { MethodWorkbench } from '../methods/MethodWorkbench';
+import { RequestPending } from '../shared/request-guard';
+import { useContext } from 'react';
+import { RecoveryForm } from '../governance/RecoveryForm';
+import '../governance/governance.css';
 import { useState } from 'react';
 import { OperationsPanel } from '../operations/OperationsPanel';
 import {
@@ -29,7 +37,7 @@ import { Badge, Button, Empty, Field, Modal, PageActions } from '../shared/ui';
 import { platformClient } from './client';
 import './platform.css';
 
-const statusLabel = (s: string) => (s === 'ACTIVE' ? '使用中' : '已停用');
+const statusLabel = (s: string) => (s === 'ACTIVE' ? '入口启用' : '入口已停用');
 const invitationLabel: Record<string, string> = {
   PENDING: '等待接受',
   ACCEPTED: '已加入',
@@ -45,7 +53,10 @@ const actionLabel: Record<string, string> = {
 const time = (date: string) => new Date(date).toLocaleString('zh-CN', { hour12: false });
 
 export function PlatformHome() {
-  const [tab, setTab] = useState<'tenants' | 'operations'>('tenants');
+  const pendingRequest = useContext(RequestPending);
+  const [tab, setTab] = useState<'tenants' | 'operations' | 'evaluation' | 'methods' | 'content-lifecycle'>(
+    'tenants',
+  );
   const [attempt, setAttempt] = useState(0);
   const [writing, setWriting] = useState(false);
   const [draftQuery, setDraftQuery] = useState('');
@@ -90,7 +101,7 @@ export function PlatformHome() {
       ) : (
         <Loading />
       )}
-      <nav className="platform-tabs" aria-label="总台管理功能">
+      <nav className="platform-tabs" aria-label="总台管理功能" inert={pendingRequest || undefined}>
         <Button
           variant={tab === 'tenants' ? 'primary' : 'ghost'}
           aria-current={tab === 'tenants' ? 'page' : undefined}
@@ -105,8 +116,36 @@ export function PlatformHome() {
         >
           运行概览
         </Button>
+        <Button
+          variant={tab === 'evaluation' ? 'primary' : 'ghost'}
+          aria-current={tab === 'evaluation' ? 'page' : undefined}
+          onClick={() => setTab('evaluation')}
+        >
+          评估与问题
+        </Button>
+        <Button
+          variant={tab === 'methods' ? 'primary' : 'ghost'}
+          aria-current={tab === 'methods' ? 'page' : undefined}
+          onClick={() => setTab('methods')}
+        >
+          方法版本
+        </Button>
+        <Button
+          disabled={pendingRequest}
+          variant={tab === 'content-lifecycle' ? 'primary' : 'ghost'}
+          aria-current={tab === 'content-lifecycle' ? 'page' : undefined}
+          onClick={() => setTab('content-lifecycle')}
+        >
+          内容回收与清理
+        </Button>
       </nav>
-      {tab === 'operations' ? (
+      {tab === 'content-lifecycle' ? (
+        <ObjectLifecycleWorkspace />
+      ) : tab === 'evaluation' ? (
+        <EvaluationWorkspace />
+      ) : tab === 'methods' ? (
+        <MethodWorkbench />
+      ) : tab === 'operations' ? (
         <OperationsPanel scope="platform" revision={attempt} />
       ) : (
         <section className="access-panel platform-catalog" aria-label="企业列表">
@@ -140,8 +179,8 @@ export function PlatformHome() {
                 }}
               >
                 <option value="">全部状态</option>
-                <option value="ACTIVE">使用中</option>
-                <option value="SUSPENDED">已停用</option>
+                <option value="ACTIVE">入口启用</option>
+                <option value="SUSPENDED">入口已停用</option>
               </select>
             </form>
           </div>
@@ -191,7 +230,9 @@ export function PlatformHome() {
           )}
         </section>
       )}
-      <p className="platform-boundary">总台仅管理企业运行信息，不提供客户资料、会话或代入访问。</p>
+      <p className="platform-boundary">
+        总台管理企业入口与技术运行信息；企业退出中的受限迁出可保留入口，实际业务状态见详情。不提供客户资料、会话或代入访问。
+      </p>
       {createOpen && (
         <Modal
           title="开通企业"
@@ -238,11 +279,11 @@ function Overview({ value }: { value: PlatformOverview }) {
           <strong>{value.totalTenants}</strong>
         </div>
         <div>
-          <span>使用中</span>
+          <span>入口启用</span>
           <strong>{value.activeTenants}</strong>
         </div>
         <div>
-          <span>已停用</span>
+          <span>入口已停用</span>
           <strong>{value.suspendedTenants}</strong>
         </div>
       </div>
@@ -271,14 +312,19 @@ function CreateForm({
 }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const task = useSubmission<{ name: string; adminEmail: string }>();
+  const [designate, setDesignate] = useState(false);
+  const task = useSubmission<{ name: string; adminEmail: string; designateAuthorizationOwner: boolean }>();
   return (
     <form
       className="platform-form"
       onSubmit={(e) => {
         e.preventDefault();
         void task.submit(
-          { name: name.trim(), adminEmail: email.trim().toLowerCase() },
+          {
+            name: name.trim(),
+            adminEmail: email.trim().toLowerCase(),
+            designateAuthorizationOwner: designate,
+          },
           async (body, requestId) => {
             const result = await platformClient.create({ ...body, requestId });
             onCreated(result.tenant.id);
@@ -301,6 +347,11 @@ function CreateForm({
             autoComplete="off"
           />
         </Field>
+        <label className="governance-check">
+          <input type="checkbox" checked={designate} onChange={(e) => setDesignate(e.target.checked)} />
+          明确指定此初始管理员为企业授权负责人候选人
+        </label>
+        <p className="muted">须由受邀人在加入后另外明确接受职责。未勾选或存量企业不会自动获得负责人资格。</p>
       </fieldset>
       <p className="platform-help">
         {delivery === 'LOCAL'
@@ -368,6 +419,7 @@ function TenantView({
         </div>
         <Badge blue={value.tenant.status === 'ACTIVE'}>{statusLabel(value.tenant.status)}</Badge>
       </div>
+      <DepartureStatus tenant={id} platform verification={attempt} />
       <dl className="platform-facts">
         <div>
           <dt>开通时间</dt>
@@ -410,6 +462,7 @@ function TenantView({
           <p className="muted">暂无初始管理员邀请记录，请联系平台维护者。</p>
         )}
       </section>
+      <RecoveryForm tenant={id} platform />
       <FormActions>
         <Button variant="ghost" icon={RefreshCw} onClick={reload}>
           刷新详情

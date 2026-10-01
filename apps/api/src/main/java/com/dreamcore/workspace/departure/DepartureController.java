@@ -1,0 +1,21 @@
+package com.dreamcore.workspace.departure;
+import jakarta.servlet.http.HttpServletResponse;import jakarta.validation.Valid;import jakarta.validation.constraints.*;import java.util.*;import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;import org.springframework.http.HttpStatus;import org.springframework.security.core.Authentication;import org.springframework.web.bind.annotation.*;
+@RestController @ConditionalOnWebApplication(type=ConditionalOnWebApplication.Type.SERVLET) @RequestMapping("/api/v1/tenants/{tenant}/departures")
+public class DepartureController {
+ public record Offboard(@NotNull UUID requestId,@NotNull UUID targetAccountId,@Min(0)long expectedMemberRevision,@NotBlank@Size(max=500)String reason,boolean acceptScheduledCleanup){}
+ public record Exit(@NotNull UUID requestId,@Min(0)long expectedTenantRevision,@NotBlank@Size(max=500)String reason,@NotNull@Size(max=200)List<DepartureService.ExportGrant> exportGrants,boolean acceptScheduledCleanup){}
+ public record Command(@NotNull UUID requestId,@Min(1)int expectedRevision,@NotNull String action){}
+ public record Transfer(@NotNull UUID requestId,@NotNull String kind,@NotNull UUID workspaceId,@NotNull UUID objectId,@NotNull UUID fromAccountId,@NotNull UUID toAccountId,@Min(0)long expectedRevision){}
+ private final DepartureService service;public DepartureController(DepartureService service){this.service=service;}
+ private UUID actor(Authentication a){return UUID.fromString(a.getName());}
+ @ModelAttribute public void headers(HttpServletResponse r){r.setHeader("Cache-Control","private, no-store");r.setHeader("X-Content-Type-Options","nosniff");}
+ @GetMapping public DepartureService.Page list(Authentication a,@PathVariable UUID tenant,@RequestParam(defaultValue="0")int offset,@RequestParam(defaultValue="20")int limit){return service.list(actor(a),tenant,offset,limit);}
+ @GetMapping("/options")public DepartureService.Options options(Authentication a,@PathVariable UUID tenant,@RequestParam(required=false)UUID targetAccountId,@RequestParam(defaultValue="0")int memberOffset,@RequestParam(defaultValue="0")int responsibilityOffset,@RequestParam(defaultValue="20")int limit){return service.options(actor(a),tenant,targetAccountId,memberOffset,responsibilityOffset,limit);}
+ @GetMapping("/export-scopes") public List<DepartureService.ExportScope> exportScopes(Authentication a,@PathVariable UUID tenant,@RequestParam(required=false)UUID exporterAccountId,@RequestParam(defaultValue="0")int offset,@RequestParam(defaultValue="20")int limit){return service.exportScopes(actor(a),tenant,exporterAccountId,offset,limit);}
+ @GetMapping("/successors")public List<DepartureService.Candidate> successors(Authentication a,@PathVariable UUID tenant,@RequestParam UUID workspaceId,@RequestParam(defaultValue="0")int offset,@RequestParam(defaultValue="20")int limit){return service.successors(actor(a),tenant,workspaceId,offset,limit);}
+ @PostMapping("/handovers")@ResponseStatus(HttpStatus.CREATED)public DepartureService.Handover handover(Authentication a,@PathVariable UUID tenant,@Valid@RequestBody Transfer b){return service.handover(actor(a),tenant,b.requestId(),b.kind(),b.workspaceId(),b.objectId(),b.fromAccountId(),b.toAccountId(),b.expectedRevision());}
+ @PostMapping("/offboard")@ResponseStatus(HttpStatus.CREATED)public DepartureService.View offboard(Authentication a,@PathVariable UUID tenant,@Valid@RequestBody Offboard b){return service.beginOffboard(actor(a),tenant,b.targetAccountId(),b.requestId(),b.expectedMemberRevision(),b.reason(),b.acceptScheduledCleanup());}
+ @PostMapping("/exit")@ResponseStatus(HttpStatus.CREATED)public DepartureService.View exit(Authentication a,@PathVariable UUID tenant,@Valid@RequestBody Exit b){return service.beginExit(actor(a),tenant,b.requestId(),b.expectedTenantRevision(),b.reason(),b.exportGrants(),b.acceptScheduledCleanup());}
+ @GetMapping("/{id}")public DepartureService.View get(Authentication a,@PathVariable UUID tenant,@PathVariable UUID id){return service.get(actor(a),tenant,id);}
+ @PostMapping("/{id}")public DepartureService.View command(Authentication a,@PathVariable UUID tenant,@PathVariable UUID id,@Valid@RequestBody Command b){return service.command(actor(a),tenant,id,b.requestId(),b.expectedRevision(),b.action());}
+}

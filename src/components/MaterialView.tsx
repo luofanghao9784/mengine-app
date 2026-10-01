@@ -1,24 +1,23 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Maximize2,
   X,
   Folder,
   Pencil,
-  History,
   Download,
   ArrowUpRight,
   Check,
   FileText,
-  Share2,
   Info,
   MessageSquare,
-  ChevronLeft,
 } from 'lucide-react';
 import { useDemo, useUI } from '../store';
 import { canEdit, latest, activity } from '../model';
 import { canReadMaterial, canManageFolder, locationNames } from '../libraryModel';
 import { Badge, Button, DocumentText, IconButton } from './ui';
 import { SourceLinks, SourceImage } from './SourceDetails';
+import { MaterialSharing } from './MaterialSharing';
 
 type ReaderProps = {
   id: string;
@@ -27,10 +26,86 @@ type ReaderProps = {
   initialTab?: string;
   compact?: boolean;
   onClose?: () => void;
+  onPropertiesChange?: (open: boolean) => void;
+  onExpand?: () => void;
+  onNavigate?: () => void;
 };
 
 export function MaterialPreview(props: ReaderProps) {
-  return <MaterialReader {...props} compact />;
+  const [expanded, setExpanded] = useState(false);
+  const [host] = useState(() => document.createElement('div'));
+  const slot = useRef<HTMLDivElement>(null);
+  const fullscreen = useRef<HTMLDialogElement>(null);
+  const readingPosition = useRef(0);
+  const propertiesOpen = useRef(false);
+  const deckHeaderAttributes = useRef<[string, string | null][]>([]);
+  const expand = () => {
+    readingPosition.current = host.querySelector('.reader-scroll')?.scrollTop || 0;
+    setExpanded(true);
+  };
+  useLayoutEffect(() => {
+    const dialog = fullscreen.current;
+    const target = expanded ? dialog : slot.current;
+    if (!dialog || !target) return;
+    const reader = host.querySelector<HTMLElement>('.reader-scroll');
+    const position = expanded ? reader?.scrollTop || 0 : readingPosition.current;
+    // Move a stable portal host, retaining the actual reader, version and property state.
+    // A second reader (or changing portal targets) would remount the document.
+    host.className = 'material-reader-host';
+    target.appendChild(host);
+    const header = host.querySelector('.reader-header');
+    if (expanded) {
+      deckHeaderAttributes.current = ['tabindex', 'data-deck-draggable', 'title'].map((name) => [
+        name,
+        header?.getAttribute(name) ?? null,
+      ]);
+      deckHeaderAttributes.current.forEach(([name]) => header?.removeAttribute(name));
+      dialog.showModal();
+      host.querySelector<HTMLButtonElement>('[aria-label="关闭资料视窗"]')?.focus({ preventScroll: true });
+    } else {
+      dialog.close();
+      deckHeaderAttributes.current.forEach(([name, value]) => {
+        if (value !== null) header?.setAttribute(name, value);
+      });
+      if (deckHeaderAttributes.current.length)
+        host.querySelector<HTMLButtonElement>('[aria-label="展开资料详情"]')?.focus({ preventScroll: true });
+    }
+    reader?.scrollTo({ top: position, behavior: 'instant' });
+  }, [expanded, host]);
+  useEffect(() => {
+    if (!expanded) props.onPropertiesChange?.(propertiesOpen.current);
+  }, [expanded]);
+  return (
+    <>
+      <div ref={slot} className="material-reader-slot" />
+      {createPortal(
+        <dialog
+          ref={fullscreen}
+          className="reader-fullscreen-dialog"
+          aria-label="资料全屏阅读"
+          onCancel={(event) => {
+            event.preventDefault();
+            setExpanded(false);
+          }}
+        />,
+        document.body,
+      )}
+      {createPortal(
+        <MaterialReader
+          {...props}
+          compact={!expanded}
+          onExpand={expand}
+          onClose={expanded ? () => setExpanded(false) : props.onClose}
+          onNavigate={() => setExpanded(false)}
+          onPropertiesChange={(open) => {
+            propertiesOpen.current = open;
+            if (!expanded) props.onPropertiesChange?.(open);
+          }}
+        />,
+        host,
+      )}
+    </>
+  );
 }
 
 export function MaterialDetails(props: ReaderProps) {
@@ -49,9 +124,13 @@ export function MaterialReader({
   initialTab = 'content',
   compact = false,
   onClose,
+  onPropertiesChange,
+  onExpand,
+  onNavigate,
 }: ReaderProps) {
   const { state, change } = useDemo();
   const ui = useUI();
+  const supportId = useId();
   const root = useRef<HTMLDivElement>(null);
   const scroll = useRef<HTMLDivElement>(null);
   const [versionId, setVersionId] = useState(initialVersionId);
@@ -60,20 +139,30 @@ export function MaterialReader({
   useEffect(() => {
     setVersionId(initialVersionId);
   }, [id, initialVersionId, versionRequest]);
+  const propertiesCallback = useRef(onPropertiesChange);
+  propertiesCallback.current = onPropertiesChange;
+  useEffect(() => {
+    propertiesCallback.current?.(!!panel);
+  }, [!!panel]);
+  const closeProperties = () => {
+    setPanel('');
+    root.current?.querySelector<HTMLButtonElement>('[aria-label="资料属性"]')?.focus();
+  };
   useEffect(() => {
     if (!panel) return;
     const escape = (event: KeyboardEvent) => {
       if (
         event.key !== 'Escape' ||
         event.defaultPrevented ||
-        document.querySelector('dialog[open]') ||
+        Array.from(document.querySelectorAll('dialog[open]')).some(
+          (dialog) => !dialog.contains(root.current),
+        ) ||
         root.current?.closest('[inert]')
       )
         return;
       event.preventDefault();
       event.stopPropagation();
-      setPanel('');
-      root.current?.querySelector<HTMLButtonElement>('[aria-label="资料信息与来源"]')?.focus();
+      closeProperties();
     };
     document.addEventListener('keydown', escape, true);
     return () => document.removeEventListener('keydown', escape, true);
@@ -101,26 +190,77 @@ export function MaterialReader({
     .map((ref) => state.materials.find((material) => material.id === ref && canReadMaterial(state, material)))
     .filter((material) => !!material);
   const support = (
-    <aside className="reader-support" aria-label="资料信息">
+    <aside id={supportId} className="reader-support" aria-label="资料属性侧栏">
       <div className="reader-support-heading">
-        <h2>资料信息</h2>
-        <IconButton icon={X} label="收起资料信息" onClick={() => setPanel('')} />
+        <h2>资料属性</h2>
+        <IconButton icon={X} label="收起资料属性" onClick={closeProperties} />
       </div>
       <div className="tabs reader-info-tabs" role="tablist" aria-label="资料详情">
         {[
-          ['attributes', '资料属性'],
+          ['attributes', '基本信息'],
           ['versions', '版本记录'],
+          ['sharing', '共享与权限'],
           ['relations', '关联资料'],
         ].map(([value, label]) => (
-          <button role="tab" aria-selected={panel === value} key={value} onClick={() => setPanel(value)}>
+          <button
+            role="tab"
+            id={`${supportId}-${value}`}
+            aria-controls={`${supportId}-panel`}
+            aria-selected={panel === value}
+            tabIndex={panel === value ? 0 : -1}
+            key={value}
+            onClick={() => setPanel(value)}
+            onKeyDown={(event) => {
+              const tabs = Array.from(
+                event.currentTarget.parentElement!.querySelectorAll<HTMLButtonElement>('[role="tab"]'),
+              );
+              const index = tabs.indexOf(event.currentTarget);
+              const next =
+                event.key === 'ArrowRight'
+                  ? (index + 1) % tabs.length
+                  : event.key === 'ArrowLeft'
+                    ? (index + tabs.length - 1) % tabs.length
+                    : event.key === 'Home'
+                      ? 0
+                      : event.key === 'End'
+                        ? tabs.length - 1
+                        : -1;
+              if (next < 0) return;
+              event.preventDefault();
+              tabs[next].click();
+              tabs[next].focus();
+            }}
+          >
             {label}
           </button>
         ))}
       </div>
-      <div className="reader-support-scroll">
+      <div
+        className="reader-support-scroll"
+        role="tabpanel"
+        id={`${supportId}-panel`}
+        aria-labelledby={`${supportId}-${panel}`}
+      >
         {panel === 'attributes' && (
           <>
             <dl className="reader-properties">
+              <dt>当前查看版本</dt>
+              <dd>
+                <select
+                  aria-label="查看资料版本"
+                  value={version?.id || ''}
+                  onChange={(event) => chooseVersion(event.target.value)}
+                >
+                  {!version && <option value="">引用版本不可用</option>}
+                  {[...doc.versions].reverse().map((item) => (
+                    <option key={item.id} value={item.id}>
+                      v{item.number}
+                      {item.id === current.id ? ' · 最新' : ''}
+                      {doc.confirmed === item.id ? ' · 已确认' : ' · 待确认'}
+                    </option>
+                  ))}
+                </select>
+              </dd>
               <dt>简介索引</dt>
               <dd>{doc.summary}</dd>
               <dt>资料路径</dt>
@@ -211,12 +351,12 @@ export function MaterialReader({
                 {doc.confirmed === version.id ? '当前确认版' : '标记为确认版'}
               </Button>
             )}
-            {compact && version && (
-              <div className="reader-version-excerpt">
-                <DocumentText text={version.content} />
-              </div>
-            )}
           </>
+        )}
+        {panel === 'sharing' && (
+          <div className="reader-sharing">
+            <MaterialSharing id={id} />
+          </div>
         )}
         {panel === 'relations' &&
           (relations.length ? (
@@ -226,6 +366,7 @@ export function MaterialReader({
                 key={material.id}
                 onClick={() => {
                   if (ui.conversationOpen) {
+                    onNavigate?.();
                     ui.preview(material.id);
                     setPanel('');
                   } else ui.go('library/' + material.space + '/' + material.id);
@@ -254,111 +395,75 @@ export function MaterialReader({
     >
       <div className="reader-main preview-pane">
         <header className="reader-header preview-header">
-          <h2>{compact ? '资料预览' : '资料视窗'}</h2>
+          <h2 title={doc.title}>{doc.title}</h2>
           <div className="row reader-header-tools">
-            <IconButton
-              icon={History}
-              label="版本记录"
-              aria-expanded={panel === 'versions'}
-              onClick={() => setPanel(panel === 'versions' ? '' : 'versions')}
-            />
-            <IconButton
-              icon={Info}
-              label="资料信息与来源"
-              aria-expanded={!!panel}
-              onClick={() => setPanel(panel ? '' : 'attributes')}
-            />
-            {compact && (
+            {!compact && (
               <IconButton
-                icon={Maximize2}
-                label="展开资料详情"
-                onClick={() => ui.open({ kind: 'details', id, initial: version?.id })}
+                icon={Pencil}
+                label={canEdit(state, doc.space) ? '编辑资料' : '创建个人修订稿'}
+                onClick={() => ui.open({ kind: 'edit', id })}
               />
             )}
+            <IconButton
+              icon={Info}
+              label="资料属性"
+              aria-expanded={!!panel}
+              aria-controls={supportId}
+              onClick={() => setPanel(panel ? '' : 'attributes')}
+            />
+            {compact && onExpand && <IconButton icon={Maximize2} label="展开资料详情" onClick={onExpand} />}
             {onClose && (
               <IconButton icon={X} label={compact ? '关闭成果预览' : '关闭资料视窗'} onClick={onClose} />
             )}
           </div>
         </header>
-        <div className="reader-version-bar">
-          {compact && panel && (
-            <IconButton icon={ChevronLeft} label="返回正文" onClick={() => setPanel('')} />
-          )}
-          <select
-            aria-label="查看资料版本"
-            value={version?.id || ''}
-            onChange={(event) => chooseVersion(event.target.value)}
-          >
-            {!version && <option value="">引用版本不可用</option>}
-            {[...doc.versions].reverse().map((item) => (
-              <option key={item.id} value={item.id}>
-                v{item.number}
-                {item.id === current.id ? ' · 最新' : ''}
-                {doc.confirmed === item.id ? ' · 已确认' : ' · 待确认'}
-              </option>
-            ))}
-          </select>
-          <span className={doc.status === '使用中' ? '' : 'reader-state-warning'}>{doc.status}</span>
-        </div>
-        {compact && panel ? (
-          support
-        ) : (
-          <div ref={scroll} className="reader-scroll preview-scroll">
-            <nav className="preview-location" aria-label="资料所属位置">
-              <Folder size={15} />
-              {locationNames(state, doc.space, doc.folderId).join(' / ')}
-            </nav>
-            <article className="reader-paper document-paper">
-              <h1>{doc.title}</h1>
-              <div className="document-meta">
+        <div className="reader-workspace">
+          <div className="reader-document">
+            <div ref={scroll} className="reader-scroll preview-scroll">
+              <nav className="preview-location" aria-label="资料所属位置">
+                <Folder size={15} />
+                {locationNames(state, doc.space, doc.folderId).join(' / ')}
+              </nav>
+              <article className="reader-paper document-paper">
+                <h1>{doc.title}</h1>
+                <div className="document-meta">
+                  <span>{doc.owner}</span>
+                  <span>{version?.date}</span>
+                </div>
+                <SourceLinks links={doc.sourceLinks} />
+                <SourceImage key={doc.id} photo={doc.photo} />
                 {version ? (
-                  <span>
-                    v{version.number} · {doc.confirmed === version.id ? '已确认' : '待确认'}
-                  </span>
+                  <DocumentText text={version.content} />
                 ) : (
-                  <span>引用版本不可用</span>
+                  <p className="reader-unavailable">该引用的版本已不可用，请明确选择其他版本后继续。</p>
                 )}
-                <span>{doc.owner}</span>
-                <span>{version?.date}</span>
-              </div>
-              <SourceLinks links={doc.sourceLinks} />
-              <SourceImage key={doc.id} photo={doc.photo} />
-              {version ? (
-                <DocumentText text={version.content} />
-              ) : (
-                <p className="reader-unavailable">该引用的版本已不可用，请明确选择其他版本后继续。</p>
+              </article>
+            </div>
+            <footer className="reader-footer preview-footer">
+              {version && version.id !== current.id && (
+                <p className="reader-action-note">
+                  编辑和共享使用最新版本 v{current.number}；提问使用当前查看版本。
+                </p>
               )}
-            </article>
+              <Button
+                className="reader-ask"
+                icon={MessageSquare}
+                variant="primary"
+                disabled={!version}
+                onClick={() => {
+                  if (version) {
+                    onNavigate?.();
+                    ui.askMaterial(id, version.id);
+                  }
+                }}
+              >
+                基于资料提问
+              </Button>
+            </footer>
           </div>
-        )}
-        <footer className="reader-footer preview-footer">
-          <div className="reader-actions">
-            <Button icon={Pencil} variant="ghost" onClick={() => ui.open({ kind: 'edit', id })}>
-              {canEdit(state, doc.space) ? '编辑资料' : '创建个人修订稿'}
-            </Button>
-            <Button icon={Share2} variant="ghost" onClick={() => ui.open({ kind: 'share', id })}>
-              {doc.space === 'personal' ? '发布到企业资料库' : '共享与权限'}
-            </Button>
-          </div>
-          {version && version.id !== current.id && (
-            <p className="reader-action-note">
-              编辑和共享使用最新版本 v{current.number}；提问使用当前查看版本。
-            </p>
-          )}
-          <Button
-            className="reader-ask"
-            icon={MessageSquare}
-            variant="primary"
-            disabled={!version}
-            onClick={() => {
-              if (version) ui.askMaterial(id, version.id);
-            }}
-          >
-            基于资料提问
-          </Button>
-        </footer>
+          {panel && support}
+        </div>
       </div>
-      {!compact && panel && support}
     </div>
   );
 }

@@ -521,7 +521,7 @@
       "sessionCookie": {
         "type": "apiKey",
         "in": "cookie",
-        "name": "SESSION"
+        "name": "DREAMCORE_SESSION"
       }
     },
     "schemas": {

@@ -7,12 +7,26 @@ import type {
   SendTask,
   TaskArtifact,
   TaskOriginal,
+  TaskAction,
+  TaskAttempts,
 } from '../../contracts/public-api/conversation';
 import { createIdentityRequest, IdentityError, record, text, uuid } from '../identity/client.ts';
 import { isChunk } from '../material/knowledge-client.ts';
 const count = (v: unknown): v is number => Number.isSafeInteger(v) && (v as number) >= 0;
 const nullable = (v: unknown) => v === null || text(v);
-const states = ['QUEUED', 'RUNNING', 'SUCCEEDED', 'FAILED', 'CANCELLED', 'INTERRUPTED'];
+const states = [
+  'QUEUED',
+  'RUNNING',
+  'SUCCEEDED',
+  'FAILED',
+  'CANCELLED',
+  'INTERRUPTED',
+  'PAUSED',
+  'WAITING_INPUT',
+  'WAITING_CAPABILITY',
+  'PARTIAL',
+  'RESULT_UNKNOWN',
+];
 const conversation = (v: unknown): v is Conversation =>
   record(v) &&
   uuid(v.id) &&
@@ -88,7 +102,14 @@ const task = (v: unknown): v is ConversationTask =>
   nullable(v.reply) &&
   nullable(v.modelName) &&
   (v.executionClass === null || ['live', 'verification'].includes(String(v.executionClass))) &&
-  (v.mode === 'AGENT') === (v.executionClass !== null) &&
+  (v.mode === 'SOURCE_LOOKUP'
+    ? v.executionClass === null
+    : v.executionClass !== null ||
+      ['WAITING_CAPABILITY', 'PAUSED', 'CANCELLED'].includes(String(v.status))) &&
+  (v.waitReason === undefined || nullable(v.waitReason)) &&
+  (v.requiredInput === undefined ||
+    (nullable(v.requiredInput) && (v.requiredInput === null || String(v.requiredInput).length <= 1000))) &&
+  (v.reconciliationRequired === undefined || typeof v.reconciliationRequired === 'boolean') &&
   Array.isArray(v.artifacts) &&
   v.artifacts.length <= 8 &&
   v.artifacts.every(
@@ -167,6 +188,16 @@ export function createConversationClient(fetcher: typeof fetch = fetch) {
         signal,
       );
     },
+    taskDetail(tenant: string, conversation: string, task: string, signal?: AbortSignal) {
+      return request(
+        root(tenant) + `/${id(conversation)}/tasks/${id(task)}`,
+        'GET',
+        (v): v is ConversationDetail =>
+          scoped(tenant, conversation)(v) && v.tasks.length === 1 && v.tasks[0].id === task,
+        undefined,
+        signal,
+      );
+    },
     historical(tenant: string, conversation: string, task: string, signal?: AbortSignal) {
       return request(
         root(tenant) + `/${id(conversation)}/tasks/${id(task)}`,
@@ -195,7 +226,7 @@ export function createConversationClient(fetcher: typeof fetch = fetch) {
       tenant: string,
       conversation: string,
       task: string,
-      body: { requestId: string; expectedRevision: number; action: 'CANCEL' | 'RETRY' },
+      body: { requestId: string; expectedRevision: number; action: TaskAction; input?: string },
       signal?: AbortSignal,
     ) {
       return request(
@@ -203,6 +234,61 @@ export function createConversationClient(fetcher: typeof fetch = fetch) {
         'POST',
         scoped(tenant, conversation),
         body,
+        signal,
+      );
+    },
+    attempts(tenant: string, conversation: string, taskId: string, offset = 0, signal?: AbortSignal) {
+      return request(
+        root(tenant) + `/${id(conversation)}/tasks/${id(taskId)}/attempts?offset=${offset}&limit=10`,
+        'GET',
+        (v): v is TaskAttempts =>
+          record(v) &&
+          v.taskId === taskId &&
+          typeof v.hasMore === 'boolean' &&
+          Array.isArray(v.items) &&
+          v.items.length <= 10 &&
+          v.items.every(
+            (a, i, all) =>
+              record(a) &&
+              count(a.number) &&
+              a.number > 0 &&
+              (i === 0 || a.number < (all[i - 1] as { number: number }).number) &&
+              states.includes(String(a.status)) &&
+              text(a.input) &&
+              a.input.length <= 16000 &&
+              nullable(a.reply) &&
+              nullable(a.summaryCode) &&
+              nullable(a.errorCode) &&
+              nullable(a.engineVersion) &&
+              nullable(a.modelName) &&
+              nullable(a.reconciliationCode) &&
+              nullable(a.startedAt) &&
+              nullable(a.finishedAt) &&
+              ['RECORDED', 'LEGACY_CURRENT_ONLY'].includes(String(a.provenance)) &&
+              Array.isArray(a.tools) &&
+              a.tools.length <= 8 &&
+              a.tools.every(
+                (t) =>
+                  record(t) &&
+                  text(t.callId) &&
+                  text(t.name) &&
+                  ['STARTED', 'succeeded', 'failed'].includes(String(t.status)),
+              ) &&
+              Array.isArray(a.sources) &&
+              a.sources.every((s) => isChunk(s) && s.tenantId === tenant) &&
+              Array.isArray(a.artifacts) &&
+              a.artifacts.length <= 8 &&
+              a.artifacts.every(
+                (f) =>
+                  record(f) &&
+                  uuid(f.id) &&
+                  text(f.filename) &&
+                  digest(f.sha256) &&
+                  count(f.bytes) &&
+                  f.bytes <= 65536,
+              ),
+          ),
+        undefined,
         signal,
       );
     },

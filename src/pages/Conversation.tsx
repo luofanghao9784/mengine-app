@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useDemo, useUI } from '../store';
 import { replyKonggu } from '../kongguReply';
+import { replyNinepop } from '../ninepop/reply';
 import { addMessage, applyDream, createMaterial, editMaterial, latest, spaceName, type Chat } from '../model';
 import { Button, Badge } from '../components/ui';
 import { DashboardConfig, AppBuilder } from './Tools';
@@ -182,6 +183,16 @@ export function Conversation({ chatId }: { chatId: string }) {
     }
     if (chat.kind === 'briefing') {
       change((s) => replyToBriefing(s, chatId, text));
+      return;
+    }
+    if (state.scenario === 'ninepop' && chat.kind === 'normal') {
+      change((s) =>
+        replyNinepop(
+          s,
+          s.chats.find((c) => c.id === chatId)!,
+          text,
+        ),
+      );
       return;
     }
     if (/共享|发布/.test(text) && doc && chat.kind === 'normal') {

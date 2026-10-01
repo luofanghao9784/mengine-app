@@ -1,13 +1,16 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:dreamcore:agent-results:1.4",
+  "$id": "urn:dreamcore:agent-results:1.5",
   "$defs": {
     "request": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "contractVersion": {
-          "const": "1.4"
+          "enum": [
+            "1.4",
+            "1.5"
+          ]
         },
         "taskId": {
           "type": "string",
@@ -20,17 +23,43 @@
         "prompt": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 2000
+          "maxLength": 16000
         }
       },
-      "required": ["contractVersion", "taskId", "attemptId", "prompt"]
+      "required": [
+        "contractVersion",
+        "taskId",
+        "attemptId",
+        "prompt"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "contractVersion": {
+                "const": "1.4"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "prompt": {
+                "maxLength": 2000
+              }
+            }
+          }
+        }
+      ]
     },
     "result": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "contractVersion": {
-          "const": "1.4"
+          "enum": [
+            "1.4",
+            "1.5"
+          ]
         },
         "engineVersion": {
           "type": "string",
@@ -48,7 +77,10 @@
           "const": "AGENT"
         },
         "executionClass": {
-          "enum": ["verification", "live"]
+          "enum": [
+            "verification",
+            "live"
+          ]
         },
         "modelName": {
           "type": "string",
@@ -91,14 +123,25 @@
                   "candidate_tool",
                   "list_originals",
                   "read_original",
-                  "process_original"
+                  "process_original",
+                  "task_control",
+                  "task_context",
+                  "task_plan",
+                  "task_preference"
                 ]
               },
               "status": {
-                "const": "succeeded"
+                "enum": [
+                  "succeeded",
+                  "failed"
+                ]
               }
             },
-            "required": ["callId", "name", "status"]
+            "required": [
+              "callId",
+              "name",
+              "status"
+            ]
           }
         },
         "artifacts": {
@@ -121,7 +164,11 @@
                 "maxLength": 90000
               }
             },
-            "required": ["name", "sha256", "contentBase64"]
+            "required": [
+              "name",
+              "sha256",
+              "contentBase64"
+            ]
           }
         },
         "modelCalls": {
@@ -149,7 +196,10 @@
                   "maximum": 1000000
                 }
               },
-              "required": ["inputTokens", "outputTokens"]
+              "required": [
+                "inputTokens",
+                "outputTokens"
+              ]
             }
           ]
         },
@@ -186,13 +236,25 @@
                 "format": "date-time"
               },
               "kind": {
-                "enum": ["SEARCH", "PAGE"]
+                "enum": [
+                  "SEARCH",
+                  "PAGE"
+                ]
               },
               "truncated": {
                 "type": "boolean"
               }
             },
-            "required": ["id", "url", "title", "excerpt", "sha256", "retrievedAt", "kind", "truncated"]
+            "required": [
+              "id",
+              "url",
+              "title",
+              "excerpt",
+              "sha256",
+              "retrievedAt",
+              "kind",
+              "truncated"
+            ]
           }
         },
         "skills": {
@@ -215,7 +277,11 @@
                 "pattern": "^[0-9a-f]{64}$"
               }
             },
-            "required": ["id", "version", "sha256"]
+            "required": [
+              "id",
+              "version",
+              "sha256"
+            ]
           }
         },
         "originalIds": {
@@ -226,6 +292,21 @@
             "type": "string",
             "format": "uuid"
           }
+        },
+        "outcome": {
+          "enum": [
+            "COMPLETE",
+            "PARTIAL",
+            "WAITING_INPUT",
+            "WAITING_CAPABILITY"
+          ]
+        },
+        "requiredInput": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 1000
         }
       },
       "required": [
@@ -245,6 +326,105 @@
         "webSources",
         "skills",
         "originalIds"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "contractVersion": {
+                "const": "1.5"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "outcome",
+              "requiredInput"
+            ]
+          },
+          "else": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "outcome"
+                  ]
+                },
+                {
+                  "required": [
+                    "requiredInput"
+                  ]
+                }
+              ]
+            },
+            "properties": {
+              "tools": {
+                "items": {
+                  "properties": {
+                    "status": {
+                      "const": "succeeded"
+                    },
+                    "name": {
+                      "not": {
+                        "enum": [
+                          "task_control",
+                          "task_context",
+                          "task_plan",
+                          "task_preference"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "WAITING_INPUT"
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          },
+          "then": {
+            "properties": {
+              "requiredInput": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "COMPLETE"
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          },
+          "then": {
+            "properties": {
+              "tools": {
+                "items": {
+                  "properties": {
+                    "status": {
+                      "const": "succeeded"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       ]
     }
   }

@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.*;
 @org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication(type = org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication.Type.SERVLET)
 public class IdentityController {
     public record Login(@NotNull @Size(max=254) String email, @NotNull @Size(max=128) String password) {}
-    public record CreateTenant(@NotNull UUID requestId, @NotNull @Size(max=100) String name, @NotNull @Size(max=254) String adminEmail) {}
+    public record CreateTenant(@NotNull UUID requestId, @NotNull @Size(max=100) String name, @NotNull @Size(max=254) String adminEmail, Boolean designateAuthorizationOwner) {}
     public record Invite(@NotNull UUID requestId, @NotNull @Size(max=254) String email) {}
     public record Accept(@NotNull @Size(max=64) String token, @Size(max=80) String displayName, @Size(max=128) String password) {}
     private final IdentityService identities;

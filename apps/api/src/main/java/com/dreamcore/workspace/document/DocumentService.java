@@ -20,18 +20,20 @@ public class DocumentService {
     public record Export(String filename,String sha256,byte[] bytes,String contentType) {}
     private final JdbcTemplate db;private final IdentityService identities;private final MaterialAccess access;
     private final ConversationService conversations;private final AgentTaskService agents;private final IdentityAudit audit;private final DocumentRenderer renderer;
-    public DocumentService(JdbcTemplate db,IdentityService identities,MaterialAccess access,ConversationService conversations,AgentTaskService agents,IdentityAudit audit,DocumentRenderer renderer){this.db=db;this.identities=identities;this.access=access;this.conversations=conversations;this.agents=agents;this.audit=audit;this.renderer=renderer;}
+    private final com.dreamcore.workspace.departure.DepartureAccess departure;
+    public DocumentService(JdbcTemplate db,IdentityService identities,MaterialAccess access,ConversationService conversations,AgentTaskService agents,IdentityAudit audit,DocumentRenderer renderer,com.dreamcore.workspace.departure.DepartureAccess departure){this.departure=departure;this.db=db;this.identities=identities;this.access=access;this.conversations=conversations;this.agents=agents;this.audit=audit;this.renderer=renderer;}
     private final RowMapper<Document> mapper=(r,n)->new Document(r.getObject("id",UUID.class),r.getObject("tenant_id",UUID.class),r.getObject("workspace_id",UUID.class),r.getObject("source_workspace_id",UUID.class),r.getObject("source_conversation_id",UUID.class),r.getObject("source_task_id",UUID.class),r.getObject("source_artifact_id",UUID.class),r.getInt("revision"),r.getString("title"),r.getTimestamp("updated_at").toInstant());
     private static final String SELECT="SELECT d.*,v.title FROM private_documents d JOIN private_document_versions v ON v.document_id=d.id AND v.number=d.revision ";
     private IdentityException missing(){return new IdentityException(404,"DOCUMENT_NOT_FOUND");}
     private Document require(UUID actor,UUID tenant,UUID id,boolean lock){
-        identities.member(actor,tenant,false);
+        identities.member(actor,tenant,false);departure.requirePrivateRead(actor,tenant);
         // Lock the document row first, then read its current version with a fresh READ COMMITTED snapshot.
         // A join in the locking statement can lose the row after a concurrent revision change.
         if(lock && db.queryForList("SELECT id FROM private_documents WHERE tenant_id=? AND owner_id=? AND id=? FOR NO KEY UPDATE",UUID.class,tenant,actor,id).isEmpty())throw missing();
-        var rows=db.query(SELECT+"WHERE d.tenant_id=? AND d.owner_id=? AND d.id=?",mapper,tenant,actor,id);
+        var rows=db.query(SELECT+"WHERE d.tenant_id=? AND d.owner_id=? AND d.id=? AND object_is_active('DOCUMENT',d.id) AND (d.source_artifact_id IS NULL OR object_is_active('ARTIFACT',d.source_artifact_id))",mapper,tenant,actor,id);
         if(rows.isEmpty())throw missing();var doc=rows.getFirst();
         var personal=access.require(actor,tenant,doc.workspaceId(),false);if(!personal.kind().equals("PERSONAL"))throw missing();
+        if(db.queryForList("SELECT id FROM readable_source_tasks WHERE id=?",doc.taskId()).isEmpty())throw missing();
         // Source dependency survives every edit and cached export. The existing task reader checks all fixed sources/originals.
         conversations.historical(actor,tenant,doc.conversationId(),doc.taskId());
         return doc;
@@ -41,12 +43,12 @@ public class DocumentService {
     }
     private static boolean invalidXml(String s){return s.codePoints().anyMatch(c->(c<32 && c!=9 && c!=10 && c!=13) || (c>=0xd800 && c<=0xdfff) || c==0xfffe || c==0xffff);}
     @Transactional public Page list(UUID actor,UUID tenant,int offset,int limit){
-        if(offset<0 || offset>10000 || limit<1 || limit>30)throw IdentityException.invalid();identities.member(actor,tenant,false);
+        if(offset<0 || offset>10000 || limit<1 || limit>30)throw IdentityException.invalid();identities.member(actor,tenant,false);departure.requirePrivateRead(actor,tenant);
         var rows=db.query(SELECT+"""
             JOIN workspaces own ON own.id=d.workspace_id AND own.tenant_id=d.tenant_id AND own.kind='PERSONAL' AND own.owner_id=d.owner_id
             JOIN workspaces source ON source.id=d.source_workspace_id AND source.tenant_id=d.tenant_id
             LEFT JOIN workspace_members g ON g.tenant_id=d.tenant_id AND g.workspace_id=d.source_workspace_id AND g.account_id=d.owner_id
-            WHERE d.tenant_id=? AND d.owner_id=? AND ((source.kind='PERSONAL' AND source.owner_id=d.owner_id) OR (source.kind='SHARED' AND g.account_id IS NOT NULL))
+            WHERE object_is_active('DOCUMENT',d.id) AND (d.source_artifact_id IS NULL OR object_is_active('ARTIFACT',d.source_artifact_id)) AND EXISTS(SELECT 1 FROM readable_source_tasks rt WHERE rt.id=d.source_task_id) AND d.tenant_id=? AND d.owner_id=? AND ((source.kind='PERSONAL' AND source.owner_id=d.owner_id) OR (source.kind='SHARED' AND g.account_id IS NOT NULL))
             ORDER BY d.updated_at DESC,d.id LIMIT ? OFFSET ?
             """,mapper,tenant,actor,limit+1,offset);
         var visible=rows.stream().limit(limit).toList();for(var doc:visible)require(actor,tenant,doc.id(),false);
@@ -99,6 +101,7 @@ public class DocumentService {
     @Transactional public Export export(UUID actor,UUID tenant,UUID id,int version,String format){
         if(!Set.of("docx","pdf").contains(format))throw IdentityException.invalid();
         require(actor,tenant,id,true);var value=detail(actor,tenant,id,version).version();
+        if(Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM private_document_exports x JOIN object_lifecycle l ON l.kind='EXPORT_CACHE' AND l.parent_id=x.document_id AND (l.details->>'version')::integer=x.version AND l.details->>'format'=x.format AND l.original_anchor=x.created_at WHERE x.tenant_id=? AND x.document_id=? AND x.version=? AND x.format=? AND NOT object_is_active('EXPORT_CACHE',l.object_id))",Boolean.class,tenant,id,version,format)))throw new IdentityException(410,"DOCUMENT_EXPORT_EXPIRED");
         var cached=db.query("SELECT sha256,content FROM private_document_exports WHERE tenant_id=? AND document_id=? AND version=? AND format=?",(r,n)->new Export("document-v"+version+"."+format,r.getString(1),r.getBytes(2),DocumentRenderer.contentType(format)),tenant,id,version,format);
         if(!cached.isEmpty())return cached.getFirst();
         byte[] bytes=renderer.render(value.title(),value.body(),format);String hash;

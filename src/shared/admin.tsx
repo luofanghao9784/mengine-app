@@ -10,6 +10,7 @@ import {
 import { ChevronLeft, ChevronRight, WifiOff, ShieldX } from 'lucide-react';
 import { IdentityError } from '../identity/client';
 import { useSession } from '../identity/session';
+import { requestNavigationLocked } from './request-guard';
 import { Button, Empty } from './ui';
 export const MutationGate = createContext<(busy: boolean) => void>(() => {});
 const errorMessage = (error: unknown) =>
@@ -18,18 +19,39 @@ export function useRemote<T>(load: (signal: AbortSignal) => Promise<T>, dependen
   const { expire } = useSession();
   const [state, setState] = useState<{ value?: T; error?: unknown }>({});
   useEffect(() => {
-    const controller = new AbortController();
-    setState({});
-    load(controller.signal)
-      .then((value) => {
-        if (!controller.signal.aborted) setState({ value });
-      })
-      .catch((error) => {
-        if (controller.signal.aborted) return;
-        if (error instanceof IdentityError && error.status === 401) expire();
-        else setState({ error });
-      });
-    return () => controller.abort();
+    let current: AbortController | undefined;
+    const read = (background: boolean) => {
+      // Keep the original request and form until an uncertain mutation is reconciled.
+      if (background && requestNavigationLocked()) return;
+      current?.abort();
+      const controller = new AbortController();
+      current = controller;
+      // A focus check must not unmount an upload form or lose an uncertain write.
+      // Authorization failures still remove the previous value immediately.
+      if (!background) setState({});
+      load(controller.signal)
+        .then((value) => {
+          if (!controller.signal.aborted)
+            setState(previous => background && !previous.error &&
+              ((requestNavigationLocked() && previous.value !== undefined) ||
+                JSON.stringify(previous.value) === JSON.stringify(value)) ? previous : { value });
+        })
+        .catch((error) => {
+          if (controller.signal.aborted) return;
+          if (error instanceof IdentityError && error.status === 401) expire();
+          else setState({ error });
+        });
+    };
+    const focus = () => read(true);
+    const visible = () => { if (document.visibilityState === 'visible') read(true); };
+    read(false);
+    window.addEventListener('focus', focus);
+    document.addEventListener('visibilitychange', visible);
+    return () => {
+      current?.abort();
+      window.removeEventListener('focus', focus);
+      document.removeEventListener('visibilitychange', visible);
+    };
   }, [...dependencies, expire]);
   return state;
 }
@@ -103,6 +125,8 @@ export function useSubmission<T>() {
       setError(undefined);
       try {
         await execute(submission.body, submission.key);
+        pending.current = undefined;
+        if (mounted.current) setUncertain(false);
       } catch (e) {
         if (e instanceof IdentityError && e.status === 401) expire();
         if (mounted.current) {

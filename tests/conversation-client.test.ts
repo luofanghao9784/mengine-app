@@ -235,3 +235,90 @@ test('original metadata rejects invalid version identities, duplicate grants and
       ),
     );
 });
+
+test('off-mode task can wait with no execution class; active task cannot invent an absent mode', async () => {
+  const waiting = {
+    ...task,
+    mode: 'AGENT',
+    status: 'WAITING_CAPABILITY',
+    executionClass: null,
+    attempt: 0,
+    sources: [],
+    summaryCode: null,
+    waitReason: 'MODEL_NOT_CONFIGURED',
+    requiredInput: null,
+    reconciliationRequired: false,
+  };
+  assert.equal(
+    (await createConversationClient(async () => response({ ...detail, tasks: [waiting] })).detail(tenant, id))
+      .tasks[0].status,
+    'WAITING_CAPABILITY',
+  );
+  await assert.rejects(
+    createConversationClient(async () =>
+      response({ ...detail, tasks: [{ ...waiting, status: 'RUNNING' }] }),
+    ).detail(tenant, id),
+  );
+});
+test('attempt history rejects mixed identity, invalid status and unbounded tools', async () => {
+  const attempt = {
+    number: 1,
+    status: 'WAITING_INPUT',
+    input: 'work',
+    reply: 'partial',
+    summaryCode: null,
+    errorCode: null,
+    engineVersion: '0.11.0',
+    modelName: 'fixture',
+    tools: [],
+    sources: [],
+    artifacts: [],
+    startedAt: null,
+    finishedAt: null,
+    provenance: 'RECORDED',
+    reconciliationCode: null,
+  };
+  assert.equal(
+    (
+      await createConversationClient(async () =>
+        response({ taskId: id, items: [attempt], hasMore: false }),
+      ).attempts(tenant, id, id)
+    ).items[0].status,
+    'WAITING_INPUT',
+  );
+  for (const bad of [
+    { taskId: space, items: [attempt], hasMore: false },
+    { taskId: id, items: [{ ...attempt, status: 'BUSINESS_DONE' }], hasMore: false },
+    {
+      taskId: id,
+      items: [
+        {
+          ...attempt,
+          tools: Array.from({ length: 9 }, () => ({ callId: 'a', name: 'search', status: 'succeeded' })),
+        },
+      ],
+      hasMore: false,
+    },
+  ])
+    await assert.rejects(createConversationClient(async () => response(bad)).attempts(tenant, id, id));
+});
+
+test('exact task detail accepts actionable waits but rejects another task or conversation', async () => {
+  const waiting = {
+    ...task,
+    mode: 'AGENT',
+    status: 'WAITING_INPUT',
+    executionClass: 'verification',
+    waitReason: 'INPUT_REQUIRED',
+    requiredInput: '请补充截止日期',
+  };
+  const value = await createConversationClient(async () =>
+    response({ ...detail, tasks: [waiting] }),
+  ).taskDetail(tenant, id, id);
+  assert.equal(value.tasks[0].status, 'WAITING_INPUT');
+  for (const invalid of [
+    { ...detail, tasks: [{ ...waiting, id: space }] },
+    { ...detail, conversation: { ...conversation, id: space }, tasks: [waiting] },
+  ])
+    await assert.rejects(createConversationClient(async () => response(invalid)).taskDetail(tenant, id, id));
+});

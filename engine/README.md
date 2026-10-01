@@ -47,7 +47,7 @@ npm run licenses:check
 
 `POST /internal/v1/agent-results` 使用共享服务密钥，接收 taskId/attemptId/prompt，按[Agent 协议](../contracts/engine-api/agent-results.schema.json)返回经过实际执行的结果。未配置返回 MODEL_NOT_CONFIGURED，不回退测试回答。`AGENT_MODEL_PROVIDER=off` 默认；配置 `bailian` 时需北京业务空间 ID、已适配模型快照和 API Key，配置 `deepseek` 时需明确模型与 API Key；两者均需平台可信地址，参考 [.env.example](.env.example)。平台另需 `AGENT_TASK_MODE=live`。不应在未确认资料范围与额度前开启。
 
-当前正式入口开放资料检索与可信能力发现/启用；按任务明确公开输入和配置可开放公开搜索/阅读；本地测试构造器可开放沙箱，但 live 类别拒绝代码工具配置。能力接口新增 agent-live/agent-verification、source-lookup/agent-task；configured 不是云模型已验收。单项 Agent 当前不投影之前的会话历史。
+当前正式入口开放资料检索与可信能力发现/启用；按任务明确公开输入和配置可开放公开搜索/阅读；本地测试构造器可开放沙箱，但 live 类别拒绝代码工具配置。能力接口新增 agent-live/agent-verification、source-lookup/agent-task；configured 不是云模型已验收。当前通过 taskBootstrap 提供最小上下文，并可按需调用 task_context(history) 读取权限内的有界私人会话历史；不一次性注入全部历史。
 
 仓库根 `npm run test:agent` 验证完整浏览器链路；`npm test` 验证引擎 HTTP、模型响应、取消和 sandbox。实际来源、限制和升级边界见[技术记录](../docs/技术/M4-A1模型网关与平台Agent边界.md)。
 
@@ -87,3 +87,7 @@ file-processing 1.1.0 的 csv_summary 在相同 TaskSandbox 生成 XLSX 汇总/�
 `AGENT_MODEL_PROVIDER=bailian` 明确选择北京专属空间；`AGENT_BAILIAN_WORKSPACE_ID` 不接受任意 URL，`AGENT_MODEL_NAME` 使用经过适配的固定快照。默认仍 off。共同消息校验与各自地址/模式分离，禁止自动 fallback。根目录 `npm run model:check` 不发请求，仅检查配置，退出码 0/1/2 分别为配置合法/关闭/配置不合法，不代表 Key 可用。具体步骤见[首轮验收](../docs/交接/百炼接入准备与首轮验收.md)。
 
 M7-A1 第七切片：平台回调升级 1.4，Agent 1.4 不变。模型调用前必须在平台登记，取消后仅有界补报用量元数据；新引擎必须搭配 V15 平台，平台保留旧引擎 1.3 回调兼容并标明未计量。见[计量与限制](../docs/技术/M7-A1模型尝试计量与执行限制.md)。
+
+## 本机真实模型配置入口（2026-10-01）
+
+本项目已提供 `npm run model:configure`（隐藏输入）、`npm run model:check:local`（零请求）、`npm run model:smoke`（一次64输出token上限的合成内容真实请求）及 `npm run trial:start:live`。smoke 可加 `-- --tools` 验证两轮工具回放，失败不重试。启动使用本工作树私有配置；普通试用仍默认 off。专用Key尚未准备，云端真实验收未完成，详见[配置与验收指南](../docs/交接/真实模型本机验收-2026-10-01.md)。

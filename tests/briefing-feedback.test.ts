@@ -74,19 +74,20 @@ test('自填入口准备当前快照和来源版本，发送前不提交；发�
   assert.equal(currentFeedback(s, ref.snapshot)?.text, '请分析工作日的客流，不要只汇总金额');
   syncBriefing(s);
   assert.equal(s.briefing!.cards.length, count);
-  assert.equal(recommendBriefing(s).find((r) => r.id === ref.cardId)?.group, 'unread');
+  assert.equal(recommendBriefing(s).find((r) => r.id === ref.cardId)?.group, 'standard');
   assert.equal(openFeedbackConversation(s, ref), id);
 });
 
-test('推荐刷新分组：普通已读在后，关注与活跃保留，没用本身不隐藏或删除', () => {
+test('阅读不改变推荐顺序或分组，关注信号保留，没用本身不隐藏或删除', () => {
   const s = seed(),
     c = source(s);
   const before = recommendBriefing(s);
   markBriefingRead(s, c.data);
-  assert.equal(before.find((r) => r.id === c.id)?.group, 'unread');
-  assert.equal(recommendBriefing(s).find((r) => r.id === c.id)?.group, 'read');
+  assert.equal(before.find((r) => r.id === c.id)?.group, 'standard');
+  assert.deepEqual(recommendBriefing(s), before);
+  assert.equal(isBriefingRead(s, c.data), true);
   c.pinned = true;
-  assert.equal(recommendBriefing(s).find((r) => r.id === c.id)?.group, 'priority');
+  assert.equal(recommendBriefing(s, Date.now() + 86400001).find((r) => r.id === c.id)?.group, 'priority');
   setBriefingFeedback(s, c.data, 'useless', 'shallow');
   assert.equal(c.hidden, false);
   assert.ok(recommendBriefing(s).some((r) => r.id === c.id));

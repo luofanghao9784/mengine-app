@@ -1,0 +1,70 @@
+.governance-panel {
+  padding: 24px 28px;
+}
+.governance-panel h2 {
+  margin-top: 0;
+}
+.governance-panel p {
+  line-height: 1.7;
+}
+.governance-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 0;
+}
+.governance-toolbar .field {
+  margin: 0;
+}
+.governance-panel code {
+  overflow-wrap: anywhere;
+}
+.governance-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 24px;
+}
+.governance-section {
+  border-top: 1px solid var(--line);
+  margin-top: 24px;
+  padding-top: 20px;
+}
+.profile-records {
+  list-style: none;
+  padding: 0;
+}
+.profile-records > li {
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line);
+}
+.profile-value {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.governance-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  line-height: 1.7;
+  margin: 16px 0;
+}
+.governance-check input {
+  margin-top: 6px;
+  flex-shrink: 0;
+}
+@media (max-width: 600px) {
+  .governance-panel {
+    padding: 20px;
+  }
+  .governance-toolbar .field {
+    width: 100%;
+  }
+}
+
+.governance-panel fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}

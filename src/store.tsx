@@ -13,6 +13,7 @@ import type { DemoState } from './model';
 import { createKongguSeed } from './kongguSeed';
 import { KONGGU_STORAGE_KEY } from './kongguSources';
 import { loadKongguState } from './kongguStorage';
+import { loadNinepopSession } from './ninepop/session';
 import { syncBriefing, type BriefingReference } from './briefing';
 
 const KEY = KONGGU_STORAGE_KEY;
@@ -26,13 +27,25 @@ type Store = {
   storageError: boolean;
 };
 const Context = createContext<Store>(null!);
-export function DemoProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState(load);
+export function DemoProvider({
+  children,
+  initialState,
+  privateStorageKey,
+}: {
+  children: ReactNode;
+  initialState?: DemoState;
+  privateStorageKey?: string;
+}) {
+  const storage = privateStorageKey ? sessionStorage : localStorage;
+  const storageKey = privateStorageKey || KEY;
+  const [state, setState] = useState(() =>
+    initialState ? loadNinepopSession(initialState, storage) : load(),
+  );
   const current = useRef(state);
   const [storageError, setStorageError] = useState(false);
   useEffect(() => {
     try {
-      localStorage.setItem(KEY, JSON.stringify(current.current));
+      storage.setItem(storageKey, JSON.stringify(current.current));
     } catch {
       setStorageError(true);
     }
@@ -42,7 +55,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
     current.current = next;
     setState(next);
     try {
-      localStorage.setItem(KEY, JSON.stringify(next));
+      storage.setItem(storageKey, JSON.stringify(next));
       setStorageError(false);
     } catch {
       setStorageError(true);
@@ -55,7 +68,14 @@ export function DemoProvider({ children }: { children: ReactNode }) {
     return result;
   }
   return (
-    <Context.Provider value={{ state, change, reset: () => save(createKongguSeed()), storageError }}>
+    <Context.Provider
+      value={{
+        state,
+        change,
+        reset: () => save(initialState ? structuredClone(initialState) : createKongguSeed()),
+        storageError,
+      }}
+    >
       {children}
     </Context.Provider>
   );

@@ -1,0 +1,1020 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Dreamcore Personal Ongoing Plans",
+    "version": "1.0.0",
+    "description": "本人明确委托；模型关闭保留等待不造任务。次数/节奏限制不是费用硬上限。每日采用IANA时区；DST缺时顺延首个有效时刻、重复时只取较早一次。错过日期合并当前核查并记录missedSlots，资料版本事实去重。"
+  },
+  "security": [
+    {
+      "sessionCookie": []
+    }
+  ],
+  "paths": {
+    "/api/v1/tenants/{tenant}/plans": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "本人且当前范围可读的计划",
+        "responses": {
+          "200": {
+            "description": "当前权限复核后的实际持久状态；private, no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "身份/范围/输入/版本或执行条件不满足"
+          },
+          "401": {
+            "description": "身份/范围/输入/版本或执行条件不满足"
+          },
+          "403": {
+            "description": "身份/范围/输入/版本或执行条件不满足"
+          },
+          "404": {
+            "description": "身份/范围/输入/版本或执行条件不满足"
+          },
+          "409": {
+            "description": "身份/范围/输入/版本或执行条件不满足"
+          }
+        },
+        "parameters": [
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000,
+              "default": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            }
+          }
+        ]
+      },
+      "post": {
+        "summary": "保存草案，不隐式启动",
+        "responses": {
+          "201": {
+            "description": "当前权限复核后的实际持久状态；private, no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Plan"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "身份/范围/输入/版本或执行条件不满足"
+          },
+          "401": {
+            "description": "身份/范围/输入/版本或执行条件不满足"
+          },
+          "403": {
+            "description": "身份/范围/输入/版本或执行条件不满足"
+          },
+          "404": {
+            "description": "身份/范围/输入/版本或执行条件不满足"
+          },
+          "409": {
+            "description": "身份/范围/输入/版本或执行条件不满足"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Create"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/plans/{id}": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "读取本人计划",
+        "responses": {
+          "200": {
+            "description": "当前权限复核后的实际持久状态；private, no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Plan"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "身份/范围/输入/版本或执行条件不满足"
+          },
+          "401": {
+            "description": "身份/范围/输入/版本或执行条件不满足"
+          },
+          "403": {
+            "description": "身份/范围/输入/版本或执行条件不满足"
+          },
+          "404": {
+            "description": "身份/范围/输入/版本或执行条件不满足"
+          },
+          "409": {
+            "description": "身份/范围/输入/版本或执行条件不满足"
+          }
+        }
+      },
+      "put": {
+        "summary": "修订暂停或草案委托并返回待启用",
+        "responses": {
+          "200": {
+            "description": "当前权限复核后的实际持久状态；private, no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Plan"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "身份/范围/输入/版本或执行条件不满足"
+          },
+          "401": {
+            "description": "身份/范围/输入/版本或执行条件不满足"
+          },
+          "403": {
+            "description": "身份/范围/输入/版本或执行条件不满足"
+          },
+          "404": {
+            "description": "身份/范围/输入/版本或执行条件不满足"
+          },
+          "409": {
+            "description": "身份/范围/输入/版本或执行条件不满足"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Update"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/plans/{id}/actions": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "summary": "明确启用/暂停/恢复/停止；关闭提醒不停止任务",
+        "responses": {
+          "200": {
+            "description": "当前权限复核后的实际持久状态；private, no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Plan"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "身份/范围/输入/版本或执行条件不满足"
+          },
+          "401": {
+            "description": "身份/范围/输入/版本或执行条件不满足"
+          },
+          "403": {
+            "description": "身份/范围/输入/版本或执行条件不满足"
+          },
+          "404": {
+            "description": "身份/范围/输入/版本或执行条件不满足"
+          },
+          "409": {
+            "description": "身份/范围/输入/版本或执行条件不满足"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Action"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/plans/{id}/runs": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "真实任务及触发覆盖记录",
+        "responses": {
+          "200": {
+            "description": "当前权限复核后的实际持久状态；private, no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Runs"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "身份/范围/输入/版本或执行条件不满足"
+          },
+          "401": {
+            "description": "身份/范围/输入/版本或执行条件不满足"
+          },
+          "403": {
+            "description": "身份/范围/输入/版本或执行条件不满足"
+          },
+          "404": {
+            "description": "身份/范围/输入/版本或执行条件不满足"
+          },
+          "409": {
+            "description": "身份/范围/输入/版本或执行条件不满足"
+          }
+        },
+        "parameters": [
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000,
+              "default": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenant}/plans/attention": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "仅投影真正需要本人动作的计划",
+        "responses": {
+          "200": {
+            "description": "当前权限复核后的实际持久状态；private, no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttentionPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "身份/范围/输入/版本或执行条件不满足"
+          },
+          "401": {
+            "description": "身份/范围/输入/版本或执行条件不满足"
+          },
+          "403": {
+            "description": "身份/范围/输入/版本或执行条件不满足"
+          },
+          "404": {
+            "description": "身份/范围/输入/版本或执行条件不满足"
+          },
+          "409": {
+            "description": "身份/范围/输入/版本或执行条件不满足"
+          }
+        },
+        "parameters": [
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000,
+              "default": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenant}/plans/{id}/versions/{revision}": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "revision",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      ],
+      "get": {
+        "summary": "当前及历史空间仍获权时读取运行关联的不可变委托版本",
+        "responses": {
+          "200": {
+            "description": "不可变配置版本，private,no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigurationVersion"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "当前授权不满足"
+          },
+          "404": {
+            "description": "版本或当前范围不可见"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "DREAMCORE_SESSION"
+      }
+    },
+    "schemas": {
+      "Configuration": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "workspaceId",
+          "goal",
+          "purpose",
+          "query",
+          "behavior",
+          "materialEvents",
+          "dailyTime",
+          "timeZone",
+          "minIntervalSeconds",
+          "maxRunsPerDay",
+          "maxTotalRuns",
+          "expiresAt",
+          "notificationsEnabled"
+        ],
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "goal": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "purpose": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "behavior": {
+            "enum": [
+              "SOURCE_LOOKUP",
+              "ANALYZE"
+            ]
+          },
+          "materialEvents": {
+            "type": "boolean"
+          },
+          "dailyTime": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+          },
+          "timeZone": {
+            "type": "string"
+          },
+          "minIntervalSeconds": {
+            "type": "integer",
+            "minimum": 60,
+            "maximum": 86400
+          },
+          "maxRunsPerDay": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 24
+          },
+          "maxTotalRuns": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "notificationsEnabled": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Plan": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "tenantId",
+          "ownerId",
+          "revision",
+          "executionEpoch",
+          "status",
+          "runtimeState",
+          "reason",
+          "configuration",
+          "nextDue",
+          "lastDispatchedAt",
+          "runs",
+          "todayRuns",
+          "checkedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ownerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "executionEpoch": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "ACTIVE",
+              "PAUSED",
+              "STOPPED",
+              "EXPIRED",
+              "AUTHORIZATION_REQUIRED"
+            ]
+          },
+          "runtimeState": {
+            "enum": [
+              "IDLE",
+              "WAITING_TIME",
+              "WAITING_DATA",
+              "WAITING_CAPABILITY",
+              "WAITING_RESOURCE",
+              "RUNNING",
+              "NEEDS_ATTENTION"
+            ]
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "configuration": {
+            "$ref": "#/components/schemas/Configuration"
+          },
+          "nextDue": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "lastDispatchedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "runs": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "todayRuns": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "checkedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "Page": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "hasMore"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Plan"
+            }
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Run": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "planId",
+          "planRevision",
+          "executionEpoch",
+          "triggerKind",
+          "scheduledFor",
+          "missedSlots",
+          "eventThrough",
+          "sourceVersions",
+          "conversationId",
+          "taskId",
+          "status",
+          "errorCode",
+          "createdAt",
+          "finishedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "planId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "planRevision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "executionEpoch": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "triggerKind": {
+            "enum": [
+              "MATERIAL_VERSION",
+              "DAILY",
+              "RETRY"
+            ]
+          },
+          "scheduledFor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "missedSlots": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "eventThrough": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sourceVersions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "materialId",
+                "versionId",
+                "parseStatus"
+              ],
+              "properties": {
+                "materialId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "versionId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "parseStatus": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "conversationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "taskId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string"
+          },
+          "errorCode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "Runs": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "hasMore"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Run"
+            }
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Create": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requestId",
+          "configuration"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "configuration": {
+            "$ref": "#/components/schemas/Configuration"
+          }
+        }
+      },
+      "Update": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requestId",
+          "expectedRevision",
+          "configuration"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "configuration": {
+            "$ref": "#/components/schemas/Configuration"
+          }
+        }
+      },
+      "Action": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requestId",
+          "expectedRevision",
+          "action",
+          "delegationAccepted"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "action": {
+            "enum": [
+              "ENABLE",
+              "PAUSE",
+              "RESUME",
+              "STOP",
+              "RETRY",
+              "MUTE",
+              "UNMUTE"
+            ]
+          },
+          "delegationAccepted": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Attention": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "workspaceId",
+          "title",
+          "reason",
+          "status",
+          "revision",
+          "taskId",
+          "conversationId",
+          "action"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "taskId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "conversationId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "action": {
+            "enum": [
+              "OPEN_TASK",
+              "OPEN_PLAN"
+            ]
+          }
+        }
+      },
+      "AttentionPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "hasMore"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Attention"
+            }
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ConfigurationVersion": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "planId",
+          "revision",
+          "configuration",
+          "createdAt"
+        ],
+        "properties": {
+          "planId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "configuration": {
+            "$ref": "#/components/schemas/Configuration"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    }
+  }
+}

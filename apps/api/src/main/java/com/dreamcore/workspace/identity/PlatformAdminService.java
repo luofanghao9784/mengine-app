@@ -19,7 +19,8 @@ public class PlatformAdminService {
     private final IdentityService identities;
     private final IdentityAudit audit;
     private final LocalInvitationDelivery delivery;
-    public PlatformAdminService(JdbcTemplate db, IdentityService identities, IdentityAudit audit, LocalInvitationDelivery delivery) {
+    private final com.dreamcore.workspace.departure.DepartureAccess departure;
+    public PlatformAdminService(JdbcTemplate db, IdentityService identities, IdentityAudit audit, LocalInvitationDelivery delivery,com.dreamcore.workspace.departure.DepartureAccess departure) {this.departure=departure;
         this.db=db; this.identities=identities; this.audit=audit; this.delivery=delivery;
     }
     public List<IdentityService.Tenant> tenants(UUID actor, String query, String status, int offset, int limit) {
@@ -69,6 +70,7 @@ public class PlatformAdminService {
         identities.platform(actor); // Recheck after request-key and tenant-lock waits, including retries.
         if (prior!=null) return projection(tenant); // Retry observes current state; never re-applies an old transition.
         version(current,expectedVersion);
+        if("ACTIVE".equals(status))departure.requireTenantActivation(tenant);
         String before=db.queryForObject("SELECT status FROM tenants WHERE id=?",String.class,tenant);
         if (!status.equals(before)) {
             db.update("UPDATE tenants SET status=?,management_version=management_version+1 WHERE id=?",status,tenant);
@@ -96,6 +98,7 @@ public class PlatformAdminService {
         db.update("UPDATE invitations SET status='REVOKED' WHERE id=?",invite.id());
         var next=identities.issue(actor,tenant,normalized,"TENANT_ADMIN");
         db.update("UPDATE tenant_initial_admin SET invitation_id=? WHERE tenant_id=?",next.id(),tenant);
+        db.update("UPDATE governance_initial_designations SET invitation_id=? WHERE tenant_id=?",next.id(),tenant);
         db.update("UPDATE tenants SET management_version=management_version+1 WHERE id=?",tenant);
         audit.record(actor,tenant,"INITIAL_ADMIN_INVITATION_REPLACE",next.id(),"SUCCESS");
         identities.remember(actor,requestId,"INITIAL_ADMIN_INVITE",fingerprint,tenant);

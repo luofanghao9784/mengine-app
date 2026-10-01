@@ -1,0 +1,72 @@
+.taskwork-notices {
+  margin-top: 14px;
+  padding: 14px 16px;
+  border: 1px solid #d7e3d1;
+  border-radius: 14px;
+  background: #f7faf5;
+  color: #30412c;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.taskwork-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.taskwork-heading span {
+  color: #74836b;
+  font-size: 12px;
+}
+.taskwork-item {
+  display: flex;
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px solid #e3eadf;
+}
+.taskwork-item > svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+.taskwork-item > div {
+  min-width: 0;
+  flex: 1;
+}
+.taskwork-item p {
+  margin: 5px 0;
+  line-height: 1.65;
+}
+.taskwork-item summary {
+  cursor: pointer;
+  color: #647558;
+}
+.taskwork-item details {
+  margin: 7px 0;
+}
+.taskwork-item a {
+  color: #425e36;
+}
+.taskwork-item button {
+  margin-top: 5px;
+  max-width: 100%;
+}
+@media (max-width: 480px) {
+  .taskwork-notices {
+    padding: 12px;
+  }
+  .taskwork-item {
+    gap: 7px;
+  }
+  .taskwork-heading span {
+    width: 100%;
+  }
+}
+
+.taskwork-pagination {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: 8px;
+}

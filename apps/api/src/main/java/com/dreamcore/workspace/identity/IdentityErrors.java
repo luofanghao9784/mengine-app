@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
-@RestControllerAdvice(assignableTypes = {IdentityController.class, PlatformAdminController.class, TenantAdminController.class, OperationsController.class, com.dreamcore.workspace.material.MaterialController.class, com.dreamcore.workspace.knowledge.KnowledgeController.class, com.dreamcore.workspace.conversation.ConversationController.class, com.dreamcore.workspace.conversation.AgentAccessController.class, com.dreamcore.workspace.briefing.BriefingController.class, com.dreamcore.workspace.document.DocumentController.class, com.dreamcore.workspace.activity.ActivityController.class})
+@RestControllerAdvice(basePackages = "com.dreamcore.workspace")
 public class IdentityErrors {
     @ExceptionHandler(IdentityException.class)
     ResponseEntity<?> identity(IdentityException error) { return response(error.status,error.code); }

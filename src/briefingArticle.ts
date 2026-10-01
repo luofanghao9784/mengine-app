@@ -268,6 +268,7 @@ function sameEvidence(a: CardData, b: CardData) {
 }
 
 export function buildBriefingArticle(data: CardData): BriefingArticleData {
+  if (data.article) return structuredClone(data.article);
   const original = kongguCards.find((card) => card.id === data.id);
   const extension =
     original && sameEvidence(data, original) ? extensions[data.id.replace('konggu:', '')] : undefined;

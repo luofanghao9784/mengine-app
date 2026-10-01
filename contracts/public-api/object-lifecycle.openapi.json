@@ -1,0 +1,1016 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Object lifecycle",
+    "version": "1.0.0",
+    "description": "Fixed event-anchored retention, current source authorization, bounded scope execution, and online erasure receipts. Old backups and independent publications are separate."
+  },
+  "security": [
+    {
+      "session": []
+    }
+  ],
+  "paths": {
+    "/api/v1/tenants/{tenant}/object-lifecycle": {
+      "get": {
+        "operationId": "tenant_get_list",
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "TASK",
+                "DOCUMENT",
+                "ARTIFACT",
+                "EXPERIENCE_VERSION",
+                "FEEDBACK_VERSION",
+                "EVALUATION_VERSION",
+                "EVALUATION_RUN",
+                "EXPORT_CACHE"
+              ]
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ACTIVE",
+                "DISABLED",
+                "TRASHED",
+                "ISOLATED",
+                "PURGE_PENDING",
+                "PURGE_FAILED",
+                "PURGED"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current authorized metadata only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current permission required"
+          },
+          "404": {
+            "description": "Unavailable in current authorized scope"
+          },
+          "409": {
+            "description": "Revision, lifecycle or active-method evidence conflict"
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/object-lifecycle/{kind}/{id}": {
+      "get": {
+        "operationId": "tenant_get__kind_id",
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "TASK",
+                "DOCUMENT",
+                "ARTIFACT",
+                "EXPERIENCE_VERSION",
+                "FEEDBACK_VERSION",
+                "EVALUATION_VERSION",
+                "EVALUATION_RUN",
+                "EXPORT_CACHE"
+              ]
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current authorized metadata only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Preview"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current permission required"
+          },
+          "404": {
+            "description": "Unavailable in current authorized scope"
+          },
+          "409": {
+            "description": "Revision, lifecycle or active-method evidence conflict"
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/object-lifecycle/{kind}/{id}/history": {
+      "get": {
+        "operationId": "tenant_get__kind_id_history",
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "TASK",
+                "DOCUMENT",
+                "ARTIFACT",
+                "EXPERIENCE_VERSION",
+                "FEEDBACK_VERSION",
+                "EVALUATION_VERSION",
+                "EVALUATION_RUN",
+                "EXPORT_CACHE"
+              ]
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current authorized metadata only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Event"
+                      }
+                    },
+                    "hasMore": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "hasMore"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current permission required"
+          },
+          "404": {
+            "description": "Unavailable in current authorized scope"
+          },
+          "409": {
+            "description": "Revision, lifecycle or active-method evidence conflict"
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/object-lifecycle/{kind}/{id}/actions": {
+      "post": {
+        "operationId": "tenant_post__kind_id_actions",
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "TASK",
+                "DOCUMENT",
+                "ARTIFACT",
+                "EXPERIENCE_VERSION",
+                "FEEDBACK_VERSION",
+                "EVALUATION_VERSION",
+                "EVALUATION_RUN",
+                "EXPORT_CACHE"
+              ]
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current authorized metadata only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Receipt"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current permission required"
+          },
+          "404": {
+            "description": "Unavailable in current authorized scope"
+          },
+          "409": {
+            "description": "Revision, lifecycle or active-method evidence conflict"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Action"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/platform-admin/v1/object-lifecycle": {
+      "get": {
+        "operationId": "platform_get_list",
+        "parameters": [
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "TASK",
+                "DOCUMENT",
+                "ARTIFACT",
+                "EXPERIENCE_VERSION",
+                "FEEDBACK_VERSION",
+                "EVALUATION_VERSION",
+                "EVALUATION_RUN",
+                "EXPORT_CACHE"
+              ]
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ACTIVE",
+                "DISABLED",
+                "TRASHED",
+                "ISOLATED",
+                "PURGE_PENDING",
+                "PURGE_FAILED",
+                "PURGED"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current authorized metadata only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current permission required"
+          },
+          "404": {
+            "description": "Unavailable in current authorized scope"
+          },
+          "409": {
+            "description": "Revision, lifecycle or active-method evidence conflict"
+          }
+        }
+      }
+    },
+    "/api/platform-admin/v1/object-lifecycle/{kind}/{id}": {
+      "get": {
+        "operationId": "platform_get__kind_id",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "TASK",
+                "DOCUMENT",
+                "ARTIFACT",
+                "EXPERIENCE_VERSION",
+                "FEEDBACK_VERSION",
+                "EVALUATION_VERSION",
+                "EVALUATION_RUN",
+                "EXPORT_CACHE"
+              ]
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current authorized metadata only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Preview"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current permission required"
+          },
+          "404": {
+            "description": "Unavailable in current authorized scope"
+          },
+          "409": {
+            "description": "Revision, lifecycle or active-method evidence conflict"
+          }
+        }
+      }
+    },
+    "/api/platform-admin/v1/object-lifecycle/{kind}/{id}/history": {
+      "get": {
+        "operationId": "platform_get__kind_id_history",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "TASK",
+                "DOCUMENT",
+                "ARTIFACT",
+                "EXPERIENCE_VERSION",
+                "FEEDBACK_VERSION",
+                "EVALUATION_VERSION",
+                "EVALUATION_RUN",
+                "EXPORT_CACHE"
+              ]
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current authorized metadata only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Event"
+                      }
+                    },
+                    "hasMore": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "hasMore"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current permission required"
+          },
+          "404": {
+            "description": "Unavailable in current authorized scope"
+          },
+          "409": {
+            "description": "Revision, lifecycle or active-method evidence conflict"
+          }
+        }
+      }
+    },
+    "/api/platform-admin/v1/object-lifecycle/{kind}/{id}/actions": {
+      "post": {
+        "operationId": "platform_post__kind_id_actions",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "TASK",
+                "DOCUMENT",
+                "ARTIFACT",
+                "EXPERIENCE_VERSION",
+                "FEEDBACK_VERSION",
+                "EVALUATION_VERSION",
+                "EVALUATION_RUN",
+                "EXPORT_CACHE"
+              ]
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current authorized metadata only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Receipt"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current permission required"
+          },
+          "404": {
+            "description": "Unavailable in current authorized scope"
+          },
+          "409": {
+            "description": "Revision, lifecycle or active-method evidence conflict"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Action"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/platform-admin/v1/object-lifecycle/technical": {
+      "get": {
+        "operationId": "platform_technical",
+        "responses": {
+          "200": {
+            "description": "No tenant IDs, content IDs or body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Technical"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "session": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "SESSION"
+      }
+    },
+    "schemas": {
+      "Action": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "DISABLE",
+              "ENABLE",
+              "TRASH",
+              "RESTORE",
+              "PURGE",
+              "RETRY",
+              "CLASSIFY_TRIAL"
+            ]
+          },
+          "irreversibleConfirmed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "requestId",
+          "expectedRevision",
+          "action",
+          "irreversibleConfirmed"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "action": {
+                  "const": "PURGE"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "irreversibleConfirmed": {
+                  "const": true
+                }
+              }
+            }
+          }
+        ]
+      },
+      "Item": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "TASK",
+              "DOCUMENT",
+              "ARTIFACT",
+              "EXPERIENCE_VERSION",
+              "FEEDBACK_VERSION",
+              "EVALUATION_VERSION",
+              "EVALUATION_RUN",
+              "EXPORT_CACHE",
+              "PROFILE_VERSION",
+              "METHOD_VERSION"
+            ]
+          },
+          "objectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "DISABLED",
+              "TRASHED",
+              "ISOLATED",
+              "PURGE_PENDING",
+              "PURGE_FAILED",
+              "PURGED"
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "originalAnchor": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "formal": {
+            "type": "boolean"
+          },
+          "policyKey": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "policyRevision": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "policyDue": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "purgeAfter": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "attempts": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "errorCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "completedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "DISABLE",
+                "ENABLE",
+                "TRASH",
+                "RESTORE",
+                "PURGE",
+                "RETRY",
+                "CLASSIFY_TRIAL"
+              ]
+            }
+          },
+          "contentState": {
+            "type": "string",
+            "enum": [
+              "ONLINE_BODY_ERASED",
+              "CURRENT_ORIGINAL_ACCESS_REQUIRED",
+              "NORMAL_ACCESS_BLOCKED"
+            ]
+          },
+          "backupState": {
+            "type": "string",
+            "enum": [
+              "NOT_COVERED_BY_ONLINE_CLEANUP"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "objectId",
+          "workspaceId",
+          "state",
+          "revision",
+          "originalAnchor",
+          "formal",
+          "policyKey",
+          "policyRevision",
+          "policyDue",
+          "purgeAfter",
+          "attempts",
+          "errorCode",
+          "completedAt",
+          "actions",
+          "contentState",
+          "backupState"
+        ]
+      },
+      "Page": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Item"
+            }
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "hasMore"
+        ]
+      },
+      "Receipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "acceptedRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "current": {
+            "$ref": "#/components/schemas/Item"
+          },
+          "receiptStatus": {
+            "type": "string",
+            "enum": [
+              "EXACT"
+            ]
+          }
+        },
+        "required": [
+          "acceptedRevision",
+          "current",
+          "receiptStatus"
+        ]
+      },
+      "Preview": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "object": {
+            "$ref": "#/components/schemas/Item"
+          },
+          "trashDeadline": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "trialDeadline": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "methodDependency": {
+            "type": "boolean"
+          },
+          "irreversible": {
+            "const": true
+          },
+          "independentCopies": {
+            "type": "string",
+            "enum": [
+              "INDEPENDENT_ENTERPRISE_PUBLICATIONS_SURVIVE"
+            ]
+          },
+          "blockers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "object",
+          "trashDeadline",
+          "trialDeadline",
+          "methodDependency",
+          "irreversible",
+          "independentCopies",
+          "blockers"
+        ]
+      },
+      "Event": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "action": {
+            "type": "string"
+          },
+          "actorId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "revision",
+          "action",
+          "actorId",
+          "createdAt"
+        ]
+      },
+      "Technical": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "TASK",
+              "DOCUMENT",
+              "ARTIFACT",
+              "EXPERIENCE_VERSION",
+              "FEEDBACK_VERSION",
+              "EVALUATION_VERSION",
+              "EVALUATION_RUN",
+              "EXPORT_CACHE",
+              "PROFILE_VERSION",
+              "METHOD_VERSION"
+            ]
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "DISABLED",
+              "TRASHED",
+              "ISOLATED",
+              "PURGE_PENDING",
+              "PURGE_FAILED",
+              "PURGED"
+            ]
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "kind",
+          "state",
+          "count"
+        ]
+      }
+    }
+  }
+}

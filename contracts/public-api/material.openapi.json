@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Dreamcore Material API",
-    "version": "1.1.0",
-    "description": "平台持有原件、稳定资料与版本身份。每次请求验证有效企业成员及空间权限；共享空间查看与维护分开。总台及企业管理角色不自动获得内容权。上传保留原件；启用本地解析时在同一事务排入独立任务，解析状态由 Knowledge API 查询。不提供公开存储 URL，下载指定版本并再次检查权限，返回 attachment/octet-stream/no-store。"
+    "version": "1.2.0",
+    "description": "平台持有原件、稳定资料与版本身份。每次请求验证有效企业成员及空间权限；共享空间查看与维护分开。总台及企业管理角色不自动获得内容权。上传保留原件；启用本地解析时在同一事务排入独立任务，解析状态由 Knowledge API 查询。不提供公开存储 URL，下载指定版本并再次检查权限，返回 attachment/octet-stream/no-store。 上传返回原请求接受的确切版本及独立currentVersion；历史缺少可靠版本映射时receiptStatus为HISTORICAL_UNKNOWN、acceptedVersion为null，既有顶层字段保留当前资料兼容行为。"
   },
   "security": [
     {
@@ -471,7 +471,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Entry"
+                  "$ref": "#/components/schemas/UploadReceipt"
                 }
               }
             }
@@ -632,7 +632,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Entry"
+                  "$ref": "#/components/schemas/UploadReceipt"
                 }
               }
             }
@@ -1399,6 +1399,133 @@
           "hasMore"
         ],
         "additionalProperties": false
+      },
+      "UploadReceipt": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceName": {
+            "type": "string",
+            "minLength": 1
+          },
+          "folderId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "kind": {
+            "enum": [
+              "FOLDER",
+              "DOCUMENT"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sizeBytes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "path": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1
+          },
+          "canMaintain": {
+            "type": "boolean"
+          },
+          "receiptStatus": {
+            "enum": [
+              "EXACT",
+              "HISTORICAL_UNKNOWN"
+            ]
+          },
+          "acceptedVersion": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Version"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "currentVersion": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "workspaceId",
+          "workspaceName",
+          "folderId",
+          "kind",
+          "name",
+          "version",
+          "sizeBytes",
+          "updatedAt",
+          "path",
+          "canMaintain",
+          "receiptStatus",
+          "acceptedVersion",
+          "currentVersion"
+        ],
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "receiptStatus": {
+                  "const": "EXACT"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "acceptedVersion": {
+                  "$ref": "#/components/schemas/Version"
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "acceptedVersion": {
+                  "type": "null"
+                }
+              }
+            }
+          }
+        ]
       }
     }
   }

@@ -16,6 +16,12 @@ export function briefingSource(source: string): string {
     .replace(/(\d{2})-(\d{2})情境/g, (_, m, d) => `${Number(m)}月${Number(d)}日情境`);
 }
 
+/** Hide the legacy demo edition label on cards; retain the original source in detail and references. */
+export function briefingCardSource(source: string): string {
+  if (/^模拟底表\s+v\d+\s*·\s*(?:\d{2}-\d{2}|\d+月\d+日)情境$/.test(source.trim())) return '';
+  return briefingSource(source);
+}
+
 export function briefingPeriod(period: string): string {
   const formatted = period.replace(/\b(\d{1,2})\/(\d{1,2})\b/g, (original, m, d) =>
     Number(m) >= 1 && Number(m) <= 12 && Number(d) >= 1 && Number(d) <= 31

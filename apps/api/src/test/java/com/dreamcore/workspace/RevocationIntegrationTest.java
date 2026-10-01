@@ -182,7 +182,7 @@ class RevocationIntegrationTest {
         }
         assertArrayEquals(original,member.get(downloads.get(1)).body());
         var before=facts();var retry=member.upload(base()+"/materials",uploadRequest,original);
-        assertEquals(201,retry.statusCode());assertEquals(document,json(retry).get("id").asString());assertEquals(2,json(retry).get("version").asInt());assertEquals(before,facts());
+        assertEquals(201,retry.statusCode());assertEquals(document,json(retry).get("id").asString());assertEquals("EXACT",json(retry).get("receiptStatus").asString());assertEquals(1,json(retry).get("version").asInt());assertEquals(1,json(retry).get("acceptedVersion").get("number").asInt());assertEquals(2,json(retry).get("currentVersion").asInt());assertEquals(before,facts());
         assertEquals(201,member.upload(base()+"/materials/"+document+"/versions",Map.of("requestId",UUID.randomUUID(),"expectedVersion",2),original).statusCode());
     }
     @Test void restoreDoesNotRestoreRemovedGrantOrIndependentlyDisabledMember() throws Exception {

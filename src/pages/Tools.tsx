@@ -14,6 +14,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useDemo, useUI } from '../store';
+import { externalAppUrl } from '../ninepop/externalApp';
 import { openBriefingChat, followupRows } from '../briefing';
 import { addChat, addMessage, spaceName, uid, type Followup, type MiniApp } from '../model';
 import { Badge, Button, Empty, Field, PageActions, SectionHeading } from '../components/ui';
@@ -73,6 +74,27 @@ export function Applications({ scope, appId: rawId }: { scope: string; appId?: s
     ui.preview(null);
     ui.go(`chat/${startConfig(change, 'builder', id)}`);
   };
+  if (app?.external) {
+    const url = externalAppUrl(app);
+    return (
+      <div className="page-container applications-page">
+        <Button variant="ghost" icon={ArrowLeft} onClick={() => ui.go(`apps/${scope}`)}>
+          返回应用
+        </Button>
+        <h1>{app.name}</h1>
+        <p>{app.description}</p>
+        <p>真实系统 · 使用9POP现有账号登录，按原有权限查看和操作。后台业务为实时数据。</p>
+        {url ? (
+          <a className="button primary" href={url} target="_blank" rel="noopener noreferrer">
+            打开9POP后台 <ArrowUpRight size={16} />
+          </a>
+        ) : (
+          <p role="alert">后台入口配置不可用。</p>
+        )}
+        <p className="subtle">画报保留9月24日固定快照；打开后台不会自动刷新画报或执行AI操作。</p>
+      </div>
+    );
+  }
   if (app) {
     // Dashboard drilldown spans the same applications as its metrics.
     const dashboardDrilldown = !!rawId?.includes('?');
@@ -196,11 +218,13 @@ export function Applications({ scope, appId: rawId }: { scope: string; appId?: s
   );
   return (
     <div className="page-container applications-page">
-      <PageActions>
-        <Button variant="primary" icon={Plus} onClick={() => launchBuilder()}>
-          用 AI 搭建应用
-        </Button>
-      </PageActions>
+      {state.scenario !== 'ninepop' && (
+        <PageActions>
+          <Button variant="primary" icon={Plus} onClick={() => launchBuilder()}>
+            用 AI 搭建应用
+          </Button>
+        </PageActions>
+      )}
       <div className="scope-tabs" aria-label="应用范围">
         {[{ id: 'all', name: '全部应用' }, { id: 'personal', name: '我的应用' }, ...state.spaces].map((s) => (
           <button
@@ -233,7 +257,9 @@ export function Applications({ scope, appId: rawId }: { scope: string; appId?: s
               <span className="app-icon">
                 <Users size={25} strokeWidth={1.4} />
               </span>
-              <Badge blue={a.published}>{a.published ? '已共享' : '个人草稿'}</Badge>
+              <Badge blue={a.published}>
+                {a.external ? '真实系统' : a.published ? '已共享' : '个人草稿'}
+              </Badge>
             </div>
             <h2>{a.name}</h2>
             <p>{a.description}</p>
@@ -241,27 +267,48 @@ export function Applications({ scope, appId: rawId }: { scope: string; appId?: s
               <FolderIcon />
               {spaceName(state, a.space)}
               <span>·</span>
-              {state.records.filter((r) => r.app === a.id).length} 条记录
+              {a.external
+                ? '使用9POP账号登录'
+                : `${state.records.filter((r) => r.app === a.id).length} 条记录`}
             </div>
             {state.requests.some((r) => r.sourceId === a.id && r.status === 'pending') && (
               <p className="pending-note">共享申请等待负责人确认</p>
             )}
             <div className="row">
-              <Button className="grow" variant="primary" onClick={() => ui.go(`apps/${scope}/${a.id}`)}>
-                打开应用
-                <ArrowUpRight size={15} />
-              </Button>
-              <Button variant="ghost" aria-label={`配置${a.name}`} onClick={() => launchBuilder(a.id)}>
-                <SlidersHorizontal size={17} />
-              </Button>
+              {a.external ? (
+                externalAppUrl(a) ? (
+                  <a
+                    className="button primary grow"
+                    href={externalAppUrl(a)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    打开9POP后台 <ArrowUpRight size={15} />
+                  </a>
+                ) : (
+                  <span>入口不可用</span>
+                )
+              ) : (
+                <>
+                  <Button className="grow" variant="primary" onClick={() => ui.go(`apps/${scope}/${a.id}`)}>
+                    打开应用
+                    <ArrowUpRight size={15} />
+                  </Button>
+                  <Button variant="ghost" aria-label={`配置${a.name}`} onClick={() => launchBuilder(a.id)}>
+                    <SlidersHorizontal size={17} />
+                  </Button>
+                </>
+              )}
             </div>
           </article>
         ))}
-        <button className="new-app-card" onClick={() => launchBuilder()}>
-          <Plus size={25} />
-          <strong>你还需要怎样的工具？</strong>
-          <span>和 AI 说说，一起从模板开始</span>
-        </button>
+        {state.scenario !== 'ninepop' && (
+          <button className="new-app-card" onClick={() => launchBuilder()}>
+            <Plus size={25} />
+            <strong>你还需要怎样的工具？</strong>
+            <span>和 AI 说说，一起从模板开始</span>
+          </button>
+        )}
       </div>
     </div>
   );

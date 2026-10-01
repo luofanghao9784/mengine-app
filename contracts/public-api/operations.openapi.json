@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Dreamcore Operations API",
-    "version": "1.1.0"
+    "version": "1.2.0"
   },
   "security": [
     {
@@ -19,7 +19,10 @@
             "in": "query",
             "schema": {
               "type": "integer",
-              "enum": [7, 30],
+              "enum": [
+                7,
+                30
+              ],
               "default": 7
             }
           }
@@ -68,7 +71,10 @@
             "in": "query",
             "schema": {
               "type": "integer",
-              "enum": [7, 30],
+              "enum": [
+                7,
+                30
+              ],
               "default": 7
             }
           }
@@ -117,7 +123,10 @@
             "in": "query",
             "schema": {
               "type": "integer",
-              "enum": [7, 30],
+              "enum": [
+                7,
+                30
+              ],
               "default": 7
             }
           }
@@ -200,6 +209,26 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 9007199254740991
+          },
+          "paused": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "waitingInput": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "waitingCapability": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "partial": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "resultUnknown": {
+            "type": "integer",
+            "minimum": 0
           }
         },
         "required": [
@@ -210,7 +239,12 @@
           "failed",
           "cancelled",
           "interrupted",
-          "retryStarts"
+          "retryStarts",
+          "paused",
+          "waitingInput",
+          "waitingCapability",
+          "partial",
+          "resultUnknown"
         ],
         "additionalProperties": false
       },
@@ -233,14 +267,21 @@
             "maximum": 9007199254740991
           }
         },
-        "required": ["materials", "versions", "originalBytes"],
+        "required": [
+          "materials",
+          "versions",
+          "originalBytes"
+        ],
         "additionalProperties": false
       },
       "ModelUsage": {
         "type": "object",
         "properties": {
           "executionClass": {
-            "enum": ["live", "verification"]
+            "enum": [
+              "live",
+              "verification"
+            ]
           },
           "succeededTasks": {
             "type": "integer",
@@ -311,7 +352,10 @@
               "TASK_FILE_LIMIT",
               "TASK_FILE_DATA",
               "TASK_INTERRUPTED",
-              "OTHER"
+              "OTHER",
+              "TASK_RESULT_UNKNOWN",
+              "TASK_PLAN_STOPPED",
+              "TASK_PLAN_EXPIRED"
             ]
           },
           "tasks": {
@@ -324,7 +368,11 @@
             "format": "date-time"
           }
         },
-        "required": ["code", "tasks", "lastOccurredAt"],
+        "required": [
+          "code",
+          "tasks",
+          "lastOccurredAt"
+        ],
         "additionalProperties": false
       },
       "Overview": {
@@ -343,7 +391,10 @@
           },
           "days": {
             "type": "integer",
-            "enum": [7, 30]
+            "enum": [
+              7,
+              30
+            ]
           },
           "from": {
             "type": "string",
@@ -368,7 +419,7 @@
           },
           "errors": {
             "type": "array",
-            "maxItems": 15,
+            "maxItems": 19,
             "items": {
               "$ref": "#/components/schemas/Failure"
             }
@@ -448,7 +499,10 @@
             "maximum": 9007199254740991
           },
           "executionClass": {
-            "enum": ["live", "verification"]
+            "enum": [
+              "live",
+              "verification"
+            ]
           },
           "inputTokens": {
             "anyOf": [
@@ -473,6 +527,26 @@
                 "type": "null"
               }
             ]
+          },
+          "paused": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "waitingInput": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "waitingCapability": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "partial": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "resultUnknown": {
+            "type": "integer",
+            "minimum": 0
           }
         },
         "required": [
@@ -488,7 +562,12 @@
           "reportedRequests",
           "executionClass",
           "inputTokens",
-          "outputTokens"
+          "outputTokens",
+          "paused",
+          "waitingInput",
+          "waitingCapability",
+          "partial",
+          "resultUnknown"
         ],
         "additionalProperties": false
       }

@@ -1,15 +1,28 @@
+import { WorkspaceNavigation } from './WorkspaceNavigation';
+import { WorkspaceComposer } from './WorkspaceComposer';
+import { DepartureStatus } from '../departure/DepartureStatus';
+import { DeparturePanel } from '../departure/DeparturePanel';
+import { RequestGuard, RequestPending, requestNavigationLocked } from '../shared/request-guard';
+import { useContext } from 'react';
+import { Plans } from '../plans/Plans';
+import { WorkspaceExperiences } from '../experience/WorkspaceExperiences';
 import { SharedActivity } from '../activity/Activity';
 import { Documents } from '../documents/Documents';
 import { documentsHref } from '../documents/routes';
 import { Conversations, conversationHref } from '../conversation/Conversations';
 import { LiveBriefing, briefingHref } from '../briefing-live/Briefing';
 import { MessageSquare, Newspaper } from 'lucide-react';
-import { TenantAdminHome } from '../tenant/TenantAdminHome';
+import { ManagementHome } from '../governance/ManagementHome';
+import { Profiles } from '../profile/Profiles';
+import { governanceClient } from '../governance/client';
+import { useRemote } from '../shared/admin';
 import { PlatformHome } from '../platform/PlatformHome';
 import { PageActionsContext } from '../shared/ui';
 import { useEffect, useState } from 'react';
 import {
   ArrowRight,
+  BookOpen,
+  CalendarClock,
   Building2,
   CircleUserRound,
   FolderOpen,
@@ -88,6 +101,7 @@ export default function AccessApp({
   }, [session.phase]);
   useEffect(() => {
     const change = () => {
+      if (requestNavigationLocked()) return;
       const invitation = readInvitation();
       if (invitation.inviting) {
         setToken(invitation.token);
@@ -100,7 +114,7 @@ export default function AccessApp({
     return () => window.removeEventListener('hashchange', change);
   }, []);
   useEffect(() => {
-    document.title = `${labels[surface]} · 梦核工作空间`;
+    document.title = `${labels[surface]} · 梦擎工作空间`;
   }, [surface]);
   const cancelInvitation = (tenant?: string) => {
     setInviting(false);
@@ -154,7 +168,7 @@ export default function AccessApp({
           ) : (
             <>
               <span className="eyebrow">{labels[surface]}</span>
-              <h1>{authPage === 'login' ? '登录梦核工作空间' : '接受邀请'}</h1>
+              <h1>{authPage === 'login' ? '登录梦擎工作空间' : '接受邀请'}</h1>
               <p className="muted">
                 {authPage === 'login'
                   ? '使用受邀邮箱和密码，继续你的工作。'
@@ -376,7 +390,15 @@ function InviteForm({
   );
 }
 
-function AccessShell({
+function AccessShell(props: { surface: Surface; identity: Identity; notice: string; onInvite: () => void }) {
+  return (
+    <RequestGuard>
+      <GuardedAccessShell {...props} />
+    </RequestGuard>
+  );
+}
+
+function GuardedAccessShell({
   surface,
   identity,
   notice,
@@ -388,14 +410,47 @@ function AccessShell({
   onInvite: () => void;
 }) {
   const { refresh, logout } = useSession();
+  const pendingRequest = useContext(RequestPending);
   const [accountOpen, setAccountOpen] = useState(false);
   const [actionsTarget, setActionsTarget] = useState<HTMLDivElement | null>(null);
-  const eligible = identity.memberships.filter(
-    (m) => surface !== 'tenant-admin' || m.role === 'TENANT_ADMIN',
+  const governance = useRemote(
+    async (signal) => ({
+      account: identity.account.id,
+      items: await Promise.all(
+        identity.memberships.map(async (m) => {
+          try {
+            return await governanceClient.snapshot(m.tenantId, signal);
+          } catch {
+            return null;
+          }
+        }),
+      ),
+    }),
+    [identity],
   );
+  const management =
+    governance.value?.account === identity.account.id
+      ? governance.value.items.filter((v) => v?.canEnterManagement).map((v) => v!.tenantId)
+      : [];
+  const eligible =
+    surface === 'tenant-admin'
+      ? identity.memberships.filter((m) => management.includes(m.tenantId))
+      : identity.memberships;
   const readTenant = () =>
-    new URLSearchParams(location.hash.slice(1)).get('tenant') || eligible[0]?.tenantId || '';
+    new URLSearchParams(location.hash.slice(1)).get('tenant') || identity.memberships[0]?.tenantId || '';
   const [tenant, setTenant] = useState(readTenant);
+  const [departure, setDeparture] = useState(
+    () => new URLSearchParams(location.hash.slice(1)).get('view') === 'departure',
+  );
+  const [plans, setPlans] = useState(
+    () => new URLSearchParams(location.hash.slice(1)).get('view') === 'plans',
+  );
+  const [experiences, setExperiences] = useState(
+    () => new URLSearchParams(location.hash.slice(1)).get('view') === 'experiences',
+  );
+  const [profiles, setProfiles] = useState(
+    () => new URLSearchParams(location.hash.slice(1)).get('view') === 'profiles',
+  );
   const [conversations, setConversations] = useState(
     () => new URLSearchParams(location.hash.slice(1)).get('view') === 'conversations',
   );
@@ -410,7 +465,12 @@ function AccessShell({
   );
   useEffect(() => {
     const change = () => {
+      if (requestNavigationLocked()) return;
       setTenant(readTenant());
+      setDeparture(new URLSearchParams(location.hash.slice(1)).get('view') === 'departure');
+      setPlans(new URLSearchParams(location.hash.slice(1)).get('view') === 'plans');
+      setExperiences(new URLSearchParams(location.hash.slice(1)).get('view') === 'experiences');
+      setProfiles(new URLSearchParams(location.hash.slice(1)).get('view') === 'profiles');
       setLibrary(new URLSearchParams(location.hash.slice(1)).get('view') === 'library');
       setDocuments(new URLSearchParams(location.hash.slice(1)).get('view') === 'documents');
       setBriefing(new URLSearchParams(location.hash.slice(1)).get('view') === 'briefing');
@@ -419,11 +479,11 @@ function AccessShell({
     window.addEventListener('hashchange', change);
     return () => window.removeEventListener('hashchange', change);
   }, [identity, surface]);
-  const selected = eligible.find((m) => m.tenantId === tenant);
+  const selected = identity.memberships.find((m) => m.tenantId === tenant);
   const allowed = surface === 'platform-admin' ? identity.platformAdmin : !!selected;
   const links: Surface[] = [
     'workspace',
-    ...(identity.memberships.some((m) => m.role === 'TENANT_ADMIN') ? ['tenant-admin' as const] : []),
+    ...(management.length || surface === 'tenant-admin' ? ['tenant-admin' as const] : []),
     ...(identity.platformAdmin ? ['platform-admin' as const] : []),
   ];
   const surfaceHref = (target: Surface) => {
@@ -431,76 +491,113 @@ function AccessShell({
     const carry =
       target !== 'platform-admin' &&
       membership &&
-      (target === 'workspace' || membership.role === 'TENANT_ADMIN');
-    return entryHref(target, carry ? tenant : undefined);
+      (target === 'workspace' || management.includes(membership.tenantId));
+    return entryHref(target, carry ? tenant : target === 'tenant-admin' ? management[0] : undefined);
   };
   const choose = (id: string) => {
     setTenant(id);
-    location.hash = documents
-      ? documentsHref(id)
-      : briefing
-        ? briefingHref(id)
-        : library
-          ? libraryHref(id)
-          : conversations
-            ? conversationHref(id)
-            : `tenant=${encodeURIComponent(id)}`;
+    location.hash = departure
+      ? `tenant=${encodeURIComponent(id)}&view=departure`
+      : plans
+        ? `tenant=${encodeURIComponent(id)}&view=plans`
+        : experiences
+          ? `tenant=${encodeURIComponent(id)}&view=experiences`
+          : profiles
+            ? `tenant=${encodeURIComponent(id)}&view=profiles`
+            : documents
+              ? documentsHref(id)
+              : briefing
+                ? briefingHref(id)
+                : library
+                  ? libraryHref(id)
+                  : conversations
+                    ? conversationHref(id)
+                    : `tenant=${encodeURIComponent(id)}`;
   };
   return (
     <PageActionsContext.Provider value={actionsTarget}>
-      <div className="access-shell">
+      <div
+        className={`access-shell ${surface === 'workspace' ? 'workspace-shell' : ''} ${surface === 'workspace' && conversations ? 'workspace-conversations' : ''} ${surface === 'workspace' && briefing ? 'workspace-briefing' : ''}`}
+      >
         <aside className="access-sidebar" aria-label="工作导航">
-          <a href={surfaceHref('workspace')} className="access-brand" aria-label="梦核工作空间">
+          <a href={surfaceHref('workspace')} className="access-brand" aria-label="梦擎工作空间">
             <DreamcoreLogo />
           </a>
-          <nav aria-label="主导航">
-            {links.map((link) => (
-              <div className="nav-item" key={link}>
-                <NavigationButton
-                  label={labels[link]}
-                  icon={icons[link]}
-                  active={
-                    surface === link &&
-                    !(surface === 'workspace' && (library || conversations || briefing || documents))
-                  }
-                  href={surfaceHref(link)}
-                />
-              </div>
-            ))}
-            {surface === 'workspace' && selected && (
-              <div className="nav-item">
-                <NavigationButton
-                  label="会话"
-                  icon={MessageSquare}
-                  active={conversations}
-                  href={conversationHref(tenant)}
-                />
-              </div>
-            )}
-            {surface === 'workspace' && selected && (
-              <div className="nav-item">
-                <NavigationButton
-                  label="智能画报"
-                  icon={Newspaper}
-                  active={briefing}
-                  href={briefingHref(tenant)}
-                />
-              </div>
-            )}
-            {surface === 'workspace' && selected && (
-              <div className="nav-item">
-                <NavigationButton
-                  label="资料库"
-                  icon={LibraryBig}
-                  active={library || documents}
-                  href={libraryHref(tenant)}
-                />
-              </div>
+          <nav aria-label="主导航" inert={pendingRequest}>
+            {surface === 'workspace' && selected ? (
+              <WorkspaceNavigation
+                routeKey={`${tenant}:${location.hash}`}
+                primary={[
+                  {
+                    label: '会话',
+                    icon: MessageSquare,
+                    active: conversations,
+                    href: conversationHref(tenant),
+                  },
+                  { label: '智能画报', icon: Newspaper, active: briefing, href: briefingHref(tenant) },
+                  {
+                    label: '资料库',
+                    icon: LibraryBig,
+                    active: library || documents,
+                    href: libraryHref(tenant),
+                  },
+                ]}
+                more={[
+                  {
+                    label: '工作空间',
+                    icon: FolderOpen,
+                    active: !(
+                      library ||
+                      conversations ||
+                      briefing ||
+                      documents ||
+                      profiles ||
+                      experiences ||
+                      plans ||
+                      departure
+                    ),
+                    href: surfaceHref('workspace'),
+                  },
+                  {
+                    label: '档案',
+                    icon: CircleUserRound,
+                    active: profiles,
+                    href: `#tenant=${tenant}&view=profiles`,
+                  },
+                  {
+                    label: '经验库',
+                    icon: BookOpen,
+                    active: experiences,
+                    href: `#tenant=${tenant}&view=experiences`,
+                  },
+                  {
+                    label: '持续计划',
+                    icon: CalendarClock,
+                    active: plans,
+                    href: `#tenant=${tenant}&view=plans`,
+                  },
+                  ...links
+                    .filter((link) => link !== 'workspace')
+                    .map((link) => ({ label: labels[link], icon: icons[link], href: surfaceHref(link) })),
+                ]}
+              />
+            ) : (
+              links.map((link) => (
+                <div className="nav-item" key={link}>
+                  <NavigationButton
+                    label={labels[link]}
+                    icon={icons[link]}
+                    active={surface === link}
+                    href={surfaceHref(link)}
+                  />
+                </div>
+              ))
             )}
           </nav>
           <button
             type="button"
             className="access-avatar"
+            disabled={pendingRequest}
             onClick={() => setAccountOpen(true)}
             aria-label="账号与退出"
           >
@@ -511,21 +608,47 @@ function AccessShell({
           <PageHeader
             className={surface === 'workspace' && library ? 'material-topbar' : ''}
             heading={
-              <h1>
-                {surface === 'workspace' && documents
-                  ? '个人文稿'
-                  : surface === 'workspace' && briefing
-                    ? '智能画报'
-                    : surface === 'workspace' && conversations
-                      ? '会话'
-                      : surface === 'workspace' && library
-                        ? '资料库'
-                        : labels[surface]}
-              </h1>
+              <>
+                <h1>
+                  {surface === 'workspace' && departure
+                    ? '迁出与清理记录'
+                    : surface === 'workspace' && plans
+                      ? '持续计划'
+                      : surface === 'workspace' && experiences
+                        ? '经验库'
+                        : surface === 'workspace' && profiles
+                          ? '档案'
+                          : surface === 'workspace' && documents
+                            ? '个人文稿'
+                            : surface === 'workspace' && briefing
+                              ? '智能画报'
+                              : surface === 'workspace' && conversations
+                                ? '会话'
+                                : surface === 'workspace' && library
+                                  ? '资料库'
+                                  : labels[surface]}
+                </h1>
+                {surface === 'workspace' && briefing && (
+                  <time className="workspace-edition" dateTime={new Date().toLocaleDateString('en-CA')}>
+                    {new Date().toLocaleDateString('zh-CN', {
+                      month: 'long',
+                      day: 'numeric',
+                      weekday: 'long',
+                    })}
+                  </time>
+                )}
+              </>
             }
             actionsRef={setActionsTarget}
             actions={
-              surface !== 'workspace' || library || conversations || briefing || documents ? undefined : (
+              surface !== 'workspace' ||
+              library ||
+              conversations ||
+              briefing ||
+              documents ||
+              plans ||
+              experiences ||
+              profiles ? undefined : (
                 <Button variant="ghost" icon={RefreshCw} onClick={() => void refresh()}>
                   刷新
                 </Button>
@@ -537,6 +660,7 @@ function AccessShell({
                   <span className="sr-only">当前企业</span>
                   <select
                     aria-label="当前企业"
+                    disabled={pendingRequest}
                     value={selected?.tenantId || ''}
                     onChange={(e) => choose(e.target.value)}
                   >
@@ -556,10 +680,21 @@ function AccessShell({
             }
           />
           <main className="access-content" key={`${identity.account.id}:${surface}:${tenant}`}>
+            {pendingRequest && (
+              <p className="access-alert" role="status">
+                正在核对本次提交，请在原处完成或重试后再切换页面。
+              </p>
+            )}
             {notice && (
               <p className="access-success" role="status">
                 {notice}
               </p>
+            )}
+            {allowed && surface !== 'platform-admin' && tenant && (
+              <DepartureStatus
+                tenant={tenant}
+                compact={surface === 'workspace' && (conversations || briefing)}
+              />
             )}
             {!allowed ? (
               <section className="access-panel">
@@ -585,7 +720,15 @@ function AccessShell({
             ) : surface === 'platform-admin' ? (
               <PlatformHome />
             ) : surface === 'tenant-admin' ? (
-              <TenantAdminHome tenant={tenant} />
+              <ManagementHome tenant={tenant} />
+            ) : departure ? (
+              <DeparturePanel tenant={tenant} />
+            ) : plans ? (
+              <Plans tenant={tenant} />
+            ) : experiences ? (
+              <WorkspaceExperiences tenant={tenant} />
+            ) : profiles ? (
+              <Profiles tenant={tenant} />
             ) : documents ? (
               <Documents key={tenant} tenant={tenant} />
             ) : briefing ? (
@@ -598,6 +741,13 @@ function AccessShell({
               <TenantHome tenant={tenant} />
             )}
           </main>
+          {surface === 'workspace' && briefing && allowed && (
+            <WorkspaceComposer
+              key={`${identity.account.id}:${tenant}`}
+              account={identity.account.id}
+              tenant={tenant}
+            />
+          )}
         </div>
         {accountOpen && (
           <Modal title="账号" onClose={() => setAccountOpen(false)}>
@@ -620,39 +770,30 @@ function AccessShell({
 }
 
 function TenantHome({ tenant }: { tenant: string }) {
-  const { expire, session } = useSession();
-  const [result, setResult] = useState<{ context?: TenantContext; error?: IdentityError }>({});
+  const { session } = useSession();
   const [attempt, setAttempt] = useState(0);
-  useEffect(() => {
-    const controller = new AbortController();
-    setResult({});
-    identityClient
-      .context(tenant, controller.signal)
-      .then((context) => {
-        if (controller.signal.aborted) return;
-        setResult({ context });
-      })
-      .catch((error) => {
-        if (controller.signal.aborted) return;
-        if (error.status === 401) expire();
-        else setResult({ error });
-      });
-    return () => controller.abort();
-  }, [tenant, attempt, expire, session.identity]);
+  const result = useRemote(
+    (signal) => identityClient.context(tenant, signal),
+    [tenant, attempt, session.identity],
+  );
   if (result.error)
     return (
       <section className="access-panel">
         <Empty
-          icon={result.error.status === 403 ? ShieldX : WifiOff}
-          title={result.error.status === 403 ? '没有访问权限' : '暂时无法读取企业信息'}
-          text={result.error.message}
+          icon={result.error instanceof IdentityError && result.error.status === 403 ? ShieldX : WifiOff}
+          title={
+            result.error instanceof IdentityError && result.error.status === 403
+              ? '没有访问权限'
+              : '暂时无法读取企业信息'
+          }
+          text={message(result.error)}
         >
           <Button onClick={() => setAttempt((v) => v + 1)}>重试</Button>
         </Empty>
       </section>
     );
-  if (!result.context) return <Status title="正在读取企业信息" detail="请稍候…" />;
-  const { context } = result;
+  if (!result.value) return <Status title="正在读取企业信息" detail="请稍候…" />;
+  const context = result.value;
   return (
     <>
       <section className="access-panel access-welcome">

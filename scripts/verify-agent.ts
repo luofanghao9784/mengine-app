@@ -1,3 +1,8 @@
+import { experienceSeedJourney } from './experience-journey.ts';
+import { taskAttentionJourney } from './attention-journey.ts';
+import { recommendationJourney } from './recommendation-journey.ts';
+import { exportJourney } from './export-journey.ts';
+import { feedbackJourney } from './feedback-journey.ts';
 import { browserName, browserType, browserArtifacts } from './browser-target.ts';
 import { ENGINE_VERSION } from '../engine/dist/release.js';
 import { inspectWorkbook } from '../engine/tests/helpers/workbook.mjs';
@@ -114,7 +119,7 @@ async function activate(page: Page, name: string) {
   await page.getByLabel(/^设置密码/).fill(password);
   await page.getByLabel('确认密码', { exact: true }).fill(password);
   await page.getByRole('button', { name: '创建账号并加入', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '登录梦核工作空间', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '登录梦擎工作空间', exact: true })).toBeVisible();
 }
 async function screenshot(page: Page, name: string) {
   await page.screenshot({ path: fileURLToPath(new URL(name, artifacts)), fullPage: true });
@@ -182,7 +187,12 @@ try {
   const created = await post(
     platform,
     '/api/platform-admin/v1/tenants',
-    { requestId: randomUUID(), name: 'Agent 合成验证企业', adminEmail: 'agent-owner@example.test' },
+    {
+      requestId: randomUUID(),
+      name: 'Agent 合成验证企业',
+      adminEmail: 'agent-owner@example.test',
+      ...(process.argv.includes('--output-only') ? { designateAuthorizationOwner: true } : {}),
+    },
     201,
   );
   const tenant = created.tenant.id;
@@ -246,208 +256,184 @@ try {
   assert.equal(task.sources.length, 2);
   assert.equal(task.executionClass, 'verification');
   assert.ok(!JSON.stringify(result).includes('lease_token'));
-  const artifactPath = conversationRoot + `/tasks/${task.id}/artifacts/${task.artifacts[0].id}`;
-  assert.equal((await platform.get(artifactPath)).status(), 403);
-  await page.reload();
-  await expect(page.locator('.conversation-reply')).toContainText('2000 分');
-  await screenshot(page, 'agent-desktop.png');
-  await page.setViewportSize({ width: 390, height: 844 });
-  await screenshot(page, 'agent-mobile.png');
-  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
-  // A stalled provider has sent headers but not its body; UI cancellation must close it.
-  await page.getByLabel('任务方式', { exact: true }).selectOption('AGENT');
-  await page.getByLabel('工作要求', { exact: true }).fill('等待取消');
-  await page.getByRole('button', { name: '开始任务', exact: true }).click();
-  await expect.poll(() => engine!.stats.calls).toBe(4);
-  await expect(page.locator('.conversation-result').last()).toContainText('正在执行任务');
-  const cancelResponse = page.waitForResponse(
-    (r) => r.request().method() === 'POST' && /\/tasks\/[^/]+$/.test(new URL(r.url()).pathname),
-  );
-  await page.getByRole('button', { name: '取消任务', exact: true }).click();
-  assert.equal((await cancelResponse).status(), 200);
-  await expect.poll(() => engine!.stats.aborted, { timeout: 5000 }).toBe(1);
-  await expect(page.locator('.conversation-result').last()).toContainText('已取消');
-  const cancelled = await (await context.request.get(conversationRoot)).json();
-  assert.equal(cancelled.tasks.at(-1).status, 'CANCELLED');
-  assert.equal(cancelled.tasks.at(-1).reply, null);
-  assert.deepEqual(cancelled.tasks.at(-1).artifacts, []);
-  await page.getByLabel('任务方式', { exact: true }).selectOption('AGENT');
-  await page
-    .getByLabel('工作要求', { exact: true })
-    .fill('PUBLIC_RESEARCH 合成私密备注 PRIVATE_MARKER_DO_NOT_SEND');
-  const longUrl = 'HTTPS://example.com/' + 'a'.repeat(300);
-  await page.getByLabel('公开检索内容（可选）', { exact: true }).fill(longUrl);
-  await expect(page.getByLabel('公开检索内容（可选）', { exact: true })).toHaveValue(longUrl);
-  await page.getByLabel('公开检索内容（可选）', { exact: true }).fill('项目发布前检查');
-  await page.reload();
-  await expect(page.getByLabel('公开检索内容（可选）', { exact: true })).toHaveValue('项目发布前检查');
-  await page.getByRole('button', { name: '开始任务', exact: true }).click();
-  await expect(page.locator('.conversation-reply').last()).toContainText('已查找公开资料并读取页面', {
-    timeout: 20000,
-  });
-  await page.getByText('公开研究样本 · 已读取页面', { exact: true }).click();
-  await expect(page.getByRole('link', { name: '打开公开来源', exact: true })).toHaveAttribute(
-    'rel',
-    'noopener noreferrer',
-  );
-  assert.equal(engine.stats.webRequests.length, 2);
-  assert.equal(new URL(engine.stats.webRequests[0]).searchParams.get('q'), '项目发布前检查');
-  assert.ok(!JSON.stringify(engine.stats.webRequests).includes('PRIVATE_MARKER'));
-  const research = (await (await context.request.get(conversationRoot)).json()).tasks.at(-1);
-  assert.equal(research.status, 'SUCCEEDED');
-  assert.equal(research.webSources[0].kind, 'PAGE');
-  assert.equal(research.skills[0].id, 'public-research');
-  assert.equal(research.publicQuery, '项目发布前检查');
-  await page.reload();
-  await expect(page.getByText('公开研究样本 · 已读取页面', { exact: true })).toBeVisible();
-  await page.getByText('公开研究样本 · 已读取页面', { exact: true }).click();
-  await screenshot(page, 'research-mobile.png');
-  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
-  await page.setViewportSize({ width: 1440, height: 960 });
-  await screenshot(page, 'research-desktop.png');
-  await page.getByLabel('任务方式', { exact: true }).selectOption('AGENT');
-  await page.getByLabel('工作要求', { exact: true }).fill('CANDIDATE_TRIAL PRIVATE_MARKER_DO_NOT_SEND');
-  await page.getByLabel('公开检索内容（可选）', { exact: true }).fill('INI parser');
-  await page.getByRole('button', { name: '开始任务', exact: true }).click();
-  await expect(page.locator('.conversation-reply').last()).toContainText('候选工具已通过样例试验', {
-    timeout: 20000,
-  });
-  const candidateTask = (await (await context.request.get(conversationRoot)).json()).tasks.at(-1);
-  assert.equal(candidateTask.status, 'SUCCEEDED');
-  assert.equal(candidateTask.skills[0].id, 'candidate-trials');
-  assert.equal(candidateTask.artifacts.length, 2);
-  assert.equal(engine.stats.candidateRequests.length, 3);
-  assert.equal(new URL(engine.stats.candidateRequests[0]).searchParams.get('text'), 'INI parser');
-  assert.ok(!JSON.stringify(engine.stats.candidateRequests).includes('PRIVATE_MARKER'));
-  for (const name of ['converted-1.json', 'candidate-report.json']) {
-    const downloading = page.waitForEvent('download');
-    await page.getByRole('button', { name: '下载 ' + name, exact: true }).click();
-    const content = JSON.parse(await readFile((await (await downloading).path())!, 'utf8'));
-    if (name === 'converted-1.json') assert.deepEqual(content, { amount: '999' });
-    else {
-      assert.equal(content.items[0].status, 'USED');
-      assert.equal(content.globallyTrusted, false);
-      assert.ok(content.licenses[0].text);
-    }
-    const file = candidateTask.artifacts.find((f: { filename: string }) => f.filename === name);
-    assert.equal(
-      (await platform.get(conversationRoot + `/tasks/${candidateTask.id}/artifacts/${file.id}`)).status(),
-      403,
+  if (process.argv.includes('--output-only')) {
+    const recommendation = await recommendationJourney(
+      page,
+      context.request,
+      tenant,
+      conversation,
+      task.id,
+      fileURLToPath(artifacts),
     );
-  }
-  await page.reload();
-  await expect(page.getByRole('button', { name: '下载 candidate-report.json', exact: true })).toBeVisible();
-  await page.locator('.conversation-result').last().scrollIntoViewIfNeeded();
-  await screenshot(page, 'candidate-desktop.png');
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.locator('.conversation-result').last().scrollIntoViewIfNeeded();
-  await screenshot(page, 'candidate-mobile.png');
-  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
-  assert.equal(engine.stats.calls, 15);
-  // Select v1, persist the draft, then upload v2 before submission. The task must still read all of v1.
-  const originalBytes = Buffer.from(
-    'RAW_ONLY_MARKER,value\n' + Array.from({ length: 4000 }, (_, i) => `${i},1`).join('\n'),
-  );
-  const originalUpload = await context.request.post(materialRoot + '/materials', {
-    headers: { [csrf.headerName]: csrf.token },
-    multipart: {
-      metadata: {
-        name: 'metadata.json',
-        mimeType: 'application/json',
-        buffer: Buffer.from(JSON.stringify({ requestId: randomUUID() })),
-      },
-      file: { name: 'whole-original.csv', mimeType: 'text/csv', buffer: originalBytes },
-    },
-  });
-  assert.equal(originalUpload.status(), 201);
-  const originalFile = await originalUpload.json();
-  const originalDetail = await (
-    await context.request.get(materialRoot + `/materials/${originalFile.id}`)
-  ).json();
-  const version = originalDetail.versions[0];
-  await page.getByLabel('任务方式', { exact: true }).selectOption('AGENT');
-  await page.getByLabel('工作要求', { exact: true }).fill('ORIGINAL_FILE 处理本次指定的文件');
-  await page.getByRole('button', { name: '选择原件版本', exact: true }).click();
-  await page.getByRole('dialog').getByLabel('查找文件', { exact: true }).fill('whole-original');
-  await page
-    .getByRole('dialog')
-    .getByRole('button', { name: 'whole-original.csv · v1', exact: true })
-    .click();
-  await page.getByRole('dialog').getByRole('button', { name: '选择 v1', exact: true }).click();
-  await page.reload();
-  await expect(page.locator('.original-selection')).toContainText('whole-original.csv · v1');
-  const revised = await context.request.post(materialRoot + `/materials/${originalFile.id}/versions`, {
-    headers: { [csrf.headerName]: csrf.token },
-    multipart: {
-      metadata: {
-        name: 'metadata.json',
-        mimeType: 'application/json',
-        buffer: Buffer.from(JSON.stringify({ requestId: randomUUID(), expectedVersion: 1 })),
-      },
-      file: { name: 'whole-original.csv', mimeType: 'text/csv', buffer: Buffer.from('row,value\n0,999999') },
-    },
-  });
-  assert.equal(revised.status(), 201);
-  await page.getByRole('button', { name: '开始任务', exact: true }).click();
-  await expect(page.locator('.conversation-reply').last()).toContainText('完整原件 4000 行，合计 4000', {
-    timeout: 20000,
-  });
-  const originalTask = (await (await context.request.get(conversationRoot)).json()).tasks.at(-1);
-  assert.equal(originalTask.originals[0].versionId, version.id);
-  assert.equal(originalTask.originals[0].version, 1);
-  assert.equal(originalTask.originals[0].read, true);
-  assert.equal(originalTask.originals[0].sha256, version.sha256);
-  assert.deepEqual(originalTask.sources, []);
-  const originalDownload = page.waitForEvent('download');
-  await page.getByRole('button', { name: '下载 original-summary.json', exact: true }).click();
-  assert.deepEqual(JSON.parse(await readFile((await (await originalDownload).path())!, 'utf8')), {
-    rows: 4000,
-    total: '4000',
-  });
-  assert.equal(
-    (
-      await platform.get(
-        conversationRoot + `/tasks/${originalTask.id}/artifacts/${originalTask.artifacts[0].id}`,
-      )
-    ).status(),
-    403,
-  );
-  await page.reload();
-  await expect(page.locator('.conversation-originals').last()).toContainText('whole-original.csv · v1');
-  await expect(page.locator('.conversation-originals').last()).toContainText('已读取原件');
-  await page.locator('.conversation-result').last().scrollIntoViewIfNeeded();
-  await screenshot(page, 'original-mobile.png');
-  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
-  await page.setViewportSize({ width: 1440, height: 960 });
-  await screenshot(page, 'original-desktop.png');
-  assert.equal(engine.stats.calls, 19);
-
-  let excelArtifactPath: string | undefined;
-  // Trusted recipes use complete selected versions; malformed/unsupported files remain failed.
-  for (const spec of [
-    {
-      name: 'recipe-table.csv',
-      prompt: 'FILE_RECIPE CSV',
-      content: 'team,amount,note\n"A,B",0.1,"first\nsecond"\n"A,B",0.2,"a""b"\nC,10,done\n',
-      expected: '完整表格 3 行，精确合计 10.3',
-      output: 'table-summary-1.json',
-    },
-    {
-      name: 'recipe-note.md',
-      prompt: 'FILE_RECIPE TEXT',
-      content: '标题\r\n<script>literal</script>\r\n第三行\r\n',
-      expected: '已提取第 2—3 行',
-      output: 'extracted-1.txt',
-    },
-    {
-      name: 'recipe-unsupported.xlsx',
-      prompt: 'FILE_RECIPE BAD',
-      content: 'synthetic unsupported file',
-      expected: '当前处理工具不支持这个文件格式',
-      output: '',
-    },
-  ]) {
-    const upload = await context.request.post(materialRoot + '/materials', {
+    const governanceRoot = `/api/v1/tenants/${tenant}/governance`;
+    let governance = await (await context.request.get(governanceRoot)).json();
+    if (governance.canAcceptInitialResponsibility)
+      governance = await post(context.request, governanceRoot + '/accept-initial-responsibility', {
+        requestId: randomUUID(),
+        expectedVersion: governance.revision,
+      });
+    const actor = (await (await context.request.get('/api/v1/me')).json()).account.id;
+    await post(context.request, governanceRoot + '/capabilities', {
+      requestId: randomUUID(),
+      expectedVersion: governance.revision,
+      accountId: actor,
+      workspaceId: null,
+      capability: 'BULK_EXPORT',
+      enabled: true,
+    });
+    const document = await post(
+      context.request,
+      `/api/v1/tenants/${tenant}/documents`,
+      { requestId: randomUUID(), conversationId: conversation, taskId: task.id },
+      200,
+    );
+    const exported = await exportJourney(
+      page,
+      context.request,
+      tenant,
+      space,
+      document.document.id,
+      fileURLToPath(artifacts),
+      `/workspace/#tenant=${tenant}&view=documents`,
+    );
+    const attentionTask = await taskAttentionJourney(
+      page,
+      context.request,
+      tenant,
+      space,
+      fileURLToPath(artifacts),
+    );
+    const seed = await experienceSeedJourney(page, context.request, tenant, space, fileURLToPath(artifacts));
+    assert.deepEqual(errors, []);
+    await writeFile(
+      new URL('output-result.json', artifacts),
+      JSON.stringify({ recommendation, exported, attentionTask, seed, cloudModelCalled: false }, null, 2),
+    );
+    console.log(
+      'PASS: real recommendation with versioned feedback, same-key settings recovery, exact task link, real ZIP and cleanup receipt.',
+    );
+  } else if (process.argv.includes('--feedback-only')) {
+    const feedback = await feedbackJourney(
+      page,
+      context.request,
+      tenant,
+      space,
+      conversation,
+      task.id,
+      fileURLToPath(artifacts),
+    );
+    assert.deepEqual(errors, []);
+    await writeFile(
+      new URL('feedback-result.json', artifacts),
+      JSON.stringify({ feedback, cloudModelCalled: false }, null, 2),
+    );
+    console.log(
+      'PASS: real feedback journey, exact versions, same-key retries, navigation/focus guard and three explicit follow-up receipts.',
+    );
+  } else {
+    const artifactPath = conversationRoot + `/tasks/${task.id}/artifacts/${task.artifacts[0].id}`;
+    assert.equal((await platform.get(artifactPath)).status(), 403);
+    await page.reload();
+    await expect(page.locator('.conversation-reply')).toContainText('2000 分');
+    await screenshot(page, 'agent-desktop.png');
+    await page.setViewportSize({ width: 390, height: 844 });
+    await screenshot(page, 'agent-mobile.png');
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+    // A stalled provider has sent headers but not its body; UI cancellation must close it.
+    await page.getByLabel('任务方式', { exact: true }).selectOption('AGENT');
+    await page.getByLabel('工作要求', { exact: true }).fill('等待取消');
+    await page.getByRole('button', { name: '开始任务', exact: true }).click();
+    await expect.poll(() => engine!.stats.calls).toBe(4);
+    await expect(page.locator('.conversation-result').last()).toContainText('正在执行任务');
+    const cancelResponse = page.waitForResponse(
+      (r) => r.request().method() === 'POST' && /\/tasks\/[^/]+$/.test(new URL(r.url()).pathname),
+    );
+    await page.getByRole('button', { name: '取消任务', exact: true }).click();
+    assert.equal((await cancelResponse).status(), 200);
+    await expect.poll(() => engine!.stats.aborted, { timeout: 5000 }).toBe(1);
+    await expect(page.locator('.conversation-result').last()).toContainText('已取消');
+    const cancelled = await (await context.request.get(conversationRoot)).json();
+    assert.equal(cancelled.tasks.at(-1).status, 'CANCELLED');
+    assert.equal(cancelled.tasks.at(-1).reply, null);
+    assert.deepEqual(cancelled.tasks.at(-1).artifacts, []);
+    await page.getByLabel('任务方式', { exact: true }).selectOption('AGENT');
+    await page
+      .getByLabel('工作要求', { exact: true })
+      .fill('PUBLIC_RESEARCH 合成私密备注 PRIVATE_MARKER_DO_NOT_SEND');
+    const longUrl = 'HTTPS://example.com/' + 'a'.repeat(300);
+    await page.getByLabel('公开检索内容（可选）', { exact: true }).fill(longUrl);
+    await expect(page.getByLabel('公开检索内容（可选）', { exact: true })).toHaveValue(longUrl);
+    await page.getByLabel('公开检索内容（可选）', { exact: true }).fill('项目发布前检查');
+    await page.reload();
+    await expect(page.getByLabel('公开检索内容（可选）', { exact: true })).toHaveValue('项目发布前检查');
+    await page.getByRole('button', { name: '开始任务', exact: true }).click();
+    await expect(page.locator('.conversation-reply').last()).toContainText('已查找公开资料并读取页面', {
+      timeout: 20000,
+    });
+    await page.getByText('公开研究样本 · 已读取页面', { exact: true }).click();
+    await expect(page.getByRole('link', { name: '打开公开来源', exact: true })).toHaveAttribute(
+      'rel',
+      'noopener noreferrer',
+    );
+    assert.equal(engine.stats.webRequests.length, 2);
+    assert.equal(new URL(engine.stats.webRequests[0]).searchParams.get('q'), '项目发布前检查');
+    assert.ok(!JSON.stringify(engine.stats.webRequests).includes('PRIVATE_MARKER'));
+    const research = (await (await context.request.get(conversationRoot)).json()).tasks.at(-1);
+    assert.equal(research.status, 'SUCCEEDED');
+    assert.equal(research.webSources[0].kind, 'PAGE');
+    assert.equal(research.skills[0].id, 'public-research');
+    assert.equal(research.publicQuery, '项目发布前检查');
+    await page.reload();
+    await expect(page.getByText('公开研究样本 · 已读取页面', { exact: true })).toBeVisible();
+    await page.getByText('公开研究样本 · 已读取页面', { exact: true }).click();
+    await screenshot(page, 'research-mobile.png');
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+    await page.setViewportSize({ width: 1440, height: 960 });
+    await screenshot(page, 'research-desktop.png');
+    await page.getByLabel('任务方式', { exact: true }).selectOption('AGENT');
+    await page.getByLabel('工作要求', { exact: true }).fill('CANDIDATE_TRIAL PRIVATE_MARKER_DO_NOT_SEND');
+    await page.getByLabel('公开检索内容（可选）', { exact: true }).fill('INI parser');
+    await page.getByRole('button', { name: '开始任务', exact: true }).click();
+    await expect(page.locator('.conversation-reply').last()).toContainText('候选工具已通过样例试验', {
+      timeout: 20000,
+    });
+    const candidateTask = (await (await context.request.get(conversationRoot)).json()).tasks.at(-1);
+    assert.equal(candidateTask.status, 'SUCCEEDED');
+    assert.equal(candidateTask.skills[0].id, 'candidate-trials');
+    assert.equal(candidateTask.artifacts.length, 2);
+    assert.equal(engine.stats.candidateRequests.length, 3);
+    assert.equal(new URL(engine.stats.candidateRequests[0]).searchParams.get('text'), 'INI parser');
+    assert.ok(!JSON.stringify(engine.stats.candidateRequests).includes('PRIVATE_MARKER'));
+    for (const name of ['converted-1.json', 'candidate-report.json']) {
+      const downloading = page.waitForEvent('download');
+      await page.getByRole('button', { name: '下载 ' + name, exact: true }).click();
+      const content = JSON.parse(await readFile((await (await downloading).path())!, 'utf8'));
+      if (name === 'converted-1.json') assert.deepEqual(content, { amount: '999' });
+      else {
+        assert.equal(content.items[0].status, 'USED');
+        assert.equal(content.globallyTrusted, false);
+        assert.ok(content.licenses[0].text);
+      }
+      const file = candidateTask.artifacts.find((f: { filename: string }) => f.filename === name);
+      assert.equal(
+        (await platform.get(conversationRoot + `/tasks/${candidateTask.id}/artifacts/${file.id}`)).status(),
+        403,
+      );
+    }
+    await page.reload();
+    await expect(page.getByRole('button', { name: '下载 candidate-report.json', exact: true })).toBeVisible();
+    await page.locator('.conversation-result').last().scrollIntoViewIfNeeded();
+    await screenshot(page, 'candidate-desktop.png');
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.locator('.conversation-result').last().scrollIntoViewIfNeeded();
+    await screenshot(page, 'candidate-mobile.png');
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+    assert.equal(engine.stats.calls, 15);
+    // Select v1, persist the draft, then upload v2 before submission. The task must still read all of v1.
+    const originalBytes = Buffer.from(
+      'RAW_ONLY_MARKER,value\n' + Array.from({ length: 4000 }, (_, i) => `${i},1`).join('\n'),
+    );
+    const originalUpload = await context.request.post(materialRoot + '/materials', {
       headers: { [csrf.headerName]: csrf.token },
       multipart: {
         metadata: {
@@ -455,172 +441,278 @@ try {
           mimeType: 'application/json',
           buffer: Buffer.from(JSON.stringify({ requestId: randomUUID() })),
         },
-        file: { name: spec.name, mimeType: 'application/octet-stream', buffer: Buffer.from(spec.content) },
+        file: { name: 'whole-original.csv', mimeType: 'text/csv', buffer: originalBytes },
       },
     });
-    assert.equal(upload.status(), 201);
-    const file = await upload.json();
-    const fileDetail = await (await context.request.get(materialRoot + `/materials/${file.id}`)).json();
-    await page.getByLabel('工作要求', { exact: true }).fill(spec.prompt);
+    assert.equal(originalUpload.status(), 201);
+    const originalFile = await originalUpload.json();
+    const originalDetail = await (
+      await context.request.get(materialRoot + `/materials/${originalFile.id}`)
+    ).json();
+    const version = originalDetail.versions[0];
+    await page.getByLabel('任务方式', { exact: true }).selectOption('AGENT');
+    await page.getByLabel('工作要求', { exact: true }).fill('ORIGINAL_FILE 处理本次指定的文件');
     await page.getByRole('button', { name: '选择原件版本', exact: true }).click();
-    await page.getByRole('dialog').getByLabel('查找文件', { exact: true }).fill(spec.name);
+    await page.getByRole('dialog').getByLabel('查找文件', { exact: true }).fill('whole-original');
     await page
       .getByRole('dialog')
-      .getByRole('button', { name: spec.name + ' · v1', exact: true })
+      .getByRole('button', { name: 'whole-original.csv · v1', exact: true })
       .click();
     await page.getByRole('dialog').getByRole('button', { name: '选择 v1', exact: true }).click();
-    if (spec.output === 'table-summary-1.json') {
-      const updated = await context.request.post(materialRoot + `/materials/${file.id}/versions`, {
+    await page.reload();
+    await expect(page.locator('.original-selection')).toContainText('whole-original.csv · v1');
+    const revised = await context.request.post(materialRoot + `/materials/${originalFile.id}/versions`, {
+      headers: { [csrf.headerName]: csrf.token },
+      multipart: {
+        metadata: {
+          name: 'metadata.json',
+          mimeType: 'application/json',
+          buffer: Buffer.from(JSON.stringify({ requestId: randomUUID(), expectedVersion: 1 })),
+        },
+        file: {
+          name: 'whole-original.csv',
+          mimeType: 'text/csv',
+          buffer: Buffer.from('row,value\n0,999999'),
+        },
+      },
+    });
+    assert.equal(revised.status(), 201);
+    await page.getByRole('button', { name: '开始任务', exact: true }).click();
+    await expect(page.locator('.conversation-reply').last()).toContainText('完整原件 4000 行，合计 4000', {
+      timeout: 20000,
+    });
+    const originalTask = (await (await context.request.get(conversationRoot)).json()).tasks.at(-1);
+    assert.equal(originalTask.originals[0].versionId, version.id);
+    assert.equal(originalTask.originals[0].version, 1);
+    assert.equal(originalTask.originals[0].read, true);
+    assert.equal(originalTask.originals[0].sha256, version.sha256);
+    assert.deepEqual(originalTask.sources, []);
+    const originalDownload = page.waitForEvent('download');
+    await page.getByRole('button', { name: '下载 original-summary.json', exact: true }).click();
+    assert.deepEqual(JSON.parse(await readFile((await (await originalDownload).path())!, 'utf8')), {
+      rows: 4000,
+      total: '4000',
+    });
+    assert.equal(
+      (
+        await platform.get(
+          conversationRoot + `/tasks/${originalTask.id}/artifacts/${originalTask.artifacts[0].id}`,
+        )
+      ).status(),
+      403,
+    );
+    await page.reload();
+    await expect(page.locator('.conversation-originals').last()).toContainText('whole-original.csv · v1');
+    await expect(page.locator('.conversation-originals').last()).toContainText('已读取原件');
+    await page.locator('.conversation-result').last().scrollIntoViewIfNeeded();
+    await screenshot(page, 'original-mobile.png');
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+    await page.setViewportSize({ width: 1440, height: 960 });
+    await screenshot(page, 'original-desktop.png');
+    assert.equal(engine.stats.calls, 19);
+
+    let excelArtifactPath: string | undefined;
+    // Trusted recipes use complete selected versions; malformed/unsupported files remain failed.
+    for (const spec of [
+      {
+        name: 'recipe-table.csv',
+        prompt: 'FILE_RECIPE CSV',
+        content: 'team,amount,note\n"A,B",0.1,"first\nsecond"\n"A,B",0.2,"a""b"\nC,10,done\n',
+        expected: '完整表格 3 行，精确合计 10.3',
+        output: 'table-summary-1.json',
+      },
+      {
+        name: 'recipe-note.md',
+        prompt: 'FILE_RECIPE TEXT',
+        content: '标题\r\n<script>literal</script>\r\n第三行\r\n',
+        expected: '已提取第 2—3 行',
+        output: 'extracted-1.txt',
+      },
+      {
+        name: 'recipe-unsupported.xlsx',
+        prompt: 'FILE_RECIPE BAD',
+        content: 'synthetic unsupported file',
+        expected: '当前处理工具不支持这个文件格式',
+        output: '',
+      },
+    ]) {
+      const upload = await context.request.post(materialRoot + '/materials', {
         headers: { [csrf.headerName]: csrf.token },
         multipart: {
           metadata: {
             name: 'metadata.json',
             mimeType: 'application/json',
-            buffer: Buffer.from(JSON.stringify({ requestId: randomUUID(), expectedVersion: 1 })),
+            buffer: Buffer.from(JSON.stringify({ requestId: randomUUID() })),
           },
-          file: { name: spec.name, mimeType: 'text/csv', buffer: Buffer.from('team,amount\nNEW,999999\n') },
+          file: { name: spec.name, mimeType: 'application/octet-stream', buffer: Buffer.from(spec.content) },
         },
       });
-      assert.equal(updated.status(), 201);
-    }
-    await page.getByRole('button', { name: '开始任务', exact: true }).click();
-    const turn = page.locator('.conversation-turn').last();
-    await expect(turn).toContainText(spec.expected, { timeout: 20000 });
-    const saved = (await (await context.request.get(conversationRoot)).json()).tasks.at(-1);
-    assert.equal(saved.originals[0].versionId, fileDetail.versions[0].id);
-    if (!spec.output) {
-      assert.equal(saved.status, 'FAILED');
-      assert.equal(saved.errorCode, 'TASK_FILE_UNSUPPORTED');
-      assert.deepEqual(saved.artifacts, []);
-      await page.reload();
-      await expect(page.locator('.conversation-turn').last()).toContainText(spec.expected);
-      continue;
-    }
-    assert.equal(saved.status, 'SUCCEEDED');
-    assert.equal(saved.skills[0].id, 'file-processing');
-    const transfer = page.waitForEvent('download');
-    await turn.getByRole('button', { name: '下载 ' + spec.output, exact: true }).click();
-    const output = await readFile((await (await transfer).path())!, 'utf8');
-    if (spec.output === 'table-summary-1.json') {
-      assert.equal(JSON.parse(output).total, '10.3');
-      assert.equal(JSON.parse(output).groups[0].total, '0.3');
-    } else assert.equal(output, '<script>literal</script>\n第三行');
-    const provenance = page.waitForEvent('download');
-    await turn.getByRole('button', { name: '下载 processing-report-1.json', exact: true }).click();
-    const report = JSON.parse(await readFile((await (await provenance).path())!, 'utf8'));
-    assert.equal(report.versionId, fileDetail.versions[0].id);
-    assert.equal(report.inputSha256, fileDetail.versions[0].sha256);
-    assert.equal(report.recipeVersion, '1.1.0');
-    if (spec.output === 'table-summary-1.json') {
+      assert.equal(upload.status(), 201);
+      const file = await upload.json();
+      const fileDetail = await (await context.request.get(materialRoot + `/materials/${file.id}`)).json();
+      await page.getByLabel('工作要求', { exact: true }).fill(spec.prompt);
+      await page.getByRole('button', { name: '选择原件版本', exact: true }).click();
+      await page.getByRole('dialog').getByLabel('查找文件', { exact: true }).fill(spec.name);
+      await page
+        .getByRole('dialog')
+        .getByRole('button', { name: spec.name + ' · v1', exact: true })
+        .click();
+      await page.getByRole('dialog').getByRole('button', { name: '选择 v1', exact: true }).click();
+      if (spec.output === 'table-summary-1.json') {
+        const updated = await context.request.post(materialRoot + `/materials/${file.id}/versions`, {
+          headers: { [csrf.headerName]: csrf.token },
+          multipart: {
+            metadata: {
+              name: 'metadata.json',
+              mimeType: 'application/json',
+              buffer: Buffer.from(JSON.stringify({ requestId: randomUUID(), expectedVersion: 1 })),
+            },
+            file: { name: spec.name, mimeType: 'text/csv', buffer: Buffer.from('team,amount\nNEW,999999\n') },
+          },
+        });
+        assert.equal(updated.status(), 201);
+      }
+      await page.getByRole('button', { name: '开始任务', exact: true }).click();
+      const turn = page.locator('.conversation-turn').last();
+      await expect(turn).toContainText(spec.expected, { timeout: 20000 });
+      const saved = (await (await context.request.get(conversationRoot)).json()).tasks.at(-1);
+      assert.equal(saved.originals[0].versionId, fileDetail.versions[0].id);
+      if (!spec.output) {
+        assert.equal(saved.status, 'FAILED');
+        assert.equal(saved.errorCode, 'TASK_FILE_UNSUPPORTED');
+        assert.deepEqual(saved.artifacts, []);
+        await page.reload();
+        await expect(page.locator('.conversation-turn').last()).toContainText(spec.expected);
+        continue;
+      }
+      assert.equal(saved.status, 'SUCCEEDED');
+      assert.equal(saved.skills[0].id, 'file-processing');
       const transfer = page.waitForEvent('download');
-      await turn.getByRole('button', { name: '下载 table-summary-1.xlsx', exact: true }).click();
-      const download = await transfer;
-      assert.equal(download.suggestedFilename(), 'table-summary-1.xlsx');
-      const bytes = await readFile((await download.path())!);
-      const parsed = inspectWorkbook(bytes);
-      assert.equal(parsed.sheets[0].B8.value, '10.3');
-      assert.equal(parsed.sheets[0].E11.value, '0.3');
-      assert.equal(parsed.sheets[1].B4.value, '1');
-      assert.equal(parsed.sheets[1].B5.value, fileDetail.versions[0].id);
-      const excel = saved.artifacts.find((a: { filename: string }) => a.filename === 'table-summary-1.xlsx');
-      assert.equal(report.workbook.sha256, excel.sha256);
-      assert.equal(report.workbook.bytes, bytes.length);
-      assert.equal(saved.engineVersion, ENGINE_VERSION);
-      excelArtifactPath = conversationRoot + `/tasks/${saved.id}/artifacts/${excel.id}`;
-      assert.equal((await platform.get(excelArtifactPath)).status(), 403);
-      await writeFile(new URL('table-summary.xlsx', artifacts), bytes);
-      await screenshot(page, 'excel-result-desktop.png');
-      await page.setViewportSize({ width: 390, height: 844 });
-      await turn
-        .getByRole('button', { name: '下载 table-summary-1.xlsx', exact: true })
-        .scrollIntoViewIfNeeded();
-      await screenshot(page, 'excel-result-mobile.png');
-      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
-      await page.setViewportSize({ width: 1440, height: 960 });
-      await page.reload();
-      await expect(page.locator('.conversation-turn').last()).toContainText(spec.expected);
-      assert.deepEqual(await (await context.request.get(excelArtifactPath)).body(), bytes);
+      await turn.getByRole('button', { name: '下载 ' + spec.output, exact: true }).click();
+      const output = await readFile((await (await transfer).path())!, 'utf8');
+      if (spec.output === 'table-summary-1.json') {
+        assert.equal(JSON.parse(output).total, '10.3');
+        assert.equal(JSON.parse(output).groups[0].total, '0.3');
+      } else assert.equal(output, '<script>literal</script>\n第三行');
+      const provenance = page.waitForEvent('download');
+      await turn.getByRole('button', { name: '下载 processing-report-1.json', exact: true }).click();
+      const report = JSON.parse(await readFile((await (await provenance).path())!, 'utf8'));
+      assert.equal(report.versionId, fileDetail.versions[0].id);
+      assert.equal(report.inputSha256, fileDetail.versions[0].sha256);
+      assert.equal(report.recipeVersion, '1.1.0');
+      if (spec.output === 'table-summary-1.json') {
+        const transfer = page.waitForEvent('download');
+        await turn.getByRole('button', { name: '下载 table-summary-1.xlsx', exact: true }).click();
+        const download = await transfer;
+        assert.equal(download.suggestedFilename(), 'table-summary-1.xlsx');
+        const bytes = await readFile((await download.path())!);
+        const parsed = inspectWorkbook(bytes);
+        assert.equal(parsed.sheets[0].B8.value, '10.3');
+        assert.equal(parsed.sheets[0].E11.value, '0.3');
+        assert.equal(parsed.sheets[1].B4.value, '1');
+        assert.equal(parsed.sheets[1].B5.value, fileDetail.versions[0].id);
+        const excel = saved.artifacts.find(
+          (a: { filename: string }) => a.filename === 'table-summary-1.xlsx',
+        );
+        assert.equal(report.workbook.sha256, excel.sha256);
+        assert.equal(report.workbook.bytes, bytes.length);
+        assert.equal(saved.engineVersion, ENGINE_VERSION);
+        excelArtifactPath = conversationRoot + `/tasks/${saved.id}/artifacts/${excel.id}`;
+        assert.equal((await platform.get(excelArtifactPath)).status(), 403);
+        await writeFile(new URL('table-summary.xlsx', artifacts), bytes);
+        await screenshot(page, 'excel-result-desktop.png');
+        await page.setViewportSize({ width: 390, height: 844 });
+        await turn
+          .getByRole('button', { name: '下载 table-summary-1.xlsx', exact: true })
+          .scrollIntoViewIfNeeded();
+        await screenshot(page, 'excel-result-mobile.png');
+        assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+        await page.setViewportSize({ width: 1440, height: 960 });
+        await page.reload();
+        await expect(page.locator('.conversation-turn').last()).toContainText(spec.expected);
+        assert.deepEqual(await (await context.request.get(excelArtifactPath)).body(), bytes);
+      }
     }
-  }
-  assert.equal(engine.stats.calls, 34);
-  const accountingResponse = await platform.get(`/api/platform-admin/v1/tenants/${tenant}/operations`);
-  assert.equal(accountingResponse.status(), 200);
-  const accounting = (await accountingResponse.json()).attemptUsage;
-  assert.equal(accounting.length, 1);
-  assert.equal(accounting[0].executionClass, 'verification');
-  assert.equal(accounting[0].requests, 34);
-  assert.equal(accounting[0].reportedRequests, 33);
-  assert.equal(accounting[0].pendingRequests, 0);
-  assert.equal(accounting[0].cancelled, 1);
-  assert.equal(accounting[0].inputTokens, 330);
-  assert.equal(accounting[0].outputTokens, 165);
-  await screenshot(page, 'file-recipes-desktop.png');
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.locator('.conversation-turn').last().scrollIntoViewIfNeeded();
-  await screenshot(page, 'file-recipes-mobile.png');
-  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+    assert.equal(engine.stats.calls, 34);
+    const accountingResponse = await platform.get(`/api/platform-admin/v1/tenants/${tenant}/operations`);
+    assert.equal(accountingResponse.status(), 200);
+    const accounting = (await accountingResponse.json()).attemptUsage;
+    assert.equal(accounting.length, 1);
+    assert.equal(accounting[0].executionClass, 'verification');
+    assert.equal(accounting[0].requests, 34);
+    assert.equal(accounting[0].reportedRequests, 33);
+    assert.equal(accounting[0].pendingRequests, 0);
+    assert.equal(accounting[0].cancelled, 1);
+    assert.equal(accounting[0].inputTokens, 330);
+    assert.equal(accounting[0].outputTokens, 165);
+    await screenshot(page, 'file-recipes-desktop.png');
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.locator('.conversation-turn').last().scrollIntoViewIfNeeded();
+    await screenshot(page, 'file-recipes-mobile.png');
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
 
-  try {
-    await briefingJourney(page, context.request, platform, tenant, conversation, screenshot);
-  } catch (error) {
-    await screenshot(page, 'briefing-failure.png');
-    throw error;
-  }
-  try {
-    await documentJourney(page, context.request, platform, tenant, conversation, screenshot, (id) =>
-      publicationJourney(page, context.request, platform, tenant, id, password, invitation, screenshot),
+    try {
+      await briefingJourney(page, context.request, platform, tenant, conversation, screenshot);
+    } catch (error) {
+      await screenshot(page, 'briefing-failure.png');
+      throw error;
+    }
+    try {
+      await documentJourney(page, context.request, platform, tenant, conversation, screenshot, (id) =>
+        publicationJourney(page, context.request, platform, tenant, id, password, invitation, screenshot),
+      );
+    } catch (error) {
+      await screenshot(page, 'documents-failure.png');
+      throw error;
+    }
+    assert.equal(engine.stats.calls, 34);
+    assert.ok(excelArtifactPath);
+    assert.equal((await context.request.get(excelArtifactPath)).status(), 403);
+    assert.deepEqual(errors, []);
+    await writeFile(
+      new URL('result.json', artifacts),
+      JSON.stringify(
+        {
+          browser: browserName,
+          browserVersion: browser!.version(),
+          modelProvider,
+          verified: [
+            'real PostgreSQL V15',
+            'shared material activity without private lineage, exact version download, workspace filter and focus revocation',
+            'real XLSX result snapshot, exact decimals and pinned v1 after v2 upload, source metadata and hash, reload download and suspension refusal',
+            'independent shared publication, real recipient reads and parsing, explicit target versions, uncertain retries and target revocation',
+            'private source-linked documents, drafts, immutable versions, conflict preservation, verified DOCX/PDF downloads and revocation clearing',
+            'real local parser',
+            'private briefing deduplicates latest successful reply, durable focus/hide/resize, historical task anchors and CSRF isolation',
+            `${modelProvider} Chat Completions HTTP fixture`,
+            'actual Harness and sandbox computation',
+            'private artifact and SHA download',
+            'draft restore and history reload',
+            'cancel aborts provider body',
+            'desktop and mobile',
+            'trusted catalog and exact-version activation',
+            'SearXNG HTTP fixture and public page snapshot',
+            'immutable public query excludes private prompt',
+            'candidate archive admission, offline staging, synthetic trial and task-local reuse',
+            'converted JSON and provenance report remain private after reload',
+            'explicit original v1 remains pinned after v2 upload; all 4000 rows computed; raw bytes excluded from model messages',
+            'trusted CSV exact decimals and quoted multiline fields; TXT/Markdown literal line extraction; private provenance and unsupported-format failure',
+          ],
+          cloudModelCalled: false,
+          sandbox: executor?.isolation ?? 'local-macos-prototype',
+          attemptUsage: accounting,
+          modelRequests: engine.stats.calls,
+          taskStatus: task.status,
+          cancelStatus: cancelled.tasks.at(-1).status,
+        },
+        null,
+        2,
+      ) + '\n',
     );
-  } catch (error) {
-    await screenshot(page, 'documents-failure.png');
-    throw error;
+    console.log(
+      'PASS: Agent browser → platform → model HTTP fixture → real Harness/tool artifact; cancellation propagated; no cloud model call.',
+    );
   }
-  assert.equal(engine.stats.calls, 34);
-  assert.ok(excelArtifactPath);
-  assert.equal((await context.request.get(excelArtifactPath)).status(), 403);
-  assert.deepEqual(errors, []);
-  await writeFile(
-    new URL('result.json', artifacts),
-    JSON.stringify(
-      {
-        browser: browserName,
-        browserVersion: browser!.version(),
-        modelProvider,
-        verified: [
-          'real PostgreSQL V15',
-          'shared material activity without private lineage, exact version download, workspace filter and focus revocation',
-          'real XLSX result snapshot, exact decimals and pinned v1 after v2 upload, source metadata and hash, reload download and suspension refusal',
-          'independent shared publication, real recipient reads and parsing, explicit target versions, uncertain retries and target revocation',
-          'private source-linked documents, drafts, immutable versions, conflict preservation, verified DOCX/PDF downloads and revocation clearing',
-          'real local parser',
-          'private briefing deduplicates latest successful reply, durable focus/hide/resize, historical task anchors and CSRF isolation',
-          `${modelProvider} Chat Completions HTTP fixture`,
-          'actual Harness and sandbox computation',
-          'private artifact and SHA download',
-          'draft restore and history reload',
-          'cancel aborts provider body',
-          'desktop and mobile',
-          'trusted catalog and exact-version activation',
-          'SearXNG HTTP fixture and public page snapshot',
-          'immutable public query excludes private prompt',
-          'candidate archive admission, offline staging, synthetic trial and task-local reuse',
-          'converted JSON and provenance report remain private after reload',
-          'explicit original v1 remains pinned after v2 upload; all 4000 rows computed; raw bytes excluded from model messages',
-          'trusted CSV exact decimals and quoted multiline fields; TXT/Markdown literal line extraction; private provenance and unsupported-format failure',
-        ],
-        cloudModelCalled: false,
-        sandbox: executor?.isolation ?? 'local-macos-prototype',
-        attemptUsage: accounting,
-        modelRequests: engine.stats.calls,
-        taskStatus: task.status,
-        cancelStatus: cancelled.tasks.at(-1).status,
-      },
-      null,
-      2,
-    ) + '\n',
-  );
-  console.log(
-    'PASS: Agent browser → platform → model HTTP fixture → real Harness/tool artifact; cancellation propagated; no cloud model call.',
-  );
   await platform.dispose();
   await context.close();
 } catch (error) {

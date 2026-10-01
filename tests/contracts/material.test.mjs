@@ -38,3 +38,14 @@ test('all material writes require CSRF and downloads specify attachments with no
   assert.equal(upload({ folderId: id }), false);
   assert.equal(upload({ requestId: id, ownerId: id }), false);
 });
+test('upload receipts distinguish the accepted immutable version from current material state', () => {
+  const at='2026-10-01T00:00:00Z';
+  const accepted={id,number:1,filename:'synthetic.txt',sizeBytes:3,sha256:'a'.repeat(64),createdBy:id,createdAt:at,origin:'UPLOAD'};
+  const entry={id,tenantId:id,workspaceId:id,workspaceName:'合成空间',folderId:null,kind:'DOCUMENT',name:'synthetic.txt',version:1,sizeBytes:3,updatedAt:at,path:['合成空间','synthetic.txt'],canMaintain:true};
+  const validate=check('UploadReceipt');
+  assert.ok(validate({...entry,receiptStatus:'EXACT',acceptedVersion:accepted,currentVersion:2}),JSON.stringify(validate.errors));
+  assert.equal(validate({...entry,receiptStatus:'EXACT',acceptedVersion:null,currentVersion:2}),false);
+  assert.ok(validate({...entry,version:2,receiptStatus:'HISTORICAL_UNKNOWN',acceptedVersion:null,currentVersion:2}));
+  assert.equal(validate({...entry,receiptStatus:'HISTORICAL_UNKNOWN',acceptedVersion:accepted,currentVersion:2}),false);
+  assert.equal(validate({...entry,receiptStatus:'EXACT',acceptedVersion:accepted,currentVersion:2,objectId:id}),false);
+});

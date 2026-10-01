@@ -35,6 +35,7 @@ export type TenantAction =
   | 'INVITATION_ACCEPT'
   | 'MEMBER_ENABLE'
   | 'MEMBER_DISABLE'
+  | 'MEMBER_SECURITY_DISABLE'
   | 'MEMBER_ROLE'
   | 'WORKSPACE_CREATE'
   | 'WORKSPACE_RENAME'
@@ -57,4 +58,15 @@ export interface TenantRecord {
 export interface VersionedChange {
   requestId: string;
   expectedVersion: number;
+}
+/** Explicit tenant-scoped safety stop. It cannot transfer ownership or disable other tenant memberships. */
+export interface EmergencyDisable extends VersionedChange { securityAction: 'SECURITY_RISK' }
+/** Historical operation receipt; status is not a substitute for refetching the current member state. */
+export interface EmergencyDisableReceipt {
+  accountId: string;
+  status: 'DISABLED';
+  version: number;
+  securityAction: 'SECURITY_RISK';
+  recoveryRequestId: string | null;
+  recoveryStatus: 'PENDING_VERIFICATION' | null;
 }

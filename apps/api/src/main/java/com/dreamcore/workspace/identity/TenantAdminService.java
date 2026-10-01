@@ -11,6 +11,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class TenantAdminService {
     public record Member(UUID accountId, String email, String displayName, String role, String status, String accountStatus, long version) {}
+    public record EmergencyDisableReceipt(UUID accountId, String status, long version, String securityAction,
+                                          UUID recoveryRequestId, String recoveryStatus) {}
     public record SharedWorkspace(UUID id, UUID tenantId, String name, String kind, long version, long memberCount) {}
     public record Grant(UUID accountId, String email, String displayName, String status, String accountStatus, boolean canMaintain) {}
     public record Overview(UUID tenantId, String name, long version, long activeMemberCount, long disabledMemberCount,
@@ -34,8 +36,10 @@ public class TenantAdminService {
     private final IdentityService identities;
     private final IdentityAudit audit;
     private final LocalInvitationDelivery delivery;
-    public TenantAdminService(JdbcTemplate db, IdentityService identities, IdentityAudit audit, LocalInvitationDelivery delivery) {
-        this.db=db; this.identities=identities; this.audit=audit; this.delivery=delivery;
+    private final com.dreamcore.workspace.governance.GovernanceAccess governance;
+    private final com.dreamcore.workspace.departure.DepartureAccess departure;
+    public TenantAdminService(JdbcTemplate db, IdentityService identities, IdentityAudit audit, LocalInvitationDelivery delivery, com.dreamcore.workspace.governance.GovernanceAccess governance,com.dreamcore.workspace.departure.DepartureAccess departure) {this.departure=departure;
+        this.db=db; this.identities=identities; this.audit=audit; this.delivery=delivery;this.governance=governance;
     }
     static void page(int offset, int limit) { if (offset<0 || offset>100000 || limit<1 || limit>100) throw IdentityException.invalid(); }
     private static void version(long supplied, long current) {
@@ -90,13 +94,50 @@ public class TenantAdminService {
         if (!List.of("ACTIVE","DISABLED").contains(status)) throw IdentityException.invalid();
         String fingerprint=IdentityService.hash(tenant+"\n"+id+"\n"+expectedVersion+"\n"+status);
         UUID prior=mutation(actor,tenant,key,"MEMBER_STATUS",fingerprint);
-        Member current=member(tenant,id); if (prior!=null) return current; version(expectedVersion,current.version());
+        Member current=member(tenant,id); if (prior!=null) return current; if("ACTIVE".equals(status))departure.requireMemberActivation(tenant,id); version(expectedVersion,current.version());
         if (!current.status().equals(status)) {
+            if ("ACTIVE".equals(status) && Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM governance_security_stops s JOIN governance_recovery_requests r ON r.id=s.recovery_request_id AND r.tenant_id=s.tenant_id WHERE s.tenant_id=? AND s.account_id=? AND r.status='PENDING_VERIFICATION')",Boolean.class,tenant,id)))
+                throw new IdentityException(409,"SECURITY_RECOVERY_PENDING");
+            governance.protectOwner(tenant,id,status);
             protectLastAdmin(tenant,current,status,current.role());
             db.update("UPDATE tenant_memberships SET status=?,management_version=management_version+1 WHERE tenant_id=? AND account_id=?",status,tenant,id);
             audit.record(actor,tenant,"ACTIVE".equals(status)?"MEMBER_ENABLE":"MEMBER_DISABLE",id,"SUCCESS");
         }
         identities.remember(actor,key,"MEMBER_STATUS",fingerprint,id); return member(tenant,id);
+    }
+    /** Safety stop is independent of ordinary handover. It never transfers responsibility or content rights. */
+    @Transactional
+    public EmergencyDisableReceipt emergencyDisable(UUID actor, UUID tenant, UUID id, UUID key, long expectedVersion, String securityAction) {
+        if (!"SECURITY_RISK".equals(securityAction)) throw IdentityException.invalid();
+        String operation="MEMBER_SECURITY_DISABLE", fingerprint=IdentityService.hash(tenant+"\n"+id+"\n"+expectedVersion+"\n"+securityAction);
+        UUID prior=mutation(actor,tenant,key,operation,fingerprint);
+        if (prior!=null) return securityReceipt(tenant,prior);
+        Member current=member(tenant,id); version(expectedVersion,current.version());
+        boolean owner=Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM tenant_governance WHERE tenant_id=? AND owner_id=?)",Boolean.class,tenant,id));
+        boolean lastAdmin="TENANT_ADMIN".equals(current.role()) && db.queryForObject("""
+            SELECT count(*) FROM tenant_memberships m JOIN accounts a ON a.id=m.account_id
+            WHERE m.tenant_id=? AND m.account_id<>? AND m.role='TENANT_ADMIN' AND m.status='ACTIVE' AND a.status='ACTIVE'
+            """,Long.class,tenant,id)==0;
+        if (!"DISABLED".equals(current.status()))
+            db.update("UPDATE tenant_memberships SET status='DISABLED',management_version=management_version+1 WHERE tenant_id=? AND account_id=?",tenant,id);
+        UUID recovery=null;
+        if (owner || lastAdmin) {
+            recovery=UUID.randomUUID();
+            db.update("INSERT INTO governance_recovery_requests(id,tenant_id,requested_by,reason) VALUES (?,?,?,?)",recovery,tenant,actor,owner?"OWNER_UNAVAILABLE":"LEGACY_OWNER_UNVERIFIED");
+            audit.record(actor,tenant,"SECURITY_RECOVERY_REQUIRED",recovery,"SUCCESS");
+        }
+        UUID receipt=UUID.randomUUID();
+        db.update("INSERT INTO governance_security_stops(id,tenant_id,account_id,requested_by,member_version,security_action,recovery_request_id) VALUES (?,?,?,?,?,?,?)",
+            receipt,tenant,id,actor,member(tenant,id).version(),securityAction,recovery);
+        identities.remember(actor,key,operation,fingerprint,receipt);
+        audit.record(actor,tenant,operation,id,"SUCCESS");
+        // Self-stop may remove the caller's last tenant role. Return only this already-authorized receipt.
+        return securityReceipt(tenant,receipt);
+    }
+    private EmergencyDisableReceipt securityReceipt(UUID tenant,UUID receipt) {
+        return db.queryForObject("SELECT account_id,member_version,security_action,recovery_request_id FROM governance_security_stops WHERE tenant_id=? AND id=?",
+            (r,n)->new EmergencyDisableReceipt(r.getObject("account_id",UUID.class),"DISABLED",r.getLong("member_version"),r.getString("security_action"),
+                r.getObject("recovery_request_id",UUID.class),r.getObject("recovery_request_id")==null?null:"PENDING_VERIFICATION"),tenant,receipt);
     }
     private void protectLastAdmin(UUID tenant, Member current, String status, String role) {
         if ("TENANT_ADMIN".equals(current.role()) && "ACTIVE".equals(current.status()) && "ACTIVE".equals(current.accountStatus()) &&
@@ -130,6 +171,7 @@ public class TenantAdminService {
     public SharedWorkspace createSpace(UUID actor, UUID tenant, UUID key, String suppliedName) {
         String name=IdentityService.name(suppliedName,100), fingerprint=IdentityService.hash(tenant+"\n"+name);
         UUID prior=mutation(actor,tenant,key,"CREATE_SHARED_SPACE",fingerprint); if (prior!=null) return space(tenant,prior);
+        departure.requireActiveBusiness(actor,tenant);
         UUID id=UUID.randomUUID();
         db.update("INSERT INTO workspaces(id,tenant_id,owner_id,name,kind) VALUES (?,?,?,?,'SHARED')",id,tenant,actor,name);
         identities.remember(actor,key,"CREATE_SHARED_SPACE",fingerprint,id); audit.record(actor,tenant,"WORKSPACE_CREATE",id,"SUCCESS");
@@ -152,8 +194,8 @@ public class TenantAdminService {
         UUID prior=mutation(actor,tenant,key,"SPACE_MEMBERSHIP",fingerprint); SharedWorkspace current=space(tenant,id);
         if (prior!=null) return current; version(expectedVersion,current.version());
         Member target=member(tenant,accountId);
-        // Self-grant awaits an explicit business decision. Revoking one's own grant is always allowed.
-        if (enabled && actor.equals(accountId)) throw new IdentityException(403,"SELF_GRANT_NOT_ENABLED");
+        if(enabled){departure.requireActiveBusiness(actor,tenant);departure.requireMemberActivation(tenant,accountId);}
+        governance.contentGrant(actor,tenant,accountId,enabled);
         if (enabled && (!"ACTIVE".equals(target.status()) || !"ACTIVE".equals(target.accountStatus())))
             throw new IdentityException(409,"MEMBER_INACTIVE");
         int changed=enabled ? db.update("INSERT INTO workspace_members(tenant_id,workspace_id,account_id) VALUES (?,?,?) ON CONFLICT DO NOTHING",tenant,id,accountId)
@@ -171,7 +213,8 @@ public class TenantAdminService {
         UUID prior=mutation(actor,tenant,key,"SPACE_MAINTENANCE",fingerprint);
         SharedWorkspace current=space(tenant,id); if (prior!=null) return current;
         version(expectedVersion,current.version()); Member target=member(tenant,accountId);
-        if (enabled && actor.equals(accountId)) throw new IdentityException(403,"SELF_GRANT_NOT_ENABLED");
+        if(enabled){departure.requireActiveBusiness(actor,tenant);departure.requireMemberActivation(tenant,accountId);}
+        governance.contentGrant(actor,tenant,accountId,enabled);
         if (enabled && (!"ACTIVE".equals(target.status()) || !"ACTIVE".equals(target.accountStatus()))) throw new IdentityException(409,"MEMBER_INACTIVE");
         var grants=db.queryForList("SELECT can_maintain FROM workspace_members WHERE tenant_id=? AND workspace_id=? AND account_id=?",Boolean.class,tenant,id,accountId);
         if (grants.isEmpty()) throw new IdentityException(404,"WORKSPACE_GRANT_NOT_FOUND");
@@ -195,7 +238,7 @@ public class TenantAdminService {
             LEFT JOIN workspaces w ON w.id=e.target_id AND w.tenant_id=e.tenant_id AND w.kind='SHARED'
             LEFT JOIN tenants t ON t.id=e.target_id AND t.id=e.tenant_id
             WHERE e.tenant_id=? AND e.outcome='SUCCESS' AND e.action IN ('INVITATION_CREATE','INVITATION_REVOKE','INVITATION_ACCEPT',
-                'MEMBER_ENABLE','MEMBER_DISABLE','MEMBER_ROLE','WORKSPACE_CREATE','WORKSPACE_RENAME','WORKSPACE_GRANT','WORKSPACE_REVOKE','WORKSPACE_MAINTAIN','WORKSPACE_READONLY','TENANT_RENAME')
+                'MEMBER_ENABLE','MEMBER_DISABLE','MEMBER_SECURITY_DISABLE','MEMBER_ROLE','WORKSPACE_CREATE','WORKSPACE_RENAME','WORKSPACE_GRANT','WORKSPACE_REVOKE','WORKSPACE_MAINTAIN','WORKSPACE_READONLY','TENANT_RENAME')
             ORDER BY e.created_at DESC,e.id DESC LIMIT ? OFFSET ?
             """,(r,n)->new AuditEntry(r.getLong("id"),r.getObject("actor_id",UUID.class),r.getString("actor_name"),r.getString("action"),
                 r.getObject("target_id",UUID.class),r.getString("target_name"),r.getObject("related_account_id",UUID.class),

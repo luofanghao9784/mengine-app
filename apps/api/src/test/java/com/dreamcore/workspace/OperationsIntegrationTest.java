@@ -70,6 +70,15 @@ class OperationsIntegrationTest {
         assertEquals(10,operations.tenant(admin,tenant,30).tasks().total());
         assertEquals(r.tasks(),operations.platform(operator,tenant,7).tasks());
     }
+    @Test void allControlStatesStayDistinctInTaskAndAttemptTotals(){
+        for(String status:List.of("PAUSED","WAITING_INPUT","WAITING_CAPABILITY","PARTIAL","RESULT_UNKNOWN")) {
+            UUID id=row(tenant,space,status,"AGENT","verification",status.equals("RESULT_UNKNOWN")?"TASK_RESULT_UNKNOWN":null,1,0,null);
+            db.update("INSERT INTO agent_attempt_usage(attempt_id,task_id,tenant_id,workspace_id,execution_class,attempt_number,status) VALUES (?,?,?,?,'verification',1,?)",UUID.randomUUID(),id,tenant,space,status);
+        }
+        var r=operations.tenant(admin,tenant,7);assertEquals(5,r.tasks().total());assertEquals(0,r.tasks().succeeded());assertEquals(0,r.tasks().failed());assertEquals(1,r.tasks().paused());assertEquals(1,r.tasks().waitingInput());assertEquals(1,r.tasks().waitingCapability());assertEquals(1,r.tasks().partial());assertEquals(1,r.tasks().resultUnknown());
+        var a=r.attemptUsage().getFirst();assertEquals(5,a.attempts());assertEquals(1,a.paused());assertEquals(1,a.waitingInput());assertEquals(1,a.waitingCapability());assertEquals(1,a.partial());assertEquals(1,a.resultUnknown());assertEquals(0,a.requests());assertNull(a.inputTokens());assertEquals("TASK_RESULT_UNKNOWN",r.errors().getFirst().code());
+        assertFalse(new JsonMapper().writeValueAsString(r).contains(SECRET));
+    }
     @Test void missingUsageAndZeroReportedTokensStayDifferent(){
         row(tenant,space,"SUCCEEDED","AGENT","live",null,1,0,"null");row(tenant,space,"SUCCEEDED","AGENT","verification",null,1,0,"{\"inputTokens\":0,\"outputTokens\":0}");
         var m=operations.tenant(admin,tenant,7).models();assertNull(m.getFirst().inputTokens());assertEquals(0,m.getFirst().reportedTasks());assertEquals(0,m.getLast().inputTokens());assertEquals(1,m.getLast().reportedTasks());

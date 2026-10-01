@@ -1,7 +1,12 @@
 import { useEffect, useState, type RefObject } from 'react';
 import { useDemo } from '../store';
 import type { BriefingState, CardSize } from '../briefing';
-import { layoutBriefingSpread, saveBriefingLayout, type BriefingEntry } from '../briefingLayout';
+import {
+  layoutBriefingSpread,
+  saveBriefingLayout,
+  type BriefingEntry,
+  type BriefingFit,
+} from '../briefingLayout';
 import { useBriefingEdit, useBriefingMove } from './BriefingMove';
 import { useBriefingResize } from './BriefingResize';
 
@@ -16,6 +21,7 @@ export function useBriefingFollowLayout(options: {
   enabled: boolean;
   blocked: boolean;
   entries: BriefingEntry[];
+  minimum?: BriefingFit;
 }) {
   const { state, change } = useDemo();
   const owner = state.profile.name;
@@ -45,6 +51,10 @@ export function useBriefingFollowLayout(options: {
       else delete preferences[owner];
     });
   };
+  // A measured minimum belongs to the previous shape. Let the new shape render
+  // before measuring it again; otherwise a wide-card minimum also blocks tall cards.
+  const resizingMinimum = (id: string) =>
+    Object.fromEntries(Object.entries(options.minimum || {}).filter(([key]) => key !== id));
   const resize = useBriefingResize({
     ...options,
     onCommit: (id, size, position) => {
@@ -56,6 +66,8 @@ export function useBriefingFollowLayout(options: {
         sizes,
         { id, row: position.row, col: position.col },
         saved?.layout,
+        false,
+        resizingMinimum(id),
       );
       save(
         {
@@ -78,6 +90,8 @@ export function useBriefingFollowLayout(options: {
         saved?.sizes,
         resize.layoutAnchor('following'),
         saved?.layout,
+        false,
+        resize.preview ? resizingMinimum(resize.preview.id) : options.minimum,
       ),
     onStart: () => resize.clearAnchors(),
     onTouchHold: () => edit.setEditing(true),
@@ -90,6 +104,8 @@ export function useBriefingFollowLayout(options: {
         { ...sizes, [preview.id]: preview.size },
         preview,
         preview.baseline,
+        false,
+        options.minimum,
       );
       save(
         {
@@ -114,6 +130,8 @@ export function useBriefingFollowLayout(options: {
         sizes,
         move.preview || resize.layoutAnchor('following'),
         move.preview?.baseline || saved?.layout,
+        false,
+        resize.preview ? resizingMinimum(resize.preview.id) : options.minimum,
       )
     : [];
   const cancel = () => {
@@ -126,6 +144,7 @@ export function useBriefingFollowLayout(options: {
     move,
     edit,
     placements,
+    requestedSizes: sizes,
     undo,
     hasLayout: !!saved,
     finishEditing: () => {

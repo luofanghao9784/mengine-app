@@ -214,7 +214,13 @@ test('标题拖动改变卡片位置和顺序，列表不可移动，草稿与�
   await openCards(page);
   const original = await order(page);
   const last = original.at(-1)!;
-  await card(page, last).getByRole('button', { name: '版本记录', exact: true }).click();
+  await card(page, last).getByRole('button', { name: '资料属性', exact: true }).click();
+  await expect(card(page, last)).toBeInViewport({ ratio: 0.99 });
+  await card(page, last).getByRole('tab', { name: '版本记录', exact: true }).click();
+  await expect(card(page, last).getByRole('tab', { name: '版本记录' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
   await page.getByLabel('继续对话', { exact: true }).fill('保留这段未发送草稿');
   const list = (await card(page, 'list').boundingBox())!;
   const oldConversationX = (await card(page, 'conversation').boundingBox())!.x;
@@ -229,8 +235,8 @@ test('标题拖动改变卡片位置和顺序，列表不可移动，草稿与�
   await page.screenshot({ path: '.local/conversation-deck/live-drag.png' });
   await page.mouse.up();
   await expect(page.getByLabel('继续对话', { exact: true })).toHaveValue('保留这段未发送草稿');
-  await expect(card(page, last).getByRole('button', { name: '版本记录', exact: true })).toHaveAttribute(
-    'aria-expanded',
+  await expect(card(page, last).getByRole('tab', { name: '版本记录', exact: true })).toHaveAttribute(
+    'aria-selected',
     'true',
   );
   expect(
@@ -360,7 +366,8 @@ test('触屏拖动标题可排序与取消，手机单卡模式保留正文滚�
   const reader = card(page, 'kg-D06').locator('.reader-scroll');
   const reading = (await reader.boundingBox())!;
   const readingX = reading.x + reading.width / 2;
-  const readingY = reading.y + reading.height - 50;
+  // Start on the document body, above its floating question button.
+  const readingY = reading.y + Math.min(reading.height - 120, reading.height * 0.6);
   await client.send('Input.dispatchTouchEvent', {
     type: 'touchStart',
     touchPoints: [{ x: readingX, y: readingY }],

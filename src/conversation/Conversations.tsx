@@ -1,19 +1,37 @@
+import { FeedbackPanel } from '../feedback/FeedbackPanel';
+import { TaskWorkNotices } from '../taskwork/TaskWorkNotices';
+import { RequestPending, requestNavigationLocked, useRequestLock } from '../shared/request-guard';
+import { useContext } from 'react';
 import { readTabDraft, writeTabDraft, removeTabDraft } from '../shared/tab-drafts';
 import { DraftWarning } from '../shared/DraftWarning';
 import { SaveAsDocument } from '../documents/Documents';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { MessageCircle, Plus, RefreshCw, Send } from 'lucide-react';
+import {
+  ArrowUp,
+  FileText,
+  Files,
+  Folder,
+  ListChecks,
+  MessageCircle,
+  Plus,
+  RefreshCw,
+  Search,
+  Sparkles,
+} from 'lucide-react';
 import type {
   ConversationDetail,
   ConversationTask,
   ConversationPage,
   SendTask,
   TaskOriginal,
+  TaskAction,
 } from '../../contracts/public-api/conversation';
 import type { TenantContext } from '../../contracts/public-api/identity';
 import { identityClient, useSession } from '../identity/session';
 import { IdentityError, record, uuid } from '../identity/client';
-import { Button, Badge, Field, PageActions, Modal } from '../shared/ui';
+import { Button, Badge, Field, PageActions } from '../shared/ui';
+import { LiveConversationDeck } from './LiveConversationDeck';
+import type { ReactNode } from 'react';
 import { Failure, Loading, Pager, SubmitError, useRemote, useSubmission } from '../shared/admin';
 import { Citation } from '../material/Knowledge';
 import { OriginalPicker } from './OriginalPicker';
@@ -24,12 +42,15 @@ export const conversationHref = (tenant: string, id?: string) =>
   '#' + new URLSearchParams({ tenant, view: 'conversations', ...(id ? { conversation: id } : {}) });
 export function Conversations({ tenant }: { tenant: string }) {
   const { session, expire } = useSession();
+  const pendingRequest = useContext(RequestPending);
   const [contextAttempt, setContextAttempt] = useState(0);
   const [hash, setHash] = useState(location.hash),
     [attempt, setAttempt] = useState(0),
     [page, setPage] = useState(0);
   useEffect(() => {
-    const change = () => setHash(location.hash);
+    const change = () => {
+      if (!requestNavigationLocked()) setHash(location.hash);
+    };
     window.addEventListener('hashchange', change);
     return () => window.removeEventListener('hashchange', change);
   }, []);
@@ -60,16 +81,9 @@ export function Conversations({ tenant }: { tenant: string }) {
     <>
       <PageActions>
         <Button
-          icon={Plus}
-          onClick={() => {
-            location.hash = conversationHref(tenant);
-          }}
-        >
-          新会话
-        </Button>
-        <Button
           variant="ghost"
           icon={RefreshCw}
+          disabled={pendingRequest}
           onClick={() => {
             changed();
             setContextAttempt((x) => x + 1);
@@ -89,35 +103,97 @@ export function Conversations({ tenant }: { tenant: string }) {
       ) : !context.value || !list.value ? (
         <Loading />
       ) : (
-        <div className="live-conversations">
-          <aside className="conversation-list" aria-label="会话列表">
-            <h2>会话列表</h2>
-            <p className="muted">仅自己可见</p>
-            {list.value.items.map((c) => (
-              <a
-                key={c.id}
-                className={selected === c.id ? 'selected' : ''}
-                href={conversationHref(tenant, c.id)}
+        <ConversationView
+          key={(selected || 'new') + ':' + (focused || '')}
+          tenant={tenant}
+          selected={selected}
+          focused={focused}
+          context={context.value}
+          enabled={list.value.enabled}
+          agentMode={list.value.agentMode}
+          publicWebEnabled={list.value.publicWebEnabled}
+          changed={changed}
+          navigation={
+            <nav className="live-conversation-list" aria-label="会话列表">
+              <header className="live-card-heading">
+                <h2>会话列表</h2>
+                <span>仅自己可见</span>
+              </header>
+              <Button
+                className="live-new-conversation"
+                icon={Plus}
+                disabled={pendingRequest}
+                onClick={() => {
+                  location.hash = conversationHref(tenant);
+                }}
               >
-                <MessageCircle size={16} />
-                <span>{c.title}</span>
-              </a>
-            ))}
-            {!list.value.items.length && <p className="muted">发送后会保留会话记录。</p>}
-            <Pager page={page} next={list.value.hasMore} onPage={setPage} />
-          </aside>
-          <ConversationView
-            key={(selected || 'new') + ':' + (focused || '')}
-            tenant={tenant}
-            selected={selected}
-            focused={focused}
-            context={context.value}
-            enabled={list.value.enabled}
-            agentMode={list.value.agentMode}
-            publicWebEnabled={list.value.publicWebEnabled}
-            changed={changed}
-          />
-        </div>
+                新会话
+              </Button>
+              <div className="live-conversation-links">
+                {context.value.workspaces.map((space) => {
+                  const conversations = list.value!.items.filter((item) => item.workspaceId === space.id);
+                  return conversations.length ? (
+                    <section className="live-conversation-group" key={space.id}>
+                      <h3>
+                        <Folder size={14} />
+                        {space.kind === 'PERSONAL' ? '个人空间' : space.name}
+                      </h3>
+                      {conversations.map((c) => (
+                        <a
+                          key={c.id}
+                          className={selected === c.id ? 'selected' : ''}
+                          href={conversationHref(tenant, c.id)}
+                          aria-current={selected === c.id ? 'page' : undefined}
+                          onClick={(event) => {
+                            if (pendingRequest) event.preventDefault();
+                          }}
+                        >
+                          <MessageCircle size={15} />
+                          <span title={c.title}>{c.title}</span>
+                        </a>
+                      ))}
+                    </section>
+                  ) : null;
+                })}
+                {list.value.items.some(
+                  (item) => !context.value!.workspaces.some((space) => space.id === item.workspaceId),
+                ) && (
+                  <section className="live-conversation-group">
+                    <h3>其他会话</h3>
+                    {list.value.items
+                      .filter(
+                        (item) => !context.value!.workspaces.some((space) => space.id === item.workspaceId),
+                      )
+                      .map((c) => (
+                        <a
+                          key={c.id}
+                          className={selected === c.id ? 'selected' : ''}
+                          href={conversationHref(tenant, c.id)}
+                          aria-current={selected === c.id ? 'page' : undefined}
+                          onClick={(event) => {
+                            if (pendingRequest) event.preventDefault();
+                          }}
+                        >
+                          <MessageCircle size={15} />
+                          <span title={c.title}>{c.title}</span>
+                        </a>
+                      ))}
+                  </section>
+                )}
+                {!list.value.items.length && (
+                  <p className="live-list-empty">从一件具体的工作开始。发送后，会话会保存在这里。</p>
+                )}
+              </div>
+              <Pager
+                page={page}
+                next={list.value.hasMore}
+                onPage={(next) => {
+                  if (!pendingRequest) setPage(next);
+                }}
+              />
+            </nav>
+          }
+        />
       )}
     </>
   );
@@ -131,7 +207,9 @@ function ConversationView({
   agentMode,
   publicWebEnabled,
   changed,
+  navigation,
 }: {
+  navigation: ReactNode;
   tenant: string;
   selected?: string;
   focused?: string;
@@ -142,10 +220,12 @@ function ConversationView({
   changed: () => void;
 }) {
   const { session, expire } = useSession();
+  const pendingRequest = useContext(RequestPending);
   const [data, setData] = useState<{ value?: ConversationDetail; error?: unknown }>({});
   const [attempt, setAttempt] = useState(0),
     [page, setPage] = useState(0),
     [citation, setCitation] = useState<string>();
+  const [suggestion, setSuggestion] = useState<{ text: string; sequence: number }>();
   const valueRef = useRef<ConversationDetail | undefined>(undefined);
   useEffect(() => {
     if (!selected) return;
@@ -160,7 +240,7 @@ function ConversationView({
     };
     const load = async () => {
       const value = focused
-        ? await api.historical(tenant, selected, focused, controller.signal)
+        ? await api.taskDetail(tenant, selected, focused, controller.signal)
         : await api.detail(tenant, selected, page * 20, controller.signal);
       if (!controller.signal.aborted) {
         valueRef.current = value;
@@ -170,7 +250,7 @@ function ConversationView({
     const poll = async () => {
       try {
         const events = await api.events(tenant, selected, valueRef.current?.cursor || 0, controller.signal);
-        if (events.items.length) {
+        if (events.items.length && !pendingRequest) {
           await load();
           changed();
         }
@@ -183,7 +263,7 @@ function ConversationView({
       failure(new IdentityError('CONVERSATION_NOT_FOUND', 404));
       return;
     }
-    void load()
+    void (pendingRequest ? Promise.resolve() : load())
       .then(() => {
         if (!controller.signal.aborted) timer = setTimeout(poll, 1500);
       })
@@ -192,7 +272,7 @@ function ConversationView({
       controller.abort();
       clearTimeout(timer);
     };
-  }, [tenant, selected, focused, page, attempt, session.identity, context, expire, changed]);
+  }, [tenant, selected, focused, page, attempt, session.identity, context, expire, changed, pendingRequest]);
   const refresh = () => {
     setAttempt((x) => x + 1);
     changed();
@@ -206,99 +286,168 @@ function ConversationView({
     );
   if (selected && !data.value) return <Loading />;
   return (
-    <section className="conversation-reader">
-      <header>
-        <div>
-          <h2>{data.value?.conversation.title || '开始新会话'}</h2>
-          <p className="muted">
-            {agentMode === 'off'
-              ? '本地资料检索 · 未调用模型'
-              : agentMode === 'verification'
-                ? '联调验证 · 未调用真实模型'
-                : '资料检索与 AI 工作任务'}
-          </p>
-        </div>
-        <Badge>私人会话</Badge>
-      </header>
-      <div className="conversation-messages" aria-live="polite">
-        {data.value?.tasks.map((task) => (
-          <TaskCard
-            key={task.id}
-            tenant={tenant}
-            conversation={selected!}
-            task={task}
-            changed={refresh}
-            citation={setCitation}
-          />
-        ))}
-        {!data.value && (
-          <div className="conversation-intro">
-            <MessageCircle size={30} />
-            <h3>{agentMode === 'off' ? '从资料里找依据' : '围绕资料开展工作'}</h3>
-            <p>
-              选择资料范围，输入关键词，查看带文件版本和位置的来源。
-              {agentMode === 'off'
-                ? 'AI 生成回复将在模型接入后开放。'
-                : publicWebEnabled
-                  ? '任务可读取所选范围内的资料片段，也可查找你指定的公开内容。'
-                  : '任务使用所选范围内的资料，也可指定文件版本供工具处理。'}
-            </p>
-          </div>
-        )}
-        {data.value && !focused && <Pager page={page} next={data.value.hasMore} onPage={setPage} />}
-      </div>
-      {focused ? (
-        <p className="conversation-history-note">
-          正在查看历史画报对应的原始回复。
-          <Button
-            onClick={() => {
-              location.hash = conversationHref(tenant, selected);
-            }}
-          >
-            返回最新对话并继续
-          </Button>
-        </p>
-      ) : (
-        <Composer
-          tenant={tenant}
-          selected={selected}
-          space={data.value?.conversation.workspaceId}
-          context={context}
-          enabled={enabled && !active && page === 0}
-          agentMode={agentMode}
-          publicWebEnabled={publicWebEnabled}
-          disabledReason={
-            !enabled
-              ? '资料检索暂未开放。'
-              : active
-                ? '请等待当前任务结束，或先取消任务。'
-                : page !== 0
-                  ? '返回最新记录后可继续发送。'
-                  : ''
-          }
-          changed={refresh}
-        />
-      )}
-      {citation && (
-        <Modal title="资料来源" onClose={() => setCitation(undefined)} wide>
+    <LiveConversationDeck
+      navigation={navigation}
+      sourceId={citation}
+      closeSource={() => setCitation(undefined)}
+      source={
+        citation ? (
           <Citation
             tenant={tenant}
             id={citation}
             verification={context}
             back={() => setCitation(undefined)}
           />
-        </Modal>
-      )}
-    </section>
+        ) : undefined
+      }
+    >
+      <section className={`conversation-reader ${!selected ? 'is-new-conversation' : ''}`}>
+        <header className="live-card-heading">
+          <div>
+            <h2>{data.value?.conversation.title || '开始新会话'}</h2>
+            <p className="muted">
+              {agentMode === 'off'
+                ? '本地资料检索 · 未调用模型'
+                : agentMode === 'verification'
+                  ? '联调验证 · 未调用真实模型'
+                  : '资料检索与 AI 工作任务'}
+            </p>
+          </div>
+          <Badge>私人会话</Badge>
+        </header>
+        <div className="conversation-messages" aria-live="polite">
+          {data.value?.tasks.map((task) => (
+            <TaskCard
+              key={task.id}
+              tenant={tenant}
+              conversation={selected!}
+              task={task}
+              changed={refresh}
+              citation={setCitation}
+            />
+          ))}
+          {!data.value && (
+            <section className="conversation-intro" aria-label="新会话启动建议">
+              <div className="live-intro-mark">
+                <Sparkles size={24} strokeWidth={1.5} />
+              </div>
+              <h3>从一件具体的工作开始</h3>
+              <p>选一个方向，或直接写下你想完成的事。</p>
+              <div className="live-starter-grid">
+                {[
+                  {
+                    title: '整理资料',
+                    description: '提炼结论，找出待确认的问题',
+                    icon: Files,
+                    text: '请整理所选范围内的相关资料，提炼关键结论、依据和待确认的问题。',
+                  },
+                  {
+                    title: '起草方案',
+                    description: '明确需求，形成可讨论的初稿',
+                    icon: FileText,
+                    text: '请协助起草一份工作方案，先确认目标、需求和交付范围。',
+                  },
+                  {
+                    title: '分析问题',
+                    description: '结合资料，梳理原因与建议',
+                    icon: Search,
+                    text: '请结合可用资料分析当前问题，区分已有依据与需要核实的判断。',
+                  },
+                  {
+                    title: '规划下一步',
+                    description: '拆解目标，理清行动与优先级',
+                    icon: ListChecks,
+                    text: '请帮我拆解当前工作目标，整理下一步行动、优先级和待确认项。',
+                  },
+                ].map(({ title, description, icon: Icon, text }) => (
+                  <button
+                    type="button"
+                    key={title}
+                    disabled={pendingRequest}
+                    onClick={() =>
+                      setSuggestion({
+                        text: agentMode === 'off' ? title : text,
+                        sequence: (suggestion?.sequence || 0) + 1,
+                      })
+                    }
+                  >
+                    <Icon size={20} strokeWidth={1.6} />
+                    <strong>{title}</strong>
+                    <span>{description}</span>
+                  </button>
+                ))}
+              </div>
+              <p className="live-intro-capability">
+                {agentMode === 'off'
+                  ? '当前仅检索已解析的资料，AI 生成回复将在模型接入并启用后开放。'
+                  : agentMode === 'verification'
+                    ? '联调任务可使用所选范围内已解析的资料片段，也可指定文件版本供工具处理。'
+                    : 'AI 任务可检索所选范围内已解析的资料片段，再生成回复。'}
+                {agentMode !== 'off' && publicWebEnabled && '也可查找你指定的公开内容。'}
+              </p>
+            </section>
+          )}
+          {data.value && !focused && (
+            <Pager
+              page={page}
+              next={data.value.hasMore}
+              onPage={(next) => {
+                if (!pendingRequest) setPage(next);
+              }}
+            />
+          )}
+        </div>
+        {focused ? (
+          <p className="conversation-history-note">
+            正在查看指定任务及其当前状态。
+            <Button
+              onClick={() => {
+                location.hash = conversationHref(tenant, selected);
+              }}
+            >
+              返回最新对话并继续
+            </Button>
+          </p>
+        ) : (
+          <Composer
+            suggestion={suggestion}
+            tenant={tenant}
+            selected={selected}
+            space={data.value?.conversation.workspaceId}
+            context={context}
+            enabled={enabled && !active && page === 0 && !pendingRequest}
+            agentMode={agentMode}
+            publicWebEnabled={publicWebEnabled}
+            disabledReason={
+              pendingRequest
+                ? '请先完成本次评价提交的核对。'
+                : !enabled
+                  ? '资料检索暂未开放。'
+                  : active
+                    ? '请等待当前任务结束，或先取消任务。'
+                    : page !== 0
+                      ? '返回最新记录后可继续发送。'
+                      : ''
+            }
+            changed={refresh}
+          />
+        )}
+      </section>
+    </LiveConversationDeck>
   );
 }
 const labels: Record<string, string> = {
   QUEUED: '等待执行',
   RUNNING: '正在查找资料',
-  SUCCEEDED: '检索完成',
+  SUCCEEDED: '执行完成',
   FAILED: '执行未完成',
   CANCELLED: '已取消',
   INTERRUPTED: '执行中断',
+  PAUSED: '已暂停',
+  WAITING_INPUT: '等待补充信息',
+  WAITING_CAPABILITY: '等待所需能力',
+  PARTIAL: '部分完成',
+  RESULT_UNKNOWN: '执行结果待核对',
 };
 function TaskCard({
   tenant,
@@ -314,26 +463,64 @@ function TaskCard({
   citation: (id: string) => void;
 }) {
   const { expire } = useSession();
+  const pendingRequest = useContext(RequestPending);
   const downloadController = useRef<AbortController | null>(null);
   useEffect(() => () => downloadController.current?.abort(), []);
   const [downloadError, setDownloadError] = useState<unknown>();
   const [downloading, setDownloading] = useState(false);
-  const submit = useSubmission<{ expectedRevision: number; action: 'CANCEL' | 'RETRY' }>();
+  const submit = useSubmission<{ expectedRevision: number; action: TaskAction; input?: string }>();
+  useRequestLock(submit.busy || submit.uncertain);
+  const [submittedAction, setSubmittedAction] = useState<TaskAction>();
+  const [input, setInput] = useState('');
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const actions: { action: TaskAction; label: string }[] = [];
+  if (!task.sourcesUnavailable && task.reconciliationRequired)
+    actions.push({ action: 'RECONCILE', label: '核对执行影响' });
+  else if (
+    !task.sourcesUnavailable &&
+    ['PAUSED', 'WAITING_INPUT', 'WAITING_CAPABILITY', 'PARTIAL'].includes(task.status)
+  )
+    actions.push({
+      action: 'RESUME',
+      label: task.status === 'WAITING_INPUT' ? '提交补充并继续' : '恢复任务',
+    });
+  else if (!task.sourcesUnavailable && ['FAILED', 'CANCELLED', 'INTERRUPTED'].includes(task.status))
+    actions.push({ action: 'RETRY', label: '重试任务' });
+  if (['QUEUED', 'RUNNING', 'WAITING_INPUT', 'WAITING_CAPABILITY', 'PARTIAL'].includes(task.status))
+    actions.push({ action: 'PAUSE', label: '暂停任务' });
+  if (
+    [
+      'QUEUED',
+      'RUNNING',
+      'WAITING_INPUT',
+      'WAITING_CAPABILITY',
+      'PARTIAL',
+      'PAUSED',
+      'RESULT_UNKNOWN',
+    ].includes(task.status)
+  )
+    actions.push({ action: 'CANCEL', label: '取消任务' });
   return (
     <article className="conversation-turn">
       <p className="conversation-user">{task.prompt}</p>
       <div className="conversation-result">
-        <strong>
-          {task.mode === 'AGENT' && task.status === 'RUNNING'
-            ? '正在执行任务'
-            : task.mode === 'AGENT' && task.status === 'SUCCEEDED'
-              ? '任务完成'
-              : labels[task.status]}
-        </strong>
-        {task.mode === 'AGENT' && (
-          <Badge>{task.executionClass === 'verification' ? '联调验证 · 未调用真实模型' : 'AI 任务'}</Badge>
-        )}
+        <div className="live-answer-heading">
+          <span className="live-answer-avatar">{task.mode === 'AGENT' ? 'AI' : <Search size={16} />}</span>
+          <strong>
+            {task.mode === 'AGENT' && task.status === 'RUNNING'
+              ? '正在执行任务'
+              : task.mode === 'AGENT' && task.status === 'SUCCEEDED'
+                ? '本次处理完成'
+                : labels[task.status]}
+          </strong>
+          {task.mode === 'AGENT' && (
+            <Badge>{task.executionClass === 'verification' ? '联调验证 · 未调用真实模型' : 'AI 任务'}</Badge>
+          )}
+        </div>
         {task.reply && <p className="conversation-reply">{task.reply}</p>}
+        {task.mode === 'AGENT' && !task.sourcesUnavailable && (
+          <TaskWorkNotices tenant={tenant} task={task.id} verification={task.revision} />
+        )}
         {task.mode === 'AGENT' && task.status === 'SUCCEEDED' && task.reply && (
           <SaveAsDocument tenant={tenant} conversation={conversation} task={task.id} />
         )}
@@ -454,34 +641,198 @@ function TaskCard({
             </button>
           ))}
         </div>
-        {['QUEUED', 'RUNNING', 'FAILED', 'CANCELLED', 'INTERRUPTED'].includes(task.status) && (
-          <Button
-            disabled={submit.busy}
-            onClick={() =>
-              void submit.submit(
-                {
-                  expectedRevision: task.revision,
-                  action: ['QUEUED', 'RUNNING'].includes(task.status) ? 'CANCEL' : 'RETRY',
-                },
-                async (body, requestId) => {
-                  try {
-                    await api.action(tenant, conversation, task.id, { ...body, requestId });
-                  } finally {
-                    changed();
-                  }
-                },
-              )
-            }
-          >
-            {['QUEUED', 'RUNNING'].includes(task.status) ? '取消任务' : '重试任务'}
-          </Button>
+        {task.requiredInput && <p>{task.requiredInput}</p>}
+        {task.status === 'WAITING_CAPABILITY' && (
+          <p className="muted">任务已保存，当前没有可用执行能力；不会自动反复调用。能力恢复后可继续。</p>
         )}
-        <SubmitError error={submit.error} uncertain={submit.uncertain} />
+        {task.reconciliationRequired && (
+          <p className="access-alert">
+            回执不足，尚不能确认结果。系统只会依据已记录的工具范围核对是否可安全重试。
+          </p>
+        )}
+        {task.mode === 'AGENT' && actions.some((a) => ['RESUME', 'RETRY'].includes(a.action)) && (
+          <Field label="补充本任务（可选）">
+            <textarea
+              aria-label="补充本任务（可选）"
+              disabled={pendingRequest || submit.busy || submit.uncertain}
+              maxLength={2000}
+              rows={2}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+            />
+          </Field>
+        )}
+        <div className="conversation-task-actions">
+          {actions.map(({ action, label }) => (
+            <Button
+              key={action}
+              disabled={
+                (pendingRequest && !submit.uncertain) ||
+                submit.busy ||
+                (submit.uncertain && action !== submittedAction) ||
+                (task.status === 'WAITING_INPUT' && action === 'RESUME' && !input.trim())
+              }
+              onClick={() => {
+                if (!submit.uncertain) setSubmittedAction(action);
+                void submit.submit(
+                  {
+                    expectedRevision: task.revision,
+                    action,
+                    ...(input.trim() && ['RESUME', 'RETRY'].includes(action) ? { input: input.trim() } : {}),
+                  },
+                  async (body, requestId) => {
+                    await api.action(tenant, conversation, task.id, { ...body, requestId });
+                    setInput('');
+                    changed();
+                  },
+                );
+              }}
+            >
+              {submit.uncertain && action === submittedAction ? '重试本次操作' : label}
+            </Button>
+          ))}
+          {!task.sourcesUnavailable && task.attempt > 0 && (
+            <Button variant="ghost" onClick={() => setHistoryOpen(!historyOpen)}>
+              {historyOpen ? '收起执行历史' : '查看执行历史'}
+            </Button>
+          )}
+        </div>
+        {!task.sourcesUnavailable &&
+          ['SUCCEEDED', 'PARTIAL', 'FAILED', 'CANCELLED', 'INTERRUPTED', 'RESULT_UNKNOWN'].includes(
+            task.status,
+          ) && (
+            <FeedbackPanel
+              tenant={tenant}
+              target={{
+                kind: 'TASK',
+                taskId: task.id,
+                taskRevision: task.revision,
+                attempt: task.attempt,
+                presentationVersion: 'task-v1',
+                presentationRevision: 0,
+              }}
+              onOpenConversation={(id) => {
+                location.hash = conversationHref(tenant, id);
+              }}
+              onOpenExperience={(workspace, id) => {
+                location.hash =
+                  '#' +
+                  new URLSearchParams({ tenant, view: 'experiences', scope: workspace, experience: id });
+              }}
+            />
+          )}
+        {!task.sourcesUnavailable && historyOpen && (
+          <AttemptHistory
+            tenant={tenant}
+            conversation={conversation}
+            task={task.id}
+            revision={task.revision}
+          />
+        )}
+        {submit.error instanceof IdentityError &&
+        (submit.error.code.startsWith('TASK_') || submit.error.code === 'CONVERSATION_BUSY') ? (
+          <p role="alert" className="access-alert">
+            {taskErrorMessage(submit.error.code)}
+          </p>
+        ) : (
+          <SubmitError error={submit.error} uncertain={submit.uncertain} />
+        )}
       </div>
     </article>
   );
 }
+function AttemptHistory({
+  tenant,
+  conversation,
+  task,
+  revision,
+}: {
+  tenant: string;
+  conversation: string;
+  task: string;
+  revision: number;
+}) {
+  const [page, setPage] = useState(0);
+  const [refresh, setRefresh] = useState(0);
+  const [downloadError, setDownloadError] = useState<unknown>();
+  const download = useRef<AbortController | null>(null);
+  useEffect(() => () => download.current?.abort(), []);
+  const history = useRemote(
+    (signal) => api.attempts(tenant, conversation, task, page * 10, signal),
+    [tenant, conversation, task, page, revision, refresh],
+  );
+  if (!history.value)
+    return history.error ? (
+      <Failure error={history.error} retry={() => setRefresh(refresh + 1)} />
+    ) : (
+      <Loading />
+    );
+  return (
+    <section className="conversation-attempts" aria-label="执行历史">
+      {history.value.items.map((a) => (
+        <details key={a.number}>
+          <summary>
+            第 {a.number} 次执行 · {labels[a.status]}
+            {a.provenance === 'LEGACY_CURRENT_ONLY' ? ' · 旧记录仅保留当次事实' : ''}
+          </summary>
+          <p className="muted">
+            {a.startedAt ? new Date(a.startedAt).toLocaleString() : '开始时间未知'}
+            {a.finishedAt ? ' — ' + new Date(a.finishedAt).toLocaleString() : ''}
+          </p>
+          <p className="conversation-reply">{a.input}</p>
+          {a.reply && <p className="conversation-reply">{a.reply}</p>}
+          {a.errorCode && <p>{taskErrorMessage(a.errorCode)}</p>}
+          {a.tools.map((t) => (
+            <p key={t.callId}>
+              {t.name} ·{' '}
+              {t.status === 'succeeded' ? '工具已返回' : t.status === 'failed' ? '工具失败' : '结果未收到'}
+            </p>
+          ))}
+          {a.sources.map((source) => (
+            <p key={source.id}>
+              {source.filename} · v{source.version} · {source.locator}
+            </p>
+          ))}
+          {a.artifacts.map((file) => (
+            <Button
+              key={file.id}
+              onClick={async () => {
+                download.current?.abort();
+                const controller = new AbortController();
+                download.current = controller;
+                setDownloadError(undefined);
+                try {
+                  const blob = await api.download(tenant, conversation, task, file, controller.signal);
+                  if (controller.signal.aborted) return;
+                  const url = URL.createObjectURL(blob);
+                  const link = document.createElement('a');
+                  link.href = url;
+                  link.download = file.filename;
+                  link.click();
+                  setTimeout(() => URL.revokeObjectURL(url), 1000);
+                } catch (error) {
+                  if (!controller.signal.aborted) setDownloadError(error);
+                }
+              }}
+            >
+              下载 {file.filename}
+            </Button>
+          ))}
+          {a.reconciliationCode && <p>已核对：允许工具不包含业务写入，可重新尝试；原结果仍未确认。</p>}
+        </details>
+      ))}
+      <SubmitError error={downloadError} uncertain={false} />
+      <Button disabled={page === 0} onClick={() => setPage(page - 1)}>
+        上一页
+      </Button>
+      <Button disabled={!history.value.hasMore} onClick={() => setPage(page + 1)}>
+        更早的执行
+      </Button>
+    </section>
+  );
+}
 function Composer({
+  suggestion,
   tenant,
   selected,
   space,
@@ -501,14 +852,16 @@ function Composer({
   publicWebEnabled: boolean;
   disabledReason: string;
   changed: () => void;
+  suggestion?: { text: string; sequence: number };
 }) {
   const { session, expire } = useSession();
+  const pendingRequest = useContext(RequestPending);
   const key = `dreamcore:composer:${session.identity?.account.id}:${tenant}:${selected || 'new'}`;
   const [loaded] = useState(() => readTabDraft(key));
   const initial = useRef(record(loaded.value) ? loaded.value : {});
   const [stored, setStored] = useState(!loaded.unreadable);
   const [mode, setMode] = useState<SendTask['mode']>(
-    initial.current.mode === 'AGENT' && agentMode !== 'off' ? 'AGENT' : 'SOURCE_LOOKUP',
+    initial.current.mode === 'AGENT' ? 'AGENT' : 'SOURCE_LOOKUP',
   );
   const [publicQuery, setPublicQuery] = useState(
     typeof initial.current.publicQuery === 'string' ? initial.current.publicQuery : '',
@@ -536,7 +889,14 @@ function Composer({
   );
   const [busy, setBusy] = useState(false),
     [error, setError] = useState<unknown>();
+  const textarea = useRef<HTMLTextAreaElement>(null);
   const controller = useRef<AbortController | null>(null);
+  useEffect(() => {
+    if (!suggestion || busy || pending) return;
+    setText(suggestion.text);
+    if (agentMode !== 'off') setMode('AGENT');
+    textarea.current?.focus({ preventScroll: true });
+  }, [suggestion]);
   useEffect(() => () => controller.current?.abort(), []);
   useEffect(() => {
     setStored(writeTabDraft(key, { text, mode, publicQuery, space: location, originals, pending }));
@@ -588,102 +948,139 @@ function Composer({
         }
       }}
     >
-      <fieldset disabled={busy || !!pending}>
-        <Field label="资料范围">
-          <select
-            value={space || location}
-            disabled={!!space}
-            onChange={(e) => {
-              setLocation(e.target.value);
-              setOriginals([]);
-              setPicking(false);
-            }}
-          >
-            {context.workspaces.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-                {s.kind === 'PERSONAL' ? '（个人）' : ''}
-              </option>
-            ))}
-          </select>
-        </Field>
-        {agentMode !== 'off' && (
-          <Field label="任务方式">
-            <select
-              aria-label="任务方式"
-              value={mode}
-              onChange={(e) => setMode(e.target.value as SendTask['mode'])}
-            >
-              <option value="SOURCE_LOOKUP">查找资料（不调用模型）</option>
-              <option value="AGENT">{agentMode === 'verification' ? 'Agent 联调验证' : 'AI 工作任务'}</option>
-            </select>
-          </Field>
-        )}
-        {mode === 'AGENT' && agentMode === 'verification' && (
-          <div className="original-selection">
-            <Button disabled={!allowed} onClick={() => setPicking(true)}>
-              选择原件版本
-            </Button>
-            {originals.map((file) => (
-              <div key={file.versionId}>
-                <span>
-                  {file.filename} · v{file.version}
-                </span>
-                <Button
-                  variant="ghost"
-                  onClick={() => setOriginals((files) => files.filter((f) => f.versionId !== file.versionId))}
-                >
-                  移除 {file.filename}
-                </Button>
-              </div>
-            ))}
-            <small>选用原件后，仅在这些版本中检索与处理；未选用时检索所选空间。</small>
+      <div className="live-composer-surface">
+        <fieldset disabled={busy || !!pending}>
+          <div className="live-composer-input">
+            <Field label={mode === 'AGENT' ? '工作要求' : '资料关键词'}>
+              <textarea
+                ref={textarea}
+                aria-label={mode === 'AGENT' ? '工作要求' : '资料关键词'}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+                    event.preventDefault();
+                    if (text.trim()) event.currentTarget.form?.requestSubmit();
+                  }
+                }}
+                required
+                maxLength={mode === 'AGENT' ? 2000 : 200}
+                rows={3}
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                placeholder={
+                  mode === 'AGENT'
+                    ? '描述需要整理、分析的工作和所需结果'
+                    : '例如：项目进度（多个关键词用空格分开）'
+                }
+              />
+            </Field>
           </div>
-        )}
-        <Field label={mode === 'AGENT' ? '工作要求' : '资料关键词'}>
-          <textarea
-            aria-label={mode === 'AGENT' ? '工作要求' : '资料关键词'}
-            required
-            maxLength={mode === 'AGENT' ? 2000 : 200}
-            rows={3}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder={
-              mode === 'AGENT'
-                ? '描述需要整理、分析的工作和所需结果'
-                : '例如：项目进度（多个关键词用空格分开）'
+          <div className="live-composer-tools">
+            <Field label="资料范围">
+              <select
+                value={space || location}
+                disabled={!!space}
+                onChange={(e) => {
+                  setLocation(e.target.value);
+                  setOriginals([]);
+                  setPicking(false);
+                }}
+              >
+                {context.workspaces.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                    {s.kind === 'PERSONAL' ? '（个人）' : ''}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            {
+              <Field label="任务方式">
+                <select
+                  aria-label="任务方式"
+                  value={mode}
+                  onChange={(e) => setMode(e.target.value as SendTask['mode'])}
+                >
+                  <option value="SOURCE_LOOKUP">查找资料（不调用模型）</option>
+                  <option value="AGENT">
+                    {agentMode === 'verification'
+                      ? 'Agent 联调验证'
+                      : agentMode === 'off'
+                        ? 'AI 工作任务（保存并等待能力）'
+                        : 'AI 工作任务'}
+                  </option>
+                </select>
+              </Field>
             }
-          />
-        </Field>
-        {mode === 'AGENT' && publicWebEnabled && (
-          <Field label="公开检索内容（可选）">
-            <input
-              aria-label="公开检索内容（可选）"
-              value={publicQuery}
-              maxLength={2048}
-              pattern="([hH][tT][tT][pP][sS]://.*|.{0,200})"
-              title="公开关键词最多 200 字，HTTPS 网址最多 2048 字"
-              onChange={(e) => setPublicQuery(e.target.value)}
-              placeholder="公开关键词，或一个 https 网页地址"
-            />
-            <small>仅将这里填写的内容用于外部检索或访问；请勿填写企业机密。留空则不联网查找。</small>
-          </Field>
-        )}
-      </fieldset>
+          </div>
+          {mode === 'AGENT' && agentMode === 'verification' && (
+            <div className="original-selection">
+              <Button disabled={!allowed} onClick={() => setPicking(true)}>
+                选择原件版本
+              </Button>
+              {originals.map((file) => (
+                <div key={file.versionId}>
+                  <span>
+                    {file.filename} · v{file.version}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    onClick={() =>
+                      setOriginals((files) => files.filter((f) => f.versionId !== file.versionId))
+                    }
+                  >
+                    移除 {file.filename}
+                  </Button>
+                </div>
+              ))}
+              <small>选用原件后，仅在这些版本中检索与处理；未选用时检索所选空间。</small>
+            </div>
+          )}
+          {mode === 'AGENT' && publicWebEnabled && (
+            <Field label="公开检索内容（可选）">
+              <input
+                aria-label="公开检索内容（可选）"
+                value={publicQuery}
+                maxLength={2048}
+                pattern="([hH][tT][tT][pP][sS]://.*|.{0,200})"
+                title="公开关键词最多 200 字，HTTPS 网址最多 2048 字"
+                onChange={(e) => setPublicQuery(e.target.value)}
+                placeholder="公开关键词，或一个 https 网页地址"
+              />
+              <small>仅将这里填写的内容用于外部检索或访问；请勿填写企业机密。留空则不联网查找。</small>
+            </Field>
+          )}
+        </fieldset>
+        <Button
+          icon={ArrowUp}
+          className="live-composer-submit"
+          type="submit"
+          variant="primary"
+          aria-label={
+            busy ? '提交中…' : pending ? '重试上次发送' : mode === 'AGENT' ? '开始任务' : '查找资料'
+          }
+          title={busy ? '提交中…' : pending ? '重试上次发送' : mode === 'AGENT' ? '开始任务' : '查找资料'}
+          disabled={busy || !enabled || !allowed || !text.trim()}
+        >
+          <span className="live-visually-hidden">
+            {busy ? '提交中…' : pending ? '重试上次发送' : mode === 'AGENT' ? '开始任务' : '查找资料'}
+          </span>
+        </Button>
+      </div>
+      {mode === 'AGENT' && agentMode === 'off' && (
+        <p className="muted">模型当前关闭。提交会保存任务并等待能力，不会调用模型；资料查找仍可正常执行。</p>
+      )}
       <div className="conversation-send">
         <small>
           {stored && !loaded.unreadable && '草稿在本标签页恢复；'}
-          {mode === 'AGENT' ? '最多 2000 字，使用资料片段及本次指定的原件。' : '最多 8 个关键词。'}
+          {mode !== 'AGENT'
+            ? '最多 8 个关键词，检索已解析的资料。'
+            : agentMode === 'verification'
+              ? '最多 2000 字，使用已解析的资料片段及本次指定的原件。'
+              : agentMode === 'off'
+                ? '最多 2000 字，保存任务并等待模型能力。'
+                : '最多 2000 字，AI 可检索所选范围内已解析的资料片段。'}
           {disabledReason}
         </small>
-        <Button
-          icon={Send}
-          type="submit"
-          variant="primary"
-          disabled={busy || !enabled || !allowed || !text.trim()}
-        >
-          {busy ? '提交中…' : pending ? '重试上次发送' : mode === 'AGENT' ? '开始任务' : '查找资料'}
-        </Button>
       </div>
       <DraftWarning unavailable={!stored} unreadable={loaded.unreadable} pending={!!pending} />
       <SubmitError error={error} uncertain={!!pending && !busy} />

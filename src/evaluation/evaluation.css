@@ -1,0 +1,137 @@
+.evaluation-panel {
+  padding: 24px;
+  min-width: 0;
+}
+.evaluation-heading,
+.evaluation-toolbar,
+.evaluation-card > header,
+.evaluation-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.evaluation-heading {
+  margin-bottom: 20px;
+}
+.evaluation-heading h2 {
+  margin: 0;
+}
+.evaluation-toolbar {
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line, #e4e7ec);
+}
+.evaluation-toolbar nav,
+.evaluation-actions {
+  display: flex;
+  gap: 8px;
+}
+.evaluation-actions {
+  justify-content: flex-start;
+  margin: 12px 0;
+}
+.evaluation-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+.evaluation-card {
+  padding: 18px;
+  border: 1px solid var(--line, #e4e7ec);
+  border-radius: 12px;
+  margin: 14px 0;
+  overflow-wrap: anywhere;
+  background: var(--surface, #fff);
+}
+.evaluation-card header strong {
+  font-size: 16px;
+}
+.evaluation-card p {
+  line-height: 1.65;
+}
+.evaluation-card details {
+  margin: 12px 0;
+}
+.evaluation-card summary {
+  cursor: pointer;
+}
+.evaluation-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.evaluation-metrics > div {
+  padding: 12px;
+  background: var(--bg, #f6f8fa);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.evaluation-metrics small {
+  color: var(--text-muted, #687280);
+}
+.evaluation-criterion,
+.evaluation-evidence {
+  margin: 14px 0;
+  padding: 14px;
+  border: 1px solid var(--line, #e4e7ec);
+  border-radius: 10px;
+}
+.evaluation-evidence-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  margin: 8px 0;
+}
+.evaluation-check {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 0;
+}
+.evaluation-check input {
+  width: auto;
+  flex: none;
+}
+.evaluation-prose {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.evaluation-panel fieldset {
+  min-width: 0;
+}
+.evaluation-panel textarea,
+.modal textarea {
+  min-height: 76px;
+}
+.evaluation-panel .field {
+  min-width: 0;
+}
+.evaluation-panel select {
+  max-width: 100%;
+}
+@media (max-width: 720px) {
+  .evaluation-panel {
+    padding: 16px;
+  }
+  .evaluation-columns,
+  .evaluation-metrics {
+    grid-template-columns: 1fr;
+  }
+  .evaluation-heading {
+    align-items: flex-start;
+  }
+  .evaluation-toolbar nav {
+    flex-wrap: wrap;
+  }
+  .evaluation-card {
+    padding: 14px;
+  }
+  .evaluation-evidence-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

@@ -108,7 +108,7 @@ async function activate(page: Page, name: string) {
   await page.getByLabel(/^设置密码/).fill(password);
   await page.getByLabel('确认密码', { exact: true }).fill(password);
   await page.getByRole('button', { name: '创建账号并加入', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '登录梦核工作空间', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '登录梦擎工作空间', exact: true })).toBeVisible();
 }
 async function screenshot(page: Page, name: string) {
   await page.screenshot({ path: fileURLToPath(new URL(name, artifacts)), fullPage: true });

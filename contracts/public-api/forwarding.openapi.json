@@ -1,0 +1,812 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "明确站内企业副本转发",
+    "version": "1.0"
+  },
+  "security": [
+    {
+      "session": []
+    }
+  ],
+  "paths": {
+    "/api/v1/tenants/{tenant}/forwarding/recipients": {
+      "get": {
+        "summary": "仅发送者当前可读副本的已获权同事；无管理员推定阅读权",
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "publicationId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "materialVersionId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000,
+              "default": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 30
+            }
+          },
+          {
+            "name": "query",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "当前获权的确切版本和真实回执；Cache-Control: no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/People"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "403": {
+            "description": "当前身份/企业业务或CSRF不可用"
+          },
+          "404": {
+            "description": "当前副本或收件对象不可用，不泄露正文"
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/forwarding/batches": {
+      "post": {
+        "summary": "一次明确站内转发，原请求重放不新增成员、不重复投递",
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "当前获权的确切版本和真实回执；Cache-Control: no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Batch"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "403": {
+            "description": "当前身份/企业业务或CSRF不可用"
+          },
+          "404": {
+            "description": "当前副本或收件对象不可用，不泄露正文"
+          },
+          "409": {
+            "description": "同幂等键的内容不同"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Send"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "本人对确切已发布版本的实际转发历史",
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "publicationId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "materialVersionId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000,
+              "default": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 30
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "当前获权的确切版本和真实回执；Cache-Control: no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/History"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "403": {
+            "description": "当前身份/企业业务或CSRF不可用"
+          },
+          "404": {
+            "description": "当前副本或收件对象不可用，不泄露正文"
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/forwarding/batches/{batch}": {
+      "get": {
+        "summary": "发送者当前获权回执；查看不标为接收者打开",
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "batch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "当前获权的确切版本和真实回执；Cache-Control: no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Batch"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "403": {
+            "description": "当前身份/企业业务或CSRF不可用"
+          },
+          "404": {
+            "description": "当前副本或收件对象不可用，不泄露正文"
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/forwarding/inbox": {
+      "get": {
+        "summary": "权限过滤先于分页；接受不等于打开或业务完成",
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000,
+              "default": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 30
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "当前获权的确切版本和真实回执；Cache-Control: no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Inbox"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "403": {
+            "description": "当前身份/企业业务或CSRF不可用"
+          },
+          "404": {
+            "description": "当前副本或收件对象不可用，不泄露正文"
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/forwarding/inbox/{receipt}/open": {
+      "post": {
+        "summary": "仅收件人主动打开；首次实际打开时刻不被重试重置",
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "receipt",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "当前获权的确切版本和真实回执；Cache-Control: no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Delivery"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "403": {
+            "description": "当前身份/企业业务或CSRF不可用"
+          },
+          "404": {
+            "description": "当前副本或收件对象不可用，不泄露正文"
+          },
+          "409": {
+            "description": "同幂等键的内容不同"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Open"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "session": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "DREAMCORE_SESSION"
+      }
+    },
+    "schemas": {
+      "Source": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "publicationId",
+          "workspaceId",
+          "workspaceName",
+          "materialId",
+          "materialVersionId",
+          "materialVersion",
+          "filename",
+          "format",
+          "sha256",
+          "publishedAt"
+        ],
+        "properties": {
+          "publicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceName": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "materialId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "materialVersionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "materialVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "filename": {
+            "type": "string",
+            "maxLength": 180
+          },
+          "format": {
+            "enum": [
+              "docx",
+              "pdf"
+            ]
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Person": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200
+          }
+        }
+      },
+      "Recipient": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "receiptId",
+          "accountId",
+          "name",
+          "state",
+          "openedAt",
+          "currentlyAccessible"
+        ],
+        "properties": {
+          "receiptId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "state": {
+            "enum": [
+              "ACCEPTED",
+              "OPENED"
+            ]
+          },
+          "openedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "currentlyAccessible": {
+            "type": "boolean"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "state": {
+                  "const": "ACCEPTED"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "openedAt": {
+                  "type": "null"
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "openedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "People": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "source",
+          "items",
+          "hasMore"
+        ],
+        "properties": {
+          "source": {
+            "$ref": "#/components/schemas/Source"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Person"
+            },
+            "minItems": 0,
+            "maxItems": 30
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Batch": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "publicationId",
+          "materialVersionId",
+          "requestId",
+          "acceptedAt",
+          "note",
+          "source",
+          "recipients"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "publicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "materialVersionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "acceptedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "source": {
+            "$ref": "#/components/schemas/Source"
+          },
+          "recipients": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Recipient"
+            },
+            "minItems": 1,
+            "maxItems": 20
+          }
+        }
+      },
+      "Delivery": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "batchId",
+          "senderId",
+          "senderName",
+          "acceptedAt",
+          "openedAt",
+          "state",
+          "note",
+          "source"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "batchId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "senderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "senderName": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "acceptedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "openedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "state": {
+            "enum": [
+              "ACCEPTED",
+              "OPENED"
+            ]
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "source": {
+            "$ref": "#/components/schemas/Source"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "state": {
+                  "const": "ACCEPTED"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "openedAt": {
+                  "type": "null"
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "openedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "Inbox": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "hasMore"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Delivery"
+            },
+            "minItems": 0,
+            "maxItems": 30
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        }
+      },
+      "History": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "hasMore"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Batch"
+            },
+            "minItems": 0,
+            "maxItems": 30
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Send": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requestId",
+          "publicationId",
+          "materialVersionId",
+          "recipients",
+          "note"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "publicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "materialVersionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "recipients": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "uniqueItems": true,
+            "minItems": 1,
+            "maxItems": 20
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 500
+          }
+        }
+      },
+      "Open": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requestId"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      }
+    }
+  }
+}

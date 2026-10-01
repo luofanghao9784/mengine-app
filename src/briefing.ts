@@ -11,11 +11,13 @@ import {
 } from './model.ts';
 import { kongguBriefingSources } from './kongguBriefing.ts';
 import { replyKonggu } from './kongguReply.ts';
+import { replyNinepop } from './ninepop/reply.ts';
 import { canReadMaterial, visibleSpaces } from './libraryModel.ts';
 import { capabilities, collaborationStatus, colleagueName } from './colleagues.ts';
 import { briefingExampleDate, exampleBriefingSources } from './briefingExamples.ts';
 import type { BriefingPresentation, BriefingPerson } from './briefingPresentation.ts';
 import { conversationBriefingSources, readableConversationReply } from './briefingChats.ts';
+import { briefingCreatedAt, briefingEntry, briefingLifecycle } from './briefingLifecycle.ts';
 
 export const cardSizes = ['1×1', '2×1', '1×2', '2×2'] as const;
 export type CardSize = (typeof cardSizes)[number];
@@ -61,6 +63,10 @@ export type CardData = {
   presentation?: BriefingPresentation;
   people?: BriefingPerson[];
   authoredAt?: string;
+  dataPeriod?: string;
+  reporting?: { dateLabel: string; date: string };
+  article?: BriefingArticleData;
+  recommendation?: { importance: 'high'; reason: string };
   sourceLinks?: SourceLink[];
   photo?: SourcePhoto;
   conversation?: { replyId: string; refVersions?: Record<string, string> };
@@ -70,6 +76,8 @@ export type BriefingCard = {
   id: string;
   data: CardData;
   updatedAt: string;
+  createdAt?: string;
+  /** Legacy storage only. New cards and updates never append dated snapshots. */
   history: { at: string; data: CardData }[];
   active: boolean;
   pinned: boolean;
@@ -133,6 +141,8 @@ export function canReadCardData(s: DemoState, data: CardData) {
 // Readable frontend demo sources only. This is not a server-side permission boundary.
 export function briefingSources(s: DemoState, now = new Date().toISOString()): CardData[] {
   const conversations = conversationBriefingSources(s, now).filter((data) => canReadCardData(s, data));
+  if (s.scenario === 'ninepop')
+    return [...(s.ninepop?.cards || []), ...conversations].filter((data) => canReadCardData(s, data));
   if (s.scenario === 'konggu')
     return [...kongguBriefingSources(s), ...conversations].filter((data) => canReadCardData(s, data));
   const spaces = visibleSpaces(s);
@@ -365,12 +375,19 @@ export function briefingSources(s: DemoState, now = new Date().toISOString()): C
 }
 
 export function syncBriefing(s: DemoState, now = new Date().toISOString()) {
+  return reconcileBriefing(s, briefingSources(s, now), now);
+}
+
+export function reconcileBriefing(s: DemoState, sources: CardData[], now: string) {
   s.briefing ||= { version: 1, cards: [] };
-  const sources = briefingSources(s, now);
   s.briefing.cards.forEach((c) => {
-    c.active = false;
+    c.createdAt ||= briefingCreatedAt(c);
+    // Published content remains findable even when it leaves the source's current
+    // candidate list. Access is checked again on every read and action.
+    c.active = briefingLifecycle(c.data) === 'dated' && canReadCardData(s, c.data);
   });
-  for (const data of sources) {
+  for (const data of new Map(sources.map((data) => [data.id, data])).values()) {
+    if (!canReadCardData(s, data)) continue;
     const card = s.briefing.cards.find((c) => c.id === data.id);
     if (!card) {
       // Authored demo editions have explicit publication dates. Existing sources
@@ -381,21 +398,25 @@ export function syncBriefing(s: DemoState, now = new Date().toISOString()) {
         (data.sourceKind === 'news' ? '2026-09-18T01:00:00.000Z' : now);
       s.briefing.cards.push({
         id: data.id,
-        data,
+        data: structuredClone(data),
         updatedAt: at,
-        history: [{ at, data: structuredClone(data) }],
+        createdAt: at,
+        history: [],
         active: true,
         pinned: false,
         hidden: false,
         ...(data.sourceKind === 'conversation' ? { chatId: data.sourceId } : {}),
       });
     } else {
-      card.active = true;
+      card.active = canReadCardData(s, card.data);
       if (data.sourceKind === 'conversation') card.chatId = data.sourceId;
-      if (JSON.stringify(card.data) !== JSON.stringify(data)) {
-        card.data = data;
-        card.updatedAt = data.sourceKind === 'conversation' ? data.authoredAt! : now;
-        card.history.push({ at: card.updatedAt, data: structuredClone(data) });
+      if (briefingLifecycle(card.data) !== 'dated' && JSON.stringify(card.data) !== JSON.stringify(data)) {
+        const changed =
+          JSON.stringify({ ...card.data, recommendation: undefined }) !==
+          JSON.stringify({ ...data, recommendation: undefined });
+        card.data = structuredClone(data);
+        card.active = true;
+        if (changed) card.updatedAt = data.sourceKind === 'conversation' ? data.authoredAt! : now;
       }
     }
   }
@@ -403,7 +424,8 @@ export function syncBriefing(s: DemoState, now = new Date().toISOString()) {
 }
 export const localDate = (iso: string) => new Date(iso).toLocaleDateString('sv-SE');
 export function snapshotOn(card: BriefingCard, day: string) {
-  return card.history.findLast((h) => localDate(h.at) <= day);
+  // Compatibility for older callers: exact content date, never an as-of snapshot.
+  return briefingEntry(card, day);
 }
 export function cardConfig(card: BriefingCard): CardConfig {
   return card.config || { size: card.data.size, title: card.data.title, compact: false };
@@ -433,7 +455,7 @@ export function openBriefingChat(
       : card.config || displayConfig || cardConfig(card);
   const key = purpose === 'content' ? 'chatId' : 'optimizeChatId';
   const data = snapshot?.data || card.data;
-  if (!canReadCardData(s, data)) throw new Error('该快照的来源已不可访问。');
+  if (!canReadCardData(s, data)) throw new Error('这条内容的来源已不可访问。');
   const at = snapshot?.at || card.updatedAt;
   const article = structuredClone(snapshot?.article || buildBriefingArticle(data));
   let chat = s.chats.find((c) => c.id === card[key]);
@@ -453,7 +475,7 @@ export function openBriefingChat(
   }
   chat.archived = false;
   card[key] = chat.id;
-  const sourceText = `${snapshot ? '回看留存快照' : '来自智能画报'} · ${localDate(at)}\n${data.title}\n${data.fact}\n${data.advice}\n依据：${data.source}`;
+  const sourceText = `来自智能画报 · ${localDate(at)}\n${data.title}\n${data.fact}\n${data.advice}\n依据：${data.source}`;
   const reference =
     purpose === 'content'
       ? chat.messages.find(
@@ -517,7 +539,7 @@ export function replyToBriefing(s: DemoState, chatId: string, text: string) {
       chat,
       'assistant',
       submitted
-        ? '已记录这次“没用”的具体原因，并关联到你刚才阅读的卡片版本。你可以继续补充希望怎样调整。当前为前端演示，尚未自动修改内容或推荐策略。'
+        ? '已记录这次“没用”的具体原因，并关联到你刚才阅读的内容及依据。你可以继续补充希望怎样调整。当前为前端演示，反馈会影响数据卡再次推荐，内容不会自动改写。'
         : '补充说明已保留在这张卡片的调整会话中。当前为前端演示，内容核查与自动调优将在引擎接入后执行。',
     );
     return;
@@ -531,7 +553,7 @@ export function replyToBriefing(s: DemoState, chatId: string, text: string) {
     if (/精简|简洁|少一点/.test(text)) draft.compact = true;
     if (/完整|详细|展开/.test(text)) draft.compact = false;
     const title = text.match(/(?:标题|名称)(?:改为|改成|设为|：|:)\s*[「“"]?([^」”"\n]+)/)?.[1]?.trim();
-    if (title) draft.title = title.slice(0, 28);
+    if (title) draft.title = title;
     const changed = JSON.stringify(draft) !== JSON.stringify(cardConfig(card));
     addMessage(
       chat,
@@ -542,6 +564,10 @@ export function replyToBriefing(s: DemoState, chatId: string, text: string) {
     );
   } else {
     const d = ctx.snapshot;
+    if (s.scenario === 'ninepop') {
+      replyNinepop(s, chat, text);
+      return;
+    }
     if (s.scenario === 'konggu') {
       replyKonggu(s, chat, text);
       return;

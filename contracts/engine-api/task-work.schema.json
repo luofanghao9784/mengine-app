@@ -1,0 +1,250 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dreamcore:task-work:1.0",
+  "$defs": {
+    "planRequest": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "action": {
+              "const": "read"
+            }
+          },
+          "required": ["action"]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "action": {
+              "const": "schedule"
+            },
+            "requestId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "expectedRevision": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "checkAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            }
+          },
+          "required": ["action", "requestId", "expectedRevision", "checkAt", "reason"]
+        }
+      ]
+    },
+    "preferenceRequest": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "action": {
+              "const": "read"
+            }
+          },
+          "required": ["action"]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "action": {
+              "const": "save"
+            },
+            "requestId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "expectedRevision": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "category": {
+              "enum": ["RESPONSE_LENGTH", "RESPONSE_FORMAT", "TONE"]
+            },
+            "choice": {
+              "enum": ["CONCISE", "DETAILED", "PARAGRAPHS", "BULLETS", "DIRECT", "FRIENDLY"]
+            },
+            "evidenceSource": {
+              "enum": ["PROMPT", "SUPPLEMENT"]
+            },
+            "evidenceOffset": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "evidence": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          "required": [
+            "action",
+            "requestId",
+            "expectedRevision",
+            "category",
+            "choice",
+            "evidenceSource",
+            "evidenceOffset",
+            "evidence"
+          ]
+        }
+      ]
+    },
+    "planReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "taskId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "planId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "requestId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "acceptedRevision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "executionEpoch": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "checkAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "reason": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "state": {
+          "enum": ["PENDING", "DISPATCHED", "CANCELLED"]
+        },
+        "currentlyEffective": {
+          "type": "boolean"
+        },
+        "dispatchedTaskId": {
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dispatchUnavailable": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "taskId",
+        "planId",
+        "requestId",
+        "acceptedRevision",
+        "executionEpoch",
+        "checkAt",
+        "reason",
+        "state",
+        "currentlyEffective",
+        "dispatchedTaskId",
+        "dispatchUnavailable"
+      ]
+    },
+    "preferenceReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "taskId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "requestId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "category": {
+          "enum": ["RESPONSE_LENGTH", "RESPONSE_FORMAT", "TONE"]
+        },
+        "choice": {
+          "enum": ["CONCISE", "DETAILED", "PARAGRAPHS", "BULLETS", "DIRECT", "FRIENDLY"]
+        },
+        "label": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "profileId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "acceptedRevision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "currentRevision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "currentStatus": {
+          "enum": ["ACTIVE", "PROPOSED", "WITHDRAWN", "EXPIRED"]
+        },
+        "currentlyEffective": {
+          "type": "boolean"
+        },
+        "canUndo": {
+          "type": "boolean"
+        },
+        "evidenceSource": {
+          "enum": ["PROMPT", "SUPPLEMENT"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "taskId",
+        "requestId",
+        "category",
+        "choice",
+        "label",
+        "profileId",
+        "acceptedRevision",
+        "currentRevision",
+        "currentStatus",
+        "currentlyEffective",
+        "canUndo",
+        "evidenceSource",
+        "createdAt"
+      ]
+    }
+  }
+}

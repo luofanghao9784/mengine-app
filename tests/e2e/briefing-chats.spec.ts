@@ -32,7 +32,7 @@ test('各画报视图暂时隐藏会话类型与正在跟进栏，保留原会�
       await expect(page.locator('.briefing-grid .magazine-会话')).toHaveCount(0);
       await expect(page.locator('[data-recommendation-group="priority"]')).toHaveCount(0);
       await expect(page.getByText('正在跟进', { exact: true })).toHaveCount(0);
-      await expect(page.locator('[data-card-id="konggu:C01"]')).toHaveCount(1);
+      await expect(page.locator('[data-card-id="konggu:C01"]')).toHaveCount(name === '日期' ? 0 : 1);
       if (name === '类型')
         await expect(page.getByLabel('内容类型').getByRole('button')).toHaveText([
           '全部',

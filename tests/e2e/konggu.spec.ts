@@ -9,7 +9,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('默认空谷40张内容卡，原文配图、独立存储与四期内容分组', async ({ page }) => {
-  await expect(page).toHaveTitle('空谷无界 · AI工作空间');
+  await expect(page).toHaveTitle('空谷无界 · 梦擎工作空间 · Mengine');
   await expect(page.locator('.briefing-grid .briefing-card')).toHaveCount(40);
   await expect(page.locator('.briefing-grid .template-conversation')).toHaveCount(0);
   expect((await state(page)).materials).toHaveLength(45);

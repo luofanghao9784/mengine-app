@@ -82,6 +82,10 @@ export function useBriefingReflow(page: RefObject<HTMLDivElement | null>) {
 }
 
 type ResizePosition = { groupId: string; row: number; col: number };
+const resizePosition = (position: ResizePosition, size: CardSize, columns: number): ResizePosition => ({
+  ...position,
+  col: Math.min(position.col, Math.max(0, columns - Number(size[0]))),
+});
 type Preview = { id: string; initial: CardSize; size: CardSize; position: ResizePosition };
 type Gesture = Preview & {
   pointerId: number;
@@ -95,6 +99,7 @@ type Gesture = Preview & {
   scrollTop: number;
   pitch: number;
   availableColumns: number;
+  horizontalScale: number;
   frame: number;
   moved: boolean;
 };
@@ -136,7 +141,7 @@ export function useBriefingResize(options: Options) {
       const size = resizeBriefingSize(
         current.initial,
         current.size,
-        current.x - current.startX,
+        (current.x - current.startX) * current.horizontalScale,
         current.y - current.startY + current.scroller.scrollTop - current.scrollTop,
         current.pitch,
         current.availableColumns,
@@ -144,7 +149,12 @@ export function useBriefingResize(options: Options) {
       if (size !== current.size) {
         capture();
         current.size = size;
-        setPreview({ id: current.id, initial: current.initial, size, position: current.position });
+        setPreview({
+          id: current.id,
+          initial: current.initial,
+          size,
+          position: resizePosition(current.position, size, latest.current.columns),
+        });
       }
       if (hint.current) {
         hint.current.style.left = `${Math.max(8, Math.min(innerWidth - 88, current.x + 18))}px`;
@@ -166,8 +176,9 @@ export function useBriefingResize(options: Options) {
       capture();
       setPreview(null);
       if (commit && current.size !== current.initial) {
-        retainPosition(current);
-        latest.current.onCommit(current.id, current.size, current.position);
+        const position = resizePosition(current.position, current.size, latest.current.columns);
+        retainPosition({ ...current, position });
+        latest.current.onCommit(current.id, current.size, position);
         setAnnouncement(`卡片已调整为 ${current.size}`);
       } else if (!commit) setAnnouncement('已取消尺寸调整');
       current.handle.focus({ preventScroll: true });
@@ -269,8 +280,21 @@ export function useBriefingResize(options: Options) {
       y: event.clientY,
       scrollTop: scroller.scrollTop,
       pitch: options.unit + 10,
-      // Growing past the right edge must not relocate the active card.
-      availableColumns: options.columns - position.col,
+      // At the right edge, growing uses the neighbouring column to the left.
+      // Map the remaining pointer room to a grid step so widening is reachable
+      // without requiring the pointer to leave the window.
+      availableColumns: options.columns,
+      horizontalScale:
+        Number(size[0]) === 1 && position.col === options.columns - 1 && options.columns > 1
+          ? Math.max(
+              1,
+              ((options.unit + 10) * 0.7) /
+                Math.max(
+                  24,
+                  Math.min(innerWidth, scroller.getBoundingClientRect().right) - event.clientX - 8,
+                ),
+            )
+          : 1,
       frame: 0,
       moved: false,
     };
@@ -306,7 +330,7 @@ export function useBriefingResize(options: Options) {
     event.preventDefault();
     event.stopPropagation();
     const width =
-      options.columns - position.col === 1
+      options.columns === 1
         ? 1
         : event.key === 'ArrowLeft'
           ? 1
@@ -317,8 +341,9 @@ export function useBriefingResize(options: Options) {
     const next = `${width}×${height}` as CardSize;
     if (next === size) return;
     capture();
-    retainPosition({ id, position });
-    latest.current.onCommit(id, next, position);
+    const target = resizePosition(position, next, options.columns);
+    retainPosition({ id, position: target });
+    latest.current.onCommit(id, next, target);
     setAnnouncement(`卡片已调整为 ${next}`);
   };
   const layoutAnchor = (groupId: string): BriefingLayoutAnchor | undefined =>

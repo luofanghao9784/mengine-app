@@ -150,7 +150,7 @@ class MaterialIntegrationTest {
             assertEquals(2,detail(writer,space,id).get("versions").size());
             writer.upload(endpoint,Map.of("requestId",UUID.randomUUID(),"expectedVersion",2),"v3.txt",new byte[]{4},true);
             var retry=writer.upload(endpoint,first.statusCode()==201?change1:change2,"v2.txt",new byte[]{(byte)(first.statusCode()==201?2:3)},true);
-            assertEquals(201,retry.statusCode());assertEquals(3,json(retry).get("version").asInt());assertEquals(3,detail(writer,space,id).get("versions").size());
+            assertEquals(201,retry.statusCode());assertEquals(2,json(retry).get("version").asInt());assertEquals(3,json(retry).get("currentVersion").asInt());assertEquals("EXACT",json(retry).get("receiptStatus").asString());assertEquals(2,json(retry).get("acceptedVersion").get("number").asInt());assertEquals(3,detail(writer,space,id).get("versions").size());
         }
     }
     @Test void rejectsOversizeInvalidNamesWrongFolderAndMissingCsrf() throws Exception {

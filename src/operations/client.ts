@@ -15,6 +15,9 @@ export const errorLabels = {
   TASK_FILE_LIMIT: '文件超过处理上限',
   TASK_FILE_DATA: '文件数据不符合处理要求',
   TASK_INTERRUPTED: '执行进程中断',
+  TASK_RESULT_UNKNOWN: '执行结果待核对',
+  TASK_PLAN_STOPPED: '所属计划已停止',
+  TASK_PLAN_EXPIRED: '所属计划已到期',
   OTHER: '其他运行异常',
 } as const;
 const count = (v: unknown): v is number => Number.isSafeInteger(v) && (v as number) >= 0;
@@ -30,7 +33,10 @@ export function isOperations(v: unknown): v is OperationsOverview {
     !date(v.from) ||
     !date(v.checkedAt) ||
     Date.parse(v.checkedAt) - Date.parse(v.from) !== v.days * 86400000 ||
-    !shape(v.tasks, 'total queued running succeeded failed cancelled interrupted retryStarts') ||
+    !shape(
+      v.tasks,
+      'total queued running succeeded failed cancelled interrupted paused waitingInput waitingCapability partial resultUnknown retryStarts',
+    ) ||
     !Object.values(v.tasks).every(count) ||
     !shape(v.storage, 'materials versions originalBytes') ||
     !Object.values(v.storage).every(count) ||
@@ -39,13 +45,23 @@ export function isOperations(v: unknown): v is OperationsOverview {
     !Array.isArray(v.attemptUsage) ||
     v.attemptUsage.length > 2 ||
     !Array.isArray(v.errors) ||
-    v.errors.length > 15
+    v.errors.length > Object.keys(errorLabels).length
   )
     return false;
   const tasks = v.tasks as OperationsOverview['tasks'];
   if (
     tasks.total !==
-    tasks.queued + tasks.running + tasks.succeeded + tasks.failed + tasks.cancelled + tasks.interrupted
+    tasks.queued +
+      tasks.running +
+      tasks.succeeded +
+      tasks.failed +
+      tasks.cancelled +
+      tasks.interrupted +
+      tasks.paused +
+      tasks.waitingInput +
+      tasks.waitingCapability +
+      tasks.partial +
+      tasks.resultUnknown
   )
     return false;
   const classes = new Set(),
@@ -75,7 +91,7 @@ export function isOperations(v: unknown): v is OperationsOverview {
     if (
       !shape(
         a,
-        'executionClass attempts meteredAttempts running succeeded failed cancelled interrupted requests pendingRequests reportedRequests inputTokens outputTokens',
+        'executionClass attempts meteredAttempts running succeeded failed cancelled interrupted paused waitingInput waitingCapability partial resultUnknown requests pendingRequests reportedRequests inputTokens outputTokens',
       ) ||
       !['live', 'verification'].includes(String(a.executionClass)) ||
       attemptClasses.has(a.executionClass)
@@ -87,7 +103,17 @@ export function isOperations(v: unknown): v is OperationsOverview {
     if (
       row.attempts < 1 ||
       row.meteredAttempts > row.attempts ||
-      row.attempts !== row.running + row.succeeded + row.failed + row.cancelled + row.interrupted ||
+      row.attempts !==
+        row.running +
+          row.succeeded +
+          row.failed +
+          row.cancelled +
+          row.interrupted +
+          row.paused +
+          row.waitingInput +
+          row.waitingCapability +
+          row.partial +
+          row.resultUnknown ||
       row.requests > row.meteredAttempts * 8 ||
       row.pendingRequests + row.reportedRequests > row.requests ||
       (row.reportedRequests === 0
@@ -111,7 +137,7 @@ export function isOperations(v: unknown): v is OperationsOverview {
     codes.add(e.code);
     failures += e.tasks;
   }
-  return successes <= tasks.succeeded && failures === tasks.failed + tasks.interrupted;
+  return successes <= tasks.succeeded && failures === tasks.failed + tasks.interrupted + tasks.resultUnknown;
 }
 export function createOperationsClient(fetcher: typeof fetch = fetch) {
   const request = createIdentityRequest(fetcher);

@@ -8,6 +8,9 @@ export interface BriefingPreference {
 export interface BriefingCard {
   conversationId: string;
   taskId: string;
+  taskRevision: number;
+  attempt: number;
+  presentationVersion: 'briefing-basic-v1';
   workspaceId: string;
   workspaceName: string;
   title: string;
@@ -41,4 +44,23 @@ export interface BriefingUpdate {
   pinned: boolean;
   hidden: boolean;
   size: BriefingPreference['size'];
+}
+export interface BriefingLayout {
+  tenantId: string;
+  revision: number;
+}
+export interface BriefingLayoutMove {
+  requestId: string;
+  expectedRevision: number;
+  conversationId: string;
+  anchorId: string;
+  direction: 'BEFORE' | 'AFTER';
+}
+export interface BriefingLayoutReceipt {
+  id: string;
+  conversationId: string;
+  anchorId: string;
+  direction: 'BEFORE' | 'AFTER';
+  appliedRevision: number;
+  currentRevision: number;
 }

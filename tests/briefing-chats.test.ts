@@ -45,7 +45,7 @@ test('发送前和仅有用户消息不生成卡片，每个会话仅一张，�
   syncBriefing(s, t2);
   card = entry(s, chat);
   assert.equal(card.updatedAt, t2);
-  assert.equal(card.history.length, 2);
+  assert.equal(card.history.length, 0);
   assert.equal(card.data.conversation?.replyId, chat.messages.at(-1)!.id);
   assert.equal(s.briefing!.cards.filter((c) => c.id === card.id).length, 1);
   const after = structuredClone(s);
@@ -128,7 +128,7 @@ test('隐藏、关注和尺寸偏好随回复更新保留，归档退出、恢�
   chat.archived = true;
   syncBriefing(s, t2);
   assert.equal(card.active, false);
-  assert.equal(canReadCardData(s, card.history[0].data), false);
+  assert.equal(canReadCardData(s, card.data), false);
   assert.throws(() => openBriefingChat(s, card.id, 'content'));
   chat.archived = false;
   syncBriefing(s, t2);
@@ -177,9 +177,11 @@ test('最新回复在已保存布局中前移，其余排列整体保留，手�
     assert.deepEqual(saved, untouched);
     const a = placed.find((p) => p.entry.card.id === entries[0].card.id)!;
     const b = placed.find((p) => p.entry.card.id === entries[1].card.id)!;
-    assert.equal(a.col, saved.positions[0].col);
-    assert.equal(b.col, saved.positions[1].col);
-    assert.equal(b.row - a.row, saved.positions[1].row - saved.positions[0].row);
+    const savedA = saved.positions.find((p) => p.id === a.entry.card.id)!;
+    const savedB = saved.positions.find((p) => p.id === b.entry.card.id)!;
+    assert.equal(a.col, savedA.col);
+    assert.equal(b.col, savedB.col);
+    assert.equal(b.row - a.row, savedB.row - savedA.row);
     const committed = saveBriefingLayout(placed, columns);
     assert.deepEqual(refreshConversationLayout(changed, committed), committed);
     assert.equal(groupBriefingEntries(changed, '最新')[0].entries[0].card.id, entries[2].card.id);

@@ -1,0 +1,21 @@
+package com.dreamcore.workspace.departure;
+import com.dreamcore.workspace.identity.*;import com.dreamcore.workspace.material.*;import com.dreamcore.workspace.experience.ExperienceService;
+import java.util.*;import org.springframework.jdbc.core.JdbcTemplate;import org.springframework.stereotype.Service;import org.springframework.transaction.annotation.*;import tools.jackson.databind.json.JsonMapper;
+@Service public class DepartureArchiveSources {
+ public static final long MAX_FILE=33554432;
+ public record Item(String kind,UUID objectId,UUID versionId,int version){}
+ public record File(String filename,byte[] bytes,String sha256){}
+ private final JdbcTemplate db;private final IdentityService identities;private final MaterialService materials;private final MaterialAccess materialAccess;private final ExperienceService experiences;private final DepartureAccess gate;private final JsonMapper json=new JsonMapper();
+ public DepartureArchiveSources(JdbcTemplate db,IdentityService identities,MaterialService materials,MaterialAccess materialAccess,ExperienceService experiences,DepartureAccess gate){this.db=db;this.identities=identities;this.materials=materials;this.materialAccess=materialAccess;this.experiences=experiences;this.gate=gate;}
+ public void scope(UUID actor,UUID tenant,UUID execution,UUID workspace){identities.member(actor,tenant,false);gate.requireContentRead(actor,tenant,workspace);if(!Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM departure_executions e JOIN departure_export_grants g ON g.execution_id=e.id WHERE e.id=? AND e.tenant_id=? AND e.kind='TENANT_EXIT' AND e.state='EXPORT_WINDOW' AND e.deadline>clock_timestamp() AND g.account_id=? AND g.workspace_id=?)",Boolean.class,execution,tenant,actor,workspace)))throw new IdentityException(403,"DEPARTURE_EXPORT_SCOPE_REQUIRED");}
+ @Transactional(propagation=Propagation.REQUIRES_NEW) public String inspect(UUID actor,UUID tenant,UUID execution,UUID workspace,Item item){scope(actor,tenant,execution,workspace);return name(actor,tenant,workspace,item);}
+ private String name(UUID actor,UUID tenant,UUID workspace,Item item){
+  if(item.kind().equals("MATERIAL_VERSION")){materialAccess.requireVersionActive(tenant,workspace,item.versionId());var names=db.queryForList("SELECT filename FROM material_versions WHERE tenant_id=? AND workspace_id=? AND material_id=? AND id=? AND number=?",String.class,tenant,workspace,item.objectId(),item.versionId(),item.version());if(names.isEmpty())throw new IdentityException(404,"DEPARTURE_EXPORT_ITEM_UNAVAILABLE");return names.getFirst();}
+  if(!item.kind().equals("EXPERIENCE_VERSION"))throw IdentityException.invalid();var entry=experiences.get(actor,tenant,workspace,item.objectId(),item.versionId());if(entry.version().number()!=item.version()||!entry.version().content().accessMode().equals("INDEPENDENT_COPY"))throw new IdentityException(404,"DEPARTURE_EXPORT_ITEM_UNAVAILABLE");return "experience-"+entry.id()+"-v"+item.version()+".json";
+ }
+ @Transactional(propagation=Propagation.REQUIRES_NEW) public File export(UUID actor,UUID tenant,UUID execution,UUID workspace,Item item){scope(actor,tenant,execution,workspace);String filename=name(actor,tenant,workspace,item);byte[] bytes;
+  if(item.kind().equals("MATERIAL_VERSION")){long size=db.queryForObject("SELECT size_bytes FROM material_versions WHERE id=?",Long.class,item.versionId());if(size>MAX_FILE)throw new IdentityException(413,"DEPARTURE_EXPORT_FILE_TOO_LARGE");bytes=materials.download(actor,tenant,workspace,item.objectId(),item.versionId()).bytes();}
+  else{var e=experiences.get(actor,tenant,workspace,item.objectId(),item.versionId());var out=new LinkedHashMap<String,Object>();out.put("schemaVersion",1);out.put("kind","INDEPENDENT_EXPERIENCE");out.put("experienceId",e.id());out.put("versionId",e.version().id());out.put("version",e.version().number());out.put("content",e.version().content());out.put("origin",e.version().origin());out.put("evaluation",e.version().evaluation());out.put("createdAt",e.version().createdAt());out.put("sourceNotes","显式整理发布的独立副本。原会话、受限引用及其正文没有自动复制或转授；参考来源需在原系统按当前权限核验。");out.put("includedSourceBodies",false);bytes=json.writeValueAsBytes(out);}
+  if(bytes.length>MAX_FILE)throw new IdentityException(413,"DEPARTURE_EXPORT_FILE_TOO_LARGE");return new File(filename,bytes,ObjectStore.sha256(bytes));
+ }
+}

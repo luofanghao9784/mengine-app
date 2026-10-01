@@ -1,0 +1,249 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dreamcore:task-context:1.0",
+  "description": "POST /internal/v1/agent-access/{task}/context. Live attempt Bearer only. Responses <= 57344 UTF-8 bytes; bootstrap <=24576. Data is never authorization. Bodies are exact-version pages; use records model-reported selection with applicationOutcome UNKNOWN. No automatic calls when check omits contextVersion or agentTask is 1.4.",
+  "$defs": {
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action"
+      ],
+      "properties": {
+        "action": {
+          "enum": [
+            "bootstrap",
+            "profiles",
+            "profile_read",
+            "history",
+            "experience_search",
+            "experience_read",
+            "experience_use"
+          ]
+        },
+        "scope": {
+          "enum": [
+            "TENANT",
+            "WORKSPACE",
+            "PERSONAL"
+          ]
+        },
+        "query": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 8001
+        },
+        "referenceId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "versionId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "requestId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "decision": {
+          "enum": [
+            "DIRECT",
+            "ADAPTED",
+            "UNKNOWN",
+            "NOT_APPLICABLE"
+          ]
+        },
+        "conditions": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "adjustments": {
+          "type": "string",
+          "maxLength": 1000
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "profiles"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "scope"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "profile_read"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "referenceId",
+              "revision"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "experience_search"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "query"
+            ],
+            "properties": {
+              "query": {
+                "minLength": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "enum": [
+                  "experience_read",
+                  "experience_use"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "referenceId",
+              "versionId"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "experience_use"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "requestId",
+              "decision",
+              "conditions"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "enum": [
+                  "profiles",
+                  "history",
+                  "experience_search"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "offset": {
+                "maximum": 1000
+              }
+            }
+          }
+        }
+      ]
+    },
+    "response": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contractVersion",
+        "action",
+        "referenceOnly",
+        "result"
+      ],
+      "properties": {
+        "contractVersion": {
+          "const": "1.0"
+        },
+        "action": {
+          "enum": [
+            "bootstrap",
+            "profiles",
+            "profile_read",
+            "history",
+            "experience_search",
+            "experience_read",
+            "experience_use"
+          ]
+        },
+        "referenceOnly": {
+          "const": true
+        },
+        "result": {
+          "type": "object"
+        }
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "allowed",
+        "executionClass",
+        "publicQuery",
+        "candidateTrialsAllowed"
+      ],
+      "properties": {
+        "allowed": {
+          "const": true
+        },
+        "executionClass": {
+          "enum": [
+            "verification",
+            "live"
+          ]
+        },
+        "publicQuery": {
+          "type": "string",
+          "maxLength": 2048
+        },
+        "candidateTrialsAllowed": {
+          "type": "boolean"
+        },
+        "contextVersion": {
+          "const": "1.0"
+        },
+        "taskWorkVersion": {
+          "const": "1.0"
+        },
+        "planAllowed": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

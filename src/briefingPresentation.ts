@@ -14,7 +14,15 @@ export type BriefingChart = {
     | 'dumbbell'
     | 'heatmap'
     | 'waterfall'
-    | 'multiples';
+    | 'multiples'
+    | 'breakdown'
+    | 'columns'
+    | 'diverging'
+    | 'bars'
+    | 'donut'
+    | 'funnel'
+    | 'unit-grid'
+    | 'progress';
   unit: string;
   period: string;
   rows: ChartDatum[];
@@ -98,6 +106,17 @@ export function briefingPresentation(data: CardData): BriefingPresentation | und
 }
 
 export function chartDescription(chart: BriefingChart): string {
+  if (chart.kind === 'funnel')
+    return `${chart.period}；${chart.rows.map((r) => `${r.label} ${r.value}${chart.unit}`).join('，')}；${(chart.series || []).map((s) => `${s.label}：开通体验 ${s.values[0]}${chart.unit}，30天内购课 ${s.values[1]}${chart.unit}`).join('；')}`;
+  if (chart.kind === 'breakdown')
+    return `${chart.period}；${chart.series
+      ?.map(
+        (series, i) =>
+          `${series.label} ${chart.rows[i]?.value}${chart.unit}＝${series.values
+            .flatMap((value, j) => (value ? [`${chart.columns?.[j]} ${value}${chart.unit}`] : []))
+            .join('＋')}`,
+      )
+      .join('；')}。两种口径分别核对，不相加。`;
   const rows = chart.rows
     .map((r) => `${r.label} ${r.previous === undefined ? '' : `${r.previous} → `}${r.value}${chart.unit}`)
     .join('，');

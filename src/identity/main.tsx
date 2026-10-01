@@ -3,6 +3,7 @@ import { SessionProvider } from './session';
 import AccessApp, { readInvitation, type Surface } from './AccessApp';
 import '../shared/theme.css';
 import './access.css';
+import './workspace.css';
 
 const root = document.getElementById('root')!;
 const surface = root.dataset.surface as Surface;

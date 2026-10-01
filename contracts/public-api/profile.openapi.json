@@ -1,0 +1,795 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Dreamcore Profiles API",
+    "version": "1.0.0"
+  },
+  "security": [
+    {
+      "sessionCookie": []
+    }
+  ],
+  "paths": {
+    "/api/v1/tenants/{tenant}/profiles/{scope}/{subject}": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "scope",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "enum": [
+              "TENANT",
+              "WORKSPACE",
+              "PERSONAL"
+            ]
+          }
+        },
+        {
+          "name": "subject",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "作用范围内的当前档案；含撤回/过期状态，使用者只采用有效内容",
+        "responses": {
+          "200": {
+            "description": "实际持久状态；不表示模型执行",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "401": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "403": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "404": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "409": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          }
+        },
+        "parameters": [
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000,
+              "default": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          }
+        ]
+      },
+      "post": {
+        "summary": "新增明确背景，不创建计划或权限",
+        "responses": {
+          "200": {
+            "description": "实际持久状态；不表示模型执行",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Value"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "401": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "403": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "404": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "409": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Create"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenant}/profiles/entries/{id}": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "查看当前或确切历史版本",
+        "responses": {
+          "200": {
+            "description": "实际持久状态；不表示模型执行",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Value"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "401": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "403": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "404": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "409": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          }
+        },
+        "parameters": [
+          {
+            "name": "version",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenant}/profiles/entries/{id}/versions": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "summary": "版本化更正；重试返回本次保存的版本",
+        "responses": {
+          "200": {
+            "description": "实际持久状态；不表示模型执行",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Value"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "401": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "403": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "404": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "409": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Save"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "get": {
+        "operationId": "profileVersionHistory",
+        "description": "Same original scope; metadata remains addressable after body removal. No body or provenance is returned.",
+        "parameters": [
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Minimal exact-version history",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/History"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/profiles/entries/{id}/withdraw": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "summary": "撤回当前档案，保留可审阅历史",
+        "responses": {
+          "200": {
+            "description": "实际持久状态；不表示模型执行",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Value"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "401": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "403": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "404": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "409": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Withdraw"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "DREAMCORE_SESSION"
+      }
+    },
+    "schemas": {
+      "Create": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "FACT",
+              "INFERENCE",
+              "GOAL",
+              "PREFERENCE"
+            ]
+          },
+          "value": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "provenance": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "PROPOSED"
+            ]
+          },
+          "expiresAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "requestId",
+          "key",
+          "kind",
+          "value",
+          "provenance",
+          "status"
+        ]
+      },
+      "Save": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "value": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "provenance": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "PROPOSED"
+            ]
+          },
+          "expiresAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "requestId",
+          "expectedRevision",
+          "value",
+          "provenance",
+          "status"
+        ]
+      },
+      "Withdraw": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "requestId",
+          "expectedRevision"
+        ]
+      },
+      "Value": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "TENANT",
+              "WORKSPACE",
+              "PERSONAL"
+            ]
+          },
+          "subjectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "key": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "FACT",
+              "INFERENCE",
+              "GOAL",
+              "PREFERENCE"
+            ]
+          },
+          "revision": {
+            "type": "integer"
+          },
+          "value": {
+            "type": "string"
+          },
+          "provenance": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "PROPOSED",
+              "WITHDRAWN"
+            ]
+          },
+          "effectiveStatus": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "PROPOSED",
+              "WITHDRAWN",
+              "EXPIRED"
+            ]
+          },
+          "expiresAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "changedBy": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "changedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "versionId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "scope",
+          "subjectId",
+          "key",
+          "kind",
+          "revision",
+          "value",
+          "provenance",
+          "status",
+          "effectiveStatus",
+          "expiresAt",
+          "changedBy",
+          "changedAt",
+          "versionId"
+        ]
+      },
+      "Page": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "TENANT",
+              "WORKSPACE",
+              "PERSONAL"
+            ]
+          },
+          "subjectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "canMaintain": {
+            "type": "boolean"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Value"
+            }
+          },
+          "hasMore": {
+            "type": "boolean"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EntryInfo"
+            }
+          }
+        },
+        "required": [
+          "tenantId",
+          "scope",
+          "subjectId",
+          "canMaintain",
+          "items",
+          "hasMore",
+          "entries"
+        ]
+      },
+      "EntryInfo": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "key": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "FACT",
+              "INFERENCE",
+              "GOAL",
+              "PREFERENCE"
+            ]
+          },
+          "versionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "bodyAvailable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "kind",
+          "versionId",
+          "revision",
+          "bodyAvailable"
+        ]
+      },
+      "VersionInfo": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "versionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "current": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "PROPOSED",
+              "WITHDRAWN"
+            ]
+          },
+          "effectiveStatus": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "PROPOSED",
+              "WITHDRAWN",
+              "EXPIRED"
+            ]
+          },
+          "expiresAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "changedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "bodyAvailable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "versionId",
+          "revision",
+          "current",
+          "status",
+          "effectiveStatus",
+          "expiresAt",
+          "changedAt",
+          "bodyAvailable"
+        ]
+      },
+      "History": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "canMaintain": {
+            "type": "boolean"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VersionInfo"
+            }
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "canMaintain",
+          "items",
+          "hasMore"
+        ]
+      }
+    }
+  }
+}

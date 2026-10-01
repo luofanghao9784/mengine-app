@@ -1,3 +1,4 @@
+import { briefingCreatedAt } from './briefingLifecycle.ts';
 import type { Chat, DemoState } from './model.ts';
 import type { BriefingCard, CardData } from './briefing.ts';
 import { canReadMaterial, visibleSpaces } from './libraryModel.ts';
@@ -111,7 +112,7 @@ export function briefingConversation(state: DemoState, card: BriefingCard) {
     // opening a chat, changing its title or sending a user message cannot bump it.
     at: reply
       ? reply.createdAt ||
-        (card.data.sourceKind === 'conversation' ? card.updatedAt : card.history[0]?.at || card.updatedAt)
+        (card.data.sourceKind === 'conversation' ? card.updatedAt : briefingCreatedAt(card))
       : '',
   };
 }

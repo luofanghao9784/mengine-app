@@ -1,0 +1,86 @@
+package com.dreamcore.workspace.objectlifecycle;
+import com.dreamcore.workspace.identity.*;
+import com.dreamcore.workspace.departure.DepartureAccess;
+import com.dreamcore.workspace.retention.*;
+import com.dreamcore.workspace.conversation.ConversationService;
+import java.time.*;import java.util.*;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.json.JsonMapper;
+/** Fixed anchors, independent action qualification, and durable online-cleanup facts. */
+@Service public class ObjectLifecycleService {
+ public static final Set<String> KINDS=Set.of("TASK","DOCUMENT","ARTIFACT","EXPERIENCE_VERSION","FEEDBACK_VERSION","EVALUATION_VERSION","EVALUATION_RUN","EXPORT_CACHE","PROFILE_VERSION","METHOD_VERSION");
+ public record Item(String kind,UUID objectId,UUID workspaceId,String state,int revision,Instant originalAnchor,boolean formal,String policyKey,Integer policyRevision,Instant policyDue,Instant purgeAfter,int attempts,String errorCode,Instant completedAt,List<String> actions,String contentState,String backupState) {}
+ public record Page(List<Item> items,boolean hasMore) {}
+ public record Receipt(int acceptedRevision,Item current,String receiptStatus) {}
+ public record Preview(Item object,Instant trashDeadline,Instant trialDeadline,boolean methodDependency,List<String> blockers,boolean irreversible,String independentCopies) {}
+ public record Event(int revision,String action,UUID actorId,Instant createdAt) {}
+ public record Events(List<Event> items,boolean hasMore) {}
+ public record ScopeProgress(UUID executionId,String state,int discovered,int queued,int purged,int failed,long remaining,boolean discoveryComplete,boolean complete) {}
+ public record Technical(String kind,String state,long count) {}
+ private final JdbcTemplate db;private final IdentityService identities;private final IdentityAudit audit;private final ObjectLifecycleAccess access;private final RetentionService retention;private final RetentionClock clock;private final ConversationService tasks;private final DepartureAccess departure;
+ private final JsonMapper json=new JsonMapper();
+ public ObjectLifecycleService(JdbcTemplate db,IdentityService identities,IdentityAudit audit,ObjectLifecycleAccess access,RetentionService retention,RetentionClock clock,ConversationService tasks,DepartureAccess departure){this.db=db;this.identities=identities;this.audit=audit;this.access=access;this.retention=retention;this.clock=clock;this.tasks=tasks;this.departure=departure;}
+ private void kind(String kind){if(!KINDS.contains(kind))throw IdentityException.invalid();}
+ private Instant time(Map<String,Object> r,String k){return r.get(k)==null?null:((java.sql.Timestamp)r.get(k)).toInstant();}
+ private java.sql.Timestamp ts(Instant at){return at==null?null:java.sql.Timestamp.from(at);}
+ private Instant earliest(Instant...values){return Arrays.stream(values).filter(Objects::nonNull).min(Comparator.naturalOrder()).orElse(null);}
+ private void lock(UUID actor,UUID tenant){if(tenant==null){identities.platform(actor);db.queryForList("SELECT pg_advisory_xact_lock(72133001)");}else{identities.member(actor,tenant,false,false);db.queryForList("SELECT id FROM tenants WHERE id=? FOR UPDATE",tenant);identities.member(actor,tenant,false,false);}}
+ private void tenantLock(UUID tenant){if(tenant!=null)db.queryForList("SELECT id FROM tenants WHERE id=? FOR UPDATE",tenant);else db.queryForList("SELECT pg_advisory_xact_lock(72133001)");}
+ private Map<String,Object> row(String kind,UUID id){var r=db.queryForList("SELECT * FROM object_lifecycle WHERE kind=? AND object_id=?",kind,id);return r.isEmpty()?null:r.getFirst();}
+ private Map<String,Object> register(Map<String,Object> s){db.update("INSERT INTO object_lifecycle(kind,object_id,tenant_id,workspace_id,owner_id,parent_kind,parent_id,original_anchor) VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(kind,object_id) DO NOTHING",s.get("kind"),s.get("object_id"),s.get("tenant_id"),s.get("workspace_id"),s.get("owner_id"),s.get("parent_kind"),s.get("parent_id"),s.get("original_anchor"));return row((String)s.get("kind"),(UUID)s.get("object_id"));}
+ private List<String> blockers(String kind,UUID id){var reasons=new ArrayList<>(db.queryForList("SELECT unnest(lifecycle_version_blockers(?,?))",String.class,kind,id));if(dependency(kind,id))reasons.add("LIFECYCLE_ACTIVE_METHOD_DEPENDENCY");return List.copyOf(reasons);}
+ private boolean dependency(String kind,UUID id){if(!kind.equals("EVALUATION_VERSION"))return false;return Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM method_adoptions a JOIN method_releases r ON r.version_id=a.version_id JOIN method_comparisons c ON c.id=r.comparison_id WHERE a.status='ACTIVE' AND (c.standard_version=? OR c.sample_versions->'items' @> ?::jsonb))",Boolean.class,id,json.writeValueAsString(List.of(id))));}
+ private boolean gone(String kind,UUID id){return switch(kind){case "PROFILE_VERSION" -> Boolean.TRUE.equals(db.queryForObject("SELECT scrubbed FROM profile_versions WHERE id=?",Boolean.class,id));case "METHOD_VERSION" -> Boolean.TRUE.equals(db.queryForObject("SELECT scrubbed FROM method_versions WHERE id=?",Boolean.class,id));case "EXPERIENCE_VERSION" -> Boolean.TRUE.equals(db.queryForObject("SELECT scrubbed FROM experience_versions WHERE id=?",Boolean.class,id));case "EVALUATION_VERSION" -> Boolean.TRUE.equals(db.queryForObject("SELECT scrubbed FROM evaluation_asset_versions WHERE id=?",Boolean.class,id));case "FEEDBACK_VERSION" -> Boolean.TRUE.equals(db.queryForObject("SELECT f.scrubbed FROM feedback_versions v JOIN feedback_entries f ON f.id=v.feedback_id WHERE v.id=?",Boolean.class,id));default -> false;};}
+ private Item item(UUID actor,UUID tenant,Map<String,Object> s,Map<String,Object> r){
+  String k=(String)s.get("kind");UUID id=(UUID)s.get("object_id");String state=r==null?"ACTIVE":(String)r.get("state");List<String> actions=new ArrayList<>();
+  if(state.equals("ACTIVE"))actions.add("DISABLE");if(state.equals("DISABLED"))actions.add("ENABLE");
+  if(Set.of("ACTIVE","DISABLED").contains(state)){actions.add("TRASH");if(k.equals("EVALUATION_RUN")&&(r==null||Boolean.TRUE.equals(r.get("is_formal"))))actions.add("CLASSIFY_TRIAL");}
+  if(state.equals("TRASHED"))actions.add("RESTORE");if(state.equals("PURGE_FAILED"))actions.add("RETRY");
+  if(Set.of("ACTIVE","DISABLED","TRASHED").contains(state)){try{access.require(actor,tenant,s,true);actions.add("PURGE");}catch(IdentityException ignored){}}
+  if(tenant!=null)try{departure.requireActiveBusiness(actor,tenant);}catch(IdentityException e){if(!e.code.equals("DEPARTURE_BUSINESS_STOPPED"))throw e;actions.clear();}
+  if(!blockers(k,id).isEmpty())actions.removeAll(List.of("DISABLE","TRASH","PURGE"));
+  Instant due=r==null?null:earliest(Boolean.TRUE.equals(r.get("is_formal"))?null:time(r,"policy_due"),time(r,"trash_due"),time(r,"scope_due"));
+  return new Item(k,id,(UUID)s.get("workspace_id"),state,r==null?0:(Integer)r.get("revision"),time(s,"original_anchor"),r==null||Boolean.TRUE.equals(r.get("is_formal")),r==null?null:(String)r.get("policy_key"),r==null?null:(Integer)r.get("policy_revision"),r==null?null:time(r,"policy_due"),due,r==null?0:(Integer)r.get("attempts"),r==null?null:(String)r.get("error_code"),r==null?null:time(r,"completed_at"),List.copyOf(actions),state.equals("PURGED")?"ONLINE_BODY_ERASED":state.equals("ACTIVE")&&(due==null||clock.now().isBefore(due))?"CURRENT_ORIGINAL_ACCESS_REQUIRED":"NORMAL_ACCESS_BLOCKED","NOT_COVERED_BY_ONLINE_CLEANUP");
+ }
+ @Transactional public Item get(UUID actor,UUID tenant,String kind,UUID id){kind(kind);var s=access.source(kind,id);access.require(actor,tenant,s,false);return item(actor,tenant,s,row(kind,id));}
+ @Transactional public Page list(UUID actor,UUID tenant,UUID workspace,String kind,String state,int offset,int limit){
+  if(offset<0||offset>100000||limit<1||limit>50)throw IdentityException.invalid();if(kind!=null)kind(kind);if(tenant==null)identities.platform(actor);else {identities.member(actor,tenant,false);if(workspace==null&&!"PROFILE_VERSION".equals(kind))throw IdentityException.invalid();}
+  var source=db.queryForList("SELECT s.* FROM lifecycle_object_sources s LEFT JOIN object_lifecycle l ON l.kind=s.kind AND l.object_id=s.object_id WHERE s.tenant_id IS NOT DISTINCT FROM ?::uuid AND s.workspace_id IS NOT DISTINCT FROM ?::uuid AND (s.kind='PROFILE_VERSION' OR s.tenant_id IS NULL OR s.owner_id=?::uuid OR (s.owner_id IS NULL AND EXISTS(SELECT 1 FROM governance_capabilities g WHERE g.tenant_id=s.tenant_id AND g.account_id=?::uuid AND g.workspace_id=s.workspace_id AND g.capability=CASE WHEN s.kind='EXPERIENCE_VERSION' THEN 'EXPERIENCE_MAINTAIN' ELSE 'EVALUATION_MAINTAIN' END))) AND (?::text IS NULL OR s.kind=?) AND (?::text IS NULL OR coalesce(l.state,'ACTIVE')=?) ORDER BY s.original_anchor DESC,s.kind,s.object_id LIMIT 1001",tenant,workspace,actor,actor,kind,kind,state,state);
+  if(source.size()>1000)throw new IdentityException(409,"LIFECYCLE_SCOPE_WINDOW_EXCEEDED");List<Item> visible=new ArrayList<>();for(var s:source)try{access.require(actor,tenant,s,false);visible.add(item(actor,tenant,s,row((String)s.get("kind"),(UUID)s.get("object_id"))));}catch(IdentityException e){if(e.status!=403&&e.status!=404)throw e;}
+  return new Page(visible.stream().skip(offset).limit(limit).toList(),visible.size()>offset+limit);
+ }
+ @Transactional public Preview preview(UUID actor,UUID tenant,String kind,UUID id){var i=get(actor,tenant,kind,id);Instant now=clock.now();return new Preview(i,retention.resolveDeadline(tenant,"TRASH",now).dueAt(),kind.equals("EVALUATION_RUN")?retention.resolveDeadline(tenant,"TRIAL_EVALUATION",i.originalAnchor()).dueAt():null,dependency(kind,id),blockers(kind,id),true,"INDEPENDENT_ENTERPRISE_PUBLICATIONS_SURVIVE");}
+ private void event(Map<String,Object> r,String action,UUID actor,Instant at){int rev=(Integer)r.get("revision");db.update("INSERT INTO object_lifecycle_events(id,object_record,revision,action,actor_id,created_at) VALUES (?,?,?,?,?,?)",UUID.randomUUID(),r.get("id"),rev,action,actor,ts(at));}
+ private void interrupt(String kind,UUID id,UUID tenant){if(kind.equals("TASK"))tasks.interruptTasks(tenant,List.of(id),"TASK_SOURCE_UNAVAILABLE");}
+ @Transactional public Receipt act(UUID actor,UUID tenant,String kind,UUID id,UUID key,int expected,String action,boolean irreversibleConfirmed){
+  kind(kind);if(expected<0||!Set.of("DISABLE","ENABLE","TRASH","RESTORE","PURGE","RETRY","CLASSIFY_TRIAL").contains(action)||(action.equals("PURGE")&&!irreversibleConfirmed))throw IdentityException.invalid();lock(actor,tenant);if(tenant!=null)departure.requireActiveBusiness(actor,tenant);var s=access.source(kind,id);access.require(actor,tenant,s,action.equals("PURGE"));
+  String fp=IdentityService.hash(json.writeValueAsString(new Object[]{tenant,kind,id,expected,action,irreversibleConfirmed}));UUID prior=identities.priorRequest(actor,key,"OBJECT_LIFECYCLE",fp);
+  if(prior!=null){var e=db.queryForMap("SELECT revision FROM object_lifecycle_events WHERE id=?",prior);var current=get(actor,tenant,kind,id);return new Receipt((Integer)e.get("revision"),current,"EXACT");}
+  var r=row(kind,id);if((r==null?0:(Integer)r.get("revision"))!=expected)throw new IdentityException(409,"LIFECYCLE_REVISION_CONFLICT");if(r==null)r=register(s);if(kind.equals("PROFILE_VERSION"))db.queryForList("SELECT e.id FROM profile_entries e JOIN profile_versions v ON v.entry_id=e.id WHERE v.id=? FOR UPDATE OF e",id);
+  if(Set.of("DISABLE","TRASH","PURGE").contains(action)&&!blockers(kind,id).isEmpty())throw new IdentityException(409,"LIFECYCLE_DEPENDENCY_PRESENT");
+  Item before=item(actor,tenant,s,r);if(!before.actions().contains(action))throw new IdentityException(409,"LIFECYCLE_ACTION_UNAVAILABLE");
+  if(kind.equals("EVALUATION_VERSION"))db.queryForList("SELECT a.id FROM evaluation_assets a JOIN evaluation_asset_versions v ON v.asset_id=a.id WHERE v.id=? FOR UPDATE OF a",id);
+  if(Set.of("DISABLE","TRASH","PURGE").contains(action)&&dependency(kind,id))throw new IdentityException(409,"LIFECYCLE_ACTIVE_METHOD_DEPENDENCY");Instant now=clock.now();String next=before.state();
+  if(Set.of("ENABLE","RESTORE").contains(action)){
+   if(gone(kind,id)||before.purgeAfter()!=null&&!now.isBefore(before.purgeAfter()))throw new IdentityException(409,"LIFECYCLE_CONTENT_EXPIRED");
+   if(s.get("parent_id")!=null&&!Boolean.TRUE.equals(db.queryForObject("SELECT object_is_active(?,?)",Boolean.class,s.get("parent_kind"),s.get("parent_id"))))throw new IdentityException(409,"LIFECYCLE_PARENT_UNAVAILABLE");
+   if(Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM object_lifecycle_scopes WHERE tenant_id=? AND (owner_id IS NULL OR owner_id=?::uuid) AND state<>'RESTORED')",Boolean.class,tenant,s.get("owner_id"))))throw new IdentityException(409,"LIFECYCLE_SCOPE_ISOLATED");
+  }
+  switch(action){
+   case "DISABLE" -> next="DISABLED";
+   case "ENABLE" -> next="ACTIVE";
+   case "TRASH" -> {var d=retention.resolveDeadline(tenant,"TRASH",now);next="TRASHED";db.update("UPDATE object_lifecycle SET prior_state=state,trash_anchor=?,trash_policy_revision=?,trash_due=? WHERE id=?",ts(d.anchor()),d.policyRevision(),ts(d.dueAt()),r.get("id"));}
+   case "RESTORE" -> {next="DISABLED";db.update("UPDATE object_lifecycle SET trash_anchor=NULL,trash_policy_revision=NULL,trash_due=NULL WHERE id=?",r.get("id"));}
+   case "PURGE","RETRY" -> next="PURGE_PENDING";
+   case "CLASSIFY_TRIAL" -> {var d=retention.resolveDeadline(tenant,"TRIAL_EVALUATION",time(s,"original_anchor"));db.update("UPDATE object_lifecycle SET is_formal=false,policy_key=?,policy_revision=?,policy_due=?,policy_pending=false WHERE id=?",d.policyKey(),d.policyRevision(),ts(d.dueAt()),r.get("id"));if(!now.isBefore(d.dueAt()))next="PURGE_PENDING";}
+  }
+  db.update("UPDATE object_lifecycle SET state=?,revision=revision+1,changed_at=?,error_code=NULL WHERE id=?",next,ts(now),r.get("id"));if(!next.equals("ACTIVE"))interrupt(kind,id,tenant);r=row(kind,id);UUID receipt=UUID.randomUUID();db.update("INSERT INTO object_lifecycle_events(id,object_record,revision,action,actor_id,created_at) VALUES (?,?,?,?,?,?)",receipt,r.get("id"),r.get("revision"),action,actor,ts(now));identities.remember(actor,key,"OBJECT_LIFECYCLE",fp,receipt);audit.record(actor,tenant,"OBJECT_LIFECYCLE_"+action,id,"SUCCESS");return new Receipt((Integer)r.get("revision"),item(actor,tenant,s,r),"EXACT");
+ }
+ @Transactional public Events history(UUID actor,UUID tenant,String kind,UUID id,int offset,int limit){get(actor,tenant,kind,id);if(offset<0||limit<1||limit>50)throw IdentityException.invalid();var rows=db.query("SELECT e.revision,e.action,e.actor_id,e.created_at FROM object_lifecycle_events e JOIN object_lifecycle l ON l.id=e.object_record WHERE l.kind=? AND l.object_id=? ORDER BY e.revision DESC LIMIT ? OFFSET ?",(rs,n)->new Event(rs.getInt(1),rs.getString(2),rs.getObject(3,UUID.class),rs.getTimestamp(4).toInstant()),kind,id,limit+1,offset);return new Events(rows.stream().limit(limit).toList(),rows.size()>limit);}
+ /** New-object trigger rows only. Original event time chooses the historical policy, never this worker's time. */
+ @Transactional public int bindPolicies(){int n=0;for(var pending:db.queryForList("SELECT id,tenant_id FROM object_lifecycle WHERE policy_pending ORDER BY created_at,id LIMIT 100")){tenantLock((UUID)pending.get("tenant_id"));var rows=db.queryForList("SELECT * FROM object_lifecycle WHERE id=? AND policy_pending FOR UPDATE",pending.get("id"));if(rows.isEmpty())continue;var r=rows.getFirst();var d=retention.resolveDeadline((UUID)r.get("tenant_id"),(String)r.get("policy_key"),time(r,"original_anchor"));db.update("UPDATE object_lifecycle SET policy_revision=?,policy_due=?,policy_pending=false WHERE id=?",d.policyRevision(),ts(d.dueAt()),r.get("id"));n++;}return n;}
+ @Transactional public int enqueueDue(){Instant now=clock.now();int n=0;for(var candidate:db.queryForList("SELECT id,tenant_id FROM object_lifecycle WHERE state IN('ACTIVE','DISABLED','TRASHED','ISOLATED') AND ((NOT is_formal AND policy_due<=?) OR trash_due<=? OR scope_due<=?) ORDER BY changed_at,id LIMIT 100",ts(now),ts(now),ts(now))){tenantLock((UUID)candidate.get("tenant_id"));var rows=db.queryForList("SELECT * FROM object_lifecycle WHERE id=? FOR UPDATE",candidate.get("id"));var r=rows.getFirst();Instant due=earliest(Boolean.TRUE.equals(r.get("is_formal"))?null:time(r,"policy_due"),time(r,"trash_due"),time(r,"scope_due"));if(due==null||now.isBefore(due)||!Set.of("ACTIVE","DISABLED","TRASHED","ISOLATED").contains(r.get("state")))continue;db.update("UPDATE object_lifecycle SET state='PURGE_PENDING',revision=revision+1,changed_at=? WHERE id=?",ts(now),r.get("id"));interrupt((String)r.get("kind"),(UUID)r.get("object_id"),(UUID)r.get("tenant_id"));event(row((String)r.get("kind"),(UUID)r.get("object_id")),"POLICY_EXPIRED",null,now);n++;}return n;}
+ @Transactional public List<Technical> technical(UUID actor){identities.platform(actor);return db.query("SELECT kind,state,count(*) FROM object_lifecycle GROUP BY kind,state ORDER BY kind,state",(rs,n)->new Technical(rs.getString(1),rs.getString(2),rs.getLong(3)));}
+}

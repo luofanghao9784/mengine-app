@@ -1,3 +1,8 @@
+import { attentionJourney } from './attention-journey.ts';
+import { experienceJourney } from './experience-journey.ts';
+import { lifecycleJourney } from './lifecycle-journey.ts';
+import { sourceJourney } from './source-journey.ts';
+import { batchUploadJourney } from './batch-upload-journey.ts';
 /** Optional M2-C1 extension to the owned M2-B4 fixture; exercises actual file and permission UI. */
 import assert from 'node:assert/strict';
 import { expect, type BrowserContext, type Page } from '@playwright/test';
@@ -28,6 +33,11 @@ export async function materialJourney({
     '/workspace/#' + new URLSearchParams({ tenant, view: 'library', scope, ...(folder ? { folder } : {}) });
   const context = await (await memberContext.request.get(`/api/v1/tenants/${tenant}/context`)).json();
   const personal = context.workspaces.find((w: { kind: string }) => w.kind === 'PERSONAL').id;
+  await batchUploadJourney(client, memberContext.request, tenant, personal, artifacts);
+  await sourceJourney(client, memberContext.request, tenant, personal, artifacts);
+  await lifecycleJourney(client, memberContext.request, tenant, personal, artifacts);
+  await experienceJourney(client, memberContext.request, tenant, personal, artifacts);
+  await attentionJourney(client, memberContext.request, tenant, personal, artifacts);
   const base = (workspace: string) => `/api/v1/tenants/${tenant}/workspaces/${workspace}`;
   const payload = (name: string, content: string) => ({
     name,

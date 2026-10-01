@@ -9,10 +9,48 @@ import {
   magazineType,
   magazineTypes,
   magazineView,
+  magazineSize,
 } from '../src/briefingMagazine.ts';
+import { chartDescription } from '../src/briefingPresentation.ts';
 import { briefingPeriod, briefingSource, briefingTime } from '../src/briefingTypography.ts';
 
 const fixture = () => syncBriefing(createKongguSeed(), '2026-09-24T01:00:00.000Z');
+
+test('收款和履约收入按两种口径展示，订金不混入收入，数据变更后不沿用旧图', () => {
+  const state = fixture();
+  const original = structuredClone(state);
+  const data = state.briefing!.cards.find((c) => c.id === 'konggu:C35')!.data;
+  const chart = magazineView(data).chart!;
+  assert.equal(chart.kind, 'breakdown');
+  assert.deepEqual(chart.columns, ['已履约已收', '未来活动订金', '已履约未收']);
+  assert.deepEqual(
+    chart.series!.map((s) => s.values),
+    [
+      [8100, 2400, 0],
+      [8100, 0, 3300],
+    ],
+  );
+  assert.deepEqual(
+    chart.rows.map((r) => r.value),
+    [10500, 11400],
+  );
+  assert.ok(chart.series!.every((s, i) => s.values.reduce((a, b) => a + b, 0) === chart.rows[i].value));
+  assert.match(chartDescription(chart), /两种口径分别核对，不相加/);
+  assert.equal(magazineView({ ...data, fact: '来源已更新，等待新的图表数据' }).chart, undefined);
+  assert.deepEqual(state, original);
+});
+
+test('自动规格按可见内容选择，短结论收紧，大图优先大尺寸，重要文字只加宽', () => {
+  const state = fixture();
+  const original = structuredClone(state);
+  const source = (id: string) => state.briefing!.cards.find((c) => c.id === `konggu:${id}`)!.data;
+  assert.equal(magazineSize(source('C40')), '1×1');
+  assert.equal(magazineSize(source('C35')), '2×1');
+  assert.equal(magazineSize(source('C01')), '2×2');
+  assert.equal(magazineSize({ ...source('C40'), recommendation: { importance: 'high' } }), '2×1');
+  assert.equal(magazineSize({ ...source('C40'), size: '2×2' }), '1×1');
+  assert.deepEqual(state, original);
+});
 
 test('混合日期卡片明确区分今天、往期、跨年及完整快照时间', () => {
   const now = new Date(2026, 8, 24, 9, 0);

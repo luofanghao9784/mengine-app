@@ -1,0 +1,105 @@
+.object-lifecycle-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.object-lifecycle-panel header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.object-lifecycle-toolbar {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.object-lifecycle-toolbar label {
+  min-width: 160px;
+  flex: 1;
+}
+.object-lifecycle-item {
+  border: 1px solid var(--border, #dce2e9);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.object-lifecycle-item p,
+.object-lifecycle-detail p {
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
+.object-lifecycle-detail {
+  display: grid;
+  gap: 12px;
+}
+.object-lifecycle-detail select {
+  max-width: 100%;
+  width: 100%;
+}
+@media (max-width: 640px) {
+  .object-lifecycle-item {
+    flex-direction: column;
+  }
+  .object-lifecycle-toolbar {
+    flex-direction: column;
+  }
+  .object-lifecycle-panel h3 {
+    overflow-wrap: anywhere;
+  }
+}
+
+.object-lifecycle-inline,
+.object-lifecycle-blockers,
+.profile-version-row {
+  border: 1px solid var(--border, #dce2e9);
+  border-radius: 12px;
+  padding: 16px;
+}
+.object-lifecycle-blockers ul {
+  padding-left: 20px;
+  line-height: 1.6;
+}
+.profile-history,
+.profile-history-versions {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.profile-version-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.profile-version-row p {
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.object-lifecycle-detail .platform-form-actions {
+  flex-wrap: wrap;
+}
+.object-lifecycle-detail input[type='checkbox'] {
+  margin-right: 8px;
+}
+@media (max-width: 640px) {
+  .object-lifecycle-inline,
+  .object-lifecycle-blockers,
+  .profile-version-row {
+    padding: 12px;
+  }
+  .object-lifecycle-detail .platform-form-actions > button {
+    max-width: 100%;
+    white-space: normal;
+  }
+}
+
+.profile-history > details > summary {
+  cursor: pointer;
+  padding: 8px 0 12px;
+  font-weight: 600;
+}

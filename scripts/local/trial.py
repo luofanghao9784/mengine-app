@@ -17,6 +17,10 @@ import time
 import urllib.request
 import uuid
 
+# Helpers import this module too; keep one exception/config identity when launched as a script.
+if __name__ == '__main__':
+    sys.modules.setdefault('trial', sys.modules[__name__])
+
 WORKSPACE = Path(__file__).resolve().parents[2]
 DEFAULT_DIRECTORY = WORKSPACE / '.local' / 'trial'
 FORMAT = 'dreamcore-local-trial-v1'
@@ -144,15 +148,80 @@ def ready(url, child, stopping):
     raise TrialError('本地服务启动超时；请查看私有日志。')
 
 
-def start(root):
+def verify_api_migrations(jar):
+    """A stale runtime must not open a newer recovered schema without its access guards."""
+    import zipfile
+    directory=WORKSPACE/'apps/api/src/main/resources/db/migration'
+    expected={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in directory.glob('V*__*.sql')}
+    try:
+        with zipfile.ZipFile(jar) as archive:
+            entries=[x for x in archive.namelist() if x.startswith('BOOT-INF/classes/db/migration/') and x.endswith('.sql')]
+            actual={name.rsplit('/',1)[-1]:hashlib.sha256(archive.read(name)).hexdigest() for name in entries}
+        if not expected or actual!=expected or len(actual)!=len(entries):raise ValueError()
+    except (OSError,ValueError,zipfile.BadZipFile):
+        raise TrialError('API 构建中的迁移与当前已核验版本不一致；先运行 npm run trial:build，禁止用旧运行时开放恢复数据。') from None
+
+
+def verify_engine(engine_port, engine_token, mode):
+    """Authenticated preflight; checking a configured runtime never calls a model."""
+    release = json.loads((WORKSPACE / 'engine/package.json').read_text())['version']
+    result = subprocess.run([binary('node'), 'scripts/check-engine.mjs', '--url', f'http://127.0.0.1:{engine_port}',
+                             '--expected-version', release, '--mode', 'agent-live' if mode == 'live' else 'source-lookup'],
+                            cwd=WORKSPACE, env={'PATH': os.environ.get('PATH', '/usr/bin:/bin'), 'TASK_ENGINE_TOKEN': engine_token},
+                            capture_output=True, timeout=15)
+    if result.returncode:
+        raise TrialError('引擎身份、版本或运行模式核验失败；API 尚未启动，未发送模型请求。')
+
+
+def model_environments(model, engine_port, engine_token, api_port):
+    engine_env = {'PATH': os.environ.get('PATH', '/usr/bin:/bin'), 'ENGINE_HOST': '127.0.0.1',
+                  'ENGINE_PORT': str(engine_port), 'TASK_ENGINE_TOKEN': engine_token}
+    api_env = {'AGENT_TASK_MODE': 'off'}
+    if model:
+        import live_model
+        engine_env.update(live_model.engine_environment(model))
+        engine_env['AGENT_PLATFORM_URL'] = f'http://127.0.0.1:{api_port}'
+        api_env['AGENT_TASK_MODE'] = 'live'
+    return api_env, engine_env
+
+
+def validate_instance_mode(settings, mode, restored=False, reconnect_live=False):
+    previous = settings.get('agentMode', 'off')
+    if reconnect_live and (not restored or mode != 'live'):
+        raise TrialError('重新接入仅适用于已完成显式 activate 的恢复实例，并需同时指定 --live。')
+    if previous not in ('off', 'live') or (previous != mode and not (previous == 'off' and restored and reconnect_live and mode == 'live')):
+        raise TrialError('该数据目录的模型模式与本次启动不一致；使用原启动命令，真实验收请使用独立新目录。已开放恢复实例可显式 --reconnect-live。')
+
+
+def start(root, model_config=None, reconnect_live=False):
     os.umask(0o077)
+    model = None
+    if model_config is not None:
+        import live_model
+        model = live_model.load(model_config)
+        live_model.check(model)
+    mode = 'live' if model else 'off'
+    # Keep the credential file outside the persistent instance and all instance backups.
+    private_root = (WORKSPACE / '.local/model-private').resolve()
+    if root.resolve() == private_root or private_root in root.resolve().parents or root.resolve() in private_root.parents:
+        raise TrialError('试用数据目录不能包含模型私有配置目录，或位于其中。')
     root = directory(root, True)
+    # Restore verification never authorizes reopening accounts, content or workers.
+    restored = (root / 'restore.json').exists() or (root / 'restore.json').is_symlink()
+    if restored:
+        import backup_recovery
+        backup_recovery.require_activation(root)
+    if reconnect_live and (not restored or mode != 'live'):
+        raise TrialError('重新接入仅适用于已完成显式 activate 的恢复实例，并需同时指定 --live。')
     # Never initialize into a directory containing unrelated files.
     if not (root / 'config.json').exists() and any(root.iterdir()):
         raise TrialError('目标目录不是空目录，也没有有效试用配置；拒绝初始化。')
+    if (root / 'config.json').exists():
+        validate_instance_mode(config(root), mode, restored, reconnect_live)
     jar = WORKSPACE / 'apps/api/target/workspace-api-0.1.0-SNAPSHOT.jar'
     if not jar.is_file() or not (WORKSPACE / 'dist/tenant-admin/index.html').is_file() or not (WORKSPACE / 'engine/dist/main.js').is_file():
         raise TrialError('缺少构建产物；先运行 npm run trial:build。')
+    verify_api_migrations(jar)
     executables = {name: binary(name) for name in ('initdb', 'pg_ctl', 'psql', 'java', 'node')}
     lock_path = root / 'supervisor.lock'
     if lock_path.is_symlink():
@@ -172,33 +241,45 @@ def start(root):
     signal.signal(signal.SIGINT, signal_stop)
     run_id = uuid.uuid4().hex
     log = None
+    logs = None
     settings = None
+    runtime_started = False
     try:
         if not (root / 'config.json').exists():
             ports = set()
             while len(ports) < 3:
                 ports.add(free_port())
             database_port, api_port, web_port = sorted(ports)
-            settings = {'format': FORMAT, 'workspace': str(WORKSPACE), 'ports': {'database': database_port, 'api': api_port, 'web': web_port}}
+            settings = {'format': FORMAT, 'workspace': str(WORKSPACE), 'agentMode': mode, 'ports': {'database': database_port, 'api': api_port, 'web': web_port}}
             private_write(root / 'config.json', settings)
             private_write(root / 'database.json', {'password': secrets.token_urlsafe(32)})
             private_write(root / 'accounts.json', {'platform': {'email': 'platform@trial.example.test', 'password': secrets.token_urlsafe(24)}})
         settings = config(root)
+        # Recheck after locking: a concurrent first start can have created the configuration.
+        if restored:
+            backup_recovery.require_activation(root)
+        validate_instance_mode(settings, mode, restored, reconnect_live)
+        if settings.get('agentMode', 'off') != mode:
+            settings['agentMode'] = mode
+            private_write(root / 'config.json', settings)
         for port in settings['ports'].values():
             available(port)
-        for file in ('service.log', 'postgres.log'):
-            if (root / file).is_symlink():
-                raise TrialError('私有日志路径异常。')
-        log = (root / 'service.log').open('a')
+        from log_retention import Logs
+        logs = Logs(root)
+        log, pg_log = logs.pipe('service'), logs.pipe('postgres')
         data = root / 'postgres'
         secret = private_read(root / 'database.json')['password']
         if data.is_symlink():
             raise TrialError('数据库目录不能是符号链接。')
         engine_port=free_port()
         engine_token=secrets.token_urlsafe(48)
+        model_api_env, engine_env = model_environments(model, engine_port, engine_token, settings['ports']['api'])
         env = {**clean_environment(), 'TASK_ENABLED':'true', 'TASK_ENGINE_TOKEN':engine_token, 'ENGINE_BASE_URL':f'http://127.0.0.1:{engine_port}', 'DATABASE_URL': f"jdbc:postgresql://127.0.0.1:{settings['ports']['database']}/dreamcore_trial", 'DATABASE_USER': 'dreamcore_trial', 'DATABASE_PASSWORD': secret,
                'KNOWLEDGE_ENABLED': str((WORKSPACE / 'workers/parser/.venv/bin/python').exists()).lower(), 'KNOWLEDGE_PARSER_ROOT': str(WORKSPACE / 'workers/parser'), 'MATERIAL_STORAGE_ROOT': str(root / 'objects'), 'SPRING_PROFILES_ACTIVE': 'local', 'INVITATION_DELIVERY': 'local', 'INVITATION_OUTBOX': str(root / 'invitations'), 'API_HOST': '127.0.0.1', 'API_PORT': str(settings['ports']['api']), 'SERVER_SERVLET_SESSION_COOKIE_NAME': 'DREAMCORE_TRIAL_' + hashlib.sha256(str(root).encode()).hexdigest()[:12]}
-        private_write(root / 'runtime.json', {'runId': run_id, 'state': 'starting', 'webUrl': f"http://127.0.0.1:{settings['ports']['web']}", 'revision': subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'], cwd=WORKSPACE, text=True).strip(), 'apiSha256': hashlib.sha256(jar.read_bytes()).hexdigest()})
+        env.update(model_api_env)
+        model_status = {'agentMode': mode, 'model': model['model'] if model else None, 'cloudVerifiedByStartup': False}
+        private_write(root / 'runtime.json', {'runId': run_id, 'state': 'starting', 'webUrl': f"http://127.0.0.1:{settings['ports']['web']}", **model_status, 'revision': subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'], cwd=WORKSPACE, text=True).strip(), 'apiSha256': hashlib.sha256(jar.read_bytes()).hexdigest()})
+        runtime_started = True
         if not data.exists():
             secret_path = root / 'init-password'
             secret_path.write_text(secret); secret_path.chmod(0o600)
@@ -207,11 +288,13 @@ def start(root):
             finally:
                 secret_path.unlink(missing_ok=True)
         def stopping():
+            logs.tick()
             request = root / 'stop-request.json'
             return stopped or (request.is_file() and private_read(request).get('runId') == run_id)
         # Keep the Unix socket path short on macOS, independent of the workspace path length.
         with tempfile.TemporaryDirectory(prefix='dreamcore-trial-socket-') as sockets:
-            run([executables['pg_ctl'], '-D', str(data), '-l', str(root / 'postgres.log'), '-o', f"-h 127.0.0.1 -p {settings['ports']['database']} -k {sockets}", '-w', 'start'], env, log)
+            # pg_ctl's inherited stderr goes through the owned collector; no process holds a rotating file.
+            run([executables['pg_ctl'], '-D', str(data), '-o', f"-h 127.0.0.1 -p {settings['ports']['database']} -k {sockets} -c logging_collector=off -c log_destination=stderr", '-w', 'start'], env, pg_log)
             pg_started = True
             if psql(root, settings, "SELECT count(*) FROM pg_database WHERE datname='dreamcore_trial'", log) == '0':
                 psql(root, settings, 'CREATE DATABASE dreamcore_trial', log)
@@ -229,9 +312,10 @@ def start(root):
                     run([executables['java'], '-jar', str(jar), '--bootstrap-admin'], {**env, 'BOOTSTRAP_EMAIL': account['email'], 'BOOTSTRAP_NAME': '本地试用平台管理员', 'BOOTSTRAP_PASSWORD_FILE': str(password_file)}, log)
                 finally:
                     password_file.unlink(missing_ok=True)
-            engine = subprocess.Popen([executables['node'], 'engine/dist/main.js'], cwd=WORKSPACE, env={'PATH':os.environ.get('PATH','/usr/bin:/bin'),'ENGINE_HOST':'127.0.0.1','ENGINE_PORT':str(engine_port),'TASK_ENGINE_TOKEN':engine_token}, stdout=log, stderr=log)
+            engine = subprocess.Popen([executables['node'], 'engine/dist/main.js'], cwd=WORKSPACE, env=engine_env, stdout=log, stderr=log)
             children.append(engine)
             ready(f'http://127.0.0.1:{engine_port}/healthz',engine,stopping)
+            verify_engine(engine_port, engine_token, mode)
             api = subprocess.Popen([executables['java'], '-jar', str(jar)], cwd=WORKSPACE, env=env, stdout=log, stderr=log)
             children.append(api)
             ready(f"http://127.0.0.1:{settings['ports']['api']}/actuator/health", api, stopping)
@@ -241,7 +325,7 @@ def start(root):
             url = f"http://127.0.0.1:{settings['ports']['web']}"
             ready(url + '/tenant-admin/', web, stopping)
             runtime = private_read(root / 'runtime.json'); runtime['state'] = 'ready'; private_write(root / 'runtime.json', runtime)
-            print(f'本地三端试用已就绪：{url}/platform-admin/\n私有账号配置：{root / "accounts.json"}\n邀请只写入本地私有目录，不发送邮件。Ctrl+C 或 npm run trial:stop 停止服务；数据保留。', flush=True)
+            print(f'本地三端试用已就绪：{url}/platform-admin/\n模型模式：{mode}；启动检查不代表云端连接已验证。\n私有账号配置：{root / "accounts.json"}\n邀请只写入本地私有目录，不发送邮件。Ctrl+C 停止服务；数据保留。其他终端停止时须使用同一实例目录。', flush=True)
             while not stopping():
                 if any(child.poll() is not None for child in children):
                     raise TrialError('所属服务意外退出；试用已停止，数据保留。')
@@ -254,18 +338,20 @@ def start(root):
             result = subprocess.run([binary('pg_ctl'), '-D', str(root / 'postgres'), '-m', 'fast', '-w', 'stop'], env=clean_environment(), stdout=log, stderr=log, timeout=30)
             if result.returncode:
                 print('所属数据库未能正常停止，请检查本地私有日志。', file=sys.stderr)
-        if settings:
-            private_write(root / 'runtime.json', {'runId': run_id, 'state': 'stopped', 'webUrl': f"http://127.0.0.1:{settings['ports']['web']}"})
-        if log:
-            log.close()
-        lock.close()
+        if runtime_started:
+            private_write(root / 'runtime.json', {'runId': run_id, 'state': 'stopped', 'agentMode': mode, 'model': model['model'] if model else None, 'cloudVerifiedByStartup': False, 'webUrl': f"http://127.0.0.1:{settings['ports']['web']}"})
+        try:
+            if logs:
+                logs.close()
+        finally:
+            lock.close()
 
 
 def status(root):
     root = directory(root); config(root)
     running = live(root)
     state = private_read(root / 'runtime.json') if (root / 'runtime.json').exists() else {'state': 'not-started'}
-    print(json.dumps({'running': running, 'state': state['state'] if running else 'stopped', 'webUrl': state.get('webUrl'), 'accountsFile': str(root / 'accounts.json')}, ensure_ascii=False))
+    print(json.dumps({'running': running, 'state': state['state'] if running else 'stopped', 'webUrl': state.get('webUrl'), 'agentMode': state.get('agentMode', 'off'), 'model': state.get('model'), 'cloudVerifiedByStartup': False, 'accountsFile': str(root / 'accounts.json')}, ensure_ascii=False))
 
 
 def stop(root):
@@ -310,14 +396,27 @@ def main():
     parser.add_argument('command', choices=['start', 'stop', 'status', 'invitations', 'invitation'])
     parser.add_argument('invitation_id', nargs='?')
     parser.add_argument('--directory', type=Path, default=DEFAULT_DIRECTORY)
+    parser.add_argument('--live', action='store_true', help='显式开启真实模型；只适用于 start。')
+    parser.add_argument('--model-config', type=Path, help='本工作树 .local/model-private 内的私有模型配置。')
+    parser.add_argument('--reconnect-live', action='store_true', help='已 activate 的恢复实例显式重新接入真实模型；旧任务/计划不自动恢复。')
     args = parser.parse_args()
+    if (args.live or args.model_config) and (args.command != 'start' or not args.live):
+        raise TrialError('模型参数仅适用于 start --live。')
+    if args.reconnect_live and (args.command != 'start' or not args.live):
+        raise TrialError('--reconnect-live 仅适用于 start --live。')
     root = args.directory.absolute()
-    if args.command == 'invitation':
+    if args.command == 'start':
+        if args.live:
+            from live_model import DEFAULT_CONFIG
+            start(root, args.model_config or DEFAULT_CONFIG, args.reconnect_live)
+        else:
+            start(root)
+    elif args.command == 'invitation':
         if not args.invitation_id:
             raise TrialError('请提供邀请 ID；可在本地 invitations 目录按邮箱查找对应 JSON 文件。')
         invitation(root, args.invitation_id)
     else:
-        {'start': start, 'stop': stop, 'status': status, 'invitations': invitations}[args.command](root)
+        {'stop': stop, 'status': status, 'invitations': invitations}[args.command](root)
 
 
 if __name__ == '__main__':

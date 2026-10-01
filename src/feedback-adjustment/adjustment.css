@@ -1,0 +1,32 @@
+.adjustment-panel {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.adjustment-history {
+  display: grid;
+  gap: 14px;
+}
+.adjustment-message {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px;
+  min-width: 0;
+}
+.adjustment-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.adjustment-reply {
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--surface-muted, #f5f7fa);
+  border-radius: 10px;
+}
+.adjustment-panel details {
+  overflow-wrap: anywhere;
+}
+.adjustment-panel textarea {
+  width: 100%;
+  box-sizing: border-box;
+}

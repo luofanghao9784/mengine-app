@@ -1,0 +1,2255 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Dreamcore private versioned feedback",
+    "version": "1.0.0",
+    "description": "Owner-only feedback about an exact task attempt/revision and presentation version. Tenant/space/material authorization is enforced on every read/replay/action. No source prose is implicitly copied. Score is not permission or proof. Lifecycle purge scrubs source-bound content; platform administrators cannot collect tenant feedback prose. Independent publication targets contain no private task identifier; the opinion is private to its author and depends solely on the published material version."
+  },
+  "paths": {
+    "/api/v1/tenants/{tenant}/feedback": {
+      "get": {
+        "summary": "Read own feedback for one exact observed target",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Tenant"
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "BRIEFING",
+                "TASK",
+                "PUBLICATION"
+              ]
+            }
+          },
+          {
+            "name": "taskId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "taskRevision",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "attempt",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "presentationVersion",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "briefing-basic-v1",
+                "task-v1",
+                "recommendation-v1"
+              ]
+            }
+          },
+          {
+            "name": "presentationRevision",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "publicationId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "materialVersionId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "materialVersion",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "FeedbackLookup",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackLookup"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create exact private feedback; stable requestId required",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Tenant"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Feedback",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Feedback"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackCreate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/feedback/preferences": {
+      "get": {
+        "summary": "Read three explicit personal expression preference slots",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Tenant"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "FeedbackPreferences",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackPreferences"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/feedback/{id}": {
+      "get": {
+        "summary": "Read own feedback with current source authorization",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Tenant"
+          },
+          {
+            "$ref": "#/components/parameters/Id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Feedback",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Feedback"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Revise or restore feedback by expected revision",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Tenant"
+          },
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Feedback",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Feedback"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackEdit"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/feedback/{id}/withdraw": {
+      "post": {
+        "summary": "Withdraw opinion; independent actions retain their own state",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Tenant"
+          },
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Feedback",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Feedback"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackWithdraw"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/feedback/{id}/history": {
+      "get": {
+        "summary": "Read immutable own evaluation history",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Tenant"
+          },
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/Offset"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "FeedbackHistory",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackHistory"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/feedback/{id}/actions": {
+      "get": {
+        "summary": "Read exact receipts under source authorization",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Tenant"
+          },
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/Offset"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "FeedbackActions",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackActions"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Perform independently confirmed action once per feedback revision",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Tenant"
+          },
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "FeedbackAction",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackAction"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackAct"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "DREAMCORE_SESSION"
+      }
+    },
+    "parameters": {
+      "Tenant": {
+        "name": "tenant",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "Id": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "CsrfHeader": {
+        "name": "X-CSRF-TOKEN",
+        "in": "header",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "maxLength": 300,
+          "minLength": 1
+        }
+      },
+      "Offset": {
+        "name": "offset",
+        "in": "query",
+        "schema": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000,
+          "default": 0
+        }
+      },
+      "Limit": {
+        "name": "limit",
+        "in": "query",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50,
+          "default": 20
+        }
+      }
+    },
+    "schemas": {
+      "FeedbackTarget": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "taskId",
+              "taskRevision",
+              "attempt",
+              "presentationVersion",
+              "presentationRevision"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "BRIEFING",
+                  "TASK"
+                ]
+              },
+              "taskId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "taskRevision": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "attempt": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "presentationVersion": {
+                "type": "string",
+                "enum": [
+                  "briefing-basic-v1",
+                  "task-v1",
+                  "recommendation-v1"
+                ]
+              },
+              "presentationRevision": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "publicationId": {
+                "type": "null"
+              },
+              "materialVersionId": {
+                "type": "null"
+              },
+              "materialVersion": {
+                "type": "null"
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "kind": {
+                      "const": "BRIEFING"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "presentationVersion": {
+                      "enum": [
+                        "briefing-basic-v1",
+                        "recommendation-v1"
+                      ]
+                    }
+                  }
+                },
+                "else": {
+                  "properties": {
+                    "presentationVersion": {
+                      "const": "task-v1"
+                    },
+                    "presentationRevision": {
+                      "const": 0
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "taskRevision",
+              "attempt",
+              "presentationVersion",
+              "presentationRevision",
+              "publicationId",
+              "materialVersionId",
+              "materialVersion"
+            ],
+            "properties": {
+              "kind": {
+                "const": "PUBLICATION"
+              },
+              "taskId": {
+                "type": "null"
+              },
+              "taskRevision": {
+                "const": 0
+              },
+              "attempt": {
+                "const": 0
+              },
+              "presentationVersion": {
+                "const": "recommendation-v1"
+              },
+              "presentationRevision": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "publicationId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "materialVersionId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "materialVersion": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        ]
+      },
+      "FeedbackAssessment": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "rating",
+          "reasons",
+          "suggestion"
+        ],
+        "properties": {
+          "rating": {
+            "type": "string",
+            "enum": [
+              "USEFUL",
+              "NOT_USEFUL",
+              "ACHIEVED",
+              "PARTIAL",
+              "NOT_ACHIEVED"
+            ]
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "IRRELEVANT",
+                "REDUNDANT",
+                "INACCURATE",
+                "UNHELPFUL",
+                "CUSTOM",
+                "FACT_ERROR",
+                "EXECUTION",
+                "GOAL_CHANGED",
+                "EXPRESSION",
+                "DATA_GAP",
+                "OTHER"
+              ]
+            },
+            "maxItems": 6,
+            "uniqueItems": true
+          },
+          "suggestion": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 0
+          }
+        },
+        "description": "Channel-specific reasons and ratings are validated by the server. NOT_USEFUL requires at least one reason or a nonblank suggestion; CUSTOM requires a nonblank suggestion. Feedback does not prove task success."
+      },
+      "FeedbackSnapshot": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "taskState",
+          "executionClass",
+          "contentSha256",
+          "sourceVersionCount"
+        ],
+        "properties": {
+          "taskState": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1
+          },
+          "executionClass": {
+            "type": "string",
+            "enum": [
+              "live",
+              "verification",
+              "none"
+            ]
+          },
+          "contentSha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "sourceVersionCount": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "Feedback": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "tenantId",
+          "workspaceId",
+          "target",
+          "revision",
+          "status",
+          "assessment",
+          "snapshot",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "target": {
+            "$ref": "#/components/schemas/FeedbackTarget"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "WITHDRAWN"
+            ]
+          },
+          "assessment": {
+            "$ref": "#/components/schemas/FeedbackAssessment"
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/FeedbackSnapshot"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "FeedbackVersion": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "revision",
+          "status",
+          "assessment",
+          "createdAt"
+        ],
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "WITHDRAWN"
+            ]
+          },
+          "assessment": {
+            "$ref": "#/components/schemas/FeedbackAssessment"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "FeedbackLookup": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "feedback"
+        ],
+        "properties": {
+          "feedback": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Feedback"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "FeedbackHistory": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "hasMore"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeedbackVersion"
+            },
+            "maxItems": 50
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        }
+      },
+      "FeedbackCreate": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requestId",
+          "target",
+          "assessment"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "target": {
+            "$ref": "#/components/schemas/FeedbackTarget"
+          },
+          "assessment": {
+            "$ref": "#/components/schemas/FeedbackAssessment"
+          }
+        }
+      },
+      "FeedbackEdit": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requestId",
+          "expectedRevision",
+          "assessment"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "assessment": {
+            "$ref": "#/components/schemas/FeedbackAssessment"
+          }
+        }
+      },
+      "FeedbackWithdraw": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requestId",
+          "expectedRevision"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      },
+      "FeedbackPreference": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scenario",
+          "style",
+          "expectedProfileRevision"
+        ],
+        "properties": {
+          "scenario": {
+            "type": "string",
+            "enum": [
+              "GENERAL",
+              "WEEKLY_REPORT",
+              "TABLE_SUMMARY"
+            ]
+          },
+          "style": {
+            "type": "string",
+            "enum": [
+              "CONCLUSION_FIRST",
+              "DETAIL_FIRST",
+              "TABLE_FIRST",
+              "CONCISE"
+            ]
+          },
+          "expectedProfileRevision": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "FeedbackPreferenceState": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scenario",
+          "profileId",
+          "revision",
+          "status",
+          "style"
+        ],
+        "properties": {
+          "scenario": {
+            "type": "string",
+            "enum": [
+              "GENERAL",
+              "WEEKLY_REPORT",
+              "TABLE_SUMMARY"
+            ]
+          },
+          "profileId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "UNSET",
+              "ACTIVE",
+              "PROPOSED",
+              "WITHDRAWN",
+              "EXPIRED",
+              "UNAVAILABLE"
+            ]
+          },
+          "style": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "CONCLUSION_FIRST",
+                  "DETAIL_FIRST",
+                  "TABLE_FIRST",
+                  "CONCISE"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "FeedbackPreferences": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeedbackPreferenceState"
+            },
+            "maxItems": 3,
+            "minItems": 3
+          }
+        }
+      },
+      "FeedbackCandidate": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "title",
+          "summary",
+          "body",
+          "tags",
+          "applicable",
+          "excluded",
+          "dependencies",
+          "basis",
+          "accessMode"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "METHOD",
+              "CASE",
+              "CORRECTION",
+              "ASSET"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1
+          },
+          "summary": {
+            "type": "string",
+            "maxLength": 600,
+            "minLength": 1
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 16000,
+            "minLength": 1
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 40,
+              "minLength": 1
+            },
+            "maxItems": 20,
+            "uniqueItems": true
+          },
+          "applicable": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1
+          },
+          "excluded": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "dependencies": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "basis": {
+            "type": "string",
+            "maxLength": 1500,
+            "minLength": 1
+          },
+          "accessMode": {
+            "const": "SOURCE_BOUND"
+          }
+        }
+      },
+      "FeedbackFollowUp": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "confirmed",
+              "preference",
+              "correction",
+              "candidate"
+            ],
+            "properties": {
+              "kind": {
+                "const": "PREFERENCE"
+              },
+              "confirmed": {
+                "const": true
+              },
+              "preference": {
+                "$ref": "#/components/schemas/FeedbackPreference"
+              },
+              "correction": {
+                "type": "null"
+              },
+              "candidate": {
+                "type": "null"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "confirmed",
+              "preference",
+              "correction",
+              "candidate"
+            ],
+            "properties": {
+              "kind": {
+                "const": "CORRECTION"
+              },
+              "confirmed": {
+                "const": true
+              },
+              "preference": {
+                "type": "null"
+              },
+              "correction": {
+                "type": "string",
+                "maxLength": 1200,
+                "minLength": 1
+              },
+              "candidate": {
+                "type": "null"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "confirmed",
+              "preference",
+              "correction",
+              "candidate"
+            ],
+            "properties": {
+              "kind": {
+                "const": "EXPERIENCE_CANDIDATE"
+              },
+              "confirmed": {
+                "const": true
+              },
+              "preference": {
+                "type": "null"
+              },
+              "correction": {
+                "type": "null"
+              },
+              "candidate": {
+                "$ref": "#/components/schemas/FeedbackCandidate"
+              }
+            }
+          }
+        ],
+        "description": "Explicit independent confirmation required. Preference uses safe enums only. Correction creates a source-bound private task, not a successful correction. Candidate is manual, source-bound, unevaluated and never auto-published."
+      },
+      "FeedbackAct": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requestId",
+          "expectedRevision",
+          "action"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "action": {
+            "$ref": "#/components/schemas/FeedbackFollowUp"
+          }
+        }
+      },
+      "FeedbackAction": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "feedbackId",
+          "feedbackRevision",
+          "kind",
+          "status",
+          "targetId",
+          "targetVersion",
+          "targetRevision",
+          "conversationId",
+          "acceptedState",
+          "executionClass",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "feedbackId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "feedbackRevision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "PREFERENCE",
+              "CORRECTION",
+              "EXPERIENCE_CANDIDATE"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "APPLIED",
+              "TASK_CREATED",
+              "CANDIDATE_CREATED"
+            ]
+          },
+          "targetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "targetVersion": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "targetRevision": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "conversationId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "acceptedState": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1
+          },
+          "executionClass": {
+            "type": "string",
+            "enum": [
+              "live",
+              "verification",
+              "none"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "targetWorkspaceId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Explicit destination of a publication reader’s private follow-up; absent on legacy receipts."
+          }
+        },
+        "description": "Exact accepted receipt, not current downstream state. One action per kind per feedback revision. Repeated same payload returns the same receipt. Generic separately confirmed preferences survive feedback withdrawal. Derived correction/candidate prose remains source-bound.",
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "PREFERENCE"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "status": {
+                  "const": "APPLIED"
+                },
+                "acceptedState": {
+                  "const": "ACTIVE"
+                },
+                "targetRevision": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "targetVersion": {
+                  "type": "null"
+                },
+                "conversationId": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "CORRECTION"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "status": {
+                  "const": "TASK_CREATED"
+                },
+                "conversationId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "targetVersion": {
+                  "type": "null"
+                },
+                "targetRevision": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "EXPERIENCE_CANDIDATE"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "status": {
+                  "const": "CANDIDATE_CREATED"
+                },
+                "acceptedState": {
+                  "const": "CANDIDATE"
+                },
+                "targetVersion": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "targetRevision": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "conversationId": {
+                  "type": "null"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "FeedbackActions": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "hasMore"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeedbackAction"
+            },
+            "maxItems": 50
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "contractVersion",
+          "code",
+          "message",
+          "retryable"
+        ],
+        "properties": {
+          "contractVersion": {
+            "const": "1.0"
+          },
+          "code": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 0
+          },
+          "retryable": {
+            "type": "boolean"
+          }
+        }
+      }
+    }
+  }
+}

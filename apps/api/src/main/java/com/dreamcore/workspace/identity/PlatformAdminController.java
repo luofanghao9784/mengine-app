@@ -17,7 +17,16 @@ public class PlatformAdminController {
     public record InitialAdmin(@NotNull UUID requestId, @NotNull @Min(0) Long expectedVersion, @NotNull @Size(max=254) String email) {}
     private final PlatformAdminService service;
     private final IdentityService identities;
-    public PlatformAdminController(PlatformAdminService service, IdentityService identities) { this.service=service; this.identities=identities; }
+    private final com.dreamcore.workspace.governance.GovernanceService governance;
+    public PlatformAdminController(PlatformAdminService service, IdentityService identities, com.dreamcore.workspace.governance.GovernanceService governance) { this.service=service; this.identities=identities;this.governance=governance; }
+    @PostMapping("/tenants/{tenant}/governance-recovery-requests")
+    public com.dreamcore.workspace.governance.GovernanceService.Recovery recovery(Authentication auth,@PathVariable UUID tenant,@Valid @RequestBody com.dreamcore.workspace.governance.GovernanceController.RecoveryRequest body) {
+        return governance.platformRecovery(IdentityController.actor(auth),tenant,body.requestId(),body.reason());
+    }
+    @GetMapping("/tenants/{tenant}/governance-recovery-requests/{id}")
+    public com.dreamcore.workspace.governance.GovernanceService.Recovery recovery(Authentication auth,@PathVariable UUID tenant,@PathVariable UUID id) {
+        return governance.platformRecoveryRecord(IdentityController.actor(auth),tenant,id);
+    }
     @GetMapping("/tenants")
     public List<IdentityService.Tenant> tenants(Authentication auth, @RequestParam(defaultValue="") String q,
             @RequestParam(defaultValue="") String status, @RequestParam(defaultValue="0") int offset, @RequestParam(defaultValue="50") int limit) {
@@ -25,7 +34,7 @@ public class PlatformAdminController {
     }
     @PostMapping("/tenants") @ResponseStatus(org.springframework.http.HttpStatus.CREATED)
     public IdentityService.TenantCreated create(Authentication auth, @Valid @RequestBody IdentityController.CreateTenant body) {
-        return identities.createTenant(IdentityController.actor(auth),body.requestId(),body.name(),body.adminEmail());
+        return identities.createTenant(IdentityController.actor(auth),body.requestId(),body.name(),body.adminEmail(),Boolean.TRUE.equals(body.designateAuthorizationOwner()));
     }
     @GetMapping("/overview")
     public PlatformAdminService.Overview overview(Authentication auth) { return service.overview(IdentityController.actor(auth)); }

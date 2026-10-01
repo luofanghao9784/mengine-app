@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Dreamcore Private Conversation API",
-    "version": "1.4.0",
-    "description": "私人会话及可恢复任务。默认 SOURCE_LOOKUP；显式启用后支持 AGENT，区分 verification 联调与 live 模型。事件轮询，不承诺 token 流。来源、回复、下载均重新检查当前权限，成果不自动共享。"
+    "version": "1.5.0",
+    "description": "私人会话及可恢复任务。SOURCE_LOOKUP 可独立运行；模型关闭时 AGENT 保存为等待能力，不自动重试。执行区分 verification 联调与 live 模型，支持等待输入、暂停恢复、部分结果、未知结果核对及分次历史。事件轮询，不承诺 token 流。来源、回复、下载均重新检查当前权限，成果不自动共享。"
   },
   "security": [
     {
@@ -368,7 +368,7 @@
         }
       },
       "get": {
-        "summary": "按已成功 AGENT 任务定位历史回复；仍检查本人、企业、空间和来源当前权限",
+        "summary": "按任务 ID 查看本人会话中的指定任务及当前状态；来源撤权后返回脱敏状态",
         "responses": {
           "200": {
             "description": "经当前权限校验，Cache-Control: private, no-store",
@@ -531,6 +531,72 @@
           }
         }
       }
+    },
+    "/api/v1/tenants/{tenant}/conversations/{conversation}/tasks/{task}/attempts": {
+      "get": {
+        "operationId": "listTaskAttempts",
+        "summary": "按当前权限读取真实尝试历史，不包含执行凭据",
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "conversation",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "task",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10,
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "尝试历史",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Attempts"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -565,7 +631,13 @@
             "format": "date-time"
           }
         },
-        "required": ["id", "tenantId", "workspaceId", "title", "updatedAt"],
+        "required": [
+          "id",
+          "tenantId",
+          "workspaceId",
+          "title",
+          "updatedAt"
+        ],
         "additionalProperties": false
       },
       "Chunk": {
@@ -620,7 +692,11 @@
             "type": "string"
           },
           "method": {
-            "enum": ["TEXT", "TABLE", "OCR"]
+            "enum": [
+              "TEXT",
+              "TABLE",
+              "OCR"
+            ]
           },
           "content": {
             "type": "string"
@@ -638,10 +714,25 @@
             "type": "string"
           },
           "mode": {
-            "enum": ["SOURCE_LOOKUP", "AGENT"]
+            "enum": [
+              "SOURCE_LOOKUP",
+              "AGENT"
+            ]
           },
           "status": {
-            "enum": ["QUEUED", "RUNNING", "SUCCEEDED", "FAILED", "CANCELLED", "INTERRUPTED"]
+            "enum": [
+              "QUEUED",
+              "RUNNING",
+              "SUCCEEDED",
+              "FAILED",
+              "CANCELLED",
+              "INTERRUPTED",
+              "PAUSED",
+              "WAITING_INPUT",
+              "WAITING_CAPABILITY",
+              "PARTIAL",
+              "RESULT_UNKNOWN"
+            ]
           },
           "revision": {
             "type": "integer",
@@ -652,13 +743,23 @@
             "minimum": 0
           },
           "summaryCode": {
-            "enum": [null, "SOURCES_FOUND", "NO_SOURCES"]
+            "enum": [
+              null,
+              "SOURCES_FOUND",
+              "NO_SOURCES"
+            ]
           },
           "errorCode": {
-            "type": ["string", "null"]
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "engineVersion": {
-            "type": ["string", "null"]
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "sourcesUnavailable": {
             "type": "boolean"
@@ -674,14 +775,24 @@
             "format": "date-time"
           },
           "reply": {
-            "type": ["string", "null"],
+            "type": [
+              "string",
+              "null"
+            ],
             "maxLength": 16000
           },
           "executionClass": {
-            "enum": [null, "verification", "live"]
+            "enum": [
+              null,
+              "verification",
+              "live"
+            ]
           },
           "modelName": {
-            "type": ["string", "null"],
+            "type": [
+              "string",
+              "null"
+            ],
             "maxLength": 80
           },
           "artifacts": {
@@ -692,7 +803,10 @@
             }
           },
           "publicQuery": {
-            "type": ["string", "null"],
+            "type": [
+              "string",
+              "null"
+            ],
             "maxLength": 2048
           },
           "webSources": {
@@ -728,13 +842,25 @@
                   "format": "date-time"
                 },
                 "kind": {
-                  "enum": ["SEARCH", "PAGE"]
+                  "enum": [
+                    "SEARCH",
+                    "PAGE"
+                  ]
                 },
                 "truncated": {
                   "type": "boolean"
                 }
               },
-              "required": ["id", "url", "title", "excerpt", "sha256", "retrievedAt", "kind", "truncated"]
+              "required": [
+                "id",
+                "url",
+                "title",
+                "excerpt",
+                "sha256",
+                "retrievedAt",
+                "kind",
+                "truncated"
+              ]
             }
           },
           "skills": {
@@ -757,7 +883,11 @@
                   "pattern": "^[0-9a-f]{64}$"
                 }
               },
-              "required": ["id", "version", "sha256"]
+              "required": [
+                "id",
+                "version",
+                "sha256"
+              ]
             }
           },
           "originals": {
@@ -796,8 +926,33 @@
                   "type": "boolean"
                 }
               },
-              "required": ["materialId", "versionId", "filename", "version", "bytes", "sha256", "read"]
+              "required": [
+                "materialId",
+                "versionId",
+                "filename",
+                "version",
+                "bytes",
+                "sha256",
+                "read"
+              ]
             }
+          },
+          "waitReason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 64
+          },
+          "requiredInput": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 1000
+          },
+          "reconciliationRequired": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -844,7 +999,12 @@
             "minimum": 0
           }
         },
-        "required": ["conversation", "tasks", "hasMore", "cursor"],
+        "required": [
+          "conversation",
+          "tasks",
+          "hasMore",
+          "cursor"
+        ],
         "additionalProperties": false
       },
       "Page": {
@@ -867,13 +1027,24 @@
             "type": "boolean"
           },
           "agentMode": {
-            "enum": ["off", "verification", "live"]
+            "enum": [
+              "off",
+              "verification",
+              "live"
+            ]
           },
           "publicWebEnabled": {
             "type": "boolean"
           }
         },
-        "required": ["tenantId", "enabled", "items", "hasMore", "agentMode", "publicWebEnabled"],
+        "required": [
+          "tenantId",
+          "enabled",
+          "items",
+          "hasMore",
+          "agentMode",
+          "publicWebEnabled"
+        ],
         "additionalProperties": false
       },
       "Event": {
@@ -888,14 +1059,31 @@
             "format": "uuid"
           },
           "kind": {
-            "enum": ["QUEUED", "RUNNING", "SUCCEEDED", "FAILED", "CANCELLED", "INTERRUPTED"]
+            "enum": [
+              "QUEUED",
+              "RUNNING",
+              "SUCCEEDED",
+              "FAILED",
+              "CANCELLED",
+              "INTERRUPTED",
+              "PAUSED",
+              "WAITING_INPUT",
+              "WAITING_CAPABILITY",
+              "PARTIAL",
+              "RESULT_UNKNOWN"
+            ]
           },
           "revision": {
             "type": "integer",
             "minimum": 0
           }
         },
-        "required": ["seq", "taskId", "kind", "revision"],
+        "required": [
+          "seq",
+          "taskId",
+          "kind",
+          "revision"
+        ],
         "additionalProperties": false
       },
       "Events": {
@@ -919,7 +1107,12 @@
             "type": "boolean"
           }
         },
-        "required": ["conversationId", "items", "cursor", "hasMore"],
+        "required": [
+          "conversationId",
+          "items",
+          "cursor",
+          "hasMore"
+        ],
         "additionalProperties": false
       },
       "Send": {
@@ -940,7 +1133,10 @@
             "description": "最多 8 个空白分隔关键词；SOURCE_LOOKUP 不作自然语言生成"
           },
           "mode": {
-            "enum": ["SOURCE_LOOKUP", "AGENT"]
+            "enum": [
+              "SOURCE_LOOKUP",
+              "AGENT"
+            ]
           },
           "publicQuery": {
             "type": "string",
@@ -963,12 +1159,19 @@
                   "format": "uuid"
                 }
               },
-              "required": ["materialId", "versionId"]
+              "required": [
+                "materialId",
+                "versionId"
+              ]
             },
             "description": "仅 AGENT verification；同一任务空间的明确版本，单份 256 KiB、合计 512 KiB。非空时原件读取和片段检索均限于所选版本。"
           }
         },
-        "required": ["requestId", "prompt", "mode"],
+        "required": [
+          "requestId",
+          "prompt",
+          "mode"
+        ],
         "additionalProperties": false,
         "allOf": [
           {
@@ -994,11 +1197,15 @@
                   "const": "SOURCE_LOOKUP"
                 }
               },
-              "required": ["mode"]
+              "required": [
+                "mode"
+              ]
             },
             "then": {
               "not": {
-                "required": ["publicQuery"]
+                "required": [
+                  "publicQuery"
+                ]
               }
             }
           },
@@ -1032,11 +1239,45 @@
             "minimum": 0
           },
           "action": {
-            "enum": ["CANCEL", "RETRY"]
+            "enum": [
+              "CANCEL",
+              "RETRY",
+              "PAUSE",
+              "RESUME",
+              "RECONCILE"
+            ]
+          },
+          "input": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
           }
         },
-        "required": ["requestId", "expectedRevision", "action"],
-        "additionalProperties": false
+        "required": [
+          "requestId",
+          "expectedRevision",
+          "action"
+        ],
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "required": [
+                "input"
+              ]
+            },
+            "then": {
+              "properties": {
+                "action": {
+                  "enum": [
+                    "RESUME",
+                    "RETRY"
+                  ]
+                }
+              }
+            }
+          }
+        ]
       },
       "Artifact": {
         "type": "object",
@@ -1060,7 +1301,178 @@
             "maximum": 65536
           }
         },
-        "required": ["id", "filename", "sha256", "bytes"]
+        "required": [
+          "id",
+          "filename",
+          "sha256",
+          "bytes"
+        ]
+      },
+      "Attempt": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "number": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "enum": [
+              "QUEUED",
+              "RUNNING",
+              "SUCCEEDED",
+              "FAILED",
+              "CANCELLED",
+              "INTERRUPTED",
+              "PAUSED",
+              "WAITING_INPUT",
+              "WAITING_CAPABILITY",
+              "PARTIAL",
+              "RESULT_UNKNOWN"
+            ]
+          },
+          "input": {
+            "type": "string",
+            "maxLength": 16000
+          },
+          "tools": {
+            "type": "array",
+            "maxItems": 8,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "callId": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "status": {
+                  "enum": [
+                    "STARTED",
+                    "succeeded",
+                    "failed"
+                  ]
+                }
+              },
+              "required": [
+                "callId",
+                "name",
+                "status"
+              ]
+            }
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Chunk"
+            }
+          },
+          "artifacts": {
+            "type": "array",
+            "maxItems": 8,
+            "items": {
+              "$ref": "#/components/schemas/Artifact"
+            }
+          },
+          "provenance": {
+            "enum": [
+              "RECORDED",
+              "LEGACY_CURRENT_ONLY"
+            ]
+          },
+          "reply": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "summaryCode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "errorCode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "engineVersion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "modelName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reconciliationCode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "startedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "finishedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "number",
+          "status",
+          "input",
+          "tools",
+          "sources",
+          "artifacts",
+          "provenance",
+          "reply",
+          "summaryCode",
+          "errorCode",
+          "engineVersion",
+          "modelName",
+          "reconciliationCode",
+          "startedAt",
+          "finishedAt"
+        ]
+      },
+      "Attempts": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "items": {
+            "type": "array",
+            "maxItems": 10,
+            "items": {
+              "$ref": "#/components/schemas/Attempt"
+            }
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "taskId",
+          "items",
+          "hasMore"
+        ]
       }
     }
   }

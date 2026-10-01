@@ -1,0 +1,157 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Closed operation cleanup",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/v1/tenants/{tenant}/retention/operation-cleanup": {
+      "get": {
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Aggregate actual cleanup receipts only",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Current authority required"
+          }
+        }
+      }
+    },
+    "/api/platform-admin/v1/operation-cleanup": {
+      "get": {
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Aggregate actual cleanup receipts only",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Current authority required"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "DREAMCORE_SESSION"
+      }
+    },
+    "schemas": {
+      "Status": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "tenantId",
+          "pending",
+          "failed",
+          "complete",
+          "removedEvents",
+          "removedAudit",
+          "nextDeadline",
+          "coverage",
+          "protectedRecords"
+        ],
+        "properties": {
+          "tenantId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "pending": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "failed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "complete": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "removedEvents": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "removedAudit": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "nextDeadline": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "coverage": {
+            "const": "NEW_CLOSED_TASK_NOTIFICATIONS"
+          },
+          "protectedRecords": {
+            "const": "BUSINESS_RESULTS_USAGE_IDEMPOTENCY_AUTHORIZATION_DELETION"
+          }
+        }
+      }
+    }
+  }
+}

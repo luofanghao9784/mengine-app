@@ -112,6 +112,19 @@ export async function fixtureEngine(
         return;
       }
       const results = input.messages.filter((m) => m.role === 'tool');
+      if (prompt.includes('ATTENTION_INPUT')) {
+        if (prompt.includes('补充到周五'))
+          return json(res, completion('已依据补充到周五完成合成核对；未执行外部业务写入。'));
+        if (!results.length)
+          return json(
+            res,
+            completion(null, [
+              call('attention-wait', 'task_control', { outcome: 'WAITING_INPUT', message: '请补充截止日期' }),
+            ]),
+          );
+        return json(res, completion('已取得合成信息，仍等待截止日期。'));
+      }
+
       if (prompt.includes('FILE_RECIPE')) {
         if (!results.length) {
           assert.ok(!input.tools.some((t) => t.function.name === 'process_original'));

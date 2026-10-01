@@ -7,9 +7,10 @@ import {
   FileCheck2,
   MessagesSquare,
 } from 'lucide-react';
+import { briefingLifecycle } from '../briefingLifecycle';
 import type { CardConfig, CardData } from '../briefing';
 import { magazineHeadline, magazineType, magazineView } from '../briefingMagazine';
-import { briefingSource, briefingTime } from '../briefingTypography';
+import { briefingCardSource, briefingTime } from '../briefingTypography';
 import { briefingPhoto, briefingDocuments, briefingPeople } from '../briefingMedia';
 import { useDemo } from '../store';
 import { BriefingChart } from './BriefingChart';
@@ -43,9 +44,10 @@ export function BriefingMagazineBody({
   const people = briefingPeople(state, data);
   const headline = magazineHeadline(data, config.title);
   const tall = config.size.endsWith('2') && !config.compact;
+  const source = briefingCardSource(data.source);
   return (
     <div
-      className={`briefing-magazine magazine-${type}${hasPhoto ? ' magazine-with-photo' : ''}${view.chart ? ' magazine-with-chart' : ''}${view.value ? ' magazine-with-value' : ''}${view.note ? ' magazine-with-note' : ''}${documents.length ? ' magazine-with-document' : ''}${config.compact ? ' magazine-compact' : ''}`}
+      className={`briefing-magazine magazine-${type}${data.reporting ? ' magazine-reporting' : ''}${hasPhoto ? ' magazine-with-photo' : ''}${view.chart ? ' magazine-with-chart' : ''}${view.value ? ' magazine-with-value' : ''}${view.note ? ' magazine-with-note' : ''}${documents.length ? ' magazine-with-document' : ''}${config.compact ? ' magazine-compact' : ''}`}
       data-magazine-type={type}
     >
       {hasPhoto && (
@@ -66,8 +68,16 @@ export function BriefingMagazineBody({
           <Icon size={14} aria-hidden="true" />
           {type}
         </span>
-        <time dateTime={at} title={`内容时间：${briefingTime(at, true)}`}>
-          {briefingTime(at)}
+        <time
+          dateTime={data.reporting?.date || at}
+          title={
+            data.reporting
+              ? `${type === '资讯' ? '报道' : '简报'}日期：${data.reporting.dateLabel}`
+              : `${briefingLifecycle(data) === 'live' ? '数据更新' : '产生时间'}：${briefingTime(at, true)}`
+          }
+        >
+          {!data.reporting && briefingLifecycle(data) === 'live' && '更新 '}
+          {data.reporting?.dateLabel || briefingTime(at)}
         </time>
         {people.length > 0 && (
           <span
@@ -130,10 +140,12 @@ export function BriefingMagazineBody({
         )}
       </div>
       <div className="magazine-footer">
-        <small className="briefing-source" title={data.source}>
-          {briefingSource(data.source)}
-          {type === '会话' && ' · AI 最新回复'}
-        </small>
+        {source && (
+          <small className="briefing-source" title={source}>
+            {source}
+            {type === '会话' && ' · AI 最新回复'}
+          </small>
+        )}
         {hasPhoto && (
           <span className="briefing-photo-credit" title={photo.credit}>
             {photo.credit}

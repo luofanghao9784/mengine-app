@@ -2,7 +2,7 @@ import { browserName, browserType, browserArtifacts } from './browser-target.ts'
 /** Full UI journey against the same persistent, owned trial supervisor users run locally. */
 import assert from 'node:assert/strict';
 import { spawn, type ChildProcess } from 'node:child_process';
-import { mkdir, mkdtemp, readFile, writeFile, rm, stat } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, writeFile, rm, stat } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -120,7 +120,7 @@ async function activate(page: Page, secret: string, account: Account, surface = 
   await page.getByLabel(/^设置密码/).fill(account.password);
   await page.getByLabel('确认密码', { exact: true }).fill(account.password);
   await page.getByRole('button', { name: '创建账号并加入', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '登录梦核工作空间', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '登录梦擎工作空间', exact: true })).toBeVisible();
   await login(page, account);
 }
 async function invite(page: Page, context: BrowserContext, tenant: string, email: string) {
@@ -232,11 +232,13 @@ try {
   await adminB.goto('/workspace/#invite=' + (await token(peerInvite)));
   await adminB.getByRole('button', { name: '确认加入企业', exact: true }).click();
   await expect(adminB.locator('.access-welcome h2')).toHaveText('合成试用企业 A');
+  await adminB.getByRole('button', { name: '更多工作与管理', exact: true }).click();
   await adminB.getByRole('link', { name: '企业管理', exact: true }).click();
   await expect(adminB.locator('.access-welcome h2')).toHaveText('合成试用企业 B');
   await adminB.getByRole('link', { name: '工作空间', exact: true }).click();
   await expect(adminB.locator('.access-welcome h2')).toHaveText('合成试用企业 B');
   await expect(adminB).toHaveURL(new RegExp(`tenant=${b}$`));
+  await adminB.getByRole('button', { name: '更多工作与管理', exact: true }).click();
   await adminB.getByRole('link', { name: '企业管理', exact: true }).click();
   const spaceA = await shared(adminA, ac, a, '企业 A 共享资料', accounts.member.email),
     spaceB = await shared(adminB, bc, b, '企业 B 共享资料', accounts.member.email);
@@ -343,6 +345,10 @@ try {
         artifacts,
       })
     : undefined;
+  if (conversations) {
+    const { workspaceDesignJourney } = await import('./workspace-design-journey.ts');
+    await workspaceDesignJourney(mc, b, artifacts);
+  }
   const conversationRestart = conversations
     ? await (
         await import('./conversation-journey.ts')
@@ -359,7 +365,8 @@ try {
   const before = await (await ac.request.get(`/api/tenant-admin/v1/tenants/${a}/records`)).json();
   await stop();
   assert.equal((await read('runtime.json')).state, 'stopped');
-  const blocker = createServer();
+  // Browser pollers may connect while the port is deliberately occupied. Do not retain those sockets.
+  const blocker = createServer((socket) => socket.destroy());
   const config = await read('config.json');
   await new Promise<void>((resolve) => blocker.listen(config.ports.web, '127.0.0.1', resolve));
   assert.equal(
@@ -385,7 +392,7 @@ try {
   await expect(memberTab.locator('.access-shell')).toBeVisible();
   await member.getByRole('button', { name: '账号与退出', exact: true }).click();
   await member.getByRole('button', { name: '退出登录', exact: true }).click();
-  await expect(memberTab.getByRole('heading', { name: '登录梦核工作空间', exact: true })).toBeVisible();
+  await expect(memberTab.getByRole('heading', { name: '登录梦擎工作空间', exact: true })).toBeVisible();
   await login(member, accounts.member);
   await expect(member.locator('.access-welcome h2')).toHaveText('合成试用企业 B');
   await member.route('**/api/v1/tenants/*/context', (route) => route.abort());
@@ -416,7 +423,13 @@ try {
     assert.ok(secrets.every((secret) => !storage.includes(secret)));
   }
   assert.deepEqual(errors, []);
-  const logs = await readFile(join(directory, 'service.log'), 'utf8');
+  const logFiles = await readdir(join(directory, 'logs'));
+  assert.ok(logFiles.some((name) => name.startsWith('service-')));
+  assert.ok(logFiles.some((name) => name.startsWith('postgres-')));
+  assert.ok(logFiles.every((name) => /^(service|postgres)-\d{8}T\d{12}Z-[a-f0-9]{12}\.log$/.test(name)));
+  const logs = (
+    await Promise.all(logFiles.map((name) => readFile(join(directory, 'logs', name), 'utf8')))
+  ).join('');
   assert.ok(secrets.every((secret) => !logs.includes(secret) && !output.includes(secret)));
   for (const name of ['accounts.json', 'database.json', 'config.json'])
     assert.equal((await stat(join(directory, name))).mode & 0o777, 0o600);

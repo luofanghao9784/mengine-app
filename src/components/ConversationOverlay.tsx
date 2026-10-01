@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from 'react';
-import { ArrowLeft, ArrowRight, Ellipsis, MessageSquare, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Ellipsis, X } from 'lucide-react';
 import { canReadCardData, type BriefingReference } from '../briefing';
 import { canReadMaterial } from '../libraryModel';
 import {
@@ -10,6 +10,7 @@ import {
   type ConversationPresentation,
 } from '../store';
 import { BriefingArticle } from './BriefingArticle';
+import { BriefingStatusMarks, briefingStatusMarks } from './BriefingStatusMarks';
 import { Conversation } from '../pages/Conversation';
 import { animateBriefingMorph, animateDetailToSource, captureBriefingVisual } from './conversationMotion';
 import { ConversationListCard } from './ConversationListCard';
@@ -78,6 +79,11 @@ export function ConversationOverlay({
       : origin?.surface === 'detail' && canReadCardData(state, origin.reference.snapshot)
         ? origin.reference
         : undefined;
+  const sourceCard = state.briefing?.cards.find((card) => card.id === reference?.cardId);
+  const [fileProperties, setFileProperties] = useState<Record<string, boolean>>({});
+  const propertiesKey = Object.keys(fileProperties)
+    .filter((id) => fileProperties[id])
+    .join('|');
   const [mobileCard, setMobileCard] = useState('conversation');
   const [focusFile, setFocusFile] = useState<{ id: string; nonce: number } | null>(null);
   const [phase, setPhase] = useState<'entering' | 'open' | 'closing'>('entering');
@@ -236,7 +242,7 @@ export function ConversationOverlay({
       let naturalLeft = padding;
       let lastAnchor: number = padding;
       cards.forEach((card, index) => {
-        const anchor =
+        let anchor =
           index === 0
             ? padding
             : index === 1
@@ -245,6 +251,15 @@ export function ConversationOverlay({
                 (cards[index - 1].dataset.deckId === 'conversation'
                   ? center.current!.offsetWidth + gap
                   : spine);
+        // An expanded reader may cover the preceding card to keep its body and
+        // properties inside the viewport; the preceding spine remains reachable.
+        if (card.dataset.widthExtension) {
+          const desiredWidth = parseFloat(card.style.getPropertyValue('--card-width'));
+          anchor = Math.min(
+            anchor,
+            Math.max(padding + index * spine, element.clientWidth - desiredWidth - padding),
+          );
+        }
         // Sticky offsets start at the rail's padding edge. Do not count that
         // padding twice, which would push the list into the first card's gap.
         card.style.setProperty('--stack-left', `${anchor - padding}px`);
@@ -313,11 +328,16 @@ export function ConversationOverlay({
       element.removeEventListener('scroll', update);
       observer.disconnect();
     };
-  }, [fileKey, reference?.cardId, route, phase, orderKey]);
+  }, [fileKey, reference?.cardId, route, phase, orderKey, propertiesKey]);
   useLayoutEffect(() => {
     if (!focusFile || !files.some((file) => file.id === focusFile.id)) return;
-    showCard(focusFile.id);
-    setFocusFile(null);
+    // Let the expanded width and its sticky anchor settle before revealing it.
+    // Otherwise the next click can be consumed by a stale "clipped card" state.
+    const frame = requestAnimationFrame(() => {
+      showCard(focusFile.id);
+      setFocusFile(null);
+    });
+    return () => cancelAnimationFrame(frame);
   }, [focusFile, fileKey]);
   useLayoutEffect(() => {
     const source = initialOrigin.current?.element;
@@ -677,7 +697,7 @@ export function ConversationOverlay({
             >
               <header className="deck-card-header">
                 <strong>画报卡片</strong>
-                <MessageSquare size={16} />
+                {sourceCard && <BriefingStatusMarks marks={briefingStatusMarks(state, sourceCard)} header />}
               </header>
               <div className="deck-source-scroll">
                 <BriefingArticle
@@ -695,6 +715,7 @@ export function ConversationOverlay({
               kind="file"
               label={`文件 ${file.title}`}
               width={widths.current[`file:${file.id}`]}
+              widthExtension={fileProperties[file.id] ? 320 : 0}
               order={orderOf(file.id)}
               onResetWidth={() => resetWidth(`file:${file.id}`)}
               onWidth={(width) => changeWidth(`file:${file.id}`, width)}
@@ -711,6 +732,12 @@ export function ConversationOverlay({
                     : pinnedVersions[file.id]
                 }
                 versionRequest={fileVersions[route + ':' + file.id]?.nonce}
+                onPropertiesChange={(open) => {
+                  setFileProperties((prior) =>
+                    prior[file.id] === open ? prior : { ...prior, [file.id]: open },
+                  );
+                  if (open) setFocusFile({ id: file.id, nonce: Date.now() });
+                }}
                 onClose={() => closeFile(file.id)}
               />
             </DeckCard>

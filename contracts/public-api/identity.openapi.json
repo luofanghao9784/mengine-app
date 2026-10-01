@@ -1873,7 +1873,7 @@
       "post": {
         "operationId": "memberStatus",
         "summary": "停用或恢复本企业成员",
-        "description": "只改本企业成员身份，不改全局账号或其他企业身份。禁止停用最后一名有效管理员。保留空间授权和资料；恢复后原有授权恢复有效。expectedVersion 与 requestId 保护并发和重试。",
+        "description": "普通停用只改本企业成员身份，不改全局账号或其他企业身份。负责人须先完成交接，且不得停用最后一名有效管理员；安全事件使用独立 emergency-disable。存在待核验安全恢复记录时不得通过普通恢复绕过。保留空间授权和资料；普通恢复后原有授权恢复有效。expectedVersion 与 requestId 保护并发和重试。",
         "responses": {
           "200": {
             "description": "成功",
@@ -2877,6 +2877,120 @@
           }
         }
       }
+    },
+    "/api/tenant-admin/v1/tenants/{tenant}/members/{account}/emergency-disable": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "account",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "operationId": "emergencyDisableMember",
+        "summary": "紧急安全停用本企业成员",
+        "description": "仅当前有效企业配置管理员可执行，含已接受职责的负责人。允许紧急停用本人、负责人或最后管理员；负责人归属、角色及内容归属不变，只撤销本企业成员有效性。涉及负责人或最后管理员时原子记录待核验恢复事项，普通恢复不可绕过。回执是历史操作结果，不代表最新成员状态；已被停用的调用人不再具备重试权限。requestId 的动作类别与普通停用分离。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmergencyDisableReceipt"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "输入无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "登录无效或已失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CSRF 或权限校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态或重复请求冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务异常，不返回内部细节",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "目标不属于本企业或不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmergencyDisable"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3156,6 +3270,11 @@
             "type": "string",
             "maxLength": 254,
             "description": "去除首尾空白并转小写；不区分邮箱大小写"
+          },
+          "designateAuthorizationOwner": {
+            "type": "boolean",
+            "default": false,
+            "description": "明确指定初始管理员可接受授权负责人职责；不自动生效或迁移存量。"
           }
         },
         "required": [
@@ -3662,7 +3781,8 @@
               "WORKSPACE_REVOKE",
               "TENANT_RENAME",
               "WORKSPACE_MAINTAIN",
-              "WORKSPACE_READONLY"
+              "WORKSPACE_READONLY",
+              "MEMBER_SECURITY_DISABLE"
             ]
           },
           "targetId": {
@@ -3811,6 +3931,80 @@
           "requestId",
           "expectedVersion",
           "enabled"
+        ],
+        "additionalProperties": false
+      },
+      "EmergencyDisable": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "securityAction": {
+            "type": "string",
+            "enum": [
+              "SECURITY_RISK"
+            ]
+          }
+        },
+        "required": [
+          "requestId",
+          "expectedVersion",
+          "securityAction"
+        ],
+        "additionalProperties": false
+      },
+      "EmergencyDisableReceipt": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DISABLED"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "securityAction": {
+            "type": "string",
+            "enum": [
+              "SECURITY_RISK"
+            ]
+          },
+          "recoveryRequestId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "recoveryStatus": {
+            "enum": [
+              "PENDING_VERIFICATION",
+              null
+            ]
+          }
+        },
+        "required": [
+          "accountId",
+          "status",
+          "version",
+          "securityAction",
+          "recoveryRequestId",
+          "recoveryStatus"
         ],
         "additionalProperties": false
       }

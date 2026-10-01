@@ -1,7 +1,8 @@
 import { withBriefingArticle } from '../briefingArticle';
+import { interleaveNinepopNews } from '../ninepop/editorial';
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
-import { RotateCcw, Newspaper, MessageSquare, RefreshCw, ArrowDown, Check } from 'lucide-react';
+import { RotateCcw, Newspaper, RefreshCw, ArrowDown, Check } from 'lucide-react';
 import { useDemo, useUI } from '../store';
 import {
   hiddenPilePositions,
@@ -17,23 +18,25 @@ import { BriefingCardPeople } from '../components/BriefingMedia';
 import { Button, Empty, Modal, PageActions } from '../components/ui';
 import { useBriefingTabs } from '../components/useBriefingTabs';
 import { useBriefingRefresh } from '../components/useBriefingRefresh';
+import { useBriefingCardFit } from '../components/useBriefingCardFit';
 import { useBriefingFollowLayout } from '../components/useBriefingFollowLayout';
 import { BriefingResizeHandle } from '../components/BriefingResize';
 import { BriefingMagazineBody } from '../components/BriefingMagazineBody';
 import { magazineType, magazineTypes, magazineFilter } from '../briefingMagazine';
-import { briefingConversation } from '../briefingChats';
+import { BriefingStatusMarks, briefingStatusMarks } from '../components/BriefingStatusMarks';
 import { BriefingDetail } from '../components/BriefingDetail';
-import { isBriefingRead, recommendBriefing } from '../briefingFeedback';
+import { isBriefingRead, recommendBriefing, refreshBriefingRecommendations } from '../briefingFeedback';
 import {
   cardConfig,
   canReadCardData,
   localDate,
-  snapshotOn,
   type BriefingCard,
   type CardConfig,
   type CardData,
   type BriefingReference,
 } from '../briefing';
+import { briefingCreatedAt, briefingEntry, briefingLifecycle } from '../briefingLifecycle';
+
 export function BriefingCardBody(props: { data: CardData; config: CardConfig; at: string }) {
   return <BriefingMagazineBody {...props} />;
 }
@@ -52,23 +55,27 @@ function Card({
 }) {
   const { state } = useDemo();
   const config = { ...cardConfig(card), title: card.config?.title || data.title, size: placement.size };
-  const hasChat = !!briefingConversation(state, card);
   const read = isBriefingRead(state, data);
+  const marks = briefingStatusMarks(state, card);
   return (
     <article
       className={`briefing-card template-${data.template} ${read ? 'is-read' : ''} ${follow?.resize.preview?.id === card.id ? 'is-resizing' : ''} ${follow?.move.preview?.id === card.id ? (follow.move.preview.pointer ? 'is-moving' : 'is-keyboard-moving') : ''}`}
       data-card-id={card.id}
       data-size={config.size}
+      data-requested-size={follow?.requestedSizes[card.id]}
       data-read={read}
       data-layout-editable={!!follow}
-      style={{
-        gridColumn: `${placement.col + 1} / span ${placement.width}`,
-        gridRow: `${placement.row + 1} / span ${placement.height}`,
-      }}
+      style={
+        {
+          '--briefing-marks-space': `${marks.length * 23}px`,
+          gridColumn: `${placement.col + 1} / span ${placement.width}`,
+          gridRow: `${placement.row + 1} / span ${placement.height}`,
+        } as CSSProperties
+      }
     >
       <button
         className="briefing-card-main"
-        aria-label={`${config.title}${read ? '，已读' : ''}${hasChat ? '，已有会话' : ''}`}
+        aria-label={[config.title, ...(read ? ['已读'] : []), ...marks.map((mark) => mark.label)].join('，')}
         aria-describedby={follow ? 'briefing-move-help' : undefined}
         aria-keyshortcuts={follow ? 'Alt+Enter' : undefined}
         onPointerDown={follow ? (event) => follow.move.start(event, card.id, 'following') : undefined}
@@ -96,11 +103,7 @@ function Card({
         }
       >
         <BriefingCardBody data={data} config={config} at={at} />
-        {hasChat && (
-          <span className="briefing-conversation-mark" title="已有会话" role="img" aria-label="已有会话">
-            <MessageSquare size={17} />
-          </span>
-        )}
+        <BriefingStatusMarks marks={marks} />
       </button>
       <BriefingCardPeople data={data} />
       {follow && (
@@ -175,7 +178,7 @@ function HiddenCards({
   const ui = useUI();
   return (
     <Modal title={`${day} · 已隐藏`} onClose={onClose}>
-      <p className="briefing-hidden-note">仅从画报隐藏，事项和会话均保留。恢复后继续显示在原日期下。</p>
+      <p className="briefing-hidden-note">仅从画报隐藏，事项和会话均保留。恢复后继续显示原卡内容。</p>
       <ul className="briefing-hidden-list">
         {entries.map(({ card, data }) => (
           <li key={card.id}>
@@ -218,7 +221,7 @@ const tabs = ['推荐', '关注', '日期', '类型', '空间'] as const;
 // Temporarily hide conversation summaries on the briefing surface; retain their data and chats.
 const visibleTypes = magazineTypes.filter((type) => type !== '会话');
 export function Briefing() {
-  const { state } = useDemo();
+  const { state, change } = useDemo();
   const ui = useUI();
   const routeScope = ui.route.split('/')[1];
   const saved = ui.briefingViews.current[ui.route];
@@ -234,21 +237,28 @@ export function Briefing() {
   const [hiddenGroup, setHiddenGroup] = useState<{ groupId: string; day: string } | null>(null);
   const hiddenTrigger = useRef<HTMLButtonElement | null>(null);
   const [recommendations, setRecommendations] = useState(() => recommendBriefing(state));
-  const [readExpanded, setReadExpanded] = useState(false);
+  useEffect(() => {
+    setRecommendations(change((draft) => refreshBriefingRecommendations(draft)));
+  }, [state.profile.name]);
   const view = useRef({ tab, type, scope, day, closed: false, scrollTop: saved?.scrollTop || 0 });
   view.current = { ...view.current, tab, type, scope, day };
   const pageRef = useRef<HTMLDivElement>(null);
   const [{ columns, unit, ready: gridReady }, setGrid] = useState({ columns: 5, unit: 248, ready: false });
   const live = (state.briefing?.cards || []).filter(
-    (c) => magazineType(c.data) !== '会话' && (tab === '日期' || c.active),
+    (c) => magazineType(c.data) !== '会话' && c.active && canReadCardData(state, c.data),
   );
-  const dates = [...new Set(live.flatMap((c) => c.history.map((h) => localDate(h.at))))].sort().reverse();
+  const dates = [
+    ...new Set(
+      live.filter((c) => briefingLifecycle(c.data) === 'dated').map((c) => localDate(briefingCreatedAt(c))),
+    ),
+  ]
+    .sort()
+    .reverse();
   const entries = live
     .filter((c) => tab !== '关注' || c.pinned)
     .flatMap((card) => {
-      const snapshot =
-        tab === '日期' && day ? snapshotOn(card, day) : { data: card.data, at: card.updatedAt };
-      return snapshot && canReadCardData(state, snapshot.data) ? [{ card, ...snapshot }] : [];
+      const entry = briefingEntry(card, tab === '日期' ? day : undefined);
+      return entry ? [entry] : [];
     })
     .filter(
       ({ data }) =>
@@ -261,29 +271,42 @@ export function Briefing() {
       personal: '个人空间',
       ...Object.fromEntries(visibleSpaces(state).map((s) => [s.id, s.name])),
     });
-  const groups: BriefingGroup[] =
+  const initialGroups: BriefingGroup[] =
     tab === '推荐'
       ? [
-          { id: 'unread', label: '为你推荐', entries: [] },
-          { id: 'read', label: '已读', entries: [] },
-        ]
-          .map((group) => ({
-            ...group,
-            entries: recommendations
-              .filter((r) => r.group === group.id || (group.id === 'unread' && r.group === 'priority'))
-              .flatMap((r) => {
-                const entry = entries.find((e) => e.card.id === r.id);
-                return entry ? [entry] : [];
-              }),
-          }))
-          .filter((g) => g.entries.length)
+          {
+            id: 'recommended',
+            label: '为你推荐',
+            entries: recommendations.flatMap((r) => {
+              const entry = entries.find((e) => e.card.id === r.id);
+              return entry ? [entry] : [];
+            }),
+          },
+        ].filter((g) => g.entries.length)
       : tab === '关注'
         ? entries.length
           ? [{ id: 'following', label: '我的关注', entries }]
           : []
         : normalGroups();
+  const groups =
+    state.scenario === 'ninepop' && tab !== '关注'
+      ? initialGroups.map((group) => ({ ...group, entries: interleaveNinepopNews(group.entries) }))
+      : initialGroups;
   const viewKey = JSON.stringify([ui.route, tab, type, scope, day]);
+  const fit = useBriefingCardFit(
+    pageRef,
+    JSON.stringify([
+      viewKey,
+      columns,
+      unit,
+      entries.map((e) => [e.card.id, e.data, e.card.config?.title]),
+      tab === '关注' ? state.briefing?.followLayouts?.[state.profile.name]?.sizes : undefined,
+    ]),
+    columns,
+    unit,
+  );
   const follow = useBriefingFollowLayout({
+    minimum: fit,
     page: pageRef,
     columns,
     unit,
@@ -299,8 +322,7 @@ export function Briefing() {
     viewKey,
     blocked: ui.conversationOpen || !!detail || !!hiddenGroup || arranging,
     onRefresh: () => {
-      setRecommendations(recommendBriefing(state));
-      setReadExpanded(false);
+      setRecommendations(change((draft) => refreshBriefingRecommendations(draft)));
     },
   });
   const selectTab = useBriefingTabs({
@@ -413,8 +435,8 @@ export function Briefing() {
         ) : (
           <button
             className="briefing-refresh-button"
-            aria-label="刷新智能画报（演示）"
-            title="刷新画报并调整已读位置"
+            aria-label={state.scenario === 'ninepop' ? '刷新智能画报' : '刷新智能画报（演示）'}
+            title="刷新画报内容"
             disabled={refresh.active || !!detail || !!hiddenGroup || arranging}
             onClick={refresh.refresh}
           >
@@ -494,16 +516,16 @@ export function Briefing() {
               全部日期
             </button>
             <label>
-              回看日期
+              产生日期
               <input
                 type="date"
-                aria-label="回看日期"
+                aria-label="产生日期"
                 value={day}
                 max={localDate(new Date().toISOString())}
                 onChange={(e) => setDay(e.target.value)}
               />
             </label>
-            {day && <span>截至当日留存的内容</span>}
+            <span>查找当天产生的内容；数据卡在推荐、关注或类型中查看最新状态。</span>
             <div className="briefing-date-shortcuts">
               {dates.slice(0, 3).map((d) => (
                 <button key={d} aria-pressed={day === d} onClick={() => setDay(d)}>
@@ -524,9 +546,7 @@ export function Briefing() {
           </div>
         )}
         {groups.map((group) => {
-          const allVisible = group.entries.filter((e) => !e.card.hidden);
-          const collapsed = tab === '推荐' && group.id === 'read';
-          const visible = collapsed && !readExpanded ? allVisible.slice(0, 3) : allVisible;
+          const visible = group.entries.filter((e) => !e.card.hidden);
           const hiddenDays = groupBriefingEntries(
             group.entries.filter((e) => e.card.hidden),
             '最新',
@@ -538,7 +558,9 @@ export function Briefing() {
             card: { ...entry.card, config: undefined },
           }));
           const placements = (
-            tab === '关注' ? follow.placements : layoutBriefingSpread(automatic, columns)
+            tab === '关注'
+              ? follow.placements
+              : layoutBriefingSpread(automatic, columns, false, {}, undefined, undefined, false, fit)
           ).map((p) => ({ ...p, entry: visible.find((e) => e.card.id === p.entry.card.id)! }));
           const piles = hiddenPilePositions(placements, columns, hiddenDays.length);
           return (
@@ -561,7 +583,7 @@ export function Briefing() {
                 {group.day && relativeBriefingDay(group.day) && (
                   <small>{relativeBriefingDay(group.day)}</small>
                 )}
-                <small>{allVisible.length} 则</small>
+                <small>{visible.length} 则</small>
               </div>
               <div className="briefing-grid" data-group-id={group.id}>
                 {placements.map((placement) => (
@@ -589,15 +611,6 @@ export function Briefing() {
                   />
                 ))}
               </div>
-              {collapsed && allVisible.length > 3 && (
-                <button
-                  className="briefing-read-more"
-                  aria-expanded={readExpanded}
-                  onClick={() => setReadExpanded(!readExpanded)}
-                >
-                  {readExpanded ? '收起已读' : `展开其余 ${allVisible.length - 3} 张已读卡片`}
-                </button>
-              )}
             </section>
           );
         })}

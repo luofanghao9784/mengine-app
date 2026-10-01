@@ -15,14 +15,6 @@
   border-radius: 6px;
   padding: 2px 5px;
 }
-.briefing-read-more {
-  display: block;
-  margin: 18px auto 8px;
-  border: 0;
-  background: transparent;
-  color: var(--muted);
-  padding: 10px 20px;
-}
 .briefing-detail {
   --feedback-gutter: 76px;
   width: min(876px, calc(100vw - 48px));

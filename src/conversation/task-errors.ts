@@ -1,4 +1,20 @@
 const messages: Record<string, string> = {
+  TASK_TENANT_EXIT: '企业退出已生效，任务已中断；已经发生的业务动作仍需按实际记录核对。',
+  TASK_MEMBER_OFFBOARDED: '成员离职已生效，原执行授权已停止，任务不会自动恢复。',
+  TASK_PLAN_STOPPED: '关联计划已暂停、停止或授权已变化，本次执行已中断。',
+  TASK_PLAN_EXPIRED: '关联计划已到期，本次执行已中断。',
+
+  TASK_STATE_CHANGED: '任务状态已变化，已刷新最新状态，请核对后操作。',
+  CONVERSATION_BUSY: '本会话已有正在执行的任务，请等待完成或先暂停该任务。',
+
+  MODEL_NOT_CONFIGURED: '模型能力当前关闭，任务已保存。',
+  TASK_INPUT_REQUIRED: '请补充本任务需要的信息后继续。',
+  TASK_INPUT_LIMIT: '本任务补充信息已达到上限，请另行发起任务。',
+  TASK_RESULT_UNKNOWN: '本次执行没有收到完整结果，需要先核对执行影响。',
+  TASK_RESULT_RECONCILED: '已依据实际工具范围确认没有业务写入；原执行结果仍未知，可明确重试。',
+  TASK_RECONCILIATION_REQUIRED: '现有执行证据不足，不能安全继续，任务保持待核对。',
+  TASK_EXECUTION_MODE_CHANGED: '运行模式已变化，不能把联调任务直接切换为真实执行，请重新发起。',
+
   PUBLIC_WEB_NOT_CONFIGURED: '公开检索服务尚未配置，请联系管理员。',
   TASK_INTERRUPTED: '服务执行中断。可明确重试，系统不会自动重复执行。',
   TASK_SOURCE_UNAVAILABLE: '当前资料权限已变化，任务未交付结果。',

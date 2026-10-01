@@ -1,6 +1,6 @@
 {
   "name": "dreamcore-engine",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -14,7 +14,9 @@
     "licenses:write": "node scripts/notices.mjs",
     "licenses:check": "node scripts/notices.mjs --check",
     "test:candidate:public": "npm run build && node scripts/verify-candidate-public.mjs",
-    "test:executor": "npm run build && node --test tests/integration/docker-sandbox.mjs"
+    "test:executor": "npm run build && node --test tests/integration/docker-sandbox.mjs",
+    "model:smoke": "npm run build && node scripts/live-model-smoke.mjs",
+    "test:model-smoke": "npm run build && node --test tests/live-model-smoke.test.mjs"
   },
   "devDependencies": {
     "@types/node": "24.13.6",

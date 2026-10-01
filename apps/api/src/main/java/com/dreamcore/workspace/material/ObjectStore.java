@@ -13,4 +13,6 @@ public interface ObjectStore {
     UUID put(byte[] bytes);
     byte[] read(UUID id, long expectedSize, String sha256);
     void discard(UUID id);
+    /** Confirm physical removal or throw; rollback discard is not evidence of deletion. */
+    default void purge(UUID id) { throw new com.dreamcore.workspace.identity.IdentityException(503,"MATERIAL_PURGE_UNAVAILABLE"); }
 }

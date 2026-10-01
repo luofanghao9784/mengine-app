@@ -1,7 +1,8 @@
-import type { CardData, CardType } from './briefing.ts';
+import type { CardData, CardType, CardSize } from './briefing.ts';
 import type { BriefingChart } from './briefingPresentation.ts';
 import { briefingPresentation } from './briefingPresentation.ts';
 import { kongguCards } from './kongguBriefing.ts';
+import { kongguResearch } from './kongguResearch.ts';
 
 export const magazineTypes = ['资讯', '数据', '洞察', '建议', '成果', '会话'] as const;
 export type MagazineType = (typeof magazineTypes)[number];
@@ -41,6 +42,7 @@ type MagazineView = {
   dots?: { selected: number; total: number };
   steps?: string[];
 };
+const eventAmounts = kongguResearch.business.computed;
 const editions: Record<string, Partial<MagazineView>> = {
   'konggu:C01': {
     headline: '过去7天，零售向上。',
@@ -124,6 +126,37 @@ const editions: Record<string, Partial<MagazineView>> = {
     note: '容量与档期待核实',
     steps: ['布置', '活动', '撤场'],
   },
+  'konggu:C35': {
+    summary: '',
+    chart: {
+      kind: 'breakdown',
+      unit: '元',
+      period: '9/13—9/19 · 模拟活动账款',
+      rows: [
+        { label: '本期活动收款', value: eventAmounts.currentEventCashReceivedFen / 100 },
+        { label: '本期履约收入', value: eventAmounts.currentCompletedEventSalesFen / 100 },
+      ],
+      columns: ['已履约已收', '未来活动订金', '已履约未收'],
+      series: [
+        {
+          label: '本期活动收款',
+          values: [
+            eventAmounts.currentEventCashCompositionFen.completedEvents / 100,
+            eventAmounts.futureEventDepositFen / 100,
+            0,
+          ],
+        },
+        {
+          label: '本期履约收入',
+          values: [
+            eventAmounts.currentEventCashCompositionFen.completedEvents / 100,
+            0,
+            eventAmounts.completedEventOutstandingFen / 100,
+          ],
+        },
+      ],
+    },
+  },
 };
 
 // These are presentation-only summaries of the three exact, prewritten demo
@@ -185,4 +218,33 @@ export function magazineView(data: CardData): MagazineView {
 // A user's custom title always takes priority over the editorial default.
 export function magazineHeadline(data: CardData, title = data.title): string {
   return title !== data.title ? title : magazineView(data).headline || title;
+}
+
+// Automatic editorial size follows the content actually rendered, not a legacy
+// template's requested area. Explicit Follow preferences remain a separate input.
+export function magazineSize(data: CardData): CardSize {
+  const view = magazineView(data);
+  if (view.photo || data.photo || data.id === 'news:direction') return data.size === '1×2' ? '1×2' : '2×2';
+  const chart = view.chart;
+  if (chart) {
+    if (['columns', 'diverging', 'bars', 'donut', 'funnel'].includes(chart.kind)) return '2×2';
+    if (
+      ['heatmap', 'multiples'].includes(chart.kind) ||
+      (['line', 'area'].includes(chart.kind) && chart.rows.length >= 5) ||
+      chart.rows.length > 5
+    )
+      return '2×2';
+    if (chart.kind === 'ring' || chart.kind === 'waffle') return '1×1';
+    return '2×1';
+  }
+  if (magazineType(data) === '成果' && data.template === 'document' && data.refs?.length) return '2×1';
+  // Importance gives a short conclusion width, never a large empty text panel.
+  if (
+    data.recommendation?.importance === 'high' ||
+    view.steps ||
+    magazineHeadline(data).length > 28 ||
+    view.summary.length + (view.note?.length || 0) > 110
+  )
+    return '2×1';
+  return '1×1';
 }

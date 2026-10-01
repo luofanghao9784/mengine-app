@@ -25,14 +25,21 @@ export function Sidebar() {
   ];
   return (
     <aside className="sidebar" aria-label="工作导航" ref={rail}>
-      <button
-        className="brand"
-        aria-label="AI Dreamcore 梦核工作空间 · 返回智能画报"
-        title="AI Dreamcore · 梦核工作空间"
-        onClick={() => go('briefing')}
+      <div
+        className={`brand nav-item ${expanded === 'brand' ? 'is-expanded' : ''}`}
+        {...interaction('brand')}
       >
-        <DreamcoreLogo />
-      </button>
+        <button
+          className="brand-button"
+          aria-label="Mengine 梦擎工作空间 · 返回智能画报"
+          onClick={() => go('briefing')}
+        >
+          <DreamcoreLogo />
+          <span className="nav-label" aria-hidden="true">
+            Mengine 梦擎工作空间
+          </span>
+        </button>
+      </div>
       <nav aria-label="主导航">
         {nav.map(({ path, label, Icon }) => {
           const isChat = path === 'conversations';

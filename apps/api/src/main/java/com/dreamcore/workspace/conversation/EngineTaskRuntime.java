@@ -25,7 +25,7 @@ public class EngineTaskRuntime implements TaskRuntime {
         var future=http.sendAsync(request,info->new BoundedBody());
         try{return future.get(3,TimeUnit.SECONDS);}finally{if(!future.isDone())future.cancel(true);}
     }
-    private String compatible(boolean agent) throws Exception {
+    private RuntimeCompatibility.Descriptor compatible(boolean agent) throws Exception {
         var response=probe("/internal/v1/runtime");
         RuntimeCompatibility.Descriptor descriptor;
         if(response.statusCode()==404 && legacy090){
@@ -39,12 +39,12 @@ public class EngineTaskRuntime implements TaskRuntime {
             try{descriptor=json.readValue(response.body(),RuntimeCompatibility.Descriptor.class);}
             catch(RuntimeException e){throw RuntimeCompatibility.incompatible();}
         }
-        return RuntimeCompatibility.require(descriptor,agent,executionClass);
+        RuntimeCompatibility.require(descriptor,agent,executionClass);return descriptor;
     }
     public Result execute(UUID task,UUID attempt,List<UUID> sources) {
         if(token.length()<32)throw new IdentityException(503,"TASK_RUNTIME_UNAVAILABLE");
         try {
-            String version=compatible(false);
+            String version=compatible(false).engineVersion();
             var request=HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(5)).header("Authorization","Bearer "+token).header("Content-Type","application/json").header("X-Dreamcore-Engine-Version",version)
                 .POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(Map.of("contractVersion","1.0","taskId",task,"attemptId",attempt,"sourceIds",sources)))).build();
             var future=http.sendAsync(request,info->new BoundedBody());
@@ -74,28 +74,29 @@ public class EngineTaskRuntime implements TaskRuntime {
         CompletableFuture<HttpResponse<byte[]>> future=null;
         try {
             if(!active.getAsBoolean())throw new IdentityException(403,"TASK_SOURCE_UNAVAILABLE");
-            String version=compatible(true);
+            var descriptor=compatible(true);String version=descriptor.engineVersion();String protocol=descriptor.protocols().get("agentTask");
+            if(protocol.equals("1.4") && prompt.length()>2000)throw new IdentityException(503,"TASK_RUNTIME_INCOMPATIBLE");
             var request=HttpRequest.newBuilder(uri.resolve("/internal/v1/agent-results")).timeout(Duration.ofSeconds(30)).header("Authorization","Bearer "+token).header("Content-Type","application/json").header("X-Dreamcore-Engine-Version",version)
-                .POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(Map.of("contractVersion","1.4","taskId",task,"attemptId",attempt,"prompt",prompt)))).build();
+                .POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(Map.of("contractVersion",protocol,"taskId",task,"attemptId",attempt,"prompt",prompt)))).build();
             if(!active.getAsBoolean())throw new IdentityException(403,"TASK_SOURCE_UNAVAILABLE");
             future=http.sendAsync(request,info->new BoundedBody(262144));long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(32);
             while(true){
                 if(!active.getAsBoolean())throw new IdentityException(403,"TASK_SOURCE_UNAVAILABLE");
-                if(System.nanoTime()>deadline)throw new IdentityException(503,"TASK_LIMIT");
+                if(System.nanoTime()>deadline)throw new IdentityException(503,"TASK_RESULT_UNKNOWN");
                 try{
                     var response=future.get(300,TimeUnit.MILLISECONDS);
                     if(response.statusCode()!=200){
-                        String code="TASK_RUNTIME_UNAVAILABLE";
+                        String code="TASK_RESULT_UNKNOWN";
                         try{String remote=json.readTree(response.body()).path("code").asString();if(Set.of("TASK_RUNTIME_INCOMPATIBLE","TASK_MODEL_FAILED","TASK_LIMIT","TASK_TOOL_FAILED","MODEL_NOT_CONFIGURED","PUBLIC_WEB_NOT_CONFIGURED","TASK_FILE_UNSUPPORTED","TASK_FILE_ENCODING","TASK_FILE_INVALID","TASK_FILE_LIMIT","TASK_FILE_DATA").contains(remote))code=remote;}catch(Exception ignored){}
                         throw new IdentityException(503,code);
                     }
                     var result=json.readValue(response.body(),AgentResult.class);
-                    if(!task.equals(result.taskId()) || !attempt.equals(result.attemptId()) || !version.equals(result.engineVersion()))throw new IdentityException(502,"TASK_RUNTIME_INCOMPATIBLE");
+                    if(!task.equals(result.taskId()) || !attempt.equals(result.attemptId()) || !version.equals(result.engineVersion()))throw new IdentityException(502,"TASK_RESULT_UNKNOWN");
                     return result;
                 }catch(TimeoutException waiting){}
             }
         }catch(IdentityException error){throw error;}
-        catch(Exception error){if(error instanceof InterruptedException)Thread.currentThread().interrupt();throw new IdentityException(503,"TASK_RUNTIME_UNAVAILABLE");}
+        catch(Exception error){if(error instanceof InterruptedException)Thread.currentThread().interrupt();throw new IdentityException(503,future==null?"TASK_RUNTIME_UNAVAILABLE":"TASK_RESULT_UNKNOWN");}
         finally{if(future!=null && !future.isDone())future.cancel(true);}
     }
 

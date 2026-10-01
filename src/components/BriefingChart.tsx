@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { chartDescription, type BriefingChart as Chart } from '../briefingPresentation';
 import { briefingPeriod } from '../briefingTypography';
+import { BriefingBusinessChart, businessChartHeight, isBusinessChart } from './BriefingBusinessChart';
 
 const blue = '#356cd4',
   light = '#98b6e8',
@@ -13,14 +14,48 @@ const number = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 
 export function BriefingChart({ chart, spacious }: { chart: Chart; spacious: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(260);
+  const [{ width, availableHeight }, setBounds] = useState({ width: 260, availableHeight: 172 });
   useLayoutEffect(() => {
     if (!ref.current) return;
-    const observer = new ResizeObserver(([entry]) => setWidth(Math.max(120, entry.contentRect.width)));
+    const measure = () => {
+      const element = ref.current!;
+      const period = element.querySelector<HTMLElement>('.briefing-chart-period');
+      const next = {
+        width: Math.max(120, element.clientWidth),
+        availableHeight: Math.max(0, element.clientHeight - (period?.offsetHeight || 0) - 5),
+      };
+      setBounds((previous) =>
+        previous.width === next.width && previous.availableHeight === next.availableHeight ? previous : next,
+      );
+    };
+    const observer = new ResizeObserver(measure);
     observer.observe(ref.current);
+    observer.observe(ref.current.querySelector('.briefing-chart-period')!);
     return () => observer.disconnect();
   }, []);
-  const height = spacious ? 172 : 74;
+  const fillsArea = ['line', 'area', 'heatmap', 'multiples', 'breakdown'].includes(chart.kind);
+  const pairedBreakdown = chart.kind === 'breakdown' && width >= 400 && !spacious;
+  const business = isBusinessChart(chart);
+  const minimumHeight = business
+    ? businessChartHeight(chart, width)
+    : chart.kind === 'breakdown'
+      ? pairedBreakdown
+        ? 66
+        : width >= 240
+          ? 110
+          : 150
+      : ['dumbbell', 'lollipop'].includes(chart.kind)
+        ? Math.max(60, chart.rows.length * 24 + 12)
+        : 60;
+  const height = business
+    ? Math.max(minimumHeight, spacious ? availableHeight : minimumHeight)
+    : chart.kind === 'breakdown'
+      ? Math.max(minimumHeight, availableHeight)
+      : spacious && fillsArea
+        ? Math.max(172, availableHeight)
+        : spacious
+          ? Math.max(172, minimumHeight)
+          : Math.max(74, minimumHeight);
   const small = width < 280;
   const rows = chart.rows;
   const marks: ReactNode[] = [];
@@ -88,6 +123,43 @@ export function BriefingChart({ chart, spacious }: { chart: Chart; spacious: boo
       )
         text(x(i), height - 3, d.label, anchor, muted);
     });
+  } else if (chart.kind === 'breakdown') {
+    const series = chart.series || [];
+    const colors = [blue, light, amber];
+    const wide = width >= 240;
+    const legendHeight = wide ? 28 : 68;
+    const max = Math.max(1, ...series.map((s) => s.values.reduce((sum, value) => sum + value, 0)));
+    const rowHeight = (height - legendHeight) / (pairedBreakdown ? 1 : Math.max(1, series.length));
+    const plotWidth = pairedBreakdown ? (width - 20) / 2 : width;
+    const barHeight = pairedBreakdown
+      ? Math.min(44, Math.max(20, (height - legendHeight - 8) * 0.6))
+      : Math.min(44, Math.max(22, rowHeight * 0.33));
+    series.forEach((series, i) => {
+      const top = (pairedBreakdown ? 0 : i * rowHeight) + 12;
+      const origin = pairedBreakdown ? i * (plotWidth + 20) : 0;
+      text(origin, top, series.label);
+      text(origin + plotWidth, top, `${number(chart.rows[i]?.value || 0)} ${chart.unit}`, 'end');
+      let left = origin;
+      series.values.forEach((value, index) => {
+        if (!value) return;
+        const segmentWidth = (plotWidth * value) / max;
+        rect(left, top + 8, segmentWidth, barHeight, colors[index % colors.length], 2);
+        text(
+          left + segmentWidth / 2,
+          top + 8 + barHeight / 2 + 4,
+          number(value),
+          'middle',
+          index === 1 ? ink : '#fff',
+        );
+        left += segmentWidth;
+      });
+    });
+    (chart.columns || []).forEach((label, i) => {
+      const x = wide ? (i * width) / 3 : 0;
+      const y = wide ? height - 6 : height - 48 + i * 20;
+      rect(x, y - 8, 8, 8, colors[i % colors.length], 2);
+      text(x + 14, y, label, 'start', muted);
+    });
   } else if (chart.kind === 'stacked') {
     let offset = 0;
     const denominator = chart.total || total || 1;
@@ -126,13 +198,20 @@ export function BriefingChart({ chart, spacious }: { chart: Chart; spacious: boo
     if (spacious) text(0, y + 78, '预算占用与实际支付分别核对', 'start', muted);
   } else if (chart.kind === 'lollipop' || chart.kind === 'dumbbell') {
     const left = small ? 74 : 100,
-      compactPair = chart.kind === 'dumbbell' && !spacious,
-      right = width - (compactPair ? 70 : 22),
+      compactPair = chart.kind === 'dumbbell' && (!spacious || rows.length >= 4),
+      valueWidth = compactPair
+        ? Math.max(...rows.map((d) => `${number(d.previous || 0)} → ${number(d.value)}`.length)) * 7 + 14
+        : chart.kind === 'lollipop'
+          ? Math.max(...rows.map((d) => number(d.value).length)) * 7 + 14
+          : 22,
+      right = width - valueWidth,
       max = Math.max(1, ...rows.flatMap((d) => [d.value, d.previous || 0]));
     const rowHeight = (height - (chart.kind === 'dumbbell' ? 24 : 12)) / Math.max(rows.length, 1),
       x = (v: number) => left + (v / max) * (right - left);
     rows.forEach((d, i) => {
-      const y = compactPair ? 12 + i * 24 : 12 + i * rowHeight + (chart.kind === 'dumbbell' ? 8 : 0);
+      const y = compactPair
+        ? 12 + i * (spacious ? rowHeight : 24)
+        : 12 + i * rowHeight + (chart.kind === 'dumbbell' ? 8 : 0);
       text(0, y + 4, d.label);
       if (d.previous !== undefined) {
         line(x(d.previous), y, x(d.value), y, light, 3);
@@ -238,7 +317,9 @@ export function BriefingChart({ chart, spacious }: { chart: Chart; spacious: boo
     const left = small ? 65 : 84,
       cols = chart.columns || [],
       cellWidth = (width - left) / Math.max(cols.length, 1),
-      cellHeight = spacious ? 29 : 14,
+      cellHeight = spacious
+        ? Math.max(29, (height - 58 - Math.max(0, rows.length - 1) * 5) / Math.max(1, rows.length))
+        : 14,
       top = 19;
     cols.forEach((c, i) => text(left + (i + 0.5) * cellWidth, 11, c, 'middle', muted));
     rows.forEach((r, i) => {
@@ -347,11 +428,12 @@ export function BriefingChart({ chart, spacious }: { chart: Chart; spacious: boo
       </div>
       <svg
         viewBox={`0 0 ${width} ${height}`}
+        data-min-height={minimumHeight}
         style={{ height }}
         role="img"
         aria-label={chartDescription(chart)}
       >
-        {marks}
+        {business ? <BriefingBusinessChart chart={chart} width={width} height={height} /> : marks}
       </svg>
     </div>
   );

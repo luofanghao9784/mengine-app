@@ -53,7 +53,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         const identity = await identityClient.me(controller.signal);
         if (id === generation.current) {
           reconcileDocumentDrafts(identity);
-          setSession({ phase: 'authenticated', identity });
+          setSession(previous => previous.phase === 'authenticated' && JSON.stringify(previous.identity) === JSON.stringify(identity)
+            ? previous : { phase: 'authenticated', identity });
         }
       } catch (error) {
         if (id !== generation.current) return;

@@ -7,6 +7,14 @@ const spec = JSON.parse(
 );
 const ajv = new Ajv2020({ strict: false, formats: { uuid: true, 'date-time': true, date: true } });
 const id = '00000000-0000-4000-8000-000000000001';
+test('manual focus placement requires current layout revision and exact card identities', () => {
+  const route = spec.paths['/api/v1/tenants/{tenant}/briefing/layout'].post;
+  assert.ok(route.parameters.some(p => p.name === 'X-CSRF-TOKEN' && p.required));
+  const check = ajv.compile(spec.components.schemas.LayoutMove);
+  const valid = { requestId:id, expectedRevision:3, conversationId:id, anchorId:id, direction:'BEFORE' };
+  assert.ok(check(valid));
+  for(const invalid of [{...valid,ownerId:id},{...valid,expectedRevision:undefined},{...valid,direction:'PUBLISH'}]) assert.equal(check(invalid),false);
+});
 test('briefing preferences require CSRF, idempotency, revision and no caller-supplied owner', () => {
   const route = spec.paths['/api/v1/tenants/{tenant}/briefing/{conversation}'].post;
   assert.ok(route.parameters.some((p) => p.name === 'X-CSRF-TOKEN' && p.required));
@@ -27,6 +35,9 @@ test('briefing result bounds apply to Unicode excerpts and truthful execution cl
   const valid = {
     conversationId: id,
     taskId: id,
+    taskRevision: 1,
+    attempt: 1,
+    presentationVersion: 'briefing-basic-v1',
     workspaceId: id,
     workspaceName: 'test',
     title: 'test',

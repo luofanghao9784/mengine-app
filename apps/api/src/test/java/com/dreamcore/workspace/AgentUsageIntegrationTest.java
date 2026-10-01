@@ -84,7 +84,7 @@ class AgentUsageIntegrationTest {
     @Test void interruptedAndUnmeteredAttemptsRemainExplicitAndWindowUsesAttemptStart(){
         var j=claim();agents.openUsage(j.id(),j.token());start(j,1);
         db.update("UPDATE conversation_tasks SET lease_until=now()-interval '1 second',created_at=now()-interval '40 days' WHERE id=?",j.id());
-        assertNull(tasks.claim());assertEquals(1,summary().interrupted());assertEquals(1,summary().pendingRequests());assertEquals(0,operations.tenant(actor,tenant,7).tasks().total());
+        assertNull(tasks.claim());assertEquals(1,summary().resultUnknown());assertEquals(0,summary().interrupted());assertEquals(1,summary().pendingRequests());assertEquals(0,operations.tenant(actor,tenant,7).tasks().total());
         receipt(j,1,"FAILED",null,null);assertNull(summary().inputTokens());assertEquals(0,summary().pendingRequests());
         var legacy=claim();tasks.fail(legacy,"TASK_RUNTIME_UNAVAILABLE");assertEquals(2,summary().attempts());assertEquals(1,summary().meteredAttempts());
         db.update("UPDATE agent_attempt_usage SET started_at=now()-interval '8 days' WHERE attempt_id=?",j.token());assertEquals(1,summary().attempts());assertEquals(2,operations.tenant(actor,tenant,30).attemptUsage().getFirst().attempts());

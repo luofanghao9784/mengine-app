@@ -18,6 +18,7 @@ export type DeckCardProps = {
   kind: string;
   width?: number;
   defaultWidth?: number;
+  widthExtension?: number;
   order?: number;
   onResetWidth?: () => void;
   onWidth: (width: number) => void;
@@ -38,6 +39,7 @@ export function DeckCard({
   kind,
   width,
   defaultWidth,
+  widthExtension = 0,
   order = 0,
   onResetWidth,
   onWidth,
@@ -51,11 +53,13 @@ export function DeckCard({
   tabLabel,
   stackTitle,
 }: DeckCardProps) {
-  const [min, max, fallback] = deckLimits[kind];
+  const [baseMin, baseMax, fallback] = deckLimits[kind];
+  const min = baseMin + widthExtension,
+    max = baseMax + widthExtension;
   const initial = defaultWidth ?? fallback;
   const drag = useRef<{ x: number; width: number } | null>(null);
-  const value = width || initial;
-  const resize = (next: number) => onWidth(Math.max(min, Math.min(max, next)));
+  const value = (width || initial) + widthExtension;
+  const resize = (next: number) => onWidth(Math.max(min, Math.min(max, next)) - widthExtension);
   const needsReveal = covered || clipped;
   return (
     <section
@@ -66,6 +70,7 @@ export function DeckCard({
       data-needs-reveal={needsReveal || undefined}
       data-clipped={clipped || undefined}
       data-deck-id={id}
+      data-width-extension={widthExtension || undefined}
       data-deck-title={stackTitle || tabLabel || label}
       data-deck-order={order}
       aria-label={label}

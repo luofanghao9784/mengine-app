@@ -79,13 +79,16 @@ test('宽屏中的窄卡片也能显示长会话标题和长资料引用，不�
   expect(await chips.evaluateAll((es) => es.every((e) => e.scrollWidth <= e.clientWidth + 1))).toBe(true);
   await chips.filter({ hasText: fileTitle }).click();
   await expect(page.locator('[data-deck-id="kg-D06"] .reader-paper h1')).toHaveText(fileTitle);
+  const fileHeader = page.locator('[data-deck-id="kg-D06"] .reader-header');
+  await expect(fileHeader.locator('h2')).toHaveText(fileTitle);
+  expect(await fileHeader.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
   await expect(page.locator('[data-deck-id="kg-D06"] .reader-header-tools button').last()).toBeInViewport({
     ratio: 1,
   });
   await page.screenshot({ path: '.local/conversation-responsive/long-titles.png' });
 });
 
-test('大屏多列预览收放和跨断点后，标题、版本及底部操作保持在各自面板内', async ({ page }) => {
+test('大屏多列预览收放和跨断点后，文件名、正文及底部操作保持在各自面板内', async ({ page }) => {
   await page.setViewportSize({ width: 2366, height: 1361 });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await openConversation(page);
@@ -96,7 +99,7 @@ test('大屏多列预览收放和跨断点后，标题、版本及底部操作�
       .evaluate((e) => e.scrollTo({ left: e.scrollWidth, behavior: 'instant' }));
     const file = page.locator('.deck-file').last();
     await expect(file).toBeInViewport({ ratio: 0.99 });
-    for (const selector of ['.reader-header', '.reader-version-bar', '.reader-paper h1', '.reader-footer']) {
+    for (const selector of ['.reader-header', '.preview-location', '.reader-paper h1', '.reader-footer']) {
       const inside = await file.locator(selector).evaluate((e) => {
         const r = e.getBoundingClientRect(),
           p = e.closest('.deck-file')!.getBoundingClientRect();

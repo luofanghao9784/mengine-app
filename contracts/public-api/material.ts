@@ -43,3 +43,10 @@ export interface MaterialUpload {
   folderId?: string | null;
   expectedVersion?: number;
 }
+
+/** Exact receipt for the upload request; a later material version is reported separately. */
+export interface MaterialUploadReceipt extends MaterialEntry {
+  receiptStatus: 'EXACT' | 'HISTORICAL_UNKNOWN';
+  acceptedVersion: MaterialVersion | null;
+  currentVersion: number;
+}

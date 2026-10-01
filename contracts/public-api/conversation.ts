@@ -50,7 +50,21 @@ export interface ConversationTask {
   id: string;
   prompt: string;
   mode: 'SOURCE_LOOKUP' | 'AGENT';
-  status: 'QUEUED' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'CANCELLED' | 'INTERRUPTED';
+  status:
+    | 'QUEUED'
+    | 'RUNNING'
+    | 'SUCCEEDED'
+    | 'FAILED'
+    | 'CANCELLED'
+    | 'INTERRUPTED'
+    | 'PAUSED'
+    | 'WAITING_INPUT'
+    | 'WAITING_CAPABILITY'
+    | 'PARTIAL'
+    | 'RESULT_UNKNOWN';
+  waitReason?: string | null;
+  requiredInput?: string | null;
+  reconciliationRequired?: boolean;
   revision: number;
   attempt: number;
   summaryCode: 'SOURCES_FOUND' | 'NO_SOURCES' | null;
@@ -87,4 +101,28 @@ export interface SendTask {
   workspaceId: string;
   prompt: string;
   mode: 'SOURCE_LOOKUP' | 'AGENT';
+}
+
+export type TaskAction = 'CANCEL' | 'RETRY' | 'PAUSE' | 'RESUME' | 'RECONCILE';
+export interface TaskAttempt {
+  number: number;
+  status: ConversationTask['status'];
+  input: string;
+  reply: string | null;
+  summaryCode: string | null;
+  errorCode: string | null;
+  engineVersion: string | null;
+  modelName: string | null;
+  tools: { callId: string; name: string; status: 'STARTED' | 'succeeded' | 'failed' }[];
+  sources: KnowledgeChunk[];
+  artifacts: TaskArtifact[];
+  startedAt: string | null;
+  finishedAt: string | null;
+  provenance: 'RECORDED' | 'LEGACY_CURRENT_ONLY';
+  reconciliationCode: string | null;
+}
+export interface TaskAttempts {
+  taskId: string;
+  items: TaskAttempt[];
+  hasMore: boolean;
 }

@@ -40,8 +40,9 @@ public class IdentityService {
     private final SecureRandom random = new SecureRandom();
     private final String dummyHash;
 
+    private final com.dreamcore.workspace.departure.DepartureAccess departure;
     public IdentityService(JdbcTemplate db, PasswordEncoder passwords, IdentityAudit audit, LoginThrottle throttle,
-                           LocalInvitationDelivery delivery, @Value("${dreamcore.invitation.ttl-hours}") int ttlHours) {
+                           LocalInvitationDelivery delivery, @Value("${dreamcore.invitation.ttl-hours}") int ttlHours,com.dreamcore.workspace.departure.DepartureAccess departure) {this.departure=departure;
         this.db = db; this.passwords = passwords; this.audit = audit; this.throttle = throttle;
         this.delivery = delivery; this.ttlHours = ttlHours;
         this.dummyHash = passwords.encode(UUID.randomUUID().toString());
@@ -94,7 +95,7 @@ public class IdentityService {
     private boolean isPlatformAdmin(UUID actor) {
         return Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM platform_roles WHERE account_id=? AND role='PLATFORM_ADMIN')", Boolean.class, actor));
     }
-    void platform(UUID actor) {
+    public void platform(UUID actor) {
         account(actor);
         if (!isPlatformAdmin(actor)) { audit.denial(actor, "PLATFORM_ACCESS"); throw IdentityException.denied(); }
     }
@@ -126,8 +127,8 @@ public class IdentityService {
         var spaces = db.query("""
             SELECT w.id,w.name,w.kind FROM workspaces w WHERE w.tenant_id=? AND
             ((w.kind='PERSONAL' AND w.owner_id=?) OR (w.kind='SHARED' AND EXISTS(SELECT 1 FROM workspace_members m
-                WHERE m.tenant_id=w.tenant_id AND m.workspace_id=w.id AND m.account_id=?))) ORDER BY w.id
-            """, (r,n) -> new Workspace(r.getObject("id", UUID.class),r.getString("name"),r.getString("kind")), tenant, actor, actor);
+                WHERE m.tenant_id=w.tenant_id AND m.workspace_id=w.id AND m.account_id=?))) AND departure_content_readable(?,w.tenant_id,w.id) ORDER BY w.id
+            """, (r,n) -> new Workspace(r.getObject("id", UUID.class),r.getString("name"),r.getString("kind")), tenant, actor, actor, actor);
         return new TenantContext(tenant(tenant), role, spaces);
     }
     public List<Tenant> tenants(UUID actor) { platform(actor); return db.query("SELECT * FROM tenants ORDER BY created_at,id", TENANT); }
@@ -149,8 +150,12 @@ public class IdentityService {
 
     @Transactional
     public TenantCreated createTenant(UUID actor, UUID requestId, String tenantName, String adminEmail) {
+        return createTenant(actor,requestId,tenantName,adminEmail,false);
+    }
+    @Transactional
+    public TenantCreated createTenant(UUID actor, UUID requestId, String tenantName, String adminEmail, boolean designateOwner) {
         platform(actor); String display = name(tenantName,100); String normalized = email(adminEmail);
-        String fingerprint = hash(display + "\n" + normalized);
+        String fingerprint = hash(display + "\n" + normalized + (designateOwner ? "\nOWNER_DESIGNATED" : ""));
         UUID prior = priorRequest(actor,requestId,"CREATE_TENANT",fingerprint);
         platform(actor); // The request key may have waited while platform access was revoked.
         if (prior != null) {
@@ -161,6 +166,7 @@ public class IdentityService {
         db.update("INSERT INTO tenants(id,name) VALUES (?,?)",id,display);
         Invitation invite = issue(actor,id,normalized,"TENANT_ADMIN");
         db.update("INSERT INTO tenant_initial_admin(tenant_id,invitation_id) VALUES (?,?)",id,invite.id());
+        if(designateOwner) db.update("INSERT INTO governance_initial_designations(tenant_id,invitation_id,designated_by) VALUES (?,?,?)",id,invite.id(),actor);
         remember(actor,requestId,"CREATE_TENANT",fingerprint,id);
         audit.record(actor,id,"TENANT_CREATE",id,"SUCCESS");
         return new TenantCreated(tenant(id),invite);
@@ -177,6 +183,7 @@ public class IdentityService {
         return result;
     }
     Invitation issue(UUID actor, UUID tenant, String email, String role) {
+        departure.requireActiveBusiness(actor,tenant);
         if (db.queryForObject("SELECT count(*) FROM tenant_memberships m JOIN accounts a ON a.id=m.account_id WHERE m.tenant_id=? AND a.email=?",Integer.class,tenant,email) > 0) throw IdentityException.conflict();
         // Expiration is also derived on read; this update releases the unique pending-invite slot.
         db.update("UPDATE invitations SET status='EXPIRED' WHERE tenant_id=? AND email=? AND status='PENDING' AND expires_at<=now()",tenant,email);
@@ -215,6 +222,7 @@ public class IdentityService {
         var invites = db.query(INVITATION_SELECT + " WHERE token_hash=? FOR UPDATE",INVITATION,hash(token));
         if (invites.isEmpty() || !"PENDING".equals(invites.getFirst().status())) throw new IdentityException(409,"INVITATION_UNAVAILABLE");
         Invitation invite = invites.getFirst();
+        departure.requireTenantActivation(invite.tenantId());
         // Serialize two invitations for the same new account without overwriting credentials.
         db.queryForList("SELECT pg_advisory_xact_lock(hashtextextended(?,0))", "account:" + invite.email());
         var existing = db.query("SELECT * FROM accounts WHERE email=? FOR UPDATE",ACCOUNT,invite.email());
@@ -228,6 +236,7 @@ public class IdentityService {
             password(password); String display = name(displayName,80); accountId = UUID.randomUUID();
             db.update("INSERT INTO accounts(id,email,display_name,password_hash) VALUES (?,?,?,?)",accountId,invite.email(),display,passwords.encode(password));
         }
+        departure.requireMemberActivation(invite.tenantId(),accountId);
         db.update("INSERT INTO tenant_memberships(tenant_id,account_id,role) VALUES (?,?,?)",invite.tenantId(),accountId,invite.role());
         db.update("INSERT INTO workspaces(id,tenant_id,owner_id,name,kind) VALUES (?,?,?,'个人空间','PERSONAL')",UUID.randomUUID(),invite.tenantId(),accountId);
         db.update("UPDATE invitations SET status='ACCEPTED',accepted_by=? WHERE id=?",accountId,invite.id());

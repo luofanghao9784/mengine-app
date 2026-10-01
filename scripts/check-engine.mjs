@@ -76,7 +76,7 @@ try {
     values.mode === 'source-lookup'
       ? value.runtimeMode === 'contract-only' || value.protocols.sourceLookup !== '1.0'
       : value.runtimeMode !== values.mode ||
-        value.protocols.agentTask !== '1.4' ||
+        !['1.4', '1.5'].includes(value.protocols.agentTask) ||
         !['1.3', '1.4'].includes(value.protocols.platformCallbacks)
   )
     throw Error('incompatible task mode');

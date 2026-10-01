@@ -1,0 +1,139 @@
+.forwarding-panel {
+  display: grid;
+  gap: 16px;
+}
+.forwarding-source {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  background: #f5f8f1;
+  border-radius: 12px;
+  overflow-wrap: anywhere;
+}
+.forwarding-source span {
+  color: #68765f;
+  font-size: 13px;
+}
+.forwarding-people {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  max-height: 260px;
+  overflow: auto;
+}
+.forwarding-people label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px;
+  border: 1px solid #e1e7dd;
+  border-radius: 9px;
+  overflow-wrap: anywhere;
+}
+.forwarding-people label input {
+  width: auto;
+}
+.forwarding-people small {
+  color: #899280;
+  margin-left: auto;
+}
+.forwarding-pagination {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+}
+.forwarding-receipt {
+  background: #eff5e9;
+  border: 1px solid #d7e3ca;
+  padding: 14px;
+  border-radius: 12px;
+}
+.forwarding-recipients {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 7px;
+}
+.forwarding-recipients li {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.forwarding-history {
+  border-top: 1px solid #e4e8df;
+  padding-top: 16px;
+}
+.forwarding-history summary {
+  cursor: pointer;
+}
+.forwarding-inbox {
+  margin: 16px 0;
+  padding: 20px;
+  border: 1px solid #dee5d7;
+  background: #fbfcf8;
+  border-radius: 18px;
+  overflow-wrap: anywhere;
+}
+.forwarding-inbox header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.forwarding-inbox h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+.forwarding-inbox header p {
+  color: #718066;
+  font-size: 13px;
+}
+.forwarding-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+.forwarding-cards article {
+  min-width: 0;
+  padding: 16px;
+  background: #fff;
+  border: 1px solid #dfe7d7;
+  border-radius: 12px;
+}
+.forwarding-cards h4 {
+  margin: 8px 0;
+}
+.forwarding-cards p {
+  line-height: 1.7;
+  font-size: 13px;
+  color: #66735f;
+}
+.forwarding-state {
+  font-size: 12px;
+  color: #526946;
+}
+.forwarding-opened {
+  border-top: 1px dashed #d8e1cf;
+  margin-top: 12px;
+  padding-top: 8px;
+}
+@media (max-width: 600px) {
+  .forwarding-people,
+  .forwarding-cards {
+    grid-template-columns: 1fr;
+  }
+  .forwarding-inbox {
+    padding: 14px;
+  }
+  .forwarding-inbox header {
+    flex-wrap: wrap;
+  }
+  .forwarding-recipients li {
+    font-size: 13px;
+  }
+}

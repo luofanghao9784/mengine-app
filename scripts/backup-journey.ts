@@ -121,6 +121,10 @@ export async function backupJourney(options: {
     const priorAttempt = randomUUID(),
       lastAttempt = randomUUID();
     sql(`UPDATE conversation_tasks SET attempt=2,model_calls=1,token_usage='{"inputTokens":40,"outputTokens":5}'::jsonb WHERE id='${task}';
+      UPDATE conversation_artifacts SET attempt_number=2 WHERE id='${artifact}';
+      INSERT INTO conversation_attempts(task_id,attempt_number,attempt_id,input,status,finished_at,provenance,snapshot)
+      VALUES('${task}',1,'${priorAttempt}','合成取消尝试','CANCELLED',now(),'RECORDED','{}'),
+      ('${task}',2,'${lastAttempt}','合成完成尝试','SUCCEEDED',now(),'RECORDED','{"reply":"合成测试文稿；不是模型调用结果。"}');
       INSERT INTO agent_attempt_usage(attempt_id,task_id,tenant_id,workspace_id,attempt_number,execution_class,status,metering_enabled,finished_at)
       VALUES ('${priorAttempt}','${task}','${tenant}','${personal}',1,'verification','CANCELLED',true,now()),
       ('${lastAttempt}','${task}','${tenant}','${personal}',2,'verification','SUCCEEDED',true,now());
@@ -187,13 +191,13 @@ export async function backupJourney(options: {
     const files = new Map<string, Buffer>();
     const versions = JSON.parse(
       sql(
-        `SELECT coalesce(json_agg(v),'[]') FROM (SELECT mv.workspace_id,mv.material_id,mv.id FROM material_versions mv JOIN workspaces w ON w.id=mv.workspace_id WHERE mv.tenant_id='${tenant}' AND (w.owner_id='${owner}' OR EXISTS(SELECT 1 FROM workspace_members m WHERE m.workspace_id=w.id AND m.account_id='${owner}'))) v`,
+        `SELECT coalesce(json_agg(v),'[]') FROM (SELECT mv.workspace_id,mv.material_id,mv.id FROM material_versions mv JOIN active_materials am ON am.id=mv.material_id JOIN workspaces w ON w.id=mv.workspace_id WHERE mv.tenant_id='${tenant}' AND ((w.kind='PERSONAL' AND w.owner_id='${owner}') OR (w.kind='SHARED' AND EXISTS(SELECT 1 FROM workspace_members m WHERE m.workspace_id=w.id AND m.tenant_id=w.tenant_id AND m.account_id='${owner}')))) v`,
       ),
     );
     for (const version of versions) {
       const path = `${root}/workspaces/${version.workspace_id}/materials/${version.material_id}/versions/${version.id}`;
       const response = await user.get(path + '/analysis');
-      assert.equal(response.status(), 200);
+      assert.equal(response.status(), 200, path);
       snapshots.set(path + '/analysis', await response.json());
       const download = await user.get(path + '/download');
       assert.equal(download.status(), 200);
@@ -210,6 +214,24 @@ export async function backupJourney(options: {
       files.set(path, await response.body());
     }
     assert.deepEqual(files.get(artifactPath), artifactBytes);
+    // Extra fixture objects are deliberately changed in the independent source AFTER the snapshot.
+    // They are outside the stable API snapshots above; no real enterprise data is touched.
+    const removedMaterial = randomUUID(),
+      removedVersion = randomUUID(),
+      removedObject = randomUUID();
+    const revokedSpace = randomUUID();
+    const removedBytes = Buffer.from('合成原件：备份后删除，恢复不得复活。');
+    await writeFile(join(directory, 'objects', removedObject + '.blob'), removedBytes, { mode: 0o600 });
+    sql(`BEGIN;
+      INSERT INTO workspaces(id,tenant_id,owner_id,name,kind) VALUES('${revokedSpace}','${tenant}','${owner}','合成恢复撤权检查','SHARED');
+      INSERT INTO workspace_members(tenant_id,workspace_id,account_id) VALUES('${tenant}','${revokedSpace}','${owner}');
+      INSERT INTO materials(id,tenant_id,workspace_id,name,created_by) VALUES('${removedMaterial}','${tenant}','${personal}','recovery-deleted.txt','${owner}');
+      INSERT INTO material_versions(id,tenant_id,workspace_id,material_id,number,filename,size_bytes,sha256,object_id,created_by)
+      VALUES('${removedVersion}','${tenant}','${personal}','${removedMaterial}',1,'recovery-deleted.txt',${removedBytes.length},'${createHash('sha256').update(removedBytes).digest('hex')}','${removedObject}','${owner}'); COMMIT;`);
+    const removedPath = `${root}/workspaces/${personal}/materials/${removedMaterial}/versions/${removedVersion}/download`;
+    const revokedPath = `${root}/workspaces/${revokedSpace}/library`;
+    assert.equal((await user.get(removedPath)).status(), 200);
+    assert.equal((await user.get(revokedPath)).status(), 200);
     const oldCookies = await memberContext.cookies();
     // A live trial must be rejected without interrupting the application.
     await backup(['create', '--directory', directory, '--output', bundle], 1);
@@ -230,8 +252,8 @@ export async function backupJourney(options: {
     // The same dump must remain verifiable after use; no credentials/outbox are imported.
     await backup(['verify', '--bundle', bundle]);
     const receipt = JSON.parse(await readFile(join(restored, 'restore.json'), 'utf8'));
-    assert.ok(receipt.pendingInvitationsRevoked >= 1);
-    assert.equal(receipt.sessionsRestored, false);
+    assert.equal(receipt.manifest.state, 'QUARANTINED');
+    assert.equal(await exit(launch(['scripts/local/trial.py', 'start', '--directory', restored])), 1);
     assert.notEqual(
       JSON.parse(await readFile(join(restored, 'database.json'), 'utf8')).password,
       database.password,
@@ -239,6 +261,35 @@ export async function backupJourney(options: {
     assert.deepEqual(
       Object.keys(JSON.parse(await readFile(join(restored, 'accounts.json'), 'utf8'))).sort(),
       ['note', 'restored'],
+    );
+    // Mutate only this stopped synthetic authority through its owned private socket, never inherited PG settings.
+    const currentChanges = `DELETE FROM workspace_members WHERE workspace_id='${revokedSpace}';
+      INSERT INTO content_lifecycle(tenant_id,workspace_id,object_kind,object_id,state)
+      VALUES('${tenant}','${personal}','MATERIAL','${removedMaterial}','PURGED');`;
+    assert.equal(
+      await exit(
+        launch([
+          '-c',
+          'import sys; from pathlib import Path; sys.path.insert(0,"scripts/local"); import backup; root=Path(sys.argv[1]);\nwith backup.owned_lock(root):\n with backup.offline_database(root) as (_,__,sql): sql(sys.argv[2])',
+          directory,
+          currentChanges,
+        ]),
+      ),
+      0,
+    );
+    await rm(join(directory, 'objects', removedObject + '.blob'));
+    await backup(['reconcile', '--directory', restored, '--current-directory', directory]);
+    assert.equal(await exit(launch(['scripts/local/trial.py', 'start', '--directory', restored])), 1);
+    await backup(['activate', '--directory', restored, '--current-directory', directory]);
+    const activation = JSON.parse(await readFile(join(restored, 'restore.json'), 'utf8'));
+    assert.equal(activation.manifest.state, 'ACTIVATED');
+    const newAccounts = JSON.parse(await readFile(join(restored, 'accounts.json'), 'utf8'));
+    assert.equal(
+      await stat(join(restored, 'objects', removedObject + '.blob')).then(
+        () => true,
+        () => false,
+      ),
+      false,
     );
     processHandle = launch(['scripts/local/trial.py', 'start', '--directory', restored]);
     let url = '';
@@ -282,8 +333,20 @@ export async function backupJourney(options: {
       [restoredMember, accounts.member],
       [restoredAdmin, accounts.adminB],
       [restoredPlatform, accounts.platform],
-    ] as const)
-      await post(ctx.request, '/api/v1/auth/login', { email: account.email, password: account.password });
+    ] as const) {
+      await post(
+        ctx.request,
+        '/api/v1/auth/login',
+        { email: account.email, password: account.password },
+        401,
+      );
+      const current = newAccounts.recovered.find((value: Account) => value.email === account.email);
+      assert.ok(current, 'Current active account must receive a new credential');
+      assert.notEqual(current.password, account.password);
+      await post(ctx.request, '/api/v1/auth/login', { email: current.email, password: current.password });
+    }
+    assert.equal((await restoredMember.request.get(removedPath)).status(), 404);
+    assert.equal((await restoredMember.request.get(revokedPath)).status(), 404);
     const usageResponse = await restoredPlatform.request.get(
       `/api/platform-admin/v1/tenants/${tenant}/operations`,
     );
@@ -353,7 +416,8 @@ export async function backupJourney(options: {
           objects: Object.keys(signed.manifest.files).length - 1,
           apiSnapshots: snapshots.size,
           byteDownloads: files.size,
-          pendingInvitationsRevoked: receipt.pendingInvitationsRevoked,
+          pendingInvitationsRevoked: invites.filter((value: { status: string }) => value.status === 'REVOKED')
+            .length,
           checks: [
             'live-backup-denied',
             'signed-manifest',
@@ -363,7 +427,11 @@ export async function backupJourney(options: {
             'versions-citations-artifacts-exports-publications',
             'old-session-denied',
             'pending-invitation-denied',
-            'account-password-login',
+            'unverified-and-reconciled-start-denied',
+            'explicit-activation-current-authority',
+            'old-password-denied-new-password-login',
+            'current-deletion-removes-original-bytes',
+            'current-space-revocation-preserved',
             'tenant-private-platform-boundaries',
             'continue-writing-after-restore',
           ],
@@ -372,7 +440,7 @@ export async function backupJourney(options: {
         2,
       ) + '\n',
     );
-    console.log('M7-A1 backup / fresh-directory restore / API + bytes + permissions PASS.');
+    console.log('M7-A3 backup / current-state reconciliation / explicit activation / browser + API PASS.');
   } finally {
     for (const context of contexts) await context.close();
     if (processHandle && processHandle.exitCode === null) {

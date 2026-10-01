@@ -55,4 +55,12 @@ public class LocalObjectStore implements ObjectStore {
         try { Files.deleteIfExists(root().resolve(id+".blob")); }
         catch(IOException ignored) { /* rollback orphan has no readable database reference */ }
     }
+    @Override public void purge(UUID id) {
+        try {
+            Path file=root().resolve(id+".blob");
+            if(Files.isSymbolicLink(file))throw unavailable();
+            Files.deleteIfExists(file);
+            if(Files.exists(file,LinkOption.NOFOLLOW_LINKS))throw unavailable();
+        } catch(IOException error) {throw unavailable();}
+    }
 }

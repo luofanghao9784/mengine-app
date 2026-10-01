@@ -47,10 +47,10 @@ public class ActivityService {
             FROM material_versions v
             JOIN workspaces w ON w.tenant_id=v.tenant_id AND w.id=v.workspace_id AND w.kind='SHARED'
             JOIN workspace_members g ON g.tenant_id=w.tenant_id AND g.workspace_id=w.id AND g.account_id=?
-            JOIN materials m ON m.tenant_id=v.tenant_id AND m.workspace_id=v.workspace_id AND m.id=v.material_id
+            JOIN active_materials m ON m.tenant_id=v.tenant_id AND m.workspace_id=v.workspace_id AND m.id=v.material_id
             JOIN accounts a ON a.id=v.created_by
             LEFT JOIN document_publications p ON p.tenant_id=v.tenant_id AND p.material_version_id=v.id
-            WHERE v.tenant_id=?
+            WHERE v.tenant_id=? AND departure_content_readable(g.account_id,w.tenant_id,w.id)
             """;
         if(workspace!=null) { sql+=" AND v.workspace_id=?"; args.add(workspace); }
         if(before!=null) { sql+=" AND (v.created_at,v.id)<(?,?)"; args.add(Timestamp.from(before)); args.add(beforeId); }

@@ -68,6 +68,9 @@ export async function conversationJourney({
   const href = `/workspace/#tenant=${tenant}&view=conversations`;
   await page.goto(href);
   await expect(page.getByRole('heading', { name: '开始新会话', exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: '新会话启动建议' })).toBeVisible();
+  await expect(page.locator('.live-composer-surface')).toBeVisible();
+  await page.screenshot({ path: join(artifacts, 'conversation-start-desktop.png'), fullPage: true });
   const keywords = page.getByLabel('资料关键词', { exact: true });
   await keywords.fill('先前已存草稿');
   await blockDraftWrites(page, 'dreamcore:composer:');
@@ -109,7 +112,7 @@ export async function conversationJourney({
   await expect(page.getByRole('button', { name: '重试上次发送', exact: true })).toBeVisible();
   await page.getByRole('button', { name: '重试上次发送', exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`conversation=${id}`));
-  await expect(page.locator('.conversation-result')).toContainText('检索完成', { timeout: 15000 });
+  await expect(page.locator('.conversation-result')).toContainText('执行完成', { timeout: 15000 });
   await expect(page.locator('.conversation-sources').first()).toContainText('会话验收.md · v1');
   assert.equal((await (await memberContext.request.get(`${root}/${id}`)).json()).tasks.length, 1);
   assert.equal((await (await memberContext.request.get(root)).json()).items.length, 1);
@@ -117,8 +120,59 @@ export async function conversationJourney({
   assert.equal((await adminContext.request.get(`${root}/${id}/events`)).status(), 404);
   assert.equal((await platformContext.request.get(`${root}/${id}`)).status(), 403);
   await page.locator('.conversation-sources button').first().click();
-  await expect(page.getByRole('dialog')).toContainText('梦核进度');
-  await page.getByRole('button', { name: '关闭弹窗', exact: true }).click();
+  const source = page.getByRole('region', { name: '资料来源', exact: true });
+  await expect(source).toContainText('梦核进度');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  // Fullscreen changes presentation without remounting the fixed-version citation reader.
+  await source
+    .locator('.live-source-reader')
+    .evaluate((element) => element.setAttribute('data-retained-reader', 'yes'));
+  await page.getByRole('button', { name: '全屏查看资料来源', exact: true }).click();
+  const fullscreenSource = page.getByRole('dialog', { name: '资料来源', exact: true });
+  await expect(fullscreenSource).toHaveAttribute('aria-modal', 'true');
+  await expect(fullscreenSource).toHaveClass(/is-fullscreen/);
+  await expect(fullscreenSource.getByRole('button', { name: '退出来源全屏', exact: true })).toBeFocused();
+  // Tab and Shift+Tab wrap inside the reader instead of reaching shell navigation or tenant selection.
+  for (const key of [...Array(8).fill('Tab'), ...Array(8).fill('Shift+Tab')]) {
+    await page.keyboard.press(key);
+    assert.equal(
+      await fullscreenSource.evaluate((element) => element.contains(document.activeElement)),
+      true,
+    );
+  }
+  await page.locator('.access-tenant-picker select').evaluate((element) => (element as HTMLElement).focus());
+  assert.equal(await fullscreenSource.evaluate((element) => element.contains(document.activeElement)), true);
+  await page.keyboard.press('Escape');
+  await expect(source).not.toHaveClass(/is-fullscreen/);
+  await expect(page.getByRole('button', { name: '全屏查看资料来源', exact: true })).toBeFocused();
+  await expect(page.locator('.access-sidebar')).not.toHaveAttribute('inert');
+  await expect(source.locator('.live-source-reader')).toHaveAttribute('data-retained-reader', 'yes');
+  await page.screenshot({ path: join(artifacts, 'conversation-source-desktop.png'), fullPage: true });
+  const desktop = page.viewportSize()!;
+  await page.setViewportSize({ width: 390, height: 844 });
+  const tabs = page.getByLabel('会话卡片切换', { exact: true });
+  await expect(source).toBeVisible();
+  await tabs.getByRole('button', { name: '对话', exact: true }).click();
+  await expect(page.getByLabel('资料关键词', { exact: true })).toBeVisible();
+  await expect(source).toBeHidden();
+  await tabs.getByRole('button', { name: '列表', exact: true }).click();
+  await expect(page.getByRole('navigation', { name: '会话列表' })).toBeVisible();
+  await tabs.getByRole('button', { name: '资料来源', exact: true }).click();
+  await expect(source).toContainText('梦核进度');
+  await expect(source.locator('.live-source-reader')).toHaveAttribute('data-retained-reader', 'yes');
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  await page.screenshot({ path: join(artifacts, 'conversation-source-mobile.png'), fullPage: true });
+  await page.getByRole('button', { name: '全屏查看资料来源', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: '资料来源', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '关闭资料来源', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: '资料来源', exact: true })).toHaveCount(0);
+  await expect(page.getByLabel('资料关键词', { exact: true })).toBeVisible();
+  await expect(page.locator('.conversation-sources button').first()).toBeFocused();
+  await page.setViewportSize(desktop);
+  await page.getByRole('button', { name: '收起会话列表', exact: true }).click();
+  await expect(page.getByRole('navigation', { name: '会话列表' })).toBeHidden();
+  await page.getByRole('button', { name: '展开会话列表', exact: true }).click();
+  await expect(page.getByRole('navigation', { name: '会话列表' })).toBeVisible();
   await page.getByLabel('资料关键词', { exact: true }).fill('不存在的验收关键词');
   await page.getByRole('button', { name: '查找资料', exact: true }).click();
   await expect(page.locator('.conversation-turn')).toHaveCount(2);
@@ -127,7 +181,9 @@ export async function conversationJourney({
   await page.reload();
   await expect(page.getByLabel('资料关键词', { exact: true })).toHaveValue('保留未发送草稿');
   await expect(page.locator('.conversation-turn')).toHaveCount(2);
-  // A failing event permission check clears old messages rather than leaving stale content visible.
+  // A failing event permission check also removes the already-open source reader.
+  await page.locator('.conversation-sources button').first().click();
+  await expect(page.getByRole('region', { name: '资料来源', exact: true })).toContainText('梦核进度');
   await page.route('**/conversations/*/events?*', (route) =>
     route.fulfill({
       status: 404,
@@ -136,6 +192,7 @@ export async function conversationJourney({
     }),
   );
   await expect(page.locator('.conversation-turn')).toHaveCount(0, { timeout: 10000 });
+  await expect(page.getByRole('region', { name: '资料来源', exact: true })).toHaveCount(0);
   await page.unrouteAll();
   await page.getByRole('button', { name: '重试', exact: true }).click();
   await expect(page.locator('.conversation-turn')).toHaveCount(2);
@@ -143,6 +200,8 @@ export async function conversationJourney({
     await page.evaluate(() => Boolean((window as unknown as Record<string, unknown>).__conversationInjected)),
     false,
   );
+  await page.getByRole('button', { name: '返回检索', exact: true }).click();
+  await expect(page.locator('.conversation-sources button').first()).toBeFocused();
   await page.screenshot({ path: join(artifacts, 'conversations-desktop.png'), fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));

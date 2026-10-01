@@ -1,5 +1,6 @@
 package com.dreamcore.workspace.conversation;
 import com.dreamcore.workspace.identity.*;
+import com.dreamcore.workspace.context.TaskContextGuard;
 import com.dreamcore.workspace.knowledge.KnowledgeService;
 import java.security.MessageDigest;
 import java.util.*;
@@ -11,12 +12,13 @@ import tools.jackson.databind.json.JsonMapper;
 @Service
 public class AgentTaskService {
     public record Input(UUID id,String filename,int version,String locator,String content) {}
+    public record SearchResult(List<Input> items,String matchStatus,KnowledgeService.Coverage coverage,boolean hasMore) {}
     public record Download(String filename,String sha256,byte[] bytes) {}
     private final JdbcTemplate db;private final ConversationService conversations;private final KnowledgeService knowledge;private final AgentSettings settings;
     private final org.springframework.transaction.support.TransactionTemplate transactions;private final IdentityAudit audit;
-    private final TaskOriginals originals;private final AgentUsageLedger usage;
+    private final TaskOriginals originals;private final AgentUsageLedger usage;private final TaskContextGuard contextGuard;
     private final JsonMapper json=new JsonMapper();
-    public AgentTaskService(JdbcTemplate db,ConversationService conversations,KnowledgeService knowledge,AgentSettings settings,org.springframework.transaction.PlatformTransactionManager manager,IdentityAudit audit,TaskOriginals originals,AgentUsageLedger usage){this.usage=usage;this.originals=originals;this.transactions=new org.springframework.transaction.support.TransactionTemplate(manager);this.audit=audit;this.db=db;this.conversations=conversations;this.knowledge=knowledge;this.settings=settings;}
+    public AgentTaskService(JdbcTemplate db,ConversationService conversations,KnowledgeService knowledge,AgentSettings settings,org.springframework.transaction.PlatformTransactionManager manager,IdentityAudit audit,TaskOriginals originals,AgentUsageLedger usage,TaskContextGuard contextGuard){this.contextGuard=contextGuard;this.usage=usage;this.originals=originals;this.transactions=new org.springframework.transaction.support.TransactionTemplate(manager);this.audit=audit;this.db=db;this.conversations=conversations;this.knowledge=knowledge;this.settings=settings;}
     private IdentityException denied(){return new IdentityException(403,"TASK_ACCESS_DENIED");}
     /** Bearer is the unpredictable, short-lived attempt capability. Owner/tenant/scope come only from the DB. */
     private ConversationService.Job authorized(UUID task,UUID attempt){
@@ -26,8 +28,9 @@ public class AgentTaskService {
         if(!settings.mode().equals(row.get("execution_class")))throw denied();
         if(row.get("public_query")!=null && !settings.publicWebEnabled())throw denied();
         var job=new ConversationService.Job(task,(UUID)row.get("tenant_id"),(UUID)row.get("workspace_id"),(UUID)row.get("conversation_id"),(UUID)row.get("requested_by"),(String)row.get("prompt"),attempt,"AGENT");
-        conversations.require(job.actor(),job.tenant(),job.conversation(),false);
+        conversations.require(job.actor(),job.tenant(),job.conversation(),false);conversations.requireReadable(job.id());
         if(!conversations.owned(job))throw denied();
+        contextGuard.requireCurrent(task);
         // PostgreSQL now() is fixed at transaction start; recheck wall time after any row-lock wait.
         if(db.queryForObject("SELECT lease_until>clock_timestamp() FROM conversation_tasks WHERE id=?",Boolean.class,task)!=Boolean.TRUE)throw denied();
         var selected=originals.list(job.actor(),job.tenant(),job.space(),job.id());
@@ -37,19 +40,66 @@ public class AgentTaskService {
         return job;
     }
     private List<UUID> grants(ConversationService.Job job){return db.queryForList("SELECT chunk_id FROM conversation_agent_grants WHERE task_id=? AND attempt_id=? ORDER BY chunk_id",UUID.class,job.id(),job.token());}
-    @Transactional public Map<String,Object> check(UUID task,UUID attempt){authorized(task,attempt);String query=db.queryForObject("SELECT public_query FROM conversation_tasks WHERE id=?",String.class,task);return Map.of("allowed",true,"executionClass",settings.mode(),"publicQuery",query==null?"":query,"candidateTrialsAllowed",settings.candidateTrialsEnabled() && query!=null);}
+    @Transactional public Map<String,Object> check(UUID task,UUID attempt){authorized(task,attempt);String query=db.queryForObject("SELECT public_query FROM conversation_tasks WHERE id=?",String.class,task);return Map.of("allowed",true,"executionClass",settings.mode(),"publicQuery",query==null?"":query,"candidateTrialsAllowed",settings.candidateTrialsEnabled() && query!=null,"contextVersion","1.0","taskWorkVersion","1.0","planAllowed",db.queryForObject("SELECT EXISTS(SELECT 1 FROM ongoing_plan_runs WHERE task_id=?)",Boolean.class,task));}
+    public record ExecutionOpen(String contractVersion,List<String> tools) {}
+    public record ToolReceipt(Integer sequence,String name,String status) {}
+    private static final Set<String> REGISTERED_TOOLS=Set.of("search_sources","run_javascript","find_skills","activate_skill","public_search","read_public_page","candidate_tool","list_originals","read_original","process_original","task_control","task_context","task_plan","task_preference");
+    @Transactional public Map<String,Object> openExecution(UUID task,UUID attempt,ExecutionOpen body){
+        authorized(task,attempt);
+        if(body==null || !Set.of("1.5","1.6").contains(body.contractVersion()==null?"":body.contractVersion()) || body.tools()==null || body.tools().isEmpty() || body.tools().size()>14 || new HashSet<>(body.tools()).size()!=body.tools().size() || body.tools().stream().anyMatch(t->t==null || !REGISTERED_TOOLS.contains(t)))throw new IdentityException(502,"TASK_RUNTIME_INCOMPATIBLE");
+        if(!settings.mode().equals("verification") && body.tools().stream().anyMatch(t->Set.of("candidate_tool","run_javascript","list_originals","read_original","process_original").contains(t)))throw denied();
+        if(body.tools().contains("task_plan")&&db.queryForObject("SELECT count(*) FROM ongoing_plan_runs WHERE task_id=?",Integer.class,task)==0)throw denied();
+        if(body.contractVersion().equals("1.5")&&body.tools().stream().anyMatch(t->Set.of("task_plan","task_preference").contains(t)))throw denied();
+        String policy=body.contractVersion().equals("1.6")?"SCOPED_PRIVATE_V2":"READ_ONLY_PRIVATE_V1";
+        var row=db.queryForMap("SELECT execution_policy,allowed_tools FROM conversation_attempts WHERE task_id=? AND attempt_id=? FOR UPDATE",task,attempt);
+        String encoded=json.writeValueAsString(body.tools().stream().sorted().toList());
+        if(row.get("execution_policy")!=null && (!policy.equals(row.get("execution_policy")) || !json.readTree(row.get("allowed_tools").toString()).equals(json.readTree(encoded))))throw new IdentityException(409,"TASK_STATE_CHANGED");
+        db.update("UPDATE conversation_attempts SET execution_policy=?,allowed_tools=CAST(? AS jsonb) WHERE task_id=? AND attempt_id=?",policy,encoded,task,attempt);
+        return Map.of("accepted",true,"policy",policy);
+    }
+    @Transactional public void toolReceipt(UUID task,UUID attempt,ToolReceipt body){
+        authorized(task,attempt);
+        if(body==null || body.sequence()==null || body.sequence()<1 || body.sequence()>8 || body.name()==null || body.status()==null || !Set.of("STARTED","succeeded","failed").contains(body.status()))throw IdentityException.invalid();
+        var row=db.queryForMap("SELECT attempt_number,allowed_tools FROM conversation_attempts WHERE task_id=? AND attempt_id=? AND execution_policy IN ('READ_ONLY_PRIVATE_V1','SCOPED_PRIVATE_V2')",task,attempt);
+        if(!Arrays.asList(json.readValue(row.get("allowed_tools").toString(),String[].class)).contains(body.name()))throw denied();
+        var found=db.queryForList("SELECT name,status FROM conversation_tool_receipts WHERE task_id=? AND attempt_number=? AND sequence=?",task,row.get("attempt_number"),body.sequence());
+        if(found.isEmpty()){
+            if(!body.status().equals("STARTED") || body.sequence()!=1+db.queryForObject("SELECT count(*) FROM conversation_tool_receipts WHERE task_id=? AND attempt_number=?",Integer.class,task,row.get("attempt_number")))throw new IdentityException(409,"TASK_STATE_CHANGED");
+            db.update("INSERT INTO conversation_tool_receipts(task_id,attempt_number,sequence,name,status) VALUES (?,?,?,?,'STARTED')",task,row.get("attempt_number"),body.sequence(),body.name());
+        }else{
+            var prior=found.getFirst();if(!body.name().equals(prior.get("name")) || !body.status().equals(prior.get("status")) && !"STARTED".equals(prior.get("status")))throw new IdentityException(409,"TASK_STATE_CHANGED");
+            db.update("UPDATE conversation_tool_receipts SET status=?,received_at=now() WHERE task_id=? AND attempt_number=? AND sequence=?",body.status(),task,row.get("attempt_number"),body.sequence());
+        }
+    }
     @Transactional public Map<String,Object> openUsage(UUID task,UUID attempt){authorized(task,attempt);return usage.open(task,attempt);}
     @Transactional public void startUsage(UUID task,UUID attempt,AgentUsageLedger.Start request){authorized(task,attempt);usage.start(task,attempt,request);}
     @Transactional public List<Input> search(UUID task,UUID attempt,String query){
+        return searchResult(task,attempt,query).items();
+    }
+    @Transactional public SearchResult searchResult(UUID task,UUID attempt,String query){
         var job=authorized(task,attempt);if(query==null)throw IdentityException.invalid();
-        var known=new HashSet<>(grants(job));var result=new ArrayList<Input>();
+        // Legacy grants with conflicting versions cannot be repaired by silently choosing the latest.
+        if(db.queryForObject("SELECT count(*) FROM conversation_agent_grants g JOIN knowledge_chunks c ON c.id=g.chunk_id LEFT JOIN conversation_task_material_versions p ON p.task_id=g.task_id AND p.attempt_id=g.attempt_id AND p.material_id=c.material_id WHERE g.task_id=? AND g.attempt_id=? AND (p.material_id IS NULL OR p.version_id<>c.version_id OR p.run_id<>c.run_id)",Integer.class,task,attempt)>0)
+            throw new IdentityException(409,"TASK_SOURCE_UNAVAILABLE");
+        var known=new HashSet<>(grants(job));var result=new ArrayList<Input>();var included=new ArrayList<KnowledgeService.Chunk>();
         var selected=originals.list(job.actor(),job.tenant(),job.space(),job.id()).stream().map(TaskOriginals.File::versionId).toList();
-        for(var chunk:knowledge.search(job.actor(),job.tenant(),job.space(),query,0,3,selected.isEmpty()?null:selected).items()){
-            if(known.size()>=10 && !known.contains(chunk.id()))continue;
-            db.update("INSERT INTO conversation_agent_grants(tenant_id,workspace_id,task_id,attempt_id,chunk_id) VALUES (?,?,?,?,?) ON CONFLICT DO NOTHING",job.tenant(),job.space(),task,attempt,chunk.id());known.add(chunk.id());
+        var found=knowledge.searchForAttempt(job.actor(),job.tenant(),job.space(),query,3,selected.isEmpty()?null:selected,task,attempt);
+        boolean more=found.hasMore();
+        for(var chunk:found.items()){
+            if(known.size()>=10 && !known.contains(chunk.id())){more=true;continue;}
+            known.add(chunk.id());included.add(chunk);
             result.add(new Input(chunk.id(),chunk.filename(),chunk.version(),chunk.locator(),chunk.content()));
         }
-        return result;
+        var coverage=found.coverage().limited(10);
+        // Actual encoded size, including control-character escaping, stays below the engine's 64 KiB callback cap.
+        while(!result.isEmpty() && json.writeValueAsBytes(new SearchResult(result,found.matchStatus(),coverage,more)).length>60*1024){
+            result.removeLast();included.removeLast();more=true;
+        }
+        for(var chunk:included){
+            db.update("INSERT INTO conversation_task_material_versions(tenant_id,workspace_id,task_id,attempt_id,material_id,version_id,run_id) VALUES (?,?,?,?,?,?,?) ON CONFLICT DO NOTHING",job.tenant(),job.space(),task,attempt,chunk.materialId(),chunk.versionId(),chunk.runId());
+            db.update("INSERT INTO conversation_agent_grants(tenant_id,workspace_id,task_id,attempt_id,chunk_id) VALUES (?,?,?,?,?) ON CONFLICT DO NOTHING",job.tenant(),job.space(),task,attempt,chunk.id());known.add(chunk.id());
+        }
+        return new SearchResult(List.copyOf(result),found.matchStatus(),coverage,more);
     }
     @Transactional public List<TaskOriginals.File> originals(UUID task,UUID attempt){var j=authorized(task,attempt);return originals.list(j.actor(),j.tenant(),j.space(),j.id());}
     @Transactional public TaskOriginals.Content readOriginal(UUID task,UUID attempt,UUID version){var j=authorized(task,attempt);var content=originals.read(j,version);authorized(task,attempt);return content;}
@@ -57,20 +107,30 @@ public class AgentTaskService {
     private void incompatible(){throw new IdentityException(502,"TASK_RUNTIME_INCOMPATIBLE");}
     @Transactional public void finish(ConversationService.Job expected,AgentResult r){
         var job=authorized(expected.id(),expected.token());
-        if(r==null || !"1.4".equals(r.contractVersion()) || !job.id().equals(r.taskId()) || !job.token().equals(r.attemptId()) || !"AGENT".equals(r.mode()) || !settings.mode().equals(r.executionClass()) ||
+        if(r==null || !("1.4".equals(r.contractVersion()) || "1.5".equals(r.contractVersion())) || !job.id().equals(r.taskId()) || !job.token().equals(r.attemptId()) || !"AGENT".equals(r.mode()) || !settings.mode().equals(r.executionClass()) ||
            r.engineVersion()==null || !r.engineVersion().matches("[A-Za-z0-9.\\-]{1,64}") || r.modelName()==null || !r.modelName().matches("[A-Za-z0-9._\\-]{1,80}") ||
            r.text()==null || r.text().isBlank() || r.text().length()>16000 || r.modelCalls()<1 || r.modelCalls()>8 ||
            r.sourceIds()==null || r.sourceIds().size()>10 || new HashSet<>(r.sourceIds()).size()!=r.sourceIds().size() || !new HashSet<>(r.sourceIds()).equals(new HashSet<>(grants(job))) ||
            r.originalIds()==null || r.originalIds().size()>3 || new HashSet<>(r.originalIds()).size()!=r.originalIds().size() || !new HashSet<>(r.originalIds()).equals(new HashSet<>(originals.readIds(job.id(),job.token()))) ||
            r.tools()==null || r.tools().size()>8 || r.artifacts()==null || r.artifacts().size()>8)incompatible();
         if(r.usage()!=null && (r.usage().inputTokens()<0 || r.usage().outputTokens()<0 || r.usage().inputTokens()>1000000 || r.usage().outputTokens()>1000000))incompatible();
+        String outcome="1.4".equals(r.contractVersion())?"COMPLETE":r.outcome();
+        if(outcome==null || !Set.of("COMPLETE","PARTIAL","WAITING_INPUT","WAITING_CAPABILITY").contains(outcome) || r.requiredInput()!=null && r.requiredInput().length()>1000 || "WAITING_INPUT".equals(outcome) && (r.requiredInput()==null || r.requiredInput().isBlank()))incompatible();
+        if("1.4".equals(r.contractVersion()) && (r.outcome()!=null || r.requiredInput()!=null || r.tools().stream().anyMatch(t->t!=null && (!"succeeded".equals(t.status()) || Set.of("task_control","task_context","task_plan","task_preference").contains(t.name()==null?"":t.name())))))incompatible();
+        if("COMPLETE".equals(outcome) && r.tools().stream().anyMatch(t->t!=null && !"succeeded".equals(t.status())))incompatible();
+        if(Set.of("WAITING_INPUT","WAITING_CAPABILITY").contains(outcome) && r.tools().stream().noneMatch(t->t!=null && "task_control".equals(t.name()) && "succeeded".equals(t.status())))incompatible();
+        if("1.5".equals(r.contractVersion())){
+            var stored=db.queryForList("SELECT name,status FROM conversation_tool_receipts WHERE task_id=? AND attempt_number=(SELECT attempt FROM conversation_tasks WHERE id=?) ORDER BY sequence",job.id(),job.id());
+            var expectedTools=r.tools().stream().map(t->t==null?"invalid":t.name()+"/"+t.status()).sorted().toList();
+            if(!stored.stream().map(t->t.get("name")+"/"+t.get("status")).sorted().toList().equals(expectedTools) || db.queryForObject("SELECT count(*) FROM conversation_attempts WHERE task_id=? AND attempt_id=? AND execution_policy IN ('READ_ONLY_PRIVATE_V1','SCOPED_PRIVATE_V2')",Integer.class,job.id(),job.token())!=1)incompatible();
+        }
         usage.validateResult(job.id(),job.token(),r.modelCalls(),r.usage());
         var calls=new HashSet<String>();boolean code=false;
         for(var tool:r.tools()){
-            if(tool==null || tool.callId()==null || !tool.callId().matches("[!-~]{1,128}") || !calls.add(tool.callId()) || !"succeeded".equals(tool.status()) || tool.name()==null || !Set.of("search_sources","run_javascript","find_skills","activate_skill","public_search","read_public_page","candidate_tool","list_originals","read_original","process_original").contains(tool.name()))incompatible();
-            if("candidate_tool".equals(tool.name())) {if(!settings.candidateTrialsEnabled() || !settings.mode().equals("verification") || db.queryForObject("SELECT public_query IS NOT NULL FROM conversation_tasks WHERE id=?",Boolean.class,job.id())!=Boolean.TRUE || r.skills()==null || r.skills().stream().noneMatch(s->s!=null && "candidate-trials".equals(s.id())))incompatible();code=true;}
-            if("process_original".equals(tool.name())){if(!settings.mode().equals("verification") || r.originalIds().isEmpty() || r.skills()==null || r.skills().stream().noneMatch(s->s!=null && "file-processing".equals(s.id())))incompatible();code=true;}
-            if("run_javascript".equals(tool.name())){if(!settings.mode().equals("verification"))incompatible();code=true;}
+            if(tool==null || tool.callId()==null || !tool.callId().matches("[!-~]{1,128}") || !calls.add(tool.callId()) || (tool.status()==null || !Set.of("succeeded","failed").contains(tool.status())) || tool.name()==null || !Set.of("search_sources","run_javascript","find_skills","activate_skill","public_search","read_public_page","candidate_tool","list_originals","read_original","process_original","task_control","task_context","task_plan","task_preference").contains(tool.name()))incompatible();
+            if("candidate_tool".equals(tool.name())) {if(!settings.candidateTrialsEnabled() || !settings.mode().equals("verification") || db.queryForObject("SELECT public_query IS NOT NULL FROM conversation_tasks WHERE id=?",Boolean.class,job.id())!=Boolean.TRUE || r.skills()==null || r.skills().stream().noneMatch(s->s!=null && "candidate-trials".equals(s.id())))incompatible();code=code || "succeeded".equals(tool.status());}
+            if("process_original".equals(tool.name())){if(!settings.mode().equals("verification") || r.originalIds().isEmpty() || r.skills()==null || r.skills().stream().noneMatch(s->s!=null && "file-processing".equals(s.id())))incompatible();code=code || "succeeded".equals(tool.status());}
+            if("run_javascript".equals(tool.name())){if(!settings.mode().equals("verification"))incompatible();code=code || "succeeded".equals(tool.status());}
         }
         if(!r.originalIds().isEmpty() && r.tools().stream().noneMatch(t->"read_original".equals(t.name())))incompatible();
         if(!r.artifacts().isEmpty() && !code)incompatible();
@@ -85,11 +145,13 @@ public class AgentTaskService {
             }
         }catch(IdentityException error){throw error;}catch(Exception error){incompatible();}
         int ordinal=0;
-        for(UUID source:r.sourceIds())db.update("INSERT INTO conversation_sources(tenant_id,workspace_id,task_id,chunk_id,ordinal) VALUES (?,?,?,?,?)",job.tenant(),job.space(),job.id(),source,ordinal++);
-        for(var file:files)db.update("INSERT INTO conversation_artifacts(id,tenant_id,workspace_id,task_id,filename,sha256,content) VALUES (?,?,?,?,?,?,?)",UUID.randomUUID(),job.tenant(),job.space(),job.id(),file.filename(),file.sha256(),file.bytes());
-        db.update("UPDATE conversation_tasks SET status='SUCCEEDED',revision=revision+1,reply=?,model_name=?,model_calls=?,token_usage=CAST(? AS jsonb),tool_receipts=CAST(? AS jsonb),engine_version=?,web_sources=CAST(? AS jsonb),skills=CAST(? AS jsonb),lease_token=NULL,lease_until=NULL,finished_at=now() WHERE id=?",r.text(),r.modelName(),r.modelCalls(),json.writeValueAsString(r.usage()),json.writeValueAsString(r.tools()),r.engineVersion(),json.writeValueAsString(r.webSources()),json.writeValueAsString(r.skills()),job.id());
-        usage.terminal(job.id(),job.token(),"SUCCEEDED");
-        int revision=db.queryForObject("SELECT revision FROM conversation_tasks WHERE id=?",Integer.class,job.id());conversations.event(job.tenant(),job.space(),job.conversation(),job.id(),"SUCCEEDED",revision);audit.record(job.actor(),job.tenant(),"TASK_COMPLETE",job.id(),"SUCCESS");
+        for(UUID source:r.sourceIds())db.update("INSERT INTO conversation_sources(tenant_id,workspace_id,task_id,chunk_id,ordinal,attempt_number) VALUES (?,?,?,?,?,(SELECT attempt FROM conversation_tasks WHERE id=?))",job.tenant(),job.space(),job.id(),source,ordinal++,job.id());
+        for(var file:files)db.update("INSERT INTO conversation_artifacts(id,tenant_id,workspace_id,task_id,filename,sha256,content,attempt_number) VALUES (?,?,?,?,?,?,?,(SELECT attempt FROM conversation_tasks WHERE id=?))",UUID.randomUUID(),job.tenant(),job.space(),job.id(),file.filename(),file.sha256(),file.bytes(),job.id());
+        String state="COMPLETE".equals(outcome)?"SUCCEEDED":outcome;
+        String waitReason="WAITING_INPUT".equals(state)?"INPUT_REQUIRED":"WAITING_CAPABILITY".equals(state)?"CAPABILITY_UNAVAILABLE":null;
+        db.update("UPDATE conversation_tasks SET status=?,wait_reason=?,required_input=?,revision=revision+1,reply=?,model_name=?,model_calls=?,token_usage=CAST(? AS jsonb),tool_receipts=CAST(? AS jsonb),engine_version=?,web_sources=CAST(? AS jsonb),skills=CAST(? AS jsonb),lease_token=NULL,lease_until=NULL,finished_at=now() WHERE id=?",state,waitReason,r.requiredInput(),r.text(),r.modelName(),r.modelCalls(),json.writeValueAsString(r.usage()),json.writeValueAsString(r.tools()),r.engineVersion(),json.writeValueAsString(r.webSources()),json.writeValueAsString(r.skills()),job.id());
+        conversations.archive(job.id());usage.terminal(job.id(),job.token(),state);
+        int revision=db.queryForObject("SELECT revision FROM conversation_tasks WHERE id=?",Integer.class,job.id());conversations.event(job.tenant(),job.space(),job.conversation(),job.id(),state,revision);audit.record(job.actor(),job.tenant(),state.equals("SUCCEEDED")?"TASK_COMPLETE":"TASK_"+state,job.id(),"SUCCESS");
     }
     private void validateResearch(ConversationService.Job job,AgentResult result){
         if(result.webSources()==null || result.webSources().size()>3 || result.skills()==null || result.skills().size()>8)incompatible();
@@ -110,8 +172,8 @@ public class AgentTaskService {
         }
     }
     @Transactional public Download download(UUID actor,UUID tenant,UUID conversation,UUID task,UUID artifact){
-        var context=conversations.require(actor,tenant,conversation,false);
-        var rows=db.query("SELECT a.filename,a.sha256,a.content FROM conversation_artifacts a JOIN conversation_tasks t ON t.id=a.task_id WHERE a.tenant_id=? AND a.workspace_id=? AND a.task_id=? AND a.id=? AND t.conversation_id=? AND t.status='SUCCEEDED'",(rs,n)->new Download(rs.getString(1),rs.getString(2),rs.getBytes(3)),tenant,context.workspaceId(),task,artifact,conversation);
+        var context=conversations.require(actor,tenant,conversation,false);conversations.requireReadable(task);
+        var rows=db.query("SELECT a.filename,a.sha256,a.content FROM conversation_artifacts a JOIN conversation_tasks t ON t.id=a.task_id WHERE a.tenant_id=? AND a.workspace_id=? AND a.task_id=? AND a.id=? AND object_is_active('ARTIFACT',a.id) AND t.conversation_id=? AND EXISTS(SELECT 1 FROM conversation_attempts h WHERE h.task_id=t.id AND h.attempt_number=a.attempt_number AND h.status IN ('SUCCEEDED','PARTIAL','WAITING_INPUT','WAITING_CAPABILITY'))",(rs,n)->new Download(rs.getString(1),rs.getString(2),rs.getBytes(3)),tenant,context.workspaceId(),task,artifact,conversation);
         if(rows.isEmpty())throw new IdentityException(404,"ARTIFACT_NOT_FOUND");
         for(UUID id:db.queryForList("SELECT chunk_id FROM conversation_sources WHERE task_id=?",UUID.class,task))knowledge.citation(actor,tenant,id);
         originals.list(actor,tenant,context.workspaceId(),task);

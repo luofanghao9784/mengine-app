@@ -28,6 +28,7 @@ public class SystemController {
     }
 }
 
+@org.springframework.core.annotation.Order(-100)
 @RestControllerAdvice(assignableTypes = SystemController.class)
 class SystemErrors {
     record ErrorBody(String contractVersion, String code, String message, boolean retryable) {}

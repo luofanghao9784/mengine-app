@@ -1,10 +1,12 @@
+import { ExportBatchPanel } from '../export/ExportBatchPanel';
+import { RequestPending, requestNavigationLocked } from '../shared/request-guard';
 import { readTabDraft, writeTabDraft, removeTabDraft } from '../shared/tab-drafts';
 import { DraftWarning } from '../shared/DraftWarning';
 import { PublicationPanel } from './Publication';
-import { useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { FileText, RefreshCw, Save, Download } from 'lucide-react';
 import type { DocumentDetail, SaveDocument } from '../../contracts/public-api/document';
-import { useSession } from '../identity/session';
+import { identityClient, useSession } from '../identity/session';
 import { IdentityError, record, uuid } from '../identity/client';
 import { Button, Field, PageActions, Badge, Empty } from '../shared/ui';
 import { Failure, Loading, Pager, SubmitError, useRemote, useSubmission } from '../shared/admin';
@@ -63,9 +65,16 @@ export function Documents({ tenant }: { tenant: string }) {
     [attempt, setAttempt] = useState(0),
     [page, setPage] = useState(0);
   const { session } = useSession();
-  const refresh = () => setAttempt((n) => n + 1);
+  const pendingRequest = useContext(RequestPending);
+  const context = useRemote((signal) => identityClient.context(tenant, signal), [tenant, session.identity]);
+  const personal = context.value?.workspaces.find((w) => w.kind === 'PERSONAL');
+  const refresh = () => {
+    if (!pendingRequest) setAttempt((n) => n + 1);
+  };
   useEffect(() => {
-    const change = () => setHash(location.hash);
+    const change = () => {
+      if (!requestNavigationLocked()) setHash(location.hash);
+    };
     window.addEventListener('hashchange', change);
     return () => window.removeEventListener('hashchange', change);
   }, []);
@@ -75,7 +84,7 @@ export function Documents({ tenant }: { tenant: string }) {
     version = rawVersion ? Number(rawVersion) : undefined;
   useEffect(() => {
     const check = () => {
-      if (document.visibilityState === 'visible') setAttempt((n) => n + 1);
+      if (!pendingRequest && document.visibilityState === 'visible') setAttempt((n) => n + 1);
     };
     window.addEventListener('focus', check);
     document.addEventListener('visibilitychange', check);
@@ -85,11 +94,11 @@ export function Documents({ tenant }: { tenant: string }) {
       document.removeEventListener('visibilitychange', check);
       clearInterval(timer);
     };
-  }, []);
+  }, [pendingRequest]);
   return (
     <section className="private-documents">
       <PageActions>
-        <Button variant="ghost" icon={RefreshCw} onClick={refresh}>
+        <Button variant="ghost" icon={RefreshCw} disabled={pendingRequest} onClick={refresh}>
           刷新
         </Button>
       </PageActions>
@@ -99,6 +108,14 @@ export function Documents({ tenant }: { tenant: string }) {
         <a href={documentsHref(tenant)}>个人文稿</a>
       </div>
       <p className="muted">仅自己可见。来源空间撤权后，文稿仍保留，但不能查看、编辑或导出。</p>
+      {personal && (
+        <ExportBatchPanel
+          tenant={tenant}
+          workspace={personal.id}
+          workspaceName={personal.name}
+          scope="PRIVATE"
+        />
+      )}
       {selected ? (
         <DocumentReader
           key={selected + ':' + (version || 'latest')}

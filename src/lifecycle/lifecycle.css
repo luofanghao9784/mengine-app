@@ -1,0 +1,66 @@
+.lifecycle-modal {
+  width: 100%;
+  min-width: 0;
+}
+.lifecycle-modal p,
+.lifecycle-modal dd {
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.lifecycle-list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.lifecycle-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--border, #dedfe4);
+  border-radius: 12px;
+}
+.lifecycle-list li > div,
+.lifecycle-list li > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.lifecycle-list small {
+  display: block;
+  margin-top: 5px;
+}
+.lifecycle-list button {
+  flex-shrink: 0;
+}
+.lifecycle-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+.lifecycle-confirm,
+.lifecycle-cleanup {
+  border: 1px solid var(--border, #dedfe4);
+  padding: 16px;
+  border-radius: 12px;
+  margin-top: 18px;
+}
+.lifecycle-object dt {
+  color: var(--muted, #6f747e);
+  font-size: 13px;
+  margin-top: 12px;
+}
+.lifecycle-object dd {
+  margin: 4px 0;
+}
+@media (max-width: 540px) {
+  .lifecycle-list li {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .lifecycle-actions button {
+    flex: 1;
+  }
+}

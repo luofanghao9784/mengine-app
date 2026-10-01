@@ -1,5 +1,6 @@
 import { withBriefingArticle } from './briefingArticle.ts';
 import { addMessage, type DemoState } from './model.ts';
+import { briefingCreatedAt, briefingLifecycle } from './briefingLifecycle.ts';
 import {
   canReadCardData,
   openBriefingChat,
@@ -39,7 +40,13 @@ export type CardFeedback = {
   version: string;
   at: string;
 };
-export type CardInteraction = { readVersions?: string[]; feedbacks?: CardFeedback[] };
+export type CardInteraction = {
+  readVersions?: string[]; // Retained legacy records; no new version list is written.
+  readContent?: string;
+  readAt?: string;
+  lastRecommendedAt?: string;
+  feedbacks?: CardFeedback[];
+};
 export type BriefingShare = {
   id: string;
   from: string;
@@ -79,16 +86,19 @@ function writableInteraction(state: DemoState, data: CardData) {
   return (cards[data.id] ||= {});
 }
 export function isBriefingRead(state: DemoState, data: CardData) {
-  return !!cardInteraction(state, data.id).readVersions?.includes(briefingContentVersion(data));
+  const interaction = cardInteraction(state, data.id);
+  const content = briefingContentVersion(data);
+  return interaction.readContent !== undefined
+    ? interaction.readContent === content
+    : !!interaction.readVersions?.includes(content);
 }
-export function markBriefingRead(state: DemoState, data: CardData) {
+export function markBriefingRead(state: DemoState, data: CardData, now = new Date().toISOString()) {
   const interaction = writableInteraction(state, data);
-  const versions = (interaction.readVersions ||= []);
-  const version = briefingContentVersion(data);
-  if (!versions.includes(version)) versions.push(version);
+  interaction.readContent = briefingContentVersion(data);
+  interaction.readAt = now;
 }
 export function currentFeedback(state: DemoState, data: CardData) {
-  return cardInteraction(state, data.id).feedbacks?.find((f) => f.version === briefingContentVersion(data));
+  return cardInteraction(state, data.id).feedbacks?.at(-1);
 }
 export function setBriefingFeedback(
   state: DemoState,
@@ -104,7 +114,7 @@ export function setBriefingFeedback(
     throw new Error('请选择原因或填写具体说明。');
   const interaction = writableInteraction(state, data);
   const version = briefingContentVersion(data);
-  interaction.feedbacks = (interaction.feedbacks || []).filter((f) => f.version !== version);
+  interaction.feedbacks = [];
   if (value)
     interaction.feedbacks.push({
       value,
@@ -165,23 +175,68 @@ export function hasActiveBriefingConversation(state: DemoState, card: BriefingCa
     (m) => m.role === 'user' && !!m.createdAt && now - Date.parse(m.createdAt) < 7 * 86400000,
   );
 }
-export type Recommendation = { id: string; group: 'priority' | 'unread' | 'read' };
-export function recommendBriefing(state: DemoState): Recommendation[] {
+export type Recommendation = {
+  id: string;
+  group: 'priority' | 'standard';
+  reason?: 'important' | 'preferred' | 'following';
+};
+// Reversible Demo policy: meaningful data changes may surface immediately;
+// unchanged, read data can return after 24 hours, with an explicit interest signal.
+export const dataRecommendationCooldown = 24 * 60 * 60 * 1000;
+export function recommendBriefing(state: DemoState, now = Date.now()): Recommendation[] {
   return (state.briefing?.cards || [])
     .filter((c) => c.active && canReadCardData(state, c.data))
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-    .map((card) => ({
-      id: card.id,
-      group:
-        card.pinned ||
-        hasActiveBriefingConversation(state, card) ||
+    .sort((a, b) =>
+      (briefingLifecycle(b.data) === 'dated' ? briefingCreatedAt(b) : b.updatedAt).localeCompare(
+        briefingLifecycle(a.data) === 'dated' ? briefingCreatedAt(a) : a.updatedAt,
+      ),
+    )
+    .map((card): Recommendation => {
+      const read = isBriefingRead(state, card.data);
+      const live = briefingLifecycle(card.data) === 'live';
+      const interaction = cardInteraction(state, card.id);
+      const feedback = currentFeedback(state, card.data);
+      const lastSeen = Math.max(
+        Date.parse(interaction.readAt || '') || 0,
+        Date.parse(interaction.lastRecommendedAt || '') || 0,
+      );
+      const signal = card.pinned
+        ? 'following'
+        : feedback?.value === 'useful'
+          ? 'preferred'
+          : card.data.recommendation?.importance === 'high'
+            ? 'important'
+            : undefined;
+      const reason =
+        live &&
+        !card.hidden &&
+        feedback?.value !== 'useless' &&
+        signal &&
+        (!read || now - lastSeen >= dataRecommendationCooldown)
+          ? signal
+          : undefined;
+      const priority =
+        reason ||
+        (!live && card.pinned) ||
+        hasActiveBriefingConversation(state, card, now) ||
         (card.data.sourceKind === 'request' &&
-          state.requests.some((r) => r.id === card.data.sourceId && r.status === 'pending'))
-          ? 'priority'
-          : isBriefingRead(state, card.data)
-            ? 'read'
-            : 'unread',
-    }));
+          state.requests.some((r) => r.id === card.data.sourceId && r.status === 'pending'));
+      return {
+        id: card.id,
+        group: priority ? 'priority' : 'standard',
+        ...(reason ? { reason } : {}),
+      };
+    });
+}
+
+export function refreshBriefingRecommendations(state: DemoState, now = Date.now()) {
+  const recommendations = recommendBriefing(state, now);
+  for (const recommendation of recommendations) {
+    if (!recommendation.reason) continue;
+    const card = state.briefing!.cards.find((c) => c.id === recommendation.id)!;
+    writableInteraction(state, card.data).lastRecommendedAt = new Date(now).toISOString();
+  }
+  return recommendations;
 }
 
 export function briefingRecipients(state: DemoState, data: CardData) {

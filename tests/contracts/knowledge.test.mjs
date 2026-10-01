@@ -18,3 +18,20 @@ test('parse requests require CSRF, an idempotency key and the current generation
  const check=ajv.compile(parse.requestBody.content['application/json'].schema);
  assert.ok(check({requestId:id,expectedGeneration:0}));assert.equal(check({requestId:id}),false);assert.equal(check({requestId:id,expectedGeneration:-1}),false);
 });
+test('coverage reports bounded authorized-scope evidence independently of query matches',()=>{
+ const check=ajv.compile({...spec.components.schemas.Results,components:spec.components});
+ const version={materialId:id,versionId:id,version:2,runId:id,generation:1,status:'QUEUED',warnings:[],pinned:false};
+ const coverage={scope:'AUTHORIZED_WORKSPACE',status:'NOT_READY',totalVersions:1,searchableVersions:0,partialVersions:0,notReadyVersions:1,relevance:'NOT_ASSESSED',versions:[version],hasMore:false};
+ const result={tenantId:id,workspaceId:id,query:'query',items:[],hasMore:false,matchStatus:'NO_MATCH',coverage};
+ assert.ok(check(result),JSON.stringify(check.errors));
+ assert.equal(check({...result,coverage:{...coverage,unauthorizedVersions:4}}),false);
+ assert.equal(check({...result,coverage:{...coverage,versions:[{...version,warnings:['x'.repeat(65)]}]}}),false);
+ assert.equal(check({...result,coverage:{...coverage,relevance:'KNOWN_RELEVANT'}}),false);
+});
+test('internal search callback keeps old item fields and bounds coverage separately',async()=>{
+ const schema=JSON.parse(await readFile(new URL('../../contracts/engine-api/search-access.schema.json',import.meta.url),'utf8'));
+ const check=ajv.compile(schema);
+ const coverage={scope:'AUTHORIZED_WORKSPACE',status:'EMPTY',totalVersions:0,searchableVersions:0,partialVersions:0,notReadyVersions:0,relevance:'NOT_ASSESSED',versions:[],hasMore:false};
+ assert.ok(check({items:[],matchStatus:'NO_MATCH',coverage,hasMore:false}));
+ assert.equal(check({items:[],matchStatus:'NO_MATCH',coverage,hasMore:false,attemptId:id}),false);
+});

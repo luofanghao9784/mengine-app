@@ -1,0 +1,88 @@
+.attention {
+  margin: 0 0 28px;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+.attention-header,
+.attention-header > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.attention-header {
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 0 16px;
+}
+.attention-header h2 {
+  font-size: 18px;
+  margin: 0;
+}
+.attention-controls {
+  flex-wrap: wrap;
+}
+.attention-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.attention-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid #dce5de;
+  border-radius: 14px;
+  background: var(--surface, #fff);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.attention-card > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--text-secondary, #687970);
+  font-size: 12px;
+}
+.attention-card h3 {
+  font-size: 16px;
+  line-height: 1.5;
+  margin: 0;
+}
+.attention-card p {
+  font-size: 14px;
+  line-height: 1.65;
+  margin: 0;
+}
+.attention-card small {
+  font-size: 12px;
+  color: var(--text-secondary, #687970);
+}
+.attention-card > a {
+  margin-top: auto;
+  align-self: flex-start;
+  white-space: normal;
+}
+.attention-empty {
+  font-size: 13px;
+  color: var(--text-secondary, #687970);
+}
+@container attention (max-width:803px) {
+  .attention-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@container attention (max-width:531px) {
+  .attention-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .attention-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+.attention {
+  container-type: inline-size;
+  container-name: attention;
+}

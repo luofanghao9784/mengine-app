@@ -1,0 +1,345 @@
+{
+  "format": "dreamcore-recovery-coverage-v1",
+  "throughVersion": 42,
+  "implementationHashes": {
+    "apps/api/src/main/java/com/dreamcore/workspace/departure/DepartureResidualCleanup.java": "f0b8fe926ac679177effbcacd529994abc901c2afcc779dca65442e1cb2ae432"
+  },
+  "migrations": [
+    {
+      "version": "1",
+      "script": "V1__identity_and_tenants.sql",
+      "sha256": "840e534e3eac0743b988fac501a5d735354ba39373994cbf149792f510ebe3c4"
+    },
+    {
+      "version": "2",
+      "script": "V2__jdbc_sessions.sql",
+      "sha256": "6db2dfd5ae3dae0d52abfed2666416bd808bae9ced3c94252020a6ce397c561e"
+    },
+    {
+      "version": "3",
+      "script": "V3__platform_tenant_management.sql",
+      "sha256": "96fc31ca803169b8dd4f69706578e6ed48bfba68b7b4184bd47e5192ede038c1"
+    },
+    {
+      "version": "4",
+      "script": "V4__tenant_management.sql",
+      "sha256": "7c7368fbd4acd0911013cb4e31c24b425f3275b72d5f45926d0c68875c9ff435"
+    },
+    {
+      "version": "5",
+      "script": "V5__material_library.sql",
+      "sha256": "84f3470ed9dc52567a58917e12e7a3518cbe198d015eaf1e9a55d734fb2db54d"
+    },
+    {
+      "version": "6",
+      "script": "V6__knowledge.sql",
+      "sha256": "44ad2eb182d61e3b762ea781f3b364ed6421e083196605ab5aa56faf8a3e92e4"
+    },
+    {
+      "version": "7",
+      "script": "V7__conversations.sql",
+      "sha256": "abe3611eb52bf653a21e36cfb963a1b1f49034d2637aad50607f8e7e52aca726"
+    },
+    {
+      "version": "8",
+      "script": "V8__agent_tasks.sql",
+      "sha256": "eab2173902a67972f248b4acb806b28fc4a89d5b23f637f8ac4cbc910e652d65"
+    },
+    {
+      "version": "9",
+      "script": "V9__agent_public_research.sql",
+      "sha256": "a37692f3b7487c0cb1f8cfb1abdbfffd2e97ea90f1b85958290b44fcca58ff15"
+    },
+    {
+      "version": "10",
+      "script": "V10__task_original_grants.sql",
+      "sha256": "e632c500e028de62bfd4e9e0109616e935762ea77f8398efd490ae7158f95e1b"
+    },
+    {
+      "version": "11",
+      "script": "V11__private_briefing_preferences.sql",
+      "sha256": "5c6b2321317b896666506b4bd2306d055ff4f8b4cb3cbd3013ccdfd53f285532"
+    },
+    {
+      "version": "12",
+      "script": "V12__private_documents.sql",
+      "sha256": "813da499fbf146492bc1eb9ff4cea077ebb4091d7a091ecd670af41cf0228bd4"
+    },
+    {
+      "version": "13",
+      "script": "V13__document_publications.sql",
+      "sha256": "cd891dd6f2bbcc0ba299e367bc29c6478b3d1d6d1ce3c6a37c66bdb09acf4787"
+    },
+    {
+      "version": "14",
+      "script": "V14__shared_activity_index.sql",
+      "sha256": "fab8d6700fbea00ae6906ccf05d3432d3f20bfa586153126582c508a068b443f"
+    },
+    {
+      "version": "15",
+      "script": "V15__agent_usage_ledger.sql",
+      "sha256": "7acdf924c67c3355698b2cd98d8ed027a53b33ea7419aecdb807b52e25808800"
+    },
+    {
+      "version": "16",
+      "script": "V16__governance_and_profiles.sql",
+      "sha256": "2ba611f165e332e83b56601f362e30547bbcf4f00043e21418481c5cb349bf9b"
+    },
+    {
+      "version": "17",
+      "script": "V17__input_receipts_and_task_versions.sql",
+      "sha256": "52d7a86ebaa6cbee7fcab6a0c3220147cbb14030ae09cac96ed23475480a85e8"
+    },
+    {
+      "version": "18",
+      "script": "V18__manual_business_sources.sql",
+      "sha256": "5209c97fdc546abef79c366ff31390f002141eea9b192a07bc5056e0dc0a6746"
+    },
+    {
+      "version": "19",
+      "script": "V19__task_control_and_attempt_history.sql",
+      "sha256": "f746e8e9194047c59d02e3e8b3cdc0e77733e8652f37afde655eaf9606da239a"
+    },
+    {
+      "version": "20",
+      "script": "V20__material_lifecycle.sql",
+      "sha256": "e630448c5ef44f8db9cdd53e4460be07583652c1a31976088392969ac4451dc5"
+    },
+    {
+      "version": "21",
+      "script": "V21__experience_library.sql",
+      "sha256": "8b0064c9d0df3339ecac891d2eaa6bdeebbd7e1d488e066ee55b295d4da4c156"
+    },
+    {
+      "version": "22",
+      "script": "V22__ongoing_plans.sql",
+      "sha256": "ee7d793bdf544b86a137d5dd39ebc6692b14432fe5c7c8aaf6b1040d605a15b0"
+    },
+    {
+      "version": "23",
+      "script": "V23__versioned_feedback.sql",
+      "sha256": "c7456cdf05fe7adcd85d99cbedc7dfa8c96dd25f6f356ff218ebd911b0b88766"
+    },
+    {
+      "version": "24",
+      "script": "V24__task_context_reads.sql",
+      "sha256": "7e99777439d932aaae1b6b67ad27aaacb64d698684c7548340d306084f7257f6"
+    },
+    {
+      "version": "26",
+      "script": "V26__bounded_export_batches.sql",
+      "sha256": "d1321b79174473fd3b36331c05a7e6330eeeae2397a378fbddfdd69968401472"
+    },
+    {
+      "version": "27",
+      "script": "V27__evaluation_and_issues.sql",
+      "sha256": "bef823dece84e296427462a16c07f307c762f4a7b618f60696ba188720913ef7"
+    },
+    {
+      "version": "28",
+      "script": "V28__method_versions_and_adoption.sql",
+      "sha256": "824c0e9630fbd2cbaf284fb989f2de2bfa3d82e06f929cf8dacbfec0a1bfaf7e"
+    },
+    {
+      "version": "29",
+      "script": "V29__retention_policies_and_exit_readiness.sql",
+      "sha256": "67ecf03fd2b760b776e71bd09782eacdbf730c0b07f2147508bb8c70a56f6e11"
+    },
+    {
+      "version": "30",
+      "script": "V30__recommendation_delivery.sql",
+      "sha256": "69e540238a03103d7212cf62616a875f149dc369aaac06695379394b92500402"
+    },
+    {
+      "version": "31",
+      "script": "V31__all_task_source_authority.sql",
+      "sha256": "13386034662d2fe81f673133daec4e362773166486cb98ede849af673032fab0"
+    },
+    {
+      "version": "32",
+      "script": "V32__recommendation_presentations.sql",
+      "sha256": "7f795a5c76a2ed89c7fe55eede444b2840764c1147da1e597fe296b70b0cb2f8"
+    },
+    {
+      "version": "33",
+      "script": "V33__object_lifecycle.sql",
+      "sha256": "4a71a21131db4a9d00066eca0d15b4cb31b2e83284ff4152eed58e8b4d80f6aa"
+    },
+    {
+      "version": "34",
+      "script": "V34__effective_departures_and_exit_exports.sql",
+      "sha256": "c14210f9bfe96ce30779097b6c2ccf9b8a2ce71df043dc0b4bc44aab61d35e75"
+    },
+    {
+      "version": "35",
+      "script": "V35__retention_execution_bindings.sql",
+      "sha256": "e48b25d6588964fb7cd7daf63592ea3280807159ccc9bb3b94c80135e89d370e"
+    },
+    {
+      "version": "36",
+      "script": "V36__closed_operation_retention.sql",
+      "sha256": "77c08d23989cd9141519aaf050e523356ed5f60a5a90357d3485bdb3822b6203"
+    },
+    {
+      "version": "37",
+      "script": "V37__publication_feedback.sql",
+      "sha256": "0e6489ebf5bb397429efa191a9cc1db720f00169d179e1fc5c5a871d9d0a80a2"
+    },
+    {
+      "version": "38",
+      "script": "V38__task_work_bridges.sql",
+      "sha256": "b9d5a886357022f63d4f630fe67c6b720623be8d7d9b173c38160cb14c403fea"
+    },
+    {
+      "version": "39",
+      "script": "V39__private_briefing_adjustments.sql",
+      "sha256": "311055f1c2fdb65eade35ea6fd5681ec0e93e5bd3ceeffc7112613b84e0c91ab"
+    },
+    {
+      "version": "40",
+      "script": "V40__briefing_focus_layout.sql",
+      "sha256": "4e4afa70a14349fee697fd0ac9c456609d59560fdcd32a74ad31e547350b525f"
+    },
+    {
+      "version": "41",
+      "script": "V41__publication_forwarding.sql",
+      "sha256": "c36b7ef99759e421353047fa4333ef055d1e6819b06f4e773bc58115c3302d69"
+    },
+    {
+      "version": "42",
+      "script": "V42__profile_and_method_version_lifecycle.sql",
+      "sha256": "ba64012f5b53c3d263b4484ce8f04dd59eccb1a6d96b717712c79c965a9af2a4"
+    }
+  ],
+  "tables": [
+    "accounts",
+    "adjustment_task_dependencies",
+    "agent_attempt_usage",
+    "agent_model_requests",
+    "briefing_layout_moves",
+    "briefing_layouts",
+    "briefing_preferences",
+    "business_source_config_versions",
+    "business_source_submissions",
+    "business_source_versions",
+    "business_sources",
+    "content_cleanup_blobs",
+    "content_cleanup_jobs",
+    "content_cleanup_materials",
+    "content_lifecycle",
+    "content_lifecycle_receipts",
+    "conversation_agent_grants",
+    "conversation_artifacts",
+    "conversation_attempts",
+    "conversation_events",
+    "conversation_original_reads",
+    "conversation_originals",
+    "conversation_sources",
+    "conversation_task_material_versions",
+    "conversation_tasks",
+    "conversation_tool_receipts",
+    "conversations",
+    "delivery_observations",
+    "departure_archive_chunks",
+    "departure_events",
+    "departure_executions",
+    "departure_export_grants",
+    "departure_export_items",
+    "departure_export_parts",
+    "departure_export_sets",
+    "departure_handovers",
+    "departure_materials",
+    "document_publications",
+    "evaluation_asset_versions",
+    "evaluation_assets",
+    "evaluation_findings",
+    "evaluation_issue_events",
+    "evaluation_issue_sources",
+    "evaluation_issues",
+    "evaluation_run_samples",
+    "evaluation_runs",
+    "evaluation_source_versions",
+    "experience_entries",
+    "experience_events",
+    "experience_evidence",
+    "experience_feedback",
+    "experience_uses",
+    "experience_versions",
+    "export_archive_chunks",
+    "export_batch_items",
+    "export_batches",
+    "export_item_sources",
+    "feedback_actions",
+    "feedback_adjustment_messages",
+    "feedback_adjustment_threads",
+    "feedback_entries",
+    "feedback_source_versions",
+    "feedback_task_sources",
+    "feedback_versions",
+    "flyway_schema_history",
+    "governance_capabilities",
+    "governance_handovers",
+    "governance_initial_designations",
+    "governance_recovery_requests",
+    "governance_security_stops",
+    "identity_audit",
+    "identity_requests",
+    "invitations",
+    "knowledge_chunks",
+    "knowledge_runs",
+    "login_attempts",
+    "material_folders",
+    "material_upload_receipts",
+    "material_versions",
+    "materials",
+    "method_adoption_events",
+    "method_adoptions",
+    "method_comparisons",
+    "method_families",
+    "method_releases",
+    "method_versions",
+    "object_lifecycle",
+    "object_lifecycle_events",
+    "object_lifecycle_scope_items",
+    "object_lifecycle_scopes",
+    "ongoing_plan_material_events",
+    "ongoing_plan_receipts",
+    "ongoing_plan_runs",
+    "ongoing_plan_versions",
+    "ongoing_plans",
+    "operation_retention_windows",
+    "platform_roles",
+    "private_document_exports",
+    "private_document_versions",
+    "private_document_writes",
+    "private_documents",
+    "profile_entries",
+    "profile_versions",
+    "publication_forward_batches",
+    "publication_forward_receipts",
+    "recommendation_presentations",
+    "recommendation_receipts",
+    "recommendation_settings",
+    "retention_case_scopes",
+    "retention_case_versions",
+    "retention_cases",
+    "retention_policy_versions",
+    "spring_session",
+    "spring_session_attributes",
+    "task_context_materials",
+    "task_context_reads",
+    "task_context_reviews",
+    "task_plan_checks",
+    "task_preference_saves",
+    "tenant_governance",
+    "tenant_initial_admin",
+    "tenant_memberships",
+    "tenants",
+    "workspace_members",
+    "workspaces"
+  ],
+  "catalogHashes": [
+    "2352e14261f58902de32203d07613ab3649bfbd15adef63cdc0bed47ec4e4f67",
+    "8055c26fed715bb0d189bdbf98b450e2a3bdfc305de6ed1d4dd53f0433d42b10"
+  ]
+}

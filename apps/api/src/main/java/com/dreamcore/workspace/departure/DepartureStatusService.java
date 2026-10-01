@@ -1,0 +1,8 @@
+package com.dreamcore.workspace.departure;
+import com.dreamcore.workspace.identity.*;import java.time.Instant;import java.util.*;import org.springframework.jdbc.core.JdbcTemplate;import org.springframework.stereotype.Service;import org.springframework.transaction.annotation.Transactional;
+/** Metadata projection only. Identity enabled and ordinary business enabled are distinct facts. */
+@Service public class DepartureStatusService {
+ public record Status(UUID tenantId,boolean businessEnabled,String exitState,Instant exportDeadline,boolean canExport){}
+ private final JdbcTemplate db;private final IdentityService identities;public DepartureStatusService(JdbcTemplate db,IdentityService identities){this.db=db;this.identities=identities;}
+ @Transactional public Status get(UUID actor,UUID tenant,boolean platform){if(platform)identities.platform(actor);else identities.member(actor,tenant,false);var ts=db.queryForList("SELECT status FROM tenants WHERE id=? FOR SHARE",String.class,tenant);if(ts.isEmpty())throw new IdentityException(404,"TENANT_NOT_FOUND");if(platform)identities.platform(actor);var es=db.queryForList("SELECT state,deadline FROM departure_executions WHERE tenant_id=? AND kind='TENANT_EXIT' AND state<>'CANCELLED'",tenant);if(es.isEmpty())return new Status(tenant,ts.getFirst().equals("ACTIVE"),null,null,false);var e=es.getFirst();boolean canExport=!platform&&Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM departure_export_grants g WHERE g.tenant_id=? AND g.account_id=? AND departure_content_readable(?,g.tenant_id,g.workspace_id))",Boolean.class,tenant,actor,actor));return new Status(tenant,false,(String)e.get("state"),((java.sql.Timestamp)e.get("deadline")).toInstant(),canExport);}
+}

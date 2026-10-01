@@ -58,7 +58,7 @@ export function createEngineServer(options: { token?: string; agent?: AgentTasks
         let bytes = 0;
         for await (const chunk of request) {
           bytes += chunk.length;
-          if (bytes > 16384) return send(413, { code: 'TOO_LARGE' });
+          if (bytes > 100000) return send(413, { code: 'TOO_LARGE' });
           chunks.push(chunk);
         }
         const result = await options.agent.run(

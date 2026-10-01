@@ -12,7 +12,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest(properties={"dreamcore.tasks.enabled=true","dreamcore.tasks.agent-mode=verification","dreamcore.tasks.initial-delay-ms=3600000","dreamcore.knowledge.initial-delay-ms=3600000"})
 class DocumentPublicationIntegrationTest {
- @Autowired com.dreamcore.workspace.activity.ActivityService activity;@Autowired DocumentPublicationService publications;@Autowired DocumentService documents;@Autowired MaterialService materials;@Autowired ConversationService conversations;@Autowired AgentTaskService agents;@Autowired JdbcTemplate db;@Autowired PasswordEncoder passwords;
+ @Autowired com.dreamcore.workspace.lifecycle.MaterialLifecycleService lifecycle;@Autowired com.dreamcore.workspace.lifecycle.MaterialCleanupService cleanup;@Autowired com.dreamcore.workspace.activity.ActivityService activity;@Autowired DocumentPublicationService publications;@Autowired DocumentService documents;@Autowired MaterialService materials;@Autowired ConversationService conversations;@Autowired AgentTaskService agents;@Autowired JdbcTemplate db;@Autowired PasswordEncoder passwords;
  UUID tenant,other,owner,reader,admin,source,destination,personal,folder,document;
  @BeforeEach void fixture(){
   tenant=UUID.randomUUID();other=UUID.randomUUID();owner=UUID.randomUUID();reader=UUID.randomUUID();admin=UUID.randomUUID();source=UUID.randomUUID();destination=UUID.randomUUID();personal=UUID.randomUUID();
@@ -70,5 +70,18 @@ class DocumentPublicationIntegrationTest {
   var start=new java.util.concurrent.CountDownLatch(1);
   try(var pool=java.util.concurrent.Executors.newFixedThreadPool(2)){var futures=new ArrayList<java.util.concurrent.Future<DocumentPublicationService.Publication>>();for(int i=0;i<2;i++)futures.add(pool.submit(()->{start.await();return publish(UUID.randomUUID());}));start.countDown();assertEquals(futures.get(0).get(10,java.util.concurrent.TimeUnit.SECONDS),futures.get(1).get(10,java.util.concurrent.TimeUnit.SECONDS));}
   assertEquals(1,db.queryForObject("SELECT count(*) FROM material_versions WHERE tenant_id=?",Integer.class,tenant));
+ }
+
+ @Test void sourcePurgeClearsPrivateDerivativesButKeepsPublishedIndependentCopy(){
+  db.update("UPDATE workspace_members SET can_maintain=true WHERE workspace_id=? AND account_id=?",source,owner);
+  var original=materials.upload(owner,tenant,source,null,null,null,UUID.randomUUID(),new org.springframework.mock.web.MockMultipartFile("file","source.txt","text/plain","private underlying facts".getBytes()));UUID originalVersion=materials.detail(owner,tenant,source,original.id(),0,20).versions().getFirst().id();
+  var submitted=conversations.submit(owner,tenant,null,source,UUID.randomUUID(),"本任务明确选定资料","AGENT",null,List.of(new TaskOriginals.Selection(original.id(),originalVersion)));var job=conversations.claim();
+  agents.finish(job,new AgentResult("1.4","0.8.0",job.id(),job.token(),"AGENT","verification","local-verification","受来源约束的私人正文",List.of(),List.of(),List.of(),1,null,List.of(),List.of(),List.of()));
+  var derived=documents.create(owner,tenant,submitted.conversation().id(),job.id(),null,UUID.randomUUID());var d=derived.document();documents.export(owner,tenant,d.id(),1,"docx");
+  var published=publications.publish(owner,tenant,d.id(),1,UUID.randomUUID(),destination,folder,null,null,"docx",true);byte[] independent=materials.download(reader,tenant,destination,published.materialId(),published.materialVersionId()).bytes();
+  lifecycle.act(owner,tenant,source,"MATERIAL",original.id(),UUID.randomUUID(),0,"TRASH");denied(404,()->documents.detail(owner,tenant,d.id(),null));denied(404,()->documents.export(owner,tenant,d.id(),1,"docx"));assertTrue(documents.list(owner,tenant,0,20).items().stream().noneMatch(x->x.id().equals(d.id())));
+  db.update("INSERT INTO governance_capabilities(tenant_id,account_id,workspace_id,capability,granted_by) VALUES (?,?,?,'LIFECYCLE_PURGE',?)",tenant,owner,source,admin);
+  lifecycle.act(owner,tenant,source,"MATERIAL",original.id(),UUID.randomUUID(),1,"PURGE");var removal=cleanup.claim();for(UUID object:cleanup.pending(removal)){cleanup.remove(object);cleanup.removed(removal,object);}cleanup.finish(removal);
+  assertEquals("",db.queryForObject("SELECT body FROM private_document_versions WHERE document_id=?",String.class,d.id()));assertEquals(0,db.queryForObject("SELECT count(*) FROM private_document_exports WHERE document_id=?",Integer.class,d.id()));assertNull(db.queryForObject("SELECT reply FROM conversation_tasks WHERE id=?",String.class,job.id()));assertArrayEquals(independent,materials.download(reader,tenant,destination,published.materialId(),published.materialVersionId()).bytes());
  }
 }

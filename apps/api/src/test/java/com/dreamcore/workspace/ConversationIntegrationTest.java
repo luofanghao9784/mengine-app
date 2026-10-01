@@ -88,7 +88,7 @@ class ConversationIntegrationTest {
         UUID wrongSource=source(space);var d=send(owner,personal);var job=conversations.claim();denied(403,()->conversations.finish(job,result(job,List.of(wrongSource))));
         denied(502,()->conversations.finish(job,new TaskRuntime.Result("1.0","test",UUID.randomUUID(),job.token(),"SOURCE_LOOKUP","NO_SOURCES",List.of())));assertEquals("RUNNING",task(detail(d.conversation().id())).status());assertEquals(0,db.queryForObject("SELECT count(*) FROM conversation_sources WHERE task_id=?",Integer.class,job.id()));
     }
-    @Test void defaultConfigurationRejectsAgentWithoutInventingReply(){denied(503,()->conversations.submit(owner,tenant,null,personal,UUID.randomUUID(),"hello","AGENT"));}
+    @Test void defaultConfigurationSavesWaitingAgentWithoutInventingReply(){var d=conversations.submit(owner,tenant,null,personal,UUID.randomUUID(),"hello","AGENT");assertEquals("WAITING_CAPABILITY",task(d).status());assertNull(task(d).reply());assertNull(task(d).executionClass());assertNull(conversations.claim());assertEquals(0,task(d).attempt());var paused=conversations.action(owner,tenant,d.conversation().id(),task(d).id(),UUID.randomUUID(),0,"PAUSE");assertEquals("PAUSED",task(paused).status());var resumed=conversations.action(owner,tenant,d.conversation().id(),task(d).id(),UUID.randomUUID(),1,"RESUME");assertEquals("WAITING_CAPABILITY",task(resumed).status());assertEquals(0,task(resumed).attempt());assertNull(conversations.claim());conversations.action(owner,tenant,d.conversation().id(),task(d).id(),UUID.randomUUID(),2,"CANCEL");assertEquals("CANCELLED",task(detail(d.conversation().id())).status());}
     @Test void invalidModeAndQueriesAreNotPretendedToBeAiReplies(){
         for(String prompt:List.of(""," ","a b c d e f g h i","x".repeat(201)))denied(400,()->conversations.submit(owner,tenant,null,personal,UUID.randomUUID(),prompt,"SOURCE_LOOKUP"));denied(400,()->conversations.submit(owner,tenant,null,personal,UUID.randomUUID(),"hello","AI_CHAT"));assertTrue(conversations.list(owner,tenant,0,20).items().isEmpty());
     }
@@ -101,7 +101,7 @@ class ConversationIntegrationTest {
     }
     @Test void defaultPlatformDoesNotExposePublicWebOrAcceptExternalQuery(){
         assertFalse(conversations.list(owner,tenant,0,20).publicWebEnabled());
-        denied(503,()->conversations.submit(owner,tenant,null,personal,UUID.randomUUID(),"研究","AGENT","公开主题"));
+        denied(403,()->conversations.submit(owner,tenant,null,personal,UUID.randomUUID(),"研究","AGENT","公开主题"));
     }
 
 }

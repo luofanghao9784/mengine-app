@@ -39,7 +39,11 @@
             "in": "query",
             "schema": {
               "type": "string",
-              "enum": ["LATEST", "FOCUSED", "HIDDEN"],
+              "enum": [
+                "LATEST",
+                "FOCUSED",
+                "HIDDEN"
+              ],
               "default": "LATEST"
             }
           },
@@ -180,6 +184,78 @@
           }
         }
       }
+    },
+    "/api/v1/tenants/{tenant}/briefing/layout": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "本人关注布局版本，不含成果正文",
+        "responses": {
+          "200": {
+            "description": "当前权限下的本人布局；回执区分原执行版本与当前布局版本",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Layout"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "仅移动两张当前可读且已关注的本人卡片；不改变其他视图及业务内容",
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LayoutMove"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "当前权限下的本人布局；回执区分原执行版本与当前布局版本",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LayoutReceipt"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "企业、成员或业务状态无权"
+          },
+          "404": {
+            "description": "目标或参考卡片不再可读/可布局"
+          },
+          "409": {
+            "description": "BRIEFING_LAYOUT_CHANGED 或幂等冲突"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -187,7 +263,7 @@
       "sessionCookie": {
         "type": "apiKey",
         "in": "cookie",
-        "name": "SESSION"
+        "name": "DREAMCORE_SESSION"
       }
     },
     "schemas": {
@@ -207,10 +283,18 @@
           },
           "size": {
             "type": "string",
-            "enum": ["STANDARD", "WIDE"]
+            "enum": [
+              "STANDARD",
+              "WIDE"
+            ]
           }
         },
-        "required": ["revision", "pinned", "hidden", "size"],
+        "required": [
+          "revision",
+          "pinned",
+          "hidden",
+          "size"
+        ],
         "additionalProperties": false
       },
       "Card": {
@@ -249,7 +333,10 @@
           },
           "executionClass": {
             "type": "string",
-            "enum": ["verification", "live"]
+            "enum": [
+              "verification",
+              "live"
+            ]
           },
           "engineVersion": {
             "type": "string",
@@ -272,6 +359,17 @@
           },
           "preference": {
             "$ref": "#/components/schemas/Preference"
+          },
+          "taskRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "attempt": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "presentationVersion": {
+            "const": "briefing-basic-v1"
           }
         },
         "required": [
@@ -288,7 +386,10 @@
           "artifactCount",
           "citationCount",
           "originalCount",
-          "preference"
+          "preference",
+          "taskRevision",
+          "attempt",
+          "presentationVersion"
         ],
         "additionalProperties": false
       },
@@ -301,10 +402,17 @@
           },
           "view": {
             "type": "string",
-            "enum": ["LATEST", "FOCUSED", "HIDDEN"]
+            "enum": [
+              "LATEST",
+              "FOCUSED",
+              "HIDDEN"
+            ]
           },
           "date": {
-            "type": ["string", "null"],
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "date"
           },
           "zone": {
@@ -321,7 +429,14 @@
             "type": "boolean"
           }
         },
-        "required": ["tenantId", "view", "date", "zone", "items", "hasMore"],
+        "required": [
+          "tenantId",
+          "view",
+          "date",
+          "zone",
+          "items",
+          "hasMore"
+        ],
         "additionalProperties": false
       },
       "Update": {
@@ -344,11 +459,115 @@
           },
           "size": {
             "type": "string",
-            "enum": ["STANDARD", "WIDE"]
+            "enum": [
+              "STANDARD",
+              "WIDE"
+            ]
           }
         },
-        "required": ["requestId", "expectedRevision", "pinned", "hidden", "size"],
+        "required": [
+          "requestId",
+          "expectedRevision",
+          "pinned",
+          "hidden",
+          "size"
+        ],
         "additionalProperties": false
+      },
+      "Layout": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "tenantId",
+          "revision"
+        ],
+        "properties": {
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "LayoutMove": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requestId",
+          "expectedRevision",
+          "conversationId",
+          "anchorId",
+          "direction"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "conversationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "anchorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "BEFORE",
+              "AFTER"
+            ]
+          }
+        }
+      },
+      "LayoutReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "conversationId",
+          "anchorId",
+          "direction",
+          "appliedRevision",
+          "currentRevision"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "conversationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "anchorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "BEFORE",
+              "AFTER"
+            ]
+          },
+          "appliedRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "currentRevision": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
       }
     }
   }

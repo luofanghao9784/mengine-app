@@ -94,7 +94,7 @@ async function activate(page: Page, name: string) {
   await page.getByLabel(/^设置密码/).fill(password);
   await page.getByLabel('确认密码', { exact: true }).fill(password);
   await page.getByRole('button', { name: '创建账号并加入', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '登录梦核工作空间', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '登录梦擎工作空间', exact: true })).toBeVisible();
 }
 async function screenshot(page: Page, name: string) {
   await page.screenshot({ path: fileURLToPath(new URL(name, artifacts)), fullPage: true });
@@ -156,7 +156,7 @@ try {
   const errors: string[] = [];
   admin.on('pageerror', (error) => errors.push(error.name));
   await admin.goto('/tenant-admin/');
-  await expect(admin.getByRole('heading', { name: '登录梦核工作空间' })).toBeVisible();
+  await expect(admin.getByRole('heading', { name: '登录梦擎工作空间' })).toBeVisible();
   await screenshot(admin, 'login-desktop.png');
   await admin.getByLabel('邮箱', { exact: true }).fill('unknown-b1@example.test');
   await admin.getByLabel('密码', { exact: true }).fill('wrong-password');
@@ -215,10 +215,12 @@ try {
   await activate(member, '合成员工');
   await login(member, 'member-b1@example.test');
   await expect(member.locator('.access-welcome h2')).toHaveText('合成企业 A');
-  await expect(member.locator('.access-sidebar nav a')).toHaveCount(2);
+  await expect(member.locator('.access-sidebar nav a')).toHaveCount(3);
+  await member.getByRole('button', { name: '更多工作与管理', exact: true }).click();
   await expect(member.getByRole('link', { name: '资料库', exact: true })).toBeVisible();
   await expect(member.getByRole('link', { name: '企业管理', exact: true })).toHaveCount(0);
   await expect(member.getByRole('link', { name: '系统管理', exact: true })).toHaveCount(0);
+  await member.getByRole('button', { name: '关闭弹窗', exact: true }).click();
   await screenshot(member, 'workspace-desktop.png');
   await member.goto('/tenant-admin/');
   await expect(member.getByRole('heading', { name: '没有访问权限' })).toBeVisible();
@@ -303,13 +305,13 @@ try {
   await expect(peer.locator('.access-shell')).toBeVisible();
   await member.getByRole('button', { name: '账号与退出' }).click();
   await member.getByRole('button', { name: '退出登录', exact: true }).click();
-  await expect(member.getByRole('heading', { name: '登录梦核工作空间' })).toBeVisible();
-  await expect(peer.getByRole('heading', { name: '登录梦核工作空间' })).toBeVisible();
+  await expect(member.getByRole('heading', { name: '登录梦擎工作空间' })).toBeVisible();
+  await expect(peer.getByRole('heading', { name: '登录梦擎工作空间' })).toBeVisible();
   await screenshot(member, 'login-mobile.png');
   await login(member, 'member-b1@example.test');
   await memberContext.clearCookies();
   await member.getByRole('button', { name: '刷新', exact: true }).click();
-  await expect(member.getByRole('heading', { name: '登录梦核工作空间' })).toBeVisible();
+  await expect(member.getByRole('heading', { name: '登录梦擎工作空间' })).toBeVisible();
 
   const platformContext = await browser.newContext({
     baseURL: webUrl,

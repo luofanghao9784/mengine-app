@@ -3,6 +3,7 @@ import type {
   MaterialPage,
   MaterialDetail,
   MaterialUpload,
+  MaterialVersion,
 } from '../../contracts/public-api/material';
 import { createIdentityRequest, IdentityError, record, text, uuid } from '../identity/client.ts';
 const count = (v: unknown): v is number => Number.isSafeInteger(v) && (v as number) >= 0;
@@ -56,6 +57,38 @@ export const isDetail = (v: unknown): v is MaterialDetail =>
       uuid(x.createdBy) &&
       date(x.createdAt),
   );
+/** Exact acceptance is separate from the material's latest version. */
+export interface MaterialUploadReceipt extends MaterialEntry {
+  receiptStatus: 'EXACT' | 'HISTORICAL_UNKNOWN';
+  acceptedVersion: MaterialVersion | null;
+  currentVersion: number;
+}
+export const isUploadReceipt = (v: unknown): v is MaterialUploadReceipt => {
+  if (
+    !isEntry(v) ||
+    !record(v) ||
+    v.kind !== 'DOCUMENT' ||
+    !count(v.currentVersion) ||
+    v.currentVersion < v.version
+  )
+    return false;
+  if (v.receiptStatus === 'HISTORICAL_UNKNOWN') return v.acceptedVersion === null;
+  const a = v.acceptedVersion;
+  return (
+    v.receiptStatus === 'EXACT' &&
+    record(a) &&
+    uuid(a.id) &&
+    a.number === v.version &&
+    text(a.filename) &&
+    a.sizeBytes === v.sizeBytes &&
+    text(a.sha256) &&
+    /^[0-9a-f]{64}$/.test(a.sha256) &&
+    uuid(a.createdBy) &&
+    date(a.createdAt) &&
+    a.createdAt === v.updatedAt &&
+    (a.origin === undefined || a.origin === 'UPLOAD' || a.origin === 'DOCUMENT_PUBLICATION')
+  );
+};
 const id = (v: string) => {
   if (!uuid(v)) throw new IdentityError('INVALID_REQUEST', 400);
   return v;
@@ -115,11 +148,18 @@ export function createMaterialClient(fetcher: typeof fetch = fetch) {
     ) {
       const form = new FormData();
       form.set('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-      form.set('file', file);
+      // Directory selections carry a relative path; folders are already resolved separately.
+      form.set('file', file, file.name);
       return request(
         root(tenant, space) + '/materials' + (document ? `/${id(document)}/versions` : ''),
         'POST',
-        scoped(tenant, space, document),
+        (v): v is MaterialUploadReceipt =>
+          isUploadReceipt(v) &&
+          scoped(tenant, space, document)(v) &&
+          (document ? true : v.folderId === (metadata.folderId || null)) &&
+          (v.receiptStatus !== 'EXACT' ||
+            (v.acceptedVersion!.sizeBytes === file.size &&
+              v.acceptedVersion!.filename === file.name.trim().normalize('NFC'))),
         form,
         signal,
       );

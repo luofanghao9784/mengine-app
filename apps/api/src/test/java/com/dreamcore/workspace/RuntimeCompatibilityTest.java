@@ -64,4 +64,12 @@ class RuntimeCompatibilityTest {
         server.createContext("/internal/v1/source-results",e->{assertEquals("0.9.1",e.getRequestHeaders().getFirst("X-Dreamcore-Engine-Version"));byte[] bytes=new JsonMapper().writeValueAsBytes(Map.of("contractVersion","1.0","engineVersion","0.9.0","taskId",task,"attemptId",attempt,"mode","SOURCE_LOOKUP","summaryCode","NO_SOURCES","sourceIds",List.of()));e.sendResponseHeaders(200,bytes.length);e.getResponseBody().write(bytes);e.close();});
         assertEquals("TASK_RUNTIME_INCOMPATIBLE",assertThrows(IdentityException.class,()->runtime(false).execute(task,attempt,List.of())).code);
     }
+    @Test void protocol15DispatchesWithDeclaredProtocolAndLongSupplementWithoutLegacyFallback(){
+        descriptor=descriptor("agent-verification","1.5");server.removeContext("/");
+        server.createContext("/internal/v1/runtime",e->{byte[] bytes=new JsonMapper().writeValueAsBytes(descriptor);e.sendResponseHeaders(200,bytes.length);e.getResponseBody().write(bytes);e.close();});
+        server.createContext("/internal/v1/agent-results",e->{var input=new JsonMapper().readTree(e.getRequestBody().readAllBytes());assertEquals("1.5",input.path("contractVersion").asString());assertEquals(3000,input.path("prompt").asString().length());posts.incrementAndGet();e.close();});
+        var failure=assertThrows(IdentityException.class,()->runtime(false).executeAgent(UUID.randomUUID(),UUID.randomUUID(),"x".repeat(3000),()->true));assertEquals("TASK_RESULT_UNKNOWN",failure.code);assertTrue(posts.get()>0);
+    }
+    @Test void legacyProtocolRejectsLongSupplementBeforeDispatch(){assertEquals("TASK_RUNTIME_INCOMPATIBLE",assertThrows(IdentityException.class,()->runtime(false).executeAgent(UUID.randomUUID(),UUID.randomUUID(),"x".repeat(2001),()->true)).code);assertEquals(0,posts.get());}
+
 }

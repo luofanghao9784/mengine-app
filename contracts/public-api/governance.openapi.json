@@ -1,0 +1,994 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Dreamcore Governance API",
+    "version": "1.0.0"
+  },
+  "security": [
+    {
+      "sessionCookie": []
+    }
+  ],
+  "paths": {
+    "/api/v1/tenants/{tenant}/governance": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "查看本人资格；管理资格不开放正文",
+        "responses": {
+          "200": {
+            "description": "实际持久状态；不表示模型执行",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "401": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "403": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "404": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "409": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/governance/accept-initial-responsibility": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "summary": "指定的新企业初始邀请接受人明确接受责任",
+        "responses": {
+          "200": {
+            "description": "实际持久状态；不表示模型执行",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "401": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "403": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "404": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "409": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Change"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenant}/governance/members/{account}/role": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "account",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "summary": "负责人任命或撤销配置管理员",
+        "responses": {
+          "200": {
+            "description": "实际持久状态；不表示模型执行",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Role"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "401": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "403": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "404": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "409": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleChange"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenant}/governance/capabilities": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "summary": "负责人显式授予或撤销范围能力",
+        "responses": {
+          "200": {
+            "description": "实际持久状态；不表示模型执行",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "401": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "403": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "404": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "409": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CapabilityChange"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "get": {
+        "summary": "负责人查看指定成员的明确资格，不包含正文",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "明确授予的范围资格",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignedCapabilities"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "当前身份没有负责资格"
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/governance/handover": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "summary": "提出交接；新提议替代旧待接受提议",
+        "responses": {
+          "200": {
+            "description": "实际持久状态；不表示模型执行",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "401": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "403": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "404": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "409": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Offer"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenant}/governance/handover/{id}/accept": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "summary": "接任人接受有效交接",
+        "responses": {
+          "200": {
+            "description": "实际持久状态；不表示模型执行",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "401": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "403": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "404": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "409": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Change"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenant}/governance/recovery-requests": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "summary": "提交待核验恢复请求；不会转移负责人",
+        "responses": {
+          "200": {
+            "description": "实际持久状态；不表示模型执行",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Recovery"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "401": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "403": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "404": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "409": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecoveryRequest"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenant}/governance/recovery-requests/{id}": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "仅提交人可查看恢复请求状态",
+        "responses": {
+          "200": {
+            "description": "实际持久状态；不表示模型执行",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Recovery"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "401": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "403": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "404": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "409": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          }
+        }
+      }
+    },
+    "/api/platform-admin/v1/tenants/{tenant}/governance-recovery-requests": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "summary": "总台记录待核验失联恢复；不核实证据、不指定接班、不恢复登录、不读取正文",
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecoveryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "待核验回执",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Recovery"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "没有有效平台身份"
+          }
+        }
+      }
+    },
+    "/api/platform-admin/v1/tenants/{tenant}/governance-recovery-requests/{id}": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "总台查看无正文的核验请求元信息",
+        "responses": {
+          "200": {
+            "description": "请求状态，不代表恢复完成",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Recovery"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "没有有效平台身份"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "DREAMCORE_SESSION"
+      }
+    },
+    "schemas": {
+      "Change": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "requestId",
+          "expectedVersion"
+        ]
+      },
+      "Capability": {
+        "type": "string",
+        "enum": [
+          "OWNER",
+          "TENANT_CONFIG",
+          "PROFILE_MAINTAIN",
+          "CONTENT_MAINTAIN",
+          "EXPERIENCE_MAINTAIN",
+          "EVALUATION_MAINTAIN",
+          "LIFECYCLE_PURGE",
+          "BULK_EXPORT",
+          "METHOD_ADOPT",
+          "PLAN_CONFIGURE",
+          "MEMBER_OFFBOARD",
+          "TENANT_EXIT"
+        ]
+      },
+      "Snapshot": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ownerId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "revision": {
+            "type": "integer"
+          },
+          "owner": {
+            "type": "boolean"
+          },
+          "canConfigure": {
+            "type": "boolean"
+          },
+          "canAcceptInitialResponsibility": {
+            "type": "boolean"
+          },
+          "canEnterManagement": {
+            "type": "boolean"
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "workspaceId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "capability": {
+                  "$ref": "#/components/schemas/Capability"
+                }
+              },
+              "required": [
+                "workspaceId",
+                "capability"
+              ]
+            }
+          },
+          "pendingHandover": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "fromAccount": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "toAccount": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "PENDING"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "fromAccount",
+                  "toAccount",
+                  "status"
+                ]
+              }
+            ]
+          }
+        },
+        "required": [
+          "tenantId",
+          "ownerId",
+          "revision",
+          "owner",
+          "canConfigure",
+          "canAcceptInitialResponsibility",
+          "canEnterManagement",
+          "capabilities",
+          "pendingHandover"
+        ]
+      },
+      "RoleChange": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "TENANT_ADMIN",
+              "MEMBER"
+            ]
+          }
+        },
+        "required": [
+          "requestId",
+          "expectedVersion",
+          "role"
+        ]
+      },
+      "Role": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "TENANT_ADMIN",
+              "MEMBER"
+            ]
+          },
+          "version": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "accountId",
+          "role",
+          "version"
+        ]
+      },
+      "CapabilityChange": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "capability": {
+            "type": "string",
+            "enum": [
+              "PROFILE_MAINTAIN",
+              "EXPERIENCE_MAINTAIN",
+              "EVALUATION_MAINTAIN",
+              "LIFECYCLE_PURGE",
+              "BULK_EXPORT",
+              "METHOD_ADOPT",
+              "PLAN_CONFIGURE",
+              "MEMBER_OFFBOARD",
+              "TENANT_EXIT"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "requestId",
+          "expectedVersion",
+          "accountId",
+          "capability",
+          "enabled"
+        ]
+      },
+      "Offer": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "requestId",
+          "expectedVersion",
+          "accountId"
+        ]
+      },
+      "RecoveryRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "OWNER_UNAVAILABLE",
+              "LEGACY_OWNER_UNVERIFIED"
+            ]
+          }
+        },
+        "required": [
+          "requestId",
+          "reason"
+        ]
+      },
+      "Recovery": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "OWNER_UNAVAILABLE",
+              "LEGACY_OWNER_UNVERIFIED"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING_VERIFICATION"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "reason",
+          "status",
+          "createdAt"
+        ]
+      },
+      "AssignedCapabilities": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "accountId",
+            "workspaceId",
+            "capability",
+            "grantedBy",
+            "createdAt"
+          ],
+          "properties": {
+            "accountId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "workspaceId": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "uuid"
+            },
+            "capability": {
+              "$ref": "#/components/schemas/Capability"
+            },
+            "grantedBy": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "createdAt": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        }
+      }
+    }
+  }
+}

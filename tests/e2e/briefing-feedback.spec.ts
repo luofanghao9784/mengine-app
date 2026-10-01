@@ -2,6 +2,15 @@ import { test, expect, type Page } from '@playwright/test';
 const key = 'enterprise-ai-demo-konggu-v1';
 const state = (page: Page) => page.evaluate((key) => JSON.parse(localStorage.getItem(key)!), key);
 const card = (page: Page, id = 'C01') => page.locator(`.briefing-grid [data-card-id="konggu:${id}"]`);
+const positions = (page: Page) =>
+  page.locator('.briefing-grid .briefing-card').evaluateAll((nodes) =>
+    nodes.map((node) => ({
+      id: (node as HTMLElement).dataset.cardId,
+      column: (node as HTMLElement).style.gridColumn,
+      row: (node as HTMLElement).style.gridRow,
+      size: (node as HTMLElement).dataset.size,
+    })),
+  );
 const detail = (page: Page) =>
   page.getByRole('dialog', { name: /./ }).filter({ has: page.locator('.briefing-feedback-actions') });
 const open = async (page: Page, id = 'C01') => {
@@ -16,25 +25,36 @@ const feedback = async (page: Page, id = 'C01') => {
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/#/briefing');
+  await expect(page.locator('.briefing-grid .briefing-card')).toHaveCount(40);
 });
 
-test('先读详情，四个反馈与主会话入口；读后灰显且不立即换位，刷新移到底部，日期仍可查找', async ({ page }) => {
+test('先读详情，四个反馈与主会话入口；读后灰显且不立即换位，刷新后仍在原位，数据从类型查找', async ({
+  page,
+}) => {
   await expect(page.getByRole('tab', { name: '推荐', exact: true })).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('.briefing-resize-handle')).toHaveCount(0);
   const chats = (await state(page)).chats.length;
+  const before = await positions(page);
   await open(page);
   for (const name of ['有用', '没用', '关注', '转发', '发起会话'])
     await expect(detail(page).getByRole('button', { name, exact: true })).toBeVisible();
   expect((await state(page)).chats.length).toBe(chats);
   await page.getByRole('button', { name: '关闭卡片详情' }).click();
   await expect(card(page)).toHaveAttribute('data-read', 'true');
-  await expect(page.locator('[data-recommendation-group="unread"] [data-card-id="konggu:C01"]')).toHaveCount(
-    1,
-  );
+  await expect.poll(() => positions(page)).toEqual(before);
+  await expect(
+    page.locator('[data-recommendation-group="recommended"] [data-card-id="konggu:C01"]'),
+  ).toHaveCount(1);
   await page.getByRole('button', { name: '刷新智能画报（演示）', exact: true }).click();
-  await expect(page.locator('[data-recommendation-group="read"] [data-card-id="konggu:C01"]')).toHaveCount(1);
+  await expect(
+    page.locator('[data-recommendation-group="recommended"] [data-card-id="konggu:C01"]'),
+  ).toHaveCount(1);
   await expect(page.locator('.briefing-page')).toHaveAttribute('data-refresh-phase', 'idle');
+  await expect.poll(() => positions(page)).toEqual(before);
   await page.getByRole('tab', { name: '日期', exact: true }).click();
+  await expect(card(page)).toHaveCount(0);
+  await page.getByRole('tab', { name: '类型', exact: true }).click();
+  await page.getByLabel('内容类型').getByRole('button', { name: '数据', exact: true }).click();
   await expect(card(page)).toHaveCount(1);
 });
 
@@ -96,7 +116,39 @@ test('普通会话按需打开，来源卡片仍保留', async ({ page }) => {
   expect(s.briefing.cards.filter((c: any) => c.id === 'konggu:C01')).toHaveLength(1);
 });
 
-test('已读超过三张折叠，关注已读仍跟进且不会重复成新卡', async ({ page }) => {
+test('会话中的画报标题栏与外部卡片同步显示有用、没用、关注及会话状态', async ({ page }) => {
+  for (const value of ['useful', 'useless']) {
+    await open(page);
+    if (value === 'useful') {
+      await detail(page).getByRole('button', { name: '有用', exact: true }).click();
+      await detail(page).getByRole('button', { name: '关注', exact: true }).click();
+    } else {
+      await detail(page).getByRole('button', { name: '没用', exact: true }).click();
+      await page.getByRole('button', { name: '分析或建议没帮助', exact: true }).click();
+    }
+    await detail(page).getByRole('button', { name: '发起会话', exact: true }).click();
+    const header = page.locator('.deck-source .deck-card-header');
+    const kinds = (selector: string) =>
+      page.locator(selector).evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-mark')));
+    await expect
+      .poll(() => kinds('.deck-source .deck-card-header [data-mark]'))
+      .toEqual([value, 'following', 'conversation']);
+    await expect(
+      header.getByRole('img', { name: value === 'useful' ? '已标记有用' : '已标记没用' }),
+    ).toBeVisible();
+    const marks = await kinds('.deck-source .deck-card-header [data-mark]');
+    await page.getByRole('button', { name: '关闭会话', exact: true }).click();
+    await expect(page.locator('.conversation-overlay')).toHaveCount(0);
+    expect(
+      await card(page)
+        .locator('[data-mark]')
+        .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-mark'))),
+    ).toEqual(marks);
+  }
+});
+
+test('读过五张卡片后刷新与重载仍保留原位，全部卡片持续展示，已读和关注保留', async ({ page }) => {
+  const before = await positions(page);
   for (const id of ['C01', 'C02', 'C03', 'C04', 'C05']) {
     await open(page, id);
     if (id === 'C05') await detail(page).getByRole('button', { name: '关注', exact: true }).click();
@@ -104,12 +156,15 @@ test('已读超过三张折叠，关注已读仍跟进且不会重复成新卡',
   }
   await page.getByRole('button', { name: '刷新智能画报（演示）', exact: true }).click();
   await expect(page.locator('.briefing-page')).toHaveAttribute('data-refresh-phase', 'idle');
-  await expect(page.locator('[data-recommendation-group="read"] .briefing-card')).toHaveCount(3);
-  await page.getByRole('button', { name: '展开其余 1 张已读卡片' }).click();
-  await expect(page.locator('[data-recommendation-group="read"] .briefing-card')).toHaveCount(4);
-  await expect(
-    page.locator('[data-recommendation-group="unread"] [data-card-id="konggu:C05"]'),
-  ).toHaveAttribute('data-read', 'true');
+  await expect.poll(() => positions(page)).toEqual(before);
+  await page.reload();
+  await expect.poll(() => positions(page)).toEqual(before);
+  await expect(page.locator('.briefing-grid .briefing-card')).toHaveCount(40);
+  await expect(page.locator('[data-recommendation-group="read"]')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /展开其余.*已读卡片/ })).toHaveCount(0);
+  for (const id of ['C01', 'C02', 'C03', 'C04', 'C05'])
+    await expect(card(page, id)).toHaveAttribute('data-read', 'true');
+  expect((await state(page)).briefing.cards.find((c: any) => c.id === 'konggu:C05').pinned).toBe(true);
 });
 
 test('转发选择有权限同事并演示提交，取消不留记录', async ({ page }) => {

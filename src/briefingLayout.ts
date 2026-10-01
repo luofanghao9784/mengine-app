@@ -1,6 +1,5 @@
 import { cardConfig, localDate, type BriefingCard, type CardData, type CardSize } from './briefing.ts';
-import { briefingPresentation } from './briefingPresentation.ts';
-import { magazineType } from './briefingMagazine.ts';
+import { magazineSize, magazineType } from './briefingMagazine.ts';
 
 export type BriefingEntry = { card: BriefingCard; data: CardData; at: string; conversationAt?: string };
 export type BriefingView = '最新' | '关注' | '日期' | '会话' | '类型' | '空间';
@@ -139,16 +138,12 @@ function preferredSize(entry: BriefingEntry, historical: boolean): CardSize {
   // Resizing changes the card's display preference, never the dated snapshot.
   if (historical) return entry.card.config?.size || entry.data.size;
   if (entry.card.config) return cardConfig(entry.card).size;
-  const presentation = briefingPresentation(entry.data);
-  if (presentation) return presentation.size || entry.data.size;
-  // Presentation choices do not write data, timestamps or history.
-  if (entry.data.type === '成果交付') return '2×1';
-  if (entry.data.template === 'progress') return '1×1';
-  return entry.data.size;
+  return magazineSize(entry.data);
 }
 
 // Fill the first available cell with a matching card from this group. Prefer
 // every card's chosen dimensions before adapting an automatic card to the gap.
+export type BriefingFit = Record<string, { size: CardSize; rows?: number }>;
 export function layoutBriefingSpread(
   entries: BriefingEntry[],
   columns: number,
@@ -157,6 +152,7 @@ export function layoutBriefingSpread(
   anchor?: BriefingLayoutAnchor,
   saved?: BriefingSavedLayout,
   preserveOrder = false,
+  minimum: BriefingFit = {},
 ): Placement[] {
   const reflowing = !!saved && saved.columns !== columns;
   const retained = saved?.columns === columns ? saved.positions : [];
@@ -164,9 +160,17 @@ export function layoutBriefingSpread(
     const override = sizeOverrides[entry.card.id];
     const previous = retained.find((p) => p.id === entry.card.id);
     let preferred = override || (!entry.card.config && previous?.size) || preferredSize(entry, historical);
+    const fit = minimum[entry.card.id];
+    if (fit)
+      preferred =
+        `${Math.max(Number(preferred[0]), Number(fit.size[0]))}×${Math.max(Number(preferred[2]), Number(fit.size[2]))}` as CardSize;
     // A narrow viewport changes only the rendered size, never the preference.
     if (columns === 1 && preferred.startsWith('2')) preferred = preferred === '2×2' ? '1×2' : '1×1';
-    return { entry, preferred, fixed: !!override || historical || !!entry.card.config || !!previous };
+    return {
+      entry,
+      preferred,
+      fixed: !!fit || !!override || historical || !!entry.card.config || !!previous,
+    };
   });
   if (saved) {
     const order = new Map(saved.order.map((id, index) => [id, index]));
@@ -176,14 +180,15 @@ export function layoutBriefingSpread(
   }
   const placements: Placement[] = [];
   const occupied = new Set<number>();
+  const rows = (id: string, size: CardSize) => Math.max(Number(size[2]), minimum[id]?.rows || 0);
   const place = (entry: BriefingEntry, size: CardSize, row: number, col: number) => {
     const width = Number(size[0]),
-      height = Number(size[2]);
+      height = rows(entry.card.id, size);
     placements.push({ entry, size, row, col, width, height });
     for (let y = 0; y < height; y++)
       for (let x = 0; x < width; x++) occupied.add((row + y) * columns + col + x);
   };
-  const canPlace = (size: CardSize, row: number, col: number) => {
+  const canPlace = (size: CardSize, row: number, col: number, id: string) => {
     if (
       !Number.isInteger(row) ||
       !Number.isInteger(col) ||
@@ -192,7 +197,7 @@ export function layoutBriefingSpread(
       col + Number(size[0]) > columns
     )
       return false;
-    for (let y = 0; y < Number(size[2]); y++)
+    for (let y = 0; y < rows(id, size); y++)
       for (let x = 0; x < Number(size[0]); x++) if (occupied.has((row + y) * columns + col + x)) return false;
     return true;
   };
@@ -214,14 +219,14 @@ export function layoutBriefingSpread(
     const index = pending.findIndex((p) => p.entry.card.id === position.id);
     if (index < 0) continue;
     const item = pending[index];
-    if (!canPlace(item.preferred, position.row, position.col)) continue;
+    if (!canPlace(item.preferred, position.row, position.col, item.entry.card.id)) continue;
     pending.splice(index, 1);
     place(item.entry, item.preferred, position.row, position.col);
   }
   let cursor = 0;
-  const fits = (size: CardSize) => {
+  const fits = (size: CardSize, id: string) => {
     const width = Number(size[0]),
-      height = Number(size[2]);
+      height = rows(id, size);
     if ((cursor % columns) + width > columns) return false;
     for (let y = 0; y < height; y++)
       for (let x = 0; x < width; x++) if (occupied.has(cursor + y * columns + x)) return false;
@@ -236,16 +241,18 @@ export function layoutBriefingSpread(
     // to leave holes. Repack within this group without overwriting its layout.
     const ordered = preserveOrder && !reflowing;
     let index = ordered
-      ? fits(pending[0].preferred)
+      ? fits(pending[0].preferred, pending[0].entry.card.id)
         ? 0
         : -1
-      : pending.findIndex(({ preferred }) => fits(preferred));
+      : pending.findIndex(({ preferred, entry }) => fits(preferred, entry.card.id));
     let size: CardSize | undefined = pending[index]?.preferred;
     if (index < 0 && !ordered) {
       // Only a display fallback: saved sizes, source facts and snapshots stay intact.
       index = pending.findIndex((item) => {
         if (item.fixed) return false;
-        size = ([`1×${item.preferred[2]}`, `${item.preferred[0]}×1`, '1×1'] as CardSize[]).find(fits);
+        size = ([`1×${item.preferred[2]}`, `${item.preferred[0]}×1`, '1×1'] as CardSize[]).find((size) =>
+          fits(size, item.entry.card.id),
+        );
         return !!size;
       });
     }

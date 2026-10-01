@@ -454,29 +454,26 @@ test('画报增量升级保留所有既有资料与会话，来源计数遵循�
   syncBriefing(s, '2026-09-19T03:00:00.000Z');
   assert.equal(s.briefing!.cards.find((c) => c.id === 'followup:sales')!.active, false);
   assert.equal(followupRows(s, 'personal').length, 0);
-  assert.equal(
-    canReadCardData(s, s.briefing!.cards.find((c) => c.id === 'insight:guide')!.history[0].data),
-    false,
-  );
+  assert.equal(canReadCardData(s, s.briefing!.cards.find((c) => c.id === 'insight:guide')!.data), false);
 });
 
-test('关注、关闭和布局不刷新内容时间；隐藏期间仍更新，历史快照不被覆写', () => {
+test('关注、隐藏和布局不刷新内容日期；建议保留产生时的内容与依据', () => {
   const s = syncBriefing(seed(), '2026-09-18T01:00:00.000Z');
   const card = s.briefing!.cards.find((c) => c.id === 'dream')!;
-  const before = structuredClone(card.history[0]);
+  const before = structuredClone({ at: card.updatedAt, data: card.data });
   card.pinned = true;
   card.hidden = true;
   card.config = { size: '2×2', title: '整理建议', compact: true };
   syncBriefing(s, '2026-09-18T02:00:00.000Z');
   assert.equal(card.updatedAt, before.at);
-  assert.equal(card.history.length, 1);
+  assert.equal(card.history.length, 0);
   assert.equal(s.dream.status, 'pending');
   applyDream(s, s.dream.revision);
   syncBriefing(s, '2026-09-19T01:00:00.000Z');
-  assert.deepEqual(card.history[0], before);
-  assert.equal(card.history.length, 2);
+  assert.deepEqual(card.data, before.data);
+  assert.equal(card.history.length, 0);
   assert.match(snapshotOn(card, '2026-09-18')!.data.fact, /等待确认/);
-  assert.match(snapshotOn(card, '2026-09-19')!.data.fact, /已/);
+  assert.equal(snapshotOn(card, '2026-09-19'), undefined);
   assert.equal(snapshotOn(card, '2026-09-17'), undefined);
   assert.equal(card.hidden, true);
   card.hidden = false;
@@ -499,7 +496,7 @@ test('同一事项与优化分别复用会话，回看不覆盖此前消息，�
   syncBriefing(s, '2026-09-19T01:00:00.000Z');
   openBriefingChat(s, card.id, 'content');
   assert.deepEqual(chat.messages.slice(0, messages.length), messages);
-  openBriefingChat(s, card.id, 'content', card.history[0]);
+  openBriefingChat(s, card.id, 'content', { at: card.updatedAt, data: card.data });
   assert.match(chat.briefingContext!.snapshot.fact, /等待确认/);
   assert.equal(s.dream.status, 'done');
   assert.equal(chat.briefingContext!.asOf, '2026-09-18T01:00:00.000Z');
@@ -530,14 +527,14 @@ test('优化会话只修改草案；内容回复不批准申请、不改变任�
   const histories = requestCard.history.length;
   resolveRequest(s, request.id, true);
   syncBriefing(s);
-  assert.equal(requestCard.history.length, histories + 1);
+  assert.equal(requestCard.history.length, histories);
   assert.equal(openBriefingChat(s, requestCard.id, 'content'), chatId);
 });
 
 test('跨空间经营快照不因个人归属而绕过当前来源可见范围', () => {
   const s = syncBriefing(seed());
   const card = s.briefing!.cards.find((c) => c.id === 'followup:personal')!;
-  const old = structuredClone(card.history[0]);
+  const old = structuredClone({ at: card.updatedAt, data: card.data });
   s.apps.push({
     id: 'personal-app',
     name: '个人跟进',
@@ -644,7 +641,18 @@ test('画报优先用后续卡片补空，只有没有匹配尺寸时才适配�
         size,
         type: '经营数据',
         template: 'number',
-        presentation: undefined,
+        photo: undefined,
+        // Automatic dimensions now follow the rendered content. Give each
+        // packing fixture the chart capacity represented by its requested size.
+        presentation: {
+          format: 'chart',
+          chart: {
+            kind: size === '2×2' ? 'heatmap' : size === '2×1' ? 'lollipop' : 'ring',
+            period: '合成布局测试',
+            unit: '项',
+            rows: [{ label: '示例', value: 1 }],
+          },
+        },
       };
       return { card, data: card.data, at: card.updatedAt };
     });
@@ -817,10 +825,10 @@ test('画报配图和项目成员为只读呈现，按明确关联和当前可�
   assert.deepEqual(briefingPeople(s, personalWithProjectReference), []);
 });
 
-test('原卡片逐版本留在消息中，往返历史版本不重复，当前状态不被回看恢复', () => {
+test('按日建议在会话中保留原依据，重复打开不复制卡片或恢复旧业务状态', () => {
   const s = syncBriefing(seed(), '2026-09-18T01:00:00.000Z');
   const card = s.briefing!.cards.find((c) => c.id === 'dream')!;
-  const first = structuredClone(card.history[0]);
+  const first = structuredClone({ at: card.updatedAt, data: card.data });
   const id = openBriefingChat(s, card.id, 'content');
   const chat = s.chats.find((c) => c.id === id)!;
   const reference = structuredClone(chat.messages.find((m) => m.briefing)!.briefing);
@@ -829,7 +837,7 @@ test('原卡片逐版本留在消息中，往返历史版本不重复，当前�
   openBriefingChat(s, card.id, 'content');
   openBriefingChat(s, card.id, 'content', first);
   openBriefingChat(s, card.id, 'content');
-  assert.equal(chat.messages.filter((m) => m.briefing).length, 2);
+  assert.equal(chat.messages.filter((m) => m.briefing).length, 1);
   assert.deepEqual(chat.messages.find((m) => m.briefing)!.briefing, reference);
   assert.equal(s.dream.status, 'done');
 });
@@ -904,7 +912,7 @@ test('四期画报有 46 张独立内容卡片、34 份可读来源，数字口�
   for (const example of briefingExamples) {
     const c = cards.find((c) => c.id === `demo:${example.key}`)!;
     assert.equal(c.updatedAt, new Date(example.at).toISOString());
-    assert.equal(c.history.length, 1);
+    assert.equal(c.history.length, 0);
     assert.equal(snapshotOn(c, '2026-09-16'), undefined);
     editions[example.at.slice(0, 10)] = (editions[example.at.slice(0, 10)] || 0) + 1;
     assert.ok(canReadCardData(s, c.data));
@@ -980,7 +988,7 @@ test('新增样例均能进入独立会话并引用来源，读权限变化同�
   s.spaces.find((space) => space.id === 'finance')!.members = [];
   syncBriefing(s);
   assert.equal(card.active, false);
-  assert.equal(canReadCardData(s, card.history[0].data), false);
+  assert.equal(canReadCardData(s, card.data), false);
   assert.throws(() => openBriefingChat(s, card.id, 'content'), /不可用/);
 });
 

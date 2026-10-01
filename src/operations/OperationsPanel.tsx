@@ -5,6 +5,7 @@ import { Button } from '../shared/ui';
 import { useRemote, Failure, Loading } from '../shared/admin';
 import { getOperations, errorLabels } from './client';
 import './operations.css';
+import { OperationRetentionStatus } from '../retention/OperationRetentionStatus';
 const number = (value: number) => value.toLocaleString('zh-CN');
 const time = (value: string) => new Date(value).toLocaleString('zh-CN', { hour12: false });
 const bytes = (value: number) =>
@@ -71,6 +72,7 @@ function ScopedPanel({
       ) : (
         <Snapshot value={data.value} />
       )}
+      {scope === 'platform' && !tenant && <OperationRetentionStatus revision={attempt + revision} />}
     </section>
   );
 }
@@ -86,6 +88,10 @@ function Snapshot({ value }: { value: OperationsOverview }) {
             ['已完成', tasks.succeeded],
             ['失败 / 中断', tasks.failed + tasks.interrupted],
             ['排队 / 执行中', tasks.queued + tasks.running],
+            ['等待补充 / 能力', tasks.waitingInput + tasks.waitingCapability],
+            ['暂停', tasks.paused],
+            ['部分完成', tasks.partial],
+            ['结果待核对', tasks.resultUnknown],
           ] as const
         ).map(([label, n]) => (
           <div key={label}>
@@ -106,7 +112,7 @@ function Snapshot({ value }: { value: OperationsOverview }) {
           </span>
         </div>
         <p className="operations-note">
-          当前全部已保存原件，含历史版本，不受上方时间范围影响。不含解析索引、任务附件、文稿导出及备份。
+          当前尚未物理清理的原件，含历史版本与回收站，不受上方时间范围影响。不含解析索引、任务附件、文稿导出及备份。
         </p>
       </div>
       <div className="operations-block">
@@ -124,7 +130,9 @@ function Snapshot({ value }: { value: OperationsOverview }) {
                 </p>
                 <p className="operations-note">
                   成功 {number(m.succeeded)} · 失败 {number(m.failed)} · 取消 {number(m.cancelled)} · 中断{' '}
-                  {number(m.interrupted)} · 执行中 {number(m.running)}
+                  {number(m.interrupted)} · 执行中 {number(m.running)} · 暂停 {number(m.paused)} · 待补充{' '}
+                  {number(m.waitingInput)} · 待能力 {number(m.waitingCapability)} · 部分完成{' '}
+                  {number(m.partial)} · 结果待核对 {number(m.resultUnknown)}
                 </p>
                 <dl>
                   <div>

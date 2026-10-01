@@ -1,0 +1,717 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "工作推荐与站内呈现",
+    "version": "1.0.0"
+  },
+  "security": [
+    {
+      "sessionCookie": []
+    }
+  ],
+  "paths": {
+    "/api/v1/tenants/{tenant}/recommendations": {
+      "get": {
+        "summary": "先对最新1000项当前获权成果排序再分页，显式报告窗口；打开动作不表示业务完成",
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "workspaceId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 30
+            }
+          },
+          {
+            "name": "snapshot",
+            "in": "query",
+            "description": "offset 大于0时必须与当前排序快照一致，否则409",
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "当前获权结果；private, no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "403": {
+            "description": "当前授权不足"
+          },
+          "409": {
+            "description": "版本或排序快照已变更"
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/recommendations/settings": {
+      "get": {
+        "summary": "本人一般推荐设置",
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "当前获权结果；private, no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Settings"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "403": {
+            "description": "当前授权不足"
+          },
+          "409": {
+            "description": "版本或排序快照已变更"
+          }
+        }
+      },
+      "post": {
+        "summary": "以请求ID和预期修订修改；原请求重试返回原回执",
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "当前获权结果；private, no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Settings"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "403": {
+            "description": "当前授权不足"
+          },
+          "409": {
+            "description": "版本或排序快照已变更"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Configure"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/recommendations/opened": {
+      "post": {
+        "summary": "用户显式打开指定版本入口的幂等记录；重新核验当前权限；不代表已阅读、采纳或业务完成",
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "当前获权结果；private, no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Opened"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "403": {
+            "description": "当前授权不足"
+          },
+          "409": {
+            "description": "版本或排序快照已变更"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Target"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "DREAMCORE_SESSION"
+      }
+    },
+    "schemas": {
+      "Settings": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["revision", "enabled"],
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Target": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "id", "versionKey"],
+        "properties": {
+          "kind": {
+            "enum": ["TASK", "PUBLICATION"]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "versionKey": {
+            "type": "string",
+            "maxLength": 120
+          }
+        }
+      },
+      "Content": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "id",
+          "versionKey",
+          "workspaceId",
+          "workspaceName",
+          "title",
+          "excerpt",
+          "truncated",
+          "createdAt",
+          "executionClass",
+          "conversationId",
+          "taskRevision",
+          "attempt",
+          "preferenceRevision",
+          "materialId",
+          "materialVersion",
+          "filename",
+          "pinned",
+          "openedAt"
+        ],
+        "properties": {
+          "kind": {
+            "enum": ["TASK", "PUBLICATION"]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "versionKey": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceName": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "excerpt": {
+            "type": "string",
+            "maxLength": 1200
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "executionClass": {
+            "enum": ["verification", "live", "PUBLISHED_COPY"]
+          },
+          "conversationId": {
+            "type": ["string", "null"],
+            "format": "uuid"
+          },
+          "taskRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "attempt": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "preferenceRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "materialId": {
+            "type": ["string", "null"],
+            "format": "uuid"
+          },
+          "materialVersion": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "filename": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "pinned": {
+            "type": "boolean"
+          },
+          "openedAt": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          }
+        }
+      },
+      "Method": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["versionId", "adoptionRevision", "scope", "workspaceId", "configurationSha"],
+        "properties": {
+          "versionId": {
+            "type": ["string", "null"],
+            "format": "uuid"
+          },
+          "adoptionRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "scope": {
+            "enum": ["BUILTIN", "TENANT", "WORKSPACE"]
+          },
+          "workspaceId": {
+            "type": ["string", "null"],
+            "format": "uuid"
+          },
+          "configurationSha": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      },
+      "Presentation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["renderer", "style", "profileId", "profileRevision"],
+        "properties": {
+          "renderer": {
+            "const": "source-preserving-v1"
+          },
+          "style": {
+            "enum": ["DEFAULT", "CONCISE", "TABLE_FIRST", "CONCLUSION_FIRST", "DETAIL_FIRST"]
+          },
+          "profileId": {
+            "type": ["string", "null"],
+            "format": "uuid"
+          },
+          "profileRevision": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "Configure": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["requestId", "expectedRevision", "enabled"],
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Opened": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["target", "openedAt", "evidence", "businessOutcome"],
+        "properties": {
+          "target": {
+            "$ref": "#/components/schemas/Target"
+          },
+          "openedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "evidence": {
+            "const": "USER_OPEN_ACTION"
+          },
+          "businessOutcome": {
+            "const": "NOT_ASSESSED"
+          }
+        }
+      },
+      "Item": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "content",
+          "score",
+          "method",
+          "presentation",
+          "reason",
+          "availability",
+          "feedbackTarget"
+        ],
+        "properties": {
+          "content": {
+            "$ref": "#/components/schemas/Content"
+          },
+          "score": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "method": {
+            "$ref": "#/components/schemas/Method"
+          },
+          "presentation": {
+            "$ref": "#/components/schemas/Presentation"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "availability": {
+            "const": "AVAILABLE_IN_APP"
+          },
+          "feedbackTarget": {
+            "$ref": "#/components/schemas/FeedbackTarget"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "content": {
+                  "properties": {
+                    "kind": {
+                      "const": "PUBLICATION"
+                    }
+                  }
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "feedbackTarget": {
+                  "properties": {
+                    "kind": {
+                      "const": "PUBLICATION"
+                    }
+                  }
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "feedbackTarget": {
+                  "properties": {
+                    "kind": {
+                      "const": "BRIEFING"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "Page": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "tenantId",
+          "settings",
+          "items",
+          "snapshot",
+          "hasMore",
+          "eligibleTotal",
+          "rankedCount",
+          "poolLimited",
+          "poolLimit",
+          "businessOutcome"
+        ],
+        "properties": {
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/Settings"
+          },
+          "items": {
+            "type": "array",
+            "maxItems": 30,
+            "items": {
+              "$ref": "#/components/schemas/Item"
+            }
+          },
+          "snapshot": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "hasMore": {
+            "type": "boolean"
+          },
+          "eligibleTotal": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "rankedCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "poolLimited": {
+            "type": "boolean"
+          },
+          "poolLimit": {
+            "const": 1000
+          },
+          "businessOutcome": {
+            "const": "NOT_ASSESSED"
+          }
+        }
+      },
+      "FeedbackTarget": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "taskId",
+              "taskRevision",
+              "attempt",
+              "presentationVersion",
+              "presentationRevision"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["BRIEFING", "TASK"]
+              },
+              "taskId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "taskRevision": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "attempt": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "presentationVersion": {
+                "type": "string",
+                "enum": ["briefing-basic-v1", "task-v1", "recommendation-v1"]
+              },
+              "presentationRevision": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "publicationId": {
+                "type": "null"
+              },
+              "materialVersionId": {
+                "type": "null"
+              },
+              "materialVersion": {
+                "type": "null"
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "kind": {
+                      "const": "BRIEFING"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "presentationVersion": {
+                      "enum": ["briefing-basic-v1", "recommendation-v1"]
+                    }
+                  }
+                },
+                "else": {
+                  "properties": {
+                    "presentationVersion": {
+                      "const": "task-v1"
+                    },
+                    "presentationRevision": {
+                      "const": 0
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "taskRevision",
+              "attempt",
+              "presentationVersion",
+              "presentationRevision",
+              "publicationId",
+              "materialVersionId",
+              "materialVersion"
+            ],
+            "properties": {
+              "kind": {
+                "const": "PUBLICATION"
+              },
+              "taskId": {
+                "type": "null"
+              },
+              "taskRevision": {
+                "const": 0
+              },
+              "attempt": {
+                "const": 0
+              },
+              "presentationVersion": {
+                "const": "recommendation-v1"
+              },
+              "presentationRevision": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "publicationId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "materialVersionId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "materialVersion": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

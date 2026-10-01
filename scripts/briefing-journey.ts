@@ -14,6 +14,7 @@ export async function briefingJourney(
   const route = `/workspace/#tenant=${tenant}&view=briefing`;
   await page.setViewportSize({ width: 1440, height: 960 });
   await page.goto(route);
+  await page.getByRole('tab', { name: '日期', exact: true }).click();
   const cards = page.locator('.live-briefing-card');
   await expect(cards).toHaveCount(1);
   await expect(cards).toContainText('已提取第 2—3 行');
@@ -39,12 +40,13 @@ export async function briefingJourney(
   );
   await cards.hover();
   await cards.getByRole('button', { name: '关注', exact: true }).click();
-  await page.getByLabel('画报视图', { exact: true }).selectOption('FOCUSED');
+  await page.getByRole('tab', { name: '关注', exact: true }).click();
   await expect(cards).toHaveCount(1);
   await cards.hover();
   await cards.getByRole('button', { name: '加宽卡片', exact: true }).click();
   await expect(cards).toHaveClass(/wide/);
   await page.reload();
+  await page.getByRole('tab', { name: '关注', exact: true }).click();
   await expect(cards).toHaveClass(/wide/);
   const csrf = await (await user.get('/api/v1/auth/csrf')).json();
   const write = {
@@ -72,20 +74,27 @@ export async function briefingJourney(
   await cards.hover();
   await cards.getByRole('button', { name: '隐藏', exact: true }).click();
   await expect(cards).toHaveCount(0);
+  await page.locator('.live-briefing-view-options > summary').click();
   await page.getByLabel('画报视图', { exact: true }).selectOption('HIDDEN');
   await expect(cards).toHaveCount(1);
   await cards.hover();
   await cards.getByRole('button', { name: '恢复显示', exact: true }).click();
   await expect(cards).toHaveCount(0);
-  await page.getByLabel('画报视图', { exact: true }).selectOption('LATEST');
+  await page.getByRole('tab', { name: '日期', exact: true }).click();
   await expect(cards).toHaveCount(1);
   const date = await page.evaluate((instant) => {
     const d = new Date(instant);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }, card.completedAt);
   await page.getByLabel('查看日期', { exact: true }).fill(date);
-  await expect(cards.locator('a')).toHaveAttribute('href', new RegExp('&task=' + card.taskId + '$'));
-  await cards.locator('a').click();
+  await cards.locator('.live-briefing-body').click();
+  const reader = page.locator('.live-reading-dialog');
+  await expect(reader).toContainText('已提取第 2—3 行');
+  await expect(reader.getByRole('link', { name: '继续会话', exact: true })).toHaveAttribute(
+    'href',
+    new RegExp('&task=' + card.taskId + '$'),
+  );
+  await reader.getByRole('link', { name: '继续会话', exact: true }).click();
   await expect(page.locator('.conversation-turn')).toHaveCount(1);
   await expect(page.locator('.conversation-reply')).toContainText('已提取第 2—3 行');
   await expect(page.getByLabel('工作要求', { exact: true })).toHaveCount(0);

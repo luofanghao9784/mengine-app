@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dreamcore:task-execution-control:1.1",
+  "$defs": {
+    "open": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "contractVersion": {
+          "enum": [
+            "1.5",
+            "1.6"
+          ]
+        },
+        "tools": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 14,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "search_sources",
+              "run_javascript",
+              "find_skills",
+              "activate_skill",
+              "public_search",
+              "read_public_page",
+              "candidate_tool",
+              "list_originals",
+              "read_original",
+              "process_original",
+              "task_control",
+              "task_context",
+              "task_plan",
+              "task_preference"
+            ]
+          }
+        }
+      },
+      "required": [
+        "contractVersion",
+        "tools"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "contractVersion": {
+                "const": "1.5"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "tools": {
+                "not": {
+                  "contains": {
+                    "enum": [
+                      "task_plan",
+                      "task_preference"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "opened": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "accepted": {
+          "const": true
+        },
+        "policy": {
+          "enum": [
+            "READ_ONLY_PRIVATE_V1",
+            "SCOPED_PRIVATE_V2"
+          ]
+        }
+      },
+      "required": [
+        "accepted",
+        "policy"
+      ]
+    },
+    "receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sequence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
+        },
+        "name": {
+          "enum": [
+            "search_sources",
+            "run_javascript",
+            "find_skills",
+            "activate_skill",
+            "public_search",
+            "read_public_page",
+            "candidate_tool",
+            "list_originals",
+            "read_original",
+            "process_original",
+            "task_control",
+            "task_context",
+            "task_plan",
+            "task_preference"
+          ]
+        },
+        "status": {
+          "enum": [
+            "STARTED",
+            "succeeded",
+            "failed"
+          ]
+        }
+      },
+      "required": [
+        "sequence",
+        "name",
+        "status"
+      ]
+    }
+  }
+}

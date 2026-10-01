@@ -28,7 +28,16 @@ export function BriefingArticle({
   const points = presentation?.points || data.items?.map((item) => ({ label: item.label, text: item.value }));
   return (
     <article className={`briefing-detail-article${embedded ? ' briefing-article-embedded' : ''}`}>
-      <time dateTime={reference.asOf}>内容截至 {briefingTime(reference.asOf, true)}</time>
+      {data.dataPeriod && (
+        <p className="subtle">
+          {data.sourceKind === 'news' ? '报道日期' : '统计范围'}：{data.dataPeriod}
+        </p>
+      )}
+      {!data.reporting && (
+        <time dateTime={reference.asOf}>
+          {data.article ? '本次分析生成于' : '内容截至'} {briefingTime(reference.asOf, true)}
+        </time>
+      )}
       <h2 id={titleId}>{magazineHeadline(data, reference.config.title)}</h2>
       <SourceImage photo={data.photo} />
       <p className="briefing-detail-lead">{data.fact}</p>
@@ -62,7 +71,15 @@ export function BriefingArticle({
         </aside>
       )}
       <div className="briefing-article-extension">
-        <span className="briefing-article-eyebrow">延伸解读 · 演示</span>
+        <span className="briefing-article-eyebrow">
+          {data.reporting
+            ? data.sourceKind === 'news'
+              ? '背景与观察'
+              : '经营分析'
+            : data.article
+              ? '完整分析 · 本次生成'
+              : '延伸解读 · 演示'}
+        </span>
         {article.sections.map((section, index) => (
           <section key={index}>
             <h3>{section.heading}</h3>

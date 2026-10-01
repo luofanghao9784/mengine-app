@@ -1,0 +1,354 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Task scoped work receipts",
+    "version": "1.0"
+  },
+  "paths": {
+    "/api/v1/tenants/{tenant}/tasks/{task}/work-receipts": {
+      "get": {
+        "summary": "本人当前获权任务的确切计划和偏好回执",
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "task",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current owner-authorized result; private, no-store. Revalidated sources and current profile state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkReceipts"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current identity, task or source access denied"
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/tasks/{task}/work-receipts/{receipt}/undo": {
+      "post": {
+        "summary": "撤销确切接受版本的个人偏好；新人工版本冲突时不覆盖",
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "task",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "receipt",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Undo"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Current owner-authorized result; private, no-store. Revalidated sources and current profile state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreferenceReceipt"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "PROFILE_VERSION_CONFLICT or IDEMPOTENCY_CONFLICT"
+          },
+          "403": {
+            "description": "Current source access denied"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "PlanCheckReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "taskId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "planId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "acceptedRevision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "executionEpoch": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "checkAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "state": {
+            "enum": [
+              "PENDING",
+              "DISPATCHED",
+              "CANCELLED"
+            ]
+          },
+          "currentlyEffective": {
+            "type": "boolean"
+          },
+          "dispatchedTaskId": {
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dispatchUnavailable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "taskId",
+          "planId",
+          "requestId",
+          "acceptedRevision",
+          "executionEpoch",
+          "checkAt",
+          "reason",
+          "state",
+          "currentlyEffective",
+          "dispatchedTaskId",
+          "dispatchUnavailable"
+        ]
+      },
+      "PreferenceReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "taskId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "category": {
+            "enum": [
+              "RESPONSE_LENGTH",
+              "RESPONSE_FORMAT",
+              "TONE"
+            ]
+          },
+          "choice": {
+            "enum": [
+              "CONCISE",
+              "DETAILED",
+              "PARAGRAPHS",
+              "BULLETS",
+              "DIRECT",
+              "FRIENDLY"
+            ]
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "acceptedRevision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "currentRevision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "currentStatus": {
+            "enum": [
+              "ACTIVE",
+              "PROPOSED",
+              "WITHDRAWN",
+              "EXPIRED",
+              "UNAVAILABLE"
+            ]
+          },
+          "currentlyEffective": {
+            "type": "boolean"
+          },
+          "canUndo": {
+            "type": "boolean"
+          },
+          "evidenceSource": {
+            "enum": [
+              "PROMPT",
+              "SUPPLEMENT"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "taskId",
+          "requestId",
+          "category",
+          "choice",
+          "label",
+          "profileId",
+          "acceptedRevision",
+          "currentRevision",
+          "currentStatus",
+          "currentlyEffective",
+          "canUndo",
+          "evidenceSource",
+          "createdAt"
+        ]
+      },
+      "WorkReceipts": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "checks": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "$ref": "#/components/schemas/PlanCheckReceipt"
+            }
+          },
+          "preferences": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "$ref": "#/components/schemas/PreferenceReceipt"
+            }
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "checks",
+          "preferences",
+          "hasMore"
+        ]
+      },
+      "Undo": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "requestId"
+        ]
+      }
+    },
+    "securitySchemes": {
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "DREAMCORE_SESSION"
+      }
+    }
+  },
+  "security": [
+    {
+      "sessionCookie": []
+    }
+  ]
+}

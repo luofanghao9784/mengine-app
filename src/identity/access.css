@@ -223,25 +223,33 @@
     left: 0;
     right: 0;
     flex-direction: row;
-    justify-content: center;
-    padding: 10px 16px max(10px, env(safe-area-inset-bottom));
+    justify-content: space-between;
+    padding: 10px 12px max(10px, env(safe-area-inset-bottom));
     background: var(--canvas);
     border-top: 1px solid var(--line);
     z-index: 5;
-    gap: 24px;
+    gap: 8px;
   }
   .access-brand {
     display: none;
   }
   .access-sidebar nav {
     flex-direction: row;
-    gap: 24px;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .access-sidebar .nav-item {
+    flex-shrink: 0;
   }
   .access-sidebar .nav-label {
     display: none;
   }
   .access-avatar {
     margin-top: 0;
+    flex-shrink: 0;
   }
   .access-main .topbar {
     grid-template-columns: minmax(0, 1fr) auto;
@@ -277,9 +285,5 @@
   }
   .access-wordmark {
     margin-bottom: 28px;
-  }
-  .access-sidebar,
-  .access-sidebar nav {
-    gap: 18px;
   }
 }

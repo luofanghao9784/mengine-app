@@ -79,7 +79,8 @@ test('推荐不开放调整，关注跨类型自由拖动；松手保存、刷�
     .evaluate((el) => parseFloat(getComputedStyle(el).getPropertyValue('--briefing-unit')) + 10);
   await page.mouse.move(bounds.x + 50, bounds.y + 70);
   await page.mouse.down();
-  await page.mouse.move(bounds.x + 50, bounds.y + 70 - unit, { steps: 8 });
+  // Automatic content sizing may put the first small card in the first row.
+  await page.mouse.move(bounds.x + 50, bounds.y + 70 + unit, { steps: 8 });
   await expect(page.locator('.briefing-page')).toHaveClass(/is-moving/);
   expect(await prefs(page)).toBeUndefined();
   await page.mouse.up();

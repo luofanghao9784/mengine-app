@@ -1,4 +1,7 @@
 import { meteredModel } from './metered-model.js';
+import { inputCoverage } from './input-coverage.js';
+import { workTools } from './task-work.js';
+import { contextTool, taskBootstrap } from './task-context.js';
 import { ENGINE_VERSION } from '../release.js';
 import { originalRecipeTool } from './file-recipes.js';
 import { OriginalInputs } from './original-inputs.js';
@@ -17,7 +20,7 @@ import { PublicWebTask, type PublicReader, type PublicSearch } from './public-we
 export const uuid = (v: unknown): v is string =>
   typeof v === 'string' && /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(v);
 export interface AgentRequest {
-  contractVersion: '1.4';
+  contractVersion: '1.4' | '1.5';
   taskId: string;
   attemptId: string;
   prompt: string;
@@ -49,12 +52,12 @@ export class AgentTasks {
   async run(input: unknown, disconnected: AbortSignal) {
     if (
       !isRecord(input) ||
-      input.contractVersion !== '1.4' ||
+      !['1.4', '1.5'].includes(String(input.contractVersion)) ||
       !uuid(input.taskId) ||
       !uuid(input.attemptId) ||
       typeof input.prompt !== 'string' ||
       !input.prompt.trim() ||
-      input.prompt.length > 2000 ||
+      input.prompt.length > (input.contractVersion === '1.5' ? 16000 : 2000) ||
       Object.keys(input).some((k) => !['contractVersion', 'taskId', 'attemptId', 'prompt'].includes(k))
     )
       throw new RuntimeError('INVALID_AGENT_REQUEST');
@@ -71,6 +74,9 @@ export class AgentTasks {
     let denied = false;
     let publicQuery: string | undefined;
     let candidatesAllowed: boolean | undefined;
+    let contextAvailable: boolean | undefined;
+    let workAvailable: boolean | undefined;
+    let planAllowed: boolean | undefined;
     let candidateSession: CandidateSession | undefined;
     let candidateUsed = false;
     let recipeFailure: string | undefined;
@@ -104,6 +110,17 @@ export class AgentTasks {
         if (typeof grant !== 'boolean' || (candidatesAllowed !== undefined && candidatesAllowed !== grant))
           throw new RuntimeError('TASK_ACCESS_DENIED');
         candidatesAllowed = grant;
+        const context = response.contextVersion === '1.0';
+        if (
+          (response.contextVersion !== undefined && !context) ||
+          (contextAvailable !== undefined && contextAvailable !== context)
+        )
+          throw new RuntimeError('TASK_ACCESS_DENIED');
+        contextAvailable = context;
+        const work = response.taskWorkVersion === '1.0';
+        const plan = response.planAllowed ?? false;
+        if ((response.taskWorkVersion !== undefined && !work) || typeof plan !== 'boolean' || (!work && plan) || (workAvailable !== undefined && workAvailable !== work) || (planAllowed !== undefined && planAllowed !== plan)) throw new RuntimeError('TASK_ACCESS_DENIED');
+        workAvailable = work; planAllowed = plan;
       } catch {
         denied = true;
         controller.abort();
@@ -211,7 +228,7 @@ export class AgentTasks {
             sources.set(source.id, source);
             items.push({ ...source, inputHandle: `${source.id}.txt` });
           }
-          return { items, scope: 'authorized-excerpts' };
+          return { items, scope: 'authorized-excerpts', ...inputCoverage(response) };
         },
       };
       const tools: TaskTool[] = [
@@ -254,6 +271,10 @@ export class AgentTasks {
           },
         },
       ];
+      const contextEnabled = task.contractVersion === '1.5' && contextAvailable;
+      const continuity = contextEnabled ? await taskBootstrap(invoke) : undefined;
+      if (contextEnabled) tools.push(contextTool(invoke, authorize));
+      if (task.contractVersion === '1.5' && workAvailable) tools.push(...workTools(invoke, authorize, !!planAllowed));
       if (web) {
         const verify = async () => {
           await authorize();
@@ -377,8 +398,71 @@ export class AgentTasks {
           },
         });
       }
+      let outcome: 'COMPLETE' | 'PARTIAL' | 'WAITING_INPUT' | 'WAITING_CAPABILITY' = 'COMPLETE';
+      let requiredInput: string | null = null;
+      if (task.contractVersion === '1.5') {
+        tools.push({
+          name: 'task_control',
+          description:
+            'Report a genuine task blocker or partial delivery. WAITING_INPUT asks the user for specific missing information; WAITING_CAPABILITY means a required capability is unavailable. PARTIAL preserves useful work without claiming completion. This does not grant permission, execute a business action, or mark business success. Finish with an honest user-facing explanation.',
+          parameters: {
+            type: 'object',
+            properties: {
+              outcome: { type: 'string', enum: ['PARTIAL', 'WAITING_INPUT', 'WAITING_CAPABILITY'] },
+              message: {
+                type: 'string',
+                description: 'Specific blocker or remaining work, 1 to 1000 characters.',
+              },
+            },
+            required: ['outcome', 'message'],
+            additionalProperties: false,
+          },
+          execute: async (args) => {
+            await authorize();
+            if (
+              !isRecord(args) ||
+              !['PARTIAL', 'WAITING_INPUT', 'WAITING_CAPABILITY'].includes(String(args.outcome)) ||
+              typeof args.message !== 'string' ||
+              !args.message.trim() ||
+              args.message.length > 1000
+            )
+              throw new RuntimeError('INVALID_TASK_CONTROL');
+            outcome = args.outcome as typeof outcome;
+            requiredInput = args.message.trim();
+            return { recorded: true, outcome, message: requiredInput, businessActionPerformed: false };
+          },
+        });
+        const registered = await invoke('execution/open', {
+          contractVersion: workAvailable ? '1.6' : '1.5',
+          tools: tools.map((t) => t.name),
+        });
+        if (
+          !isRecord(registered) ||
+          registered.accepted !== true ||
+          registered.policy !== (workAvailable ? 'SCOPED_PRIVATE_V2' : 'READ_ONLY_PRIVATE_V1')
+        )
+          throw new RuntimeError('TASK_RUNTIME_INCOMPATIBLE');
+        let sequence = 0;
+        for (const tool of tools) {
+          const execute = tool.execute.bind(tool);
+          tool.execute = async (args, executionSignal) => {
+            const number = ++sequence;
+            await invoke('execution/tool', { sequence: number, name: tool.name, status: 'STARTED' });
+            let output: Json;
+            try {
+              output = await execute(args, executionSignal);
+            } catch (error) {
+              await invoke('execution/tool', { sequence: number, name: tool.name, status: 'failed' });
+              throw error;
+            }
+            await invoke('execution/tool', { sequence: number, name: tool.name, status: 'succeeded' });
+            return output;
+          };
+        }
+      }
       const result = await runHarness({
         prompt: task.prompt,
+        context: continuity,
         model,
         tools,
         signal,
@@ -388,16 +472,19 @@ export class AgentTasks {
       if (result.status !== 'completed' || !result.text.trim() || result.text.length > 16000)
         throw new RuntimeError(result.status === 'limit' ? 'TASK_LIMIT' : 'TASK_MODEL_FAILED');
       // Failed tools cannot be turned into a successful business task by an apologetic model reply.
-      if (result.tools.some((t) => t.status !== 'succeeded'))
-        throw new RuntimeError(recipeFailure ?? 'TASK_TOOL_FAILED');
+      if (result.tools.some((t) => t.status !== 'succeeded')) {
+        if (task.contractVersion === '1.4') throw new RuntimeError(recipeFailure ?? 'TASK_TOOL_FAILED');
+        if ((outcome as string) === 'COMPLETE') outcome = 'PARTIAL';
+      }
       await authorize();
       const artifacts: Json[] = [];
       let total = 0;
       for (const receipt of result.tools.filter(
         (t) =>
-          t.name === 'run_javascript' ||
-          t.name === 'process_original' ||
-          (t.name === 'candidate_tool' && isRecord(t.output) && Array.isArray(t.output.artifacts)),
+          t.status === 'succeeded' &&
+          (t.name === 'run_javascript' ||
+            t.name === 'process_original' ||
+            (t.name === 'candidate_tool' && isRecord(t.output) && Array.isArray(t.output.artifacts))),
       )) {
         const output = receipt.output;
         if (!isRecord(output) || !Array.isArray(output.artifacts)) throw new RuntimeError('INVALID_ARTIFACT');
@@ -436,7 +523,8 @@ export class AgentTasks {
         artifacts.push(report);
       }
       return {
-        contractVersion: '1.4',
+        contractVersion: task.contractVersion,
+        ...(task.contractVersion === '1.5' ? { outcome, requiredInput } : {}),
         engineVersion: ENGINE_VERSION,
         taskId: task.taskId,
         attemptId: task.attemptId,

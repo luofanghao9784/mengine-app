@@ -1,3 +1,5 @@
+import { RequestPending } from '../shared/request-guard';
+import { useContext } from 'react';
 import { useState, type ReactNode } from 'react';
 import { OperationsPanel } from '../operations/OperationsPanel';
 import {
@@ -40,6 +42,7 @@ type Dialog =
   | { kind: 'invite' }
   | { kind: 'create' }
   | { kind: 'status'; member: TenantMember }
+  | { kind: 'emergency'; member: TenantMember }
   | { kind: 'revoke'; invitation: Invitation }
   | { kind: 'space'; id: string }
   | { kind: 'settings'; overview: TenantOverview };
@@ -58,6 +61,7 @@ const actions: Record<string, string> = {
   INVITATION_ACCEPT: '接受邀请',
   MEMBER_ENABLE: '恢复成员',
   MEMBER_DISABLE: '停用成员',
+  MEMBER_SECURITY_DISABLE: '紧急安全停用成员',
   MEMBER_ROLE: '调整管理员角色',
   WORKSPACE_CREATE: '创建共享空间',
   WORKSPACE_RENAME: '修改空间名称',
@@ -72,6 +76,7 @@ const role = (value: string) => (value === 'TENANT_ADMIN' ? '企业管理员' : 
 export function TenantAdminHome({ tenant }: { tenant: string }) {
   const { session, refresh: refreshIdentity } = useSession();
   const [tab, setTab] = useState<Tab>('members');
+  const pendingRequest = useContext(RequestPending);
   const [attempt, setAttempt] = useState(0);
   const [dialog, setDialog] = useState<Dialog>();
   const [writing, setWriting] = useState(false);
@@ -126,6 +131,7 @@ export function TenantAdminHome({ tenant }: { tenant: string }) {
             {tabs.map(([key, label, Icon]) => (
               <Button
                 key={key}
+                disabled={pendingRequest || writing}
                 icon={Icon}
                 variant={tab === key ? 'primary' : 'ghost'}
                 aria-current={tab === key ? 'page' : undefined}
@@ -142,6 +148,7 @@ export function TenantAdminHome({ tenant }: { tenant: string }) {
                 attempt={attempt}
                 refresh={refresh}
                 onStatus={(member) => setDialog({ kind: 'status', member })}
+                onEmergency={(member) => setDialog({ kind: 'emergency', member })}
               />
             )}
             {tab === 'invitations' && (
@@ -193,6 +200,7 @@ export function TenantAdminHome({ tenant }: { tenant: string }) {
               invite: '邀请成员',
               create: '创建共享空间',
               status: '调整成员状态',
+              emergency: '紧急安全停用',
               revoke: '撤销邀请',
               space: '共享空间管理',
               settings: '修改企业名称',
@@ -238,6 +246,16 @@ export function TenantAdminHome({ tenant }: { tenant: string }) {
                   await api.settings(tenant, { requestId, name, expectedVersion: dialog.overview.version });
                   complete('企业名称已更新。');
                   await refreshIdentity(true);
+                }}
+              />
+            )}
+            {dialog.kind === 'emergency' && (
+              <EmergencyStop
+                tenant={tenant}
+                member={dialog.member}
+                complete={async (message) => {
+                  complete(message);
+                  if (dialog.member.accountId === session.identity?.account.id) await refreshIdentity(true);
                 }}
               />
             )}
@@ -324,11 +342,13 @@ function Members({
   attempt,
   refresh,
   onStatus,
+  onEmergency,
 }: {
   tenant: string;
   attempt: number;
   refresh: () => void;
   onStatus: (m: TenantMember) => void;
+  onEmergency: (m: TenantMember) => void;
 }) {
   const [q, setQ] = useState(''),
     [status, setStatus] = useState(''),
@@ -383,6 +403,11 @@ function Members({
                       ? '已启用'
                       : '已停用'}
                 </Badge>
+                {m.status === 'ACTIVE' && (
+                  <Button variant="danger" onClick={() => onEmergency(m)}>
+                    紧急安全停用
+                  </Button>
+                )}
                 <Button variant="ghost" onClick={() => onStatus(m)}>
                   {m.status === 'ACTIVE' ? '停用' : '恢复'}
                 </Button>
@@ -840,7 +865,9 @@ function AddGrant({
   return (
     <>
       <h3>选择要授权的成员</h3>
-      <p className="platform-help">仅可新增有效成员。管理员为自己新增授权的规则待确认，暂不开放。</p>
+      <p className="platform-help">
+        仅可新增有效成员。配置管理员不能为自己新增内容权限；企业授权负责人可明确授权。
+      </p>
       <Filter
         label="搜索授权成员"
         submit={(q) => {
@@ -877,5 +904,61 @@ function AddGrant({
         </>
       )}
     </>
+  );
+}
+
+function EmergencyStop({
+  tenant,
+  member,
+  complete,
+}: {
+  tenant: string;
+  member: TenantMember;
+  complete: (message: string) => Promise<void>;
+}) {
+  const [acknowledged, setAcknowledged] = useState(false);
+  const task = useSubmission<boolean>();
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (acknowledged)
+          void task.submit(true, async (_, requestId) => {
+            const result = await api.emergencyDisable(tenant, member.accountId, {
+              requestId,
+              expectedVersion: member.version,
+              securityAction: 'SECURITY_RISK',
+            });
+            await complete(
+              result.recoveryRequestId
+                ? `已紧急停用。恢复申请 ${result.recoveryRequestId} 待核验；未变更负责人。`
+                : '已紧急停用该成员的本企业资格。',
+            );
+          });
+      }}
+    >
+      <p>
+        <strong>{member.displayName}</strong> · {member.email}
+      </p>
+      <p>
+        用于已识别的账号安全风险，可先停用负责人或最后管理员。操作立即撤销该成员的本企业使用资格；停用本人后将失去本企业入口。
+      </p>
+      <p>负责人归属与私人内容不转移。涉及负责人或最后管理员时进入待核验恢复，不能通过普通恢复绕过。</p>
+      <label className="governance-check">
+        <input
+          type="checkbox"
+          checked={acknowledged}
+          disabled={task.busy || task.uncertain}
+          onChange={(e) => setAcknowledged(e.target.checked)}
+        />
+        确认存在安全风险，需要立即停用
+      </label>
+      <SubmitError error={task.error} uncertain={task.uncertain} />
+      <FormActions>
+        <Button type="submit" variant="danger" disabled={!acknowledged || task.busy}>
+          {task.uncertain ? '重试本次紧急停用' : '确认紧急安全停用'}
+        </Button>
+      </FormActions>
+    </form>
   );
 }

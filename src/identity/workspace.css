@@ -1,0 +1,182 @@
+/* Workspace presentation follows the 9POP integrated Demo at e2f59ee.
+   Management surfaces keep their own denser layouts. */
+.workspace-shell .access-sidebar {
+  position: relative;
+  z-index: 20;
+  padding-top: 20px;
+}
+.workspace-shell .access-brand {
+  margin-bottom: 32px;
+}
+.workspace-shell .access-sidebar nav {
+  gap: 14px;
+}
+.workspace-shell .access-main .topbar {
+  --topbar-row-height: 80px;
+  padding-right: 28px;
+}
+.workspace-shell .access-main .topbar h1 {
+  font-size: var(--font-heading);
+  letter-spacing: 0;
+}
+.workspace-shell .access-content {
+  padding: 0 28px 28px 0;
+}
+.workspace-shell .access-tenant-picker {
+  max-width: 220px;
+  font-size: 12px;
+}
+.workspace-edition {
+  color: var(--muted);
+  font-size: var(--font-caption);
+}
+.workspace-briefing .topbar-heading {
+  gap: 10px;
+}
+.workspace-briefing .access-main .topbar {
+  grid-template-columns: minmax(180px, 1fr) auto minmax(140px, 1fr);
+}
+.workspace-briefing .topbar-actions {
+  justify-self: center;
+}
+.workspace-briefing .access-main {
+  position: relative;
+}
+.workspace-briefing .access-content {
+  padding-bottom: 106px;
+}
+.workspace-composer {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(720px, calc(100% - 48px));
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 26px;
+  box-shadow: 0 8px 30px #2536510a;
+  padding: 8px 10px 8px 18px;
+  z-index: 4;
+}
+.workspace-composer input:not([type]) {
+  border: 0;
+  padding: 7px 0;
+  background: transparent;
+  outline-offset: 4px;
+}
+.workspace-composer button {
+  display: grid;
+  place-items: center;
+  flex: 0 0 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--selected);
+  color: var(--blue-ink);
+}
+.workspace-composer > p {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  background: white;
+  color: #a43e42;
+  border-radius: 10px;
+  padding: 8px 12px;
+}
+.workspace-more-links {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.workspace-more-links a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--text-secondary);
+}
+.workspace-more-links a:hover,
+.workspace-more-links a[aria-current='page'] {
+  background: var(--selected);
+  color: var(--blue-ink);
+}
+.workspace-conversations {
+  --canvas: #fff;
+  background: #fff;
+}
+.workspace-conversations .access-main .topbar {
+  --topbar-row-height: 64px;
+  background: #fff;
+}
+.workspace-conversations .access-content {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-bottom: 20px;
+}
+.workspace-conversations .access-content > :is(.access-alert, .access-success, .departure-status) {
+  flex: 0 0 auto;
+}
+.workspace-conversations .live-conversations {
+  flex: 1;
+  min-height: 0;
+}
+@media (max-width: 800px) {
+  .workspace-shell .access-sidebar {
+    position: fixed;
+    padding: 10px 12px max(10px, env(safe-area-inset-bottom));
+  }
+  .workspace-shell .access-sidebar nav {
+    gap: 6px;
+    justify-content: space-around;
+  }
+  .workspace-shell .access-main .topbar {
+    --topbar-row-height: 80px;
+    min-height: 80px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: 14px 16px;
+    gap: 5px 8px;
+  }
+  .workspace-shell .access-main .topbar-meta {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-self: start;
+  }
+  .workspace-shell .access-content {
+    padding: 0 14px calc(90px + env(safe-area-inset-bottom));
+  }
+  .workspace-briefing .access-content {
+    padding-bottom: calc(162px + env(safe-area-inset-bottom));
+  }
+  .workspace-composer {
+    bottom: calc(86px + env(safe-area-inset-bottom));
+    width: calc(100% - 28px);
+  }
+  .workspace-briefing .topbar-heading {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+  .workspace-conversations .access-content {
+    padding: 0 10px calc(82px + env(safe-area-inset-bottom));
+  }
+  .workspace-shell .access-tenant-picker select {
+    padding-block: 0;
+  }
+}
+@media (max-width: 380px) {
+  .workspace-shell .access-sidebar {
+    gap: 4px;
+    padding-inline: 7px;
+  }
+  .workspace-shell .access-sidebar nav {
+    gap: 2px;
+  }
+  .workspace-more-links {
+    grid-template-columns: 1fr;
+  }
+}

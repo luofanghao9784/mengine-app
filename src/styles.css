@@ -18,7 +18,7 @@
   background: var(--canvas);
   z-index: 20;
 }
-.brand {
+.sidebar .brand {
   display: grid;
   place-items: center;
   width: 48px;
@@ -28,6 +28,15 @@
 }
 .brand:hover {
   background: #edf1f6;
+}
+.brand-button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border-radius: inherit;
 }
 .help-brand {
   margin-bottom: 24px;
@@ -366,12 +375,13 @@
 .workbench-dashboard-entry:hover {
   background: var(--selected);
 }
-/* The fixed heading stays crisp while scrolling content dissolves below it.
-   Two masked blur layers give the edge a soft falloff instead of a hard strip. */
-:is(.main-shell > .topbar, .deck-card-header, .preview-header, .conversation-list-tools) {
+/* Shared scroll-edge geometry. The input softens once, then fades to white;
+   repeating the stronger header blur turns short buttons into gray streaks. */
+:is(.main-shell > .topbar, .deck-card-header, .preview-header, .conversation-list-tools, .conversation-overlay .composer-wrap) {
   --scroll-edge-color: 255 255 255;
   --scroll-edge-depth: 24px;
   --scroll-edge-visible: 0;
+  --scroll-edge-direction: to bottom;
   position: relative;
   z-index: 3;
 }
@@ -380,8 +390,8 @@
   --scroll-edge-depth: 32px;
   z-index: 15;
 }
-:is(.main-shell > .topbar, .deck-card-header, .preview-header, .conversation-list-tools)::before,
-:is(.main-shell > .topbar, .deck-card-header, .preview-header, .conversation-list-tools)::after {
+:is(.main-shell > .topbar, .deck-card-header, .preview-header, .conversation-list-tools, .conversation-overlay .composer-wrap)::before,
+:is(.main-shell > .topbar, .deck-card-header, .preview-header, .conversation-list-tools, .conversation-overlay .composer-wrap)::after {
   content: '';
   position: absolute;
   inset: 100% 0 auto;
@@ -389,16 +399,16 @@
   pointer-events: none;
   opacity: var(--scroll-edge-visible);
   transition: opacity 140ms ease-out;
-  -webkit-mask-image: linear-gradient(to bottom, #000, #0008 45%, transparent);
-  mask-image: linear-gradient(to bottom, #000, #0008 45%, transparent);
+  -webkit-mask-image: linear-gradient(var(--scroll-edge-direction), #000, #0008 45%, transparent);
+  mask-image: linear-gradient(var(--scroll-edge-direction), #000, #0008 45%, transparent);
 }
-:is(.main-shell > .topbar, .deck-card-header, .preview-header, .conversation-list-tools)::before {
+:is(.main-shell > .topbar, .deck-card-header, .preview-header, .conversation-list-tools, .conversation-overlay .composer-wrap)::before {
   -webkit-backdrop-filter: blur(2px);
   backdrop-filter: blur(2px);
 }
-:is(.main-shell > .topbar, .deck-card-header, .preview-header, .conversation-list-tools)::after {
+:is(.main-shell > .topbar, .deck-card-header, .preview-header, .conversation-list-tools, .conversation-overlay .composer-wrap)::after {
   height: calc(var(--scroll-edge-depth) * 0.75);
-  background: linear-gradient(to bottom, rgb(var(--scroll-edge-color)), rgb(var(--scroll-edge-color) / 0));
+  background: linear-gradient(var(--scroll-edge-direction), rgb(var(--scroll-edge-color)), rgb(var(--scroll-edge-color) / 0));
   -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
 }
@@ -406,7 +416,8 @@
 .deck-card-content:has(> .chat-main > .conversation-scroll[data-scrolled-start]) > .deck-card-header,
 .deck-card-content:has(> .deck-source-scroll[data-scrolled-start]) > .deck-card-header,
 .conversation-list-tools:has(+ .sidebar-scroll[data-scrolled-start]),
-.preview-pane:has(> .preview-scroll[data-scrolled-start]) > .preview-header {
+.preview-pane:has(> .preview-scroll[data-scrolled-start]) > .preview-header,
+.reader-main:has(> .reader-workspace > .reader-document > .reader-scroll[data-scrolled-start]) > .reader-header {
   --scroll-edge-visible: 1;
 }
 .conversation-list-tools {
@@ -415,8 +426,8 @@
   flex-shrink: 0;
 }
 @media (prefers-reduced-motion: reduce) {
-  :is(.main-shell > .topbar, .deck-card-header, .preview-header, .conversation-list-tools)::before,
-  :is(.main-shell > .topbar, .deck-card-header, .preview-header, .conversation-list-tools)::after {
+  :is(.main-shell > .topbar, .deck-card-header, .preview-header, .conversation-list-tools, .conversation-overlay .composer-wrap)::before,
+  :is(.main-shell > .topbar, .deck-card-header, .preview-header, .conversation-list-tools, .conversation-overlay .composer-wrap)::after {
     transition: none;
   }
 }
@@ -5461,6 +5472,8 @@ html[data-briefing-slide]::view-transition-new(briefing-composer) {
   background: #1769e010;
 }
 .conversation-overlay .chat-main {
+  --composer-top-inset: 10px;
+  --composer-edge-overlap: 12px;
   border-radius: 0 0 24px 24px;
 }
 .conversation-overlay .conversation-scroll {
@@ -5482,7 +5495,44 @@ html[data-briefing-slide]::view-transition-new(briefing-composer) {
   min-width: 0;
 }
 .conversation-overlay .composer-wrap {
-  padding: 10px 18px 14px;
+  --scroll-edge-direction: to top;
+  --scroll-edge-visible: 1;
+  position: relative;
+  z-index: 1;
+  padding: var(--composer-top-inset) 18px 14px;
+  background: transparent;
+}
+/* Keep the scroll surface behind the input edge so the blur does not sample
+   a clipped row. The white end of the fade covers this small overlap. */
+.conversation-overlay .conversation-scroll:has(+ .composer-wrap) {
+  margin-bottom: calc(-1 * (var(--composer-top-inset) + var(--composer-edge-overlap)));
+  padding-bottom: calc(24px + var(--composer-edge-overlap));
+  scroll-padding-bottom: calc(24px + var(--composer-edge-overlap));
+}
+.conversation-overlay .composer-wrap::before,
+.conversation-overlay .composer-wrap::after {
+  inset: auto 0 calc(100% - var(--composer-top-inset));
+}
+.conversation-overlay .composer-wrap::after {
+  bottom: calc(100% - var(--composer-top-inset) - var(--composer-edge-overlap));
+  height: calc(var(--scroll-edge-depth) + var(--composer-edge-overlap));
+  /* Keep the fade independent of the blur mask: multiplying both alpha
+     gradients leaves too much dark, blurred text visible at the input edge. */
+  background: linear-gradient(
+    to top,
+    rgb(var(--scroll-edge-color)) calc(var(--composer-edge-overlap) + var(--scroll-edge-depth) * 0.25),
+    rgb(var(--scroll-edge-color) / 0.92) calc(var(--composer-edge-overlap) + var(--scroll-edge-depth) * 0.5),
+    rgb(var(--scroll-edge-color) / 0.55) calc(var(--composer-edge-overlap) + var(--scroll-edge-depth) * 0.75),
+    rgb(var(--scroll-edge-color) / 0)
+  );
+  -webkit-mask-image: none;
+  mask-image: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+.conversation-overlay .composer-wrap > .composer {
+  position: relative;
+  z-index: 1;
 }
 .conversation-overlay .composer textarea {
   min-height: 64px;
@@ -5725,8 +5775,11 @@ html[data-briefing-slide]::view-transition-new(briefing-composer) {
   .conversation-overlay .conversation-scroll {
     padding: 0 16px;
   }
+  .conversation-overlay .chat-main {
+    --composer-top-inset: 8px;
+  }
   .conversation-overlay .composer-wrap {
-    padding: 8px 10px 12px;
+    padding: var(--composer-top-inset) 10px 12px;
   }
   .conversation-overlay .composer textarea {
     font-size: 16px;

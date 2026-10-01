@@ -217,7 +217,7 @@ export async function revocationJourney({
     await other.goto(location());
     await other.getByRole('button', { name: '账号与退出', exact: true }).click();
     await other.getByRole('button', { name: '退出登录', exact: true }).click();
-    await expect(page.getByRole('heading', { name: '登录梦核工作空间', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '登录梦擎工作空间', exact: true })).toBeVisible();
     await expect(page.getByRole('dialog')).toHaveCount(0);
     assert.equal((await api.get(download)).status(), 401);
     await page.getByLabel('邮箱', { exact: true }).fill(memberAccount.email);

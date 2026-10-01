@@ -9,6 +9,9 @@ const preference = { revision: 1, pinned: true, hidden: false, size: 'WIDE' as c
 const card = {
   conversationId: id,
   taskId: id,
+  taskRevision: 1,
+  attempt: 1,
+  presentationVersion: 'briefing-basic-v1',
   workspaceId: space,
   workspaceName: '合成空间',
   title: '合成任务',
@@ -33,6 +36,19 @@ const page = {
 };
 const response = (value: unknown) =>
   new Response(JSON.stringify(value), { headers: { 'content-type': 'application/json' } });
+test('focus layout binds the requested cards and preserves the original move after a lost reply', async () => {
+  const body = { requestId: tenant, expectedRevision: 2, conversationId: id, anchorId: space, direction: 'BEFORE' as const };
+  const receipt = { id: tenant, conversationId: id, anchorId: space, direction: 'BEFORE', appliedRevision: 3, currentRevision: 4 };
+  const client = (value: unknown) => createBriefingClient(async (url, init) => {
+    if (String(url).endsWith('/csrf')) return response({ token: 'synthetic', headerName: 'X-CSRF-TOKEN' });
+    assert.deepEqual(JSON.parse(String(init?.body)), body); return response(value);
+  });
+  assert.deepEqual(await client(receipt).move(tenant, body), receipt);
+  for (const bad of [{ ...receipt, anchorId: id }, { ...receipt, currentRevision: 1 }, { ...receipt, direction: 'AFTER' }])
+    await assert.rejects(client(bad).move(tenant, body), (e) => e instanceof IdentityError && e.code === 'CONTRACT_MISMATCH');
+  assert.deepEqual(await createBriefingClient(async () => response({tenantId:tenant,revision:0})).layout(tenant), {tenantId:tenant,revision:0});
+  await assert.rejects(createBriefingClient(async () => response({tenantId:space,revision:0})).layout(tenant));
+});
 test('briefing accepts escaped text but rejects foreign scopes, duplicate conversations and invalid receipts', async () => {
   assert.deepEqual(await createBriefingClient(async () => response(page)).list(tenant, filter), page);
   for (const value of [

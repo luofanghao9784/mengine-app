@@ -89,7 +89,7 @@
       "sessionCookie": {
         "type": "apiKey",
         "in": "cookie",
-        "name": "SESSION"
+        "name": "DREAMCORE_SESSION"
       }
     },
     "schemas": {
@@ -111,7 +111,10 @@
             "maxLength": 160
           },
           "folderId": {
-            "type": ["string", "null"],
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "uuid"
           },
           "materialId": {
@@ -133,7 +136,12 @@
             "maxLength": 80
           },
           "kind": {
-            "enum": ["MATERIAL_UPLOADED", "MATERIAL_UPDATED", "DOCUMENT_PUBLISHED", "DOCUMENT_UPDATED"]
+            "enum": [
+              "MATERIAL_UPLOADED",
+              "MATERIAL_UPDATED",
+              "DOCUMENT_PUBLISHED",
+              "DOCUMENT_UPDATED"
+            ]
           },
           "occurredAt": {
             "type": "string",
@@ -162,7 +170,10 @@
             "format": "uuid"
           },
           "workspaceId": {
-            "type": ["string", "null"],
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "uuid"
           },
           "items": {
@@ -173,12 +184,20 @@
             }
           },
           "nextCursor": {
-            "type": ["string", "null"],
+            "type": [
+              "string",
+              "null"
+            ],
             "minLength": 1,
             "maxLength": 100
           }
         },
-        "required": ["tenantId", "workspaceId", "items", "nextCursor"]
+        "required": [
+          "tenantId",
+          "workspaceId",
+          "items",
+          "nextCursor"
+        ]
       }
     }
   }

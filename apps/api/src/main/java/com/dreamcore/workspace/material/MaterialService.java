@@ -23,6 +23,18 @@ public class MaterialService {
                        long maxUploadBytes, List<Entry> items, boolean hasMore) {}
     public record Version(UUID id, int number, String filename, long sizeBytes, String sha256, UUID createdBy, Instant createdAt, String origin) {}
     public record Detail(Entry document, List<Version> versions, boolean hasMore) {}
+    /** Top-level entry is the accepted version when known; currentVersion is read at replay time. */
+    public record UploadReceipt(UUID id, UUID tenantId, UUID workspaceId, String workspaceName, UUID folderId, String kind,
+                                String name, int version, Long sizeBytes, Instant updatedAt, List<String> path, boolean canMaintain,
+                                String receiptStatus, Version acceptedVersion, int currentVersion) {
+        UploadReceipt(Entry current,Version accepted) {
+            this(current.id(),current.tenantId(),current.workspaceId(),current.workspaceName(),current.folderId(),current.kind(),
+                current.name(),accepted==null?current.version():accepted.number(),accepted==null?current.sizeBytes():accepted.sizeBytes(),
+                accepted==null?current.updatedAt():accepted.createdAt(),current.path(),current.canMaintain(),
+                accepted==null?"HISTORICAL_UNKNOWN":"EXACT",accepted,current.version());
+        }
+        public Entry entry(){return new Entry(id,tenantId,workspaceId,workspaceName,folderId,kind,name,version,sizeBytes,updatedAt,path,canMaintain);}
+    }
     public record Download(String filename, byte[] bytes) {}
     private final JdbcTemplate db; private final IdentityService identities; private final IdentityAudit audit;
     private final com.dreamcore.workspace.knowledge.KnowledgeService knowledge;
@@ -43,7 +55,7 @@ public class MaterialService {
         var result=new ArrayList<Crumb>(); var seen=new HashSet<UUID>();
         while(folder!=null) {
             if(!seen.add(folder) || result.size()>=32) throw new IdentityException(409,"MATERIAL_FOLDER_DEPTH");
-            var rows=db.queryForList("SELECT id,name,parent_id FROM material_folders WHERE tenant_id=? AND workspace_id=? AND id=?",tenant,workspace,folder);
+            var rows=db.queryForList("SELECT id,name,parent_id FROM active_material_folders WHERE tenant_id=? AND workspace_id=? AND id=?",tenant,workspace,folder);
             if(rows.isEmpty()) throw missing(); var row=rows.getFirst();
             result.add(new Crumb((UUID)row.get("id"),(String)row.get("name"))); folder=(UUID)row.get("parent_id");
         }
@@ -61,15 +73,15 @@ public class MaterialService {
     private static final String ENTRIES="""
         WITH entries AS (
           SELECT f.id,f.tenant_id,f.workspace_id,f.parent_id,'FOLDER' AS kind,f.name,0 AS version,NULL::bigint AS size_bytes,f.created_at AS updated_at
-          FROM material_folders f
+          FROM active_material_folders f
           UNION ALL
           SELECT m.id,m.tenant_id,m.workspace_id,m.folder_id,'DOCUMENT',m.name,m.current_version,v.size_bytes,m.updated_at
-          FROM materials m JOIN material_versions v ON v.tenant_id=m.tenant_id AND v.workspace_id=m.workspace_id AND v.material_id=m.id AND v.number=m.current_version
+          FROM active_materials m JOIN material_versions v ON v.tenant_id=m.tenant_id AND v.workspace_id=m.workspace_id AND v.material_id=m.id AND v.number=m.current_version
         )
-        SELECT e.*,w.name AS workspace_name,(w.kind='PERSONAL' OR coalesce(g.can_maintain,false)) AS can_maintain
+        SELECT e.*,w.name AS workspace_name,((w.kind='PERSONAL' OR coalesce(g.can_maintain,false)) AND NOT EXISTS(SELECT 1 FROM departure_executions d WHERE d.tenant_id=w.tenant_id AND d.kind='TENANT_EXIT' AND d.state<>'CANCELLED')) AS can_maintain
         FROM entries e JOIN workspaces w ON w.tenant_id=e.tenant_id AND w.id=e.workspace_id
         LEFT JOIN workspace_members g ON g.tenant_id=w.tenant_id AND g.workspace_id=w.id AND g.account_id=?
-        WHERE e.tenant_id=? AND ((w.kind='PERSONAL' AND w.owner_id=?) OR (w.kind='SHARED' AND g.account_id IS NOT NULL))
+        WHERE e.tenant_id=? AND ((w.kind='PERSONAL' AND w.owner_id=?) OR (w.kind='SHARED' AND g.account_id IS NOT NULL)) AND departure_content_readable(coalesce(g.account_id,w.owner_id),w.tenant_id,w.id)
         """;
     @Transactional
     public Page list(UUID actor,UUID tenant,UUID workspace,UUID folder,String q,int offset,int limit) {
@@ -110,6 +122,10 @@ public class MaterialService {
     }
     @Transactional
     public Entry upload(UUID actor,UUID tenant,UUID workspace,UUID folder,UUID material,Integer expectedVersion,UUID key,MultipartFile file) {
+        return uploadReceipt(actor,tenant,workspace,folder,material,expectedVersion,key,file).entry();
+    }
+    @Transactional
+    public UploadReceipt uploadReceipt(UUID actor,UUID tenant,UUID workspace,UUID folder,UUID material,Integer expectedVersion,UUID key,MultipartFile file) {
         // Preliminary authorization before reading file bytes; recheck under lock after the request lock.
         access.check(actor,tenant,workspace,true,false);
         String filename=name(file.getOriginalFilename());
@@ -123,9 +139,17 @@ public class MaterialService {
         String hash=ObjectStore.sha256(bytes),fingerprint=IdentityService.hash(tenant+"\n"+workspace+"\n"+folder+"\n"+material+"\n"+expectedVersion+"\n"+filename+"\n"+hash);
         UUID prior=identities.priorRequest(actor,key,"MATERIAL_UPLOAD",fingerprint);
         access.require(actor,tenant,workspace,true);
-        if(prior!=null) return document(actor,tenant,workspace,prior);
+        if(prior!=null) return uploadReceipt(actor,tenant,workspace,prior,key);
         Entry result=storeGenerated(actor,tenant,workspace,folder,material,expectedVersion,filename,bytes);
-        identities.remember(actor,key,"MATERIAL_UPLOAD",fingerprint,result.id());return result;
+        identities.remember(actor,key,"MATERIAL_UPLOAD",fingerprint,result.id());
+        db.update("INSERT INTO material_upload_receipts(actor_id,request_id,tenant_id,workspace_id,material_id,version_id) SELECT ?,?,tenant_id,workspace_id,material_id,id FROM material_versions WHERE tenant_id=? AND workspace_id=? AND material_id=? AND number=?",actor,key,tenant,workspace,result.id(),result.version());
+        return uploadReceipt(actor,tenant,workspace,result.id(),key);
+    }
+    private UploadReceipt uploadReceipt(UUID actor,UUID tenant,UUID workspace,UUID material,UUID key) {
+        Entry current=document(actor,tenant,workspace,material);
+        var accepted=db.query("SELECT v.* FROM material_upload_receipts r JOIN material_versions v ON v.id=r.version_id AND v.tenant_id=r.tenant_id AND v.workspace_id=r.workspace_id AND v.material_id=r.material_id WHERE r.actor_id=? AND r.request_id=? AND r.tenant_id=? AND r.workspace_id=? AND r.material_id=?",
+            (r,n)->new Version(r.getObject("id",UUID.class),r.getInt("number"),r.getString("filename"),r.getLong("size_bytes"),r.getString("sha256"),r.getObject("created_by",UUID.class),r.getTimestamp("created_at").toInstant(),"UPLOAD"),actor,key,tenant,workspace,material);
+        return new UploadReceipt(current,accepted.isEmpty()?null:accepted.getFirst());
     }
     /** Internal platform operation; callers own their request idempotency. Not exposed as an HTTP upload bypass. */
     @Transactional public Entry storeGenerated(UUID actor,UUID tenant,UUID workspace,UUID folder,UUID material,Integer expectedVersion,String suppliedFilename,byte[] bytes){
@@ -156,6 +180,7 @@ public class MaterialService {
     @Transactional
     public Download download(UUID actor,UUID tenant,UUID workspace,UUID material,UUID version) {
         access.require(actor,tenant,workspace,false);
+        access.requireMaterialActive(tenant,workspace,material);
         var rows=db.queryForList("SELECT filename,object_id,size_bytes,sha256 FROM material_versions WHERE tenant_id=? AND workspace_id=? AND material_id=? AND id=?",tenant,workspace,material,version);
         if(rows.isEmpty()) throw missing(); var row=rows.getFirst();
         byte[] bytes=store.read((UUID)row.get("object_id"),(Long)row.get("size_bytes"),(String)row.get("sha256"));

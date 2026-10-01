@@ -79,7 +79,7 @@ class DocumentIntegrationTest {
   for(String filename:List.of("binary.txt","report.json","foreign.md")){
    UUID artifact=UUID.randomUUID();byte[] content=filename.equals("binary.txt")?new byte[]{(byte)0xff}:"正文".getBytes(StandardCharsets.UTF_8);
    String sha=HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(content));
-   db.update("INSERT INTO conversation_artifacts(id,tenant_id,workspace_id,task_id,filename,sha256,content) VALUES (?,?,?,?,?,?,?)",artifact,tenant,space,filename.equals("foreign.md")?foreignTask:task,filename,sha,content);
+   db.update("INSERT INTO conversation_artifacts(id,tenant_id,workspace_id,task_id,filename,sha256,content,attempt_number) VALUES (?,?,?,?,?,?,?,1)",artifact,tenant,space,filename.equals("foreign.md")?foreignTask:task,filename,sha,content);
    denied(filename.equals("foreign.md")?404:400,()->documents.create(owner,tenant,conversation,task,artifact,UUID.randomUUID()));
   }
   assertTrue(documents.list(owner,tenant,0,20).items().isEmpty());
@@ -102,4 +102,28 @@ class DocumentIntegrationTest {
   assertNotEquals(word.sha256(),documents.export(owner,tenant,id,1,"docx").sha256());
  }
  @Test void missingGlyphFailsExplicitlyWithoutCachingMisleadingPdf(){var doc=create();UUID id=doc.document().id();documents.save(owner,tenant,id,UUID.randomUUID(),1,"字体验证","未支持字符 \uD83E\uDD84");denied(422,()->documents.export(owner,tenant,id,2,"pdf"));assertEquals(0,db.queryForObject("SELECT count(*) FROM private_document_exports WHERE document_id=?",Integer.class,id));assertTrue(documents.export(owner,tenant,id,2,"docx").bytes().length>0);}
+ @Test void documentDisableHidesAllVersionsAndCachedExportsBeforePhysicalCleanup(){
+  var d=create();UUID id=d.document().id(),key=UUID.randomUUID();documents.save(owner,tenant,id,key,1,"待停用文稿","本地保存正文");documents.export(owner,tenant,id,1,"docx");
+  db.update("UPDATE object_lifecycle SET state='DISABLED' WHERE kind='DOCUMENT' AND object_id=?",id);
+  assertTrue(documents.list(owner,tenant,0,20).items().isEmpty());assertFalse(documents.list(owner,tenant,0,20).hasMore());
+  denied(404,()->documents.detail(owner,tenant,id,1));denied(404,()->documents.export(owner,tenant,id,1,"docx"));denied(404,()->documents.save(owner,tenant,id,key,1,"待停用文稿","本地保存正文"));
+  assertEquals(1,db.queryForObject("SELECT count(*) FROM private_document_exports WHERE document_id=?",Integer.class,id));
+ }
+ @Test void expiredRenderedCacheCannotDownloadAndOldCleanupCannotDeleteNewExplicitExport(){
+  UUID id=create().document().id();documents.export(owner,tenant,id,1,"docx");UUID old=db.queryForObject("SELECT object_id FROM object_lifecycle WHERE kind='EXPORT_CACHE' AND parent_id=?",UUID.class,id);
+  db.update("UPDATE object_lifecycle SET is_formal=false,policy_due=now()-interval '1 second',policy_pending=false WHERE object_id=?",old);
+  denied(410,()->documents.export(owner,tenant,id,1,"docx"));assertNotNull(documents.detail(owner,tenant,id,1));
+  db.queryForList("SELECT scrub_lifecycle_object('EXPORT_CACHE',?)",old);var regenerated=documents.export(owner,tenant,id,1,"docx");assertTrue(regenerated.bytes().length>0);
+  db.queryForList("SELECT scrub_lifecycle_object('EXPORT_CACHE',?)",old);
+  assertEquals(1,db.queryForObject("SELECT count(*) FROM private_document_exports WHERE document_id=?",Integer.class,id));assertArrayEquals(regenerated.bytes(),documents.export(owner,tenant,id,1,"docx").bytes());
+ }
+ @Test void disabledArtifactStopsItsDerivedDocumentWithoutHidingIndependentTaskReply(){
+  var source=success(space,"任务本体仍可读");UUID task=source.tasks().getFirst().id(),artifact=UUID.randomUUID();byte[] body="附件专用正文".getBytes(StandardCharsets.UTF_8);
+  db.update("INSERT INTO conversation_artifacts(id,tenant_id,workspace_id,task_id,filename,sha256,content,attempt_number) VALUES (?,?,?,?,'detail.md',?,?,1)",artifact,tenant,space,task,com.dreamcore.workspace.material.ObjectStore.sha256(body),body);
+  var doc=documents.create(owner,tenant,source.conversation().id(),task,artifact,UUID.randomUUID());
+  db.update("UPDATE object_lifecycle SET state='TRASHED' WHERE kind='ARTIFACT' AND object_id=?",artifact);
+  denied(404,()->agents.download(owner,tenant,source.conversation().id(),task,artifact));denied(404,()->documents.detail(owner,tenant,doc.document().id(),1));assertTrue(documents.list(owner,tenant,0,20).items().isEmpty());
+  var visible=conversations.historical(owner,tenant,source.conversation().id(),task).tasks().getFirst();assertEquals("任务本体仍可读",visible.reply());assertTrue(visible.artifacts().isEmpty());
+ }
+
 }

@@ -30,6 +30,15 @@ export function SourceImage({ photo }: { photo?: SourcePhoto }) {
       <img src={photo.src} alt={photo.alt} referrerPolicy="no-referrer" onError={() => setFailed(true)} />
       <figcaption>
         {photo.credit} · {photo.alt}
+        {/^https?:\/\//.test(photo.sourceUrl) && (
+          <>
+            {' '}
+            ·{' '}
+            <a href={photo.sourceUrl} target="_blank" rel="noopener noreferrer">
+              图片出处 ↗
+            </a>
+          </>
+        )}
       </figcaption>
     </figure>
   );

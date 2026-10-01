@@ -54,7 +54,12 @@ export default function App() {
   useAutoHideScrollbars();
   const { state, storageError } = useDemo();
   useEffect(() => {
-    document.title = state.scenario === 'konggu' ? '空谷无界 · AI工作空间' : '企业AI工作空间';
+    document.title =
+      state.scenario === 'ninepop'
+        ? '9POP · 梦擎工作空间 · Mengine'
+        : state.scenario === 'konggu'
+          ? '空谷无界 · 梦擎工作空间 · Mengine'
+          : '梦擎工作空间 · Mengine';
   }, [state.scenario]);
   const [route, setRoute] = useState(() => normalizeRoute(location.hash.slice(2) || 'briefing'));
   const [presentation, setPresentation] = useState(() => readConversationEntry(route).presentation);
@@ -235,7 +240,7 @@ export default function App() {
                 <>
                   <button
                     className="mobile-brand"
-                    aria-label="关于 AI Dreamcore 梦核工作空间"
+                    aria-label="关于 Mengine 梦擎工作空间"
                     onClick={() => setDialog({ kind: 'help' })}
                   >
                     <DreamcoreLogo />
@@ -260,7 +265,11 @@ export default function App() {
                 <>
                   <button className="mode-label" onClick={() => setDialog({ kind: 'help' })}>
                     <span className="tiny-dot" />
-                    {state.scenario === 'konggu' ? '空谷无界 · 演示' : '演示模式'}
+                    {state.scenario === 'ninepop'
+                      ? '9POP · 经营简报'
+                      : state.scenario === 'konggu'
+                        ? '空谷无界 · 演示'
+                        : '演示模式'}
                   </button>
                 </>
               }

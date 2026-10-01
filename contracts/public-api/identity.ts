@@ -50,6 +50,8 @@ export interface CreateTenant {
   requestId: string;
   name: string;
   adminEmail: string;
+  /** Explicit nomination; invited member must separately accept this responsibility. */
+  designateAuthorizationOwner?: boolean;
 }
 export interface InviteMember {
   requestId: string;

@@ -2,7 +2,7 @@
 """Offline logical backup of an owned local trial. Restore only to a new private directory."""
 import argparse
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from functools import lru_cache
 import fcntl
 import hashlib
@@ -19,7 +19,9 @@ import tempfile
 import uuid
 import trial
 
-FORMAT = 'dreamcore-local-backup-v1'
+FORMAT = 'dreamcore-local-backup-v2'
+KEY_FORMATS = {FORMAT, 'dreamcore-local-backup-v1'}
+RETENTION_DAYS = 30
 KEY_FILE = trial.WORKSPACE / '.local' / 'backup-private' / 'signing.json'
 MAX_BYTES = 2 * 1024**3
 MAX_FILES = 10001
@@ -65,7 +67,7 @@ def signing_key(path, create=False):
         with os.fdopen(os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600), 'w') as file:
             json.dump({'format': FORMAT, 'key': secrets.token_hex(32)}, file)
     value = trial.private_read(path)
-    if value.get('format') != FORMAT or not re.fullmatch('[0-9a-f]{64}', str(value.get('key', ''))):
+    if value.get('format') not in KEY_FORMATS or not re.fullmatch('[0-9a-f]{64}', str(value.get('key', ''))):
         fail('备份校验密钥格式不正确。')
     return bytes.fromhex(value['key'])
 
@@ -79,6 +81,64 @@ def schema_hash():
     for file in sorted((trial.WORKSPACE / 'apps/api/src/main/resources/db/migration').glob('V*__*.sql')):
         result.update(file.name.encode() + b'\0' + file.read_bytes() + b'\0')
     return result.hexdigest()
+
+
+def now():
+    return datetime.now(timezone.utc)
+
+
+def migrations():
+    files = (trial.WORKSPACE / 'apps/api/src/main/resources/db/migration').glob('V*__*.sql')
+    return [{'version': re.match(r'V(\d+)__', file.name)[1], 'script': file.name,
+             'sha256': hashlib.sha256(file.read_bytes()).hexdigest()}
+            for file in sorted(files, key=lambda p: int(re.match(r'V(\d+)__', p.name)[1]))]
+
+
+def check_migrations(sql):
+    actual = json.loads(sql("SELECT coalesce(json_agg(x ORDER BY x.installed_rank),'[]'::json)::text FROM (SELECT installed_rank,version,script,success FROM flyway_schema_history) x"))
+    expected = [{'version': m['version'], 'script': m['script']} for m in migrations()]
+    if any(row.get('success') is not True for row in actual) or [
+            {'version': row.get('version'), 'script': row.get('script')} for row in actual] != expected:
+        fail('数据库迁移与当前工作树不完全一致，不能声明完整备份或恢复。')
+
+
+def signed_write(path, value, key):
+    trial.private_write(path, {'manifest': value, 'signature': hmac.new(key, canonical(value), hashlib.sha256).hexdigest()})
+
+
+def signed_read(path, key):
+    value = trial.private_read(path)
+    body, signature = value.get('manifest'), value.get('signature')
+    if not isinstance(body, dict) or not isinstance(signature, str) or not hmac.compare_digest(
+            hmac.new(key, canonical(body), hashlib.sha256).hexdigest(), signature):
+        fail('独立状态证据校验失败；保持隔离。')
+    return body
+
+
+def source_identity(root, key_path, sql, enroll=False):
+    """Bind authority to the original cluster and path, outside any backup bundle."""
+    if (root / 'restore.json').exists() or (root / 'restore.json').is_symlink():
+        # An explicitly activated, current-reconciled instance becomes a new operational lineage.
+        # A pending restore can never refresh its old snapshot's retention by being dumped again.
+        import backup_recovery
+        backup_recovery.require_activation(root)
+    key = signing_key(key_path)
+    identity_path = root / 'backup-origin.json'
+    cluster = sql('SELECT system_identifier::text FROM pg_control_system()')
+    if not identity_path.exists():
+        if not enroll:
+            fail('缺少原实例独立登记；保持隔离。')
+        identity = {'instanceId': str(uuid.uuid4()), 'directory': str(root.resolve()), 'cluster': cluster}
+        signed_write(identity_path, identity, key)
+    identity = signed_read(identity_path, key)
+    uuid.UUID(identity['instanceId'])
+    registry = key_path.parent / ('source-' + identity['instanceId'] + '.json')
+    if not registry.exists() and enroll:
+        signed_write(registry, identity, key)
+    registered = signed_read(registry, key)
+    if identity != registered or identity.get('directory') != str(root.resolve()) or identity.get('cluster') != cluster:
+        fail('当前状态来源不是已登记的原数据库实例；保持隔离。')
+    return identity
 
 
 @contextmanager
@@ -158,12 +218,7 @@ def offline_database(root, initialize=False):
 
 
 def facts(sql):
-    if sql("SELECT string_agg(CASE WHEN success THEN version ELSE 'FAILED' END,',' ORDER BY installed_rank) FROM flyway_schema_history") != ','.join(map(str, range(1, 16))):
-        fail('备份要求已完成 V15 的当前试用结构。')
-    if sql("SELECT (SELECT count(*) FROM conversation_tasks WHERE status IN ('QUEUED','RUNNING')) + (SELECT count(*) FROM knowledge_runs WHERE status IN ('QUEUED','RUNNING'))") != '0':
-        fail('仍有排队或运行中的任务；先启动原环境完成或取消任务，再停止并备份。')
-    if sql('SELECT count(*) FROM platform_roles') == '0':
-        fail('试用环境缺少可恢复的平台管理身份。')
+    check_migrations(sql)
     tables = sql("SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename").splitlines()
     result = {}
     for table in tables:
@@ -177,7 +232,10 @@ def facts(sql):
 
 
 def objects(sql):
-    raw = sql("SELECT coalesce(json_agg(x ORDER BY x.object_id),'[]'::json)::text FROM (SELECT object_id::text,size_bytes,sha256 FROM material_versions) x")
+    raw = sql("""SELECT coalesce(json_agg(x ORDER BY x.object_id),'[]'::json)::text FROM (
+        SELECT v.object_id::text,v.size_bytes,v.sha256 FROM material_versions v
+        WHERE NOT EXISTS(SELECT 1 FROM content_lifecycle l WHERE l.object_kind='MATERIAL' AND l.object_id=v.material_id AND l.state='PURGED')
+        AND NOT EXISTS(SELECT 1 FROM content_cleanup_blobs b WHERE b.object_id=v.object_id AND b.deleted_at IS NOT NULL)) x""")
     result = {}
     for row in json.loads(raw):
         if str(uuid.UUID(row['object_id'])) != row['object_id']:
@@ -196,7 +254,7 @@ def reserve(path):
     return path
 
 
-def verify(bundle, key_path):
+def verify(bundle, key_path, allow_expired=False):
     bundle = trial.directory(bundle)
     if key_path.resolve().is_relative_to(bundle):
         fail('校验密钥必须与备份分开保管。')
@@ -212,6 +270,26 @@ def verify(bundle, key_path):
         fail('备份来源或清单校验失败。')
     if manifest.get('format') != FORMAT or manifest.get('postgresMajor') != 18:
         fail('备份格式不兼容。')
+    if (not re.fullmatch('[0-9a-f]{64}', str(manifest.get('schemaHash', '')))
+            or not isinstance(manifest.get('tables'), dict)
+            or not isinstance(manifest.get('migrations'), list)
+            or type(manifest.get('sourceTransaction')) is not int or manifest['sourceTransaction'] < 0):
+        fail('备份结构与状态证据清单无效。')
+    for table, metadata in manifest['tables'].items():
+        if (not re.fullmatch('[a-z_][a-z0-9_]*', table) or not isinstance(metadata, dict)
+                or type(metadata.get('rows')) is not int or metadata['rows'] < 0
+                or not re.fullmatch('[0-9a-f]{64}', str(metadata.get('sha256', '')))):
+            fail('备份数据表摘要无效。')
+    try:
+        uuid.UUID(manifest['snapshotId'])
+        uuid.UUID(manifest['sourceInstanceId'])
+        created, expires = (datetime.fromisoformat(manifest[field]) for field in ('createdAt', 'expiresAt'))
+        if created.tzinfo is None or expires.tzinfo is None or expires != created + timedelta(days=RETENTION_DAYS) or created > now():
+            raise ValueError()
+    except (ValueError, KeyError, TypeError):
+        fail('备份原始生成时间或有效期无效。')
+    if not allow_expired and now() >= expires:
+        fail('备份已超过原始快照生成起 30 日；不得重新打包延长有效期。')
     files = manifest.get('files', {})
     if not isinstance(files, dict) or 'database.dump' not in files or len(files) > MAX_FILES:
         fail('备份文件清单无效。')
@@ -242,6 +320,8 @@ def create(root, output, key_path):
         try:
             (destination / 'objects').mkdir(mode=0o700)
             with offline_database(root) as (run, args, sql):
+                identity = source_identity(root, key_path, sql, True)
+                created = now()
                 snapshot = facts(sql)
                 referenced = objects(sql)
                 if len(referenced) + 1 > MAX_FILES or sum(x['bytes'] for x in referenced.values()) > MAX_BYTES:
@@ -257,10 +337,12 @@ def create(root, output, key_path):
                      '--exclude-table-data=public.spring_session', '--exclude-table-data=public.spring_session_attributes',
                      '--file', str(destination / 'database.dump')])
                 (destination / 'database.dump').chmod(0o600)
-                manifest = {'format': FORMAT, 'createdAt': datetime.now(timezone.utc).isoformat(), 'postgresMajor': 18,
+                manifest = {'format': FORMAT, 'snapshotId': str(uuid.uuid4()), 'sourceInstanceId': identity['instanceId'],
+                            'createdAt': created.isoformat(), 'expiresAt': (created + timedelta(days=RETENTION_DAYS)).isoformat(), 'postgresMajor': 18,
+                            'migrations': migrations(), 'sourceTransaction': int(sql('SELECT txid_current()')),
                             'schemaHash': schema_hash(), 'tables': snapshot, 'files': {'database.dump': digest(destination / 'database.dump'), **referenced},
                             'sourceRevision': subprocess.check_output(['git','rev-parse','HEAD'], cwd=trial.WORKSPACE, text=True).strip()}
-            trial.private_write(destination / 'manifest.json', {'manifest': manifest, 'signature': hmac.new(key, canonical(manifest), hashlib.sha256).hexdigest()})
+            signed_write(destination / 'manifest.json', manifest, key)
             verify(destination, key_path)
         except BaseException:
             shutil.rmtree(destination)
@@ -269,6 +351,7 @@ def create(root, output, key_path):
 
 
 def restore(bundle, output, key_path):
+    import backup_recovery
     manifest = verify(bundle, key_path)
     if output.resolve().is_relative_to(bundle.resolve()):
         fail('还原目录必须位于备份之外。')
@@ -276,6 +359,8 @@ def restore(bundle, output, key_path):
         fail('迁移文件与备份不匹配；请使用对应版本工作树还原。')
     destination = reserve(output)
     try:
+        signed_write(destination / 'restore.json', {'format': FORMAT, 'state': 'QUARANTINED', 'snapshot': manifest, 'recoveryDirectory':str(destination.resolve()),
+                    'restoredAt': now().isoformat(), 'reopeningSupported': False}, signing_key(key_path))
         secret = secrets.token_urlsafe(32)
         trial.private_write(destination / 'database.json', {'password':secret})
         (destination / 'objects').mkdir(mode=0o700)
@@ -289,20 +374,20 @@ def restore(bundle, output, key_path):
             run([pg('pg_restore'), *args, '--no-owner', '--no-acl', '--single-transaction', '--exit-on-error', str(destination / 'database.dump')])
             if facts(sql) != manifest['tables']:
                 fail('数据库还原后逐表摘要不一致。')
+            backup_recovery.coverage(sql)
             for name, metadata in objects(sql).items():
                 if name not in manifest['files'] or digest(destination / name) != metadata:
                     fail('还原后的数据库与原件不一致。')
             if sql('SELECT count(*) FROM spring_session') != '0' or sql('SELECT count(*) FROM spring_session_attributes') != '0':
                 fail('还原包含旧登录会话。')
             pending = int(sql("SELECT count(*) FROM invitations WHERE status='PENDING'"))
-            sql("UPDATE invitations SET status='REVOKED' WHERE status='PENDING'")
+            backup_recovery.quarantine(sql)
         (destination / 'database.dump').unlink()
         ports = set()
         while len(ports) < 3:
             ports.add(trial.free_port())
         database_port, api_port, web_port = sorted(ports)
-        trial.private_write(destination / 'accounts.json', {'restored':True,'note':'使用备份时原账号密码登录；此目录不包含原明文密码。'})
-        trial.private_write(destination / 'restore.json', {'format':FORMAT,'restoredAt':datetime.now(timezone.utc).isoformat(),'sourceRevision':manifest['sourceRevision'],'pendingInvitationsRevoked':pending,'sessionsRestored':False})
+        trial.private_write(destination / 'accounts.json', {'restored':True,'note':'隔离恢复：旧凭据、会话和执行均已停用；此工具不提供重新开放入口。'})
         # Publish the trial configuration last; partial restores can never start as a trial.
         trial.private_write(destination / 'config.json', {'format':trial.FORMAT,'workspace':str(trial.WORKSPACE),'ports':{'database':database_port,'api':api_port,'web':web_port}})
     except BaseException:
@@ -310,16 +395,60 @@ def restore(bundle, output, key_path):
         if not (destination / 'postgres' / 'postmaster.pid').exists():
             shutil.rmtree(destination)
         raise
-    return {'status':'restored','files':len(manifest['files']),'tables':len(manifest['tables']),'pendingInvitationsRevoked':pending}
+    return {'status':'restored_quarantined','files':len(manifest['files']),'tables':len(manifest['tables']),'pendingInvitationsRevoked':pending,'reopeningSupported':False}
+
+
+def repack(bundle, output, key_path):
+    manifest = verify(bundle, key_path)
+    if output.resolve().is_relative_to(bundle.resolve()):
+        fail('副本必须位于原备份之外。')
+    destination = reserve(output)
+    try:
+        (destination / 'objects').mkdir(mode=0o700)
+        for name in ['manifest.json', *manifest['files']]:
+            shutil.copyfile(bundle / name, destination / name)
+            (destination / name).chmod(0o600)
+        if verify(destination, key_path) != manifest:
+            fail('复制期间备份发生变化。')
+    except BaseException:
+        shutil.rmtree(destination)
+        raise
+    return {'status': 'copied', 'snapshotId': manifest['snapshotId'], 'expiresAt': manifest['expiresAt']}
+
+
+def rotate(directory, key_path):
+    root = trial.directory(directory)
+    if key_path.resolve().is_relative_to(root):
+        fail('密钥必须与轮转目录分开保存。')
+    removed, retained, rejected = [], [], []
+    for path in sorted(root.iterdir()):
+        try:
+            if (path / 'restore.json').exists():
+                import backup_recovery
+                if backup_recovery.rotate_pending(path, key_path):
+                    removed.append(path.name)
+                else:
+                    retained.append(path.name)
+                continue
+            manifest = verify(path, key_path, allow_expired=True)
+            if now() >= datetime.fromisoformat(manifest['expiresAt']):
+                shutil.rmtree(path)
+                removed.append(path.name)
+            else:
+                retained.append(path.name)
+        except (trial.TrialError, OSError, ValueError, KeyError, TypeError):
+            rejected.append(path.name)
+    return {'status': 'rotated', 'removed': removed, 'retained': retained, 'rejected': rejected}
 
 
 def main():
     os.umask(0o077)
     parser = argparse.ArgumentParser(description='已停止的本地试用：备份、校验、还原到新目录。备份含业务内容及密码散列，密钥须单独保存。')
-    parser.add_argument('command', choices=['create', 'verify', 'restore'])
+    parser.add_argument('command', choices=['create', 'verify', 'restore', 'repack', 'rotate', 'reconcile', 'activate'])
     parser.add_argument('--directory', type=Path, default=trial.DEFAULT_DIRECTORY)
     parser.add_argument('--bundle', type=Path)
     parser.add_argument('--output', type=Path)
+    parser.add_argument('--current-directory', type=Path)
     parser.add_argument('--key-file', type=Path, default=KEY_FILE)
     args = parser.parse_args()
     if args.command == 'create' and args.output:
@@ -329,8 +458,18 @@ def main():
         result = {'status': 'verified', 'files': len(manifest['files']), 'tables': len(manifest['tables'])}
     elif args.command == 'restore' and args.bundle and args.output:
         result = restore(args.bundle.absolute(), args.output.absolute(), args.key_file.absolute())
+    elif args.command == 'repack' and args.bundle and args.output:
+        result = repack(args.bundle.absolute(), args.output.absolute(), args.key_file.absolute())
+    elif args.command == 'rotate':
+        result = rotate(args.directory.absolute(), args.key_file.absolute())
+    elif args.command == 'activate' and args.current_directory:
+        import backup_recovery
+        result = backup_recovery.activate(args.directory.absolute(), args.current_directory.absolute(), args.key_file.absolute())
+    elif args.command == 'reconcile' and args.current_directory:
+        import backup_recovery
+        result = backup_recovery.reconcile(args.directory.absolute(), args.current_directory.absolute(), args.key_file.absolute())
     else:
-        parser.error('create 需要 --output；verify 需要 --bundle；restore 需要 --bundle 与 --output。')
+        parser.error('create 需要 --output；verify 需要 --bundle；restore/repack 需要 --bundle 与 --output；reconcile/activate 需要 --directory 与 --current-directory；rotate 使用 --directory。')
     print(json.dumps(result, ensure_ascii=False))
 
 

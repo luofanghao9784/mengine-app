@@ -1,6 +1,7 @@
 package com.dreamcore.workspace;
 
 import com.dreamcore.workspace.briefing.BriefingService;
+import com.dreamcore.workspace.briefing.BriefingLayoutService;
 import com.dreamcore.workspace.conversation.*;
 import com.dreamcore.workspace.identity.IdentityException;
 import java.sql.Timestamp;
@@ -16,6 +17,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest(properties={"dreamcore.tasks.enabled=true","dreamcore.tasks.agent-mode=verification","dreamcore.tasks.initial-delay-ms=3600000","dreamcore.knowledge.initial-delay-ms=3600000"})
 class BriefingIntegrationTest {
     @Autowired BriefingService briefing;
+    @Autowired BriefingLayoutService layout;
     @Autowired ConversationService conversations;
     @Autowired AgentTaskService agents;
     @Autowired JdbcTemplate db;
@@ -128,5 +130,48 @@ class BriefingIntegrationTest {
         var historical=conversations.historical(owner,tenant,id,anchor);assertEquals(1,historical.tasks().size());assertEquals(anchor,historical.tasks().getFirst().id());assertEquals("不可被替换的旧回复",historical.tasks().getFirst().reply());
         var other=success(owner,personal,null,"另一个会话",null);denied(404,()->conversations.historical(owner,tenant,id,other.tasks().getLast().id()));
         var queued=conversations.submit(owner,tenant,id,null,UUID.randomUUID(),"尚未完成","AGENT");denied(404,()->conversations.historical(owner,tenant,id,queued.tasks().getLast().id()));
+    }
+    List<UUID> focused(){return briefing.list(owner,tenant,null,"FOCUSED",null,"UTC",0,20).items().stream().map(BriefingService.Card::conversationId).toList();}
+    UUID pinned(UUID location,String finished){UUID id=success(owner,location,null,"布局合成成果",finished).conversation().id();briefing.update(owner,tenant,id,UUID.randomUUID(),0,true,false,"STANDARD");return id;}
+    @Test void manualFocusOrderSurvivesNewResultsWithoutChangingLatestOrContent(){
+        UUID a=pinned(personal,"2026-09-21T08:00:00Z"),b=pinned(personal,"2026-09-23T08:00:00Z"),c=pinned(personal,"2026-09-22T08:00:00Z");
+        assertEquals(List.of(a,b,c),focused());var before=list().items();
+        layout.move(owner,tenant,UUID.randomUUID(),layout.get(owner,tenant).revision(),c,a,"BEFORE");
+        assertEquals(List.of(c,a,b),focused());assertEquals(before,list().items());
+        success(owner,personal,a,"较新的内容保留手动位置","2026-09-24T08:00:00Z");
+        assertEquals(List.of(c,a,b),focused());assertEquals(a,list().items().getFirst().conversationId());
+        assertEquals(List.of(c,a),briefing.list(owner,tenant,null,"FOCUSED",null,"UTC",0,2).items().stream().map(BriefingService.Card::conversationId).toList());
+        assertEquals(List.of(a),briefing.list(owner,tenant,null,"FOCUSED","2026-09-24","UTC",0,20).items().stream().map(BriefingService.Card::conversationId).toList());
+    }
+    @Test void layoutReplayIsHistoricalAndCurrentAuthorityStillApplies(){
+        UUID a=pinned(personal,null),b=pinned(space,null),key=UUID.randomUUID();int initial=layout.get(owner,tenant).revision();
+        var first=layout.move(owner,tenant,key,initial,b,a,"BEFORE");
+        layout.move(owner,tenant,UUID.randomUUID(),first.currentRevision(),a,b,"BEFORE");
+        var replay=layout.move(owner,tenant,key,initial,b,a,"BEFORE");
+        assertEquals(first.id(),replay.id());assertEquals(first.appliedRevision(),replay.appliedRevision());assertTrue(replay.currentRevision()>first.appliedRevision());assertEquals(List.of(a,b),focused());
+        denied(409,()->layout.move(owner,tenant,key,initial,a,b,"BEFORE"));
+        denied(404,()->layout.move(reader,tenant,UUID.randomUUID(),0,b,a,"BEFORE"));
+        denied(403,()->layout.get(owner,other));
+        db.update("DELETE FROM workspace_members WHERE workspace_id=? AND account_id=?",space,owner);
+        denied(404,()->layout.move(owner,tenant,key,initial,b,a,"BEFORE"));assertEquals(List.of(a),focused());
+    }
+    @Test void changedPreferenceAndConcurrentLayoutCannotSilentlyOverwrite() throws Exception {
+        UUID a=pinned(personal,null),b=pinned(personal,null),c=pinned(personal,null);int initial=layout.get(owner,tenant).revision();
+        briefing.update(owner,tenant,c,UUID.randomUUID(),1,true,false,"WIDE");
+        denied(409,()->layout.move(owner,tenant,UUID.randomUUID(),initial,b,a,"BEFORE"));
+        int revision=layout.get(owner,tenant).revision();var start=new java.util.concurrent.CountDownLatch(1);
+        try(var pool=java.util.concurrent.Executors.newFixedThreadPool(2)){
+            var results=new ArrayList<java.util.concurrent.Future<Integer>>();for(UUID id:List.of(b,c))results.add(pool.submit(()->{start.await();try{layout.move(owner,tenant,UUID.randomUUID(),revision,id,a,"BEFORE");return 200;}catch(IdentityException e){return e.status;}}));
+            start.countDown();var statuses=new ArrayList<Integer>();for(var result:results)statuses.add(result.get(5,java.util.concurrent.TimeUnit.SECONDS));Collections.sort(statuses);assertEquals(List.of(200,409),statuses);
+        }
+    }
+    @Test void repeatedFractionalMovesRebaseWithoutLosingDistinctPositions(){
+        UUID a=pinned(personal,null),b=pinned(personal,null),c=pinned(personal,null);
+        for(int i=0;i<100;i++)layout.move(owner,tenant,UUID.randomUUID(),layout.get(owner,tenant).revision(),i%2==0?a:c,b,"BEFORE");
+        assertEquals(List.of(a,c,b),focused());
+        assertEquals(3,db.queryForObject("SELECT count(DISTINCT focus_position) FROM briefing_preferences WHERE tenant_id=? AND owner_id=?",Integer.class,tenant,owner));
+        for(int i=0;i<100;i++)layout.move(owner,tenant,UUID.randomUUID(),layout.get(owner,tenant).revision(),i%2==0?a:c,b,"AFTER");
+        assertEquals(List.of(b,c,a),focused());
+        assertEquals(3,db.queryForObject("SELECT count(DISTINCT focus_position) FROM briefing_preferences WHERE tenant_id=? AND owner_id=?",Integer.class,tenant,owner));
     }
 }

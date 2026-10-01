@@ -1,0 +1,1041 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Dreamcore Manual Business Sources",
+    "version": "1.0.0",
+    "description": "来源管理使用当前空间读/维护资格；个人空间、管理员身份、解析质量分别判断。写入请求幂等，后台无联网/模型/自动委托。"
+  },
+  "security": [
+    {
+      "sessionCookie": []
+    }
+  ],
+  "paths": {
+    "/api/v1/tenants/{tenant}/workspaces/{workspace}/sources": {
+      "get": {
+        "summary": "列出当前空间获权的人工来源",
+        "responses": {
+          "200": {
+            "description": "实际回执；声明覆盖不代表业务完整性或解析质量",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "拒绝无效、无权或冲突请求"
+          },
+          "401": {
+            "description": "拒绝无效、无权或冲突请求"
+          },
+          "403": {
+            "description": "拒绝无效、无权或冲突请求"
+          },
+          "404": {
+            "description": "拒绝无效、无权或冲突请求"
+          },
+          "409": {
+            "description": "拒绝无效、无权或冲突请求"
+          }
+        },
+        "parameters": [
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000,
+              "default": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 50
+            }
+          }
+        ]
+      },
+      "post": {
+        "summary": "登记人工来源与接收周期",
+        "responses": {
+          "201": {
+            "description": "实际回执；声明覆盖不代表业务完整性或解析质量",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Source"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "拒绝无效、无权或冲突请求"
+          },
+          "401": {
+            "description": "拒绝无效、无权或冲突请求"
+          },
+          "403": {
+            "description": "拒绝无效、无权或冲突请求"
+          },
+          "404": {
+            "description": "拒绝无效、无权或冲突请求"
+          },
+          "409": {
+            "description": "拒绝无效、无权或冲突请求"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Create"
+              }
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "workspace",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ]
+    },
+    "/api/v1/tenants/{tenant}/workspaces/{workspace}/sources/{source}": {
+      "get": {
+        "summary": "读取来源及覆盖缺口",
+        "responses": {
+          "200": {
+            "description": "实际回执；声明覆盖不代表业务完整性或解析质量",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Source"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "拒绝无效、无权或冲突请求"
+          },
+          "401": {
+            "description": "拒绝无效、无权或冲突请求"
+          },
+          "403": {
+            "description": "拒绝无效、无权或冲突请求"
+          },
+          "404": {
+            "description": "拒绝无效、无权或冲突请求"
+          },
+          "409": {
+            "description": "拒绝无效、无权或冲突请求"
+          }
+        }
+      },
+      "post": {
+        "summary": "按版本维护来源，暂停不删除数据",
+        "responses": {
+          "200": {
+            "description": "实际回执；声明覆盖不代表业务完整性或解析质量",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Source"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "拒绝无效、无权或冲突请求"
+          },
+          "401": {
+            "description": "拒绝无效、无权或冲突请求"
+          },
+          "403": {
+            "description": "拒绝无效、无权或冲突请求"
+          },
+          "404": {
+            "description": "拒绝无效、无权或冲突请求"
+          },
+          "409": {
+            "description": "拒绝无效、无权或冲突请求"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Edit"
+              }
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "workspace",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "source",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ]
+    },
+    "/api/v1/tenants/{tenant}/workspaces/{workspace}/sources/{source}/submissions": {
+      "get": {
+        "summary": "分页查看确切版本补交历史",
+        "responses": {
+          "200": {
+            "description": "实际回执；声明覆盖不代表业务完整性或解析质量",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Submissions"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "拒绝无效、无权或冲突请求"
+          },
+          "401": {
+            "description": "拒绝无效、无权或冲突请求"
+          },
+          "403": {
+            "description": "拒绝无效、无权或冲突请求"
+          },
+          "404": {
+            "description": "拒绝无效、无权或冲突请求"
+          },
+          "409": {
+            "description": "拒绝无效、无权或冲突请求"
+          }
+        },
+        "parameters": [
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000,
+              "default": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 50
+            }
+          }
+        ]
+      },
+      "post": {
+        "summary": "声明覆盖时段并关联实际原件版本",
+        "responses": {
+          "201": {
+            "description": "实际回执；声明覆盖不代表业务完整性或解析质量",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Submission"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "拒绝无效、无权或冲突请求"
+          },
+          "401": {
+            "description": "拒绝无效、无权或冲突请求"
+          },
+          "403": {
+            "description": "拒绝无效、无权或冲突请求"
+          },
+          "404": {
+            "description": "拒绝无效、无权或冲突请求"
+          },
+          "409": {
+            "description": "拒绝无效、无权或冲突请求"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Submit"
+              }
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "workspace",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "source",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ]
+    },
+    "/api/v1/tenants/{tenant}/workspaces/{workspace}/sources/{source}/submissions/{submission}/withdraw": {
+      "post": {
+        "summary": "撤回错误覆盖声明，原件不删除",
+        "responses": {
+          "200": {
+            "description": "实际回执；声明覆盖不代表业务完整性或解析质量",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Submission"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "拒绝无效、无权或冲突请求"
+          },
+          "401": {
+            "description": "拒绝无效、无权或冲突请求"
+          },
+          "403": {
+            "description": "拒绝无效、无权或冲突请求"
+          },
+          "404": {
+            "description": "拒绝无效、无权或冲突请求"
+          },
+          "409": {
+            "description": "拒绝无效、无权或冲突请求"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Withdraw"
+              }
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "workspace",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "source",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "submission",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ]
+    },
+    "/api/v1/tenants/{tenant}/workspaces/{workspace}/sources/{source}/versions": {
+      "get": {
+        "summary": "查看曾生效的来源约定，不将当前配置覆盖历史",
+        "responses": {
+          "200": {
+            "description": "实际回执；声明覆盖不代表业务完整性或解析质量",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigHistory"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "拒绝无效、无权或冲突请求"
+          },
+          "401": {
+            "description": "拒绝无效、无权或冲突请求"
+          },
+          "403": {
+            "description": "拒绝无效、无权或冲突请求"
+          },
+          "404": {
+            "description": "拒绝无效、无权或冲突请求"
+          },
+          "409": {
+            "description": "拒绝无效、无权或冲突请求"
+          }
+        },
+        "parameters": [
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000,
+              "default": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 50
+            }
+          }
+        ]
+      },
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "workspace",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "source",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ]
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "DREAMCORE_SESSION"
+      }
+    },
+    "schemas": {
+      "Settings": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "responsibleId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cadenceHours": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 8760
+          },
+          "expectedFrom": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "expectedThrough": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "PAUSED"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "responsibleId",
+          "cadenceHours",
+          "expectedFrom",
+          "expectedThrough",
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "Source": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "responsibleId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cadenceHours": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 8760
+          },
+          "expectedFrom": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "expectedThrough": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "PAUSED"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "coverageState": {
+            "enum": [
+              "UNKNOWN",
+              "MISSING",
+              "GAP",
+              "DECLARED"
+            ]
+          },
+          "lastSubmittedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "dueAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "overdue": {
+            "type": "boolean"
+          },
+          "canMaintain": {
+            "type": "boolean"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "responsibleId",
+          "cadenceHours",
+          "expectedFrom",
+          "expectedThrough",
+          "status",
+          "id",
+          "tenantId",
+          "workspaceId",
+          "revision",
+          "coverageState",
+          "lastSubmittedAt",
+          "dueAt",
+          "overdue",
+          "canMaintain",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "Version": {
+        "type": "object",
+        "properties": {
+          "materialId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "versionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "filename": {
+            "type": "string",
+            "maxLength": 180
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "materialId",
+          "versionId",
+          "number",
+          "filename",
+          "sha256"
+        ],
+        "additionalProperties": false
+      },
+      "Submission": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sourceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "coverageFrom": {
+            "type": "string",
+            "format": "date"
+          },
+          "coverageThrough": {
+            "type": "string",
+            "format": "date"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "WITHDRAWN"
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "submittedBy": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "versions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Version"
+            },
+            "maxItems": 100,
+            "minItems": 0
+          },
+          "unavailableVersions": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "id",
+          "sourceId",
+          "coverageFrom",
+          "coverageThrough",
+          "note",
+          "status",
+          "revision",
+          "submittedBy",
+          "submittedAt",
+          "versions",
+          "unavailableVersions"
+        ],
+        "additionalProperties": false
+      },
+      "Create": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/Settings"
+          }
+        },
+        "required": [
+          "requestId",
+          "settings"
+        ],
+        "additionalProperties": false
+      },
+      "Edit": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "settings": {
+            "$ref": "#/components/schemas/Settings"
+          }
+        },
+        "required": [
+          "requestId",
+          "expectedRevision",
+          "settings"
+        ],
+        "additionalProperties": false
+      },
+      "Submit": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "coverageFrom": {
+            "type": "string",
+            "format": "date"
+          },
+          "coverageThrough": {
+            "type": "string",
+            "format": "date"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "versionIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "minItems": 1,
+            "maxItems": 100,
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "requestId",
+          "coverageFrom",
+          "coverageThrough",
+          "note",
+          "versionIds"
+        ],
+        "additionalProperties": false
+      },
+      "Withdraw": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "requestId",
+          "expectedRevision"
+        ],
+        "additionalProperties": false
+      },
+      "Page": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Source"
+            },
+            "maxItems": 50
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "hasMore"
+        ],
+        "additionalProperties": false
+      },
+      "Submissions": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Submission"
+            },
+            "maxItems": 50
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "hasMore"
+        ],
+        "additionalProperties": false
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "ConfigVersion": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "settings": {
+            "$ref": "#/components/schemas/Settings"
+          },
+          "changedBy": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "effectiveAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "revision",
+          "settings",
+          "changedBy",
+          "effectiveAt"
+        ]
+      },
+      "ConfigHistory": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConfigVersion"
+            },
+            "maxItems": 50
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "hasMore"
+        ]
+      }
+    }
+  }
+}

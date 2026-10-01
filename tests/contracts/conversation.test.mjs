@@ -149,3 +149,78 @@ test('original contracts pin exact versions and reject arbitrary file paths or u
   assert.equal(send({ ...body, mode: 'SOURCE_LOOKUP' }), false);
   assert.equal(send({ ...body, originals: [{ materialId: id, versionId: id, objectId: id }] }), false);
 });
+
+test('control protocol supports explicit wait/partial without manual success or legacy ambiguity', async () => {
+  const schema = JSON.parse(
+    await readFile(new URL('../../contracts/engine-api/agent-results.schema.json', import.meta.url), 'utf8'),
+  );
+  const request = ajv.compile(schema.$defs.request),
+    result = ajv.compile(schema.$defs.result),
+    action = ajv.compile(spec.components.schemas.Action);
+  assert.ok(request({ contractVersion: '1.5', taskId: id, attemptId: id, prompt: 'x'.repeat(3000) }));
+  assert.equal(
+    request({ contractVersion: '1.4', taskId: id, attemptId: id, prompt: 'x'.repeat(3000) }),
+    false,
+  );
+  const current = {
+    contractVersion: '1.5',
+    engineVersion: '0.11.0',
+    taskId: id,
+    attemptId: id,
+    mode: 'AGENT',
+    executionClass: 'verification',
+    modelName: 'synthetic',
+    text: '需要信息',
+    sourceIds: [],
+    originalIds: [],
+    tools: [{ callId: 'control', name: 'task_control', status: 'succeeded' }],
+    artifacts: [],
+    webSources: [],
+    skills: [],
+    modelCalls: 2,
+    usage: null,
+    outcome: 'WAITING_INPUT',
+    requiredInput: '请补充日期',
+  };
+  assert.ok(result(current));
+  assert.equal(result({ ...current, requiredInput: null }), false);
+  assert.equal(result({ ...current, contractVersion: '1.4' }), false);
+  assert.ok(
+    result({
+      ...current,
+      outcome: 'PARTIAL',
+      tools: [{ callId: 'search', name: 'search_sources', status: 'failed' }],
+    }),
+  );
+  assert.equal(
+    result({
+      ...current,
+      outcome: 'COMPLETE',
+      tools: [{ callId: 'search', name: 'search_sources', status: 'failed' }],
+    }),
+    false,
+  );
+  assert.ok(action({ requestId: id, expectedRevision: 2, action: 'RESUME', input: '周五' }));
+  assert.equal(action({ requestId: id, expectedRevision: 2, action: 'SUCCEED' }), false);
+  assert.equal(
+    action({ requestId: id, expectedRevision: 2, action: 'RECONCILE', input: '我确认成功' }),
+    false,
+  );
+});
+
+test('execution evidence registers a bounded read-only allowlist without identity or manual success', async () => {
+  const schema = JSON.parse(
+    await readFile(
+      new URL('../../contracts/engine-api/task-execution-control.schema.json', import.meta.url),
+      'utf8',
+    ),
+  );
+  const open = ajv.compile(schema.$defs.open),
+    receipt = ajv.compile(schema.$defs.receipt);
+  assert.ok(open({ contractVersion: '1.5', tools: ['search_sources', 'task_control'] }));
+  assert.equal(open({ contractVersion: '1.5', tools: ['send_payment'] }), false);
+  assert.equal(open({ contractVersion: '1.5', tools: ['search_sources'], tenantId: id }), false);
+  assert.ok(receipt({ sequence: 1, name: 'search_sources', status: 'STARTED' }));
+  assert.equal(receipt({ sequence: 9, name: 'search_sources', status: 'succeeded' }), false);
+  assert.equal(receipt({ sequence: 1, name: 'task_control', status: 'BUSINESS_DONE' }), false);
+});

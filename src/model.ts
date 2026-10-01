@@ -88,6 +88,7 @@ export type MiniApp = {
   hasDate: boolean;
   published: boolean;
   sourceId?: string;
+  external?: { url: string };
 };
 export type Request = {
   id: string;
@@ -104,7 +105,8 @@ export type Request = {
 };
 export type DemoState = {
   schema: 1;
-  scenario?: 'konggu';
+  scenario?: 'konggu' | 'ninepop';
+  ninepop?: { datasetId: string; generatedAt: string; cards: import('./briefing.ts').CardData[] };
   folders?: MaterialFolder[];
   workspaceExamplesVersion?: number;
   briefingExamplesVersion?: number;

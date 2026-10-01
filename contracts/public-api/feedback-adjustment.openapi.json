@@ -1,0 +1,1449 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Private briefing adjustment conversations",
+    "version": "1.0.0",
+    "description": "GET is read only. Explicit POST atomically saves a feedback version and a real task in the owner/card private thread. Each message retains its server-issued reading snapshot, presentation and fixed source/history references; opening never rates. Source/current authority/lifecycle gates apply, including replay. Adjustments are excluded from ordinary briefing/recommendation business candidates. Model off remains WAITING_CAPABILITY. Feedback withdrawal does not undo separately requested work; task/source lifecycle erases captured prose. No automatic publishing or standing preferences."
+  },
+  "paths": {
+    "/api/v1/tenants/{tenant}/feedback-adjustments": {
+      "get": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Tenant"
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "BRIEFING",
+                "TASK",
+                "PUBLICATION"
+              ]
+            }
+          },
+          {
+            "name": "taskId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "taskRevision",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "attempt",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "presentationVersion",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "briefing-basic-v1",
+                "task-v1",
+                "recommendation-v1"
+              ]
+            }
+          },
+          {
+            "name": "presentationRevision",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "publicationId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "materialVersionId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "materialVersion",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "AdjustmentView",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdjustmentView"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Tenant"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendAdjustment"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "AdjustmentSent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdjustmentSent"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Current card, thread, feedback or task conflict; no partial opinion/task is committed."
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "DREAMCORE_SESSION"
+      }
+    },
+    "parameters": {
+      "Tenant": {
+        "name": "tenant",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "Id": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "CsrfHeader": {
+        "name": "X-CSRF-TOKEN",
+        "in": "header",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "maxLength": 300,
+          "minLength": 1
+        }
+      },
+      "Offset": {
+        "name": "offset",
+        "in": "query",
+        "schema": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000,
+          "default": 0
+        }
+      },
+      "Limit": {
+        "name": "limit",
+        "in": "query",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50,
+          "default": 20
+        }
+      }
+    },
+    "schemas": {
+      "FeedbackTarget": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "taskId",
+              "taskRevision",
+              "attempt",
+              "presentationVersion",
+              "presentationRevision"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "BRIEFING",
+                  "TASK"
+                ]
+              },
+              "taskId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "taskRevision": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "attempt": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "presentationVersion": {
+                "type": "string",
+                "enum": [
+                  "briefing-basic-v1",
+                  "task-v1",
+                  "recommendation-v1"
+                ]
+              },
+              "presentationRevision": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "publicationId": {
+                "type": "null"
+              },
+              "materialVersionId": {
+                "type": "null"
+              },
+              "materialVersion": {
+                "type": "null"
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "kind": {
+                      "const": "BRIEFING"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "presentationVersion": {
+                      "enum": [
+                        "briefing-basic-v1",
+                        "recommendation-v1"
+                      ]
+                    }
+                  }
+                },
+                "else": {
+                  "properties": {
+                    "presentationVersion": {
+                      "const": "task-v1"
+                    },
+                    "presentationRevision": {
+                      "const": 0
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "taskRevision",
+              "attempt",
+              "presentationVersion",
+              "presentationRevision",
+              "publicationId",
+              "materialVersionId",
+              "materialVersion"
+            ],
+            "properties": {
+              "kind": {
+                "const": "PUBLICATION"
+              },
+              "taskId": {
+                "type": "null"
+              },
+              "taskRevision": {
+                "const": 0
+              },
+              "attempt": {
+                "const": 0
+              },
+              "presentationVersion": {
+                "const": "recommendation-v1"
+              },
+              "presentationRevision": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "publicationId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "materialVersionId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "materialVersion": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        ]
+      },
+      "FeedbackAssessment": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "rating",
+          "reasons",
+          "suggestion"
+        ],
+        "properties": {
+          "rating": {
+            "type": "string",
+            "enum": [
+              "USEFUL",
+              "NOT_USEFUL",
+              "ACHIEVED",
+              "PARTIAL",
+              "NOT_ACHIEVED"
+            ]
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "IRRELEVANT",
+                "REDUNDANT",
+                "INACCURATE",
+                "UNHELPFUL",
+                "CUSTOM",
+                "FACT_ERROR",
+                "EXECUTION",
+                "GOAL_CHANGED",
+                "EXPRESSION",
+                "DATA_GAP",
+                "OTHER"
+              ]
+            },
+            "maxItems": 6,
+            "uniqueItems": true
+          },
+          "suggestion": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 0
+          }
+        },
+        "description": "Channel-specific reasons and ratings are validated by the server. NOT_USEFUL requires at least one reason or a nonblank suggestion; CUSTOM requires a nonblank suggestion. Feedback does not prove task success."
+      },
+      "FeedbackSnapshot": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "taskState",
+          "executionClass",
+          "contentSha256",
+          "sourceVersionCount"
+        ],
+        "properties": {
+          "taskState": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1
+          },
+          "executionClass": {
+            "type": "string",
+            "enum": [
+              "live",
+              "verification",
+              "none"
+            ]
+          },
+          "contentSha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "sourceVersionCount": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "Feedback": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "tenantId",
+          "workspaceId",
+          "target",
+          "revision",
+          "status",
+          "assessment",
+          "snapshot",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "target": {
+            "$ref": "#/components/schemas/FeedbackTarget"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "WITHDRAWN"
+            ]
+          },
+          "assessment": {
+            "$ref": "#/components/schemas/FeedbackAssessment"
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/FeedbackSnapshot"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "FeedbackVersion": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "revision",
+          "status",
+          "assessment",
+          "createdAt"
+        ],
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "WITHDRAWN"
+            ]
+          },
+          "assessment": {
+            "$ref": "#/components/schemas/FeedbackAssessment"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "FeedbackLookup": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "feedback"
+        ],
+        "properties": {
+          "feedback": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Feedback"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "FeedbackHistory": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "hasMore"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeedbackVersion"
+            },
+            "maxItems": 50
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        }
+      },
+      "FeedbackCreate": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requestId",
+          "target",
+          "assessment"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "target": {
+            "$ref": "#/components/schemas/FeedbackTarget"
+          },
+          "assessment": {
+            "$ref": "#/components/schemas/FeedbackAssessment"
+          }
+        }
+      },
+      "FeedbackEdit": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requestId",
+          "expectedRevision",
+          "assessment"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "assessment": {
+            "$ref": "#/components/schemas/FeedbackAssessment"
+          }
+        }
+      },
+      "FeedbackWithdraw": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requestId",
+          "expectedRevision"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      },
+      "FeedbackPreference": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scenario",
+          "style",
+          "expectedProfileRevision"
+        ],
+        "properties": {
+          "scenario": {
+            "type": "string",
+            "enum": [
+              "GENERAL",
+              "WEEKLY_REPORT",
+              "TABLE_SUMMARY"
+            ]
+          },
+          "style": {
+            "type": "string",
+            "enum": [
+              "CONCLUSION_FIRST",
+              "DETAIL_FIRST",
+              "TABLE_FIRST",
+              "CONCISE"
+            ]
+          },
+          "expectedProfileRevision": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "FeedbackPreferenceState": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scenario",
+          "profileId",
+          "revision",
+          "status",
+          "style"
+        ],
+        "properties": {
+          "scenario": {
+            "type": "string",
+            "enum": [
+              "GENERAL",
+              "WEEKLY_REPORT",
+              "TABLE_SUMMARY"
+            ]
+          },
+          "profileId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "UNSET",
+              "ACTIVE",
+              "PROPOSED",
+              "WITHDRAWN",
+              "EXPIRED"
+            ]
+          },
+          "style": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "CONCLUSION_FIRST",
+                  "DETAIL_FIRST",
+                  "TABLE_FIRST",
+                  "CONCISE"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "FeedbackPreferences": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeedbackPreferenceState"
+            },
+            "maxItems": 3,
+            "minItems": 3
+          }
+        }
+      },
+      "FeedbackCandidate": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "title",
+          "summary",
+          "body",
+          "tags",
+          "applicable",
+          "excluded",
+          "dependencies",
+          "basis",
+          "accessMode"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "METHOD",
+              "CASE",
+              "CORRECTION",
+              "ASSET"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1
+          },
+          "summary": {
+            "type": "string",
+            "maxLength": 600,
+            "minLength": 1
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 16000,
+            "minLength": 1
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 40,
+              "minLength": 1
+            },
+            "maxItems": 20,
+            "uniqueItems": true
+          },
+          "applicable": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1
+          },
+          "excluded": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "dependencies": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "basis": {
+            "type": "string",
+            "maxLength": 1500,
+            "minLength": 1
+          },
+          "accessMode": {
+            "const": "SOURCE_BOUND"
+          }
+        }
+      },
+      "FeedbackFollowUp": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "confirmed",
+              "preference",
+              "correction",
+              "candidate"
+            ],
+            "properties": {
+              "kind": {
+                "const": "PREFERENCE"
+              },
+              "confirmed": {
+                "const": true
+              },
+              "preference": {
+                "$ref": "#/components/schemas/FeedbackPreference"
+              },
+              "correction": {
+                "type": "null"
+              },
+              "candidate": {
+                "type": "null"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "confirmed",
+              "preference",
+              "correction",
+              "candidate"
+            ],
+            "properties": {
+              "kind": {
+                "const": "CORRECTION"
+              },
+              "confirmed": {
+                "const": true
+              },
+              "preference": {
+                "type": "null"
+              },
+              "correction": {
+                "type": "string",
+                "maxLength": 1200,
+                "minLength": 1
+              },
+              "candidate": {
+                "type": "null"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "confirmed",
+              "preference",
+              "correction",
+              "candidate"
+            ],
+            "properties": {
+              "kind": {
+                "const": "EXPERIENCE_CANDIDATE"
+              },
+              "confirmed": {
+                "const": true
+              },
+              "preference": {
+                "type": "null"
+              },
+              "correction": {
+                "type": "null"
+              },
+              "candidate": {
+                "$ref": "#/components/schemas/FeedbackCandidate"
+              }
+            }
+          }
+        ],
+        "description": "Explicit independent confirmation required. Preference uses safe enums only. Correction creates a source-bound private task, not a successful correction. Candidate is manual, source-bound, unevaluated and never auto-published."
+      },
+      "FeedbackAct": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requestId",
+          "expectedRevision",
+          "action"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "action": {
+            "$ref": "#/components/schemas/FeedbackFollowUp"
+          }
+        }
+      },
+      "FeedbackAction": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "feedbackId",
+          "feedbackRevision",
+          "kind",
+          "status",
+          "targetId",
+          "targetVersion",
+          "targetRevision",
+          "conversationId",
+          "acceptedState",
+          "executionClass",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "feedbackId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "feedbackRevision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "PREFERENCE",
+              "CORRECTION",
+              "EXPERIENCE_CANDIDATE"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "APPLIED",
+              "TASK_CREATED",
+              "CANDIDATE_CREATED"
+            ]
+          },
+          "targetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "targetVersion": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "targetRevision": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "conversationId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "acceptedState": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1
+          },
+          "executionClass": {
+            "type": "string",
+            "enum": [
+              "live",
+              "verification",
+              "none"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "targetWorkspaceId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Explicit destination of a publication reader’s private follow-up; absent on legacy receipts."
+          }
+        },
+        "description": "Exact accepted receipt, not current downstream state. One action per kind per feedback revision. Repeated same payload returns the same receipt. Generic separately confirmed preferences survive feedback withdrawal. Derived correction/candidate prose remains source-bound.",
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "PREFERENCE"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "status": {
+                  "const": "APPLIED"
+                },
+                "acceptedState": {
+                  "const": "ACTIVE"
+                },
+                "targetRevision": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "targetVersion": {
+                  "type": "null"
+                },
+                "conversationId": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "CORRECTION"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "status": {
+                  "const": "TASK_CREATED"
+                },
+                "conversationId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "targetVersion": {
+                  "type": "null"
+                },
+                "targetRevision": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "EXPERIENCE_CANDIDATE"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "status": {
+                  "const": "CANDIDATE_CREATED"
+                },
+                "acceptedState": {
+                  "const": "CANDIDATE"
+                },
+                "targetVersion": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "targetRevision": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "conversationId": {
+                  "type": "null"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "FeedbackActions": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "hasMore"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeedbackAction"
+            },
+            "maxItems": 50
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "contractVersion",
+          "code",
+          "message",
+          "retryable"
+        ],
+        "properties": {
+          "contractVersion": {
+            "const": "1.0"
+          },
+          "code": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 0
+          },
+          "retryable": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AdjustmentReading": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "workspaceId",
+          "cardId",
+          "cardKind",
+          "target",
+          "title",
+          "excerpt",
+          "truncated",
+          "presentation",
+          "sourceVersions",
+          "contentSha256"
+        ],
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cardId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cardKind": {
+            "enum": [
+              "BRIEFING",
+              "PUBLICATION"
+            ]
+          },
+          "target": {
+            "$ref": "#/components/schemas/FeedbackTarget"
+          },
+          "title": {
+            "type": "string"
+          },
+          "excerpt": {
+            "type": "string"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "presentation": {
+            "type": "string"
+          },
+          "sourceVersions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "uniqueItems": true
+          },
+          "contentSha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      },
+      "AdjustmentMessage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "ordinal",
+          "taskId",
+          "taskRevision",
+          "status",
+          "waitReason",
+          "request",
+          "reading",
+          "historyTaskIds",
+          "reply",
+          "requiredInput",
+          "supplementalInput",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ordinal": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "taskId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "taskRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "status": {
+            "enum": [
+              "QUEUED",
+              "RUNNING",
+              "SUCCEEDED",
+              "FAILED",
+              "CANCELLED",
+              "INTERRUPTED",
+              "PAUSED",
+              "WAITING_INPUT",
+              "WAITING_CAPABILITY",
+              "PARTIAL",
+              "RESULT_UNKNOWN"
+            ]
+          },
+          "waitReason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "request": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "reading": {
+            "$ref": "#/components/schemas/AdjustmentReading"
+          },
+          "historyTaskIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "maxItems": 5,
+            "uniqueItems": true
+          },
+          "reply": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "requiredInput": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "supplementalInput": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AdjustmentView": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "reading",
+          "threadId",
+          "conversationId",
+          "threadRevision",
+          "feedbackRevision",
+          "items",
+          "hasMore",
+          "nextOffset"
+        ],
+        "properties": {
+          "reading": {
+            "$ref": "#/components/schemas/AdjustmentReading"
+          },
+          "threadId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "conversationId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "threadRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "feedbackRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "items": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "$ref": "#/components/schemas/AdjustmentMessage"
+            }
+          },
+          "hasMore": {
+            "type": "boolean"
+          },
+          "nextOffset": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "SendAdjustment": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requestId",
+          "target",
+          "expectedThreadRevision",
+          "expectedFeedbackRevision",
+          "message",
+          "rating"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "target": {
+            "$ref": "#/components/schemas/FeedbackTarget"
+          },
+          "expectedThreadRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "expectedFeedbackRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "rating": {
+            "enum": [
+              "USEFUL",
+              "NOT_USEFUL"
+            ]
+          }
+        }
+      },
+      "AdjustmentSent": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "threadId",
+          "conversationId",
+          "threadRevision",
+          "message",
+          "feedback"
+        ],
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "conversationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "threadRevision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "message": {
+            "$ref": "#/components/schemas/AdjustmentMessage"
+          },
+          "feedback": {
+            "$ref": "#/components/schemas/Feedback"
+          }
+        }
+      }
+    }
+  }
+}

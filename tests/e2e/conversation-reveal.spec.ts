@@ -41,7 +41,7 @@ async function expectFull(page: Page, id: string) {
   await expect(card(page, id).locator('.deck-card-content')).not.toHaveAttribute('inert');
 }
 
-test('点击视窗边缘局部卡片完整展现，第一次不误触版本按钮，草稿及顺序保留', async ({ page }) => {
+test('点击视窗边缘局部卡片完整展现，第一次不误触属性按钮，草稿及顺序保留', async ({ page }) => {
   await openCards(page);
   const file = await page.locator('.deck-file').first().getAttribute('data-deck-id');
   const id = file!;
@@ -57,24 +57,24 @@ test('点击视窗边缘局部卡片完整展现，第一次不误触版本按�
   expect(revealed.scroll).toBeGreaterThan(before.scroll);
   await expect(page.getByLabel('继续对话', { exact: true })).toHaveValue('保持这段草稿');
 
-  // Leave only 30px clipped, so a real version button is visible. Its first tap
+  // Leave only 30px clipped, so a real properties button is visible. Its first tap
   // reveals the card; a second tap performs the normal action.
   await rail(page).evaluate((node) => node.scrollBy({ left: -30, behavior: 'instant' }));
   await expect(card(page, id)).toHaveAttribute('data-clipped', 'true');
-  const versions = card(page, id).getByRole('button', { name: '版本记录', exact: true });
-  const button = (await versions.boundingBox())!;
+  const properties = card(page, id).getByRole('button', { name: '资料属性', exact: true });
+  const button = (await properties.boundingBox())!;
   expect(button.x + button.width).toBeLessThan(1440);
   await page.mouse.click(button.x + button.width / 2, button.y + button.height / 2);
   await expectFull(page, id);
-  await expect(versions).toHaveAttribute('aria-expanded', 'false');
-  await versions.click();
-  await expect(versions).toHaveAttribute('aria-expanded', 'true');
+  await expect(properties).toHaveAttribute('aria-expanded', 'false');
+  await properties.click();
+  await expect(properties).toHaveAttribute('aria-expanded', 'true');
   await rail(page).evaluate((node) => node.scrollTo({ left: 0, behavior: 'instant' }));
   await expect(card(page, id)).toHaveAttribute('data-clipped', 'true');
   const headerTap = await geometry(page, id);
   await page.mouse.click(headerTap.x, headerTap.top + 30);
   await expectFull(page, id);
-  await expect(versions).toHaveAttribute('aria-expanded', 'true');
+  await expect(properties).toHaveAttribute('aria-expanded', 'true');
   await expect(page.locator('.deck-file')).toHaveCount(2);
   await page.screenshot({ path: '.local/conversation-deck/revealed-file.png' });
 });

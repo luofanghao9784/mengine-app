@@ -16,6 +16,7 @@ public class TenantAdminController {
     public record Named(@NotNull UUID requestId, @NotNull @Size(max=100) String name) {}
     public record Rename(@NotNull UUID requestId, @NotNull @Min(0) Long expectedVersion, @NotNull @Size(max=100) String name) {}
     public record Status(@NotNull UUID requestId, @NotNull @Min(0) Long expectedVersion, @NotNull String status) {}
+    public record EmergencyDisable(@NotNull UUID requestId, @NotNull @Min(0) Long expectedVersion, @NotNull String securityAction) {}
     public record Grant(@NotNull UUID requestId, @NotNull @Min(0) Long expectedVersion, @NotNull Boolean enabled) {}
     private final TenantAdminService service;
     public TenantAdminController(TenantAdminService service) { this.service=service; }
@@ -33,6 +34,11 @@ public class TenantAdminController {
     @PostMapping("/members/{account}/status")
     public TenantAdminService.Member status(Authentication auth, @PathVariable UUID tenant, @PathVariable UUID account, @Valid @RequestBody Status body) {
         return service.status(IdentityController.actor(auth),tenant,account,body.requestId(),body.expectedVersion(),body.status());
+    }
+    @PostMapping("/members/{account}/emergency-disable")
+    public TenantAdminService.EmergencyDisableReceipt emergencyDisable(Authentication auth, @PathVariable UUID tenant,
+            @PathVariable UUID account, @Valid @RequestBody EmergencyDisable body) {
+        return service.emergencyDisable(IdentityController.actor(auth),tenant,account,body.requestId(),body.expectedVersion(),body.securityAction());
     }
     @GetMapping("/workspaces")
     public List<TenantAdminService.SharedWorkspace> spaces(Authentication auth, @PathVariable UUID tenant, @RequestParam(defaultValue="") String q,

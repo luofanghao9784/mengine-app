@@ -1,4 +1,4 @@
-/** Operations 1.1.0: current state of tasks created in [from, checkedAt); not a billing ledger. */
+/** Operations 1.2.0: current state of tasks created in [from, checkedAt); not a billing ledger. */
 export type OperationsDays = 7 | 30;
 export type OperationsErrorCode =
   | 'TASK_SOURCE_UNAVAILABLE'
@@ -15,6 +15,9 @@ export type OperationsErrorCode =
   | 'TASK_FILE_LIMIT'
   | 'TASK_FILE_DATA'
   | 'TASK_INTERRUPTED'
+  | 'TASK_RESULT_UNKNOWN'
+  | 'TASK_PLAN_STOPPED'
+  | 'TASK_PLAN_EXPIRED'
   | 'OTHER';
 export interface OperationsOverview {
   tenantId: string | null;
@@ -29,9 +32,14 @@ export interface OperationsOverview {
     failed: number;
     cancelled: number;
     interrupted: number;
+    paused: number;
+    waitingInput: number;
+    waitingCapability: number;
+    partial: number;
+    resultUnknown: number;
     retryStarts: number;
   };
-  /** All committed originals, including historical versions, irrespective of task window. */
+  /** All originals not yet physically removed, including historical versions, irrespective of task window. */
   storage: { materials: number; versions: number; originalBytes: number };
   /** Successful Agent receipts only. Partial coverage and verification mode must stay visible. */
   models: {
@@ -42,7 +50,7 @@ export interface OperationsOverview {
     inputTokens: number | null;
     outputTokens: number | null;
   }[];
-  /** Current failed/interrupted tasks; a successfully retried task leaves this view. */
+  /** Current failed/interrupted/unknown tasks; a successfully retried task leaves this view. */
   /** Attempts started in [from, checkedAt), including retries. V15 onward, no historic backfill. */
   attemptUsage: {
     executionClass: 'live' | 'verification';
@@ -53,6 +61,11 @@ export interface OperationsOverview {
     failed: number;
     cancelled: number;
     interrupted: number;
+    paused: number;
+    waitingInput: number;
+    waitingCapability: number;
+    partial: number;
+    resultUnknown: number;
     requests: number;
     pendingRequests: number;
     reportedRequests: number;

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Dreamcore Knowledge API",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "平台持有解析批次、版本和引用。本地关键词检索，仅检索最新文件版本的最新成功或部分成功批次；重新解析期间暂不返回旧批次。共享汇总排除所有个人空间。每次读取与执行分别验证空间权限。"
   },
   "security": [
@@ -647,7 +647,9 @@
           "workspaceId",
           "query",
           "items",
-          "hasMore"
+          "hasMore",
+          "matchStatus",
+          "coverage"
         ],
         "properties": {
           "tenantId": {
@@ -672,6 +674,15 @@
           },
           "hasMore": {
             "type": "boolean"
+          },
+          "matchStatus": {
+            "enum": [
+              "MATCHED",
+              "NO_MATCH"
+            ]
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/Coverage"
           }
         }
       },
@@ -718,6 +729,130 @@
           "code",
           "message",
           "retryable"
+        ],
+        "additionalProperties": false
+      },
+      "VersionCoverage": {
+        "type": "object",
+        "properties": {
+          "materialId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "versionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "runId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "generation": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "status": {
+            "enum": [
+              "NOT_STARTED",
+              "QUEUED",
+              "RUNNING",
+              "READY",
+              "PARTIAL",
+              "FAILED",
+              "UNSUPPORTED",
+              "CANCELLED"
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "maxItems": 4,
+            "items": {
+              "type": "string",
+              "maxLength": 64
+            }
+          },
+          "pinned": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "materialId",
+          "versionId",
+          "version",
+          "runId",
+          "generation",
+          "status",
+          "warnings",
+          "pinned"
+        ],
+        "additionalProperties": false
+      },
+      "Coverage": {
+        "type": "object",
+        "description": "Only currently authorized scope is counted. Unparsed files have unknown query relevance. Version details are bounded separately from result pagination.",
+        "properties": {
+          "scope": {
+            "enum": [
+              "AUTHORIZED_WORKSPACE",
+              "AUTHORIZED_SHARED",
+              "SELECTED_VERSIONS"
+            ]
+          },
+          "status": {
+            "enum": [
+              "EMPTY",
+              "READY",
+              "PARTIAL",
+              "NOT_READY"
+            ]
+          },
+          "relevance": {
+            "const": "NOT_ASSESSED"
+          },
+          "versions": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/VersionCoverage"
+            }
+          },
+          "hasMore": {
+            "type": "boolean"
+          },
+          "totalVersions": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "searchableVersions": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "partialVersions": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "notReadyVersions": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "scope",
+          "status",
+          "relevance",
+          "versions",
+          "hasMore",
+          "totalVersions",
+          "searchableVersions",
+          "partialVersions",
+          "notReadyVersions"
         ],
         "additionalProperties": false
       }

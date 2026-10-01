@@ -1,3 +1,6 @@
+import { ObjectLifecycleWorkspace } from '../objectlifecycle/ObjectLifecycleWorkspace';
+import { ExportBatchPanel } from '../export/ExportBatchPanel';
+import { requestNavigationLocked } from '../shared/request-guard';
 import { documentsHref } from '../documents/routes';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -22,6 +25,9 @@ import { Failure, Loading, Pager, useRemote, useSubmission, SubmitError } from '
 import { materialClient as api } from './client';
 import './material.css';
 import { AnalysisPanel, ContentSearch } from './Knowledge';
+import { BatchUploadDialog } from './BatchUpload';
+import { SourcePanel } from '../source/SourcePanel';
+import { MaterialMaintenance } from '../lifecycle/MaterialMaintenance';
 export const libraryHref = (tenant: string, scope = 'personal', folder?: string) =>
   '#' + new URLSearchParams({ tenant, view: 'library', scope, ...(folder ? { folder } : {}) });
 const size = (bytes: number) =>
@@ -37,26 +43,15 @@ const accessDenied = (error: unknown) =>
 export function LiveLibrary({ tenant }: { tenant: string }) {
   const { session } = useSession();
   const [attempt, setAttempt] = useState(0);
-  const { expire } = useSession();
-  const [context, setContext] = useState<{ value?: TenantContext; error?: unknown }>({});
-  useEffect(() => {
-    const controller = new AbortController();
-    // A native file picker regains window focus; retain an in-progress form during background revalidation.
-    identityClient
-      .context(tenant, controller.signal)
-      .then((value) => {
-        if (!controller.signal.aborted) setContext({ value });
-      })
-      .catch((error) => {
-        if (controller.signal.aborted) return;
-        if (error instanceof IdentityError && error.status === 401) expire();
-        else setContext({ error });
-      });
-    return () => controller.abort();
-  }, [tenant, attempt, session.identity, expire]);
+  const [contentLifecycleOpen, setContentLifecycleOpen] = useState(false);
+  const context = useRemote(
+    (signal) => identityClient.context(tenant, signal),
+    [tenant, attempt, session.identity],
+  );
   return (
     <>
       <PageActions>
+        <Button onClick={() => setContentLifecycleOpen(true)}>内容回收与清理</Button>
         <Button
           icon={FileText}
           onClick={() => {
@@ -69,6 +64,16 @@ export function LiveLibrary({ tenant }: { tenant: string }) {
           刷新
         </Button>
       </PageActions>
+      {contentLifecycleOpen && (
+        <Modal
+          title="内容回收与清理"
+          onClose={() => {
+            if (!requestNavigationLocked()) setContentLifecycleOpen(false);
+          }}
+        >
+          <ObjectLifecycleWorkspace tenant={tenant} />
+        </Modal>
+      )}
       {context.error ? (
         <Failure error={context.error} retry={() => setAttempt((x) => x + 1)} />
       ) : !context.value ? (
@@ -82,7 +87,9 @@ export function LiveLibrary({ tenant }: { tenant: string }) {
 function LibraryContents({ tenant, context }: { tenant: string; context: TenantContext }) {
   const [hash, setHash] = useState(location.hash);
   useEffect(() => {
-    const change = () => setHash(location.hash);
+    const change = () => {
+      if (!requestNavigationLocked()) setHash(location.hash);
+    };
     window.addEventListener('hashchange', change);
     return () => window.removeEventListener('hashchange', change);
   }, []);
@@ -148,12 +155,16 @@ function LibraryListing({
   all: boolean;
 }) {
   const [contentSearch, setContentSearch] = useState(false);
+  const [sourcesOpen, setSourcesOpen] = useState(() =>
+    new URLSearchParams(location.hash.slice(1)).has('source'),
+  );
+  const [maintenanceOpen, setMaintenanceOpen] = useState(false);
   const [query, setQuery] = useState(''),
     [q, setQ] = useState(''),
     [page, setPage] = useState(0),
     [attempt, setAttempt] = useState(0);
   const [layout, setLayout] = useState<'cards' | 'list'>('cards');
-  const [modal, setModal] = useState<'folder' | 'upload'>(),
+  const [modal, setModal] = useState<'folder' | 'upload' | 'batch'>(),
     [document, setDocument] = useState<MaterialEntry>(),
     [notice, setNotice] = useState('');
   const data = useRemote(
@@ -186,10 +197,29 @@ function LibraryListing({
       setNotice(message(data.error || new IdentityError('MATERIAL_READ_ONLY', 403)));
     }
   }, [data.error, data.value, workspace, modal, uploadTarget, context]);
+  useEffect(() => {
+    if (data.error || (data.value && !data.value.canMaintain)) setMaintenanceOpen(false);
+  }, [data.error, data.value]);
   const personal = current?.kind === 'PERSONAL';
   return (
     <>
+      {current?.kind === 'SHARED' && (
+        <ExportBatchPanel
+          tenant={tenant}
+          workspace={current.id}
+          workspaceName={current.name}
+          scope="ENTERPRISE"
+        />
+      )}
       <PageActions>
+        {workspace && data.value?.canMaintain && (
+          <Button onClick={() => setMaintenanceOpen(true)}>维护与回收站</Button>
+        )}
+        {workspace && data.value && (
+          <Button icon={LibraryBig} onClick={() => setSourcesOpen(true)}>
+            数据来源
+          </Button>
+        )}
         {data.value?.canMaintain && (
           <Button icon={FolderPlus} onClick={() => setModal('folder')}>
             新建文件夹
@@ -205,6 +235,17 @@ function LibraryListing({
             }}
           >
             上传资料
+          </Button>
+        )}
+        {(data.value?.canMaintain || enterprise || all) && (
+          <Button
+            icon={Upload}
+            onClick={() => {
+              setUploadTarget(workspace || '');
+              setModal('batch');
+            }}
+          >
+            批量上传
           </Button>
         )}
       </PageActions>
@@ -396,6 +437,25 @@ function LibraryListing({
           verification={context}
         />
       )}
+      {maintenanceOpen && workspace && (
+        <MaterialMaintenance
+          tenant={tenant}
+          workspace={workspace}
+          entries={data.value?.items || []}
+          verification={context}
+          close={() => setMaintenanceOpen(false)}
+          changed={refresh}
+        />
+      )}
+      {sourcesOpen && workspace && current && (
+        <SourcePanel
+          tenant={tenant}
+          workspace={workspace}
+          workspaceName={current.name}
+          verification={context}
+          close={() => setSourcesOpen(false)}
+        />
+      )}
       {modal === 'folder' && workspace && (
         <FolderDialog
           tenant={tenant}
@@ -431,6 +491,33 @@ function LibraryListing({
             </Field>
           )}
         </UploadDialog>
+      )}
+      {modal === 'batch' && (
+        <BatchUploadDialog
+          tenant={tenant}
+          workspace={uploadTarget}
+          parent={workspace ? folder : null}
+          close={() => {
+            setModal(undefined);
+            refresh();
+          }}
+          changed={refresh}
+        >
+          {!workspace && (
+            <Field label="批量保存到共享空间" hint="选定后核对该空间的维护权限。">
+              <select required value={uploadTarget} onChange={(e) => setUploadTarget(e.target.value)}>
+                <option value="">请选择空间</option>
+                {context.workspaces
+                  .filter((s) => s.kind === 'SHARED')
+                  .map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+              </select>
+            </Field>
+          )}
+        </BatchUploadDialog>
       )}
       {document && (
         <DocumentDialog

@@ -13,17 +13,24 @@ import org.springframework.transaction.annotation.Transactional;
 public class KnowledgeService {
     public record Chunk(UUID id,UUID tenantId,UUID workspaceId,UUID materialId,UUID versionId,UUID runId,int version,String filename,String locator,String method,String content) {}
     public record Analysis(UUID tenantId,UUID workspaceId,UUID materialId,UUID versionId,int generation,String status,String parserVersion,List<String> warnings,boolean canMaintain,boolean available,List<Chunk> chunks,boolean hasMore) {}
-    public record Results(UUID tenantId,UUID workspaceId,String query,List<Chunk> items,boolean hasMore) {}
+    public record VersionCoverage(UUID materialId,UUID versionId,int version,UUID runId,int generation,String status,List<String> warnings,boolean pinned) {}
+    public record Coverage(String scope,String status,long totalVersions,long searchableVersions,long partialVersions,long notReadyVersions,
+                           String relevance,List<VersionCoverage> versions,boolean hasMore) {
+        public Coverage limited(int limit){return new Coverage(scope,status,totalVersions,searchableVersions,partialVersions,notReadyVersions,relevance,versions.stream().limit(limit).toList(),hasMore || versions.size()>limit);}
+    }
+    public record Results(UUID tenantId,UUID workspaceId,String query,List<Chunk> items,boolean hasMore,String matchStatus,Coverage coverage) {}
     public record Job(UUID id,UUID tenant,UUID workspace,UUID material,UUID version,UUID actor,UUID token) {}
     public record Input(String filename,byte[] bytes) {}
     private final JdbcTemplate db; private final MaterialAccess access; private final IdentityService identities;
     private final IdentityAudit audit; private final ObjectStore store; private final boolean enabled;
+    private final tools.jackson.databind.json.JsonMapper json=new tools.jackson.databind.json.JsonMapper();
     public KnowledgeService(JdbcTemplate db,MaterialAccess access,IdentityService identities,IdentityAudit audit,ObjectStore store,@Value("${dreamcore.knowledge.enabled:false}") boolean enabled) {
         this.db=db;this.access=access;this.identities=identities;this.audit=audit;this.store=store;this.enabled=enabled;
     }
     private IdentityException missing() { return new IdentityException(404,"KNOWLEDGE_NOT_FOUND"); }
     private void page(int offset,int limit) { if(offset<0 || offset>100000 || limit<1 || limit>50) throw IdentityException.invalid(); }
     private Map<String,Object> version(UUID tenant,UUID space,UUID material,UUID version,boolean lock) {
+        access.requireVersionActive(tenant,space,version);
         var rows=db.queryForList("SELECT * FROM material_versions WHERE tenant_id=? AND workspace_id=? AND material_id=? AND id=?"+(lock?" FOR UPDATE":""),tenant,space,material,version);
         if(rows.isEmpty()) throw missing(); return rows.getFirst();
     }
@@ -67,32 +74,77 @@ public class KnowledgeService {
     @Transactional
     public Results search(UUID actor,UUID tenant,UUID space,String query,int offset,int limit) {return search(actor,tenant,space,query,offset,limit,null);}
     @Transactional public Results search(UUID actor,UUID tenant,UUID space,String query,int offset,int limit,List<UUID> selectedVersions) {
+        return search(actor,tenant,space,query,offset,limit,selectedVersions,null,null);
+    }
+    /** Only the platform's authorized attempt callback supplies task/attempt; no public request selects them. */
+    @Transactional public Results searchForAttempt(UUID actor,UUID tenant,UUID space,String query,int limit,List<UUID> selectedVersions,UUID task,UUID attempt) {
+        if(task==null || attempt==null || space==null)throw IdentityException.invalid();
+        return search(actor,tenant,space,query,0,limit,selectedVersions,task,attempt);
+    }
+    private Results search(UUID actor,UUID tenant,UUID space,String suppliedQuery,int offset,int limit,List<UUID> selectedVersions,UUID task,UUID attempt) {
         if(selectedVersions!=null && (space==null || selectedVersions.isEmpty() || selectedVersions.size()>3 || selectedVersions.stream().anyMatch(Objects::isNull)))throw IdentityException.invalid();
         page(offset,limit); identities.member(actor,tenant,false);if(space!=null) access.require(actor,tenant,space,false);
-        query=query.strip();if(query.isEmpty() || query.length()>200) throw IdentityException.invalid();
+        if(suppliedQuery==null)throw IdentityException.invalid();
+        String query=suppliedQuery.strip();if(query.isEmpty() || query.length()>200) throw IdentityException.invalid();
         String[] terms=query.split("\\s+");if(terms.length>8) throw IdentityException.invalid();
-        String sql=SELECT+"""
-            JOIN workspaces w ON w.id=c.workspace_id AND w.tenant_id=c.tenant_id
-            JOIN materials m ON m.id=c.material_id AND m.tenant_id=c.tenant_id AND m.workspace_id=c.workspace_id
-            JOIN knowledge_runs r ON r.id=c.run_id AND r.status IN ('READY','PARTIAL')
+        var args=new ArrayList<Object>();args.add(task);args.add(attempt);args.add(actor);args.add(tenant);args.add(actor);
+        String scope="""
+            SELECT v.*,r.id AS run_id,coalesce(r.status,'NOT_STARTED') AS parse_status,
+                   coalesce(r.generation,0) AS generation,coalesce(r.warnings,'') AS warnings,
+                   r.created_at AS run_created_at,(pin.task_id IS NOT NULL) AS pinned
+            FROM active_materials m JOIN workspaces w ON w.id=m.workspace_id AND w.tenant_id=m.tenant_id
+            LEFT JOIN conversation_task_material_versions pin ON pin.task_id=? AND pin.attempt_id=?
+              AND pin.tenant_id=m.tenant_id AND pin.workspace_id=m.workspace_id AND pin.material_id=m.id
+            JOIN material_versions v ON v.material_id=m.id AND v.tenant_id=m.tenant_id AND v.workspace_id=m.workspace_id
+            LEFT JOIN LATERAL (
+              SELECT k.* FROM knowledge_runs k WHERE k.version_id=v.id AND (pin.run_id IS NULL OR k.id=pin.run_id)
+              ORDER BY k.generation DESC LIMIT 1
+            ) r ON true
             LEFT JOIN workspace_members g ON g.tenant_id=w.tenant_id AND g.workspace_id=w.id AND g.account_id=?
-            WHERE c.tenant_id=? AND ((w.kind='PERSONAL' AND w.owner_id=?) OR (w.kind='SHARED' AND g.account_id IS NOT NULL))
-            AND NOT EXISTS (SELECT 1 FROM knowledge_runs newer WHERE newer.version_id=r.version_id AND newer.generation>r.generation)
+            WHERE m.tenant_id=? AND ((w.kind='PERSONAL' AND w.owner_id=?) OR (w.kind='SHARED' AND g.account_id IS NOT NULL)) AND departure_content_readable(coalesce(g.account_id,w.owner_id),w.tenant_id,w.id)
             """;
-        var args=new ArrayList<Object>(List.of(actor,tenant,actor));
-        if(selectedVersions==null)sql+=" AND m.current_version=v.number";
-        else {sql+=" AND c.version_id IN ("+String.join(",",Collections.nCopies(selectedVersions.size(),"?"))+")";args.addAll(selectedVersions);}
-        if(space==null) sql+=" AND w.kind='SHARED'";else { sql+=" AND c.workspace_id=?";args.add(space); }
-        for(String term:terms) {sql+=" AND strpos(lower(c.content),lower(?))>0";args.add(term);}
-        sql+=" ORDER BY r.created_at DESC,c.ordinal,c.id LIMIT ? OFFSET ?";args.add(limit+1);args.add(offset);
+        if(selectedVersions==null)scope+=" AND ((pin.version_id IS NULL AND m.current_version=v.number) OR pin.version_id=v.id)";
+        else {scope+=" AND v.id IN ("+String.join(",",Collections.nCopies(selectedVersions.size(),"?"))+")";args.addAll(selectedVersions);}
+        if(space==null)scope+=" AND w.kind='SHARED'";else {scope+=" AND m.workspace_id=?";args.add(space);}
+        String match="SELECT c.*,s.number,s.filename,s.run_created_at FROM knowledge_chunks c JOIN scoped s ON c.run_id=s.run_id AND c.version_id=s.id AND c.tenant_id=s.tenant_id AND c.workspace_id=s.workspace_id WHERE s.parse_status IN ('READY','PARTIAL')";
+        for(String term:terms){match+=" AND strpos(lower(c.content),lower(?))>0";args.add(term);}
+        args.add(limit+1);args.add(offset);
+        // One snapshot covers authorization-filtered totals, the bounded version receipt and the result page.
+        // A not-yet-parsed file is scope coverage, never a claim that it is relevant to the query.
+        String sql="WITH scoped AS MATERIALIZED ("+scope+"),matched AS MATERIALIZED ("+match+"), page AS (SELECT * FROM matched ORDER BY run_created_at DESC,ordinal,id LIMIT ? OFFSET ?) "+"""
+            SELECT count(*) AS total,
+              count(*) FILTER(WHERE parse_status IN ('READY','PARTIAL')) AS searchable,
+              count(*) FILTER(WHERE parse_status='PARTIAL') AS partial,
+              EXISTS(SELECT 1 FROM matched) AS has_match,
+              coalesce((SELECT jsonb_agg(jsonb_build_object(
+                'id',p.id,'tenantId',p.tenant_id,'workspaceId',p.workspace_id,'materialId',p.material_id,
+                'versionId',p.version_id,'runId',p.run_id,'version',p.number,'filename',p.filename,
+                'locator',p.locator,'method',p.method,'content',p.content) ORDER BY p.run_created_at DESC,p.ordinal,p.id) FROM page p),'[]') AS items,
+              coalesce((SELECT jsonb_agg(jsonb_build_object(
+                'materialId',v.material_id,'versionId',v.id,'version',v.number,'runId',v.run_id,'generation',v.generation,
+                'status',v.parse_status,'warnings',CASE WHEN v.warnings='' THEN ARRAY[]::text[] ELSE string_to_array(v.warnings,',') END,
+                'pinned',v.pinned) ORDER BY v.material_id,v.number)
+                FROM (SELECT * FROM scoped ORDER BY material_id,number LIMIT 100) v),'[]') AS versions
+            FROM scoped
+            """;
         db.execute("SET LOCAL statement_timeout='3s'");
-        var found=db.query(sql,mapper,args.toArray());return new Results(tenant,space,query,found.stream().limit(limit).toList(),found.size()>limit);
+        return db.queryForObject(sql,(r,n)->{
+            long total=r.getLong("total"),searchable=r.getLong("searchable"),partial=r.getLong("partial");
+            String state=total==0?"EMPTY":searchable==0?"NOT_READY":searchable<total || partial>0?"PARTIAL":"READY";
+            var found=Arrays.asList(json.readValue(r.getString("items"),Chunk[].class));
+            var versions=Arrays.stream(json.readValue(r.getString("versions"),VersionCoverage[].class))
+                .map(v->new VersionCoverage(v.materialId(),v.versionId(),v.version(),v.runId(),v.generation(),v.status(),
+                    v.warnings().stream().limit(4).map(w->w.substring(0,Math.min(64,w.length()))).toList(),v.pinned())).toList();
+            var coverage=new Coverage(selectedVersions!=null?"SELECTED_VERSIONS":space==null?"AUTHORIZED_SHARED":"AUTHORIZED_WORKSPACE",
+                state,total,searchable,partial,total-searchable,"NOT_ASSESSED",versions,total>versions.size());
+            return new Results(tenant,space,query,found.stream().limit(limit).toList(),found.size()>limit,r.getBoolean("has_match")?"MATCHED":"NO_MATCH",coverage);
+        },args.toArray());
     }
     @Transactional
     public Chunk citation(UUID actor,UUID tenant,UUID id) {
         identities.member(actor,tenant,false);
         var rows=db.query(SELECT+" WHERE c.tenant_id=? AND c.id=?",mapper,tenant,id);if(rows.isEmpty()) throw missing();
-        var chunk=rows.getFirst();access.require(actor,tenant,chunk.workspaceId(),false);return chunk;
+        var chunk=rows.getFirst();access.require(actor,tenant,chunk.workspaceId(),false);access.requireVersionActive(tenant,chunk.workspaceId(),chunk.versionId());return chunk;
     }
     @Transactional
     public Job claim() {
@@ -112,6 +164,7 @@ public class KnowledgeService {
     @Transactional
     public void finish(Job job,DocumentParser.Result result) {
         access.require(job.actor(),job.tenant(),job.workspace(),true);if(!owned(job)) return;
+        access.requireVersionActive(job.tenant(),job.workspace(),job.version());
         int ordinal=0;
         for(var c:result.chunks()) db.update("INSERT INTO knowledge_chunks(id,tenant_id,workspace_id,material_id,version_id,run_id,ordinal,locator,method,content) VALUES (?,?,?,?,?,?,?,?,?,?)",UUID.randomUUID(),job.tenant(),job.workspace(),job.material(),job.version(),job.id(),ordinal++,c.locator(),c.method(),c.content());
         db.update("UPDATE knowledge_runs SET status=?,parser_version=?,warnings=?,finished_at=now(),lease_token=NULL,lease_until=NULL WHERE id=?",result.status(),result.parserVersion(),String.join(",",result.warnings()),job.id());

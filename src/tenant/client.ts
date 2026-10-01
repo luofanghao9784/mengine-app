@@ -6,6 +6,8 @@ import type {
   WorkspaceGrant,
   TenantRecord,
   VersionedChange,
+  EmergencyDisable,
+  EmergencyDisableReceipt,
 } from '../../contracts/public-api/tenant-admin';
 import { createIdentityRequest, IdentityError, record, text, uuid } from '../identity/client.ts';
 const count = (v: unknown): v is number => Number.isSafeInteger(v) && (v as number) >= 0;
@@ -55,6 +57,7 @@ const actions = [
   'INVITATION_ACCEPT',
   'MEMBER_ENABLE',
   'MEMBER_DISABLE',
+  'MEMBER_SECURITY_DISABLE',
   'MEMBER_ROLE',
   'WORKSPACE_CREATE',
   'WORKSPACE_RENAME',
@@ -114,6 +117,20 @@ export function createTenantClient(fetcher: typeof fetch = fetch) {
         path(tenant) + `/members/${id(account)}/status`,
         'POST',
         (v): v is TenantMember => isMember(v) && v.accountId === account,
+        body,
+      ),
+    emergencyDisable: (tenant: string, account: string, body: EmergencyDisable) =>
+      request(
+        path(tenant) + `/members/${id(account)}/emergency-disable`,
+        'POST',
+        (v): v is EmergencyDisableReceipt =>
+          record(v) &&
+          v.accountId === account &&
+          v.status === 'DISABLED' &&
+          count(v.version) &&
+          v.securityAction === 'SECURITY_RISK' &&
+          ((v.recoveryRequestId === null && v.recoveryStatus === null) ||
+            (uuid(v.recoveryRequestId) && v.recoveryStatus === 'PENDING_VERIFICATION')),
         body,
       ),
     invitations: (tenant: string, offset = 0, signal?: AbortSignal) =>

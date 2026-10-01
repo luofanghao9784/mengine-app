@@ -4,6 +4,9 @@ import type {
   BriefingPage,
   BriefingFilter,
   BriefingUpdate,
+  BriefingLayout,
+  BriefingLayoutMove,
+  BriefingLayoutReceipt,
 } from '../../contracts/public-api/briefing';
 import { createIdentityRequest, IdentityError, record, text, uuid } from '../identity/client.ts';
 const count = (v: unknown): v is number => Number.isSafeInteger(v) && Number(v) >= 0;
@@ -17,6 +20,10 @@ const card = (v: unknown): v is BriefingCard =>
   record(v) &&
   uuid(v.conversationId) &&
   uuid(v.taskId) &&
+  count(v.taskRevision) &&
+  count(v.attempt) &&
+  v.attempt > 0 &&
+  v.presentationVersion === 'briefing-basic-v1' &&
   uuid(v.workspaceId) &&
   text(v.workspaceName) &&
   v.workspaceName.length <= 200 &&
@@ -45,6 +52,17 @@ export function createBriefingClient(fetcher: typeof fetch = fetch) {
   const request = createIdentityRequest(fetcher);
   const root = (tenant: string) => `/api/v1/tenants/${id(tenant)}/briefing`;
   return {
+    layout(tenant: string, signal?: AbortSignal) {
+      return request(root(tenant) + '/layout', 'GET', (v): v is BriefingLayout =>
+        record(v) && v.tenantId === tenant && count(v.revision), undefined, signal);
+    },
+    move(tenant: string, body: BriefingLayoutMove) {
+      return request(root(tenant) + '/layout', 'POST', (v): v is BriefingLayoutReceipt =>
+        record(v) && uuid(v.id) && v.conversationId === body.conversationId &&
+        v.anchorId === body.anchorId && v.direction === body.direction &&
+        count(v.appliedRevision) && count(v.currentRevision) && v.currentRevision >= v.appliedRevision,
+        body);
+    },
     list(tenant: string, filter: BriefingFilter, offset = 0, signal?: AbortSignal) {
       const query = new URLSearchParams({
         view: filter.view,

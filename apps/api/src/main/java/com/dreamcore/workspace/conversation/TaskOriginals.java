@@ -20,6 +20,7 @@ public class TaskOriginals {
         return selections.stream().sorted(Comparator.comparing(s->s.versionId().toString())).toList();
     }
     private File metadata(UUID tenant,UUID space,Selection s){
+        access.requireVersionActive(tenant,space,s.versionId());
         var files=db.query("SELECT * FROM material_versions WHERE tenant_id=? AND workspace_id=? AND material_id=? AND id=?",(r,n)->new File(s.materialId(),s.versionId(),r.getString("filename"),r.getInt("number"),r.getLong("size_bytes"),r.getString("sha256"),false),tenant,space,s.materialId(),s.versionId());
         if(files.isEmpty())throw new IdentityException(404,"TASK_ORIGINAL_UNAVAILABLE");return files.getFirst();
     }

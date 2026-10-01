@@ -1,0 +1,300 @@
+.export-panel {
+  margin: 22px 0;
+  padding: 22px;
+  border: 1px solid #dfe6e7;
+  border-radius: 14px;
+  background: var(--surface, #fff);
+  color: var(--text-primary, #263831);
+  min-width: 0;
+  font-size: 14px;
+}
+.export-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+}
+.export-heading h2 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 18px;
+  margin: 0 0 8px;
+}
+.export-heading p {
+  margin: 0;
+  color: var(--text-secondary, #718078);
+  font-size: 13px;
+}
+.export-toolbar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.export-note {
+  padding: 12px 14px;
+  background: #f2f7f4;
+  color: #58705f;
+  border-radius: 9px;
+  line-height: 1.8;
+  font-size: 12px;
+  margin: 17px 0;
+}
+.export-muted {
+  color: var(--text-secondary, #718078);
+  font-size: 12px;
+  line-height: 1.8;
+}
+.export-history {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 10px;
+  margin: 20px 0;
+}
+.export-batch-card {
+  padding: 14px;
+  text-align: left;
+  border: 1px solid #e1e8e2;
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+  color: inherit;
+}
+.export-batch-card.selected {
+  border-color: #819b85;
+  background: #f2f7ef;
+}
+.export-batch-card:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+.export-batch-card strong,
+.export-batch-card span,
+.export-batch-card small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.export-batch-card span {
+  font-size: 12px;
+  margin-top: 7px;
+  color: #65756a;
+}
+.export-batch-card small {
+  font-size: 11px;
+  margin-top: 5px;
+  color: #839086;
+}
+.export-picker,
+.export-detail {
+  border-top: 1px solid #e4eae5;
+  margin-top: 20px;
+  padding-top: 20px;
+}
+.export-choices,
+.export-items {
+  list-style: none;
+  padding: 0;
+  margin: 16px 0;
+}
+.export-choices li,
+.export-items li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid #edf0eb;
+  min-width: 0;
+}
+.export-choices label {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+.export-choices input {
+  margin-top: 3px;
+  flex: none;
+}
+.export-choices strong,
+.export-items strong {
+  display: block;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
+.export-choices small,
+.export-items small {
+  display: block;
+  color: #758278;
+  font-size: 12px;
+  line-height: 1.8;
+  margin-top: 4px;
+}
+.export-page {
+  border: 0;
+  padding: 0;
+  margin: 14px 0;
+  min-width: 0;
+}
+.export-page .platform-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+}
+.export-basket {
+  padding: 18px;
+  background: #f6f8f4;
+  border: 1px solid #e3e8de;
+  border-radius: 11px;
+  margin-top: 20px;
+}
+.export-basket h3 {
+  margin: 0 0 12px;
+  font-size: 14px;
+}
+.export-basket > div:not(.field) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 8px 0;
+}
+.export-basket span {
+  overflow-wrap: anywhere;
+}
+.export-basket .field {
+  max-width: 230px;
+  margin: 18px 0;
+}
+.export-panel select {
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+}
+.export-panel .field {
+  margin: 0;
+}
+.export-panel .export-basket .field {
+  margin: 18px 0;
+}
+.export-detail-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.export-detail-heading h3 {
+  margin: 0;
+  font-size: 16px;
+}
+.export-detail-heading small {
+  color: #829086;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.export-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0;
+}
+.export-stats span {
+  padding: 6px 9px;
+  background: #f4f6f0;
+  border-radius: 6px;
+  color: #61755e;
+  font-size: 12px;
+}
+.export-items li {
+  justify-content: flex-start;
+}
+.export-items li > div {
+  min-width: 0;
+}
+.export-items p {
+  font-size: 12px;
+  color: #9a784b;
+  margin: 5px 0;
+  line-height: 1.6;
+}
+.export-ordinal {
+  height: 23px;
+  width: 23px;
+  border-radius: 6px;
+  background: #edf2e8;
+  color: #718065;
+  display: grid;
+  place-items: center;
+  flex: none;
+  font-size: 11px;
+}
+.export-items code {
+  display: block;
+  font-size: 10px;
+  color: #86917f;
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+.export-commands {
+  margin-top: 12px;
+}
+.export-cleanup {
+  background: #f4f7f2;
+  border: 1px solid #e0e6db;
+  padding: 16px;
+  border-radius: 10px;
+  margin: 18px 0;
+  line-height: 1.7;
+}
+.export-cleanup strong {
+  font-size: 13px;
+}
+.export-cleanup p,
+.export-cleanup small {
+  font-size: 12px;
+  color: #72816d;
+}
+.export-cleanup p {
+  margin: 7px 0;
+}
+.export-panel .button {
+  white-space: normal;
+}
+@media (max-width: 620px) {
+  .export-panel {
+    padding: 15px;
+  }
+  .export-heading {
+    flex-direction: column;
+  }
+  .export-history {
+    grid-template-columns: 1fr;
+  }
+  .export-choices li {
+    flex-wrap: wrap;
+  }
+  .export-choices li > .button {
+    margin-left: 24px;
+  }
+  .export-choices label {
+    flex-basis: 100%;
+  }
+  .export-basket {
+    padding: 13px;
+  }
+  .export-detail-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .export-toolbar {
+    align-items: stretch;
+  }
+  .export-page .platform-pagination {
+    gap: 8px;
+  }
+}

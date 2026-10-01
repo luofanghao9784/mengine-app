@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 const storageKey = 'enterprise-ai-demo-konggu-v1';
 
 for (const savedColumns of [0, 5, 2]) {
-  test(`${savedColumns ? `已有 ${savedColumns} 列保存布局` : '默认画报'}：缩窄与展开都补齐中间空位，DOM 同序且不改写偏好`, async ({
+  test(`${savedColumns ? `已有 ${savedColumns} 列保存布局` : '默认画报'}：缩窄与展开补齐可容纳卡片的空位，DOM 同序且不改写偏好`, async ({
     page,
   }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -69,13 +69,16 @@ for (const savedColumns of [0, 5, 2]) {
           const errors: string[] = [];
           const columns = getComputedStyle(grid).gridTemplateColumns.split(' ').length;
           const occupied = new Set<number>();
+          const placements: { start: number; width: number; height: number }[] = [];
           let previous = -1;
           for (const card of grid.querySelectorAll<HTMLElement>(':scope > .briefing-card')) {
             const style = getComputedStyle(card);
             const row = Number(style.gridRowStart) - 1,
               col = Number(style.gridColumnStart) - 1;
-            const [width, height] = card.dataset.size!.split('×').map(Number);
+            const width = Number(card.dataset.size![0]);
+            const height = Number(style.gridRowEnd.replace('span ', ''));
             const start = row * columns + col;
+            placements.push({ start, width, height });
             if (start <= previous) errors.push('DOM order differs from visual order');
             previous = start;
             if (col + width > columns) errors.push('card exceeds columns');
@@ -86,8 +89,22 @@ for (const savedColumns of [0, 5, 2]) {
                 occupied.add(cell);
               }
           }
-          for (let cell = 0; cell < previous; cell++)
-            if (!occupied.has(cell)) errors.push(`empty middle cell ${cell}`);
+          // Complete titles impose real minimum dimensions. A trailing wide
+          // card cannot fill a one-column hole without clipping its content.
+          for (let cell = 0; cell < previous; cell++) {
+            if (occupied.has(cell)) continue;
+            const canFill = placements.some(
+              (p) =>
+                p.start > cell &&
+                (cell % columns) + p.width <= columns &&
+                Array.from({ length: p.height }, (_, y) =>
+                  Array.from({ length: p.width }, (_, x) => cell + y * columns + x),
+                )
+                  .flat()
+                  .every((slot) => !occupied.has(slot)),
+            );
+            if (canFill) errors.push(`fillable middle cell ${cell}`);
+          }
           return errors;
         }),
       );

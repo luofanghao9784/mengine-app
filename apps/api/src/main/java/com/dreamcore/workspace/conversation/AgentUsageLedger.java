@@ -21,7 +21,7 @@ public class AgentUsageLedger {
         db.update("UPDATE agent_attempt_usage SET status=?,finished_at=now() WHERE task_id=? AND attempt_id=? AND status='RUNNING'",state,task,attempt);
     }
     void expired(UUID task){
-        db.update("UPDATE agent_attempt_usage SET status='INTERRUPTED',finished_at=now() WHERE task_id=? AND status='RUNNING'",task);
+        db.update("UPDATE agent_attempt_usage a SET status=t.status,finished_at=now() FROM conversation_tasks t WHERE a.task_id=? AND a.task_id=t.id AND a.status='RUNNING'",task);
     }
     void validateResult(UUID task,UUID attempt,int calls,AgentResult.Usage usage){
         var rows=db.queryForList("SELECT metering_enabled FROM agent_attempt_usage WHERE task_id=? AND attempt_id=?",task,attempt);
