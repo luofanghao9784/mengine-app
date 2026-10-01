@@ -42,6 +42,7 @@ public class IdentitySecurity {
             .requestCache(c -> c.disable()).formLogin(c -> c.disable()).httpBasic(c -> c.disable()).logout(c -> c.disable())
             .authorizeHttpRequests(a -> a
                 .requestMatchers("/api/v1/system/info", "/actuator/health", "/api/v1/auth/csrf", "/api/v1/auth/login", "/api/v1/auth/invitations/accept").permitAll()
+                .requestMatchers("/api/v1/auth/phone/configuration", "/api/v1/auth/phone/invitation", "/api/v1/auth/phone/switch-account", "/api/v1/auth/phone/challenges", "/api/v1/auth/phone/accept", "/api/v1/auth/phone/reset", "/api/v1/auth/phone/local-code/*").permitAll()
                 .requestMatchers("/internal/v1/agent-access/**").permitAll() // Every operation validates a running task attempt capability.
                 .anyRequest().authenticated())
             .exceptionHandling(e -> e
@@ -51,7 +52,10 @@ public class IdentitySecurity {
                 @Override protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain) throws ServletException, IOException {
                     var auth = SecurityContextHolder.getContext().getAuthentication();
                     if (auth != null && auth.isAuthenticated() && !(auth instanceof AnonymousAuthenticationToken)) {
-                        if (!identities.active(UUID.fromString(auth.getName()))) {
+                        var currentSession=request.getSession(false);
+                        Object savedVersion=currentSession==null?null:currentSession.getAttribute("CREDENTIAL_VERSION");
+                        long version=savedVersion instanceof Number number?number.longValue():0;
+                        if (!identities.validSession(UUID.fromString(auth.getName()),version)) {
                             var session = request.getSession(false);
                             if (session != null) session.invalidate();
                             SecurityContextHolder.clearContext();

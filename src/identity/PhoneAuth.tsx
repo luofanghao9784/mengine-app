@@ -1,0 +1,541 @@
+import { useEffect, useState } from 'react';
+import type { FormEvent } from 'react';
+import type { Identity, Membership } from '../../contracts/public-api/identity';
+import { Button, Field } from '../shared/ui';
+import { IdentityError, contactLabel } from './client';
+import { identityClient, useSession } from './session';
+import { phoneClient } from './phone-client';
+import type { Challenge, InvitationPreview } from './phone-client';
+
+const errorText = (error: unknown) =>
+  error instanceof IdentityError ? error.message : '请求未完成，请稍后重试。';
+function ErrorMessage({ error }: { error: string }) {
+  return error ? (
+    <p className="access-alert" role="alert">
+      {error}
+    </p>
+  ) : null;
+}
+
+export function PasswordField({
+  value,
+  change,
+  label = '密码',
+  creating = false,
+}: {
+  value: string;
+  change: (v: string) => void;
+  label?: string;
+  creating?: boolean;
+}) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <Field label={label} hint={creating ? '至少 6 位，可使用更长密码。' : undefined}>
+      <div className="phone-password">
+        <input
+          aria-label={label}
+          type={visible ? 'text' : 'password'}
+          name={creating ? 'new-password' : 'password'}
+          autoComplete={creating ? 'new-password' : 'current-password'}
+          minLength={creating ? 6 : undefined}
+          maxLength={128}
+          required
+          value={value}
+          onChange={(e) => change(e.target.value)}
+        />
+        <button
+          type="button"
+          aria-label={visible ? '隐藏密码' : '显示密码'}
+          aria-pressed={visible}
+          onClick={() => setVisible(!visible)}
+        >
+          {visible ? '隐藏' : '显示'}
+        </button>
+      </div>
+    </Field>
+  );
+}
+function PhoneField({ value, change }: { value: string; change: (v: string) => void }) {
+  return (
+    <Field label="手机号">
+      <input
+        type="tel"
+        name="phone"
+        inputMode="tel"
+        autoComplete="tel"
+        placeholder="手机号，海外号码请带国家区号"
+        maxLength={40}
+        required
+        value={value}
+        onChange={(e) => change(e.target.value)}
+      />
+    </Field>
+  );
+}
+function CodeField({
+  purpose,
+  phone,
+  token,
+  challenge,
+  setChallenge,
+  code,
+  setCode,
+}: {
+  purpose: 'JOIN' | 'BIND' | 'RESET';
+  phone?: string;
+  token?: string;
+  challenge: Challenge | null;
+  setChallenge: (v: Challenge | null) => void;
+  code: string;
+  setCode: (v: string) => void;
+}) {
+  const [busy, setBusy] = useState(false),
+    [error, setError] = useState(''),
+    [until, setUntil] = useState(0),
+    [now, setNow] = useState(Date.now());
+  const [localCode, setLocalCode] = useState('');
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  useEffect(() => {
+    setChallenge(null);
+    setCode('');
+    setLocalCode('');
+    setError('');
+  }, [phone, token, purpose]);
+  const seconds = Math.max(0, Math.ceil((until - now) / 1000));
+  return (
+    <>
+      <Field label="短信验证码">
+        <div className="phone-code">
+          <input
+            aria-label="短信验证码"
+            autoComplete="one-time-code"
+            inputMode="numeric"
+            pattern="[0-9]{6}"
+            maxLength={6}
+            required
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+          />
+          <Button
+            disabled={busy || seconds > 0 || (purpose !== 'JOIN' && !phone?.trim())}
+            onClick={async () => {
+              setBusy(true);
+              setError('');
+              setLocalCode('');
+              try {
+                const next = await phoneClient.challenge(purpose, phone, token);
+                setChallenge(next);
+                setCode('');
+                setUntil(Date.now() + next.retryAfterSeconds * 1000);
+              } catch (e) {
+                setError(errorText(e));
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            {busy ? '获取中…' : seconds ? `${seconds} 秒后重试` : '获取验证码'}
+          </Button>
+        </div>
+      </Field>
+      {challenge && (
+        <p className="phone-local-note">
+          本地测试短信，未发送至手机。
+          {challenge.localPreview && (
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  const result = await phoneClient.localCode(challenge.id);
+                  setLocalCode(result.code);
+                  setError('');
+                } catch (e) {
+                  setError(errorText(e));
+                }
+              }}
+            >
+              查看本地测试短信
+            </button>
+          )}
+          {localCode && (
+            <span role="status">
+              测试验证码：<strong>{localCode}</strong>
+            </span>
+          )}
+        </p>
+      )}
+      <ErrorMessage error={error} />
+    </>
+  );
+}
+
+export function PhoneAuth({
+  token,
+  inviting,
+  identity,
+  onJoined,
+  onCancel,
+  onInvite,
+}: {
+  token: string;
+  inviting: boolean;
+  identity: Identity | null;
+  onJoined: (m: Membership) => void;
+  onCancel: () => void;
+  onInvite: () => void;
+}) {
+  const { authenticated, login, logout, expire } = useSession();
+  const [mode, setMode] = useState<'login' | 'legacy' | 'reset'>('login');
+  const [phone, setPhone] = useState(''),
+    [email, setEmail] = useState(''),
+    [password, setPassword] = useState(''),
+    [name, setName] = useState('');
+  const [code, setCode] = useState(''),
+    [challenge, setChallenge] = useState<Challenge | null>(null),
+    [acceptOwner, setAcceptOwner] = useState(false);
+  const [previewState, setPreview] = useState<{ context: string; value: InvitationPreview } | null>(null),
+    [previewError, setPreviewError] = useState(''),
+    [attempt, setAttempt] = useState(0);
+  const [busy, setBusy] = useState(false),
+    [error, setError] = useState(''),
+    [notice, setNotice] = useState(''),
+    [inviteInput, setInviteInput] = useState('');
+  const [requestId] = useState(() => crypto.randomUUID());
+  const [manualToken, setManualToken] = useState('');
+  const effectiveToken = token || manualToken || undefined;
+  const previewKey = `${identity?.account.id || 'anonymous'}:${identity?.account.phone || ''}:${effectiveToken || 'stored'}:${attempt}`;
+  const preview = previewState?.context === previewKey ? previewState.value : null;
+  const binding = !!identity && !identity.account.phone;
+  useEffect(() => {
+    let active = true;
+    setPreview(null);
+    setPreviewError('');
+    setAcceptOwner(false);
+    setCode('');
+    setChallenge(null);
+    setError('');
+    if (inviting)
+      phoneClient
+        .preview(effectiveToken)
+        .then((v) => {
+          if (active) setPreview({ context: previewKey, value: v });
+        })
+        .catch((e) => {
+          if (active) setPreviewError(errorText(e));
+        });
+    return () => {
+      active = false;
+    };
+  }, [inviting, effectiveToken, identity?.account.id, identity?.account.phone, attempt]);
+  const switchMode = (value: typeof mode) => {
+    setMode(value);
+    setPassword('');
+    setError('');
+    setNotice('');
+    setCode('');
+    setChallenge(null);
+  };
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    setError('');
+    try {
+      if (binding) {
+        if (!challenge) throw new Error('verification required');
+        const identity = await phoneClient.bind({ phone, password, challengeId: challenge.id, code });
+        setPassword('');
+        authenticated(identity);
+        setMode('login');
+      } else if (mode === 'legacy') {
+        const identity = await identityClient.legacyLogin(email.trim(), password);
+        setPassword('');
+        authenticated(identity);
+        setMode('login');
+      } else if (mode === 'reset') {
+        if (!challenge) throw new Error('verification required');
+        await phoneClient.reset({ phone, password, challengeId: challenge.id, code });
+        expire();
+        setPassword('');
+        setMode('login');
+        setNotice('密码已更新，请使用手机号和新密码登录。');
+      } else if (inviting && preview) {
+        const result = await phoneClient.accept({
+          requestId,
+          token: effectiveToken,
+          displayName: preview.action === 'CREATE' ? name.trim() : undefined,
+          password: preview.action === 'CONFIRM' ? undefined : password,
+          challengeId: challenge?.id,
+          code: challenge ? code : undefined,
+          acceptResponsibility: acceptOwner,
+        });
+        setPassword('');
+        onJoined(result.membership);
+        authenticated(result.identity);
+      } else {
+        await login(phone.trim(), password);
+        setPassword('');
+      }
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  if (inviting && !binding && mode === 'login' && !preview)
+    return (
+      <>
+        <h1>加入企业</h1>
+        {previewError ? (
+          <>
+            <ErrorMessage error={previewError} />
+            <Button onClick={() => setAttempt((v) => v + 1)}>重新读取邀请</Button>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const value = inviteInput.trim();
+                try {
+                  const url = new URL(value, location.href);
+                  setManualToken(new URLSearchParams(url.hash.slice(1)).get('invite') || value);
+                } catch {
+                  setManualToken(value);
+                }
+                setAttempt((v) => v + 1);
+              }}
+            >
+              <Field label="邀请链接或邀请码">
+                <input
+                  value={inviteInput}
+                  onChange={(e) => setInviteInput(e.target.value)}
+                  required
+                  autoComplete="off"
+                />
+              </Field>
+              <Button type="submit">继续</Button>
+            </form>
+          </>
+        ) : (
+          <p role="status">正在读取邀请…</p>
+        )}
+        <Button variant="ghost" onClick={onCancel}>
+          返回登录
+        </Button>
+      </>
+    );
+  const joining = inviting && mode === 'login' && !binding && preview;
+  const creating = !!joining && preview.action === 'CREATE';
+  const switching = !!joining && preview.action === 'SWITCH';
+  const confirming = !!joining && preview.action === 'CONFIRM';
+  return (
+    <>
+      <h1>
+        {binding
+          ? '绑定手机号'
+          : mode === 'legacy'
+            ? '迁移原邮箱账号'
+            : mode === 'reset'
+              ? '找回密码'
+              : joining
+                ? `加入${preview.tenantName}`
+                : '登录梦擎工作空间'}
+      </h1>
+      <p className="muted">
+        {binding
+          ? '验证手机号后继续使用原账号，企业、权限和资料都会保留。'
+          : mode === 'legacy'
+            ? '先验证原邮箱账号，再绑定手机号。'
+            : mode === 'reset'
+              ? '验证手机号后设置新密码。'
+              : joining
+                ? `受邀手机号：${preview.maskedPhone}`
+                : '使用手机号和密码，继续你的工作。'}
+      </p>
+      {notice && (
+        <p className="access-success" role="status">
+          {notice}
+        </p>
+      )}
+      {switching ? (
+        <>
+          <p>当前登录账号 {contactLabel(identity!.account)} 与邀请不匹配。</p>
+          <Button
+            onClick={async () => {
+              try {
+                await phoneClient.switchAccount(effectiveToken);
+                expire();
+              } catch (e) {
+                setError(errorText(e));
+              }
+            }}
+          >
+            切换到受邀账号
+          </Button>
+          <ErrorMessage error={error} />
+        </>
+      ) : (
+        <form onSubmit={submit}>
+          <fieldset disabled={busy}>
+            {mode === 'legacy' && !binding ? (
+              <Field label="原账号邮箱">
+                <input
+                  type="email"
+                  autoComplete="username"
+                  required
+                  maxLength={254}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </Field>
+            ) : (
+              !joining && <PhoneField value={phone} change={setPhone} />
+            )}
+            {creating && (
+              <Field label="你的姓名">
+                <input
+                  name="displayName"
+                  autoComplete="name"
+                  maxLength={80}
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </Field>
+            )}
+            {(creating || binding || mode === 'reset') && (
+              <CodeField
+                purpose={binding ? 'BIND' : mode === 'reset' ? 'RESET' : 'JOIN'}
+                phone={joining ? preview.phone : phone}
+                token={effectiveToken}
+                challenge={challenge}
+                setChallenge={setChallenge}
+                code={code}
+                setCode={setCode}
+              />
+            )}
+            {!confirming && (
+              <PasswordField
+                value={password}
+                change={setPassword}
+                label={binding ? '原账号密码' : creating || mode === 'reset' ? '设置密码' : '密码'}
+                creating={creating || mode === 'reset'}
+              />
+            )}
+            {joining && preview.designatedOwner && preview.status === 'PENDING' && (
+              <label className="phone-owner">
+                <input
+                  type="checkbox"
+                  checked={acceptOwner}
+                  onChange={(e) => setAcceptOwner(e.target.checked)}
+                />
+                我接受企业授权负责人职责，可任命管理员及管理授权；资料访问仍按单独授权。
+              </label>
+            )}
+            <ErrorMessage error={error} />
+            <Button
+              type="submit"
+              variant="primary"
+              className="full"
+              disabled={(creating || binding || mode === 'reset') && !challenge}
+            >
+              {busy
+                ? '正在处理…'
+                : binding
+                  ? '绑定并继续'
+                  : mode === 'legacy'
+                    ? '验证原账号'
+                    : mode === 'reset'
+                      ? '重置密码'
+                      : creating
+                        ? '加入并开始使用'
+                        : confirming
+                          ? preview.status === 'ACCEPTED'
+                            ? '进入企业'
+                            : '确认加入'
+                          : joining
+                            ? '登录并加入'
+                            : '登录'}
+            </Button>
+          </fieldset>
+        </form>
+      )}
+      <div className="access-auth-links">
+        {binding ? (
+          <Button variant="ghost" onClick={() => void logout().catch((e) => setError(errorText(e)))}>
+            退出账号
+          </Button>
+        ) : (
+          <>
+            {mode !== 'login' ? (
+              <Button variant="ghost" onClick={() => switchMode('login')}>
+                返回{inviting ? '邀请' : '登录'}
+              </Button>
+            ) : (
+              <>
+                {!creating && !confirming && !switching && (
+                  <Button variant="ghost" onClick={() => switchMode('reset')}>
+                    忘记密码
+                  </Button>
+                )}
+                {!identity && (
+                  <Button variant="ghost" onClick={() => switchMode('legacy')}>
+                    原邮箱账号迁移
+                  </Button>
+                )}
+                {inviting ? (
+                  <Button variant="ghost" onClick={onCancel}>
+                    暂不加入
+                  </Button>
+                ) : (
+                  <Button variant="ghost" onClick={onInvite}>
+                    我收到企业邀请
+                  </Button>
+                )}
+              </>
+            )}
+          </>
+        )}
+      </div>
+      {creating && <p className="muted">如已有邮箱账号，请先迁移原账号，保留已有资料。</p>}
+    </>
+  );
+}
+
+export function ChangePassword({ done }: { done: () => void }) {
+  const { expire } = useSession();
+  const [current, setCurrent] = useState(''),
+    [next, setNext] = useState(''),
+    [error, setError] = useState(''),
+    [busy, setBusy] = useState(false);
+  return (
+    <form
+      onSubmit={async (e) => {
+        e.preventDefault();
+        if (busy) return;
+        setBusy(true);
+        setError('');
+        try {
+          await phoneClient.password(current, next);
+          expire();
+          done();
+        } catch (e) {
+          setError(errorText(e));
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      <fieldset disabled={busy}>
+        <PasswordField label="当前密码" value={current} change={setCurrent} />
+        <PasswordField label="新密码" value={next} change={setNext} creating />
+        <p className="muted">修改后需使用新密码重新登录。</p>
+        <ErrorMessage error={error} />
+        <Button type="submit" variant="primary">
+          {busy ? '正在修改…' : '修改密码'}
+        </Button>
+      </fieldset>
+    </form>
+  );
+}

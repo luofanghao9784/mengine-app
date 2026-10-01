@@ -85,7 +85,7 @@ def available(port):
 
 
 def clean_environment():
-    prefixes = ('SPRING_', 'DATABASE_', 'INVITATION_', 'BOOTSTRAP_', 'API_', 'ENGINE_', 'SERVER_', 'MANAGEMENT_', 'DREAMCORE_', 'MATERIAL_', 'KNOWLEDGE_', 'TASK_', 'AGENT_', 'PG')
+    prefixes = ('SPRING_', 'DATABASE_', 'INVITATION_', 'PHONE_', 'BOOTSTRAP_', 'API_', 'ENGINE_', 'SERVER_', 'MANAGEMENT_', 'DREAMCORE_', 'MATERIAL_', 'KNOWLEDGE_', 'TASK_', 'AGENT_', 'PG')
     return {k: v for k, v in os.environ.items() if not k.startswith(prefixes) and k not in ('JAVA_TOOL_OPTIONS', 'JDK_JAVA_OPTIONS')}
 
 
@@ -193,7 +193,7 @@ def validate_instance_mode(settings, mode, restored=False, reconnect_live=False)
         raise TrialError('该数据目录的模型模式与本次启动不一致；使用原启动命令，真实验收请使用独立新目录。已开放恢复实例可显式 --reconnect-live。')
 
 
-def start(root, model_config=None, reconnect_live=False):
+def start(root, model_config=None, reconnect_live=False, phone_local=False):
     os.umask(0o077)
     model = None
     if model_config is not None:
@@ -276,6 +276,7 @@ def start(root, model_config=None, reconnect_live=False):
         model_api_env, engine_env = model_environments(model, engine_port, engine_token, settings['ports']['api'])
         env = {**clean_environment(), 'TASK_ENABLED':'true', 'TASK_ENGINE_TOKEN':engine_token, 'ENGINE_BASE_URL':f'http://127.0.0.1:{engine_port}', 'DATABASE_URL': f"jdbc:postgresql://127.0.0.1:{settings['ports']['database']}/dreamcore_trial", 'DATABASE_USER': 'dreamcore_trial', 'DATABASE_PASSWORD': secret,
                'KNOWLEDGE_ENABLED': str((WORKSPACE / 'workers/parser/.venv/bin/python').exists()).lower(), 'KNOWLEDGE_PARSER_ROOT': str(WORKSPACE / 'workers/parser'), 'MATERIAL_STORAGE_ROOT': str(root / 'objects'), 'SPRING_PROFILES_ACTIVE': 'local', 'INVITATION_DELIVERY': 'local', 'INVITATION_OUTBOX': str(root / 'invitations'), 'API_HOST': '127.0.0.1', 'API_PORT': str(settings['ports']['api']), 'SERVER_SERVLET_SESSION_COOKIE_NAME': 'DREAMCORE_TRIAL_' + hashlib.sha256(str(root).encode()).hexdigest()[:12]}
+        env.update({'PHONE_DELIVERY': 'local' if phone_local else 'disabled', 'PHONE_LOCAL_PREVIEW': str(phone_local).lower(), 'PHONE_OUTBOX': str(root / 'phone-sms')})
         env.update(model_api_env)
         model_status = {'agentMode': mode, 'model': model['model'] if model else None, 'cloudVerifiedByStartup': False}
         private_write(root / 'runtime.json', {'runId': run_id, 'state': 'starting', 'webUrl': f"http://127.0.0.1:{settings['ports']['web']}", **model_status, 'revision': subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'], cwd=WORKSPACE, text=True).strip(), 'apiSha256': hashlib.sha256(jar.read_bytes()).hexdigest()})
@@ -376,7 +377,7 @@ def invitations(root):
     rows = []
     for file in sorted(outbox.glob('*.json'), key=lambda p: p.stat().st_mtime, reverse=True)[:100]:
         value = private_read(file)
-        rows.append({'invitationId': value['invitationId'], 'email': value['email']})
+        rows.append({'invitationId': value['invitationId'], 'contact': value.get('phone') or value.get('email')})
     print(json.dumps(rows, ensure_ascii=False, indent=2))
     print('以上仅为最近 100 条本地投递记录；是否已接受、过期或撤销，请以管理页面为准。')
 
@@ -384,9 +385,9 @@ def invitations(root):
 def invitation(root, supplied_id):
     root = directory(root); config(root)
     invitation_id = str(uuid.UUID(supplied_id))
-    # Operator-only local delivery. The app and HTTP server never expose this file.
+    # Local delivery file; HTTP preview requires the explicit phone-local switch and scoped management rights.
     value = private_read(root / 'invitations' / (invitation_id + '.json'))
-    print(f'本地邀请文件：{root / "invitations" / (invitation_id + ".json")}\n请在文件中复制 token，进入客户端的“我有邀请码”。有效状态仍由服务端校验。')
+    print(f'本地邀请文件：{root / "invitations" / (invitation_id + ".json")}\n请使用文件中的 path 打开完整邀请链接。有效状态仍由服务端校验。')
     if value.get('invitationId') != invitation_id:
         raise TrialError('邀请文件标识不匹配。')
 
@@ -396,6 +397,7 @@ def main():
     parser.add_argument('command', choices=['start', 'stop', 'status', 'invitations', 'invitation'])
     parser.add_argument('invitation_id', nargs='?')
     parser.add_argument('--directory', type=Path, default=DEFAULT_DIRECTORY)
+    parser.add_argument('--phone-local', action='store_true', help='在隔离的非 live 实例启用本地测试短信与邀请预览，不发送真实短信。')
     parser.add_argument('--live', action='store_true', help='显式开启真实模型；只适用于 start。')
     parser.add_argument('--model-config', type=Path, help='本工作树 .local/model-private 内的私有模型配置。')
     parser.add_argument('--reconnect-live', action='store_true', help='已 activate 的恢复实例显式重新接入真实模型；旧任务/计划不自动恢复。')
@@ -404,16 +406,18 @@ def main():
         raise TrialError('模型参数仅适用于 start --live。')
     if args.reconnect_live and (args.command != 'start' or not args.live):
         raise TrialError('--reconnect-live 仅适用于 start --live。')
+    if args.phone_local and (args.command != 'start' or args.live):
+        raise TrialError('--phone-local 仅适用于非 live 的 start。')
     root = args.directory.absolute()
     if args.command == 'start':
         if args.live:
             from live_model import DEFAULT_CONFIG
             start(root, args.model_config or DEFAULT_CONFIG, args.reconnect_live)
         else:
-            start(root)
+            start(root, phone_local=args.phone_local)
     elif args.command == 'invitation':
         if not args.invitation_id:
-            raise TrialError('请提供邀请 ID；可在本地 invitations 目录按邮箱查找对应 JSON 文件。')
+            raise TrialError('请提供邀请 ID；可在本地 invitations 目录按手机号或旧邮箱查找对应 JSON 文件。')
         invitation(root, args.invitation_id)
     else:
         {'stop': stop, 'status': status, 'invitations': invitations}[args.command](root)

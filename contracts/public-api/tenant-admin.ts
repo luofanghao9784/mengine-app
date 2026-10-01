@@ -10,7 +10,8 @@ export interface TenantOverview {
 }
 export interface TenantMember {
   accountId: string;
-  email: string;
+  email: string | null;
+  phone?: string | null;
   displayName: string;
   role: TenantRole;
   status: 'ACTIVE' | 'DISABLED';
@@ -27,7 +28,7 @@ export interface SharedWorkspace {
 }
 export type WorkspaceGrant = Pick<
   TenantMember,
-  'accountId' | 'email' | 'displayName' | 'status' | 'accountStatus'
+  'accountId' | 'email' | 'phone' | 'displayName' | 'status' | 'accountStatus'
 > & { canMaintain: boolean };
 export type TenantAction =
   | 'INVITATION_CREATE'
@@ -60,7 +61,9 @@ export interface VersionedChange {
   expectedVersion: number;
 }
 /** Explicit tenant-scoped safety stop. It cannot transfer ownership or disable other tenant memberships. */
-export interface EmergencyDisable extends VersionedChange { securityAction: 'SECURITY_RISK' }
+export interface EmergencyDisable extends VersionedChange {
+  securityAction: 'SECURITY_RISK';
+}
 /** Historical operation receipt; status is not a substitute for refetching the current member state. */
 export interface EmergencyDisableReceipt {
   accountId: string;

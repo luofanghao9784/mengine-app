@@ -30,6 +30,11 @@ public class LocalInvitationDelivery {
         this.local = env.acceptsProfiles(Profiles.of("local"));
     }
     String mode() { return local && "local".equals(mode) ? "LOCAL" : "DISABLED"; }
+    public String localToken(UUID id) {
+        if (!"LOCAL".equals(mode())) throw new IdentityException(404,"LOCAL_PREVIEW_DISABLED");
+        try { return json.readTree(Files.readString(directory.resolve(id + ".json"))).get("token").asString(); }
+        catch (IOException failure) { throw new IdentityException(404,"INVITATION_UNAVAILABLE"); }
+    }
     public void deliver(UUID id, String email, String token) {
         if (!local || !"local".equals(mode)) throw new IdentityException(503, "INVITATION_DELIVERY_UNAVAILABLE");
         Path file = directory.resolve(id + ".json");
@@ -45,7 +50,7 @@ public class LocalInvitationDelivery {
                     }
                 }
             });
-            Files.writeString(file, json.writeValueAsString(Map.of("invitationId", id, "email", email, "token", token)),
+            Files.writeString(file, json.writeValueAsString(Map.of("invitationId", id, email.startsWith("+") ? "phone" : "email", email, "token", token, "path", "/workspace/#invite=" + token)),
                     StandardCharsets.UTF_8, StandardOpenOption.WRITE);
         } catch (IOException | UnsupportedOperationException failure) { throw new IdentityException(503, "INVITATION_DELIVERY_UNAVAILABLE"); }
     }

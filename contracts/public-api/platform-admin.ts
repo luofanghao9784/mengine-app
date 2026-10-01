@@ -36,5 +36,6 @@ export interface ChangeTenantStatus {
 export interface ReplaceInitialInvitation {
   requestId: string;
   expectedVersion: number;
-  email: string;
+  email?: string;
+  phone?: string;
 }

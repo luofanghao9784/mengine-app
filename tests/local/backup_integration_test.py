@@ -119,6 +119,38 @@ class RealBackupTest(unittest.TestCase):
         INSERT INTO recommendation_settings(tenant_id,actor_id,enabled) VALUES('{t}','{a}',true);
         """)
 
+    def test_phone_accounts_restore_with_new_credentials_and_no_verification_proofs(self):
+        with backup.offline_database(self.source) as (_,__,sql):
+            sql(f"UPDATE accounts SET email=NULL,phone='+8619900009901',phone_verified_at=now() WHERE id='{ident(1)}'")
+            sql(f"INSERT INTO phone_challenges(id,phone,purpose,session_hash,account_id,code_hash,expires_at,verified_at) VALUES('{ident(900)}','+8619900009901','RESET','{'0'*64}','{ident(1)}','synthetic-only',now()+interval '5 minutes',now())")
+        bundle,restored=self.root/'phone-bundle',self.root/'phone-restored'
+        backup.create(self.source,bundle,self.key)
+        self.assertNotIn('phone_challenges',backup.verify(bundle,self.key)['tables'])
+        backup.restore(bundle,restored,self.key)
+        with backup.offline_database(restored) as (_,__,sql):
+            self.assertEqual(sql('SELECT count(*) FROM phone_challenges'),'0')
+            self.assertEqual(sql(f"SELECT status||':'||credential_version FROM accounts WHERE id='{ident(1)}'"),'DISABLED:1')
+        backup_recovery.activate(restored,self.source,self.key)
+        credentials=trial.private_read(restored/'accounts.json')['recovered']
+        account=next(row for row in credentials if row['accountId']==ident(1))
+        self.assertEqual(account['phone'],'+8619900009901');self.assertIsNone(account['email'])
+        with backup.offline_database(restored) as (_,__,sql):
+            self.assertEqual(sql(f"SELECT status FROM accounts WHERE id='{ident(1)}'"),'ACTIVE')
+            self.assertGreater(int(sql(f"SELECT credential_version FROM accounts WHERE id='{ident(1)}'")),1)
+            self.assertEqual(sql('SELECT count(*) FROM phone_challenges'),'0')
+
+    def test_changed_phone_cannot_reopen_snapshot_identity(self):
+        with backup.offline_database(self.source) as (_,__,sql):
+            sql(f"UPDATE accounts SET phone='+8619900009901',phone_verified_at=now() WHERE id='{ident(1)}'")
+        bundle,restored=self.root/'phone-bundle',self.root/'phone-restored'
+        backup.create(self.source,bundle,self.key);backup.restore(bundle,restored,self.key)
+        with backup.offline_database(self.source) as (_,__,sql):
+            sql(f"UPDATE accounts SET phone='+8619900009902' WHERE id='{ident(1)}'")
+        result=backup_recovery.activate(restored,self.source,self.key)
+        self.assertEqual(result['accountsEnabled'],0)
+        with backup.offline_database(restored) as (_,__,sql):
+            self.assertEqual(sql(f"SELECT status FROM accounts WHERE id='{ident(1)}'"),'DISABLED')
+
     def test_real_create_restore_current_deletion_revocation_rotation(self):
         bundles = backup.reserve(self.root/'bundles')
         bundle = bundles/'first'

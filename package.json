@@ -70,7 +70,9 @@
     "trial:start:live": "python3 scripts/local/trial.py start --live --directory .local/selfuse-live",
     "trial:stop:live": "python3 scripts/local/trial.py stop --directory .local/selfuse-live",
     "trial:status:live": "python3 scripts/local/trial.py status --directory .local/selfuse-live",
-    "demo:9pop": "node scripts/ninepop/start.mjs"
+    "demo:9pop": "node scripts/ninepop/start.mjs",
+    "test:phone-flow": "python3 scripts/with-test-postgres.py node --experimental-strip-types scripts/verify-phone-flow.ts",
+    "trial:start:phone": "python3 scripts/local/trial.py start --phone-local --directory .local/phone-trial"
   },
   "dependencies": {
     "lucide-react": "^1.47.0",

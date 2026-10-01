@@ -206,7 +206,7 @@ function OwnerControls({
               <option value="">选择成员</option>
               {members.value.slice(0, 20).map((m) => (
                 <option value={m.accountId} key={m.accountId}>
-                  {m.displayName} · {m.email}
+                  {m.displayName} · {m.phone || m.email}
                   {m.status !== 'ACTIVE' ? '（已停用）' : ''}
                 </option>
               ))}

@@ -22,9 +22,9 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication(type = org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication.Type.SERVLET)
 public class IdentityController {
-    public record Login(@NotNull @Size(max=254) String email, @NotNull @Size(max=128) String password) {}
-    public record CreateTenant(@NotNull UUID requestId, @NotNull @Size(max=100) String name, @NotNull @Size(max=254) String adminEmail, Boolean designateAuthorizationOwner) {}
-    public record Invite(@NotNull UUID requestId, @NotNull @Size(max=254) String email) {}
+    public record Login(@Size(max=40) String phone, @Size(max=254) String email, @NotNull @Size(max=128) String password) {}
+    public record CreateTenant(@NotNull UUID requestId, @NotNull @Size(max=100) String name, @Size(max=254) String adminEmail, @Size(max=40) String adminPhone, Boolean designateAuthorizationOwner) {}
+    public record Invite(@NotNull UUID requestId, @Size(max=254) String email, @Size(max=40) String phone) {}
     public record Accept(@NotNull @Size(max=64) String token, @Size(max=80) String displayName, @Size(max=128) String password) {}
     private final IdentityService identities;
     private final IdentityAudit audit;
@@ -43,9 +43,10 @@ public class IdentityController {
     }
     @PostMapping("/api/v1/auth/login")
     public IdentityService.Me login(@Valid @RequestBody Login body, HttpServletRequest request, HttpServletResponse response) {
-        var account = identities.login(body.email(),body.password(),request.getRemoteAddr());
+        var account = identities.login(PhoneNumbers.contact(body.phone(),body.email()),body.password(),request.getRemoteAddr());
         var auth = UsernamePasswordAuthenticationToken.authenticated(account.id().toString(),null,List.of(new SimpleGrantedAuthority("ROLE_USER")));
         sessions.onAuthentication(auth,request,response);
+        request.getSession().setAttribute("CREDENTIAL_VERSION",account.credentialVersion());
         var context = SecurityContextHolder.createEmptyContext(); context.setAuthentication(auth);
         SecurityContextHolder.setContext(context); contexts.saveContext(context,request,response);
         return identities.me(account.id());
@@ -66,7 +67,7 @@ public class IdentityController {
     }
     @PostMapping("/api/tenant-admin/v1/tenants/{tenant}/invitations") @ResponseStatus(org.springframework.http.HttpStatus.CREATED)
     public IdentityService.Invitation invite(Authentication auth, @PathVariable UUID tenant, @Valid @RequestBody Invite body) {
-        return identities.invite(actor(auth),tenant,body.requestId(),body.email());
+        return identities.invite(actor(auth),tenant,body.requestId(),PhoneNumbers.contact(body.phone(),body.email()));
     }
     @DeleteMapping("/api/tenant-admin/v1/tenants/{tenant}/invitations/{id}") @ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT)
     public void revoke(Authentication auth, @PathVariable UUID tenant, @PathVariable UUID id) { identities.revoke(actor(auth),tenant,id); }

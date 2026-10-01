@@ -2,7 +2,8 @@
 export type TenantRole = 'TENANT_ADMIN' | 'MEMBER';
 export interface Account {
   id: string;
-  email: string;
+  email: string | null;
+  phone?: string | null;
   displayName: string;
 }
 export interface Membership {
@@ -33,7 +34,8 @@ export interface TenantContext {
 export interface Invitation {
   id: string;
   tenantId: string;
-  email: string;
+  email: string | null;
+  phone?: string | null;
   role: TenantRole;
   status: 'PENDING' | 'ACCEPTED' | 'REVOKED' | 'EXPIRED';
   expiresAt: string;
@@ -49,12 +51,15 @@ export interface Csrf {
 export interface CreateTenant {
   requestId: string;
   name: string;
-  adminEmail: string;
+  /** Legacy local fixtures only. Normal clients supply adminPhone. */
+  adminEmail?: string;
+  adminPhone?: string;
   /** Explicit nomination; invited member must separately accept this responsibility. */
   designateAuthorizationOwner?: boolean;
 }
 export interface InviteMember {
   requestId: string;
-  email: string;
+  email?: string;
+  phone?: string;
 }
 export type AcceptInvitation = { token: string; displayName: string; password: string } | { token: string };

@@ -9,7 +9,7 @@ import type {
   EmergencyDisable,
   EmergencyDisableReceipt,
 } from '../../contracts/public-api/tenant-admin';
-import { createIdentityRequest, IdentityError, record, text, uuid } from '../identity/client.ts';
+import { createIdentityRequest, isContact, IdentityError, record, text, uuid } from '../identity/client.ts';
 const count = (v: unknown): v is number => Number.isSafeInteger(v) && (v as number) >= 0;
 const active = (v: unknown) => v === 'ACTIVE' || v === 'DISABLED';
 const nullableText = (v: unknown) => v === null || text(v);
@@ -27,7 +27,7 @@ export const isOverview = (v: unknown): v is TenantOverview =>
 const isPerson = (v: unknown) =>
   record(v) &&
   uuid(v.accountId) &&
-  text(v.email) &&
+  isContact(v) &&
   text(v.displayName) &&
   active(v.status) &&
   active(v.accountStatus);
@@ -47,7 +47,7 @@ export const isInvitation = (v: unknown): v is Invitation =>
   record(v) &&
   uuid(v.id) &&
   uuid(v.tenantId) &&
-  text(v.email) &&
+  isContact(v) &&
   role(v.role) &&
   ['PENDING', 'ACCEPTED', 'REVOKED', 'EXPIRED'].includes(String(v.status)) &&
   date(v.expiresAt);

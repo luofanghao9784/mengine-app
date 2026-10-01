@@ -287,3 +287,47 @@
     margin-bottom: 28px;
   }
 }
+
+/* Phone onboarding shares the existing quiet auth card. */
+.phone-password,
+.phone-code {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+.phone-password input,
+.phone-code input {
+  min-width: 0;
+  flex: 1;
+}
+.phone-password button,
+.phone-local-note button {
+  border: 0;
+  background: transparent;
+  color: var(--accent, #2375ca);
+  cursor: pointer;
+  white-space: nowrap;
+  padding: 6px;
+}
+.phone-local-note {
+  font-size: 12px;
+  color: var(--muted, #64748b);
+  line-height: 1.6;
+}
+.phone-local-note span {
+  display: block;
+}
+.phone-owner {
+  display: flex;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 12px 0;
+}
+.phone-owner input {
+  width: auto !important;
+  flex: 0 0 auto;
+  margin-top: 4px;
+  align-self: flex-start;
+}

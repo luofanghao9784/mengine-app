@@ -70,10 +70,10 @@ def quarantine(sql):
     # This executes in the private, offline database before any application can start.
     # A stopped worker is not evidence that an external side effect failed or succeeded.
     sql("""BEGIN;
-    DELETE FROM spring_session_attributes; DELETE FROM spring_session;
+    DELETE FROM spring_session_attributes; DELETE FROM spring_session; DELETE FROM phone_challenges;
     UPDATE invitations SET status='REVOKED' WHERE status='PENDING';
     UPDATE governance_handovers SET status='CANCELLED' WHERE status='PENDING';
-    UPDATE accounts SET status='DISABLED',password_hash='!RECOVERY_DISABLED!';
+    UPDATE accounts SET status='DISABLED',password_hash='!RECOVERY_DISABLED!',credential_version=credential_version+1;
     UPDATE tenants SET status='SUSPENDED';
     UPDATE tenant_memberships SET status='DISABLED',role='MEMBER';
     DELETE FROM platform_roles; DELETE FROM governance_capabilities; DELETE FROM workspace_members;
@@ -373,9 +373,9 @@ def password_hash(password):
 def reopen_current(sql, current_sql, root):
     """Only current-authorized intersections are reopened; unsupported identities remain disabled."""
     import secrets
-    accounts = {x['id']: x for x in json_rows(current_sql, "SELECT id::text,email FROM accounts WHERE status='ACTIVE'")}
-    local_accounts = json_rows(sql, 'SELECT id::text,email FROM accounts')
-    eligible = {x['id'] for x in local_accounts if x['id'] in accounts and x['email'] == accounts[x['id']]['email']}
+    accounts = {x['id']: x for x in json_rows(current_sql, "SELECT id::text,email,phone FROM accounts WHERE status='ACTIVE'")}
+    local_accounts = json_rows(sql, 'SELECT id::text,email,phone FROM accounts')
+    eligible = {x['id'] for x in local_accounts if x == accounts.get(x['id'])}
     current_spaces = {x['id']: x for x in json_rows(current_sql, 'SELECT id::text,tenant_id::text,owner_id::text,kind FROM workspaces')}
     local_spaces = json_rows(sql, 'SELECT id::text,tenant_id::text,owner_id::text,kind FROM workspaces')
     valid_spaces = {x['id'] for x in local_spaces if current_spaces.get(x['id']) == x}
@@ -412,8 +412,8 @@ def reopen_current(sql, current_sql, root):
                        'ALTER TABLE tenant_memberships DISABLE TRIGGER departure_member_activation']
     for identity in sorted(eligible):
         password = secrets.token_urlsafe(24)
-        statements.append(f"UPDATE accounts SET status='ACTIVE',password_hash={literal(password_hash(password))} WHERE id={quoted_id(identity)}")
-        credentials.append({'accountId': identity, 'email': accounts[identity]['email'], 'password': password})
+        statements.append(f"UPDATE accounts SET status='ACTIVE',password_hash={literal(password_hash(password))},credential_version=credential_version+1 WHERE id={quoted_id(identity)}")
+        credentials.append({'accountId': identity, 'email': accounts[identity]['email'], 'phone': accounts[identity]['phone'], 'password': password})
     for identity in sorted(tenants):
         statements.append(f"UPDATE tenants SET status='ACTIVE',management_version={int(tenant_versions[identity])} WHERE id={quoted_id(identity)}")
     for (tenant,account), row in members.items():

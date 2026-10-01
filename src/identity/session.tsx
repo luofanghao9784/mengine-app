@@ -11,9 +11,10 @@ type Session = {
 const SessionContext = createContext<{
   session: Session;
   refresh: (background?: boolean) => Promise<void>;
-  login: (email: string, password: string) => Promise<void>;
+  login: (phone: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   expire: () => void;
+  authenticated: (identity: Identity) => void;
 } | null>(null);
 const CHANGE_KEY = 'dreamcore-session-change';
 
@@ -32,6 +33,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     invalidate();
     reconcileDocumentDrafts(null);
     setSession({ phase: 'anonymous', identity: null });
+    notify();
   }, [invalidate]);
   const notify = () => {
     channel.current?.postMessage('changed');
@@ -53,8 +55,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         const identity = await identityClient.me(controller.signal);
         if (id === generation.current) {
           reconcileDocumentDrafts(identity);
-          setSession(previous => previous.phase === 'authenticated' && JSON.stringify(previous.identity) === JSON.stringify(identity)
-            ? previous : { phase: 'authenticated', identity });
+          setSession((previous) =>
+            previous.phase === 'authenticated' &&
+            JSON.stringify(previous.identity) === JSON.stringify(identity)
+              ? previous
+              : { phase: 'authenticated', identity },
+          );
         }
       } catch (error) {
         if (id !== generation.current) return;
@@ -89,10 +95,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       window.removeEventListener('focus', focus);
     };
   }, [refresh, invalidate]);
-  const login = async (email: string, password: string) => {
+  const authenticated = (identity: Identity) => {
+    invalidate();
+    reconcileDocumentDrafts(identity);
+    setSession({ phase: 'authenticated', identity });
+    notify();
+  };
+  const login = async (phone: string, password: string) => {
     invalidate();
     const id = generation.current;
-    const identity = await identityClient.login(email, password);
+    const identity = await identityClient.login(phone, password);
     if (id === generation.current) {
       reconcileDocumentDrafts(identity);
       setSession({ phase: 'authenticated', identity });
@@ -120,7 +132,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
   };
   return (
-    <SessionContext.Provider value={{ session, refresh, login, logout, expire }}>
+    <SessionContext.Provider value={{ session, refresh, login, logout, expire, authenticated }}>
       {children}
     </SessionContext.Provider>
   );

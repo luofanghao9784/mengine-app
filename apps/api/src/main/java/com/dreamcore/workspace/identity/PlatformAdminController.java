@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/platform-admin/v1")
 public class PlatformAdminController {
     public record Status(@NotNull UUID requestId, @NotNull @Min(0) Long expectedVersion, @NotNull String status) {}
-    public record InitialAdmin(@NotNull UUID requestId, @NotNull @Min(0) Long expectedVersion, @NotNull @Size(max=254) String email) {}
+    public record InitialAdmin(@NotNull UUID requestId, @NotNull @Min(0) Long expectedVersion, @Size(max=254) String email, @Size(max=40) String phone) {}
     private final PlatformAdminService service;
     private final IdentityService identities;
     private final com.dreamcore.workspace.governance.GovernanceService governance;
@@ -34,7 +34,7 @@ public class PlatformAdminController {
     }
     @PostMapping("/tenants") @ResponseStatus(org.springframework.http.HttpStatus.CREATED)
     public IdentityService.TenantCreated create(Authentication auth, @Valid @RequestBody IdentityController.CreateTenant body) {
-        return identities.createTenant(IdentityController.actor(auth),body.requestId(),body.name(),body.adminEmail(),Boolean.TRUE.equals(body.designateAuthorizationOwner()));
+        return identities.createTenant(IdentityController.actor(auth),body.requestId(),body.name(),PhoneNumbers.contact(body.adminPhone(),body.adminEmail()),Boolean.TRUE.equals(body.designateAuthorizationOwner()));
     }
     @GetMapping("/overview")
     public PlatformAdminService.Overview overview(Authentication auth) { return service.overview(IdentityController.actor(auth)); }
@@ -46,7 +46,7 @@ public class PlatformAdminController {
     }
     @PostMapping("/tenants/{tenant}/initial-admin-invitation")
     public PlatformAdminService.Detail initial(Authentication auth, @PathVariable UUID tenant, @Valid @RequestBody InitialAdmin body) {
-        return service.replaceInitialInvitation(IdentityController.actor(auth),tenant,body.requestId(),body.expectedVersion(),body.email());
+        return service.replaceInitialInvitation(IdentityController.actor(auth),tenant,body.requestId(),body.expectedVersion(),PhoneNumbers.contact(body.phone(),body.email()));
     }
     @GetMapping("/tenants/{tenant}/records")
     public List<PlatformAdminService.AuditEntry> records(Authentication auth, @PathVariable UUID tenant,

@@ -10,21 +10,21 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class TenantAdminService {
-    public record Member(UUID accountId, String email, String displayName, String role, String status, String accountStatus, long version) {}
+    public record Member(UUID accountId, String email, String displayName, String role, String status, String accountStatus, long version, String phone) {}
     public record EmergencyDisableReceipt(UUID accountId, String status, long version, String securityAction,
                                           UUID recoveryRequestId, String recoveryStatus) {}
     public record SharedWorkspace(UUID id, UUID tenantId, String name, String kind, long version, long memberCount) {}
-    public record Grant(UUID accountId, String email, String displayName, String status, String accountStatus, boolean canMaintain) {}
+    public record Grant(UUID accountId, String email, String displayName, String status, String accountStatus, boolean canMaintain, String phone) {}
     public record Overview(UUID tenantId, String name, long version, long activeMemberCount, long disabledMemberCount,
                            long sharedWorkspaceCount, String invitationDelivery) {}
     public record AuditEntry(long id, UUID actorId, String actorName, String action, UUID targetId, String targetName,
                              UUID relatedAccountId, String relatedAccountName, Instant createdAt) {}
     private static final String MEMBER_SQL = """
-        SELECT m.account_id,a.email,a.display_name,m.role,m.status,a.status AS account_status,m.management_version
+        SELECT m.account_id,a.email,a.phone,a.display_name,m.role,m.status,a.status AS account_status,m.management_version
         FROM tenant_memberships m JOIN accounts a ON a.id=m.account_id WHERE m.tenant_id=?
         """;
     private static final RowMapper<Member> MEMBER = (r,n) -> new Member(r.getObject("account_id",UUID.class),r.getString("email"),
-        r.getString("display_name"),r.getString("role"),r.getString("status"),r.getString("account_status"),r.getLong("management_version"));
+        r.getString("display_name"),r.getString("role"),r.getString("status"),r.getString("account_status"),r.getLong("management_version"),r.getString("phone"));
     private static final String SPACE_SQL = """
         SELECT w.id,w.tenant_id,w.name,w.kind,w.management_version,
         (SELECT count(*) FROM workspace_members g WHERE g.tenant_id=w.tenant_id AND g.workspace_id=w.id) AS member_count
@@ -82,7 +82,7 @@ public class TenantAdminService {
     public List<Member> members(UUID actor, UUID tenant, String query, String status, int offset, int limit) {
         identities.member(actor,tenant,true); page(offset,limit);
         if (query.length()>100 || !List.of("","ACTIVE","DISABLED").contains(status)) throw IdentityException.invalid();
-        return db.query(MEMBER_SQL+" AND (?='' OR m.status=?) AND (strpos(lower(a.email),lower(?))>0 OR strpos(lower(a.display_name),lower(?))>0) ORDER BY a.display_name,a.id LIMIT ? OFFSET ?",
+        return db.query(MEMBER_SQL+" AND (?='' OR m.status=?) AND (strpos(lower(coalesce(a.phone,a.email)),lower(?))>0 OR strpos(lower(a.display_name),lower(?))>0) ORDER BY a.display_name,a.id LIMIT ? OFFSET ?",
             MEMBER,tenant,status,status,query.strip(),query.strip(),limit,offset);
     }
     private Member member(UUID tenant, UUID id) {
@@ -161,11 +161,11 @@ public class TenantAdminService {
     public List<Grant> grants(UUID actor, UUID tenant, UUID id, int offset, int limit) {
         identities.member(actor,tenant,true); page(offset,limit); space(tenant,id);
         return db.query("""
-            SELECT g.account_id,a.email,a.display_name,m.status,a.status AS account_status,g.can_maintain FROM workspace_members g
+            SELECT g.account_id,a.email,a.phone,a.display_name,m.status,a.status AS account_status,g.can_maintain FROM workspace_members g
             JOIN tenant_memberships m ON m.tenant_id=g.tenant_id AND m.account_id=g.account_id JOIN accounts a ON a.id=g.account_id
             WHERE g.tenant_id=? AND g.workspace_id=? ORDER BY a.display_name,a.id LIMIT ? OFFSET ?
             """,(r,n)->new Grant(r.getObject("account_id",UUID.class),r.getString("email"),r.getString("display_name"),
-                r.getString("status"),r.getString("account_status"),r.getBoolean("can_maintain")),tenant,id,limit,offset);
+                r.getString("status"),r.getString("account_status"),r.getBoolean("can_maintain"),r.getString("phone")),tenant,id,limit,offset);
     }
     @Transactional
     public SharedWorkspace createSpace(UUID actor, UUID tenant, UUID key, String suppliedName) {
@@ -231,7 +231,7 @@ public class TenantAdminService {
         identities.member(actor,tenant,true); page(offset,limit);
         return db.query("""
             SELECT e.id,e.actor_id,a.display_name AS actor_name,e.action,e.target_id,e.related_account_id,b.display_name AS related_name,e.created_at,
-              CASE WHEN e.action LIKE 'INVITATION_%' THEN i.email WHEN e.action LIKE 'MEMBER_%' THEN c.display_name
+              CASE WHEN e.action LIKE 'INVITATION_%' THEN coalesce(i.phone,i.email) WHEN e.action LIKE 'MEMBER_%' THEN c.display_name
                    WHEN e.action LIKE 'WORKSPACE_%' THEN w.name WHEN e.action='TENANT_RENAME' THEN t.name END AS target_name
             FROM identity_audit e JOIN accounts a ON a.id=e.actor_id LEFT JOIN accounts b ON b.id=e.related_account_id
             LEFT JOIN accounts c ON c.id=e.target_id LEFT JOIN invitations i ON i.id=e.target_id AND i.tenant_id=e.tenant_id

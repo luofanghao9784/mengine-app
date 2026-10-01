@@ -1,6 +1,6 @@
 {
   "format": "dreamcore-recovery-coverage-v1",
-  "throughVersion": 42,
+  "throughVersion": 43,
   "implementationHashes": {
     "apps/api/src/main/java/com/dreamcore/workspace/departure/DepartureResidualCleanup.java": "f0b8fe926ac679177effbcacd529994abc901c2afcc779dca65442e1cb2ae432"
   },
@@ -209,6 +209,11 @@
       "version": "42",
       "script": "V42__profile_and_method_version_lifecycle.sql",
       "sha256": "ba64012f5b53c3d263b4484ce8f04dd59eccb1a6d96b717712c79c965a9af2a4"
+    },
+    {
+      "version": "43",
+      "script": "V43__phone_accounts.sql",
+      "sha256": "9e5124ff312d5e25ba31e6763e124d2fd8c60e8e307e0dc2e5bc044e41967aea"
     }
   ],
   "tables": [
@@ -308,6 +313,7 @@
     "ongoing_plan_versions",
     "ongoing_plans",
     "operation_retention_windows",
+    "phone_challenges",
     "platform_roles",
     "private_document_exports",
     "private_document_versions",
@@ -339,7 +345,7 @@
     "workspaces"
   ],
   "catalogHashes": [
-    "2352e14261f58902de32203d07613ab3649bfbd15adef63cdc0bed47ec4e4f67",
-    "8055c26fed715bb0d189bdbf98b450e2a3bdfc305de6ed1d4dd53f0433d42b10"
+    "858534bb07c07e53119b99ff891a0a4d8241cac16ad144b99fd87b9e6c424cd3",
+    "d99050f9f77bd45c6e3d09b73c55f98fc19ec40e126b7a88b7b1c5aff5a9369d"
   ]
 }

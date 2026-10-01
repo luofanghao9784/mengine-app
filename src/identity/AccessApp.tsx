@@ -1,3 +1,6 @@
+import { PhoneAuth, ChangePassword } from './PhoneAuth';
+import { contactLabel } from './client';
+import { entryTenant, rememberedTenant, rememberTenant } from './entry';
 import { WorkspaceNavigation } from './WorkspaceNavigation';
 import { WorkspaceComposer } from './WorkspaceComposer';
 import { DepartureStatus } from '../departure/DepartureStatus';
@@ -20,7 +23,6 @@ import { PlatformHome } from '../platform/PlatformHome';
 import { PageActionsContext } from '../shared/ui';
 import { useEffect, useState } from 'react';
 import {
-  ArrowRight,
   BookOpen,
   CalendarClock,
   Building2,
@@ -33,9 +35,9 @@ import {
   ShieldCheck,
   WifiOff,
 } from 'lucide-react';
-import type { Identity, Membership, TenantContext } from '../../contracts/public-api/identity';
+import type { Identity } from '../../contracts/public-api/identity';
 import { DreamcoreLogo } from '../components/DreamcoreLogo';
-import { Button, Badge, Empty, Field, Modal } from '../shared/ui';
+import { Button, Badge, Empty, Modal } from '../shared/ui';
 import { NavigationButton, PageHeader } from '../shared/layout';
 import { IdentityError } from './client';
 import { identityClient, useSession } from './session';
@@ -53,13 +55,6 @@ export const entryHref = (surface: Surface, tenant?: string) =>
   new URL(`../${surface}/`, location.href).pathname + (tenant ? `#tenant=${encodeURIComponent(tenant)}` : '');
 const message = (error: unknown) =>
   error instanceof IdentityError ? error.message : '请求未完成，请稍后重试。';
-function Alert({ text }: { text: string }) {
-  return (
-    <p className="access-alert" role="alert">
-      {text}
-    </p>
-  );
-}
 function Status({ title, detail, retry }: { title: string; detail: string; retry?: () => void }) {
   return (
     <div className="access-status" role="status">
@@ -74,7 +69,7 @@ function Status({ title, detail, retry }: { title: string; detail: string; retry
   );
 }
 
-// Strip invitation secrets before mounting or requesting any service. Keep only in memory.
+// Strip invitation secrets before mounting. The server stores only a hash to restore intent on refresh.
 export function readInvitation() {
   const params = new URLSearchParams(location.hash.slice(1));
   const token = params.get('invite') || '';
@@ -94,7 +89,6 @@ export default function AccessApp({
   const { session, refresh, logout } = useSession();
   const [inviting, setInviting] = useState(initialInvitation.inviting);
   const [token, setToken] = useState(initialInvitation.token);
-  const [authPage, setAuthPage] = useState<'login' | 'activate'>(inviting ? 'activate' : 'login');
   const [notice, setNotice] = useState('');
   useEffect(() => {
     if (session.phase === 'authenticated') setNotice('');
@@ -106,7 +100,6 @@ export default function AccessApp({
       if (invitation.inviting) {
         setToken(invitation.token);
         setInviting(true);
-        setAuthPage('activate');
         setNotice('');
       }
     };
@@ -118,7 +111,6 @@ export default function AccessApp({
   }, [surface]);
   const cancelInvitation = (tenant?: string) => {
     setInviting(false);
-    setAuthPage('login');
     setToken('');
     history.replaceState(
       null,
@@ -131,90 +123,23 @@ export default function AccessApp({
     return (
       <Status title="暂时无法连接服务" detail="当前状态尚未确认，请重新连接。" retry={() => void refresh()} />
     );
-  if (session.phase === 'anonymous' || inviting)
+  if (session.phase === 'anonymous' || inviting || !session.identity?.account.phone)
     return (
       <div className="access-auth-layout">
         <a className="access-wordmark" href={entryHref('workspace')}>
           <DreamcoreLogo wordmark />
         </a>
         <section className="access-auth-card" aria-label="账号登录与邀请">
-          {session.identity ? (
-            <>
-              <span className="eyebrow">加入企业</span>
-              <h1>接受邀请</h1>
-              <p className="muted">使用 {session.identity.account.email} 加入受邀企业。</p>
-              <InviteForm
-                token={token}
-                setToken={setToken}
-                onSuccess={async (membership) => {
-                  cancelInvitation(membership.tenantId);
-                  setNotice(`已加入 ${membership.tenantName}`);
-                  await refresh();
-                }}
-              />
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  setAuthPage('login');
-                  void logout().catch(() => {});
-                }}
-              >
-                切换账号
-              </Button>
-              <Button variant="ghost" onClick={() => cancelInvitation()}>
-                返回{labels[surface]}
-              </Button>
-            </>
-          ) : (
-            <>
-              <span className="eyebrow">{labels[surface]}</span>
-              <h1>{authPage === 'login' ? '登录梦擎工作空间' : '接受邀请'}</h1>
-              <p className="muted">
-                {authPage === 'login'
-                  ? '使用受邀邮箱和密码，继续你的工作。'
-                  : '使用管理员提供的邀请码，设置你的账号。'}
-              </p>
-              {notice && (
-                <p className="access-success" role="status">
-                  {notice}
-                </p>
-              )}
-              {authPage === 'login' ? (
-                <LoginForm />
-              ) : (
-                <InviteForm
-                  token={token}
-                  setToken={setToken}
-                  newAccount
-                  onSuccess={(membership) => {
-                    cancelInvitation(membership.tenantId);
-                    setNotice(`已加入 ${membership.tenantName}，请使用受邀邮箱登录。`);
-                  }}
-                />
-              )}
-              <div className="access-auth-links">
-                {authPage === 'login' ? (
-                  <Button
-                    variant="ghost"
-                    onClick={() => {
-                      setNotice('');
-                      setInviting(true);
-                      setAuthPage('activate');
-                    }}
-                  >
-                    我有邀请码
-                  </Button>
-                ) : (
-                  <Button variant="ghost" onClick={() => setAuthPage('login')}>
-                    已有账号，先登录
-                  </Button>
-                )}
-                <Button variant="ghost" icon={RefreshCw} onClick={() => void refresh()}>
-                  重新确认登录状态
-                </Button>
-              </div>
-            </>
-          )}
+          <PhoneAuth
+            token={token}
+            inviting={inviting}
+            identity={session.identity}
+            onJoined={(membership) => {
+              cancelInvitation(membership.tenantId);
+            }}
+            onCancel={() => cancelInvitation()}
+            onInvite={() => setInviting(true)}
+          />
         </section>
         <p className="access-auth-note">邀请制使用 · 企业成员身份由所属企业授予</p>
       </div>
@@ -224,169 +149,8 @@ export default function AccessApp({
       surface={surface}
       identity={session.identity!}
       notice={notice}
-      onInvite={() => {
-        setInviting(true);
-        setAuthPage('activate');
-      }}
+      onInvite={() => setInviting(true)}
     />
-  );
-}
-
-function LoginForm() {
-  const { login } = useSession();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  return (
-    <form
-      onSubmit={async (event) => {
-        event.preventDefault();
-        if (busy) return;
-        setBusy(true);
-        setError('');
-        try {
-          await login(email.trim(), password);
-        } catch (e) {
-          setError(message(e));
-        } finally {
-          setPassword('');
-          setBusy(false);
-        }
-      }}
-    >
-      <fieldset disabled={busy}>
-        <Field label="邮箱">
-          <input
-            type="email"
-            name="email"
-            autoComplete="username"
-            maxLength={254}
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            autoFocus
-          />
-        </Field>
-        <Field label="密码">
-          <input
-            type="password"
-            name="password"
-            autoComplete="current-password"
-            maxLength={128}
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </Field>
-        {error && <Alert text={error} />}
-        <Button type="submit" variant="primary" className="full" icon={ArrowRight}>
-          {busy ? '正在登录…' : '登录'}
-        </Button>
-      </fieldset>
-    </form>
-  );
-}
-
-function InviteForm({
-  token,
-  setToken,
-  newAccount = false,
-  onSuccess,
-}: {
-  token: string;
-  setToken: (token: string) => void;
-  newAccount?: boolean;
-  onSuccess: (membership: Membership) => void | Promise<void>;
-}) {
-  const [name, setName] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmation, setConfirmation] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const { expire } = useSession();
-  return (
-    <form
-      onSubmit={async (event) => {
-        event.preventDefault();
-        if (busy) return;
-        if (newAccount && password !== confirmation) {
-          setError('两次输入的密码不一致。');
-          return;
-        }
-        setBusy(true);
-        setError('');
-        try {
-          const result = await identityClient.accept(
-            newAccount ? { token, displayName: name.trim(), password } : { token },
-          );
-          setToken('');
-          await onSuccess(result);
-        } catch (e) {
-          if (e instanceof IdentityError && e.status === 401) expire();
-          setError(message(e));
-        } finally {
-          setBusy(false);
-          setPassword('');
-          setConfirmation('');
-        }
-      }}
-    >
-      <fieldset disabled={busy}>
-        <Field label="邀请码">
-          <input
-            name="invitation"
-            autoComplete="off"
-            spellCheck={false}
-            value={token}
-            onChange={(e) => setToken(e.target.value.trim())}
-            required
-            pattern="[A-Za-z0-9_\-]{43}"
-            maxLength={64}
-          />
-        </Field>
-        {newAccount && (
-          <>
-            <Field label="你的姓名">
-              <input
-                name="displayName"
-                autoComplete="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                maxLength={80}
-                required
-              />
-            </Field>
-            <Field label="设置密码" hint="15–128 个字符，建议使用便于记忆的长密码。">
-              <input
-                type="password"
-                autoComplete="new-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                minLength={15}
-                maxLength={128}
-                required
-              />
-            </Field>
-            <Field label="确认密码">
-              <input
-                type="password"
-                autoComplete="new-password"
-                value={confirmation}
-                onChange={(e) => setConfirmation(e.target.value)}
-                minLength={15}
-                maxLength={128}
-                required
-              />
-            </Field>
-          </>
-        )}
-        {error && <Alert text={error} />}
-        <Button type="submit" variant="primary" className="full">
-          {busy ? '正在加入…' : newAccount ? '创建账号并加入' : '确认加入企业'}
-        </Button>
-      </fieldset>
-    </form>
   );
 }
 
@@ -412,6 +176,7 @@ function GuardedAccessShell({
   const { refresh, logout } = useSession();
   const pendingRequest = useContext(RequestPending);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
   const [actionsTarget, setActionsTarget] = useState<HTMLDivElement | null>(null);
   const governance = useRemote(
     async (signal) => ({
@@ -437,7 +202,11 @@ function GuardedAccessShell({
       ? identity.memberships.filter((m) => management.includes(m.tenantId))
       : identity.memberships;
   const readTenant = () =>
-    new URLSearchParams(location.hash.slice(1)).get('tenant') || identity.memberships[0]?.tenantId || '';
+    entryTenant(
+      new URLSearchParams(location.hash.slice(1)).get('tenant'),
+      identity.memberships,
+      rememberedTenant(identity.account.id),
+    );
   const [tenant, setTenant] = useState(readTenant);
   const [departure, setDeparture] = useState(
     () => new URLSearchParams(location.hash.slice(1)).get('view') === 'departure',
@@ -486,6 +255,9 @@ function GuardedAccessShell({
     return () => window.removeEventListener('hashchange', change);
   }, [identity, surface]);
   const selected = identity.memberships.find((m) => m.tenantId === tenant);
+  useEffect(() => {
+    if (selected) rememberTenant(identity.account.id, selected.tenantId);
+  }, [identity.account.id, selected?.tenantId]);
   const allowed = surface === 'platform-admin' ? identity.platformAdmin : !!selected;
   const links: Surface[] = [
     'workspace',
@@ -702,7 +474,17 @@ function GuardedAccessShell({
                 compact={surface === 'workspace' && (conversations || briefing)}
               />
             )}
-            {!allowed ? (
+            {!allowed && !tenant && eligible.length > 1 ? (
+              <section className="access-panel">
+                <h2>选择要进入的企业</h2>
+                <p>下次将回到你最近使用的企业。</p>
+                {eligible.map((m) => (
+                  <Button key={m.tenantId} onClick={() => choose(m.tenantId)}>
+                    {m.tenantName}
+                  </Button>
+                ))}
+              </section>
+            ) : !allowed ? (
               <section className="access-panel">
                 <Empty
                   icon={ShieldX}
@@ -759,12 +541,17 @@ function GuardedAccessShell({
             />
           )}
         </div>
+        {changingPassword && (
+          <Modal title="修改密码" onClose={() => setChangingPassword(false)}>
+            <ChangePassword done={() => setChangingPassword(false)} />
+          </Modal>
+        )}
         {accountOpen && (
           <Modal title="账号" onClose={() => setAccountOpen(false)}>
             <div className="access-account">
               <CircleUserRound size={32} />
               <strong>{identity.account.displayName}</strong>
-              <p>{identity.account.email}</p>
+              <p>{contactLabel(identity.account)}</p>
             </div>
             {surface === 'workspace' && eligible.length > 1 && (
               <label className="field">
@@ -788,6 +575,14 @@ function GuardedAccessShell({
             )}
             <div className="access-account-actions">
               <Button onClick={onInvite}>接受另一企业邀请</Button>
+              <Button
+                onClick={() => {
+                  setAccountOpen(false);
+                  setChangingPassword(true);
+                }}
+              >
+                修改密码
+              </Button>
               <Button icon={LogOut} onClick={() => void logout().catch(() => {})}>
                 退出登录
               </Button>

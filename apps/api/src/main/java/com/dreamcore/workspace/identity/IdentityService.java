@@ -18,18 +18,19 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class IdentityService {
-    public record Account(UUID id, String email, String displayName) {}
+    public record Account(UUID id, String email, String displayName, String phone,
+                          @com.fasterxml.jackson.annotation.JsonIgnore long credentialVersion) {}
     public record Membership(UUID tenantId, String tenantName, String role) {}
     public record Me(Account account, boolean platformAdmin, List<Membership> memberships) {}
     public record Tenant(UUID id, String name, String status) {}
     public record Workspace(UUID id, String name, String kind) {}
     public record TenantContext(Tenant tenant, String role, List<Workspace> workspaces) {}
-    public record Invitation(UUID id, UUID tenantId, String email, String role, String status, Instant expiresAt) {}
+    public record Invitation(UUID id, UUID tenantId, String email, String role, String status, Instant expiresAt, String phone) {}
     public record TenantCreated(Tenant tenant, Invitation invitation) {}
-    private static final RowMapper<Account> ACCOUNT = (r, n) -> new Account(r.getObject("id", UUID.class), r.getString("email"), r.getString("display_name"));
+    private static final RowMapper<Account> ACCOUNT = (r, n) -> new Account(r.getObject("id", UUID.class), r.getString("email"), r.getString("display_name"), r.getString("phone"),r.getLong("credential_version"));
     private static final RowMapper<Tenant> TENANT = (r, n) -> new Tenant(r.getObject("id", UUID.class), r.getString("name"), r.getString("status"));
     private static final RowMapper<Invitation> INVITATION = (r, n) -> new Invitation(r.getObject("id", UUID.class), r.getObject("tenant_id", UUID.class),
-            r.getString("email"), r.getString("role"), r.getString("effective_status"), r.getTimestamp("expires_at").toInstant());
+            r.getString("email"), r.getString("role"), r.getString("effective_status"), r.getTimestamp("expires_at").toInstant(), r.getString("phone"));
     private static final String INVITATION_SELECT = "SELECT *, CASE WHEN status='PENDING' AND expires_at<=now() THEN 'EXPIRED' ELSE status END AS effective_status FROM invitations";
     private final JdbcTemplate db;
     private final PasswordEncoder passwords;
@@ -62,16 +63,20 @@ public class IdentityService {
         return value.strip();
     }
     static void password(String value) {
-        if (value == null || value.length() < 15 || value.length() > 128) throw new IdentityException(400, "PASSWORD_POLICY");
+        if (value == null || value.length() < 6 || value.length() > 128) throw new IdentityException(400, "PASSWORD_POLICY");
     }
     public boolean active(UUID account) {
         return Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM accounts WHERE id=? AND status='ACTIVE')", Boolean.class, account));
     }
+    public boolean validSession(UUID account,long version) {
+        return Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM accounts WHERE id=? AND status='ACTIVE' AND credential_version=?)",Boolean.class,account,version));
+    }
     public Account login(String suppliedEmail, String password, String ip) {
-        String normalized = email(suppliedEmail);
+        boolean byPhone = suppliedEmail != null && !suppliedEmail.contains("@");
+        String normalized = byPhone ? PhoneNumbers.normalize(suppliedEmail) : email(suppliedEmail);
         if (!throttle.allow(normalized, ip)) { audit.denial(null, "LOGIN_THROTTLED"); throw new IdentityException(429, "LOGIN_THROTTLED"); }
         if (password == null || password.length() > 128) throw new IdentityException(401, "INVALID_CREDENTIALS");
-        var rows = db.queryForList("SELECT id,password_hash,status FROM accounts WHERE email=?", normalized);
+        var rows = db.queryForList("SELECT id,password_hash,status,credential_version FROM accounts WHERE " + (byPhone ? "phone=?" : "email=? AND phone IS NULL"), normalized);
         String encoded = rows.isEmpty() ? dummyHash : (String) rows.getFirst().get("password_hash");
         boolean matches = passwords.matches(password, encoded);
         if (!matches || rows.isEmpty() || !"ACTIVE".equals(rows.getFirst().get("status"))) {
@@ -79,7 +84,9 @@ public class IdentityService {
         }
         UUID id = (UUID) rows.getFirst().get("id");
         audit.record(id, null, "LOGIN", id, "SUCCESS");
-        return account(id);
+        var current=account(id);
+        // Bind the new session to the password version that actually matched, even if a reset races.
+        return new Account(current.id(),current.email(),current.displayName(),current.phone(),(Long)rows.getFirst().get("credential_version"));
     }
     public Account account(UUID id) {
         var rows = db.query("SELECT * FROM accounts WHERE id=? AND status='ACTIVE'", ACCOUNT, id);
@@ -154,7 +161,7 @@ public class IdentityService {
     }
     @Transactional
     public TenantCreated createTenant(UUID actor, UUID requestId, String tenantName, String adminEmail, boolean designateOwner) {
-        platform(actor); String display = name(tenantName,100); String normalized = email(adminEmail);
+        platform(actor); String display = name(tenantName,100); String normalized = adminEmail != null && adminEmail.contains("@") ? email(adminEmail) : PhoneNumbers.normalize(adminEmail);
         String fingerprint = hash(display + "\n" + normalized + (designateOwner ? "\nOWNER_DESIGNATED" : ""));
         UUID prior = priorRequest(actor,requestId,"CREATE_TENANT",fingerprint);
         platform(actor); // The request key may have waited while platform access was revoked.
@@ -173,7 +180,7 @@ public class IdentityService {
     }
     @Transactional
     public Invitation invite(UUID actor, UUID tenant, UUID requestId, String suppliedEmail) {
-        member(actor,tenant,true,false); String normalized = email(suppliedEmail);
+        member(actor,tenant,true,false); String normalized = suppliedEmail != null && suppliedEmail.contains("@") ? email(suppliedEmail) : PhoneNumbers.normalize(suppliedEmail);
         String fingerprint = hash(tenant + "\n" + normalized);
         UUID prior = priorRequest(actor,requestId,"INVITE_MEMBER",fingerprint);
         member(actor,tenant,true);
@@ -184,12 +191,14 @@ public class IdentityService {
     }
     Invitation issue(UUID actor, UUID tenant, String email, String role) {
         departure.requireActiveBusiness(actor,tenant);
-        if (db.queryForObject("SELECT count(*) FROM tenant_memberships m JOIN accounts a ON a.id=m.account_id WHERE m.tenant_id=? AND a.email=?",Integer.class,tenant,email) > 0) throw IdentityException.conflict();
+        boolean byPhone = email.startsWith("+");
+        String contactColumn = byPhone ? "phone" : "email";
+        if (db.queryForObject("SELECT count(*) FROM tenant_memberships m JOIN accounts a ON a.id=m.account_id WHERE m.tenant_id=? AND a." + contactColumn + "=?",Integer.class,tenant,email) > 0) throw IdentityException.conflict();
         // Expiration is also derived on read; this update releases the unique pending-invite slot.
-        db.update("UPDATE invitations SET status='EXPIRED' WHERE tenant_id=? AND email=? AND status='PENDING' AND expires_at<=now()",tenant,email);
+        db.update("UPDATE invitations SET status='EXPIRED' WHERE tenant_id=? AND " + contactColumn + "=? AND status='PENDING' AND expires_at<=now()",tenant,email);
         UUID id = UUID.randomUUID(); byte[] bytes = new byte[32]; random.nextBytes(bytes);
         String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-        db.update("INSERT INTO invitations(id,tenant_id,email,role,token_hash,expires_at,created_by) VALUES (?,?,?,?,?,now() + make_interval(hours => ?),?)",
+        db.update("INSERT INTO invitations(id,tenant_id," + contactColumn + ",role,token_hash,expires_at,created_by) VALUES (?,?,?,?,?,now() + make_interval(hours => ?),?)",
                 id,tenant,email,role,hash(token),ttlHours,actor);
         delivery.deliver(id,email,token);
         audit.record(actor,tenant,"INVITATION_CREATE",id,"SUCCESS");
@@ -222,6 +231,7 @@ public class IdentityService {
         var invites = db.query(INVITATION_SELECT + " WHERE token_hash=? FOR UPDATE",INVITATION,hash(token));
         if (invites.isEmpty() || !"PENDING".equals(invites.getFirst().status())) throw new IdentityException(409,"INVITATION_UNAVAILABLE");
         Invitation invite = invites.getFirst();
+        if (invite.phone() != null) throw new IdentityException(400,"PHONE_VERIFICATION_REQUIRED");
         departure.requireTenantActivation(invite.tenantId());
         // Serialize two invitations for the same new account without overwriting credentials.
         db.queryForList("SELECT pg_advisory_xact_lock(hashtextextended(?,0))", "account:" + invite.email());

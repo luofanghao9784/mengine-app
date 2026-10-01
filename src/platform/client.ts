@@ -6,7 +6,7 @@ import type {
   ChangeTenantStatus,
   ReplaceInitialInvitation,
 } from '../../contracts/public-api/platform-admin';
-import { createIdentityRequest, IdentityError, record, text, uuid } from '../identity/client.ts';
+import { createIdentityRequest, isContact, IdentityError, record, text, uuid } from '../identity/client.ts';
 
 const count = (v: unknown): v is number => Number.isSafeInteger(v) && (v as number) >= 0;
 const date = (v: unknown): v is string => text(v) && Number.isFinite(Date.parse(v));
@@ -16,7 +16,7 @@ const isInvitation = (v: unknown): v is Invitation =>
   record(v) &&
   uuid(v.id) &&
   uuid(v.tenantId) &&
-  text(v.email) &&
+  isContact(v) &&
   v.role === 'TENANT_ADMIN' &&
   ['PENDING', 'ACCEPTED', 'REVOKED', 'EXPIRED'].includes(String(v.status)) &&
   date(v.expiresAt);

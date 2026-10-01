@@ -11,7 +11,20 @@ export class IdentityError extends Error {
   readonly status: number;
   constructor(code: string, status = 0) {
     const messages: Record<string, string> = {
-      INVALID_CREDENTIALS: '邮箱或密码不正确，或账号已停用。',
+      PHONE_INVALID: '请输入正确的手机号；海外号码请带国家区号。',
+      PHONE_IN_USE: '此手机号已关联其他账号，请使用原账号登录或联系管理员核实。',
+      PHONE_ALREADY_BOUND: '账号已绑定手机号，请重新登录。',
+      PHONE_VERIFICATION_REQUIRED: '请先完成手机号验证。',
+      SMS_UNAVAILABLE: '短信服务尚未配置，请联系管理员。',
+      SMS_COOLDOWN: '请稍候再获取验证码。',
+      SMS_THROTTLED: '验证码请求较多，请稍后再试。',
+      CODE_INVALID: '验证码不正确或已过期，请检查后重试。',
+      CODE_ATTEMPTS_EXCEEDED: '验证码尝试次数已用完，请重新获取。',
+      CODE_UNAVAILABLE: '本地测试短信不可读取，请重新获取验证码。',
+      LOCAL_PREVIEW_DISABLED: '当前环境没有启用本地测试短信。',
+      INVITATION_CONTEXT_LOST: '邀请上下文已失效，请重新打开原邀请链接。',
+      LEGACY_INVITATION: '这是旧邮箱邀请，请联系管理员重新发送手机号邀请。',
+      INVALID_CREDENTIALS: '账号或密码不正确，或账号已停用。',
       DEPARTURE_BUSINESS_STOPPED: '企业退出或成员离职已生效，当前不能开展新业务。',
       DEPARTURE_PRIVATE_ACCESS_STOPPED: '当前已进入退出或离职流程，私人会话、文稿和偏好已停止读取。',
       DEPARTURE_MEMBER_DISABLED: '正式离职已生效，当前企业内容已停止访问。',
@@ -21,7 +34,7 @@ export class IdentityError extends Error {
       AUTHENTICATION_REQUIRED: '登录已失效，请重新登录。',
       ACCESS_DENIED: '当前账号没有访问权限，或页面验证已过期，请刷新后重试。',
       LOGIN_THROTTLED: '尝试次数较多，请稍后再试。',
-      PASSWORD_POLICY: '密码需要 15–128 个字符。',
+      PASSWORD_POLICY: '密码需要 6–128 个字符。',
       INVALID_REQUEST: '请检查填写内容。',
       KNOWLEDGE_NOT_FOUND: '此来源不存在，或你已没有查看权限。',
       KNOWLEDGE_UNAVAILABLE: '本地解析尚未启用，请联系系统维护者。',
@@ -57,7 +70,7 @@ export class IdentityError extends Error {
       WORKSPACE_GRANT_NOT_FOUND: '请先为该成员授予空间访问权限。',
       INVITATION_INVALID: '邀请码格式不正确，请检查后重试。',
       INVITATION_UNAVAILABLE: '邀请已过期、已撤销或已被接受，请联系企业管理员。',
-      INVITATION_ACCOUNT_LOGIN_REQUIRED: '请先使用受邀邮箱登录，再接受邀请。',
+      INVITATION_ACCOUNT_LOGIN_REQUIRED: '请先使用受邀账号登录，再接受邀请。',
       INVITATION_ACCOUNT_MISMATCH: '当前账号与邀请不匹配，请切换到受邀账号。',
       EXISTING_ACCOUNT_CREDENTIALS_NOT_ALLOWED: '已有账号无需再次设置姓名和密码。',
       INVITATION_DELIVERY_UNAVAILABLE: '邀请服务暂时不可用，操作未完成，请稍后重试。',
@@ -104,6 +117,12 @@ export const text = (v: unknown): v is string => typeof v === 'string' && v.leng
 export const uuid = (v: unknown): v is string =>
   typeof v === 'string' && /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(v);
 const role = (v: unknown) => v === 'TENANT_ADMIN' || v === 'MEMBER';
+export const isContact = (v: Record<string, unknown>) =>
+  (v.phone == null || (typeof v.phone === 'string' && /^\+[1-9][0-9]{7,14}$/.test(v.phone))) &&
+  (v.email == null || text(v.email)) &&
+  (text(v.phone) || text(v.email));
+export const contactLabel = (v: { phone?: string | null; email?: string | null }) =>
+  v.phone || v.email || '未绑定手机号';
 export function isMembership(v: unknown): v is Membership {
   return record(v) && uuid(v.tenantId) && text(v.tenantName) && role(v.role);
 }
@@ -112,7 +131,7 @@ export function isIdentity(v: unknown): v is Identity {
     record(v) &&
     record(v.account) &&
     uuid(v.account.id) &&
-    text(v.account.email) &&
+    isContact(v.account) &&
     text(v.account.displayName) &&
     typeof v.platformAdmin === 'boolean' &&
     Array.isArray(v.memberships) &&
@@ -202,7 +221,9 @@ export function createIdentityClient(fetcher: typeof fetch = fetch, timeoutMs = 
   const request = createIdentityRequest(fetcher, timeoutMs);
   return {
     me: (signal?: AbortSignal) => request('/api/v1/me', 'GET', isIdentity, undefined, signal),
-    login: (email: string, password: string) =>
+    login: (phone: string, password: string) =>
+      request('/api/v1/auth/login', 'POST', isIdentity, { phone, password }),
+    legacyLogin: (email: string, password: string) =>
       request('/api/v1/auth/login', 'POST', isIdentity, { email, password }),
     logout: () => request('/api/v1/auth/logout', 'POST', (v): v is null => v === null),
     accept: (body: AcceptInvitation) =>

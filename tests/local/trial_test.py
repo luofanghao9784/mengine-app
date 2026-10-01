@@ -58,6 +58,7 @@ class LocalTrialBoundaryTest(unittest.TestCase):
         unsafe = {'SPRING_DATASOURCE_URL': 'other-db', 'SPRING_CONFIG_LOCATION': 'other-config',
                   'DATABASE_URL': 'other-db', 'API_PORT': '9999', 'SERVER_PORT': '9999',
                   'PGHOST': 'other-host', 'PGSERVICE': 'other-service', 'JAVA_TOOL_OPTIONS': 'other-options',
+                  'PHONE_DELIVERY': 'local', 'PHONE_LOCAL_PREVIEW': 'true', 'PHONE_OUTBOX': 'other-phone-outbox',
                   'BOOTSTRAP_EMAIL': 'other-account', 'INVITATION_OUTBOX': 'other-outbox', 'MATERIAL_STORAGE_ROOT': 'other-storage', 'KNOWLEDGE_ENABLED': 'true', 'KNOWLEDGE_PARSER_ROOT': 'other-parser', 'TASK_ENABLED': 'true', 'TASK_ENGINE_TOKEN': 'other-token', 'ENGINE_BASE_URL': 'http://other-project', 'AGENT_TASK_MODE': 'live', 'AGENT_MODEL_API_KEY': 'other-key', 'AGENT_MODEL_PROVIDER': 'deepseek'}
         with patch.dict(os.environ, {**unsafe, 'PATH': '/synthetic-bin'}, clear=True):
             self.assertEqual(trial.clean_environment(), {'PATH': '/synthetic-bin'})
@@ -70,3 +71,20 @@ class LocalTrialBoundaryTest(unittest.TestCase):
                 trial.stop(root)
             self.assertFalse((root / 'stop-request.json').exists())
             self.assertFalse((root / 'supervisor.lock').exists())
+
+
+class PhoneTrialBoundaryTest(unittest.TestCase):
+    def test_phone_simulation_cannot_be_enabled_for_live_or_non_start_commands(self):
+        for args in [['trial.py', 'start', '--live', '--phone-local'], ['trial.py', 'status', '--phone-local']]:
+            with patch('sys.argv', args), patch.object(trial, 'start') as start:
+                with self.assertRaises(trial.TrialError):
+                    trial.main()
+                start.assert_not_called()
+
+    def test_phone_simulation_requires_an_explicit_start_flag(self):
+        with patch('sys.argv', ['trial.py', 'start', '--phone-local']), patch.object(trial, 'start') as start:
+            trial.main()
+            self.assertTrue(start.call_args.kwargs['phone_local'])
+        with patch('sys.argv', ['trial.py', 'start']), patch.object(trial, 'start') as start:
+            trial.main()
+            self.assertFalse(start.call_args.kwargs['phone_local'])

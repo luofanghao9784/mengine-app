@@ -1,3 +1,4 @@
+import { LocalInviteLink } from '../identity/LocalInviteLink';
 import { RequestPending } from '../shared/request-guard';
 import { useContext } from 'react';
 import { useState, type ReactNode } from 'react';
@@ -214,12 +215,12 @@ export function TenantAdminHome({ tenant }: { tenant: string }) {
           <fieldset className="tenant-modal-fields" disabled={writing}>
             {dialog.kind === 'invite' && (
               <TextForm
-                label="受邀邮箱"
-                email
+                label="受邀手机号"
+                phone
                 action="生成邀请"
-                description="邀请成员加入当前企业。当前使用本地投递，生成后由维护者提供邀请码，尚未发送邮件。"
+                description="邀请成员加入当前企业。当前为本地验证，可从邀请列表复制本地邀请链接，未发送真实短信。"
                 submit={async (value, requestId) => {
-                  await api.invite(tenant, { requestId, email: value });
+                  await api.invite(tenant, { requestId, phone: value });
                   complete('成员邀请已生成，等待接受。');
                 }}
               />
@@ -274,7 +275,7 @@ export function TenantAdminHome({ tenant }: { tenant: string }) {
                 }}
               >
                 <p>
-                  <strong>{dialog.member.displayName}</strong> · {dialog.member.email}
+                  <strong>{dialog.member.displayName}</strong> · {dialog.member.phone || dialog.member.email}
                 </p>
                 <p className="muted">
                   {dialog.member.status === 'ACTIVE'
@@ -293,7 +294,8 @@ export function TenantAdminHome({ tenant }: { tenant: string }) {
                 }}
               >
                 <p>
-                  撤销发给 <strong>{dialog.invitation.email}</strong> 的邀请，原邀请码将失效。
+                  撤销发给 <strong>{dialog.invitation.phone || dialog.invitation.email}</strong>{' '}
+                  的邀请，原邀请码将失效。
                 </p>
               </Confirm>
             )}
@@ -362,7 +364,7 @@ function Members({
       <div className="platform-list-heading">
         <h2>企业成员</h2>
         <Filter
-          label="搜索姓名或邮箱"
+          label="搜索姓名或手机号"
           submit={(q) => {
             setQ(q);
             setPage(0);
@@ -393,7 +395,7 @@ function Members({
               <li key={m.accountId}>
                 <span className="tenant-person">
                   <strong>{m.displayName}</strong>
-                  <small>{m.email}</small>
+                  <small>{m.phone || m.email}</small>
                 </span>
                 <Badge>{role(m.role)}</Badge>
                 <Badge blue={m.status === 'ACTIVE' && m.accountStatus === 'ACTIVE'}>
@@ -445,7 +447,7 @@ function Invitations({
           <h2>成员邀请</h2>
           <p className="platform-help">
             {delivery === 'LOCAL'
-              ? '当前为本地投递，邀请不会发送邮件。'
+              ? '当前为本地投递，邀请不会发送短信。'
               : '邀请服务尚未启用，暂不能生成邀请。'}
           </p>
         </div>
@@ -460,7 +462,8 @@ function Invitations({
             {data.value.slice(0, 20).map((i) => (
               <li key={i.id}>
                 <span className="tenant-person">
-                  <strong>{i.email}</strong>
+                  <strong>{i.phone || i.email}</strong>
+                  {i.phone && i.status === 'PENDING' && <LocalInviteLink invitation={i.id} />}
                   <small>
                     {role(i.role)} · 到期 {time(i.expiresAt)}
                   </small>
@@ -594,14 +597,14 @@ function Records({ tenant, attempt, refresh }: { tenant: string; attempt: number
 function TextForm({
   label,
   initial = '',
-  email = false,
+  phone = false,
   action,
   description,
   submit,
 }: {
   label: string;
   initial?: string;
-  email?: boolean;
+  phone?: boolean;
   action: string;
   description?: string;
   submit: (v: string, key: string) => Promise<void>;
@@ -613,7 +616,7 @@ function TextForm({
       className="platform-form"
       onSubmit={(e) => {
         e.preventDefault();
-        void task.submit(email ? value.trim().toLowerCase() : value.trim(), submit);
+        void task.submit(value.trim(), submit);
       }}
     >
       {description && <p className="muted">{description}</p>}
@@ -622,8 +625,8 @@ function TextForm({
           <input
             autoFocus
             required
-            type={email ? 'email' : 'text'}
-            maxLength={email ? 254 : 100}
+            type={phone ? 'tel' : 'text'}
+            maxLength={phone ? 40 : 100}
             value={value}
             onChange={(e) => setValue(e.target.value)}
           />
@@ -794,7 +797,7 @@ function SpaceContents({
                 <li key={m.accountId}>
                   <span className="tenant-person">
                     <strong>{m.displayName}</strong>
-                    <small>{m.email}</small>
+                    <small>{m.phone || m.email}</small>
                   </span>
                   <Badge>{m.canMaintain ? '可维护' : '只读'}</Badge>
                   <Button
@@ -858,7 +861,8 @@ function AddGrant({
         }}
       >
         <p>
-          允许 <strong>{selected.displayName}</strong>（{selected.email}）访问“{space.name}”。
+          允许 <strong>{selected.displayName}</strong>（{selected.phone || selected.email}）访问“{space.name}
+          ”。
         </p>
       </Confirm>
     );
@@ -886,7 +890,7 @@ function AddGrant({
               <li key={m.accountId}>
                 <span className="tenant-person">
                   <strong>{m.displayName}</strong>
-                  <small>{m.email}</small>
+                  <small>{m.phone || m.email}</small>
                 </span>
                 <Button
                   disabled={m.accountId === session.identity?.account.id || m.accountStatus !== 'ACTIVE'}
@@ -938,7 +942,7 @@ function EmergencyStop({
       }}
     >
       <p>
-        <strong>{member.displayName}</strong> · {member.email}
+        <strong>{member.displayName}</strong> · {member.phone || member.email}
       </p>
       <p>
         用于已识别的账号安全风险，可先停用负责人或最后管理员。操作立即撤销该成员的本企业使用资格；停用本人后将失去本企业入口。

@@ -81,7 +81,7 @@ public class PlatformAdminService {
     }
     @Transactional
     public Detail replaceInitialInvitation(UUID actor, UUID tenant, UUID requestId, long expectedVersion, String email) {
-        identities.platform(actor); String normalized=IdentityService.email(email);
+        identities.platform(actor); String normalized=email != null && email.contains("@") ? IdentityService.email(email) : PhoneNumbers.normalize(email);
         if (expectedVersion<0) throw IdentityException.invalid();
         String fingerprint=IdentityService.hash(tenant+"\n"+expectedVersion+"\n"+normalized);
         UUID prior=identities.priorRequest(actor,requestId,"INITIAL_ADMIN_INVITE",fingerprint);

@@ -1,3 +1,4 @@
+import { LocalInviteLink } from '../identity/LocalInviteLink';
 import { DepartureStatus } from '../departure/DepartureStatus';
 import { ObjectLifecycleWorkspace } from '../objectlifecycle/ObjectLifecycleWorkspace';
 import { EvaluationWorkspace } from '../evaluation/EvaluationWorkspace';
@@ -294,7 +295,7 @@ function Overview({ value }: { value: PlatformOverview }) {
         </span>
         <span>
           {value.invitationDelivery === 'LOCAL'
-            ? '邀请使用本地投递，尚未发送邮件'
+            ? '邀请使用本地投递，尚未发送短信'
             : '邀请服务未启用，暂不能开通企业或生成邀请'}
         </span>
         <time dateTime={value.checkedAt}>检查于 {time(value.checkedAt)}</time>
@@ -313,7 +314,7 @@ function CreateForm({
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [designate, setDesignate] = useState(false);
-  const task = useSubmission<{ name: string; adminEmail: string; designateAuthorizationOwner: boolean }>();
+  const task = useSubmission<{ name: string; adminPhone: string; designateAuthorizationOwner: boolean }>();
   return (
     <form
       className="platform-form"
@@ -322,7 +323,7 @@ function CreateForm({
         void task.submit(
           {
             name: name.trim(),
-            adminEmail: email.trim().toLowerCase(),
+            adminPhone: email.trim(),
             designateAuthorizationOwner: designate,
           },
           async (body, requestId) => {
@@ -332,16 +333,16 @@ function CreateForm({
         );
       }}
     >
-      <p className="muted">填写企业名称与初始管理员邮箱。管理员接受邀请后，才能进入企业管理。</p>
+      <p className="muted">填写企业名称与初始管理员手机号。管理员接受邀请后，才能进入企业管理。</p>
       <fieldset disabled={task.busy || task.uncertain}>
         <Field label="企业名称">
           <input required maxLength={100} value={name} onChange={(e) => setName(e.target.value)} autoFocus />
         </Field>
-        <Field label="初始管理员邮箱">
+        <Field label="初始管理员手机号">
           <input
-            type="email"
+            type="tel"
             required
-            maxLength={254}
+            maxLength={40}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             autoComplete="off"
@@ -351,11 +352,11 @@ function CreateForm({
           <input type="checkbox" checked={designate} onChange={(e) => setDesignate(e.target.checked)} />
           明确指定此初始管理员为企业授权负责人候选人
         </label>
-        <p className="muted">须由受邀人在加入后另外明确接受职责。未勾选或存量企业不会自动获得负责人资格。</p>
+        <p className="muted">受邀人可在加入页面明确接受职责。未勾选或存量企业不会自动获得负责人资格。</p>
       </fieldset>
       <p className="platform-help">
         {delivery === 'LOCAL'
-          ? '当前环境使用本地投递，不会发送邮件。邀请有效期为 72 小时。'
+          ? '当前环境使用本地投递，不会发送短信。邀请有效期为 72 小时。'
           : '邀请服务暂未启用，请联系平台维护者。'}
       </p>
       <SubmitError error={task.error} uncertain={task.uncertain} />
@@ -439,7 +440,8 @@ function TenantView({
         {invitation ? (
           <>
             <div className="platform-invitation-line">
-              <strong>{invitation.email}</strong>
+              <strong>{invitation.phone || invitation.email}</strong>
+              {invitation.phone && <LocalInviteLink invitation={invitation.id} />}
               <Badge>{invitationLabel[invitation.status]}</Badge>
             </div>
             {invitation.status !== 'ACCEPTED' && (
@@ -501,7 +503,7 @@ function TenantAction({
   onBack: () => void;
   onSuccess: (value: TenantDetail) => void;
 }) {
-  const [email, setEmail] = useState(detail.initialAdminInvitation?.email || '');
+  const [email, setEmail] = useState(detail.initialAdminInvitation?.phone || '');
   const task = useSubmission<{ email: string }>();
   const suspend = detail.tenant.status === 'ACTIVE';
   const label = action === 'invite' ? '重新生成邀请' : suspend ? '停用企业' : '恢复使用';
@@ -516,7 +518,7 @@ function TenantAction({
               ? await platformClient.replaceInvitation(detail.tenant.id, {
                   requestId,
                   expectedVersion: detail.version,
-                  email: body.email,
+                  phone: body.email,
                 })
               : await platformClient.status(detail.tenant.id, {
                   requestId,
@@ -539,11 +541,11 @@ function TenantAction({
       </p>
       {action === 'invite' && (
         <fieldset disabled={task.busy || task.uncertain}>
-          <Field label="初始管理员邮箱">
+          <Field label="初始管理员手机号">
             <input
-              type="email"
+              type="tel"
               required
-              maxLength={254}
+              maxLength={40}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
