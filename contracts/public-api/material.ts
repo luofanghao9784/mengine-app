@@ -5,7 +5,7 @@ export interface MaterialEntry {
   workspaceId: string;
   workspaceName: string;
   folderId: string | null;
-  kind: 'FOLDER' | 'DOCUMENT';
+  kind: 'FOLDER' | 'DOCUMENT' | 'DRAFT';
   name: string;
   version: number;
   sizeBytes: number | null;
@@ -34,6 +34,7 @@ export interface MaterialVersion {
   createdAt: string;
 }
 export interface MaterialDetail {
+  inLibrary?: boolean;
   document: MaterialEntry;
   versions: MaterialVersion[];
   hasMore: boolean;

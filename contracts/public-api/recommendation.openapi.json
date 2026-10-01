@@ -2,7 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "工作推荐与站内呈现",
-    "version": "1.0.0"
+    "version": "1.0.0",
+    "description": " generatedOnly=true 只读取已有独立画报内容；普通回复不覆盖旧画报。"
   },
   "security": [
     {
@@ -56,6 +57,44 @@
             "schema": {
               "type": "string",
               "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          {
+            "name": "generatedOnly",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          {
+            "name": "businessType",
+            "in": "query",
+            "description": "先按明确业务类型过滤，再排序和分页；历史无类型不猜测",
+            "schema": {
+              "enum": [
+                "INFO",
+                "DATA",
+                "INSIGHT",
+                "SUGGESTION",
+                "RESULT"
+              ]
+            }
+          },
+          {
+            "name": "publicationsOnly",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          {
+            "name": "focused",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
             }
           }
         ],
@@ -226,6 +265,78 @@
           }
         }
       }
+    },
+    "/api/v1/tenants/{tenant}/recommendations/publications/{material}/preference": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "material",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "读取本人对共享企业副本的关注",
+        "responses": {
+          "200": {
+            "description": "本人当前关注状态；重新核对共享副本权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicationPreference"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "关注或取消关注；不创建持续计划、不改变企业副本",
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicationFollow"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "本人当前关注状态；重新核对共享副本权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicationPreference"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -240,7 +351,10 @@
       "Settings": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["revision", "enabled"],
+        "required": [
+          "revision",
+          "enabled"
+        ],
         "properties": {
           "revision": {
             "type": "integer",
@@ -254,10 +368,17 @@
       "Target": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["kind", "id", "versionKey"],
+        "required": [
+          "kind",
+          "id",
+          "versionKey"
+        ],
         "properties": {
           "kind": {
-            "enum": ["TASK", "PUBLICATION"]
+            "enum": [
+              "TASK",
+              "PUBLICATION"
+            ]
           },
           "id": {
             "type": "string",
@@ -295,7 +416,10 @@
         ],
         "properties": {
           "kind": {
-            "enum": ["TASK", "PUBLICATION"]
+            "enum": [
+              "TASK",
+              "PUBLICATION"
+            ]
           },
           "id": {
             "type": "string",
@@ -329,10 +453,17 @@
             "format": "date-time"
           },
           "executionClass": {
-            "enum": ["verification", "live", "PUBLISHED_COPY"]
+            "enum": [
+              "verification",
+              "live",
+              "PUBLISHED_COPY"
+            ]
           },
           "conversationId": {
-            "type": ["string", "null"],
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "uuid"
           },
           "taskRevision": {
@@ -348,7 +479,10 @@
             "minimum": 0
           },
           "materialId": {
-            "type": ["string", "null"],
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "uuid"
           },
           "materialVersion": {
@@ -363,7 +497,10 @@
             "type": "boolean"
           },
           "openedAt": {
-            "type": ["string", "null"],
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "date-time"
           }
         }
@@ -371,10 +508,19 @@
       "Method": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["versionId", "adoptionRevision", "scope", "workspaceId", "configurationSha"],
+        "required": [
+          "versionId",
+          "adoptionRevision",
+          "scope",
+          "workspaceId",
+          "configurationSha"
+        ],
         "properties": {
           "versionId": {
-            "type": ["string", "null"],
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "uuid"
           },
           "adoptionRevision": {
@@ -382,10 +528,17 @@
             "minimum": 0
           },
           "scope": {
-            "enum": ["BUILTIN", "TENANT", "WORKSPACE"]
+            "enum": [
+              "BUILTIN",
+              "TENANT",
+              "WORKSPACE"
+            ]
           },
           "workspaceId": {
-            "type": ["string", "null"],
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "uuid"
           },
           "configurationSha": {
@@ -397,16 +550,30 @@
       "Presentation": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["renderer", "style", "profileId", "profileRevision"],
+        "required": [
+          "renderer",
+          "style",
+          "profileId",
+          "profileRevision"
+        ],
         "properties": {
           "renderer": {
             "const": "source-preserving-v1"
           },
           "style": {
-            "enum": ["DEFAULT", "CONCISE", "TABLE_FIRST", "CONCLUSION_FIRST", "DETAIL_FIRST"]
+            "enum": [
+              "DEFAULT",
+              "CONCISE",
+              "TABLE_FIRST",
+              "CONCLUSION_FIRST",
+              "DETAIL_FIRST"
+            ]
           },
           "profileId": {
-            "type": ["string", "null"],
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "uuid"
           },
           "profileRevision": {
@@ -418,7 +585,11 @@
       "Configure": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["requestId", "expectedRevision", "enabled"],
+        "required": [
+          "requestId",
+          "expectedRevision",
+          "enabled"
+        ],
         "properties": {
           "requestId": {
             "type": "string",
@@ -436,7 +607,12 @@
       "Opened": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["target", "openedAt", "evidence", "businessOutcome"],
+        "required": [
+          "target",
+          "openedAt",
+          "evidence",
+          "businessOutcome"
+        ],
         "properties": {
           "target": {
             "$ref": "#/components/schemas/Target"
@@ -489,6 +665,520 @@
           },
           "feedbackTarget": {
             "$ref": "#/components/schemas/FeedbackTarget"
+          },
+          "briefing": {
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "artifactId",
+                  "sha256",
+                  "content"
+                ],
+                "properties": {
+                  "artifactId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "content": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "schemaVersion",
+                          "businessType",
+                          "title",
+                          "summary",
+                          "analysis",
+                          "chart",
+                          "source",
+                          "calculationArtifactId",
+                          "calculationSha256",
+                          "generatedAt"
+                        ],
+                        "properties": {
+                          "schemaVersion": {
+                            "const": "briefing-data-v1"
+                          },
+                          "businessType": {
+                            "const": "DATA"
+                          },
+                          "title": {
+                            "type": "string",
+                            "minLength": 4,
+                            "maxLength": 80
+                          },
+                          "summary": {
+                            "type": "string",
+                            "minLength": 12,
+                            "maxLength": 240
+                          },
+                          "analysis": {
+                            "type": "array",
+                            "minItems": 2,
+                            "maxItems": 4,
+                            "items": {
+                              "type": "string",
+                              "minLength": 12,
+                              "maxLength": 500
+                            }
+                          },
+                          "chart": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "type",
+                              "metric",
+                              "unit",
+                              "baseline",
+                              "current",
+                              "range",
+                              "rows",
+                              "totals"
+                            ],
+                            "properties": {
+                              "type": {
+                                "const": "GROUPED_BAR"
+                              },
+                              "metric": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100
+                              },
+                              "unit": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100
+                              },
+                              "baseline": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100
+                              },
+                              "current": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100
+                              },
+                              "range": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 32
+                              },
+                              "rows": {
+                                "type": "array",
+                                "minItems": 1,
+                                "maxItems": 50,
+                                "items": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "group",
+                                    "baseline",
+                                    "current",
+                                    "difference",
+                                    "changePercent",
+                                    "baselineRank",
+                                    "currentRank",
+                                    "issue"
+                                  ],
+                                  "properties": {
+                                    "group": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 100
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "baseline": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "pattern": "^-?\\d{1,64}(?:\\.\\d{1,12})?$"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "current": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "pattern": "^-?\\d{1,64}(?:\\.\\d{1,12})?$"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "difference": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "pattern": "^-?\\d{1,64}(?:\\.\\d{1,12})?$"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "changePercent": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "pattern": "^-?\\d{1,64}(?:\\.\\d{1,12})?$"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "baselineRank": {
+                                      "anyOf": [
+                                        {
+                                          "type": "integer",
+                                          "minimum": 1,
+                                          "maximum": 50
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "currentRank": {
+                                      "anyOf": [
+                                        {
+                                          "type": "integer",
+                                          "minimum": 1,
+                                          "maximum": 50
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "issue": {
+                                      "anyOf": [
+                                        {
+                                          "enum": [
+                                            "MISSING_PERIOD",
+                                            "NON_POSITIVE_BASELINE",
+                                            "UNEQUAL_GROUP_COVERAGE"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                }
+                              },
+                              "totals": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "group",
+                                  "baseline",
+                                  "current",
+                                  "difference",
+                                  "changePercent",
+                                  "baselineRank",
+                                  "currentRank",
+                                  "issue"
+                                ],
+                                "properties": {
+                                  "group": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 100
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "baseline": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "pattern": "^-?\\d{1,64}(?:\\.\\d{1,12})?$"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "current": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "pattern": "^-?\\d{1,64}(?:\\.\\d{1,12})?$"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "difference": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "pattern": "^-?\\d{1,64}(?:\\.\\d{1,12})?$"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "changePercent": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "pattern": "^-?\\d{1,64}(?:\\.\\d{1,12})?$"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "baselineRank": {
+                                    "anyOf": [
+                                      {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 50
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "currentRank": {
+                                    "anyOf": [
+                                      {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 50
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "issue": {
+                                    "anyOf": [
+                                      {
+                                        "enum": [
+                                          "MISSING_PERIOD",
+                                          "NON_POSITIVE_BASELINE",
+                                          "UNEQUAL_GROUP_COVERAGE"
+                                        ]
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          "source": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "id",
+                              "materialId",
+                              "versionId",
+                              "version",
+                              "filename",
+                              "sha256",
+                              "scopeExcerpt"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "materialId": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "versionId": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "version": {
+                                "type": "integer",
+                                "minimum": 1
+                              },
+                              "filename": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 255
+                              },
+                              "sha256": {
+                                "type": "string",
+                                "pattern": "^[a-f0-9]{64}$"
+                              },
+                              "scopeExcerpt": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 4000
+                              }
+                            }
+                          },
+                          "calculationArtifactId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "calculationSha256": {
+                            "type": "string",
+                            "pattern": "^[a-f0-9]{64}$"
+                          },
+                          "generatedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "schemaVersion",
+                          "businessType",
+                          "title",
+                          "summary",
+                          "analysis",
+                          "chart",
+                          "source",
+                          "calculationArtifactId",
+                          "calculationSha256",
+                          "generatedAt"
+                        ],
+                        "properties": {
+                          "schemaVersion": {
+                            "const": "briefing-text-v1"
+                          },
+                          "businessType": {
+                            "enum": [
+                              "INFO",
+                              "INSIGHT",
+                              "SUGGESTION",
+                              "RESULT"
+                            ]
+                          },
+                          "title": {
+                            "type": "string",
+                            "minLength": 4,
+                            "maxLength": 80
+                          },
+                          "summary": {
+                            "type": "string",
+                            "minLength": 12,
+                            "maxLength": 240
+                          },
+                          "analysis": {
+                            "type": "array",
+                            "minItems": 2,
+                            "maxItems": 4,
+                            "items": {
+                              "type": "string",
+                              "minLength": 12,
+                              "maxLength": 500
+                            }
+                          },
+                          "chart": {
+                            "type": "null"
+                          },
+                          "source": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "id",
+                                  "materialId",
+                                  "versionId",
+                                  "version",
+                                  "filename",
+                                  "sha256",
+                                  "scopeExcerpt"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  "materialId": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  "versionId": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  "version": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                  },
+                                  "filename": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 255
+                                  },
+                                  "sha256": {
+                                    "type": "string",
+                                    "pattern": "^[a-f0-9]{64}$"
+                                  },
+                                  "scopeExcerpt": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 4000
+                                  }
+                                }
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "calculationArtifactId": {
+                            "type": "null"
+                          },
+                          "calculationSha256": {
+                            "type": "null"
+                          },
+                          "generatedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "allOf": [
@@ -602,7 +1292,10 @@
             "properties": {
               "kind": {
                 "type": "string",
-                "enum": ["BRIEFING", "TASK"]
+                "enum": [
+                  "BRIEFING",
+                  "TASK"
+                ]
               },
               "taskId": {
                 "type": "string",
@@ -618,7 +1311,11 @@
               },
               "presentationVersion": {
                 "type": "string",
-                "enum": ["briefing-basic-v1", "task-v1", "recommendation-v1"]
+                "enum": [
+                  "briefing-basic-v1",
+                  "task-v1",
+                  "recommendation-v1"
+                ]
               },
               "presentationRevision": {
                 "type": "integer",
@@ -646,7 +1343,10 @@
                 "then": {
                   "properties": {
                     "presentationVersion": {
-                      "enum": ["briefing-basic-v1", "recommendation-v1"]
+                      "enum": [
+                        "briefing-basic-v1",
+                        "recommendation-v1"
+                      ]
                     }
                   }
                 },
@@ -711,6 +1411,45 @@
             }
           }
         ]
+      },
+      "PublicationPreference": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "revision",
+          "pinned"
+        ],
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "pinned": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PublicationFollow": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requestId",
+          "expectedRevision",
+          "pinned"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "pinned": {
+            "type": "boolean"
+          }
+        }
       }
     }
   }

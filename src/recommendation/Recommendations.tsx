@@ -1,4 +1,8 @@
+import { ContinueWithMaterial } from '../conversation/AttachmentMaterials';
+import { AnalysisPanel } from '../material/Knowledge';
+import { briefingTypeLabels } from '../briefing-live/content';
 import { useViewState, pageState } from '../shared/useViewState';
+import { DataBriefing } from '../briefing-live/DataBriefing';
 import { ForwardPublicationButton } from '../forwarding/ForwardPublicationButton';
 import { useContext, useEffect, useRef, useState } from 'react';
 import { Download, RefreshCw, Newspaper, Share2, Star } from 'lucide-react';
@@ -17,20 +21,56 @@ import { usePackedRecommendations } from './usePackedRecommendations';
 import { MagazineBody, RailButton } from '../briefing-live/Magazine';
 import { ReadingDialog } from '../briefing-live/ReadingDialog';
 import './recommendation.css';
-export function Recommendations({ tenant, workspace }: { tenant: string; workspace: string | null }) {
+export function Recommendations({
+  tenant,
+  workspace,
+  businessType,
+  publicationsOnly = false,
+  focused = false,
+}: {
+  tenant: string;
+  workspace: string | null;
+  businessType?: string;
+  publicationsOnly?: boolean;
+  focused?: boolean;
+}) {
   const { session } = useSession(),
     pending = useContext(RequestPending);
-  const [page, setPage] = useViewState(tenant, 'recommendation:page:' + workspace, 0, pageState),
+  const [page, setPage] = useViewState(
+      tenant,
+      'recommendation:page:' +
+        workspace +
+        ':' +
+        (businessType || 'ALL') +
+        ':' +
+        focused +
+        ':' +
+        publicationsOnly,
+      0,
+      pageState,
+    ),
     [attempt, setAttempt] = useState(0),
     [snapshot, setSnapshot] = useViewState<string | undefined>(
       tenant,
-      'recommendation:snapshot:' + workspace,
+      'recommendation:snapshot:' +
+        workspace +
+        ':' +
+        (businessType || 'ALL') +
+        ':' +
+        focused +
+        ':' +
+        publicationsOnly,
       undefined,
       (v): v is string | undefined => v === undefined || (typeof v === 'string' && v.length < 1000),
     );
   const data = useRemote(
-    (signal) => api.list(tenant, workspace, page * 20, page ? snapshot : undefined, signal),
-    [tenant, workspace, page, attempt, session.identity],
+    (signal) =>
+      api.list(tenant, workspace, page * 20, page ? snapshot : undefined, signal, {
+        businessType,
+        publicationsOnly,
+        focused,
+      }),
+    [tenant, workspace, businessType, publicationsOnly, focused, page, attempt, session.identity],
   );
   const grid = useRef<HTMLDivElement>(null);
   usePackedRecommendations(
@@ -46,38 +86,40 @@ export function Recommendations({ tenant, workspace }: { tenant: string; workspa
   };
   const settings = data.value?.settings;
   return (
-    <section className="recommendations" aria-label="工作推荐">
-      <details className="recommendation-options">
-        <summary>推荐设置与依据</summary>
-        <div className="recommendation-toolbar">
-          <p>按当前可访问成果、明确关注和有效方法排序，阅读后保留原位。</p>
-          <Button icon={RefreshCw} disabled={pending} onClick={refresh}>
-            刷新推荐
-          </Button>
-          {settings && (
-            <Button
-              disabled={submission.busy || (pending && !submission.uncertain)}
-              onClick={() =>
-                void submission.submit(
-                  { expectedRevision: settings.revision, enabled: !settings.enabled },
-                  async (body, key) => {
-                    await api.configure(tenant, { ...body, requestId: key });
-                    refresh();
-                  },
-                )
-              }
-            >
-              {submission.uncertain ? '重试本次设置' : settings.enabled ? '关闭一般推荐' : '开启一般推荐'}
+    <section className="recommendations" aria-label={focused ? '关注的企业成果' : '工作推荐'}>
+      {!focused && (
+        <details className="recommendation-options">
+          <summary>推荐设置与依据</summary>
+          <div className="recommendation-toolbar">
+            <p>按当前可访问成果、明确关注和有效方法排序，阅读后保留原位。</p>
+            <Button icon={RefreshCw} disabled={pending} onClick={refresh}>
+              刷新推荐
             </Button>
-          )}
-        </div>
-      </details>
+            {settings && (
+              <Button
+                disabled={submission.busy || (pending && !submission.uncertain)}
+                onClick={() =>
+                  void submission.submit(
+                    { expectedRevision: settings.revision, enabled: !settings.enabled },
+                    async (body, key) => {
+                      await api.configure(tenant, { ...body, requestId: key });
+                      refresh();
+                    },
+                  )
+                }
+              >
+                {submission.uncertain ? '重试本次设置' : settings.enabled ? '关闭一般推荐' : '开启一般推荐'}
+              </Button>
+            )}
+          </div>
+        </details>
+      )}
       <SubmitError error={submission.error} uncertain={submission.uncertain} />
       {data.error ? (
         <Failure error={data.error} retry={refresh} />
       ) : !data.value ? (
         <Loading />
-      ) : !data.value.settings.enabled ? (
+      ) : !data.value.settings.enabled && !focused ? (
         <Empty
           icon={Newspaper}
           title="一般推荐已关闭"
@@ -95,7 +137,7 @@ export function Recommendations({ tenant, workspace }: { tenant: string; workspa
             <Empty
               icon={Newspaper}
               title="你的下一份工作成果，从一次会话开始"
-              text="完成的会话成果和已发布的企业副本，会在这里汇集。"
+              text="请在会话中要求 AI 根据资料生成画报，完成后的分析和图表会出现在这里。"
             >
               <a className="button" href={conversationHref(tenant)}>
                 发起会话
@@ -207,7 +249,7 @@ function RecommendationCard({ tenant, item }: { tenant: string; item: Recommenda
       {c.kind === 'TASK' && c.conversationId ? (
         <FollowButton tenant={tenant} conversation={c.conversationId} pinned={pinned} changed={setPinned} />
       ) : (
-        <RailButton label="企业副本暂不支持关注" icon={Star} disabled />
+        <PublicationFollow tenant={tenant} material={c.materialId!} pinned={pinned} changed={setPinned} />
       )}
       {c.kind === 'PUBLICATION' && item.feedbackTarget?.kind === 'PUBLICATION' ? (
         <ForwardPublicationButton
@@ -226,6 +268,7 @@ function RecommendationCard({ tenant, item }: { tenant: string; item: Recommenda
       <article
         className={
           'live-briefing-card recommendation-card ' +
+          (item.briefing ? 'has-data-briefing ' : '') +
           (opened ? 'is-read ' : '') +
           (item.presentation.style === 'CONCISE' ? 'compact' : '')
         }
@@ -240,17 +283,29 @@ function RecommendationCard({ tenant, item }: { tenant: string; item: Recommenda
           onClick={() => void open()}
           aria-label={'阅读：' + c.title}
         >
-          <MagazineBody
-            title={c.title}
-            excerpt={c.excerpt}
-            truncated={c.truncated}
-            workspace={c.workspaceName}
-            date={c.createdAt}
-            publication={c.kind === 'PUBLICATION'}
-            pinned={pinned}
-            verification={c.executionClass === 'verification'}
-            footer={c.kind === 'PUBLICATION' ? <span>v{c.materialVersion}</span> : undefined}
-          />
+          {item.briefing ? (
+            <>
+              <div className="data-briefing-type">
+                {briefingTypeLabels[item.briefing.content.businessType]}{' '}
+                <time>{new Date(c.createdAt).toLocaleDateString('zh-CN')}</time>
+              </div>
+              <h3>{item.briefing.content.title}</h3>
+              <DataBriefing document={item.briefing} compact />
+              <span className="data-briefing-generated">{c.workspaceName} · 有计算依据</span>
+            </>
+          ) : (
+            <MagazineBody
+              title={c.title}
+              excerpt={c.excerpt}
+              truncated={c.truncated}
+              workspace={c.workspaceName}
+              date={c.createdAt}
+              publication={c.kind === 'PUBLICATION'}
+              pinned={pinned}
+              verification={c.executionClass === 'verification'}
+              footer={c.kind === 'PUBLICATION' ? <span>v{c.materialVersion}</span> : undefined}
+            />
+          )}
         </button>
         {!reading && item.feedbackTarget && (
           <div className="live-card-action-rail">
@@ -264,6 +319,7 @@ function RecommendationCard({ tenant, item }: { tenant: string; item: Recommenda
       {reading && (
         <ReadingDialog
           title={c.title}
+          contentLabel={item.briefing ? briefingTypeLabels[item.briefing.content.businessType] : '成果'}
           workspace={c.workspaceName}
           date={c.createdAt}
           tenant={tenant}
@@ -322,12 +378,26 @@ function RecommendationCard({ tenant, item }: { tenant: string; item: Recommenda
         >
           {c.kind === 'PUBLICATION' && (
             <>
+              <AnalysisPanel
+                tenant={tenant}
+                space={c.workspaceId}
+                material={c.materialId!}
+                version={c.id}
+                verification={c.versionKey}
+              />
+              <ContinueWithMaterial
+                tenant={tenant}
+                space={c.workspaceId}
+                material={c.materialId!}
+                version={c.id}
+                close={() => setReading(false)}
+              />
               <p className="live-publication-excerpt">
                 {c.excerpt}
                 {c.truncated ? '…' : ''}
               </p>
               <div className="live-publication-download">
-                <p>企业发布的独立副本 · v{c.materialVersion}。此处为内容摘要，请下载该版本核对完整正文。</p>
+                <p>企业发布的独立副本 · v{c.materialVersion}。上方展示已解析正文，可下载该版本核对原件。</p>
                 <Button icon={Download} disabled={pending || busy} onClick={() => void save()}>
                   下载发布副本 v{c.materialVersion}
                 </Button>
@@ -374,5 +444,55 @@ function RecommendationCard({ tenant, item }: { tenant: string; item: Recommenda
         </Modal>
       )}
     </>
+  );
+}
+
+function PublicationFollow({
+  tenant,
+  material,
+  pinned,
+  changed,
+}: {
+  tenant: string;
+  material: string;
+  pinned: boolean;
+  changed: (value: boolean) => void;
+}) {
+  const submit = useSubmission<{ expectedRevision: number; pinned: boolean }>();
+  const [body, setBody] = useState<{ expectedRevision: number; pinned: boolean }>(),
+    [reading, setReading] = useState(false),
+    [error, setError] = useState<unknown>();
+  useRequestLock(reading || submit.busy || submit.uncertain);
+  async function send() {
+    setReading(true);
+    setError(undefined);
+    try {
+      const current = submit.uncertain
+        ? body
+        : await api
+            .publicationPreference(tenant, material)
+            .then((p) => ({ expectedRevision: p.revision, pinned: !p.pinned }));
+      if (!current) return;
+      setBody(current);
+      await submit.submit(current, async (value, requestId) =>
+        changed((await api.followPublication(tenant, material, { ...value, requestId })).pinned),
+      );
+    } catch (e) {
+      setError(e);
+    } finally {
+      setReading(false);
+    }
+  }
+  return (
+    <div className="live-follow-action">
+      <RailButton
+        icon={Star}
+        label={submit.uncertain ? '重试本次关注' : pinned ? '取消关注' : '关注'}
+        active={pinned}
+        disabled={reading || submit.busy}
+        onClick={() => void send()}
+      />
+      <SubmitError error={error || submit.error} uncertain={submit.uncertain} />
+    </div>
   );
 }

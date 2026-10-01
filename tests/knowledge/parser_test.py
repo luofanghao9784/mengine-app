@@ -49,6 +49,30 @@ class ParserTests(unittest.TestCase):
                     data=re.sub(rb'<dimension ref="[^"]+"',b'<dimension ref="A1:A1"',data)
                 dest.writestr(item,data)
         return out.getvalue()
+    def test_xlsx_search_passage_keeps_title_headers_and_comparable_rows_together(self):
+        b=Workbook();s=b.active;s.title='收款与订单'
+        s.append(['月度收款同口径底表']);s.append(['统计期间','门店','收款（元）'])
+        for month in ['2026-08','2026-09']:
+            for store in range(5): s.append([month,f'合成门店{store}',1000+store])
+        s.append([]);s.append(['另一张表']);s.append(['不能混入月度表',123])
+        out=io.BytesIO();b.save(out);r=self.parse(out.getvalue(),'xlsx')
+        self.assertEqual('READY',r['status'])
+        matched=[c for c in r['chunks'] if '月度收款' in c['content']]
+        self.assertEqual(1,len(matched));passage=matched[0]
+        self.assertEqual('收款与订单 · 第 1–12 行',passage['locator'])
+        self.assertIn('收款（元）',passage['content'])
+        self.assertIn('A3="2026-08"',passage['content']);self.assertIn('A12="2026-09"',passage['content'])
+        self.assertNotIn('另一张表',passage['content'])
+    def test_xlsx_long_tables_keep_exact_cells_bounded_with_preceding_context(self):
+        b=Workbook();s=b.active;s.title='测试'
+        s.append(['收款表']);s.append(['门店','收款元'])
+        for i in range(150): s.append([f'门店{i:03d}',1000+i])
+        out=io.BytesIO();b.save(out);r=self.parse(out.getvalue(),'xlsx')
+        self.assertEqual('READY',r['status']);self.assertGreater(len(r['chunks']),1)
+        self.assertTrue(all(len(c['content'])<=2000 for c in r['chunks']))
+        self.assertTrue(all('收款表' in c['content'] and '收款元' in c['content'] for c in r['chunks']))
+        for i in range(150): self.assertEqual(1,self.text(r).count(f'B{i+3}={1000+i}'))
+        self.assertIn('本段前文',r['chunks'][1]['content'])
     def test_xlsx_incorrect_dimensions_do_not_silently_drop_cells(self):
         r=self.parse(self.xlsx_with_wrong_dimension(),'xlsx')
         self.assertIn('B3="dimension-marker-789"',self.text(r))

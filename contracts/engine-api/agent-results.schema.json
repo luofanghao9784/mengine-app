@@ -127,7 +127,10 @@
                   "task_control",
                   "task_context",
                   "task_plan",
-                  "task_preference"
+                  "task_preference",
+                  "compare_table",
+                  "deliver_briefing",
+                  "manage_plan"
                 ]
               },
               "status": {
@@ -370,7 +373,8 @@
                           "task_control",
                           "task_context",
                           "task_plan",
-                          "task_preference"
+                          "task_preference",
+                          "manage_plan"
                         ]
                       }
                     }

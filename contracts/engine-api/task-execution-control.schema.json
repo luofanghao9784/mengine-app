@@ -15,7 +15,7 @@
         "tools": {
           "type": "array",
           "minItems": 1,
-          "maxItems": 14,
+          "maxItems": 16,
           "uniqueItems": true,
           "items": {
             "enum": [
@@ -32,7 +32,10 @@
               "task_control",
               "task_context",
               "task_plan",
-              "task_preference"
+              "task_preference",
+              "compare_table",
+              "deliver_briefing",
+              "manage_plan"
             ]
           }
         }
@@ -57,7 +60,8 @@
                   "contains": {
                     "enum": [
                       "task_plan",
-                      "task_preference"
+                      "task_preference",
+                      "manage_plan"
                     ]
                   }
                 }
@@ -110,7 +114,10 @@
             "task_control",
             "task_context",
             "task_plan",
-            "task_preference"
+            "task_preference",
+            "compare_table",
+            "deliver_briefing",
+            "manage_plan"
           ]
         },
         "status": {

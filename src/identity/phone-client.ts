@@ -55,6 +55,17 @@ const joined = (v: unknown): v is Joined => {
 const request = createIdentityRequest();
 const root = '/api/v1/auth/phone';
 export const phoneClient = {
+  configuration: (signal?: AbortSignal) =>
+    request(
+      root + '/configuration',
+      'GET',
+      (v): v is { delivery: 'LOCAL' | 'DISABLED'; localPreview: boolean } =>
+        record(v) &&
+        ['LOCAL', 'DISABLED'].includes(String(v.delivery)) &&
+        typeof v.localPreview === 'boolean',
+      undefined,
+      signal,
+    ),
   preview: (token?: string) => request(root + '/invitation', 'POST', preview, { token }),
   switchAccount: (token?: string) =>
     request(root + '/switch-account', 'POST', (v): v is null => v === null, { token }),

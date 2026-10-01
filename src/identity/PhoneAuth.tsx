@@ -176,6 +176,7 @@ export function PhoneAuth({
   token,
   inviting,
   identity,
+  legacyAllowed = false,
   onJoined,
   onCancel,
   onInvite,
@@ -183,6 +184,7 @@ export function PhoneAuth({
   token: string;
   inviting: boolean;
   identity: Identity | null;
+  legacyAllowed?: boolean;
   onJoined: (m: Membership) => void;
   onCancel: () => void;
   onInvite: () => void;
@@ -335,7 +337,9 @@ export function PhoneAuth({
         {binding
           ? '绑定手机号'
           : mode === 'legacy'
-            ? '迁移原邮箱账号'
+            ? legacyAllowed
+              ? '原账号登录'
+              : '迁移原邮箱账号'
             : mode === 'reset'
               ? '找回密码'
               : joining
@@ -353,6 +357,11 @@ export function PhoneAuth({
                 ? `受邀手机号：${preview.maskedPhone}`
                 : '使用手机号和密码，继续你的工作。'}
       </p>
+      {legacyAllowed && !inviting && (
+        <p className="muted">
+          短信验证暂未启用，原账号可继续使用邮箱和密码登录。手机号绑定将在短信开通后完成。
+        </p>
+      )}
       {notice && (
         <p className="access-success" role="status">
           {notice}
@@ -445,7 +454,9 @@ export function PhoneAuth({
                 : binding
                   ? '绑定并继续'
                   : mode === 'legacy'
-                    ? '验证原账号'
+                    ? legacyAllowed
+                      ? '登录原账号'
+                      : '验证原账号'
                     : mode === 'reset'
                       ? '重置密码'
                       : creating
@@ -481,7 +492,7 @@ export function PhoneAuth({
                 )}
                 {!identity && (
                   <Button variant="ghost" onClick={() => switchMode('legacy')}>
-                    原邮箱账号迁移
+                    {legacyAllowed ? '原邮箱账号登录' : '原邮箱账号迁移'}
                   </Button>
                 )}
                 {inviting ? (

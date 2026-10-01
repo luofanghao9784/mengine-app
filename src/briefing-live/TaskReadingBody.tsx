@@ -1,3 +1,5 @@
+import { DataBriefing } from './DataBriefing';
+import { readBriefing } from './content';
 import { useEffect, useRef, useState } from 'react';
 import { DocumentText, Button } from '../shared/ui';
 import { Failure, Loading, useRemote } from '../shared/admin';
@@ -29,6 +31,16 @@ export function TaskReadingBody({
     [tenant, task.conversationId, task.taskId, task.taskRevision, task.attempt, attempt],
   );
   const result = data.value?.tasks[0];
+  const hasBriefing = !!result?.artifacts.some(
+    (a) => a.filename.startsWith('briefing-data-') || a.filename.startsWith('briefing-text-'),
+  );
+  const generated = useRemote(
+    (signal) =>
+      hasBriefing
+        ? readBriefing(tenant, task.conversationId, task.taskId, task.taskRevision, task.attempt, signal)
+        : Promise.resolve(null),
+    [tenant, task.conversationId, task.taskId, task.taskRevision, task.attempt, hasBriefing, attempt],
+  );
   const state = readableTask(data.value, task);
   const notified = useRef(false),
     read = useRef(onRead);
@@ -57,7 +69,17 @@ export function TaskReadingBody({
       {result.executionClass === 'verification' && (
         <p className="live-verification-label">联调验证内容 · 未调用真实模型</p>
       )}
-      <DocumentText text={result.reply || ''} />
+      {hasBriefing ? (
+        generated.error ? (
+          <Failure error={generated.error} retry={() => setAttempt((n) => n + 1)} />
+        ) : generated.value ? (
+          <DataBriefing document={generated.value} />
+        ) : (
+          <Loading />
+        )
+      ) : (
+        <DocumentText text={result.reply || ''} />
+      )}
       {(result.sources.length > 0 ||
         result.webSources.length > 0 ||
         result.originals.length > 0 ||

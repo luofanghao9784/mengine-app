@@ -24,11 +24,21 @@ export function attentionHref(tenant: string, item: AttentionItem) {
       view: item.kind === 'TASK' ? 'conversations' : item.kind === 'PLAN' ? 'plans' : 'library',
       ...(item.kind === 'TASK'
         ? { conversation: item.conversationId!, task: item.id }
-        : item.kind === 'PLAN' ? { plan: item.id } : { scope: item.workspaceId, source: item.id }),
+        : item.kind === 'PLAN'
+          ? { plan: item.id }
+          : { scope: item.workspaceId, source: item.id }),
     })
   );
 }
-export function Attention({ tenant, managed = false }: { tenant: string; managed?: boolean }) {
+export function Attention({
+  tenant,
+  managed = false,
+  refreshToken,
+}: {
+  tenant: string;
+  managed?: boolean;
+  refreshToken?: number;
+}) {
   const { session } = useSession();
   const key = `attention-display:${session.identity?.account.id}:${tenant}:${managed}`;
   const [display, setDisplay] = useState<AttentionDisplay>(() => {
@@ -46,7 +56,7 @@ export function Attention({ tenant, managed = false }: { tenant: string; managed
   const refresh = () => setAttempt((n) => n + 1);
   const data = useRemote(
     (signal) => getAttention(tenant, managed, display === 'expanded' ? page * 50 : 0, signal),
-    [tenant, managed, page, display, attempt, session.identity],
+    [tenant, managed, page, display, attempt, refreshToken, session.identity],
   );
   useEffect(() => {
     const f = () => {
@@ -101,9 +111,11 @@ export function Attention({ tenant, managed = false }: { tenant: string; managed
               完全收起
             </Button>
           )}
-          <Button variant="ghost" icon={RefreshCw} onClick={refresh}>
-            刷新待办
-          </Button>
+          {managed && (
+            <Button variant="ghost" icon={RefreshCw} onClick={refresh}>
+              刷新待办
+            </Button>
+          )}
         </div>
       </header>
       {data.error ? (

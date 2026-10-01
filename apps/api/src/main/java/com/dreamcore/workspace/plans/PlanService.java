@@ -78,15 +78,16 @@ public class PlanService {
    """,id,tenant,c.workspaceId(),actor,c.goal().strip(),c.purpose().strip(),c.query().strip(),c.behavior(),c.materialEvents(),c.dailyTime(),c.timeZone(),c.minIntervalSeconds(),c.maxRunsPerDay(),c.maxTotalRuns(),Timestamp.from(c.expiresAt()),c.notificationsEnabled());
   var result=get(actor,tenant,id);history(actor,result);audit.record(actor,tenant,"PLAN_CREATE",id,"SUCCESS");return remember(actor,key,"PLAN_CREATE",hash,result);
  }
- @Transactional public Plan update(UUID actor,UUID tenant,UUID id,UUID key,int revision,Configuration c){
+ @Transactional public Plan update(UUID actor,UUID tenant,UUID id,UUID key,int revision,Configuration c){return update(actor,tenant,id,key,revision,c,false);}
+ @Transactional public Plan update(UUID actor,UUID tenant,UUID id,UUID key,int revision,Configuration c,boolean keepPaused){
   if(c==null||c.workspaceId()==null)throw IdentityException.invalid();identities.member(actor,tenant,false);departure.requirePrivateRead(actor,tenant);ownerLock(actor);var r=own(actor,tenant,id,true);readable(actor,tenant,r);access.require(actor,tenant,c.workspaceId(),false);
-  String hash=fingerprint(tenant,id,revision,c);UUID prior=identities.priorRequest(actor,key,"PLAN_UPDATE",hash);if(prior!=null)return replay(actor,key);
+  String hash=keepPaused?fingerprint(tenant,id,revision,c,"KEEP_PAUSED"):fingerprint(tenant,id,revision,c);UUID prior=identities.priorRequest(actor,key,"PLAN_UPDATE",hash);if(prior!=null)return replay(actor,key);
   validate(c);
   if(revision!=(Integer)r.get("revision"))throw new IdentityException(409,"PLAN_REVISION_CONFLICT");
   if(!Set.of("DRAFT","PAUSED","AUTHORIZATION_REQUIRED").contains(r.get("status")))throw new IdentityException(409,"PLAN_PAUSE_BEFORE_EDIT");
   db.update("""
-   UPDATE ongoing_plans SET workspace_id=?,goal=?,purpose=?,query=?,behavior=?,material_events=?,daily_time=?,time_zone=?,min_interval_seconds=?,max_runs_per_day=?,max_total_runs=?,expires_at=?,notify=?,revision=revision+1,execution_epoch=execution_epoch+1,status='DRAFT',runtime_state='IDLE',reason=NULL,next_due=NULL,observed_event=0,last_source_key=NULL,updated_at=now() WHERE id=?
-   """,c.workspaceId(),c.goal().strip(),c.purpose().strip(),c.query().strip(),c.behavior(),c.materialEvents(),c.dailyTime(),c.timeZone(),c.minIntervalSeconds(),c.maxRunsPerDay(),c.maxTotalRuns(),Timestamp.from(c.expiresAt()),c.notificationsEnabled(),id);
+   UPDATE ongoing_plans SET workspace_id=?,goal=?,purpose=?,query=?,behavior=?,material_events=?,daily_time=?,time_zone=?,min_interval_seconds=?,max_runs_per_day=?,max_total_runs=?,expires_at=?,notify=?,revision=revision+1,execution_epoch=execution_epoch+1,status=CASE WHEN ? THEN 'PAUSED' ELSE 'DRAFT' END,runtime_state='IDLE',reason=NULL,next_due=NULL,observed_event=0,last_source_key=NULL,updated_at=now() WHERE id=?
+   """,c.workspaceId(),c.goal().strip(),c.purpose().strip(),c.query().strip(),c.behavior(),c.materialEvents(),c.dailyTime(),c.timeZone(),c.minIntervalSeconds(),c.maxRunsPerDay(),c.maxTotalRuns(),Timestamp.from(c.expiresAt()),c.notificationsEnabled(),keepPaused&&"PAUSED".equals(r.get("status")),id);
   var result=get(actor,tenant,id);history(actor,result);audit.record(actor,tenant,"PLAN_UPDATE",id,"SUCCESS");return remember(actor,key,"PLAN_UPDATE",hash,result);
  }
  @Transactional public Plan action(UUID actor,UUID tenant,UUID id,UUID key,int revision,String action,boolean accepted){
@@ -149,7 +150,7 @@ public class PlanService {
    SELECT m.id AS material_id,v.id AS version_id,coalesce(k.status,'NOT_REQUESTED') AS parse_status FROM active_materials m
    JOIN material_versions v ON v.material_id=m.id AND v.number=m.current_version
    LEFT JOIN LATERAL(SELECT status FROM knowledge_runs WHERE version_id=v.id ORDER BY generation DESC LIMIT 1) k ON true
-   WHERE m.tenant_id=? AND m.workspace_id=? ORDER BY m.id LIMIT 1001
+   WHERE m.in_library AND m.tenant_id=? AND m.workspace_id=? ORDER BY m.id LIMIT 1001
    """,(r,n)->new Version(r.getObject("material_id",UUID.class),r.getObject("version_id",UUID.class),r.getString("parse_status")),tenant,c.workspaceId());
   if(versions.size()>1000){runtime(id,"WAITING_RESOURCE","SOURCE_COUNT_LIMIT");return;}
   if(versions.isEmpty()||versions.stream().noneMatch(v->Set.of("READY","PARTIAL").contains(v.parseStatus()))){runtime(id,"WAITING_DATA",versions.isEmpty()?"NO_MATERIALS":versions.stream().anyMatch(v->Set.of("FAILED","UNSUPPORTED","CANCELLED").contains(v.parseStatus()))?"SOURCE_REQUIRES_ATTENTION":"MATERIALS_NOT_READY");return;}

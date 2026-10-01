@@ -29,7 +29,7 @@ public class ConversationService {
     // The automatic title copies the original prompt; it shares that first task's current authority.
     private String readableTitle(UUID conversation,String title){
         var first=db.queryForList("SELECT id FROM conversation_tasks WHERE conversation_id=? ORDER BY created_at,id LIMIT 1",UUID.class,conversation);
-        return !first.isEmpty()&&sourcesReadable(first.getFirst())?title:"会话内容暂不可用";
+        return first.isEmpty() || sourcesReadable(first.getFirst())?title:"会话内容暂不可用";
     }
     private void paging(int offset,int limit){if(offset<0 || offset>100000 || limit<1 || limit>50)throw IdentityException.invalid();}
     Conversation require(UUID actor,UUID tenant,UUID id,boolean lock) {
@@ -84,22 +84,40 @@ public class ConversationService {
     @Transactional public Detail submit(UUID actor,UUID tenant,UUID id,UUID space,UUID key,String prompt,String mode){return submit(actor,tenant,id,space,key,prompt,mode,null);}
     @Transactional public Detail submit(UUID actor,UUID tenant,UUID id,UUID space,UUID key,String prompt,String mode,String publicQuery) {return submit(actor,tenant,id,space,key,prompt,mode,publicQuery,List.of());}
     @Transactional public Detail submit(UUID actor,UUID tenant,UUID id,UUID space,UUID key,String prompt,String mode,String publicQuery,List<TaskOriginals.Selection> selectedOriginals) {
-        return submitInternal(actor,tenant,id,space,key,prompt,mode,publicQuery,selectedOriginals,false);
+        return submitInternal(actor,tenant,id,space,key,prompt,mode,publicQuery,selectedOriginals,false,"WORKSPACE");
+    }
+    /** New interactive tasks opt into the authorized library; delegated/legacy calls retain WORKSPACE. */
+    @Transactional public Detail submitClient(UUID actor,UUID tenant,UUID id,UUID space,UUID key,String prompt,String mode,String publicQuery,List<TaskOriginals.Selection> selected,String sourceScope){
+        String scope=sourceScope==null?"AUTHORIZED_LIBRARY":sourceScope;
+        if(!Set.of("AUTHORIZED_LIBRARY","SELECTED").contains(scope))throw IdentityException.invalid();
+        if(prompt!=null && prompt.matches("(?s).*(只|仅)(使用|用|依据|根据|基于|参考).{0,12}(所选|附件|上传|这[几些份个]*资料|这[几些份个]*文件).*"))scope="SELECTED";
+        if(scope.equals("SELECTED")&&(selected==null||selected.isEmpty()))throw new IdentityException(400,"TASK_SELECTION_REQUIRED");
+        if(scope.equals("SELECTED")&&publicQuery!=null&&!publicQuery.isBlank())throw new IdentityException(400,"TASK_SCOPE_CONFLICT");
+        return submitInternal(actor,tenant,id,space,key,prompt,mode,publicQuery,selected,false,scope);
+    }
+    @Transactional public Conversation draft(UUID actor,UUID tenant,UUID space,UUID request){
+        identities.member(actor,tenant,false);departure.requireActiveBusiness(actor,tenant);access.require(actor,tenant,space,false);
+        UUID prior=identities.priorRequest(actor,request,"CONVERSATION_DRAFT",IdentityService.hash(tenant+"\n"+space));
+        if(prior!=null)return require(actor,tenant,prior,false);
+        UUID id=UUID.randomUUID();db.update("INSERT INTO conversations(id,tenant_id,workspace_id,owner_id,title) VALUES (?,?,?,?,?)",id,tenant,space,actor,"新会话");
+        identities.remember(actor,request,"CONVERSATION_DRAFT",IdentityService.hash(tenant+"\n"+space),id);
+        return require(actor,tenant,id,false);
     }
     /** Only the explicit feedback adjustment service supplies the captured, versioned context. */
     @Transactional public Detail submitAdjustment(UUID actor,UUID tenant,UUID id,UUID space,UUID key,String prompt){
-        return submitInternal(actor,tenant,id,space,key,prompt,"AGENT",null,List.of(),true);
+        return submitInternal(actor,tenant,id,space,key,prompt,"AGENT",null,List.of(),true,"WORKSPACE");
     }
-    private Detail submitInternal(UUID actor,UUID tenant,UUID id,UUID space,UUID key,String prompt,String mode,String publicQuery,List<TaskOriginals.Selection> selectedOriginals,boolean adjustment) {
+    private Detail submitInternal(UUID actor,UUID tenant,UUID id,UUID space,UUID key,String prompt,String mode,String publicQuery,List<TaskOriginals.Selection> selectedOriginals,boolean adjustment,String sourceScope) {
         identities.member(actor,tenant,false);departure.requireActiveBusiness(actor,tenant);
         var selected=originals.normalize(selectedOriginals);
-        if(!selected.isEmpty() && (!"AGENT".equals(mode) || !"verification".equals(agentSettings.mode())))throw new IdentityException(403,"TASK_ORIGINALS_DISABLED");
+        if(!selected.isEmpty() && !"AGENT".equals(mode))throw new IdentityException(403,"TASK_ORIGINALS_DISABLED");
         if(prompt==null || prompt.strip().isEmpty() || mode==null || !Set.of("SOURCE_LOOKUP","AGENT").contains(mode) || prompt.length()>(adjustment?12000:"AGENT".equals(mode)?2000:200) || ("SOURCE_LOOKUP".equals(mode) && prompt.strip().split("\\s+").length>8) || prompt.codePoints().anyMatch(c->Character.isISOControl(c) && c!=10 && c!=13 && c!=9))throw IdentityException.invalid();
         publicQuery=publicQuery==null || publicQuery.isBlank()?null:publicQuery.strip();
         if(publicQuery!=null && (!"AGENT".equals(mode) || publicQuery.length()>2048 || (!publicQuery.toLowerCase(Locale.ROOT).startsWith("https://") && publicQuery.length()>200) || publicQuery.codePoints().anyMatch(Character::isISOControl)))throw IdentityException.invalid();
         prompt=prompt.strip();String fingerprint=IdentityService.hash(publicQuery==null?tenant+"\n"+id+"\n"+space+"\n"+mode+"\n"+prompt:"public-query-v1\n"+json.writeValueAsString(new Object[]{tenant,id,space,mode,prompt,publicQuery}));
         if(adjustment)fingerprint=IdentityService.hash("briefing-adjustment-v1\n"+fingerprint);
         if(!selected.isEmpty())fingerprint=IdentityService.hash("originals-v1\n"+json.writeValueAsString(new Object[]{tenant,id,space,mode,prompt,publicQuery,selected}));
+        if(!"WORKSPACE".equals(sourceScope))fingerprint=IdentityService.hash(fingerprint+"\n"+sourceScope);
         UUID prior=identities.priorRequest(actor,key,"CONVERSATION_SEND",fingerprint);
         if(prior!=null)return detail(actor,tenant,prior,0,20);
         if(!enabled)throw new IdentityException(503,"TASK_RUNTIME_UNAVAILABLE");
@@ -109,6 +127,8 @@ public class ConversationService {
         if(db.queryForObject("SELECT count(*) FROM conversation_tasks WHERE conversation_id=? AND status IN ('QUEUED','RUNNING')",Integer.class,id)>0)throw new IdentityException(409,"CONVERSATION_BUSY");
         String state="AGENT".equals(mode) && !agentSettings.enabled()?"WAITING_CAPABILITY":"QUEUED";
         UUID task=UUID.randomUUID();db.update("INSERT INTO conversation_tasks(id,tenant_id,workspace_id,conversation_id,requested_by,prompt,mode,status,execution_class,public_query,wait_reason) VALUES (?,?,?,?,?,?,?,?,?,?,?)",task,tenant,space,id,actor,prompt,mode,state,"AGENT".equals(mode) && agentSettings.enabled()?agentSettings.mode():null,publicQuery,state.equals("WAITING_CAPABILITY")?"MODEL_NOT_CONFIGURED":null);
+        db.update("UPDATE conversation_tasks SET source_scope=? WHERE id=?",sourceScope,task);
+        db.update("UPDATE conversations SET title=? WHERE id=? AND NOT EXISTS(SELECT 1 FROM conversation_tasks WHERE conversation_id=? AND id<>?)",prompt.substring(0,Math.min(80,prompt.length())),id,id,task);
         originals.select(actor,tenant,space,task,selected);
         event(tenant,space,id,task,state,0);db.update("UPDATE conversations SET updated_at=now() WHERE id=?",id);
         identities.remember(actor,key,"CONVERSATION_SEND",fingerprint,id);audit.record(actor,tenant,"CONVERSATION_SEND",task,"SUCCESS");return detail(actor,tenant,id,0,20);
@@ -241,7 +261,7 @@ public class ConversationService {
         }
         String prompt=(String)row.get("prompt");String supplement=(String)row.get("supplemental_input");if(!supplement.isEmpty())prompt+="\n\n用户对本任务的补充：\n"+supplement;
         db.update("INSERT INTO conversation_attempts(task_id,attempt_number,attempt_id,input,status,started_at,provenance) VALUES (?,?,?,?,'RUNNING',now(),'RECORDED')",id,(Integer)row.get("attempt")+1,token,prompt);
-        db.update("UPDATE conversation_tasks SET status='RUNNING',revision=revision+1,attempt=attempt+1,wait_reason=NULL,required_input=NULL,error_code=NULL,summary_code=NULL,reply=NULL,engine_version=NULL,model_name=NULL,model_calls=NULL,token_usage=NULL,tool_receipts=NULL,web_sources='[]',skills='[]',finished_at=NULL,lease_token=?,lease_until=now()+CASE WHEN mode='AGENT' THEN interval '60 seconds' ELSE interval '30 seconds' END WHERE id=?",token,id);
+        db.update("UPDATE conversation_tasks SET status='RUNNING',revision=revision+1,attempt=attempt+1,wait_reason=NULL,required_input=NULL,error_code=NULL,summary_code=NULL,reply=NULL,engine_version=NULL,model_name=NULL,model_calls=NULL,token_usage=NULL,tool_receipts=NULL,web_sources='[]',skills='[]',finished_at=NULL,lease_token=?,lease_until=now()+CASE WHEN mode='AGENT' THEN interval '90 seconds' ELSE interval '30 seconds' END WHERE id=?",token,id);
         var job=new Job(id,(UUID)row.get("tenant_id"),(UUID)row.get("workspace_id"),(UUID)row.get("conversation_id"),(UUID)row.get("requested_by"),prompt,token,(String)row.get("mode"));
         usage.claim(job,(Integer)row.get("attempt")+1,(String)row.get("execution_class"));
         event(job.tenant(),job.space(),job.conversation(),id,"RUNNING",(Integer)row.get("revision")+1);return job;

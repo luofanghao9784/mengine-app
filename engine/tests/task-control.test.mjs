@@ -35,7 +35,15 @@ async function fixture(t, scenario, protocol = '1.5') {
       usage: null,
       async *generate(request) {
         calls++;
-        if (calls === 1 && scenario !== 'legacy') {
+        if (scenario === 'budget' && calls < 8) {
+          yield {
+            type: 'tool_call',
+            id: `search-${calls}`,
+            name: 'search_sources',
+            arguments: JSON.stringify({ query: '收款' }),
+          };
+          yield { type: 'finish', reason: 'tool_calls' };
+        } else if (calls === 1 && scenario !== 'legacy') {
           assert.ok(
             request.tools.some((t) => t.name === 'task_control'),
             JSON.stringify(request.tools.map((t) => t.name)),
@@ -46,11 +54,12 @@ async function fixture(t, scenario, protocol = '1.5') {
             id: 'call-1',
             name: failed ? 'search_sources' : 'task_control',
             arguments: JSON.stringify(
-              failed ? { query: ' ' } : { outcome: scenario, message: '请提供合成截止日期' },
+              failed ? { query: 'x'.repeat(201) } : { outcome: scenario, message: '请提供合成截止日期' },
             ),
           };
           yield { type: 'finish', reason: 'tool_calls' };
         } else {
+          if (scenario === 'budget') assert.deepEqual(request.tools, []);
           yield { type: 'text', text: '合成说明：已取得部分信息，仍需确认缺少的数据。' };
           yield { type: 'finish', reason: 'stop' };
         }
@@ -103,4 +112,12 @@ test('legacy 1.4 requests keep the existing response and never call new callback
   assert.equal(result.requiredInput, undefined);
   assert.deepEqual(receipts, []);
   assert.deepEqual(openings, []);
+});
+test('repeated searches retain a partial response within eight metered calls, never business success', async (t) => {
+  const { result, receipts, calls } = await fixture(t, 'budget');
+  assert.equal(calls, 8);
+  assert.equal(result.outcome, 'PARTIAL');
+  assert.match(result.requiredInput, /预算/);
+  assert.match(result.text, /仍需确认缺少的数据/);
+  assert.equal(receipts.filter((r) => r.status === 'succeeded').length, 7);
 });

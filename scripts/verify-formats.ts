@@ -218,7 +218,7 @@ try {
         { timeout: 45000, message: `analysis ${expected}` },
       )
       .toBe(expected);
-    assert.equal(value.parserVersion, 'local-2');
+    assert.equal(value.parserVersion, 'local-3');
     return value;
   }
   async function search(query: string) {

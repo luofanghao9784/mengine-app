@@ -16,7 +16,7 @@ export const isEntry = (v: unknown): v is MaterialEntry =>
   uuid(v.workspaceId) &&
   text(v.workspaceName) &&
   nullableId(v.folderId) &&
-  ['FOLDER', 'DOCUMENT'].includes(String(v.kind)) &&
+  ['FOLDER', 'DOCUMENT', 'DRAFT'].includes(String(v.kind)) &&
   text(v.name) &&
   count(v.version) &&
   (v.kind === 'FOLDER' ? v.version === 0 && v.sizeBytes === null : v.version > 0 && count(v.sizeBytes)) &&
@@ -172,6 +172,23 @@ export function createMaterialClient(fetcher: typeof fetch = fetch) {
           isDetail(v) &&
           scoped(tenant, space, document)(v.document) &&
           new Set(v.versions.map((x) => x.id)).size === v.versions.length,
+        undefined,
+        signal,
+      );
+    },
+    version(tenant: string, space: string, document: string, version: string, signal?: AbortSignal) {
+      return request(
+        root(tenant, space) + `/materials/${id(document)}/versions/${id(version)}`,
+        'GET',
+        (v): v is MaterialVersion =>
+          record(v) &&
+          v.id === version &&
+          count(v.number) &&
+          text(v.filename) &&
+          count(v.sizeBytes) &&
+          text(v.sha256) &&
+          uuid(v.createdBy) &&
+          date(v.createdAt),
         undefined,
         signal,
       );

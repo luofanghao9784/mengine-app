@@ -1,3 +1,8 @@
+import { PlanCard } from '../plans/Plans';
+import { isPlan, statusLabels } from '../plans/client';
+import type { Plan } from '../../contracts/public-api/plans';
+import { createIdentityRequest, record } from '../identity/client';
+const readPlanReceipts = createIdentityRequest();
 import { useState } from 'react';
 import { CalendarClock, Check, Undo2 } from 'lucide-react';
 import { Button } from '../shared/ui';
@@ -7,7 +12,12 @@ import { useSession } from '../identity/session';
 import { taskWorkClient as api } from './client';
 import './taskwork.css';
 export function TaskWorkNotices(props: { tenant: string; task: string; verification?: unknown }) {
-  return <Notices key={`${props.tenant}:${props.task}`} {...props} />;
+  return (
+    <>
+      <PlanReceipts {...props} />
+      <Notices key={`${props.tenant}:${props.task}`} {...props} />
+    </>
+  );
 }
 function Notices({ tenant, task, verification }: { tenant: string; task: string; verification?: unknown }) {
   const { session } = useSession();
@@ -124,5 +134,72 @@ function Notices({ tenant, task, verification }: { tenant: string; task: string;
         </Button>
       </div>
     </aside>
+  );
+}
+
+function PlanReceipts({
+  tenant,
+  task,
+  verification,
+}: {
+  tenant: string;
+  task: string;
+  verification?: unknown;
+}) {
+  const { session } = useSession();
+  const [opened, setOpened] = useState<string>(),
+    [attempt, setAttempt] = useState(0);
+  const data = useRemote(
+    (signal) =>
+      readPlanReceipts(
+        `/api/v1/tenants/${tenant}/tasks/${task}/plan-receipts`,
+        'GET',
+        (
+          v,
+        ): v is { action: string; acceptedRevision: number; plan: Plan; changedSinceAcceptance: boolean }[] =>
+          Array.isArray(v) &&
+          v.length <= 1 &&
+          v.every(
+            (r) =>
+              record(r) &&
+              isPlan(r.plan) &&
+              r.plan.tenantId === tenant &&
+              r.plan.ownerId === session.identity?.account.id,
+          ),
+        undefined,
+        signal,
+      ),
+    [tenant, task, verification, session.identity, attempt],
+  );
+  if (data.error) return <Failure error={data.error} retry={() => setAttempt((n) => n + 1)} />;
+  return (
+    <>
+      {data.value?.map((r) => (
+        <article className="taskwork-item" key={r.plan.id}>
+          <CalendarClock size={18} />
+          <div>
+            <strong>{r.plan.configuration.goal}</strong>
+            <p>
+              {statusLabels[r.plan.status]} ·{' '}
+              {r.plan.configuration.dailyTime ? `每天 ${r.plan.configuration.dailyTime}` : '资料变化时'} ·
+              下次：{r.plan.nextDue ? new Date(r.plan.nextDue).toLocaleString('zh-CN') : '等待触发'}
+            </p>
+            <small>
+              仅本人在系统内查看 · 截至 {new Date(r.plan.configuration.expiresAt).toLocaleDateString('zh-CN')}
+            </small>
+            <Button onClick={() => setOpened(r.plan.id)}>查看计划</Button>
+          </div>
+        </article>
+      ))}
+      {opened && (
+        <PlanCard
+          tenant={tenant}
+          owner={session.identity!.account.id}
+          id={opened}
+          close={() => setOpened(undefined)}
+          onChanged={() => setAttempt((n) => n + 1)}
+        />
+      )}
+    </>
   );
 }

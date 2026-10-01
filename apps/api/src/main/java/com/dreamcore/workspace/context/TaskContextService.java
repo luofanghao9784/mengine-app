@@ -1,6 +1,7 @@
 package com.dreamcore.workspace.context;
 
 import com.dreamcore.workspace.conversation.AgentTaskService;
+import com.dreamcore.workspace.conversation.BriefingContentService;
 import com.dreamcore.workspace.experience.ExperienceService;
 import com.dreamcore.workspace.identity.*;
 import com.dreamcore.workspace.material.MaterialAccess;
@@ -20,8 +21,8 @@ public class TaskContextService {
  private record Task(UUID id,UUID actor,UUID tenant,UUID space,UUID conversation,int attempt) {}
  private final JdbcTemplate db; private final AgentTaskService agents; private final ProfileService profiles;
  private final ExperienceService experiences; private final MaterialAccess materials; private final TaskContextGuard guard;
- private final JsonMapper json=new JsonMapper();
- public TaskContextService(JdbcTemplate db,AgentTaskService agents,ProfileService profiles,ExperienceService experiences,MaterialAccess materials,TaskContextGuard guard){this.db=db;this.agents=agents;this.profiles=profiles;this.experiences=experiences;this.materials=materials;this.guard=guard;}
+ private final JsonMapper json=new JsonMapper();private final BriefingContentService briefings;
+ public TaskContextService(JdbcTemplate db,AgentTaskService agents,ProfileService profiles,ExperienceService experiences,MaterialAccess materials,TaskContextGuard guard,BriefingContentService briefings){this.briefings=briefings;this.db=db;this.agents=agents;this.profiles=profiles;this.experiences=experiences;this.materials=materials;this.guard=guard;}
  private IdentityException missing(){return new IdentityException(404,"TASK_CONTEXT_NOT_FOUND");}
  private String text(String s,int max,boolean required){if(s==null)s="";if(s.length()>max||required&&s.isBlank()||s.codePoints().anyMatch(c->Character.isISOControl(c)&&c!=10&&c!=13&&c!=9))throw IdentityException.invalid();return s.strip();}
  private int offset(Request r){int n=r.offset()==null?0:r.offset();if(n<0||n>1000)throw IdentityException.invalid();return n;}
@@ -33,12 +34,12 @@ public class TaskContextService {
   var t=task(task,token);if(r==null||r.action()==null)throw IdentityException.invalid();
   Object result=switch(r.action()){
    case "bootstrap" -> bootstrap(t);
-   case "profiles" -> profileList(t,r);
-   case "profile_read" -> profile(t,r);
-   case "history" -> history(t,r);
-   case "experience_search" -> search(t,r);
-   case "experience_read" -> experience(t,r,true);
-   case "experience_use" -> review(t,r);
+   case "profiles" -> selectedOnly(t)?map("items",List.of(),"hasMore",false,"reason","SELECTED_ONLY"):profileList(t,r);
+   case "profile_read" -> selectedOnly(t)?map("unavailable",true,"reason","SELECTED_ONLY"):profile(t,r);
+   case "history" -> selectedOnly(t)?map("items",List.of(),"hasMore",false,"reason","SELECTED_ONLY"):history(t,r);
+   case "experience_search" -> selectedOnly(t)?map("items",List.of(),"hasMore",false,"reason","SELECTED_ONLY"):search(t,r);
+   case "experience_read" -> selectedOnly(t)?map("unavailable",true,"reason","SELECTED_ONLY"):experience(t,r,true);
+   case "experience_use" -> selectedOnly(t)?map("unavailable",true,"reason","SELECTED_ONLY"):review(t,r);
    default -> throw IdentityException.invalid();
   };
   agents.check(task,token);guard.requireCurrent(task);
@@ -74,9 +75,17 @@ public class TaskContextService {
   if(!Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM conversation_tasks s JOIN conversations c ON c.id=s.conversation_id JOIN readable_source_tasks v ON v.id=s.id WHERE s.id=? AND s.tenant_id=? AND c.owner_id=?)",Boolean.class,source,t.tenant(),t.actor())))throw missing();
   UUID space=db.queryForObject("SELECT workspace_id FROM conversation_tasks WHERE id=?",UUID.class,source);materials.require(t.actor(),t.tenant(),space,false);
  }
+ private boolean selectedOnly(Task t){return "SELECTED".equals(db.queryForObject("SELECT source_scope FROM conversation_tasks WHERE id=?",String.class,t.id()));}
  private Object bootstrap(Task t){
   var previous=db.queryForList("SELECT * FROM conversation_attempts WHERE task_id=? AND attempt_number<? ORDER BY attempt_number DESC LIMIT 1",t.id(),t.attempt());
-  return map("taskId",t.id(),"attempt",t.attempt(),"historyScope","CURRENT_PRIVATE_CONVERSATION","profileScopes",List.of("TENANT","WORKSPACE","PERSONAL"),"experienceScope","CURRENT_WORKSPACE_PUBLISHED","previousAttempt",previous.isEmpty()?null:historyItem(previous.getFirst(),false),"backgroundIsAuthorization",false);
+  return map("taskId",t.id(),"attempt",t.attempt(),"historyScope","CURRENT_PRIVATE_CONVERSATION","profileScopes",List.of("TENANT","WORKSPACE","PERSONAL"),"experienceScope","CURRENT_WORKSPACE_PUBLISHED","previousAttempt",previous.isEmpty()?null:historyItem(previous.getFirst(),false),"latestBriefing",selectedOnly(t)?null:latestBriefing(t),"sourceScope",db.queryForObject("SELECT source_scope FROM conversation_tasks WHERE id=?",String.class,t.id()),"selectedMaterials",db.queryForList("SELECT v.filename,v.number AS version,v.id AS version_id FROM conversation_originals o JOIN material_versions v ON v.id=o.version_id WHERE o.task_id=? ORDER BY v.id",t.id()),"backgroundIsAuthorization",false);
+ }
+ private Object latestBriefing(Task current){
+  var found=db.queryForList("SELECT t.id,t.attempt FROM conversation_tasks t JOIN readable_source_tasks readable ON readable.id=t.id WHERE t.conversation_id=? AND t.tenant_id=? AND t.status='SUCCEEDED' AND t.created_at<(SELECT created_at FROM conversation_tasks WHERE id=?) AND EXISTS ("+BriefingContentService.ELIGIBLE+") ORDER BY t.created_at DESC LIMIT 1",current.conversation(),current.tenant(),current.id());
+  if(found.isEmpty())return null;var row=found.getFirst();UUID source=(UUID)row.get("id");readableTask(current,source);dependencies(current,sourceVersions(source));
+  var doc=briefings.find(source,((Number)row.get("attempt")).intValue());if(doc==null)return null;var c=doc.content();var chart=c.chart();
+  var reference=map("artifactId",doc.artifactId(),"title",c.title(),"summary",c.summary(),"analysis",c.analysis(),"source",c.source(),"generatedAt",c.generatedAt(),"chart",chart==null?null:map("metric",chart.metric(),"unit",chart.unit(),"baseline",chart.baseline(),"current",chart.current(),"rows",chart.rows().stream().limit(10).toList(),"totalGroups",chart.rows().size(),"rowsTruncated",chart.rows().size()>10,"totals",chart.totals()));
+  record(current,"HISTORY",source,row.get("attempt").toString(),reference);return reference;
  }
  private boolean usable(ProfileService.Value v){return (v.status()==ProfileService.Status.ACTIVE||v.kind()==ProfileService.Kind.INFERENCE&&v.status()==ProfileService.Status.PROPOSED)&&(v.expiresAt()==null||v.expiresAt().isAfter(Instant.now()));}
  private void profileScope(Task t,ProfileService.Value v){if(v.scope()==ProfileService.Scope.WORKSPACE&&!v.subjectId().equals(t.space())||v.scope()==ProfileService.Scope.PERSONAL&&!v.subjectId().equals(t.actor()))throw missing();if(!usable(v))throw missing();}

@@ -74,27 +74,31 @@ public class KnowledgeService {
     @Transactional
     public Results search(UUID actor,UUID tenant,UUID space,String query,int offset,int limit) {return search(actor,tenant,space,query,offset,limit,null);}
     @Transactional public Results search(UUID actor,UUID tenant,UUID space,String query,int offset,int limit,List<UUID> selectedVersions) {
-        return search(actor,tenant,space,query,offset,limit,selectedVersions,null,null);
+        return search(actor,tenant,space,query,offset,limit,selectedVersions,null,null,false,null);
     }
     /** Only the platform's authorized attempt callback supplies task/attempt; no public request selects them. */
     @Transactional public Results searchForAttempt(UUID actor,UUID tenant,UUID space,String query,int limit,List<UUID> selectedVersions,UUID task,UUID attempt) {
         if(task==null || attempt==null || space==null)throw IdentityException.invalid();
-        return search(actor,tenant,space,query,0,limit,selectedVersions,task,attempt);
+        return search(actor,tenant,space,query,0,limit,selectedVersions,task,attempt,false,null);
     }
-    private Results search(UUID actor,UUID tenant,UUID space,String suppliedQuery,int offset,int limit,List<UUID> selectedVersions,UUID task,UUID attempt) {
-        if(selectedVersions!=null && (space==null || selectedVersions.isEmpty() || selectedVersions.size()>3 || selectedVersions.stream().anyMatch(Objects::isNull)))throw IdentityException.invalid();
+    @Transactional public Results searchClientTask(UUID actor,UUID tenant,UUID space,String query,int limit,List<UUID> selectedVersions,UUID task,UUID attempt,UUID conversation){
+        return search(actor,tenant,space,query,0,limit,selectedVersions,task,attempt,true,conversation);
+    }
+    private Results search(UUID actor,UUID tenant,UUID space,String suppliedQuery,int offset,int limit,List<UUID> selectedVersions,UUID task,UUID attempt,boolean library,UUID conversation) {
+        if(selectedVersions!=null && (selectedVersions.isEmpty() || selectedVersions.size()>3 || selectedVersions.stream().anyMatch(Objects::isNull)))throw IdentityException.invalid();
         page(offset,limit); identities.member(actor,tenant,false);if(space!=null) access.require(actor,tenant,space,false);
         if(suppliedQuery==null)throw IdentityException.invalid();
-        String query=suppliedQuery.strip();if(query.isEmpty() || query.length()>200) throw IdentityException.invalid();
-        String[] terms=query.split("\\s+");if(terms.length>8) throw IdentityException.invalid();
-        var args=new ArrayList<Object>();args.add(task);args.add(attempt);args.add(actor);args.add(tenant);args.add(actor);
+        String query=suppliedQuery.strip();if((query.isEmpty() && (task==null || selectedVersions==null)) || query.length()>200) throw IdentityException.invalid();
+        String[] terms=query.isEmpty()?new String[0]:query.split("\\s+");if(terms.length>8) throw IdentityException.invalid();
+        var args=new ArrayList<Object>();args.add(task);args.add(attempt);args.add(task);args.add(actor);args.add(tenant);args.add(actor);
         String scope="""
             SELECT v.*,r.id AS run_id,coalesce(r.status,'NOT_STARTED') AS parse_status,
                    coalesce(r.generation,0) AS generation,coalesce(r.warnings,'') AS warnings,
-                   r.created_at AS run_created_at,(pin.task_id IS NOT NULL) AS pinned
+                   r.created_at AS run_created_at,(pin.task_id IS NOT NULL) AS pinned,(requested.task_id IS NOT NULL) AS selected
             FROM active_materials m JOIN workspaces w ON w.id=m.workspace_id AND w.tenant_id=m.tenant_id
             LEFT JOIN conversation_task_material_versions pin ON pin.task_id=? AND pin.attempt_id=?
               AND pin.tenant_id=m.tenant_id AND pin.workspace_id=m.workspace_id AND pin.material_id=m.id
+            LEFT JOIN conversation_originals requested ON requested.task_id=? AND requested.tenant_id=m.tenant_id AND requested.material_id=m.id
             JOIN material_versions v ON v.material_id=m.id AND v.tenant_id=m.tenant_id AND v.workspace_id=m.workspace_id
             LEFT JOIN LATERAL (
               SELECT k.* FROM knowledge_runs k WHERE k.version_id=v.id AND (pin.run_id IS NULL OR k.id=pin.run_id)
@@ -103,15 +107,17 @@ public class KnowledgeService {
             LEFT JOIN workspace_members g ON g.tenant_id=w.tenant_id AND g.workspace_id=w.id AND g.account_id=?
             WHERE m.tenant_id=? AND ((w.kind='PERSONAL' AND w.owner_id=?) OR (w.kind='SHARED' AND g.account_id IS NOT NULL)) AND departure_content_readable(coalesce(g.account_id,w.owner_id),w.tenant_id,w.id)
             """;
-        if(selectedVersions==null)scope+=" AND ((pin.version_id IS NULL AND m.current_version=v.number) OR pin.version_id=v.id)";
+        if(selectedVersions==null)scope+=" AND ((pin.version_id IS NULL AND requested.version_id IS NULL AND m.current_version=v.number) OR coalesce(pin.version_id,requested.version_id)=v.id)";
         else {scope+=" AND v.id IN ("+String.join(",",Collections.nCopies(selectedVersions.size(),"?"))+")";args.addAll(selectedVersions);}
-        if(space==null)scope+=" AND w.kind='SHARED'";else {scope+=" AND m.workspace_id=?";args.add(space);}
-        String match="SELECT c.*,s.number,s.filename,s.run_created_at FROM knowledge_chunks c JOIN scoped s ON c.run_id=s.run_id AND c.version_id=s.id AND c.tenant_id=s.tenant_id AND c.workspace_id=s.workspace_id WHERE s.parse_status IN ('READY','PARTIAL')";
+        if(!library){if(space==null)scope+=" AND w.kind='SHARED'";else {scope+=" AND m.workspace_id=?";args.add(space);}}
+        if(selectedVersions==null){scope+=" AND (m.in_library OR m.attachment_conversation_id=?::uuid OR requested.version_id=v.id)";args.add(conversation);}
+
+        String match="SELECT c.*,s.number,s.filename,s.run_created_at,s.selected FROM knowledge_chunks c JOIN scoped s ON c.run_id=s.run_id AND c.version_id=s.id AND c.tenant_id=s.tenant_id AND c.workspace_id=s.workspace_id WHERE s.parse_status IN ('READY','PARTIAL')";
         for(String term:terms){match+=" AND strpos(lower(c.content),lower(?))>0";args.add(term);}
         args.add(limit+1);args.add(offset);
         // One snapshot covers authorization-filtered totals, the bounded version receipt and the result page.
         // A not-yet-parsed file is scope coverage, never a claim that it is relevant to the query.
-        String sql="WITH scoped AS MATERIALIZED ("+scope+"),matched AS MATERIALIZED ("+match+"), page AS (SELECT * FROM matched ORDER BY run_created_at DESC,ordinal,id LIMIT ? OFFSET ?) "+"""
+        String sql="WITH scoped AS MATERIALIZED ("+scope+"),matched AS MATERIALIZED ("+match+"), page AS (SELECT * FROM matched ORDER BY selected DESC,run_created_at DESC,ordinal,id LIMIT ? OFFSET ?) "+"""
             SELECT count(*) AS total,
               count(*) FILTER(WHERE parse_status IN ('READY','PARTIAL')) AS searchable,
               count(*) FILTER(WHERE parse_status='PARTIAL') AS partial,
@@ -119,7 +125,7 @@ public class KnowledgeService {
               coalesce((SELECT jsonb_agg(jsonb_build_object(
                 'id',p.id,'tenantId',p.tenant_id,'workspaceId',p.workspace_id,'materialId',p.material_id,
                 'versionId',p.version_id,'runId',p.run_id,'version',p.number,'filename',p.filename,
-                'locator',p.locator,'method',p.method,'content',p.content) ORDER BY p.run_created_at DESC,p.ordinal,p.id) FROM page p),'[]') AS items,
+                'locator',p.locator,'method',p.method,'content',p.content) ORDER BY p.selected DESC,p.run_created_at DESC,p.ordinal,p.id) FROM page p),'[]') AS items,
               coalesce((SELECT jsonb_agg(jsonb_build_object(
                 'materialId',v.material_id,'versionId',v.id,'version',v.number,'runId',v.run_id,'generation',v.generation,
                 'status',v.parse_status,'warnings',CASE WHEN v.warnings='' THEN ARRAY[]::text[] ELSE string_to_array(v.warnings,',') END,
@@ -135,7 +141,7 @@ public class KnowledgeService {
             var versions=Arrays.stream(json.readValue(r.getString("versions"),VersionCoverage[].class))
                 .map(v->new VersionCoverage(v.materialId(),v.versionId(),v.version(),v.runId(),v.generation(),v.status(),
                     v.warnings().stream().limit(4).map(w->w.substring(0,Math.min(64,w.length()))).toList(),v.pinned())).toList();
-            var coverage=new Coverage(selectedVersions!=null?"SELECTED_VERSIONS":space==null?"AUTHORIZED_SHARED":"AUTHORIZED_WORKSPACE",
+            var coverage=new Coverage(selectedVersions!=null?"SELECTED_VERSIONS":library?"AUTHORIZED_LIBRARY":space==null?"AUTHORIZED_SHARED":"AUTHORIZED_WORKSPACE",
                 state,total,searchable,partial,total-searchable,"NOT_ASSESSED",versions,total>versions.size());
             return new Results(tenant,space,query,found.stream().limit(limit).toList(),found.size()>limit,r.getBoolean("has_match")?"MATCHED":"NO_MATCH",coverage);
         },args.toArray());

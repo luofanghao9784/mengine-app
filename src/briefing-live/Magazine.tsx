@@ -1,3 +1,6 @@
+import { briefingTypeLabels } from './content';
+import type { BriefingDocument } from '../../contracts/public-api/briefing-content';
+import { DataBriefing } from './DataBriefing';
 import { FileText, MessageSquare, Star, type LucideIcon } from 'lucide-react';
 import { useRef, type ReactNode } from 'react';
 import { NavIconButton, useNavHover } from '../components/NavIconButton';
@@ -36,6 +39,7 @@ export function MagazineBody({
   pinned = false,
   verification = false,
   footer,
+  briefing,
 }: {
   title: string;
   excerpt: string;
@@ -46,7 +50,21 @@ export function MagazineBody({
   pinned?: boolean;
   verification?: boolean;
   footer?: ReactNode;
+  briefing?: BriefingDocument | null;
 }) {
+  if (briefing)
+    return (
+      <>
+        <div className="data-briefing-type">
+          {briefingTypeLabels[briefing.content.businessType]}{' '}
+          <time>{new Date(date).toLocaleDateString('zh-CN')}</time>
+        </div>
+        <h3>{briefing.content.title}</h3>
+        <DataBriefing document={briefing} compact />
+        <span className="data-briefing-generated">{workspace} · 有计算依据</span>
+        <BriefingStatusMarks pinned={pinned} />
+      </>
+    );
   const Icon = publication ? FileText : MessageSquare;
   return (
     <>

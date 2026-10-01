@@ -1,3 +1,4 @@
+import { phoneClient } from './phone-client';
 import { PhoneAuth, ChangePassword } from './PhoneAuth';
 import { contactLabel } from './client';
 import { entryTenant, rememberedTenant, rememberTenant } from './entry';
@@ -90,6 +91,12 @@ export default function AccessApp({
   const [inviting, setInviting] = useState(initialInvitation.inviting);
   const [token, setToken] = useState(initialInvitation.token);
   const [notice, setNotice] = useState('');
+  const [phoneAttempt, setPhoneAttempt] = useState(0);
+  const phoneConfiguration = useRemote(
+    (signal) => phoneClient.configuration(signal),
+    [session.phase, session.identity?.account.id, phoneAttempt],
+  );
+  const legacyAllowed = phoneConfiguration.value?.delivery === 'DISABLED';
   useEffect(() => {
     if (session.phase === 'authenticated') setNotice('');
   }, [session.phase]);
@@ -123,7 +130,15 @@ export default function AccessApp({
     return (
       <Status title="暂时无法连接服务" detail="当前状态尚未确认，请重新连接。" retry={() => void refresh()} />
     );
-  if (session.phase === 'anonymous' || inviting || !session.identity?.account.phone)
+  if (session.phase === 'authenticated' && !session.identity?.account.phone && !phoneConfiguration.value)
+    return (
+      <Status
+        title="正在确认账号入口"
+        detail={phoneConfiguration.error ? '登录方式暂不可读取，请重新连接。' : '请稍候…'}
+        retry={phoneConfiguration.error ? () => setPhoneAttempt((n) => n + 1) : undefined}
+      />
+    );
+  if (session.phase === 'anonymous' || inviting || (!session.identity?.account.phone && !legacyAllowed))
     return (
       <div className="access-auth-layout">
         <a className="access-wordmark" href={entryHref('workspace')}>
@@ -134,6 +149,7 @@ export default function AccessApp({
             token={token}
             inviting={inviting}
             identity={session.identity}
+            legacyAllowed={legacyAllowed}
             onJoined={(membership) => {
               cancelInvitation(membership.tenantId);
             }}

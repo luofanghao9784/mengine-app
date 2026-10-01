@@ -38,7 +38,7 @@ export interface KnowledgeVersionCoverage {
   pinned: boolean;
 }
 export interface KnowledgeCoverage {
-  scope: 'AUTHORIZED_WORKSPACE' | 'AUTHORIZED_SHARED' | 'SELECTED_VERSIONS';
+  scope: 'AUTHORIZED_LIBRARY' | 'AUTHORIZED_WORKSPACE' | 'AUTHORIZED_SHARED' | 'SELECTED_VERSIONS';
   status: 'EMPTY' | 'READY' | 'PARTIAL' | 'NOT_READY';
   totalVersions: number;
   searchableVersions: number;

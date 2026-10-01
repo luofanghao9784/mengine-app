@@ -1,3 +1,4 @@
+import type {BriefingDocument} from './briefing-content';
 import type { FeedbackTarget } from './feedback';
 export interface RecommendationSettings {
   revision: number;
@@ -34,6 +35,7 @@ export interface MethodReference {
   configurationSha: string;
 }
 export interface RecommendationItem {
+  briefing?: BriefingDocument | null;
   content: RecommendationContent;
   score: number;
   method: MethodReference;

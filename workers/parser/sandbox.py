@@ -12,15 +12,16 @@ def run(job, extension, script=None):
     if sys.platform != 'darwin' or not Path('/usr/bin/sandbox-exec').exists(): raise RuntimeError('SANDBOX_UNAVAILABLE')
     job = Path(job).resolve(strict=True)
     env = {'PATH': '/opt/homebrew/bin:/usr/bin:/bin', 'LANG': 'en_US.UTF-8', 'TMPDIR': str(job), 'TESSDATA_PREFIX': str(ROOT / '.local/tessdata'), 'OMP_THREAD_LIMIT': '1', 'PYTHONDONTWRITEBYTECODE': '1'}
-    args = ['/usr/bin/sandbox-exec', '-p', profile(job), str(ROOT / '.venv/bin/python'), '-I', '-B', str(script or ROOT / 'parse.py'), str(job / 'input'), extension]
+    table = extension == 'table-compare'
+    args = ['/usr/bin/sandbox-exec', '-p', profile(job), str(ROOT / '.venv/bin/python'), '-I', '-B', str(script or ROOT / ('table_compare.py' if table else 'parse.py')), str(job / 'input'), extension]
     def limits():
         resource.setrlimit(resource.RLIMIT_FSIZE, (8_388_608, 8_388_608))
-        resource.setrlimit(resource.RLIMIT_CPU, (50, 50))
+        resource.setrlimit(resource.RLIMIT_CPU, (5, 5) if table else (50, 50))
     # Files avoid unbounded stdout/stderr buffers. Limits also apply to child processes.
     with (job / 'result').open('wb') as out, (job / 'errors').open('wb') as err:
         process = subprocess.Popen(args, cwd=job, env=env, stdout=out, stderr=err, start_new_session=True, preexec_fn=limits)
         try:
-            process.wait(timeout=75)
+            process.wait(timeout=8 if table else 75)
             if process.returncode: raise RuntimeError('PARSER_EXIT')
         finally:
             try: os.killpg(process.pid, signal.SIGKILL)
@@ -31,5 +32,5 @@ def run(job, extension, script=None):
 if __name__ == '__main__':
     try: print(run(sys.argv[1], sys.argv[2]))
     except Exception:
-        print(json.dumps({'parserVersion': 'local-2', 'status': 'FAILED', 'warnings': ['PARSER_UNAVAILABLE_OR_LIMIT'], 'chunks': []}))
+        print(json.dumps({'parserVersion': 'local-3', 'status': 'FAILED', 'warnings': ['PARSER_UNAVAILABLE_OR_LIMIT'], 'chunks': []}))
         sys.exit(0)

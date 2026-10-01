@@ -60,7 +60,7 @@ class KnowledgeIntegrationTest {
             new MockMultipartFile("file","旧编码.txt","text/plain",text.getBytes(java.nio.charset.Charset.forName("GB18030"))));
         var file=new File(result.id(),materials.detail(owner,tenant,space,result.id(),0,20).versions().getFirst().id());
         finish(file);var state=analysis(reader,space,file);
-        assertEquals("PARTIAL",state.status());assertEquals("local-2",state.parserVersion());
+        assertEquals("PARTIAL",state.status());assertEquals("local-3",state.parserVersion());
         assertEquals(List.of("ENCODING_GB18030"),state.warnings());
         assertEquals(text,knowledge.search(reader,tenant,space,"FORMATGB",0,20).items().getFirst().content());
     }

@@ -1,3 +1,5 @@
+import { LiveConversationDeck } from '../conversation/LiveConversationDeck';
+import { conversationHref } from '../conversation/Conversations';
 import { RequestPending, requestNavigationLocked, useRequestLock } from '../shared/request-guard';
 import { useContext } from 'react';
 import { useEffect, useState } from 'react';
@@ -55,7 +57,9 @@ export function Plans({ tenant }: { tenant: string }) {
           </Button>
           <Button
             variant="primary"
-            onClick={() => setEditing('new')}
+            onClick={() => {
+              location.hash = conversationHref(tenant);
+            }}
             disabled={!context.value || pendingRequest}
           >
             新建计划
@@ -104,14 +108,17 @@ export function Plans({ tenant }: { tenant: string }) {
           </div>
           <Pager page={page} next={listing.value.hasMore} onPage={setPage} />
           {selected && (
-            <PlanDetails
+            <PlanCard
               key={tenant + selected}
               tenant={tenant}
               owner={owner}
               id={selected}
               refresh={refresh}
               onChanged={changed}
-              onEdit={setEditing}
+              close={() => {
+                setSelected(null);
+                location.hash = '#' + new URLSearchParams({ tenant, view: 'plans' });
+              }}
             />
           )}
         </>
@@ -170,47 +177,55 @@ function PlanDetails({
       <h3>{config.goal}</h3>
       <p>{config.purpose}</p>
       <p className="plans-query">{config.query}</p>
-      <dl className="plans-facts">
-        <div>
-          <dt>执行范围</dt>
-          <dd>以本人当前权限，{behavior(config.behavior)}；结果仅本人接收，不发布到共享空间或外部。</dd>
-        </div>
-        <div>
-          <dt>触发条件</dt>
-          <dd>
-            {config.materialEvents ? '资料新版本就绪后检查' : ''}
-            {config.materialEvents && config.dailyTime ? '；' : ''}
-            {config.dailyTime ? `每天 ${config.dailyTime}（${config.timeZone}）` : ''}
-          </dd>
-        </div>
-        <div>
-          <dt>资源与退出</dt>
-          <dd>
-            最短间隔 {config.minIntervalSeconds / 60} 分钟；每日最多 {config.maxRunsPerDay} 次，总计最多{' '}
-            {config.maxTotalRuns} 次。{date(config.expiresAt, config.timeZone)} 到期停止。
-          </dd>
-        </div>
-        <div>
-          <dt>真实状态</dt>
-          <dd>
-            {statusLabels[plan.status]} · {runtimeLabels[plan.runtimeState]}。
-            {plan.reason ? (reasonLabels[plan.reason] ?? plan.reason) : ''}
-          </dd>
-        </div>
-        <div>
-          <dt>本次用量</dt>
-          <dd>
-            今日 {plan.todayRuns} 次，累计 {plan.runs} 次。次数上限不代表模型费用封顶。
-          </dd>
-        </div>
-        <div>
-          <dt>后续核查</dt>
-          <dd>
-            {config.dailyTime ? date(plan.nextDue, config.timeZone) : '等待资料版本变化'}；一般提醒
-            {config.notificationsEnabled ? '开启' : '关闭'}。
-          </dd>
-        </div>
-      </dl>
+      <p>
+        <Badge>{statusLabels[plan.status]}</Badge> ·{' '}
+        {config.dailyTime ? `每天 ${config.dailyTime}` : '资料更新时'} ·{' '}
+        {config.dailyTime ? date(plan.nextDue, config.timeZone) : '等待资料变化'}
+      </p>
+      <details>
+        <summary>配置与资源范围</summary>
+        <dl className="plans-facts">
+          <div>
+            <dt>执行范围</dt>
+            <dd>以本人当前权限，{behavior(config.behavior)}；结果仅本人接收，不发布到共享空间或外部。</dd>
+          </div>
+          <div>
+            <dt>触发条件</dt>
+            <dd>
+              {config.materialEvents ? '资料新版本就绪后检查' : ''}
+              {config.materialEvents && config.dailyTime ? '；' : ''}
+              {config.dailyTime ? `每天 ${config.dailyTime}（${config.timeZone}）` : ''}
+            </dd>
+          </div>
+          <div>
+            <dt>资源与退出</dt>
+            <dd>
+              最短间隔 {config.minIntervalSeconds / 60} 分钟；每日最多 {config.maxRunsPerDay} 次，总计最多{' '}
+              {config.maxTotalRuns} 次。{date(config.expiresAt, config.timeZone)} 到期停止。
+            </dd>
+          </div>
+          <div>
+            <dt>真实状态</dt>
+            <dd>
+              {statusLabels[plan.status]} · {runtimeLabels[plan.runtimeState]}。
+              {plan.reason ? (reasonLabels[plan.reason] ?? plan.reason) : ''}
+            </dd>
+          </div>
+          <div>
+            <dt>本次用量</dt>
+            <dd>
+              今日 {plan.todayRuns} 次，累计 {plan.runs} 次。次数上限不代表模型费用封顶。
+            </dd>
+          </div>
+          <div>
+            <dt>后续核查</dt>
+            <dd>
+              {config.dailyTime ? date(plan.nextDue, config.timeZone) : '等待资料版本变化'}；一般提醒
+              {config.notificationsEnabled ? '开启' : '关闭'}。
+            </dd>
+          </div>
+        </dl>
+      </details>
       <div className="plans-actions">
         {plan.status === 'DRAFT' && (
           <Button variant="primary" onClick={() => setAction('ENABLE')}>
@@ -243,67 +258,69 @@ function PlanDetails({
           </>
         )}
       </div>
-      <h4>运行记录</h4>
-      <p className="muted">
-        每条记录对应真实任务。触发时的资料版本不等于模型实际引用范围；缺口与实际依据在原任务中核对。
-      </p>
-      {runs.error ? (
-        <Failure error={runs.error} retry={onChanged} />
-      ) : !runs.value ? (
-        <Loading />
-      ) : (
-        <>
-          {!runs.value.items.length && <p>尚未启动任务。等待资料、模型或触发时间不会生成成果记录。</p>}
-          <ol className="plans-runs">
-            {runs.value.items.map((run) => (
-              <li key={run.id}>
-                <div>
-                  <strong>
-                    {run.triggerKind === 'DAILY'
-                      ? '每日核查'
-                      : run.triggerKind === 'RETRY'
-                        ? '明确重试'
-                        : '资料变化'}
-                  </strong>
-                  <Badge>
-                    {(
-                      {
-                        QUEUED: '已排队',
-                        RUNNING: '执行中',
-                        SUCCEEDED: '检查完成',
-                        FAILED: '执行失败',
-                        INTERRUPTED: '已中断',
-                        CANCELLED: '已取消',
-                        WAITING_INPUT: '等待补充',
-                        WAITING_CAPABILITY: '等待能力',
-                        PAUSED: '本次已暂停',
-                        PARTIAL: '部分完成',
-                        RESULT_UNKNOWN: '结果待核对',
-                      } as Record<string, string>
-                    )[run.status] ?? run.status}
-                  </Badge>
-                </div>
-                <p>
-                  {date(run.createdAt, config.timeZone)} · 依据覆盖 {run.sourceVersions.length} 个资料版本 ·
-                  委托版本 {run.planRevision}
-                </p>
-                {run.missedSlots > 0 && (
-                  <p>中断期间错过 {run.missedSlots} 次约定检查，本次仅核查当前情况。</p>
-                )}
-                <a
-                  href={`/workspace/#tenant=${tenant}&view=conversations&conversation=${run.conversationId}&task=${run.taskId}`}
-                >
-                  查看原任务
-                </a>
-                <Button variant="ghost" onClick={() => setVersion(run.planRevision)}>
-                  查看委托版本
-                </Button>
-              </li>
-            ))}
-          </ol>
-          <Pager page={page} next={runs.value.hasMore} onPage={setPage} />
-        </>
-      )}
+      <details>
+        <summary>运行记录与历史版本</summary>
+        <p className="muted">
+          每条记录对应真实任务。触发时的资料版本不等于模型实际引用范围；缺口与实际依据在原任务中核对。
+        </p>
+        {runs.error ? (
+          <Failure error={runs.error} retry={onChanged} />
+        ) : !runs.value ? (
+          <Loading />
+        ) : (
+          <>
+            {!runs.value.items.length && <p>尚未启动任务。等待资料、模型或触发时间不会生成成果记录。</p>}
+            <ol className="plans-runs">
+              {runs.value.items.map((run) => (
+                <li key={run.id}>
+                  <div>
+                    <strong>
+                      {run.triggerKind === 'DAILY'
+                        ? '每日核查'
+                        : run.triggerKind === 'RETRY'
+                          ? '明确重试'
+                          : '资料变化'}
+                    </strong>
+                    <Badge>
+                      {(
+                        {
+                          QUEUED: '已排队',
+                          RUNNING: '执行中',
+                          SUCCEEDED: '检查完成',
+                          FAILED: '执行失败',
+                          INTERRUPTED: '已中断',
+                          CANCELLED: '已取消',
+                          WAITING_INPUT: '等待补充',
+                          WAITING_CAPABILITY: '等待能力',
+                          PAUSED: '本次已暂停',
+                          PARTIAL: '部分完成',
+                          RESULT_UNKNOWN: '结果待核对',
+                        } as Record<string, string>
+                      )[run.status] ?? run.status}
+                    </Badge>
+                  </div>
+                  <p>
+                    {date(run.createdAt, config.timeZone)} · 依据覆盖 {run.sourceVersions.length} 个资料版本 ·
+                    委托版本 {run.planRevision}
+                  </p>
+                  {run.missedSlots > 0 && (
+                    <p>中断期间错过 {run.missedSlots} 次约定检查，本次仅核查当前情况。</p>
+                  )}
+                  <a
+                    href={`/workspace/#tenant=${tenant}&view=conversations&conversation=${run.conversationId}&task=${run.taskId}`}
+                  >
+                    查看原任务
+                  </a>
+                  <Button variant="ghost" onClick={() => setVersion(run.planRevision)}>
+                    查看委托版本
+                  </Button>
+                </li>
+              ))}
+            </ol>
+            <Pager page={page} next={runs.value.hasMore} onPage={setPage} />
+          </>
+        )}
+      </details>
       {action && (
         <PlanActionDialog
           plan={plan}
@@ -677,5 +694,65 @@ function PlanEditor({
         </FormActions>
       </form>
     </Modal>
+  );
+}
+
+export function PlanCard({
+  tenant,
+  owner,
+  id,
+  close,
+  onChanged = () => {},
+  refresh = 0,
+}: {
+  tenant: string;
+  owner: string;
+  id: string;
+  close: () => void;
+  onChanged?: () => void;
+  refresh?: number;
+}) {
+  const [attempt, setAttempt] = useState(0),
+    [editing, setEditing] = useState<Plan | null>(null);
+  const context = useRemote((signal) => identityClient.context(tenant, signal), [tenant]);
+  const changed = () => {
+    setAttempt((n) => n + 1);
+    onChanged();
+  };
+  return (
+    <>
+      <Modal title="持续计划" wide className="live-library-deck-modal" onClose={close}>
+        <LiveConversationDeck
+          tenant={tenant}
+          reader
+          title="持续计划"
+          onClose={close}
+          onRefresh={changed}
+          cards={[]}
+        >
+          <PlanDetails
+            tenant={tenant}
+            owner={owner}
+            id={id}
+            refresh={refresh + attempt}
+            onChanged={changed}
+            onEdit={setEditing}
+          />
+        </LiveConversationDeck>
+      </Modal>
+      {editing && context.value && (
+        <PlanEditor
+          tenant={tenant}
+          owner={owner}
+          current={editing}
+          spaces={context.value.workspaces}
+          close={() => setEditing(null)}
+          saved={() => {
+            setEditing(null);
+            changed();
+          }}
+        />
+      )}
+    </>
   );
 }

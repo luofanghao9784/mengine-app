@@ -24,6 +24,7 @@ export function ReadingDialog({
   feedbackTarget,
   actions,
   pinned = false,
+  contentLabel,
 }: {
   title: string;
   workspace: string;
@@ -38,6 +39,7 @@ export function ReadingDialog({
   feedbackTarget?: FeedbackTarget;
   actions?: ReactNode;
   pinned?: boolean;
+  contentLabel?: string;
 }) {
   const ref = useRef<HTMLDialogElement>(null),
     feedbackRef = useRef<HTMLDivElement>(null);
@@ -75,7 +77,7 @@ export function ReadingDialog({
       <div className="live-reading-card">
         <header className="live-reading-header">
           <span>
-            {task ? '会话' : '企业副本'} · {workspace}
+            {contentLabel || (task ? '会话' : '企业副本')} · {workspace}
           </span>
           <BriefingStatusMarks pinned={pinned} conversation={!!task} />
           <button

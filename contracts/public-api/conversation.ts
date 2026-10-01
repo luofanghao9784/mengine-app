@@ -32,6 +32,8 @@ export interface OriginalSelection {
   versionId: string;
 }
 export interface TaskOriginal extends OriginalSelection {
+  workspaceId?: string;
+  attachmentConversationId?: string | null;
   filename: string;
   version: number;
   bytes: number;
@@ -95,6 +97,7 @@ export interface ConversationEvents {
   hasMore: boolean;
 }
 export interface SendTask {
+  sourceScope?: 'AUTHORIZED_LIBRARY' | 'SELECTED';
   originals?: OriginalSelection[];
   publicQuery?: string;
   requestId: string;

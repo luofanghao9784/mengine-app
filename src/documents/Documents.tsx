@@ -1,14 +1,15 @@
+import { LiveConversationDeck } from '../conversation/LiveConversationDeck';
 import { ExportBatchPanel } from '../export/ExportBatchPanel';
 import { RequestPending, requestNavigationLocked } from '../shared/request-guard';
 import { readTabDraft, writeTabDraft, removeTabDraft } from '../shared/tab-drafts';
 import { DraftWarning } from '../shared/DraftWarning';
 import { PublicationPanel } from './Publication';
 import { useContext, useEffect, useRef, useState } from 'react';
-import { FileText, RefreshCw, Save, Download } from 'lucide-react';
+import { FileText, RefreshCw, Save, Download, Info } from 'lucide-react';
 import type { DocumentDetail, SaveDocument } from '../../contracts/public-api/document';
 import { identityClient, useSession } from '../identity/session';
 import { IdentityError, record, uuid } from '../identity/client';
-import { Button, Field, PageActions, Badge, Empty } from '../shared/ui';
+import { Button, Field, PageActions, Badge, Empty, Modal, DocumentText, IconButton } from '../shared/ui';
 import { Failure, Loading, Pager, SubmitError, useRemote, useSubmission } from '../shared/admin';
 import { documentClient as api } from './client';
 import { libraryHref } from '../material/Library';
@@ -19,7 +20,7 @@ export function SaveAsDocument({
   conversation,
   task,
   artifact,
-  label = '保存为个人文稿',
+  label = '保存到个人资料',
 }: {
   tenant: string;
   conversation: string;
@@ -28,6 +29,8 @@ export function SaveAsDocument({
   label?: string;
 }) {
   const submit = useSubmission<object>();
+  const [saved,setSaved]=useState<string>();
+  const [reading,setReading]=useState(false);
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -39,7 +42,7 @@ export function SaveAsDocument({
     <span className="save-document">
       <Button
         icon={FileText}
-        disabled={submit.busy}
+        disabled={submit.busy||!!saved}
         onClick={() =>
           void submit.submit({}, async (_, requestId) => {
             const origin = location.hash;
@@ -50,12 +53,14 @@ export function SaveAsDocument({
               ...(artifact ? { artifactId: artifact } : {}),
             });
             if (mounted.current && location.hash === origin)
-              location.hash = documentsHref(tenant, value.document.id);
+              setSaved(value.document.id);
           })
         }
       >
-        {label}
+        {saved?'已保存到个人资料':label}
       </Button>
+      {saved&&<Button onClick={()=>setReading(true)}>查看资料</Button>}
+      {saved&&reading&&<DocumentCard tenant={tenant} id={saved} close={()=>setReading(false)}/>}
       <SubmitError error={submit.error} uncertain={submit.uncertain} />
     </span>
   );
@@ -181,15 +186,17 @@ function DocumentList({
     </>
   );
 }
-function DocumentReader({
+export function DocumentReader({
   tenant,
   id,
   version,
   invalid,
   attempt,
   refresh,
+  onVersion,
 }: {
   tenant: string;
+  onVersion?: (version?:number)=>void;
   id: string;
   version?: number;
   invalid: boolean;
@@ -230,6 +237,7 @@ function DocumentReader({
       tenant={tenant}
       value={data.value}
       historical={!!version}
+      onVersion={onVersion}
       storageKey={storageKey}
       refresh={refresh}
       denied={(error) => {
@@ -248,10 +256,12 @@ function Editor({
   storageKey,
   refresh,
   denied,
+  onVersion,
 }: {
   tenant: string;
   value: DocumentDetail;
   historical: boolean;
+  onVersion?: (version?:number)=>void;
   storageKey: string;
   refresh: () => void;
   denied: (e: unknown) => void;
@@ -327,7 +337,7 @@ function Editor({
         <Button
           disabled={value.version.number <= 1 || busy}
           onClick={() => {
-            location.hash = documentsHref(tenant, value.document.id, value.version.number - 1);
+            if(onVersion)onVersion(value.version.number-1);else location.hash = documentsHref(tenant, value.document.id, value.version.number - 1);
           }}
         >
           上一版本
@@ -335,7 +345,7 @@ function Editor({
         {historical && (
           <Button
             onClick={() => {
-              location.hash = documentsHref(tenant, value.document.id);
+              if(onVersion)onVersion();else location.hash = documentsHref(tenant, value.document.id);
             }}
           >
             返回最新版本
@@ -489,4 +499,13 @@ function Editor({
       </a>
     </div>
   );
+}
+
+export function DocumentCard({tenant,id,close}:{tenant:string;id:string;close:()=>void}){
+ const [attempt,setAttempt]=useState(0),[version,setVersion]=useState<number>(),[properties,setProperties]=useState(false),[editing,setEditing]=useState(false);
+ const refresh=()=>setAttempt(n=>n+1);
+ const data=useRemote(signal=>api.detail(tenant,id,version,signal),[tenant,id,version,attempt]);
+ return <Modal title="个人资料" wide className="live-library-deck-modal" onClose={close}><LiveConversationDeck tenant={tenant} reader title={data.value?.version.title||'个人资料'} onClose={close} onRefresh={refresh} mainActions={<><Button onClick={()=>setEditing(!editing)}>{editing?'阅读':'编辑与导出'}</Button><IconButton icon={Info} label="资料属性" onClick={()=>setProperties(true)}/></>} cards={properties?[{id:'properties',kind:'properties',title:'资料属性',label:'版本与共享',parentId:'conversation',close:()=>setProperties(false),content:data.value?<><p>个人资料 · 仅本人可见 · v{data.value.version.number}</p><p>共享后会形成独立企业副本；后续修改需明确更新共享版本。</p><PublicationPanel tenant={tenant} id={id} version={data.value.version} disabled={false}/></>:<Loading/>}]:[]}>
+ {data.error?<Failure error={data.error} retry={refresh}/>:!data.value?<Loading/>:editing?<DocumentReader tenant={tenant} id={id} version={version} invalid={false} attempt={attempt} refresh={refresh} onVersion={setVersion}/>:<DocumentText text={data.value.version.body}/>}
+ </LiveConversationDeck></Modal>;
 }

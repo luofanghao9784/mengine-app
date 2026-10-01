@@ -1,3 +1,4 @@
+import { isBriefingDocument } from '../briefing-live/content.ts';
 import { isTarget } from '../feedback/client.ts';
 import type {
   DeliveryTarget,
@@ -48,6 +49,7 @@ export const isContent = (v: unknown): v is RecommendationContent =>
 export const isItem = (v: unknown): v is RecommendationItem =>
   record(v) &&
   isContent(v.content) &&
+  (v.briefing == null || isBriefingDocument(v.briefing)) &&
   typeof v.score === 'number' &&
   Number.isFinite(v.score) &&
   v.score >= 0 &&
@@ -87,8 +89,18 @@ export function createRecommendationClient(fetcher: typeof fetch = fetch) {
     return `/api/v1/tenants/${tenant}/recommendations`;
   };
   return {
-    list(tenant: string, workspace: string | null, offset = 0, snapshot?: string, signal?: AbortSignal) {
-      const q = new URLSearchParams({ offset: String(offset), limit: '20' });
+    list(
+      tenant: string,
+      workspace: string | null,
+      offset = 0,
+      snapshot?: string,
+      signal?: AbortSignal,
+      filter?: { businessType?: string; publicationsOnly?: boolean; focused?: boolean },
+    ) {
+      const q = new URLSearchParams({ offset: String(offset), limit: '20', generatedOnly: 'true' });
+      if (filter?.businessType) q.set('businessType', filter.businessType);
+      if (filter?.publicationsOnly) q.set('publicationsOnly', 'true');
+      if (filter?.focused) q.set('focused', 'true');
       if (workspace) q.set('workspaceId', workspace);
       if (snapshot) q.set('snapshot', snapshot);
       return request(
@@ -113,6 +125,27 @@ export function createRecommendationClient(fetcher: typeof fetch = fetch) {
           v.businessOutcome === 'NOT_ASSESSED',
         undefined,
         signal,
+      );
+    },
+    publicationPreference(tenant: string, material: string) {
+      return request(
+        root(tenant) + `/publications/${material}/preference`,
+        'GET',
+        (v): v is { revision: number; pinned: boolean } =>
+          record(v) && num(v.revision) && typeof v.pinned === 'boolean',
+      );
+    },
+    followPublication(
+      tenant: string,
+      material: string,
+      body: { requestId: string; expectedRevision: number; pinned: boolean },
+    ) {
+      return request(
+        root(tenant) + `/publications/${material}/preference`,
+        'POST',
+        (v): v is { revision: number; pinned: boolean } =>
+          record(v) && num(v.revision) && typeof v.pinned === 'boolean',
+        body,
       );
     },
     configure(tenant: string, body: { requestId: string; expectedRevision: number; enabled: boolean }) {

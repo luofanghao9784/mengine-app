@@ -44,7 +44,7 @@ export function contextResponse(value: unknown, action: string): Json {
   return value;
 }
 export async function taskBootstrap(invoke: Invoke): Promise<Json> {
-  return contextResponse(await invoke('context', { action: 'bootstrap' }, 24576), 'bootstrap');
+  return contextResponse(await invoke('context', { action: 'bootstrap' }, 57344), 'bootstrap');
 }
 export function contextTool(invoke: Invoke, authorize: () => Promise<void>): TaskTool {
   return {

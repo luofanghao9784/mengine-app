@@ -169,6 +169,62 @@ test('model call, tool call, output and time budgets stop the turn', async () =>
   }
 });
 
+test('reserved final response uses the existing budget and cannot execute another tool', async () => {
+  for (const ignoresFinal of [false, true]) {
+    let executions = 0;
+    const result = await runHarness({
+      prompt: 'Find supported facts, preserving gaps.',
+      reserveFinalResponse: true,
+      limits: { modelCalls: 2, toolCalls: 4 },
+      tools: [{ name: 'search_sources', description: 'synthetic', parameters: { type: 'object' },
+        async execute() { executions++; return { items: [] }; } }],
+      model: fixture([
+        call('search_sources', {}),
+        (request) => {
+          assert.deepEqual(request.tools, []);
+          assert.match(request.messages[0].content[0].text, /reserved final response/);
+          return ignoresFinal ? call('search_sources', {}, 'blocked') : reply('No supporting evidence yet; data remains missing.');
+        },
+      ]),
+    });
+    assert.equal(executions, 1);
+    assert.equal(result.modelCalls, 2);
+    assert.equal(result.finalResponseReserved, true);
+    assert.equal(result.status, ignoresFinal ? 'limit' : 'completed');
+    if (ignoresFinal) assert.equal(result.text, '');
+  }
+});
+
+test('slow evidence retrieval reserves wall time for a final reply even with calls remaining', async () => {
+  let calls = 0;
+  const result = await runHarness({
+    prompt: 'Analyze the evidence and report gaps.',
+    reserveFinalResponse: true,
+    limits: { timeoutMs: 2000, modelCalls: 8, toolCalls: 8 },
+    tools: [{ name: 'search_sources', description: 'synthetic', parameters: { type: 'object' },
+      async execute() { await delay(600); return { evidence: 'Receipts: 42 yuan; matched partial period.' }; } }],
+    model: {
+      async *generate(request) {
+        calls++;
+        if (calls === 1) {
+          yield* call('search_sources', {});
+        } else {
+          assert.deepEqual(request.tools, []);
+          assert.match(request.messages[0].content[0].text, /reserved final response/);
+          assert.ok(request.messages.flatMap(m => m.content).some(b => b.type === 'tool_result' && b.content.includes('42 yuan')));
+          await delay(100);
+          yield* reply('42 yuan for the matched partial period; chart generation remains unavailable.');
+        }
+      },
+    },
+  });
+  assert.equal(result.status, 'completed');
+  assert.equal(result.finalResponseReserved, true);
+  assert.equal(calls, 2);
+  assert.equal(result.tools.length, 1);
+  assert.match(result.text, /42 yuan/);
+});
+
 test('cancellation drains a running tool, returns no late text and does not retry', async () => {
   const controller = new AbortController();
   let started,

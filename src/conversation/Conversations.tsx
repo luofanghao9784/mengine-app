@@ -42,7 +42,7 @@ import { Failure, Loading, Pager, SubmitError, useRemote, useSubmission } from '
 import { Citation } from '../material/Knowledge';
 import { ActionPopover } from '../shared/ActionPopover';
 import { libraryHref } from '../material/Library';
-import { OriginalPicker } from './OriginalPicker';
+import { AttachmentMaterials, AttachmentReader } from './AttachmentMaterials';
 import { taskErrorMessage } from './task-errors';
 import { conversationClient as api, isOriginal } from './client';
 import './conversation.css';
@@ -576,6 +576,7 @@ function TaskCard({
   changed: () => void;
   citation: (id: string) => void;
 }) {
+  const [readingOriginal, setReadingOriginal] = useState<TaskOriginal>();
   const { expire } = useSession();
   const pendingRequest = useContext(RequestPending);
   const downloadController = useRef<AbortController | null>(null);
@@ -665,14 +666,28 @@ function TaskCard({
           </p>
         )}
         {task.errorCode && <p className="access-alert">{taskErrorMessage(task.errorCode)}</p>}
+        {readingOriginal && (
+          <AttachmentReader
+            tenant={tenant}
+            file={readingOriginal}
+            conversation={readingOriginal.attachmentConversationId || undefined}
+            close={() => setReadingOriginal(undefined)}
+          />
+        )}
         {task.originals.length > 0 && (
           <div className="conversation-originals" aria-label="本次指定的原件">
             {task.originals.map((file) => (
               <p key={file.versionId}>
-                <strong>
+                <Button variant="ghost" onClick={() => setReadingOriginal(file)}>
                   {file.filename} · v{file.version}
-                </strong>
-                <span>{file.read ? '已读取原件' : '已选用 · 尚未读取'}</span>
+                </Button>
+                <span>
+                  {file.read
+                    ? '已读取原件'
+                    : task.sources.some((source) => source.versionId === file.versionId)
+                      ? '已读取解析内容'
+                      : '已选用'}
+                </span>
               </p>
             ))}
           </div>
@@ -988,7 +1003,22 @@ function Composer({
   const [originals, setOriginals] = useState<TaskOriginal[]>(
     Array.isArray(initial.current.originals) ? initial.current.originals.filter(isOriginal).slice(0, 3) : [],
   );
-  const [picking, setPicking] = useState(false);
+  const [draftConversation, setDraftConversation] = useState<string | undefined>(
+    typeof initial.current.draftConversation === 'string' ? initial.current.draftConversation : undefined,
+  );
+  const [draftRequestId] = useState(
+    typeof initial.current.draftRequestId === 'string' ? initial.current.draftRequestId : crypto.randomUUID(),
+  );
+  const [uploading, setUploading] = useState(false);
+  const [prepared, setPrepared] = useState<Record<string, boolean>>({});
+  const onReady = useCallback(
+    (id: string, ready: boolean) =>
+      setPrepared((previous) => (previous[id] === ready ? previous : { ...previous, [id]: ready })),
+    [],
+  );
+  const [dropped, setDropped] = useState<{ files: File[]; sequence: number }>();
+  const [selectedOnly, setSelectedOnly] = useState(initial.current.selectedOnly === true);
+  const preparing = uploading || originals.some((f) => f.workspaceId && !prepared[f.versionId]);
   const restored = initial.current.pending;
   const [pending, setPending] = useState<SendTask | undefined>(
     record(restored) &&
@@ -1029,35 +1059,82 @@ function Composer({
   }, [suggestion]);
   useEffect(() => () => controller.current?.abort(), []);
   useEffect(() => {
-    setStored(writeTabDraft(key, { text, mode, publicQuery, space: location, originals, pending }));
-  }, [key, text, mode, publicQuery, location, originals, pending]);
+    setStored(
+      writeTabDraft(key, {
+        text,
+        mode,
+        publicQuery,
+        space: location,
+        originals,
+        pending,
+        draftConversation,
+        draftRequestId,
+        selectedOnly,
+      }),
+    );
+  }, [
+    key,
+    text,
+    mode,
+    publicQuery,
+    location,
+    originals,
+    pending,
+    draftConversation,
+    draftRequestId,
+    selectedOnly,
+  ]);
   const allowed = context.workspaces.some((s) => s.id === (space || location));
   return (
     <form
       className="conversation-composer"
+      onDragOver={(e) => {
+        if (e.dataTransfer.types.includes('Files')) e.preventDefault();
+      }}
+      onDrop={(e) => {
+        if (e.dataTransfer.files.length) {
+          e.preventDefault();
+          if (!busy && !pending)
+            setDropped({ files: Array.from(e.dataTransfer.files), sequence: Date.now() });
+        }
+      }}
       onSubmit={async (event) => {
         event.preventDefault();
-        if (busy || !enabled || !allowed || (!pending && !text.trim())) return;
+        if (busy || preparing || !enabled || !allowed || (!pending && !text.trim())) return;
         const body = pending || {
           requestId: crypto.randomUUID(),
           workspaceId: space || location,
           prompt: text.trim(),
           mode,
-          ...(mode === 'AGENT' && agentMode === 'verification' && originals.length
+          sourceScope:
+            selectedOnly && originals.length ? ('SELECTED' as const) : ('AUTHORIZED_LIBRARY' as const),
+          ...(mode === 'AGENT' && originals.length
             ? { originals: originals.map(({ materialId, versionId }) => ({ materialId, versionId })) }
             : {}),
-          ...(mode === 'AGENT' && publicWebEnabled && publicQuery.trim()
+          ...(mode === 'AGENT' && !selectedOnly && publicWebEnabled && publicQuery.trim()
             ? { publicQuery: publicQuery.trim() }
             : {}),
         };
-        setStored(writeTabDraft(key, { text, mode, publicQuery, space: location, originals, pending: body }));
+        setStored(
+          writeTabDraft(key, {
+            text,
+            mode,
+            publicQuery,
+            space: location,
+            originals,
+            pending: body,
+            draftConversation,
+            draftRequestId,
+            selectedOnly,
+          }),
+        );
         setPending(body);
         setBusy(true);
         setError(undefined);
         const request = new AbortController();
         controller.current = request;
         try {
-          const result = await api.send(tenant, selected, body, request.signal);
+          const result = await api.send(tenant, selected || draftConversation, body, request.signal);
           if (request.signal.aborted) return;
           setText('');
           setPublicQuery('');
@@ -1101,79 +1178,31 @@ function Composer({
             </Field>
           </div>
           <div className="live-composer-tools">
-            <div ref={toolsAnchor}>
-              <Button
-                icon={Paperclip}
-                variant="ghost"
-                aria-expanded={toolsOpen}
-                onClick={() => setToolsOpen(!toolsOpen)}
-              >
-                添加资料
-              </Button>
-              {toolsOpen && (
-                <ActionPopover anchor={toolsAnchor} label="添加资料" onClose={() => setToolsOpen(false)}>
-                  {agentMode === 'verification' && (
-                    <Button
-                      icon={Files}
-                      onClick={() => {
-                        setToolsOpen(false);
-                        setPicking(true);
-                      }}
-                    >
-                      选择原件版本
-                    </Button>
-                  )}
-                  <a className="button ghost" href={libraryHref(tenant, space || location)}>
-                    在资料库上传与管理
-                  </a>
-                  <p>
-                    AI 会检索当前资料范围内已解析的内容。
-                    {agentMode !== 'verification' && '上传完成后可返回此草稿继续。'}
-                  </p>
-                </ActionPopover>
-              )}
-            </div>
-            <Field label="资料范围">
-              <Folder size={15} aria-hidden="true" />
-              <select
-                value={space || location}
-                disabled={!!space}
-                onChange={(e) => {
-                  setLocation(e.target.value);
-                  setOriginals([]);
-                  setPicking(false);
-                }}
-              >
-                {context.workspaces.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                    {s.kind === 'PERSONAL' ? '（个人）' : ''}
-                  </option>
-                ))}
-              </select>
-            </Field>
+            <AttachmentMaterials
+              tenant={tenant}
+              conversation={selected || draftConversation}
+              draftRequestId={draftRequestId}
+              context={context}
+              files={originals}
+              setFiles={setOriginals}
+              onConversation={setDraftConversation}
+              onBusy={setUploading}
+              onReady={onReady}
+              dropped={dropped}
+              verification={agentMode === 'verification'}
+            />
           </div>
-          {mode === 'AGENT' && agentMode === 'verification' && originals.length > 0 && (
-            <div className="original-selection">
-              {originals.map((file) => (
-                <div key={file.versionId}>
-                  <span>
-                    {file.filename} · v{file.version}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    onClick={() =>
-                      setOriginals((files) => files.filter((f) => f.versionId !== file.versionId))
-                    }
-                  >
-                    移除 {file.filename}
-                  </Button>
-                </div>
-              ))}
-              {originals.length > 0 && <small>本次使用所选文件版本。</small>}
-            </div>
+          {originals.length > 0 && (
+            <label className="attachment-scope">
+              <input
+                type="checkbox"
+                checked={selectedOnly}
+                onChange={(e) => setSelectedOnly(e.target.checked)}
+              />
+              只用所选资料
+            </label>
           )}
-          {mode === 'AGENT' && publicWebEnabled && (
+          {mode === 'AGENT' && !selectedOnly && publicWebEnabled && (
             <details className="live-web-options">
               <summary>查找公开资料（可选）</summary>
               <Field label="公开检索内容（可选）">
@@ -1200,7 +1229,7 @@ function Composer({
             busy ? '提交中…' : pending ? '重试上次发送' : mode === 'AGENT' ? '开始任务' : '查找资料'
           }
           title={busy ? '提交中…' : pending ? '重试上次发送' : mode === 'AGENT' ? '开始任务' : '查找资料'}
-          disabled={busy || !enabled || !allowed || !text.trim()}
+          disabled={busy || preparing || !enabled || !allowed || !text.trim()}
         >
           <span className="live-visually-hidden">
             {busy ? '提交中…' : pending ? '重试上次发送' : mode === 'AGENT' ? '开始任务' : '查找资料'}
@@ -1213,23 +1242,11 @@ function Composer({
       <div className="conversation-send">
         <small>
           Enter 发送 · Shift + Enter 换行
-          {disabledReason}
+          {preparing ? ' · 资料准备中，可先编辑问题' : disabledReason}
         </small>
       </div>
       <DraftWarning unavailable={!stored} unreadable={loaded.unreadable} pending={!!pending} />
       <SubmitError error={error} uncertain={!!pending && !busy} />
-      {picking && !busy && !pending && (
-        <OriginalPicker
-          key={space || location}
-          tenant={tenant}
-          space={space || location}
-          selected={originals}
-          onSelect={(file) =>
-            setOriginals((files) => [...files.filter((f) => f.materialId !== file.materialId), file])
-          }
-          onClose={() => setPicking(false)}
-        />
-      )}
     </form>
   );
   function locationHash(id: string) {

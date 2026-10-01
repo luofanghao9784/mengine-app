@@ -18,7 +18,7 @@ CONTROL_TABLES = [
     'object_lifecycle', 'object_lifecycle_scopes', 'object_lifecycle_scope_items', 'operation_retention_windows',
     'departure_executions', 'departure_export_grants', 'departure_materials',
     'feedback_entries', 'feedback_versions', 'feedback_source_versions',
-    'task_plan_checks', 'task_preference_saves',
+    'task_plan_checks', 'task_preference_saves', 'conversation_plan_commands', 'publication_preferences',
     'briefing_layouts', 'briefing_layout_moves',
     'feedback_adjustment_threads', 'feedback_adjustment_messages', 'adjustment_task_dependencies',
     'publication_forward_batches', 'publication_forward_receipts',
@@ -581,6 +581,13 @@ def reopen_configurations(sql, current_sql):
         sql('DELETE FROM recommendation_settings')
         for row in json_rows(current_sql,'SELECT * FROM recommendation_settings'):
             sql("INSERT INTO recommendation_settings(tenant_id,actor_id,revision,enabled,updated_at) SELECT "+','.join(literal(row[k]) for k in ('tenant_id','actor_id','revision','enabled','updated_at'))+" WHERE EXISTS(SELECT 1 FROM tenant_memberships WHERE tenant_id="+literal(row['tenant_id'])+" AND account_id="+literal(row['actor_id'])+")")
+    # Publication follows are current personal preferences, never restored as an old subscription.
+    # Conversation plan commands are immutable receipts. Quarantine pauses all plans/tasks; receipts
+    # cannot execute commands, and their referenced plans are reconciled against current authority.
+    if has_table(sql,'publication_preferences'):
+        sql('DELETE FROM publication_preferences')
+        for row in json_rows(current_sql,'SELECT * FROM publication_preferences'):
+            sql("INSERT INTO publication_preferences(tenant_id,actor_id,material_id,pinned,revision,updated_at) SELECT "+','.join(literal(row[k]) for k in ('tenant_id','actor_id','material_id','pinned','revision','updated_at'))+" WHERE EXISTS(SELECT 1 FROM tenant_memberships WHERE tenant_id="+literal(row['tenant_id'])+" AND account_id="+literal(row['actor_id'])+") AND EXISTS(SELECT 1 FROM active_materials WHERE id="+literal(row['material_id'])+")")
     sql('UPDATE briefing_preferences SET hidden=true,pinned=false')
     layouts=has_table(sql,'briefing_layouts')
     for row in json_rows(current_sql,'SELECT p.*'+(',p.focus_position::text AS exact_focus_position' if layouts else '')+' FROM briefing_preferences p'):

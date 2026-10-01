@@ -1,5 +1,8 @@
+import { planManagementTool } from './plan-management.js';
 import { meteredModel } from './metered-model.js';
 import { inputCoverage } from './input-coverage.js';
+import { briefingDeliveryTool, hasPreparedBriefing } from './briefing-delivery.js';
+import { tableComparisonTool } from './table-comparison.js';
 import { workTools } from './task-work.js';
 import { contextTool, taskBootstrap } from './task-context.js';
 import { ENGINE_VERSION } from '../release.js';
@@ -77,6 +80,9 @@ export class AgentTasks {
     let contextAvailable: boolean | undefined;
     let workAvailable: boolean | undefined;
     let planAllowed: boolean | undefined;
+    let tablesAvailable: boolean | undefined;
+    let planManagementAvailable = false;
+    let briefingAvailable: boolean | undefined;
     let candidateSession: CandidateSession | undefined;
     let candidateUsed = false;
     let recipeFailure: string | undefined;
@@ -119,8 +125,33 @@ export class AgentTasks {
         contextAvailable = context;
         const work = response.taskWorkVersion === '1.0';
         const plan = response.planAllowed ?? false;
-        if ((response.taskWorkVersion !== undefined && !work) || typeof plan !== 'boolean' || (!work && plan) || (workAvailable !== undefined && workAvailable !== work) || (planAllowed !== undefined && planAllowed !== plan)) throw new RuntimeError('TASK_ACCESS_DENIED');
-        workAvailable = work; planAllowed = plan;
+        if (
+          (response.taskWorkVersion !== undefined && !work) ||
+          typeof plan !== 'boolean' ||
+          (!work && plan) ||
+          (workAvailable !== undefined && workAvailable !== work) ||
+          (planAllowed !== undefined && planAllowed !== plan)
+        )
+          throw new RuntimeError('TASK_ACCESS_DENIED');
+        workAvailable = work;
+        planAllowed = plan;
+        const tables = response.tableComparisonVersion === '1.0';
+        if (
+          (response.tableComparisonVersion !== undefined &&
+            response.tableComparisonVersion !== '' &&
+            !tables) ||
+          (tablesAvailable !== undefined && tablesAvailable !== tables)
+        )
+          throw new RuntimeError('TASK_ACCESS_DENIED');
+        tablesAvailable = tables;
+        const briefing = response.briefingContentVersion === '1.0';
+        if (
+          (response.briefingContentVersion !== undefined && !briefing) ||
+          (briefingAvailable !== undefined && briefingAvailable !== briefing)
+        )
+          throw new RuntimeError('TASK_ACCESS_DENIED');
+        briefingAvailable = briefing;
+        planManagementAvailable = response.planManagementVersion === '1.0';
       } catch {
         denied = true;
         controller.abort();
@@ -196,7 +227,8 @@ export class AgentTasks {
       const search: TaskTool = {
         name: 'search_sources',
         description:
-          'Search authorized parsed excerpts. If the user selected originals, search is restricted to those exact versions; otherwise it uses the current workspace. Returns fixed citations and input handles; excerpts may be partial, not complete original files.',
+          'Literal keyword search: begin with a short keyword, not a sentence; space-separated terms must all occur in the passage. Search the platform-authorized scope: interactive tasks may use the authorized library across workspaces; selected-only tasks and existing plans remain restricted. An empty query reads selected file excerpts first. Selected versions are exact. Returns fixed citations, coverage and truncation; never claim partial excerpts are complete files.',
+
         parameters: {
           type: 'object',
           properties: { query: { type: 'string' } },
@@ -206,7 +238,7 @@ export class AgentTasks {
         execute: async (args) => {
           await authorize();
           const query = (args as { query: string }).query;
-          if (!query.trim() || query.length > 200 || query.trim().split(/\s+/).length > 8)
+          if (query.length > 200 || query.trim().split(/\s+/).length > 8)
             throw new RuntimeError('INVALID_QUERY');
           const response = await invoke('search', { query });
           if (!isRecord(response) || !Array.isArray(response.items) || response.items.length > 10)
@@ -233,6 +265,42 @@ export class AgentTasks {
       };
       const tools: TaskTool[] = [
         search,
+        ...(task.contractVersion === '1.5' && workAvailable && planManagementAvailable && !planAllowed
+          ? [planManagementTool(invoke, authorize)]
+          : []),
+        ...(briefingAvailable && task.contractVersion === '1.5'
+          ? [
+              briefingDeliveryTool({
+                authorize,
+                invoke: (body, executionSignal) =>
+                  postJson(
+                    new URL(`/internal/v1/agent-access/${task.taskId}/deliver-briefing`, this.platform),
+                    task.attemptId,
+                    body,
+                    AbortSignal.any([signal, executionSignal]),
+                    65536,
+                    12000,
+                  ),
+              }),
+            ]
+          : []),
+        ...(tablesAvailable && task.contractVersion === '1.5'
+          ? [
+              tableComparisonTool({
+                hasSource: (id) => sources.has(id),
+                authorize,
+                invoke: (body, executionSignal) =>
+                  postJson(
+                    new URL(`/internal/v1/agent-access/${task.taskId}/compare-table`, this.platform),
+                    task.attemptId,
+                    body,
+                    AbortSignal.any([signal, executionSignal]),
+                    65536,
+                    12000,
+                  ),
+              }),
+            ]
+          : []),
         {
           name: 'find_skills',
           description:
@@ -274,7 +342,8 @@ export class AgentTasks {
       const contextEnabled = task.contractVersion === '1.5' && contextAvailable;
       const continuity = contextEnabled ? await taskBootstrap(invoke) : undefined;
       if (contextEnabled) tools.push(contextTool(invoke, authorize));
-      if (task.contractVersion === '1.5' && workAvailable) tools.push(...workTools(invoke, authorize, !!planAllowed));
+      if (task.contractVersion === '1.5' && workAvailable)
+        tools.push(...workTools(invoke, authorize, !!planAllowed));
       if (web) {
         const verify = async () => {
           await authorize();
@@ -452,6 +521,17 @@ export class AgentTasks {
             try {
               output = await execute(args, executionSignal);
             } catch (error) {
+              if (tool.name === 'deliver_briefing')
+                console.warn(
+                  JSON.stringify({
+                    event: 'BRIEFING_DELIVERY_REJECTED',
+                    taskId: task.taskId,
+                    code:
+                      error instanceof RuntimeError && /^[A-Z_]{1,64}$/.test(error.code)
+                        ? error.code
+                        : 'TOOL_FAILED',
+                  }),
+                );
               await invoke('execution/tool', { sequence: number, name: tool.name, status: 'failed' });
               throw error;
             }
@@ -466,11 +546,18 @@ export class AgentTasks {
         model,
         tools,
         signal,
-        limits: { timeoutMs: 25000, modelCalls: 8, toolCalls: 8 },
+        limits: { timeoutMs: 55000, modelCalls: 8, toolCalls: 8 },
+        reserveFinalResponse: task.contractVersion === '1.5',
+        hasCompletedDeliverable: hasPreparedBriefing,
       });
       if (denied) throw new RuntimeError('TASK_ACCESS_DENIED');
       if (result.status !== 'completed' || !result.text.trim() || result.text.length > 16000)
         throw new RuntimeError(result.status === 'limit' ? 'TASK_LIMIT' : 'TASK_MODEL_FAILED');
+      if (result.finalResponseReserved && outcome === 'COMPLETE' && !hasPreparedBriefing(result.tools)) {
+        outcome = 'PARTIAL';
+        requiredInput =
+          '本次执行预算已用于资料处理，已保留有依据的阶段结果；请核对回复中的缺口与未完成事项。';
+      }
       // Failed tools cannot be turned into a successful business task by an apologetic model reply.
       if (result.tools.some((t) => t.status !== 'succeeded')) {
         if (task.contractVersion === '1.4') throw new RuntimeError(recipeFailure ?? 'TASK_TOOL_FAILED');

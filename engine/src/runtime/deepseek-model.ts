@@ -31,7 +31,7 @@ export class DeepSeekModel extends ChatCompletionsModel {
     super({
       ...config,
       endpoint,
-      timeoutMs: config.timeoutMs ?? 12000,
+      timeoutMs: config.timeoutMs ?? 45000,
       modeParameters: { thinking: { type: 'disabled' } },
     });
   }

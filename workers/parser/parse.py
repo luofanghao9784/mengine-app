@@ -7,7 +7,7 @@ resource.setrlimit(resource.RLIMIT_NOFILE, (128, 128))
 import csv, io, json, os, re, subprocess, sys, zipfile, warnings
 from pathlib import Path
 
-VERSION = 'local-2'
+VERSION = 'local-3'
 chunks, notes = [], set()
 MAX_CHARS, MAX_CHUNKS = 400_000, 500
 used = 0
@@ -90,6 +90,44 @@ def xlsx_grid_check(path, worksheets):
                         if cells > 200: raise Limit()
                     if event == 'end': element.clear()
 
+class TablePassages:
+    """Keep adjacent spreadsheet cells together, without inferring headers or values."""
+    def __init__(self, title):
+        self.title = title
+        self.rows = []
+        self.opening = []
+
+    def flush(self):
+        if not self.rows: return
+        first, last = self.rows[0][0], self.rows[-1][0]
+        locator = f'{self.title} · 第 {first} 行' if first == last else f'{self.title} · 第 {first}–{last} 行'
+        context = [row for row in self.opening if row[0] < first]
+        text = '\n'.join([f'工作表：{self.title}'] +
+                         ([f'本段前文（第 {context[0][0]}–{context[-1][0]} 行）：'] + [r[1] for r in context] if context else []) +
+                         [r[1] for r in self.rows])
+        add(locator, text, 'TABLE')
+        self.rows = []
+
+    def append(self, number, text):
+        if not text:
+            self.flush(); self.opening = []; return
+        # Preserve oversized rows through the existing bounded splitter. Do not
+        # mistake a split cell for a complete table or discard the remaining bytes.
+        if len(text) > 1200:
+            self.flush(); self.opening = []
+            add(f'{self.title} · 第 {number} 行', text, 'TABLE')
+            return
+        candidate = self.rows + [(number, text)]
+        context = [r for r in self.opening if r[0] < candidate[0][0]]
+        size = len(self.title) + 80 + sum(len(r[1]) + 1 for r in context + candidate)
+        if size > 1950:
+            self.flush()
+        self.rows.append((number, text))
+        # Repeat only exact, bounded opening rows on later passages. They are
+        # labeled as preceding text, never promoted to inferred column headers.
+        if len(self.opening) < 2 and sum(len(r[1]) for r in self.opening) + len(text) <= 600:
+            self.opening.append((number, text))
+
 def parse(path, extension):
     if extension in ('txt', 'md'):
         for i, line in enumerate(decode(path).splitlines(), 1): add(f'第 {i} 行', line)
@@ -129,6 +167,7 @@ def parse(path, extension):
             xlsx_grid_check(path, [sheet._worksheet_path for sheet in formulas])
             for sheet in formulas:
                 sheet.reset_dimensions(); values[sheet.title].reset_dimensions()
+                passages = TablePassages(sheet.title)
                 for i, (raw, cached) in enumerate(zip(sheet.iter_rows(), values[sheet.title].iter_rows()), 1):
                     if i > 20_000 or len(raw) > 200 or len(cached) > 200: raise Limit()
                     cells = []
@@ -139,7 +178,8 @@ def parse(path, extension):
                             v = {'formula': cell.value, 'cachedValue': v}
                             if value.value is None: notes.add('FORMULA_VALUE_MISSING')
                         if v is not None: cells.append(f'{cell.coordinate}={json.dumps(v, ensure_ascii=False, default=str)}')
-                    add(f'{sheet.title} · 第 {i} 行', ' | '.join(cells), 'TABLE')
+                    passages.append(i, ' | '.join(cells))
+                passages.flush()
         finally: values.close(); formulas.close()
     elif extension == 'xls':
         import xlrd

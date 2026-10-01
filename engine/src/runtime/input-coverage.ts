@@ -9,7 +9,7 @@ export function inputCoverage(response: Record<string, unknown>): Record<string,
   if (
     !['MATCHED', 'NO_MATCH'].includes(String(response.matchStatus)) ||
     !isRecord(coverage) ||
-    !['AUTHORIZED_WORKSPACE', 'AUTHORIZED_SHARED', 'SELECTED_VERSIONS'].includes(String(coverage.scope)) ||
+    !['AUTHORIZED_LIBRARY', 'AUTHORIZED_WORKSPACE', 'AUTHORIZED_SHARED', 'SELECTED_VERSIONS'].includes(String(coverage.scope)) ||
     !['EMPTY', 'READY', 'PARTIAL', 'NOT_READY'].includes(String(coverage.status)) ||
     coverage.relevance !== 'NOT_ASSESSED' ||
     typeof coverage.hasMore !== 'boolean' || typeof response.hasMore !== 'boolean' ||

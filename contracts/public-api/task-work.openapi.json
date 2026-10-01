@@ -124,6 +124,48 @@
           }
         }
       }
+    },
+    "/api/v1/tenants/{tenant}/tasks/{task}/plan-receipts": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "task",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "读取会话已被平台接受的计划命令；重新核对本人权限和来源；只读回执不重放命令",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功；仅本人当前权限可见，Cache-Control: private, no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "maxItems": 1,
+                  "items": {
+                    "$ref": "#/components/schemas/PlanCommandReceipt"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -336,6 +378,39 @@
         "required": [
           "requestId"
         ]
+      },
+      "PlanCommandReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "action",
+          "acceptedRevision",
+          "changedSinceAcceptance",
+          "plan"
+        ],
+        "properties": {
+          "action": {
+            "enum": [
+              "create",
+              "update",
+              "pause",
+              "resume",
+              "stop",
+              "mute",
+              "unmute"
+            ]
+          },
+          "acceptedRevision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "changedSinceAcceptance": {
+            "type": "boolean"
+          },
+          "plan": {
+            "$ref": "./plans.openapi.json#/components/schemas/Plan"
+          }
+        }
       }
     },
     "securitySchemes": {

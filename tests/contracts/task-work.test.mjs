@@ -9,7 +9,7 @@ const read = async (p) => JSON.parse(await readFile(new URL(p, import.meta.url),
 const ajv = new Ajv({ strict: false, formats: { uuid: true, 'date-time': true } }),
   id = '00000000-0000-4000-8000-000000000001';
 test('only current owner receipt reads and exact CSRF undo are public', () => {
-  assert.equal(Object.keys(spec.paths).length, 2);
+  assert.equal(Object.keys(spec.paths).length, 3);
   for (const p of Object.values(spec.paths))
     if (p.post)
       assert.ok(p.post.parameters.some((p) => p.in === 'header' && p.name === 'X-CSRF-TOKEN' && p.required));
@@ -55,4 +55,10 @@ test('preference callback is finite and old registration cannot gain either writ
   assert.ok(open({ contractVersion: '1.6', tools: ['task_preference'] }));
   assert.equal(open({ contractVersion: '1.5', tools: ['task_preference'] }), false);
   assert.equal(open({ contractVersion: '1.5', tools: ['task_plan'] }), false);
+});
+test('interactive continuing plan requires current evidence and exact version, without user-supplied authority',async()=>{
+ const schema=await read('../../contracts/engine-api/plan-management.schema.json'),check=ajv.compile(schema);
+ const create={action:'create',workspaceId:id,goal:'销售简报',query:'整理资料',dailyTime:'09:00',evidence:'本月每天09:00根据个人资料整理销售简报。'};
+ assert.ok(check(create));assert.ok(check({action:'read'}));assert.equal(check({...create,recipient:id}),false);
+ assert.equal(check({action:'pause',planId:id,evidence:'暂停计划'}),false);assert.equal(check({...create,dailyTime:'29:00'}),false);assert.equal(check({action:'read',evidence:'无关内容'}),false);
 });

@@ -6,17 +6,22 @@ import { Failure, Loading, Pager, useRemote } from '../shared/admin';
 
 export function OriginalPicker({
   tenant,
-  space,
+  space: initialSpace,
+  spaces,
+  verification=false,
   selected,
   onSelect,
   onClose,
 }: {
   tenant: string;
   space: string;
+  spaces?: {id:string;name:string}[];
+  verification?: boolean;
   selected: TaskOriginal[];
   onSelect: (file: TaskOriginal) => void;
   onClose: () => void;
 }) {
+  const [space,setSpace]=useState(initialSpace);
   const [folder, setFolder] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(0);
@@ -40,8 +45,9 @@ export function OriginalPicker({
   return (
     <Modal title="选择文件版本" onClose={onClose}>
       <p className="muted">
-        本次最多 3 份文件，单份 256 KiB、合计 512 KiB。所选版本固定用于本次任务；上传新版本不会自动替换。
+        本次最多 3 份文件，{verification?'单份 256 KiB、合计 512 KiB':'单份 20 MiB、合计 60 MiB'}。所选版本固定用于本次任务。
       </p>
+      {spaces&&<Field label="资料位置"><select aria-label="资料位置" value={space} onChange={e=>{setSpace(e.target.value);setFolder(null);setPage(0);setDocument(undefined);setQuery('');}}>{spaces.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></Field>}
       {document ? (
         <>
           <Button onClick={() => setDocument(undefined)}>返回文件列表</Button>
@@ -57,8 +63,8 @@ export function OriginalPicker({
                   const other = selected.filter((f) => f.materialId !== document);
                   const fits =
                     other.length < 3 &&
-                    version.sizeBytes <= 262144 &&
-                    other.reduce((n, f) => n + f.bytes, 0) + version.sizeBytes <= 524288;
+                    version.sizeBytes <= (verification?262144:20971520) &&
+                    other.reduce((n, f) => n + f.bytes, 0) + version.sizeBytes <= (verification?524288:62914560);
                   return (
                     <div key={version.id}>
                       <span>
@@ -68,6 +74,7 @@ export function OriginalPicker({
                         disabled={!fits}
                         onClick={() => {
                           onSelect({
+                            workspaceId: space,
                             materialId: document,
                             versionId: version.id,
                             filename: version.filename,
@@ -101,7 +108,7 @@ export function OriginalPicker({
                 setQuery(e.target.value);
                 setPage(0);
               }}
-              placeholder="按文件名搜索当前空间"
+              placeholder="查找名称或正文（含子目录）"
             />
           </Field>
           <nav className="original-picker-path" aria-label="文件夹位置">
@@ -122,6 +129,7 @@ export function OriginalPicker({
                 {files.value.items.map((f) => (
                   <Button
                     key={f.id}
+                    disabled={f.kind==='DRAFT'}
                     onClick={() => {
                       if (f.kind === 'FOLDER') changeFolder(f.id);
                       else {
@@ -132,7 +140,7 @@ export function OriginalPicker({
                   >
                     {f.kind === 'FOLDER' ? '文件夹：' : ''}
                     {f.name}
-                    {f.kind === 'DOCUMENT' ? ` · v${f.version}` : ''}
+                    {f.kind === 'DRAFT' ? ' · 个人文稿，请从文稿卡继续工作' : f.kind === 'DOCUMENT' ? ` · v${f.version}` : ''}
                   </Button>
                 ))}
               </div>

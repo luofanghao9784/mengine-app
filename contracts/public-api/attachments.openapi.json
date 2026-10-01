@@ -1,0 +1,797 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Private conversation attachments",
+    "version": "1.0.0"
+  },
+  "security": [
+    {
+      "sessionCookie": []
+    }
+  ],
+  "paths": {
+    "/api/v1/tenants/{tenant}/conversation-attachments": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "summary": "上传至本人私有会话；幂等回执，不提交任务，不进入普通资料库",
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "成功；仅本人当前权限可见，Cache-Control: private, no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttachmentReceipt"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "metadata",
+                  "file"
+                ],
+                "properties": {
+                  "metadata": {
+                    "$ref": "#/components/schemas/AttachmentUpload"
+                  },
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              },
+              "encoding": {
+                "metadata": {
+                  "contentType": "application/json"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/conversation-attachments/drafts/{request}": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "request",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "核对上传未知结果；不创建新草稿",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功；仅本人当前权限可见，Cache-Control: private, no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "conversation"
+                  ],
+                  "properties": {
+                    "conversation": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/components/schemas/Conversation"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/conversations/{conversation}/attachments": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "conversation",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "仅本人读取该私有会话保留的资料",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功；仅本人当前权限可见，Cache-Control: private, no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Detail"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/conversations/{conversation}/attachments/{material}/save": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "conversation",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "material",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "summary": "显式保存到本人个人资料库；幂等、不共享",
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功；仅本人当前权限可见，Cache-Control: private, no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttachmentSave"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Entry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceName": {
+            "type": "string",
+            "minLength": 1
+          },
+          "folderId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "kind": {
+            "enum": [
+              "FOLDER",
+              "DOCUMENT",
+              "DRAFT"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sizeBytes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "path": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1
+          },
+          "canMaintain": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "workspaceId",
+          "workspaceName",
+          "folderId",
+          "kind",
+          "name",
+          "version",
+          "sizeBytes",
+          "updatedAt",
+          "path",
+          "canMaintain"
+        ],
+        "additionalProperties": false
+      },
+      "Crumb": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "Version": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "filename": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sizeBytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "createdBy": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "UPLOAD",
+              "DOCUMENT_PUBLICATION"
+            ],
+            "description": "版本写入方式；不包含私人文稿、会话或源空间标识。"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "filename",
+          "sizeBytes",
+          "sha256",
+          "createdBy",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "FolderRequest": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "parentId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 180
+          }
+        },
+        "required": [
+          "requestId",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "UploadRequest": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "folderId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "expectedVersion": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          }
+        },
+        "required": [
+          "requestId"
+        ],
+        "additionalProperties": false
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "contractVersion": {
+            "const": "1.0"
+          },
+          "code": {
+            "enum": [
+              "INVALID_REQUEST",
+              "PASSWORD_POLICY",
+              "AUTHENTICATION_REQUIRED",
+              "INVALID_CREDENTIALS",
+              "ACCESS_DENIED",
+              "STATE_CONFLICT",
+              "INVITATION_DELIVERY_UNAVAILABLE",
+              "INVITATION_NOT_FOUND",
+              "INVITATION_INVALID",
+              "INVITATION_UNAVAILABLE",
+              "INVITATION_ACCOUNT_LOGIN_REQUIRED",
+              "EXISTING_ACCOUNT_CREDENTIALS_NOT_ALLOWED",
+              "INVITATION_ACCOUNT_MISMATCH",
+              "IDEMPOTENCY_CONFLICT",
+              "LOGIN_THROTTLED",
+              "INTERNAL_ERROR",
+              "TENANT_NOT_FOUND",
+              "STALE_TENANT_VERSION",
+              "TENANT_SUSPENDED",
+              "INITIAL_ADMIN_UNAVAILABLE",
+              "INITIAL_ADMIN_ALREADY_SET"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "retryable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "contractVersion",
+          "code",
+          "message",
+          "retryable"
+        ],
+        "additionalProperties": false
+      },
+      "Page": {
+        "type": "object",
+        "properties": {
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "folderId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "trail": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Crumb"
+            }
+          },
+          "canMaintain": {
+            "type": "boolean"
+          },
+          "maxUploadBytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 67108864
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Entry"
+            }
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "tenantId",
+          "workspaceId",
+          "folderId",
+          "trail",
+          "canMaintain",
+          "maxUploadBytes",
+          "items",
+          "hasMore"
+        ],
+        "additionalProperties": false
+      },
+      "Detail": {
+        "type": "object",
+        "properties": {
+          "document": {
+            "$ref": "#/components/schemas/Entry"
+          },
+          "versions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Version"
+            }
+          },
+          "hasMore": {
+            "type": "boolean"
+          },
+          "inLibrary": {
+            "type": "boolean",
+            "description": "已显式保存在普通资料库；false 为会话私有附件"
+          }
+        },
+        "required": [
+          "document",
+          "versions",
+          "hasMore"
+        ],
+        "additionalProperties": false
+      },
+      "UploadReceipt": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceName": {
+            "type": "string",
+            "minLength": 1
+          },
+          "folderId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "kind": {
+            "enum": [
+              "FOLDER",
+              "DOCUMENT"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sizeBytes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "path": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1
+          },
+          "canMaintain": {
+            "type": "boolean"
+          },
+          "receiptStatus": {
+            "enum": [
+              "EXACT",
+              "HISTORICAL_UNKNOWN"
+            ]
+          },
+          "acceptedVersion": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Version"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "currentVersion": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "workspaceId",
+          "workspaceName",
+          "folderId",
+          "kind",
+          "name",
+          "version",
+          "sizeBytes",
+          "updatedAt",
+          "path",
+          "canMaintain",
+          "receiptStatus",
+          "acceptedVersion",
+          "currentVersion"
+        ],
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "receiptStatus": {
+                  "const": "EXACT"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "acceptedVersion": {
+                  "$ref": "#/components/schemas/Version"
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "acceptedVersion": {
+                  "type": "null"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "Conversation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "workspaceId",
+          "title",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "AttachmentUpload": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requestId",
+          "draftRequestId"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "draftRequestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "conversationId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "AttachmentSave": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requestId"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "AttachmentReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "conversation",
+          "file"
+        ],
+        "properties": {
+          "conversation": {
+            "$ref": "#/components/schemas/Conversation"
+          },
+          "file": {
+            "$ref": "#/components/schemas/UploadReceipt"
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "DREAMCORE_SESSION"
+      }
+    }
+  }
+}

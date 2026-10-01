@@ -34,6 +34,8 @@ export interface RuntimeResult {
   modelCalls: number;
   tools: { callId: string; name: string; status: 'succeeded' | 'failed'; output?: Json }[];
   code?: string;
+  /** The last model call was reserved to report bounded progress, not business completion. */
+  finalResponseReserved?: boolean;
 }
 export class RuntimeError extends Error {
   constructor(readonly code: string) {

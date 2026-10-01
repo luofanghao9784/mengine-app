@@ -12,7 +12,7 @@ import tools.jackson.databind.json.JsonMapper;
 public class LocalDocumentParser implements DocumentParser {
     private final String root;
     public LocalDocumentParser(@Value("${dreamcore.knowledge.parser-root:}") String root) { this.root=root; }
-    private Result failed() { return new Result("local-2","FAILED",List.of("PARSER_UNAVAILABLE_OR_LIMIT"),List.of()); }
+    private Result failed() { return new Result("local-3","FAILED",List.of("PARSER_UNAVAILABLE_OR_LIMIT"),List.of()); }
     @Override public Result parse(String filename,byte[] original) {
         Path job=null; Process process=null;
         try {
@@ -29,7 +29,7 @@ public class LocalDocumentParser implements DocumentParser {
             if(!process.waitFor(85,TimeUnit.SECONDS) || process.exitValue()!=0) return failed();
             Path output=job.resolve("launcher-output"); if(Files.size(output)>4_000_000) return failed();
             Result result=new JsonMapper().readValue(Files.readAllBytes(output),Result.class);
-            if(!Set.of("READY","PARTIAL","FAILED","UNSUPPORTED").contains(result.status()) || !Set.of("local-1","local-2").contains(result.parserVersion()) || result.chunks()==null || result.chunks().size()>500 || result.warnings()==null || result.warnings().size()>32) return failed();
+            if(!Set.of("READY","PARTIAL","FAILED","UNSUPPORTED").contains(result.status()) || !Set.of("local-1","local-2","local-3").contains(result.parserVersion()) || result.chunks()==null || result.chunks().size()>500 || result.warnings()==null || result.warnings().size()>32) return failed();
             if(result.warnings().stream().anyMatch(x->x==null || !x.matches("[A-Z][A-Z0-9_]{0,63}"))) return failed();
             int total=0;
             for(var chunk:result.chunks()) {

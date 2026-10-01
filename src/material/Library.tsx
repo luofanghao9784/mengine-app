@@ -1,10 +1,11 @@
+import { ContinueWithMaterial } from '../conversation/AttachmentMaterials';
+import { DocumentCard } from '../documents/Documents';
 import { useViewState, textState, pageState } from '../shared/useViewState';
 import { LiveConversationDeck } from '../conversation/LiveConversationDeck';
 import { MoreActions } from '../shared/MoreActions';
 import { ObjectLifecycleWorkspace } from '../objectlifecycle/ObjectLifecycleWorkspace';
 import { ExportBatchPanel } from '../export/ExportBatchPanel';
 import { requestNavigationLocked } from '../shared/request-guard';
-import { documentsHref } from '../documents/routes';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   Info,
@@ -55,14 +56,6 @@ export function LiveLibrary({ tenant }: { tenant: string }) {
   const managementActions = (
     <>
       <Button onClick={() => setContentLifecycleOpen(true)}>内容回收与清理</Button>
-      <Button
-        icon={FileText}
-        onClick={() => {
-          location.hash = documentsHref(tenant);
-        }}
-      >
-        个人文稿
-      </Button>
       <Button variant="ghost" icon={RefreshCw} onClick={() => setAttempt((x) => x + 1)}>
         刷新
       </Button>
@@ -173,6 +166,7 @@ function LibraryListing({
   enterprise: boolean;
   all: boolean;
 }) {
+  const [draftDocument, setDraftDocument] = useState<string>();
   const [contentSearch, setContentSearch] = useState(false);
   const [sourcesOpen, setSourcesOpen] = useState(() =>
     new URLSearchParams(location.hash.slice(1)).has('source'),
@@ -325,9 +319,6 @@ function LibraryListing({
           ))}
         </nav>
         <div className="material-controls">
-          <Button icon={Search} onClick={() => setContentSearch(true)}>
-            搜索内容
-          </Button>
           <form
             onSubmit={(event) => {
               event.preventDefault();
@@ -337,8 +328,8 @@ function LibraryListing({
           >
             <Search size={16} />
             <input
-              aria-label="搜索资料名称"
-              placeholder={workspace ? '搜索当前空间资料' : '搜索企业资料'}
+              aria-label="搜索资料名称或正文"
+              placeholder={workspace ? '查找文件名或正文（含子目录）' : '查找企业资料名称或正文'}
               value={query}
               maxLength={180}
               onChange={(e) => setQuery(e.target.value)}
@@ -411,7 +402,7 @@ function LibraryListing({
           {workspace && (
             <p className="material-caption">
               {data.value.canMaintain ? '可上传与维护' : '只读 · 可查看与下载'}
-              {q ? ' · 搜索范围为当前整个空间' : ''}
+              {q ? ' · 搜索名称与正文，包含当前目录及子目录' : ''}
             </p>
           )}
           <div className={`material-entries ${layout}`}>
@@ -422,7 +413,9 @@ function LibraryListing({
                 onClick={() =>
                   item.kind === 'FOLDER'
                     ? (location.hash = libraryHref(tenant, personal ? 'personal' : item.workspaceId, item.id))
-                    : setDocument({ id: item.id, workspaceId: item.workspaceId })
+                    : item.kind === 'DRAFT'
+                      ? setDraftDocument(item.id)
+                      : setDocument({ id: item.id, workspaceId: item.workspaceId })
                 }
               >
                 <div className="material-cover">
@@ -430,9 +423,11 @@ function LibraryListing({
                   <span>
                     {item.kind === 'FOLDER'
                       ? '文件夹'
-                      : item.name.includes('.')
-                        ? item.name.split('.').at(-1)?.toUpperCase()
-                        : '文件'}
+                      : item.kind === 'DRAFT'
+                        ? '文稿'
+                        : item.name.includes('.')
+                          ? item.name.split('.').at(-1)?.toUpperCase()
+                          : '文件'}
                   </span>
                   {item.kind === 'DOCUMENT' && <strong>{item.name}</strong>}
                 </div>
@@ -556,6 +551,9 @@ function LibraryListing({
             </Field>
           )}
         </BatchUploadDialog>
+      )}
+      {draftDocument && (
+        <DocumentCard tenant={tenant} id={draftDocument} close={() => setDraftDocument(undefined)} />
       )}
       {document && (
         <DocumentDialog
@@ -955,6 +953,13 @@ function DocumentDialog({
                 <>
                   <div className="live-reader-version-bar">
                     <Badge>v{selectedVersion.number}</Badge>
+                    <ContinueWithMaterial
+                      tenant={tenant}
+                      space={entry.workspaceId}
+                      material={entry.id}
+                      version={selectedVersion.id}
+                      close={close}
+                    />
                     <Button icon={Download} disabled={busy} onClick={() => void download(selectedVersion)}>
                       下载原件
                     </Button>

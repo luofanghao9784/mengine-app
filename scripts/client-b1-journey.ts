@@ -102,7 +102,7 @@ export async function verifyClientB1(owner: Page, member: Page, tenant: string, 
 INSERT INTO knowledge_chunks(id,tenant_id,workspace_id,material_id,version_id,run_id,ordinal,locator,method,content) VALUES ('${chunk}','${tenant}','${space}','${material.id}','${version.id}','${run}',0,'合成第 1 页','TEXT',${quote(body)});`);
     }
     await owner.goto(`/workspace/#tenant=${tenant}&view=library`);
-    await owner.getByLabel('搜索资料名称', { exact: true }).fill('b1-reader');
+    await owner.getByLabel('搜索资料名称或正文', { exact: true }).fill('b1-reader');
     await owner.getByRole('button', { name: '搜索', exact: true }).click();
     await owner.locator('.material-entry').filter({ hasText: 'b1-reader.txt' }).click();
     const reader = owner.getByRole('region', { name: '资料阅读视窗', exact: true });
@@ -138,7 +138,7 @@ INSERT INTO knowledge_chunks(id,tenant_id,workspace_id,material_id,version_id,ru
       .click();
     await expect(owner.getByRole('heading', { name: '企业管理', exact: true })).toBeVisible();
     await owner.getByRole('link', { name: '返回原工作', exact: true }).click();
-    await expect(owner.getByLabel('搜索资料名称', { exact: true })).toHaveValue('b1-reader');
+    await expect(owner.getByLabel('搜索资料名称或正文', { exact: true })).toHaveValue('b1-reader');
     await owner.locator('.material-entry').filter({ hasText: 'b1-reader.txt' }).click();
     await expect(body).toContainText('第 1 版合成阅读段落');
     await owner.setViewportSize({ width: 390, height: 844 });

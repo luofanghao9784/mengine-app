@@ -1,6 +1,7 @@
 package com.dreamcore.workspace.briefing;
 
 import com.dreamcore.workspace.conversation.TaskOriginals;
+import com.dreamcore.workspace.conversation.BriefingContentService;
 import com.dreamcore.workspace.identity.*;
 import com.dreamcore.workspace.knowledge.KnowledgeService;
 import com.dreamcore.workspace.material.MaterialAccess;
@@ -16,21 +17,24 @@ public class BriefingService {
     public record Preference(int revision, boolean pinned, boolean hidden, String size) {}
     public record Card(UUID conversationId, UUID taskId, int taskRevision, int attempt, String presentationVersion, UUID workspaceId, String workspaceName, String title,
                        String excerpt, boolean truncated, Instant completedAt, String executionClass, String engineVersion,
-                       int artifactCount, int citationCount, int originalCount, Preference preference) {}
+                       int artifactCount, int citationCount, int originalCount, Preference preference,BriefingContentService.Document briefing) {}
     public record Page(UUID tenantId, String view, String date, String zone, List<Card> items, boolean hasMore) {}
     private final JdbcTemplate db;
     private final IdentityService identities;
     private final MaterialAccess access;
     private final TaskOriginals originals;
     private final KnowledgeService knowledge;
-    private final IdentityAudit audit;
+    private final IdentityAudit audit;private final BriefingContentService briefings;
     private final com.dreamcore.workspace.departure.DepartureAccess departure;
-    public BriefingService(JdbcTemplate db, IdentityService identities, MaterialAccess access, TaskOriginals originals, KnowledgeService knowledge, IdentityAudit audit,com.dreamcore.workspace.departure.DepartureAccess departure) {this.departure=departure;
+    public BriefingService(JdbcTemplate db, IdentityService identities, MaterialAccess access, TaskOriginals originals, KnowledgeService knowledge, IdentityAudit audit,com.dreamcore.workspace.departure.DepartureAccess departure,BriefingContentService briefings) {this.briefings=briefings;this.departure=departure;
         this.db=db; this.identities=identities; this.access=access; this.originals=originals; this.knowledge=knowledge; this.audit=audit;
     }
     private IdentityException missing() { return new IdentityException(404,"BRIEFING_NOT_FOUND"); }
     @Transactional
-    public Page list(UUID actor, UUID tenant, UUID space, String view, String date, String zone, int offset, int limit) {
+    public Page list(UUID actor, UUID tenant, UUID space, String view, String date, String zone, int offset, int limit) {return list(actor,tenant,space,view,date,zone,offset,limit,false);}
+    @Transactional public Page list(UUID actor, UUID tenant, UUID space, String view, String date, String zone, int offset, int limit,boolean generatedOnly) {return list(actor,tenant,space,view,date,zone,offset,limit,generatedOnly,null);}
+    @Transactional public Page list(UUID actor, UUID tenant, UUID space, String view, String date, String zone, int offset, int limit,boolean generatedOnly,String businessType) {
+        if(businessType!=null&&!Set.of("INFO","DATA","INSIGHT","SUGGESTION","RESULT").contains(businessType))throw IdentityException.invalid();
         if(view==null || !Set.of("LATEST","FOCUSED","HIDDEN").contains(view) || offset<0 || offset>10000 || limit<1 || limit>30 || (date!=null && (!date.matches("[0-9]{4}-[0-9]{2}-[0-9]{2}") || date.startsWith("0000")))) throw IdentityException.invalid();
         ZoneId timeZone; LocalDate day;
         try { timeZone=ZoneId.of(zone); day=date==null?null:LocalDate.parse(date); if(day!=null && !day.toString().equals(date))throw new IllegalArgumentException(); }
@@ -44,9 +48,11 @@ public class BriefingService {
             args.add(Timestamp.from(day.atStartOfDay(timeZone).toInstant()));
             args.add(Timestamp.from(day.plusDays(1).atStartOfDay(timeZone).toInstant()));
         }
+        if(generatedOnly)range+=" AND EXISTS ("+BriefingContentService.ELIGIBLE+")";
+        if(businessType!=null){range+=" AND EXISTS(SELECT 1 FROM ("+BriefingContentService.ELIGIBLE+") classified WHERE convert_from(classified.content,'UTF8')::jsonb->>'businessType'=?)";args.add(businessType);}
         String sql="""
-            SELECT c.id AS conversation_id,c.workspace_id,w.name AS workspace_name,CASE WHEN EXISTS(SELECT 1 FROM readable_source_tasks title_source WHERE title_source.id=(SELECT first_task.id FROM conversation_tasks first_task WHERE first_task.conversation_id=c.id ORDER BY first_task.created_at,first_task.id LIMIT 1)) THEN c.title ELSE '会话内容暂不可用' END AS title,
-                   t.id AS task_id,left(t.reply,600) AS excerpt,length(t.reply)>600 AS truncated,t.finished_at,
+            SELECT c.id AS conversation_id,c.workspace_id,w.name AS workspace_name,coalesce(convert_from(b.content,'UTF8')::jsonb->>'title',CASE WHEN EXISTS(SELECT 1 FROM readable_source_tasks title_source WHERE title_source.id=(SELECT first_task.id FROM conversation_tasks first_task WHERE first_task.conversation_id=c.id ORDER BY first_task.created_at,first_task.id LIMIT 1)) THEN c.title ELSE '会话内容暂不可用' END) AS title,
+                   t.id AS task_id,coalesce(convert_from(b.content,'UTF8')::jsonb->>'summary',left(t.reply,600)) AS excerpt,(b.id IS NULL AND length(t.reply)>600) AS truncated,t.finished_at,
                    t.execution_class,t.engine_version,t.revision AS task_revision,t.attempt,
                    (SELECT count(*) FROM conversation_artifacts a WHERE a.task_id=t.id AND a.attempt_number=t.attempt) AS artifact_count,
                    (SELECT count(*) FROM conversation_sources s WHERE s.task_id=t.id AND s.attempt_number=t.attempt) AS citation_count,
@@ -59,6 +65,9 @@ public class BriefingService {
                 AND t.mode='AGENT' AND t.status='SUCCEEDED' AND t.reply IS NOT NULL AND EXISTS(SELECT 1 FROM readable_source_tasks rt WHERE rt.id=t.id)
             """+range+"""
                 ORDER BY t.finished_at DESC,t.id DESC LIMIT 1) t ON true
+            LEFT JOIN LATERAL (
+            """+BriefingContentService.ELIGIBLE+"""
+            ) b ON true
             LEFT JOIN briefing_preferences p ON p.conversation_id=c.id AND p.owner_id=c.owner_id
             LEFT JOIN workspace_members g ON g.tenant_id=c.tenant_id AND g.workspace_id=c.workspace_id AND g.account_id=?
             WHERE c.tenant_id=? AND c.owner_id=? AND c.purpose='BUSINESS' AND ((w.kind='PERSONAL' AND w.owner_id=?) OR (w.kind='SHARED' AND g.account_id IS NOT NULL))
@@ -69,7 +78,7 @@ public class BriefingService {
         if(view.equals("FOCUSED"))sql+=" AND coalesce(p.pinned,false)=true";
         sql+=view.equals("FOCUSED")?" ORDER BY p.focus_position ASC NULLS LAST,c.id LIMIT ? OFFSET ?":" ORDER BY t.finished_at DESC,c.id LIMIT ? OFFSET ?"; args.add(limit+1); args.add(offset);
         db.execute("SET LOCAL statement_timeout='3s'");
-        var found=db.query(sql,(r,n)->new Card(r.getObject("conversation_id",UUID.class),r.getObject("task_id",UUID.class),r.getInt("task_revision"),r.getInt("attempt"),"briefing-basic-v1",r.getObject("workspace_id",UUID.class),r.getString("workspace_name"),r.getString("title"),r.getString("excerpt"),r.getBoolean("truncated"),r.getTimestamp("finished_at").toInstant(),r.getString("execution_class"),r.getString("engine_version"),r.getInt("artifact_count"),r.getInt("citation_count"),r.getInt("original_count"),new Preference(r.getInt("pref_revision"),r.getBoolean("pinned"),r.getBoolean("hidden"),r.getString("size"))),args.toArray());
+        var found=db.query(sql,(r,n)->new Card(r.getObject("conversation_id",UUID.class),r.getObject("task_id",UUID.class),r.getInt("task_revision"),r.getInt("attempt"),"briefing-basic-v1",r.getObject("workspace_id",UUID.class),r.getString("workspace_name"),r.getString("title"),r.getString("excerpt"),r.getBoolean("truncated"),r.getTimestamp("finished_at").toInstant(),r.getString("execution_class"),r.getString("engine_version"),r.getInt("artifact_count"),r.getInt("citation_count"),r.getInt("original_count"),new Preference(r.getInt("pref_revision"),r.getBoolean("pinned"),r.getBoolean("hidden"),r.getString("size")),briefings.find(r.getObject("task_id",UUID.class),r.getInt("attempt"))),args.toArray());
         var cards=found.stream().limit(limit).toList();
         // Current grants apply even when displaying an old day's immutable task result.
         for(var card:cards) {

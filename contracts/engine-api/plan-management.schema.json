@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dreamcore:plan-management:1.0",
+  "$comment": "Current interactive owner only. Server rechecks active attempt, current prompt, supported trigger/source/end conditions, registered tool and one command receipt per task. It never broadens a background plan implicitly.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "action"
+  ],
+  "properties": {
+    "action": {
+      "enum": [
+        "read",
+        "create",
+        "update",
+        "pause",
+        "resume",
+        "stop",
+        "mute",
+        "unmute"
+      ]
+    },
+    "planId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "expectedRevision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "workspaceId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "goal": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "query": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000
+    },
+    "dailyTime": {
+      "type": "string",
+      "pattern": "^(?:[01][0-9]|2[0-3]):[0-5][0-9]$"
+    },
+    "materialEvents": {
+      "type": "boolean"
+    },
+    "evidence": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "action": {
+            "const": "read"
+          }
+        }
+      },
+      "then": {
+        "maxProperties": 1
+      },
+      "else": {
+        "required": [
+          "evidence"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "action": {
+            "enum": [
+              "update",
+              "pause",
+              "resume",
+              "stop",
+              "mute",
+              "unmute"
+            ]
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "planId",
+          "expectedRevision"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "action": {
+            "enum": [
+              "create",
+              "update"
+            ]
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "workspaceId",
+          "goal",
+          "query"
+        ],
+        "anyOf": [
+          {
+            "required": [
+              "dailyTime"
+            ]
+          },
+          {
+            "required": [
+              "materialEvents"
+            ],
+            "properties": {
+              "materialEvents": {
+                "const": true
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

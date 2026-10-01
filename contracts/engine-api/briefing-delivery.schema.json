@@ -1,0 +1,623 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dreamcore:briefing-delivery:1.0",
+  "$comment": "POST /internal/v1/agent-access/{task}/deliver-briefing; active attempt bearer; no-store. Model writes prose only; server binds exact calculation values and publishes privately only after successful completion.",
+  "$defs": {
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "summary",
+        "analysis"
+      ],
+      "properties": {
+        "calculationArtifactId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 80
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 12,
+          "maxLength": 240
+        },
+        "analysis": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 4,
+          "items": {
+            "type": "string",
+            "minLength": 12,
+            "maxLength": 500
+          }
+        },
+        "businessType": {
+          "enum": [
+            "INFO",
+            "DATA",
+            "INSIGHT",
+            "SUGGESTION",
+            "RESULT"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "anyOf": [
+              {
+                "not": {
+                  "required": [
+                    "businessType"
+                  ]
+                }
+              },
+              {
+                "properties": {
+                  "businessType": {
+                    "const": "DATA"
+                  }
+                }
+              }
+            ]
+          },
+          "then": {
+            "required": [
+              "calculationArtifactId"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "calculationArtifactId"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contractVersion",
+        "status",
+        "artifactId",
+        "title",
+        "visibility"
+      ],
+      "properties": {
+        "contractVersion": {
+          "const": "1.0"
+        },
+        "status": {
+          "const": "PREPARED"
+        },
+        "artifactId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 80
+        },
+        "visibility": {
+          "const": "PRIVATE_AFTER_TASK_SUCCEEDS"
+        }
+      }
+    },
+    "document": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifactId",
+        "sha256",
+        "content"
+      ],
+      "properties": {
+        "artifactId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "content": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "schemaVersion",
+                "businessType",
+                "title",
+                "summary",
+                "analysis",
+                "chart",
+                "source",
+                "calculationArtifactId",
+                "calculationSha256",
+                "generatedAt"
+              ],
+              "properties": {
+                "schemaVersion": {
+                  "const": "briefing-data-v1"
+                },
+                "businessType": {
+                  "const": "DATA"
+                },
+                "title": {
+                  "type": "string",
+                  "minLength": 4,
+                  "maxLength": 80
+                },
+                "summary": {
+                  "type": "string",
+                  "minLength": 12,
+                  "maxLength": 240
+                },
+                "analysis": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 4,
+                  "items": {
+                    "type": "string",
+                    "minLength": 12,
+                    "maxLength": 500
+                  }
+                },
+                "chart": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "type",
+                    "metric",
+                    "unit",
+                    "baseline",
+                    "current",
+                    "range",
+                    "rows",
+                    "totals"
+                  ],
+                  "properties": {
+                    "type": {
+                      "const": "GROUPED_BAR"
+                    },
+                    "metric": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    },
+                    "unit": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    },
+                    "baseline": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    },
+                    "current": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    },
+                    "range": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 32
+                    },
+                    "rows": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 50,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "group",
+                          "baseline",
+                          "current",
+                          "difference",
+                          "changePercent",
+                          "baselineRank",
+                          "currentRank",
+                          "issue"
+                        ],
+                        "properties": {
+                          "group": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "baseline": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^-?\\d{1,64}(?:\\.\\d{1,12})?$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "current": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^-?\\d{1,64}(?:\\.\\d{1,12})?$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "difference": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^-?\\d{1,64}(?:\\.\\d{1,12})?$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "changePercent": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^-?\\d{1,64}(?:\\.\\d{1,12})?$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "baselineRank": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 50
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "currentRank": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 50
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "issue": {
+                            "anyOf": [
+                              {
+                                "enum": [
+                                  "MISSING_PERIOD",
+                                  "NON_POSITIVE_BASELINE",
+                                  "UNEQUAL_GROUP_COVERAGE"
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    "totals": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "group",
+                        "baseline",
+                        "current",
+                        "difference",
+                        "changePercent",
+                        "baselineRank",
+                        "currentRank",
+                        "issue"
+                      ],
+                      "properties": {
+                        "group": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 100
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "baseline": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^-?\\d{1,64}(?:\\.\\d{1,12})?$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "current": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^-?\\d{1,64}(?:\\.\\d{1,12})?$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "difference": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^-?\\d{1,64}(?:\\.\\d{1,12})?$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "changePercent": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^-?\\d{1,64}(?:\\.\\d{1,12})?$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "baselineRank": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 50
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "currentRank": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 50
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "issue": {
+                          "anyOf": [
+                            {
+                              "enum": [
+                                "MISSING_PERIOD",
+                                "NON_POSITIVE_BASELINE",
+                                "UNEQUAL_GROUP_COVERAGE"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                },
+                "source": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "id",
+                    "materialId",
+                    "versionId",
+                    "version",
+                    "filename",
+                    "sha256",
+                    "scopeExcerpt"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "materialId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "versionId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "filename": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 255
+                    },
+                    "sha256": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    },
+                    "scopeExcerpt": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 4000
+                    }
+                  }
+                },
+                "calculationArtifactId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "calculationSha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "generatedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "schemaVersion",
+                "businessType",
+                "title",
+                "summary",
+                "analysis",
+                "chart",
+                "source",
+                "calculationArtifactId",
+                "calculationSha256",
+                "generatedAt"
+              ],
+              "properties": {
+                "schemaVersion": {
+                  "const": "briefing-text-v1"
+                },
+                "businessType": {
+                  "enum": [
+                    "INFO",
+                    "INSIGHT",
+                    "SUGGESTION",
+                    "RESULT"
+                  ]
+                },
+                "title": {
+                  "type": "string",
+                  "minLength": 4,
+                  "maxLength": 80
+                },
+                "summary": {
+                  "type": "string",
+                  "minLength": 12,
+                  "maxLength": 240
+                },
+                "analysis": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 4,
+                  "items": {
+                    "type": "string",
+                    "minLength": 12,
+                    "maxLength": 500
+                  }
+                },
+                "chart": {
+                  "type": "null"
+                },
+                "source": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "id",
+                        "materialId",
+                        "versionId",
+                        "version",
+                        "filename",
+                        "sha256",
+                        "scopeExcerpt"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "materialId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "versionId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "version": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "filename": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 255
+                        },
+                        "sha256": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        },
+                        "scopeExcerpt": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 4000
+                        }
+                      }
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "calculationArtifactId": {
+                  "type": "null"
+                },
+                "calculationSha256": {
+                  "type": "null"
+                },
+                "generatedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

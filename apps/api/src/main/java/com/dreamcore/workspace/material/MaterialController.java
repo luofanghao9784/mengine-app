@@ -52,6 +52,7 @@ public class MaterialController {
             @RequestParam(defaultValue="0") int offset,@RequestParam(defaultValue="50") int limit) {
         return service.detail(actor(auth),tenant,workspace,material,offset,limit);
     }
+    @GetMapping("/workspaces/{workspace}/materials/{material}/versions/{version}") public MaterialService.Version exactVersion(Authentication auth,@PathVariable UUID tenant,@PathVariable UUID workspace,@PathVariable UUID material,@PathVariable UUID version){return service.version(actor(auth),tenant,workspace,material,version);}
     @GetMapping("/workspaces/{workspace}/materials/{material}/versions/{version}/download")
     public ResponseEntity<byte[]> download(Authentication auth,@PathVariable UUID tenant,@PathVariable UUID workspace,@PathVariable UUID material,@PathVariable UUID version) {
         var result=service.download(actor(auth),tenant,workspace,material,version);

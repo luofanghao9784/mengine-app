@@ -16,8 +16,8 @@ public class BriefingController {
     private final BriefingService service;
     public BriefingController(BriefingService service){this.service=service;}
     @ModelAttribute public void privateResponse(HttpServletResponse response){response.setHeader("Cache-Control","private, no-store");response.setHeader("X-Content-Type-Options","nosniff");}
-    @GetMapping public BriefingService.Page list(Authentication auth,@PathVariable UUID tenant,@RequestParam(required=false) UUID workspaceId,@RequestParam(defaultValue="LATEST") String view,@RequestParam(required=false) String date,@RequestParam(defaultValue="Asia/Shanghai") String zone,@RequestParam(defaultValue="0") int offset,@RequestParam(defaultValue="20") int limit) {
-        return service.list(UUID.fromString(auth.getName()),tenant,workspaceId,view,date,zone,offset,limit);
+    @GetMapping public BriefingService.Page list(Authentication auth,@PathVariable UUID tenant,@RequestParam(required=false) UUID workspaceId,@RequestParam(defaultValue="LATEST") String view,@RequestParam(required=false) String date,@RequestParam(defaultValue="Asia/Shanghai") String zone,@RequestParam(defaultValue="0") int offset,@RequestParam(defaultValue="20") int limit,@RequestParam(defaultValue="false") boolean generatedOnly,@RequestParam(required=false) String businessType) {
+        return service.list(UUID.fromString(auth.getName()),tenant,workspaceId,view,date,zone,offset,limit,generatedOnly,businessType);
     }
     @PostMapping("/{conversation}") public BriefingService.Preference update(Authentication auth,@PathVariable UUID tenant,@PathVariable UUID conversation,@Valid @RequestBody Update body) {
         return service.update(UUID.fromString(auth.getName()),tenant,conversation,body.requestId(),body.expectedRevision(),body.pinned(),body.hidden(),body.size());

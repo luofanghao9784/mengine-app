@@ -1,3 +1,4 @@
+import { briefingTypeLabels } from './content';
 import { useViewState, textState, pageState } from '../shared/useViewState';
 import { ForwardInbox } from '../forwarding/ForwardInbox';
 import { Recommendations } from '../recommendation/Recommendations';
@@ -39,6 +40,7 @@ export function LiveBriefing({ tenant }: { tenant: string }) {
     [space, setSpace] = useViewState(tenant, 'briefing:space', '', textState);
   const [page, setPage] = useViewState(tenant, 'briefing:page', 0, pageState),
     [attempt, setAttempt] = useState(0);
+  const [businessType, setBusinessType] = useViewState(tenant, 'briefing:type', '', textState);
   const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const refresh = () => setAttempt((n) => n + 1);
   const [moving, setMoving] = useState<string>();
@@ -78,6 +80,7 @@ export function LiveBriefing({ tenant }: { tenant: string }) {
             tenant,
             {
               view,
+              businessType: businessType || undefined,
               date: date || null,
               zone,
               ...(space ? { workspaceId: space } : {}),
@@ -85,7 +88,7 @@ export function LiveBriefing({ tenant }: { tenant: string }) {
             page * 20,
             signal,
           ),
-    [tenant, view, date, zone, space, page, session.identity, attempt],
+    [tenant, view, businessType, date, zone, space, page, session.identity, attempt],
   );
   useEffect(() => {
     const check = () => {
@@ -122,8 +125,8 @@ export function LiveBriefing({ tenant }: { tenant: string }) {
               role="tab"
               aria-selected={tab === label}
               aria-controls="live-briefing-panel"
-              title={label === '类型' ? '业务类型分类尚未接入' : undefined}
-              disabled={pendingRequest || label === '类型'}
+
+              disabled={pendingRequest}
               onClick={() => {
                 setTab(label);
                 setPage(0);
@@ -149,9 +152,26 @@ export function LiveBriefing({ tenant }: { tenant: string }) {
         </button>
       </PageActions>
       <section className="live-briefing" id="live-briefing-panel" role="tabpanel">
-        <Attention tenant={tenant} />
+        <Attention tenant={tenant} refreshToken={attempt} />
         <ForwardInbox tenant={tenant} />
         <div className="live-briefing-filters">
+          <Field label="内容类型">
+            <select
+              aria-label="内容类型"
+              value={businessType}
+              onChange={(e) => {
+                setBusinessType(e.target.value);
+                setPage(0);
+              }}
+            >
+              <option value="">全部类型</option>
+              {Object.entries(briefingTypeLabels).map(([key, label]) => (
+                <option key={key} value={key}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </Field>
           {tab === '日期' && (
             <Field label="完成日期">
               <input
@@ -216,9 +236,10 @@ export function LiveBriefing({ tenant }: { tenant: string }) {
         {!!context.error && <Failure error={context.error} retry={refresh} />}
         {view === 'RECOMMENDED' ? (
           <Recommendations
-            key={tenant + ':' + space + ':' + attempt}
+            key={tenant + ':' + space + ':' + businessType + ':' + attempt}
             tenant={tenant}
             workspace={space || null}
+            businessType={businessType || undefined}
           />
         ) : feed.error || context.error ? (
           <Failure error={feed.error || context.error} retry={refresh} />
@@ -226,6 +247,16 @@ export function LiveBriefing({ tenant }: { tenant: string }) {
           <Loading />
         ) : (
           <>
+            {view === 'FOCUSED' && (
+              <Recommendations
+                key={'publication-focus:' + space + ':' + businessType + ':' + attempt}
+                tenant={tenant}
+                workspace={space || null}
+                businessType={businessType || undefined}
+                publicationsOnly
+                focused
+              />
+            )}
             {view === 'FOCUSED' && (
               <section className="focus-layout-tools" aria-label="关注布局">
                 <details>
@@ -261,12 +292,12 @@ export function LiveBriefing({ tenant }: { tenant: string }) {
                     ? '没有隐藏的卡片'
                     : view === 'FOCUSED'
                       ? '还没有关注的卡片'
-                      : '暂时没有会话成果'
+                      : '暂时没有生成的画报'
                 }
                 text={
                   date
-                    ? '这一天没有符合当前范围的已完成回复。可切换日期或空间。'
-                    : '完成的会话回复会在这里汇集；关注、隐藏只改变自己的画报。'
+                    ? '这一天没有符合当前范围的画报。可切换日期或空间。'
+                    : '可在会话中要求 AI 根据资料生成画报；有完整内容和依据的结果会出现在这里。'
                 }
               >
                 <a className="button" href={conversationHref(tenant)}>
@@ -390,8 +421,12 @@ function Card({
   return (
     <>
       <article
-        className={'live-briefing-card ' + (card.preference.size === 'WIDE' ? 'wide' : '')}
-        aria-label={'会话成果：' + card.title}
+        className={
+          'live-briefing-card ' +
+          (card.briefing ? 'has-data-briefing ' : '') +
+          (card.preference.size === 'WIDE' ? 'wide' : '')
+        }
+        aria-label={(card.briefing ? '画报：' : '会话成果：') + card.title}
         data-conversation-id={card.conversationId}
       >
         <button
@@ -401,6 +436,7 @@ function Card({
           onClick={() => setReading(true)}
         >
           <MagazineBody
+            briefing={card.briefing}
             title={card.title}
             excerpt={card.excerpt}
             truncated={card.truncated}
@@ -476,6 +512,7 @@ function Card({
         <ReadingDialog
           tenant={tenant}
           title={card.title}
+          contentLabel={card.briefing ? '数据分析' : undefined}
           workspace={card.workspaceName}
           date={card.completedAt}
           task={{

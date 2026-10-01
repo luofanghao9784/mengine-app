@@ -76,10 +76,10 @@ public class EngineTaskRuntime implements TaskRuntime {
             if(!active.getAsBoolean())throw new IdentityException(403,"TASK_SOURCE_UNAVAILABLE");
             var descriptor=compatible(true);String version=descriptor.engineVersion();String protocol=descriptor.protocols().get("agentTask");
             if(protocol.equals("1.4") && prompt.length()>2000)throw new IdentityException(503,"TASK_RUNTIME_INCOMPATIBLE");
-            var request=HttpRequest.newBuilder(uri.resolve("/internal/v1/agent-results")).timeout(Duration.ofSeconds(30)).header("Authorization","Bearer "+token).header("Content-Type","application/json").header("X-Dreamcore-Engine-Version",version)
+            var request=HttpRequest.newBuilder(uri.resolve("/internal/v1/agent-results")).timeout(Duration.ofSeconds(60)).header("Authorization","Bearer "+token).header("Content-Type","application/json").header("X-Dreamcore-Engine-Version",version)
                 .POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(Map.of("contractVersion",protocol,"taskId",task,"attemptId",attempt,"prompt",prompt)))).build();
             if(!active.getAsBoolean())throw new IdentityException(403,"TASK_SOURCE_UNAVAILABLE");
-            future=http.sendAsync(request,info->new BoundedBody(262144));long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(32);
+            future=http.sendAsync(request,info->new BoundedBody(262144));long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(62);
             while(true){
                 if(!active.getAsBoolean())throw new IdentityException(403,"TASK_SOURCE_UNAVAILABLE");
                 if(System.nanoTime()>deadline)throw new IdentityException(503,"TASK_RESULT_UNKNOWN");

@@ -25,7 +25,7 @@
       ],
       "get": {
         "summary": "汇总本人可见的企业共享资料",
-        "description": "排除所有个人空间。q 按名称搜索；offset/limit 分页。",
+        "description": "先按当前企业及空间权限过滤；q 同时检索名称与已解析正文。指定目录时搜索该目录及子目录，按对象去重后统一排序和分页。个人资料包含 DRAFT，未保存的会话附件不在普通资料库。",
         "responses": {
           "200": {
             "description": "成功",
@@ -174,7 +174,7 @@
       ],
       "get": {
         "summary": "浏览目录或搜索当前整个空间",
-        "description": "folder 仅用于目录浏览；q 非空时按名称搜索整个当前空间。返回完整路径、当前维护权和本环境上传上限。",
+        "description": "先按当前企业及空间权限过滤；q 同时检索名称与已解析正文。指定目录时搜索该目录及子目录，按对象去重后统一排序和分页。个人资料包含 DRAFT，未保存的会话附件不在普通资料库。",
         "responses": {
           "200": {
             "description": "成功",
@@ -1051,6 +1051,62 @@
           }
         }
       }
+    },
+    "/api/v1/tenants/{tenant}/workspaces/{workspace}/materials/{material}/versions/{version}": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "workspace",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "material",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "version",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "读取确切版本元数据；不切换到最新版本",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功；仅本人当前权限可见，Cache-Control: private, no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Version"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1102,7 +1158,8 @@
           "kind": {
             "enum": [
               "FOLDER",
-              "DOCUMENT"
+              "DOCUMENT",
+              "DRAFT"
             ]
           },
           "name": {
@@ -1391,6 +1448,10 @@
           },
           "hasMore": {
             "type": "boolean"
+          },
+          "inLibrary": {
+            "type": "boolean",
+            "description": "已显式保存在普通资料库；false 为会话私有附件"
           }
         },
         "required": [

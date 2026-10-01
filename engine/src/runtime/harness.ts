@@ -34,13 +34,15 @@ export async function runHarness(options: {
   tools: readonly TaskTool[];
   signal?: AbortSignal;
   limits?: { modelCalls?: number; toolCalls?: number; timeoutMs?: number };
+  reserveFinalResponse?: boolean;
+  hasCompletedDeliverable?: (tools: RuntimeResult['tools']) => boolean;
 }): Promise<RuntimeResult> {
   if (!options.model) throw new RuntimeError('MODEL_NOT_CONFIGURED');
   if (
     !options.prompt.trim() ||
     options.prompt.length > 16000 ||
     (options.context !== undefined && Buffer.byteLength(JSON.stringify(options.context)) > 24576) ||
-    options.tools.length > 14 ||
+    options.tools.length > 16 ||
     new Set(options.tools.map((t) => t.name)).size !== options.tools.length ||
     options.tools.some((t) => !/^[a-z][a-z0-9_]{0,63}$/.test(t.name))
   )
@@ -52,6 +54,10 @@ export async function runHarness(options: {
   const maxCalls = bound(options.limits?.modelCalls ?? 4, 12);
   const maxTools = bound(options.limits?.toolCalls ?? 4, 16);
   const timeoutMs = bound(options.limits?.timeoutMs ?? 15000, 60000);
+  // A final reply needs wall-clock time as well as one remaining call. Slow tool
+  // rounds must not consume the entire deadline while nominal calls remain.
+  const finalResponseMs = Math.min(40000, Math.floor(timeoutMs * 0.75));
+  const deadline = performance.now() + timeoutMs;
   const result: RuntimeResult = { status: 'failed', text: '', modelCalls: 0, tools: [] };
   if (options.signal?.aborted) return { ...result, status: 'cancelled', code: 'CANCELLED' };
   const controller = new AbortController();
@@ -97,6 +103,11 @@ export async function runHarness(options: {
           return;
         }
         result.modelCalls++;
+        const remainingMs = Math.max(0, deadline - performance.now());
+        const finalResponse = options.reserveFinalResponse === true &&
+          (result.modelCalls === maxCalls || toolCalls >= maxTools || remainingMs <= finalResponseMs);
+        if (finalResponse) result.finalResponseReserved = true;
+        const completedDeliverable = options.hasCompletedDeliverable?.(result.tools) === true;
         const messages = request.messages.map((message) => ({
           role: message.role,
           content: message.content.flatMap((block): ModelBlock[] => {
@@ -115,11 +126,17 @@ export async function runHarness(options: {
             throw new RuntimeError('UNSUPPORTED_MODEL_CONTENT');
           }),
         }));
+        if (options.reserveFinalResponse) messages.unshift({
+          role: 'system',
+          content: [{ type: 'text', text: finalResponse
+            ? completedDeliverable ? 'This is the reserved final response. No tools may be called. The platform has verified an actual saved deliverable and all tools succeeded. Give a short user-facing completion confirmation if it satisfies the request. Do not expose internal IDs or PREPARED status. Be explicit about any remaining limitation; do not invent work.' : 'This is the reserved final response. No tools may be called. Deliver a concise answer with useful findings already supported by evidence, citations, and specific missing data or unfinished work. Do not claim full completion or invent values. The platform will retain this as a partial result.'
+            : `Execution budget: ${maxCalls - result.modelCalls} model calls remain after this call, including one reserved final response. ${Math.max(0, maxTools - toolCalls)} tool calls and ${Math.floor(remainingMs / 1000)} seconds remain. Avoid repeated unproductive searches; use short literal keywords. Once evidence is sufficient, finish with a concise answer. Do not draft a full answer before another tool call; reserve the answer for the final response.` }],
+        });
         let index = 0,
           finished = false;
         for await (const part of model.generate({
           messages,
-          tools: request.tools ?? [],
+          tools: finalResponse ? [] : request.tools ?? [],
           signal: controller.signal,
           maxTokens: 2048,
         })) {
@@ -146,6 +163,10 @@ export async function runHarness(options: {
             yield { type: 'text-delta', index, text: part.text };
             yield { type: 'block-end', index, block: { type: 'text', text: part.text } };
           } else {
+            if (finalResponse) {
+              abort('MODEL_CALL_LIMIT');
+              return;
+            }
             if (
               part.type !== 'tool_call' ||
               typeof part.id !== 'string' ||

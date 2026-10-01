@@ -1022,3 +1022,5 @@
     max-height: calc(100dvh - 20px);
   }
 }
+
+.attachment-materials{display:flex;flex-wrap:wrap;gap:6px;align-items:center;flex:1;min-width:0}.attachment-add-options{display:flex;align-items:center;flex-wrap:wrap;gap:8px;width:100%;padding:8px;border-radius:12px;background:var(--surface-secondary,#f5f5f5)}.attachment-chip{display:flex;flex-wrap:wrap;align-items:center;gap:4px;padding:4px 6px;border:1px solid var(--border,#e4e4e7);border-radius:12px;max-width:100%;font-size:12px}.attachment-chip .button{max-width:100%;white-space:normal}.attachment-preparation{font-size:11px;color:var(--text-muted,#71717a)}.attachment-scope{display:flex;align-items:center;gap:6px;padding:0 12px 8px;font-size:12px}.attachment-scope input{width:auto}

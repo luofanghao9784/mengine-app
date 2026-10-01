@@ -1,6 +1,6 @@
 {
   "format": "dreamcore-recovery-coverage-v1",
-  "throughVersion": 43,
+  "throughVersion": 46,
   "implementationHashes": {
     "apps/api/src/main/java/com/dreamcore/workspace/departure/DepartureResidualCleanup.java": "f0b8fe926ac679177effbcacd529994abc901c2afcc779dca65442e1cb2ae432"
   },
@@ -214,6 +214,21 @@
       "version": "43",
       "script": "V43__phone_accounts.sql",
       "sha256": "9e5124ff312d5e25ba31e6763e124d2fd8c60e8e307e0dc2e5bc044e41967aea"
+    },
+    {
+      "version": "44",
+      "script": "V44__client_input_scope.sql",
+      "sha256": "cea6393e7610c8295ffbc1be035e32660a00ef8a4a3f4a5fc26dbcd074129f42"
+    },
+    {
+      "version": "45",
+      "script": "V45__client_publication_preferences.sql",
+      "sha256": "51b328e7e71a3e350bb38015d9f0802dd675e5c14954b07f1f2877fff9fb6f55"
+    },
+    {
+      "version": "46",
+      "script": "V46__conversation_plan_commands.sql",
+      "sha256": "df8477922075322123660bc152d959d5059dd8acb580b72a361c6fa94c8fb596"
     }
   ],
   "tables": [
@@ -239,6 +254,7 @@
     "conversation_events",
     "conversation_original_reads",
     "conversation_originals",
+    "conversation_plan_commands",
     "conversation_sources",
     "conversation_task_material_versions",
     "conversation_tasks",
@@ -323,6 +339,7 @@
     "profile_versions",
     "publication_forward_batches",
     "publication_forward_receipts",
+    "publication_preferences",
     "recommendation_presentations",
     "recommendation_receipts",
     "recommendation_settings",
@@ -345,7 +362,7 @@
     "workspaces"
   ],
   "catalogHashes": [
-    "858534bb07c07e53119b99ff891a0a4d8241cac16ad144b99fd87b9e6c424cd3",
-    "d99050f9f77bd45c6e3d09b73c55f98fc19ec40e126b7a88b7b1c5aff5a9369d"
+    "8b4efd64e2c50339191bbe8b7435d39207b64ec82a2f165575c3b2a1ed0afcac",
+    "de3522270c8901b4a8112c243f9c26f35a2a222c0af79718ac7964bbb54459e4"
   ]
 }

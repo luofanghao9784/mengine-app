@@ -54,7 +54,7 @@ export const isOriginal = (v: unknown): v is TaskOriginal =>
   count(v.version) &&
   v.version > 0 &&
   count(v.bytes) &&
-  v.bytes <= 262144 &&
+  v.bytes <= 20971520 &&
   digest(v.sha256) &&
   typeof v.read === 'boolean';
 const task = (v: unknown): v is ConversationTask =>
@@ -65,7 +65,10 @@ const task = (v: unknown): v is ConversationTask =>
   v.originals.every(isOriginal) &&
   new Set(v.originals.map((f) => f.materialId)).size === v.originals.length &&
   new Set(v.originals.map((f) => f.versionId)).size === v.originals.length &&
-  v.originals.reduce((n, f) => n + f.bytes, 0) <= 524288 &&
+  v.originals.reduce((n, f) => n + f.bytes, 0) <= 62914560 &&
+  (v.executionClass !== 'verification' ||
+    (v.originals.every((f) => f.bytes <= 262144) &&
+      v.originals.reduce((n, f) => n + f.bytes, 0) <= 524288)) &&
   (v.originals.length === 0 || v.mode === 'AGENT') &&
   text(v.prompt) &&
   ['SOURCE_LOOKUP', 'AGENT'].includes(String(v.mode)) &&

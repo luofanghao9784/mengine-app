@@ -242,6 +242,18 @@
         },
         "planAllowed": {
           "type": "boolean"
+        },
+        "tableComparisonVersion": {
+          "enum": [
+            "",
+            "1.0"
+          ]
+        },
+        "briefingContentVersion": {
+          "const": "1.0"
+        },
+        "planManagementVersion": {
+          "const": "1.0"
         }
       }
     }

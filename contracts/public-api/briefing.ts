@@ -1,3 +1,4 @@
+import type { BriefingDocument } from './briefing-content';
 export type BriefingView = 'LATEST' | 'FOCUSED' | 'HIDDEN';
 export interface BriefingPreference {
   revision: number;
@@ -6,6 +7,7 @@ export interface BriefingPreference {
   size: 'STANDARD' | 'WIDE';
 }
 export interface BriefingCard {
+  briefing?: BriefingDocument | null;
   conversationId: string;
   taskId: string;
   taskRevision: number;
@@ -33,6 +35,7 @@ export interface BriefingPage {
   hasMore: boolean;
 }
 export interface BriefingFilter {
+  businessType?: string;
   view: BriefingView;
   date: string | null;
   zone: string;

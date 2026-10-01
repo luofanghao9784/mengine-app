@@ -1,3 +1,4 @@
+import { isBriefingDocument } from './content.ts';
 import type {
   BriefingCard,
   BriefingPreference,
@@ -18,6 +19,7 @@ export const isPreference = (v: unknown): v is BriefingPreference =>
   ['STANDARD', 'WIDE'].includes(String(v.size));
 const card = (v: unknown): v is BriefingCard =>
   record(v) &&
+  (v.briefing == null || isBriefingDocument(v.briefing)) &&
   uuid(v.conversationId) &&
   uuid(v.taskId) &&
   count(v.taskRevision) &&
@@ -92,7 +94,9 @@ export function createBriefingClient(fetcher: typeof fetch = fetch) {
         zone: filter.zone,
         offset: String(offset),
         limit: '20',
+        generatedOnly: 'true',
       });
+      if (filter.businessType) query.set('businessType', filter.businessType);
       if (filter.date) query.set('date', filter.date);
       if (filter.workspaceId) query.set('workspaceId', id(filter.workspaceId));
       return request(
