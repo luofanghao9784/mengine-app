@@ -1,3 +1,4 @@
+import { reconcileViewStates } from '../shared/view-state';
 import { reconcileDocumentDrafts } from '../documents/drafts';
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Identity } from '../../contracts/public-api/identity';
@@ -32,6 +33,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const expire = useCallback(() => {
     invalidate();
     reconcileDocumentDrafts(null);
+    reconcileViewStates(null);
     setSession({ phase: 'anonymous', identity: null });
     notify();
   }, [invalidate]);
@@ -55,6 +57,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         const identity = await identityClient.me(controller.signal);
         if (id === generation.current) {
           reconcileDocumentDrafts(identity);
+          reconcileViewStates(
+            identity.account.id,
+            identity.memberships.map((m) => m.tenantId),
+          );
           setSession((previous) =>
             previous.phase === 'authenticated' &&
             JSON.stringify(previous.identity) === JSON.stringify(identity)
@@ -64,7 +70,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         }
       } catch (error) {
         if (id !== generation.current) return;
-        if (error instanceof IdentityError && error.status === 401) reconcileDocumentDrafts(null);
+        if (error instanceof IdentityError && error.status === 401) {
+          reconcileDocumentDrafts(null);
+          reconcileViewStates(null);
+        }
         setSession({
           phase: error instanceof IdentityError && error.status === 401 ? 'anonymous' : 'unavailable',
           identity: null,
@@ -98,6 +107,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const authenticated = (identity: Identity) => {
     invalidate();
     reconcileDocumentDrafts(identity);
+    reconcileViewStates(
+      identity.account.id,
+      identity.memberships.map((m) => m.tenantId),
+    );
     setSession({ phase: 'authenticated', identity });
     notify();
   };
@@ -107,6 +120,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const identity = await identityClient.login(phone, password);
     if (id === generation.current) {
       reconcileDocumentDrafts(identity);
+      reconcileViewStates(
+        identity.account.id,
+        identity.memberships.map((m) => m.tenantId),
+      );
       setSession({ phase: 'authenticated', identity });
     } else await refresh();
     notify();
@@ -114,6 +131,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     // Drop rendered business state immediately, even if transport cannot confirm logout.
     reconcileDocumentDrafts(null);
+    reconcileViewStates(null);
     invalidate();
     setSession({ phase: 'loading', identity: null });
     try {

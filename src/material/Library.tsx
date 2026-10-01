@@ -1,3 +1,5 @@
+import { useViewState, textState, pageState } from '../shared/useViewState';
+import { LiveConversationDeck } from '../conversation/LiveConversationDeck';
 import { MoreActions } from '../shared/MoreActions';
 import { ObjectLifecycleWorkspace } from '../objectlifecycle/ObjectLifecycleWorkspace';
 import { ExportBatchPanel } from '../export/ExportBatchPanel';
@@ -5,6 +7,7 @@ import { requestNavigationLocked } from '../shared/request-guard';
 import { documentsHref } from '../documents/routes';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
+  Info,
   FileText,
   Folder,
   FolderPlus,
@@ -21,7 +24,7 @@ import type { TenantContext } from '../../contracts/public-api/identity';
 import type { MaterialEntry, MaterialVersion } from '../../contracts/public-api/material';
 import { useSession, identityClient } from '../identity/session';
 import { IdentityError, uuid } from '../identity/client';
-import { Button, Badge, Empty, Field, Modal, PageActions } from '../shared/ui';
+import { Button, Badge, Empty, Field, Modal, PageActions, IconButton } from '../shared/ui';
 import { Failure, Loading, Pager, useRemote, useSubmission, SubmitError } from '../shared/admin';
 import { materialClient as api } from './client';
 import './material.css';
@@ -175,14 +178,27 @@ function LibraryListing({
     new URLSearchParams(location.hash.slice(1)).has('source'),
   );
   const [maintenanceOpen, setMaintenanceOpen] = useState(false);
-  const [query, setQuery] = useState(''),
-    [q, setQ] = useState(''),
-    [page, setPage] = useState(0),
-    [attempt, setAttempt] = useState(0);
-  const [layout, setLayout] = useState<'cards' | 'list'>('cards');
-  const [modal, setModal] = useState<'folder' | 'upload' | 'batch'>(),
-    [document, setDocument] = useState<MaterialEntry>(),
-    [notice, setNotice] = useState('');
+  const listingKey = 'library:' + (workspace || (all ? 'all' : 'enterprise')) + ':' + (folder || 'root');
+  const [query, setQuery] = useViewState(tenant, listingKey + ':input', '', textState);
+  const [q, setQ] = useViewState(tenant, listingKey + ':query', '', textState);
+  const [page, setPage] = useViewState(tenant, listingKey + ':page', 0, pageState);
+  const [attempt, setAttempt] = useState(0);
+  const [layout, setLayout] = useViewState<'cards' | 'list'>(
+    tenant,
+    'library:layout',
+    'cards',
+    (v): v is 'cards' | 'list' => v === 'cards' || v === 'list',
+  );
+  const [modal, setModal] = useState<'folder' | 'upload' | 'batch'>();
+  const [document, setDocument] = useViewState<Pick<MaterialEntry, 'id' | 'workspaceId'> | null>(
+    tenant,
+    listingKey + ':document',
+    null,
+    (v): v is Pick<MaterialEntry, 'id' | 'workspaceId'> | null =>
+      v === null ||
+      (!!v && typeof v === 'object' && 'id' in v && 'workspaceId' in v && uuid(v.id) && uuid(v.workspaceId)),
+  );
+  const [notice, setNotice] = useState('');
   const data = useRemote(
     (signal) => api.list(tenant, workspace, folder, q, page * 24, signal),
     [tenant, workspace, folder, q, page, attempt, context],
@@ -406,7 +422,7 @@ function LibraryListing({
                 onClick={() =>
                   item.kind === 'FOLDER'
                     ? (location.hash = libraryHref(tenant, personal ? 'personal' : item.workspaceId, item.id))
-                    : setDocument(item)
+                    : setDocument({ id: item.id, workspaceId: item.workspaceId })
                 }
               >
                 <div className="material-cover">
@@ -547,7 +563,7 @@ function LibraryListing({
           tenant={tenant}
           entry={document}
           maxBytes={data.value?.maxUploadBytes || 20971520}
-          close={() => setDocument(undefined)}
+          close={() => setDocument(null)}
           changed={refresh}
           verification={context}
         />
@@ -712,7 +728,7 @@ function DocumentDialog({
   verification,
 }: {
   tenant: string;
-  entry: MaterialEntry;
+  entry: Pick<MaterialEntry, 'id' | 'workspaceId'>;
   maxBytes: number;
   close: () => void;
   changed: () => void;
@@ -722,8 +738,29 @@ function DocumentDialog({
   const [page, setPage] = useState(0),
     [attempt, setAttempt] = useState(0),
     [upload, setUpload] = useState<number>();
-  const [analysis, setAnalysis] = useState<MaterialVersion>();
-  const [tab, setTab] = useState<'content' | 'versions' | 'properties'>('content');
+  const readerKey = 'material:' + entry.workspaceId + ':' + entry.id;
+  const [analysis, setAnalysis] = useViewState<MaterialVersion | null>(
+    tenant,
+    readerKey + ':version',
+    null,
+    (v): v is MaterialVersion | null =>
+      v === null ||
+      (!!v &&
+        typeof v === 'object' &&
+        'id' in v &&
+        uuid(v.id) &&
+        'number' in v &&
+        Number.isSafeInteger(v.number) &&
+        'filename' in v &&
+        typeof v.filename === 'string'),
+  );
+  const [properties, setProperties] = useViewState(
+    tenant,
+    readerKey + ':properties',
+    false,
+    (v): v is boolean => typeof v === 'boolean',
+  );
+  const [reveal, setReveal] = useState<{ id: string; sequence: number }>();
   const [error, setError] = useState<unknown>(),
     [busy, setBusy] = useState(false);
   const [denial, setDenial] = useState<unknown>();
@@ -772,8 +809,8 @@ function DocumentDialog({
       if (!request.signal.aborted) setBusy(false);
     }
   };
-  if (upload !== undefined)
-    return (
+  const uploadDialog =
+    upload !== undefined ? (
       <UploadDialog
         tenant={tenant}
         workspace={entry.workspaceId}
@@ -797,152 +834,149 @@ function DocumentDialog({
           changed();
         }}
       />
-    );
+    ) : null;
+  const selectedVersion = analysis || data.value?.versions[0];
+  useEffect(() => {
+    if (!analysis && data.value?.versions[0]) setAnalysis(data.value.versions[0]);
+  }, [analysis, data.value]);
+  const refreshReader = () => {
+    setDenial(undefined);
+    setAttempt((x) => x + 1);
+  };
+  const title = data.value?.document.name || '资料';
+  const unavailable = failure ? <Failure error={failure} retry={refreshReader} /> : <Loading />;
   return (
-    <Modal title="资料与历史版本" onClose={close} wide className="live-material-reader">
-      {failure ? (
-        <Failure
-          error={failure}
-          retry={() => {
-            setDenial(undefined);
-            setAttempt((x) => x + 1);
-          }}
-        />
-      ) : !data.value ? (
-        <Loading />
-      ) : (
-        <>
-          <div className="material-detail-heading">
-            <FileText size={30} />
-            <div>
-              <h2>{data.value.document.name}</h2>
-              <p>{data.value.document.path.join(' / ')}</p>
-            </div>
-            <Badge>v{data.value.document.version}</Badge>
-          </div>
-          <div className="live-reader-tabs" role="tablist" aria-label="资料阅读方式">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={tab === 'content'}
-              onClick={() => setTab('content')}
-            >
-              正文
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={tab === 'versions'}
-              onClick={() => setTab('versions')}
-            >
-              历史版本
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={tab === 'properties'}
-              onClick={() => setTab('properties')}
-            >
-              资料信息
-            </button>
-          </div>
-          {tab === 'properties' && (
-            <div className="live-material-properties">
-              <p>原件已保存。正文显示文件解析内容；下载原件可核对版式或编辑后上传新版本。</p>
-              <p>位置：{data.value.document.path.join(' / ')}</p>
-              <p>当前版本：v{data.value.document.version}</p>
-              <p>{data.value.document.canMaintain ? '可阅读、下载与维护' : '可阅读与下载'}</p>
-            </div>
-          )}
-          {tab !== 'content' && data.value.document.canMaintain && (
-            <Button icon={Upload} onClick={() => setUpload(data.value!.document.version)}>
-              上传新版本
-            </Button>
-          )}
-          {error && (
-            <p className="access-alert" role="alert">
-              {message(error)}
-            </p>
-          )}
-          {tab === 'versions' && (
-            <ul className="material-versions">
-              {data.value.versions.map((v) => (
-                <li key={v.id}>
-                  <div>
-                    <strong>
-                      v{v.number} · {v.filename}
-                      {v.origin === 'DOCUMENT_PUBLICATION' ? ' · 文稿发布' : ''}
-                    </strong>
-                    <small>
-                      {size(v.sizeBytes)} · {new Date(v.createdAt).toLocaleString('zh-CN')}
-                    </small>
-                    <details className="material-checksum">
-                      <summary>文件校验信息</summary>
-                      <small>SHA-256：{v.sha256}</small>
-                    </details>
+    <>
+      <Modal
+        title="资料与历史版本"
+        onClose={() => {
+          if (!requestNavigationLocked()) close();
+        }}
+        wide
+        className="live-library-deck-modal"
+      >
+        <LiveConversationDeck
+          tenant={tenant}
+          reader
+          persistenceKey={readerKey}
+          title={title}
+          onClose={close}
+          onRefresh={refreshReader}
+          reveal={reveal}
+          mainActions={
+            !failure &&
+            data.value && (
+              <IconButton
+                icon={Info}
+                label="查看资料属性与版本"
+                onClick={() => {
+                  setProperties(true);
+                  setReveal((previous) => ({ id: 'properties', sequence: (previous?.sequence || 0) + 1 }));
+                }}
+              />
+            )
+          }
+          cards={
+            properties
+              ? [
+                  {
+                    id: 'properties',
+                    kind: 'properties',
+                    title,
+                    label: '资料属性与版本',
+                    parentId: 'conversation',
+                    close: () => setProperties(false),
+                    content:
+                      failure || !data.value ? (
+                        unavailable
+                      ) : (
+                        <>
+                          <dl className="live-material-properties">
+                            <dt>位置</dt>
+                            <dd>{data.value.document.path.join(' / ')}</dd>
+                            <dt>阅读版本</dt>
+                            <dd>v{selectedVersion?.number}</dd>
+                            <dt>当前最新版本</dt>
+                            <dd>v{data.value.document.version}</dd>
+                            <dt>权限</dt>
+                            <dd>{data.value.document.canMaintain ? '可阅读、下载与维护' : '可阅读与下载'}</dd>
+                          </dl>
+                          {data.value.document.canMaintain && (
+                            <Button icon={Upload} onClick={() => setUpload(data.value!.document.version)}>
+                              上传新版本
+                            </Button>
+                          )}
+                          <h3>历史版本</h3>
+                          <ul className="material-versions">
+                            {data.value.versions.map((v) => (
+                              <li key={v.id}>
+                                <div>
+                                  <strong>
+                                    v{v.number} · {v.filename}
+                                  </strong>
+                                  <small>
+                                    {size(v.sizeBytes)} · {new Date(v.createdAt).toLocaleString('zh-CN')}
+                                  </small>
+                                  <details className="material-checksum">
+                                    <summary>文件校验信息</summary>
+                                    <small>SHA-256：{v.sha256}</small>
+                                  </details>
+                                </div>
+                                <Button
+                                  onClick={() => {
+                                    setAnalysis(v);
+                                    setReveal((previous) => ({
+                                      id: 'conversation',
+                                      sequence: (previous?.sequence || 0) + 1,
+                                    }));
+                                  }}
+                                >
+                                  查看 v{v.number} 解析
+                                </Button>
+                                <Button icon={Download} disabled={busy} onClick={() => void download(v)}>
+                                  下载 v{v.number}
+                                </Button>
+                              </li>
+                            ))}
+                          </ul>
+                          {(page > 0 || data.value.hasMore) && (
+                            <Pager page={page} next={data.value.hasMore} onPage={setPage} />
+                          )}
+                        </>
+                      ),
+                  },
+                ]
+              : []
+          }
+        >
+          {failure || !data.value
+            ? unavailable
+            : selectedVersion && (
+                <>
+                  <div className="live-reader-version-bar">
+                    <Badge>v{selectedVersion.number}</Badge>
+                    <Button icon={Download} disabled={busy} onClick={() => void download(selectedVersion)}>
+                      下载原件
+                    </Button>
                   </div>
-                  <Button
-                    onClick={() => {
-                      setAnalysis(v);
-                      setTab('content');
-                    }}
-                  >
-                    查看 v{v.number} 解析
-                  </Button>
-                  <Button icon={Download} disabled={busy} onClick={() => void download(v)}>
-                    下载 v{v.number}
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          )}
-          {tab === 'versions' && (page > 0 || data.value.hasMore) && (
-            <Pager page={page} next={data.value.hasMore} onPage={setPage} />
-          )}
-          {tab === 'content' && (analysis || data.value.versions[0]) && (
-            <>
-              <div className="live-reader-version-bar">
-                <label>
-                  阅读版本{' '}
-                  <select
-                    aria-label="阅读资料版本"
-                    value={(analysis || data.value.versions[0]).id}
-                    onChange={(e) => setAnalysis(data.value!.versions.find((v) => v.id === e.target.value))}
-                  >
-                    {analysis && !data.value.versions.some((v) => v.id === analysis.id) && (
-                      <option value={analysis.id}>
-                        v{analysis.number} · {analysis.filename}
-                      </option>
-                    )}
-                    {data.value.versions.map((v) => (
-                      <option key={v.id} value={v.id}>
-                        v{v.number} · {v.filename}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <Button
-                  icon={Download}
-                  disabled={busy}
-                  onClick={() => void download(analysis || data.value!.versions[0])}
-                >
-                  下载原件
-                </Button>
-              </div>
-              <div className="live-material-body">
-                <AnalysisPanel
-                  key={(analysis || data.value.versions[0]).id}
-                  tenant={tenant}
-                  space={entry.workspaceId}
-                  material={entry.id}
-                  version={(analysis || data.value.versions[0]).id}
-                  verification={verification}
-                />
-              </div>
-            </>
-          )}
-        </>
-      )}
-    </Modal>
+                  {error && (
+                    <p className="access-alert" role="alert">
+                      {message(error)}
+                    </p>
+                  )}
+                  <AnalysisPanel
+                    key={selectedVersion.id}
+                    tenant={tenant}
+                    space={entry.workspaceId}
+                    material={entry.id}
+                    version={selectedVersion.id}
+                    verification={verification}
+                  />
+                </>
+              )}
+        </LiveConversationDeck>
+      </Modal>
+      {uploadDialog}
+    </>
   );
 }

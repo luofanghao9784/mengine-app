@@ -51,7 +51,6 @@ export interface FeedbackPanelProps {
   label?: string;
   verification?: unknown;
   onOpenConversation?: (conversationId: string) => void;
-  onOpenExperience?: (workspaceId: string, experienceId: string) => void;
 }
 /** Insert at a meaningful delivery/detail, never after every streamed reply. Does not infer a successful task. */
 export function FeedbackPanel(props: FeedbackPanelProps) {
@@ -63,14 +62,7 @@ export function FeedbackPanel(props: FeedbackPanelProps) {
     />
   ) : null;
 }
-function Panel({
-  tenant,
-  target,
-  label,
-  verification,
-  onOpenConversation,
-  onOpenExperience,
-}: FeedbackPanelProps) {
+function Panel({ tenant, target, label, verification, onOpenConversation }: FeedbackPanelProps) {
   const { session } = useSession();
   const [attempt, setAttempt] = useState(0),
     [expanded, setExpanded] = useState(false),
@@ -199,7 +191,6 @@ function Panel({
                       feedback={f}
                       onDenied={onDenied}
                       onOpenConversation={onOpenConversation}
-                      onOpenExperience={onOpenExperience}
                     />
                   </>
                 )}

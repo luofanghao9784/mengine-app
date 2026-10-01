@@ -1,3 +1,4 @@
+import { verifyClientB1 } from './client-b1-journey.ts';
 /** Real browser + HTTP + disposable database; local SMS only, no model or external provider. */
 import assert from 'node:assert/strict';
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -231,6 +232,8 @@ try {
   assert.equal(identity.memberships.length, 2);
   await existing.goto('/workspace/');
   await expect(existing.getByLabel('当前企业')).toHaveValue(second.tenant.id);
+  if (process.argv.includes('--client-b1'))
+    await verifyClientB1(owner, existing, created.tenant.id, second.tenant.id);
   // Wrong signed-in account can switch while preserving a refreshed invitation intent.
   const wrong = await page();
   await wrong.goto('/workspace/');

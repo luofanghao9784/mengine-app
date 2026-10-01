@@ -8,7 +8,6 @@ import { DeparturePanel } from '../departure/DeparturePanel';
 import { RequestGuard, RequestPending, requestNavigationLocked } from '../shared/request-guard';
 import { useContext } from 'react';
 import { Plans } from '../plans/Plans';
-import { WorkspaceExperiences } from '../experience/WorkspaceExperiences';
 import { SharedActivity } from '../activity/Activity';
 import { Documents } from '../documents/Documents';
 import { documentsHref } from '../documents/routes';
@@ -21,9 +20,10 @@ import { governanceClient } from '../governance/client';
 import { useRemote } from '../shared/admin';
 import { PlatformHome } from '../platform/PlatformHome';
 import { PageActionsContext } from '../shared/ui';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { managementHref, returnToWorkspaceHref, workspaceReturnHash } from './navigation';
+import { useViewScroll } from '../shared/useViewState';
 import {
-  BookOpen,
   CalendarClock,
   Building2,
   CircleUserRound,
@@ -201,59 +201,32 @@ function GuardedAccessShell({
     surface === 'tenant-admin'
       ? identity.memberships.filter((m) => management.includes(m.tenantId))
       : identity.memberships;
-  const readTenant = () =>
-    entryTenant(
-      new URLSearchParams(location.hash.slice(1)).get('tenant'),
-      identity.memberships,
-      rememberedTenant(identity.account.id),
-    );
-  const [tenant, setTenant] = useState(readTenant);
-  const [departure, setDeparture] = useState(
-    () => new URLSearchParams(location.hash.slice(1)).get('view') === 'departure',
+  const [routeHash, setRouteHash] = useState(location.hash);
+  const params = new URLSearchParams(routeHash.slice(1));
+  const tenant = entryTenant(
+    params.get('tenant'),
+    identity.memberships,
+    rememberedTenant(identity.account.id),
   );
-  const [plans, setPlans] = useState(
-    () => new URLSearchParams(location.hash.slice(1)).get('view') === 'plans',
-  );
-  const [experiences, setExperiences] = useState(
-    () => new URLSearchParams(location.hash.slice(1)).get('view') === 'experiences',
-  );
-  const [profiles, setProfiles] = useState(
-    () => new URLSearchParams(location.hash.slice(1)).get('view') === 'profiles',
-  );
-  const [conversations, setConversations] = useState(
-    () => new URLSearchParams(location.hash.slice(1)).get('view') === 'conversations',
-  );
-  const [documents, setDocuments] = useState(
-    () => new URLSearchParams(location.hash.slice(1)).get('view') === 'documents',
-  );
-  const isBriefingEntry = () => {
-    const view = new URLSearchParams(location.hash.slice(1)).get('view');
-    return view === 'briefing' || (surface === 'workspace' && !view);
-  };
-  const [briefing, setBriefing] = useState(isBriefingEntry);
-  const [fromBriefing, setFromBriefing] = useState(
-    () => new URLSearchParams(location.hash.slice(1)).get('from') === 'briefing',
-  );
-  const [library, setLibrary] = useState(
-    () => new URLSearchParams(location.hash.slice(1)).get('view') === 'library',
-  );
+  const view = params.get('view');
+  const departure = view === 'departure',
+    plans = view === 'plans',
+    experiences = view === 'experiences',
+    profiles = view === 'profiles',
+    conversations = view === 'conversations',
+    documents = view === 'documents',
+    briefing = view === 'briefing' || (surface === 'workspace' && !view),
+    fromBriefing = params.get('from') === 'briefing',
+    library = view === 'library';
+  const mainRef = useRef<HTMLElement>(null);
+  useViewScroll(mainRef, tenant, surface + ':' + routeHash);
   useEffect(() => {
     const change = () => {
-      if (requestNavigationLocked()) return;
-      setTenant(readTenant());
-      setDeparture(new URLSearchParams(location.hash.slice(1)).get('view') === 'departure');
-      setPlans(new URLSearchParams(location.hash.slice(1)).get('view') === 'plans');
-      setExperiences(new URLSearchParams(location.hash.slice(1)).get('view') === 'experiences');
-      setProfiles(new URLSearchParams(location.hash.slice(1)).get('view') === 'profiles');
-      setLibrary(new URLSearchParams(location.hash.slice(1)).get('view') === 'library');
-      setDocuments(new URLSearchParams(location.hash.slice(1)).get('view') === 'documents');
-      setBriefing(isBriefingEntry());
-      setFromBriefing(new URLSearchParams(location.hash.slice(1)).get('from') === 'briefing');
-      setConversations(new URLSearchParams(location.hash.slice(1)).get('view') === 'conversations');
+      if (!requestNavigationLocked()) setRouteHash(location.hash);
     };
     window.addEventListener('hashchange', change);
     return () => window.removeEventListener('hashchange', change);
-  }, [identity, surface]);
+  }, []);
   const selected = identity.memberships.find((m) => m.tenantId === tenant);
   useEffect(() => {
     if (selected) rememberTenant(identity.account.id, selected.tenantId);
@@ -261,19 +234,15 @@ function GuardedAccessShell({
   const allowed = surface === 'platform-admin' ? identity.platformAdmin : !!selected;
   const links: Surface[] = [
     'workspace',
-    ...(management.length || surface === 'tenant-admin' ? ['tenant-admin' as const] : []),
+    ...(management.includes(tenant) || surface === 'tenant-admin' ? ['tenant-admin' as const] : []),
     ...(identity.platformAdmin ? ['platform-admin' as const] : []),
   ];
   const surfaceHref = (target: Surface) => {
-    const membership = identity.memberships.find((m) => m.tenantId === tenant);
-    const carry =
-      target !== 'platform-admin' &&
-      membership &&
-      (target === 'workspace' || management.includes(membership.tenantId));
-    return entryHref(target, carry ? tenant : target === 'tenant-admin' ? management[0] : undefined);
+    if (target === 'workspace' && surface !== 'workspace') return returnToWorkspaceHref(routeHash, tenant);
+    if (target !== 'workspace' && surface === 'workspace') return managementHref(target, tenant, routeHash);
+    return entryHref(target, tenant || undefined);
   };
   const choose = (id: string) => {
-    setTenant(id);
     location.hash = departure
       ? `tenant=${encodeURIComponent(id)}&view=departure`
       : plans
@@ -304,7 +273,7 @@ function GuardedAccessShell({
           <nav aria-label="主导航" inert={pendingRequest}>
             {surface === 'workspace' && selected ? (
               <WorkspaceNavigation
-                routeKey={`${tenant}:${location.hash}`}
+                routeKey={`${tenant}:${routeHash}`}
                 primary={[
                   {
                     label: '会话',
@@ -337,19 +306,7 @@ function GuardedAccessShell({
                     href: `#tenant=${tenant}&view=spaces`,
                   },
                   {
-                    label: '档案',
-                    icon: CircleUserRound,
-                    active: profiles,
-                    href: `#tenant=${tenant}&view=profiles`,
-                  },
-                  {
-                    label: '经验库',
-                    icon: BookOpen,
-                    active: experiences,
-                    href: `#tenant=${tenant}&view=experiences`,
-                  },
-                  {
-                    label: '持续计划',
+                    label: '我的计划',
                     icon: CalendarClock,
                     active: plans,
                     href: `#tenant=${tenant}&view=plans`,
@@ -377,7 +334,7 @@ function GuardedAccessShell({
             className="access-avatar"
             disabled={pendingRequest}
             onClick={() => setAccountOpen(true)}
-            aria-label="账号与退出"
+            aria-label="个人设置与账号"
           >
             {identity.account.displayName.slice(0, 1)}
           </button>
@@ -391,11 +348,11 @@ function GuardedAccessShell({
                   {surface === 'workspace' && departure
                     ? '迁出与清理记录'
                     : surface === 'workspace' && plans
-                      ? '持续计划'
+                      ? '我的计划'
                       : surface === 'workspace' && experiences
-                        ? '经验库'
+                        ? '工作空间'
                         : surface === 'workspace' && profiles
-                          ? '档案'
+                          ? '我的档案与偏好'
                           : surface === 'workspace' && documents
                             ? '个人文稿'
                             : surface === 'workspace' && briefing
@@ -433,16 +390,22 @@ function GuardedAccessShell({
               )
             }
             meta={
-              surface !== 'platform-admin' && eligible.length > 0 ? (
+              surface !== 'platform-admin' && eligible.length === 1 && eligible[0].tenantId === tenant ? (
+                <span className="access-tenant-name" aria-label="当前企业">
+                  {eligible[0].tenantName}
+                </span>
+              ) : surface !== 'platform-admin' && eligible.length > 0 ? (
                 <label className="access-tenant-picker">
                   <span className="sr-only">当前企业</span>
                   <select
                     aria-label="当前企业"
                     disabled={pendingRequest}
-                    value={selected?.tenantId || ''}
+                    value={eligible.some((m) => m.tenantId === tenant) ? tenant : ''}
                     onChange={(e) => choose(e.target.value)}
                   >
-                    {!selected && <option value="">请选择有权访问的企业</option>}
+                    {!eligible.some((m) => m.tenantId === tenant) && (
+                      <option value="">请选择有权访问的企业</option>
+                    )}
                     {eligible.map((m) => (
                       <option key={m.tenantId} value={m.tenantId}>
                         {m.tenantName}
@@ -457,7 +420,14 @@ function GuardedAccessShell({
               )
             }
           />
-          <main className="access-content" key={`${identity.account.id}:${surface}:${tenant}`}>
+          <main ref={mainRef} className="access-content" key={`${identity.account.id}:${surface}:${tenant}`}>
+            {surface !== 'workspace' && (
+              <a className="button ghost workspace-return" href={surfaceHref('workspace')}>
+                {workspaceReturnHash(new URLSearchParams(routeHash.slice(1)).get('back') || '', tenant)
+                  ? '返回原工作'
+                  : '返回工作空间'}
+              </a>
+            )}
             {pendingRequest && (
               <p className="access-alert" role="status">
                 正在核对本次提交，请在原处完成或重试后再切换页面。
@@ -514,9 +484,17 @@ function GuardedAccessShell({
             ) : plans ? (
               <Plans tenant={tenant} />
             ) : experiences ? (
-              <WorkspaceExperiences tenant={tenant} />
+              <Empty
+                icon={FolderOpen}
+                title="此功能暂未开放"
+                text="首版客户端暂不提供经验库展示与维护。你可以继续会话或查看智能画报。"
+              >
+                <a className="button primary" href={briefingHref(tenant)}>
+                  返回智能画报
+                </a>
+              </Empty>
             ) : profiles ? (
-              <Profiles tenant={tenant} />
+              <Profiles tenant={tenant} personalOnly />
             ) : documents ? (
               <Documents key={tenant} tenant={tenant} />
             ) : briefing || conversations ? (
@@ -547,33 +525,22 @@ function GuardedAccessShell({
           </Modal>
         )}
         {accountOpen && (
-          <Modal title="账号" onClose={() => setAccountOpen(false)}>
+          <Modal title="个人设置与账号" onClose={() => setAccountOpen(false)}>
             <div className="access-account">
               <CircleUserRound size={32} />
               <strong>{identity.account.displayName}</strong>
               <p>{contactLabel(identity.account)}</p>
             </div>
-            {surface === 'workspace' && eligible.length > 1 && (
-              <label className="field">
-                <span>切换企业</span>
-                <select
-                  aria-label="切换企业"
-                  disabled={pendingRequest}
-                  value={tenant}
-                  onChange={(e) => {
-                    choose(e.target.value);
-                    setAccountOpen(false);
-                  }}
-                >
-                  {eligible.map((m) => (
-                    <option key={m.tenantId} value={m.tenantId}>
-                      {m.tenantName}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
             <div className="access-account-actions">
+              {selected && (
+                <a
+                  className="button"
+                  href={'/workspace/#' + new URLSearchParams({ tenant, view: 'profiles' })}
+                  onClick={() => setAccountOpen(false)}
+                >
+                  我的档案与偏好
+                </a>
+              )}
               <Button onClick={onInvite}>接受另一企业邀请</Button>
               <Button
                 onClick={() => {

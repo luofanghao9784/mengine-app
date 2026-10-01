@@ -23,7 +23,15 @@ import '../governance/governance.css';
 import { RequestPending, useRequestLock } from '../shared/request-guard';
 import { ObjectLifecycleDetail } from '../objectlifecycle/ObjectLifecycleWorkspace';
 
-export function Profiles({ tenant, management }: { tenant: string; management?: GovernanceSnapshot }) {
+export function Profiles({
+  tenant,
+  management,
+  personalOnly = false,
+}: {
+  tenant: string;
+  management?: GovernanceSnapshot;
+  personalOnly?: boolean;
+}) {
   const { session } = useSession();
   const pending = useContext(RequestPending);
   const [attempt, setAttempt] = useState(0),
@@ -49,17 +57,17 @@ export function Profiles({ tenant, management }: { tenant: string; management?: 
           },
         ]
       : []),
-    ...(allowed(null)
+    ...(!personalOnly && allowed(null)
       ? [{ id: 'tenant', scope: 'TENANT' as const, subject: tenant, label: '企业档案' }]
       : []),
     ...context.value.workspaces
-      .filter((w) => w.kind === 'SHARED' && allowed(w.id))
+      .filter((w) => !personalOnly && w.kind === 'SHARED' && allowed(w.id))
       .map((w) => ({ id: w.id, scope: 'WORKSPACE' as const, subject: w.id, label: `空间 · ${w.name}` })),
   ];
   const active = choices.find((x) => x.id === selected) || choices[0];
   return (
     <section className="access-panel governance-panel">
-      <h2>档案</h2>
+      <h2>{personalOnly ? '我的档案与偏好' : '档案'}</h2>
       <p className="muted">
         事实、推断、目标和偏好分别保存。档案描述不会授予权限，也不会自行启动任务或持续计划。
       </p>
@@ -67,20 +75,22 @@ export function Profiles({ tenant, management }: { tenant: string; management?: 
         <p>当前职责没有档案维护范围。其他工作仍可在工作空间中继续。</p>
       ) : (
         <>
-          <Field label="档案范围">
-            <select
-              disabled={pending}
-              aria-label="档案范围"
-              value={active.id}
-              onChange={(e) => setSelected(e.target.value)}
-            >
-              {choices.map((x) => (
-                <option key={x.id} value={x.id}>
-                  {x.label}
-                </option>
-              ))}
-            </select>
-          </Field>
+          {!personalOnly && (
+            <Field label="档案范围">
+              <select
+                disabled={pending}
+                aria-label="档案范围"
+                value={active.id}
+                onChange={(e) => setSelected(e.target.value)}
+              >
+                {choices.map((x) => (
+                  <option key={x.id} value={x.id}>
+                    {x.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
           <ProfileList
             key={`${tenant}:${active.id}`}
             tenant={tenant}

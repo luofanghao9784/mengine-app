@@ -974,3 +974,51 @@
   font-size: 12px;
   padding: 6px 8px;
 }
+
+/* Library and conversation readers share the same deck, including fullscreen. */
+.modal.wide.live-library-deck-modal {
+  width: min(1500px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
+  height: min(900px, calc(100dvh - 40px));
+  max-height: calc(100dvh - 40px);
+  padding: 0;
+  overflow: hidden;
+  background: var(--canvas, #f7f8fa);
+}
+.modal.wide.live-library-deck-modal > header {
+  display: none;
+}
+.modal.wide.live-library-deck-modal > .modal-content {
+  height: 100%;
+  padding: 12px 0;
+  overflow: hidden;
+}
+.live-reading-deck {
+  height: 100%;
+}
+.live-reading-deck .deck-conversation > .deck-card-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.live-material-properties {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 20px;
+}
+.live-material-properties dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+.live-material-properties dd {
+  margin: 0 0 10px;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 800px) {
+  .modal.wide.live-library-deck-modal {
+    width: calc(100vw - 12px);
+    max-width: calc(100vw - 12px);
+    height: calc(100dvh - 20px);
+    max-height: calc(100dvh - 20px);
+  }
+}

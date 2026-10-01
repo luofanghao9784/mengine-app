@@ -394,7 +394,7 @@ try {
   const memberTab = await mc.newPage();
   await memberTab.goto('/workspace/#tenant=' + b);
   await expect(memberTab.locator('.access-shell')).toBeVisible();
-  await member.getByRole('button', { name: '账号与退出', exact: true }).click();
+  await member.getByRole('button', { name: '个人设置与账号', exact: true }).click();
   await member.getByRole('button', { name: '退出登录', exact: true }).click();
   await expect(memberTab.getByRole('heading', { name: '登录梦擎工作空间', exact: true })).toBeVisible();
   await login(member, accounts.member);

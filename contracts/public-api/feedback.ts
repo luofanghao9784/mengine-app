@@ -78,6 +78,7 @@ export interface FeedbackPreferenceState {
   status: 'UNSET' | 'ACTIVE' | 'PROPOSED' | 'WITHDRAWN' | 'EXPIRED' | 'UNAVAILABLE';
   style: PreferenceStyle | null;
 }
+/** EXPERIENCE_CANDIDATE is retained for historical/internal records; client POST rejects it with 409 EXPERIENCE_CLIENT_DISABLED. */
 export type FeedbackFollowUp =
   | { kind: 'PREFERENCE'; confirmed: true; preference: FeedbackPreference; correction: null; candidate: null }
   | { kind: 'CORRECTION'; confirmed: true; preference: null; correction: string; candidate: null }

@@ -1,3 +1,4 @@
+import { useViewState, textState, pageState } from '../shared/useViewState';
 import { ForwardInbox } from '../forwarding/ForwardInbox';
 import { Recommendations } from '../recommendation/Recommendations';
 import { FeedbackActions } from './FeedbackActions';
@@ -26,11 +27,17 @@ export const briefingHref = (tenant: string) => '#' + new URLSearchParams({ tena
 export function LiveBriefing({ tenant }: { tenant: string }) {
   const { session } = useSession();
   const pendingRequest = useContext(RequestPending);
-  const [view, setView] = useState<BriefingView | 'RECOMMENDED'>('RECOMMENDED');
-  const [tab, setTab] = useState('推荐');
-  const [date, setDate] = useState(''),
-    [space, setSpace] = useState('');
-  const [page, setPage] = useState(0),
+  const [view, setView] = useViewState<BriefingView | 'RECOMMENDED'>(
+    tenant,
+    'briefing:view',
+    'RECOMMENDED',
+    (v): v is BriefingView | 'RECOMMENDED' =>
+      typeof v === 'string' && ['RECOMMENDED', 'FOCUSED', 'LATEST', 'HIDDEN'].includes(v),
+  );
+  const [tab, setTab] = useViewState(tenant, 'briefing:tab', '推荐', textState);
+  const [date, setDate] = useViewState(tenant, 'briefing:date', '', textState),
+    [space, setSpace] = useViewState(tenant, 'briefing:space', '', textState);
+  const [page, setPage] = useViewState(tenant, 'briefing:page', 0, pageState),
     [attempt, setAttempt] = useState(0);
   const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const refresh = () => setAttempt((n) => n + 1);

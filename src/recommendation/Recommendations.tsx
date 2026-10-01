@@ -1,3 +1,4 @@
+import { useViewState, pageState } from '../shared/useViewState';
 import { ForwardPublicationButton } from '../forwarding/ForwardPublicationButton';
 import { useContext, useEffect, useRef, useState } from 'react';
 import { Download, RefreshCw, Newspaper, Share2, Star } from 'lucide-react';
@@ -19,9 +20,14 @@ import './recommendation.css';
 export function Recommendations({ tenant, workspace }: { tenant: string; workspace: string | null }) {
   const { session } = useSession(),
     pending = useContext(RequestPending);
-  const [page, setPage] = useState(0),
+  const [page, setPage] = useViewState(tenant, 'recommendation:page:' + workspace, 0, pageState),
     [attempt, setAttempt] = useState(0),
-    [snapshot, setSnapshot] = useState<string>();
+    [snapshot, setSnapshot] = useViewState<string | undefined>(
+      tenant,
+      'recommendation:snapshot:' + workspace,
+      undefined,
+      (v): v is string | undefined => v === undefined || (typeof v === 'string' && v.length < 1000),
+    );
   const data = useRemote(
     (signal) => api.list(tenant, workspace, page * 20, page ? snapshot : undefined, signal),
     [tenant, workspace, page, attempt, session.identity],
@@ -38,13 +44,6 @@ export function Recommendations({ tenant, workspace }: { tenant: string; workspa
     setSnapshot(undefined);
     setAttempt((n) => n + 1);
   };
-  useEffect(() => {
-    const focus = () => {
-      if (!pending) refresh();
-    };
-    window.addEventListener('focus', focus);
-    return () => window.removeEventListener('focus', focus);
-  }, [pending]);
   const settings = data.value?.settings;
   return (
     <section className="recommendations" aria-label="工作推荐">

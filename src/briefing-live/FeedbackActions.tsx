@@ -220,10 +220,6 @@ export function FeedbackActions({
                 '#' +
                 new URLSearchParams({ tenant, view: 'conversations', conversation: id, from: 'briefing' });
             }}
-            onOpenExperience={(workspace, id) => {
-              location.hash =
-                '#' + new URLSearchParams({ tenant, view: 'experiences', scope: workspace, experience: id });
-            }}
           />
         </Modal>
       )}

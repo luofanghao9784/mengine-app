@@ -1106,7 +1106,8 @@
               }
             }
           }
-        }
+        },
+        "description": "Client receipts exclude EXPERIENCE_CANDIDATE before pagination. Historical/internal records remain available to internal services."
       },
       "post": {
         "summary": "Perform independently confirmed action once per feedback revision",
@@ -1256,7 +1257,8 @@
               }
             }
           }
-        }
+        },
+        "description": "Only personal preference and correction actions are available in the first client release. EXPERIENCE_CANDIDATE returns 409 EXPERIENCE_CLIENT_DISABLED after access verification, without creating an action or candidate. Retained schemas describe historical/internal records."
       }
     }
   },

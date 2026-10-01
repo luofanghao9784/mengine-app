@@ -59,6 +59,23 @@ class FeedbackIntegrationTest {
   var invalid=c.send("POST",root,Map.of("requestId",UUID.randomUUID(),"target",target("BRIEFING"),"assessment",new FeedbackService.Assessment("NOT_USEFUL",List.of(),"")),true);assertEquals(400,invalid.statusCode(),invalid.body());assertEquals("1.0",json.readTree(invalid.body()).get("contractVersion").asString());
   var other=new Client();other.send("POST","/api/v1/auth/login",Map.of("email",email(admin),"password",password),true);var denied=other.send("GET",root+"/"+f.id(),null,false);assertEquals(404,denied.statusCode(),denied.body());assertEquals("FEEDBACK_NOT_FOUND",json.readTree(denied.body()).get("code").asString());
  }
+ @Test void clientHttpDefersExperienceMaintenanceWithoutDeletingInternalHistory() throws Exception {
+  var f=create("TASK");var c=new Client();c.send("POST","/api/v1/auth/login",Map.of("email",email(owner),"password",password),true);
+  String path="/api/v1/tenants/"+tenant+"/feedback/"+f.id()+"/actions";
+  var action=new FeedbackService.FollowUp("EXPERIENCE_CANDIDATE",true,null,null,candidate());
+  var response=c.send("POST",path,Map.of("requestId",UUID.randomUUID(),"expectedRevision",1,"action",action),true);
+  assertEquals(409,response.statusCode());assertEquals("EXPERIENCE_CLIENT_DISABLED",json.readTree(response.body()).get("code").asString());
+  assertEquals(0,db.queryForObject("SELECT count(*) FROM feedback_actions WHERE feedback_id=?",Integer.class,f.id()));
+  var historical=service.followUp(owner,tenant,f.id(),UUID.randomUUID(),1,action);
+  var correction=service.clientFollowUp(owner,tenant,f.id(),UUID.randomUUID(),1,new FeedbackService.FollowUp("CORRECTION",true,null,"核对当前资料",null));
+  assertEquals(2,service.actions(owner,tenant,f.id(),0,20).items().size());
+  assertNotNull(experiences.get(owner,tenant,space,historical.targetId(),historical.targetVersion()));
+  var clientPage=service.clientActions(owner,tenant,f.id(),0,1);assertEquals(List.of(correction),clientPage.items());assertFalse(clientPage.hasMore());
+  assertTrue(service.clientActions(owner,tenant,f.id(),1,1).items().isEmpty());
+  var listed=c.send("GET",path,null,false);assertEquals(200,listed.statusCode());assertFalse(listed.body().contains(historical.targetId().toString()));
+  assertThrows(IdentityException.class,()->service.clientActions(admin,tenant,f.id(),0,20));
+  assertThrows(IdentityException.class,()->service.clientFollowUp(admin,tenant,f.id(),UUID.randomUUID(),1,action));
+ }
  final class Client{final HttpClient http=HttpClient.newBuilder().cookieHandler(new CookieManager(null,CookiePolicy.ACCEPT_ALL)).build();HttpResponse<String> send(String method,String path,Object body,boolean csrf)throws Exception{var r=HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+path)).header("Content-Type","application/json");if(csrf){var c=json.readTree(send("GET","/api/v1/auth/csrf",null,false).body());r.header(c.get("headerName").asString(),c.get("token").asString());}return http.send(r.method(method,body==null?HttpRequest.BodyPublishers.noBody():HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body))).build(),HttpResponse.BodyHandlers.ofString());}}
  @Test void realHttpFeedbackPersistsAndRequiresSessionCsrf()throws Exception{var c=new Client();String root="/api/v1/tenants/"+tenant+"/feedback";var body=Map.of("requestId",UUID.randomUUID(),"target",target("TASK"),"assessment",assessment("TASK"));assertEquals(401,c.send("GET",root+"/preferences",null,false).statusCode());assertEquals(200,c.send("POST","/api/v1/auth/login",Map.of("email",email(owner),"password",password),true).statusCode());assertEquals(403,c.send("POST",root,body,false).statusCode());var response=c.send("POST",root,body,true);assertEquals(201,response.statusCode(),response.body());assertTrue(response.headers().firstValue("cache-control").orElse("").contains("no-store"));UUID id=UUID.fromString(json.readTree(response.body()).get("id").asString());assertEquals(200,c.send("GET",root+"/"+id,null,false).statusCode());}
 }

@@ -18,8 +18,10 @@ export function BusinessSources(props: Props) {
 function ScopedSources({ tenant, verification = 0, onOpenLibrary, onOpenConversation }: Props) {
   const { session } = useSession(),
     pending = useContext(RequestPending);
-  const [selected, setSelected] = useState(''),
-    [opened, setOpened] = useState(false),
+  const [selected, setSelected] = useState(
+      () => new URLSearchParams(location.hash.slice(1)).get('scope') || '',
+    ),
+    [opened, setOpened] = useState(() => new URLSearchParams(location.hash.slice(1)).has('source')),
     [attempt, setAttempt] = useState(0);
   const refresh = () => setAttempt((x) => x + 1);
   useEffect(() => {
@@ -34,7 +36,7 @@ function ScopedSources({ tenant, verification = 0, onOpenLibrary, onOpenConversa
     [tenant, verification, attempt, session.identity],
   );
   const spaces = remote.value?.workspaces.filter((w) => w.kind === 'SHARED') ?? [],
-    active = spaces.find((w) => w.id === selected) ?? spaces[0];
+    active = selected ? spaces.find((w) => w.id === selected) : spaces[0];
   return (
     <section className="access-panel business-configuration" aria-label="企业数据来源">
       <header className="configuration-heading">
@@ -122,6 +124,21 @@ function ScopedSources({ tenant, verification = 0, onOpenLibrary, onOpenConversa
             />
           )}
         </>
+      ) : selected && spaces.length > 0 ? (
+        <Empty
+          icon={Database}
+          title="原工作空间当前不可用"
+          text="来源页面未切换到其他空间。可返回原工作，或明确选择另一个获权空间。"
+        >
+          <Button
+            onClick={() => {
+              setSelected(spaces[0].id);
+              setOpened(false);
+            }}
+          >
+            查看其他获权空间
+          </Button>
+        </Empty>
       ) : (
         <Empty
           icon={Database}

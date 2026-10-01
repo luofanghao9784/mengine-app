@@ -46,20 +46,24 @@ export async function feedbackJourney(
     const token = await (await request.get('/api/v1/auth/csrf')).json();
     return request.post(root + path, { headers: { [token.headerName]: token.token }, data: body });
   }
-  const capture: Probe = {armed:false,suffix:'/feedback',keys:[],status:null,receipt:null};
+  const capture: Probe = { armed: false, suffix: '/feedback', keys: [], status: null, receipt: null };
   const pattern = '**' + root + '**';
-  await page.route(pattern, async route => {
+  await page.route(pattern, async (route) => {
     const req = route.request();
-    if (req.method() !== 'POST' || !new URL(req.url()).pathname.endsWith(capture.suffix)) return route.continue();
+    if (req.method() !== 'POST' || !new URL(req.url()).pathname.endsWith(capture.suffix))
+      return route.continue();
     capture.keys.push(req.postDataJSON().requestId);
     const response = await route.fetch();
     if (capture.armed) {
-      capture.armed = false; capture.status = response.status(); capture.receipt = await response.json();
+      capture.armed = false;
+      capture.status = response.status();
+      capture.receipt = await response.json();
       await route.abort('failed');
-    } else await route.fulfill({response});
+    } else await route.fulfill({ response });
   });
-  const arm = async (suffix: string) => Object.assign(capture, {armed:true,suffix,keys:[],status:null,receipt:null});
-  const probe = async () => ({keys:[...capture.keys],status:capture.status,receipt:capture.receipt});
+  const arm = async (suffix: string) =>
+    Object.assign(capture, { armed: true, suffix, keys: [], status: null, receipt: null });
+  const probe = async () => ({ keys: [...capture.keys], status: capture.status, receipt: capture.receipt });
   try {
     await page.goto(
       `/workspace/#tenant=${tenant}&view=conversations&conversation=${conversationId}&task=${taskId}`,
@@ -76,7 +80,9 @@ export async function feedbackJourney(
     await page.evaluate(() => window.dispatchEvent(new Event('focus')));
     await expect(panel.getByRole('button', { name: '重试同次提交', exact: true })).toBeVisible();
     await expect(page.getByLabel('当前企业', { exact: true })).toBeDisabled();
-    await page.evaluate(() => { location.hash = '#view=briefing'; });
+    await page.evaluate(() => {
+      location.hash = '#view=briefing';
+    });
     await expect(page).toHaveURL(pinnedUrl);
     await expect(panel.getByRole('button', { name: '重试同次提交', exact: true })).toBeVisible();
     await panel.getByRole('button', { name: '重试同次提交', exact: true }).click();
@@ -129,7 +135,7 @@ export async function feedbackJourney(
     await panel.getByRole('button', { name: '确认并执行所选动作', exact: true }).click();
     await expect(panel.getByRole('alert')).toContainText('同一次请求');
     await expect(panel.getByRole('button', { name: '撤回评价', exact: true })).toBeDisabled();
-    await expect(panel.getByRole('button', { name: '整理经验候选', exact: true })).toBeDisabled();
+    await expect(panel.getByRole('button', { name: '整理经验候选', exact: true })).toHaveCount(0);
     await panel.getByRole('button', { name: '重试同次后续动作', exact: true }).click();
     await expect(panel.locator('.feedback-receipts')).toContainText('独立纠正任务已建立');
     const second = await probe();
@@ -144,40 +150,19 @@ export async function feedbackJourney(
     assert.equal(correctionResponse.status(), 200);
     const correctionDetail = await correctionResponse.json();
     assert.ok(correctionDetail.tasks.some((t: any) => t.id === correction.targetId));
-    await panel.getByRole('button', { name: '整理经验候选', exact: true }).click();
-    await panel
-      .getByLabel('候选标题', { exact: true })
-      .fill('离线反馈的人工核对方法 ' + randomUUID().slice(0, 8));
-    await panel.getByLabel('候选摘要', { exact: true }).fill('明确区分已核对事实与资料缺口。');
-    await panel
-      .getByLabel('可复用方法与人工纠正', { exact: true })
-      .fill('先核对本次资料版本，再整理差异；不能用历史经验补造本次事实。');
-    await panel.getByLabel('适用前提', { exact: true }).fill('有本次获准的计划与实际记录。');
-    await panel.getByLabel('不适用条件', { exact: true }).fill('不代表真实业务成功或已评测。');
-    await panel.locator('.feedback-confirm input').check();
-    await panel.getByRole('button', { name: '确认并执行所选动作', exact: true }).click();
-    await expect(panel.locator('.feedback-receipts')).toContainText('经验候选已保存，尚未评测、未发布');
+    await expect(panel.getByRole('button', { name: '整理经验候选', exact: true })).toHaveCount(0);
     const results = (await (await request.get(root + `/${saved.id}/actions`)).json())
       .items as FeedbackAction[];
-    assert.equal(results.length, 3);
+    assert.equal(results.length, 2);
     assert.equal(results.filter((a) => a.kind === 'CORRECTION').length, 1);
-    const candidate = results.find((a) => a.kind === 'EXPERIENCE_CANDIDATE')!;
-    const experienceResponse = await request.get(
-      `/api/v1/tenants/${tenant}/workspaces/${workspace}/experiences/${candidate.targetId}`,
-    );
-    assert.equal(experienceResponse.status(), 200);
-    const experience = await experienceResponse.json();
-    assert.equal(experience.status, 'CANDIDATE');
-    assert.equal(experience.version.evaluation, 'NOT_EVALUATED');
-    assert.equal(experience.version.content.accessMode, 'SOURCE_BOUND');
-    assert.ok(experience.version.content.basis.includes(saved.id));
+    assert.ok(results.every((a) => a.kind !== 'EXPERIENCE_CANDIDATE'));
     await panel.getByRole('button', { name: '撤回评价', exact: true }).click();
     await expect(panel).toContainText('评价已撤回');
     const history = (await (await request.get(root + `/${saved.id}/history`)).json()).items;
     assert.equal(history[0].status, 'WITHDRAWN');
     assert.equal(history[0].revision, 4);
     assert.equal(history.length, 4);
-    assert.equal((await (await request.get(root + `/${saved.id}/actions`)).json()).items.length, 3);
+    assert.equal((await (await request.get(root + `/${saved.id}/actions`)).json()).items.length, 2);
     await page.screenshot({ path: join(artifacts, 'feedback-desktop.png'), fullPage: true });
     await page.setViewportSize({ width: 390, height: 844 });
     await page.screenshot({ path: join(artifacts, 'feedback-mobile.png'), fullPage: true });
@@ -189,14 +174,13 @@ export async function feedbackJourney(
       feedbackId: saved.id,
       feedbackRevision: 4,
       correctionTask: correction.targetId,
-      candidateId: candidate.targetId,
       actions: results.length,
       requestRetries: 'same-key',
       executionClass: saved.snapshot.executionClass,
     };
   } catch (error) {
-    await page.screenshot({path:join(artifacts,'feedback-failure.png'),fullPage:true});
-    await writeFile(join(artifacts,'feedback-failure.txt'),await page.locator('body').innerText());
+    await page.screenshot({ path: join(artifacts, 'feedback-failure.png'), fullPage: true });
+    await writeFile(join(artifacts, 'feedback-failure.txt'), await page.locator('body').innerText());
     throw error;
   } finally {
     await page.unroute(pattern);

@@ -13,10 +13,14 @@ import { useDeckElasticScroll } from '../components/useDeckElasticScroll';
 import { useDeckLayout } from '../components/useDeckLayout';
 import { conversationDefaultWidth, deckOrder, deckSpacing } from '../conversationDeck';
 import './deck.css';
+import './conversation.css';
+import { useViewState, useViewScroll, textState } from '../shared/useViewState';
 
 export type CompanionCard = {
   id: string;
-  kind: 'source' | 'file';
+  kind: 'source' | 'file' | 'properties';
+  parentId?: string;
+  actions?: ReactNode;
   title: string;
   label: string;
   content: ReactNode;
@@ -33,9 +37,15 @@ export function LiveConversationDeck({
   reveal,
   onClose,
   onRefresh,
+  reader = false,
+  mainActions,
+  persistenceKey = 'conversation',
 }: {
   tenant: string;
-  navigation: ReactNode;
+  navigation?: ReactNode;
+  reader?: boolean;
+  mainActions?: ReactNode;
+  persistenceKey?: string;
   children: ReactNode;
   title: string;
   cards: CompanionCard[];
@@ -43,8 +53,9 @@ export function LiveConversationDeck({
   onClose: () => void;
   onRefresh: () => void;
 }) {
-  const [active, setActive] = useState('conversation');
+  const [active, setActive] = useViewState(tenant, persistenceKey + ':active', 'conversation', textState);
   const root = useRef<HTMLDivElement>(null);
+  useViewScroll(root, tenant, persistenceKey);
   const close = () => {
     if (requestNavigationLocked()) return;
     const element = root.current;
@@ -61,6 +72,7 @@ export function LiveConversationDeck({
     void animation.finished.then(onClose).catch(() => {});
   };
   useLayoutEffect(() => {
+    if (reader) return;
     const origin = takeViewportMotion(tenant);
     if (!origin) return;
     let surface: HTMLDivElement | undefined;
@@ -102,8 +114,21 @@ export function LiveConversationDeck({
     };
   }, [tenant]);
   const [fullscreen, setFullscreen] = useState<string>();
-  const [widths, setWidths] = useState<Record<string, number>>({});
-  const [order, setOrder] = useState<string[]>([]);
+  const [widths, setWidths] = useViewState<Record<string, number>>(
+    tenant,
+    persistenceKey + ':widths',
+    {},
+    (v): v is Record<string, number> =>
+      !!v &&
+      typeof v === 'object' &&
+      Object.values(v).every((n) => typeof n === 'number' && n >= 208 && n <= 1040),
+  );
+  const [order, setOrder] = useViewState<string[]>(
+    tenant,
+    persistenceKey + ':order',
+    [],
+    (v): v is string[] => Array.isArray(v) && v.length <= 100 && v.every(textState),
+  );
   const scroller = useRef<HTMLDivElement>(null),
     center = useRef<HTMLElement>(null);
   const fullscreenTrigger = useRef<HTMLElement | null>(null);
@@ -142,9 +167,16 @@ export function LiveConversationDeck({
   };
   useDeckReveal(scroller, layoutKey, !fullscreen, show);
   useLayoutEffect(() => {
+    // Layout measures the restored cards before returning to the active reader.
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => show(active, false));
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [persistenceKey]);
+  useLayoutEffect(() => {
     if (!reveal) return;
     const trigger = document.activeElement;
-    if (trigger instanceof HTMLElement && center.current?.contains(trigger))
+    if (trigger instanceof HTMLElement && root.current?.contains(trigger))
       sourceTriggers.current[reveal.id] = trigger;
     const frame = requestAnimationFrame(() => show(reveal.id));
     return () => cancelAnimationFrame(frame);
@@ -153,8 +185,8 @@ export function LiveConversationDeck({
     if (!['list', ...available].includes(active)) setActive('conversation');
     if (fullscreen && !available.includes(fullscreen)) setFullscreen(undefined);
   }, [layoutKey]);
-  const restore = (id: string) => {
-    show('conversation', false);
+  const restore = (id: string, parentId = 'conversation') => {
+    show(parentId, false);
     requestAnimationFrame(() => {
       const trigger = sourceTriggers.current[id];
       (trigger?.isConnected
@@ -195,11 +227,13 @@ export function LiveConversationDeck({
       ).filter((e) => e.getClientRects().length && !e.closest('[inert]'));
     const first = () => (controls()[0] || dialog).focus({ preventScroll: true });
     const contain = (e: FocusEvent) => {
-      if (document.querySelector('dialog[open]')) return;
+      if (Array.from(document.querySelectorAll('dialog[open]')).some((modal) => !modal.contains(dialog)))
+        return;
       if (!dialog.contains(e.target as Node)) first();
     };
     const keydown = (e: KeyboardEvent) => {
-      if (document.querySelector('dialog[open]')) return;
+      if (Array.from(document.querySelectorAll('dialog[open]')).some((modal) => !modal.contains(dialog)))
+        return;
       if (e.key === 'Escape') {
         e.preventDefault();
         e.stopPropagation();
@@ -238,7 +272,7 @@ export function LiveConversationDeck({
         event.key !== 'Escape' ||
         event.defaultPrevented ||
         fullscreen ||
-        document.querySelector('dialog[open]')
+        Array.from(document.querySelectorAll('dialog[open]')).some((modal) => !modal.contains(root.current))
       )
         return;
       event.preventDefault();
@@ -268,24 +302,26 @@ export function LiveConversationDeck({
     <div
       ref={root}
       role="region"
-      aria-label="会话视窗"
-      className={`live-conversations live-demo-deck ${fullscreen ? 'has-fullscreen-reader' : ''}`}
+      aria-label={reader ? '资料阅读视窗' : '会话视窗'}
+      className={`live-conversations live-demo-deck ${fullscreen ? 'has-fullscreen-reader' : ''} ${reader ? 'live-reading-deck' : ''}`}
       style={{ '--deck-padding': `${deckSpacing.padding}px` } as CSSProperties}
     >
       <header className="live-deck-toolbar">
-        <h1 className="live-deck-caption">会话视窗</h1>
+        <h1 className="live-deck-caption">{reader ? '资料阅读' : '会话视窗'}</h1>
         <div className="deck-mobile-tabs" aria-label="会话卡片切换">
-          <button type="button" aria-pressed={active === 'list'} onClick={() => show('list')}>
-            列表
-          </button>
+          {navigation && (
+            <button type="button" aria-pressed={active === 'list'} onClick={() => show('list')}>
+              列表
+            </button>
+          )}
           {movableOrder.map((id) => (
             <button key={id} type="button" aria-pressed={active === id} onClick={() => show(id)}>
-              {id === 'conversation' ? '对话' : cards.find((c) => c.id === id)?.label}
+              {id === 'conversation' ? (reader ? '正文' : '对话') : cards.find((c) => c.id === id)?.label}
             </button>
           ))}
         </div>
         <div className="live-deck-arrows">
-          <IconButton icon={RefreshCw} label="刷新会话" onClick={onRefresh} />
+          <IconButton icon={RefreshCw} label={reader ? '刷新资料' : '刷新会话'} onClick={onRefresh} />
           <IconButton
             icon={ArrowLeft}
             label="向左查看卡片"
@@ -298,7 +334,7 @@ export function LiveConversationDeck({
             disabled={!canScrollRight}
             onClick={() => scroller.current?.scrollBy({ left: 380, behavior: 'smooth' })}
           />
-          <IconButton icon={X} label="关闭会话视窗" onClick={close} />
+          <IconButton icon={X} label={reader ? '关闭资料阅读' : '关闭会话视窗'} onClick={close} />
         </div>
       </header>
       <div
@@ -306,39 +342,74 @@ export function LiveConversationDeck({
         ref={scroller}
         style={{ '--deck-gap': `${deckSpacing.gap}px` } as CSSProperties}
       >
-        <DeckCard {...common('list')} kind="list" label="会话列表卡片" tabLabel="会话列表">
-          {navigation}
-        </DeckCard>
+        {navigation && (
+          <DeckCard {...common('list')} kind="list" label="会话列表卡片" tabLabel="会话列表">
+            {navigation}
+          </DeckCard>
+        )}
         <OrderedDeckCards order={movableOrder}>
           <DeckCard
             {...common('conversation')}
             kind="conversation"
-            label="当前会话"
+            label={reader ? '资料正文 ' + title : '当前会话'}
+            className={fullscreen === 'conversation' ? 'live-reader-fullscreen' : ''}
             stackTitle={title}
             cardRef={center}
             defaultWidth={conversationDefaultWidth(
               deckSize.width,
-              deckSize.list,
+              navigation ? deckSize.list : 0,
               cards.map((c) => widths[c.id] || (c.kind === 'source' ? 440 : 400)),
             )}
           >
-            {children}
+            {reader ? (
+              <>
+                <header className="deck-card-header live-card-heading">
+                  <div>
+                    <small>资料卡片</small>
+                    <h2>{title}</h2>
+                  </div>
+                  <div className="live-card-actions">
+                    {mainActions}
+                    <IconButton
+                      icon={fullscreen === 'conversation' ? Minimize2 : Maximize2}
+                      label={fullscreen === 'conversation' ? '退出正文全屏' : '全屏查看资料正文'}
+                      onClick={(e) => {
+                        fullscreenTrigger.current = e.currentTarget;
+                        setFullscreen(fullscreen === 'conversation' ? undefined : 'conversation');
+                      }}
+                    />
+                  </div>
+                </header>
+                <div className="live-source-reader" data-scroll-key="reader">
+                  {children}
+                </div>
+              </>
+            ) : (
+              children
+            )}
           </DeckCard>
           {cards.map((card) => (
             <DeckCard
               key={card.id}
               {...common(card.id)}
-              kind={card.kind}
+              kind={card.kind === 'properties' ? 'file' : card.kind}
               label={card.label}
               stackTitle={card.title}
               className={fullscreen === card.id ? 'live-reader-fullscreen' : ''}
             >
               <header className="deck-card-header live-card-heading">
                 <div>
-                  <small>{card.kind === 'source' ? '画报卡片' : '资料卡片'}</small>
+                  <small>
+                    {card.kind === 'source'
+                      ? '画报卡片'
+                      : card.kind === 'properties'
+                        ? '属性卡片'
+                        : '资料卡片'}
+                  </small>
                   <h2 title={card.title}>{card.title}</h2>
                 </div>
                 <div className="live-card-actions">
+                  {card.actions}
                   <IconButton
                     icon={fullscreen === card.id ? Minimize2 : Maximize2}
                     label={fullscreen === card.id ? '退出来源全屏' : `全屏查看${card.label}`}
@@ -351,14 +422,17 @@ export function LiveConversationDeck({
                     icon={X}
                     label={`关闭${card.label}`}
                     onClick={() => {
+                      if (requestNavigationLocked()) return;
                       setFullscreen(undefined);
                       card.close();
-                      restore(card.id);
+                      restore(card.id, card.parentId);
                     }}
                   />
                 </div>
               </header>
-              <div className="live-source-reader">{card.content}</div>
+              <div className="live-source-reader" data-scroll-key={card.id}>
+                {card.content}
+              </div>
             </DeckCard>
           ))}
         </OrderedDeckCards>

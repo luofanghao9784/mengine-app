@@ -327,7 +327,7 @@ try {
       JSON.stringify({ feedback, cloudModelCalled: false }, null, 2),
     );
     console.log(
-      'PASS: real feedback journey, exact versions, same-key retries, navigation/focus guard and three explicit follow-up receipts.',
+      'PASS: real feedback journey, exact versions, same-key retries, navigation/focus guard and two explicit follow-up receipts; client experience maintenance remains deferred.',
     );
   } else {
     const artifactPath = conversationRoot + `/tasks/${task.id}/artifacts/${task.artifacts[0].id}`;

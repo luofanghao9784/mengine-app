@@ -145,6 +145,13 @@ public class FeedbackService {
  @Transactional public Preferences preferences(UUID actor,UUID tenant){identities.member(actor,tenant,false);departure.requirePrivateRead(actor,tenant);var result=new ArrayList<PreferenceState>();for(String scenario:List.of("GENERAL","WEEKLY_REPORT","TABLE_SUMMARY")){UUID id=preferenceId(actor,tenant,scenario);if(id==null)result.add(new PreferenceState(scenario,null,0,"UNSET",null));else{var meta=profiles.currentMetadata(actor,tenant,id);if(!meta.bodyAvailable()){result.add(new PreferenceState(scenario,id,meta.revision(),"UNAVAILABLE",null));continue;}var value=profiles.get(actor,tenant,id,null);String style=STYLES.keySet().stream().filter(s->preferenceText(scenario,s).equals(value.value())).findFirst().orElse(null);result.add(new PreferenceState(scenario,id,value.revision(),value.effectiveStatus(),style));}}return new Preferences(result);}
  private Action receipt(UUID id){return db.queryForObject("SELECT receipt FROM feedback_actions WHERE id=?",(r,n)->json.readValue(r.getString(1),Action.class),id);}
  @Transactional public Actions actions(UUID actor,UUID tenant,UUID id,int offset,int limit){paging(offset,limit);row(actor,tenant,id,false);var ids=db.queryForList("SELECT id FROM feedback_actions WHERE feedback_id=? ORDER BY created_at DESC,id LIMIT ? OFFSET ?",UUID.class,id,limit+1,offset);return new Actions(ids.stream().limit(limit).map(this::receipt).toList(),ids.size()>limit);}
+ /** Client edition defers experience maintenance; filter before paging, preserve internal history. */
+ @Transactional public Actions clientActions(UUID actor,UUID tenant,UUID id,int offset,int limit){paging(offset,limit);row(actor,tenant,id,false);var ids=db.queryForList("SELECT id FROM feedback_actions WHERE feedback_id=? AND kind<>'EXPERIENCE_CANDIDATE' ORDER BY created_at DESC,id LIMIT ? OFFSET ?",UUID.class,id,limit+1,offset);return new Actions(ids.stream().limit(limit).map(this::receipt).toList(),ids.size()>limit);}
+ @Transactional public Action clientFollowUp(UUID actor,UUID tenant,UUID id,UUID key,int expected,FollowUp body){
+  row(actor,tenant,id,false);
+  if(body!=null&&"EXPERIENCE_CANDIDATE".equals(body.kind()))throw new IdentityException(409,"EXPERIENCE_CLIENT_DISABLED");
+  return followUp(actor,tenant,id,key,expected,body);
+ }
  @Transactional public Action followUp(UUID actor,UUID tenant,UUID id,UUID key,int expected,FollowUp body){
   if(body==null||!body.confirmed()||body.kind()==null||!Set.of("PREFERENCE","CORRECTION","EXPERIENCE_CANDIDATE").contains(body.kind()))throw IdentityException.invalid();
   if((body.preference()!=null?1:0)+(body.correction()!=null?1:0)+(body.candidate()!=null?1:0)!=1)throw IdentityException.invalid();

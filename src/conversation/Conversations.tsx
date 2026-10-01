@@ -1,3 +1,4 @@
+import { useViewState } from '../shared/useViewState';
 import { FeedbackPanel } from '../feedback/FeedbackPanel';
 import { TaskWorkNotices } from '../taskwork/TaskWorkNotices';
 import { RequestPending, requestNavigationLocked, useRequestLock } from '../shared/request-guard';
@@ -7,6 +8,7 @@ import { DraftWarning } from '../shared/DraftWarning';
 import { SaveAsDocument } from '../documents/Documents';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Info,
   ArrowUp,
   FileText,
   Files,
@@ -31,7 +33,7 @@ import type {
 import type { TenantContext } from '../../contracts/public-api/identity';
 import { identityClient, useSession } from '../identity/session';
 import { IdentityError, record, uuid } from '../identity/client';
-import { Button, Badge, Field, PageActions, DocumentText } from '../shared/ui';
+import { Button, Badge, Field, PageActions, DocumentText, IconButton } from '../shared/ui';
 import { TaskReadingBody, type ReadingTask } from '../briefing-live/TaskReadingBody';
 import { readBriefingContext, retainConversationContext } from './briefing-context';
 import { LiveConversationDeck } from './LiveConversationDeck';
@@ -235,7 +237,22 @@ function ConversationView({
   const [data, setData] = useState<{ value?: ConversationDetail; error?: unknown }>({});
   const [attempt, setAttempt] = useState(0),
     [page, setPage] = useState(0);
-  const [citations, setCitations] = useState<{ id: string; title: string }[]>([]);
+  const readerKey = 'conversation:' + (selected || 'new');
+  const [citations, setCitations] = useViewState<{ id: string; title: string }[]>(
+    tenant,
+    readerKey + ':citations',
+    [],
+    (v): v is { id: string; title: string }[] =>
+      Array.isArray(v) &&
+      v.length <= 50 &&
+      v.every((c) => record(c) && uuid(c.id) && typeof c.title === 'string' && c.title.length <= 300),
+  );
+  const [properties, setProperties] = useViewState<string[]>(
+    tenant,
+    readerKey + ':properties',
+    [],
+    (v): v is string[] => Array.isArray(v) && v.length <= 50 && v.every(uuid),
+  );
   const [reveal, setReveal] = useState<{ id: string; sequence: number }>();
   const [briefingOpen, setBriefingOpen] = useState(!!briefingContext);
   const openCitation = (id: string, title: string) => {
@@ -312,6 +329,7 @@ function ConversationView({
     <LiveConversationDeck
       tenant={tenant}
       navigation={navigation}
+      persistenceKey={readerKey}
       title={data.value?.conversation.title || '新会话'}
       reveal={reveal}
       onRefresh={() => {
@@ -333,22 +351,54 @@ function ConversationView({
               },
             ]
           : []),
-        ...citations.map((c) => ({
-          id: c.id,
-          kind: 'file' as const,
-          title: c.title,
-          label: '资料来源 ' + c.title,
-          close: () => setCitations((all) => all.filter((item) => item.id !== c.id)),
-          content: (
-            <Citation
-              tenant={tenant}
-              id={c.id}
-              verification={context}
-              embedded
-              back={() => setCitations((all) => all.filter((item) => item.id !== c.id))}
-            />
-          ),
-        })),
+        ...citations.flatMap((c) => [
+          {
+            id: c.id,
+            kind: 'file' as const,
+            title: c.title,
+            label: '资料来源 ' + c.title,
+            actions: (
+              <IconButton
+                icon={Info}
+                label={'查看资料属性 ' + c.title}
+                onClick={() => {
+                  setProperties((all) => (all.includes(c.id) ? all : [...all, c.id]));
+                  setReveal((previous) => ({
+                    id: 'properties:' + c.id,
+                    sequence: (previous?.sequence || 0) + 1,
+                  }));
+                }}
+              />
+            ),
+            close: () => {
+              setCitations((all) => all.filter((item) => item.id !== c.id));
+              setProperties((all) => all.filter((id) => id !== c.id));
+            },
+            content: <Citation tenant={tenant} id={c.id} verification={context} embedded back={() => {}} />,
+          },
+          ...(properties.includes(c.id)
+            ? [
+                {
+                  id: 'properties:' + c.id,
+                  parentId: c.id,
+                  kind: 'properties' as const,
+                  title: c.title,
+                  label: '资料属性 ' + c.title,
+                  close: () => setProperties((all) => all.filter((id) => id !== c.id)),
+                  content: (
+                    <Citation
+                      tenant={tenant}
+                      id={c.id}
+                      verification={context}
+                      embedded
+                      propertiesOnly
+                      back={() => {}}
+                    />
+                  ),
+                },
+              ]
+            : []),
+        ]),
       ]}
     >
       <section className={`conversation-reader ${!selected ? 'is-new-conversation' : ''}`}>
@@ -367,7 +417,7 @@ function ConversationView({
           </div>
           <Badge>私人会话</Badge>
         </header>
-        <div className="conversation-messages" aria-live="polite">
+        <div className="conversation-messages" data-scroll-key="messages" aria-live="polite">
           {data.value?.tasks.map((task) => (
             <TaskCard
               key={task.id}
@@ -781,11 +831,6 @@ function TaskCard({
               }}
               onOpenConversation={(id) => {
                 location.hash = retainConversationContext(conversationHref(tenant, id), location.hash);
-              }}
-              onOpenExperience={(workspace, id) => {
-                location.hash =
-                  '#' +
-                  new URLSearchParams({ tenant, view: 'experiences', scope: workspace, experience: id });
               }}
             />
           )}

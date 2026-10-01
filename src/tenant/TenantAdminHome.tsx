@@ -76,10 +76,15 @@ const time = (date: string) => new Date(date).toLocaleString('zh-CN', { hour12: 
 const role = (value: string) => (value === 'TENANT_ADMIN' ? '企业管理员' : '成员');
 export function TenantAdminHome({ tenant }: { tenant: string }) {
   const { session, refresh: refreshIdentity } = useSession();
-  const [tab, setTab] = useState<Tab>('members');
+  const [tab, setTab] = useState<Tab>(() =>
+    new URLSearchParams(location.hash.slice(1)).get('tab') === 'spaces' ? 'spaces' : 'members',
+  );
   const pendingRequest = useContext(RequestPending);
   const [attempt, setAttempt] = useState(0);
-  const [dialog, setDialog] = useState<Dialog>();
+  const [dialog, setDialog] = useState<Dialog | undefined>(() => {
+    const id = new URLSearchParams(location.hash.slice(1)).get('space');
+    return id && /^[a-f0-9-]{36}$/i.test(id) ? { kind: 'space', id } : undefined;
+  });
   const [writing, setWriting] = useState(false);
   const [notice, setNotice] = useState('');
   const overview = useRemote((signal) => api.overview(tenant, signal), [tenant, attempt]);

@@ -1,3 +1,4 @@
+import { useViewState } from '../shared/useViewState';
 import { useEffect, useState } from 'react';
 import type { KnowledgeChunk } from '../../contracts/public-api/knowledge';
 import { useSession } from '../identity/session';
@@ -136,16 +137,23 @@ export function Citation({
   back,
   verification,
   embedded = false,
+  propertiesOnly = false,
 }: {
   tenant: string;
   id: string;
   back: () => void;
   verification: unknown;
   embedded?: boolean;
+  propertiesOnly?: boolean;
 }) {
   const { session } = useSession();
   const [attempt, setAttempt] = useState(0);
-  const [view, setView] = useState<'citation' | 'content'>('citation');
+  const [view, setView] = useViewState<'citation' | 'content'>(
+    tenant,
+    'citation:' + id,
+    'citation',
+    (v): v is 'citation' | 'content' => v === 'citation' || v === 'content',
+  );
   const data = useRemote(
     (signal) => api.citation(tenant, id, signal),
     [tenant, id, attempt, session.identity, verification],
@@ -159,23 +167,25 @@ export function Citation({
         <Loading />
       ) : (
         <>
-          {embedded ? (
-            <details className="live-citation-properties">
-              <summary>资料信息 · v{data.value.version}</summary>
-              <p>{data.value.filename}</p>
-              <p className="muted">
-                引用固定在此文件版本和解析批次，后续更新不会覆盖这里的内容。以下为本次引用片段。
-              </p>
-            </details>
+          {propertiesOnly ? (
+            <dl className="live-material-properties">
+              <dt>文件</dt>
+              <dd>{data.value.filename}</dd>
+              <dt>阅读版本</dt>
+              <dd>v{data.value.version}</dd>
+              <dt>引用位置</dt>
+              <dd>{data.value.locator}</dd>
+              <dt>来源规则</dt>
+              <dd>引用固定在此文件版本和解析批次，后续更新不会覆盖这里的内容。</dd>
+            </dl>
           ) : (
-            <>
+            !embedded && (
               <h3>
                 {data.value.filename} · v{data.value.version}
               </h3>
-              <p className="muted">引用固定在此文件版本和解析批次，后续更新不会覆盖这里的内容。</p>
-            </>
+            )
           )}
-          {embedded && (
+          {embedded && !propertiesOnly && (
             <div className="live-reader-tabs" role="tablist" aria-label="资料内容范围">
               <button
                 type="button"
@@ -195,17 +205,18 @@ export function Citation({
               </button>
             </div>
           )}
-          {view === 'content' && embedded ? (
-            <AnalysisPanel
-              tenant={tenant}
-              space={data.value.workspaceId}
-              material={data.value.materialId}
-              version={data.value.versionId}
-              verification={verification}
-            />
-          ) : (
-            <Fragment chunk={data.value} />
-          )}
+          {!propertiesOnly &&
+            (view === 'content' && embedded ? (
+              <AnalysisPanel
+                tenant={tenant}
+                space={data.value.workspaceId}
+                material={data.value.materialId}
+                version={data.value.versionId}
+                verification={verification}
+              />
+            ) : (
+              <Fragment chunk={data.value} />
+            ))}
         </>
       )}
     </>
