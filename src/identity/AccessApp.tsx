@@ -457,8 +457,13 @@ function GuardedAccessShell({
   const [documents, setDocuments] = useState(
     () => new URLSearchParams(location.hash.slice(1)).get('view') === 'documents',
   );
-  const [briefing, setBriefing] = useState(
-    () => new URLSearchParams(location.hash.slice(1)).get('view') === 'briefing',
+  const isBriefingEntry = () => {
+    const view = new URLSearchParams(location.hash.slice(1)).get('view');
+    return view === 'briefing' || (surface === 'workspace' && !view);
+  };
+  const [briefing, setBriefing] = useState(isBriefingEntry);
+  const [fromBriefing, setFromBriefing] = useState(
+    () => new URLSearchParams(location.hash.slice(1)).get('from') === 'briefing',
   );
   const [library, setLibrary] = useState(
     () => new URLSearchParams(location.hash.slice(1)).get('view') === 'library',
@@ -473,7 +478,8 @@ function GuardedAccessShell({
       setProfiles(new URLSearchParams(location.hash.slice(1)).get('view') === 'profiles');
       setLibrary(new URLSearchParams(location.hash.slice(1)).get('view') === 'library');
       setDocuments(new URLSearchParams(location.hash.slice(1)).get('view') === 'documents');
-      setBriefing(new URLSearchParams(location.hash.slice(1)).get('view') === 'briefing');
+      setBriefing(isBriefingEntry());
+      setFromBriefing(new URLSearchParams(location.hash.slice(1)).get('from') === 'briefing');
       setConversations(new URLSearchParams(location.hash.slice(1)).get('view') === 'conversations');
     };
     window.addEventListener('hashchange', change);
@@ -512,7 +518,7 @@ function GuardedAccessShell({
                   ? libraryHref(id)
                   : conversations
                     ? conversationHref(id)
-                    : `tenant=${encodeURIComponent(id)}`;
+                    : `tenant=${encodeURIComponent(id)}${new URLSearchParams(location.hash.slice(1)).get('view') === 'spaces' ? '&view=spaces' : ''}`;
   };
   return (
     <PageActionsContext.Provider value={actionsTarget}>
@@ -556,7 +562,7 @@ function GuardedAccessShell({
                       plans ||
                       departure
                     ),
-                    href: surfaceHref('workspace'),
+                    href: `#tenant=${tenant}&view=spaces`,
                   },
                   {
                     label: '档案',
@@ -731,10 +737,14 @@ function GuardedAccessShell({
               <Profiles tenant={tenant} />
             ) : documents ? (
               <Documents key={tenant} tenant={tenant} />
-            ) : briefing ? (
-              <LiveBriefing key={tenant} tenant={tenant} />
-            ) : conversations ? (
-              <Conversations key={tenant} tenant={tenant} />
+            ) : briefing || conversations ? (
+              <WorkspaceConversationPages
+                key={tenant}
+                tenant={tenant}
+                briefing={briefing}
+                conversations={conversations}
+                overlay={conversations && fromBriefing}
+              />
             ) : library ? (
               <LiveLibrary key={tenant} tenant={tenant} />
             ) : (
@@ -829,6 +839,37 @@ function TenantHome({ tenant }: { tenant: string }) {
         </div>
       </section>
       <SharedActivity tenant={tenant} context={context} />
+    </>
+  );
+}
+
+/** Keep the briefing mounted while a contextual conversation is open. */
+function WorkspaceConversationPages({
+  tenant,
+  briefing,
+  conversations,
+  overlay,
+}: {
+  tenant: string;
+  briefing: boolean;
+  conversations: boolean;
+  overlay: boolean;
+}) {
+  const actions = useContext(PageActionsContext);
+  return (
+    <>
+      {(briefing || overlay) && (
+        <div className="workspace-briefing-background" inert={overlay || undefined}>
+          <PageActionsContext.Provider value={overlay ? null : actions}>
+            <LiveBriefing tenant={tenant} />
+          </PageActionsContext.Provider>
+        </div>
+      )}
+      {conversations && (
+        <div className={overlay ? 'workspace-conversation-overlay' : 'workspace-conversation-page'}>
+          <Conversations tenant={tenant} />
+        </div>
+      )}
     </>
   );
 }

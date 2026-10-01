@@ -236,7 +236,6 @@ try {
     .toBe('READY');
   const href = `/workspace/#tenant=${tenant}&view=conversations`;
   await page.goto(href);
-  await page.getByLabel('任务方式', { exact: true }).selectOption('AGENT');
   await page.getByLabel('工作要求', { exact: true }).fill('请计算 amount 合计并提供结果文件');
   await page.reload();
   await expect(page.getByLabel('工作要求', { exact: true })).toHaveValue('请计算 amount 合计并提供结果文件');
@@ -340,7 +339,6 @@ try {
     await screenshot(page, 'agent-mobile.png');
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
     // A stalled provider has sent headers but not its body; UI cancellation must close it.
-    await page.getByLabel('任务方式', { exact: true }).selectOption('AGENT');
     await page.getByLabel('工作要求', { exact: true }).fill('等待取消');
     await page.getByRole('button', { name: '开始任务', exact: true }).click();
     await expect.poll(() => engine!.stats.calls).toBe(4);
@@ -356,7 +354,6 @@ try {
     assert.equal(cancelled.tasks.at(-1).status, 'CANCELLED');
     assert.equal(cancelled.tasks.at(-1).reply, null);
     assert.deepEqual(cancelled.tasks.at(-1).artifacts, []);
-    await page.getByLabel('任务方式', { exact: true }).selectOption('AGENT');
     await page
       .getByLabel('工作要求', { exact: true })
       .fill('PUBLIC_RESEARCH 合成私密备注 PRIVATE_MARKER_DO_NOT_SEND');
@@ -390,7 +387,6 @@ try {
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
     await page.setViewportSize({ width: 1440, height: 960 });
     await screenshot(page, 'research-desktop.png');
-    await page.getByLabel('任务方式', { exact: true }).selectOption('AGENT');
     await page.getByLabel('工作要求', { exact: true }).fill('CANDIDATE_TRIAL PRIVATE_MARKER_DO_NOT_SEND');
     await page.getByLabel('公开检索内容（可选）', { exact: true }).fill('INI parser');
     await page.getByRole('button', { name: '开始任务', exact: true }).click();
@@ -450,7 +446,6 @@ try {
       await context.request.get(materialRoot + `/materials/${originalFile.id}`)
     ).json();
     const version = originalDetail.versions[0];
-    await page.getByLabel('任务方式', { exact: true }).selectOption('AGENT');
     await page.getByLabel('工作要求', { exact: true }).fill('ORIGINAL_FILE 处理本次指定的文件');
     await page.getByRole('button', { name: '选择原件版本', exact: true }).click();
     await page.getByRole('dialog').getByLabel('查找文件', { exact: true }).fill('whole-original');

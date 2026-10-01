@@ -92,15 +92,13 @@ export async function briefingJourney(
   await expect(reader).toContainText('已提取第 2—3 行');
   await expect(reader.getByRole('link', { name: '继续会话', exact: true })).toHaveAttribute(
     'href',
-    new RegExp('&task=' + card.taskId + '$'),
+    new RegExp('&briefingTask=' + card.taskId + '&'),
   );
   await reader.getByRole('link', { name: '继续会话', exact: true }).click();
-  await expect(page.locator('.conversation-turn')).toHaveCount(1);
-  await expect(page.locator('.conversation-reply')).toContainText('已提取第 2—3 行');
-  await expect(page.getByLabel('工作要求', { exact: true })).toHaveCount(0);
+  await expect(page.locator('[data-deck-id="briefing"]')).toContainText('已提取第 2—3 行');
+  await expect(page.getByLabel('工作要求', { exact: true })).toBeVisible();
   await page.reload();
-  await expect(page.locator('.conversation-turn')).toHaveCount(1);
-  await page.getByRole('button', { name: '返回最新对话并继续', exact: true }).click();
+  await expect(page.locator('[data-deck-id="briefing"]')).toContainText('已提取第 2—3 行');
   await expect(page.getByLabel('工作要求', { exact: true })).toBeVisible();
   await expect(page.locator('.conversation-turn').last()).toContainText('当前处理工具不支持');
   await page.goto(route);

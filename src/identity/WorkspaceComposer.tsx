@@ -1,5 +1,5 @@
 import { useContext, useEffect, useState } from 'react';
-import { ArrowUp } from 'lucide-react';
+import { Expand } from 'lucide-react';
 import { conversationHref } from '../conversation/Conversations';
 import { readTabDraft, writeTabDraft } from '../shared/tab-drafts';
 import { record } from './client';
@@ -34,7 +34,7 @@ export function WorkspaceComposer({ tenant, account }: { tenant: string; account
       setError('草稿暂时无法保存，请保留输入内容后重试。');
       return;
     }
-    location.hash = conversationHref(tenant);
+    location.hash = conversationHref(tenant) + '&from=briefing';
   };
   return (
     <form
@@ -51,14 +51,14 @@ export function WorkspaceComposer({ tenant, account }: { tenant: string; account
         disabled={pendingRequest || !!initial.pending}
         value={text}
         onChange={(event) => setText(event.target.value)}
-        maxLength={12000}
+        maxLength={2000}
       />
       <button
         type="submit"
         aria-label={initial.pending ? '继续未确认的会话' : '进入会话，继续编辑'}
         disabled={pendingRequest}
       >
-        <ArrowUp size={20} />
+        <Expand size={18} />
       </button>
       {error && <p role="alert">{error}</p>}
     </form>

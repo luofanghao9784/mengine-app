@@ -29,7 +29,9 @@ import type {
 import type { TenantContext } from '../../contracts/public-api/identity';
 import { identityClient, useSession } from '../identity/session';
 import { IdentityError, record, uuid } from '../identity/client';
-import { Button, Badge, Field, PageActions } from '../shared/ui';
+import { Button, Badge, Field, PageActions, DocumentText } from '../shared/ui';
+import { TaskReadingBody, type ReadingTask } from '../briefing-live/TaskReadingBody';
+import { readBriefingContext, retainConversationContext } from './briefing-context';
 import { LiveConversationDeck } from './LiveConversationDeck';
 import type { ReactNode } from 'react';
 import { Failure, Loading, Pager, SubmitError, useRemote, useSubmission } from '../shared/admin';
@@ -104,10 +106,11 @@ export function Conversations({ tenant }: { tenant: string }) {
         <Loading />
       ) : (
         <ConversationView
-          key={(selected || 'new') + ':' + (focused || '')}
+          key={(selected || 'new') + ':' + (focused || '') + ':' + (readBriefingContext(hash)?.taskId || '')}
           tenant={tenant}
           selected={selected}
           focused={focused}
+          briefingContext={readBriefingContext(hash)}
           context={context.value}
           enabled={list.value.enabled}
           agentMode={list.value.agentMode}
@@ -115,7 +118,7 @@ export function Conversations({ tenant }: { tenant: string }) {
           changed={changed}
           navigation={
             <nav className="live-conversation-list" aria-label="会话列表">
-              <header className="live-card-heading">
+              <header className="deck-card-header live-card-heading">
                 <h2>会话列表</h2>
                 <span>仅自己可见</span>
               </header>
@@ -208,7 +211,9 @@ function ConversationView({
   publicWebEnabled,
   changed,
   navigation,
+  briefingContext,
 }: {
+  briefingContext?: ReadingTask;
   navigation: ReactNode;
   tenant: string;
   selected?: string;
@@ -223,8 +228,14 @@ function ConversationView({
   const pendingRequest = useContext(RequestPending);
   const [data, setData] = useState<{ value?: ConversationDetail; error?: unknown }>({});
   const [attempt, setAttempt] = useState(0),
-    [page, setPage] = useState(0),
-    [citation, setCitation] = useState<string>();
+    [page, setPage] = useState(0);
+  const [citations, setCitations] = useState<{ id: string; title: string }[]>([]);
+  const [reveal, setReveal] = useState<{ id: string; sequence: number }>();
+  const [briefingOpen, setBriefingOpen] = useState(!!briefingContext);
+  const openCitation = (id: string, title: string) => {
+    setCitations((all) => (all.some((c) => c.id === id) ? all : [...all, { id, title }]));
+    setReveal((previous) => ({ id, sequence: (previous?.sequence || 0) + 1 }));
+  };
   const [suggestion, setSuggestion] = useState<{ text: string; sequence: number }>();
   const valueRef = useRef<ConversationDetail | undefined>(undefined);
   useEffect(() => {
@@ -277,6 +288,12 @@ function ConversationView({
     setAttempt((x) => x + 1);
     changed();
   };
+  useEffect(() => {
+    if (data.value?.tasks.some((task) => task.sourcesUnavailable)) {
+      setCitations([]);
+      setBriefingOpen(false);
+    }
+  }, [data.value]);
   const active = !!data.value?.tasks.some((t) => ['QUEUED', 'RUNNING'].includes(t.status));
   if (data.error)
     return (
@@ -288,29 +305,52 @@ function ConversationView({
   return (
     <LiveConversationDeck
       navigation={navigation}
-      sourceId={citation}
-      closeSource={() => setCitation(undefined)}
-      source={
-        citation ? (
-          <Citation
-            tenant={tenant}
-            id={citation}
-            verification={context}
-            back={() => setCitation(undefined)}
-          />
-        ) : undefined
-      }
+      title={data.value?.conversation.title || '新会话'}
+      reveal={reveal}
+      onClose={() => {
+        if (!requestNavigationLocked()) location.hash = '#tenant=' + tenant + '&view=briefing';
+      }}
+      cards={[
+        ...(briefingContext && briefingOpen
+          ? [
+              {
+                id: 'briefing',
+                kind: 'source' as const,
+                title: data.value?.conversation.title || '会话成果',
+                label: '画报卡片',
+                close: () => setBriefingOpen(false),
+                content: <TaskReadingBody tenant={tenant} task={briefingContext} onSource={openCitation} />,
+              },
+            ]
+          : []),
+        ...citations.map((c) => ({
+          id: c.id,
+          kind: 'file' as const,
+          title: c.title,
+          label: '资料来源 ' + c.title,
+          close: () => setCitations((all) => all.filter((item) => item.id !== c.id)),
+          content: (
+            <Citation
+              tenant={tenant}
+              id={c.id}
+              verification={context}
+              embedded
+              back={() => setCitations((all) => all.filter((item) => item.id !== c.id))}
+            />
+          ),
+        })),
+      ]}
     >
       <section className={`conversation-reader ${!selected ? 'is-new-conversation' : ''}`}>
-        <header className="live-card-heading">
+        <header className="deck-card-header live-card-heading">
           <div>
             <h2>{data.value?.conversation.title || '开始新会话'}</h2>
             <p className="muted">
               {agentMode === 'off'
-                ? '本地资料检索 · 未调用模型'
+                ? '模型暂不可用 · 任务可保存等待'
                 : agentMode === 'verification'
                   ? '联调验证 · 未调用真实模型'
-                  : '资料检索与 AI 工作任务'}
+                  : '描述需求，让 AI 协助完成工作'}
             </p>
           </div>
           <Badge>私人会话</Badge>
@@ -323,7 +363,10 @@ function ConversationView({
               conversation={selected!}
               task={task}
               changed={refresh}
-              citation={setCitation}
+              citation={(id) => {
+                const source = task.sources.find((s) => s.id === id);
+                if (source) openCitation(id, source.filename + ' · v' + source.version);
+              }}
             />
           ))}
           {!data.value && (
@@ -366,7 +409,7 @@ function ConversationView({
                     disabled={pendingRequest}
                     onClick={() =>
                       setSuggestion({
-                        text: agentMode === 'off' ? title : text,
+                        text,
                         sequence: (suggestion?.sequence || 0) + 1,
                       })
                     }
@@ -379,7 +422,7 @@ function ConversationView({
               </div>
               <p className="live-intro-capability">
                 {agentMode === 'off'
-                  ? '当前仅检索已解析的资料，AI 生成回复将在模型接入并启用后开放。'
+                  ? '模型暂不可用。你可以先写下需求，发送后保存为等待中的任务。'
                   : agentMode === 'verification'
                     ? '联调任务可使用所选范围内已解析的资料片段，也可指定文件版本供工具处理。'
                     : 'AI 任务可检索所选范围内已解析的资料片段，再生成回复。'}
@@ -422,7 +465,7 @@ function ConversationView({
               pendingRequest
                 ? '请先完成本次评价提交的核对。'
                 : !enabled
-                  ? '资料检索暂未开放。'
+                  ? '会话暂未开放。'
                   : active
                     ? '请等待当前任务结束，或先取消任务。'
                     : page !== 0
@@ -517,7 +560,11 @@ function TaskCard({
             <Badge>{task.executionClass === 'verification' ? '联调验证 · 未调用真实模型' : 'AI 任务'}</Badge>
           )}
         </div>
-        {task.reply && <p className="conversation-reply">{task.reply}</p>}
+        {task.reply && (
+          <div className="conversation-reply">
+            <DocumentText text={task.reply} />
+          </div>
+        )}
         {task.mode === 'AGENT' && !task.sourcesUnavailable && (
           <TaskWorkNotices tenant={tenant} task={task.id} verification={task.revision} />
         )}
@@ -860,9 +907,8 @@ function Composer({
   const [loaded] = useState(() => readTabDraft(key));
   const initial = useRef(record(loaded.value) ? loaded.value : {});
   const [stored, setStored] = useState(!loaded.unreadable);
-  const [mode, setMode] = useState<SendTask['mode']>(
-    initial.current.mode === 'AGENT' ? 'AGENT' : 'SOURCE_LOOKUP',
-  );
+  // New sends always use AI. Uncertain historical sends retain their exact body below.
+  const mode: SendTask['mode'] = 'AGENT';
   const [publicQuery, setPublicQuery] = useState(
     typeof initial.current.publicQuery === 'string' ? initial.current.publicQuery : '',
   );
@@ -894,7 +940,6 @@ function Composer({
   useEffect(() => {
     if (!suggestion || busy || pending) return;
     setText(suggestion.text);
-    if (agentMode !== 'off') setMode('AGENT');
     textarea.current?.focus({ preventScroll: true });
   }, [suggestion]);
   useEffect(() => () => controller.current?.abort(), []);
@@ -907,7 +952,7 @@ function Composer({
       className="conversation-composer"
       onSubmit={async (event) => {
         event.preventDefault();
-        if (busy || !enabled || !allowed) return;
+        if (busy || !enabled || !allowed || (!pending && !text.trim())) return;
         const body = pending || {
           requestId: crypto.randomUUID(),
           workspaceId: space || location,
@@ -993,24 +1038,6 @@ function Composer({
                 ))}
               </select>
             </Field>
-            {
-              <Field label="任务方式">
-                <select
-                  aria-label="任务方式"
-                  value={mode}
-                  onChange={(e) => setMode(e.target.value as SendTask['mode'])}
-                >
-                  <option value="SOURCE_LOOKUP">查找资料（不调用模型）</option>
-                  <option value="AGENT">
-                    {agentMode === 'verification'
-                      ? 'Agent 联调验证'
-                      : agentMode === 'off'
-                        ? 'AI 工作任务（保存并等待能力）'
-                        : 'AI 工作任务'}
-                  </option>
-                </select>
-              </Field>
-            }
           </div>
           {mode === 'AGENT' && agentMode === 'verification' && (
             <div className="original-selection">
@@ -1032,22 +1059,25 @@ function Composer({
                   </Button>
                 </div>
               ))}
-              <small>选用原件后，仅在这些版本中检索与处理；未选用时检索所选空间。</small>
+              {originals.length > 0 && <small>本次使用所选文件版本。</small>}
             </div>
           )}
           {mode === 'AGENT' && publicWebEnabled && (
-            <Field label="公开检索内容（可选）">
-              <input
-                aria-label="公开检索内容（可选）"
-                value={publicQuery}
-                maxLength={2048}
-                pattern="([hH][tT][tT][pP][sS]://.*|.{0,200})"
-                title="公开关键词最多 200 字，HTTPS 网址最多 2048 字"
-                onChange={(e) => setPublicQuery(e.target.value)}
-                placeholder="公开关键词，或一个 https 网页地址"
-              />
-              <small>仅将这里填写的内容用于外部检索或访问；请勿填写企业机密。留空则不联网查找。</small>
-            </Field>
+            <details className="live-web-options">
+              <summary>查找公开资料（可选）</summary>
+              <Field label="公开检索内容（可选）">
+                <input
+                  aria-label="公开检索内容（可选）"
+                  value={publicQuery}
+                  maxLength={2048}
+                  pattern="([hH][tT][tT][pP][sS]://.*|.{0,200})"
+                  title="公开关键词最多 200 字，HTTPS 网址最多 2048 字"
+                  onChange={(e) => setPublicQuery(e.target.value)}
+                  placeholder="公开关键词，或一个 https 网页地址"
+                />
+                <small>仅将这里填写的内容用于外部检索或访问；请勿填写企业机密。留空则不联网查找。</small>
+              </Field>
+            </details>
           )}
         </fieldset>
         <Button
@@ -1067,18 +1097,11 @@ function Composer({
         </Button>
       </div>
       {mode === 'AGENT' && agentMode === 'off' && (
-        <p className="muted">模型当前关闭。提交会保存任务并等待能力，不会调用模型；资料查找仍可正常执行。</p>
+        <p className="muted">模型暂不可用。发送后会保存任务，等待模型恢复；不会生成 AI 回复。</p>
       )}
       <div className="conversation-send">
         <small>
-          {stored && !loaded.unreadable && '草稿在本标签页恢复；'}
-          {mode !== 'AGENT'
-            ? '最多 8 个关键词，检索已解析的资料。'
-            : agentMode === 'verification'
-              ? '最多 2000 字，使用已解析的资料片段及本次指定的原件。'
-              : agentMode === 'off'
-                ? '最多 2000 字，保存任务并等待模型能力。'
-                : '最多 2000 字，AI 可检索所选范围内已解析的资料片段。'}
+          Enter 发送 · Shift + Enter 换行
           {disabledReason}
         </small>
       </div>
@@ -1099,6 +1122,6 @@ function Composer({
     </form>
   );
   function locationHash(id: string) {
-    window.location.hash = conversationHref(tenant, id);
+    window.location.hash = retainConversationContext(conversationHref(tenant, id), window.location.hash);
   }
 }

@@ -8,6 +8,7 @@ export function useDeckReorder(
   order: string[],
   onOrder: (order: string[]) => void,
   motion: { capture: () => void; bounds: (card: HTMLElement) => DOMRect },
+  enabled = true,
 ) {
   const callback = useRef(onOrder);
   callback.current = onOrder;
@@ -22,7 +23,7 @@ export function useDeckReorder(
   const key = order.join('|');
   useEffect(() => {
     const rail = scroller.current;
-    if (!rail) return;
+    if (!rail || !enabled) return;
     const card = (id: string) =>
       Array.from(rail.querySelectorAll<HTMLElement>('[data-deck-id]')).find(
         (node) => node.dataset.deckId === id,
@@ -241,6 +242,6 @@ export function useDeckReorder(
       window.removeEventListener('blur', cancel);
       window.removeEventListener('resize', cancel);
     };
-  }, [scroller, route, key, capture, bounds]);
+  }, [scroller, route, key, capture, bounds, enabled]);
   return { message, order: previewOrder || order };
 }

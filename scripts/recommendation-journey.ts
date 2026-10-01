@@ -83,8 +83,9 @@ export async function recommendationJourney(
     await section.locator('.recommendation-card .live-briefing-body').click();
     await expect(reader).toContainText('2000 分');
     await reader.getByRole('link', { name: '继续会话', exact: true }).click();
-    await expect(page).toHaveURL(new RegExp(`conversation=${conversation}.*task=${task}`));
+    await expect(page).toHaveURL(new RegExp(`conversation=${conversation}.*briefingTask=${task}`));
     await expect(page.locator('.conversation-reply')).toContainText('2000 分');
+    await expect(page.getByLabel('工作要求', { exact: true })).toBeVisible();
     const current = await (await request.get(root)).json();
     assert.ok(current.items[0].content.openedAt);
     assert.equal(current.businessOutcome, 'NOT_ASSESSED');

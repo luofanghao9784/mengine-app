@@ -221,27 +221,31 @@ try {
   await expect(adminB.locator('.access-welcome h2')).toHaveText('合成试用企业 B');
   const first = await invite(adminA, ac, a, accounts.member.email);
   await activate(member, await token(first), accounts.member, 'workspace');
+  await member.goto('/workspace/#tenant=' + a + '&view=spaces');
   await expect(member.locator('.access-spaces > li')).toHaveCount(1);
   const second = await invite(adminB, bc, b, accounts.member.email);
   await member.goto('/workspace/#invite=' + (await token(second)));
   await member.getByRole('button', { name: '确认加入企业', exact: true }).click();
-  await expect(member.locator('.access-welcome h2')).toHaveText('合成试用企业 B');
+  await expect(member.getByLabel('当前企业')).toHaveValue(b);
+  await expect(member.getByRole('tab', { name: '推荐', exact: true })).toBeVisible();
   await expect(member).toHaveURL(new RegExp(`tenant=${b}$`));
   // B's administrator also joins A as an ordinary member; an A URL must not grant A management rights.
   const peerInvite = await invite(adminA, ac, a, accounts.adminB.email);
   await adminB.goto('/workspace/#invite=' + (await token(peerInvite)));
   await adminB.getByRole('button', { name: '确认加入企业', exact: true }).click();
-  await expect(adminB.locator('.access-welcome h2')).toHaveText('合成试用企业 A');
+  await expect(adminB.getByLabel('当前企业')).toHaveValue(a);
   await adminB.getByRole('button', { name: '更多工作与管理', exact: true }).click();
   await adminB.getByRole('link', { name: '企业管理', exact: true }).click();
   await expect(adminB.locator('.access-welcome h2')).toHaveText('合成试用企业 B');
   await adminB.getByRole('link', { name: '工作空间', exact: true }).click();
-  await expect(adminB.locator('.access-welcome h2')).toHaveText('合成试用企业 B');
+  await expect(adminB.getByLabel('当前企业')).toHaveValue(b);
+  await expect(adminB.getByRole('tab', { name: '推荐', exact: true })).toBeVisible();
   await expect(adminB).toHaveURL(new RegExp(`tenant=${b}$`));
   await adminB.getByRole('button', { name: '更多工作与管理', exact: true }).click();
   await adminB.getByRole('link', { name: '企业管理', exact: true }).click();
   const spaceA = await shared(adminA, ac, a, '企业 A 共享资料', accounts.member.email),
     spaceB = await shared(adminB, bc, b, '企业 B 共享资料', accounts.member.email);
+  await member.goto('/workspace/#tenant=' + a + '&view=spaces');
   await member.getByLabel('当前企业').selectOption(a);
   await expect(member.locator('.access-spaces')).toContainText('企业 A 共享资料');
   await expect(member.locator('.access-spaces')).not.toContainText('企业 B 共享资料');
@@ -296,7 +300,7 @@ try {
   await row.getByRole('button', { name: '恢复', exact: true }).click();
   await adminA.getByRole('button', { name: '恢复成员', exact: true }).click();
   await expect(row).toContainText('已启用');
-  await member.goto('/workspace/#tenant=' + a);
+  await member.goto('/workspace/#tenant=' + a + '&view=spaces');
   await member.getByRole('button', { name: '刷新', exact: true }).click();
   await expect(member.locator('.access-spaces > li')).toHaveCount(1);
   // Platform suspension of B does not remove the same member's A access.

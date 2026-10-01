@@ -135,11 +135,13 @@ export function Citation({
   id,
   back,
   verification,
+  embedded = false,
 }: {
   tenant: string;
   id: string;
   back: () => void;
   verification: unknown;
+  embedded?: boolean;
 }) {
   const { session } = useSession();
   const [attempt, setAttempt] = useState(0);
@@ -149,17 +151,29 @@ export function Citation({
   );
   return (
     <>
-      <Button onClick={back}>返回检索</Button>
+      {!embedded && <Button onClick={back}>返回检索</Button>}
       {data.error ? (
         <Failure error={data.error} retry={() => setAttempt((x) => x + 1)} />
       ) : !data.value ? (
         <Loading />
       ) : (
         <>
-          <h3>
-            {data.value.filename} · v{data.value.version}
-          </h3>
-          <p className="muted">引用固定在此文件版本和解析批次，后续更新不会覆盖这里的内容。</p>
+          {embedded ? (
+            <details className="live-citation-properties">
+              <summary>资料信息 · v{data.value.version}</summary>
+              <p>{data.value.filename}</p>
+              <p className="muted">
+                引用固定在此文件版本和解析批次，后续更新不会覆盖这里的内容。以下为本次引用片段。
+              </p>
+            </details>
+          ) : (
+            <>
+              <h3>
+                {data.value.filename} · v{data.value.version}
+              </h3>
+              <p className="muted">引用固定在此文件版本和解析批次，后续更新不会覆盖这里的内容。</p>
+            </>
+          )}
           <Fragment chunk={data.value} />
         </>
       )}

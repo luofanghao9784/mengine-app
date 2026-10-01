@@ -307,7 +307,7 @@ try {
   await expect(page.locator('.live-reading-dialog')).toContainText('已核对的完整原文');
   await expect(page.getByRole('link', { name: '继续会话', exact: true })).toHaveAttribute(
     'href',
-    new RegExp('task=' + uid(100)),
+    new RegExp('briefingTask=' + uid(100)),
   );
   await page.getByRole('button', { name: '评价 / 建议', exact: true }).click();
   await expect(page.locator('.feedback-panel')).toContainText('这条画报对你有用吗');
