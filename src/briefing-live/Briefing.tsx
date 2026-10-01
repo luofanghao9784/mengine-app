@@ -1,3 +1,4 @@
+import { GenerationPanel } from './GenerationPanel';
 import { briefingTypeLabels } from './content';
 import { useViewState, textState, pageState } from '../shared/useViewState';
 import { ForwardInbox } from '../forwarding/ForwardInbox';
@@ -57,7 +58,7 @@ export function LiveBriefing({ tenant }: { tenant: string }) {
     void layoutSubmit.submit(
       { expectedRevision: layout.value.revision, conversationId: source, anchorId, direction },
       async (body, requestId) => {
-        const receipt = await api.move(tenant, { ...body, requestId });
+        const receipt = await api.cardMove(tenant, { ...body, requestId });
         setMoving(undefined);
         setLayoutNotice(
           receipt.currentRevision === receipt.appliedRevision
@@ -72,22 +73,40 @@ export function LiveBriefing({ tenant }: { tenant: string }) {
     (signal) => identityClient.context(tenant, signal),
     [tenant, session.identity, attempt],
   );
+  const anchor = useRef<{ key: string; asOf?: string }>({ key: '' });
+  const anchorKey = JSON.stringify([
+    tenant,
+    view,
+    businessType,
+    date,
+    zone,
+    space,
+    session.identity,
+    attempt,
+  ]);
+  if (anchor.current.key !== anchorKey) anchor.current = { key: anchorKey };
   const feed = useRemote(
     (signal) =>
       view === 'RECOMMENDED'
         ? Promise.resolve(null)
-        : api.list(
-            tenant,
-            {
-              view,
-              businessType: businessType || undefined,
-              date: date || null,
-              zone,
-              ...(space ? { workspaceId: space } : {}),
-            },
-            page * 20,
-            signal,
-          ),
+        : api
+            .list(
+              tenant,
+              {
+                view,
+                asOf: anchor.current.asOf,
+                businessType: businessType || undefined,
+                date: date || null,
+                zone,
+                ...(space ? { workspaceId: space } : {}),
+              },
+              page * 20,
+              signal,
+            )
+            .then((result) => {
+              if (!signal.aborted && anchor.current.key === anchorKey) anchor.current.asOf = result.asOf;
+              return result;
+            }),
     [tenant, view, businessType, date, zone, space, page, session.identity, attempt],
   );
   useEffect(() => {
@@ -297,7 +316,7 @@ export function LiveBriefing({ tenant }: { tenant: string }) {
                 text={
                   date
                     ? '这一天没有符合当前范围的画报。可切换日期或空间。'
-                    : '可在会话中要求 AI 根据资料生成画报；有完整内容和依据的结果会出现在这里。'
+                    : '系统会在资料就绪后自动生成，也可以在下方生成更多。'
                 }
               >
                 <a className="button" href={conversationHref(tenant)}>
@@ -311,16 +330,16 @@ export function LiveBriefing({ tenant }: { tenant: string }) {
                 <div className="live-briefing-grid">
                   {cards.map((card) => (
                     <Card
-                      key={card.conversationId}
+                      key={card.cardId || card.taskId}
                       tenant={tenant}
                       card={card}
                       changed={refresh}
                       focused={view === 'FOCUSED'}
                       moving={moving}
                       canMove={!!layout.value}
-                      pick={() => setMoving(card.conversationId)}
-                      move={(direction) => move(card.conversationId, direction)}
-                      drop={(anchor) => move(anchor, 'BEFORE', card.conversationId)}
+                      pick={() => setMoving(card.cardId || card.taskId)}
+                      move={(direction) => move(card.cardId || card.taskId, direction)}
+                      drop={(anchor) => move(anchor, 'BEFORE', card.cardId || card.taskId)}
                     />
                   ))}
                 </div>
@@ -337,6 +356,22 @@ export function LiveBriefing({ tenant }: { tenant: string }) {
             )}
           </>
         )}
+        <GenerationPanel
+          key={tenant + ':' + session.identity}
+          tenant={tenant}
+          workspace={space || undefined}
+          businessType={businessType || undefined}
+          onDelivered={(cards) => {
+            if (view === 'RECOMMENDED')
+              window.dispatchEvent(new CustomEvent('briefing-generated', { detail: { tenant, cards } }));
+          }}
+          onRefresh={() => {
+            setView('RECOMMENDED');
+            setDate('');
+            setPage(0);
+            refresh();
+          }}
+        />
       </section>
     </>
   );
@@ -379,7 +414,7 @@ function Card({
         ...change,
       },
       async (body, requestId) => {
-        await api.update(tenant, card.conversationId, { ...body, requestId });
+        await api.cardUpdate(tenant, card.cardId || card.taskId, { ...body, requestId });
         changed();
       },
     );
@@ -427,7 +462,7 @@ function Card({
           (card.preference.size === 'WIDE' ? 'wide' : '')
         }
         aria-label={(card.briefing ? '画报：' : '会话成果：') + card.title}
-        data-conversation-id={card.conversationId}
+        data-conversation-id={card.cardId || card.taskId}
       >
         <button
           type="button"
@@ -474,7 +509,7 @@ function Card({
                     .elementFromPoint(event.clientX, event.clientY)
                     ?.closest<HTMLElement>('.live-briefing-card[data-conversation-id]');
                   const id = target?.dataset.conversationId;
-                  if (id && id !== card.conversationId) drop(id);
+                  if (id && id !== (card.cardId || card.taskId)) drop(id);
                 }
               }}
               onPointerCancel={() => {
@@ -485,10 +520,10 @@ function Card({
                 else pick();
               }}
             >
-              {moving === card.conversationId ? '已选择此卡' : '移动此卡'}
+              {moving === (card.cardId || card.taskId) ? '已选择此卡' : '移动此卡'}
             </Button>
           )}
-          {focused && moving && moving !== card.conversationId && (
+          {focused && moving && moving !== (card.cardId || card.taskId) && (
             <>
               <Button variant="ghost" disabled={pendingRequest || !canMove} onClick={() => move('BEFORE')}>
                 移到此卡前

@@ -176,14 +176,25 @@ test('reserved final response uses the existing budget and cannot execute anothe
       prompt: 'Find supported facts, preserving gaps.',
       reserveFinalResponse: true,
       limits: { modelCalls: 2, toolCalls: 4 },
-      tools: [{ name: 'search_sources', description: 'synthetic', parameters: { type: 'object' },
-        async execute() { executions++; return { items: [] }; } }],
+      tools: [
+        {
+          name: 'search_sources',
+          description: 'synthetic',
+          parameters: { type: 'object' },
+          async execute() {
+            executions++;
+            return { items: [] };
+          },
+        },
+      ],
       model: fixture([
         call('search_sources', {}),
         (request) => {
           assert.deepEqual(request.tools, []);
           assert.match(request.messages[0].content[0].text, /reserved final response/);
-          return ignoresFinal ? call('search_sources', {}, 'blocked') : reply('No supporting evidence yet; data remains missing.');
+          return ignoresFinal
+            ? call('search_sources', {}, 'blocked')
+            : reply('No supporting evidence yet; data remains missing.');
         },
       ]),
     });
@@ -201,8 +212,17 @@ test('slow evidence retrieval reserves wall time for a final reply even with cal
     prompt: 'Analyze the evidence and report gaps.',
     reserveFinalResponse: true,
     limits: { timeoutMs: 2000, modelCalls: 8, toolCalls: 8 },
-    tools: [{ name: 'search_sources', description: 'synthetic', parameters: { type: 'object' },
-      async execute() { await delay(600); return { evidence: 'Receipts: 42 yuan; matched partial period.' }; } }],
+    tools: [
+      {
+        name: 'search_sources',
+        description: 'synthetic',
+        parameters: { type: 'object' },
+        async execute() {
+          await delay(600);
+          return { evidence: 'Receipts: 42 yuan; matched partial period.' };
+        },
+      },
+    ],
     model: {
       async *generate(request) {
         calls++;
@@ -211,7 +231,11 @@ test('slow evidence retrieval reserves wall time for a final reply even with cal
         } else {
           assert.deepEqual(request.tools, []);
           assert.match(request.messages[0].content[0].text, /reserved final response/);
-          assert.ok(request.messages.flatMap(m => m.content).some(b => b.type === 'tool_result' && b.content.includes('42 yuan')));
+          assert.ok(
+            request.messages
+              .flatMap((m) => m.content)
+              .some((b) => b.type === 'tool_result' && b.content.includes('42 yuan')),
+          );
           await delay(100);
           yield* reply('42 yuan for the matched partial period; chart generation remains unavailable.');
         }
@@ -352,4 +376,53 @@ test('invalid model completion and duplicate call IDs fail closed without execut
   assert.equal(count, 1);
   assert.equal(result.status, 'failed');
   assert.equal(result.text, '');
+});
+
+test('fine-grained streaming uses the same content budget as a single chunk', async () => {
+  const text = '证'.repeat(3000);
+  const result = await runHarness({
+    prompt: 'test streaming payload',
+    tools: [],
+    model: {
+      async *generate() {
+        for (const ch of text) yield { type: 'text', text: ch };
+        yield { type: 'finish', reason: 'stop' };
+      },
+    },
+  });
+  assert.equal(result.status, 'completed');
+  assert.equal(result.text, text);
+});
+
+test('structured delivery keeps tools after 15 seconds while preserving a short final confirmation', async (t) => {
+  const now = performance.now.bind(performance);
+  let elapsed = 0;
+  t.mock.method(performance, 'now', () => now() + elapsed);
+  let calls = 0;
+  const r = await runHarness({
+    prompt: 'deliver a structured card',
+    reserveFinalResponse: true,
+    finalResponseReserveMs: 10000,
+    limits: { timeoutMs: 55000, modelCalls: 8, toolCalls: 8 },
+    tools: tools('evidence'),
+    model: {
+      async *generate(req) {
+        calls++;
+        if (calls === 1) {
+          elapsed = 20000;
+          yield* call('read_input', { handle: 'current.txt' });
+        } else if (calls === 2) {
+          assert.ok(req.tools.length > 0);
+          elapsed = 46000;
+          yield* call('read_input', { handle: 'current.txt' }, 'second');
+        } else {
+          assert.equal(req.tools.length, 0);
+          yield* reply('A short truthful final response.');
+        }
+      },
+    },
+  });
+  assert.equal(r.status, 'completed');
+  assert.equal(calls, 3);
+  assert.equal(r.finalResponseReserved, true);
 });

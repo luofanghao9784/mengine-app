@@ -114,6 +114,7 @@ try {
     TASK_ENABLED: process.argv.includes('--client-all') ? 'true' : 'false',
     AGENT_TASK_MODE: 'off',
     DREAMCORE_TASKS_INITIAL_DELAY_MS: '3600000',
+    DREAMCORE_BRIEFING_INITIAL_DELAY_MS: '3600000',
     KNOWLEDGE_ENABLED: 'false',
   });
   await ready(apiUrl + '/actuator/health', api);

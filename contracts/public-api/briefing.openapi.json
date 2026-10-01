@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Dreamcore Private Briefing API",
-    "version": "1.1.0",
-    "description": "从实际成功的私人 AGENT 会话派生卡片；同一会话在当前筛选范围只保留最后一次成功回复。date 按指定 IANA zone 的本地日筛选，不代表自动分析或共享发布；关注、隐藏和尺寸偏好跨日期共用。管理员无内容旁路。 generatedOnly=true 以独立画报 artifact 的真实生成回执为准；标题、摘要和图表读取固定版本内容。刷新仅查询，不触发模型。"
+    "version": "1.2.0",
+    "description": "本人智能画报。generatedOnly=true 时以成功任务的独立交付 artifact 为卡片身份，同会话多张卡均保留，偏好按 cardId（taskId）保存；旧会话接口仅保留兼容。刷新只读取。系统策略独立于个人计划，首次资料就绪、资料/目标/洞察变化和资讯日程可提交当前主模型；生成更多只追加。来源不足、额度不足和失败都有真实批次状态。"
   },
   "security": [
     {
@@ -105,6 +105,15 @@
                 "RESULT"
               ]
             }
+          },
+          {
+            "name": "asOf",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "沿用第一页返回时间，排除阅读期间新增卡片；仍复查当前权限。"
           }
         ],
         "responses": {
@@ -325,6 +334,321 @@
           },
           "404": {
             "description": "非本人会话、无成功成果或空间不可访问"
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/briefing/generation": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "读取自动策略和最近批次，不提交任务",
+        "responses": {
+          "200": {
+            "description": "仅本人；Cache-Control: private, no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerationState"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "幂等生成更多；同范围同类型进行中批次归并",
+        "responses": {
+          "200": {
+            "description": "仅本人；Cache-Control: private, no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerationBatch"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Generate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/briefing/generation/{id}": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "读取本人批次和真实成功卡片",
+        "responses": {
+          "200": {
+            "description": "仅本人；Cache-Control: private, no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerationBatch"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/briefing/generation/{id}/cancel": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "summary": "取消本次生成，重复取消返回当前状态",
+        "responses": {
+          "200": {
+            "description": "仅本人；Cache-Control: private, no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerationBatch"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenant}/briefing/generation/policy": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "summary": "暂停或恢复未来自动生成，不改变个人计划或正在执行批次",
+        "responses": {
+          "200": {
+            "description": "仅本人；Cache-Control: private, no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerationPolicy"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigureGeneration"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/briefing/cards/{card}/preference": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "card",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "读取指定独立交付卡片偏好",
+        "responses": {
+          "200": {
+            "description": "仅本人；Cache-Control: private, no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Preference"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "幂等更新指定卡片偏好",
+        "responses": {
+          "200": {
+            "description": "仅本人；Cache-Control: private, no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Preference"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Update"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/briefing/cards/layout": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "summary": "移动本人已关注的独立卡片",
+        "responses": {
+          "200": {
+            "description": "仅本人；Cache-Control: private, no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CardMoveReceipt"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CardMove"
+              }
+            }
           }
         }
       }
@@ -956,6 +1280,10 @@
                 "type": "null"
               }
             ]
+          },
+          "cardId": {
+            "type": "string",
+            "format": "uuid"
           }
         },
         "required": [
@@ -1013,6 +1341,10 @@
           },
           "hasMore": {
             "type": "boolean"
+          },
+          "asOf": {
+            "type": "string",
+            "format": "date-time"
           }
         },
         "required": [
@@ -1152,6 +1484,282 @@
           "currentRevision": {
             "type": "integer",
             "minimum": 0
+          }
+        }
+      },
+      "Generate": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requestId"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "businessType": {
+            "type": "string",
+            "enum": [
+              "INFO",
+              "DATA",
+              "INSIGHT",
+              "SUGGESTION",
+              "RESULT"
+            ]
+          }
+        }
+      },
+      "GenerationBatch": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "workspaceId",
+          "trigger",
+          "businessType",
+          "status",
+          "reason",
+          "taskId",
+          "cardIds",
+          "createdAt",
+          "finishedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "trigger": {
+            "type": "string"
+          },
+          "businessType": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "INFO",
+              "DATA",
+              "INSIGHT",
+              "SUGGESTION",
+              "RESULT",
+              null
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "RUNNING",
+              "WAITING_DATA",
+              "WAITING_RESOURCE",
+              "WAITING_CAPABILITY",
+              "SUCCEEDED",
+              "NO_NEW_CONTENT",
+              "FAILED",
+              "CANCELLED",
+              "AUTHORITY_REVOKED"
+            ]
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "taskId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "cardIds": {
+            "type": "array",
+            "maxItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "GenerationPolicy": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "workspaceId",
+          "workspaceName",
+          "enabled",
+          "revision",
+          "reason"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceName": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "GenerationState": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "policies",
+          "batches"
+        ],
+        "properties": {
+          "policies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GenerationPolicy"
+            }
+          },
+          "batches": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "$ref": "#/components/schemas/GenerationBatch"
+            }
+          }
+        }
+      },
+      "ConfigureGeneration": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "workspaceId",
+          "expectedRevision",
+          "enabled"
+        ],
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        }
+      },
+      "CardMove": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requestId",
+          "expectedRevision",
+          "cardId",
+          "anchorId",
+          "direction"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "anchorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "BEFORE",
+              "AFTER"
+            ]
+          },
+          "cardId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "CardMoveReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "cardId",
+          "anchorId",
+          "direction",
+          "appliedRevision",
+          "currentRevision"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cardId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "anchorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "BEFORE",
+              "AFTER"
+            ]
+          },
+          "appliedRevision": {
+            "type": "integer"
+          },
+          "currentRevision": {
+            "type": "integer"
           }
         }
       }

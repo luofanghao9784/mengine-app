@@ -36,6 +36,8 @@ public class BriefingContentService {
         if(request==null)throw IdentityException.invalid();
         String type=request.businessType()==null?"DATA":request.businessType();
         if(!Set.of("INFO","DATA","INSIGHT","SUGGESTION","RESULT").contains(type))throw IdentityException.invalid();
+        var desired=db.queryForList("SELECT business_type FROM briefing_generation_batches WHERE task_id=? AND business_type IS NOT NULL",String.class,job.id());
+        if(!desired.isEmpty()&&!desired.getFirst().equals(type))throw new IdentityException(422,"BRIEFING_TYPE_MISMATCH");
         text(request.title(),4,80,false);text(request.summary(),12,240,true);
         if(request.analysis()==null||request.analysis().size()<2||request.analysis().size()>4)throw new IdentityException(422,"BRIEFING_ANALYSIS_REQUIRED");
         request.analysis().forEach(s->text(s,12,500,true));
@@ -61,6 +63,7 @@ public class BriefingContentService {
             return doc;
         }
         var content=new Content("briefing-data-v1","DATA",request.title().strip(),request.summary().strip(),List.copyOf(request.analysis()),chart,source,request.calculationArtifactId(),(String)item.get("sha256"),Instant.now().toString());
+        if(!reserve(job,content))return null;
         byte[] body=json.writeValueAsBytes(content);if(body.length>20000)throw new IdentityException(413,"BRIEFING_CONTENT_LIMIT");
         var total=db.queryForMap("SELECT count(*) n,coalesce(sum(octet_length(content)),0) bytes FROM conversation_artifacts WHERE task_id=? AND attempt_number=?",job.id(),attempt);
         if(((Number)total.get("n")).intValue()>=8||((Number)total.get("bytes")).longValue()+body.length>65536)throw new IdentityException(413,"BRIEFING_CONTENT_LIMIT");
@@ -70,11 +73,14 @@ public class BriefingContentService {
     private Document createText(ConversationService.Job job,Request request,String type,int attempt){
         if(request.calculationArtifactId()!=null)throw IdentityException.invalid();
         var sources=db.queryForList("SELECT c.id,c.material_id,c.version_id,v.number,v.filename,v.sha256,c.content FROM conversation_agent_grants g JOIN knowledge_chunks c ON c.id=g.chunk_id JOIN material_versions v ON v.id=c.version_id WHERE g.task_id=? AND g.attempt_id=? ORDER BY c.id",job.id(),job.token());
-        if(sources.isEmpty()&&!type.equals("RESULT")&&db.queryForObject("SELECT count(*) FROM conversation_tool_receipts WHERE task_id=? AND attempt_number=? AND name IN ('public_search','read_public_page') AND status='succeeded'",Integer.class,job.id(),attempt)==0)throw new IdentityException(422,"BRIEFING_SOURCES_REQUIRED");
+        if(sources.isEmpty()&&db.queryForObject("SELECT count(*) FROM conversation_tool_receipts WHERE task_id=? AND attempt_number=? AND name IN ('public_search','read_public_page') AND status='succeeded'",Integer.class,job.id(),attempt)==0)throw new IdentityException(422,"BRIEFING_SOURCES_REQUIRED");
+        if(type.equals("INFO")&&db.queryForObject("SELECT EXISTS(SELECT 1 FROM briefing_generation_batches WHERE task_id=? AND business_type='INFO')",Boolean.class,job.id())&&
+            (sources.isEmpty()||db.queryForObject("SELECT count(*) FROM conversation_tool_receipts WHERE task_id=? AND attempt_number=? AND name='read_public_page' AND status='succeeded'",Integer.class,job.id(),attempt)==0))throw new IdentityException(422,"BRIEFING_NEWS_EVIDENCE_REQUIRED");
         Source source=null;if(!sources.isEmpty()){var r=sources.getFirst();source=new Source((UUID)r.get("id"),(UUID)r.get("material_id"),(UUID)r.get("version_id"),(Integer)r.get("number"),(String)r.get("filename"),(String)r.get("sha256"),(String)r.get("content"));}
         var prior=db.queryForList("SELECT a.id,a.sha256,a.content FROM conversation_artifacts a WHERE task_id=? AND attempt_number=? AND EXISTS(SELECT 1 FROM identity_audit p WHERE p.target_id=a.id AND p.action='TASK_BRIEFING_CREATED' AND p.tenant_id=a.tenant_id)",job.id(),attempt);
         if(!prior.isEmpty()){var doc=read(prior.getFirst());if(!doc.content().businessType().equals(type)||!doc.content().title().equals(request.title().strip())||!doc.content().summary().equals(request.summary().strip())||!doc.content().analysis().equals(request.analysis()))throw new IdentityException(409,"BRIEFING_ALREADY_CREATED");return doc;}
         var content=new Content("briefing-text-v1",type,request.title().strip(),request.summary().strip(),List.copyOf(request.analysis()),null,source,null,null,Instant.now().toString());
+        if(!reserve(job,content))return null;
         byte[] body=json.writeValueAsBytes(content);var total=db.queryForMap("SELECT count(*) n,coalesce(sum(octet_length(content)),0) bytes FROM conversation_artifacts WHERE task_id=? AND attempt_number=?",job.id(),attempt);
         if(((Number)total.get("n")).intValue()>=8||((Number)total.get("bytes")).longValue()+body.length>65536)throw new IdentityException(413,"BRIEFING_CONTENT_LIMIT");
         UUID id=UUID.randomUUID();String sha=hash(body);db.update("INSERT INTO conversation_artifacts(id,tenant_id,workspace_id,task_id,filename,sha256,content,attempt_number) VALUES (?,?,?,?,?,?,?,?)",id,job.tenant(),job.space(),job.id(),"briefing-text-"+sha.substring(0,20)+".json",sha,body,attempt);
@@ -85,6 +91,20 @@ public class BriefingContentService {
         var rows=db.queryForList("SELECT b.* FROM conversation_tasks t JOIN LATERAL ("+ELIGIBLE+") b ON true WHERE t.id=? AND t.attempt=?",task,attempt);
         return rows.isEmpty()?null:read(rows.getFirst());
     }
+    private boolean reserve(ConversationService.Job job,Content content){
+        String key=contentKey(content);
+        db.queryForList("SELECT pg_advisory_xact_lock(hashtextextended(?,0))","briefing-content:"+job.tenant()+":"+job.actor());
+        for(var legacy:db.queryForList("SELECT t.id,b.* FROM conversation_tasks t JOIN conversations c ON c.id=t.conversation_id JOIN LATERAL ("+ELIGIBLE+") b ON true WHERE c.tenant_id=? AND c.owner_id=? AND t.status='SUCCEEDED' AND EXISTS(SELECT 1 FROM readable_source_tasks r WHERE r.id=t.id) AND NOT EXISTS(SELECT 1 FROM briefing_content_keys k WHERE k.task_id=t.id) ORDER BY t.finished_at DESC LIMIT 1000",job.tenant(),job.actor())){
+            var old=read(legacy);if(contentKey(old.content()).equals(key))return false;
+        }
+        // An unsuccessful prepared artifact cannot monopolize its key forever.
+        db.update("DELETE FROM briefing_content_keys k USING conversation_tasks t WHERE k.task_id=t.id AND k.tenant_id=? AND k.owner_id=? AND k.fingerprint=? AND t.status NOT IN ('SUCCEEDED','RUNNING','QUEUED')",job.tenant(),job.actor(),key);
+        db.update("INSERT INTO briefing_content_keys VALUES(?,?,?,?) ON CONFLICT DO NOTHING",job.tenant(),job.actor(),key,job.id());
+        UUID owner=db.queryForObject("SELECT task_id FROM briefing_content_keys WHERE tenant_id=? AND owner_id=? AND fingerprint=?",UUID.class,job.tenant(),job.actor(),key);
+        if(!owner.equals(job.id())&&!"SUCCEEDED".equals(db.queryForObject("SELECT status FROM conversation_tasks WHERE id=?",String.class,owner)))throw new IdentityException(409,"BRIEFING_CONTENT_IN_PROGRESS");
+        return owner.equals(job.id());
+    }
+    private String contentKey(Content c){return IdentityService.hash(json.writeValueAsString(List.of(c.businessType(),c.source()==null?"PUBLIC":c.source().sha256(),c.chart()!=null?json.writeValueAsString(c.chart()):c.summary().replaceAll("[\\p{P}\\s]", "").toLowerCase(Locale.ROOT))));}
     private Document read(Map<String,Object> row){
         byte[] bytes=(byte[])row.get("content");String sha=(String)row.get("sha256");if(!hash(bytes).equals(sha))throw new IdentityException(502,"BRIEFING_CONTENT_INVALID");
         Content content=json.readValue(bytes,Content.class);if(!Set.of("briefing-data-v1","briefing-text-v1").contains(content.schemaVersion()))throw new IdentityException(502,"BRIEFING_CONTENT_INVALID");

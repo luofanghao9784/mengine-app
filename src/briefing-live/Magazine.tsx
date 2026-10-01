@@ -61,7 +61,9 @@ export function MagazineBody({
         </div>
         <h3>{briefing.content.title}</h3>
         <DataBriefing document={briefing} compact />
-        <span className="data-briefing-generated">{workspace} · 有计算依据</span>
+        <span className="data-briefing-generated">
+          {workspace} · {briefing.content.chart ? '有计算依据' : '有来源依据'}
+        </span>
         <BriefingStatusMarks pinned={pinned} />
       </>
     );

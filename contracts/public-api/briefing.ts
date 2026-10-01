@@ -7,6 +7,7 @@ export interface BriefingPreference {
   size: 'STANDARD' | 'WIDE';
 }
 export interface BriefingCard {
+  cardId?: string;
   briefing?: BriefingDocument | null;
   conversationId: string;
   taskId: string;
@@ -27,6 +28,7 @@ export interface BriefingCard {
   preference: BriefingPreference;
 }
 export interface BriefingPage {
+  asOf?: string;
   tenantId: string;
   view: BriefingView;
   date: string | null;
@@ -35,6 +37,7 @@ export interface BriefingPage {
   hasMore: boolean;
 }
 export interface BriefingFilter {
+  asOf?: string;
   businessType?: string;
   view: BriefingView;
   date: string | null;

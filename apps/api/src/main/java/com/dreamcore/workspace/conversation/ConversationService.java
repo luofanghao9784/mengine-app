@@ -95,6 +95,10 @@ public class ConversationService {
         if(scope.equals("SELECTED")&&publicQuery!=null&&!publicQuery.isBlank())throw new IdentityException(400,"TASK_SCOPE_CONFLICT");
         return submitInternal(actor,tenant,id,space,key,prompt,mode,publicQuery,selected,false,scope);
     }
+    /** System-owned generation fixes its source versions; public-only batches cannot search private library material. */
+    @Transactional public Detail submitBriefing(UUID actor,UUID tenant,UUID space,UUID key,String prompt,String publicQuery,List<TaskOriginals.Selection> selected){
+        return submitInternal(actor,tenant,null,space,key,prompt,"AGENT",publicQuery,selected,false,"SELECTED");
+    }
     @Transactional public Conversation draft(UUID actor,UUID tenant,UUID space,UUID request){
         identities.member(actor,tenant,false);departure.requireActiveBusiness(actor,tenant);access.require(actor,tenant,space,false);
         UUID prior=identities.priorRequest(actor,request,"CONVERSATION_DRAFT",IdentityService.hash(tenant+"\n"+space));
@@ -222,7 +226,7 @@ public class ConversationService {
     }
     /** Internal atomic fence for lifecycle/plan owners. Caller acquires the tenant lock first. */
     @Transactional public void interruptTasks(UUID tenant,List<UUID> taskIds,String reason){
-        if(reason==null || !Set.of("TASK_SOURCE_UNAVAILABLE","TASK_PLAN_STOPPED","TASK_PLAN_EXPIRED","TASK_MEMBER_OFFBOARDED","TASK_TENANT_EXIT").contains(reason))throw IdentityException.invalid();
+        if(reason==null || !Set.of("TASK_SOURCE_UNAVAILABLE","TASK_PLAN_STOPPED","TASK_PLAN_EXPIRED","TASK_MEMBER_OFFBOARDED","TASK_TENANT_EXIT","BRIEFING_CANCELLED","BRIEFING_AUTHORITY_REVOKED","BRIEFING_AUTHORITY_CHANGED","BRIEFING_TASK_UNFINISHED").contains(reason))throw IdentityException.invalid();
         if(taskIds==null || taskIds.isEmpty())return;
         String ids=taskIds.stream().distinct().map(UUID::toString).collect(java.util.stream.Collectors.joining(",","{","}"));
         var affected=db.queryForList("SELECT * FROM conversation_tasks WHERE tenant_id=? AND id=ANY(?::uuid[]) AND status IN ('QUEUED','RUNNING') ORDER BY id FOR UPDATE",tenant,ids);

@@ -58,13 +58,11 @@ export async function verifyClientAll(owner: Page, member: Page, tenant: string)
     const uploaded = owner.waitForResponse(
       (r) => r.url().endsWith('/conversation-attachments') && r.request().method() === 'POST',
     );
-    await owner
-      .locator('.attachment-materials input[type=file]')
-      .setInputFiles({
-        name: '统一验收资料.txt',
-        mimeType: 'text/plain',
-        buffer: Buffer.from('合成销售资料：十月合计三十，仅用于验收。'),
-      });
+    await owner.locator('.attachment-materials input[type=file]').setInputFiles({
+      name: '统一验收资料.txt',
+      mimeType: 'text/plain',
+      buffer: Buffer.from('合成销售资料：十月合计三十，仅用于验收。'),
+    });
     const upload = await (await uploaded).json();
     assert.ok(upload.conversation.id);
     const c = upload.conversation.id,
@@ -200,6 +198,48 @@ export async function verifyClientAll(owner: Page, member: Page, tenant: string)
     await owner.getByRole('button', { name: '关闭卡片详情', exact: true }).click();
     await expect(owner.getByRole('button', { name: '刷新待办', exact: true })).toHaveCount(0);
     await owner.setViewportSize({ width: 1366, height: 900 });
+    // Generation UI uses the real batch API; completion below is explicitly synthetic.
+    const generatedResponse = owner.waitForResponse(
+      (r) => r.url().endsWith('/briefing/generation') && r.request().method() === 'POST',
+    );
+    await owner.getByRole('button', { name: '生成更多', exact: true }).click();
+    const generation = await (await generatedResponse).json();
+    assert.equal(generation.status, 'QUEUED');
+    await expect(owner.locator('.recommendation-card')).toHaveCount(1);
+    const newTask = randomUUID(),
+      newArtifact = randomUUID();
+    sql(`INSERT INTO conversation_tasks(id,tenant_id,workspace_id,conversation_id,requested_by,prompt,mode,status,revision,attempt,reply,execution_class,engine_version,finished_at)
+      SELECT '${newTask}',t.tenant_id,t.workspace_id,t.conversation_id,t.requested_by,'合成生成更多验收','AGENT','SUCCEEDED',1,1,'新增画报已准备。','verification','generation-ui-fixture',now()
+      FROM conversation_tasks t JOIN conversations c ON c.id=t.conversation_id WHERE c.title='合成INSIGHT业务主题' AND c.tenant_id='${tenant}' LIMIT 1;
+      INSERT INTO conversation_artifacts(id,tenant_id,workspace_id,task_id,filename,sha256,content,attempt_number)
+      SELECT '${newArtifact}',a.tenant_id,a.workspace_id,'${newTask}','briefing-text-fixture.json',encode(sha256(convert_to(j.body::text,'UTF8')),'hex'),convert_to(j.body::text,'UTF8'),1
+      FROM conversation_artifacts a JOIN conversation_tasks t ON t.id=a.task_id JOIN conversations c ON c.id=t.conversation_id
+      CROSS JOIN LATERAL(SELECT convert_from(a.content,'UTF8')::jsonb||jsonb_build_object('title','合成新增独立画报','summary','这是通过生成更多流程追加的合成新结论。') body) j
+      WHERE c.title='合成INSIGHT业务主题' AND c.tenant_id='${tenant}' LIMIT 1;
+      INSERT INTO identity_audit(actor_id,tenant_id,action,target_id,outcome) VALUES ('${me.account.id}','${tenant}','TASK_BRIEFING_CREATED','${newArtifact}','SUCCESS');
+      INSERT INTO conversation_attempts(task_id,attempt_number,attempt_id,input,status,provenance,execution_policy,allowed_tools) VALUES ('${newTask}',1,'${randomUUID()}','合成生成更多验收','SUCCEEDED','RECORDED','SCOPED_PRIVATE_V2','["deliver_briefing"]');
+      INSERT INTO conversation_tool_receipts(task_id,attempt_number,sequence,name,status) VALUES ('${newTask}',1,1,'deliver_briefing','succeeded');
+      UPDATE briefing_generation_batches SET task_id='${newTask}',status='SUCCEEDED',finished_at=now() WHERE id='${generation.id}';`);
+    await expect(owner.locator('.recommendation-card')).toHaveCount(2, { timeout: 15000 });
+    assert.match(await owner.locator('.recommendation-card').first().innerText(), /合成INSIGHT业务主题/);
+    assert.match(await owner.locator('.recommendation-card').last().innerText(), /合成新增独立画报/);
+    await shot('generation-appended-desktop');
+    await owner.setViewportSize({ width: 390, height: 844 });
+    await owner.getByRole('button', { name: '生成更多', exact: true }).scrollIntoViewIfNeeded();
+    await shot('generation-appended-mobile');
+    const nextResponse = owner.waitForResponse(
+      (r) => r.url().endsWith('/briefing/generation') && r.request().method() === 'POST',
+    );
+    await owner.getByRole('button', { name: '生成更多', exact: true }).click();
+    await nextResponse;
+    await expect(owner.getByRole('button', { name: '取消本次', exact: true })).toBeVisible();
+    await owner.getByRole('button', { name: '取消本次', exact: true }).click();
+    await expect(owner.getByRole('status')).toContainText('已取消本次生成');
+    await owner.getByText('自动生成设置', { exact: true }).click();
+    await owner.getByRole('button', { name: '暂停', exact: true }).click();
+    await expect(owner.getByText(/自动生成已暂停/)).toBeVisible();
+    assert.equal((await get(root + '/briefing/generation')).policies[0].enabled, false);
+    await owner.setViewportSize({ width: 1366, height: 900 });
     await writeFile(
       new URL('result.json', artifacts),
       JSON.stringify(
@@ -220,6 +260,8 @@ export async function verifyClientAll(owner: Page, member: Page, tenant: string)
             'briefing continues conversation',
             'mobile reader',
             'one refresh entry',
+            'real generation request and synthetic completion append without replacing old card',
+            'generation cancellation and built-in policy pause',
           ],
         },
         null,

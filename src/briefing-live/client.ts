@@ -20,6 +20,7 @@ export const isPreference = (v: unknown): v is BriefingPreference =>
 const card = (v: unknown): v is BriefingCard =>
   record(v) &&
   (v.briefing == null || isBriefingDocument(v.briefing)) &&
+  (v.cardId === undefined || uuid(v.cardId)) &&
   uuid(v.conversationId) &&
   uuid(v.taskId) &&
   count(v.taskRevision) &&
@@ -54,6 +55,43 @@ export function createBriefingClient(fetcher: typeof fetch = fetch) {
   const request = createIdentityRequest(fetcher);
   const root = (tenant: string) => `/api/v1/tenants/${id(tenant)}/briefing`;
   return {
+    cardPreference(tenant: string, card: string) {
+      return request(root(tenant) + '/cards/' + id(card) + '/preference', 'GET', isPreference);
+    },
+    cardUpdate(tenant: string, card: string, body: BriefingUpdate) {
+      return request(root(tenant) + '/cards/' + id(card) + '/preference', 'POST', isPreference, body);
+    },
+    async cardMove(tenant: string, body: BriefingLayoutMove) {
+      const result = await request(
+        root(tenant) + '/cards/layout',
+        'POST',
+        (
+          v,
+        ): v is {
+          id: string;
+          cardId: string;
+          anchorId: string;
+          direction: string;
+          appliedRevision: number;
+          currentRevision: number;
+        } =>
+          record(v) &&
+          uuid(v.id) &&
+          v.cardId === body.conversationId &&
+          v.anchorId === body.anchorId &&
+          v.direction === body.direction &&
+          count(v.appliedRevision) &&
+          count(v.currentRevision),
+        {
+          requestId: body.requestId,
+          expectedRevision: body.expectedRevision,
+          cardId: body.conversationId,
+          anchorId: body.anchorId,
+          direction: body.direction,
+        },
+      );
+      return { ...result, conversationId: result.cardId };
+    },
     preference(tenant: string, conversation: string, signal?: AbortSignal) {
       return request(
         root(tenant) + '/' + id(conversation) + '/preference',
@@ -96,6 +134,7 @@ export function createBriefingClient(fetcher: typeof fetch = fetch) {
         limit: '20',
         generatedOnly: 'true',
       });
+      if (filter.asOf) query.set('asOf', filter.asOf);
       if (filter.businessType) query.set('businessType', filter.businessType);
       if (filter.date) query.set('date', filter.date);
       if (filter.workspaceId) query.set('workspaceId', id(filter.workspaceId));
@@ -118,7 +157,8 @@ export function createBriefingClient(fetcher: typeof fetch = fetch) {
               c.preference.hidden === (filter.view === 'HIDDEN') &&
               (filter.view !== 'FOCUSED' || c.preference.pinned),
           ) &&
-          new Set(v.items.map((c) => (c as BriefingCard).conversationId)).size === v.items.length,
+          new Set(v.items.map((c) => (c as BriefingCard).cardId || (c as BriefingCard).taskId)).size ===
+            v.items.length,
         undefined,
         signal,
       );

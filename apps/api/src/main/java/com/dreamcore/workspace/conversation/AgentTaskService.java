@@ -41,7 +41,7 @@ public class AgentTaskService {
     }
     private String scope(UUID task){return db.queryForObject("SELECT source_scope FROM conversation_tasks WHERE id=?",String.class,task);}
     private List<UUID> grants(ConversationService.Job job){return db.queryForList("SELECT chunk_id FROM conversation_agent_grants WHERE task_id=? AND attempt_id=? ORDER BY chunk_id",UUID.class,job.id(),job.token());}
-    @Transactional public Map<String,Object> check(UUID task,UUID attempt){authorized(task,attempt);String query=db.queryForObject("SELECT public_query FROM conversation_tasks WHERE id=?",String.class,task);return Map.of("allowed",true,"executionClass",settings.mode(),"publicQuery",query==null?"":query,"candidateTrialsAllowed",settings.candidateTrialsEnabled() && query!=null,"contextVersion","1.0","taskWorkVersion","1.0","tableComparisonVersion",tables.available()?"1.0":"","briefingContentVersion","1.0","planManagementVersion","1.0","planAllowed",db.queryForObject("SELECT EXISTS(SELECT 1 FROM ongoing_plan_runs WHERE task_id=?)",Boolean.class,task));}
+    @Transactional public Map<String,Object> check(UUID task,UUID attempt){authorized(task,attempt);String query=db.queryForObject("SELECT public_query FROM conversation_tasks WHERE id=?",String.class,task);var response=new LinkedHashMap<String,Object>(Map.of("allowed",true,"executionClass",settings.mode(),"publicQuery",query==null?"":query,"candidateTrialsAllowed",settings.candidateTrialsEnabled() && query!=null,"contextVersion","1.0","taskWorkVersion","1.0","tableComparisonVersion",tables.available()?"1.0":"","briefingContentVersion","1.0","planManagementVersion","1.0","planAllowed",db.queryForObject("SELECT EXISTS(SELECT 1 FROM ongoing_plan_runs WHERE task_id=?)",Boolean.class,task)));response.put("briefingGeneration",db.queryForObject("SELECT EXISTS(SELECT 1 FROM briefing_generation_batches WHERE task_id=?)",Boolean.class,task));return response;}
     public record ExecutionOpen(String contractVersion,List<String> tools) {}
     public record ToolReceipt(Integer sequence,String name,String status) {}
     private static final Set<String> REGISTERED_TOOLS=Set.of("deliver_briefing","compare_table","search_sources","run_javascript","find_skills","activate_skill","public_search","read_public_page","candidate_tool","list_originals","read_original","process_original","task_control","task_context","task_plan","task_preference","manage_plan");
@@ -118,6 +118,10 @@ public class AgentTaskService {
         var job=authorized(task,attempt);
         if(db.queryForObject("SELECT count(*) FROM conversation_attempts WHERE task_id=? AND attempt_id=? AND allowed_tools @> '[\"deliver_briefing\"]'::jsonb",Integer.class,task,attempt)!=1||db.queryForObject("SELECT count(*) FROM conversation_tool_receipts WHERE task_id=? AND attempt_number=(SELECT attempt FROM conversation_tasks WHERE id=?) AND name='deliver_briefing' AND status='STARTED'",Integer.class,task,task)==0)throw denied();
         var doc=briefings.create(job,request);
+        if(doc==null){
+            audit.record(job.actor(),job.tenant(),"TASK_BRIEFING_DUPLICATE",job.token(),"SUCCESS");
+            return Map.of("contractVersion","1.0","status","NO_NEW_CONTENT","reason","DUPLICATE_CONTENT");
+        }
         return Map.of("contractVersion","1.0","status","PREPARED","artifactId",doc.artifactId(),"title",doc.content().title(),"visibility","PRIVATE_AFTER_TASK_SUCCEEDS");
     }
     @Transactional public BriefingContentService.Document briefing(UUID actor,UUID tenant,UUID conversation,UUID task,int revision,int attempt){
@@ -156,7 +160,9 @@ public class AgentTaskService {
         }
         if(!r.originalIds().isEmpty() && r.tools().stream().noneMatch(t->"read_original".equals(t.name())))incompatible();
         if(!r.artifacts().isEmpty() && !code)incompatible();
-        if(r.tools().stream().anyMatch(t->"deliver_briefing".equals(t.name())&&"succeeded".equals(t.status())) && briefings.find(job.id(),db.queryForObject("SELECT attempt FROM conversation_tasks WHERE id=?",Integer.class,job.id()))==null)incompatible();
+        if(r.tools().stream().anyMatch(t->"deliver_briefing".equals(t.name())&&"succeeded".equals(t.status()))
+            && briefings.find(job.id(),db.queryForObject("SELECT attempt FROM conversation_tasks WHERE id=?",Integer.class,job.id()))==null
+            && !Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM identity_audit WHERE tenant_id=? AND target_id=? AND action='TASK_BRIEFING_DUPLICATE' AND outcome='SUCCESS')",Boolean.class,job.tenant(),job.token())))incompatible();
         validateResearch(job,r);
         int total=db.queryForObject("SELECT coalesce(sum(octet_length(content)),0) FROM conversation_artifacts WHERE task_id=? AND attempt_number=(SELECT attempt FROM conversation_tasks WHERE id=?)",Integer.class,job.id(),job.id());
         if(r.artifacts().size()+db.queryForObject("SELECT count(*) FROM conversation_artifacts WHERE task_id=? AND attempt_number=(SELECT attempt FROM conversation_tasks WHERE id=?)",Integer.class,job.id(),job.id())>8)incompatible();

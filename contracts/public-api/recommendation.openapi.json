@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "工作推荐与站内呈现",
-    "version": "1.0.0",
+    "version": "1.2.0",
     "description": " generatedOnly=true 只读取已有独立画报内容；普通回复不覆盖旧画报。"
   },
   "security": [
@@ -331,6 +331,45 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PublicationPreference"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/recommendations/cards": {
+      "parameters": [],
+      "get": {
+        "summary": "按本批新生成的卡片ID读取当前获准内容，供追加到阅读流",
+        "parameters": [
+          {
+            "name": "ids",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "minItems": 1,
+              "maxItems": 20
+            },
+            "style": "form",
+            "explode": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "仅本人当前可读卡片，private, no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Item"
+                  }
                 }
               }
             }

@@ -89,6 +89,17 @@ export function createRecommendationClient(fetcher: typeof fetch = fetch) {
     return `/api/v1/tenants/${tenant}/recommendations`;
   };
   return {
+    cards(tenant: string, cards: string[], signal?: AbortSignal) {
+      if (!cards.length || cards.length > 20 || !cards.every(uuid))
+        throw new IdentityError('INVALID_REQUEST', 400);
+      return request(
+        root(tenant) + '/cards?ids=' + cards.join(','),
+        'GET',
+        (v): v is RecommendationItem[] => Array.isArray(v) && v.length <= 20 && v.every(isItem),
+        undefined,
+        signal,
+      );
+    },
     list(
       tenant: string,
       workspace: string | null,

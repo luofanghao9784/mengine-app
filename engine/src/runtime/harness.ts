@@ -35,6 +35,9 @@ export async function runHarness(options: {
   signal?: AbortSignal;
   limits?: { modelCalls?: number; toolCalls?: number; timeoutMs?: number };
   reserveFinalResponse?: boolean;
+  /** Structured card batches need their time for delivery; their final reply is only a confirmation. */
+  finalResponseReserveMs?: number;
+  finishOnDeliverable?: boolean;
   hasCompletedDeliverable?: (tools: RuntimeResult['tools']) => boolean;
 }): Promise<RuntimeResult> {
   if (!options.model) throw new RuntimeError('MODEL_NOT_CONFIGURED');
@@ -56,7 +59,10 @@ export async function runHarness(options: {
   const timeoutMs = bound(options.limits?.timeoutMs ?? 15000, 60000);
   // A final reply needs wall-clock time as well as one remaining call. Slow tool
   // rounds must not consume the entire deadline while nominal calls remain.
-  const finalResponseMs = Math.min(40000, Math.floor(timeoutMs * 0.75));
+  const finalResponseMs =
+    options.finalResponseReserveMs === undefined
+      ? Math.min(40000, Math.floor(timeoutMs * 0.75))
+      : bound(options.finalResponseReserveMs, timeoutMs);
   const deadline = performance.now() + timeoutMs;
   const result: RuntimeResult = { status: 'failed', text: '', modelCalls: 0, tools: [] };
   if (options.signal?.aborted) return { ...result, status: 'cancelled', code: 'CANCELLED' };
@@ -104,10 +110,11 @@ export async function runHarness(options: {
         }
         result.modelCalls++;
         const remainingMs = Math.max(0, deadline - performance.now());
-        const finalResponse = options.reserveFinalResponse === true &&
+        const completedDeliverable = options.hasCompletedDeliverable?.(result.tools) === true;
+        const finalResponse =
+          options.reserveFinalResponse === true &&
           (result.modelCalls === maxCalls || toolCalls >= maxTools || remainingMs <= finalResponseMs);
         if (finalResponse) result.finalResponseReserved = true;
-        const completedDeliverable = options.hasCompletedDeliverable?.(result.tools) === true;
         const messages = request.messages.map((message) => ({
           role: message.role,
           content: message.content.flatMap((block): ModelBlock[] => {
@@ -126,22 +133,38 @@ export async function runHarness(options: {
             throw new RuntimeError('UNSUPPORTED_MODEL_CONTENT');
           }),
         }));
-        if (options.reserveFinalResponse) messages.unshift({
-          role: 'system',
-          content: [{ type: 'text', text: finalResponse
-            ? completedDeliverable ? 'This is the reserved final response. No tools may be called. The platform has verified an actual saved deliverable and all tools succeeded. Give a short user-facing completion confirmation if it satisfies the request. Do not expose internal IDs or PREPARED status. Be explicit about any remaining limitation; do not invent work.' : 'This is the reserved final response. No tools may be called. Deliver a concise answer with useful findings already supported by evidence, citations, and specific missing data or unfinished work. Do not claim full completion or invent values. The platform will retain this as a partial result.'
-            : `Execution budget: ${maxCalls - result.modelCalls} model calls remain after this call, including one reserved final response. ${Math.max(0, maxTools - toolCalls)} tool calls and ${Math.floor(remainingMs / 1000)} seconds remain. Avoid repeated unproductive searches; use short literal keywords. Once evidence is sufficient, finish with a concise answer. Do not draft a full answer before another tool call; reserve the answer for the final response.` }],
-        });
+        if (options.reserveFinalResponse)
+          messages.unshift({
+            role: 'system',
+            content: [
+              {
+                type: 'text',
+                text: finalResponse
+                  ? completedDeliverable
+                    ? 'This is the reserved final response. No tools may be called. The platform has verified a terminal delivery receipt and all tools succeeded. PREPARED means a saved deliverable; NO_NEW_CONTENT means no new card was created. Give a short confirmation matching that actual receipt. Do not expose internal IDs or PREPARED status. Be explicit about any remaining limitation; do not invent work.'
+                    : 'This is the reserved final response. No tools may be called. Deliver a concise answer with useful findings already supported by evidence, citations, and specific missing data or unfinished work. Do not claim full completion or invent values. The platform will retain this as a partial result.'
+                  : `Execution budget: ${maxCalls - result.modelCalls} model calls remain after this call, including one reserved final response. ${Math.max(0, maxTools - toolCalls)} tool calls and ${Math.floor(remainingMs / 1000)} seconds remain. Avoid repeated unproductive searches; use short literal keywords. Once evidence is sufficient, finish with a concise answer. Do not draft a full answer before another tool call; reserve the answer for the final response.`,
+              },
+            ],
+          });
         let index = 0,
           finished = false;
         for await (const part of model.generate({
           messages,
-          tools: finalResponse ? [] : request.tools ?? [],
+          tools: finalResponse ? [] : (request.tools ?? []),
           signal: controller.signal,
           maxTokens: 2048,
         })) {
           controller.signal.throwIfAborted();
-          streamBytes += Buffer.byteLength(JSON.stringify(part));
+          // Bound generated payload, not repeated SSE/event envelope overhead.
+          // Providers may split identical text into one chunk or thousands of tiny chunks.
+          const bytes = (v: unknown) => (typeof v === 'string' ? Buffer.byteLength(v) : 0);
+          streamBytes +=
+            part.type === 'text'
+              ? bytes(part.text)
+              : part.type === 'tool_call'
+                ? bytes(part.id) + bytes(part.name) + bytes(part.arguments)
+                : 0;
           if (streamBytes > 65536) {
             abort('MODEL_OUTPUT_LIMIT');
             return;
@@ -241,6 +264,20 @@ export async function runHarness(options: {
                 if (Buffer.byteLength(JSON.stringify(value)) > 65536)
                   throw new RuntimeError('TOOL_OUTPUT_LIMIT');
                 toolOutputs.set(execution.callId, structuredClone(value));
+                // Native generation is a structured delivery workflow. The verified
+                // tool receipt concludes this turn without a redundant model reply.
+                // The final committed receipts and terminal state are checked again.
+                if (
+                  options.finishOnDeliverable === true &&
+                  options.hasCompletedDeliverable?.(
+                    result.tools.map((receipt) =>
+                      receipt.callId === execution.callId
+                        ? { ...receipt, status: 'succeeded', output: value }
+                        : receipt,
+                    ),
+                  ) === true
+                )
+                  execution.concludeTurn();
                 return value;
               } catch (error) {
                 // Never place raw host paths, credentials or arbitrary stack traces in model history.

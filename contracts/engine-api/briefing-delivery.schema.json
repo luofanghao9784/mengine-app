@@ -82,35 +82,59 @@
       ]
     },
     "result": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "contractVersion",
-        "status",
-        "artifactId",
-        "title",
-        "visibility"
-      ],
-      "properties": {
-        "contractVersion": {
-          "const": "1.0"
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "contractVersion",
+            "status",
+            "artifactId",
+            "title",
+            "visibility"
+          ],
+          "properties": {
+            "contractVersion": {
+              "const": "1.0"
+            },
+            "status": {
+              "const": "PREPARED"
+            },
+            "artifactId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "title": {
+              "type": "string",
+              "minLength": 4,
+              "maxLength": 80
+            },
+            "visibility": {
+              "const": "PRIVATE_AFTER_TASK_SUCCEEDS"
+            }
+          }
         },
-        "status": {
-          "const": "PREPARED"
-        },
-        "artifactId": {
-          "type": "string",
-          "format": "uuid"
-        },
-        "title": {
-          "type": "string",
-          "minLength": 4,
-          "maxLength": 80
-        },
-        "visibility": {
-          "const": "PRIVATE_AFTER_TASK_SUCCEEDS"
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "contractVersion",
+            "status",
+            "reason"
+          ],
+          "properties": {
+            "contractVersion": {
+              "const": "1.0"
+            },
+            "status": {
+              "const": "NO_NEW_CONTENT"
+            },
+            "reason": {
+              "const": "DUPLICATE_CONTENT"
+            }
+          }
         }
-      }
+      ]
     },
     "document": {
       "type": "object",

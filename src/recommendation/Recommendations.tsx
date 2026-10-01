@@ -72,10 +72,45 @@ export function Recommendations({
       }),
     [tenant, workspace, businessType, publicationsOnly, focused, page, attempt, session.identity],
   );
+  const [extra, setExtra] = useState<RecommendationItem[]>([]);
+  useEffect(() => {
+    setExtra([]);
+    const controller = new AbortController();
+    const receive = (event: Event) => {
+      const detail = (event as CustomEvent<{ tenant: string; cards: string[] }>).detail;
+      if (detail.tenant !== tenant || focused || publicationsOnly) return;
+      void api
+        .cards(tenant, detail.cards, controller.signal)
+        .then((items) => {
+          if (controller.signal.aborted) return;
+          setExtra((old) => [
+            ...old,
+            ...items.filter(
+              (item) =>
+                (!workspace || item.content.workspaceId === workspace) &&
+                (!businessType || item.briefing?.content.businessType === businessType) &&
+                !old.some((v) => v.content.id === item.content.id),
+            ),
+          ]);
+        })
+        .catch(() => {
+          if (!controller.signal.aborted) setExtra([]);
+        });
+    };
+    window.addEventListener('briefing-generated', receive);
+    return () => {
+      controller.abort();
+      window.removeEventListener('briefing-generated', receive);
+    };
+  }, [tenant, workspace, businessType, focused, publicationsOnly]);
+  const visibleItems = [
+    ...(data.value?.items || []),
+    ...extra.filter((item) => !data.value?.items.some((v) => v.content.id === item.content.id)),
+  ];
   const grid = useRef<HTMLDivElement>(null);
   usePackedRecommendations(
     grid,
-    data.value?.items.map((i) => i.content.id + ':' + i.content.versionKey).join('|') ?? '',
+    visibleItems.map((i) => i.content.id + ':' + i.content.versionKey).join('|'),
   );
   const submission = useSubmission<{ expectedRevision: number; enabled: boolean }>();
   useRequestLock(submission.busy || submission.uncertain);
@@ -133,11 +168,11 @@ export function Recommendations({
               项获权成果排序，另有更早成果。可按空间缩小范围，或在会话、资料库查找。
             </p>
           )}
-          {!data.value.items.length && (
+          {!visibleItems.length && (
             <Empty
               icon={Newspaper}
-              title="你的下一份工作成果，从一次会话开始"
-              text="请在会话中要求 AI 根据资料生成画报，完成后的分析和图表会出现在这里。"
+              title="画报正在等待可用资料"
+              text="资料就绪后系统会自动准备画报。也可以在下方生成更多。"
             >
               <a className="button" href={conversationHref(tenant)}>
                 发起会话
@@ -145,7 +180,7 @@ export function Recommendations({
             </Empty>
           )}
           <div className="live-briefing-grid recommendation-grid" ref={grid}>
-            {data.value.items.map((item) => (
+            {visibleItems.map((item) => (
               <RecommendationCard
                 key={item.content.id + ':' + item.content.versionKey}
                 tenant={tenant}
@@ -247,7 +282,13 @@ function RecommendationCard({ tenant, item }: { tenant: string; item: Recommenda
   const actions = (
     <>
       {c.kind === 'TASK' && c.conversationId ? (
-        <FollowButton tenant={tenant} conversation={c.conversationId} pinned={pinned} changed={setPinned} />
+        <FollowButton
+          tenant={tenant}
+          conversation={c.conversationId}
+          cardId={c.id}
+          pinned={pinned}
+          changed={setPinned}
+        />
       ) : (
         <PublicationFollow tenant={tenant} material={c.materialId!} pinned={pinned} changed={setPinned} />
       )}
@@ -291,7 +332,9 @@ function RecommendationCard({ tenant, item }: { tenant: string; item: Recommenda
               </div>
               <h3>{item.briefing.content.title}</h3>
               <DataBriefing document={item.briefing} compact />
-              <span className="data-briefing-generated">{c.workspaceName} · 有计算依据</span>
+              <span className="data-briefing-generated">
+                {c.workspaceName} · {item.briefing.content.chart ? '有计算依据' : '有来源依据'}
+              </span>
             </>
           ) : (
             <MagazineBody

@@ -56,9 +56,9 @@ public class RecommendationService {
      t.revision task_revision,t.attempt,coalesce(p.revision,0) preference_revision,NULL::uuid material_id,0 material_version,'' filename,coalesce(p.pinned,false) pinned
     FROM conversations c JOIN spaces w ON w.id=c.workspace_id
     JOIN LATERAL(SELECT t.* FROM conversation_tasks t WHERE t.conversation_id=c.id AND t.status='SUCCEEDED' AND t.mode='AGENT' AND t.reply IS NOT NULL
-      AND EXISTS(SELECT 1 FROM readable_source_tasks r WHERE r.id=t.id) AND (NOT ? OR EXISTS (%s)) AND (?::text IS NULL OR EXISTS(SELECT 1 FROM (%s) classified WHERE convert_from(classified.content,'UTF8')::jsonb->>'businessType'=?)) ORDER BY t.finished_at DESC,t.id DESC LIMIT 1) t ON true
+      AND EXISTS(SELECT 1 FROM readable_source_tasks r WHERE r.id=t.id) AND (NOT ? OR EXISTS (%s)) AND (?::text IS NULL OR EXISTS(SELECT 1 FROM (%s) classified WHERE convert_from(classified.content,'UTF8')::jsonb->>'businessType'=?)) ORDER BY t.finished_at DESC,t.id DESC %s) t ON true
     LEFT JOIN LATERAL (%s) b ON true
-    LEFT JOIN briefing_preferences p ON p.conversation_id=c.id AND p.owner_id=c.owner_id
+    LEFT JOIN %s AND p.owner_id=c.owner_id
     WHERE c.tenant_id=? AND c.owner_id=? AND c.purpose='BUSINESS' AND NOT coalesce(p.hidden,false) AND NOT ? AND (NOT ? OR coalesce(p.pinned,false))
      AND NOT EXISTS(SELECT 1 FROM ongoing_plan_runs r JOIN ongoing_plans p ON p.id=r.plan_id WHERE r.task_id=t.id AND NOT p.notify)
     UNION ALL
@@ -73,7 +73,7 @@ public class RecommendationService {
    SELECT c.*,o.opened_at,count(*) OVER() eligible_total FROM candidates c LEFT JOIN delivery_observations o
     ON o.tenant_id=? AND o.actor_id=? AND o.target_kind=c.kind AND o.target_id=c.id AND o.version_key=c.version_key
    ORDER BY c.created_at DESC,c.id LIMIT 1000
-   """.formatted(BriefingContentService.ELIGIBLE,BriefingContentService.ELIGIBLE,BriefingContentService.ELIGIBLE);
+   """.formatted(BriefingContentService.ELIGIBLE,BriefingContentService.ELIGIBLE,generatedOnly?"":"LIMIT 1",BriefingContentService.ELIGIBLE,generatedOnly?"briefing_card_preferences p ON p.task_id=t.id":"briefing_preferences p ON p.conversation_id=c.id");
   final long[] total={0};db.execute("SET LOCAL statement_timeout='3s'");
   var items=db.query(sql,(r,n)->{total[0]=r.getLong("eligible_total");return new Candidate(r.getObject("id",UUID.class),r.getString("kind"),r.getString("version_key"),r.getObject("workspace_id",UUID.class),r.getString("workspace_name"),r.getString("title"),r.getString("excerpt"),r.getBoolean("truncated"),r.getTimestamp("created_at").toInstant(),r.getString("execution_class"),r.getObject("conversation_id",UUID.class),r.getInt("task_revision"),r.getInt("attempt"),r.getInt("preference_revision"),r.getObject("material_id",UUID.class),r.getInt("material_version"),r.getString("filename"),r.getBoolean("pinned"),r.getTimestamp("opened_at")==null?null:r.getTimestamp("opened_at").toInstant());},actor,tenant,workspace,workspace,actor,generatedOnly,businessType,businessType,tenant,actor,publicationsOnly,focused,actor,businessType,businessType,focused,tenant,actor);
   return new Pool(items,total[0]);
@@ -103,11 +103,29 @@ public class RecommendationService {
   for(var c:pool.items()){lookup.put(c.id(),c);double age=Math.max(0,day-c.createdAt().atZone(ZoneOffset.UTC).toLocalDate().toEpochDay());features.add(new MethodSelection.Candidate(c.id(),c.workspaceId(),c.pinned()?1:c.kind().equals("TASK")?.6:.4,1/(1+age/7),c.pinned()?1:0,c.createdAt()));}
   var ranked=methods.rank(actor,tenant,features);var presentation=presentation(actor,tenant);
   String snapshot=IdentityService.hash(json.writeValueAsString(List.of(settings,generatedOnly,businessType==null?"ALL":businessType,publicationsOnly,focused,ranked.snapshotKey(),pool.items().stream().map(Candidate::snapshotValue).toList(),presentation)));
-  if(offset>0 && (expectedSnapshot==null || !snapshot.equals(expectedSnapshot)))throw new IdentityException(409,"RECOMMENDATION_SNAPSHOT_CHANGED");
-  // Preserve the effective method's value/date/tie-break ordering after a card is read.
-  var ordered=ranked.items();
+  // A reading snapshot contains only identities; every subsequent page rechecks current authority.
+  List<MethodSelection.Ranked> ordered=ranked.items();
+  String scopeKey=IdentityService.hash(json.writeValueAsString(Arrays.asList(workspace,businessType,publicationsOnly,focused,settings)));
+  if(generatedOnly&&offset>0&&expectedSnapshot!=null){
+   var saved=db.queryForList("SELECT card_ids::text FROM briefing_reading_snapshots WHERE tenant_id=? AND owner_id=? AND snapshot=? AND scope_key=? AND created_at>now()-interval '1 day'",String.class,tenant,actor,expectedSnapshot,scopeKey);
+   if(saved.isEmpty())throw new IdentityException(409,"RECOMMENDATION_SNAPSHOT_CHANGED");
+   var ids=Arrays.asList(json.readValue(saved.getFirst(),UUID[].class));var current=new HashMap<UUID,MethodSelection.Ranked>();ranked.items().forEach(r->current.put(r.candidate().id(),r));
+   if(!current.keySet().containsAll(ids))throw new IdentityException(409,"RECOMMENDATION_SNAPSHOT_CHANGED");
+   ordered=ids.stream().map(current::get).toList();snapshot=expectedSnapshot;
+  }else if(offset>0&&(expectedSnapshot==null||!snapshot.equals(expectedSnapshot)))throw new IdentityException(409,"RECOMMENDATION_SNAPSHOT_CHANGED");
+  if(generatedOnly&&offset==0){
+   db.update("INSERT INTO briefing_reading_snapshots(tenant_id,owner_id,snapshot,scope_key,card_ids) VALUES(?,?,?,?,?::jsonb) ON CONFLICT DO NOTHING",tenant,actor,snapshot,scopeKey,json.writeValueAsString(ordered.stream().map(r->r.candidate().id()).toList()));
+   db.update("DELETE FROM briefing_reading_snapshots WHERE tenant_id=? AND owner_id=? AND snapshot NOT IN (SELECT snapshot FROM briefing_reading_snapshots WHERE tenant_id=? AND owner_id=? ORDER BY created_at DESC,snapshot LIMIT 20)",tenant,actor,tenant,actor);
+  }
   var page=ordered.stream().skip(offset).limit(limit).map(r->{var c=lookup.get(r.candidate().id());String reason=c.pinned()?"你已明确关注这项内容":c.kind().equals("TASK")?"你本人完成的会话成果，按当前有效方法排序":"当前获权空间已明确发布的独立企业副本";return new Item(c,r.score(),r.method(),presentation,reason,"AVAILABLE_IN_APP",feedbackTarget(actor,tenant,c,r.method(),presentation,settings),c.kind().equals("TASK")?briefings.find(c.id(),c.attempt()):null);}).toList();
   return new Page(tenant,settings,page,snapshot,offset+page.size()<ordered.size(),pool.total(),ordered.size(),pool.total()>1000,1000,"NOT_ASSESSED");
+ }
+ @Transactional public List<Item> cards(UUID actor,UUID tenant,List<UUID> ids){
+  if(ids==null||ids.isEmpty()||ids.size()>20)throw IdentityException.invalid();var settings=settings(actor,tenant);
+  var selected=pool(actor,tenant,null,true,null,false,false).items().stream().filter(c->ids.contains(c.id())).toList();
+  var ranked=methods.rank(actor,tenant,selected.stream().map(c->new MethodSelection.Candidate(c.id(),c.workspaceId(),.6,1,0,c.createdAt())).toList());
+  var presentation=presentation(actor,tenant);var lookup=new HashMap<UUID,Candidate>();selected.forEach(c->lookup.put(c.id(),c));
+  return ranked.items().stream().map(r->{var c=lookup.get(r.candidate().id());return new Item(c,r.score(),r.method(),presentation,"本批新生成的画报","AVAILABLE_IN_APP",feedbackTarget(actor,tenant,c,r.method(),presentation,settings),briefings.find(c.id(),c.attempt()));}).toList();
  }
  public record PublicationPreference(int revision,boolean pinned){}
  @Transactional public PublicationPreference publicationPreference(UUID actor,UUID tenant,UUID material){

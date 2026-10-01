@@ -9,11 +9,13 @@ import { RailButton } from './Magazine';
 export function FollowButton({
   tenant,
   conversation,
+  cardId,
   pinned,
   changed,
 }: {
   tenant: string;
   conversation: string;
+  cardId?: string;
   pinned: boolean;
   changed: (pinned: boolean) => void;
 }) {
@@ -30,7 +32,9 @@ export function FollowButton({
       setReading(true);
       try {
         // Fetch all settings before changing one; never reset a previously widened/hidden card.
-        const current = await briefingClient.preference(tenant, conversation);
+        const current = await (cardId
+          ? briefingClient.cardPreference(tenant, cardId)
+          : briefingClient.preference(tenant, conversation));
         body = {
           hidden: current.hidden,
           size: current.size,
@@ -47,7 +51,9 @@ export function FollowButton({
     }
     if (!body) return;
     await mutation.submit(body, async (value, requestId) => {
-      const result = await briefingClient.update(tenant, conversation, { ...value, requestId });
+      const result = await (cardId
+        ? briefingClient.cardUpdate(tenant, cardId, { ...value, requestId })
+        : briefingClient.update(tenant, conversation, { ...value, requestId }));
       changed(result.pinned);
     });
   };

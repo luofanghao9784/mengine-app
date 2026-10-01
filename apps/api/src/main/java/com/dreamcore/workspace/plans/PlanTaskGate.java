@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
  public PlanTaskGate(JdbcTemplate db,PlanClock clock,com.dreamcore.workspace.departure.DepartureAccess departure){this.departure=departure;this.db=db;this.clock=clock;}
  public boolean allows(UUID task){
   if(!departure.allowsTask(task))return false;
+  if(Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM briefing_generation_batches b JOIN briefing_generation_policies p ON p.id=b.policy_id WHERE b.task_id=? AND (b.policy_epoch<>p.epoch OR b.status NOT IN ('QUEUED','RUNNING')))",Boolean.class,task)))return false;
   if(db.queryForObject("SELECT count(*) FROM ongoing_plan_runs WHERE task_id=?",Integer.class,task)==0)return true;
   return Boolean.TRUE.equals(db.queryForObject("""
    SELECT EXISTS(SELECT 1 FROM ongoing_plan_runs r JOIN ongoing_plans p ON p.id=r.plan_id

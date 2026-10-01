@@ -15,10 +15,10 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class BriefingService {
     public record Preference(int revision, boolean pinned, boolean hidden, String size) {}
-    public record Card(UUID conversationId, UUID taskId, int taskRevision, int attempt, String presentationVersion, UUID workspaceId, String workspaceName, String title,
+    public record Card(UUID cardId,UUID conversationId, UUID taskId, int taskRevision, int attempt, String presentationVersion, UUID workspaceId, String workspaceName, String title,
                        String excerpt, boolean truncated, Instant completedAt, String executionClass, String engineVersion,
                        int artifactCount, int citationCount, int originalCount, Preference preference,BriefingContentService.Document briefing) {}
-    public record Page(UUID tenantId, String view, String date, String zone, List<Card> items, boolean hasMore) {}
+    public record Page(UUID tenantId, String view, String date, String zone, List<Card> items, boolean hasMore,Instant asOf) {}
     private final JdbcTemplate db;
     private final IdentityService identities;
     private final MaterialAccess access;
@@ -34,6 +34,10 @@ public class BriefingService {
     public Page list(UUID actor, UUID tenant, UUID space, String view, String date, String zone, int offset, int limit) {return list(actor,tenant,space,view,date,zone,offset,limit,false);}
     @Transactional public Page list(UUID actor, UUID tenant, UUID space, String view, String date, String zone, int offset, int limit,boolean generatedOnly) {return list(actor,tenant,space,view,date,zone,offset,limit,generatedOnly,null);}
     @Transactional public Page list(UUID actor, UUID tenant, UUID space, String view, String date, String zone, int offset, int limit,boolean generatedOnly,String businessType) {
+        return list(actor,tenant,space,view,date,zone,offset,limit,generatedOnly,businessType,null);
+    }
+    @Transactional public Page list(UUID actor, UUID tenant, UUID space, String view, String date, String zone, int offset, int limit,boolean generatedOnly,String businessType,Instant before) {
+        Instant asOf=before==null?Instant.now():before;if(asOf.isAfter(Instant.now().plusSeconds(1)))throw IdentityException.invalid();
         if(businessType!=null&&!Set.of("INFO","DATA","INSIGHT","SUGGESTION","RESULT").contains(businessType))throw IdentityException.invalid();
         if(view==null || !Set.of("LATEST","FOCUSED","HIDDEN").contains(view) || offset<0 || offset>10000 || limit<1 || limit>30 || (date!=null && (!date.matches("[0-9]{4}-[0-9]{2}-[0-9]{2}") || date.startsWith("0000")))) throw IdentityException.invalid();
         ZoneId timeZone; LocalDate day;
@@ -48,6 +52,7 @@ public class BriefingService {
             args.add(Timestamp.from(day.atStartOfDay(timeZone).toInstant()));
             args.add(Timestamp.from(day.plusDays(1).atStartOfDay(timeZone).toInstant()));
         }
+        if(generatedOnly){range+=" AND t.finished_at<=?";args.add(Timestamp.from(asOf));}
         if(generatedOnly)range+=" AND EXISTS ("+BriefingContentService.ELIGIBLE+")";
         if(businessType!=null){range+=" AND EXISTS(SELECT 1 FROM ("+BriefingContentService.ELIGIBLE+") classified WHERE convert_from(classified.content,'UTF8')::jsonb->>'businessType'=?)";args.add(businessType);}
         String sql="""
@@ -64,11 +69,15 @@ public class BriefingService {
             JOIN LATERAL (SELECT * FROM conversation_tasks t WHERE t.conversation_id=c.id AND t.tenant_id=c.tenant_id
                 AND t.mode='AGENT' AND t.status='SUCCEEDED' AND t.reply IS NOT NULL AND EXISTS(SELECT 1 FROM readable_source_tasks rt WHERE rt.id=t.id)
             """+range+"""
-                ORDER BY t.finished_at DESC,t.id DESC LIMIT 1) t ON true
+                ORDER BY t.finished_at DESC,t.id DESC
+            """+(generatedOnly?"":"LIMIT 1")+"""
+            ) t ON true
             LEFT JOIN LATERAL (
             """+BriefingContentService.ELIGIBLE+"""
             ) b ON true
-            LEFT JOIN briefing_preferences p ON p.conversation_id=c.id AND p.owner_id=c.owner_id
+            LEFT JOIN
+            """+(generatedOnly?"briefing_card_preferences p ON p.task_id=t.id":"briefing_preferences p ON p.conversation_id=c.id")+"""
+             AND p.owner_id=c.owner_id
             LEFT JOIN workspace_members g ON g.tenant_id=c.tenant_id AND g.workspace_id=c.workspace_id AND g.account_id=?
             WHERE c.tenant_id=? AND c.owner_id=? AND c.purpose='BUSINESS' AND ((w.kind='PERSONAL' AND w.owner_id=?) OR (w.kind='SHARED' AND g.account_id IS NOT NULL))
             """;
@@ -76,9 +85,9 @@ public class BriefingService {
         if(space!=null) { sql+=" AND c.workspace_id=?"; args.add(space); }
         sql+=" AND coalesce(p.hidden,false)="+(view.equals("HIDDEN")?"true":"false");
         if(view.equals("FOCUSED"))sql+=" AND coalesce(p.pinned,false)=true";
-        sql+=view.equals("FOCUSED")?" ORDER BY p.focus_position ASC NULLS LAST,c.id LIMIT ? OFFSET ?":" ORDER BY t.finished_at DESC,c.id LIMIT ? OFFSET ?"; args.add(limit+1); args.add(offset);
+        sql+=view.equals("FOCUSED")?" ORDER BY p.focus_position ASC NULLS LAST,t.id LIMIT ? OFFSET ?":" ORDER BY t.finished_at DESC,t.id LIMIT ? OFFSET ?"; args.add(limit+1); args.add(offset);
         db.execute("SET LOCAL statement_timeout='3s'");
-        var found=db.query(sql,(r,n)->new Card(r.getObject("conversation_id",UUID.class),r.getObject("task_id",UUID.class),r.getInt("task_revision"),r.getInt("attempt"),"briefing-basic-v1",r.getObject("workspace_id",UUID.class),r.getString("workspace_name"),r.getString("title"),r.getString("excerpt"),r.getBoolean("truncated"),r.getTimestamp("finished_at").toInstant(),r.getString("execution_class"),r.getString("engine_version"),r.getInt("artifact_count"),r.getInt("citation_count"),r.getInt("original_count"),new Preference(r.getInt("pref_revision"),r.getBoolean("pinned"),r.getBoolean("hidden"),r.getString("size")),briefings.find(r.getObject("task_id",UUID.class),r.getInt("attempt"))),args.toArray());
+        var found=db.query(sql,(r,n)->new Card(r.getObject("task_id",UUID.class),r.getObject("conversation_id",UUID.class),r.getObject("task_id",UUID.class),r.getInt("task_revision"),r.getInt("attempt"),"briefing-basic-v1",r.getObject("workspace_id",UUID.class),r.getString("workspace_name"),r.getString("title"),r.getString("excerpt"),r.getBoolean("truncated"),r.getTimestamp("finished_at").toInstant(),r.getString("execution_class"),r.getString("engine_version"),r.getInt("artifact_count"),r.getInt("citation_count"),r.getInt("original_count"),new Preference(r.getInt("pref_revision"),r.getBoolean("pinned"),r.getBoolean("hidden"),r.getString("size")),briefings.find(r.getObject("task_id",UUID.class),r.getInt("attempt"))),args.toArray());
         var cards=found.stream().limit(limit).toList();
         // Current grants apply even when displaying an old day's immutable task result.
         for(var card:cards) {
@@ -86,7 +95,7 @@ public class BriefingService {
             for(UUID id:db.queryForList("SELECT chunk_id FROM conversation_sources WHERE task_id=?",UUID.class,card.taskId()))knowledge.citation(actor,tenant,id);
             originals.list(actor,tenant,card.workspaceId(),card.taskId());
         }
-        return new Page(tenant,view,date,timeZone.getId(),cards,found.size()>limit);
+        return new Page(tenant,view,date,timeZone.getId(),cards,found.size()>limit,asOf);
     }
     private Preference preference(UUID conversation) {
         var rows=db.query("SELECT * FROM briefing_preferences WHERE conversation_id=?",(r,n)->new Preference(r.getInt("revision"),r.getBoolean("pinned"),r.getBoolean("hidden"),r.getString("size")),conversation);

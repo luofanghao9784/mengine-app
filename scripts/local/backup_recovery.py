@@ -19,7 +19,7 @@ CONTROL_TABLES = [
     'departure_executions', 'departure_export_grants', 'departure_materials',
     'feedback_entries', 'feedback_versions', 'feedback_source_versions',
     'task_plan_checks', 'task_preference_saves', 'conversation_plan_commands', 'publication_preferences',
-    'briefing_layouts', 'briefing_layout_moves',
+    'briefing_layouts', 'briefing_layout_moves', 'briefing_card_preferences', 'briefing_card_moves', 'briefing_generation_policies',
     'feedback_adjustment_threads', 'feedback_adjustment_messages', 'adjustment_task_dependencies',
     'publication_forward_batches', 'publication_forward_receipts',
 ]
@@ -88,6 +88,10 @@ def quarantine(sql):
       WHERE status NOT IN ('STOPPED','EXPIRED');
     UPDATE ongoing_plan_runs SET status='INTERRUPTED',error_code='RECOVERY_QUARANTINE',finished_at=now()
       WHERE status IN ('QUEUED','RUNNING');
+    UPDATE briefing_generation_policies SET enabled=false,epoch=epoch+1,revision=revision+1,reason='RECOVERY_QUARANTINE';
+    UPDATE briefing_generation_batches SET status='CANCELLED',reason='RECOVERY_QUARANTINE',finished_at=now()
+      WHERE status IN ('QUEUED','RUNNING','WAITING_DATA','WAITING_RESOURCE','WAITING_CAPABILITY');
+    DELETE FROM briefing_reading_snapshots;
     UPDATE conversation_tasks SET reconciliation_required=reconciliation_required OR status='RUNNING',
       status=CASE WHEN status='RUNNING' THEN 'RESULT_UNKNOWN' ELSE 'PAUSED' END,
       lease_token=NULL,lease_until=NULL,wait_reason='RECOVERY_QUARANTINE',revision=revision+1
@@ -588,6 +592,12 @@ def reopen_configurations(sql, current_sql):
         sql('DELETE FROM publication_preferences')
         for row in json_rows(current_sql,'SELECT * FROM publication_preferences'):
             sql("INSERT INTO publication_preferences(tenant_id,actor_id,material_id,pinned,revision,updated_at) SELECT "+','.join(literal(row[k]) for k in ('tenant_id','actor_id','material_id','pinned','revision','updated_at'))+" WHERE EXISTS(SELECT 1 FROM tenant_memberships WHERE tenant_id="+literal(row['tenant_id'])+" AND account_id="+literal(row['actor_id'])+") AND EXISTS(SELECT 1 FROM active_materials WHERE id="+literal(row['material_id'])+")")
+    # Restore content-card preferences only from current facts. Generation remains paused;
+    # old queued batches and receipts must never resurrect background work.
+    if has_table(sql,'briefing_card_preferences'):
+        sql('UPDATE briefing_card_preferences SET hidden=true,pinned=false')
+        for row in json_rows(current_sql,'SELECT p.*,p.focus_position::text AS exact_focus_position FROM briefing_card_preferences p'):
+            sql(f"UPDATE briefing_card_preferences SET hidden={literal(row['hidden'])},pinned={literal(row['pinned'])},size={literal(row['size'])},revision={int(row['revision'])},focus_position={literal(row['exact_focus_position'])} WHERE task_id={quoted_id(row['task_id'])} AND owner_id={quoted_id(row['owner_id'])}")
     sql('UPDATE briefing_preferences SET hidden=true,pinned=false')
     layouts=has_table(sql,'briefing_layouts')
     for row in json_rows(current_sql,'SELECT p.*'+(',p.focus_position::text AS exact_focus_position' if layouts else '')+' FROM briefing_preferences p'):

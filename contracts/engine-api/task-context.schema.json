@@ -254,6 +254,10 @@
         },
         "planManagementVersion": {
           "const": "1.0"
+        },
+        "briefingGeneration": {
+          "type": "boolean",
+          "description": "Platform-owned generation batch; reserves a short final confirmation without increasing total task budget."
         }
       }
     }

@@ -1,0 +1,29 @@
+.briefing-generation {
+  margin: 24px auto;
+  padding: 24px;
+  max-width: 720px;
+  text-align: center;
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+}
+.briefing-generation p {
+  margin: 8px 0;
+}
+.briefing-generation details {
+  text-align: left;
+  width: 100%;
+  max-width: 560px;
+  color: var(--muted, #64748b);
+}
+.briefing-generation summary {
+  cursor: pointer;
+  text-align: center;
+}
+.briefing-generation details > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+}

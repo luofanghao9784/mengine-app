@@ -1,6 +1,6 @@
 {
   "format": "dreamcore-recovery-coverage-v1",
-  "throughVersion": 46,
+  "throughVersion": 47,
   "implementationHashes": {
     "apps/api/src/main/java/com/dreamcore/workspace/departure/DepartureResidualCleanup.java": "f0b8fe926ac679177effbcacd529994abc901c2afcc779dca65442e1cb2ae432"
   },
@@ -229,6 +229,11 @@
       "version": "46",
       "script": "V46__conversation_plan_commands.sql",
       "sha256": "df8477922075322123660bc152d959d5059dd8acb580b72a361c6fa94c8fb596"
+    },
+    {
+      "version": "47",
+      "script": "V47__briefing_cards_and_generation.sql",
+      "sha256": "a97b987a7a053f9d7274c65440a8f67d6e19f0111babbabef35487f9f4ab8c5a"
     }
   ],
   "tables": [
@@ -236,9 +241,16 @@
     "adjustment_task_dependencies",
     "agent_attempt_usage",
     "agent_model_requests",
+    "briefing_card_moves",
+    "briefing_card_preferences",
+    "briefing_content_keys",
+    "briefing_generation_batches",
+    "briefing_generation_policies",
+    "briefing_generation_requests",
     "briefing_layout_moves",
     "briefing_layouts",
     "briefing_preferences",
+    "briefing_reading_snapshots",
     "business_source_config_versions",
     "business_source_submissions",
     "business_source_versions",
@@ -362,7 +374,7 @@
     "workspaces"
   ],
   "catalogHashes": [
-    "8b4efd64e2c50339191bbe8b7435d39207b64ec82a2f165575c3b2a1ed0afcac",
-    "de3522270c8901b4a8112c243f9c26f35a2a222c0af79718ac7964bbb54459e4"
+    "35a62e0b4b44bee7e44719b10ee27c6e01a8a0175b7b9edf62e6664f3fce243f",
+    "9c156f9314302dc5567f33688baf92a6ce22577348f85ab05f47c1257e7a8f3d"
   ]
 }

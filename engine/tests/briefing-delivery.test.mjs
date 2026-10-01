@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { createServer } from 'node:http';
 import { briefingDeliveryTool, hasPreparedBriefing } from '../dist/runtime/briefing-delivery.js';
 import { AgentTasks } from '../dist/runtime/agent-task.js';
+import { runHarness } from '../dist/runtime/harness.js';
 import { listen, close, body, json } from './fixtures/agent.mjs';
 import { usageFixture } from './fixtures/usage.mjs';
 test('a model claim or malformed envelope is not a real prepared briefing', async () => {
@@ -13,7 +14,7 @@ test('a model claim or malformed envelope is not a real prepared briefing', asyn
   });
   await assert.rejects(tool.execute({}, new AbortController().signal), { code: 'BRIEFING_RECEIPT_INVALID' });
 });
-test('real Harness delivers model prose through platform callback and records actual receipt', async (t) => {
+test('native generation concludes on the verified receipt without another model call', async (t) => {
   const realNow = performance.now.bind(performance);
   let elapsed = 0;
   t.mock.method(performance, 'now', () => realNow() + elapsed);
@@ -26,7 +27,12 @@ test('real Harness delivers model prose through platform callback and records ac
     if (usageFixture(req, res)) return;
     const input = await body(req);
     if (req.url.endsWith('/check'))
-      return json(res, { allowed: true, executionClass: 'live', briefingContentVersion: '1.0' });
+      return json(res, {
+        allowed: true,
+        executionClass: 'live',
+        briefingContentVersion: '1.0',
+        briefingGeneration: true,
+      });
     if (req.url.endsWith('/execution/open')) {
       assert.ok(input.tools.includes('deliver_briefing'));
       return json(res, { accepted: true, policy: 'READ_ONLY_PRIVATE_V1' });
@@ -37,7 +43,7 @@ test('real Harness delivers model prose through platform callback and records ac
     }
     if (req.url.endsWith('/deliver-briefing')) {
       delivered++;
-      elapsed = 16000;
+      elapsed = 1000;
       assert.equal(input.calculationArtifactId, calc);
       return json(res, {
         contractVersion: '1.0',
@@ -75,7 +81,7 @@ test('real Harness delivers model prose through platform callback and records ac
         } else {
           assert.ok(JSON.stringify(r.messages).includes('PREPARED'));
           assert.equal(r.tools.length, 0);
-          assert.match(r.messages[0].content[0].text, /verified an actual saved deliverable/);
+          assert.match(r.messages[0].content[0].text, /verified a terminal delivery receipt/);
           yield { type: 'text', text: '画报已生成，可在智能画报查看。' };
           yield { type: 'finish', reason: 'stop' };
         }
@@ -92,7 +98,8 @@ test('real Harness delivers model prose through platform callback and records ac
     receipts.map((x) => x.status),
     ['STARTED', 'succeeded'],
   );
-  assert.equal(calls, 2);
+  assert.equal(calls, 1);
+  assert.equal(r.text, '画报已生成，可在智能画报查看。');
 });
 
 test('a claim, failed tool, or unfinished post-delivery tool cannot release a partial result', () => {
@@ -115,4 +122,60 @@ test('a claim, failed tool, or unfinished post-delivery tool cannot release a pa
     [valid, { name: 'search_sources', status: 'succeeded' }],
   ])
     assert.equal(hasPreparedBriefing(tools), false);
+});
+
+test('verified duplicate receipt completes without pretending to save a new card', async () => {
+  const receipt = { contractVersion: '1.0', status: 'NO_NEW_CONTENT', reason: 'DUPLICATE_CONTENT' };
+  const tool = briefingDeliveryTool({ authorize: async () => {}, invoke: async () => receipt });
+  assert.deepEqual(await tool.execute({}, new AbortController().signal), receipt);
+  assert.equal(
+    hasPreparedBriefing([{ name: 'deliver_briefing', status: 'succeeded', output: receipt }]),
+    true,
+  );
+  assert.equal(
+    hasPreparedBriefing([
+      { name: 'deliver_briefing', status: 'succeeded', output: { ...receipt, reason: 'model says so' } },
+    ]),
+    false,
+  );
+});
+
+test('receipt-based completion respects duplicates, cancellation, failed tools and conversation mode', async () => {
+  for (const mode of ['duplicate', 'cancel', 'failed-tool', 'conversation']) {
+    let calls = 0;
+    const controller = new AbortController();
+    const result = await runHarness({
+      prompt: 'synthetic terminal receipt check',
+      signal: controller.signal,
+      finishOnDeliverable: mode !== 'conversation',
+      hasCompletedDeliverable: hasPreparedBriefing,
+      tools: [
+        {
+          name: 'deliver_briefing',
+          description: 'synthetic',
+          parameters: { type: 'object', properties: {} },
+          execute: async () => {
+            if (mode === 'cancel') controller.abort();
+            if (mode === 'failed-tool') throw Error('synthetic failure');
+            return { contractVersion: '1.0', status: 'NO_NEW_CONTENT', reason: 'DUPLICATE_CONTENT' };
+          },
+        },
+      ],
+      model: {
+        async *generate() {
+          calls++;
+          if (calls === 1) {
+            yield { type: 'tool_call', id: 'delivery', name: 'deliver_briefing', arguments: '{}' };
+            yield { type: 'finish', reason: 'tool_calls' };
+          } else {
+            yield { type: 'text', text: 'No new content.' };
+            yield { type: 'finish', reason: 'stop' };
+          }
+        },
+      },
+    });
+    assert.equal(calls, ['duplicate', 'cancel'].includes(mode) ? 1 : 2, mode);
+    assert.equal(result.status, mode === 'cancel' ? 'cancelled' : 'completed', mode);
+    assert.equal(hasPreparedBriefing(result.tools), ['duplicate', 'conversation'].includes(mode), mode);
+  }
 });

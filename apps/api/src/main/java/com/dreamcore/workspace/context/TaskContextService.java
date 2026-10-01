@@ -34,8 +34,8 @@ public class TaskContextService {
   var t=task(task,token);if(r==null||r.action()==null)throw IdentityException.invalid();
   Object result=switch(r.action()){
    case "bootstrap" -> bootstrap(t);
-   case "profiles" -> selectedOnly(t)?map("items",List.of(),"hasMore",false,"reason","SELECTED_ONLY"):profileList(t,r);
-   case "profile_read" -> selectedOnly(t)?map("unavailable",true,"reason","SELECTED_ONLY"):profile(t,r);
+   case "profiles" -> profilesSelectedOnly(t)?map("items",List.of(),"hasMore",false,"reason","SELECTED_ONLY"):profileList(t,r);
+   case "profile_read" -> profilesSelectedOnly(t)?map("unavailable",true,"reason","SELECTED_ONLY"):profile(t,r);
    case "history" -> selectedOnly(t)?map("items",List.of(),"hasMore",false,"reason","SELECTED_ONLY"):history(t,r);
    case "experience_search" -> selectedOnly(t)?map("items",List.of(),"hasMore",false,"reason","SELECTED_ONLY"):search(t,r);
    case "experience_read" -> selectedOnly(t)?map("unavailable",true,"reason","SELECTED_ONLY"):experience(t,r,true);
@@ -87,6 +87,7 @@ public class TaskContextService {
   var reference=map("artifactId",doc.artifactId(),"title",c.title(),"summary",c.summary(),"analysis",c.analysis(),"source",c.source(),"generatedAt",c.generatedAt(),"chart",chart==null?null:map("metric",chart.metric(),"unit",chart.unit(),"baseline",chart.baseline(),"current",chart.current(),"rows",chart.rows().stream().limit(10).toList(),"totalGroups",chart.rows().size(),"rowsTruncated",chart.rows().size()>10,"totals",chart.totals()));
   record(current,"HISTORY",source,row.get("attempt").toString(),reference);return reference;
  }
+ private boolean profilesSelectedOnly(Task t){return selectedOnly(t)&&!Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM briefing_generation_batches WHERE task_id=? AND owner_id=? AND tenant_id=? AND workspace_id=?)",Boolean.class,t.id(),t.actor(),t.tenant(),t.space()));}
  private boolean usable(ProfileService.Value v){return (v.status()==ProfileService.Status.ACTIVE||v.kind()==ProfileService.Kind.INFERENCE&&v.status()==ProfileService.Status.PROPOSED)&&(v.expiresAt()==null||v.expiresAt().isAfter(Instant.now()));}
  private void profileScope(Task t,ProfileService.Value v){if(v.scope()==ProfileService.Scope.WORKSPACE&&!v.subjectId().equals(t.space())||v.scope()==ProfileService.Scope.PERSONAL&&!v.subjectId().equals(t.actor()))throw missing();if(!usable(v))throw missing();}
  private Object profileValue(Task t,ProfileService.Value v,int limit){

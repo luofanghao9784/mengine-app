@@ -74,6 +74,8 @@ export class AgentTasks {
     this.attempts.set(key, Date.now());
     this.active.set(key, controller);
     const sources = new Map<string, Source>();
+    const tableHandles = new Map<string, string>();
+    let briefingGeneration: boolean | undefined;
     let denied = false;
     let publicQuery: string | undefined;
     let candidatesAllowed: boolean | undefined;
@@ -151,6 +153,13 @@ export class AgentTasks {
         )
           throw new RuntimeError('TASK_ACCESS_DENIED');
         briefingAvailable = briefing;
+        const generation = response.briefingGeneration ?? false;
+        if (
+          typeof generation !== 'boolean' ||
+          (briefingGeneration !== undefined && briefingGeneration !== generation)
+        )
+          throw new RuntimeError('TASK_ACCESS_DENIED');
+        briefingGeneration = generation;
         planManagementAvailable = response.planManagementVersion === '1.0';
       } catch {
         denied = true;
@@ -258,7 +267,16 @@ export class AgentTasks {
             const source = value as unknown as Source;
             if (!sources.has(source.id) && sources.size >= 10) continue;
             sources.set(source.id, source);
-            items.push({ ...source, inputHandle: `${source.id}.txt` });
+            const tableSourceId = source.filename.toLowerCase().endsWith('.xlsx')
+              ? ([...tableHandles].find(([, id]) => id === source.id)?.[0] ??
+                `table-${tableHandles.size + 1}`)
+              : undefined;
+            if (tableSourceId) tableHandles.set(tableSourceId, source.id);
+            items.push({
+              ...source,
+              ...(tableSourceId ? { tableSourceId } : {}),
+              inputHandle: `${source.id}.txt`,
+            });
           }
           return { items, scope: 'authorized-excerpts', ...inputCoverage(response) };
         },
@@ -288,6 +306,7 @@ export class AgentTasks {
           ? [
               tableComparisonTool({
                 hasSource: (id) => sources.has(id),
+                resolveSource: (id) => tableHandles.get(id) ?? id,
                 authorize,
                 invoke: (body, executionSignal) =>
                   postJson(
@@ -521,10 +540,11 @@ export class AgentTasks {
             try {
               output = await execute(args, executionSignal);
             } catch (error) {
-              if (tool.name === 'deliver_briefing')
+              if (tool.name === 'deliver_briefing' || tool.name === 'compare_table')
                 console.warn(
                   JSON.stringify({
-                    event: 'BRIEFING_DELIVERY_REJECTED',
+                    event: 'TASK_TOOL_REJECTED',
+                    tool: tool.name,
                     taskId: task.taskId,
                     code:
                       error instanceof RuntimeError && /^[A-Z_]{1,64}$/.test(error.code)
@@ -548,9 +568,30 @@ export class AgentTasks {
         signal,
         limits: { timeoutMs: 55000, modelCalls: 8, toolCalls: 8 },
         reserveFinalResponse: task.contractVersion === '1.5',
+        finalResponseReserveMs: briefingGeneration ? 10000 : undefined,
+        finishOnDeliverable: briefingGeneration,
         hasCompletedDeliverable: hasPreparedBriefing,
       });
       if (denied) throw new RuntimeError('TASK_ACCESS_DENIED');
+      if (result.status === 'limit')
+        console.warn(
+          JSON.stringify({
+            event: 'TASK_RUNTIME_LIMIT',
+            taskId: task.taskId,
+            code: result.code,
+            modelCalls: result.modelCalls,
+            toolCalls: result.tools.length,
+          }),
+        );
+      if (briefingGeneration && result.status === 'completed' && hasPreparedBriefing(result.tools)) {
+        // This is a system delivery acknowledgement, not model-authored analysis.
+        // The immutable card content already came from the model's checked tool call.
+        const receipt = result.tools.at(-1)?.output;
+        result.text =
+          isRecord(receipt) && receipt.status === 'NO_NEW_CONTENT'
+            ? '本次没有新增画报：相同内容已存在。'
+            : '画报已生成，可在智能画报查看。';
+      }
       if (result.status !== 'completed' || !result.text.trim() || result.text.length > 16000)
         throw new RuntimeError(result.status === 'limit' ? 'TASK_LIMIT' : 'TASK_MODEL_FAILED');
       if (result.finalResponseReserved && outcome === 'COMPLETE' && !hasPreparedBriefing(result.tools)) {
