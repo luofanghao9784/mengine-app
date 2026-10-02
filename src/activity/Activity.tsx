@@ -17,9 +17,20 @@ const verbs: Record<ActivityKind, string> = {
   DOCUMENT_PUBLISHED: '发布了文稿',
   DOCUMENT_UPDATED: '更新了已发布文稿',
 };
-export function SharedActivity({ tenant, context }: { tenant: string; context: TenantContext }) {
+export function SharedActivity({
+  tenant,
+  context,
+  workspace,
+  embedded = false,
+}: {
+  tenant: string;
+  context: TenantContext;
+  workspace?: string;
+  embedded?: boolean;
+}) {
   const { session, expire } = useSession();
-  const [space, setSpace] = useState<string | null>(null);
+  const [selectedSpace, setSpace] = useState<string | null>(null);
+  const space = workspace || selectedSpace;
   const [cursors, setCursors] = useState<(string | null)[]>([null]);
   const [page, setPage] = useState(0);
   const [attempt, setAttempt] = useState(0);
@@ -78,10 +89,13 @@ export function SharedActivity({ tenant, context }: { tenant: string; context: T
     }
   }
   return (
-    <section className="access-panel shared-activity" aria-label="企业动态">
+    <section
+      className={embedded ? 'shared-activity' : 'access-panel shared-activity'}
+      aria-label="资料动态记录"
+    >
       <header className="access-section-heading">
         <div>
-          <h2>企业动态</h2>
+          {!embedded && <h2>资料动态</h2>}
           <p className="muted">查看共享资料的维护与发布记录</p>
         </div>
         <Button variant="ghost" icon={RefreshCw} onClick={refresh}>
@@ -89,28 +103,32 @@ export function SharedActivity({ tenant, context }: { tenant: string; context: T
         </Button>
       </header>
       <div className="activity-filter">
-        <label>
-          空间范围{' '}
-          <select
-            aria-label="动态空间范围"
-            value={space || ''}
-            onChange={(event) => {
-              cancelDownload();
-              setSpace(event.target.value || null);
-              setCursors([null]);
-              setPage(0);
-            }}
-          >
-            <option value="">全部可见共享空间</option>
-            {context.workspaces
-              .filter((s) => s.kind === 'SHARED')
-              .map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-          </select>
-        </label>
+        {workspace ? (
+          <span>{context.workspaces.find((s) => s.id === workspace)?.name}</span>
+        ) : (
+          <label>
+            空间范围{' '}
+            <select
+              aria-label="动态空间范围"
+              value={space || ''}
+              onChange={(event) => {
+                cancelDownload();
+                setSpace(event.target.value || null);
+                setCursors([null]);
+                setPage(0);
+              }}
+            >
+              <option value="">全部可见共享空间</option>
+              {context.workspaces
+                .filter((s) => s.kind === 'SHARED')
+                .map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+            </select>
+          </label>
+        )}
         <span className="muted">按资料权限展示</span>
       </div>
       {downloadError && (

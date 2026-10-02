@@ -1,12 +1,13 @@
+import { LibraryToolbar } from './LibraryToolbar';
+import { SharedActivity } from '../activity/Activity';
 import { ContinueWithMaterial } from '../conversation/AttachmentMaterials';
 import { DocumentCard } from '../documents/Documents';
 import { useViewState, textState, pageState } from '../shared/useViewState';
 import { LiveConversationDeck } from '../conversation/LiveConversationDeck';
 import { MoreActions } from '../shared/MoreActions';
-import { ObjectLifecycleWorkspace } from '../objectlifecycle/ObjectLifecycleWorkspace';
 import { ExportBatchPanel } from '../export/ExportBatchPanel';
 import { requestNavigationLocked } from '../shared/request-guard';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Info,
   FileText,
@@ -15,9 +16,6 @@ import {
   Upload,
   Download,
   ChevronRight,
-  Grid2X2,
-  List,
-  Search,
   RefreshCw,
   LibraryBig,
 } from 'lucide-react';
@@ -30,8 +28,8 @@ import { Failure, Loading, Pager, useRemote, useSubmission, SubmitError } from '
 import { materialClient as api } from './client';
 import './material.css';
 import { AnalysisPanel, ContentSearch } from './Knowledge';
-import { BatchUploadDialog } from './BatchUpload';
-import { SourcePanel } from '../source/SourcePanel';
+import { MaterialUploadDialog } from './BatchUpload';
+import { useUploads } from './UploadManager';
 import { MaterialMaintenance } from '../lifecycle/MaterialMaintenance';
 export const libraryHref = (tenant: string, scope = 'personal', folder?: string) =>
   '#' + new URLSearchParams({ tenant, view: 'library', scope, ...(folder ? { folder } : {}) });
@@ -48,50 +46,20 @@ const accessDenied = (error: unknown) =>
 export function LiveLibrary({ tenant }: { tenant: string }) {
   const { session } = useSession();
   const [attempt, setAttempt] = useState(0);
-  const [contentLifecycleOpen, setContentLifecycleOpen] = useState(false);
   const context = useRemote(
     (signal) => identityClient.context(tenant, signal),
     [tenant, attempt, session.identity],
   );
-  const managementActions = (
-    <>
-      <Button onClick={() => setContentLifecycleOpen(true)}>内容回收与清理</Button>
-      <Button variant="ghost" icon={RefreshCw} onClick={() => setAttempt((x) => x + 1)}>
-        刷新
-      </Button>
-    </>
-  );
-  return (
-    <>
-      {contentLifecycleOpen && (
-        <Modal
-          title="内容回收与清理"
-          onClose={() => {
-            if (!requestNavigationLocked()) setContentLifecycleOpen(false);
-          }}
-        >
-          <ObjectLifecycleWorkspace tenant={tenant} />
-        </Modal>
-      )}
-      {context.error ? (
-        <Failure error={context.error} retry={() => setAttempt((x) => x + 1)} />
-      ) : !context.value ? (
-        <Loading />
-      ) : (
-        <LibraryContents tenant={tenant} context={context.value} managementActions={managementActions} />
-      )}
-    </>
+  return context.error ? (
+    <Failure error={context.error} retry={() => setAttempt((x) => x + 1)} />
+  ) : !context.value ? (
+    <Loading />
+  ) : (
+    <LibraryContents tenant={tenant} context={context.value} />
   );
 }
-function LibraryContents({
-  tenant,
-  context,
-  managementActions,
-}: {
-  tenant: string;
-  context: TenantContext;
-  managementActions: ReactNode;
-}) {
+
+function LibraryContents({ tenant, context }: { tenant: string; context: TenantContext }) {
   const [hash, setHash] = useState(location.hash);
   useEffect(() => {
     const change = () => {
@@ -143,7 +111,6 @@ function LibraryContents({
           folder={folder}
           enterprise={enterprise}
           all={all}
-          managementActions={managementActions}
         />
       )}
     </>
@@ -156,9 +123,7 @@ function LibraryListing({
   folder,
   enterprise,
   all,
-  managementActions,
 }: {
-  managementActions: ReactNode;
   tenant: string;
   context: TenantContext;
   workspace: string | null;
@@ -168,22 +133,23 @@ function LibraryListing({
 }) {
   const [draftDocument, setDraftDocument] = useState<string>();
   const [contentSearch, setContentSearch] = useState(false);
-  const [sourcesOpen, setSourcesOpen] = useState(() =>
-    new URLSearchParams(location.hash.slice(1)).has('source'),
-  );
   const [maintenanceOpen, setMaintenanceOpen] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(false);
   const listingKey = 'library:' + (workspace || (all ? 'all' : 'enterprise')) + ':' + (folder || 'root');
   const [query, setQuery] = useViewState(tenant, listingKey + ':input', '', textState);
   const [q, setQ] = useViewState(tenant, listingKey + ':query', '', textState);
   const [page, setPage] = useViewState(tenant, listingKey + ':page', 0, pageState);
   const [attempt, setAttempt] = useState(0);
+  const { queue } = useUploads();
+  const savedUploads = queue.jobs.reduce((n, job) => n + job.run.files.filter(row => row.state === 'succeeded').length, 0);
+  useEffect(() => { setAttempt(n => n + 1); }, [savedUploads]);
   const [layout, setLayout] = useViewState<'cards' | 'list'>(
     tenant,
     'library:layout',
     'cards',
     (v): v is 'cards' | 'list' => v === 'cards' || v === 'list',
   );
-  const [modal, setModal] = useState<'folder' | 'upload' | 'batch'>();
+  const [modal, setModal] = useState<'folder' | 'upload'>();
   const [document, setDocument] = useViewState<Pick<MaterialEntry, 'id' | 'workspaceId'> | null>(
     tenant,
     listingKey + ':document',
@@ -225,6 +191,7 @@ function LibraryListing({
   }, [data.error, data.value, workspace, modal, uploadTarget, context]);
   useEffect(() => {
     if (data.error || (data.value && !data.value.canMaintain)) setMaintenanceOpen(false);
+    if (data.error) setActivityOpen(false);
   }, [data.error, data.value]);
   const personal = current?.kind === 'PERSONAL';
   return (
@@ -239,14 +206,14 @@ function LibraryListing({
       )}
       <PageActions>
         <MoreActions label="资料操作">
-          {managementActions}
+          {(enterprise || all || current?.kind === 'SHARED') && (
+            <Button onClick={() => setActivityOpen(true)}>资料动态</Button>
+          )}
+          <Button variant="ghost" icon={RefreshCw} onClick={refresh}>
+            刷新
+          </Button>
           {workspace && data.value?.canMaintain && (
             <Button onClick={() => setMaintenanceOpen(true)}>维护与回收站</Button>
-          )}
-          {workspace && data.value && (
-            <Button icon={LibraryBig} onClick={() => setSourcesOpen(true)}>
-              数据来源
-            </Button>
           )}
           {data.value?.canMaintain && (
             <Button icon={FolderPlus} onClick={() => setModal('folder')}>
@@ -266,90 +233,75 @@ function LibraryListing({
             上传资料
           </Button>
         )}
-        {(data.value?.canMaintain || enterprise || all) && (
-          <Button
-            icon={Upload}
-            onClick={() => {
-              setUploadTarget(workspace || '');
-              setModal('batch');
-            }}
-          >
-            批量上传
-          </Button>
-        )}
       </PageActions>
-      <div className="material-toolbar">
-        <nav className="material-crumbs" aria-label="文件夹路径">
-          <button
-            onClick={() => {
-              location.hash = libraryHref(tenant, personal ? 'personal' : 'enterprise');
-            }}
-          >
-            {personal ? '个人空间' : '企业资料库'}
-          </button>
-          {current && !personal && (
-            <>
-              <ChevronRight size={14} />
-              <button
-                onClick={() => {
-                  location.hash = libraryHref(tenant, workspace!);
-                }}
-              >
-                {current.name}
-              </button>
-            </>
-          )}
-          {all && (
-            <>
-              <ChevronRight size={14} />
-              <span>全部资料</span>
-            </>
-          )}
-          {data.value?.trail.map((c) => (
-            <span key={c.id}>
-              <ChevronRight size={14} />
-              <button
-                onClick={() => {
-                  location.hash = libraryHref(tenant, personal ? 'personal' : workspace!, c.id);
-                }}
-              >
-                {c.name}
-              </button>
-            </span>
-          ))}
-        </nav>
-        <div className="material-controls">
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              setQ(query.trim());
-              setPage(0);
-            }}
-          >
-            <Search size={16} />
-            <input
-              aria-label="搜索资料名称或正文"
-              placeholder={workspace ? '查找文件名或正文（含子目录）' : '查找企业资料名称或正文'}
-              value={query}
-              maxLength={180}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-            <Button type="submit">搜索</Button>
-          </form>
-          <Button
-            aria-label="卡片视图"
-            aria-pressed={layout === 'cards'}
-            icon={Grid2X2}
-            onClick={() => setLayout('cards')}
+      <LibraryToolbar
+        query={query}
+        onQuery={setQuery}
+        layout={layout}
+        onLayout={setLayout}
+        onSearch={() => {
+          setQ(query.trim());
+          setPage(0);
+        }}
+        onClear={() => {
+          setQuery('');
+          setQ('');
+          setPage(0);
+        }}
+      >
+        {(folder || all || (current && !personal)) && (
+          <nav className="material-crumbs" aria-label="文件夹路径">
+            <button
+              onClick={() => {
+                location.hash = libraryHref(tenant, personal ? 'personal' : 'enterprise');
+              }}
+            >
+              {personal ? '个人空间' : '企业资料库'}
+            </button>
+            {current && !personal && (
+              <>
+                <ChevronRight size={14} />
+                <button
+                  onClick={() => {
+                    location.hash = libraryHref(tenant, workspace!);
+                  }}
+                >
+                  {current.name}
+                </button>
+              </>
+            )}
+            {all && (
+              <>
+                <ChevronRight size={14} />
+                <span>全部资料</span>
+              </>
+            )}
+            {data.value?.trail.map((c) => (
+              <span key={c.id}>
+                <ChevronRight size={14} />
+                <button
+                  onClick={() => {
+                    location.hash = libraryHref(tenant, personal ? 'personal' : workspace!, c.id);
+                  }}
+                >
+                  {c.name}
+                </button>
+              </span>
+            ))}
+          </nav>
+        )}
+      </LibraryToolbar>
+      {activityOpen && (enterprise || all || current?.kind === 'SHARED') && (
+        <Modal title="资料动态" onClose={() => setActivityOpen(false)}>
+          <SharedActivity
+            key={workspace || 'enterprise'}
+            tenant={tenant}
+            context={context}
+            workspace={current?.kind === 'SHARED' ? current.id : undefined}
+            embedded
           />
-          <Button
-            aria-label="列表视图"
-            aria-pressed={layout === 'list'}
-            icon={List}
-            onClick={() => setLayout('list')}
-          />
-        </div>
-      </div>
+        </Modal>
+      )}
       {notice && (
         <p className="access-success" role="status">
           {notice}
@@ -480,15 +432,6 @@ function LibraryListing({
           changed={refresh}
         />
       )}
-      {sourcesOpen && workspace && current && (
-        <SourcePanel
-          tenant={tenant}
-          workspace={workspace}
-          workspaceName={current.name}
-          verification={context}
-          close={() => setSourcesOpen(false)}
-        />
-      )}
       {modal === 'folder' && workspace && (
         <FolderDialog
           tenant={tenant}
@@ -500,15 +443,9 @@ function LibraryListing({
         />
       )}
       {modal === 'upload' && (
-        <UploadDialog
-          tenant={tenant}
-          workspace={uploadTarget}
-          folder={workspace ? folder : null}
-          maxBytes={data.value?.maxUploadBytes || 20971520}
-          close={() => setModal(undefined)}
-          completed={() => completed('原文件已保存；可在版本详情查看解析状态。')}
-          denied={denied}
-        >
+        <MaterialUploadDialog tenant={tenant} workspace={uploadTarget} parent={workspace ? folder : null}
+          workspaceName={context.workspaces.find(space => space.id === uploadTarget)?.name || ''}
+          scope={personal ? 'personal' : uploadTarget} close={() => setModal(undefined)}>
           {!workspace && (
             <Field label="保存到共享空间" hint="仅具备资料维护权限时可以上传。">
               <select required value={uploadTarget} onChange={(e) => setUploadTarget(e.target.value)}>
@@ -523,34 +460,7 @@ function LibraryListing({
               </select>
             </Field>
           )}
-        </UploadDialog>
-      )}
-      {modal === 'batch' && (
-        <BatchUploadDialog
-          tenant={tenant}
-          workspace={uploadTarget}
-          parent={workspace ? folder : null}
-          close={() => {
-            setModal(undefined);
-            refresh();
-          }}
-          changed={refresh}
-        >
-          {!workspace && (
-            <Field label="批量保存到共享空间" hint="选定后核对该空间的维护权限。">
-              <select required value={uploadTarget} onChange={(e) => setUploadTarget(e.target.value)}>
-                <option value="">请选择空间</option>
-                {context.workspaces
-                  .filter((s) => s.kind === 'SHARED')
-                  .map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-              </select>
-            </Field>
-          )}
-        </BatchUploadDialog>
+        </MaterialUploadDialog>
       )}
       {draftDocument && (
         <DocumentCard tenant={tenant} id={draftDocument} close={() => setDraftDocument(undefined)} />

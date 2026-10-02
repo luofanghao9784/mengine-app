@@ -9,13 +9,14 @@ export function useBriefingCardFit(
   key: string,
   columns: number,
   unit: number,
+  selectors = { cards: '.briefing-grid .briefing-card', button: '.briefing-card-main' },
 ) {
   const [measured, setMeasured] = useState<{ key: string; limits: BriefingFit }>({ key, limits: {} });
   const limits = measured.key === key ? measured.limits : {};
   useLayoutEffect(() => {
     let active = true;
     const waiting = new WeakSet<Animation>();
-    const cards = [...(page.current?.querySelectorAll<HTMLElement>('.briefing-grid .briefing-card') || [])];
+    const cards = [...(page.current?.querySelectorAll<HTMLElement>(selectors.cards) || [])];
     const measure = () => {
       if (!active) return;
       const updates: BriefingFit = {};
@@ -36,7 +37,7 @@ export function useBriefingCardFit(
         }
         const copy = card.querySelector<HTMLElement>('.magazine-copy');
         const magazine = card.querySelector<HTMLElement>('.briefing-magazine');
-        const button = card.querySelector<HTMLElement>('.briefing-card-main');
+        const button = card.querySelector<HTMLElement>(selectors.button);
         if (!copy || !magazine || !button || !card.getBoundingClientRect().height) continue;
         const blocks = [...copy.children].filter((e) => getComputedStyle(e).display !== 'none');
         const copyHeight =
@@ -70,7 +71,8 @@ export function useBriefingCardFit(
           (card.querySelector('.magazine-eyebrow')?.getBoundingClientRect().height || 0) +
           (card.querySelector('.magazine-footer')?.getBoundingClientRect().height || 0) +
           (inlinePhoto ? 3 : 2) * parseFloat(getComputedStyle(magazine).rowGap) +
-          2;
+          2 +
+          (card.querySelector<HTMLElement>('.live-briefing-controls')?.offsetHeight || 0);
         if (needed <= card.getBoundingClientRect().height + 1) continue;
         const id = card.dataset.cardId!;
         const size = card.dataset.size as CardSize;

@@ -1,3 +1,4 @@
+import { sourceJourney } from './source-journey.ts';
 /** Full effective departure through the integrated real application. Synthetic owned data only. */
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
@@ -18,9 +19,9 @@ async function post(api: APIRequestContext, path: string, data: unknown, status 
   return response.json();
 }
 async function login(page: Page, email: string, password: string) {
-  await page.getByLabel('邮箱', { exact: true }).fill(email);
-  await page.getByLabel('密码', { exact: true }).fill(password);
-  await page.getByRole('button', { name: '登录', exact: true }).click();
+  // This management fixture verifies business actions; phone onboarding has its own journey.
+  await post(page.context().request, '/api/v1/auth/login', { email, password });
+  await page.reload();
   await expect(page.locator('.access-shell')).toBeVisible();
 }
 
@@ -156,6 +157,7 @@ async function verifyDeparture(
       },
     });
     assert.equal(uploaded.status(), 201, await uploaded.text());
+    await sourceJourney(page, ctx.request, tenant, workspace.id, artifacts);
     const management = await managementConfigurationJourney(
       page,
       ctx.request,

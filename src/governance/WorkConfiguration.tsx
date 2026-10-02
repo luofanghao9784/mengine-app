@@ -4,6 +4,7 @@ import { identityClient, useSession } from '../identity/session';
 import { Button, Field } from '../shared/ui';
 import { Failure, Loading, useRemote } from '../shared/admin';
 import { RequestPending } from '../shared/request-guard';
+import { featureEntries } from '../shared/feature-entries';
 import { createHttpSystemClient, SystemClientError } from '../data/systemClient';
 import { methodClient } from '../methods/client';
 import { runtimePresentation, effectiveMethodPresentation } from './work-configuration';
@@ -227,27 +228,29 @@ function Configuration({
             </a>
           </div>
         </article>
-        <article className="configuration-card">
-          <h3>
-            <Clock3 size={18} /> 主动与持续工作
-          </h3>
-          <p>
-            普通会话可以直接开始。只有明确保存的本人计划才持续运行；没有企业级“代管全员私人计划”入口，也不会因开通企业就扫描所有私人资料。
-          </p>
-          {onOpenPlans ? (
-            <Button disabled={pending} onClick={onOpenPlans}>
-              查看我的持续计划
-            </Button>
-          ) : (
-            <a
-              className="button secondary"
-              aria-disabled={pending}
-              href={pending ? undefined : `/workspace/#${new URLSearchParams({ tenant, view: 'plans' })}`}
-            >
-              查看我的持续计划
-            </a>
-          )}
-        </article>
+        {featureEntries.ongoingPlans && (
+          <article className="configuration-card">
+            <h3>
+              <Clock3 size={18} /> 主动与持续工作
+            </h3>
+            <p>
+              普通会话可以直接开始。只有明确保存的本人计划才持续运行；没有企业级“代管全员私人计划”入口，也不会因开通企业就扫描所有私人资料。
+            </p>
+            {onOpenPlans ? (
+              <Button disabled={pending} onClick={onOpenPlans}>
+                查看我的持续计划
+              </Button>
+            ) : (
+              <a
+                className="button secondary"
+                aria-disabled={pending}
+                href={pending ? undefined : `/workspace/#${new URLSearchParams({ tenant, view: 'plans' })}`}
+              >
+                查看我的持续计划
+              </a>
+            )}
+          </article>
+        )}
         <article className="configuration-card">
           <h3>
             <Layers3 size={18} /> 资料与能力范围

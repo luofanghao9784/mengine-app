@@ -90,16 +90,18 @@
 }
 .live-briefing-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 12px;
+  container: live-briefing-grid / inline-size;
   align-items: start;
 }
 .live-briefing-card {
   position: relative;
   background: #fff;
-  border: 1px solid #e4e8ee;
-  border-radius: 18px;
-  box-shadow: 0 3px 16px #26374a05;
+  border: 1px solid var(--card-edge);
+  border-radius: 24px;
+  box-shadow: var(--card-shadow);
+  container: live-briefing-card / inline-size;
   min-width: 0;
   transition:
     box-shadow 160ms,
@@ -117,9 +119,9 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
   width: 100%;
-  min-height: 240px;
+  min-height: 254px;
   padding: 20px;
   text-align: left;
   border: 0;
@@ -191,6 +193,22 @@
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
+.live-magazine .live-magazine-footer {
+  padding-right: 28px;
+  min-height: 18px;
+}
+.live-magazine .magazine-value strong {
+  overflow-wrap: anywhere;
+}
+.live-briefing-card.is-read .briefing-magazine h3 {
+  color: #8b929d;
+}
+.live-briefing-card .live-magazine:not(.magazine-with-chart) .magazine-summary {
+  -webkit-line-clamp: 3;
+}
+.live-briefing-card.compact .live-magazine .magazine-summary {
+  -webkit-line-clamp: 2;
+}
 .live-briefing-marks {
   display: flex;
   align-items: center;
@@ -212,7 +230,7 @@
   padding-right: 38px;
 }
 .live-briefing-card.is-read h3 {
-  color: #7e8794;
+  color: #8b929d;
 }
 .live-briefing-controls {
   display: flex;
@@ -230,7 +248,7 @@
 .live-card-action-rail {
   position: absolute;
   right: 8px;
-  top: 18px;
+  bottom: 16px;
   opacity: 0;
   pointer-events: none;
   transition: opacity 160ms;
@@ -309,7 +327,7 @@
   box-sizing: border-box;
 }
 .live-reading-dialog::backdrop {
-  background: #27425c16;
+  background: #27425c24;
   backdrop-filter: blur(12px);
 }
 .live-reading-card {
@@ -320,18 +338,18 @@
   background: #fff;
   border: 1px solid #e4e8ee;
   border-radius: 26px;
-  box-shadow: 0 24px 90px #1d365522;
+  box-shadow: 0 24px 90px #1d365529;
   overflow: hidden;
 }
 .live-reading-header {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 18px 22px 12px 32px;
+  padding: 17px 22px 12px 32px;
   flex-shrink: 0;
   color: #35465e;
-  font-size: 14px;
-  font-weight: 550;
+  font-size: 16px;
+  font-weight: 600;
 }
 .live-reading-header > span:first-child {
   flex: 1;
@@ -485,11 +503,6 @@
 }
 .live-reading-forward > .button:is(:hover, :focus-visible)::after {
   display: block;
-}
-@media (max-width: 1100px) {
-  .live-briefing-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 @media (max-width: 650px) {
   .live-briefing-tabs {
@@ -765,4 +778,71 @@
   top: 0;
   width: 230px;
   box-shadow: 0 8px 30px #2336511a;
+}
+
+.live-briefing-type-options {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.live-briefing-type-options button {
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-size: 12px;
+  color: var(--muted);
+  background: transparent;
+}
+.live-briefing-type-options button[aria-pressed='true'] {
+  color: var(--blue-ink);
+  background: var(--selected);
+}
+
+/* Match the fixed Demo's pull gesture and compact feedback, with real read completion. */
+.access-content:has(.live-briefing) {
+  overscroll-behavior-y: contain;
+}
+.access-content:has(.live-briefing:not([data-refresh-phase='idle'])) {
+  overflow-anchor: none;
+}
+.live-briefing {
+  padding-top: 12px;
+}
+.live-briefing-refresh-space {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  transition: height 220ms cubic-bezier(0.2, 0.65, 0.25, 1);
+}
+.live-briefing:is([data-refresh-phase='pulling'], [data-refresh-phase='ready']) .live-briefing-refresh-space {
+  transition: none;
+}
+.live-briefing-refresh-indicator {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #64778f;
+  font-size: 13px;
+  white-space: nowrap;
+  user-select: none;
+}
+.live-briefing-refresh-indicator svg {
+  flex-shrink: 0;
+  color: #6891ce;
+}
+.live-briefing-refresh-spinner {
+  animation: live-briefing-refresh-spin 800ms linear infinite;
+}
+@keyframes live-briefing-refresh-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .live-briefing-refresh-space {
+    transition: none;
+  }
+  .live-briefing-refresh-spinner {
+    animation: none;
+  }
 }

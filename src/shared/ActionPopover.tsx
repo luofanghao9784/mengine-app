@@ -37,7 +37,7 @@ export function ActionPopover({
     observer.observe(panel);
     place();
     panel
-      .querySelector<HTMLElement>('button:not(:disabled), textarea, input')
+      .querySelector<HTMLElement>('button:not(:disabled), a[href], select:not(:disabled), textarea, input')
       ?.focus({ preventScroll: true });
     const outside = (event: PointerEvent) => {
       if (!panel.contains(event.target as Node) && !anchor.current?.contains(event.target as Node))

@@ -32,8 +32,3 @@
   border-top: 1px solid #e4e8ee;
   padding-top: 16px;
 }
-/* Preserve API ranking, including opened cards. Dense flow must never reorder the content list. */
-.recommendation-grid[data-packed='true'] {
-  grid-auto-rows: 8px;
-  grid-auto-flow: row;
-}

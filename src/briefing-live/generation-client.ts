@@ -56,6 +56,8 @@ export const generationClient = {
       undefined,
       signal,
     ),
+  batch: (tenant: string, id: string, signal?: AbortSignal) =>
+    request(root(tenant) + `/${id}`, 'GET', batch, undefined, signal),
   generate: (tenant: string, body: { requestId: string; workspaceId?: string; businessType?: string }) =>
     request(root(tenant), 'POST', batch, body),
   cancel: (tenant: string, id: string) => request(root(tenant) + `/${id}/cancel`, 'POST', batch, {}),

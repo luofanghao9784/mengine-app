@@ -4,6 +4,7 @@ import { TaskWorkNotices } from '../taskwork/TaskWorkNotices';
 import { RequestPending, requestNavigationLocked, useRequestLock } from '../shared/request-guard';
 import { useContext } from 'react';
 import { readTabDraft, writeTabDraft, removeTabDraft } from '../shared/tab-drafts';
+import { prepareViewportMotion } from './viewport-motion';
 import { DraftWarning } from '../shared/DraftWarning';
 import { SaveAsDocument } from '../documents/Documents';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -124,20 +125,22 @@ export function Conversations({ tenant }: { tenant: string }) {
           changed={changed}
           navigation={
             <nav className="live-conversation-list" aria-label="会话列表">
-              <header className="deck-card-header live-card-heading">
-                <h2>会话列表</h2>
-                <span>仅自己可见</span>
-              </header>
-              <Button
-                className="live-new-conversation"
-                icon={Plus}
-                disabled={pendingRequest}
-                onClick={() => {
-                  location.hash = retainConversationContext(conversationHref(tenant), location.hash);
-                }}
-              >
-                新会话
-              </Button>
+              <div className="live-list-tools">
+                <header className="deck-card-header live-card-heading">
+                  <h2>会话列表</h2>
+                  <span>仅自己可见</span>
+                </header>
+                <Button
+                  className="live-new-conversation"
+                  icon={Plus}
+                  disabled={pendingRequest}
+                  onClick={() => {
+                    location.hash = retainConversationContext(conversationHref(tenant), location.hash);
+                  }}
+                >
+                  新会话
+                </Button>
+              </div>
               <div className="live-conversation-links">
                 {context.value.workspaces.map((space) => {
                   const conversations = list.value!.items.filter((item) => item.workspaceId === space.id);
@@ -255,6 +258,7 @@ function ConversationView({
   );
   const [reveal, setReveal] = useState<{ id: string; sequence: number }>();
   const [briefingOpen, setBriefingOpen] = useState(!!briefingContext);
+  const [briefingTitle, setBriefingTitle] = useState<string>();
   const openCitation = (id: string, title: string) => {
     setCitations((all) => (all.some((c) => c.id === id) ? all : [...all, { id, title }]));
     setReveal((previous) => ({ id, sequence: (previous?.sequence || 0) + 1 }));
@@ -344,10 +348,17 @@ function ConversationView({
               {
                 id: 'briefing',
                 kind: 'source' as const,
-                title: data.value?.conversation.title || '会话成果',
+                title: briefingTitle || '画报卡片',
                 label: '画报卡片',
                 close: () => setBriefingOpen(false),
-                content: <TaskReadingBody tenant={tenant} task={briefingContext} onSource={openCitation} />,
+                content: (
+                  <TaskReadingBody
+                    tenant={tenant}
+                    task={briefingContext}
+                    onSource={openCitation}
+                    onTitle={setBriefingTitle}
+                  />
+                ),
               },
             ]
           : []),
@@ -415,7 +426,6 @@ function ConversationView({
               </p>
             )}
           </div>
-          <Badge>私人会话</Badge>
         </header>
         <div className="conversation-messages" data-scroll-key="messages" aria-live="polite">
           {data.value?.tasks.map((task) => (
@@ -523,7 +533,7 @@ function ConversationView({
             </Button>
           </p>
         ) : (
-          <Composer
+          <ConversationComposer
             suggestion={suggestion}
             tenant={tenant}
             selected={selected}
@@ -959,8 +969,9 @@ function AttemptHistory({
     </section>
   );
 }
-function Composer({
+export function ConversationComposer({
   suggestion,
+  fromBriefing = false,
   tenant,
   selected,
   space,
@@ -981,6 +992,7 @@ function Composer({
   disabledReason: string;
   changed: () => void;
   suggestion?: { text: string; sequence: number };
+  fromBriefing?: boolean;
 }) {
   const { session, expire } = useSession();
   const pendingRequest = useContext(RequestPending);
@@ -1032,6 +1044,31 @@ function Composer({
   const [busy, setBusy] = useState(false),
     [error, setError] = useState<unknown>();
   const textarea = useRef<HTMLTextAreaElement>(null);
+  const form = useRef<HTMLFormElement>(null);
+  const composing = useRef(false);
+  const submitting = useRef(false);
+  const [focused, setFocused] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const expanded = !fromBriefing || focused || !!text || !!originals.length || !!pending;
+  const isCollapsed = fromBriefing && collapsed && !expanded;
+  useEffect(() => {
+    if (!fromBriefing) return;
+    const scroll = form.current?.closest('.access-main')?.querySelector('.access-content');
+    if (!scroll) return;
+    let origin = scroll.scrollTop;
+    const onScroll = () => {
+      const top = scroll.scrollTop;
+      if (expanded || top < 40 || top < origin - 36) {
+        setCollapsed(false);
+        origin = top;
+      } else if (top > origin + 60) {
+        setCollapsed(true);
+        origin = top;
+      }
+    };
+    scroll.addEventListener('scroll', onScroll, { passive: true });
+    return () => scroll.removeEventListener('scroll', onScroll);
+  }, [fromBriefing, expanded]);
   const controller = useRef<AbortController | null>(null);
   const toolsAnchor = useRef<HTMLDivElement>(null);
   const [toolsOpen, setToolsOpen] = useState(false);
@@ -1050,8 +1087,9 @@ function Composer({
   useEffect(() => {
     if (!textarea.current) return;
     textarea.current.style.height = 'auto';
-    textarea.current.style.height = Math.min(160, Math.max(70, textarea.current.scrollHeight)) + 'px';
-  }, [text]);
+    textarea.current.style.height =
+      Math.min(160, Math.max(fromBriefing ? (expanded ? 68 : 54) : 70, textarea.current.scrollHeight)) + 'px';
+  }, [text, expanded, fromBriefing]);
   useEffect(() => {
     if (!suggestion || busy || pending) return;
     setText(suggestion.text);
@@ -1087,7 +1125,13 @@ function Composer({
   const allowed = context.workspaces.some((s) => s.id === (space || location));
   return (
     <form
-      className="conversation-composer"
+      ref={form}
+      className={`conversation-composer ${fromBriefing ? 'workspace-composer' : ''} ${expanded ? 'is-expanded' : ''} ${isCollapsed ? 'is-collapsed' : ''}`}
+      aria-label={fromBriefing ? '从画报发起会话' : undefined}
+      onFocusCapture={() => setFocused(true)}
+      onBlurCapture={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocused(false);
+      }}
       onDragOver={(e) => {
         if (e.dataTransfer.types.includes('Files')) e.preventDefault();
       }}
@@ -1100,7 +1144,16 @@ function Composer({
       }}
       onSubmit={async (event) => {
         event.preventDefault();
-        if (busy || preparing || !enabled || !allowed || (!pending && !text.trim())) return;
+        if (
+          submitting.current ||
+          composing.current ||
+          busy ||
+          preparing ||
+          !enabled ||
+          !allowed ||
+          (!pending && !text.trim())
+        )
+          return;
         const body = pending || {
           requestId: crypto.randomUUID(),
           workspaceId: space || location,
@@ -1129,6 +1182,7 @@ function Composer({
           }),
         );
         setPending(body);
+        submitting.current = true;
         setBusy(true);
         setError(undefined);
         const request = new AbortController();
@@ -1141,6 +1195,7 @@ function Composer({
           setOriginals([]);
           setPending(undefined);
           setStored(removeTabDraft(key));
+          if (fromBriefing && form.current) prepareViewportMotion(tenant, form.current, 'composer');
           locationHash(result.conversation.id);
           changed();
         } catch (e) {
@@ -1151,22 +1206,47 @@ function Composer({
             if (e.status === 401) expire();
           }
         } finally {
+          submitting.current = false;
           if (!request.signal.aborted) setBusy(false);
         }
       }}
     >
-      <div className="live-composer-surface">
+      {isCollapsed && (
+        <button
+          type="button"
+          className="workspace-compose-trigger"
+          aria-label="新建会话"
+          onClick={() => {
+            setCollapsed(false);
+            requestAnimationFrame(() => textarea.current?.focus({ preventScroll: true }));
+          }}
+        >
+          <Plus size={22} />
+        </button>
+      )}
+      <div className="live-composer-surface" hidden={isCollapsed}>
         <fieldset disabled={busy || !!pending}>
           <div className="live-composer-input">
             <Field label={mode === 'AGENT' ? '工作要求' : '资料关键词'}>
               <textarea
                 ref={textarea}
-                aria-label={mode === 'AGENT' ? '工作要求' : '资料关键词'}
+                aria-label={fromBriefing ? '新的工作需求' : mode === 'AGENT' ? '工作要求' : '资料关键词'}
                 onKeyDown={(event) => {
-                  if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+                  if (
+                    event.key === 'Enter' &&
+                    !event.shiftKey &&
+                    !composing.current &&
+                    !event.nativeEvent.isComposing
+                  ) {
                     event.preventDefault();
                     if (text.trim()) event.currentTarget.form?.requestSubmit();
                   }
+                }}
+                onCompositionStart={() => {
+                  composing.current = true;
+                }}
+                onCompositionEnd={() => {
+                  composing.current = false;
                 }}
                 required
                 maxLength={mode === 'AGENT' ? 2000 : 200}
@@ -1226,30 +1306,57 @@ function Composer({
           type="submit"
           variant="primary"
           aria-label={
-            busy ? '提交中…' : pending ? '重试上次发送' : mode === 'AGENT' ? '开始任务' : '查找资料'
+            busy
+              ? '提交中…'
+              : pending
+                ? '重试上次发送'
+                : fromBriefing
+                  ? '发送消息'
+                  : mode === 'AGENT'
+                    ? '开始任务'
+                    : '查找资料'
           }
-          title={busy ? '提交中…' : pending ? '重试上次发送' : mode === 'AGENT' ? '开始任务' : '查找资料'}
+          title={
+            busy
+              ? '提交中…'
+              : pending
+                ? '重试上次发送'
+                : fromBriefing
+                  ? '发送消息'
+                  : mode === 'AGENT'
+                    ? '开始任务'
+                    : '查找资料'
+          }
           disabled={busy || preparing || !enabled || !allowed || !text.trim()}
         >
           <span className="live-visually-hidden">
-            {busy ? '提交中…' : pending ? '重试上次发送' : mode === 'AGENT' ? '开始任务' : '查找资料'}
+            {busy
+              ? '提交中…'
+              : pending
+                ? '重试上次发送'
+                : fromBriefing
+                  ? '发送消息'
+                  : mode === 'AGENT'
+                    ? '开始任务'
+                    : '查找资料'}
           </span>
         </Button>
       </div>
       {mode === 'AGENT' && agentMode === 'off' && (
         <p className="muted">模型暂不可用。发送后会保存任务，等待模型恢复；不会生成 AI 回复。</p>
       )}
-      <div className="conversation-send">
-        <small>
-          Enter 发送 · Shift + Enter 换行
-          {preparing ? ' · 资料准备中，可先编辑问题' : disabledReason}
-        </small>
-      </div>
+      {(preparing || disabledReason) && (
+        <div className="conversation-send">
+          <small>{preparing ? '资料准备中，可先编辑问题' : disabledReason}</small>
+        </div>
+      )}
       <DraftWarning unavailable={!stored} unreadable={loaded.unreadable} pending={!!pending} />
       <SubmitError error={error} uncertain={!!pending && !busy} />
     </form>
   );
   function locationHash(id: string) {
-    window.location.hash = retainConversationContext(conversationHref(tenant, id), window.location.hash);
+    window.location.hash = fromBriefing
+      ? conversationHref(tenant, id) + '&from=briefing'
+      : retainConversationContext(conversationHref(tenant, id), window.location.hash);
   }
 }

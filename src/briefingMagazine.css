@@ -1,34 +1,39 @@
-/* Magazine presentation is independent of stored facts, sizes and layout. */
+/* Shared cover palette and typography; demo layout remains independent. */
 .briefing-card:has(.briefing-magazine) {
+  container-type: size;
+}
+/* Magazine presentation is independent of stored facts, sizes and layout. */
+:is(.briefing-card, .live-briefing-card):has(.briefing-magazine) {
   --magazine-color: #526747;
   --magazine-tint: #eff3eb;
   --briefing-ink: #202c3c;
   --briefing-muted: #657184;
   --magazine-title-size: 24px;
   --magazine-value-size: 36px;
-  container-type: size;
 }
-.briefing-card:has(.magazine-数据) {
+:is(.briefing-card, .live-briefing-card):has(.magazine-数据) {
   --magazine-color: #365eae;
   --magazine-tint: #eef3fc;
 }
-.briefing-card:has(.magazine-洞察) {
+:is(.briefing-card, .live-briefing-card):has(.magazine-洞察) {
   --magazine-color: #785571;
   --magazine-tint: #f5eff4;
 }
-.briefing-card:has(.magazine-建议) {
+:is(.briefing-card, .live-briefing-card):has(.magazine-建议) {
   --magazine-color: #97601b;
   --magazine-tint: #fbf3e7;
 }
-.briefing-card:has(.magazine-成果) {
+:is(.briefing-card, .live-briefing-card):has(.magazine-成果) {
   --magazine-color: #347369;
   --magazine-tint: #edf5f2;
 }
-.briefing-card:has(.magazine-会话) {
+:is(.briefing-card, .live-briefing-card):has(.magazine-会话) {
   --magazine-color: #4d659b;
   --magazine-tint: #eff3fc;
 }
-.briefing-grid .briefing-card[data-size]:has(.briefing-magazine) .briefing-card-main {
+.briefing-grid
+  :is(.briefing-card, .live-briefing-card)[data-size]:has(.briefing-magazine)
+  .briefing-card-main {
   padding: 20px;
 }
 .briefing-magazine {
@@ -40,7 +45,7 @@
   gap: 12px;
   font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
 }
-.briefing-card .briefing-magazine .magazine-eyebrow {
+:is(.briefing-card, .live-briefing-card) .briefing-magazine .magazine-eyebrow {
   display: flex;
   flex: none;
   gap: 8px;
@@ -89,8 +94,8 @@
   min-height: 0;
   gap: 8px;
 }
-.briefing-card .briefing-magazine h3,
-.briefing-grid .briefing-card[data-size] .briefing-magazine h3 {
+:is(.briefing-card, .live-briefing-card) .briefing-magazine h3,
+.briefing-grid :is(.briefing-card, .live-briefing-card)[data-size] .briefing-magazine h3 {
   font-family: 'Songti SC', 'STSong', serif;
   font-size: var(--magazine-title-size);
   line-height: 1.35;
@@ -107,20 +112,20 @@
   overflow-wrap: anywhere;
   text-wrap: pretty;
 }
-.briefing-card .briefing-magazine p {
+:is(.briefing-card, .live-briefing-card) .briefing-magazine p {
   font-size: 14px;
   line-height: 1.6;
   margin: 0;
   color: var(--briefing-muted);
 }
-.briefing-card .briefing-magazine .magazine-summary {
+:is(.briefing-card, .live-briefing-card) .briefing-magazine .magazine-summary {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow: hidden;
   flex-shrink: 0;
 }
-.briefing-card .briefing-magazine .magazine-note {
+:is(.briefing-card, .live-briefing-card) .briefing-magazine .magazine-note {
   font-size: 12px;
   line-height: 1.55;
   display: -webkit-box;
@@ -156,7 +161,7 @@
   z-index: 1;
   padding-right: var(--briefing-marks-space, 0px);
 }
-.briefing-card:has(.briefing-card-marks) .magazine-footer {
+:is(.briefing-card, .live-briefing-card):has(.briefing-card-marks) .magazine-footer {
   min-height: 17px;
 }
 .briefing-card-marks {
@@ -180,7 +185,7 @@
   position: static;
   flex-shrink: 0;
 }
-.briefing-card .briefing-magazine .briefing-source {
+:is(.briefing-card, .live-briefing-card) .briefing-magazine .briefing-source {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -191,7 +196,7 @@
   padding: 0;
   margin: 0;
 }
-.briefing-card .briefing-magazine .briefing-photo-credit {
+:is(.briefing-card, .live-briefing-card) .briefing-magazine .briefing-photo-credit {
   font-size: 12px;
   line-height: 1.5;
   white-space: normal;

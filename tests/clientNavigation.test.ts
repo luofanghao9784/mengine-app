@@ -1,3 +1,4 @@
+import { rememberTenant, rememberedTenant } from '../src/identity/entry.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { managementHref, returnToWorkspaceHref, workspaceReturnHash } from '../src/identity/navigation.ts';
@@ -39,7 +40,7 @@ test('management navigation keeps the selected enterprise and workspace; return 
   const params = new URLSearchParams(target.hash.slice(1));
   assert.equal(params.get('tenant'), tenant);
   assert.equal(params.get('scope'), space);
-  assert.equal(params.get('manage'), 'sources');
+  assert.equal(params.get('manage'), null);
   assert.equal(
     returnToWorkspaceHref(target.hash, tenant),
     `/workspace/#tenant=${tenant}&view=library&scope=${space}`,
@@ -84,4 +85,16 @@ test('tab view state survives navigation but is isolated by account/tenant and p
   writeViewState(current, 'late cleanup', storage);
   assert.equal(storage.length, 1);
   assert.equal(storage.getItem('unrelated'), 'retain');
+});
+
+test('last enterprise is isolated by surface, tab and account instead of a shared browser preference', () => {
+  const clientTab = new TabStorage(),
+    managementTab = new TabStorage();
+  rememberTenant('alice', tenant, 'workspace', clientTab);
+  rememberTenant('alice', other, 'tenant-admin', clientTab);
+  rememberTenant('alice', other, 'workspace', managementTab);
+  assert.equal(rememberedTenant('alice', 'workspace', clientTab), tenant);
+  assert.equal(rememberedTenant('alice', 'tenant-admin', clientTab), other);
+  assert.equal(rememberedTenant('alice', 'workspace', managementTab), other);
+  assert.equal(rememberedTenant('bob', 'workspace', clientTab), null);
 });

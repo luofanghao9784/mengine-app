@@ -96,7 +96,7 @@
   flex-direction: column;
   gap: 14px;
 }
-.access-sidebar .nav-item:is(:hover, :focus-within) .nav-label {
+.access-sidebar .nav-item:not([data-nav-hover]):is(:hover, :focus-within) .nav-label {
   opacity: 1;
   visibility: visible;
   transform: translateY(-50%);

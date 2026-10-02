@@ -11,6 +11,7 @@ import { libraryHref } from '../material/Library';
 import { RequestPending, requestNavigationLocked } from '../shared/request-guard';
 import { useContext, useEffect } from 'react';
 import { Attention } from '../attention/Attention';
+import { featureEntries } from '../shared/feature-entries';
 import { WorkspaceExperiences } from '../experience/WorkspaceExperiences';
 import { useState } from 'react';
 import { useSession } from '../identity/session';
@@ -153,13 +154,15 @@ export function ManagementHome({ tenant }: { tenant: string }) {
         >
           经验维护
         </Button>
-        <Button
-          disabled={pendingRequest}
-          variant={mode === 'attention' ? 'primary' : 'ghost'}
-          onClick={() => setTab('attention')}
-        >
-          维护待办
-        </Button>
+        {featureEntries.attention && (
+          <Button
+            disabled={pendingRequest}
+            variant={mode === 'attention' ? 'primary' : 'ghost'}
+            onClick={() => setTab('attention')}
+          >
+            维护待办
+          </Button>
+        )}
         {(data.value.canConfigure ||
           data.value.capabilities.some((c) => c.capability === 'EVALUATION_MAINTAIN')) && (
           <Button
@@ -235,7 +238,13 @@ export function ManagementHome({ tenant }: { tenant: string }) {
       ) : mode === 'methods' ? (
         <MethodWorkbench tenant={tenant} />
       ) : mode === 'attention' ? (
-        <Attention tenant={tenant} managed />
+        featureEntries.attention ? (
+          <Attention tenant={tenant} managed />
+        ) : (
+          <Empty icon={Building2} title="待办暂未开放" text="首期待办入口暂时隐藏，后续完善后开放。">
+            <Button onClick={() => setTab('configuration')}>返回工作配置</Button>
+          </Empty>
+        )
       ) : mode === 'experiences' ? (
         <WorkspaceExperiences tenant={tenant} management={data.value} />
       ) : mode === 'profiles' ? (

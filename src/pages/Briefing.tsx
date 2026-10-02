@@ -1,3 +1,4 @@
+import { magazineGridMetrics } from '../briefingGrid';
 import { withBriefingArticle } from '../briefingArticle';
 import { interleaveNinepopNews } from '../ninepop/editorial';
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
@@ -366,8 +367,7 @@ export function Briefing() {
   }, []);
   useLayoutEffect(() => {
     const measure = (width: number) => {
-      const columns = width >= 1210 ? 5 : width >= 966 ? 4 : width >= 722 ? 3 : width >= 478 ? 2 : 1;
-      setGrid({ columns, unit: (width - (columns - 1) * 10) / columns, ready: true });
+      setGrid({ ...magazineGridMetrics(width), ready: true });
     };
     const observer = new ResizeObserver(([entry]) => measure(entry.contentRect.width));
     if (pageRef.current) {

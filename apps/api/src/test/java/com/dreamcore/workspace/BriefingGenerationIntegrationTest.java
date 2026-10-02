@@ -127,6 +127,24 @@ class BriefingGenerationIntegrationTest {
   db.update("UPDATE conversation_tasks SET status='FAILED',error_code='TASK_LIMIT' WHERE id=?",generation.get(actor,tenant,b.id()).taskId());generation.tick(p);
   var result=generation.get(actor,tenant,b.id());assertEquals("FAILED",result.status());assertEquals("TASK_LIMIT",result.reason());assertTrue(result.cardIds().isEmpty());
  }
+ @Test @org.springframework.transaction.annotation.Transactional
+ void firstReleaseMigrationResumesPausedPoliciesWithoutReplayingWork() throws Exception {
+  UUID p=policy();
+  db.update("UPDATE briefing_generation_policies SET enabled=false,revision=7,epoch=9,data_key='known-source',context_key='known-context',info_day=current_date WHERE id=?",p);
+  var before=db.queryForMap("SELECT * FROM briefing_generation_policies WHERE id=?",p);
+  var alreadyEnabled=db.queryForMap("SELECT * FROM briefing_generation_policies WHERE tenant_id=? AND owner_id=?",tenant,reader);
+  long tasksBefore=db.queryForObject("SELECT count(*) FROM conversation_tasks",Long.class);
+  long batchesBefore=db.queryForObject("SELECT count(*) FROM briefing_generation_batches",Long.class);
+  String migration=new org.springframework.core.io.ClassPathResource("db/migration/V48__resume_briefing_generation.sql").getContentAsString(StandardCharsets.UTF_8);
+  db.execute(migration);
+  var after=db.queryForMap("SELECT * FROM briefing_generation_policies WHERE id=?",p);
+  before.put("enabled",true);before.put("revision",8);assertEquals(before,after);
+  assertEquals(alreadyEnabled,db.queryForMap("SELECT * FROM briefing_generation_policies WHERE tenant_id=? AND owner_id=?",tenant,reader));
+  assertEquals(0,db.queryForObject("SELECT count(*) FROM briefing_generation_policies WHERE NOT enabled",Integer.class));
+  db.execute(migration);assertEquals(after,db.queryForMap("SELECT * FROM briefing_generation_policies WHERE id=?",p));
+  assertEquals(tasksBefore,db.queryForObject("SELECT count(*) FROM conversation_tasks",Long.class));
+  assertEquals(batchesBefore,db.queryForObject("SELECT count(*) FROM briefing_generation_batches",Long.class));
+ }
  @Test void policyPauseIsSeparateFromManualGenerationAndCancellation(){
   upload("marker 暂停测试。",true);UUID p=policy();var policy=generation.state(actor,tenant).policies().getFirst();generation.configure(actor,tenant,space,policy.revision(),false);generation.tick(p);assertTrue(generation.state(actor,tenant).batches().isEmpty());
   var manual=manual();generation.tick(p);assertEquals("RUNNING",generation.get(actor,tenant,manual.id()).status());generation.cancel(actor,tenant,manual.id());assertEquals("CANCELLED",generation.get(actor,tenant,manual.id()).status());

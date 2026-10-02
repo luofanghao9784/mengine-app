@@ -86,6 +86,65 @@
   color: #7c8797;
   background: #f4f6f8;
 }
+/* Same two-layer, 24px scroll edge as the reference Demo. Headers stay crisp;
+   only content passing underneath fades into the card surface. */
+.live-conversations
+  :is(.conversation-reader > .live-card-heading, .deck-card-content > .live-card-heading, .live-list-tools) {
+  position: relative;
+  z-index: 3;
+  --scroll-edge-visible: 0;
+}
+.live-conversations
+  :is(
+    .conversation-reader > .live-card-heading,
+    .deck-card-content > .live-card-heading,
+    .live-list-tools
+  )::before,
+.live-conversations
+  :is(
+    .conversation-reader > .live-card-heading,
+    .deck-card-content > .live-card-heading,
+    .live-list-tools
+  )::after {
+  content: '';
+  position: absolute;
+  inset: 100% 0 auto;
+  height: 24px;
+  pointer-events: none;
+  opacity: var(--scroll-edge-visible);
+  transition: opacity 140ms ease-out;
+  -webkit-mask-image: linear-gradient(to bottom, #000, #0008 45%, transparent);
+  mask-image: linear-gradient(to bottom, #000, #0008 45%, transparent);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+}
+.live-conversations
+  :is(
+    .conversation-reader > .live-card-heading,
+    .deck-card-content > .live-card-heading,
+    .live-list-tools
+  )::after {
+  height: 18px;
+  background: linear-gradient(to bottom, #fff, #fff0);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+.live-conversations
+  .live-card-heading:has(+ :is(.conversation-messages, .live-source-reader)[data-scrolled-start]),
+.live-list-tools:has(+ .live-conversation-links[data-scrolled-start]) {
+  --scroll-edge-visible: 1;
+}
+.live-list-tools {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .live-conversations :is(.live-card-heading, .live-list-tools)::before,
+  .live-conversations :is(.live-card-heading, .live-list-tools)::after {
+    transition: none;
+  }
+}
 .live-card-actions {
   display: flex;
   gap: 2px;
@@ -177,6 +236,9 @@
   padding: 5px 8px;
 }
 .live-conversations .conversation-reader {
+  --composer-top-inset: 10px;
+  --composer-edge-overlap: 12px;
+  --composer-edge-depth: 24px;
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -200,8 +262,9 @@
   scroll-padding-bottom: 30px;
 }
 .live-conversations .conversation-messages:has(+ .conversation-composer) {
-  margin-bottom: -20px;
-  padding-bottom: 42px;
+  margin-bottom: calc(-1 * (var(--composer-top-inset) + var(--composer-edge-overlap)));
+  padding-bottom: calc(24px + var(--composer-edge-overlap));
+  scroll-padding-bottom: calc(24px + var(--composer-edge-overlap));
 }
 .live-conversations .conversation-messages > .platform-pagination {
   margin-block: 12px;
@@ -373,7 +436,7 @@
   position: relative;
   z-index: 1;
   flex-shrink: 0;
-  padding: 10px 18px 14px;
+  padding: var(--composer-top-inset) 18px 14px;
   background: transparent;
   border: 0;
   max-height: 55%;
@@ -387,19 +450,26 @@
   pointer-events: none;
   left: 0;
   right: 0;
-  bottom: calc(100% - 10px);
-  height: 28px;
+  bottom: calc(100% - var(--composer-top-inset));
+  height: var(--composer-edge-depth);
 }
 .live-conversations .conversation-composer::before {
-  -webkit-backdrop-filter: blur(3px);
-  backdrop-filter: blur(3px);
-  -webkit-mask-image: linear-gradient(to top, #000, transparent);
-  mask-image: linear-gradient(to top, #000, transparent);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+  -webkit-mask-image: linear-gradient(to top, #000, #0008 45%, transparent);
+  mask-image: linear-gradient(to top, #000, #0008 45%, transparent);
 }
 .live-conversations .conversation-composer::after {
-  bottom: calc(100% - 22px);
-  height: 40px;
-  background: linear-gradient(to top, #fff 38%, #fffffff0 60%, #ffffff88 80%, #ffffff00);
+  bottom: calc(100% - var(--composer-top-inset) - var(--composer-edge-overlap));
+  height: calc(var(--composer-edge-depth) + var(--composer-edge-overlap));
+  /* The opaque end covers the scroll clip; blur and whitening stay independent. */
+  background: linear-gradient(
+    to top,
+    #fff calc(var(--composer-edge-overlap) + var(--composer-edge-depth) * 0.25),
+    rgb(255 255 255 / 0.92) calc(var(--composer-edge-overlap) + var(--composer-edge-depth) * 0.5),
+    rgb(255 255 255 / 0.55) calc(var(--composer-edge-overlap) + var(--composer-edge-depth) * 0.75),
+    rgb(255 255 255 / 0)
+  );
 }
 .live-composer-surface {
   position: relative;
@@ -560,6 +630,14 @@
 .live-source-reader pre {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+/* These are vertical readers, not horizontal tables. Let native horizontal
+   gestures reach the card rail; tables inside retain their own scroll boundary. */
+.live-conversations :is(.conversation-messages, .live-source-reader, .live-conversation-links) {
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-x: auto;
+  overscroll-behavior-y: contain;
 }
 .live-conversations .conversation-history-note {
   padding: 16px 22px;
@@ -1023,4 +1101,50 @@
   }
 }
 
-.attachment-materials{display:flex;flex-wrap:wrap;gap:6px;align-items:center;flex:1;min-width:0}.attachment-add-options{display:flex;align-items:center;flex-wrap:wrap;gap:8px;width:100%;padding:8px;border-radius:12px;background:var(--surface-secondary,#f5f5f5)}.attachment-chip{display:flex;flex-wrap:wrap;align-items:center;gap:4px;padding:4px 6px;border:1px solid var(--border,#e4e4e7);border-radius:12px;max-width:100%;font-size:12px}.attachment-chip .button{max-width:100%;white-space:normal}.attachment-preparation{font-size:11px;color:var(--text-muted,#71717a)}.attachment-scope{display:flex;align-items:center;gap:6px;padding:0 12px 8px;font-size:12px}.attachment-scope input{width:auto}
+.attachment-materials {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+.attachment-add-options {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+  padding: 8px;
+  border-radius: 12px;
+  background: var(--surface-secondary, #f5f5f5);
+}
+.attachment-chip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border: 1px solid var(--border, #e4e4e7);
+  border-radius: 12px;
+  max-width: 100%;
+  font-size: 12px;
+}
+.attachment-chip .button {
+  max-width: 100%;
+  white-space: normal;
+}
+.attachment-preparation {
+  font-size: 11px;
+  color: var(--text-muted, #71717a);
+}
+.attachment-scope {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px 8px;
+  font-size: 12px;
+}
+.attachment-scope input {
+  width: auto;
+}

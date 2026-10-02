@@ -1,6 +1,7 @@
+import { UploadProvider } from '../material/UploadManager';
 import { phoneClient } from './phone-client';
 import { PhoneAuth, ChangePassword } from './PhoneAuth';
-import { contactLabel } from './client';
+import { contactLabel, uuid } from './client';
 import { entryTenant, rememberedTenant, rememberTenant } from './entry';
 import { WorkspaceNavigation } from './WorkspaceNavigation';
 import { WorkspaceComposer } from './WorkspaceComposer';
@@ -9,12 +10,13 @@ import { DeparturePanel } from '../departure/DeparturePanel';
 import { RequestGuard, RequestPending, requestNavigationLocked } from '../shared/request-guard';
 import { useContext } from 'react';
 import { Plans } from '../plans/Plans';
-import { SharedActivity } from '../activity/Activity';
+import { featureEntries } from '../shared/feature-entries';
+import { AccountWorkspaces } from './AccountWorkspaces';
 import { Documents } from '../documents/Documents';
 import { documentsHref } from '../documents/routes';
 import { Conversations, conversationHref } from '../conversation/Conversations';
 import { LiveBriefing, briefingHref } from '../briefing-live/Briefing';
-import { MessageSquare, Newspaper } from 'lucide-react';
+import { MessageSquare, Newspaper, ExternalLink } from 'lucide-react';
 import { ManagementHome } from '../governance/ManagementHome';
 import { Profiles } from '../profile/Profiles';
 import { governanceClient } from '../governance/client';
@@ -41,7 +43,7 @@ import { DreamcoreLogo } from '../components/DreamcoreLogo';
 import { Button, Badge, Empty, Modal } from '../shared/ui';
 import { NavigationButton, PageHeader } from '../shared/layout';
 import { IdentityError } from './client';
-import { identityClient, useSession } from './session';
+import { useSession } from './session';
 import { LiveLibrary, libraryHref } from '../material/Library';
 import { useAutoHideScrollbars } from '../useAutoHideScrollbars';
 
@@ -222,7 +224,7 @@ function GuardedAccessShell({
   const tenant = entryTenant(
     params.get('tenant'),
     identity.memberships,
-    rememberedTenant(identity.account.id),
+    rememberedTenant(identity.account.id, surface),
   );
   const view = params.get('view');
   const departure = view === 'departure',
@@ -233,7 +235,15 @@ function GuardedAccessShell({
     documents = view === 'documents',
     briefing = view === 'briefing' || (surface === 'workspace' && !view),
     fromBriefing = params.get('from') === 'briefing',
-    library = view === 'library';
+    library = view === 'library' || view === 'spaces';
+  const legacySpace = params.get('space');
+  const libraryScope = params.get('scope');
+  useEffect(() => {
+    if (surface !== 'workspace' || view !== 'spaces' || !tenant || pendingRequest) return;
+    const next = libraryHref(tenant, uuid(legacySpace) ? legacySpace : 'enterprise');
+    history.replaceState(history.state, '', next);
+    setRouteHash(next);
+  }, [surface, view, tenant, legacySpace, pendingRequest]);
   const mainRef = useRef<HTMLElement>(null);
   useViewScroll(mainRef, tenant, surface + ':' + routeHash);
   useEffect(() => {
@@ -245,8 +255,8 @@ function GuardedAccessShell({
   }, []);
   const selected = identity.memberships.find((m) => m.tenantId === tenant);
   useEffect(() => {
-    if (selected) rememberTenant(identity.account.id, selected.tenantId);
-  }, [identity.account.id, selected?.tenantId]);
+    if (selected) rememberTenant(identity.account.id, selected.tenantId, surface);
+  }, [identity.account.id, selected?.tenantId, surface]);
   const allowed = surface === 'platform-admin' ? identity.platformAdmin : !!selected;
   const links: Surface[] = [
     'workspace',
@@ -272,13 +282,13 @@ function GuardedAccessShell({
               : briefing
                 ? briefingHref(id)
                 : library
-                  ? libraryHref(id)
+                  ? libraryHref(id, libraryScope && libraryScope !== 'personal' ? 'enterprise' : 'personal')
                   : conversations
                     ? conversationHref(id)
                     : `tenant=${encodeURIComponent(id)}${new URLSearchParams(location.hash.slice(1)).get('view') === 'spaces' ? '&view=spaces' : ''}`;
   };
   return (
-    <PageActionsContext.Provider value={actionsTarget}>
+    <UploadShell key={`${identity.account.id}:${tenant}:${allowed}`} actionsTarget={actionsTarget}>
       <div
         className={`access-shell ${surface === 'workspace' ? 'workspace-shell' : ''} ${surface === 'workspace' && conversations ? `workspace-conversations ${fromBriefing ? 'workspace-contextual' : ''}` : ''} ${surface === 'workspace' && briefing ? 'workspace-briefing' : ''}`}
       >
@@ -289,7 +299,7 @@ function GuardedAccessShell({
           <nav aria-label="主导航" inert={pendingRequest}>
             {surface === 'workspace' && selected ? (
               <WorkspaceNavigation
-                routeKey={`${tenant}:${routeHash}`}
+                routeKey={routeHash}
                 primary={[
                   {
                     label: '会话',
@@ -304,32 +314,6 @@ function GuardedAccessShell({
                     active: library || documents,
                     href: libraryHref(tenant),
                   },
-                ]}
-                more={[
-                  {
-                    label: '工作空间',
-                    icon: FolderOpen,
-                    active: !(
-                      library ||
-                      conversations ||
-                      briefing ||
-                      documents ||
-                      profiles ||
-                      experiences ||
-                      plans ||
-                      departure
-                    ),
-                    href: `#tenant=${tenant}&view=spaces`,
-                  },
-                  {
-                    label: '我的计划',
-                    icon: CalendarClock,
-                    active: plans,
-                    href: `#tenant=${tenant}&view=plans`,
-                  },
-                  ...links
-                    .filter((link) => link !== 'workspace')
-                    .map((link) => ({ label: labels[link], icon: icons[link], href: surfaceHref(link) })),
                 ]}
               />
             ) : (
@@ -405,44 +389,27 @@ function GuardedAccessShell({
                 </Button>
               )
             }
-            meta={
-              surface !== 'platform-admin' && eligible.length === 1 && eligible[0].tenantId === tenant ? (
-                <span className="access-tenant-name" aria-label="当前企业">
-                  {eligible[0].tenantName}
-                </span>
-              ) : surface !== 'platform-admin' && eligible.length > 0 ? (
-                <label className="access-tenant-picker">
-                  <span className="sr-only">当前企业</span>
-                  <select
-                    aria-label="当前企业"
-                    disabled={pendingRequest}
-                    value={eligible.some((m) => m.tenantId === tenant) ? tenant : ''}
-                    onChange={(e) => choose(e.target.value)}
-                  >
-                    {!eligible.some((m) => m.tenantId === tenant) && (
-                      <option value="">请选择有权访问的企业</option>
-                    )}
-                    {eligible.map((m) => (
-                      <option key={m.tenantId} value={m.tenantId}>
-                        {m.tenantName}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ) : (
-                <Badge>
-                  {surface === 'platform-admin' && identity.platformAdmin ? '平台管理员' : '成员账号'}
-                </Badge>
-              )
-            }
           />
           <main ref={mainRef} className="access-content" key={`${identity.account.id}:${surface}:${tenant}`}>
             {surface !== 'workspace' && (
-              <a className="button ghost workspace-return" href={surfaceHref('workspace')}>
-                {workspaceReturnHash(new URLSearchParams(routeHash.slice(1)).get('back') || '', tenant)
-                  ? '返回原工作'
-                  : '返回工作空间'}
-              </a>
+              <div className="surface-return-actions">
+                <a className="button ghost workspace-return" href={surfaceHref('workspace')}>
+                  {workspaceReturnHash(new URLSearchParams(routeHash.slice(1)).get('back') || '', tenant)
+                    ? '返回原工作'
+                    : '返回工作空间'}
+                </a>
+                <a
+                  className="button ghost"
+                  href={surfaceHref('workspace')}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="在新标签页打开客户端"
+                  title="在新标签页打开客户端"
+                >
+                  <ExternalLink size={16} aria-hidden="true" />
+                  新标签页打开客户端
+                </a>
+              </div>
             )}
             {pendingRequest && (
               <p className="access-alert" role="status">
@@ -454,12 +421,7 @@ function GuardedAccessShell({
                 {notice}
               </p>
             )}
-            {allowed && surface !== 'platform-admin' && tenant && (
-              <DepartureStatus
-                tenant={tenant}
-                compact={surface === 'workspace' && (conversations || briefing)}
-              />
-            )}
+            {allowed && surface !== 'platform-admin' && tenant && <DepartureStatus tenant={tenant} />}
             {!allowed && !tenant && eligible.length > 1 ? (
               <section className="access-panel">
                 <h2>选择要进入的企业</h2>
@@ -496,9 +458,21 @@ function GuardedAccessShell({
             ) : surface === 'tenant-admin' ? (
               <ManagementHome tenant={tenant} />
             ) : departure ? (
-              <DeparturePanel tenant={tenant} />
+              <DeparturePanel tenant={tenant} recordsOnly />
             ) : plans ? (
-              <Plans tenant={tenant} />
+              featureEntries.ongoingPlans ? (
+                <Plans tenant={tenant} />
+              ) : (
+                <Empty
+                  icon={CalendarClock}
+                  title="持续计划暂未开放"
+                  text="首期暂不提供持续计划入口，后续完善后开放。你可以继续会话或查看智能画报。"
+                >
+                  <a className="button primary" href={briefingHref(tenant)}>
+                    返回智能画报
+                  </a>
+                </Empty>
+              )
             ) : experiences ? (
               <Empty
                 icon={FolderOpen}
@@ -521,10 +495,12 @@ function GuardedAccessShell({
                 conversations={conversations}
                 overlay={conversations && fromBriefing}
               />
+            ) : view === 'spaces' ? (
+              <Status title="正在打开资料库" detail="请稍候…" />
             ) : library ? (
               <LiveLibrary key={tenant} tenant={tenant} />
             ) : (
-              <TenantHome tenant={tenant} />
+              <LiveLibrary key={tenant} tenant={tenant} />
             )}
           </main>
           {surface === 'workspace' && briefing && allowed && (
@@ -547,6 +523,24 @@ function GuardedAccessShell({
               <strong>{identity.account.displayName}</strong>
               <p>{contactLabel(identity.account)}</p>
             </div>
+            <AccountWorkspaces
+              tenant={tenant}
+              memberships={surface === 'platform-admin' ? [] : eligible}
+              links={links
+                .filter((link) => link !== 'workspace' && link !== surface)
+                .map((link) => ({
+                  label: link === 'tenant-admin' ? '切换到企业管理端' : '切换到系统管理端',
+                  newTabLabel:
+                    link === 'tenant-admin' ? '在新标签页打开企业管理端' : '在新标签页打开系统管理端',
+                  href: surfaceHref(link),
+                  icon: icons[link],
+                }))}
+              onChoose={(id) => {
+                choose(id);
+                setAccountOpen(false);
+              }}
+              onNavigate={() => setAccountOpen(false)}
+            />
             <div className="access-account-actions">
               {selected && (
                 <a
@@ -573,71 +567,7 @@ function GuardedAccessShell({
           </Modal>
         )}
       </div>
-    </PageActionsContext.Provider>
-  );
-}
-
-function TenantHome({ tenant }: { tenant: string }) {
-  const { session } = useSession();
-  const [attempt, setAttempt] = useState(0);
-  const result = useRemote(
-    (signal) => identityClient.context(tenant, signal),
-    [tenant, attempt, session.identity],
-  );
-  if (result.error)
-    return (
-      <section className="access-panel">
-        <Empty
-          icon={result.error instanceof IdentityError && result.error.status === 403 ? ShieldX : WifiOff}
-          title={
-            result.error instanceof IdentityError && result.error.status === 403
-              ? '没有访问权限'
-              : '暂时无法读取企业信息'
-          }
-          text={message(result.error)}
-        >
-          <Button onClick={() => setAttempt((v) => v + 1)}>重试</Button>
-        </Empty>
-      </section>
-    );
-  if (!result.value) return <Status title="正在读取企业信息" detail="请稍候…" />;
-  const context = result.value;
-  return (
-    <>
-      <section className="access-panel access-welcome">
-        <div>
-          <span className="eyebrow">我的企业</span>
-          <h2>{context.tenant.name}</h2>
-          <p>当前身份：{context.role === 'TENANT_ADMIN' ? '企业管理员' : '企业成员'}</p>
-        </div>
-        <Badge blue>已连接</Badge>
-      </section>
-      <section className="access-panel">
-        <header className="access-section-heading">
-          <h2>我的空间</h2>
-          <span className="muted">仅显示你有权访问的空间</span>
-        </header>
-        {context.workspaces.length ? (
-          <ul className="access-spaces">
-            {context.workspaces.map((space) => (
-              <li key={space.id}>
-                <FolderOpen size={22} />
-                <a href={libraryHref(tenant, space.kind === 'PERSONAL' ? 'personal' : space.id)}>
-                  {space.name}
-                </a>
-                <Badge>{space.kind === 'PERSONAL' ? '个人' : '共享'}</Badge>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <Empty icon={FolderOpen} title="还没有可访问的空间" text="请联系企业管理员确认空间权限。" />
-        )}
-        <div className="access-footnote">
-          点击空间进入资料库；在“会话”中开展工作，完成的会话成果会汇集到“智能画报”。
-        </div>
-      </section>
-      <SharedActivity tenant={tenant} context={context} />
-    </>
+    </UploadShell>
   );
 }
 
@@ -679,5 +609,19 @@ function WorkspaceConversationPages({
         </div>
       )}
     </>
+  );
+}
+
+function UploadShell({
+  actionsTarget,
+  children,
+}: {
+  actionsTarget: HTMLDivElement | null;
+  children: React.ReactNode;
+}) {
+  return (
+    <UploadProvider>
+      <PageActionsContext.Provider value={actionsTarget}>{children}</PageActionsContext.Provider>
+    </UploadProvider>
   );
 }

@@ -1,7 +1,6 @@
 import { attentionJourney } from './attention-journey.ts';
 import { experienceJourney } from './experience-journey.ts';
 import { lifecycleJourney } from './lifecycle-journey.ts';
-import { sourceJourney } from './source-journey.ts';
 import { batchUploadJourney } from './batch-upload-journey.ts';
 /** Optional M2-C1 extension to the owned M2-B4 fixture; exercises actual file and permission UI. */
 import assert from 'node:assert/strict';
@@ -34,7 +33,6 @@ export async function materialJourney({
   const context = await (await memberContext.request.get(`/api/v1/tenants/${tenant}/context`)).json();
   const personal = context.workspaces.find((w: { kind: string }) => w.kind === 'PERSONAL').id;
   await batchUploadJourney(client, memberContext.request, tenant, personal, artifacts);
-  await sourceJourney(client, memberContext.request, tenant, personal, artifacts);
   await lifecycleJourney(client, memberContext.request, tenant, personal, artifacts);
   await experienceJourney(client, memberContext.request, tenant, personal, artifacts);
   await attentionJourney(client, memberContext.request, tenant, personal, artifacts);
@@ -48,16 +46,12 @@ export async function materialJourney({
   const updated = 'M2-C1 合成自用资料\n更新后的第二版；原版仍可下载。\n';
   async function upload(name: string, content: string) {
     await client.getByRole('button', { name: '上传资料', exact: true }).click();
-    await client.getByLabel(/^选择文件/).setInputFiles(payload(name, content));
-    // Native picker focus must not tear down the selected file or its form.
+    await client.getByLabel('选择上传文件', { exact: true }).setInputFiles(payload(name, content));
     await client.evaluate(() => window.dispatchEvent(new Event('focus')));
-    await expect
-      .poll(() =>
-        client.getByLabel(/^选择文件/).evaluate((input: HTMLInputElement) => input.files?.[0]?.name),
-      )
-      .toBe(name);
-    await client.getByRole('button', { name: '保存原文件', exact: true }).click();
-    await expect(client.getByRole('dialog')).toHaveCount(0);
+    await expect(client.getByRole('list', { name: '待上传文件清单' })).toContainText(name);
+    await client.getByRole('button', { name: '开始上传 1 个文件', exact: true }).click();
+    await expect(client.getByRole('button', { name: '关闭上传状态', exact: true })).toBeVisible();
+    await client.getByRole('button', { name: '关闭上传状态', exact: true }).click();
     await expect(client.locator('.material-entry').filter({ hasText: name })).toHaveCount(1);
   }
   async function saveVersion(number: number, expected: string) {
@@ -128,12 +122,12 @@ export async function materialJourney({
   });
   await client.getByRole('button', { name: '上传资料', exact: true }).click();
   await client
-    .getByLabel(/^选择文件/)
+    .getByLabel('选择上传文件', { exact: true })
     .setInputFiles(payload('企业资料说明.md', '合成共享资料；已明确授予维护权限。'));
-  await client.getByRole('button', { name: '保存原文件', exact: true }).click();
-  await expect(client.getByRole('button', { name: '重试本次上传', exact: true })).toBeVisible();
+  await client.getByRole('button', { name: '开始上传 1 个文件', exact: true }).click();
+  await expect(client.getByRole('button', { name: '重试 1 个', exact: true })).toBeVisible();
   await client.unrouteAll();
-  await client.getByRole('button', { name: '重试本次上传', exact: true }).click();
+  await client.getByRole('button', { name: '重试 1 个', exact: true }).click();
   await expect(client.getByRole('dialog')).toHaveCount(0);
   await expect(client.locator('.material-entry').filter({ hasText: '企业资料说明.md' })).toHaveCount(1);
   const sharedList = await (await memberContext.request.get(base(space) + '/library')).json();
@@ -202,7 +196,7 @@ export async function materialJourney({
     await expect(client.locator('.material-entry')).toContainText('自用进展.md');
     await client.route('**/library?*', (route) => route.abort());
     await client.getByLabel('搜索资料名称').fill('自用');
-    await client.getByRole('button', { name: '搜索', exact: true }).click();
+    await client.getByRole('button', { name: '搜索资料', exact: true }).click();
     await expect(client.getByRole('heading', { name: '暂时无法读取', exact: true })).toBeVisible();
     await expect(client.locator('.material-entry')).toHaveCount(0);
     await client.unrouteAll();

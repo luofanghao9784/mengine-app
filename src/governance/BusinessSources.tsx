@@ -45,7 +45,9 @@ function ScopedSources({ tenant, verification = 0, onOpenLibrary, onOpenConversa
             <Database size={16} /> 数据与能力
           </p>
           <h2>数据来源</h2>
-          <p className="muted">集中处理你当前可访问的共享空间，沿用资料库中的同一份来源记录与版本。</p>
+          <p className="muted">
+            在企业管理端维护当前获权共享空间的来源、负责人和更新周期；资料仍保存在对应空间。
+          </p>
         </div>
         <Button icon={RefreshCw} disabled={pending} onClick={refresh}>
           刷新获权空间

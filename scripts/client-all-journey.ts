@@ -119,7 +119,7 @@ export async function verifyClientAll(owner: Page, member: Page, tenant: string)
     await owner.getByRole('button', { name: '关闭资料阅读', exact: true }).click();
     await owner.goto(`/workspace/#tenant=${tenant}&view=library`);
     await owner.getByLabel('搜索资料名称或正文', { exact: true }).fill('十月合计三十');
-    await owner.getByRole('button', { name: '搜索', exact: true }).click();
+    await owner.getByRole('button', { name: '搜索资料', exact: true }).click();
     await expect(owner.locator('.material-entry')).toHaveCount(2);
     await shot('unified-library');
     // Typed card fixtures exercise real feed/filter/detail/feedback APIs; numerical calculations are covered by the backend suite.
@@ -177,7 +177,11 @@ export async function verifyClientAll(owner: Page, member: Page, tenant: string)
     }
     await owner.goto(`/workspace/#tenant=${tenant}&view=briefing`);
     await owner.getByRole('tab', { name: '类型', exact: true }).click();
-    await owner.getByLabel('内容类型', { exact: true }).selectOption('DATA');
+    await owner.getByRole('tab', { name: '类型', exact: true }).click();
+    await owner
+      .getByRole('group', { name: '内容类型', exact: true })
+      .getByRole('button', { name: '数据', exact: true })
+      .click();
     await expect(owner.locator('.recommendation-card')).toHaveCount(1);
     await owner.locator('.recommendation-card').click();
     await expect(owner.getByRole('dialog')).toContainText('销售额');
@@ -189,7 +193,10 @@ export async function verifyClientAll(owner: Page, member: Page, tenant: string)
     await expect(owner.getByPlaceholder('有什么工作想交给 AI？', { exact: true })).toHaveValue('');
     await owner.goto(`/workspace/#tenant=${tenant}&view=briefing`);
     await owner.setViewportSize({ width: 390, height: 844 });
-    await owner.getByLabel('内容类型', { exact: true }).selectOption('INSIGHT');
+    await owner
+      .getByRole('group', { name: '内容类型', exact: true })
+      .getByRole('button', { name: '洞察', exact: true })
+      .click();
     await expect(owner.locator('.recommendation-card')).toHaveCount(1);
     await owner.locator('.recommendation-card').click();
     await expect(owner.getByRole('dialog')).toContainText('合成INSIGHT业务主题');
@@ -235,10 +242,8 @@ export async function verifyClientAll(owner: Page, member: Page, tenant: string)
     await expect(owner.getByRole('button', { name: '取消本次', exact: true })).toBeVisible();
     await owner.getByRole('button', { name: '取消本次', exact: true }).click();
     await expect(owner.getByRole('status')).toContainText('已取消本次生成');
-    await owner.getByText('自动生成设置', { exact: true }).click();
-    await owner.getByRole('button', { name: '暂停', exact: true }).click();
-    await expect(owner.getByText(/自动生成已暂停/)).toBeVisible();
-    assert.equal((await get(root + '/briefing/generation')).policies[0].enabled, false);
+    await expect(owner.getByText('自动生成设置', { exact: true })).toHaveCount(0);
+    assert.ok((await get(root + '/briefing/generation')).policies.every((p: { enabled: boolean }) => p.enabled));
     await owner.setViewportSize({ width: 1366, height: 900 });
     await writeFile(
       new URL('result.json', artifacts),
@@ -261,7 +266,7 @@ export async function verifyClientAll(owner: Page, member: Page, tenant: string)
             'mobile reader',
             'one refresh entry',
             'real generation request and synthetic completion append without replacing old card',
-            'generation cancellation and built-in policy pause',
+            'generation cancellation and default-on policy without a first-release toggle',
           ],
         },
         null,

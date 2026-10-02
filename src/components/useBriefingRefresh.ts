@@ -1,19 +1,22 @@
+import { hasNestedScroll, wheelGestureAxis } from '../shared/gesture-routing';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 
 type Phase = 'idle' | 'pulling' | 'ready' | 'refreshing' | 'done';
 type Options = {
-  page: RefObject<HTMLDivElement | null>;
+  page: RefObject<HTMLElement | null>;
   ready: boolean;
   blocked: boolean;
   viewKey: string;
   onRefresh?: () => void;
+  /** Real pages finish only after their reads settle; Demo retains its local animation. */
+  reload?: () => Promise<boolean>;
 };
 const TRIGGER = 64;
 const distanceFor = (raw: number) => 108 * (1 - Math.exp(-Math.max(0, raw) / 145));
 
 // Entrance is independent of the transform used by layout reflow. It runs for
 // the visible reading area; offscreen cards never wait behind a long queue.
-function useBriefingArrival(page: RefObject<HTMLDivElement | null>, ready: boolean) {
+function useBriefingArrival(page: RefObject<HTMLElement | null>, ready: boolean) {
   const [pending, setPending] = useState(true);
   const started = useRef(false);
   const animations = useRef<Animation[]>([]);
@@ -28,7 +31,11 @@ function useBriefingArrival(page: RefObject<HTMLDivElement | null>, ready: boole
     const scroller = root?.closest('main');
     if (!root || !scroller || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const viewport = scroller.getBoundingClientRect();
-    const cards = [...root.querySelectorAll<HTMLElement>('.briefing-grid > .briefing-card')]
+    const cards = [
+      ...root.querySelectorAll<HTMLElement>(
+        '.briefing-grid > .briefing-card, .live-magazine-grid .live-briefing-card',
+      ),
+    ]
       .map((element) => ({ element, rect: element.getBoundingClientRect() }))
       .filter(({ rect }) => rect.bottom > viewport.top && rect.top < viewport.bottom)
       .sort((a, b) => a.rect.top - b.rect.top || a.rect.left - b.rect.left);
@@ -105,27 +112,39 @@ export function useBriefingRefresh(options: Options) {
     arrival.cancel();
     const token = ++generation.current;
     change('refreshing', 54);
-    setAnnouncement('正在演示刷新智能画报');
+    setAnnouncement(latest.current.reload ? '正在刷新智能画报' : '正在演示刷新智能画报');
     const scroller = latest.current.page.current?.closest('main');
     scroller?.scrollTo({ top: 0, behavior: 'instant' });
-    // This is explicitly a local interaction demo: no synthetic new business
-    // records, timestamps or layout resets are written to the user's store.
-    timers.current.push(
-      setTimeout(() => {
-        if (generation.current !== token) return;
-        latest.current.onRefresh?.();
-        change('done', 54);
-        setAnnouncement('已刷新画报排列，内容与历史记录已保留');
-        timers.current.push(
-          setTimeout(() => {
-            if (generation.current !== token) return;
-            change('idle', 0);
-            timers.current = [];
-            arrival.play();
-          }, 300),
-        );
-      }, 650),
-    );
+    const finish = (success = true) => {
+      if (generation.current !== token) return;
+      if (!success) {
+        change('idle', 0);
+        setAnnouncement('刷新未完成，请稍后重试');
+        return;
+      }
+      change('done', 54);
+      setAnnouncement(latest.current.reload ? '画报已刷新' : '已刷新画报排列，内容与历史记录已保留');
+      timers.current.push(
+        setTimeout(() => {
+          if (generation.current !== token) return;
+          change('idle', 0);
+          timers.current = [];
+          arrival.play();
+        }, 300),
+      );
+    };
+    if (latest.current.reload) {
+      void latest.current.reload().then(finish, () => finish(false));
+    } else {
+      // The fixed Demo only updates its local recommendations, after animation.
+      timers.current.push(
+        setTimeout(() => {
+          if (generation.current !== token) return;
+          latest.current.onRefresh?.();
+          finish();
+        }, 650),
+      );
+    }
   }, [arrival.cancel, arrival.play, change]);
   const previousView = useRef(options.viewKey);
   useEffect(() => {
@@ -156,8 +175,9 @@ export function useBriefingRefresh(options: Options) {
       !scroller.closest('[inert]') &&
       !document.querySelector('dialog[open], [data-anchored-popover]') &&
       target instanceof Element &&
+      !hasNestedScroll(target, scroller, 'y') &&
       !target.closest(
-        'input, textarea, select, a, [contenteditable="true"], .briefing-card-tools, .briefing-card-menu, .briefing-resize-handle, .briefing-people, .briefing-filters, .briefing-hidden-pile, .draft-composer, [role="dialog"]',
+        'input, textarea, select, a, [contenteditable="true"], .briefing-card-tools, .briefing-card-menu, .briefing-resize-handle, .briefing-people, .briefing-filters, .briefing-hidden-pile, .draft-composer, .live-briefing-rail, .live-briefing-filters, .live-briefing-pager, .platform-pagination, .briefing-generation button, [data-anchored-popover], [role="dialog"]',
       );
     const releaseCapture = () => {
       const old = gesture;
@@ -205,7 +225,7 @@ export function useBriefingRefresh(options: Options) {
     };
     const pointerDown = (e: PointerEvent) => {
       if (e.pointerType !== 'mouse' || e.button !== 0 || !e.isPrimary || !allowed(e.target)) return;
-      if ((e.target as Element).closest('.briefing-card-main')) return;
+      if ((e.target as Element).closest('.briefing-card-main, .live-briefing-body, button, summary')) return;
       gesture = { kind: 'mouse', id: e.pointerId, x: e.clientX, y: e.clientY, active: false };
     };
     const pointerMove = (e: PointerEvent) => {
@@ -243,15 +263,10 @@ export function useBriefingRefresh(options: Options) {
     const touchCancel = () => {
       if (gesture?.kind === 'touch') reset();
     };
+    const wheelAxis = wheelGestureAxis();
     const wheel = (e: WheelEvent) => {
-      if (
-        e.defaultPrevented ||
-        e.ctrlKey ||
-        e.shiftKey ||
-        Math.abs(e.deltaX) >= Math.abs(e.deltaY) ||
-        gesture
-      )
-        return;
+      const axis = wheelAxis(e);
+      if (e.defaultPrevented || axis !== 'y' || e.shiftKey || gesture) return;
       const now = performance.now();
       if (busy()) {
         wheelAt = now;

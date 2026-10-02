@@ -1,3 +1,5 @@
+import { briefingTime } from '../briefingTypography';
+import '../briefingFeedback.css';
 import { useContext, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { MessageSquare, ThumbsUp, X } from 'lucide-react';
@@ -92,7 +94,7 @@ export function ReadingDialog({
         </header>
         <div className="live-reading-scroll">
           <article className="live-reading-article">
-            <time dateTime={date}>{new Date(date).toLocaleString('zh-CN')}</time>
+            <time dateTime={date}>{briefingTime(date, true)}</time>
             <h2 id={titleId}>{title}</h2>
             {preface}
             {task && <TaskReadingBody tenant={tenant} task={task} onRead={onRead} />}
@@ -106,7 +108,7 @@ export function ReadingDialog({
         </div>
         {task && (
           <a
-            className="live-conversation-cta"
+            className="briefing-conversation-cta live-conversation-cta"
             aria-disabled={pending}
             href={briefingConversationHref(tenant, task)}
             onClick={(e) => {

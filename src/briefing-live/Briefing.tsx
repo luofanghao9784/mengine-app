@@ -1,15 +1,30 @@
-import { GenerationPanel } from './GenerationPanel';
+import { MagazineGrid } from './MagazineGrid';
+import { useBriefingTabs } from '../components/useBriefingTabs';
+import { useBriefingRefresh } from '../components/useBriefingRefresh';
+import { useBriefingGeneration } from './useBriefingGeneration';
 import { briefingTypeLabels } from './content';
 import { useViewState, textState, pageState } from '../shared/useViewState';
 import { ForwardInbox } from '../forwarding/ForwardInbox';
-import { Recommendations } from '../recommendation/Recommendations';
+import { Recommendations, GeneratedBriefings } from '../recommendation/Recommendations';
 import { FeedbackActions } from './FeedbackActions';
 import { MoreActions } from '../shared/MoreActions';
 import { RequestPending, useRequestLock } from '../shared/request-guard';
 import { useContext } from 'react';
 import { Attention } from '../attention/Attention';
+import { featureEntries } from '../shared/feature-entries';
 import { useEffect, useRef, useState } from 'react';
-import { Eye, EyeOff, Newspaper, Star, RefreshCw, Expand, Minimize, Share2 } from 'lucide-react';
+import {
+  Eye,
+  EyeOff,
+  Newspaper,
+  Star,
+  RefreshCw,
+  ArrowDown,
+  Check,
+  Expand,
+  Minimize,
+  Share2,
+} from 'lucide-react';
 import { MagazineBody, RailButton } from './Magazine';
 import { ReadingDialog } from './ReadingDialog';
 import type {
@@ -28,6 +43,10 @@ import './briefing.css';
 export const briefingHref = (tenant: string) => '#' + new URLSearchParams({ tenant, view: 'briefing' });
 export function LiveBriefing({ tenant }: { tenant: string }) {
   const { session } = useSession();
+  return <BriefingPage key={tenant + ':' + session.identity} tenant={tenant} />;
+}
+function BriefingPage({ tenant }: { tenant: string }) {
+  const { session } = useSession();
   const pendingRequest = useContext(RequestPending);
   const [view, setView] = useViewState<BriefingView | 'RECOMMENDED'>(
     tenant,
@@ -42,12 +61,43 @@ export function LiveBriefing({ tenant }: { tenant: string }) {
   const [page, setPage] = useViewState(tenant, 'briefing:page', 0, pageState),
     [attempt, setAttempt] = useState(0);
   const [businessType, setBusinessType] = useViewState(tenant, 'briefing:type', '', textState);
+  const selectedType = tab === '类型' ? businessType : '';
+  const selectedSpace = tab === '空间' ? space : '';
+  const generation = useBriefingGeneration(tenant, selectedSpace || undefined, selectedType || undefined);
+  const selectedDate = tab === '日期' ? date : '';
   const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const refresh = () => setAttempt((n) => n + 1);
+  const pageRef = useRef<HTMLElement>(null);
+  const reloadState = useRef<{
+    attempt: number;
+    pending: Set<string>;
+    finish: (success: boolean) => void;
+  } | null>(null);
+  const settled = (part: string, revision: number, success: boolean) => {
+    const state = reloadState.current;
+    if (!state || state.attempt !== revision) return;
+    state.pending.delete(part);
+    if (!success || !state.pending.size) {
+      reloadState.current = null;
+      state.finish(success);
+    }
+  };
+  const trackRead = async <T,>(part: string, request: Promise<T>, signal: AbortSignal) => {
+    try {
+      const value = await request;
+      if (!signal.aborted) settled(part, attempt, true);
+      return value;
+    } catch (error) {
+      if (!signal.aborted) settled(part, attempt, false);
+      throw error;
+    }
+  };
+  useEffect(() => () => reloadState.current?.finish(false), []);
   const [moving, setMoving] = useState<string>();
   const [layoutNotice, setLayoutNotice] = useState('');
   const layout = useRemote(
-    (signal) => (view === 'FOCUSED' ? api.layout(tenant, signal) : Promise.resolve(null)),
+    (signal) =>
+      trackRead('layout', view === 'FOCUSED' ? api.layout(tenant, signal) : Promise.resolve(null), signal),
     [tenant, view, attempt, session.identity],
   );
   const layoutSubmit = useSubmission<Omit<BriefingLayoutMove, 'requestId'>>();
@@ -70,48 +120,92 @@ export function LiveBriefing({ tenant }: { tenant: string }) {
     );
   };
   const context = useRemote(
-    (signal) => identityClient.context(tenant, signal),
+    (signal) => trackRead('context', identityClient.context(tenant, signal), signal),
     [tenant, session.identity, attempt],
   );
   const anchor = useRef<{ key: string; asOf?: string }>({ key: '' });
   const anchorKey = JSON.stringify([
     tenant,
     view,
-    businessType,
-    date,
+    selectedType,
+    selectedDate,
     zone,
-    space,
+    selectedSpace,
     session.identity,
     attempt,
   ]);
   if (anchor.current.key !== anchorKey) anchor.current = { key: anchorKey };
   const feed = useRemote(
     (signal) =>
-      view === 'RECOMMENDED'
-        ? Promise.resolve(null)
-        : api
-            .list(
-              tenant,
-              {
-                view,
-                asOf: anchor.current.asOf,
-                businessType: businessType || undefined,
-                date: date || null,
-                zone,
-                ...(space ? { workspaceId: space } : {}),
-              },
-              page * 20,
-              signal,
-            )
-            .then((result) => {
-              if (!signal.aborted && anchor.current.key === anchorKey) anchor.current.asOf = result.asOf;
-              return result;
-            }),
-    [tenant, view, businessType, date, zone, space, page, session.identity, attempt],
+      trackRead(
+        'feed',
+        view === 'RECOMMENDED'
+          ? Promise.resolve(null)
+          : api
+              .list(
+                tenant,
+                {
+                  view,
+                  asOf: anchor.current.asOf,
+                  businessType: selectedType || undefined,
+                  date: selectedDate || null,
+                  zone,
+                  ...(selectedSpace ? { workspaceId: selectedSpace } : {}),
+                },
+                page * 20,
+                signal,
+              )
+              .then((result) => {
+                if (!signal.aborted && anchor.current.key === anchorKey) anchor.current.asOf = result.asOf;
+                return result;
+              }),
+        signal,
+      ),
+    [tenant, view, selectedType, selectedDate, zone, selectedSpace, page, session.identity, attempt],
   );
+  const pullRefresh = useBriefingRefresh({
+    page: pageRef,
+    ready: !!context.value && (view === 'RECOMMENDED' || !!feed.value),
+    viewKey: JSON.stringify([tenant, view, tab, selectedType, selectedSpace, selectedDate]),
+    blocked: pendingRequest || !!moving,
+    reload: () =>
+      new Promise<boolean>((finish) => {
+        reloadState.current?.finish(false);
+        const revision = attempt + 1;
+        reloadState.current = {
+          attempt: revision,
+          pending: new Set([
+            'context',
+            'layout',
+            'feed',
+            ...(['RECOMMENDED', 'FOCUSED'].includes(view) ? ['recommendations'] : []),
+          ]),
+          finish,
+        };
+        setPage(0);
+        setAttempt(revision);
+      }),
+  });
+  const tabs = ['推荐', '关注', '日期', '类型', '空间'];
+  const selectTab = useBriefingTabs({
+    page: pageRef,
+    index: Math.max(0, tabs.indexOf(tab)),
+    count: tabs.length,
+    blocked: pendingRequest || pullRefresh.active || !!moving,
+    onSelect: (index) => {
+      const label = tabs[index];
+      pageRef.current?.closest('main')?.scrollTo({ top: 0, behavior: 'instant' });
+      setTab(label);
+      setPage(0);
+      setDate('');
+      setMoving(undefined);
+      setView(label === '关注' ? 'FOCUSED' : label === '日期' ? 'LATEST' : 'RECOMMENDED');
+    },
+  });
   useEffect(() => {
     const check = () => {
-      if (!pendingRequest && document.visibilityState === 'visible') setAttempt((n) => n + 1);
+      if (!pendingRequest && !reloadState.current && document.visibilityState === 'visible')
+        setAttempt((n) => n + 1);
     };
     window.addEventListener('focus', check);
     document.addEventListener('visibilitychange', check);
@@ -138,21 +232,15 @@ export function LiveBriefing({ tenant }: { tenant: string }) {
     <>
       <PageActions>
         <div role="tablist" aria-label="画报分类" className="live-briefing-tabs">
-          {['推荐', '关注', '日期', '类型', '空间'].map((label) => (
+          {tabs.map((label, index) => (
             <button
               key={label}
               role="tab"
               aria-selected={tab === label}
               aria-controls="live-briefing-panel"
 
-              disabled={pendingRequest}
-              onClick={() => {
-                setTab(label);
-                setPage(0);
-                setDate('');
-                setMoving(undefined);
-                setView(label === '关注' ? 'FOCUSED' : label === '日期' ? 'LATEST' : 'RECOMMENDED');
-              }}
+              disabled={pendingRequest || pullRefresh.active}
+              onClick={() => selectTab(index)}
             >
               {label}
             </button>
@@ -160,105 +248,143 @@ export function LiveBriefing({ tenant }: { tenant: string }) {
         </div>
       </PageActions>
       <PageActions placement="meta">
+        <MoreActions label="更多画报视图">
+          <Field label="画报视图">
+            <select
+              aria-label="画报视图"
+              disabled={pendingRequest || pullRefresh.active}
+              value={view}
+              onChange={(e) => {
+                const next = e.target.value as BriefingView | 'RECOMMENDED';
+                setView(next);
+                setPage(0);
+                setMoving(undefined);
+                if (next === 'RECOMMENDED' || next === 'FOCUSED') {
+                  setDate('');
+                  setTab(next === 'RECOMMENDED' ? '推荐' : '关注');
+                }
+              }}
+            >
+              <option value="RECOMMENDED">工作推荐</option>
+              <option value="LATEST">最新会话成果</option>
+              <option value="FOCUSED">关注</option>
+              <option value="HIDDEN">已隐藏</option>
+            </select>
+          </Field>
+        </MoreActions>
         <button
           className="live-briefing-refresh"
           aria-label="刷新智能画报"
           title="刷新画报内容"
-          disabled={pendingRequest}
-          onClick={refresh}
+          disabled={pendingRequest || pullRefresh.active}
+          onClick={pullRefresh.refresh}
         >
           <RefreshCw size={17} />
         </button>
       </PageActions>
-      <section className="live-briefing" id="live-briefing-panel" role="tabpanel">
-        <Attention tenant={tenant} refreshToken={attempt} />
-        <ForwardInbox tenant={tenant} />
-        <div className="live-briefing-filters">
-          <Field label="内容类型">
-            <select
-              aria-label="内容类型"
-              value={businessType}
-              onChange={(e) => {
-                setBusinessType(e.target.value);
-                setPage(0);
-              }}
-            >
-              <option value="">全部类型</option>
-              {Object.entries(briefingTypeLabels).map(([key, label]) => (
-                <option key={key} value={key}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </Field>
-          {tab === '日期' && (
-            <Field label="完成日期">
-              <input
-                type="date"
-                aria-label="查看日期"
-                disabled={pendingRequest}
-                value={date}
-                onChange={(e) => {
-                  setDate(e.target.value);
-                  setPage(0);
-                }}
+      <section
+        className="live-briefing"
+        id="live-briefing-panel"
+        role="tabpanel"
+        ref={pageRef}
+        data-refresh-phase={pullRefresh.phase}
+      >
+        <div
+          className="live-briefing-refresh-space"
+          style={{ height: pullRefresh.distance }}
+          aria-hidden="true"
+        >
+          <div className="live-briefing-refresh-indicator">
+            {pullRefresh.phase === 'refreshing' ? (
+              <RefreshCw className="live-briefing-refresh-spinner" size={17} />
+            ) : pullRefresh.phase === 'done' ? (
+              <Check size={17} />
+            ) : (
+              <ArrowDown
+                size={17}
+                style={{ transform: `rotate(${Math.min(1, pullRefresh.distance / 64) * 180}deg)` }}
               />
-            </Field>
-          )}
-          <Field label="工作空间">
-            <select
-              aria-label="工作空间"
-              disabled={pendingRequest}
-              value={space}
-              onChange={(e) => {
-                setSpace(e.target.value);
-                setPage(0);
-              }}
-            >
-              <option value="">全部可访问空间</option>
-              {context.value?.workspaces.map((w) => (
-                <option value={w.id} key={w.id}>
-                  {w.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <details className="live-briefing-view-options">
-            <summary>
-              {view === 'HIDDEN' ? '已隐藏' : view === 'LATEST' && tab !== '日期' ? '最新会话' : '更多视图'}
-            </summary>
-            <Field label="画报视图">
+            )}
+            <span>
+              {pullRefresh.phase === 'refreshing'
+                ? '正在刷新'
+                : pullRefresh.phase === 'done'
+                  ? '已刷新'
+                  : pullRefresh.phase === 'ready'
+                    ? '松开刷新'
+                    : '下拉刷新'}
+            </span>
+          </div>
+        </div>
+        <span className="sr-only" role="status" aria-live="polite">
+          {pullRefresh.announcement}
+        </span>
+        {featureEntries.attention && <Attention tenant={tenant} refreshToken={attempt} />}
+        {featureEntries.forwarding && <ForwardInbox tenant={tenant} />}
+        {['类型', '空间', '日期'].includes(tab) && (
+          <div className="live-briefing-filters">
+            {tab === '类型' && (
+              <div className="live-briefing-type-options" role="group" aria-label="内容类型">
+                {[['', '全部'], ...Object.entries(briefingTypeLabels)].map(([value, label]) => (
+                  <button
+                    type="button"
+                    key={value}
+                    aria-pressed={businessType === value}
+                    disabled={pendingRequest}
+                    onClick={() => {
+                      setBusinessType(value);
+                      setPage(0);
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+            {tab === '空间' && (
               <select
-                aria-label="画报视图"
+                aria-label="画报工作空间"
                 disabled={pendingRequest}
-                value={view}
+                value={space}
                 onChange={(e) => {
-                  const next = e.target.value as BriefingView | 'RECOMMENDED';
-                  setView(next);
+                  setSpace(e.target.value);
                   setPage(0);
-                  setMoving(undefined);
-                  if (next === 'RECOMMENDED' || next === 'FOCUSED') {
-                    setDate('');
-                    setTab(next === 'RECOMMENDED' ? '推荐' : '关注');
-                  }
                 }}
               >
-                <option value="RECOMMENDED">工作推荐</option>
-                <option value="LATEST">最新会话成果</option>
-                <option value="FOCUSED">关注</option>
-                <option value="HIDDEN">已隐藏</option>
+                <option value="">全部可访问空间</option>
+                {context.value?.workspaces.map((w) => (
+                  <option value={w.id} key={w.id}>
+                    {w.name}
+                  </option>
+                ))}
               </select>
-            </Field>
-          </details>
-          {tab === '日期' && <span className="live-briefing-filter-note">按完成日期查看本人会话成果</span>}
-        </div>
+            )}
+            {tab === '日期' && (
+              <Field label="完成日期">
+                <input
+                  type="date"
+                  aria-label="查看日期"
+                  disabled={pendingRequest}
+                  value={date}
+                  onChange={(e) => {
+                    setDate(e.target.value);
+                    setPage(0);
+                  }}
+                />
+              </Field>
+            )}
+            {tab === '日期' && <span className="live-briefing-filter-note">按完成日期查看本人会话成果</span>}
+          </div>
+        )}
         {!!context.error && <Failure error={context.error} retry={refresh} />}
         {view === 'RECOMMENDED' ? (
           <Recommendations
-            key={tenant + ':' + space + ':' + businessType + ':' + attempt}
+            key={tenant + ':' + selectedSpace + ':' + selectedType + ':' + attempt}
             tenant={tenant}
-            workspace={space || null}
-            businessType={businessType || undefined}
+            generation={generation}
+            onSettled={(success) => settled('recommendations', attempt, success)}
+            workspace={selectedSpace || null}
+            businessType={selectedType || undefined}
           />
         ) : feed.error || context.error ? (
           <Failure error={feed.error || context.error} retry={refresh} />
@@ -268,10 +394,11 @@ export function LiveBriefing({ tenant }: { tenant: string }) {
           <>
             {view === 'FOCUSED' && (
               <Recommendations
-                key={'publication-focus:' + space + ':' + businessType + ':' + attempt}
+                key={'publication-focus:' + selectedSpace + ':' + selectedType + ':' + attempt}
                 tenant={tenant}
-                workspace={space || null}
-                businessType={businessType || undefined}
+                onSettled={(success) => settled('recommendations', attempt, success)}
+                workspace={selectedSpace || null}
+                businessType={selectedType || undefined}
                 publicationsOnly
                 focused
               />
@@ -327,22 +454,29 @@ export function LiveBriefing({ tenant }: { tenant: string }) {
             {[...groups].map(([day, cards]) => (
               <section className="live-briefing-day" key={day}>
                 <h2>{day}</h2>
-                <div className="live-briefing-grid">
-                  {cards.map((card) => (
-                    <Card
-                      key={card.cardId || card.taskId}
-                      tenant={tenant}
-                      card={card}
-                      changed={refresh}
-                      focused={view === 'FOCUSED'}
-                      moving={moving}
-                      canMove={!!layout.value}
-                      pick={() => setMoving(card.cardId || card.taskId)}
-                      move={(direction) => move(card.cardId || card.taskId, direction)}
-                      drop={(anchor) => move(anchor, 'BEFORE', card.cardId || card.taskId)}
-                    />
-                  ))}
-                </div>
+                <MagazineGrid
+                  items={cards.map((card) => ({
+                    id: card.cardId || card.taskId,
+                    title: card.briefing?.content.title ?? card.title,
+                    summary: card.briefing?.content.summary ?? card.excerpt,
+                    chart: !!card.briefing?.content.chart,
+                    wide: card.preference.size === 'WIDE',
+                    render: (
+                      <Card
+                        key={card.cardId || card.taskId}
+                        tenant={tenant}
+                        card={card}
+                        changed={refresh}
+                        focused={view === 'FOCUSED'}
+                        moving={moving}
+                        canMove={!!layout.value}
+                        pick={() => setMoving(card.cardId || card.taskId)}
+                        move={(direction) => move(card.cardId || card.taskId, direction)}
+                        drop={(anchor) => move(anchor, 'BEFORE', card.cardId || card.taskId)}
+                      />
+                    ),
+                  }))}
+                />
               </section>
             ))}
             {feed.value.items.length > 0 && (
@@ -356,22 +490,7 @@ export function LiveBriefing({ tenant }: { tenant: string }) {
             )}
           </>
         )}
-        <GenerationPanel
-          key={tenant + ':' + session.identity}
-          tenant={tenant}
-          workspace={space || undefined}
-          businessType={businessType || undefined}
-          onDelivered={(cards) => {
-            if (view === 'RECOMMENDED')
-              window.dispatchEvent(new CustomEvent('briefing-generated', { detail: { tenant, cards } }));
-          }}
-          onRefresh={() => {
-            setView('RECOMMENDED');
-            setDate('');
-            setPage(0);
-            refresh();
-          }}
-        />
+        {view !== 'RECOMMENDED' && <GeneratedBriefings tenant={tenant} generation={generation} />}
       </section>
     </>
   );
@@ -436,7 +555,9 @@ function Card({
         disabled={submission.busy || (pendingRequest && !submission.uncertain)}
         onClick={() => edit({ pinned: !card.preference.pinned })}
       />
-      <RailButton label="转发" icon={Share2} disabled={pendingRequest} onClick={() => setShareInfo(true)} />
+      {featureEntries.forwarding && (
+        <RailButton label="转发" icon={Share2} disabled={pendingRequest} onClick={() => setShareInfo(true)} />
+      )}
       <MoreActions label="卡片设置">
         <RailButton
           label={card.preference.hidden ? '恢复显示' : '隐藏'}
@@ -563,7 +684,7 @@ function Card({
           actions={actions}
         />
       )}
-      {shareInfo && (
+      {featureEntries.forwarding && shareInfo && (
         <Modal title="转发这份成果" onClose={() => setShareInfo(false)}>
           <p>这份成果来自你的私人会话。先保存为文稿并发布到有权共享的空间，再转发企业副本给已获权同事。</p>
           <a className="button primary" href={conversationHref(tenant, card.conversationId)}>

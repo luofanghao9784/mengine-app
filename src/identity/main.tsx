@@ -1,3 +1,4 @@
+import '../shared/gesture-boundaries.css';
 import { createRoot } from 'react-dom/client';
 import { SessionProvider } from './session';
 import AccessApp, { readInvitation, type Surface } from './AccessApp';

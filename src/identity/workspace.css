@@ -22,6 +22,43 @@
 .workspace-shell .access-content {
   padding: 0 28px 28px 0;
 }
+/* Demo page edge: fade only the content scrolling under the fixed title bar. */
+.workspace-shell:not(.workspace-conversations) .access-main > .topbar {
+  position: relative;
+  z-index: 15;
+  --scroll-edge-visible: 0;
+}
+.workspace-shell:not(.workspace-conversations)
+  .access-main:has(> .access-content[data-scrolled-start])
+  > .topbar {
+  --scroll-edge-visible: 1;
+}
+.workspace-shell:not(.workspace-conversations) .access-main > .topbar::before,
+.workspace-shell:not(.workspace-conversations) .access-main > .topbar::after {
+  content: '';
+  position: absolute;
+  inset: 100% 0 auto;
+  height: 32px;
+  pointer-events: none;
+  opacity: var(--scroll-edge-visible);
+  transition: opacity 140ms ease-out;
+  -webkit-mask-image: linear-gradient(to bottom, #000, #0008 45%, transparent);
+  mask-image: linear-gradient(to bottom, #000, #0008 45%, transparent);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+}
+.workspace-shell:not(.workspace-conversations) .access-main > .topbar::after {
+  height: 24px;
+  background: linear-gradient(to bottom, var(--canvas), transparent);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .workspace-shell .access-main > .topbar::before,
+  .workspace-shell .access-main > .topbar::after {
+    transition: none;
+  }
+}
 .workspace-shell .access-tenant-picker {
   max-width: 220px;
   font-size: 12px;
@@ -43,71 +80,106 @@
   position: relative;
 }
 .workspace-briefing .access-content {
-  padding-bottom: 106px;
+  padding-bottom: 230px;
 }
-.workspace-composer {
+/* Same dimensions, border and send control as the reference Demo draft composer. */
+.workspace-composer,
+.workspace-composer-status {
   position: absolute;
-  bottom: 20px;
+  bottom: 18px;
   left: 50%;
   transform: translateX(-50%);
-  width: min(720px, calc(100% - 48px));
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: #fff;
-  border: 1px solid var(--line);
-  border-radius: 26px;
-  box-shadow: 0 8px 30px #2536510a;
-  padding: 8px 10px 8px 18px;
-  z-index: 4;
+  width: min(720px, calc(100% - 56px));
+  z-index: 12;
 }
-.workspace-composer textarea {
-  border: 0;
-  padding: 7px 0;
+.workspace-composer {
+  padding: 0;
   background: transparent;
-  outline: 0;
-  resize: none;
-  flex: 1;
-  min-width: 0;
-  font: inherit;
-  line-height: 1.6;
+  border: 0;
 }
-.workspace-composer button {
+.workspace-composer .live-composer-surface {
+  border: 1px solid #dce7ef;
+  border-radius: var(--conversation-card-radius, 24px);
+  box-shadow: 0 3px 16px #345d7d04;
+  overflow: visible;
+}
+.workspace-composer .live-composer-surface:focus-within {
+  border-color: #a9cfe9;
+  box-shadow: 0 0 0 3px #ddf0ff66;
+}
+.workspace-composer fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.workspace-composer .live-composer-input textarea {
+  display: block;
+  width: 100%;
+  border: 0 !important;
+  border-radius: var(--conversation-card-radius, 24px);
+  box-shadow: none !important;
+  background: transparent;
+  outline: none !important;
+  resize: none;
+  min-height: 68px;
+  max-height: 160px;
+  padding: 18px 18px 4px;
+  font-size: var(--font-body, 14px);
+  line-height: 1.7;
+}
+.workspace-composer:not(.is-expanded) .live-composer-input textarea {
+  min-height: 54px;
+  height: 54px !important;
+  padding: 14px 58px 14px 18px;
+}
+.workspace-composer:not(.is-expanded) :is(.live-composer-tools, .live-web-options) {
+  display: none;
+}
+.workspace-composer .live-composer-tools {
+  min-height: 44px;
+  padding: 8px 58px 10px 14px;
+}
+.workspace-composer .live-composer-submit {
+  position: absolute;
+  right: 14px;
+  bottom: 10px;
   display: grid;
   place-items: center;
-  flex: 0 0 36px;
-  height: 36px;
+  width: 35px;
+  height: 35px;
+  min-height: 35px;
+  padding: 0;
+  border: 0;
   border-radius: 50%;
-  background: var(--selected);
-  color: var(--blue-ink);
+  color: var(--accent-text, #fff);
+  background: var(--accent);
 }
-.workspace-composer > p {
-  position: absolute;
-  bottom: 100%;
-  left: 0;
-  background: white;
-  color: #a43e42;
-  border-radius: 10px;
-  padding: 8px 12px;
+.workspace-composer .live-composer-submit:disabled {
+  opacity: 0.55;
 }
-.workspace-more-links {
+.workspace-composer .live-web-options {
+  padding: 0 58px 10px 18px;
+}
+.workspace-composer .conversation-send,
+.workspace-composer > .muted {
+  font-size: 12px;
+  margin: 4px 12px;
+}
+.workspace-composer [hidden] {
+  display: none !important;
+}
+.workspace-compose-trigger {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-.workspace-more-links a {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 18px 14px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  color: var(--text-secondary);
-}
-.workspace-more-links a:hover,
-.workspace-more-links a[aria-current='page'] {
-  background: var(--selected);
-  color: var(--blue-ink);
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 1px solid #dce7ef;
+  border-radius: 24px;
+  background: #fff;
+  color: var(--text);
+  box-shadow: 0 4px 20px #21344912;
 }
 .workspace-conversations {
   --canvas: #fff;
@@ -157,7 +229,8 @@
   .workspace-briefing .access-content {
     padding-bottom: calc(162px + env(safe-area-inset-bottom));
   }
-  .workspace-composer {
+  .workspace-composer,
+  .workspace-composer-status {
     bottom: calc(86px + env(safe-area-inset-bottom));
     width: calc(100% - 28px);
   }
@@ -180,9 +253,6 @@
   }
   .workspace-shell .access-sidebar nav {
     gap: 2px;
-  }
-  .workspace-more-links {
-    grid-template-columns: 1fr;
   }
 }
 /* The viewport owns a single toolbar, over the entire main canvas like the Demo. */
@@ -256,8 +326,8 @@
 }
 
 .workspace-composer.is-collapsed {
-  width: 52px;
-  padding: 7px;
+  width: 48px;
+  padding: 0;
 }
 .workspace-composer.is-collapsed textarea,
 .workspace-composer button[hidden] {
@@ -274,13 +344,29 @@
   }
 }
 
-@media (min-width: 801px) {
+.workspace-conversations .access-main > .topbar > .topbar-meta {
+  position: fixed;
+  visibility: visible;
+  z-index: 50;
+  right: 190px;
+  top: 24px;
+}
+@media (max-width: 1000px) {
   .workspace-conversations .access-main > .topbar > .topbar-meta {
-    position: fixed;
-    visibility: visible;
-    z-index: 50;
-    right: 190px;
-    top: 24px;
+    right: 64px;
+  }
+  .workspace-conversations .tenant-menu-trigger,
+  .workspace-conversations .access-tenant-name {
+    max-width: min(180px, calc(100vw - 224px));
+  }
+  .workspace-conversations .live-deck-toolbar .deck-mobile-tabs {
+    margin-right: min(188px, calc(100vw - 216px));
+  }
+}
+@media (max-width: 800px) {
+  .workspace-conversations .access-main > .topbar > .topbar-meta {
+    right: 56px;
+    top: 16px;
   }
 }
 .live-conversation-group > summary {
@@ -300,4 +386,21 @@
 }
 .live-conversation-group:not([open]) > summary::before {
   transform: none;
+}
+
+/* Main navigation uses Demo hover state, quiet labels and two dissolved blur layers. */
+.workspace-nav-items {
+  display: contents;
+}
+.workspace-nav-items .nav-label::before {
+  background: color-mix(in srgb, var(--canvas) 20%, transparent);
+}
+.workspace-nav-items .nav-label::after {
+  background: color-mix(in srgb, var(--canvas) 28%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .workspace-nav-items .nav-link,
+  .workspace-nav-items .nav-label {
+    transition: none;
+  }
 }

@@ -24,7 +24,9 @@ async function trackArrival(page: Page) {
 async function pullMouse(page: Page, distance: number, release = true) {
   await expect(page.locator('.briefing-refresh-space')).toHaveCSS('height', '0px');
   await expect(page.locator('main')).toHaveJSProperty('scrollTop', 0);
-  const divider = page.locator('.briefing-date-divider').first();
+  const divider = page
+    .locator('.briefing-date-divider, .briefing-follow-controls .briefing-view-note')
+    .first();
   await divider.hover();
   const box = (await divider.boundingBox())!;
   const x = box.x + box.width / 2,
@@ -82,10 +84,17 @@ test('刷新页面可见卡片按实际网格顺序轻微错峰入场，之后�
 test('鼠标下拉阈值、取消、刷新反馈和再次入场完整，保留手动位置及所有数据', async ({ page }) => {
   await trackArrival(page);
   await page.goto('/#/briefing');
+  // Layout editing now belongs to the follow view; recommendations remain automatic.
+  await page.evaluate((key) => {
+    const data = JSON.parse(localStorage.getItem(key)!);
+    for (const c of data.briefing.cards) c.pinned = ['konggu:C01', 'konggu:C02'].includes(c.id);
+    localStorage.setItem(key, JSON.stringify(data));
+  }, key);
+  await page.reload();
+  await page.getByRole('tab', { name: '关注', exact: true }).click();
+  await expect(page.locator('html')).not.toHaveAttribute('data-briefing-slide');
   const card = page.locator('[data-card-id="konggu:C01"]');
-  await card.hover();
-  await card.getByRole('button', { name: /^卡片操作 / }).click();
-  await card.getByRole('button', { name: '用方向键调整位置', exact: true }).click();
+  await card.locator('.briefing-card-main').press('Alt+Enter');
   await expect(card).toHaveClass(/is-keyboard-moving/);
   await card.locator('.briefing-card-main').press('ArrowDown');
   await card.locator('.briefing-card-main').press('Enter');
@@ -113,7 +122,8 @@ test('鼠标下拉阈值、取消、刷新反馈和再次入场完整，保留�
   await page.screenshot({ path: '.local/briefing-refresh/desktop-ready.png' });
   await page.mouse.up();
   await expect(root(page)).toHaveAttribute('data-refresh-phase', 'refreshing');
-  await expect(page.locator('.briefing-refresh-indicator')).toContainText('演示');
+  await expect(page.locator('.briefing-refresh-indicator')).toHaveText('正在刷新');
+  await expect(page.getByRole('status').filter({ hasText: '正在演示刷新智能画报' })).toHaveCount(1);
   await expect(page.getByRole('button', { name: '刷新智能画报（演示）', exact: true })).toBeDisabled();
   await expect(page.locator('.briefing-compose-dock')).toBeHidden();
   await idle(page);
@@ -121,7 +131,14 @@ test('鼠标下拉阈值、取消、刷新反馈和再次入场完整，保留�
     .poll(() => page.evaluate(() => (window as any).arrivalLog.length))
     .toBeGreaterThan(arrivalsBefore);
   expect(await positions()).toEqual(layout);
-  expect(await state(page)).toBe(before);
+  // A refresh records recommendation exposure again; business facts and saved layout stay intact.
+  const withoutExposureTime = (value: string | null) =>
+    JSON.parse(value!, (key, field) => (key === 'lastRecommendedAt' ? undefined : field));
+  const after = await state(page);
+  expect(withoutExposureTime(after)).toEqual(withoutExposureTime(before));
+  const beforeSeen = JSON.parse(before!).briefing.interactions['空谷主理人']['konggu:C01'].lastRecommendedAt;
+  const afterSeen = JSON.parse(after!).briefing.interactions['空谷主理人']['konggu:C01'].lastRecommendedAt;
+  expect(Date.parse(afterSeen)).toBeGreaterThanOrEqual(Date.parse(beforeSeen));
   await expect(page).toHaveURL(/#\/briefing$/);
 });
 

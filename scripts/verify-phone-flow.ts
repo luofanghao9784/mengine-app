@@ -265,7 +265,7 @@ try {
     const identity = await (await existing.request.get('/api/v1/me')).json();
     assert.equal(identity.memberships.length, 2);
     await existing.goto('/workspace/');
-    await expect(existing.getByLabel('当前企业')).toHaveValue(second.tenant.id);
+    await expect(existing.getByRole('button', { name: '当前企业：合成第二企业', exact: true })).toBeVisible();
     if (process.argv.includes('--client-b1') || process.argv.includes('--client-all'))
       await verifyClientB1(owner, existing, created.tenant.id, second.tenant.id);
     if (process.argv.includes('--client-all')) await verifyClientAll(owner, existing, created.tenant.id);

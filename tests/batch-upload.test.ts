@@ -1,8 +1,11 @@
 import test from 'node:test';
+import { UploadQueue } from '../src/material/upload-queue.ts';
 import assert from 'node:assert/strict';
 import {
   BatchUploadRun,
-  checkBatchFolder,
+  availableName,
+  destinationNames,
+  planUpload,
   scanFiles,
   selectedConflicts,
   validName,
@@ -11,7 +14,7 @@ import {
 import type { MaterialUploadReceipt } from '../src/material/client.ts';
 import { IdentityError } from '../src/identity/client.ts';
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
-const destination = { tenant: id(1), workspace: id(2), parentId: null, name: '本次导入' };
+const destination = { tenant: id(1), workspace: id(2), parentId: null };
 function file(name: string, path = name, body = 'data') {
   const value = new File([body], name);
   Object.defineProperty(value, 'webkitRelativePath', { value: path });
@@ -58,7 +61,7 @@ function transport(overrides: Partial<BatchTransport> = {}): BatchTransport {
   };
 }
 
-test('selected FileList metadata preserves paths, rejects unsafe names/oversize/depth, and keeps unsupported originals selectable', () => {
+test('selected files preserve authorized relative paths and reject invalid names, size and depth', () => {
   const rows = scanned([
     file('a.txt', '目录/a.txt'),
     file('movie.mov'),
@@ -67,96 +70,176 @@ test('selected FileList metadata preserves paths, rejects unsafe names/oversize/
     file('x\u200b.txt'),
   ]);
   assert.deepEqual(rows[0].parts, ['目录', 'a.txt']);
-  assert.equal(rows[0].parseSupported, true);
-  assert.equal(rows[1].parseSupported, false);
   assert.equal(rows[1].selected, true);
+  assert.equal(rows[1].parseSupported, false);
   assert.ok(rows.slice(2).every((r) => r.problem && !r.selected));
   assert.ok(scanned([file('a', 'd/a')], 31)[0].problem);
   assert.equal(scanned([file('a')], 31)[0].problem, undefined);
   assert.equal(validName('a/b'), false);
-  assert.equal(validName(' .. '), false);
 });
 
-test('normalized duplicate names and file-directory collisions require an explicit selection change', () => {
-  const rows = scanned([file('é.txt'), file('e\u0301.txt'), file('folder'), file('x', 'folder/x')]);
-  assert.equal(selectedConflicts(rows).size, 4);
-  rows[1].selected = false;
-  rows[2].selected = false;
-  assert.equal(selectedConflicts(rows).size, 0);
-  const bad = scanned([file('same'), file('same')]);
-  assert.throws(() => new BatchUploadRun(destination, bad));
-});
-
-test('preflight checks beyond the first page and never merges a pre-existing root', async () => {
-  let lists = 0,
-    creates = 0;
-  const api = transport({
-    list: async (_t, _w, _f, _q, offset) => {
-      lists++;
-      return {
-        items: offset ? [{ ...receipt('本次导入'), kind: 'DOCUMENT' }] : [],
-        canMaintain: true,
-        hasMore: !offset,
-      };
-    },
-    folder: async () => {
-      creates++;
-      return { id: id(3), name: '本次导入' };
-    },
-  });
-  await assert.rejects(
-    checkBatchFolder(api, destination),
-    (e) => e instanceof IdentityError && e.code === 'MATERIAL_NAME_CONFLICT',
-  );
-  assert.equal(lists, 2);
-  assert.equal(creates, 0);
-  const batch = new BatchUploadRun(destination, scanned([file('one')]));
-  await batch.execute(api, 'ready', () => {});
-  assert.equal(batch.files[0].state, 'failed');
-  assert.equal(creates, 0);
-});
-
-test('lost file response retries the same request only; successful files and directories are not duplicated', async () => {
-  const calls: string[] = [],
-    keys: string[] = [];
-  let folders = 0,
-    failures = 0;
-  const api = transport({
-    folder: async (_t, _w, body) => {
-      folders++;
-      return { id: id(3), name: body.name };
-    },
-    upload: async (_t, _w, body, f) => {
-      calls.push(f.name);
-      keys.push(body.requestId);
-      if (f.name === 'two' && failures++ === 0) throw new IdentityError('UNCERTAIN_RESULT');
-      return receipt(f.name);
-    },
-  });
-  const batch = new BatchUploadRun(destination, scanned([file('one', 'dir/one'), file('two', 'dir/two')]));
-  await batch.execute(api, 'ready', () => {});
+test('planning keeps both files, retains extension, resolves NFC and file-folder collisions', () => {
+  const rows = scanned([
+    file('é.txt'),
+    file('e\u0301.txt'),
+    file('folder'),
+    file('x', 'folder/x'),
+    file('y', 'folder/y'),
+  ]);
+  const planned = planUpload(rows, new Set(['é.txt']));
   assert.deepEqual(
-    batch.files.map((r) => r.state),
-    ['succeeded', 'uncertain'],
+    planned.map((r) => r.parts.join('/')),
+    ['é (1).txt', 'é (2).txt', 'folder', 'folder (1)/x', 'folder (1)/y'],
   );
-  await batch.execute(api, 'retry', () => {});
-  assert.deepEqual(calls, ['one', 'two', 'two']);
-  assert.equal(keys[1], keys[2]);
-  assert.equal(folders, 2);
-  await batch.execute(api, 'ready', () => {});
-  await batch.execute(api, 'retry', () => {});
-  assert.equal(calls.length, 3);
+  assert.equal(selectedConflicts(planned).size, 0);
+  assert.deepEqual(rows[0].parts, ['é.txt']);
 });
 
-test('lost folder response retries its original key without rejecting its own committed directory', async () => {
-  const keys: string[] = [];
-  let lists = 0,
-    committed = false;
+test('repeated folder selections are copied independently without merging', () => {
+  const rows = scanned([file('a', '目录/a'), file('b', '目录/b'), file('a', '目录/a')]);
+  rows[0].selectionId = rows[1].selectionId = 'first';
+  rows[2].selectionId = 'second';
+  assert.deepEqual(
+    planUpload(rows, new Set(['目录'])).map((r) => r.parts.join('/')),
+    ['目录 (1)/a', '目录 (1)/b', '目录 (2)/a'],
+  );
+});
+
+test('suffix chooses the next free name and keeps a valid maximum-length Unicode filename', () => {
+  assert.equal(availableName('报表.xlsx', new Set(['报表.xlsx', '报表 (1).xlsx']), true), '报表 (2).xlsx');
+  const name = '😀'.repeat(87) + '.txt';
+  const renamed = availableName(name, new Set([name]), true);
+  assert.equal(validName(renamed), true);
+  assert.ok(renamed.endsWith(' (1).txt'));
+  assert.ok(renamed.length <= 180);
+});
+
+test('preflight reads all pages and refuses a read-only destination before any write', async () => {
+  const offsets: number[] = [];
+  const names = await destinationNames(
+    transport({
+      list: async (_t, _w, _f, _q, offset) => {
+        offsets.push(offset);
+        return { items: [receipt(offset ? 'later' : 'first')], hasMore: !offset, canMaintain: true };
+      },
+    }),
+    destination,
+  );
+  assert.deepEqual(offsets, [0, 24]);
+  assert.deepEqual([...names], ['first', 'later']);
+  let writes = 0;
+  const run = new BatchUploadRun(destination, scanned([file('one')]));
+  await assert.rejects(
+    run.execute(
+      transport({
+        list: async () => ({ items: [], hasMore: false, canMaintain: false }),
+        upload: async () => {
+          writes++;
+          return receipt('one');
+        },
+      }),
+      'ready',
+      () => {},
+    ),
+  );
+  assert.equal(writes, 0);
+});
+
+test('multiple files save directly in the chosen parent without an artificial batch folder', async () => {
+  let folders = 0;
+  const parents: (string | null)[] = [];
+  const names: string[] = [];
+  const run = new BatchUploadRun(
+    { ...destination, parentId: id(55) },
+    scanned([file('report.txt'), file('report.txt')]),
+  );
+  await run.execute(
+    transport({
+      list: async () => ({ items: [receipt('report.txt')], hasMore: false, canMaintain: true }),
+      folder: async () => {
+        folders++;
+        return { id: id(3), name: 'unexpected' };
+      },
+      upload: async (_t, _w, body, f) => {
+        parents.push(body.folderId);
+        names.push(f.name);
+        return receipt(f.name);
+      },
+    }),
+    'ready',
+    () => {},
+  );
+  assert.equal(folders, 0);
+  assert.deepEqual(parents, [id(55), id(55)]);
+  assert.deepEqual(names, ['report (1).txt', 'report (2).txt']);
+});
+
+test('renamed folders retain all children and uploaded bytes', async () => {
+  const created: { parentId: string | null; name: string }[] = [];
+  const parents: (string | null)[] = [];
+  const run = new BatchUploadRun(destination, scanned([file('one', 'dir/sub/one'), file('two', 'dir/two')]));
+  await run.execute(
+    transport({
+      list: async () => ({ items: [receipt('dir')], hasMore: false, canMaintain: true }),
+      folder: async (_t, _w, body) => {
+        created.push(body);
+        return { id: id(created.length + 50), name: body.name };
+      },
+      upload: async (_t, _w, body, f) => {
+        parents.push(body.folderId);
+        assert.equal(await f.text(), 'data');
+        return receipt(f.name);
+      },
+    }),
+    'ready',
+    () => {},
+  );
+  assert.deepEqual(
+    created.map((x) => [x.parentId, x.name]),
+    [
+      [null, 'dir (1)'],
+      [id(51), 'sub'],
+    ],
+  );
+  assert.deepEqual(parents, [id(52), id(51)]);
+});
+
+test('lost file response retries the same name, bytes and request only, without renaming its own saved file', async () => {
+  const calls: { key: string; name: string }[] = [];
+  let lost = false,
+    lists = 0;
   const api = transport({
     list: async () => {
       lists++;
-      return { items: committed ? [receipt(destination.name)] : [], canMaintain: true, hasMore: false };
+      return { items: [receipt('two')], hasMore: false, canMaintain: true };
     },
+    upload: async (_t, _w, body, f) => {
+      calls.push({ key: body.requestId, name: f.name });
+      if (f.name === 'two (1)' && !lost) {
+        lost = true;
+        throw new IdentityError('UNCERTAIN_RESULT');
+      }
+      return receipt(f.name);
+    },
+  });
+  const run = new BatchUploadRun(destination, scanned([file('one'), file('two')]));
+  await run.execute(api, 'ready', () => {});
+  assert.deepEqual(
+    run.files.map((r) => r.state),
+    ['succeeded', 'uncertain'],
+  );
+  await run.execute(api, 'retry', () => {});
+  assert.deepEqual(calls[1], calls[2]);
+  assert.equal(calls.length, 3);
+  assert.equal(lists, 1);
+  await run.execute(api, 'retry', () => {});
+  assert.equal(calls.length, 3);
+});
+
+test('lost folder response retains original request and stops siblings until explicit retry', async () => {
+  const keys: string[] = [];
+  let committed = false;
+  const api = transport({
     folder: async (_t, _w, body) => {
       keys.push(body.requestId);
       if (!committed) {
@@ -166,89 +249,131 @@ test('lost folder response retries its original key without rejecting its own co
       return { id: id(3), name: body.name };
     },
   });
-  const batch = new BatchUploadRun(destination, scanned([file('one')]));
-  await batch.execute(api, 'ready', () => {});
-  assert.equal(batch.files[0].state, 'uncertain');
-  await batch.execute(api, 'retry', () => {});
-  assert.equal(batch.files[0].state, 'succeeded');
-  assert.equal(lists, 1);
+  const run = new BatchUploadRun(destination, scanned([file('one', 'dir/one'), file('two', 'dir/two')]));
+  await run.execute(api, 'ready', () => {});
+  assert.deepEqual(
+    run.files.map((r) => r.state),
+    ['uncertain', 'ready'],
+  );
+  assert.equal(keys.length, 1);
+  await run.execute(api, 'retry', () => {});
+  await run.execute(api, 'ready', () => {});
   assert.equal(keys[0], keys[1]);
+  assert.equal(keys.length, 2);
+  assert.ok(run.files.every((r) => r.state === 'succeeded'));
 });
 
-test('stop waits for in-flight receipt, leaves unstarted files pending, and continue sends only pending files', async () => {
+test('pause waits for receipt and continues only pending files', async () => {
   let release!: () => void,
     calls = 0;
   const held = new Promise<void>((resolve) => {
     release = resolve;
   });
+  const run = new BatchUploadRun(destination, scanned([file('one'), file('two')]));
   const api = transport({
     upload: async (_t, _w, _b, f) => {
-      calls++;
-      if (calls === 1) await held;
+      if (++calls === 1) await held;
       return receipt(f.name);
     },
   });
-  const batch = new BatchUploadRun(destination, scanned([file('one'), file('two')]));
-  const running = batch.execute(api, 'ready', () => {});
+  const running = run.execute(api, 'ready', () => {});
   await new Promise((resolve) => setImmediate(resolve));
-  await batch.execute(api, 'ready', () => {});
-  batch.stop();
+  run.stop();
   release();
   await running;
-  assert.equal(calls, 1);
   assert.deepEqual(
-    batch.files.map((r) => r.state),
+    run.files.map((r) => r.state),
     ['succeeded', 'ready'],
   );
-  await batch.execute(api, 'ready', () => {});
+  await run.execute(api, 'ready', () => {});
   assert.equal(calls, 2);
 });
 
-test('revocation stops remaining requests, and unknown historical receipt never becomes confirmed success', async () => {
-  let calls = 0;
-  const batch = new BatchUploadRun(destination, scanned([file('one'), file('two')]));
-  await batch.execute(
-    transport({
-      upload: async () => {
-        calls++;
-        throw new IdentityError('MATERIAL_READ_ONLY', 403);
-      },
-    }),
-    'ready',
-    () => {},
-  );
-  assert.equal(calls, 1);
-  assert.deepEqual(
-    batch.files.map((r) => r.state),
-    ['failed', 'ready'],
-  );
-  const unknown = new BatchUploadRun(destination, scanned([file('one')]));
-  await unknown.execute(
+test('unknown historical receipts never count as success', async () => {
+  const run = new BatchUploadRun(destination, scanned([file('one')]));
+  await run.execute(
     transport({
       upload: async () => ({ ...receipt('one'), receiptStatus: 'HISTORICAL_UNKNOWN', acceptedVersion: null }),
     }),
     'ready',
     () => {},
   );
-  assert.equal(unknown.files[0].state, 'uncertain');
+  assert.equal(run.files[0].state, 'uncertain');
 });
-
-test('an uncertain shared directory is not automatically retried by the next file in the same run', async () => {
-  let calls = 0;
-  const batch = new BatchUploadRun(destination, scanned([file('one'), file('two')]));
-  await batch.execute(
+const tick = () => new Promise((resolve) => setImmediate(resolve));
+test('queue serializes submissions, survives listener/page replacement, and plans names when each job begins', async () => {
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const names: string[] = [];
+  const queue = new UploadQueue(
     transport({
-      folder: async () => {
-        calls++;
-        throw new IdentityError('UNCERTAIN_RESULT');
+      list: async () => ({ items: names.map((n) => receipt(n)), hasMore: false, canMaintain: true }),
+      upload: async (_t, _w, _b, f) => {
+        if (!names.length) await held;
+        names.push(f.name);
+        return receipt(f.name);
       },
     }),
-    'ready',
-    () => {},
   );
+  const unsub = queue.subscribe(() => {});
+  queue.add(destination, scanned([file('one')]), '个人空间', '#first');
+  queue.add(destination, scanned([file('one')]), '个人空间', '#second');
+  await tick();
+  assert.equal(queue.jobs[1].state, 'queued');
+  unsub();
+  queue.subscribe(() => {});
+  release();
+  await tick();
+  assert.deepEqual(names, ['one', 'one (1)']);
+  assert.ok(queue.jobs.every((j) => j.state === 'done'));
+  queue.dispose();
+});
+
+test('permission revocation stops current and queued files without reporting completion', async () => {
+  let calls = 0;
+  const queue = new UploadQueue(
+    transport({
+      upload: async () => {
+        calls++;
+        throw new IdentityError('MATERIAL_READ_ONLY', 403);
+      },
+    }),
+  );
+  queue.add(destination, scanned([file('one'), file('two')]), '个人空间', '#first');
+  queue.add(destination, scanned([file('three')]), '个人空间', '#second');
+  await tick();
   assert.equal(calls, 1);
-  assert.deepEqual(
-    batch.files.map((r) => r.state),
-    ['uncertain', 'ready'],
+  assert.ok(queue.jobs.every((j) => j.state === 'paused'));
+  assert.equal(queue.jobs[0].run.files[0].state, 'failed');
+  queue.dispose();
+});
+
+test('account or tenant disposal aborts in-flight work and clears all file references', async () => {
+  let release!: () => void,
+    calls = 0,
+    signal: AbortSignal | undefined;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const queue = new UploadQueue(
+    transport({
+      upload: async (_t, _w, _b, f, _d, s) => {
+        calls++;
+        signal = s;
+        await held;
+        return receipt(f.name);
+      },
+    }),
   );
+  queue.add(destination, scanned([file('one'), file('two')]), '个人空间', '#first');
+  queue.add(destination, scanned([file('three')]), '个人空间', '#second');
+  await tick();
+  queue.dispose();
+  release();
+  await tick();
+  assert.equal(signal?.aborted, true);
+  assert.equal(calls, 1);
+  assert.equal(queue.jobs.length, 0);
 });

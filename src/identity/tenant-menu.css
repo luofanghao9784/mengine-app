@@ -1,0 +1,82 @@
+.tenant-menu {
+  min-width: 0;
+}
+.tenant-menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 180px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  cursor: pointer;
+}
+.tenant-menu-trigger > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tenant-menu-trigger > svg {
+  flex-shrink: 0;
+}
+.tenant-menu-trigger:hover,
+.tenant-menu-trigger[aria-expanded='true'] {
+  background: var(--selected);
+  color: var(--blue-ink);
+}
+.tenant-menu-trigger:focus-visible {
+  outline: 2px solid var(--blue-ink);
+  outline-offset: 2px;
+}
+.tenant-menu-items > .button {
+  justify-content: space-between;
+  gap: 12px;
+}
+.tenant-menu-items > p {
+  margin: 0;
+  padding: 4px 12px;
+}
+.tenant-menu-items > button[aria-pressed='true'] {
+  color: var(--blue-ink);
+  background: var(--selected);
+}
+
+.tenant-surface-links,
+.surface-return-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.tenant-surface-links > a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 8px;
+  border-radius: 10px;
+  color: inherit;
+  font-size: 13px;
+  text-decoration: none;
+}
+.tenant-surface-links > a:first-child {
+  flex: 1;
+  min-width: 0;
+}
+.tenant-surface-links > a:hover {
+  background: var(--selected);
+}
+.tenant-surface-links > a:focus-visible {
+  outline: 2px solid var(--blue-ink);
+  outline-offset: -2px;
+}
+.tenant-open-new {
+  flex-shrink: 0;
+  justify-content: center;
+  min-width: 40px;
+  min-height: 40px;
+}
+.surface-return-actions {
+  flex-wrap: wrap;
+}

@@ -1,29 +1,91 @@
-.briefing-generation {
-  margin: 24px auto;
-  padding: 24px;
-  max-width: 720px;
-  text-align: center;
-  display: grid;
-  justify-items: center;
-  gap: 12px;
-}
-.briefing-generation p {
-  margin: 8px 0;
-}
-.briefing-generation details {
+.briefing-generation,
+.generation-placeholder {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  margin: 0;
+  height: 100%;
   text-align: left;
-  width: 100%;
-  max-width: 560px;
+}
+.generation-card-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: safe center;
+  height: 100%;
+  min-height: 0;
+  padding: clamp(16px, 7cqi, 26px);
+  gap: 10px;
+  overflow-y: auto;
+}
+.generation-card-copy h3 {
+  margin: 0;
+  font-size: clamp(16px, 7cqi, 21px);
+  line-height: 1.45;
+  letter-spacing: -0.02em;
+}
+.generation-card-copy p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.7;
   color: var(--muted, #64748b);
 }
-.briefing-generation summary {
-  cursor: pointer;
-  text-align: center;
+.generation-card-copy .button {
+  flex: none;
+  margin-top: 2px;
+  gap: 6px;
+  font-size: 13px;
 }
-.briefing-generation details > div {
+.generation-eyebrow {
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  color: #6b86ab;
+}
+.generation-symbol {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 8px 0;
+  color: #7899c5;
+  margin-bottom: 2px;
+}
+.generation-card-copy .generation-result {
+  font-size: 11px;
+  color: #60718a;
+}
+.generation-card-copy .access-alert {
+  font-size: 11px;
+  padding: 6px;
+}
+.generation-placeholder {
+  background: #f2f6fc;
+}
+.generation-placeholder.is-generating::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: -60%;
+  background: linear-gradient(
+    115deg,
+    transparent 22%,
+    #dee8ffb3 36%,
+    #f8faffee 49%,
+    #e5e1fb99 62%,
+    transparent 78%
+  );
+  animation: generation-flow 3.6s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes generation-flow {
+  0%,
+  100% {
+    transform: translateX(-28%) rotate(-7deg);
+    opacity: 0.65;
+  }
+  50% {
+    transform: translateX(28%) rotate(7deg);
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .generation-placeholder.is-generating::before {
+    animation: none;
+  }
 }

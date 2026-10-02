@@ -321,7 +321,7 @@ export function LiveConversationDeck({
           ))}
         </div>
         <div className="live-deck-arrows">
-          <IconButton icon={RefreshCw} label={reader ? '刷新资料' : '刷新会话'} onClick={onRefresh} />
+          {reader && <IconButton icon={RefreshCw} label="刷新资料" onClick={onRefresh} />}
           <IconButton
             icon={ArrowLeft}
             label="向左查看卡片"

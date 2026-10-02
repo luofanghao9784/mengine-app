@@ -8,6 +8,7 @@ import { RailButton } from '../briefing-live/Magazine';
 import { useSession } from '../identity/session';
 import { forwardingClient as api } from './client';
 import './forwarding.css';
+import { featureEntries } from '../shared/feature-entries';
 export function ForwardPublicationButton({
   tenant,
   publicationId,
@@ -22,6 +23,7 @@ export function ForwardPublicationButton({
   const [open, setOpen] = useState(false),
     [locked, setLocked] = useState(false);
   const pending = useContext(RequestPending);
+  if (!featureEntries.forwarding) return null;
   return (
     <>
       {compact ? (

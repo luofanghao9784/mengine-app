@@ -19,11 +19,13 @@ export function TaskReadingBody({
   task,
   onRead,
   onSource,
+  onTitle,
 }: {
   tenant: string;
   task: ReadingTask;
   onRead?: () => void;
   onSource?: (id: string, title: string) => void;
+  onTitle?: (title: string | undefined) => void;
 }) {
   const [attempt, setAttempt] = useState(0);
   const data = useRemote(
@@ -42,6 +44,11 @@ export function TaskReadingBody({
     [tenant, task.conversationId, task.taskId, task.taskRevision, task.attempt, hasBriefing, attempt],
   );
   const state = readableTask(data.value, task);
+  const title =
+    state === 'ready' && !data.error && !generated.error ? generated.value?.content.title : undefined;
+  useEffect(() => {
+    onTitle?.(title);
+  }, [onTitle, title]);
   const notified = useRef(false),
     read = useRef(onRead);
   read.current = onRead;

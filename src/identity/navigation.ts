@@ -47,9 +47,11 @@ export function managementHref(surface: 'tenant-admin' | 'platform-admin', tenan
   if (surface === 'tenant-admin') {
     const context = new URLSearchParams(current.replace(/^#/, ''));
     if (context.get('view') === 'library' && uuid(context.get('scope'))) {
-      params.set('manage', 'sources');
       params.set('scope', context.get('scope')!);
-      if (uuid(context.get('source'))) params.set('source', context.get('source')!);
+      if (uuid(context.get('source'))) {
+        params.set('manage', 'sources');
+        params.set('source', context.get('source')!);
+      }
     } else if (context.get('view') === 'spaces') {
       params.set('manage', 'business');
       params.set('tab', 'spaces');

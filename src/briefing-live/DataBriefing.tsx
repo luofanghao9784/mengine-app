@@ -1,6 +1,8 @@
-import { useId } from 'react';
 import type { BriefingDocument } from '../../contracts/public-api/briefing-content';
 import { formatBriefingNumber as value } from './content';
+import { BriefingChart as MagazineChart } from '../components/BriefingChart';
+import { toMagazineChart } from './chart-presentation';
+import '../briefingDesign.css';
 import './data-briefing.css';
 
 export function BriefingChart({
@@ -10,73 +12,17 @@ export function BriefingChart({
   document: BriefingDocument;
   compact?: boolean;
 }) {
-  const c = document.content.chart,
-    uid = useId();
-  if (!c) return null;
-  const max = Math.max(
-    1,
-    ...c.rows.flatMap((r) => [Number(r.baseline ?? 0), Number(r.current ?? 0)].map(Math.abs)),
-  );
-  const negative = c.rows.some((r) => Number(r.baseline ?? 0) < 0 || Number(r.current ?? 0) < 0);
-  const width = 640,
-    zero = negative ? 325 : 150,
-    scale = (negative ? 170 : 330) / max,
-    rowHeight = compact ? 48 : 58,
-    height = c.rows.length * rowHeight + 24;
+  const chart = toMagazineChart(document, compact);
+  if (!chart) return null;
+  if (compact) return <MagazineChart chart={chart} spacious />;
   return (
-    <figure className={'data-briefing-chart ' + (compact ? 'is-compact' : '')}>
-      <div className="data-chart-legend">
-        <span>
-          <i className="baseline" />
-          {c.baseline}
-        </span>
-        <span>
-          <i className="current" />
-          {c.current}
-        </span>
-        <span>{c.metric}</span>
+    <figure className="data-briefing-chart briefing-detail-chart">
+      <div className="data-chart-scroll">
+        <div style={{ minWidth: chart.rows.length > 6 ? chart.rows.length * 64 + 34 : undefined }}>
+          <MagazineChart chart={chart} spacious={false} />
+        </div>
       </div>
-      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-labelledby={`${uid}-title ${uid}-desc`}>
-        <title id={`${uid}-title`}>{c.metric}两期对比图</title>
-        <desc id={`${uid}-desc`}>
-          {c.rows
-            .map(
-              (r) =>
-                `${r.group}：${c.baseline} ${value(r.baseline)}，${c.current} ${value(r.current)} ${c.unit}`,
-            )
-            .join('；')}
-          。缺失值不作零处理。
-        </desc>
-        <line x1={zero} y1={0} x2={zero} y2={height - 5} stroke="#dbe3ee" />
-        {c.rows.map((r, index) => (
-          <g key={r.group} transform={`translate(0 ${index * rowHeight + 6})`}>
-            <text className="chart-group" x={0} y={23}>
-              {r.group}
-            </text>
-            {[r.baseline, r.current].map((n, j) => {
-              const size = Math.abs(Number(n ?? 0)) * scale;
-              return (
-                <g key={j}>
-                  {n !== null && (
-                    <rect
-                      x={Number(n) < 0 ? zero - size : zero}
-                      y={j * 20}
-                      width={Math.max(Number(n) === 0 ? 0 : 1, size)}
-                      height={12}
-                      rx={3}
-                      className={j ? 'current' : 'baseline'}
-                    />
-                  )}
-                  <text className="chart-value" x={negative ? 520 : zero + size + 8} y={j * 20 + 11}>
-                    {value(n)}
-                  </text>
-                </g>
-              );
-            })}
-          </g>
-        ))}
-      </svg>
-      <figcaption>单位：{c.unit} · 按原表同口径比较，具体日期与统计范围见下方依据。</figcaption>
+      <figcaption>按原表同口径比较，具体日期与统计范围见下方依据。</figcaption>
     </figure>
   );
 }

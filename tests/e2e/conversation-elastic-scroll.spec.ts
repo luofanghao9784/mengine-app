@@ -296,3 +296,35 @@ test('全部卡片放得下时仍有边界反馈，调整窗口后清理弹性�
   expect(mobile.prevented).toBe(false);
   await expect(page.getByLabel('继续对话', { exact: true })).toBeInViewport({ ratio: 1 });
 });
+
+test('横滑限于会话区域，嵌套表格到边界不带动卡片，输入和缩放不被接管', async ({ page }) => {
+  await openCards(page);
+  const before = (await snapshot(page))[0].scroll;
+  const outside = await page.locator('.sidebar').evaluate((node) => {
+    const event = new WheelEvent('wheel', { deltaX: 180, bubbles: true, cancelable: true });
+    node.dispatchEvent(event);
+    return event.defaultPrevented;
+  });
+  expect(outside).toBe(false);
+  expect((await snapshot(page))[0].scroll).toBe(before);
+  await page.locator('.deck-scroller [data-deck-id="conversation"] .deck-card-content').evaluate((node) => {
+    const table = document.createElement('div');
+    table.setAttribute('aria-label', '嵌套表格手势验证');
+    table.style.cssText = 'width:240px;height:60px;overflow:auto;flex-shrink:0;overscroll-behavior:contain';
+    table.innerHTML = '<div style="width:1000px;height:50px">合成表格</div>';
+    node.prepend(table);
+  });
+  const table = page.getByLabel('嵌套表格手势验证');
+  const sample = await table.evaluate((node) => {
+    node.scrollLeft = node.scrollWidth;
+    const event = new WheelEvent('wheel', { deltaX: 180, bubbles: true, cancelable: true });
+    node.dispatchEvent(event);
+    return { prevented: event.defaultPrevented, max: node.scrollWidth - node.clientWidth };
+  });
+  expect(sample.max).toBeGreaterThan(0);
+  expect(sample.prevented).toBe(false);
+  expect((await snapshot(page))[0].scroll).toBe(before);
+  const zoom = (await snapshot(page, { deltaX: 200, ctrlKey: true }))[0];
+  expect(zoom.prevented).toBe(false);
+  expect(zoom.scroll).toBe(before);
+});

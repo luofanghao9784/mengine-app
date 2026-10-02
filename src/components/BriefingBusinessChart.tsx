@@ -85,15 +85,44 @@ export function BriefingBusinessChart({
       bottom = height - 39,
       top = 44,
       pitch = (width - left) / Math.max(rows.length, 1);
-    const peak = Math.max(1, ...rows.flatMap((row) => [row.value, row.previous || 0]));
+    const values = rows.flatMap((row) => [
+      row.valueMissing ? 0 : row.value,
+      row.previousMissing ? 0 : row.previous || 0,
+    ]);
+    const peak = Math.max(1, ...values.map(Math.abs));
     const step = 10 ** Math.floor(Math.log10(peak));
-    const max = Math.ceil(peak / step) * step;
-    const y = (value: number) => bottom - (value / max) * (bottom - top);
+    const max = Math.ceil(Math.max(1, ...values) / step) * step;
+    const min = Math.floor(Math.min(0, ...values) / step) * step;
+    const y = (value: number) => bottom - ((value - min) / (max - min)) * (bottom - top);
+    const legendWidth = Math.min(
+      (width - left) / 2,
+      Math.max(68, (chart.columns?.[0]?.length || 2) * 7 + 28),
+    );
+    const legend = (label: string, room: number) =>
+      label.length * 7 > room ? label.slice(0, Math.max(2, Math.floor(room / 7) - 1)) + '…' : label;
     rect(left, 2, 10, 10, pale);
-    text(left + 16, 12, chart.columns?.[0] || '上期', 'start', muted);
-    rect(left + 68, 2, 10, 10, blue);
-    text(left + 84, 12, chart.columns?.[1] || '本期', 'start', muted);
-    for (const value of [0, max / 2, max]) {
+    text(
+      left + 16,
+      12,
+      <tspan>
+        <title>{chart.columns?.[0] || '上期'}</title>
+        {legend(chart.columns?.[0] || '上期', legendWidth - 20)}
+      </tspan>,
+      'start',
+      muted,
+    );
+    rect(left + legendWidth, 2, 10, 10, blue);
+    text(
+      left + legendWidth + 16,
+      12,
+      <tspan>
+        <title>{chart.columns?.[1] || '本期'}</title>
+        {legend(chart.columns?.[1] || '本期', width - left - legendWidth - 16)}
+      </tspan>,
+      'start',
+      muted,
+    );
+    for (const value of min < 0 ? [min, 0, max] : [0, max / 2, max]) {
       line(left, y(value), width, y(value));
       text(
         left - 6,
@@ -107,28 +136,30 @@ export function BriefingBusinessChart({
     rows.forEach((row, i) => {
       const x = left + (i + 0.5) * pitch,
         bar = Math.min(25, pitch * 0.3);
-      rect(
-        x - bar - 1.5,
-        y(row.previous || 0),
-        bar,
-        bottom - y(row.previous || 0),
-        pale,
-        `${row.label} · ${chart.columns?.[0]}：${amount(row.previous || 0)}${chart.unit}`,
-      );
-      rect(
-        x + 1.5,
-        y(row.value),
-        bar,
-        bottom - y(row.value),
-        blue,
-        `${row.label} · ${chart.columns?.[1]}：${amount(row.value)}${chart.unit}`,
-      );
+      if (!row.previousMissing)
+        rect(
+          x - bar - 1.5,
+          Math.min(y(0), y(row.previous || 0)),
+          bar,
+          Math.abs(y(0) - y(row.previous || 0)),
+          pale,
+          `${row.label} · ${chart.columns?.[0]}：${row.previousText ?? amount(row.previous || 0)}${chart.unit}`,
+        );
+      if (!row.valueMissing)
+        rect(
+          x + 1.5,
+          Math.min(y(0), y(row.value)),
+          bar,
+          Math.abs(y(0) - y(row.value)),
+          blue,
+          `${row.label} · ${chart.columns?.[1]}：${row.valueText ?? amount(row.value)}${chart.unit}`,
+        );
       // Label the current bar directly; exact prior values remain available on the light bar.
       marks.push(
         <text
           key={key++}
           x={Math.min(width - 22, x + 1.5 + bar / 2)}
-          y={y(row.value) - 9}
+          y={y(Math.max(0, row.value)) - 9}
           textAnchor="middle"
           fill={blue}
           stroke="white"
@@ -136,16 +167,26 @@ export function BriefingBusinessChart({
           paintOrder="stroke"
           style={{ fontSize: 11, fontWeight: 600 }}
         >
-          {amount(row.value)}
+          <title>{row.valueMissing ? '缺数据' : (row.valueText ?? amount(row.value))}</title>
+          {row.valueMissing
+            ? '缺数据'
+            : (row.valueText?.length || 0) > 12
+              ? row.value.toExponential(2)
+              : (row.valueText ?? amount(row.value))}
         </text>,
       );
       const label = row.label.replace(/店$/, '');
-      const chunks = pitch < 54 && label.length > 3 ? [label.slice(0, 2), label.slice(2)] : [label];
+      const maximum = Math.max(4, Math.floor(pitch / 11) * 2);
+      const visibleLabel = label.length > maximum ? label.slice(0, maximum - 1) + '…' : label;
+      const wrap = visibleLabel.length * 11 > pitch - 4;
+      const split = Math.ceil(visibleLabel.length / 2);
+      const chunks = wrap ? [visibleLabel.slice(0, split), visibleLabel.slice(split)] : [visibleLabel];
       text(
         x,
         bottom + 18,
         chunks.map((part, j) => (
           <tspan key={j} x={x} dy={j ? 14 : 0}>
+            <title>{row.label}</title>
             {part}
           </tspan>
         )),

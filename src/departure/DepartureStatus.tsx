@@ -9,12 +9,10 @@ export function DepartureStatus({
   tenant,
   platform = false,
   verification = 0,
-  compact = false,
 }: {
   tenant: string;
   platform?: boolean;
   verification?: number;
-  compact?: boolean;
 }) {
   const [refresh, setRefresh] = useState(0);
   useEffect(() => {
@@ -43,17 +41,16 @@ export function DepartureStatus({
       </p>
     );
   const s = remote.value;
-  if (compact && s.businessEnabled && !s.exitState) return null;
+  // Normal operation is silent across every page; only exceptional states need a banner.
+  if (s.businessEnabled) return null;
   return (
-    <div className={'departure-status ' + (s.businessEnabled ? 'active' : 'stopped')} role="status">
+    <div className="departure-status stopped" role="status">
       <strong>
-        {s.businessEnabled
-          ? '业务运行中'
-          : s.exitState === 'COMPLETE'
-            ? '已退出 · 在线清理完成'
-            : s.exitState
-              ? '企业退出中 · 普通业务已停止'
-              : '业务已停用'}
+        {s.exitState === 'COMPLETE'
+          ? '已退出 · 在线清理完成'
+          : s.exitState
+            ? '企业退出中 · 普通业务已停止'
+            : '业务已停用'}
       </strong>
       {s.exitState && !platform && <ExitRecordLink tenant={tenant} revision={refresh} />}
       {s.exitState && (

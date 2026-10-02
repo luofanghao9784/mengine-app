@@ -1,3 +1,4 @@
+import { hasNestedScroll, wheelGestureAxis } from '../shared/gesture-routing';
 import { useLayoutEffect, type RefObject } from 'react';
 import { deckSpacing } from '../conversationDeck';
 
@@ -12,7 +13,7 @@ export function useDeckElasticScroll(
   useLayoutEffect(() => {
     const deck = scroller.current;
     if (!deck || !enabled) return;
-    const root = deck.closest('.conversation-overlay')!;
+    const root = deck.closest<HTMLElement>('.conversation-overlay, .live-demo-deck') || deck;
     const preference = matchMedia('(prefers-reduced-motion: reduce)');
     let side = 0;
     let level = 0;
@@ -147,24 +148,16 @@ export function useDeckElasticScroll(
       deck.hasAttribute('data-reordering') ||
       !!document.querySelector('dialog[open], [role="dialog"][aria-modal="true"]') ||
       !!target?.closest('[role="listbox"], [role="menu"], [data-anchored-popover]');
-    const nestedScroll = (target: Element | null, delta: number) => {
-      for (let node = target; node && node !== deck && root.contains(node); node = node.parentElement) {
-        if (
-          node.scrollWidth <= node.clientWidth + 1 ||
-          !/(auto|scroll)/.test(getComputedStyle(node).overflowX)
-        )
-          continue;
-        if (delta < 0 ? node.scrollLeft > 0 : node.scrollLeft + node.clientWidth < node.scrollWidth - 1)
-          return true;
-      }
-      return false;
-    };
+    const nestedScroll = (target: Element | null) => !!target && hasNestedScroll(target, deck, 'x');
+    const wheelAxis = wheelGestureAxis();
     const wheel = (event: WheelEvent) => {
       const target = event.target instanceof Element ? event.target : null;
-      if (event.defaultPrevented || event.ctrlKey || blocked(target)) return;
-      if (!event.shiftKey && Math.abs(event.deltaX) <= Math.abs(event.deltaY)) return;
+      if (!target || !root.contains(target)) return;
+      const axis = wheelAxis(event);
+      if (event.defaultPrevented || blocked(target) || axis !== 'x') return;
+      if (target.closest('input, textarea, select, [contenteditable="true"]')) return;
       const delta = event.shiftKey && !event.deltaX ? event.deltaY : event.deltaX;
-      if (!delta || nestedScroll(target, delta)) return;
+      if (!delta || nestedScroll(target)) return;
       const unit =
         event.deltaMode === WheelEvent.DOM_DELTA_LINE
           ? 16
@@ -208,7 +201,7 @@ export function useDeckElasticScroll(
       if (!touch.axis) {
         if (Math.hypot(dx, dy) < 6) return;
         touch.axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
-        if (nestedScroll(event.target as Element, -dx)) touch.axis = 'nested';
+        if (nestedScroll(event.target as Element)) touch.axis = 'nested';
       }
       const delta = touch.x - point.clientX;
       touch.x = point.clientX;
@@ -249,11 +242,11 @@ export function useDeckElasticScroll(
     const observer = new ResizeObserver(interrupt);
     observer.observe(deck);
     deck.querySelectorAll('[data-deck-id]').forEach((card) => observer.observe(card));
-    document.addEventListener('wheel', wheel, { passive: false });
-    document.addEventListener('touchstart', touchStart, { passive: true });
-    document.addEventListener('touchmove', touchMove, { passive: false });
-    document.addEventListener('touchend', touchEnd);
-    document.addEventListener('touchcancel', touchEnd);
+    root.addEventListener('wheel', wheel, { passive: false });
+    root.addEventListener('touchstart', touchStart, { passive: true });
+    root.addEventListener('touchmove', touchMove, { passive: false });
+    root.addEventListener('touchend', touchEnd);
+    root.addEventListener('touchcancel', touchEnd);
     document.addEventListener('pointerdown', pointerDown, true);
     document.addEventListener('keydown', keyDown, true);
     deck.addEventListener('scroll', scroll, { passive: true });
@@ -263,11 +256,11 @@ export function useDeckElasticScroll(
     return () => {
       interrupt();
       observer.disconnect();
-      document.removeEventListener('wheel', wheel);
-      document.removeEventListener('touchstart', touchStart);
-      document.removeEventListener('touchmove', touchMove);
-      document.removeEventListener('touchend', touchEnd);
-      document.removeEventListener('touchcancel', touchEnd);
+      root.removeEventListener('wheel', wheel);
+      root.removeEventListener('touchstart', touchStart);
+      root.removeEventListener('touchmove', touchMove);
+      root.removeEventListener('touchend', touchEnd);
+      root.removeEventListener('touchcancel', touchEnd);
       document.removeEventListener('pointerdown', pointerDown, true);
       document.removeEventListener('keydown', keyDown, true);
       deck.removeEventListener('scroll', scroll);

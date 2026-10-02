@@ -54,7 +54,7 @@ export function NavigationButton({
     'aria-current': active ? ('page' as const) : undefined,
   };
   return href ? (
-    <a {...props} href={href}>
+    <a {...props} href={href} onClick={onClick}>
       {content}
     </a>
   ) : (

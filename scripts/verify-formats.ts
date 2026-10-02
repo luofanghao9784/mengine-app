@@ -296,7 +296,7 @@ try {
   async function show(name: string) {
     await page.goto(`/workspace/#tenant=${tenant}&view=library&scope=personal`);
     await page.getByLabel('搜索资料名称').fill(name);
-    await page.getByRole('button', { name: '搜索', exact: true }).click();
+    await page.getByRole('button', { name: '搜索资料', exact: true }).click();
     await page.locator('.material-entry').filter({ hasText: name }).click();
     await page.getByRole('button', { name: '查看 v1 解析', exact: true }).click();
     return page.getByLabel('版本解析内容');

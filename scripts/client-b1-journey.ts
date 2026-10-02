@@ -45,11 +45,11 @@ export async function verifyClientB1(owner: Page, member: Page, tenant: string, 
     await owner.goto(`/workspace/#tenant=${tenant}&view=library`);
     await expect(owner.getByRole('heading', { name: '资料库', exact: true })).toBeVisible();
     await expect(owner.locator('select[aria-label="当前企业"]')).toHaveCount(0);
-    await owner.getByRole('button', { name: '更多工作与管理', exact: true }).click();
-    const more = owner.getByRole('dialog', { name: '工作与管理', exact: true });
-    await expect(more.getByRole('link', { name: '我的计划', exact: true })).toBeVisible();
+    await owner.getByRole('button', { name: /^当前企业：/ }).click();
+    const more = owner.getByRole('dialog', { name: '企业与管理', exact: true });
+    await expect(more.getByRole('link', { name: '我的计划', exact: true })).toHaveCount(0);
     await expect(more.getByRole('link', { name: /档案|经验/ })).toHaveCount(0);
-    await more.getByRole('button', { name: '关闭弹窗', exact: true }).click();
+    await owner.keyboard.press('Escape');
     await owner.getByRole('button', { name: '个人设置与账号', exact: true }).click();
     await expect(owner.getByRole('combobox', { name: '切换企业' })).toHaveCount(0);
     await owner.getByRole('link', { name: '我的档案与偏好', exact: true }).click();
@@ -58,6 +58,30 @@ export async function verifyClientB1(owner: Page, member: Page, tenant: string, 
     await shot(owner, 'personal-settings');
 
     const identity = await (await owner.request.get('/api/v1/me')).json();
+    await owner.goto(`/workspace/#tenant=${tenant}&view=library`);
+    await owner.getByLabel('搜索资料名称或正文', { exact: true }).fill('独立客户端检索');
+    await owner.getByRole('button', { name: /^当前企业：/ }).click();
+    const [parallelManagement] = await Promise.all([
+      owner.context().waitForEvent('page'),
+      owner.getByRole('link', { name: '在新标签页打开企业管理端', exact: true }).click(),
+    ]);
+    await expect(
+      parallelManagement.getByRole('heading', { name: '企业管理', exact: true, level: 1 }),
+    ).toBeVisible();
+    assert.equal(
+      (await (await parallelManagement.request.get('/api/v1/me')).json()).account.id,
+      identity.account.id,
+    );
+    assert.equal(await parallelManagement.evaluate(() => window.opener === null), true);
+    await parallelManagement.getByLabel('搜索姓名或手机号', { exact: true }).fill('独立管理端检索');
+    await owner.bringToFront();
+    await expect(owner.getByLabel('搜索资料名称或正文', { exact: true })).toHaveValue('独立客户端检索');
+    await parallelManagement.bringToFront();
+    await expect(parallelManagement.getByLabel('搜索姓名或手机号', { exact: true })).toHaveValue(
+      '独立管理端检索',
+    );
+    await parallelManagement.close();
+    await owner.getByLabel('搜索资料名称或正文', { exact: true }).fill('');
     const context = await (await owner.request.get(`/api/v1/tenants/${tenant}/context`)).json();
     const space = context.workspaces.find((s: { kind: string }) => s.kind === 'PERSONAL').id as string;
     const root = `/api/v1/tenants/${tenant}/workspaces/${space}/materials`;
@@ -103,7 +127,7 @@ INSERT INTO knowledge_chunks(id,tenant_id,workspace_id,material_id,version_id,ru
     }
     await owner.goto(`/workspace/#tenant=${tenant}&view=library`);
     await owner.getByLabel('搜索资料名称或正文', { exact: true }).fill('b1-reader');
-    await owner.getByRole('button', { name: '搜索', exact: true }).click();
+    await owner.getByRole('button', { name: '搜索资料', exact: true }).click();
     await owner.locator('.material-entry').filter({ hasText: 'b1-reader.txt' }).click();
     const reader = owner.getByRole('region', { name: '资料阅读视窗', exact: true });
     const body = reader.locator('[data-deck-id="conversation"] .live-source-reader');
@@ -131,10 +155,10 @@ INSERT INTO knowledge_chunks(id,tenant_id,workspace_id,material_id,version_id,ru
     await expect(body).toContainText('第 1 版合成阅读段落');
     await expect(properties).toContainText('当前最新版本');
     await reader.getByRole('button', { name: '关闭资料阅读', exact: true }).click();
-    await owner.getByRole('button', { name: '更多工作与管理', exact: true }).click();
+    await owner.getByRole('button', { name: /^当前企业：/ }).click();
     await owner
-      .getByRole('dialog', { name: '工作与管理', exact: true })
-      .getByRole('link', { name: '企业管理', exact: true })
+      .getByRole('dialog', { name: '企业与管理', exact: true })
+      .getByRole('link', { name: '切换到企业管理端', exact: true })
       .click();
     await expect(owner.getByRole('heading', { name: '企业管理', exact: true })).toBeVisible();
     await owner.getByRole('link', { name: '返回原工作', exact: true }).click();
@@ -169,12 +193,14 @@ INSERT INTO conversation_sources(tenant_id,workspace_id,task_id,chunk_id,ordinal
     await expect(deck.locator(`[data-deck-id="${chunks[0]}"]`)).toBeVisible();
     const editor = owner.getByPlaceholder('有什么工作想交给 AI？', { exact: true });
     await editor.fill('B1 尚未发送的草稿');
-    await owner.getByRole('button', { name: '更多工作与管理', exact: true }).click();
+    await owner.getByRole('link', { name: '资料库', exact: true }).click();
+    await owner.getByRole('button', { name: /^当前企业：/ }).click();
     await owner
-      .getByRole('dialog', { name: '工作与管理', exact: true })
-      .getByRole('link', { name: '企业管理', exact: true })
+      .getByRole('dialog', { name: '企业与管理', exact: true })
+      .getByRole('link', { name: '切换到企业管理端', exact: true })
       .click();
     await owner.getByRole('link', { name: '返回原工作', exact: true }).click();
+    await owner.goto(`/workspace/#tenant=${tenant}&view=conversations&conversation=${conversation}`);
     await expect(editor).toHaveValue('B1 尚未发送的草稿');
     await expect(deck.locator(`[data-deck-id="${chunks[0]}"]`)).not.toHaveAttribute(
       'data-needs-reveal',
@@ -189,22 +215,26 @@ INSERT INTO conversation_sources(tenant_id,workspace_id,task_id,chunk_id,ordinal
 
     // Employee in tenant one, administrator in tenant two: management must not silently change tenant.
     await member.goto(`/workspace/#tenant=${tenant}&view=briefing`);
-    await member.getByRole('button', { name: '更多工作与管理', exact: true }).click();
+    await member.getByRole('button', { name: /^当前企业：/ }).click();
     await expect(
       member
-        .getByRole('dialog', { name: '工作与管理', exact: true })
-        .getByRole('link', { name: '企业管理', exact: true }),
+        .getByRole('dialog', { name: '企业与管理', exact: true })
+        .getByRole('link', { name: '切换到企业管理端', exact: true }),
     ).toHaveCount(0);
-    await member.getByRole('button', { name: '关闭弹窗', exact: true }).click();
-    await member.getByLabel('当前企业', { exact: true }).selectOption(otherTenant);
-    await expect(member.getByLabel('当前企业', { exact: true })).toHaveValue(otherTenant);
-    await member.getByRole('button', { name: '更多工作与管理', exact: true }).click();
+    await member.keyboard.press('Escape');
+    await member.getByRole('button', { name: /^当前企业：/ }).click();
+    await member
+      .getByRole('dialog', { name: '企业与管理' })
+      .getByRole('button', { name: '合成第二企业', exact: true })
+      .click();
+    await expect(member).toHaveURL(new RegExp(`tenant=${otherTenant}`));
+    await member.getByRole('button', { name: /^当前企业：/ }).click();
     await expect(
       member
-        .getByRole('dialog', { name: '工作与管理', exact: true })
-        .getByRole('link', { name: '企业管理', exact: true }),
+        .getByRole('dialog', { name: '企业与管理', exact: true })
+        .getByRole('link', { name: '切换到企业管理端', exact: true }),
     ).toBeVisible();
-    await member.getByRole('button', { name: '关闭弹窗', exact: true }).click();
+    await member.keyboard.press('Escape');
     await owner.goto(`/workspace/#tenant=${tenant}&view=experiences&experience=${randomUUID()}`);
     await expect(owner.getByRole('heading', { name: '此功能暂未开放', exact: true })).toBeVisible();
     await expect(owner.getByRole('button', { name: /新建经验|整理经验/ })).toHaveCount(0);
@@ -228,6 +258,7 @@ INSERT INTO conversation_sources(tenant_id,workspace_id,task_id,chunk_id,ordinal
             'conversation property card',
             'running task permits navigation',
             'no silent cross-tenant administration',
+            'shared real login with independent client and management tabs',
             'retired experience route',
           ],
         },

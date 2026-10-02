@@ -1,11 +1,13 @@
+import { generationTiles } from '../briefing-live/GenerationPanel';
+import type { BriefingGeneration } from '../briefing-live/useBriefingGeneration';
 import { ContinueWithMaterial } from '../conversation/AttachmentMaterials';
 import { AnalysisPanel } from '../material/Knowledge';
 import { briefingTypeLabels } from '../briefing-live/content';
 import { useViewState, pageState } from '../shared/useViewState';
-import { DataBriefing } from '../briefing-live/DataBriefing';
 import { ForwardPublicationButton } from '../forwarding/ForwardPublicationButton';
+import { featureEntries } from '../shared/feature-entries';
 import { useContext, useEffect, useRef, useState } from 'react';
-import { Download, RefreshCw, Newspaper, Share2, Star } from 'lucide-react';
+import { Download, Newspaper, Share2, Star } from 'lucide-react';
 import type { RecommendationItem } from '../../contracts/public-api/recommendation';
 import { Failure, Loading, Pager, SubmitError, useRemote, useSubmission } from '../shared/admin';
 import { RequestPending, useRequestLock } from '../shared/request-guard';
@@ -17,7 +19,7 @@ import { FeedbackActions } from '../briefing-live/FeedbackActions';
 import { FollowButton } from '../briefing-live/FollowButton';
 import { Modal } from '../shared/ui';
 import { recommendationClient as api } from './client';
-import { usePackedRecommendations } from './usePackedRecommendations';
+import { MagazineGrid } from '../briefing-live/MagazineGrid';
 import { MagazineBody, RailButton } from '../briefing-live/Magazine';
 import { ReadingDialog } from '../briefing-live/ReadingDialog';
 import './recommendation.css';
@@ -27,12 +29,16 @@ export function Recommendations({
   businessType,
   publicationsOnly = false,
   focused = false,
+  onSettled,
+  generation,
 }: {
+  generation?: BriefingGeneration;
   tenant: string;
   workspace: string | null;
   businessType?: string;
   publicationsOnly?: boolean;
   focused?: boolean;
+  onSettled?: (success: boolean) => void;
 }) {
   const { session } = useSession(),
     pending = useContext(RequestPending);
@@ -65,53 +71,36 @@ export function Recommendations({
     );
   const data = useRemote(
     (signal) =>
-      api.list(tenant, workspace, page * 20, page ? snapshot : undefined, signal, {
-        businessType,
-        publicationsOnly,
-        focused,
-      }),
+      api
+        .list(tenant, workspace, page * 20, page ? snapshot : undefined, signal, {
+          businessType,
+          publicationsOnly,
+          focused,
+        })
+        .then(
+          (result) => {
+            if (!signal.aborted) onSettled?.(true);
+            return result;
+          },
+          (error) => {
+            if (!signal.aborted) onSettled?.(false);
+            throw error;
+          },
+        ),
     [tenant, workspace, businessType, publicationsOnly, focused, page, attempt, session.identity],
   );
-  const [extra, setExtra] = useState<RecommendationItem[]>([]);
-  useEffect(() => {
-    setExtra([]);
-    const controller = new AbortController();
-    const receive = (event: Event) => {
-      const detail = (event as CustomEvent<{ tenant: string; cards: string[] }>).detail;
-      if (detail.tenant !== tenant || focused || publicationsOnly) return;
-      void api
-        .cards(tenant, detail.cards, controller.signal)
-        .then((items) => {
-          if (controller.signal.aborted) return;
-          setExtra((old) => [
-            ...old,
-            ...items.filter(
-              (item) =>
-                (!workspace || item.content.workspaceId === workspace) &&
-                (!businessType || item.briefing?.content.businessType === businessType) &&
-                !old.some((v) => v.content.id === item.content.id),
-            ),
-          ]);
-        })
-        .catch(() => {
-          if (!controller.signal.aborted) setExtra([]);
-        });
-    };
-    window.addEventListener('briefing-generated', receive);
-    return () => {
-      controller.abort();
-      window.removeEventListener('briefing-generated', receive);
-    };
-  }, [tenant, workspace, businessType, focused, publicationsOnly]);
-  const visibleItems = [
-    ...(data.value?.items || []),
-    ...extra.filter((item) => !data.value?.items.some((v) => v.content.id === item.content.id)),
+  const reserved = new Set(generation?.slots.flatMap((slot) => slot.batch.cardIds) || []);
+  const visibleItems = (data.value?.items || []).filter((item) => !reserved.has(item.content.id));
+  const tiles = [
+    ...visibleItems.map((item) => ({
+      id: item.content.id + ':' + item.content.versionKey,
+      title: item.briefing?.content.title ?? item.content.title,
+      summary: item.briefing?.content.summary ?? item.content.excerpt,
+      chart: !!item.briefing?.content.chart,
+      render: <RecommendationCard tenant={tenant} item={item} />,
+    })),
+    ...(generation ? generationTiles(generation, (item) => <RecommendationCard tenant={tenant} item={item} />) : []),
   ];
-  const grid = useRef<HTMLDivElement>(null);
-  usePackedRecommendations(
-    grid,
-    visibleItems.map((i) => i.content.id + ':' + i.content.versionKey).join('|'),
-  );
   const submission = useSubmission<{ expectedRevision: number; enabled: boolean }>();
   useRequestLock(submission.busy || submission.uncertain);
   const refresh = () => {
@@ -119,47 +108,30 @@ export function Recommendations({
     setSnapshot(undefined);
     setAttempt((n) => n + 1);
   };
-  const settings = data.value?.settings;
   return (
     <section className="recommendations" aria-label={focused ? '关注的企业成果' : '工作推荐'}>
-      {!focused && (
-        <details className="recommendation-options">
-          <summary>推荐设置与依据</summary>
-          <div className="recommendation-toolbar">
-            <p>按当前可访问成果、明确关注和有效方法排序，阅读后保留原位。</p>
-            <Button icon={RefreshCw} disabled={pending} onClick={refresh}>
-              刷新推荐
-            </Button>
-            {settings && (
-              <Button
-                disabled={submission.busy || (pending && !submission.uncertain)}
-                onClick={() =>
-                  void submission.submit(
-                    { expectedRevision: settings.revision, enabled: !settings.enabled },
-                    async (body, key) => {
-                      await api.configure(tenant, { ...body, requestId: key });
-                      refresh();
-                    },
-                  )
-                }
-              >
-                {submission.uncertain ? '重试本次设置' : settings.enabled ? '关闭一般推荐' : '开启一般推荐'}
-              </Button>
-            )}
-          </div>
-        </details>
-      )}
       <SubmitError error={submission.error} uncertain={submission.uncertain} />
       {data.error ? (
         <Failure error={data.error} retry={refresh} />
       ) : !data.value ? (
         <Loading />
       ) : !data.value.settings.enabled && !focused ? (
-        <Empty
-          icon={Newspaper}
-          title="一般推荐已关闭"
-          text="随时可以在推荐设置中重新开启。会话、成果和待办仍可正常使用。"
-        />
+        <Empty icon={Newspaper} title="一般推荐已关闭" text="会话和成果仍可正常使用，也可以重新开启推荐。">
+          <Button
+            disabled={submission.busy || (pending && !submission.uncertain)}
+            onClick={() =>
+              void submission.submit(
+                { expectedRevision: data.value!.settings.revision, enabled: true },
+                async (body, requestId) => {
+                  await api.configure(tenant, { ...body, requestId });
+                  refresh();
+                },
+              )
+            }
+          >
+            {submission.uncertain ? '重试开启推荐' : '开启推荐'}
+          </Button>
+        </Empty>
       ) : (
         <>
           {data.value.poolLimited && (
@@ -168,7 +140,7 @@ export function Recommendations({
               项获权成果排序，另有更早成果。可按空间缩小范围，或在会话、资料库查找。
             </p>
           )}
-          {!visibleItems.length && (
+          {!visibleItems.length && !generation && (
             <Empty
               icon={Newspaper}
               title="画报正在等待可用资料"
@@ -179,15 +151,7 @@ export function Recommendations({
               </a>
             </Empty>
           )}
-          <div className="live-briefing-grid recommendation-grid" ref={grid}>
-            {visibleItems.map((item) => (
-              <RecommendationCard
-                key={item.content.id + ':' + item.content.versionKey}
-                tenant={tenant}
-                item={item}
-              />
-            ))}
-          </div>
+          <MagazineGrid items={tiles} />
           {(page > 0 || data.value.hasMore) && (
             <Pager
               page={page}
@@ -201,8 +165,14 @@ export function Recommendations({
           )}
         </>
       )}
+      {generation && (!data.value || !data.value.settings.enabled || !!data.error) && (
+        <GeneratedBriefings tenant={tenant} generation={generation} />
+      )}
     </section>
   );
+}
+export function GeneratedBriefings({ tenant, generation }: { tenant: string; generation: BriefingGeneration }) {
+  return <MagazineGrid items={generationTiles(generation, (item) => <RecommendationCard tenant={tenant} item={item} />)} />;
 }
 function RecommendationCard({ tenant, item }: { tenant: string; item: RecommendationItem }) {
   const c = item.content,
@@ -292,16 +262,17 @@ function RecommendationCard({ tenant, item }: { tenant: string; item: Recommenda
       ) : (
         <PublicationFollow tenant={tenant} material={c.materialId!} pinned={pinned} changed={setPinned} />
       )}
-      {c.kind === 'PUBLICATION' && item.feedbackTarget?.kind === 'PUBLICATION' ? (
-        <ForwardPublicationButton
-          tenant={tenant}
-          publicationId={item.feedbackTarget.publicationId}
-          materialVersionId={item.feedbackTarget.materialVersionId}
-          compact
-        />
-      ) : (
-        <RailButton label="转发" icon={Share2} disabled={pending} onClick={() => setShareInfo(true)} />
-      )}
+      {featureEntries.forwarding &&
+        (c.kind === 'PUBLICATION' && item.feedbackTarget?.kind === 'PUBLICATION' ? (
+          <ForwardPublicationButton
+            tenant={tenant}
+            publicationId={item.feedbackTarget.publicationId}
+            materialVersionId={item.feedbackTarget.materialVersionId}
+            compact
+          />
+        ) : (
+          <RailButton label="转发" icon={Share2} disabled={pending} onClick={() => setShareInfo(true)} />
+        ))}
     </>
   );
   return (
@@ -324,31 +295,18 @@ function RecommendationCard({ tenant, item }: { tenant: string; item: Recommenda
           onClick={() => void open()}
           aria-label={'阅读：' + c.title}
         >
-          {item.briefing ? (
-            <>
-              <div className="data-briefing-type">
-                {briefingTypeLabels[item.briefing.content.businessType]}{' '}
-                <time>{new Date(c.createdAt).toLocaleDateString('zh-CN')}</time>
-              </div>
-              <h3>{item.briefing.content.title}</h3>
-              <DataBriefing document={item.briefing} compact />
-              <span className="data-briefing-generated">
-                {c.workspaceName} · {item.briefing.content.chart ? '有计算依据' : '有来源依据'}
-              </span>
-            </>
-          ) : (
-            <MagazineBody
-              title={c.title}
-              excerpt={c.excerpt}
-              truncated={c.truncated}
-              workspace={c.workspaceName}
-              date={c.createdAt}
-              publication={c.kind === 'PUBLICATION'}
-              pinned={pinned}
-              verification={c.executionClass === 'verification'}
-              footer={c.kind === 'PUBLICATION' ? <span>v{c.materialVersion}</span> : undefined}
-            />
-          )}
+          <MagazineBody
+            briefing={item.briefing}
+            title={c.title}
+            excerpt={c.excerpt}
+            truncated={c.truncated}
+            workspace={c.workspaceName}
+            date={c.createdAt}
+            publication={c.kind === 'PUBLICATION'}
+            pinned={pinned}
+            verification={c.executionClass === 'verification'}
+            footer={c.kind === 'PUBLICATION' ? <span>v{c.materialVersion}</span> : undefined}
+          />
         </button>
         {!reading && item.feedbackTarget && (
           <div className="live-card-action-rail">
@@ -476,7 +434,7 @@ function RecommendationCard({ tenant, item }: { tenant: string; item: Recommenda
           </details>
         </ReadingDialog>
       )}
-      {shareInfo && (
+      {featureEntries.forwarding && shareInfo && (
         <Modal title="转发这份成果" onClose={() => setShareInfo(false)}>
           <p>
             这份成果来自你的私人会话。先在会话中保存为文稿并发布到有权共享的空间，随后即可从企业副本转发给已获权同事。

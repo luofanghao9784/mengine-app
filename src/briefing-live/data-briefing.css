@@ -5,56 +5,18 @@
   margin: 16px 0 20px;
 }
 .data-briefing-chart {
-  margin: 20px 0 26px;
+  margin: 28px 0;
 }
-.data-chart-legend {
-  display: flex;
-  gap: 18px;
-  flex-wrap: wrap;
-  font-size: 12px;
-  color: #66758b;
-  margin-bottom: 15px;
-}
-.data-chart-legend span {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.data-chart-legend i {
-  width: 10px;
-  height: 10px;
-  border-radius: 3px;
-}
-.data-briefing-chart .baseline {
-  fill: #bacbdf;
-  background: #bacbdf;
-}
-.data-briefing-chart .current {
-  fill: #3978b8;
-  background: #3978b8;
-}
-.data-briefing-chart svg {
-  display: block;
-  width: 100%;
-  height: auto;
-  overflow: visible;
-}
-.data-briefing-chart text {
-  font-family: inherit;
-  fill: #3c4c60;
-}
-.data-briefing-chart .chart-group {
-  font-size: 15px;
-}
-.data-briefing-chart .chart-value {
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
+.data-chart-scroll {
+  overflow-x: auto;
 }
 .data-briefing-chart figcaption {
-  font-size: 12px;
+  font: 12px/1.65 system-ui;
   color: #7d8795;
-  line-height: 1.65;
   margin-top: 8px;
+}
+.data-briefing-chart .briefing-visual-chart {
+  font-family: system-ui;
 }
 .data-briefing-analysis p {
   font-size: 15px;
@@ -112,46 +74,4 @@
 }
 .data-briefing.is-compact .data-briefing-chart {
   margin: 16px 0 4px;
-}
-.data-briefing.is-compact .data-chart-legend {
-  font-size: 11px;
-  gap: 12px;
-  margin-bottom: 10px;
-}
-.data-briefing.is-compact figcaption {
-  font-size: 10px;
-}
-.live-magazine-type.data {
-  color: #3978b8;
-}
-.live-briefing-card.has-data-briefing .live-briefing-body {
-  height: auto;
-  min-height: 360px;
-}
-.live-briefing-card.has-data-briefing h3 {
-  font-size: 21px;
-  line-height: 1.5;
-}
-.data-briefing-type {
-  display: inline-flex;
-  gap: 8px;
-  align-items: center;
-  color: #58738d;
-  font-size: 12px;
-}
-.data-briefing-generated {
-  font-size: 11px;
-  color: #8190a2;
-}
-/* Keep SVG labels legible when a card or reader is narrower than the chart's viewBox. */
-.data-briefing-chart {
-  container-type: inline-size;
-}
-@container (max-width: 440px) {
-  .data-briefing-chart .chart-group {
-    font-size: 26px;
-  }
-  .data-briefing-chart .chart-value {
-    font-size: 24px;
-  }
 }

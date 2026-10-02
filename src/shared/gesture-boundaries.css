@@ -1,0 +1,16 @@
+/* The app owns overscroll gestures, while browser buttons/shortcuts and pinch zoom remain native.
+   Apply at the viewport too: a short/empty page has no inner scrolling boundary to contain it. */
+html:has(.workspace-shell, .app-shell),
+body:has(.workspace-shell, .app-shell) {
+  overscroll-behavior: none;
+}
+.workspace-shell,
+.workspace-shell .access-content {
+  overscroll-behavior: none;
+}
+
+.briefing-is-swiping,
+.briefing-is-swiping * {
+  user-select: none;
+  cursor: grabbing;
+}

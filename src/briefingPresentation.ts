@@ -1,6 +1,15 @@
 import type { CardData, CardSize } from './briefing.ts';
 
-export type ChartDatum = { label: string; value: number; previous?: number };
+export type ChartDatum = {
+  label: string;
+  value: number;
+  previous?: number;
+  // Exact display strings and missing flags accompany numeric plotting coordinates.
+  valueText?: string;
+  previousText?: string;
+  valueMissing?: boolean;
+  previousMissing?: boolean;
+};
 export type BriefingChart = {
   kind:
     | 'line'
@@ -118,7 +127,10 @@ export function chartDescription(chart: BriefingChart): string {
       )
       .join('；')}。两种口径分别核对，不相加。`;
   const rows = chart.rows
-    .map((r) => `${r.label} ${r.previous === undefined ? '' : `${r.previous} → `}${r.value}${chart.unit}`)
+    .map(
+      (r) =>
+        `${r.label} ${r.previous === undefined ? '' : `${r.previousMissing ? '缺数据' : (r.previousText ?? r.previous)} → `}${r.valueMissing ? '缺数据' : (r.valueText ?? r.value)}${chart.unit}`,
+    )
     .join('，');
   if (chart.kind === 'heatmap')
     return `${chart.period}；${chart.rows.map((r, i) => `${r.label}：${chart.columns?.map((c, j) => `${c} ${['待补充', '待确认', '齐备'][chart.matrix?.[i]?.[j] ?? 0]}`).join('，')}`).join('；')}`;

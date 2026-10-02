@@ -61,7 +61,7 @@ export async function managementConfigurationJourney(
       'href',
       `/workspace/#tenant=${tenant}&view=profiles`,
     );
-    await expect(page.getByText('查看我的持续计划', { exact: true })).toBeVisible();
+    await expect(page.getByText('查看我的持续计划', { exact: true })).toHaveCount(0);
     await page.screenshot({ path: join(artifacts, 'management-work-configuration.png'), fullPage: true });
     await page.setViewportSize({ width: 390, height: 844 });
     await page.screenshot({

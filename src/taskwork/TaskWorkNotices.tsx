@@ -1,4 +1,5 @@
 import { PlanCard } from '../plans/Plans';
+import { featureEntries } from '../shared/feature-entries';
 import { isPlan, statusLabels } from '../plans/client';
 import type { Plan } from '../../contracts/public-api/plans';
 import { createIdentityRequest, record } from '../identity/client';
@@ -77,7 +78,9 @@ function Notices({ tenant, task, verification }: { tenant: string; task: string;
                 。安排被接受不代表后续任务已完成，执行仍需通过原计划权限、时限与额度检查。
               </p>
               {r.dispatchUnavailable && <p>已派发；原任务不在本次恢复数据中。</p>}
-              <a href={`/workspace/#tenant=${tenant}&view=plans`}>查看我的持续计划</a>
+              {featureEntries.ongoingPlans && (
+                <a href={`/workspace/#tenant=${tenant}&view=plans`}>查看我的持续计划</a>
+              )}
             </details>
           </div>
         </div>
@@ -187,11 +190,11 @@ function PlanReceipts({
             <small>
               仅本人在系统内查看 · 截至 {new Date(r.plan.configuration.expiresAt).toLocaleDateString('zh-CN')}
             </small>
-            <Button onClick={() => setOpened(r.plan.id)}>查看计划</Button>
+            {featureEntries.ongoingPlans && <Button onClick={() => setOpened(r.plan.id)}>查看计划</Button>}
           </div>
         </article>
       ))}
-      {opened && (
+      {featureEntries.ongoingPlans && opened && (
         <PlanCard
           tenant={tenant}
           owner={session.identity!.account.id}

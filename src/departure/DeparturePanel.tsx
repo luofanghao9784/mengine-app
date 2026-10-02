@@ -101,11 +101,34 @@ function useActionRunner(reload: () => void) {
     },
   };
 }
-/** Mount under existing authenticated management/workspace shell; no administrator read privilege is implied. */
-export function DeparturePanel({ tenant, verification = 0 }: { tenant: string; verification?: number }) {
-  return <DepartureSession key={tenant} tenant={tenant} verification={verification} />;
+/** The client only exposes designated export records; administrative actions stay on the management surface. */
+export function DeparturePanel({
+  tenant,
+  verification = 0,
+  recordsOnly = false,
+}: {
+  tenant: string;
+  verification?: number;
+  recordsOnly?: boolean;
+}) {
+  return (
+    <DepartureSession
+      key={`${tenant}:${recordsOnly}`}
+      tenant={tenant}
+      verification={verification}
+      recordsOnly={recordsOnly}
+    />
+  );
 }
-function DepartureSession({ tenant, verification }: { tenant: string; verification: number }) {
+function DepartureSession({
+  tenant,
+  verification,
+  recordsOnly,
+}: {
+  tenant: string;
+  verification: number;
+  recordsOnly: boolean;
+}) {
   const [nonce, setNonce] = useState(0),
     [page, setPage] = useState(0),
     [mode, setMode] = useState<'list' | 'offboard' | 'exit'>('list'),
@@ -120,19 +143,23 @@ function DepartureSession({ tenant, verification }: { tenant: string; verificati
     [tenant, page, nonce, verification],
   );
   const options = useRemote(
-    (signal) => api.options(tenant, undefined, 0, 0, signal),
-    [tenant, nonce, verification],
+    (signal) => (recordsOnly ? Promise.resolve(null) : api.options(tenant, undefined, 0, 0, signal)),
+    [tenant, nonce, verification, recordsOnly],
   );
   return (
     <Actions.Provider value={{ blocked: action.blocked, run: action.run, reload }}>
-      <section className="departure-panel" aria-label="离职与企业退出">
+      <section className="departure-panel" aria-label={recordsOnly ? '迁出与清理记录' : '离职与企业退出'}>
         <header className="departure-header">
           <div>
             <p className="departure-kicker">
               <ShieldCheck size={16} /> 生效执行与回执
             </p>
-            <h2>离职与企业退出</h2>
-            <p>先移交共享责任，再明确执行。准备清单不会自动停用身份。</p>
+            <h2>{recordsOnly ? '迁出与清理记录' : '离职与企业退出'}</h2>
+            <p>
+              {recordsOnly
+                ? '查看当前获权的执行记录，按指定范围迁出资料。'
+                : '先移交共享责任，再明确执行。准备清单不会自动停用身份。'}
+            </p>
           </div>
           <Button icon={RefreshCw} disabled={action.blocked} onClick={reload}>
             刷新状态
@@ -154,7 +181,7 @@ function DepartureSession({ tenant, verification }: { tenant: string; verificati
           >
             执行记录
           </Button>
-          {options.value?.canOffboard && (
+          {!recordsOnly && options.value?.canOffboard && (
             <Button
               disabled={action.blocked}
               icon={ArrowRightLeft}
@@ -166,7 +193,7 @@ function DepartureSession({ tenant, verification }: { tenant: string; verificati
               办理员工离职
             </Button>
           )}
-          {options.value?.canExit && (
+          {!recordsOnly && options.value?.canExit && (
             <Button
               disabled={action.blocked}
               icon={LogOut}
@@ -182,12 +209,13 @@ function DepartureSession({ tenant, verification }: { tenant: string; verificati
         {selected ? (
           <Execution
             key={selected}
+            recordsOnly={recordsOnly}
             tenant={tenant}
             id={selected}
             nonce={nonce + verification}
             close={() => setSelected(undefined)}
           />
-        ) : mode === 'offboard' ? (
+        ) : !recordsOnly && mode === 'offboard' ? (
           <Offboard
             tenant={tenant}
             nonce={nonce + verification}
@@ -196,7 +224,7 @@ function DepartureSession({ tenant, verification }: { tenant: string; verificati
               setMode('list');
             }}
           />
-        ) : mode === 'exit' ? (
+        ) : !recordsOnly && mode === 'exit' ? (
           <ExitForm
             tenant={tenant}
             nonce={nonce + verification}
@@ -213,7 +241,11 @@ function DepartureSession({ tenant, verification }: { tenant: string; verificati
           <>
             <div className="departure-records">
               {list.value.items.length === 0 ? (
-                <p className="departure-note">尚无正式执行记录。可先在保存与退出政策中准备清单。</p>
+                <p className="departure-note">
+                  {recordsOnly
+                    ? '当前没有可查看的迁出或清理记录。'
+                    : '尚无正式执行记录。可先在保存与退出政策中准备清单。'}
+                </p>
               ) : (
                 list.value.items.map((e) => (
                   <button
@@ -621,6 +653,7 @@ function ExitForm({
   );
 }
 function Execution({
+  recordsOnly,
   tenant,
   id,
   nonce,
@@ -629,6 +662,7 @@ function Execution({
   tenant: string;
   id: string;
   nonce: number;
+  recordsOnly: boolean;
   close: () => void;
 }) {
   const { blocked, run, reload } = useContext(Actions);
@@ -687,7 +721,7 @@ function Execution({
             <p role="alert">执行需重试：{remote.value.execution.errorCode}</p>
           )}
           <div className="departure-actions">
-            {remote.value.canCancel && (
+            {!recordsOnly && remote.value.canCancel && (
               <Button
                 disabled={blocked}
                 onClick={() =>
@@ -703,7 +737,7 @@ function Execution({
                 撤销离职并恢复未清理私人内容
               </Button>
             )}
-            {remote.value.canRetry && (
+            {!recordsOnly && remote.value.canRetry && (
               <Button
                 disabled={blocked}
                 onClick={() =>

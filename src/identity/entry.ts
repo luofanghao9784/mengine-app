@@ -8,17 +8,30 @@ export function entryTenant(
   if (remembered && memberships.some((m) => m.tenantId === remembered)) return remembered;
   return memberships.length === 1 ? memberships[0].tenantId : '';
 }
-export function rememberedTenant(account: string): string | null {
+type Surface = 'workspace' | 'tenant-admin' | 'platform-admin';
+const tenantKey = (account: string, surface: Surface) => `dreamcore-tab-tenant:${surface}:${account}`;
+
+/** Navigation belongs to this tab and surface; the authentication cookie remains shared. */
+export function rememberedTenant(
+  account: string,
+  surface: Surface = 'workspace',
+  storage?: Storage,
+): string | null {
   try {
-    return localStorage.getItem('dreamcore-last-tenant:' + account);
+    return (storage ?? sessionStorage).getItem(tenantKey(account, surface));
   } catch {
     return null;
   }
 }
-export function rememberTenant(account: string, tenant: string) {
+export function rememberTenant(
+  account: string,
+  tenant: string,
+  surface: Surface = 'workspace',
+  storage?: Storage,
+) {
   try {
-    localStorage.setItem('dreamcore-last-tenant:' + account, tenant);
+    (storage ?? sessionStorage).setItem(tenantKey(account, surface), tenant);
   } catch {
-    /* Only a navigation preference. */
+    /* Only a navigation preference; explicit destinations remain usable. */
   }
 }
