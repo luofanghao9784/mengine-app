@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dreamcore:conversation-realtime:1.0",
+  "description": "Negotiated by check.realtimeVersion=1.0; authenticated using active attempt bearer. POST /internal/v1/agent-access/{task}/live/{action}. open enables stop handshake; control reads pending inputs; output upserts monotonic step snapshots; applied acknowledges actual request context; started acknowledges resumed blocking answers; question records a single question; stopped confirms executor termination. No raw tool arguments or reasoning. No task data writes after lease expiry.",
+  "$defs": {
+    "output": {
+      "type": "object",
+      "required": [
+        "step",
+        "version",
+        "text",
+        "state"
+      ],
+      "properties": {
+        "step": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "text": {
+          "type": "string",
+          "maxLength": 65536
+        },
+        "state": {
+          "enum": [
+            "STREAMING",
+            "COMPLETE",
+            "INTERRUPTED"
+          ]
+        }
+      }
+    },
+    "question": {
+      "type": "object",
+      "required": [
+        "id",
+        "text",
+        "options",
+        "blocking"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "text": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "options": {
+          "type": "array",
+          "maxItems": 5,
+          "items": {
+            "type": "string",
+            "maxLength": 120
+          }
+        },
+        "blocking": {
+          "type": "boolean"
+        }
+      }
+    },
+    "applied": {
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        }
+      }
+    },
+    "control": {
+      "type": "object",
+      "required": [
+        "stop",
+        "inputs"
+      ],
+      "properties": {
+        "stop": {
+          "type": "boolean"
+        },
+        "inputs": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "text"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "text": {
+                "type": "string",
+                "maxLength": 2000
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

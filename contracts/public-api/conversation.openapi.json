@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Dreamcore Private Conversation API",
-    "version": "1.5.0",
-    "description": "私人会话及可恢复任务。SOURCE_LOOKUP 可独立运行；模型关闭时 AGENT 保存为等待能力，不自动重试。执行区分 verification 联调与 live 模型，支持等待输入、暂停恢复、部分结果、未知结果核对及分次历史。事件轮询，不承诺 token 流。来源、回复、下载均重新检查当前权限，成果不自动共享。"
+    "version": "1.6.0",
+    "description": "私人会话及可恢复任务。SOURCE_LOOKUP 可独立运行；模型关闭时 AGENT 保存为等待能力，不自动重试。执行区分 verification 联调与 live 模型，支持等待输入、暂停恢复、部分结果、未知结果核对及分次历史。支持受鉴权 SSE 过程快照与轮询降级、答案增量、途中补充及问题卡；过程文本不是已完成成果。来源、回复、下载均重新检查当前权限，成果不自动共享。"
   },
   "security": [
     {
@@ -666,6 +666,176 @@
             "description": "未成功完成或版本不匹配"
           }
         }
+      }
+    },
+    "/api/v1/tenants/{tenant}/conversations/{conversation}/live": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "conversation",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "读取当前获权任务的过程快照",
+        "responses": {
+          "200": {
+            "description": "no-store；stream 每帧 data 为 LiveSnapshot，event: unavailable 清除缓存",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveSnapshot"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限已失效"
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/conversations/{conversation}/stream": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "conversation",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "订阅过程快照；断线恢复完整快照，持续复核权限",
+        "responses": {
+          "200": {
+            "description": "no-store；stream 每帧 data 为 LiveSnapshot，event: unavailable 清除缓存",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限已失效"
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/conversations/{conversation}/tasks/{task}/inputs": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "conversation",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "task",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "summary": "幂等提交文本补充或问题答案；收到不等于采用",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "requestId",
+                  "attempt",
+                  "text"
+                ],
+                "properties": {
+                  "requestId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "attempt": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "text": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2000
+                  },
+                  "questionId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "accepted=true；采用状态通过过程快照查看"
+          },
+          "409": {
+            "description": "任务或问题状态已变化；保留草稿"
+          },
+          "403": {
+            "description": "无权补充"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       }
     }
   },
@@ -2065,6 +2235,193 @@
                 }
               }
             ]
+          }
+        }
+      },
+      "LiveSnapshot": {
+        "type": "object",
+        "required": [
+          "conversationId",
+          "items"
+        ],
+        "properties": {
+          "conversationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "items": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "$ref": "#/components/schemas/LiveTask"
+            }
+          }
+        }
+      },
+      "LiveTask": {
+        "type": "object",
+        "required": [
+          "taskId",
+          "attempt",
+          "status",
+          "enabled",
+          "stopping",
+          "outputs",
+          "inputs",
+          "tools",
+          "questions"
+        ],
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "attempt": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "status": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "stopping": {
+            "type": "boolean"
+          },
+          "outputs": {
+            "type": "array",
+            "maxItems": 8,
+            "items": {
+              "type": "object",
+              "required": [
+                "step",
+                "version",
+                "text",
+                "state"
+              ],
+              "properties": {
+                "step": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "version": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "text": {
+                  "type": "string",
+                  "maxLength": 65536
+                },
+                "state": {
+                  "enum": [
+                    "STREAMING",
+                    "COMPLETE",
+                    "INTERRUPTED"
+                  ]
+                }
+              }
+            }
+          },
+          "inputs": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "text",
+                "applied",
+                "attempt"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "text": {
+                  "type": "string",
+                  "maxLength": 2000
+                },
+                "applied": {
+                  "type": "boolean"
+                },
+                "attempt": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "resumeAnswer": {
+                  "type": "boolean",
+                  "description": "阻塞问题的回答随同一任务恢复，在下一次真实模型请求开始后标记采用。"
+                }
+              }
+            }
+          },
+          "tools": {
+            "type": "array",
+            "maxItems": 8,
+            "items": {
+              "type": "object",
+              "required": [
+                "sequence",
+                "name",
+                "status"
+              ],
+              "properties": {
+                "sequence": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "name": {
+                  "type": "string"
+                },
+                "status": {
+                  "enum": [
+                    "STARTED",
+                    "succeeded",
+                    "failed"
+                  ]
+                }
+              }
+            }
+          },
+          "questions": {
+            "type": "array",
+            "maxItems": 1,
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "text",
+                "options",
+                "blocking",
+                "answered"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "text": {
+                  "type": "string",
+                  "maxLength": 1000
+                },
+                "options": {
+                  "type": "array",
+                  "maxItems": 5,
+                  "items": {
+                    "type": "string",
+                    "maxLength": 120
+                  }
+                },
+                "blocking": {
+                  "type": "boolean"
+                },
+                "answered": {
+                  "type": "boolean"
+                }
+              }
+            }
           }
         }
       }

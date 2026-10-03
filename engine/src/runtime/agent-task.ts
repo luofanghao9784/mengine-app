@@ -1,3 +1,4 @@
+import type { RealtimePort } from './realtime.js';
 import { planManagementTool } from './plan-management.js';
 import { meteredModel } from './metered-model.js';
 import { inputCoverage } from './input-coverage.js';
@@ -8,7 +9,7 @@ import { contextTool, taskBootstrap } from './task-context.js';
 import { ENGINE_VERSION } from '../release.js';
 import { originalRecipeTool } from './file-recipes.js';
 import { OriginalInputs } from './original-inputs.js';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 import { runHarness } from './harness.js';
 import { RuntimeError, type Json, type ModelPort, type TaskTool } from './ports.js';
@@ -77,6 +78,7 @@ export class AgentTasks {
     const tableHandles = new Map<string, string>();
     let briefingGeneration: boolean | undefined;
     let denied = false;
+    let realtimeAvailable = false;
     let publicQuery: string | undefined;
     let candidatesAllowed: boolean | undefined;
     let contextAvailable: boolean | undefined;
@@ -106,6 +108,7 @@ export class AgentTasks {
           response.executionClass !== this.config.executionClass
         )
           throw new RuntimeError('TASK_ACCESS_DENIED');
+        realtimeAvailable = response.realtimeVersion === '1.0';
         const query = response.publicQuery ?? '';
         if (
           typeof query !== 'string' ||
@@ -488,6 +491,79 @@ export class AgentTasks {
       }
       let outcome: 'COMPLETE' | 'PARTIAL' | 'WAITING_INPUT' | 'WAITING_CAPABILITY' = 'COMPLETE';
       let requiredInput: string | null = null;
+      let blockingQuestion = false;
+      let realtime: RealtimePort | undefined;
+      if (task.contractVersion === '1.5' && realtimeAvailable && !briefingGeneration) {
+        await invoke('live/open', {});
+        let outputVersion = 0;
+        realtime = {
+          started: async () => {
+            await invoke('live/started', {});
+          },
+          control: async () => {
+            const c = await invoke('live/control', {});
+            if (
+              !isRecord(c) ||
+              typeof c.stop !== 'boolean' ||
+              !Array.isArray(c.inputs) ||
+              c.inputs.length > 20 ||
+              c.inputs.some(
+                (i) => !isRecord(i) || !uuid(i.id) || typeof i.text !== 'string' || i.text.length > 2000,
+              )
+            )
+              throw new RuntimeError('INVALID_CONTROL');
+            return c as unknown as Awaited<ReturnType<RealtimePort['control']>>;
+          },
+          applied: async (id) => {
+            await invoke('live/applied', { id });
+          },
+          output: async (step, text, state) => {
+            await invoke('live/output', { step, text, state, version: ++outputVersion });
+          },
+        };
+        tools.push({
+          name: 'ask_user',
+          description:
+            'Ask one clear question, with up to 5 short suggested answers and free text always allowed. Set blocking=true if the answer is required: this ends execution and releases resources until the user answers. Otherwise only continue independent authorized work. Never treat a default answer as approval. Ask at most once per execution.',
+          parameters: {
+            type: 'object',
+            properties: {
+              text: { type: 'string', description: 'Nonempty question, at most 1000 characters.' },
+              options: {
+                type: 'array',
+                items: {
+                  type: 'string',
+                  description: 'Nonempty suggested answer, at most 120 characters. At most 5 options.',
+                },
+              },
+              blocking: { type: 'boolean' },
+            },
+            required: ['text', 'options', 'blocking'],
+            additionalProperties: false,
+          },
+          execute: async (args) => {
+            await authorize();
+            if (
+              !isRecord(args) ||
+              typeof args.text !== 'string' ||
+              !args.text.trim() ||
+              args.text.length > 1000 ||
+              !Array.isArray(args.options) ||
+              args.options.length > 5 ||
+              args.options.some((x) => typeof x !== 'string' || !x.trim() || x.length > 120) ||
+              typeof args.blocking !== 'boolean'
+            )
+              throw new RuntimeError('INVALID_QUESTION');
+            await invoke('live/question', { id: randomUUID(), ...args });
+            if (args.blocking) {
+              blockingQuestion = true;
+              outcome = 'WAITING_INPUT';
+              requiredInput = args.text;
+            }
+            return { recorded: true, waiting: args.blocking };
+          },
+        });
+      }
       if (task.contractVersion === '1.5') {
         tools.push({
           name: 'task_control',
@@ -561,6 +637,8 @@ export class AgentTasks {
         }
       }
       const result = await runHarness({
+        realtime,
+        shouldConcludeTurn: () => blockingQuestion,
         prompt: task.prompt,
         context: continuity,
         model,
@@ -572,6 +650,12 @@ export class AgentTasks {
         finishOnDeliverable: briefingGeneration,
         hasCompletedDeliverable: hasPreparedBriefing,
       });
+      if (realtime && (result.status === 'cancelled' || (await realtime.control()).stop)) {
+        await invoke('live/stopped', {});
+        throw new RuntimeError('TASK_STOPPED');
+      }
+      if (blockingQuestion && result.status === 'completed')
+        result.text = requiredInput ?? '请补充必要信息后继续。';
       if (denied) throw new RuntimeError('TASK_ACCESS_DENIED');
       if (result.status === 'limit')
         console.warn(
@@ -592,6 +676,7 @@ export class AgentTasks {
             ? '本次没有新增画报：相同内容已存在。'
             : '画报已生成，可在智能画报查看。';
       }
+      if (result.code === 'CONTROL_UNAVAILABLE') throw new RuntimeError('TASK_RESULT_UNKNOWN');
       if (result.status !== 'completed' || !result.text.trim() || result.text.length > 16000)
         throw new RuntimeError(result.status === 'limit' ? 'TASK_LIMIT' : 'TASK_MODEL_FAILED');
       if (result.finalResponseReserved && outcome === 'COMPLETE' && !hasPreparedBriefing(result.tools)) {

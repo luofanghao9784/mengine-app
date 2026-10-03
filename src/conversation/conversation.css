@@ -1148,3 +1148,14 @@
 .attachment-scope input {
   width: auto;
 }
+
+.conversation-process { margin: 12px 0; color: var(--text-secondary, #617087); font-size: 13px; }
+.process-summary { display: flex; gap: 16px; align-items: center; border: 0; background: transparent; color: inherit; padding: 6px 0; cursor: pointer; }
+.process-summary span { font-size: 12px; }
+.process-history { border-left: 2px solid #e6edf7; padding-left: 12px; max-height: 280px; overflow-y: auto; }
+.process-input { margin: 12px 0; padding: 10px 14px; border-radius: 14px; background: #eff4fd; }
+.process-input p { margin: 0 0 5px; white-space: pre-wrap; }
+.conversation-question { display: grid; gap: 10px; padding: 16px; margin: 16px 0; border: 1px solid #dce6f6; border-radius: 16px; background: #fff; }
+.conversation-question > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.conversation-question textarea { width: 100%; resize: vertical; min-height: 68px; }
+.conversation-new-content { align-self: center; margin: 0 auto 6px; }

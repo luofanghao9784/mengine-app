@@ -1,3 +1,7 @@
+import { useRealtime } from './useRealtime';
+import { LiveProcess } from './LiveProcess';
+import { liveClient } from './realtime-client';
+import type { LiveTask } from '../../contracts/public-api/conversation';
 import { useViewState } from '../shared/useViewState';
 import { FeedbackPanel } from '../feedback/FeedbackPanel';
 import { TaskWorkNotices } from '../taskwork/TaskWorkNotices';
@@ -288,11 +292,13 @@ function ConversationView({
     const poll = async () => {
       try {
         const events = await api.events(tenant, selected, valueRef.current?.cursor || 0, controller.signal);
-        if (events.items.length && !pendingRequest) {
+        if (events.items.some((e) => e.kind !== 'LIVE') && !pendingRequest) {
           await load();
           changed();
         }
-        if (!controller.signal.aborted) timer = setTimeout(poll, 1500);
+        if (valueRef.current && events.cursor > valueRef.current.cursor)
+          valueRef.current = { ...valueRef.current, cursor: events.cursor };
+        if (!controller.signal.aborted) timer = setTimeout(poll, events.hasMore ? 0 : 1500);
       } catch (error) {
         failure(error);
       }
@@ -321,7 +327,36 @@ function ConversationView({
       setBriefingOpen(false);
     }
   }, [data.value]);
-  const active = !!data.value?.tasks.some((t) => ['QUEUED', 'RUNNING'].includes(t.status));
+  const live = useRealtime(tenant, selected);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const following = useRef(true);
+  const [newContent, setNewContent] = useState(false);
+  useEffect(() => {
+    following.current = true;
+    setNewContent(false);
+  }, [selected]);
+  useEffect(() => {
+    if (live.denied) {
+      valueRef.current = undefined;
+      setData({ error: live.denied });
+      if (live.denied.status === 401) expire();
+    }
+  }, [live.denied, expire]);
+  useEffect(() => {
+    const node = scrollRef.current;
+    if (!node) return;
+    if (following.current) node.scrollTop = node.scrollHeight;
+    else setNewContent(true);
+  }, [live.snapshot, data.value]);
+  const activeTask = data.value?.tasks.find((t) => ['QUEUED', 'RUNNING'].includes(t.status));
+  const active = !!activeTask;
+  const activeLive = live.snapshot?.items.find(
+    (t) => t.taskId === activeTask?.id && t.attempt === activeTask.attempt,
+  );
+  const ongoing =
+    activeTask?.status === 'RUNNING' && activeLive?.enabled && !activeLive.stopping
+      ? { id: activeTask.id, attempt: activeTask.attempt }
+      : undefined;
   if (data.error)
     return (
       <section className="conversation-reader">
@@ -427,13 +462,24 @@ function ConversationView({
             )}
           </div>
         </header>
-        <div className="conversation-messages" data-scroll-key="messages" aria-live="polite">
+        <div
+          ref={scrollRef}
+          className="conversation-messages"
+          data-scroll-key="messages"
+          onScroll={(e) => {
+            const n = e.currentTarget;
+            following.current = n.scrollHeight - n.scrollTop - n.clientHeight < 48;
+            if (following.current) setNewContent(false);
+          }}
+        >
+          {live.disconnected && <p role="status">连接恢复中，已显示内容仍保留</p>}
           {data.value?.tasks.map((task) => (
             <TaskCard
               key={task.id}
               tenant={tenant}
               conversation={selected!}
               task={task}
+              live={live.snapshot?.items.find((t) => t.taskId === task.id && t.attempt === task.attempt)}
               changed={refresh}
               citation={(id) => {
                 const source = task.sources.find((s) => s.id === id);
@@ -521,6 +567,18 @@ function ConversationView({
             />
           )}
         </div>
+        {newContent && (
+          <Button
+            className="conversation-new-content"
+            onClick={() => {
+              following.current = true;
+              setNewContent(false);
+              if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+            }}
+          >
+            有新内容 ↓
+          </Button>
+        )}
         {focused ? (
           <p className="conversation-history-note">
             正在查看指定任务及其当前状态。
@@ -539,7 +597,8 @@ function ConversationView({
             selected={selected}
             space={data.value?.conversation.workspaceId}
             context={context}
-            enabled={enabled && !active && page === 0 && !pendingRequest}
+            ongoing={ongoing}
+            enabled={enabled && (!active || !!ongoing) && page === 0 && !pendingRequest}
             agentMode={agentMode}
             publicWebEnabled={publicWebEnabled}
             disabledReason={
@@ -547,8 +606,10 @@ function ConversationView({
                 ? '请先完成本次评价提交的核对。'
                 : !enabled
                   ? '会话暂未开放。'
-                  : active
-                    ? '请等待当前任务结束，或先取消任务。'
+                  : active && !ongoing
+                    ? activeLive?.stopping
+                      ? '正在停止任务…'
+                      : '正在准备执行，可先编辑补充。'
                     : page !== 0
                       ? '返回最新记录后可继续发送。'
                       : ''
@@ -577,12 +638,14 @@ function TaskCard({
   tenant,
   conversation,
   task,
+  live,
   changed,
   citation,
 }: {
   tenant: string;
   conversation: string;
   task: ConversationTask;
+  live?: LiveTask;
   changed: () => void;
   citation: (id: string) => void;
 }) {
@@ -611,7 +674,7 @@ function TaskCard({
     });
   else if (!task.sourcesUnavailable && ['FAILED', 'CANCELLED', 'INTERRUPTED'].includes(task.status))
     actions.push({ action: 'RETRY', label: '重试任务' });
-  if (['QUEUED', 'RUNNING', 'WAITING_INPUT', 'WAITING_CAPABILITY', 'PARTIAL'].includes(task.status))
+  if (['QUEUED', 'WAITING_INPUT', 'WAITING_CAPABILITY', 'PARTIAL'].includes(task.status))
     actions.push({ action: 'PAUSE', label: '暂停任务' });
   if (
     [
@@ -624,7 +687,10 @@ function TaskCard({
       'RESULT_UNKNOWN',
     ].includes(task.status)
   )
-    actions.push({ action: 'CANCEL', label: '取消任务' });
+    actions.push({
+      action: 'CANCEL',
+      label: live?.stopping && task.status === 'RUNNING' ? '正在停止…' : '停止任务',
+    });
   return (
     <article className="conversation-turn">
       <p className="conversation-user">{task.prompt}</p>
@@ -632,16 +698,27 @@ function TaskCard({
         <div className="live-answer-heading">
           <span className="live-answer-avatar">{task.mode === 'AGENT' ? 'AI' : <Search size={16} />}</span>
           <strong>
-            {task.mode === 'AGENT' && task.status === 'RUNNING'
-              ? '正在执行任务'
-              : task.mode === 'AGENT' && task.status === 'SUCCEEDED'
-                ? '本次处理完成'
-                : labels[task.status]}
+            {live?.stopping && task.status === 'RUNNING'
+              ? '正在停止…'
+              : task.mode === 'AGENT' && task.status === 'RUNNING'
+                ? '正在执行任务'
+                : task.mode === 'AGENT' && task.status === 'SUCCEEDED'
+                  ? '本次处理完成'
+                  : labels[task.status]}
           </strong>
           {task.mode === 'AGENT' && (
             <Badge>{task.executionClass === 'verification' ? '联调验证 · 未调用真实模型' : 'AI 任务'}</Badge>
           )}
         </div>
+        {live && !task.sourcesUnavailable && (
+          <LiveProcess
+            live={live}
+            task={task}
+            tenant={tenant}
+            conversation={conversation}
+            changed={changed}
+          />
+        )}
         {task.reply && (
           <div className="conversation-reply">
             <DocumentText text={task.reply} />
@@ -784,7 +861,7 @@ function TaskCard({
             </button>
           ))}
         </div>
-        {task.requiredInput && <p>{task.requiredInput}</p>}
+        {task.requiredInput && !live?.questions.length && <p>{task.requiredInput}</p>}
         {task.status === 'WAITING_CAPABILITY' && (
           <p className="muted">任务已保存，当前没有可用执行能力；不会自动反复调用。能力恢复后可继续。</p>
         )}
@@ -793,47 +870,54 @@ function TaskCard({
             回执不足，尚不能确认结果。系统只会依据已记录的工具范围核对是否可安全重试。
           </p>
         )}
-        {task.mode === 'AGENT' && actions.some((a) => ['RESUME', 'RETRY'].includes(a.action)) && (
-          <Field label="补充本任务（可选）">
-            <textarea
-              aria-label="补充本任务（可选）"
-              disabled={pendingRequest || submit.busy || submit.uncertain}
-              maxLength={2000}
-              rows={2}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-            />
-          </Field>
-        )}
+        {!live?.questions.some((q) => !q.answered) &&
+          task.mode === 'AGENT' &&
+          actions.some((a) => ['RESUME', 'RETRY'].includes(a.action)) && (
+            <Field label="补充本任务（可选）">
+              <textarea
+                aria-label="补充本任务（可选）"
+                disabled={pendingRequest || submit.busy || submit.uncertain}
+                maxLength={2000}
+                rows={2}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+              />
+            </Field>
+          )}
         <div className="conversation-task-actions">
-          {actions.map(({ action, label }) => (
-            <Button
-              key={action}
-              disabled={
-                (pendingRequest && !submit.uncertain) ||
-                submit.busy ||
-                (submit.uncertain && action !== submittedAction) ||
-                (task.status === 'WAITING_INPUT' && action === 'RESUME' && !input.trim())
-              }
-              onClick={() => {
-                if (!submit.uncertain) setSubmittedAction(action);
-                void submit.submit(
-                  {
-                    expectedRevision: task.revision,
-                    action,
-                    ...(input.trim() && ['RESUME', 'RETRY'].includes(action) ? { input: input.trim() } : {}),
-                  },
-                  async (body, requestId) => {
-                    await api.action(tenant, conversation, task.id, { ...body, requestId });
-                    setInput('');
-                    changed();
-                  },
-                );
-              }}
-            >
-              {submit.uncertain && action === submittedAction ? '重试本次操作' : label}
-            </Button>
-          ))}
+          {actions
+            .filter((a) => !(a.action === 'RESUME' && live?.questions.some((q) => q.blocking && !q.answered)))
+            .map(({ action, label }) => (
+              <Button
+                key={action}
+                disabled={
+                  (task.status === 'RUNNING' && live?.stopping) ||
+                  (pendingRequest && !submit.uncertain) ||
+                  submit.busy ||
+                  (submit.uncertain && action !== submittedAction) ||
+                  (task.status === 'WAITING_INPUT' && action === 'RESUME' && !input.trim())
+                }
+                onClick={() => {
+                  if (!submit.uncertain) setSubmittedAction(action);
+                  void submit.submit(
+                    {
+                      expectedRevision: task.revision,
+                      action,
+                      ...(input.trim() && ['RESUME', 'RETRY'].includes(action)
+                        ? { input: input.trim() }
+                        : {}),
+                    },
+                    async (body, requestId) => {
+                      await api.action(tenant, conversation, task.id, { ...body, requestId });
+                      setInput('');
+                      changed();
+                    },
+                  );
+                }}
+              >
+                {submit.uncertain && action === submittedAction ? '重试本次操作' : label}
+              </Button>
+            ))}
           {!task.sourcesUnavailable && task.attempt > 0 && (
             <Button variant="ghost" onClick={() => setHistoryOpen(!historyOpen)}>
               {historyOpen ? '收起执行历史' : '查看执行历史'}
@@ -969,7 +1053,9 @@ function AttemptHistory({
     </section>
   );
 }
+type PendingSend = SendTask & { liveTask?: string; liveAttempt?: number };
 export function ConversationComposer({
+  ongoing,
   suggestion,
   fromBriefing = false,
   tenant,
@@ -993,6 +1079,7 @@ export function ConversationComposer({
   changed: () => void;
   suggestion?: { text: string; sequence: number };
   fromBriefing?: boolean;
+  ongoing?: { id: string; attempt: number };
 }) {
   const { session, expire } = useSession();
   const pendingRequest = useContext(RequestPending);
@@ -1032,13 +1119,13 @@ export function ConversationComposer({
   const [selectedOnly, setSelectedOnly] = useState(initial.current.selectedOnly === true);
   const preparing = uploading || originals.some((f) => f.workspaceId && !prepared[f.versionId]);
   const restored = initial.current.pending;
-  const [pending, setPending] = useState<SendTask | undefined>(
+  const [pending, setPending] = useState<PendingSend | undefined>(
     record(restored) &&
       uuid(restored.requestId) &&
       uuid(restored.workspaceId) &&
       typeof restored.prompt === 'string' &&
       ['SOURCE_LOOKUP', 'AGENT'].includes(String(restored.mode))
-      ? (restored as unknown as SendTask)
+      ? (restored as unknown as PendingSend)
       : undefined,
   );
   const [busy, setBusy] = useState(false),
@@ -1138,7 +1225,7 @@ export function ConversationComposer({
       onDrop={(e) => {
         if (e.dataTransfer.files.length) {
           e.preventDefault();
-          if (!busy && !pending)
+          if (!busy && !pending && !ongoing)
             setDropped({ files: Array.from(e.dataTransfer.files), sequence: Date.now() });
         }
       }}
@@ -1156,6 +1243,7 @@ export function ConversationComposer({
           return;
         const body = pending || {
           requestId: crypto.randomUUID(),
+          ...(ongoing ? { liveTask: ongoing.id, liveAttempt: ongoing.attempt } : {}),
           workspaceId: space || location,
           prompt: text.trim(),
           mode,
@@ -1188,7 +1276,23 @@ export function ConversationComposer({
         const request = new AbortController();
         controller.current = request;
         try {
-          const result = await api.send(tenant, selected || draftConversation, body, request.signal);
+          if (body.liveTask && selected && body.liveAttempt) {
+            await liveClient.input(
+              tenant,
+              selected,
+              body.liveTask,
+              { requestId: body.requestId, attempt: body.liveAttempt, text: body.prompt },
+              request.signal,
+            );
+            if (request.signal.aborted) return;
+            setText('');
+            setPending(undefined);
+            setStored(removeTabDraft(key));
+            changed();
+            return;
+          }
+          const { liveTask: _task, liveAttempt: _attempt, ...sendBody } = body;
+          const result = await api.send(tenant, selected || draftConversation, sendBody, request.signal);
           if (request.signal.aborted) return;
           setText('');
           setPublicQuery('');
@@ -1230,7 +1334,15 @@ export function ConversationComposer({
             <Field label={mode === 'AGENT' ? '工作要求' : '资料关键词'}>
               <textarea
                 ref={textarea}
-                aria-label={fromBriefing ? '新的工作需求' : mode === 'AGENT' ? '工作要求' : '资料关键词'}
+                aria-label={
+                  ongoing
+                    ? '补充要求'
+                    : fromBriefing
+                      ? '新的工作需求'
+                      : mode === 'AGENT'
+                        ? '工作要求'
+                        : '资料关键词'
+                }
                 onKeyDown={(event) => {
                   if (
                     event.key === 'Enter' &&
@@ -1253,11 +1365,12 @@ export function ConversationComposer({
                 rows={3}
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                placeholder="有什么工作想交给 AI？"
+                placeholder={ongoing ? '补充要求，AI 将在后续步骤采用' : '有什么工作想交给 AI？'}
               />
             </Field>
           </div>
           <div className="live-composer-tools">
+            {!ongoing && (
             <AttachmentMaterials
               tenant={tenant}
               conversation={selected || draftConversation}
@@ -1271,6 +1384,7 @@ export function ConversationComposer({
               dropped={dropped}
               verification={agentMode === 'verification'}
             />
+            )}
           </div>
           {originals.length > 0 && (
             <label className="attachment-scope">
@@ -1282,7 +1396,7 @@ export function ConversationComposer({
               只用所选资料
             </label>
           )}
-          {mode === 'AGENT' && !selectedOnly && publicWebEnabled && (
+          {!ongoing && mode === 'AGENT' && !selectedOnly && publicWebEnabled && (
             <details className="live-web-options">
               <summary>查找公开资料（可选）</summary>
               <Field label="公开检索内容（可选）">
@@ -1313,7 +1427,9 @@ export function ConversationComposer({
                 : fromBriefing
                   ? '发送消息'
                   : mode === 'AGENT'
-                    ? '开始任务'
+                    ? ongoing
+                      ? '发送补充'
+                      : '开始任务'
                     : '查找资料'
           }
           title={
@@ -1324,7 +1440,9 @@ export function ConversationComposer({
                 : fromBriefing
                   ? '发送消息'
                   : mode === 'AGENT'
-                    ? '开始任务'
+                    ? ongoing
+                      ? '发送补充'
+                      : '开始任务'
                     : '查找资料'
           }
           disabled={busy || preparing || !enabled || !allowed || !text.trim()}
@@ -1337,7 +1455,9 @@ export function ConversationComposer({
                 : fromBriefing
                   ? '发送消息'
                   : mode === 'AGENT'
-                    ? '开始任务'
+                    ? ongoing
+                      ? '发送补充'
+                      : '开始任务'
                     : '查找资料'}
           </span>
         </Button>

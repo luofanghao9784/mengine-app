@@ -1,6 +1,7 @@
 import { RuntimeError, type ModelPart, type ModelPort } from './ports.js';
 import type { TokenUsage } from './metered-model.js';
-import { isRecord, postJson } from './http-json.js';
+import { isRecord } from './http-json.js';
+import { postStream } from './http-stream.js';
 
 /** Shared wire format only. Each provider validates its own endpoint and capabilities. */
 export class ChatCompletionsModel implements ModelPort {
@@ -61,7 +62,8 @@ export class ChatCompletionsModel implements ModelPort {
     const input = {
       model: this.config.model,
       messages,
-      stream: false,
+      stream: true,
+      stream_options: { include_usage: true },
       ...this.config.modeParameters,
       max_tokens: request.maxTokens,
       ...(request.tools.length
@@ -69,18 +71,110 @@ export class ChatCompletionsModel implements ModelPort {
         : {}),
     };
     if (Buffer.byteLength(JSON.stringify(input)) > 262144) throw new RuntimeError('MODEL_INPUT_LIMIT');
-    const body = await postJson(
-      this.config.endpoint,
-      this.config.apiKey,
-      input,
-      request.signal,
-      131072,
-      this.config.timeoutMs,
-    ).catch((error) => {
+    let body: unknown;
+    let streamed = false,
+      content = '',
+      finish: unknown = null,
+      usage: unknown;
+    const fragments = new Map<
+      number,
+      { id: string; type: string; function: { name: string; arguments: string } }
+    >();
+    try {
+      for await (const chunk of postStream(
+        this.config.endpoint,
+        this.config.apiKey,
+        input,
+        request.signal,
+        this.config.timeoutMs,
+      )) {
+        if (!isRecord(chunk) || !Array.isArray(chunk.choices))
+          throw new RuntimeError('INVALID_MODEL_RESPONSE');
+        if (chunk.usage) usage = chunk.usage;
+        if (!chunk.choices.length) continue;
+        if (chunk.choices.length !== 1 || !isRecord(chunk.choices[0]))
+          throw new RuntimeError('INVALID_MODEL_RESPONSE');
+        const choice = chunk.choices[0];
+        // Some compatible providers return complete JSON even when streaming is requested.
+        if (choice.message) {
+          if (streamed || body) throw new RuntimeError('INVALID_MODEL_RESPONSE');
+          body = chunk;
+          continue;
+        }
+        if (body || !isRecord(choice.delta) || choice.index !== 0 || finish !== null)
+          throw new RuntimeError('INVALID_MODEL_RESPONSE');
+        streamed = true;
+        const delta = choice.delta;
+        if (delta.reasoning_content || (delta.role !== undefined && delta.role !== 'assistant'))
+          throw new RuntimeError('INVALID_MODEL_RESPONSE');
+        if (delta.content !== undefined && delta.content !== null) {
+          if (typeof delta.content !== 'string') throw new RuntimeError('INVALID_MODEL_RESPONSE');
+          content += delta.content;
+          if (Buffer.byteLength(content) > 65536) throw new RuntimeError('MODEL_OUTPUT_LIMIT');
+          if (delta.content) yield { type: 'text', text: delta.content };
+        }
+        if (delta.tool_calls !== undefined) {
+          if (!Array.isArray(delta.tool_calls)) throw new RuntimeError('INVALID_MODEL_RESPONSE');
+          for (const call of delta.tool_calls) {
+            if (
+              !isRecord(call) ||
+              !Number.isInteger(call.index) ||
+              (call.index as number) < 0 ||
+              (call.index as number) > 3
+            )
+              throw new RuntimeError('INVALID_MODEL_RESPONSE');
+            const key = call.index as number;
+            const prior = fragments.get(key) ?? {
+              id: '',
+              type: 'function',
+              function: { name: '', arguments: '' },
+            };
+            if (call.id !== undefined) {
+              if (typeof call.id !== 'string' || prior.id) throw new RuntimeError('INVALID_MODEL_RESPONSE');
+              prior.id = call.id;
+            }
+            if (call.type !== undefined && call.type !== 'function')
+              throw new RuntimeError('INVALID_MODEL_RESPONSE');
+            if (call.function !== undefined) {
+              if (!isRecord(call.function)) throw new RuntimeError('INVALID_MODEL_RESPONSE');
+              for (const field of ['name', 'arguments'] as const)
+                if (call.function[field] !== undefined) {
+                  if (typeof call.function[field] !== 'string')
+                    throw new RuntimeError('INVALID_MODEL_RESPONSE');
+                  prior.function[field] += call.function[field];
+                }
+            }
+            if (
+              prior.function.arguments.length > 65536 ||
+              prior.function.name.length > 64 ||
+              prior.id.length > 128
+            )
+              throw new RuntimeError('MODEL_OUTPUT_LIMIT');
+            fragments.set(key, prior);
+          }
+        }
+        if (choice.finish_reason !== undefined && choice.finish_reason !== null)
+          finish = choice.finish_reason;
+      }
+      if (streamed)
+        body = {
+          usage,
+          choices: [
+            {
+              finish_reason: finish,
+              message: {
+                role: 'assistant',
+                content,
+                tool_calls: [...fragments.entries()].sort(([a], [b]) => a - b).map(([, v]) => v),
+              },
+            },
+          ],
+        };
+    } catch (error) {
       this.usageIncomplete = true;
       this.usage = null;
       throw error;
-    });
+    }
     if (
       isRecord(body) &&
       isRecord(body.usage) &&
@@ -129,7 +223,7 @@ export class ChatCompletionsModel implements ModelPort {
     )
       throw new RuntimeError('INVALID_MODEL_RESPONSE');
     const parts: ModelPart[] = [];
-    if (message.content) parts.push({ type: 'text', text: message.content as string });
+    if (message.content && !streamed) parts.push({ type: 'text', text: message.content as string });
     const ids = new Set();
     for (const call of calls) {
       if (
@@ -142,6 +236,12 @@ export class ChatCompletionsModel implements ModelPort {
         typeof call.function.arguments !== 'string'
       )
         throw new RuntimeError('INVALID_MODEL_RESPONSE');
+      if (streamed)
+        try {
+          JSON.parse(call.function.arguments);
+        } catch {
+          throw new RuntimeError('INVALID_MODEL_RESPONSE');
+        }
       ids.add(call.id);
       parts.push({
         type: 'tool_call',

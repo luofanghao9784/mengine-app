@@ -130,7 +130,8 @@
                   "task_preference",
                   "compare_table",
                   "deliver_briefing",
-                  "manage_plan"
+                  "manage_plan",
+                  "ask_user"
                 ]
               },
               "status": {
@@ -374,7 +375,8 @@
                           "task_context",
                           "task_plan",
                           "task_preference",
-                          "manage_plan"
+                          "manage_plan",
+                          "ask_user"
                         ]
                       }
                     }

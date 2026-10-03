@@ -129,3 +129,20 @@ export interface TaskAttempts {
   items: TaskAttempt[];
   hasMore: boolean;
 }
+
+/** Version 1 full snapshots are replay-safe; provisional text is not a completed result. */
+export interface LiveTask {
+  taskId: string;
+  attempt: number;
+  status: ConversationTask['status'];
+  enabled: boolean;
+  stopping: boolean;
+  outputs: { step: number; version: number; text: string; state: 'STREAMING' | 'COMPLETE' | 'INTERRUPTED' }[];
+  inputs: { id: string; text: string; applied: boolean; attempt?: number; resumeAnswer?: boolean }[];
+  tools: { sequence: number; name: string; status: 'STARTED' | 'succeeded' | 'failed' }[];
+  questions: { id: string; text: string; options: string[]; blocking: boolean; answered: boolean }[];
+}
+export interface LiveSnapshot {
+  conversationId: string;
+  items: LiveTask[];
+}

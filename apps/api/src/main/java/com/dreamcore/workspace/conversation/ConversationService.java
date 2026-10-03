@@ -160,6 +160,12 @@ public class ConversationService {
             next="FAILED";reason="TASK_RESULT_RECONCILED";
         }else if(stopping){
             if(!Set.of("QUEUED","RUNNING","WAITING_INPUT","WAITING_CAPABILITY","PARTIAL","PAUSED","RESULT_UNKNOWN").contains(state) || action.equals("PAUSE") && Set.of("PAUSED","RESULT_UNKNOWN").contains(state))throw new IdentityException(409,"TASK_STATE_CHANGED");
+            if(state.equals("RUNNING") && Boolean.TRUE.equals(db.queryForObject("SELECT realtime_enabled FROM conversation_attempts WHERE task_id=? AND attempt_number=?",Boolean.class,task,row.get("attempt")))) {
+                db.update("UPDATE conversation_attempts SET stop_requested=true,stop_action=? WHERE task_id=? AND attempt_number=?",action,task,row.get("attempt"));
+                event(tenant,c.workspaceId(),conversation,task,"LIVE",revision);
+                identities.remember(actor,key,"CONVERSATION_ACTION",fingerprint,task);
+                return detail(actor,tenant,conversation,0,20);
+            }
             next=action.equals("CANCEL")?"CANCELLED":"PAUSED";
             if(state.equals("RUNNING"))usage.terminal(task,(UUID)row.get("lease_token"),next);
         }else{

@@ -94,7 +94,22 @@ class RealBackupTest(unittest.TestCase):
           VALUES('{ident(80)}','{t}','{w}','{a}','ACTIVE','synthetic goal','purpose','query','SOURCE_LOOKUP',true,'UTC',60,1,10,now()+interval '1 day');
         """)
 
+        if backup_recovery.has_table(sql,'conversation_live_output'):
+            sql(f"INSERT INTO conversation_live_output VALUES('{task}',1,1,1,'sensitive partial','STREAMING')")
+            sql(f"INSERT INTO conversation_live_questions(id,task_id,attempt_number,text,options,blocking) VALUES('{ident(90)}','{task}',1,'sensitive question','[]',true)")
+            sql(f"INSERT INTO conversation_live_inputs(id,task_id,attempt_number,text,question_id) VALUES('{ident(91)}','{task}',1,'sensitive supplement','{ident(90)}')")
         self.seed_current_modules(sql)
+
+    def test_realtime_restore_interrupts_and_source_purge_removes_private_content(self):
+        bundle,restored=self.root/'realtime-bundle',self.root/'realtime-restored'
+        backup.create(self.source,bundle,self.key)
+        backup.restore(bundle,restored,self.key)
+        with backup.offline_database(restored) as (_,__,sql):
+            self.assertEqual(sql("SELECT state FROM conversation_live_output"),'INTERRUPTED')
+            self.assertEqual(sql("SELECT applied FROM conversation_live_inputs"),'f')
+            sql("UPDATE conversation_attempts SET input='内容已按来源生命周期清理',snapshot='{}'")
+            for table in ('conversation_live_output','conversation_live_inputs','conversation_live_questions'):
+                self.assertEqual(sql(f"SELECT count(*) FROM {table}"),'0')
 
     def seed_current_modules(self,sql):
         if not backup_recovery.has_table(sql,'export_batches'):return

@@ -66,7 +66,7 @@ test('Bailian wire → real Harness → tool result → final text preserves cal
     assert.equal(input.model, config.model);
     assert.equal(input.enable_thinking, false);
     assert.equal(input.thinking, undefined);
-    assert.equal(input.stream, false);
+    assert.equal(input.stream, true);
     assert.ok(input.tools.some((x) => x.function.name === 'lookup'));
     const results = input.messages.filter((m) => m.role === 'tool');
     if (!results.length)

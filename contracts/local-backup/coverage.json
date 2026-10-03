@@ -1,6 +1,6 @@
 {
   "format": "dreamcore-recovery-coverage-v1",
-  "throughVersion": 47,
+  "throughVersion": 50,
   "implementationHashes": {
     "apps/api/src/main/java/com/dreamcore/workspace/departure/DepartureResidualCleanup.java": "f0b8fe926ac679177effbcacd529994abc901c2afcc779dca65442e1cb2ae432"
   },
@@ -234,6 +234,21 @@
       "version": "47",
       "script": "V47__briefing_cards_and_generation.sql",
       "sha256": "a97b987a7a053f9d7274c65440a8f67d6e19f0111babbabef35487f9f4ab8c5a"
+    },
+    {
+      "version": "48",
+      "script": "V48__resume_briefing_generation.sql",
+      "sha256": "acb72a02ec5b5f566b8182da0856363b4394c7e1a40cd2b1947de51c9299c274"
+    },
+    {
+      "version": "49",
+      "script": "V49__briefing_discussions.sql",
+      "sha256": "2079421d4a3d06378fdac79eed5e3ab25f6cc8362a9a6fb031b28672e5d46a60"
+    },
+    {
+      "version": "50",
+      "script": "V50__conversation_realtime.sql",
+      "sha256": "9d90d3577b364973912015e87a5ed07e314cd253a877967266812dd8fe771baa"
     }
   ],
   "tables": [
@@ -244,6 +259,7 @@
     "briefing_card_moves",
     "briefing_card_preferences",
     "briefing_content_keys",
+    "briefing_discussions",
     "briefing_generation_batches",
     "briefing_generation_policies",
     "briefing_generation_requests",
@@ -264,6 +280,9 @@
     "conversation_artifacts",
     "conversation_attempts",
     "conversation_events",
+    "conversation_live_inputs",
+    "conversation_live_output",
+    "conversation_live_questions",
     "conversation_original_reads",
     "conversation_originals",
     "conversation_plan_commands",
@@ -374,7 +393,7 @@
     "workspaces"
   ],
   "catalogHashes": [
-    "35a62e0b4b44bee7e44719b10ee27c6e01a8a0175b7b9edf62e6664f3fce243f",
-    "9c156f9314302dc5567f33688baf92a6ce22577348f85ab05f47c1257e7a8f3d"
+    "8e58e29bbc39aae731ef00ab5bc206940cef764767ced3f43eb669b10e62b915",
+    "e70d23c57d1bbcab4dfaa62618cd5eb741f92f89c15aac5708648da021348e0b"
   ]
 }

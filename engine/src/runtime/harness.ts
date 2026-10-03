@@ -1,3 +1,4 @@
+import type { RealtimePort } from './realtime.js';
 import { randomUUID } from 'node:crypto';
 import { Context } from '@deepseek-ai/cordis';
 import Agents, { type AgentHandle } from '@deepseek-ai/dsh-agent';
@@ -27,6 +28,8 @@ import {
 
 /** Core-only composition: no CLI, home config, filesystem, shell, persistence, retry or plugin loader. */
 export async function runHarness(options: {
+  realtime?: RealtimePort;
+  shouldConcludeTurn?: () => boolean;
   prompt: string;
   /** Platform continuity facts, supplied separately from the current user request; never instructions. */
   context?: Json;
@@ -85,6 +88,37 @@ export async function runHarness(options: {
   options.signal?.addEventListener('abort', onAbort, { once: true });
   const timer = setTimeout(() => abort('TIME_LIMIT'), timeoutMs);
   const ctx = new Context();
+  const incoming = new Map<string, { text: string; applied: boolean }>();
+  let controlTimer: ReturnType<typeof setTimeout> | undefined;
+  let controlPending: Promise<void> | undefined;
+  let disposed = false;
+  const pollControl = async () => {
+    if (!options.realtime || disposed || controller.signal.aborted) return;
+    try {
+      const control = await options.realtime.control();
+      if (disposed || controller.signal.aborted) return;
+      if (control.stop) {
+        abort('CANCELLED');
+        return;
+      }
+      for (const input of control.inputs)
+        if (!incoming.has(input.id)) {
+          incoming.set(input.id, { text: input.text, applied: false });
+          handle?.agent.steer(
+            createUserMessage({
+              source: { kind: 'user' },
+              content: [{ type: 'text', text: `[supplement:${input.id}]\n${input.text}` }],
+            }),
+          );
+        }
+    } catch {
+      abort('CONTROL_UNAVAILABLE');
+    }
+    if (!disposed && !controller.signal.aborted)
+      controlTimer = setTimeout(() => {
+        controlPending = pollControl();
+      }, 400);
+  };
   try {
     for (const plugin of [Llm, Agents, Sessions, Projections, Invariants]) ctx.plugin(plugin);
     ctx.plugin(SystemPrompt, { includeHarnessIdentity: false, includeRuntimeContext: false });
@@ -147,82 +181,136 @@ export async function runHarness(options: {
               },
             ],
           });
-        let index = 0,
-          finished = false;
-        for await (const part of model.generate({
-          messages,
-          tools: finalResponse ? [] : (request.tools ?? []),
-          signal: controller.signal,
-          maxTokens: 2048,
-        })) {
-          controller.signal.throwIfAborted();
-          // Bound generated payload, not repeated SSE/event envelope overhead.
-          // Providers may split identical text into one chunk or thousands of tiny chunks.
-          const bytes = (v: unknown) => (typeof v === 'string' ? Buffer.byteLength(v) : 0);
-          streamBytes +=
-            part.type === 'text'
-              ? bytes(part.text)
-              : part.type === 'tool_call'
-                ? bytes(part.id) + bytes(part.name) + bytes(part.arguments)
-                : 0;
-          if (streamBytes > 65536) {
-            abort('MODEL_OUTPUT_LIMIT');
-            return;
+        for (const [id, input] of incoming)
+          if (
+            !input.applied &&
+            messages.some(
+              (m) =>
+                m.role === 'user' &&
+                m.content.some((b) => b.type === 'text' && b.text.includes(`[supplement:${id}]`)),
+            )
+          ) {
+            await options.realtime?.applied(id);
+            input.applied = true;
           }
-          if (part.type === 'finish') {
-            if (!['stop', 'tool_calls', 'length'].includes(part.reason))
-              throw new RuntimeError('INVALID_MODEL_RESPONSE');
-            finished = true;
-            if (part.reason === 'length') {
+        if (result.modelCalls === 1) await options.realtime?.started?.();
+        const step = result.modelCalls;
+        let visible = '',
+          lastSent = 0,
+          sentText = '';
+        let index = 0,
+          textOpen = false,
+          textBlock = '',
+          finished = false;
+        const flush = async (state: 'STREAMING' | 'COMPLETE' | 'INTERRUPTED', force = false) => {
+          if (
+            options.realtime &&
+            (force || performance.now() - lastSent >= 250) &&
+            (sentText !== visible || state !== 'STREAMING')
+          ) {
+            await options.realtime.output(step, visible, state);
+            lastSent = performance.now();
+            sentText = visible;
+          }
+        };
+        try {
+          for await (const part of model.generate({
+            messages,
+            tools: finalResponse ? [] : (request.tools ?? []),
+            signal: controller.signal,
+            maxTokens: 2048,
+          })) {
+            controller.signal.throwIfAborted();
+            // Bound generated payload, not repeated SSE/event envelope overhead.
+            // Providers may split identical text into one chunk or thousands of tiny chunks.
+            const bytes = (v: unknown) => (typeof v === 'string' ? Buffer.byteLength(v) : 0);
+            streamBytes +=
+              part.type === 'text'
+                ? bytes(part.text)
+                : part.type === 'tool_call'
+                  ? bytes(part.id) + bytes(part.name) + bytes(part.arguments)
+                  : 0;
+            if (streamBytes > 65536) {
               abort('MODEL_OUTPUT_LIMIT');
               return;
             }
-            yield { type: 'finish', reason: { kind: part.reason === 'tool_calls' ? 'tool-calls' : 'stop' } };
-            break;
-          }
-          if (part.type === 'text') {
-            if (typeof part.text !== 'string') throw new RuntimeError('INVALID_MODEL_RESPONSE');
-            yield { type: 'block-start', index, blockType: 'text' };
-            yield { type: 'text-delta', index, text: part.text };
-            yield { type: 'block-end', index, block: { type: 'text', text: part.text } };
-          } else {
-            if (finalResponse) {
-              abort('MODEL_CALL_LIMIT');
-              return;
+            if (part.type === 'finish') {
+              if (!['stop', 'tool_calls', 'length'].includes(part.reason))
+                throw new RuntimeError('INVALID_MODEL_RESPONSE');
+              finished = true;
+              if (part.reason === 'length') {
+                abort('MODEL_OUTPUT_LIMIT');
+                return;
+              }
+              if (textOpen) {
+                yield { type: 'block-end', index, block: { type: 'text', text: textBlock } };
+                textOpen = false;
+                index++;
+              }
+              await flush('COMPLETE', true);
+              yield {
+                type: 'finish',
+                reason: { kind: part.reason === 'tool_calls' ? 'tool-calls' : 'stop' },
+              };
+              break;
             }
-            if (
-              part.type !== 'tool_call' ||
-              typeof part.id !== 'string' ||
-              !/^[\x21-\x7e]{1,128}$/.test(part.id) ||
-              modelCallIds.has(part.id) ||
-              typeof part.name !== 'string' ||
-              !/^[a-z][a-z0-9_]{0,63}$/.test(part.name) ||
-              typeof part.arguments !== 'string'
-            )
-              throw new RuntimeError('INVALID_MODEL_RESPONSE');
-            modelCallIds.add(part.id);
-            yield { type: 'block-start', index, blockType: 'tool-call' };
-            yield {
-              type: 'tool-call-delta',
-              index,
-              id: brandString<ToolCallId>(part.id),
-              name: part.name,
-              argumentsDelta: part.arguments,
-            };
-            yield {
-              type: 'block-end',
-              index,
-              block: {
-                type: 'tool-call',
+            if (part.type === 'text') {
+              if (typeof part.text !== 'string') throw new RuntimeError('INVALID_MODEL_RESPONSE');
+              if (!textOpen) {
+                yield { type: 'block-start', index, blockType: 'text' };
+                textOpen = true;
+              }
+              textBlock += part.text;
+              visible += part.text;
+              yield { type: 'text-delta', index, text: part.text };
+              await flush('STREAMING');
+            } else {
+              if (textOpen) {
+                yield { type: 'block-end', index, block: { type: 'text', text: textBlock } };
+                textOpen = false;
+                textBlock = '';
+                index++;
+              }
+              if (finalResponse) {
+                abort('MODEL_CALL_LIMIT');
+                return;
+              }
+              if (
+                part.type !== 'tool_call' ||
+                typeof part.id !== 'string' ||
+                !/^[\x21-\x7e]{1,128}$/.test(part.id) ||
+                modelCallIds.has(part.id) ||
+                typeof part.name !== 'string' ||
+                !/^[a-z][a-z0-9_]{0,63}$/.test(part.name) ||
+                typeof part.arguments !== 'string'
+              )
+                throw new RuntimeError('INVALID_MODEL_RESPONSE');
+              modelCallIds.add(part.id);
+              yield { type: 'block-start', index, blockType: 'tool-call' };
+              yield {
+                type: 'tool-call-delta',
+                index,
                 id: brandString<ToolCallId>(part.id),
                 name: part.name,
-                arguments: part.arguments,
-              },
-            };
+                argumentsDelta: part.arguments,
+              };
+              yield {
+                type: 'block-end',
+                index,
+                block: {
+                  type: 'tool-call',
+                  id: brandString<ToolCallId>(part.id),
+                  name: part.name,
+                  arguments: part.arguments,
+                },
+              };
+            }
+            if (part.type === 'tool_call') index++;
           }
-          index++;
+          if (!finished && !controller.signal.aborted) throw new RuntimeError('MODEL_INCOMPLETE');
+        } finally {
+          if (!finished) await flush('INTERRUPTED', true).catch(() => {});
         }
-        if (!finished && !controller.signal.aborted) throw new RuntimeError('MODEL_INCOMPLETE');
       }
     }
     ctx.llm.registerAdapter(['dreamcore'], new Bridge());
@@ -278,6 +366,7 @@ export async function runHarness(options: {
                   ) === true
                 )
                   execution.concludeTurn();
+                if (options.shouldConcludeTurn?.()) execution.concludeTurn();
                 return value;
               } catch (error) {
                 // Never place raw host paths, credentials or arbitrary stack traces in model history.
@@ -332,6 +421,7 @@ export async function runHarness(options: {
         ],
       }),
     );
+    controlPending = pollControl();
     await handle.agent.whenIdle();
     if (!controller.signal.aborted) {
       result.status = terminal === 'completed' ? 'completed' : 'failed';
@@ -343,6 +433,9 @@ export async function runHarness(options: {
       result.code = 'RUNTIME_FAILED';
     }
   } finally {
+    disposed = true;
+    clearTimeout(controlTimer);
+    await controlPending;
     clearTimeout(timer);
     options.signal?.removeEventListener('abort', onAbort);
     await handle?.dispose();

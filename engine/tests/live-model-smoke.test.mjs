@@ -101,7 +101,7 @@ test('text smoke sends one bounded synthetic request through the real adapter an
   assert.equal(request.headers.authorization, `Bearer ${key}`);
   assert.equal(request.url, '/compatible-mode/v1/chat/completions');
   assert.equal(request.input.max_tokens, 64);
-  assert.equal(request.input.stream, false);
+  assert.equal(request.input.stream, true);
   assert.equal(request.input.enable_thinking, false);
   assert.equal(request.input.tools, undefined);
   assert.equal(request.input.messages.length, 1);

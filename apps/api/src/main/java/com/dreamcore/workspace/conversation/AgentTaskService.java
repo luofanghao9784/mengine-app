@@ -22,7 +22,7 @@ public class AgentTaskService {
     public AgentTaskService(JdbcTemplate db,ConversationService conversations,KnowledgeService knowledge,AgentSettings settings,org.springframework.transaction.PlatformTransactionManager manager,IdentityAudit audit,TaskOriginals originals,AgentUsageLedger usage,TaskContextGuard contextGuard,TableCalculationService tables,BriefingContentService briefings){this.briefings=briefings;this.tables=tables;this.contextGuard=contextGuard;this.usage=usage;this.originals=originals;this.transactions=new org.springframework.transaction.support.TransactionTemplate(manager);this.audit=audit;this.db=db;this.conversations=conversations;this.knowledge=knowledge;this.settings=settings;}
     private IdentityException denied(){return new IdentityException(403,"TASK_ACCESS_DENIED");}
     /** Bearer is the unpredictable, short-lived attempt capability. Owner/tenant/scope come only from the DB. */
-    private ConversationService.Job authorized(UUID task,UUID attempt){
+    ConversationService.Job authorized(UUID task,UUID attempt){
         if(!settings.enabled() || attempt==null)throw denied();
         var rows=db.queryForList("SELECT * FROM conversation_tasks WHERE id=? AND lease_token=? AND mode='AGENT' AND status='RUNNING' AND lease_until>now()",task,attempt);
         if(rows.isEmpty())throw denied();var row=rows.getFirst();
@@ -41,10 +41,10 @@ public class AgentTaskService {
     }
     private String scope(UUID task){return db.queryForObject("SELECT source_scope FROM conversation_tasks WHERE id=?",String.class,task);}
     private List<UUID> grants(ConversationService.Job job){return db.queryForList("SELECT chunk_id FROM conversation_agent_grants WHERE task_id=? AND attempt_id=? ORDER BY chunk_id",UUID.class,job.id(),job.token());}
-    @Transactional public Map<String,Object> check(UUID task,UUID attempt){authorized(task,attempt);String query=db.queryForObject("SELECT public_query FROM conversation_tasks WHERE id=?",String.class,task);var response=new LinkedHashMap<String,Object>(Map.of("allowed",true,"executionClass",settings.mode(),"publicQuery",query==null?"":query,"candidateTrialsAllowed",settings.candidateTrialsEnabled() && query!=null,"contextVersion","1.0","taskWorkVersion","1.0","tableComparisonVersion",tables.available()?"1.0":"","briefingContentVersion","1.0","planManagementVersion","1.0","planAllowed",db.queryForObject("SELECT EXISTS(SELECT 1 FROM ongoing_plan_runs WHERE task_id=?)",Boolean.class,task)));response.put("briefingGeneration",db.queryForObject("SELECT EXISTS(SELECT 1 FROM briefing_generation_batches WHERE task_id=?)",Boolean.class,task));return response;}
+    @Transactional public Map<String,Object> check(UUID task,UUID attempt){authorized(task,attempt);String query=db.queryForObject("SELECT public_query FROM conversation_tasks WHERE id=?",String.class,task);var response=new LinkedHashMap<String,Object>(Map.of("allowed",true,"executionClass",settings.mode(),"publicQuery",query==null?"":query,"candidateTrialsAllowed",settings.candidateTrialsEnabled() && query!=null,"contextVersion","1.0","taskWorkVersion","1.0","tableComparisonVersion",tables.available()?"1.0":"","briefingContentVersion","1.0","planManagementVersion","1.0","planAllowed",db.queryForObject("SELECT EXISTS(SELECT 1 FROM ongoing_plan_runs WHERE task_id=?)",Boolean.class,task)));response.put("realtimeVersion","1.0");response.put("briefingGeneration",db.queryForObject("SELECT EXISTS(SELECT 1 FROM briefing_generation_batches WHERE task_id=?)",Boolean.class,task));return response;}
     public record ExecutionOpen(String contractVersion,List<String> tools) {}
     public record ToolReceipt(Integer sequence,String name,String status) {}
-    private static final Set<String> REGISTERED_TOOLS=Set.of("deliver_briefing","compare_table","search_sources","run_javascript","find_skills","activate_skill","public_search","read_public_page","candidate_tool","list_originals","read_original","process_original","task_control","task_context","task_plan","task_preference","manage_plan");
+    private static final Set<String> REGISTERED_TOOLS=Set.of("deliver_briefing","compare_table","search_sources","run_javascript","find_skills","activate_skill","public_search","read_public_page","candidate_tool","list_originals","read_original","process_original","ask_user","task_control","task_context","task_plan","task_preference","manage_plan");
     @Transactional public Map<String,Object> openExecution(UUID task,UUID attempt,ExecutionOpen body){
         authorized(task,attempt);
         if(body==null || !Set.of("1.5","1.6").contains(body.contractVersion()==null?"":body.contractVersion()) || body.tools()==null || body.tools().isEmpty() || body.tools().size()>16 || new HashSet<>(body.tools()).size()!=body.tools().size() || body.tools().stream().anyMatch(t->t==null || !REGISTERED_TOOLS.contains(t)))throw new IdentityException(502,"TASK_RUNTIME_INCOMPATIBLE");
@@ -65,6 +65,7 @@ public class AgentTaskService {
         if(!Arrays.asList(json.readValue(row.get("allowed_tools").toString(),String[].class)).contains(body.name()))throw denied();
         var found=db.queryForList("SELECT name,status FROM conversation_tool_receipts WHERE task_id=? AND attempt_number=? AND sequence=?",task,row.get("attempt_number"),body.sequence());
         if(found.isEmpty()){
+            if(Boolean.TRUE.equals(db.queryForObject("SELECT stop_requested FROM conversation_attempts WHERE task_id=? AND attempt_id=?",Boolean.class,task,attempt)))throw new IdentityException(409,"TASK_STOPPING");
             if(!body.status().equals("STARTED") || body.sequence()!=1+db.queryForObject("SELECT count(*) FROM conversation_tool_receipts WHERE task_id=? AND attempt_number=?",Integer.class,task,row.get("attempt_number")))throw new IdentityException(409,"TASK_STATE_CHANGED");
             db.update("INSERT INTO conversation_tool_receipts(task_id,attempt_number,sequence,name,status) VALUES (?,?,?,?,'STARTED')",task,row.get("attempt_number"),body.sequence(),body.name());
         }else{
@@ -73,7 +74,7 @@ public class AgentTaskService {
         }
     }
     @Transactional public Map<String,Object> openUsage(UUID task,UUID attempt){authorized(task,attempt);return usage.open(task,attempt);}
-    @Transactional public void startUsage(UUID task,UUID attempt,AgentUsageLedger.Start request){authorized(task,attempt);usage.start(task,attempt,request);}
+    @Transactional public void startUsage(UUID task,UUID attempt,AgentUsageLedger.Start request){authorized(task,attempt);if(Boolean.TRUE.equals(db.queryForObject("SELECT stop_requested FROM conversation_attempts WHERE task_id=? AND attempt_id=?",Boolean.class,task,attempt)))throw new IdentityException(409,"TASK_STOPPING");usage.start(task,attempt,request);}
     @Transactional public List<Input> search(UUID task,UUID attempt,String query){
         return searchResult(task,attempt,query).items();
     }
@@ -133,6 +134,13 @@ public class AgentTaskService {
     private void incompatible(){throw new IdentityException(502,"TASK_RUNTIME_INCOMPATIBLE");}
     @Transactional public void finish(ConversationService.Job expected,AgentResult r){
         var job=authorized(expected.id(),expected.token());
+        var stop=db.queryForMap("SELECT stop_requested,stop_action FROM conversation_attempts WHERE task_id=? AND attempt_id=?",job.id(),job.token());
+        if(Boolean.TRUE.equals(stop.get("stop_requested"))){
+            String next="PAUSE".equals(stop.get("stop_action"))?"PAUSED":"CANCELLED";
+            db.update("UPDATE conversation_tasks SET status=?,revision=revision+1,lease_token=NULL,lease_until=NULL,finished_at=now() WHERE id=?",next,job.id());
+            conversations.archive(job.id());usage.terminal(job.id(),job.token(),next);
+            conversations.event(job.tenant(),job.space(),job.conversation(),job.id(),next,db.queryForObject("SELECT revision FROM conversation_tasks WHERE id=?",Integer.class,job.id()));return;
+        }
         if(r==null || !("1.4".equals(r.contractVersion()) || "1.5".equals(r.contractVersion())) || !job.id().equals(r.taskId()) || !job.token().equals(r.attemptId()) || !"AGENT".equals(r.mode()) || !settings.mode().equals(r.executionClass()) ||
            r.engineVersion()==null || !r.engineVersion().matches("[A-Za-z0-9.\\-]{1,64}") || r.modelName()==null || !r.modelName().matches("[A-Za-z0-9._\\-]{1,80}") ||
            r.text()==null || r.text().isBlank() || r.text().length()>16000 || r.modelCalls()<1 || r.modelCalls()>8 ||
@@ -142,9 +150,9 @@ public class AgentTaskService {
         if(r.usage()!=null && (r.usage().inputTokens()<0 || r.usage().outputTokens()<0 || r.usage().inputTokens()>1000000 || r.usage().outputTokens()>1000000))incompatible();
         String outcome="1.4".equals(r.contractVersion())?"COMPLETE":r.outcome();
         if(outcome==null || !Set.of("COMPLETE","PARTIAL","WAITING_INPUT","WAITING_CAPABILITY").contains(outcome) || r.requiredInput()!=null && r.requiredInput().length()>1000 || "WAITING_INPUT".equals(outcome) && (r.requiredInput()==null || r.requiredInput().isBlank()))incompatible();
-        if("1.4".equals(r.contractVersion()) && (r.outcome()!=null || r.requiredInput()!=null || r.tools().stream().anyMatch(t->t!=null && (!"succeeded".equals(t.status()) || Set.of("task_control","task_context","task_plan","task_preference","manage_plan").contains(t.name()==null?"":t.name())))))incompatible();
+        if("1.4".equals(r.contractVersion()) && (r.outcome()!=null || r.requiredInput()!=null || r.tools().stream().anyMatch(t->t!=null && (!"succeeded".equals(t.status()) || Set.of("ask_user","task_control","task_context","task_plan","task_preference","manage_plan").contains(t.name()==null?"":t.name())))))incompatible();
         if("COMPLETE".equals(outcome) && r.tools().stream().anyMatch(t->t!=null && !"succeeded".equals(t.status())))incompatible();
-        if(Set.of("WAITING_INPUT","WAITING_CAPABILITY").contains(outcome) && r.tools().stream().noneMatch(t->t!=null && "task_control".equals(t.name()) && "succeeded".equals(t.status())))incompatible();
+        if(Set.of("WAITING_INPUT","WAITING_CAPABILITY").contains(outcome) && r.tools().stream().noneMatch(t->t!=null && ("task_control".equals(t.name()) || "WAITING_INPUT".equals(outcome) && "ask_user".equals(t.name()) && Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM conversation_live_questions WHERE task_id=? AND attempt_number=(SELECT attempt FROM conversation_tasks WHERE id=?) AND blocking)",Boolean.class,job.id(),job.id()))) && "succeeded".equals(t.status())))incompatible();
         if("1.5".equals(r.contractVersion())){
             var stored=db.queryForList("SELECT name,status FROM conversation_tool_receipts WHERE task_id=? AND attempt_number=(SELECT attempt FROM conversation_tasks WHERE id=?) ORDER BY sequence",job.id(),job.id());
             var expectedTools=r.tools().stream().map(t->t==null?"invalid":t.name()+"/"+t.status()).sorted().toList();
@@ -153,7 +161,7 @@ public class AgentTaskService {
         usage.validateResult(job.id(),job.token(),r.modelCalls(),r.usage());
         var calls=new HashSet<String>();boolean code=false;
         for(var tool:r.tools()){
-            if(tool==null || tool.callId()==null || !tool.callId().matches("[!-~]{1,128}") || !calls.add(tool.callId()) || (tool.status()==null || !Set.of("succeeded","failed").contains(tool.status())) || tool.name()==null || !Set.of("deliver_briefing","compare_table","search_sources","run_javascript","find_skills","activate_skill","public_search","read_public_page","candidate_tool","list_originals","read_original","process_original","task_control","task_context","task_plan","task_preference","manage_plan").contains(tool.name()))incompatible();
+            if(tool==null || tool.callId()==null || !tool.callId().matches("[!-~]{1,128}") || !calls.add(tool.callId()) || (tool.status()==null || !Set.of("succeeded","failed").contains(tool.status())) || tool.name()==null || !Set.of("deliver_briefing","compare_table","search_sources","run_javascript","find_skills","activate_skill","public_search","read_public_page","candidate_tool","list_originals","read_original","process_original","ask_user","task_control","task_context","task_plan","task_preference","manage_plan").contains(tool.name()))incompatible();
             if("candidate_tool".equals(tool.name())) {if(!settings.candidateTrialsEnabled() || !settings.mode().equals("verification") || db.queryForObject("SELECT public_query IS NOT NULL FROM conversation_tasks WHERE id=?",Boolean.class,job.id())!=Boolean.TRUE || r.skills()==null || r.skills().stream().noneMatch(s->s!=null && "candidate-trials".equals(s.id())))incompatible();code=code || "succeeded".equals(tool.status());}
             if("process_original".equals(tool.name())){if(!settings.mode().equals("verification") || r.originalIds().isEmpty() || r.skills()==null || r.skills().stream().noneMatch(s->s!=null && "file-processing".equals(s.id())))incompatible();code=code || "succeeded".equals(tool.status());}
             if("run_javascript".equals(tool.name())){if(!settings.mode().equals("verification"))incompatible();code=code || "succeeded".equals(tool.status());}

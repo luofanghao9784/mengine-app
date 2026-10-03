@@ -104,6 +104,8 @@ def quarantine(sql):
     UPDATE content_cleanup_jobs SET state='FAILED',lease_token=NULL,lease_until=NULL,error_code='RECOVERY_QUARANTINE'
       WHERE state IN ('QUEUED','CLEANING');
     COMMIT;""")
+    if has_table(sql,'conversation_live_output'):
+        sql("UPDATE conversation_live_output SET state='INTERRUPTED',version=version+1 WHERE state='STREAMING'")
     if has_table(sql,'task_plan_checks'):
         # Explicit even for an already stopped plan: no old accepted check is executable after restore.
         sql("UPDATE task_plan_checks SET state='CANCELLED' WHERE state='PENDING'")

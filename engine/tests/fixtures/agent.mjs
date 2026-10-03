@@ -103,7 +103,7 @@ export async function fixtureEngine(
         assert.equal(input.enable_thinking, false);
         assert.equal(input.thinking, undefined);
       } else assert.equal(input.thinking.type, 'disabled');
-      assert.equal(input.stream, false);
+      assert.equal(input.stream, true);
       const prompt = input.messages.find((m) => m.role === 'user')?.content;
       if (prompt.includes('等待取消')) {
         res.writeHead(200, { 'content-type': 'application/json' });
