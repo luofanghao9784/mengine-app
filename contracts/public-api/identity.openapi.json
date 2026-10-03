@@ -3,7 +3,7 @@
   "info": {
     "title": "Dreamcore Identity and Tenant API",
     "version": "1.4.0",
-    "description": "M2-A1 身份、M2-B2 总台与 M2-B3 企业管理接口。同源 Cookie 会话，所有写请求必须带 CSRF。总台仅提供企业运行与管理元信息，不提供客户内容或代入入口。 M2-C1 共享资料查看与维护分开授权，已有访问成员默认只读。"
+    "description": "M2-A1 身份、M2-B2 总台与 M2-B3 企业管理接口。同源 Cookie 会话，所有写请求必须带 CSRF。总台仅提供企业运行与管理元信息，不提供客户内容或代入入口。 M2-C1 共享资料查看与维护分开授权，已有访问成员默认只读。 总台改为独立平台凭据与会话；客户端和企业端继续共用客户账号。历史平台角色不会自动转换为独立总台登录。"
   },
   "security": [
     {
@@ -244,7 +244,7 @@
     "/api/v1/me": {
       "get": {
         "operationId": "getMe",
-        "summary": "当前账号、平台身份与有效企业成员身份",
+        "summary": "当前客户账号与有效企业成员身份",
         "responses": {
           "200": {
             "description": "成功",
@@ -500,7 +500,12 @@
             }
           }
         ],
-        "description": "保持 Tenant 数组响应，新增过滤与有界分页；默认最多 50 条，按创建时间和 ID 倒序。"
+        "description": "保持 Tenant 数组响应，新增过滤与有界分页；默认最多 50 条，按创建时间和 ID 倒序。",
+        "security": [
+          {
+            "platformSessionCookie": []
+          }
+        ]
       },
       "post": {
         "operationId": "createTenant",
@@ -592,7 +597,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "platformSessionCookie": []
+          }
+        ]
       }
     },
     "/api/tenant-admin/v1/tenants/{tenant}/invitations": {
@@ -1059,7 +1069,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "platformSessionCookie": []
+          }
+        ]
       }
     },
     "/api/platform-admin/v1/tenants/{tenant}": {
@@ -1159,7 +1174,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "platformSessionCookie": []
+          }
+        ]
       }
     },
     "/api/platform-admin/v1/tenants/{tenant}/status": {
@@ -1274,7 +1294,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "platformSessionCookie": []
+          }
+        ]
       }
     },
     "/api/platform-admin/v1/tenants/{tenant}/initial-admin-invitation": {
@@ -1389,7 +1414,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "platformSessionCookie": []
+          }
+        ]
       }
     },
     "/api/platform-admin/v1/tenants/{tenant}/records": {
@@ -1513,6 +1543,11 @@
               "maximum": 100,
               "default": 50
             }
+          }
+        ],
+        "security": [
+          {
+            "platformSessionCookie": []
           }
         ]
       }
@@ -3276,6 +3311,379 @@
           }
         }
       }
+    },
+    "/api/platform-admin/v1/auth/csrf": {
+      "get": {
+        "operationId": "platformAuthCsrf",
+        "summary": "取得独立总台会话 CSRF",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Csrf"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "输入无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "登录无效或已失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CSRF 或权限校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态或重复请求冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务异常，不返回内部细节",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/platform-admin/v1/auth/login": {
+      "post": {
+        "operationId": "platformAuthLogin",
+        "summary": "使用平台管理账号登录",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "输入无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "登录无效或已失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CSRF 或权限校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态或重复请求冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务异常，不返回内部细节",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "15 分钟窗口内超过尝试次数",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "description": "登录前先获取 CSRF；成功后重新获取 CSRF，旧会话 ID 与令牌失效。账号不存在、密码错误、账号停用统一返回 INVALID_CREDENTIALS。",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformLogin"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/platform-admin/v1/auth/me": {
+      "get": {
+        "operationId": "platformAuthMe",
+        "summary": "读取当前平台管理身份",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "输入无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "登录无效或已失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CSRF 或权限校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态或重复请求冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务异常，不返回内部细节",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "platformSessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/platform-admin/v1/auth/logout": {
+      "post": {
+        "operationId": "platformAuthLogout",
+        "summary": "仅退出总台会话",
+        "responses": {
+          "204": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "输入无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "登录无效或已失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CSRF 或权限校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态或重复请求冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务异常，不返回内部细节",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          }
+        ],
+        "security": [
+          {
+            "platformSessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/platform-admin/v1/local-invitations/{id}": {
+      "get": {
+        "summary": "本地合成短信环境下读取初始企业邀请链接",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalInvitationLink"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "getPlatformLocalInitialInvitation",
+        "security": [
+          {
+            "platformSessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/platform-admin/v1/local-invitations/configuration": {
+      "get": {
+        "operationId": "getPlatformLocalInvitationConfiguration",
+        "summary": "读取平台本地测试邀请预览是否启用",
+        "security": [
+          {
+            "platformSessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "可用性",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "localPreview"
+                  ],
+                  "properties": {
+                    "localPreview": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3284,6 +3692,12 @@
         "type": "apiKey",
         "in": "cookie",
         "name": "DREAMCORE_SESSION"
+      },
+      "platformSessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "DREAMCORE_PLATFORM",
+        "description": "独立总台会话；企业用户 Cookie 不授予平台权限。写入前从 /api/platform-admin/v1/auth/csrf 取得令牌。"
       }
     },
     "parameters": {
@@ -4813,6 +5227,25 @@
           "path"
         ],
         "additionalProperties": false
+      },
+      "PlatformLogin": {
+        "type": "object",
+        "required": [
+          "username",
+          "password"
+        ],
+        "properties": {
+          "username": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 254
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
       }
     }
   }

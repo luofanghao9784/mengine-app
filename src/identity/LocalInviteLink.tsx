@@ -2,14 +2,14 @@ import { useEffect, useState } from 'react';
 import { createIdentityRequest, IdentityError, record, text } from './client';
 import { Button } from '../shared/ui';
 const request = createIdentityRequest();
-export function LocalInviteLink({ invitation }: { invitation: string }) {
+export function LocalInviteLink({ invitation, platform = false }: { invitation: string; platform?: boolean }) {
   const [enabled, setEnabled] = useState(false),
     [path, setPath] = useState(''),
     [error, setError] = useState('');
   useEffect(() => {
     let active = true;
     request(
-      '/api/v1/auth/phone/configuration',
+      platform ? '/api/platform-admin/v1/local-invitations/configuration' : '/api/v1/auth/phone/configuration',
       'GET',
       (v): v is { localPreview: boolean } => record(v) && typeof v.localPreview === 'boolean',
     )
@@ -20,7 +20,7 @@ export function LocalInviteLink({ invitation }: { invitation: string }) {
     return () => {
       active = false;
     };
-  }, []);
+  }, [platform]);
   if (!enabled) return null;
   return (
     <div className="phone-local-note">
@@ -29,7 +29,7 @@ export function LocalInviteLink({ invitation }: { invitation: string }) {
         onClick={async () => {
           try {
             const result = await request(
-              '/api/v1/auth/phone/local-invitation/' + invitation,
+              (platform ? '/api/platform-admin/v1/local-invitations/' : '/api/v1/auth/phone/local-invitation/') + invitation,
               'GET',
               (v): v is { path: string } =>
                 record(v) &&

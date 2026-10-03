@@ -47,3 +47,15 @@ test('platform record projection rejects employee activity outside the managemen
   await assert.rejects(client([{ ...record, action: 'INVITATION_ACCEPT' }]).records(id), mismatch);
   assert.equal((await client([{ ...record, action: 'TENANT_CREATE' }]).records(id)).length, 1);
 });
+
+
+test('platform writes obtain platform CSRF and never borrow a customer session token', async () => {
+  const calls: { path: string; init?: RequestInit }[] = [];
+  const api = createPlatformClient(async (path, init) => {
+    calls.push({ path: String(path), init });
+    return Response.json(String(path).endsWith('/csrf') ? { token: 'platform-csrf', headerName: 'X-CSRF-TOKEN' } : detail);
+  });
+  await api.status(id, { requestId: other, expectedVersion: 0, status: 'SUSPENDED' });
+  assert.equal(calls[0].path, '/api/platform-admin/v1/auth/csrf');
+  assert.equal((calls[1].init?.headers as Record<string,string>)['X-CSRF-TOKEN'], 'platform-csrf');
+});

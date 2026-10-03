@@ -41,6 +41,7 @@ public class IdentitySecurity {
             .csrf(c -> c.csrfTokenRepository(csrf).ignoringRequestMatchers("/internal/v1/agent-access/**"))
             .requestCache(c -> c.disable()).formLogin(c -> c.disable()).httpBasic(c -> c.disable()).logout(c -> c.disable())
             .authorizeHttpRequests(a -> a
+                .dispatcherTypeMatchers(jakarta.servlet.DispatcherType.ERROR).permitAll()
                 .requestMatchers("/api/v1/system/info", "/actuator/health", "/api/v1/auth/csrf", "/api/v1/auth/login", "/api/v1/auth/invitations/accept").permitAll()
                 .requestMatchers("/api/v1/auth/phone/configuration", "/api/v1/auth/phone/invitation", "/api/v1/auth/phone/switch-account", "/api/v1/auth/phone/challenges", "/api/v1/auth/phone/accept", "/api/v1/auth/phone/reset", "/api/v1/auth/phone/local-code/*").permitAll()
                 .requestMatchers("/internal/v1/agent-access/**").permitAll() // Every operation validates a running task attempt capability.

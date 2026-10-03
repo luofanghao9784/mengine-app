@@ -2,7 +2,7 @@ import { reconcileViewStates } from '../shared/view-state';
 import { reconcileDocumentDrafts } from '../documents/drafts';
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Identity } from '../../contracts/public-api/identity';
-import { createIdentityClient, IdentityError } from './client';
+import { createIdentityClient, createIdentityRequest, isIdentity, IdentityError } from './client';
 
 export const identityClient = createIdentityClient();
 type Session = {
@@ -17,9 +17,21 @@ const SessionContext = createContext<{
   expire: () => void;
   authenticated: (identity: Identity) => void;
 } | null>(null);
-const CHANGE_KEY = 'dreamcore-session-change';
+const platformRequest = createIdentityRequest();
+const platformIdentityClient = {
+  me: (signal?: AbortSignal) => platformRequest('/api/platform-admin/v1/auth/me', 'GET', isIdentity, undefined, signal),
+  login: (username: string, password: string) => platformRequest('/api/platform-admin/v1/auth/login', 'POST', isIdentity, {username, password}),
+  logout: () => platformRequest('/api/platform-admin/v1/auth/logout', 'POST', (v): v is null => v === null),
+};
 
-export function SessionProvider({ children }: { children: ReactNode }) {
+export function SessionProvider({ children, realm = 'customer' }: { children: ReactNode; realm?: 'customer' | 'platform' }) {
+  const client = realm === 'platform' ? platformIdentityClient : identityClient;
+  const CHANGE_KEY = realm === 'platform' ? 'dreamcore-platform-session-change' : 'dreamcore-session-change';
+  const reconcile = useCallback((identity: Identity | null) => {
+    if (realm === 'platform') return;
+    reconcileDocumentDrafts(identity);
+    reconcileViewStates(identity?.account.id ?? null, identity?.memberships.map((m) => m.tenantId));
+  }, [realm]);
   const [session, setSession] = useState<Session>({ phase: 'loading', identity: null });
   const generation = useRef(0);
   const pending = useRef<AbortController | null>(null);
@@ -32,8 +44,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
   const expire = useCallback(() => {
     invalidate();
-    reconcileDocumentDrafts(null);
-    reconcileViewStates(null);
+    reconcile(null);
     setSession({ phase: 'anonymous', identity: null });
     notify();
   }, [invalidate]);
@@ -54,13 +65,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       pending.current = controller;
       if (!background) setSession({ phase: 'loading', identity: null });
       try {
-        const identity = await identityClient.me(controller.signal);
+        const identity = await client.me(controller.signal);
         if (id === generation.current) {
-          reconcileDocumentDrafts(identity);
-          reconcileViewStates(
-            identity.account.id,
-            identity.memberships.map((m) => m.tenantId),
-          );
+          reconcile(identity);
           setSession((previous) =>
             previous.phase === 'authenticated' &&
             JSON.stringify(previous.identity) === JSON.stringify(identity)
@@ -71,8 +78,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       } catch (error) {
         if (id !== generation.current) return;
         if (error instanceof IdentityError && error.status === 401) {
-          reconcileDocumentDrafts(null);
-          reconcileViewStates(null);
+          reconcile(null);
         }
         setSession({
           phase: error instanceof IdentityError && error.status === 401 ? 'anonymous' : 'unavailable',
@@ -80,7 +86,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         });
       }
     },
-    [invalidate],
+    [invalidate, reconcile, client],
   );
   useEffect(() => {
     void refresh();
@@ -106,36 +112,27 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [refresh, invalidate]);
   const authenticated = (identity: Identity) => {
     invalidate();
-    reconcileDocumentDrafts(identity);
-    reconcileViewStates(
-      identity.account.id,
-      identity.memberships.map((m) => m.tenantId),
-    );
+    reconcile(identity);
     setSession({ phase: 'authenticated', identity });
     notify();
   };
   const login = async (phone: string, password: string) => {
     invalidate();
     const id = generation.current;
-    const identity = await identityClient.login(phone, password);
+    const identity = await client.login(phone, password);
     if (id === generation.current) {
-      reconcileDocumentDrafts(identity);
-      reconcileViewStates(
-        identity.account.id,
-        identity.memberships.map((m) => m.tenantId),
-      );
+      reconcile(identity);
       setSession({ phase: 'authenticated', identity });
     } else await refresh();
     notify();
   };
   const logout = async () => {
     // Drop rendered business state immediately, even if transport cannot confirm logout.
-    reconcileDocumentDrafts(null);
-    reconcileViewStates(null);
+    reconcile(null);
     invalidate();
     setSession({ phase: 'loading', identity: null });
     try {
-      await identityClient.logout();
+      await client.logout();
       expire();
       notify();
     } catch (error) {

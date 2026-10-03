@@ -26,6 +26,6 @@ test('cleanup summary contains aggregates and cannot carry private task bodies o
   assert.ok(check(value));
   assert.equal(check({ ...value, prompt: 'private task' }), false);
   assert.equal(check({ ...value, removedEvents: -1 }), false);
-  for (const verbs of Object.values(spec.paths))
-    assert.deepEqual(verbs.get.security, [{ sessionCookie: [] }]);
+  for (const [path, verbs] of Object.entries(spec.paths))
+    assert.deepEqual(verbs.get.security, [{ [path.startsWith('/api/platform-admin/') ? 'platformSessionCookie' : 'sessionCookie']: [] }]);
 });

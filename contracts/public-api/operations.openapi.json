@@ -50,7 +50,12 @@
           "404": {
             "description": "总台指定企业不存在"
           }
-        }
+        },
+        "security": [
+          {
+            "platformSessionCookie": []
+          }
+        ]
       }
     },
     "/api/platform-admin/v1/tenants/{tenant}/operations": {
@@ -102,7 +107,12 @@
           "404": {
             "description": "总台指定企业不存在"
           }
-        }
+        },
+        "security": [
+          {
+            "platformSessionCookie": []
+          }
+        ]
       }
     },
     "/api/tenant-admin/v1/tenants/{tenant}/operations": {
@@ -164,6 +174,12 @@
         "type": "apiKey",
         "in": "cookie",
         "name": "DREAMCORE_SESSION"
+      },
+      "platformSessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "DREAMCORE_PLATFORM",
+        "description": "独立总台会话；企业用户 Cookie 不授予平台权限。写入前从 /api/platform-admin/v1/auth/csrf 取得令牌。"
       }
     },
     "schemas": {

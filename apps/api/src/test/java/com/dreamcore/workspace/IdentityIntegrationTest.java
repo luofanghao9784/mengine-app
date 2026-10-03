@@ -41,12 +41,15 @@ class IdentityIntegrationTest {
     UUID platformId;
 
     final class Client {
+        final boolean platformRealm;
+        Client() { this(false); }
+        Client(boolean platformRealm) { this.platformRealm=platformRealm; }
         final CookieManager cookies = new CookieManager(null,CookiePolicy.ACCEPT_ALL);
         final HttpClient http = HttpClient.newBuilder().cookieHandler(cookies).build();
         HttpResponse<String> send(String method, String path, Object body, boolean csrf) throws Exception {
             var request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + path));
             if (csrf) {
-                var token = json(send("GET","/api/v1/auth/csrf",null,false));
+                var token = json(send("GET",path.startsWith("/api/platform-admin/") ? "/api/platform-admin/v1/auth/csrf" : "/api/v1/auth/csrf",null,false));
                 request.header(token.get("headerName").asString(),token.get("token").asString());
             }
             request.header("Content-Type","application/json");
@@ -58,7 +61,7 @@ class IdentityIntegrationTest {
             assertEquals(expected,response.statusCode(),response.body());
             return response.body().isEmpty() ? null : json(response);
         }
-        JsonNode login(String email) throws Exception { return ok("POST","/api/v1/auth/login",Map.of("email",email,"password",PASSWORD),200); }
+        JsonNode login(String email) throws Exception { return ok("POST",platformRealm ? "/api/platform-admin/v1/auth/login" : "/api/v1/auth/login",Map.of(platformRealm ? "username" : "email",email,"password",PASSWORD),200); }
     }
     JsonNode json(HttpResponse<String> response) { return JSON.readTree(response.body()); }
     String token(String invite) throws Exception {
@@ -77,7 +80,7 @@ class IdentityIntegrationTest {
     }
     @BeforeAll void setup() throws Exception {
         platformId = identities.bootstrap("platform@example.test","合成平台管理员",PASSWORD);
-        platform = new Client(); platform.login("platform@example.test");
+        platform = new Client(true); platform.login("platform@example.test");
         var a = create("合成企业 A","admin-a@example.test"); tenantA = a.get("tenant").get("id").asString();
         adminA = acceptNew(a.get("invitation").get("id").asString(),"admin-a@example.test");
         var b = create("合成企业 B","admin-b@example.test"); tenantB = b.get("tenant").get("id").asString();
@@ -107,11 +110,11 @@ class IdentityIntegrationTest {
     }
     @Test void rolesNeverGrantCrossTenantOrPrivateWorkspaceAccess() throws Exception {
         for (Client forbidden : List.of(platform,adminB)) {
-            assertEquals(403,forbidden.send("GET","/api/v1/tenants/"+tenantA+"/context",null,false).statusCode());
-            assertEquals(403,forbidden.send("GET","/api/tenant-admin/v1/tenants/"+tenantA+"/invitations",null,false).statusCode());
+            assertEquals(forbidden.platformRealm ? 401 : 403,forbidden.send("GET","/api/v1/tenants/"+tenantA+"/context",null,false).statusCode());
+            assertEquals(forbidden.platformRealm ? 401 : 403,forbidden.send("GET","/api/tenant-admin/v1/tenants/"+tenantA+"/invitations",null,false).statusCode());
         }
         assertEquals(403,employee.send("GET","/api/tenant-admin/v1/tenants/"+tenantA+"/invitations",null,false).statusCode());
-        assertEquals(403,adminA.send("GET","/api/platform-admin/v1/tenants",null,false).statusCode());
+        assertEquals(401,adminA.send("GET","/api/platform-admin/v1/tenants",null,false).statusCode());
         var adminSpaces = adminA.ok("GET","/api/v1/tenants/"+tenantA+"/context",null,200).get("workspaces");
         var employeeSpaces = employee.ok("GET","/api/v1/tenants/"+tenantA+"/context",null,200).get("workspaces");
         assertEquals(1,adminSpaces.size()); assertEquals(1,employeeSpaces.size());
@@ -223,8 +226,8 @@ class IdentityIntegrationTest {
         // Restore the shared fixture's session for independent tests.
         employee.login("employee@example.test");
         db.update("DELETE FROM platform_roles WHERE account_id=?",platformId);
-        try { assertEquals(403,platform.send("GET","/api/platform-admin/v1/tenants",null,false).statusCode()); }
-        finally { db.update("INSERT INTO platform_roles(account_id,role) VALUES (?,'PLATFORM_ADMIN')",platformId); }
+        try { assertEquals(401,platform.send("GET","/api/platform-admin/v1/tenants",null,false).statusCode()); }
+        finally { db.update("INSERT INTO platform_roles(account_id,role) VALUES (?,'PLATFORM_ADMIN')",platformId); platform.login("platform@example.test"); }
     }
 
     @Test void bootstrapCannotRunTwiceAndAuditNeverContainsCredentials() throws Exception {
@@ -257,13 +260,13 @@ class IdentityIntegrationTest {
         assertEquals(runtime.get("totalTenants").asLong(),runtime.get("activeTenants").asLong()+runtime.get("suspendedTenants").asLong());
         for(Client forbidden:List.of(adminA,employee)) {
             for(String denied:List.of(path,path+"/records","/api/platform-admin/v1/overview"))
-                assertEquals(403,forbidden.send("GET",denied,null,false).statusCode());
-            assertEquals(403,forbidden.send("POST",path+"/status",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"status","SUSPENDED"),true).statusCode());
-            assertEquals(403,forbidden.send("POST",path+"/initial-admin-invitation",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"email","forbidden@example.test"),true).statusCode());
+                assertEquals(401,forbidden.send("GET",denied,null,false).statusCode());
+            assertEquals(401,forbidden.send("POST",path+"/status",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"status","SUSPENDED"),true).statusCode());
+            assertEquals(401,forbidden.send("POST",path+"/initial-admin-invitation",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"email","forbidden@example.test"),true).statusCode());
         }
         assertEquals(403,platform.send("POST",path+"/status",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"status","SUSPENDED"),false).statusCode());
         assertEquals(404,platform.send("GET","/api/platform-admin/v1/tenants/"+UUID.randomUUID(),null,false).statusCode());
-        assertEquals(403,platform.send("GET","/api/v1/tenants/"+id+"/context",null,false).statusCode());
+        assertEquals(401,platform.send("GET","/api/v1/tenants/"+id+"/context",null,false).statusCode());
         for(String forbidden:List.of("content","conversations","impersonate")) assertEquals(404,platform.send("GET",path+"/"+forbidden,null,false).statusCode());
     }
     @Test void platformSuspensionIsVersionedIdempotentAndTenantScoped() throws Exception {
@@ -319,7 +322,7 @@ class IdentityIntegrationTest {
     @Test void concurrentPlatformTransitionsAndInvitationAcceptanceStayAtomic() throws Exception {
         var created=create("并发总台合成企业","platform-race@example.test");
         String id=created.get("tenant").get("id").asString(),path="/api/platform-admin/v1/tenants/"+id;
-        Client peer=new Client();peer.login("platform@example.test");
+        Client peer=new Client(true);peer.login("platform@example.test");
         try(var executor=Executors.newFixedThreadPool(2)) {
             var one=executor.submit(()->platform.send("POST",path+"/status",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"status","SUSPENDED"),true).statusCode());
             var two=executor.submit(()->peer.send("POST",path+"/status",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"status","SUSPENDED"),true).statusCode());
@@ -371,9 +374,9 @@ class IdentityIntegrationTest {
         String id=space.get("id").asString();
         for(Client forbidden:List.of(platform,adminB,member)) {
             for(String route:List.of("/overview","/members","/workspaces","/records","/workspaces/"+id,"/workspaces/"+id+"/members","/invitations"))
-                assertEquals(403,forbidden.send("GET",f.path+route,null,false).statusCode());
-            assertEquals(403,forbidden.send("POST",f.path+"/workspaces",body,true).statusCode());
-            assertEquals(403,forbidden.send("POST",f.path+"/members/"+f.adminId+"/status",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"status","DISABLED"),true).statusCode());
+                assertEquals(forbidden.platformRealm ? 401 : 403,forbidden.send("GET",f.path+route,null,false).statusCode());
+            assertEquals(forbidden.platformRealm ? 401 : 403,forbidden.send("POST",f.path+"/workspaces",body,true).statusCode());
+            assertEquals(forbidden.platformRealm ? 401 : 403,forbidden.send("POST",f.path+"/members/"+f.adminId+"/status",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"status","DISABLED"),true).statusCode());
         }
         assertEquals(403,f.admin.send("POST",f.path+"/workspaces",body,false).statusCode());
         assertEquals(400,f.admin.send("POST",f.path+"/workspaces",Map.of("requestId",UUID.randomUUID(),"name","注入","kind","PERSONAL"),true).statusCode());

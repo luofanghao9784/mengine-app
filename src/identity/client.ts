@@ -173,7 +173,7 @@ export function createIdentityRequest(fetcher: typeof fetch = fetch, timeoutMs =
     try {
       const headers: Record<string, string> = { Accept: 'application/json' };
       if (method !== 'GET') {
-        const token = await request('/api/v1/auth/csrf', 'GET', isCsrf, undefined, controller.signal);
+        const token = await request(path.startsWith('/api/platform-admin/') ? '/api/platform-admin/v1/auth/csrf' : '/api/v1/auth/csrf', 'GET', isCsrf, undefined, controller.signal);
         headers[token.headerName] = token.token;
         if (body !== undefined && !(body instanceof FormData)) headers['Content-Type'] = 'application/json';
       }

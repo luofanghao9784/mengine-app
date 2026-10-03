@@ -441,7 +441,7 @@ function TenantView({
           <>
             <div className="platform-invitation-line">
               <strong>{invitation.phone || invitation.email}</strong>
-              {invitation.phone && <LocalInviteLink invitation={invitation.id} />}
+              {invitation.phone && <LocalInviteLink platform invitation={invitation.id} />}
               <Badge>{invitationLabel[invitation.status]}</Badge>
             </div>
             {invitation.status !== 'ACCEPTED' && (

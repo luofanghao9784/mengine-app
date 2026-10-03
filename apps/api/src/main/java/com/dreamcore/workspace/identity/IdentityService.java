@@ -69,14 +69,14 @@ public class IdentityService {
         return Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM accounts WHERE id=? AND status='ACTIVE')", Boolean.class, account));
     }
     public boolean validSession(UUID account,long version) {
-        return Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM accounts WHERE id=? AND status='ACTIVE' AND credential_version=?)",Boolean.class,account,version));
+        return Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM accounts WHERE id=? AND status='ACTIVE' AND credential_version=? AND NOT EXISTS(SELECT 1 FROM platform_accounts p WHERE p.account_id=accounts.id))",Boolean.class,account,version));
     }
     public Account login(String suppliedEmail, String password, String ip) {
         boolean byPhone = suppliedEmail != null && !suppliedEmail.contains("@");
         String normalized = byPhone ? PhoneNumbers.normalize(suppliedEmail) : email(suppliedEmail);
         if (!throttle.allow(normalized, ip)) { audit.denial(null, "LOGIN_THROTTLED"); throw new IdentityException(429, "LOGIN_THROTTLED"); }
         if (password == null || password.length() > 128) throw new IdentityException(401, "INVALID_CREDENTIALS");
-        var rows = db.queryForList("SELECT id,password_hash,status,credential_version FROM accounts WHERE " + (byPhone ? "phone=?" : "email=? AND phone IS NULL"), normalized);
+        var rows = db.queryForList("SELECT id,password_hash,status,credential_version FROM accounts WHERE NOT EXISTS(SELECT 1 FROM platform_accounts p WHERE p.account_id=accounts.id) AND " + (byPhone ? "phone=?" : "email=? AND phone IS NULL"), normalized);
         String encoded = rows.isEmpty() ? dummyHash : (String) rows.getFirst().get("password_hash");
         boolean matches = passwords.matches(password, encoded);
         if (!matches || rows.isEmpty() || !"ACTIVE".equals(rows.getFirst().get("status"))) {
@@ -94,7 +94,7 @@ public class IdentityService {
         return rows.getFirst();
     }
     public Me me(UUID actor) {
-        return new Me(account(actor), isPlatformAdmin(actor), db.query("""
+        return new Me(account(actor), false, db.query("""
             SELECT t.id,t.name,m.role FROM tenant_memberships m JOIN tenants t ON t.id=m.tenant_id
             WHERE m.account_id=? AND m.status='ACTIVE' AND t.status='ACTIVE' ORDER BY t.created_at,t.id
             """, (r,n) -> new Membership(r.getObject("id", UUID.class), r.getString("name"), r.getString("role")), actor));
@@ -146,10 +146,10 @@ public class IdentityService {
     public UUID bootstrap(String suppliedEmail, String displayName, String password) {
         String normalized = email(suppliedEmail); String display = name(displayName,80); password(password);
         db.execute("SELECT pg_advisory_xact_lock(743012009)");
-        if (db.queryForObject("SELECT count(*) FROM platform_roles", Integer.class) != 0) throw new IdentityException(409, "BOOTSTRAP_ALREADY_COMPLETED");
-        if (db.queryForObject("SELECT count(*) FROM accounts WHERE email=?", Integer.class, normalized) != 0) throw IdentityException.conflict();
+        if (db.queryForObject("SELECT count(*) FROM platform_accounts", Integer.class) != 0) throw new IdentityException(409, "BOOTSTRAP_ALREADY_COMPLETED");
         UUID id = UUID.randomUUID();
-        db.update("INSERT INTO accounts(id,email,display_name,password_hash) VALUES (?,?,?,?)",id,normalized,display,passwords.encode(password));
+        db.update("INSERT INTO accounts(id,email,display_name,password_hash) VALUES (?,?,?,?)",id,"platform-"+id+"@identity.invalid",display,passwords.encode(UUID.randomUUID().toString()));
+        db.update("INSERT INTO platform_accounts(account_id,login_name,password_hash) VALUES (?,?,?)",id,normalized,passwords.encode(password));
         db.update("INSERT INTO platform_roles(account_id,role) VALUES (?,'PLATFORM_ADMIN')",id);
         audit.record(id,null,"PLATFORM_BOOTSTRAP",id,"SUCCESS");
         return id;

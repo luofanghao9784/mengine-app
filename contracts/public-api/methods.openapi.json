@@ -95,6 +95,11 @@
               "maximum": 50
             }
           }
+        ],
+        "security": [
+          {
+            "platformSessionCookie": []
+          }
         ]
       },
       "post": {
@@ -179,6 +184,11 @@
               "type": "string"
             }
           }
+        ],
+        "security": [
+          {
+            "platformSessionCookie": []
+          }
         ]
       }
     },
@@ -255,6 +265,11 @@
               "type": "string",
               "format": "uuid"
             }
+          }
+        ],
+        "security": [
+          {
+            "platformSessionCookie": []
           }
         ]
       }
@@ -351,7 +366,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "platformSessionCookie": []
+          }
+        ]
       }
     },
     "/api/platform-admin/v1/methods/comparisons": {
@@ -436,6 +456,11 @@
             "schema": {
               "type": "string"
             }
+          }
+        ],
+        "security": [
+          {
+            "platformSessionCookie": []
           }
         ]
       }
@@ -533,6 +558,11 @@
               "maximum": 50
             }
           }
+        ],
+        "security": [
+          {
+            "platformSessionCookie": []
+          }
         ]
       }
     },
@@ -628,7 +658,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "platformSessionCookie": []
+          }
+        ]
       }
     },
     "/api/platform-admin/v1/methods/sample-suite": {
@@ -713,6 +748,11 @@
             "schema": {
               "type": "string"
             }
+          }
+        ],
+        "security": [
+          {
+            "platformSessionCookie": []
           }
         ]
       }
@@ -999,6 +1039,12 @@
         "type": "apiKey",
         "in": "cookie",
         "name": "JSESSIONID"
+      },
+      "platformSessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "DREAMCORE_PLATFORM",
+        "description": "独立总台会话；企业用户 Cookie 不授予平台权限。写入前从 /api/platform-admin/v1/auth/csrf 取得令牌。"
       }
     },
     "schemas": {

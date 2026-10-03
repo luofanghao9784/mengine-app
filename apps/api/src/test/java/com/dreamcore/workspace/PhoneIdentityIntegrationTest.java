@@ -37,7 +37,7 @@ class PhoneIdentityIntegrationTest {
         final HttpClient http=HttpClient.newBuilder().cookieHandler(cookies).build();
         HttpResponse<String> send(String method,String path,Object body,boolean csrf)throws Exception{
             var req=HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+path)).timeout(java.time.Duration.ofSeconds(15));
-            if(csrf){var token=JSON.readTree(send("GET","/api/v1/auth/csrf",null,false).body());req.header(token.get("headerName").asString(),token.get("token").asString());}
+            if(csrf){var token=JSON.readTree(send("GET",path.startsWith("/api/platform-admin/")?"/api/platform-admin/v1/auth/csrf":"/api/v1/auth/csrf",null,false).body());req.header(token.get("headerName").asString(),token.get("token").asString());}
             req.header("Content-Type","application/json");req.method(method,body==null?HttpRequest.BodyPublishers.noBody():HttpRequest.BodyPublishers.ofString(JSON.writeValueAsString(body)));
             return http.send(req.build(),HttpResponse.BodyHandlers.ofString());
         }
@@ -183,14 +183,17 @@ class PhoneIdentityIntegrationTest {
         var i=invite(false);var c=join(i);var target=invite(false);
         new Client().call("GET","/api/v1/auth/phone/local-invitation/"+target.id(),null,401);
         c.call("GET","/api/v1/auth/phone/local-invitation/"+target.id(),null,403);
-        var admin=new Client();admin.call("POST","/api/v1/auth/login",Map.of("email",platform+"@phone.test","password",PASSWORD),200);
-        var link=admin.call("GET","/api/v1/auth/phone/local-invitation/"+target.id(),null,200);assertTrue(link.get("path").asString().startsWith("/workspace/#invite="));
+        db.update("INSERT INTO platform_accounts(account_id,login_name,password_hash) VALUES (?,?,?)",platform,platform+"@phone.test",passwords.encode(PASSWORD));
+        var admin=new Client();admin.call("POST","/api/platform-admin/v1/auth/login",Map.of("username",platform+"@phone.test","password",PASSWORD),200);
+        var link=admin.call("GET","/api/platform-admin/v1/local-invitations/"+target.id(),null,200);assertTrue(link.get("path").asString().startsWith("/workspace/#invite="));
+        db.update("DELETE FROM platform_sessions WHERE account_id=?",platform);
+        db.update("DELETE FROM platform_accounts WHERE account_id=?",platform);
     }
     @Test void noContentPermissionsAreGrantedByJoiningOrBecomingOwner()throws Exception{
         var i=invite(true);var c=join(i);UUID account=UUID.fromString(c.me().get("account").get("id").asString());
         assertEquals(0,db.queryForObject("SELECT count(*) FROM tenant_governance WHERE tenant_id=? AND owner_id IS NOT NULL",Integer.class,i.tenant()));
         assertEquals(0,db.queryForObject("SELECT count(*) FROM workspace_members WHERE account_id=?",Integer.class,account));
-        assertEquals(403,c.send("GET","/api/platform-admin/v1/tenants",null,false).statusCode());
+        assertEquals(401,c.send("GET","/api/platform-admin/v1/tenants",null,false).statusCode());
     }
     @Test void disabledOrSuspendedIdentityCannotBeRecoveredViaInvitation()throws Exception{
         var i=invite(false);var c=join(i);var old=c.me();UUID account=UUID.fromString(old.get("account").get("id").asString());

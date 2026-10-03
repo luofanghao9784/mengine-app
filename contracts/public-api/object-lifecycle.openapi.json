@@ -381,7 +381,12 @@
           "409": {
             "description": "Revision, lifecycle or active-method evidence conflict"
           }
-        }
+        },
+        "security": [
+          {
+            "platformSessionCookie": []
+          }
+        ]
       }
     },
     "/api/platform-admin/v1/object-lifecycle/{kind}/{id}": {
@@ -436,7 +441,12 @@
           "409": {
             "description": "Revision, lifecycle or active-method evidence conflict"
           }
-        }
+        },
+        "security": [
+          {
+            "platformSessionCookie": []
+          }
+        ]
       }
     },
     "/api/platform-admin/v1/object-lifecycle/{kind}/{id}/history": {
@@ -507,7 +517,12 @@
           "409": {
             "description": "Revision, lifecycle or active-method evidence conflict"
           }
-        }
+        },
+        "security": [
+          {
+            "platformSessionCookie": []
+          }
+        ]
       }
     },
     "/api/platform-admin/v1/object-lifecycle/{kind}/{id}/actions": {
@@ -580,7 +595,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "platformSessionCookie": []
+          }
+        ]
       }
     },
     "/api/platform-admin/v1/object-lifecycle/technical": {
@@ -600,7 +620,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "platformSessionCookie": []
+          }
+        ]
       }
     }
   },
@@ -610,6 +635,12 @@
         "type": "apiKey",
         "in": "cookie",
         "name": "SESSION"
+      },
+      "platformSessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "DREAMCORE_PLATFORM",
+        "description": "独立总台会话；企业用户 Cookie 不授予平台权限。写入前从 /api/platform-admin/v1/auth/csrf 取得令牌。"
       }
     },
     "schemas": {

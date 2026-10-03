@@ -43,9 +43,7 @@ public class PhoneIdentityService {
     }
     public void requireInvitationManager(UUID actor, UUID id) {
         var i=identities.invitation(id);
-        boolean initial=Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM tenant_initial_admin WHERE invitation_id=?)",Boolean.class,id));
-        if(initial && identities.me(actor).platformAdmin()) identities.platform(actor);
-        else identities.member(actor,i.tenantId(),true);
+        identities.member(actor,i.tenantId(),true);
         if(!"PENDING".equals(i.status()))throw new IdentityException(409,"INVITATION_UNAVAILABLE");
     }
     private UUID accountFor(String phone) {

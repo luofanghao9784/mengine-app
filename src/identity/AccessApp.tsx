@@ -261,7 +261,6 @@ function GuardedAccessShell({
   const links: Surface[] = [
     'workspace',
     ...(management.includes(tenant) || surface === 'tenant-admin' ? ['tenant-admin' as const] : []),
-    ...(identity.platformAdmin ? ['platform-admin' as const] : []),
   ];
   const surfaceHref = (target: Surface) => {
     if (target === 'workspace' && surface !== 'workspace') return returnToWorkspaceHref(routeHash, tenant);
