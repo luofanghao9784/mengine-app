@@ -206,8 +206,21 @@ def validate_instance_mode(settings, mode, restored=False, reconnect_live=False)
         raise TrialError('该数据目录的模型模式与本次启动不一致；使用原启动命令，真实验收请使用独立新目录。已开放恢复实例可显式 --reconnect-live。')
 
 
-def start(root, model_config=None, reconnect_live=False, phone_local=False):
+def collection_environment(path):
+    if path is None:
+        return {}
+    value = private_read(path)
+    if set(value) != {'executable'}:
+        raise TrialError('采集部署配置仅接受 executable，不接受任意环境变量。')
+    executable = Path(value['executable'])
+    if not executable.is_absolute() or executable.is_symlink() or not executable.is_file() or executable.stat().st_uid != os.getuid() or executable.stat().st_mode & 0o022 or not os.access(executable, os.X_OK):
+        raise TrialError('采集器必须是本人所有、不可被其他用户改写的绝对路径可执行文件。')
+    return {'DREAMCORE_COLLECTION_EXECUTABLE': str(executable)}
+
+
+def start(root, model_config=None, reconnect_live=False, phone_local=False, collection_config=None):
     os.umask(0o077)
+    collection_env = collection_environment(collection_config)
     model = None
     if model_config is not None:
         import live_model
@@ -291,6 +304,7 @@ def start(root, model_config=None, reconnect_live=False, phone_local=False):
                'KNOWLEDGE_ENABLED': str((WORKSPACE / 'workers/parser/.venv/bin/python').exists()).lower(), 'KNOWLEDGE_PARSER_ROOT': str(WORKSPACE / 'workers/parser'), 'MATERIAL_STORAGE_ROOT': str(root / 'objects'), 'SPRING_PROFILES_ACTIVE': 'local', 'INVITATION_DELIVERY': 'local', 'INVITATION_OUTBOX': str(root / 'invitations'), 'API_HOST': '127.0.0.1', 'API_PORT': str(settings['ports']['api']), 'SERVER_SERVLET_SESSION_COOKIE_NAME': 'DREAMCORE_TRIAL_' + hashlib.sha256(str(root).encode()).hexdigest()[:12]}
         env.update({'PHONE_DELIVERY': 'local' if phone_local else 'disabled', 'PHONE_LOCAL_PREVIEW': str(phone_local).lower(), 'PHONE_OUTBOX': str(root / 'phone-sms')})
         env['PLATFORM_COOKIE_NAME'] = 'DREAMCORE_PLATFORM_TRIAL_' + hashlib.sha256(str(root).encode()).hexdigest()[:12]
+        env.update(collection_env)
         env.update(model_api_env)
         model_status = {'agentMode': mode, 'model': model['model'] if model else None, 'cloudVerifiedByStartup': False}
         private_write(root / 'runtime.json', {'runId': run_id, 'state': 'starting', 'webUrl': f"http://127.0.0.1:{settings['ports']['web']}", **model_status, 'revision': subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'], cwd=WORKSPACE, text=True).strip(), 'apiSha256': hashlib.sha256(jar.read_bytes()).hexdigest()})
@@ -413,7 +427,10 @@ def main():
     parser.add_argument('--live', action='store_true', help='显式开启真实模型；只适用于 start。')
     parser.add_argument('--model-config', type=Path, help='本工作树 .local/model-private 内的私有模型配置。')
     parser.add_argument('--reconnect-live', action='store_true', help='已 activate 的恢复实例显式重新接入真实模型；旧任务/计划不自动恢复。')
+    parser.add_argument('--collection-config', type=Path, help='部署维护的 0600 采集器配置；不从继承环境读取。')
     args = parser.parse_args()
+    if args.collection_config and args.command != 'start':
+        raise TrialError('采集配置仅适用于 start。')
     if (args.live or args.model_config) and (args.command != 'start' or not args.live):
         raise TrialError('模型参数仅适用于 start --live。')
     if args.reconnect_live and (args.command != 'start' or not args.live):
@@ -424,9 +441,9 @@ def main():
     if args.command == 'start':
         if args.live:
             from live_model import DEFAULT_CONFIG
-            start(root, args.model_config or DEFAULT_CONFIG, args.reconnect_live)
+            start(root, args.model_config or DEFAULT_CONFIG, args.reconnect_live, collection_config=args.collection_config)
         else:
-            start(root, phone_local=args.phone_local)
+            start(root, phone_local=args.phone_local, collection_config=args.collection_config)
     elif args.command == 'invitation':
         if not args.invitation_id:
             raise TrialError('请提供邀请 ID；可在本地 invitations 目录按手机号或旧邮箱查找对应 JSON 文件。')
