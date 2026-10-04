@@ -22,6 +22,13 @@ CONTROL_TABLES = [
     'briefing_layouts', 'briefing_layout_moves', 'briefing_card_preferences', 'briefing_card_moves', 'briefing_generation_policies',
     'feedback_adjustment_threads', 'feedback_adjustment_messages', 'adjustment_task_dependencies',
     'publication_forward_batches', 'publication_forward_receipts',
+    'experience_intake_sources', 'experience_analysis_items', 'experience_analysis_runs', 'experience_admissions',
+    'experience_automatic_sources', 'experience_automatic_dependencies', 'experience_adjustments', 'experience_evidence',
+    'experience_generalization_sources', 'experience_generalization_runs', 'general_experience_entries', 'general_experience_versions',
+    'general_experience_origins', 'general_experience_admissions', 'general_experience_version_dependencies',
+    'general_experience_adjustments', 'general_experience_adjustment_runs', 'general_experience_suggestions',
+    'experience_general_dependencies', 'tenant_general_experience_usage', 'tenant_general_experience_usage_events',
+    'general_experience_management_events', 'experience_events',
 ]
 
 
@@ -355,6 +362,7 @@ def reconcile(root, current_root, key_path):
                 applied['operations']=backup_lifecycle.operations(sql,current_sql)
                 applied['departures']=backup_lifecycle.departures(sql,current_sql)
                 applied['residual']=backup_lifecycle.residual(sql,current_sql)
+                applied['experience']=backup_experience.synchronize(sql,current_sql)
                 closed = sql("SELECT (SELECT count(*) FROM accounts WHERE status='ACTIVE')+(SELECT count(*) FROM tenants WHERE status='ACTIVE')+(SELECT count(*) FROM platform_roles)+(SELECT count(*) FROM workspace_members)+(SELECT count(*) FROM governance_capabilities)+(SELECT count(*) FROM conversation_tasks WHERE status IN('QUEUED','RUNNING'))+(SELECT count(*) FROM ongoing_plans WHERE status='ACTIVE')+(SELECT count(*) FROM knowledge_runs WHERE status IN('QUEUED','RUNNING'))")
                 if closed != '0':
                     backup.fail('恢复实例隔离检查失败；不得开放。')
@@ -712,6 +720,7 @@ def activate(root, current_root, key_path):
                 applied['forwarding']=backup_lifecycle.forwarding(sql,current_sql)
                 applied['operations']=backup_lifecycle.operations(sql,current_sql)
                 applied['departures']=backup_lifecycle.departures(sql,current_sql)
+                applied['experience']=backup_experience.synchronize(sql,current_sql)
                 reopened=reopen_current(sql,current_sql,root)
                 sync_retention(sql,current_sql,set(reopened['heldTenantIds']))
                 reopened['effectiveConfigurations']=reopen_configurations(sql,current_sql)
