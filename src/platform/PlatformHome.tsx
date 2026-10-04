@@ -391,7 +391,7 @@ function TenantView({
                 {invitation.status === 'PENDING' && (
                   <>
                     <p className="muted">有效至 {time(invitation.expiresAt)}</p>
-                    {invitation.phone && delivery === 'LOCAL' && (
+                    {delivery === 'LOCAL' && (
                       <LocalInviteLink platform invitation={invitation.id} />
                     )}
                   </>

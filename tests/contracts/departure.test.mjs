@@ -48,10 +48,12 @@ test('exit inventory recognizes exact data snapshots without accepting an extern
 });
 test('all endpoints are scoped, no-store, CSRF-bound and support precise conflict', () => {
   assert.equal(spec.components.securitySchemes.sessionCookie.name, 'DREAMCORE_SESSION');
+  assert.equal(spec.components.securitySchemes.platformSessionCookie.name, 'DREAMCORE_PLATFORM');
   for (const [path, verbs] of Object.entries(spec.paths))
     for (const [method, op] of Object.entries(verbs)) {
-      assert.ok(/^\/api\/v1\/(platform\/)?tenants\/\{tenant\}\//.test(path));
-      assert.deepEqual(op.security, [{ sessionCookie: [] }]);
+      const platform = path.startsWith('/api/platform-admin/');
+      assert.ok(platform ? /^\/api\/platform-admin\/v1\/tenants\/\{tenant\}\//.test(path) : /^\/api\/v1\/tenants\/\{tenant\}\//.test(path));
+      assert.deepEqual(op.security, platform ? [{ platformSessionCookie: [] }] : [{ sessionCookie: [] }]);
       assert.ok((op.responses['200'] ?? op.responses['201']).headers['Cache-Control']);
       if (method === 'post') {
         assert.ok(op.parameters.some((x) => x.$ref === '#/components/parameters/CsrfHeader'));

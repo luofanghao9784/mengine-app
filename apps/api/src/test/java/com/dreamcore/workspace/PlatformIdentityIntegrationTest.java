@@ -69,6 +69,31 @@ class PlatformIdentityIntegrationTest {
         assertEquals(customer.toString(),JSON.readTree(browser.send("GET","/api/v1/me",null,null).body()).get("account").get("id").asString());
         db.update("DELETE FROM platform_roles WHERE account_id=?",customer);
     }
+    @Test void pendingEnterpriseStatusUsesPlatformRealmWithoutExpiringItsSession() throws Exception {
+        String login="pending-"+UUID.randomUUID()+"@example.test",password="synthetic-platform-status";
+        provisionedPlatform=identities.bootstrap(login,"合成总台管理员",password);
+        var platform=new Browser();
+        assertEquals(200,platform.post(PLATFORM,"/login",Map.of("username",login,"password",password)).statusCode());
+        var created=platform.send("POST","/api/platform-admin/v1/tenants",Map.of("requestId",UUID.randomUUID(),"name","待邀请合成企业","adminEmail","owner-"+UUID.randomUUID()+"@example.test","designateAuthorizationOwner",true),platform.csrf(PLATFORM));
+        assertEquals(201,created.statusCode());
+        String tenant=JSON.readTree(created.body()).get("tenant").get("id").asString();
+        assertEquals(200,platform.get("/api/platform-admin/v1/tenants/"+tenant));
+        String statusPath="/api/platform-admin/v1/tenants/"+tenant+"/departure-status";
+        var status=platform.send("GET",statusPath,null,null);
+        assertEquals(200,status.statusCode());
+        var payload=JSON.readTree(status.body());
+        assertTrue(payload.get("businessEnabled").asBoolean());
+        assertFalse(payload.get("canExport").asBoolean());
+        assertEquals(200,platform.get(PLATFORM+"/me"));
+        // The customer realm must not grant platform status access, even with a valid login.
+        String customerLogin="customer-"+UUID.randomUUID()+"@example.test";
+        db.update("INSERT INTO accounts(id,email,display_name,password_hash) VALUES (?,?,?,?)",UUID.randomUUID(),customerLogin,"合成客户",passwords.encode("synthetic-customer-status"));
+        var customer=new Browser();
+        assertEquals(200,customer.post(CUSTOMER,"/login",Map.of("email",customerLogin,"password","synthetic-customer-status")).statusCode());
+        assertEquals(401,customer.get(statusPath));
+        assertEquals(401,platform.get("/api/v1/platform/tenants/"+tenant+"/departure-status"));
+        assertEquals(200,platform.get(PLATFORM+"/me"));
+    }
     @Test void deploymentCannotConfigureInvalidOrSharedCustomerCookieName() {
         assertThrows(IllegalArgumentException.class,()->new com.dreamcore.workspace.identity.PlatformIdentity(db,passwords,identities,null,null,"bad;name","CUSTOMER"));
         assertThrows(IllegalArgumentException.class,()->new com.dreamcore.workspace.identity.PlatformIdentity(db,passwords,identities,null,null,"SAME","SAME"));

@@ -1512,11 +1512,11 @@
         }
       }
     },
-    "/api/v1/platform/tenants/{tenant}/departure-status": {
+    "/api/platform-admin/v1/tenants/{tenant}/departure-status": {
       "get": {
         "security": [
           {
-            "sessionCookie": []
+            "platformSessionCookie": []
           }
         ],
         "parameters": [
@@ -1576,6 +1576,11 @@
         "type": "apiKey",
         "in": "cookie",
         "name": "DREAMCORE_SESSION"
+      },
+      "platformSessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "DREAMCORE_PLATFORM"
       }
     },
     "parameters": {

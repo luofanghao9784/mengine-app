@@ -215,7 +215,7 @@ export function createDepartureClient(fetcher: typeof fetch = fetch) {
   return {
     businessStatus: (t: string, platform = false, signal?: AbortSignal) =>
       request(
-        platform ? `/api/v1/platform/tenants/${id(t)}/departure-status` : root(t) + '/business-status',
+        platform ? `/api/platform-admin/v1/tenants/${id(t)}/departure-status` : root(t) + '/business-status',
         'GET',
         (v): v is DepartureBusinessStatus =>
           isBusinessStatus(v) && v.tenantId === t && (!platform || v.canExport === false),

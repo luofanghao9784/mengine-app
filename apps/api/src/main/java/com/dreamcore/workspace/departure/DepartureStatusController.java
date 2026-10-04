@@ -5,5 +5,5 @@ public class DepartureStatusController {
  private final DepartureStatusService service;public DepartureStatusController(DepartureStatusService service){this.service=service;}
  @ModelAttribute public void headers(HttpServletResponse r){r.setHeader("Cache-Control","private, no-store");}
  @GetMapping("/api/v1/tenants/{tenant}/departures/business-status")public DepartureStatusService.Status member(Authentication actor,@PathVariable UUID tenant){return service.get(UUID.fromString(actor.getName()),tenant,false);}
- @GetMapping("/api/v1/platform/tenants/{tenant}/departure-status")public DepartureStatusService.Status platform(Authentication actor,@PathVariable UUID tenant){return service.get(UUID.fromString(actor.getName()),tenant,true);}
+ @GetMapping("/api/platform-admin/v1/tenants/{tenant}/departure-status")public DepartureStatusService.Status platform(Authentication actor,@PathVariable UUID tenant){return service.get(UUID.fromString(actor.getName()),tenant,true);}
 }

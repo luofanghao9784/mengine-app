@@ -199,3 +199,18 @@ test('selected departure member is explicitly bound even when absent from curren
     api({ items: [summary], hasMore: false }).list(id(1), 0, undefined, 'MEMBER_OFFBOARD'),
   );
 });
+
+
+test('platform business status uses its independent session route and cannot grant export', async () => {
+  const paths: string[] = [];
+  const status = { tenantId: id(1), businessEnabled: true, exitState: null, exportDeadline: null, canExport: false };
+  const client = createDepartureClient(async (path, options) => {
+    paths.push(String(path));
+    assert.equal(options?.credentials, 'same-origin');
+    return new Response(JSON.stringify(status), { status: 200 });
+  });
+  assert.deepEqual(await client.businessStatus(id(1), true), status);
+  assert.deepEqual(paths, [`/api/platform-admin/v1/tenants/${id(1)}/departure-status`]);
+  assert.deepEqual(await client.businessStatus(id(1), false), status);
+  assert.equal(paths[1], `/api/v1/tenants/${id(1)}/departures/business-status`);
+});
