@@ -414,3 +414,107 @@ test('request bounds reject unknown fields, duplicate sources and untrusted capa
     assert.throws(() => fixture().engine.run(r), { code: 'INVALID_EXPERIENCE_REQUEST' });
   }
 });
+
+const platformRequest = () => {
+  const input = request();
+  input.job.tenant = null;
+  input.job.scope = 'PLATFORM';
+  input.job.inputs[0].kind = 'SOURCE_EXCERPT';
+  input.job.inputs[1].kind = 'FEEDBACK';
+  const { title, summary, steps, applicable, excluded } = candidate();
+  input.job.existing = [{ versionId: id(8), title, summary, steps, applicable, excluded }];
+  return input;
+};
+const platformSteps = () => {
+  const evidence = [{ inputId: id(5), quote: request().job.inputs[0].text }, ...candidate().evidence];
+  return {
+    extract: [
+      ...reads(),
+      tool('submit_experience', { candidate: { ...candidate(), targetVersionId: id(8), evidence } }),
+    ],
+    verify: [
+      ...reads(),
+      tool('experience_candidate'),
+      tool('verify_experience', { ...review(), basis: 'FEEDBACK_CORRECTION', evidence }),
+    ],
+  };
+};
+test('platform correction has no tenant, uses two fresh sessions and targets only its fixed cleaned base', async () => {
+  const input = platformRequest(),
+    f = fixture(platformSteps());
+  assert.equal(validExperienceRequest(input), true);
+  const result = await f.engine.run(input);
+  assert.equal(result.outcome, 'QUALIFIED');
+  assert.equal(result.candidate.targetVersionId, id(8));
+  assert.equal(result.review.basis, 'FEEDBACK_CORRECTION');
+  assert.equal(result.admitted, false);
+  assert.deepEqual(f.sessions, ['extract', 'verify']);
+  assert.equal(result.scope, 'PLATFORM');
+  assert.ok(validResult(result));
+  const replay = structuredClone(input);
+  replay.job.tenant = id(3);
+  delete replay.job.scope;
+  assert.throws(() => f.engine.run(replay), /EXPERIENCE_ATTEMPT_CONFLICT/);
+});
+test('platform requests cannot impersonate a tenant, inject task records, omit a fixed base or use partial input', () => {
+  const validate = ajv.compile({ $ref: spec.$id + '#/$defs/Request' });
+  assert.ok(validate(platformRequest()), JSON.stringify(validate.errors));
+  const bad = (change) => {
+    const input = platformRequest();
+    change(input.job);
+    return input;
+  };
+  for (const input of [
+    bad((j) => {
+      j.tenant = id(3);
+    }),
+    bad((j) => {
+      delete j.scope;
+    }),
+    bad((j) => {
+      delete j.tenant;
+    }),
+    bad((j) => {
+      j.scope = 'TENANT';
+    }),
+    bad((j) => {
+      j.inputs[1].kind = 'EXECUTION_RECORD';
+    }),
+    bad((j) => {
+      j.inputs[0].kind = 'TASK_RESULT';
+    }),
+    bad((j) => {
+      j.inputs[0].complete = false;
+    }),
+    bad((j) => {
+      j.inputs = [j.inputs[1]];
+    }),
+    bad((j) => {
+      j.existing = [];
+    }),
+    bad((j) => {
+      j.existing.push({ ...j.existing[0], versionId: id(9) });
+    }),
+  ]) {
+    assert.equal(validExperienceRequest(input), false, JSON.stringify(input));
+    assert.equal(validate(input), false, JSON.stringify(input));
+  }
+});
+test('platform model cannot turn adjustment into an unrelated new entry or claim observed execution', async () => {
+  for (const target of [null, id(9)]) {
+    const steps = platformSteps();
+    steps.extract = [
+      ...reads(),
+      tool('submit_experience', { candidate: { ...candidate(), targetVersionId: target } }),
+    ];
+    const f = fixture(steps),
+      result = await f.engine.run(platformRequest());
+    assert.notEqual(result.outcome, 'QUALIFIED');
+    assert.equal(result.candidate, null);
+  }
+  const steps = platformSteps();
+  steps.verify = [...reads(), tool('experience_candidate'), tool('verify_experience', review())];
+  const result = await fixture(steps).engine.run(platformRequest());
+  assert.equal(result.outcome, 'REJECTED');
+  assert.equal(result.candidate, null);
+});

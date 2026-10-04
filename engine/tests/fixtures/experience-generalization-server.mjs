@@ -4,8 +4,9 @@ import {
   qualityChecks,
 } from '../../dist/runtime/experience-generalization.js';
 import { createEngineServer } from '../../dist/server.js';
-const [token] = process.argv.slice(2);
-if (!token?.startsWith('synthetic-')) throw Error('Local fixture only');
+const [token, basis = 'OBSERVED_EXECUTION'] = process.argv.slice(2);
+if (!token?.startsWith('synthetic-') || !['OBSERVED_EXECUTION', 'FEEDBACK_CORRECTION'].includes(basis))
+  throw Error('Local fixture only');
 let stage = 0;
 const generalization = new ExperienceGeneralization({
   executionClass: 'verification',
@@ -35,7 +36,7 @@ const generalization = new ExperienceGeneralization({
                   applicable: ['两个期间的数值比较'],
                   excluded: ['不能证明全部场景的业务效果'],
                   tags: ['数据比较'],
-                  basis: 'OBSERVED_EXECUTION',
+                  basis,
                 },
               }
             : name.startsWith('check_')

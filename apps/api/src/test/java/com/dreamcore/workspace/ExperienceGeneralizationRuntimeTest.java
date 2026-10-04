@@ -64,4 +64,26 @@ class ExperienceGeneralizationRuntimeTest {
   var invalid=new ExperienceGeneralizationRuntime.Job(job.id(),job.lease(),job.tenant(),job.source(),original,List.of());
   var ex=assertThrows(ExperienceGeneralizationRuntime.Failure.class,()->runtime.execute(invalid,runtime.preflight(),()->true));assertFalse(ex.sent);assertEquals("INVALID_GENERALIZATION_REQUEST",ex.code);assertEquals(0,posts.get());
  }
+ ExperienceGeneralizationRuntime.Job platformJob(){var m=method();return ExperienceGeneralizationRuntime.Job.platform(job.id(),job.lease(),job.source(),new ExperienceGeneralizationRuntime.Method(m.title(),m.summary(),m.steps(),m.applicable(),m.excluded(),m.tags(),"FEEDBACK_CORRECTION"),List.of());}
+ @SuppressWarnings("unchecked") @Test void platformGeneralizationPreservesCleanedCorrectionWithoutInventedTenant(){
+  assertFalse(json.readTree(json.writeValueAsString(job)).has("scope"));
+  job=platformJob();var wire=json.readTree(json.writeValueAsString(job));assertEquals("PLATFORM",wire.path("scope").asString());assertTrue(wire.path("tenant").isNull());
+  var r=receipt();r.put("scope","PLATFORM");((Map<String,Object>)r.get("method")).put("basis","FEEDBACK_CORRECTION");response.set(json.writeValueAsString(r));
+  var result=runtime.execute(job,runtime.preflight(),()->true);assertEquals("QUALIFIED",result.outcome());assertEquals(result,runtime.validateReceipt(result,job,"synthetic-v1","verification"));assertEquals(1,posts.get());
+  var borrowed=new ExperienceGeneralizationRuntime.Job(job.id(),job.lease(),UUID.randomUUID(),job.source(),job.original(),job.protectedValues());
+  assertThrows(ExperienceGeneralizationRuntime.Failure.class,()->runtime.recover(borrowed,"synthetic-v1"));
+  var wrong=receipt();wrong.put("scope","PLATFORM");reject(wrong); // cannot inflate correction evidence
+  r.remove("scope");reject(r);r.put("scope",null);reject(r);
+ }
+ @Test void ambiguousScopeBorrowedIdentityAndUnverifiedExecutionBasisNeverDispatch(){
+  var p=platformJob();
+  for(var invalid:List.of(
+   new ExperienceGeneralizationRuntime.Job(p.id(),p.lease(),null,p.source(),p.original(),List.of()),
+   new ExperienceGeneralizationRuntime.Job(p.id(),p.lease(),UUID.randomUUID(),p.source(),p.original(),List.of(),"PLATFORM"),
+   ExperienceGeneralizationRuntime.Job.platform(p.id(),p.lease(),p.source(),method(),List.of()))) {
+   var ex=assertThrows(ExperienceGeneralizationRuntime.Failure.class,()->runtime.execute(invalid,runtime.preflight(),()->true));assertEquals("INVALID_GENERALIZATION_REQUEST",ex.code);assertFalse(ex.sent);
+  }
+  assertEquals(0,posts.get());
+ }
+
 }

@@ -102,3 +102,18 @@ test('fixed inputs cannot request arbitrary tools or silently omit truncation co
   );
   assert.equal(valid({ ...r, job: { ...r.job, inputs: Array(9).fill(r.job.inputs[0]) } }), false);
 });
+
+test('platform correction receipts are explicitly scoped, fixed-version corrections with no invented execution proof', () => {
+  const valid = ajv.compile({ $ref: spec.$id + '#/$defs/Result' });
+  const r = {
+    ...result,
+    scope: 'PLATFORM',
+    candidate: { ...candidate, targetVersionId: id },
+    review: { ...review, basis: 'FEEDBACK_CORRECTION' },
+  };
+  assert.ok(valid(r), JSON.stringify(valid.errors));
+  assert.equal(valid({ ...r, scope: null }), false);
+  assert.equal(valid({ ...r, scope: 'TENANT' }), false);
+  assert.equal(valid({ ...r, candidate }), false);
+  assert.equal(valid({ ...r, review }), false);
+});

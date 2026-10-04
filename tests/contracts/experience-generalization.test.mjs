@@ -92,3 +92,11 @@ test('results cannot announce admission or carry original quotes, authority or s
   for (const outcome of ['SKIPPED', 'REJECTED', 'FAILED', 'CANCELLED'])
     assert.equal(validate({ ...receipt(), outcome }), false);
 });
+
+test('platform cleaning cannot inflate feedback correction into observed execution', () => {
+  const r = { ...receipt(), scope: 'PLATFORM', method: { ...method, basis: 'FEEDBACK_CORRECTION' } };
+  assert.ok(validate(r), JSON.stringify(validate.errors));
+  assert.equal(validate({ ...r, method }), false);
+  assert.equal(validate({ ...r, scope: null }), false);
+  assert.equal(validate({ ...r, scope: 'TENANT' }), false);
+});

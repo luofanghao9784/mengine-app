@@ -43,4 +43,44 @@ class ExperienceAnalysisRuntimeTest {
   assertFalse(new ExperienceAnalysisRuntime(base,token,"off").configured());assertThrows(ExperienceAnalysisRuntime.Failure.class,()->new ExperienceAnalysisRuntime(base,token,"off").preflight());
   for(String path:List.of("file:///tmp/engine","https://user:password@example.test","https://example.test/path","https://example.test?query"))assertThrows(IllegalArgumentException.class,()->new ExperienceAnalysisRuntime(path,token,"verification"));assertEquals(0,posts.get());
  }
+ ExperienceAnalysisRuntime.Job platformJob(){
+  var i=job.inputs();
+  return ExperienceAnalysisRuntime.Job.platform(job.id(),job.lease(),job.source(),List.of(
+   new ExperienceAnalysisRuntime.Input(i.get(0).id(),"SOURCE_EXCERPT",i.get(0).text(),true),
+   new ExperienceAnalysisRuntime.Input(i.get(1).id(),"FEEDBACK",i.get(1).text(),true)),List.of(
+   new ExperienceAnalysisRuntime.Existing(ExperienceAnalysisHarnessIT.id(8),"固定通用方法","清洗后方法",List.of("检查覆盖范围"),List.of("期间比较"),List.of("范围未知"))),List.of());
+ }
+ @SuppressWarnings("unchecked") Map<String,Object> platformReceipt(){
+  var r=receipt();r.put("scope","PLATFORM");((Map<String,Object>)r.get("candidate")).put("targetVersionId",ExperienceAnalysisHarnessIT.id(8));
+  r.put("review",Map.of("checks",Map.of("grounded","PASS","reusable","PASS","bounded","PASS","privacySafe","PASS","novel","PASS"),"basis","FEEDBACK_CORRECTION","evidence",List.of(
+   Map.of("inputId",job.inputs().get(0).id(),"quote",job.inputs().get(0).text()),
+   Map.of("inputId",job.inputs().get(1).id(),"quote",job.inputs().get(1).text()))));return r;
+ }
+ @Test void explicitPlatformJobCarriesNoTenantAndKeepsLegacyTenantWireShape(){
+  var legacy=json.readTree(json.writeValueAsString(job));assertFalse(legacy.has("scope"));assertEquals(job.tenant().toString(),legacy.path("tenant").asString());
+  job=platformJob();var wire=json.readTree(json.writeValueAsString(job));assertTrue(wire.path("tenant").isNull());assertEquals("PLATFORM",wire.path("scope").asString());
+  response.set(json.writeValueAsString(platformReceipt()));var result=runtime.execute(job,runtime.preflight(),()->true);
+  assertEquals("QUALIFIED",result.outcome());assertEquals("FEEDBACK_CORRECTION",result.review().basis());assertEquals(result,runtime.validateReceipt(result,job,"synthetic-v1"));assertEquals(1,posts.get());
+  var borrowed=new ExperienceAnalysisRuntime.Job(job.id(),job.lease(),UUID.randomUUID(),job.source(),job.inputs(),job.existing(),job.protectedValues());
+  assertThrows(ExperienceAnalysisRuntime.Failure.class,()->runtime.recover(borrowed,"synthetic-v1"));
+  var missing=platformReceipt();missing.remove("scope");reject(missing);missing.put("scope",null);reject(missing);
+ }
+ @Test void nullOrBorrowedTenantAndTaskInputsNeverReachPlatformEngine(){
+  var p=platformJob();
+  for(var invalid:List.of(
+   new ExperienceAnalysisRuntime.Job(p.id(),p.lease(),null,p.source(),p.inputs(),p.existing(),p.protectedValues()),
+   new ExperienceAnalysisRuntime.Job(p.id(),p.lease(),UUID.randomUUID(),p.source(),p.inputs(),p.existing(),p.protectedValues(),"PLATFORM"),
+   ExperienceAnalysisRuntime.Job.platform(p.id(),p.lease(),p.source(),job.inputs(),p.existing(),p.protectedValues()),
+   ExperienceAnalysisRuntime.Job.platform(p.id(),p.lease(),p.source(),p.inputs(),List.of(),p.protectedValues()),
+   ExperienceAnalysisRuntime.Job.platform(p.id(),p.lease(),p.source(),List.of(p.inputs().get(1)),p.existing(),p.protectedValues()))) {
+   var ex=assertThrows(ExperienceAnalysisRuntime.Failure.class,()->runtime.execute(invalid,runtime.preflight(),()->true));assertEquals("INVALID_EXPERIENCE_REQUEST",ex.code);assertFalse(ex.sent);
+  }
+  assertEquals(0,posts.get());
+ }
+ @SuppressWarnings("unchecked") @Test void platformCorrectionMustTargetFixedVersionAndCannotClaimObservedExecution(){
+  job=platformJob();
+  for(UUID target:Arrays.asList(null,UUID.randomUUID())){var r=platformReceipt();((Map<String,Object>)r.get("candidate")).put("targetVersionId",target);reject(r);}
+  var r=platformReceipt();var review=new HashMap<>((Map<String,Object>)r.get("review"));review.put("basis","OBSERVED_EXECUTION");r.put("review",review);reject(r);
+ }
+
 }

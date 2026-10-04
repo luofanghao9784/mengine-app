@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:dreamcore:experience-analysis:1.0",
-  "description": "Authenticated internal extraction and fresh-session verification. Contains private source evidence: never forward whole receipts to tenant/platform UI or general library. QUALIFIED is not admission; platform must recheck current authority, execution class, source versions and conflicts. No human review state.",
+  "description": "Authenticated internal extraction and fresh-session verification. Contains private source evidence: never forward whole receipts to tenant/platform UI or general library. QUALIFIED is not admission; platform must recheck current authority, execution class, source versions and conflicts. No human review state. Explicit scope PLATFORM with tenant null is reserved for platform adjustment jobs on fixed cleaned general methods, never tenant impersonation or private-source access. Omitted scope requires a real tenant UUID. Backend authorization is not provided by this discriminator.",
   "$defs": {
     "Candidate": {
       "type": "object",
@@ -252,8 +252,15 @@
               "format": "uuid"
             },
             "tenant": {
-              "type": "string",
-              "format": "uuid"
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "source": {
               "type": "string",
@@ -362,10 +369,72 @@
               "minItems": 0,
               "maxItems": 100,
               "uniqueItems": true
+            },
+            "scope": {
+              "const": "PLATFORM"
             }
           },
           "required": ["id", "lease", "tenant", "source", "inputs", "existing", "protectedValues"],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "not": {
+                "required": ["scope"]
+              },
+              "properties": {
+                "tenant": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            {
+              "required": ["scope"],
+              "properties": {
+                "tenant": {
+                  "type": "null"
+                },
+                "existing": {
+                  "minItems": 1,
+                  "maxItems": 1
+                },
+                "inputs": {
+                  "items": {
+                    "properties": {
+                      "kind": {
+                        "enum": ["SOURCE_EXCERPT", "FEEDBACK"]
+                      },
+                      "complete": {
+                        "const": true
+                      }
+                    }
+                  },
+                  "allOf": [
+                    {
+                      "contains": {
+                        "properties": {
+                          "kind": {
+                            "const": "SOURCE_EXCERPT"
+                          }
+                        },
+                        "required": ["kind"]
+                      }
+                    },
+                    {
+                      "contains": {
+                        "properties": {
+                          "kind": {
+                            "const": "FEEDBACK"
+                          }
+                        },
+                        "required": ["kind"]
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ]
         }
       },
       "required": ["contractVersion", "job"],
@@ -474,6 +543,10 @@
               ]
             }
           ]
+        },
+        "scope": {
+          "const": "PLATFORM",
+          "description": "Echoed only for explicit platform jobs. The receiver must match the fixed job scope, including recovered receipts."
         }
       },
       "required": [
@@ -650,6 +723,35 @@
             "properties": {
               "code": {
                 "const": "CANCELLED"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": ["scope"],
+            "properties": {
+              "outcome": {
+                "const": "QUALIFIED"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "candidate": {
+                "properties": {
+                  "targetVersionId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                }
+              },
+              "review": {
+                "properties": {
+                  "basis": {
+                    "const": "FEEDBACK_CORRECTION"
+                  }
+                }
               }
             }
           }

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:dreamcore:experience-generalization:1.0",
-  "description": "Internal enterprise method generalization: separate CLEAN, PRIVACY and QUALITY sessions. Only QUALITY receives the cleaned method alone. Original must be an authorized fixed automatically checked method; no raw task/conversation/attachment inputs. Receipt is private operational data, never a platform UI or a public library entry. QUALIFIED does not admit; backend must recheck authorization, live provenance, fixed source, conflicts and withdrawal. Method is the sole cleaned content projection. No human approval workflow.",
+  "description": "Internal enterprise method generalization: separate CLEAN, PRIVACY and QUALITY sessions. Only QUALITY receives the cleaned method alone. Original must be an authorized fixed automatically checked method; no raw task/conversation/attachment inputs. Receipt is private operational data, never a platform UI or a public library entry. QUALIFIED does not admit; backend must recheck authorization, live provenance, fixed source, conflicts and withdrawal. Method is the sole cleaned content projection. No human approval workflow. Explicit scope PLATFORM with tenant null is reserved for platform adjustment jobs on fixed cleaned general methods, never tenant impersonation or private-source access. Omitted scope requires a real tenant UUID. Backend authorization is not provided by this discriminator.",
   "$defs": {
     "Method": {
       "type": "object",
@@ -198,8 +198,15 @@
               "format": "uuid"
             },
             "tenant": {
-              "type": "string",
-              "format": "uuid"
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "source": {
               "type": "string",
@@ -218,8 +225,39 @@
                 "maxLength": 300,
                 "pattern": "\\S"
               }
+            },
+            "scope": {
+              "const": "PLATFORM"
             }
-          }
+          },
+          "oneOf": [
+            {
+              "not": {
+                "required": ["scope"]
+              },
+              "properties": {
+                "tenant": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            {
+              "required": ["scope"],
+              "properties": {
+                "tenant": {
+                  "type": "null"
+                },
+                "original": {
+                  "properties": {
+                    "basis": {
+                      "const": "FEEDBACK_CORRECTION"
+                    }
+                  }
+                }
+              }
+            }
+          ]
         }
       }
     },
@@ -354,6 +392,10 @@
               ]
             }
           ]
+        },
+        "scope": {
+          "const": "PLATFORM",
+          "description": "Echoed only for explicit platform jobs. The receiver must match the fixed job scope, including recovered receipts."
         }
       },
       "allOf": [
@@ -513,6 +555,27 @@
             "properties": {
               "code": {
                 "const": "CANCELLED"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": ["scope"],
+            "properties": {
+              "outcome": {
+                "const": "QUALIFIED"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "method": {
+                "properties": {
+                  "basis": {
+                    "const": "FEEDBACK_CORRECTION"
+                  }
+                }
               }
             }
           }

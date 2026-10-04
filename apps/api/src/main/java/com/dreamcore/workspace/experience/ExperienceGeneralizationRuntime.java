@@ -8,9 +8,14 @@ import tools.jackson.databind.json.JsonMapper;
 public class ExperienceGeneralizationRuntime {
  public record Descriptor(String contractVersion,String engineVersion,boolean configured,String executionClass) {}
  public record Method(String title,String summary,List<String> steps,List<String> applicable,List<String> excluded,List<String> tags,String basis) {}
- public record Job(UUID id,UUID lease,UUID tenant,UUID source,Method original,List<String> protectedValues) {}
+ public record Job(UUID id,UUID lease,UUID tenant,UUID source,Method original,List<String> protectedValues,@com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) String scope) {
+  public Job(UUID id,UUID lease,UUID tenant,UUID source,Method original,List<String> protectedValues){this(id,lease,tenant,source,original,protectedValues,null);}
+  public static Job platform(UUID id,UUID lease,UUID source,Method original,List<String> protectedValues){return new Job(id,lease,null,source,original,protectedValues,"PLATFORM");}
+ }
  public record Stage(String stage,String modelName,Integer modelCalls,Long inputTokens,Long outputTokens) {}
- public record Result(String contractVersion,String engineVersion,String executionClass,UUID runId,UUID lease,UUID source,Boolean admitted,String outcome,String code,Method method,Map<String,String> privacy,Map<String,String> quality,List<Stage> stages) {}
+ public record Result(String contractVersion,String engineVersion,String executionClass,UUID runId,UUID lease,UUID source,Boolean admitted,String outcome,String code,Method method,Map<String,String> privacy,Map<String,String> quality,List<Stage> stages,@com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) String scope) {
+  public Result(String contractVersion,String engineVersion,String executionClass,UUID runId,UUID lease,UUID source,Boolean admitted,String outcome,String code,Method method,Map<String,String> privacy,Map<String,String> quality,List<Stage> stages){this(contractVersion,engineVersion,executionClass,runId,lease,source,admitted,outcome,code,method,privacy,quality,stages,null);}
+ }
  public static class Failure extends RuntimeException {public final String code;public final boolean sent;public Failure(String code,boolean sent){super(code);this.code=code;this.sent=sent;}}
  private final URI base;private final String token,mode;private final HttpClient http=HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).followRedirects(HttpClient.Redirect.NEVER).build();private final JsonMapper json=new JsonMapper();
  public ExperienceGeneralizationRuntime(@Value("${dreamcore.engine.base-url}") String base,@Value("${dreamcore.tasks.engine-token:}") String token,@Value("${dreamcore.tasks.agent-mode:off}") String mode){
@@ -29,7 +34,7 @@ public class ExperienceGeneralizationRuntime {
  public Result execute(Job job,Descriptor descriptor,BooleanSupplier active){
   if(!configured())throw new Failure("MODEL_NOT_CONFIGURED",false);
   if(descriptor==null||!descriptor.configured()||!mode.equals(descriptor.executionClass())||!"1.0".equals(descriptor.contractVersion()))throw new Failure("GENERALIZATION_ENGINE_INCOMPATIBLE",false);
-  if(job==null||job.id()==null||job.lease()==null||job.tenant()==null||job.source()==null||!validMethod(job.original())||!texts(job.protectedValues(),0,100,300))throw new Failure("INVALID_GENERALIZATION_REQUEST",false);
+  if(!validJob(job))throw new Failure("INVALID_GENERALIZATION_REQUEST",false);
   CompletableFuture<HttpResponse<byte[]>> future=null;
   try{
    if(!active.getAsBoolean())throw new Failure("GENERALIZATION_SOURCE_CHANGED",false);
@@ -48,7 +53,11 @@ public class ExperienceGeneralizationRuntime {
   }catch(Failure f){throw f;}catch(Exception e){if(e instanceof InterruptedException)Thread.currentThread().interrupt();throw new Failure(future==null?"GENERALIZATION_ENGINE_UNAVAILABLE":"GENERALIZATION_RESULT_UNKNOWN",future!=null);}
   finally{if(future!=null&&!future.isDone())future.cancel(true);}
  }
+ private static boolean validJob(Job job){
+  return job!=null&&job.id()!=null&&job.lease()!=null&&job.source()!=null&&ExperienceProcessingScope.valid(job.tenant(),job.scope())&&validMethod(job.original())&&texts(job.protectedValues(),0,100,300)&&(!"PLATFORM".equals(job.scope())||"FEEDBACK_CORRECTION".equals(job.original().basis()));
+ }
  public Result recover(Job job,String version){
+  if(!validJob(job))throw new Failure("INVALID_GENERALIZATION_REQUEST",false);
   try{var response=send(request("/internal/v1/experience-generalization/results/"+job.id()+"/"+job.lease()).GET().build());if(response.statusCode()==202)return null;if(response.statusCode()!=200)throw new Failure("GENERALIZATION_RESULT_UNKNOWN",true);return validate(response.body(),job,version,mode);}
   catch(Failure f){throw f;}catch(Exception e){if(e instanceof InterruptedException)Thread.currentThread().interrupt();throw new Failure("GENERALIZATION_RESULT_UNKNOWN",true);}
  }
@@ -67,16 +76,17 @@ public class ExperienceGeneralizationRuntime {
   return values.stream().anyMatch(v->body.contains(normalized(v)))||java.util.regex.Pattern.compile("[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,}|https?://|\\b(?:bearer\\s+|sk-)[a-z0-9_-]{12,}|\\b1[3-9]\\d{9}\\b|\\b\\d{17}[\\dx]\\b|[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}",java.util.regex.Pattern.CASE_INSENSITIVE).matcher(body).find();
  }
  private static boolean exact(tools.jackson.databind.JsonNode node,Set<String> names){return node!=null&&node.isObject()&&node.size()==names.size()&&names.stream().allMatch(node::has);}
- public Result validateReceipt(Result result,Job job,String version,String expectedMode){return validate(json.writeValueAsBytes(result),job,version,expectedMode);}
+ public Result validateReceipt(Result result,Job job,String version,String expectedMode){if(!validJob(job))throw new Failure("INVALID_GENERALIZATION_REQUEST",false);return validate(json.writeValueAsBytes(result),job,version,expectedMode);}
  private Result validate(byte[] body,Job job,String version,String expectedMode){
   try{
    var tree=json.readTree(body);
-   if(!exact(tree,Set.of("contractVersion","engineVersion","executionClass","runId","lease","source","admitted","outcome","code","method","privacy","quality","stages")))throw new Failure("GENERALIZATION_RESULT_UNKNOWN",true);
+   var fields=new HashSet<>(Set.of("contractVersion","engineVersion","executionClass","runId","lease","source","admitted","outcome","code","method","privacy","quality","stages"));if(job.scope()!=null)fields.add("scope");
+   if(!exact(tree,fields))throw new Failure("GENERALIZATION_RESULT_UNKNOWN",true);
    if(!tree.path("method").isNull()&&!exact(tree.get("method"),Set.of("title","summary","steps","applicable","excluded","tags","basis")))throw new Failure("GENERALIZATION_RESULT_UNKNOWN",true);
    if(!tree.path("stages").isArray())throw new Failure("GENERALIZATION_RESULT_UNKNOWN",true);
    for(var stage:tree.get("stages"))if(!exact(stage,Set.of("stage","modelName","modelCalls","inputTokens","outputTokens")))throw new Failure("GENERALIZATION_RESULT_UNKNOWN",true);
    var r=json.readValue(body,Result.class);
-   if(!"1.0".equals(r.contractVersion())||!job.id().equals(r.runId())||!job.lease().equals(r.lease())||!job.source().equals(r.source())||!expectedMode.equals(r.executionClass())||!Objects.equals(version,r.engineVersion())||!Boolean.FALSE.equals(r.admitted())||!Set.of("QUALIFIED","SKIPPED","REJECTED","FAILED","CANCELLED").contains(r.outcome())||r.stages()==null||r.stages().isEmpty()||r.stages().size()>3)throw new Failure("GENERALIZATION_RESULT_UNKNOWN",true);
+   if(!"1.0".equals(r.contractVersion())||!job.id().equals(r.runId())||!job.lease().equals(r.lease())||!job.source().equals(r.source())||!Objects.equals(job.scope(),r.scope())||!expectedMode.equals(r.executionClass())||!Objects.equals(version,r.engineVersion())||!Boolean.FALSE.equals(r.admitted())||!Set.of("QUALIFIED","SKIPPED","REJECTED","FAILED","CANCELLED").contains(r.outcome())||r.stages()==null||r.stages().isEmpty()||r.stages().size()>3)throw new Failure("GENERALIZATION_RESULT_UNKNOWN",true);
    for(int n=0;n<r.stages().size();n++){var s=r.stages().get(n);if(s==null||!Objects.equals(STAGES.get(n),s.stage())||!text(s.modelName(),200)||s.modelCalls()==null||s.modelCalls()<0||s.modelCalls()>6||(s.inputTokens()==null)!=(s.outputTokens()==null)||s.inputTokens()!=null&&(s.inputTokens()<0||s.outputTokens()<0))throw new Failure("GENERALIZATION_RESULT_UNKNOWN",true);}
    if(r.privacy()!=null&&(!checks(r.privacy(),PRIVACY)||r.stages().size()<2)||r.quality()!=null&&(!checks(r.quality(),QUALITY)||r.stages().size()!=3||!passed(r.privacy())))throw new Failure("GENERALIZATION_RESULT_UNKNOWN",true);
    if(r.outcome().equals("QUALIFIED")){

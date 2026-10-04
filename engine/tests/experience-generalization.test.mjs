@@ -414,3 +414,60 @@ test('bounded concurrent jobs share identical attempts and stop aborts all activ
   assert.deepEqual(results[0], results[1]);
   assert.ok(calls <= 2);
 });
+
+const platformRequest = () => {
+  const input = request();
+  input.job.tenant = null;
+  input.job.scope = 'PLATFORM';
+  input.job.original = { ...method(), basis: 'FEEDBACK_CORRECTION' };
+  return input;
+};
+test('platform cleaned correction keeps feedback evidence strength across three isolated stages', async () => {
+  const input = platformRequest(),
+    steps = happy();
+  steps.CLEAN = [tool('original_method'), tool('submit_general_method', { method: input.job.original })];
+  const f = fixture(steps);
+  assert.ok(validGeneralizationRequest(input));
+  assert.ok(validRequest(input));
+  const result = await f.runtime.run(input);
+  assert.equal(result.outcome, 'QUALIFIED');
+  assert.equal(result.method.basis, 'FEEDBACK_CORRECTION');
+  assert.equal(result.admitted, false);
+  assert.deepEqual(f.sessions, ['CLEAN', 'PRIVACY', 'QUALITY']);
+  assert.equal(result.scope, 'PLATFORM');
+  assert.ok(validResult(result));
+  const replay = structuredClone(input);
+  delete replay.job.scope;
+  replay.job.tenant = id(3);
+  assert.throws(() => f.runtime.run(replay), /GENERALIZATION_ATTEMPT_CONFLICT/);
+});
+test('platform generalization rejects borrowed tenant identity, missing scope and invented execution basis', () => {
+  const bad = (change) => {
+    const input = platformRequest();
+    change(input.job);
+    return input;
+  };
+  for (const input of [
+    bad((j) => {
+      j.tenant = id(3);
+    }),
+    bad((j) => {
+      delete j.scope;
+    }),
+    bad((j) => {
+      delete j.tenant;
+    }),
+    bad((j) => {
+      j.scope = 'TENANT';
+    }),
+    bad((j) => {
+      j.original.basis = 'OBSERVED_EXECUTION';
+    }),
+    bad((j) => {
+      j.original.evidence = [{ quote: 'private' }];
+    }),
+  ]) {
+    assert.equal(validGeneralizationRequest(input), false, JSON.stringify(input));
+    assert.equal(validRequest(input), false, JSON.stringify(input));
+  }
+});
