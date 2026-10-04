@@ -2,6 +2,18 @@ package com.dreamcore.workspace;
 import com.dreamcore.workspace.profile.*;import java.util.*;import org.junit.jupiter.api.*;import static org.junit.jupiter.api.Assertions.*;import static org.mockito.Mockito.*;
 
 class CompanyAnalysisIntegrationTest extends CompanyAnalysisFixture {
+ @Test void offlineRecoveryTerminalStateDoesNotRediscoverOrAcceptOldResult(){
+  var job=claim();queue.dispatched(job,descriptor());
+  db.update("UPDATE company_inference_runs SET state='CANCELLED',fenced=true,lease_until=now(),finished_at=now() WHERE id=?",job.id());
+  db.update("UPDATE company_analysis_attempts SET state='CANCELLED',error_code='RECOVERY_QUARANTINE',finished_at=now() WHERE run_id=?",job.id());
+  db.update("UPDATE company_analysis_items SET state='FAILED',error_code='RECOVERY_QUARANTINE' WHERE run_id=?",job.id());
+  queue.discover();due();assertNull(queue.claim(tenant));
+  assertTrue(queue.recoveries().stream().noneMatch(r->r.id().equals(job.id())));
+  queue.complete(result(job,"COMPLETE"));
+  assertEquals("FAILED",state());
+  assertTrue(information.get(admin,tenant).groups().stream().allMatch(g->g.tags().isEmpty()));
+  assertNull(db.queryForObject("SELECT model_calls FROM company_analysis_attempts WHERE run_id=?",Integer.class,job.id()));
+ }
  @Test void discoveryIsIdempotentAndExcludesPrivateOrUnpublishedSources(){
   source(personal);UUID attachment=source(space);db.update("UPDATE materials SET in_library=false WHERE id=(SELECT material_id FROM knowledge_chunks WHERE id=?)",attachment);
   var job=claim();assertEquals(1,job.inputs().size());assertEquals(chunk,job.inputs().getFirst().chunkId());assertNull(queue.claim(tenant));queue.discover();assertEquals(1,db.queryForObject("SELECT count(*) FROM company_analysis_items WHERE tenant_id=?",Integer.class,tenant));

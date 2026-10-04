@@ -31,6 +31,9 @@ CONTROL_TABLES = [
     'general_experience_management_events', 'experience_events',
     'data_connections', 'collection_runs', 'business_datasets', 'dataset_snapshots',
     'task_dataset_reads', 'task_dataset_fences', 'dataset_task_inheritance', 'briefing_dataset_selections',
+    'company_information_groups', 'company_information_tags', 'company_inference_runs',
+    'company_inference_inputs', 'company_information_suggestions', 'company_suggestion_evidence',
+    'company_profile_inferences', 'company_analysis_items', 'company_analysis_attempts',
 ]
 
 
@@ -82,6 +85,8 @@ def quarantine(sql):
     backup_experience.stop_pending(sql)
     import backup_collection
     backup_collection.stop_pending(sql)
+    import backup_company
+    backup_company.stop_pending(sql)
     platform_reset = ''
     if has_table(sql, 'platform_accounts'):
         platform_reset = """
@@ -369,6 +374,8 @@ def reconcile(root, current_root, key_path):
                 applied['departures']=backup_lifecycle.departures(sql,current_sql)
                 applied['residual']=backup_lifecycle.residual(sql,current_sql)
                 applied['experience']=backup_experience.synchronize(sql,current_sql)
+                import backup_company
+                applied['company']=backup_company.synchronize(sql,current_sql)
                 closed = sql("SELECT (SELECT count(*) FROM accounts WHERE status='ACTIVE')+(SELECT count(*) FROM tenants WHERE status='ACTIVE')+(SELECT count(*) FROM platform_roles)+(SELECT count(*) FROM workspace_members)+(SELECT count(*) FROM governance_capabilities)+(SELECT count(*) FROM conversation_tasks WHERE status IN('QUEUED','RUNNING'))+(SELECT count(*) FROM ongoing_plans WHERE status='ACTIVE')+(SELECT count(*) FROM knowledge_runs WHERE status IN('QUEUED','RUNNING'))")
                 if closed != '0':
                     backup.fail('恢复实例隔离检查失败；不得开放。')
@@ -573,7 +580,8 @@ def reopen_configurations(sql, current_sql):
         rows=json_rows(db,'SELECT * FROM '+table)
         return {str(x['id']):{k:v for k,v in x.items() if k not in exclude} for x in rows}
     local=keyed(sql,'profile_versions',('status',))
-    for row in json_rows(current_sql,"SELECT v.* FROM profile_versions v JOIN profile_entries e ON e.id=v.entry_id AND e.revision=v.revision WHERE v.status='ACTIVE' AND (to_jsonb(v)->>'scrubbed') IS DISTINCT FROM 'true' AND object_is_active('PROFILE_VERSION',v.id) AND (v.expires_at IS NULL OR v.expires_at>now())"):
+    company_guard = " AND NOT EXISTS(SELECT 1 FROM company_profile_inferences p JOIN company_inference_runs r ON r.id=p.run_id WHERE p.version_id=v.id AND (r.fenced OR r.state<>'SUCCEEDED'))" if has_table(current_sql,'company_profile_inferences') else ''
+    for row in json_rows(current_sql,"SELECT v.* FROM profile_versions v JOIN profile_entries e ON e.id=v.entry_id AND e.revision=v.revision WHERE v.status='ACTIVE' AND (to_jsonb(v)->>'scrubbed') IS DISTINCT FROM 'true' AND object_is_active('PROFILE_VERSION',v.id) AND (v.expires_at IS NULL OR v.expires_at>now())"+company_guard):
         value={k:v for k,v in row.items() if k!='status'}
         if local.get(row['id'])==value:
             sql(f"UPDATE profile_versions SET status='ACTIVE' WHERE id={quoted_id(row['id'])}")
@@ -729,10 +737,13 @@ def activate(root, current_root, key_path):
                 applied['operations']=backup_lifecycle.operations(sql,current_sql)
                 applied['departures']=backup_lifecycle.departures(sql,current_sql)
                 applied['experience']=backup_experience.synchronize(sql,current_sql)
+                import backup_company
+                applied['company']=backup_company.synchronize(sql,current_sql)
                 reopened=reopen_current(sql,current_sql,root)
                 sync_retention(sql,current_sql,set(reopened['heldTenantIds']))
                 reopened['effectiveConfigurations']=reopen_configurations(sql,current_sql)
                 applied['residual']=backup_lifecycle.residual(sql,current_sql)
+                backup_company.revalidate(sql)
                 backup_experience.revalidate(sql)
                 cluster=sql('SELECT system_identifier::text FROM pg_control_system()')
                 if sql("SELECT (SELECT count(*) FROM conversation_tasks WHERE status IN('QUEUED','RUNNING'))+(SELECT count(*) FROM ongoing_plans WHERE status='ACTIVE')+(SELECT count(*) FROM knowledge_runs WHERE status IN('QUEUED','RUNNING'))+(SELECT count(*) FROM spring_session)")!='0':

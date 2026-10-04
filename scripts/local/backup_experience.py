@@ -17,6 +17,9 @@ ISOLATION_TRIGGERS = (
     ('departure_executions', 'generalization_departure_changed'),
     ('content_lifecycle', 'generalization_material_state_changed'),
     ('materials', 'generalization_material_scope_changed'),
+    ('tenant_memberships', 'company_member_fence'),
+    ('workspace_members', 'company_space_fence'),
+    ('content_lifecycle', 'company_material_lifecycle_fence'),
 )
 
 
