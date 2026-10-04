@@ -82,6 +82,18 @@ class ObjectLifecycleIntegrationTest {
   UUID record=db.queryForObject("SELECT id FROM object_lifecycle WHERE kind='EXPERIENCE_VERSION' AND object_id=?",UUID.class,v);db.update("UPDATE object_lifecycle SET state='PURGE_PENDING' WHERE id=?",record);cleanup.clean(record);
   assertEquals("REVOKED",db.queryForObject("SELECT state FROM departure_export_parts WHERE id=?",String.class,part));assertNull(db.queryForObject("SELECT lease_token FROM departure_export_parts WHERE id=?",UUID.class,part));assertEquals("COMPLETE",db.queryForObject("SELECT cleanup_state FROM departure_export_parts WHERE id=?",String.class,part));assertEquals(0,db.queryForObject("SELECT count(*) FROM departure_archive_chunks WHERE part_id=?",Integer.class,part));assertNull(db.queryForObject("SELECT filename FROM departure_export_items WHERE part_id=?",String.class,part));
  }
+ @Test void recursiveDependencyChecksRejectCyclesWithoutInspectingUnrelatedObjects(){
+  UUID unrelated=task(),first=task(),second=task();
+  db.update("INSERT INTO adjustment_task_dependencies(task_id,source_task_id,source_revision,source_attempt) VALUES (?,?,0,0),(?,?,0,0)",first,second,second,first);
+  // A single correlated query must finish even when other targets contain a cycle.
+  var states=db.execute((org.springframework.jdbc.core.ConnectionCallback<Map<UUID,Boolean>>) connection->{
+   try(var query=connection.prepareStatement("SELECT id,object_is_active('TASK',id) AS available FROM conversation_tasks WHERE tenant_id=?")){
+    query.setQueryTimeout(5);query.setObject(1,tenant);var result=new HashMap<UUID,Boolean>();
+    try(var rows=query.executeQuery()){while(rows.next())result.put(rows.getObject("id",UUID.class),rows.getBoolean("available"));}return result;
+   }
+  });
+  assertEquals(Map.of(unrelated,true,first,false,second,false),states);
+ }
  @Test void anotherMembersPrivateTasksDoNotConsumeTheAuthorizedListWindow(){
   UUID mine=task(shared),conversation=UUID.randomUUID();db.update("INSERT INTO conversations(id,tenant_id,workspace_id,owner_id,title) VALUES (?,?,?,?,'另一成员私人会话')",conversation,tenant,shared,admin);db.update("INSERT INTO conversation_tasks(id,tenant_id,workspace_id,conversation_id,requested_by,prompt,mode,status) SELECT gen_random_uuid(),?,?,?,?,'他人私人任务','AGENT','WAITING_CAPABILITY' FROM generate_series(1,1001)",tenant,shared,conversation,admin);
   var result=service.list(owner,tenant,shared,"TASK",null,0,20);assertEquals(List.of(mine),result.items().stream().map(ObjectLifecycleService.Item::objectId).toList());assertFalse(result.hasMore());

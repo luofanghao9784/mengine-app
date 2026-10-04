@@ -206,3 +206,18 @@ V12 保存文稿、不可变版本、精确幂等回执和导出缓存；文稿 
 V13 保存私人文稿固定版本与独立企业文件版本的映射、回执及去重约束。文稿/资料 API 1.1.0；`POST /api/v1/tenants/{tenant}/documents/{id}/versions/{version}/publications` 仅接受请求键、目标、预期企业版本、格式和独立副本确认；不接受正文/所有者。`GET /api/v1/tenants/{tenant}/documents/{id}/publications` 仅供本人且过滤已失权目标。资料详情的版本增加 `origin=UPLOAD|DOCUMENT_PUBLICATION`，不公开私人来源 ID。
 
 发布复查源权限及目标维护权，明确更新与普通上传共用版本锁。共享读者只按目标权限读取，来源撤权/发布者停用不撤回企业副本。独立存储、事务回滚、幂等重试、解析状态和升级顺序见[边界](../../docs/技术/M6-A1共享发布与企业版本边界.md)。`npm run test:api` 包含发布专题；`npm run test:agent` 覆盖真实 HTTP/浏览器联调。
+
+
+## 经验自动积累：来源登记切片（B4，尚未完整启用）
+
+`EXPERIENCE_INTAKE_ENABLED=false` 为默认值。开启后每 30 秒发现已记录成功尝试的 live 任务与有效反馈，只保存企业、原主体、空间、来源身份、版本及尝试号；不复制会话、反馈正文，不调用模型，不向总台上送，也没有新增管理员读取私人内容的接口。每轮分别最多发现 100 条任务与 100 条反馈，再轮转复核最多 300 条待处理来源。
+
+登记不是经验入库，更不是人工审核队列。受影响成员资格/空间授权变化立即使既有登记失效；来源版本、生命周期、资料/数据库依赖在使用前重新核验，已标记失效的同一来源版本不自动恢复。企业暂停不等于来源质量不合格，但暂停期间不新增来源；后续实际提炼仍须另行核验执行资格。`verification` 执行及其反馈不作为真实任务经验。
+
+本切片包含 V68 来源登记及 V69 生命周期递归查询修正。V69 先选中实际依赖，再逐个检查，避免 SQL 优化器在过滤前递归无关对象。完整自动提炼、质量验证、准入、通用经验脱敏上送及观察页面仍待后续完成，旧手工经验接口尚未替换；暂不建议对验收实例启用本开关。迁移编号还须按[五批实施记录](../../docs/交接/管理端五批实施记录-2026-10-04.md)与主链整合。
+
+合成数据库验证：
+
+```bash
+python3 scripts/with-test-postgres.py ./apps/api/mvnw -f apps/api/pom.xml -q -Dtest=ExperienceIntakeIntegrationTest,ObjectLifecycleIntegrationTest,ProfileMethodLifecycleIntegrationTest,FeedbackIntegrationTest,PublicationFeedbackIntegrationTest,FeedbackAdjustmentIntegrationTest,TaskDatasetIntegrationTest,TaskContextIntegrationTest test
+```
