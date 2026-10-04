@@ -21,7 +21,7 @@
   grid-template-columns: minmax(180px, 1.3fr) minmax(170px, 1.1fr) 80px 160px 96px;
   padding: 12px 24px;
   gap: 20px;
-  background: var(--surface-muted, #f3f6fa);
+  background: var(--table-header, #eaf2ff);
   color: var(--muted);
   font-size: 12px;
   border-top: 1px solid var(--line);
@@ -685,7 +685,7 @@
   padding-block: 16px;
   border-top: 0;
   border-bottom: 1px solid var(--line);
-  background: var(--surface-muted, #f3f6fa);
+  background: var(--table-header, #eaf2ff);
   font-size: 13px;
   font-weight: 600;
 }
@@ -759,7 +759,7 @@
 
 .admin-platform .platform-enterprise-page .platform-account-catalog { padding: 0; overflow: hidden; }
 .platform-account-columns, .platform-account-row { display: grid; grid-template-columns: minmax(200px, 1fr) minmax(180px, .9fr) minmax(250px, 1.3fr) 100px 16px; gap: 24px; align-items: center; padding: 16px 24px; }
-.platform-account-columns { background: var(--surface-muted, #f3f6fa); border-bottom: 1px solid var(--line); color: var(--muted); font-size: 13px; font-weight: 600; }
+.platform-account-columns { background: var(--table-header, #eaf2ff); border-bottom: 1px solid var(--line); color: var(--muted); font-size: 13px; font-weight: 600; }
 .platform-account-row { width: 100%; min-height: 64px; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: var(--text); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
 .platform-account-row:last-child { border-bottom: 0; }
 .platform-account-row strong { font-size: 14px; font-weight: 550; }

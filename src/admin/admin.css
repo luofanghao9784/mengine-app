@@ -377,6 +377,7 @@ button.admin-directory-row:hover {
   --card-edge: var(--border);
   --card-shadow: none;
   --selected: #e4eeff;
+  --table-header: #eaf2ff;
   --selected-text: #185bb1;
   --blue-ink: var(--selected-text);
   --blue: #1769e0;
@@ -753,3 +754,8 @@ button.admin-directory-row:hover {
 .admin-platform .admin-header .platform-enterprise-heading-text { flex: initial; }
 .admin-platform .admin-header .platform-enterprise-heading-text p { margin-top: 4px; }
 .admin-platform .admin-header .platform-enterprise-heading .badge { margin-left: 10px; }
+
+/* 总台列表与原生表格统一使用主题浅蓝表头。 */
+.admin-platform table thead th {
+  background: var(--table-header);
+}
