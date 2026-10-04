@@ -131,7 +131,7 @@ test('automatic polling produces real samples and stops after leaving the engine
   await page.clock.runFor(3000);
   await expect.poll(() => f.reads()).toBe(3);
   await expect(page.getByRole('img', { name: /已采样 3 次/ })).toBeVisible();
-  await expect(page.locator('.engine-status')).toContainText('每 3 秒更新');
+  await expect(page.locator('.engine-refresh')).toContainText('每 3 秒更新');
   await page.evaluate(() => {
     location.hash = '#admin=overview';
   });

@@ -649,7 +649,7 @@
   grid-row: 1;
 }
 .admin-platform .engine-observatory .engine-wires {
-  height: 510px;
+  height: 100%;
 }
 .admin-platform .engine-observatory .engine-bank:not(.engine-evolution) {
   display: flex;
@@ -856,4 +856,16 @@
   .admin-platform .engine-observatory .engine-transfer-packet {
     display: none;
   }
+}
+
+.admin-platform .engine-refresh {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+.admin-platform .engine-refresh > small {
+  color: #aec5da;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
 }

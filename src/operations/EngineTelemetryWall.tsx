@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { Activity, ArrowDownToLine, ArrowUpFromLine, Cpu, GitBranch, RefreshCw } from 'lucide-react';
 import type {
   EngineTelemetry,
@@ -128,9 +128,12 @@ function Wall({ scope, tenant }: { scope: 'platform' | 'tenant'; tenant: string 
       <div className={`engine-heading ${scope === 'platform' ? 'engine-heading--embedded' : ''}`}>
         <div>
           {scope === 'tenant' ? <h2>企业引擎运行</h2> : <h1>引擎仪表盘</h1>}
-          <p className="muted">{scope === 'tenant' ? '本企业' : '全平台'}的运行记录 · 只读监控</p>
+          {scope === 'tenant' && <p className="muted">本企业的运行记录 · 只读监控</p>}
         </div>
-        {refreshAction}
+        <div className="engine-refresh">
+          {refreshAction}
+          {scope === 'platform' && value && <small>快照 {time(value.checkedAt)} · 可见时每 3 秒更新</small>}
+        </div>
       </div>
       {error ? (
         <Failure error={error} retry={() => setRefresh((v) => v + 1)} />
@@ -153,6 +156,36 @@ function Snapshot({
   loading: boolean;
   compact: boolean;
 }) {
+  const reactor = useRef<HTMLDivElement>(null);
+  const [geometry, setGeometry] = useState<{
+    width: number;
+    height: number;
+    paths: Record<string, string>;
+  }>();
+  useLayoutEffect(() => {
+    if (!compact || !reactor.current) return;
+    const root = reactor.current;
+    const measure = () => {
+      const bounds = root.getBoundingClientRect();
+      const orb = root.querySelector('.engine-orb')!.getBoundingClientRect();
+      const x = orb.left + orb.width / 2 - bounds.left;
+      const y = orb.top + orb.height / 2 - bounds.top;
+      const paths = Object.fromEntries(
+        groups.map((g) => {
+          const card = root.querySelector(`.engine-${g.id}`)!.getBoundingClientRect();
+          const cx = card.left + card.width / 2 - bounds.left;
+          const cy = card.bottom - bounds.top;
+          return [g.id, g.id === 'output' ? `M${x} ${y}H${cx}V${cy}` : `M${cx} ${cy}V${y}H${x}`];
+        }),
+      );
+      setGeometry({ width: bounds.width, height: bounds.height, paths });
+    };
+    const observer = new ResizeObserver(measure);
+    observer.observe(root);
+    root.querySelectorAll('.engine-bank, .engine-orb').forEach((node) => observer.observe(node));
+    measure();
+    return () => observer.disconnect();
+  }, [compact]);
   const rows = value.channels,
     running = sum(rows, 'running');
   const recent = rows
@@ -188,8 +221,7 @@ function Snapshot({
         </div>
       </div>
       {!compact && <p>输入 · 处理 · 输出</p>}
-      <small>{compact ? '环形表示各区构成' : '按记录归组，不是完成百分比'}</small>
-      {compact && <small className="engine-transfer-note">连线为传输演示 · 数字为实际快照</small>}
+      {!compact && <small>按记录归组，不是完成百分比</small>}
     </div>
   );
   return (
@@ -197,14 +229,16 @@ function Snapshot({
       className={`engine-wall ${compact ? 'engine-observatory' : ''}`}
       data-active={running > 0 ? true : undefined}
     >
-      <div className="engine-status">
-        <span>
-          <Activity size={14} /> {loading ? '正在更新' : '已读取运行快照'}
-        </span>
-        <span>
-          快照 {time(value.checkedAt)} · 可见时每 {compact ? 3 : 15} 秒更新
-        </span>
-      </div>
+      {!compact && (
+        <div className="engine-status">
+          <span>
+            <Activity size={14} /> {loading ? '正在更新' : '已读取运行快照'}
+          </span>
+          <span>
+            快照 {time(value.checkedAt)} · 可见时每 {compact ? 3 : 15} 秒更新
+          </span>
+        </div>
+      )}
       {!compact && (
         <dl className="engine-totals">
           {[
@@ -224,15 +258,16 @@ function Snapshot({
           ))}
         </dl>
       )}
-      <div className="engine-reactor">
-        <svg className="engine-wires" viewBox="0 0 1000 460" preserveAspectRatio="none" aria-hidden="true">
+      <div className="engine-reactor" ref={reactor}>
+        <svg
+          className="engine-wires"
+          viewBox={compact && geometry ? `0 0 ${geometry.width} ${geometry.height}` : '0 0 1000 460'}
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
           {groups.map((g, i) => {
             const wire = compact
-              ? g.id === 'input'
-                ? 'M165 270V320H500V380'
-                : g.id === 'output'
-                  ? 'M500 380V320H835V270'
-                  : 'M500 270V380'
+              ? geometry?.paths[g.id] || ''
               : g.id === 'input'
                 ? 'M330 105H390L500 230'
                 : g.id === 'process'
