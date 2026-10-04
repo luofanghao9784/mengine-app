@@ -337,3 +337,5 @@ button.admin-directory-row:hover {
   width: 30px;
   height: 30px;
 }
+
+.space-owner-form p { overflow-wrap: anywhere; }

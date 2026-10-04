@@ -3684,6 +3684,305 @@
           }
         }
       }
+    },
+    "/api/tenant-admin/v1/tenants/{tenant}/workspaces/{workspace}/owner": {
+      "post": {
+        "operationId": "changeSharedWorkspaceOwner",
+        "summary": "修改共享空间名称",
+        "description": "仅企业管理员。指定有效企业成员并同步授予空间查看、维护和成员授权；原负责人按明确选择保留只读、维护或移出。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedWorkspace"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "输入无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "登录无效或已失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CSRF 或权限校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态或重复请求冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务异常，不返回内部细节",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "目标不属于本企业或不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeSpaceOwner"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tenant-admin/v1/tenants/{tenant}/workspaces/{workspace}/eligible-members": {
+      "get": {
+        "operationId": "listSpaceEligibleMembers",
+        "summary": "本企业成员",
+        "description": "仅本空间负责人或企业管理员可检索有效企业成员元信息，用于空间授权。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TenantMember"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "输入无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "登录无效或已失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CSRF 或权限校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态或重复请求冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务异常，不返回内部细节",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "目标不属于本企业或不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000,
+              "default": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100,
+              "default": ""
+            }
+          },
+          {
+            "name": "workspace",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/tenant-admin/v1/tenants/{tenant}/workspaces/{workspace}/owner-records": {
+      "get": {
+        "operationId": "listSpaceOwnerChanges",
+        "summary": "共享空间授权名单",
+        "description": "企业管理员或当前空间负责人查看最近 50 条负责人变更元信息。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SpaceOwnerChange"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "输入无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "登录无效或已失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CSRF 或权限校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态或重复请求冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务异常，不返回内部细节",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "目标不属于本企业或不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": []
+      }
     }
   },
   "components": {
@@ -4679,6 +4978,23 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 9007199254740991
+          },
+          "ownerId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "ownerName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500
           }
         },
         "required": [
@@ -4687,7 +5003,10 @@
           "name",
           "kind",
           "version",
-          "memberCount"
+          "memberCount",
+          "ownerId",
+          "ownerName",
+          "description"
         ],
         "additionalProperties": false
       },
@@ -4723,7 +5042,8 @@
               "TENANT_RENAME",
               "WORKSPACE_MAINTAIN",
               "WORKSPACE_READONLY",
-              "MEMBER_SECURITY_DISABLE"
+              "MEMBER_SECURITY_DISABLE",
+              "WORKSPACE_OWNER_CHANGE"
             ]
           },
           "targetId": {
@@ -4817,11 +5137,23 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 100
+          },
+          "ownerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
           }
         },
         "required": [
           "requestId",
-          "name"
+          "name",
+          "ownerId"
         ],
         "additionalProperties": false
       },
@@ -5246,6 +5578,81 @@
             "maxLength": 128
           }
         }
+      },
+      "ChangeSpaceOwner": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "ownerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "previousAccess": {
+            "type": "string",
+            "enum": [
+              "READ",
+              "MAINTAIN",
+              "REMOVE"
+            ]
+          }
+        },
+        "required": [
+          "requestId",
+          "expectedVersion",
+          "ownerId",
+          "previousAccess"
+        ]
+      },
+      "SpaceOwnerChange": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "actorName": {
+            "type": "string"
+          },
+          "previousOwnerName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "nextOwnerName": {
+            "type": "string"
+          },
+          "previousAccess": {
+            "type": "string",
+            "enum": [
+              "READ",
+              "MAINTAIN",
+              "REMOVE",
+              "NONE"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "actorName",
+          "previousOwnerName",
+          "nextOwnerName",
+          "previousAccess",
+          "createdAt"
+        ]
       }
     }
   }

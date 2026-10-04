@@ -426,9 +426,31 @@ function Handover({
     [page, setPage] = useState(0),
     [to, setTo] = useState('');
   const remote = useRemote(
-    (signal) => api.successors(tenant, value.workspaceId, page * 20, signal),
+    (signal) =>
+      value.kind === 'WORKSPACE_OWNER'
+        ? Promise.resolve([])
+        : api.successors(tenant, value.workspaceId, page * 20, signal),
     [tenant, value.workspaceId, page, nonce],
   );
+  if (value.kind === 'WORKSPACE_OWNER')
+    return (
+      <section className="departure-inset">
+        <h4>移交：{value.name}</h4>
+        <p>
+          先在空间管理中选择接任负责人，并明确原负责人保留只读、保留维护或移出空间。完成后返回这里重新核对交接。
+        </p>
+        <a
+          className="button"
+          href={
+            '/tenant-admin/#' +
+            new URLSearchParams({ tenant, admin: 'members', tab: 'spaces', space: value.workspaceId })
+          }
+        >
+          打开空间负责人管理
+        </a>
+        <Button onClick={close}>返回</Button>
+      </section>
+    );
   return (
     <section className="departure-inset">
       <h4>移交：{value.name}</h4>

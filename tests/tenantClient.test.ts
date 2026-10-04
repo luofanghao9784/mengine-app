@@ -5,7 +5,7 @@ import { IdentityError } from '../src/identity/client.ts';
 const tenant = '00000000-0000-4000-8000-000000000001',
   other = '00000000-0000-4000-8000-000000000002',
   spaceId = '00000000-0000-4000-8000-000000000003';
-const space = { id: spaceId, tenantId: tenant, name: '共享空间', kind: 'SHARED', version: 0, memberCount: 0 };
+const space = { id: spaceId, tenantId: tenant, name: '共享空间', kind: 'SHARED', version: 0, memberCount: 0, ownerId: null, ownerName: null, description: '' };
 const mismatch = (e: unknown) => e instanceof IdentityError && e.code === 'CONTRACT_MISMATCH';
 const client = (v: unknown) =>
   createTenantClient(

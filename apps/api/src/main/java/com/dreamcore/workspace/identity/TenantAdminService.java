@@ -13,7 +13,8 @@ public class TenantAdminService {
     public record Member(UUID accountId, String email, String displayName, String role, String status, String accountStatus, long version, String phone) {}
     public record EmergencyDisableReceipt(UUID accountId, String status, long version, String securityAction,
                                           UUID recoveryRequestId, String recoveryStatus) {}
-    public record SharedWorkspace(UUID id, UUID tenantId, String name, String kind, long version, long memberCount) {}
+    public record SharedWorkspace(UUID id, UUID tenantId, String name, String kind, long version, long memberCount, UUID ownerId, String ownerName, String description) {}
+    public record OwnerChange(UUID id,String actorName,String previousOwnerName,String nextOwnerName,String previousAccess,Instant createdAt) {}
     public record Grant(UUID accountId, String email, String displayName, String status, String accountStatus, boolean canMaintain, String phone) {}
     public record Overview(UUID tenantId, String name, long version, long activeMemberCount, long disabledMemberCount,
                            long sharedWorkspaceCount, String invitationDelivery) {}
@@ -26,12 +27,14 @@ public class TenantAdminService {
     private static final RowMapper<Member> MEMBER = (r,n) -> new Member(r.getObject("account_id",UUID.class),r.getString("email"),
         r.getString("display_name"),r.getString("role"),r.getString("status"),r.getString("account_status"),r.getLong("management_version"),r.getString("phone"));
     private static final String SPACE_SQL = """
-        SELECT w.id,w.tenant_id,w.name,w.kind,w.management_version,
+        SELECT w.id,w.tenant_id,w.name,w.kind,w.management_version,w.description,
+        CASE WHEN w.responsibility_confirmed THEN w.owner_id END AS responsible_id,
+        CASE WHEN w.responsibility_confirmed THEN (SELECT display_name FROM accounts WHERE id=w.owner_id) END AS responsible_name,
         (SELECT count(*) FROM workspace_members g WHERE g.tenant_id=w.tenant_id AND g.workspace_id=w.id) AS member_count
         FROM workspaces w WHERE w.tenant_id=? AND w.kind='SHARED'
         """;
     private static final RowMapper<SharedWorkspace> SPACE = (r,n) -> new SharedWorkspace(r.getObject("id",UUID.class),
-        r.getObject("tenant_id",UUID.class),r.getString("name"),r.getString("kind"),r.getLong("management_version"),r.getLong("member_count"));
+        r.getObject("tenant_id",UUID.class),r.getString("name"),r.getString("kind"),r.getLong("management_version"),r.getLong("member_count"),r.getObject("responsible_id",UUID.class),r.getString("responsible_name"),r.getString("description"));
     private final JdbcTemplate db;
     private final IdentityService identities;
     private final IdentityAudit audit;
@@ -148,18 +151,20 @@ public class TenantAdminService {
     }
     @Transactional
     public List<SharedWorkspace> spaces(UUID actor, UUID tenant, String query, int offset, int limit) {
-        identities.member(actor,tenant,true); page(offset,limit); if (query.length()>100) throw IdentityException.invalid();
-        return db.query(SPACE_SQL+" AND strpos(lower(w.name),lower(?))>0 ORDER BY w.name,w.id LIMIT ? OFFSET ?",SPACE,tenant,query.strip(),limit,offset);
+        String role=identities.member(actor,tenant,false);
+        if(!"TENANT_ADMIN".equals(role)&&!Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM workspaces WHERE tenant_id=? AND owner_id=? AND responsibility_confirmed)",Boolean.class,tenant,actor)))throw IdentityException.denied();
+        page(offset,limit); if (query.length()>100) throw IdentityException.invalid();
+        return db.query(SPACE_SQL+" AND (? OR (w.responsibility_confirmed AND w.owner_id=?)) AND strpos(lower(w.name),lower(?))>0 ORDER BY w.name,w.id LIMIT ? OFFSET ?",SPACE,tenant,"TENANT_ADMIN".equals(role),actor,query.strip(),limit,offset);
     }
     private SharedWorkspace space(UUID tenant, UUID id) {
         var rows=db.query(SPACE_SQL+" AND w.id=?",SPACE,tenant,id);
         if (rows.isEmpty()) throw new IdentityException(404,"WORKSPACE_NOT_FOUND"); return rows.getFirst();
     }
     @Transactional
-    public SharedWorkspace spaceInfo(UUID actor, UUID tenant, UUID id) { identities.member(actor,tenant,true); return space(tenant,id); }
+    public SharedWorkspace spaceInfo(UUID actor, UUID tenant, UUID id) { requireSpaceManagement(actor,tenant,id); return space(tenant,id); }
     @Transactional
     public List<Grant> grants(UUID actor, UUID tenant, UUID id, int offset, int limit) {
-        identities.member(actor,tenant,true); page(offset,limit); space(tenant,id);
+        requireSpaceManagement(actor,tenant,id); page(offset,limit); space(tenant,id);
         return db.query("""
             SELECT g.account_id,a.email,a.phone,a.display_name,m.status,a.status AS account_status,g.can_maintain FROM workspace_members g
             JOIN tenant_memberships m ON m.tenant_id=g.tenant_id AND m.account_id=g.account_id JOIN accounts a ON a.id=g.account_id
@@ -167,15 +172,67 @@ public class TenantAdminService {
             """,(r,n)->new Grant(r.getObject("account_id",UUID.class),r.getString("email"),r.getString("display_name"),
                 r.getString("status"),r.getString("account_status"),r.getBoolean("can_maintain"),r.getString("phone")),tenant,id,limit,offset);
     }
+    private boolean spaceOwner(UUID actor,UUID tenant,UUID id) {
+        return Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM workspaces WHERE tenant_id=? AND id=? AND kind='SHARED' AND responsibility_confirmed AND owner_id=?)",Boolean.class,tenant,id,actor));
+    }
+    private void requireSpaceManagement(UUID actor,UUID tenant,UUID id) {requireSpaceManagement(actor,tenant,id,true);}
+    private void requireSpaceManagement(UUID actor,UUID tenant,UUID id,boolean lock) {
+        String role=identities.member(actor,tenant,false,lock);
+        if(!"TENANT_ADMIN".equals(role)&&!spaceOwner(actor,tenant,id))throw IdentityException.denied();
+        space(tenant,id);
+    }
+    private UUID spaceMutation(UUID actor,UUID tenant,UUID id,UUID key,String operation,String fingerprint) {
+        requireSpaceManagement(actor,tenant,id,false);UUID prior=identities.priorRequest(actor,key,operation,fingerprint);
+        db.queryForList("SELECT id FROM tenants WHERE id=? FOR UPDATE",tenant);requireSpaceManagement(actor,tenant,id);return prior;
+    }
+    private void activeOwner(UUID actor,UUID tenant,UUID owner) {
+        if(owner==null)throw IdentityException.invalid();
+        Member target=member(tenant,owner);
+        if(!"ACTIVE".equals(target.status())||!"ACTIVE".equals(target.accountStatus()))throw new IdentityException(409,"MEMBER_INACTIVE");
+        departure.requireActiveBusiness(actor,tenant);departure.requireMemberActivation(tenant,owner);
+    }
+    private String description(String supplied) {
+        if(supplied==null)return "";if(supplied.strip().length()>500)throw IdentityException.invalid();return supplied.strip();
+    }
     @Transactional
-    public SharedWorkspace createSpace(UUID actor, UUID tenant, UUID key, String suppliedName) {
-        String name=IdentityService.name(suppliedName,100), fingerprint=IdentityService.hash(tenant+"\n"+name);
-        UUID prior=mutation(actor,tenant,key,"CREATE_SHARED_SPACE",fingerprint); if (prior!=null) return space(tenant,prior);
-        departure.requireActiveBusiness(actor,tenant);
-        UUID id=UUID.randomUUID();
-        db.update("INSERT INTO workspaces(id,tenant_id,owner_id,name,kind) VALUES (?,?,?,?,'SHARED')",id,tenant,actor,name);
-        identities.remember(actor,key,"CREATE_SHARED_SPACE",fingerprint,id); audit.record(actor,tenant,"WORKSPACE_CREATE",id,"SUCCESS");
+    public List<Member> spaceCandidates(UUID actor,UUID tenant,UUID id,String query,int offset,int limit) {
+        requireSpaceManagement(actor,tenant,id);page(offset,limit);if(query==null||query.length()>100)throw IdentityException.invalid();
+        return db.query(MEMBER_SQL+" AND m.status='ACTIVE' AND a.status='ACTIVE' AND (strpos(lower(coalesce(a.phone,a.email)),lower(?))>0 OR strpos(lower(a.display_name),lower(?))>0) ORDER BY a.display_name,a.id LIMIT ? OFFSET ?",MEMBER,tenant,query.strip(),query.strip(),limit,offset);
+    }
+    @Transactional
+    public List<OwnerChange> ownerChanges(UUID actor,UUID tenant,UUID id) {
+        requireSpaceManagement(actor,tenant,id);
+        return db.query("SELECT c.*,a.display_name actor_name,p.display_name previous_name,n.display_name next_name FROM workspace_owner_changes c JOIN accounts a ON a.id=c.actor_id LEFT JOIN accounts p ON p.id=c.previous_owner JOIN accounts n ON n.id=c.next_owner WHERE c.tenant_id=? AND c.workspace_id=? ORDER BY c.created_at DESC,c.id LIMIT 50",(r,i)->new OwnerChange(r.getObject("id",UUID.class),r.getString("actor_name"),r.getString("previous_name"),r.getString("next_name"),r.getString("previous_access"),r.getTimestamp("created_at").toInstant()),tenant,id);
+    }
+    @Transactional
+    public SharedWorkspace createSpace(UUID actor, UUID tenant, UUID key, String suppliedName,UUID owner,String suppliedDescription) {
+        String name=IdentityService.name(suppliedName,100),description=description(suppliedDescription);
+        if(owner==null)throw IdentityException.invalid();
+        String fingerprint=IdentityService.hash(tenant+"\n"+name+"\n"+owner+"\n"+description);
+        UUID prior=mutation(actor,tenant,key,"CREATE_SHARED_SPACE",fingerprint); if(prior!=null)return space(tenant,prior);
+        activeOwner(actor,tenant,owner);UUID id=UUID.randomUUID();
+        db.update("INSERT INTO workspaces(id,tenant_id,owner_id,name,kind,responsibility_confirmed,description) VALUES (?,?,?,?,'SHARED',true,?)",id,tenant,owner,name,description);
+        db.update("INSERT INTO workspace_members(tenant_id,workspace_id,account_id,can_maintain) VALUES (?,?,?,true)",tenant,id,owner);
+        identities.remember(actor,key,"CREATE_SHARED_SPACE",fingerprint,id);audit.record(actor,tenant,"WORKSPACE_CREATE",id,"SUCCESS");
         return space(tenant,id);
+    }
+    @Transactional
+    public SharedWorkspace changeOwner(UUID actor,UUID tenant,UUID id,UUID key,long expected,UUID owner,String previousAccess) {
+        if(owner==null||!List.of("READ","MAINTAIN","REMOVE").contains(previousAccess))throw IdentityException.invalid();
+        String fingerprint=IdentityService.hash(tenant+"\n"+id+"\n"+expected+"\n"+owner+"\n"+previousAccess);
+        UUID prior=mutation(actor,tenant,key,"SPACE_OWNER_CHANGE",fingerprint);var current=space(tenant,id);
+        if(prior!=null)return current;version(expected,current.version());activeOwner(actor,tenant,owner);
+        if(!owner.equals(current.ownerId())) {
+            if(current.ownerId()!=null) {
+                if(previousAccess.equals("REMOVE"))db.update("DELETE FROM workspace_members WHERE tenant_id=? AND workspace_id=? AND account_id=?",tenant,id,current.ownerId());
+                else db.update("UPDATE workspace_members SET can_maintain=? WHERE tenant_id=? AND workspace_id=? AND account_id=?",previousAccess.equals("MAINTAIN"),tenant,id,current.ownerId());
+            }
+            db.update("INSERT INTO workspace_members(tenant_id,workspace_id,account_id,can_maintain) VALUES (?,?,?,true) ON CONFLICT(tenant_id,workspace_id,account_id) DO UPDATE SET can_maintain=true",tenant,id,owner);
+            db.update("UPDATE workspaces SET owner_id=?,responsibility_confirmed=true,management_version=management_version+1 WHERE tenant_id=? AND id=?",owner,tenant,id);
+            db.update("INSERT INTO workspace_owner_changes(id,tenant_id,workspace_id,actor_id,previous_owner,next_owner,previous_access) VALUES (?,?,?,?,?,?,?)",UUID.randomUUID(),tenant,id,actor,current.ownerId(),owner,current.ownerId()==null?"NONE":previousAccess);
+            db.update("INSERT INTO identity_audit(actor_id,tenant_id,action,target_id,related_account_id,outcome) VALUES (?,?,'WORKSPACE_OWNER_CHANGE',?,?,'SUCCESS')",actor,tenant,id,owner);
+        }
+        identities.remember(actor,key,"SPACE_OWNER_CHANGE",fingerprint,id);return space(tenant,id);
     }
     @Transactional
     public SharedWorkspace renameSpace(UUID actor, UUID tenant, UUID id, UUID key, long expectedVersion, String suppliedName) {
@@ -191,11 +248,12 @@ public class TenantAdminService {
     @Transactional
     public SharedWorkspace grant(UUID actor, UUID tenant, UUID id, UUID accountId, UUID key, long expectedVersion, boolean enabled) {
         String fingerprint=IdentityService.hash(tenant+"\n"+id+"\n"+accountId+"\n"+expectedVersion+"\n"+enabled);
-        UUID prior=mutation(actor,tenant,key,"SPACE_MEMBERSHIP",fingerprint); SharedWorkspace current=space(tenant,id);
+        UUID prior=spaceMutation(actor,tenant,id,key,"SPACE_MEMBERSHIP",fingerprint); SharedWorkspace current=space(tenant,id);
         if (prior!=null) return current; version(expectedVersion,current.version());
         Member target=member(tenant,accountId);
         if(enabled){departure.requireActiveBusiness(actor,tenant);departure.requireMemberActivation(tenant,accountId);}
-        governance.contentGrant(actor,tenant,accountId,enabled);
+        if(!enabled&&accountId.equals(current.ownerId()))throw new IdentityException(409,"SPACE_OWNER_CHANGE_REQUIRED");
+        if(!spaceOwner(actor,tenant,id))governance.contentGrant(actor,tenant,accountId,enabled);
         if (enabled && (!"ACTIVE".equals(target.status()) || !"ACTIVE".equals(target.accountStatus())))
             throw new IdentityException(409,"MEMBER_INACTIVE");
         int changed=enabled ? db.update("INSERT INTO workspace_members(tenant_id,workspace_id,account_id) VALUES (?,?,?) ON CONFLICT DO NOTHING",tenant,id,accountId)
@@ -210,11 +268,12 @@ public class TenantAdminService {
     @Transactional
     public SharedWorkspace maintenance(UUID actor, UUID tenant, UUID id, UUID accountId, UUID key, long expectedVersion, boolean enabled) {
         String fingerprint=IdentityService.hash(tenant+"\n"+id+"\n"+accountId+"\n"+expectedVersion+"\n"+enabled);
-        UUID prior=mutation(actor,tenant,key,"SPACE_MAINTENANCE",fingerprint);
+        UUID prior=spaceMutation(actor,tenant,id,key,"SPACE_MAINTENANCE",fingerprint);
         SharedWorkspace current=space(tenant,id); if (prior!=null) return current;
         version(expectedVersion,current.version()); Member target=member(tenant,accountId);
         if(enabled){departure.requireActiveBusiness(actor,tenant);departure.requireMemberActivation(tenant,accountId);}
-        governance.contentGrant(actor,tenant,accountId,enabled);
+        if(!enabled&&accountId.equals(current.ownerId()))throw new IdentityException(409,"SPACE_OWNER_CHANGE_REQUIRED");
+        if(!spaceOwner(actor,tenant,id))governance.contentGrant(actor,tenant,accountId,enabled);
         if (enabled && (!"ACTIVE".equals(target.status()) || !"ACTIVE".equals(target.accountStatus()))) throw new IdentityException(409,"MEMBER_INACTIVE");
         var grants=db.queryForList("SELECT can_maintain FROM workspace_members WHERE tenant_id=? AND workspace_id=? AND account_id=?",Boolean.class,tenant,id,accountId);
         if (grants.isEmpty()) throw new IdentityException(404,"WORKSPACE_GRANT_NOT_FOUND");
@@ -238,7 +297,7 @@ public class TenantAdminService {
             LEFT JOIN workspaces w ON w.id=e.target_id AND w.tenant_id=e.tenant_id AND w.kind='SHARED'
             LEFT JOIN tenants t ON t.id=e.target_id AND t.id=e.tenant_id
             WHERE e.tenant_id=? AND e.outcome='SUCCESS' AND e.action IN ('INVITATION_CREATE','INVITATION_REVOKE','INVITATION_ACCEPT',
-                'MEMBER_ENABLE','MEMBER_DISABLE','MEMBER_SECURITY_DISABLE','MEMBER_ROLE','WORKSPACE_CREATE','WORKSPACE_RENAME','WORKSPACE_GRANT','WORKSPACE_REVOKE','WORKSPACE_MAINTAIN','WORKSPACE_READONLY','TENANT_RENAME')
+                'MEMBER_ENABLE','MEMBER_DISABLE','MEMBER_SECURITY_DISABLE','MEMBER_ROLE','WORKSPACE_CREATE','WORKSPACE_OWNER_CHANGE','WORKSPACE_RENAME','WORKSPACE_GRANT','WORKSPACE_REVOKE','WORKSPACE_MAINTAIN','WORKSPACE_READONLY','TENANT_RENAME')
             ORDER BY e.created_at DESC,e.id DESC LIMIT ? OFFSET ?
             """,(r,n)->new AuditEntry(r.getLong("id"),r.getObject("actor_id",UUID.class),r.getString("actor_name"),r.getString("action"),
                 r.getObject("target_id",UUID.class),r.getString("target_name"),r.getObject("related_account_id",UUID.class),

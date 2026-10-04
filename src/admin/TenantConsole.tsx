@@ -9,7 +9,7 @@ import { governanceClient } from '../governance/client';
 import { GovernancePanel, type MemberSelection } from '../governance/GovernancePanel';
 import { Failure, Loading, useRemote } from '../shared/admin';
 import { Button, Empty } from '../shared/ui';
-import { TenantAdminHome } from '../tenant/TenantAdminHome';
+import { TenantAdminHome, ManagedSpaces } from '../tenant/TenantAdminHome';
 import { OperationsPanel } from '../operations/OperationsPanel';
 import { BusinessSources } from '../governance/BusinessSources';
 import { Profiles } from '../profile/Profiles';
@@ -20,7 +20,7 @@ import { DeparturePanel } from '../departure/DeparturePanel';
 
 export function TenantConsole({ tenant, name }: { tenant: string; name: string }) {
   const { session, logout } = useSession();
-  const { page, hash } = useAdminRoute('tenant');
+  const { page: requestedPage, hash } = useAdminRoute('tenant');
   const [attempt, setAttempt] = useState(0);
   const [error, setError] = useState('');
   const [selection, select] = useState<MemberSelection>({ query: '', page: 0, target: '' });
@@ -29,6 +29,9 @@ export function TenantConsole({ tenant, name }: { tenant: string; name: string }
     [tenant, attempt, session.identity],
   );
   const refresh = () => setAttempt((n) => n + 1);
+  const limited = governance.value && !governance.value.canConfigure;
+  const page =
+    limited && !['members', 'materials', 'experience'].includes(requestedPage) ? 'members' : requestedPage;
   const params = new URLSearchParams(hash.slice(1));
   const secondary =
     params.get('detail') ||
@@ -44,6 +47,7 @@ export function TenantConsole({ tenant, name }: { tenant: string; name: string }
   return (
     <AdminShell
       realm="tenant"
+      allowedPages={limited ? ['members', 'materials', 'experience'] : undefined}
       name={name}
       account={session.identity?.account.displayName || ''}
       page={page}
@@ -108,7 +112,7 @@ export function TenantConsole({ tenant, name }: { tenant: string; name: string }
             <div className="admin-secondary-link">
               <a href={adminHref('tenant', 'members', hash, { detail: 'duties' })}>职责与交接</a>
             </div>
-            <TenantAdminHome tenant={tenant} compact />
+            {limited ? <ManagedSpaces tenant={tenant} /> : <TenantAdminHome tenant={tenant} compact />}
           </>
         )
       ) : page === 'database' ? (

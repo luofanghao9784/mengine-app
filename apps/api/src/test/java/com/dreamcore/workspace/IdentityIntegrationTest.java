@@ -370,7 +370,7 @@ class IdentityIntegrationTest {
     String accountId(Client client) throws Exception { return client.ok("GET","/api/v1/me",null,200).get("account").get("id").asString(); }
     @Test void tenantManagementRequiresLiveOwnTenantAdminAndNeverListsPersonalSpaces() throws Exception {
         var f=managed("b3-isolation");Client member=acceptNew(invitation(f.admin,f.tenant,"b3-reader@example.test"),"b3-reader@example.test");
-        var body=Map.of("requestId",UUID.randomUUID(),"name","共享资料");var space=f.admin.ok("POST",f.path+"/workspaces",body,201);
+        var body=Map.of("requestId",UUID.randomUUID(),"name","共享资料","ownerId",f.adminId,"description","");var space=f.admin.ok("POST",f.path+"/workspaces",body,201);
         String id=space.get("id").asString();
         for(Client forbidden:List.of(platform,adminB,member)) {
             for(String route:List.of("/overview","/members","/workspaces","/records","/workspaces/"+id,"/workspaces/"+id+"/members","/invitations"))
@@ -382,8 +382,9 @@ class IdentityIntegrationTest {
         assertEquals(400,f.admin.send("POST",f.path+"/workspaces",Map.of("requestId",UUID.randomUUID(),"name","注入","kind","PERSONAL"),true).statusCode());
         assertEquals(1,f.admin.ok("GET",f.path+"/workspaces",null,200).size());
         var personal=f.admin.ok("GET","/api/v1/tenants/"+f.tenant+"/context",null,200).get("workspaces");
-        assertEquals(1,personal.size()); // A shared-space creator does not automatically gain content access.
-        assertEquals(404,f.admin.send("GET",f.path+"/workspaces/"+personal.get(0).get("id").asString(),null,false).statusCode());
+        assertEquals(2,personal.size()); // Creator explicitly chose themselves as responsible owner.
+        var personalId=db.queryForObject("SELECT id FROM workspaces WHERE tenant_id=? AND owner_id=? AND kind='PERSONAL'",UUID.class,UUID.fromString(f.tenant),UUID.fromString(f.adminId));
+        assertEquals(404,f.admin.send("GET",f.path+"/workspaces/"+personalId.toString(),null,false).statusCode());
         assertEquals(404,adminB.send("GET","/api/tenant-admin/v1/tenants/"+tenantB+"/workspaces/"+id,null,false).statusCode());
         assertEquals(404,f.admin.send("POST",f.path+"/members/"+employeeId+"/status",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"status","DISABLED"),true).statusCode());
         for(String route:List.of("/members?limit=101","/workspaces?offset=-1","/members?status=UNKNOWN","/records?limit=0","/invitations?limit=101"))
@@ -391,24 +392,40 @@ class IdentityIntegrationTest {
         assertEquals(1,f.admin.ok("GET",f.path+"/members?q=b3-reader&limit=1",null,200).size());
         assertEquals(404,f.admin.send("POST",f.path+"/members/"+accountId(member)+"/role",Map.of("role","TENANT_ADMIN"),true).statusCode());
     }
+    @Test void ordinarySpaceOwnerCanManageOnlyAssignedSpaceThroughHttp() throws Exception {
+        var f=managed("b3-space-responsibility");Client responsible=acceptNew(invitation(f.admin,f.tenant,"b3-space-owner@example.test"),"b3-space-owner@example.test");
+        String owner=accountId(responsible);
+        var space=f.admin.ok("POST",f.path+"/workspaces",Map.of("requestId",UUID.randomUUID(),"name","指定普通成员","ownerId",owner),201);
+        String path=f.path+"/workspaces/"+space.get("id").asString();
+        assertEquals(owner,space.get("ownerId").asString());
+        assertEquals(200,responsible.send("GET",path,null,false).statusCode());
+        assertEquals(200,responsible.send("GET",path+"/members",null,false).statusCode());
+        assertEquals(200,responsible.send("GET",path+"/eligible-members",null,false).statusCode());
+        assertEquals(403,responsible.send("GET",f.path+"/members",null,false).statusCode());
+        assertEquals(403,responsible.send("POST",path+"/owner",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"ownerId",f.adminId,"previousAccess","READ"),true).statusCode());
+        assertEquals(1,f.admin.ok("GET","/api/v1/tenants/"+f.tenant+"/context",null,200).get("workspaces").size());
+        assertEquals(403,responsible.send("POST",path+"/members/"+f.adminId,Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"enabled",true),false).statusCode());
+        assertEquals(200,responsible.send("POST",path+"/members/"+f.adminId,Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"enabled",true),true).statusCode());
+        assertEquals(2,f.admin.ok("GET","/api/v1/tenants/"+f.tenant+"/context",null,200).get("workspaces").size());
+    }
     @Test void sharedWorkspaceGrantsAreScopedVersionedAndOldRetriesDoNotRestoreRevokedAccess() throws Exception {
         var f=managed("b3-grants");Client reader=acceptNew(invitation(f.admin,f.tenant,"b3-granted@example.test"),"b3-granted@example.test");String account=accountId(reader);
-        var create=Map.of("requestId",UUID.randomUUID(),"name","产品资料");var space=f.admin.ok("POST",f.path+"/workspaces",create,201);
+        var create=Map.of("requestId",UUID.randomUUID(),"name","产品资料","ownerId",f.adminId,"description","");var space=f.admin.ok("POST",f.path+"/workspaces",create,201);
         assertEquals(space,f.admin.ok("POST",f.path+"/workspaces",create,201));
-        assertEquals(409,f.admin.send("POST",f.path+"/workspaces",Map.of("requestId",create.get("requestId"),"name","不同内容"),true).statusCode());
+        assertEquals(409,f.admin.send("POST",f.path+"/workspaces",Map.of("requestId",create.get("requestId"),"name","不同内容","ownerId",f.adminId,"description",""),true).statusCode());
         String id=space.get("id").asString(),path=f.path+"/workspaces/"+id;
-        assertEquals(403,f.admin.send("POST",path+"/members/"+f.adminId,Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"enabled",true),true).statusCode());
+        assertEquals(200,f.admin.send("POST",path+"/members/"+f.adminId,Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"enabled",true),true).statusCode());
         assertEquals(404,f.admin.send("POST",path+"/members/"+employeeId,Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"enabled",true),true).statusCode());
         var grant=Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"enabled",true);
         var granted=f.admin.ok("POST",path+"/members/"+account,grant,200);
-        assertEquals(1,granted.get("version").asLong());assertEquals(1,granted.get("memberCount").asLong());
+        assertEquals(1,granted.get("version").asLong());assertEquals(2,granted.get("memberCount").asLong());
         assertEquals(granted,f.admin.ok("POST",path+"/members/"+account,grant,200));
         assertEquals(2,reader.ok("GET","/api/v1/tenants/"+f.tenant+"/context",null,200).get("workspaces").size());
         var revoke=Map.of("requestId",UUID.randomUUID(),"expectedVersion",1,"enabled",false);
         f.admin.ok("POST",path+"/members/"+account,revoke,200);
         assertEquals(1,reader.ok("GET","/api/v1/tenants/"+f.tenant+"/context",null,200).get("workspaces").size());
         var retried=f.admin.ok("POST",path+"/members/"+account,grant,200);
-        assertEquals(0,retried.get("memberCount").asLong());assertEquals(2,retried.get("version").asLong());
+        assertEquals(1,retried.get("memberCount").asLong());assertEquals(2,retried.get("version").asLong());
         assertEquals(409,f.admin.send("POST",path+"/settings",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"name","过期更新"),true).statusCode());
         f.admin.ok("POST",path+"/settings",Map.of("requestId",UUID.randomUUID(),"expectedVersion",2,"name","产品资料二"),200);
         var records=f.admin.ok("GET",f.path+"/records",null,200);
@@ -419,7 +436,7 @@ class IdentityIntegrationTest {
     @Test void memberDisableRevokesExistingSessionOnlyInThisTenantAndRestoreKeepsOriginalGrants() throws Exception {
         var f=managed("b3-disable");String email="b3-multitenant@example.test";Client reader=acceptNew(invitation(f.admin,f.tenant,email),email);String account=accountId(reader);
         reader.ok("POST","/api/v1/auth/invitations/accept",Map.of("token",token(invitation(adminB,tenantB,email))),200);
-        String id=f.admin.ok("POST",f.path+"/workspaces",Map.of("requestId",UUID.randomUUID(),"name","停用验证"),201).get("id").asString();
+        String id=f.admin.ok("POST",f.path+"/workspaces",Map.of("requestId",UUID.randomUUID(),"name","停用验证","ownerId",f.adminId,"description",""),201).get("id").asString();
         f.admin.ok("POST",f.path+"/workspaces/"+id+"/members/"+account,Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"enabled",true),200);
         String path=f.path+"/members/"+account+"/status";var disable=Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"status","DISABLED");
         f.admin.ok("POST",path,disable,200);f.admin.ok("POST",path,disable,200);
@@ -448,7 +465,7 @@ class IdentityIntegrationTest {
         assertEquals(403,removed.send("POST",f.path+"/invitations",Map.of("requestId",UUID.randomUUID(),"email","b3-removed-invite@example.test"),true).statusCode());
     }
     @Test void tenantSettingsAndWorkspaceConcurrencyRejectStaleWritesAndStayIndependentOfPlatformStateVersion() throws Exception {
-        var f=managed("b3-versions");String id=f.admin.ok("POST",f.path+"/workspaces",Map.of("requestId",UUID.randomUUID(),"name","版本测试"),201).get("id").asString();
+        var f=managed("b3-versions");String id=f.admin.ok("POST",f.path+"/workspaces",Map.of("requestId",UUID.randomUUID(),"name","版本测试","ownerId",f.adminId,"description",""),201).get("id").asString();
         Client peer=new Client();peer.login("b3-versions@example.test");
         try(var executor=Executors.newFixedThreadPool(2)) {
             var one=executor.submit(()->f.admin.send("POST",f.path+"/workspaces/"+id+"/settings",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"name","名称一"),true).statusCode());

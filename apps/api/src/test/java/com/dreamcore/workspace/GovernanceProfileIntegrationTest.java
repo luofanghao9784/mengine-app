@@ -34,7 +34,7 @@ class GovernanceProfileIntegrationTest {
         final HttpClient http=HttpClient.newBuilder().cookieHandler(new CookieManager(null,CookiePolicy.ACCEPT_ALL)).build();
         HttpResponse<String> send(String method,String path,Object body,boolean csrf)throws Exception {
             var request=HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+path)).header("Content-Type","application/json");
-            if(csrf){var c=JSON.readTree(send("GET","/api/v1/auth/csrf",null,false).body());request.header(c.get("headerName").asString(),c.get("token").asString());}
+            if(csrf){var c=JSON.readTree(send("GET",path.startsWith("/api/platform-admin/")?"/api/platform-admin/v1/auth/csrf":"/api/v1/auth/csrf",null,false).body());request.header(c.get("headerName").asString(),c.get("token").asString());}
             request.method(method,body==null?HttpRequest.BodyPublishers.noBody():HttpRequest.BodyPublishers.ofString(JSON.writeValueAsString(body)));
             return http.send(request.build(),HttpResponse.BodyHandlers.ofString());
         }
@@ -53,7 +53,8 @@ class GovernanceProfileIntegrationTest {
     @BeforeEach void fixture()throws Exception {
         if(passwordHash==null)passwordHash=passwords.encode(PASSWORD);
         platformId=account();ownerId=account();memberId=account();db.update("INSERT INTO platform_roles(account_id,role) VALUES (?,'PLATFORM_ADMIN')",platformId);
-        platform=client(platformId);owner=client(ownerId);member=client(memberId);
+        db.update("INSERT INTO platform_accounts(account_id,login_name,password_hash) VALUES (?,?,?)",platformId,platformId+"@governance.test",passwordHash);
+        platform=new Client();platform.call("POST","/api/platform-admin/v1/auth/login",Map.of("username",platformId+"@governance.test","password",PASSWORD),200);owner=client(ownerId);member=client(memberId);
         var created=platform.call("POST","/api/platform-admin/v1/tenants",Map.of("requestId",UUID.randomUUID(),"name","隔离治理企业","adminEmail",ownerId+"@governance.test","designateAuthorizationOwner",true),201);
         tenant=UUID.fromString(created.get("tenant").get("id").asString());
         String invitation=created.get("invitation").get("id").asString();
@@ -64,14 +65,14 @@ class GovernanceProfileIntegrationTest {
         privateSpace=db.queryForObject("SELECT id FROM workspaces WHERE tenant_id=? AND owner_id=? AND kind='PERSONAL'",UUID.class,tenant,memberId);
     }
     @AfterEach void cleanup(){
-        if(platformId!=null)db.update("DELETE FROM platform_roles WHERE account_id=?",platformId);
+        if(platformId!=null){db.update("DELETE FROM platform_roles WHERE account_id=?",platformId);db.update("DELETE FROM platform_sessions WHERE account_id=?",platformId);db.update("DELETE FROM platform_accounts WHERE account_id=?",platformId);}
         // This HTTP fixture only uses loopback; do not leak its login volume into later suites.
         db.update("DELETE FROM login_attempts WHERE bucket=?",IdentityService.hash("ip:127.0.0.1"));
     }
     @Test void explicitNominationAndAcceptanceNeverBackfillLegacyOwners()throws Exception {
         var initial=owner.call("GET",governance(),null,200);assertTrue(initial.get("ownerId").isNull());assertTrue(initial.get("canAcceptInitialResponsibility").asBoolean());
         member.call("POST",governance()+"/accept-initial-responsibility",change(0),403);
-        platform.call("GET",governance(),null,403);
+        platform.call("GET",governance(),null,401);
         var request=change(0);var accepted=owner.call("POST",governance()+"/accept-initial-responsibility",request,200);assertEquals(ownerId.toString(),accepted.get("ownerId").asString());
         assertEquals(accepted,owner.call("POST",governance()+"/accept-initial-responsibility",request,200));
         UUID legacy=UUID.randomUUID();db.update("INSERT INTO tenants(id,name) VALUES (?,'存量企业')",legacy);db.update("INSERT INTO tenant_memberships(tenant_id,account_id,role) VALUES (?,?,'TENANT_ADMIN')",legacy,ownerId);
@@ -97,7 +98,7 @@ class GovernanceProfileIntegrationTest {
         String stop=manage+"/members/"+ownerId+"/emergency-disable";
         var body=Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"securityAction","SECURITY_RISK");
         owner.call("POST",manage+"/members/"+ownerId+"/status",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"status","DISABLED"),409);
-        member.call("POST",stop,body,403);platform.call("POST",stop,body,403);
+        member.call("POST",stop,body,403);platform.call("POST",stop,body,401);
         assertEquals(403,owner.send("POST",stop,body,false).statusCode());
         owner.call("POST",stop,Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"securityAction","ORDINARY"),400);
         var offer=owner.call("POST",governance()+"/handover",Map.of("requestId",UUID.randomUUID(),"expectedVersion",revision(),"accountId",memberId),200);
@@ -114,7 +115,7 @@ class GovernanceProfileIntegrationTest {
         assertEquals("ACTIVE",db.queryForObject("SELECT status FROM tenant_memberships WHERE tenant_id=? AND account_id=?",String.class,otherTenant,ownerId));
         String recoveryPath="/api/platform-admin/v1/tenants/"+tenant+"/governance-recovery-requests/"+result.get("recoveryRequestId").asString();
         assertEquals("OWNER_UNAVAILABLE",platform.call("GET",recoveryPath,null,200).get("reason").asString());
-        platform.call("GET",base()+"/profiles/PERSONAL/"+ownerId,null,403);
+        platform.call("GET",base()+"/profiles/PERSONAL/"+ownerId,null,401);
     }
     @Test void emergencyStopIsIdempotentDistinctFromOrdinaryStatusAndCannotBypassRecovery()throws Exception {
         acceptOwner();owner.call("POST",governance()+"/members/"+memberId+"/role",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"role","TENANT_ADMIN"),200);
@@ -215,7 +216,7 @@ class GovernanceProfileIntegrationTest {
         assertEquals(2,member.call("POST",base()+"/profiles/entries/"+id+"/versions",update,200).get("revision").asInt());
         assertEquals("WITHDRAWN",member.call("GET",base()+"/profiles/entries/"+id,null,200).get("status").asString());
         assertEquals("简洁",member.call("GET",base()+"/profiles/entries/"+id+"?version=1",null,200).get("value").asString());
-        owner.call("GET",base()+"/profiles/entries/"+id,null,404);platform.call("GET",base()+"/profiles/entries/"+fact.get("id").asString(),null,403);
+        owner.call("GET",base()+"/profiles/entries/"+id,null,404);platform.call("GET",base()+"/profiles/entries/"+fact.get("id").asString(),null,401);
         assertEquals(0,db.queryForObject("SELECT count(*) FROM conversation_tasks WHERE tenant_id=?",Integer.class,tenant));
     }
     @Test void expiredPreferenceIsNotEffectiveAndConcurrentEditsNeverOverwrite()throws Exception {
@@ -273,7 +274,7 @@ class GovernanceProfileIntegrationTest {
         var body=Map.of("requestId",UUID.randomUUID(),"reason","OWNER_UNAVAILABLE");
         var receipt=platform.call("POST",p,body,200);assertEquals("PENDING_VERIFICATION",receipt.get("status").asString());assertEquals(receipt,platform.call("POST",p,body,200));
         assertEquals(receipt,platform.call("GET",p+"/"+receipt.get("id").asString(),null,200));
-        member.call("POST",p,body,403);platform.call("GET",base()+"/profiles/PERSONAL/"+ownerId,null,403);
+        member.call("POST",p,body,401);platform.call("GET",base()+"/profiles/PERSONAL/"+ownerId,null,401);
         assertEquals(ownerId,db.queryForObject("SELECT owner_id FROM tenant_governance WHERE tenant_id=?",UUID.class,tenant));
         assertEquals("DISABLED",db.queryForObject("SELECT status FROM accounts WHERE id=?",String.class,ownerId));
         assertEquals(0,db.queryForObject("SELECT count(*) FROM tenant_memberships WHERE tenant_id=? AND account_id=?",Integer.class,tenant,platformId));

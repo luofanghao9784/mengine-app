@@ -49,7 +49,7 @@ public class GovernanceService {
         var rows=db.queryForList("SELECT owner_id,revision FROM tenant_governance WHERE tenant_id=?",tenant);
         UUID owner=rows.isEmpty()?null:(UUID)rows.getFirst().get("owner_id");long revision=rows.isEmpty()?0:(Long)rows.getFirst().get("revision");
         var pending=db.query("SELECT id,from_account,to_account,status FROM governance_handovers WHERE tenant_id=? AND status='PENDING' AND (from_account=? OR to_account=?)",(r,n)->new Handover(r.getObject(1,UUID.class),r.getObject(2,UUID.class),r.getObject(3,UUID.class),r.getString(4)),tenant,actor,actor);
-        return new Snapshot(tenant,owner,revision,actor.equals(owner),access.allows(actor,tenant,TENANT_CONFIG,null),owner==null&&designated(actor,tenant),access.allows(actor,tenant,TENANT_CONFIG,null)||!access.scopes(actor,tenant).isEmpty()||!pending.isEmpty(),access.scopes(actor,tenant),pending.isEmpty()?null:pending.getFirst());
+        return new Snapshot(tenant,owner,revision,actor.equals(owner),access.allows(actor,tenant,TENANT_CONFIG,null),owner==null&&designated(actor,tenant),access.allows(actor,tenant,TENANT_CONFIG,null)||!access.scopes(actor,tenant).isEmpty()||!pending.isEmpty()||Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM workspaces WHERE tenant_id=? AND owner_id=? AND responsibility_confirmed)",Boolean.class,tenant,actor)),access.scopes(actor,tenant),pending.isEmpty()?null:pending.getFirst());
     }
     @Transactional public Snapshot acceptInitial(UUID actor,UUID tenant,UUID key,long expected) {
         UUID prior=mutation(actor,tenant,key,"OWNER_ACCEPT",expected);

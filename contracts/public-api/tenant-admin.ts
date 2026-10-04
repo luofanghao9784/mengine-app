@@ -25,6 +25,9 @@ export interface SharedWorkspace {
   kind: 'SHARED';
   version: number;
   memberCount: number;
+  ownerId: string | null;
+  ownerName: string | null;
+  description: string;
 }
 export type WorkspaceGrant = Pick<
   TenantMember,
@@ -39,6 +42,7 @@ export type TenantAction =
   | 'MEMBER_SECURITY_DISABLE'
   | 'MEMBER_ROLE'
   | 'WORKSPACE_CREATE'
+  | 'WORKSPACE_OWNER_CHANGE'
   | 'WORKSPACE_RENAME'
   | 'WORKSPACE_GRANT'
   | 'WORKSPACE_REVOKE'
@@ -72,4 +76,13 @@ export interface EmergencyDisableReceipt {
   securityAction: 'SECURITY_RISK';
   recoveryRequestId: string | null;
   recoveryStatus: 'PENDING_VERIFICATION' | null;
+}
+
+export interface SpaceOwnerChange {
+  id: string;
+  actorName: string;
+  previousOwnerName: string | null;
+  nextOwnerName: string;
+  previousAccess: 'READ' | 'MAINTAIN' | 'REMOVE' | 'NONE';
+  createdAt: string;
 }

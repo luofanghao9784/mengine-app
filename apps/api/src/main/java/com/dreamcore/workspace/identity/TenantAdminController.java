@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.*;
 @org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication(type = org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication.Type.SERVLET)
 @RequestMapping("/api/tenant-admin/v1/tenants/{tenant}")
 public class TenantAdminController {
+    public record CreateSpace(@NotNull UUID requestId,@NotNull @Size(max=100) String name,@NotNull UUID ownerId,@Size(max=500) String description) {}
+    public record OwnerChange(@NotNull UUID requestId,@NotNull @Min(0) Long expectedVersion,@NotNull UUID ownerId,@NotNull String previousAccess) {}
     public record Named(@NotNull UUID requestId, @NotNull @Size(max=100) String name) {}
     public record Rename(@NotNull UUID requestId, @NotNull @Min(0) Long expectedVersion, @NotNull @Size(max=100) String name) {}
     public record Status(@NotNull UUID requestId, @NotNull @Min(0) Long expectedVersion, @NotNull String status) {}
@@ -46,9 +48,15 @@ public class TenantAdminController {
         return service.spaces(IdentityController.actor(auth),tenant,q,offset,limit);
     }
     @PostMapping("/workspaces") @ResponseStatus(org.springframework.http.HttpStatus.CREATED)
-    public TenantAdminService.SharedWorkspace create(Authentication auth, @PathVariable UUID tenant, @Valid @RequestBody Named body) {
-        return service.createSpace(IdentityController.actor(auth),tenant,body.requestId(),body.name());
+    public TenantAdminService.SharedWorkspace create(Authentication auth, @PathVariable UUID tenant, @Valid @RequestBody CreateSpace body) {
+        return service.createSpace(IdentityController.actor(auth),tenant,body.requestId(),body.name(),body.ownerId(),body.description());
     }
+    @GetMapping("/workspaces/{workspace}/eligible-members")
+    public List<TenantAdminService.Member> candidates(Authentication auth,@PathVariable UUID tenant,@PathVariable UUID workspace,@RequestParam(defaultValue="")String q,@RequestParam(defaultValue="0")int offset,@RequestParam(defaultValue="21")int limit) {return service.spaceCandidates(IdentityController.actor(auth),tenant,workspace,q,offset,limit);}
+    @GetMapping("/workspaces/{workspace}/owner-records")
+    public List<TenantAdminService.OwnerChange> ownerRecords(Authentication auth,@PathVariable UUID tenant,@PathVariable UUID workspace) {return service.ownerChanges(IdentityController.actor(auth),tenant,workspace);}
+    @PostMapping("/workspaces/{workspace}/owner")
+    public TenantAdminService.SharedWorkspace owner(Authentication auth,@PathVariable UUID tenant,@PathVariable UUID workspace,@Valid @RequestBody OwnerChange body) {return service.changeOwner(IdentityController.actor(auth),tenant,workspace,body.requestId(),body.expectedVersion(),body.ownerId(),body.previousAccess());}
     @GetMapping("/workspaces/{workspace}")
     public TenantAdminService.SharedWorkspace space(Authentication auth, @PathVariable UUID tenant, @PathVariable UUID workspace) {
         return service.spaceInfo(IdentityController.actor(auth),tenant,workspace);

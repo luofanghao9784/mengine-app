@@ -22,6 +22,8 @@ export class IdentityError extends Error {
       CODE_ATTEMPTS_EXCEEDED: '验证码尝试次数已用完，请重新获取。',
       CODE_UNAVAILABLE: '本地测试短信不可读取，请重新获取验证码。',
       LOCAL_PREVIEW_DISABLED: '当前环境没有启用本地测试短信。',
+      SPACE_OWNER_USE_MANAGEMENT: '请在空间管理中明确更换负责人及原负责人的后续权限，然后继续离职办理。',
+      SPACE_OWNER_CHANGE_REQUIRED: '请先更换空间负责人，再调整原负责人的权限。',
       LAST_PLATFORM_ADMIN: '必须保留至少一位有效的平台管理员。',
       PLATFORM_ALREADY_ADMIN: '该账号已经具备平台管理资格。',
       INVITATION_ALREADY_PENDING: '该手机号已有待接受邀请，请先查看邀请记录。',

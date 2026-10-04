@@ -1,3 +1,5 @@
+import { SpaceOwnerForm } from './SpaceOwnerForm';
+import { useRequestLock } from '../shared/request-guard';
 import { useViewState, textState, pageState } from '../shared/useViewState';
 import { LocalInviteLink } from '../identity/LocalInviteLink';
 import { RequestPending } from '../shared/request-guard';
@@ -65,6 +67,7 @@ const actions: Record<string, string> = {
   MEMBER_DISABLE: '停用成员',
   MEMBER_SECURITY_DISABLE: '紧急安全停用成员',
   MEMBER_ROLE: '调整管理员角色',
+  WORKSPACE_OWNER_CHANGE: '更换空间负责人',
   WORKSPACE_CREATE: '创建共享空间',
   WORKSPACE_RENAME: '修改空间名称',
   WORKSPACE_GRANT: '授权空间成员',
@@ -282,14 +285,11 @@ export function TenantAdminHome({
               />
             )}
             {dialog.kind === 'create' && (
-              <TextForm
-                label="空间名称"
-                action="创建空间"
-                description="创建供团队共同使用的空间，再按需添加成员。创建空间不会自动授予内容访问权。"
-                submit={async (name, requestId) => {
-                  const result = await api.createSpace(tenant, { requestId, name });
+              <SpaceOwnerForm
+                tenant={tenant}
+                saved={(result) => {
                   setDialog({ kind: 'space', id: result.id });
-                  setNotice('共享空间已创建，可继续添加成员。');
+                  setNotice('共享空间已创建，负责人授权已生效。');
                   refresh();
                 }}
               />
@@ -555,7 +555,7 @@ function Spaces({
   tenant: string;
   attempt: number;
   refresh: () => void;
-  create: () => void;
+  create?: () => void;
   open: (id: string) => void;
 }) {
   const [q, setQ] = useViewState(tenant, 'admin:spaces:query', '', textState),
@@ -573,9 +573,11 @@ function Spaces({
             setPage(0);
           }}
         >
-          <Button icon={Plus} onClick={create}>
-            创建空间
-          </Button>
+          {create && (
+            <Button icon={Plus} onClick={create}>
+              创建空间
+            </Button>
+          )}
         </Filter>
       </div>
       {data.error ? (
@@ -597,7 +599,10 @@ function Spaces({
                   </span>
                   <span className="platform-tenant-name">
                     <strong>{s.name}</strong>
-                    <small>{s.memberCount} 位已授权成员（含停用成员）</small>
+                    <small>
+                      {s.ownerName ? `负责人：${s.ownerName}` : '负责人待指定'} · {s.memberCount}{' '}
+                      位已授权成员（含停用成员）
+                    </small>
                   </span>
                   <span>管理</span>
                 </button>
@@ -753,7 +758,7 @@ function SpaceContents({
   space: SharedWorkspace;
   refresh: () => void;
 }) {
-  const [mode, setMode] = useState<'list' | 'add' | 'rename'>('list'),
+  const [mode, setMode] = useState<'list' | 'add' | 'rename' | 'owner'>('list'),
     [page, setPage] = useState(0);
   const [revoking, setRevoking] = useState<WorkspaceGrant>();
   const [maintenance, setMaintenance] = useState<WorkspaceGrant>();
@@ -762,6 +767,18 @@ function SpaceContents({
     (signal) => api.grants(tenant, space.id, page * 20, signal),
     [tenant, space.id, page],
   );
+  const canConfigure = session.identity?.memberships.some(
+    (m) => m.tenantId === tenant && m.role === 'TENANT_ADMIN',
+  );
+  if (mode === 'owner')
+    return (
+      <>
+        <Button variant="ghost" onClick={() => setMode('list')}>
+          返回空间详情
+        </Button>
+        <SpaceOwnerForm tenant={tenant} space={space} saved={refresh} />
+      </>
+    );
   if (mode === 'rename')
     return (
       <>
@@ -832,11 +849,21 @@ function SpaceContents({
     <>
       <div className="platform-detail-title">
         <h3>{space.name}</h3>
-        <Button variant="ghost" onClick={() => setMode('rename')}>
-          修改名称
-        </Button>
+        {canConfigure && (
+          <Button variant="ghost" onClick={() => setMode('rename')}>
+            修改名称
+          </Button>
+        )}
+      </div>
+      <p className="platform-help">{space.description || '未填写空间说明'}</p>
+      <div className="tenant-space-heading">
+        <p>负责人：{space.ownerName || '尚未明确指定'}</p>
+        {canConfigure && (
+          <Button onClick={() => setMode('owner')}>{space.ownerId ? '更换负责人' : '指定负责人'}</Button>
+        )}
       </div>
       <div className="platform-detail-section">
+        <SpaceOwnerRecords tenant={tenant} space={space.id} />
         <div className="tenant-space-heading">
           <h3>已授权成员</h3>
           <Button icon={Plus} onClick={() => setMode('add')}>
@@ -863,17 +890,22 @@ function SpaceContents({
                   <Button
                     variant="ghost"
                     disabled={
-                      !m.canMaintain &&
-                      (m.accountId === session.identity?.account.id ||
-                        m.status !== 'ACTIVE' ||
-                        m.accountStatus !== 'ACTIVE')
+                      m.accountId === space.ownerId ||
+                      (!m.canMaintain &&
+                        (m.accountId === session.identity?.account.id ||
+                          m.status !== 'ACTIVE' ||
+                          m.accountStatus !== 'ACTIVE'))
                     }
                     onClick={() => setMaintenance(m)}
                   >
                     {m.canMaintain ? '设为只读' : '允许维护'}
                   </Button>
                   {(m.status === 'DISABLED' || m.accountStatus === 'DISABLED') && <Badge>访问暂停</Badge>}
-                  <Button variant="ghost" onClick={() => setRevoking(m)}>
+                  <Button
+                    variant="ghost"
+                    disabled={m.accountId === space.ownerId}
+                    onClick={() => setRevoking(m)}
+                  >
                     撤销授权
                   </Button>
                 </li>
@@ -904,7 +936,7 @@ function AddGrant({
     [attempt, setAttempt] = useState(0),
     [selected, setSelected] = useState<TenantMember>();
   const data = useRemote(
-    (signal) => api.members(tenant, q, 'ACTIVE', page * 20, signal),
+    (signal) => api.spaceCandidates(tenant, space.id, q, page * 20, signal),
     [tenant, q, page, attempt],
   );
   if (selected)
@@ -930,7 +962,7 @@ function AddGrant({
     <>
       <h3>选择要授权的成员</h3>
       <p className="platform-help">
-        仅可新增有效成员。配置管理员不能为自己新增内容权限；企业授权负责人可明确授权。
+        仅可新增本企业有效成员。新成员默认只读；负责人权限需通过更换负责人调整。
       </p>
       <Filter
         label="搜索授权成员"
@@ -1024,5 +1056,72 @@ function EmergencyStop({
         </Button>
       </FormActions>
     </form>
+  );
+}
+
+/** Ordinary space owners see only their assigned spaces, never the enterprise member/invite console. */
+export function ManagedSpaces({ tenant }: { tenant: string }) {
+  const [attempt, setAttempt] = useState(0),
+    [selected, setSelected] = useState(''),
+    [writing, setWriting] = useState(false);
+  const pending = useContext(RequestPending);
+  useRequestLock(writing);
+  const refresh = () => setAttempt((n) => n + 1);
+  return (
+    <MutationGate.Provider value={setWriting}>
+      <section className="admin-section">
+        <p className="admin-note">只显示你负责的共享空间，可在空间内添加已入企成员并调整其权限。</p>
+        <Spaces tenant={tenant} attempt={attempt} refresh={refresh} open={setSelected} />
+      </section>
+      {selected && (
+        <Modal
+          title="空间管理"
+          onClose={() => {
+            if (!writing && !pending) setSelected('');
+          }}
+        >
+          <SpaceDetail tenant={tenant} id={selected} onChange={refresh} />
+        </Modal>
+      )}
+    </MutationGate.Provider>
+  );
+}
+
+function SpaceOwnerRecords({ tenant, space }: { tenant: string; space: string }) {
+  const [attempt, setAttempt] = useState(0);
+  const data = useRemote((signal) => api.ownerChanges(tenant, space, signal), [tenant, space, attempt]);
+  return (
+    <details>
+      <summary>负责人变更记录</summary>
+      <p className="platform-help">最近 50 条记录</p>
+      {data.error ? (
+        <Failure error={data.error} retry={() => setAttempt((n) => n + 1)} />
+      ) : !data.value ? (
+        <Loading />
+      ) : !data.value.length ? (
+        <p>暂无负责人变更。</p>
+      ) : (
+        data.value.map((item) => (
+          <div className="admin-account-record" key={item.id}>
+            <strong>
+              {item.previousOwnerName || '未指定'} → {item.nextOwnerName}
+            </strong>
+            <p>
+              {item.actorName} · {time(item.createdAt)}
+            </p>
+            <p>
+              {
+                {
+                  READ: '原负责人保留只读',
+                  MAINTAIN: '原负责人保留资料维护',
+                  REMOVE: '原负责人移出空间',
+                  NONE: '首次明确指定负责人，原有成员授权保留',
+                }[item.previousAccess]
+              }
+            </p>
+          </div>
+        ))
+      )}
+    </details>
   );
 }

@@ -60,6 +60,7 @@ export function AdminShell({
   hash,
   logout,
   customerLinks,
+  allowedPages,
   children,
 }: {
   realm: AdminRealm;
@@ -69,6 +70,7 @@ export function AdminShell({
   hash: string;
   logout: () => void;
   customerLinks?: ReactNode;
+  allowedPages?: readonly AdminPage[];
   children: ReactNode;
 }) {
   const pending = useContext(RequestPending);
@@ -76,7 +78,7 @@ export function AdminShell({
   const [actions, setActions] = useState<HTMLDivElement | null>(null);
   const main = useRef<HTMLElement>(null);
   const scrollPositions = useRef(new Map<string, number>());
-  const nav = entries[realm];
+  const nav = entries[realm].filter((entry) => !allowedPages || allowedPages.includes(entry.id));
   const title = page === 'settings' ? '设置' : nav.find((x) => x.id === page)?.title || '概览';
   useLayoutEffect(() => {
     document.title = `${title} · ${realm === 'platform' ? '梦擎总台' : name + '企业管理'}`;

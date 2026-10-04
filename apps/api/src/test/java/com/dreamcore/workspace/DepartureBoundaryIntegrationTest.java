@@ -65,7 +65,7 @@ class DepartureBoundaryIntegrationTest {
   db.update("INSERT INTO governance_capabilities(tenant_id,account_id,capability,granted_by) VALUES (?,?,'BULK_EXPORT',?)",tenant,actor,actor);
   db.update("UPDATE departure_executions SET effective_at=now()-interval '2 days',deadline=now()-interval '1 day' WHERE id=?",id);
   denied(403,()->materials.download(actor,tenant,shared,f.id(),version));assertTrue(materials.list(actor,tenant,null,null,"",0,20).items().isEmpty());
-  denied(409,()->identities.invite(actor,tenant,UUID.randomUUID(),"new-"+UUID.randomUUID()+"@example.test"));denied(409,()->admin.createSpace(actor,tenant,UUID.randomUUID(),"不应恢复业务"));
+  denied(409,()->identities.invite(actor,tenant,UUID.randomUUID(),"new-"+UUID.randomUUID()+"@example.test"));denied(409,()->admin.createSpace(actor,tenant,UUID.randomUUID(),"不应恢复业务",actor,""));
  }
  @Test void ordinaryMemberEnableCannotUndoFormalOffboarding(){
   UUID id=UUID.randomUUID();db.update("INSERT INTO departure_executions(id,tenant_id,kind,target_account_id,state,requested_by,reason,policy_key,policy_revision,effective_at,deadline,prior_tenant_status,prior_member_status) VALUES (?,?,'MEMBER_OFFBOARD',?,'ISOLATED',?,'合成离职','OFFBOARD_ISOLATION',0,now(),now()+interval '30 days','ACTIVE','ACTIVE')",id,tenant,other,actor);db.update("UPDATE tenant_memberships SET status='DISABLED' WHERE tenant_id=? AND account_id=?",tenant,other);

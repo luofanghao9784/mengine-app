@@ -1,5 +1,6 @@
 import type { Invitation, InviteMember } from '../../contracts/public-api/identity';
 import type {
+  SpaceOwnerChange,
   TenantOverview,
   TenantMember,
   SharedWorkspace,
@@ -42,7 +43,10 @@ export const isSpace = (v: unknown): v is SharedWorkspace =>
   text(v.name) &&
   v.kind === 'SHARED' &&
   count(v.version) &&
-  count(v.memberCount);
+  count(v.memberCount) &&
+  (v.ownerId === null || uuid(v.ownerId)) &&
+  nullableText(v.ownerName) &&
+  typeof v.description === 'string';
 export const isInvitation = (v: unknown): v is Invitation =>
   record(v) &&
   uuid(v.id) &&
@@ -60,6 +64,7 @@ const actions = [
   'MEMBER_SECURITY_DISABLE',
   'MEMBER_ROLE',
   'WORKSPACE_CREATE',
+  'WORKSPACE_OWNER_CHANGE',
   'WORKSPACE_RENAME',
   'WORKSPACE_GRANT',
   'WORKSPACE_REVOKE',
@@ -155,8 +160,40 @@ export function createTenantClient(fetcher: typeof fetch = fetch) {
       ),
     space: (tenant: string, space: string, signal?: AbortSignal) =>
       request(path(tenant) + `/workspaces/${id(space)}`, 'GET', spaceCheck(tenant, space), undefined, signal),
-    createSpace: (tenant: string, body: { requestId: string; name: string }) =>
-      request(path(tenant) + '/workspaces', 'POST', scoped(tenant, isSpace), body),
+    createSpace: (
+      tenant: string,
+      body: { requestId: string; name: string; ownerId: string; description: string },
+    ) => request(path(tenant) + '/workspaces', 'POST', scoped(tenant, isSpace), body),
+    ownerChanges: (tenant: string, space: string, signal?: AbortSignal) =>
+      request(
+        path(tenant) + `/workspaces/${id(space)}/owner-records`,
+        'GET',
+        list(
+          (v): v is SpaceOwnerChange =>
+            record(v) &&
+            uuid(v.id) &&
+            text(v.actorName) &&
+            nullableText(v.previousOwnerName) &&
+            text(v.nextOwnerName) &&
+            ['READ', 'MAINTAIN', 'REMOVE', 'NONE'].includes(String(v.previousAccess)) &&
+            date(v.createdAt),
+        ),
+        undefined,
+        signal,
+      ),
+    changeOwner: (
+      tenant: string,
+      space: string,
+      body: VersionedChange & { ownerId: string; previousAccess: string },
+    ) => request(path(tenant) + `/workspaces/${id(space)}/owner`, 'POST', spaceCheck(tenant, space), body),
+    spaceCandidates: (tenant: string, space: string, q = '', offset = 0, signal?: AbortSignal) =>
+      request(
+        path(tenant) + `/workspaces/${id(space)}/eligible-members` + page(offset, { q }),
+        'GET',
+        list(isMember),
+        undefined,
+        signal,
+      ),
     renameSpace: (tenant: string, space: string, body: VersionedChange & { name: string }) =>
       request(path(tenant) + `/workspaces/${id(space)}/settings`, 'POST', spaceCheck(tenant, space), body),
     grants: (tenant: string, space: string, offset = 0, signal?: AbortSignal) =>
