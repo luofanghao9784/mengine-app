@@ -59,7 +59,7 @@ export const isEntry = (v: unknown): v is ExperienceEntry =>
   typeof v.canMaintain === 'boolean' &&
   isVersion(v.version) &&
   v.version.number <= v.latestNumber;
-const isSummary = (v: unknown): v is ExperienceSummary =>
+export const isSummary = (v: unknown): v is ExperienceSummary =>
   record(v) &&
   uuid(v.id) &&
   uuid(v.versionId) &&

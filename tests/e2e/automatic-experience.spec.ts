@@ -8,6 +8,8 @@ const tenant = id(1),
 async function fixture(context: BrowserContext) {
   let revoked = false;
   const mutations: string[] = [];
+  const queries: URLSearchParams[] = [];
+  let waiting = 3;
   const content = {
     kind: 'METHOD',
     title: '先核对来源口径',
@@ -70,25 +72,95 @@ async function fixture(context: BrowserContext) {
         role: 'TENANT_ADMIN',
         workspaces: [{ id: space, name: '合成共享空间', kind: 'SHARED', ownerId: person, canMaintain: true }],
       });
-    if (path.endsWith('/experiences'))
+    if (path.endsWith('/experience-library')) {
+      queries.push(new URL(route.request().url()).searchParams);
       return json({
+        scopes: [{ id: space, name: '合成共享空间' }],
         items: revoked
           ? []
           : [
               {
-                id: entryId,
-                versionId: version,
-                number: 1,
-                revision: 2,
-                status: 'PUBLISHED',
-                ...content,
-                origin: 'AUTOMATIC',
-                evaluation: 'AUTOMATIC_CHECKED',
+                workspaceId: space,
+                workspaceName: '合成共享空间',
+                updatedAt: '2026-10-04T00:00:00Z',
+                experience: {
+                  id: entryId,
+                  versionId: version,
+                  number: 1,
+                  revision: 2,
+                  status: 'PUBLISHED',
+                  ...content,
+                  origin: 'AUTOMATIC',
+                  evaluation: 'AUTOMATIC_CHECKED',
+                },
               },
             ],
         hasMore: false,
-        canMaintain: true,
-        indexStatus: 'READY',
+      });
+    }
+    if (path.endsWith('/experience-library/processing'))
+      return json({
+        enabled: false,
+        scopes: [{ id: space, name: '合成共享空间' }],
+        counts: {
+          WAITING: waiting,
+          PROCESSING: 0,
+          RETRYING: 0,
+          ADMITTED: 1,
+          UPDATED: 0,
+          DUPLICATE: 0,
+          NOT_ADMITTED: 1,
+          UNAVAILABLE: 0,
+          FAILED: 1,
+          UNKNOWN: 0,
+        },
+        items: [
+          {
+            id: id(10),
+            sourceKind: 'TASK',
+            state: 'NOT_ADMITTED',
+            reason: 'INSUFFICIENT_EVIDENCE',
+            updatedAt: '2026-10-04T00:00:00Z',
+            entryId: null,
+            versionId: null,
+            workspaceId: space,
+          },
+          {
+            id: id(11),
+            sourceKind: 'FEEDBACK',
+            state: 'FAILED',
+            reason: 'TECHNICAL_FAILURE',
+            updatedAt: '2026-10-04T00:00:00Z',
+            entryId: null,
+            versionId: null,
+            workspaceId: space,
+          },
+          {
+            id: id(12),
+            sourceKind: 'TASK',
+            state: 'ADMITTED',
+            reason: null,
+            updatedAt: '2026-10-04T00:00:00Z',
+            entryId,
+            versionId: version,
+            workspaceId: space,
+          },
+        ],
+        hasMore: false,
+      });
+    if (path.endsWith('/history'))
+      return json({
+        items: [
+          {
+            id: version,
+            number: 1,
+            origin: 'AUTOMATIC',
+            evaluation: 'AUTOMATIC_CHECKED',
+            createdAt: '2026-10-04T00:00:00Z',
+            current: true,
+          },
+        ],
+        hasMore: false,
       });
     if (path.endsWith('/experiences/' + entryId))
       return revoked ? json({ contractVersion: '1.0', code: 'EXPERIENCE_NOT_FOUND' }, 404) : json(result);
@@ -96,6 +168,10 @@ async function fixture(context: BrowserContext) {
   });
   return {
     mutations,
+    queries,
+    setWaiting: (n: number) => {
+      waiting = n;
+    },
     revoke: () => {
       revoked = true;
     },
@@ -108,7 +184,7 @@ test('automatic experience is readable in tenant admin without manual approval o
 }) => {
   const state = await fixture(context);
   await page.goto(start);
-  await expect(page.locator('.experience-card')).toContainText('自动核验通过');
+  await expect(page.locator('.experience-management-card')).toContainText('自动核验通过');
   await page.getByRole('button', { name: /先核对来源口径/ }).click();
   await expect(page.locator('.experience-detail')).toContainText('系统积累 · 自动核验通过');
   await expect(page.locator('.experience-detail')).toContainText('持续依赖来源权限');
@@ -127,4 +203,55 @@ test('a focus refresh removes a detail after source access disappears', async ({
   await page.evaluate(() => window.dispatchEvent(new Event('focus')));
   await expect(page.locator('.experience-detail')).toHaveCount(0);
   await expect(page.getByText('核对来源范围，再检查实际执行回执。', { exact: true })).toHaveCount(0);
+});
+
+test('drawer preserves search and scope, with version history loaded on demand', async ({
+  page,
+  context,
+}) => {
+  const state = await fixture(context);
+  await page.goto(start);
+  await page.getByLabel('搜索经验').fill('核对');
+  await page.getByRole('button', { name: '搜索', exact: true }).click();
+  await expect.poll(() => state.queries.at(-1)?.get('query')).toBe('核对');
+  await page.getByRole('button', { name: /先核对来源口径/ }).click();
+  await page.getByText('版本历史', { exact: true }).click();
+  await expect(page.getByRole('button', { name: 'v1 · 当前生效' })).toBeVisible();
+  await page.getByRole('button', { name: '关闭弹窗' }).click();
+  await expect(page.getByLabel('搜索经验')).toHaveValue('核对');
+  await expect(page.getByLabel('经验范围')).toHaveValue(space);
+});
+test('accumulation dashboard separates quality and execution outcomes without human review actions', async ({
+  page,
+  context,
+}) => {
+  const state = await fixture(context);
+  await page.clock.install();
+  await page.goto(start);
+  await page.getByRole('tab', { name: '积累与改进' }).click();
+  await expect(page.getByText('缺少充分依据', { exact: true })).toBeVisible();
+  await expect(page.getByText('技术执行未完成', { exact: true })).toBeVisible();
+  await expect(page.getByText(/自动积累尚未启用/)).toBeVisible();
+  await expect(page.getByRole('button', { name: /审核|批准|驳回|分派|手工关闭|补齐/ })).toHaveCount(0);
+  state.setWaiting(2);
+  await page.clock.fastForward(31000);
+  await expect(
+    page.locator('.experience-processing-metrics section').filter({ hasText: '等待处理' }),
+  ).toContainText('2');
+  await page.getByRole('button', { name: '查看关联经验' }).click();
+  await expect(page.locator('.experience-detail')).toBeVisible();
+  expect(state.mutations).toEqual([]);
+});
+test('mobile processing and drawer fit the viewport', async ({ page, context }) => {
+  await fixture(context);
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.goto(start);
+  await page.getByRole('tab', { name: '积累与改进' }).click();
+  await expect(page.locator('.experience-processing-metrics')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: '/tmp/experience-processing-mobile.png', fullPage: true });
+  await page.getByRole('button', { name: '查看关联经验' }).click();
+  await expect(page.locator('.experience-detail')).toBeVisible();
+  expect(await page.locator('dialog').evaluate((e) => e.scrollWidth <= e.clientWidth)).toBe(true);
+  await page.screenshot({ path: '/tmp/experience-drawer-mobile.png', fullPage: true });
 });

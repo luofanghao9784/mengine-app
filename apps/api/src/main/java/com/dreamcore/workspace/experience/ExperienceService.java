@@ -63,7 +63,7 @@ public class ExperienceService {
  AND ((r.kind='MATERIAL_VERSION' AND EXISTS(SELECT 1 FROM material_versions mv JOIN active_materials am ON am.id=mv.material_id WHERE mv.id=r.material_version_id AND mv.tenant_id=e.tenant_id AND mv.workspace_id=w.id))
  OR (r.kind='TASK' AND EXISTS(SELECT 1 FROM conversation_tasks t JOIN conversations c ON c.id=t.conversation_id WHERE t.id=r.task_id AND t.tenant_id=e.tenant_id AND t.workspace_id=w.id AND c.owner_id=p.actor AND EXISTS(SELECT 1 FROM readable_source_tasks rt WHERE rt.id=t.id)))))))
  """;
- private static final String VISIBLE="(object_is_active('EXPERIENCE_VERSION',v.id) AND NOT v.scrubbed AND (v.access_mode='INDEPENDENT_COPY' OR "+EVIDENCE_VISIBLE+"))";
+ static final String VISIBLE="(object_is_active('EXPERIENCE_VERSION',v.id) AND NOT v.scrubbed AND (v.access_mode='INDEPENDENT_COPY' OR "+EVIDENCE_VISIBLE+"))";
  private boolean evidenceAllowed(UUID actor,UUID tenant,Evidence ref){
   try{access.require(actor,tenant,ref.workspaceId(),false);
    if(ref.kind().equals("MATERIAL_VERSION")){access.requireVersionActive(tenant,ref.workspaceId(),ref.referenceId());return true;}

@@ -1,0 +1,720 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Tenant experience management views",
+    "version": "1.0.0",
+    "description": "Read-only observation of automatic accumulation. Scope and source authorization precede pagination. Processing records never contain source bodies or raw provider messages. No approval routes."
+  },
+  "security": [
+    {
+      "sessionCookie": []
+    }
+  ],
+  "paths": {
+    "/api/v1/tenants/{tenant}/experience-library": {
+      "get": {
+        "operationId": "experienceManagementContentPage",
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000,
+              "default": 0
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "schema": {
+              "enum": [
+                "AVAILABLE",
+                "STOPPED"
+              ],
+              "default": "AVAILABLE"
+            }
+          },
+          {
+            "name": "query",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200,
+              "default": ""
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized content or metadata-only processing",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContentPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Customer session required"
+          },
+          "403": {
+            "description": "Tenant or scope denied"
+          },
+          "400": {
+            "description": "Invalid filter"
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/experience-library/processing": {
+      "get": {
+        "operationId": "experienceManagementProcessingPage",
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000,
+              "default": 0
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "schema": {
+              "enum": [
+                "ALL",
+                "WAITING",
+                "PROCESSING",
+                "RETRYING",
+                "ADMITTED",
+                "UPDATED",
+                "DUPLICATE",
+                "NOT_ADMITTED",
+                "UNAVAILABLE",
+                "FAILED",
+                "UNKNOWN"
+              ],
+              "default": "ALL"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized content or metadata-only processing",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessingPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Customer session required"
+          },
+          "403": {
+            "description": "Tenant or scope denied"
+          },
+          "400": {
+            "description": "Invalid filter"
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/experience-library/{entry}/history": {
+      "get": {
+        "operationId": "experienceManagementHistory",
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000,
+              "default": 0
+            }
+          },
+          {
+            "name": "entry",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized content or metadata-only processing",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/History"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Customer session required"
+          },
+          "403": {
+            "description": "Tenant or scope denied"
+          },
+          "400": {
+            "description": "Invalid filter"
+          },
+          "404": {
+            "description": "No readable published history"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "DREAMCORE_SESSION"
+      }
+    },
+    "schemas": {
+      "ExperienceSummary": {
+        "oneOf": [
+          {
+            "properties": {
+              "origin": {
+                "const": "MANUAL"
+              },
+              "evaluation": {
+                "const": "NOT_EVALUATED"
+              }
+            }
+          },
+          {
+            "properties": {
+              "origin": {
+                "const": "AUTOMATIC"
+              },
+              "evaluation": {
+                "const": "AUTOMATIC_CHECKED"
+              }
+            }
+          }
+        ],
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "versionId",
+          "number",
+          "revision",
+          "status",
+          "title",
+          "summary",
+          "tags",
+          "applicable",
+          "excluded",
+          "origin",
+          "evaluation"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "versionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PUBLISHED",
+              "WITHDRAWN"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "summary": {
+            "type": "string",
+            "maxLength": 600
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 40
+            },
+            "maxItems": 20
+          },
+          "applicable": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "excluded": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "origin": {
+            "enum": [
+              "MANUAL",
+              "AUTOMATIC"
+            ]
+          },
+          "evaluation": {
+            "enum": [
+              "NOT_EVALUATED",
+              "AUTOMATIC_CHECKED"
+            ]
+          }
+        }
+      },
+      "Scope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "Item": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "experience",
+          "workspaceId",
+          "workspaceName",
+          "updatedAt"
+        ],
+        "properties": {
+          "experience": {
+            "$ref": "#/components/schemas/ExperienceSummary"
+          },
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceName": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ContentPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scopes",
+          "items",
+          "hasMore"
+        ],
+        "properties": {
+          "scopes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Scope"
+            }
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Item"
+            },
+            "maxItems": 20
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Processing": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "sourceKind",
+          "state",
+          "reason",
+          "updatedAt",
+          "entryId",
+          "versionId",
+          "workspaceId"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sourceKind": {
+            "enum": [
+              "TASK",
+              "FEEDBACK"
+            ]
+          },
+          "state": {
+            "enum": [
+              "WAITING",
+              "PROCESSING",
+              "RETRYING",
+              "ADMITTED",
+              "UPDATED",
+              "DUPLICATE",
+              "NOT_ADMITTED",
+              "UNAVAILABLE",
+              "FAILED",
+              "UNKNOWN"
+            ]
+          },
+          "reason": {
+            "enum": [
+              "DUPLICATE",
+              "NO_REUSABLE_METHOD",
+              "PREFERENCE_ONLY",
+              "PRODUCT_ISSUE",
+              "INSUFFICIENT_EVIDENCE",
+              "QUALITY_NOT_ESTABLISHED",
+              "EXPERIENCE_TARGET_VERSION_UNAVAILABLE",
+              "MODEL_NOT_CONFIGURED",
+              "EXPERIENCE_VERIFICATION_ONLY",
+              "EXPERIENCE_RESULT_UNKNOWN",
+              "VERSION_CONFLICT",
+              "TECHNICAL_FAILURE",
+              null
+            ]
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "entryId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "versionId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "oneOf": [
+          {
+            "properties": {
+              "entryId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "versionId": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          },
+          {
+            "properties": {
+              "entryId": {
+                "type": "null"
+              },
+              "versionId": {
+                "type": "null"
+              }
+            }
+          }
+        ]
+      },
+      "ProcessingPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "enabled",
+          "scopes",
+          "counts",
+          "items",
+          "hasMore"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Scope"
+            }
+          },
+          "counts": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "WAITING",
+              "PROCESSING",
+              "RETRYING",
+              "ADMITTED",
+              "UPDATED",
+              "DUPLICATE",
+              "NOT_ADMITTED",
+              "UNAVAILABLE",
+              "FAILED",
+              "UNKNOWN"
+            ],
+            "properties": {
+              "WAITING": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "PROCESSING": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "RETRYING": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "ADMITTED": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "UPDATED": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "DUPLICATE": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "NOT_ADMITTED": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "UNAVAILABLE": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "FAILED": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "UNKNOWN": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Processing"
+            },
+            "maxItems": 20
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        }
+      },
+      "HistoryVersion": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "number",
+          "origin",
+          "evaluation",
+          "createdAt",
+          "current"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "origin": {
+            "enum": [
+              "MANUAL",
+              "AUTOMATIC"
+            ]
+          },
+          "evaluation": {
+            "enum": [
+              "NOT_EVALUATED",
+              "AUTOMATIC_CHECKED"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "current": {
+            "type": "boolean"
+          }
+        },
+        "oneOf": [
+          {
+            "properties": {
+              "origin": {
+                "const": "MANUAL"
+              },
+              "evaluation": {
+                "const": "NOT_EVALUATED"
+              }
+            }
+          },
+          {
+            "properties": {
+              "origin": {
+                "const": "AUTOMATIC"
+              },
+              "evaluation": {
+                "const": "AUTOMATIC_CHECKED"
+              }
+            }
+          }
+        ]
+      },
+      "History": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "hasMore"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "$ref": "#/components/schemas/HistoryVersion"
+            }
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        }
+      }
+    }
+  }
+}

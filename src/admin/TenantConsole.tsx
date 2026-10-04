@@ -15,7 +15,7 @@ import { OperationsPanel } from '../operations/OperationsPanel';
 import { TenantDatabase } from '../database/TenantDatabase';
 import { CompanyInformation } from '../profile/CompanyInformation';
 import { TenantMaterials } from '../material/TenantMaterials';
-import { WorkspaceExperiences } from '../experience/WorkspaceExperiences';
+import { TenantExperiences } from '../experience/TenantExperiences';
 import { DeparturePanel } from '../departure/DeparturePanel';
 
 export function TenantConsole({ tenant, name }: { tenant: string; name: string }) {
@@ -163,7 +163,7 @@ export function TenantConsole({ tenant, name }: { tenant: string; name: string }
       ) : page === 'materials' ? (
         <TenantMaterials key={tenant} tenant={tenant} hash={hash} />
       ) : page === 'experience' ? (
-        <WorkspaceExperiences tenant={tenant} management={governance.value} readOnly />
+        <TenantExperiences key={tenant} tenant={tenant} />
       ) : secondary === 'records' && governance.value.canConfigure ? (
         <>
           <a className="button ghost" href={adminHref('tenant', 'company', hash)}>

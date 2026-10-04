@@ -1,0 +1,164 @@
+.experience-management-tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.experience-management-tabs > button:last-child {
+  margin-left: auto;
+}
+.experience-management-filters {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.experience-management-filters .field {
+  margin: 0;
+  flex: 1;
+  min-width: 160px;
+}
+.experience-management-filters input,
+.experience-management-filters select {
+  min-height: 42px;
+  width: 100%;
+}
+.experience-management-list,
+.experience-processing-list {
+  display: grid;
+  gap: 12px;
+}
+.experience-management-card {
+  border: 1px solid var(--line);
+  background: var(--surface, #fff);
+  border-radius: 16px;
+  padding: 22px;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  min-width: 0;
+}
+.experience-management-card:hover {
+  border-color: var(--blue);
+  box-shadow: 0 4px 18px #20394b0b;
+}
+.experience-management-card > div,
+.experience-management-card footer,
+.experience-processing-list article > div,
+.experience-processing-list footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.experience-management-card h2 {
+  font-size: 18px;
+  margin: 14px 0 8px;
+}
+.experience-management-card p,
+.experience-processing-list p {
+  color: var(--muted);
+  line-height: 1.7;
+}
+.experience-management-card footer,
+.experience-processing-list footer {
+  font-size: 12px;
+  color: var(--muted);
+}
+.experience-processing-metrics {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+}
+.experience-processing-metrics section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px;
+}
+.experience-processing-metrics strong {
+  font-size: 28px;
+  font-weight: 600;
+}
+.experience-processing-metrics span {
+  font-size: 13px;
+  color: var(--muted);
+}
+.modal.experience-management-drawer {
+  margin: 0 0 0 auto;
+  inset: 0 0 0 auto;
+  width: min(680px, 100vw);
+  max-width: 100vw;
+  box-sizing: border-box;
+  height: 100dvh;
+  max-height: 100dvh;
+  border-radius: 20px 0 0 20px;
+}
+.experience-management-drawer .experience-detail {
+  padding: 0;
+  border: 0;
+}
+.experience-management-drawer .experience-refs {
+  overflow-wrap: anywhere;
+}
+.experience-management-drawer .experience-section-head {
+  align-items: start;
+  flex-wrap: wrap;
+}
+@media (max-width: 1000px) {
+  .experience-processing-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 600px) {
+  .experience-processing-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .experience-management-filters .field {
+    min-width: 100%;
+  }
+  .experience-management-card {
+    padding: 16px;
+  }
+  .modal.experience-management-drawer {
+    border-radius: 0;
+  }
+  .experience-management-drawer .modal-content {
+    padding: 18px;
+  }
+  .experience-management-drawer .experience-boundaries {
+    grid-template-columns: 1fr;
+  }
+  .experience-processing-metrics section {
+    padding: 16px;
+  }
+}
+.experience-management-tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.experience-management-drawer details {
+  border-top: 1px solid var(--line);
+  padding: 18px 0;
+  margin-top: 12px;
+}
+.experience-management-drawer summary {
+  cursor: pointer;
+  font-weight: 550;
+}
+.experience-management-history {
+  list-style: none;
+  padding: 0;
+}
+.experience-management-history li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--muted);
+  flex-wrap: wrap;
+}
