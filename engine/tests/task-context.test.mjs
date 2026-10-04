@@ -8,7 +8,7 @@ import { capabilityDirectory } from '../dist/runtime/task-rules.js';
 import { listen, close, body, json } from './fixtures/agent.mjs';
 import { usageFixture } from './fixtures/usage.mjs';
 
-async function fixture(t, { protocol = '1.5', advertised = true, malformed = false } = {}) {
+async function fixture(t, { protocol = '1.5', advertised = true, malformed = false, datasets = false } = {}) {
   const actions = [],
     tools = [];
   const current = 'CURRENT: 今天只写草稿，不发送；旧历史的问题不要重复。';
@@ -20,6 +20,7 @@ async function fixture(t, { protocol = '1.5', advertised = true, malformed = fal
         allowed: true,
         executionClass: 'verification',
         ...(advertised ? { contextVersion: '1.0' } : {}),
+        ...(datasets ? { datasetContextVersion: '1.0' } : {}),
       });
     if (req.url.endsWith('/context')) {
       actions.push(input.action);
@@ -28,7 +29,7 @@ async function fixture(t, { protocol = '1.5', advertised = true, malformed = fal
         action: input.action,
         referenceOnly: true,
         result:
-          input.action === 'bootstrap'
+          input.action === 'dataset_search' ? { items: [dataset], hasMore: false } : input.action === 'bootstrap'
             ? {
                 previousAttempt: {
                   status: 'WAITING_INPUT',
@@ -76,6 +77,7 @@ async function fixture(t, { protocol = '1.5', advertised = true, malformed = fal
           request.tools.some((t) => t.name === 'task_context'),
           enabled,
         );
+        if (enabled) assert.equal(request.tools.find(t => t.name === 'task_context').parameters.properties.action.enum.includes('dataset_read'), datasets);
         const system = request.messages
           .filter((m) => m.role === 'system')
           .flatMap((m) => m.content)
@@ -91,7 +93,7 @@ async function fixture(t, { protocol = '1.5', advertised = true, malformed = fal
             type: 'tool_call',
             id: 'profile-1',
             name: 'task_context',
-            arguments: JSON.stringify({ action: 'profiles', scope: 'PERSONAL' }),
+            arguments: JSON.stringify(datasets ? { action: 'dataset_search' } : { action: 'profiles', scope: 'PERSONAL' }),
           };
           yield { type: 'finish', reason: 'tool_calls' };
         } else {
@@ -184,4 +186,40 @@ test('response projection rejects oversized history and false authority claims a
     /INVALID_CONTEXT_RESPONSE/,
   );
   assert.ok(!capabilityDirectory(['search_sources']).includes('task_context:'));
+});
+
+test('dataset capability is advertised independently and delivered through the real task tool', async (t) => {
+  const { result, actions } = await fixture(t, { datasets: true });
+  assert.equal(result.outcome, 'COMPLETE');
+  assert.deepEqual(actions, ['bootstrap', 'dataset_search']);
+});
+const datasetId = '00000000-0000-4000-8000-000000000001';
+const snapshotId = '00000000-0000-4000-8000-000000000002';
+const dataset = {
+  datasetId, snapshotId, version: 2, name: '合成销售', description: '', columns: ['日期', '销售额'],
+  columnOffset: 0, nextColumnOffset: null, totalColumns: 2, rowCount: 1,
+  coverageThrough: null, collectedAt: '2026-10-04T00:00:00Z', authority: false,
+};
+const dataResult = {
+  source: dataset, rows: [['2026-10-01', '100']], offset: 0, nextOffset: null,
+  hasMore: false, completeDataset: true, referenceOnly: true,
+};
+const envelope = result => ({ contractVersion: '1.0', action: 'dataset_read', referenceOnly: true, result });
+test('dataset reads require capability, exact snapshot IDs and valid row/column coverage', async () => {
+  const args = { action: 'dataset_read', referenceId: datasetId, versionId: snapshotId };
+  await assert.rejects(contextTool(async () => envelope(dataResult), async () => {}).execute(args), /INVALID_CONTEXT_REQUEST/);
+  const tool = contextTool(async (_action, body) => { assert.deepEqual(body, args); return envelope(dataResult); }, async () => {}, true);
+  assert.deepEqual(await tool.execute(args), envelope(dataResult));
+  for (const patch of [{ completeDataset: false }, { rows: [['100']] }, { hasMore: true }, { nextOffset: 1 },
+    { source: { ...dataset, authority: true } }, { source: { ...dataset, columnOffset: 1 } }])
+    assert.throws(() => contextResponse(envelope({ ...dataResult, ...patch }), 'dataset_read'), /INVALID_CONTEXT_RESPONSE/);
+  const substituted = contextTool(async () => envelope({ ...dataResult, source: { ...dataset, snapshotId: datasetId } }), async () => {}, true);
+  await assert.rejects(substituted.execute(args), /INVALID_CONTEXT_RESPONSE/);
+  await assert.rejects(tool.execute({ ...args, columnLimit: 0 }), /INVALID_CONTEXT_REQUEST/);
+});
+test('partial columns remain exact and cannot be labelled a complete dataset', () => {
+  const partial = { ...dataResult, source: { ...dataset, columns: ['日期'], nextColumnOffset: 1 }, rows: [['2026-10-01']], completeDataset: false };
+  assert.deepEqual(contextResponse(envelope(partial), 'dataset_read'), envelope(partial));
+  assert.throws(() => contextResponse(envelope({ ...partial, completeDataset: true }), 'dataset_read'), /INVALID_CONTEXT_RESPONSE/);
+  assert.throws(() => contextResponse({ contractVersion: '1.0', action: 'dataset_search', referenceOnly: true, result: { items: [{ ...dataset, version: 0 }], hasMore: false } }, 'dataset_search'), /INVALID_CONTEXT_RESPONSE/);
 });

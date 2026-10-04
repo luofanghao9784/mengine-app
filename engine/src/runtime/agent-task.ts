@@ -83,6 +83,7 @@ export class AgentTasks {
     let candidatesAllowed: boolean | undefined;
     let contextAvailable: boolean | undefined;
     let workAvailable: boolean | undefined;
+    let datasetContextAvailable: boolean | undefined;
     let planAllowed: boolean | undefined;
     let tablesAvailable: boolean | undefined;
     let planManagementAvailable = false;
@@ -128,6 +129,11 @@ export class AgentTasks {
         )
           throw new RuntimeError('TASK_ACCESS_DENIED');
         contextAvailable = context;
+        const datasets = response.datasetContextVersion === '1.0';
+        if ((response.datasetContextVersion !== undefined && !datasets) ||
+            (datasets && !context) || (datasetContextAvailable !== undefined && datasetContextAvailable !== datasets))
+          throw new RuntimeError('TASK_ACCESS_DENIED');
+        datasetContextAvailable = datasets;
         const work = response.taskWorkVersion === '1.0';
         const plan = response.planAllowed ?? false;
         if (
@@ -363,7 +369,7 @@ export class AgentTasks {
       ];
       const contextEnabled = task.contractVersion === '1.5' && contextAvailable;
       const continuity = contextEnabled ? await taskBootstrap(invoke) : undefined;
-      if (contextEnabled) tools.push(contextTool(invoke, authorize));
+      if (contextEnabled) tools.push(contextTool(invoke, authorize, datasetContextAvailable));
       if (task.contractVersion === '1.5' && workAvailable)
         tools.push(...workTools(invoke, authorize, !!planAllowed));
       if (web) {

@@ -41,5 +41,17 @@ test('legacy check payload stays valid while only known context versions can adv
   };
   assert.ok(check(base));
   assert.ok(check({ ...base, contextVersion: '1.0' }));
+  assert.ok(check({ ...base, contextVersion: '1.0', datasetContextVersion: '1.0' }));
+  assert.ok(!check({ ...base, contextVersion: '1.0', datasetContextVersion: '2.0' }));
   assert.ok(!check({ ...base, contextVersion: '2.0' }));
+});
+test('dataset reads require exact identities and bounded rows and columns, never a connection credential', () => {
+  const id = '00000000-0000-4000-8000-000000000001';
+  const input = { action: 'dataset_read', referenceId: id, versionId: id, offset: 99999, columnOffset: 99, columnLimit: 1 };
+  assert.ok(request(input));
+  assert.ok(!request({ ...input, versionId: 'latest' }));
+  assert.ok(!request({ ...input, columnLimit: 11 }));
+  assert.ok(!request({ ...input, connectionId: id }));
+  assert.ok(!request({ ...input, sql: 'select * from customers' }));
+  assert.ok(!request({ action: 'dataset_read', referenceId: id }));
 });

@@ -25,6 +25,6 @@ public class TaskContextGuard {
      WHERE e.id=r.reference_id AND e.status='PUBLISHED' AND v.id::text=r.version_key AND NOT v.scrubbed AND object_is_active('EXPERIENCE_VERSION',v.id)))
    ))
    """,Boolean.class,task));
-  if(stale)throw new IdentityException(409,"TASK_CONTEXT_CHANGED");
+  if(stale || !Boolean.TRUE.equals(db.queryForObject("SELECT task_datasets_readable(?) AND NOT EXISTS(SELECT 1 FROM task_dataset_fences f JOIN conversation_tasks t ON t.id=f.task_id AND t.attempt=f.attempt_number WHERE t.id=?)",Boolean.class,task,task)))throw new IdentityException(409,"TASK_CONTEXT_CHANGED");
  }
 }

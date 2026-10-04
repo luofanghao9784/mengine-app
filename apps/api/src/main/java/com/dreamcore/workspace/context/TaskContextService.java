@@ -17,12 +17,14 @@ import tools.jackson.databind.json.JsonMapper;
 /** Bounded, optional reference reads. Task identity and scope never come from model arguments. */
 @Service
 public class TaskContextService {
- public record Request(String action,String scope,String query,Integer offset,UUID referenceId,UUID versionId,Integer revision,UUID requestId,String decision,String conditions,String adjustments) {}
+ public record Request(String action,String scope,String query,Integer offset,UUID referenceId,UUID versionId,Integer revision,UUID requestId,String decision,String conditions,String adjustments,Integer columnOffset,Integer columnLimit) {
+  public Request(String action,String scope,String query,Integer offset,UUID referenceId,UUID versionId,Integer revision,UUID requestId,String decision,String conditions,String adjustments){this(action,scope,query,offset,referenceId,versionId,revision,requestId,decision,conditions,adjustments,null,null);}
+ }
  private record Task(UUID id,UUID actor,UUID tenant,UUID space,UUID conversation,int attempt) {}
  private final JdbcTemplate db; private final AgentTaskService agents; private final ProfileService profiles;
  private final ExperienceService experiences; private final MaterialAccess materials; private final TaskContextGuard guard;
- private final JsonMapper json=new JsonMapper();private final BriefingContentService briefings;
- public TaskContextService(JdbcTemplate db,AgentTaskService agents,ProfileService profiles,ExperienceService experiences,MaterialAccess materials,TaskContextGuard guard,BriefingContentService briefings){this.briefings=briefings;this.db=db;this.agents=agents;this.profiles=profiles;this.experiences=experiences;this.materials=materials;this.guard=guard;}
+ private final JsonMapper json=new JsonMapper();private final BriefingContentService briefings;private final DatasetTaskContext datasets;
+ public TaskContextService(JdbcTemplate db,AgentTaskService agents,ProfileService profiles,ExperienceService experiences,MaterialAccess materials,TaskContextGuard guard,BriefingContentService briefings,DatasetTaskContext datasets){this.datasets=datasets;this.briefings=briefings;this.db=db;this.agents=agents;this.profiles=profiles;this.experiences=experiences;this.materials=materials;this.guard=guard;}
  private IdentityException missing(){return new IdentityException(404,"TASK_CONTEXT_NOT_FOUND");}
  private String text(String s,int max,boolean required){if(s==null)s="";if(s.length()>max||required&&s.isBlank()||s.codePoints().anyMatch(c->Character.isISOControl(c)&&c!=10&&c!=13&&c!=9))throw IdentityException.invalid();return s.strip();}
  private int offset(Request r){int n=r.offset()==null?0:r.offset();if(n<0||n>1000)throw IdentityException.invalid();return n;}
@@ -34,6 +36,7 @@ public class TaskContextService {
   var t=task(task,token);if(r==null||r.action()==null)throw IdentityException.invalid();
   Object result=switch(r.action()){
    case "bootstrap" -> bootstrap(t);
+   case "dataset_search", "dataset_read" -> datasets.read(task,r);
    case "profiles" -> profilesSelectedOnly(t)?map("items",List.of(),"hasMore",false,"reason","SELECTED_ONLY"):profileList(t,r);
    case "profile_read" -> profilesSelectedOnly(t)?map("unavailable",true,"reason","SELECTED_ONLY"):profile(t,r);
    case "history" -> selectedOnly(t)?map("items",List.of(),"hasMore",false,"reason","SELECTED_ONLY"):history(t,r);
@@ -142,6 +145,7 @@ public class TaskContextService {
  }
  private void trackExperience(Task t,ExperienceService.Entry e){
   if(e.version().content().accessMode().equals("SOURCE_BOUND")){
+   for(var ref:e.version().evidence())if(ref.kind().equals("TASK"))datasets.inherit(t.id(),ref.referenceId());
    var deps=new LinkedHashSet<UUID>();for(var ref:e.version().evidence())if(ref.kind().equals("MATERIAL_VERSION"))deps.add(ref.referenceId());else deps.addAll(sourceVersions(ref.referenceId()));dependencies(t,deps);
   }
  }
