@@ -468,3 +468,164 @@
     font-size: 22px;
   }
 }
+
+/* Four operational sectors around a live snapshot core. */
+.admin-platform .engine-heading--embedded {
+  display: none;
+}
+.admin-platform .engine-observatory {
+  padding: 24px;
+  border-color: #253e58;
+  background:
+    radial-gradient(ellipse at 50% 40%, #16416655, transparent 55%),
+    linear-gradient(#73caff05 1px, transparent 1px), linear-gradient(90deg, #73caff05 1px, transparent 1px),
+    #091827;
+  background-size:
+    auto,
+    32px 32px,
+    32px 32px,
+    auto;
+  box-shadow:
+    inset 0 1px #b9e7ff12,
+    0 12px 32px #17304e16;
+  border-radius: 20px;
+}
+.admin-platform .engine-observatory .engine-status {
+  border: 0;
+  padding-bottom: 4px;
+}
+.admin-platform .engine-observatory .engine-status span:first-child {
+  color: #75dce9;
+}
+.admin-platform .engine-observatory .engine-totals {
+  padding: 18px 0;
+  gap: 14px;
+}
+.admin-platform .engine-observatory .engine-totals > div {
+  border: 1px solid #92caff18;
+  border-radius: 10px;
+  padding: 12px 16px;
+  background: #17344c55;
+}
+.admin-platform .engine-observatory .engine-totals dd {
+  font-size: 30px;
+  font-weight: 550;
+}
+.admin-platform .engine-observatory .engine-reactor {
+  grid-template-columns: minmax(0, 1fr) 220px minmax(0, 1fr);
+  gap: 18px 20px;
+  padding: 20px 0;
+}
+.admin-platform .engine-observatory .engine-bank {
+  padding: 20px;
+  border: 1px solid #90cfff25;
+  border-top: 2px solid var(--tone);
+  background: linear-gradient(135deg, #173750df, #112638ed);
+  border-radius: 16px;
+  box-shadow: inset 0 1px #d0f0ff0a;
+}
+.admin-platform .engine-observatory .engine-bank-heading > div > small {
+  color: var(--tone);
+  letter-spacing: 0.18em;
+  font-size: 10px;
+  margin-bottom: 7px;
+}
+.admin-platform .engine-observatory .engine-bank-heading > strong {
+  font-size: 32px;
+}
+.admin-platform .engine-observatory .engine-channels {
+  gap: 10px;
+}
+.admin-platform .engine-observatory .engine-channel {
+  grid-template-columns: minmax(110px, auto) minmax(16px, 1fr) 24px;
+}
+.admin-platform .engine-observatory .engine-channel i {
+  background: #99ccff13;
+  height: 3px;
+}
+.admin-platform .engine-observatory .engine-channel i b {
+  transition: width 0.5s ease;
+  box-shadow: 0 0 8px var(--tone);
+}
+.admin-platform .engine-observatory .engine-core {
+  gap: 12px;
+}
+.admin-platform .engine-observatory .engine-orb {
+  width: 170px;
+  height: 170px;
+  padding: 3px;
+  border-radius: 50%;
+  background: var(--engine-ring);
+  box-shadow:
+    0 0 0 12px #72b9f309,
+    0 0 0 26px #72b9f305,
+    0 0 60px #58beff20;
+}
+.admin-platform .engine-observatory .engine-orb > div {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: radial-gradient(circle, #1c3e59, #0d2032 75%);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+}
+.admin-platform .engine-observatory .engine-orb small {
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: #7daec7;
+}
+.admin-platform .engine-observatory .engine-orb strong {
+  font-size: 44px;
+  color: #e9f8ff;
+  font-weight: 550;
+}
+.admin-platform .engine-observatory .engine-orb span {
+  font-size: 12px;
+  color: #9fc5db;
+}
+.admin-platform .engine-observatory .engine-core > small {
+  max-width: none;
+  font-size: 10px;
+}
+.admin-platform .engine-observatory .engine-wires {
+  color: #528fbb60;
+}
+.admin-platform .engine-observatory .engine-wires path[data-active] {
+  stroke: #71dff5;
+  stroke-dasharray: 8 12;
+  animation: engine-snapshot-flow 3s linear infinite;
+}
+.admin-platform .engine-observatory .engine-evolution-flow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 18px;
+  color: #9d86c3;
+}
+.admin-platform .engine-observatory .engine-evolution-flow span {
+  padding: 7px 9px;
+  border: 1px solid #b298e52a;
+  border-radius: 6px;
+  font-size: 11px;
+}
+.admin-platform .engine-observatory .engine-panel {
+  background: #11283bbd;
+  border-color: #91c5f323;
+  border-radius: 12px;
+}
+@keyframes engine-snapshot-flow {
+  to {
+    stroke-dashoffset: -60;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .admin-platform .engine-observatory .engine-wires path[data-active] {
+    animation: none;
+  }
+  .admin-platform .engine-observatory .engine-channel i b {
+    transition: none;
+  }
+}

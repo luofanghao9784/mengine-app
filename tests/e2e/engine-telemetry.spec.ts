@@ -39,7 +39,7 @@ async function fixture(context: BrowserContext) {
       if (denied) return json({ code: 'ACCESS_DENIED' }, 403);
       return json({
         tenantId: wrong ? '00000000-0000-4000-8000-000000000003' : platform ? null : tenant,
-        checkedAt: new Date(Date.UTC(2026, 9, 4, 10, 0, reads * 15)).toISOString(),
+        checkedAt: new Date(Date.UTC(2026, 9, 4, 10, 0, reads * (platform ? 3 : 15))).toISOString(),
         recentSeconds: 300,
         evolution: 'NOT_CONNECTED',
         channels: telemetryChannels
@@ -125,9 +125,13 @@ test('automatic polling produces real samples and stops after leaving the engine
   await page.clock.install();
   await page.goto('/platform-admin/#admin=engine');
   await expect(page.locator('.engine-wall')).toBeVisible();
-  await page.clock.runFor(15010);
+  await page.clock.runFor(3010);
   await expect.poll(() => f.reads()).toBe(2);
   await expect(page.getByRole('img', { name: /已采样 2 次/ })).toBeVisible();
+  await page.clock.runFor(3000);
+  await expect.poll(() => f.reads()).toBe(3);
+  await expect(page.getByRole('img', { name: /已采样 3 次/ })).toBeVisible();
+  await expect(page.locator('.engine-status')).toContainText('每 3 秒更新');
   await page.evaluate(() => {
     location.hash = '#admin=overview';
   });

@@ -59,6 +59,7 @@ export function EngineTelemetryWall({
 }
 function Wall({ scope, tenant }: { scope: 'platform' | 'tenant'; tenant: string | null }) {
   const { expire } = useSession();
+  const pollMs = scope === 'platform' ? 3000 : 15000;
   const [value, setValue] = useState<EngineTelemetry>();
   const [error, setError] = useState<unknown>();
   const [samples, setSamples] = useState<Sample[]>([]);
@@ -72,6 +73,7 @@ function Wall({ scope, tenant }: { scope: 'platform' | 'tenant'; tenant: string 
       if (disposed || active || document.visibilityState === 'hidden') return;
       clearTimeout(timer);
       active = new AbortController();
+      const started = Date.now();
       setLoading(true);
       try {
         const next = await getTelemetry(scope, tenant, active.signal);
@@ -86,7 +88,7 @@ function Wall({ scope, tenant }: { scope: 'platform' | 'tenant'; tenant: string 
                 Date.parse(s.at) >= Date.parse(next.checkedAt) - 300000,
             ),
             { at: next.checkedAt, running: sum(next.channels, 'running') },
-          ].slice(-21),
+          ].slice(scope === 'platform' ? -101 : -21),
         );
       } catch (e) {
         if (disposed) return;
@@ -98,7 +100,7 @@ function Wall({ scope, tenant }: { scope: 'platform' | 'tenant'; tenant: string 
         active = undefined;
         if (!disposed) {
           setLoading(false);
-          timer = setTimeout(read, 15000);
+          timer = setTimeout(read, Math.max(0, pollMs - (Date.now() - started)));
         }
       }
     };
@@ -115,7 +117,7 @@ function Wall({ scope, tenant }: { scope: 'platform' | 'tenant'; tenant: string 
       window.removeEventListener('focus', visible);
       document.removeEventListener('visibilitychange', visible);
     };
-  }, [scope, tenant, refresh, expire]);
+  }, [scope, tenant, refresh, expire, pollMs]);
   const refreshAction = (
     <Button variant="ghost" icon={RefreshCw} disabled={loading} onClick={() => setRefresh((v) => v + 1)}>
       {loading ? '更新中…' : '刷新'}
@@ -171,12 +173,17 @@ function Snapshot({
   const gradient = sectors.map((s) => `var(--engine-${s.id}) ${s.start}% ${s.end}%`).join(',');
   const RecentContainer = compact ? 'details' : 'section';
   return (
-    <div className="engine-wall">
+    <div
+      className={`engine-wall ${compact ? 'engine-observatory' : ''}`}
+      data-active={running > 0 ? true : undefined}
+    >
       <div className="engine-status">
         <span>
           <Activity size={14} /> {loading ? '正在更新' : '已读取运行快照'}
         </span>
-        <span>快照 {time(value.checkedAt)} · 可见时每 15 秒更新</span>
+        <span>
+          快照 {time(value.checkedAt)} · 可见时每 {compact ? 3 : 15} 秒更新
+        </span>
       </div>
       <dl className="engine-totals">
         {[
@@ -195,11 +202,29 @@ function Snapshot({
       {compact && <p className="engine-scope-note">仅统计已接入的运行记录；保留异常可能包含历史尝试。</p>}
       <div className="engine-reactor">
         <svg className="engine-wires" viewBox="0 0 1000 460" preserveAspectRatio="none" aria-hidden="true">
+          {groups.map((g, i) => (
+            <path
+              key={g.id}
+              data-active={sectors[i].end > sectors[i].start ? true : undefined}
+              d={
+                g.id === 'input'
+                  ? 'M330 105H390L500 230'
+                  : g.id === 'process'
+                    ? 'M500 230L610 105H670'
+                    : 'M500 230L610 355H670'
+              }
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+            />
+          ))}
           <path
-            d="M330 105H390L500 230M670 105H610L500 230M670 355H610L500 230M330 355H390L500 230"
+            className="engine-evolution-wire"
+            d="M330 355H390L500 230"
             fill="none"
             stroke="currentColor"
             strokeWidth="1.5"
+            strokeDasharray="3 8"
           />
           {!compact && (
             <circle cx="500" cy="230" r="50" fill="none" stroke="currentColor" strokeDasharray="3 8" />
@@ -212,7 +237,7 @@ function Snapshot({
             <section key={g.id} className={`engine-bank engine-${g.id}`} aria-label={`${g.title}运行状态`}>
               <div className="engine-bank-heading">
                 <div>
-                  {!compact && <small>{g.english}</small>}
+                  <small>{g.english}</small>
                   <h3>
                     <g.icon size={19} />
                     {g.title}
@@ -250,39 +275,27 @@ function Snapshot({
           );
         })}
         <div className="engine-core">
-          {compact ? (
-            <>
-              <Cpu size={28} strokeWidth={1.5} aria-hidden="true" />
-              <span>引擎</span>
-              <small>按运行记录归组</small>
-            </>
-          ) : (
-            <>
-              <div
-                className="engine-orb"
-                style={
-                  {
-                    '--engine-ring': running
-                      ? `conic-gradient(${gradient})`
-                      : 'conic-gradient(#34506a 0% 100%)',
-                  } as CSSProperties
-                }
-              >
-                <div>
-                  <small>ENGINE</small>
-                  <strong>{n(running)}</strong>
-                  <span>登记执行中</span>
-                </div>
-              </div>
-              <p>输入 · 处理 · 输出</p>
-              <small>按记录归组，不是完成百分比</small>
-            </>
-          )}
+          <div
+            className="engine-orb"
+            style={
+              {
+                '--engine-ring': running ? `conic-gradient(${gradient})` : 'conic-gradient(#34506a 0% 100%)',
+              } as CSSProperties
+            }
+          >
+            <div>
+              <small>ENGINE</small>
+              <strong>{n(running)}</strong>
+              <span>登记执行中</span>
+            </div>
+          </div>
+          <p>输入 · 处理 · 输出</p>
+          <small>按记录归组，不是完成百分比</small>
         </div>
         <section className="engine-bank engine-evolution" aria-label="自进化运行状态">
           <div className="engine-bank-heading">
             <div>
-              {!compact && <small>EVOLUTION</small>}
+              <small>EVOLUTION</small>
               <h3>
                 <GitBranch size={19} />
                 自进化
@@ -291,11 +304,9 @@ function Snapshot({
             <span className="engine-unavailable">未启用</span>
           </div>
           <p>独立自进化执行器尚未接通。</p>
-          {!compact && (
-            <div className="engine-evolution-flow" aria-hidden="true">
-              <span>发现</span>›<span>候选</span>›<span>验证</span>›<span>采用</span>
-            </div>
-          )}
+          <div className="engine-evolution-flow" aria-hidden="true">
+            <span>发现</span>›<span>候选</span>›<span>验证</span>›<span>采用</span>
+          </div>
           <p className="engine-bank-state">基础经验提炼与清洗计入处理区，不作为自进化执行。</p>
         </section>
       </div>
@@ -333,7 +344,7 @@ function Snapshot({
           <h3>
             登记执行趋势 <small>当前页面观测 · 最多 5 分钟</small>
           </h3>
-          <Trend samples={samples} />
+          <Trend samples={samples} maxGap={compact ? 9000 : 45000} />
           <p>只连接本页实际读到的快照；空白期间无采样，离开页面后不保留。</p>
         </section>
       </div>
@@ -374,7 +385,7 @@ function Snapshot({
     </div>
   );
 }
-function Trend({ samples }: { samples: Sample[] }) {
+function Trend({ samples, maxGap }: { samples: Sample[]; maxGap: number }) {
   if (samples.length < 2)
     return <div className="engine-trend-empty">已取得 {samples.length} 个快照，等待下一次采样</div>;
   const first = Date.parse(samples[0].at),
@@ -388,7 +399,7 @@ function Trend({ samples }: { samples: Sample[] }) {
   const lines = samples
     .slice(1)
     .flatMap((s, i) =>
-      Date.parse(s.at) - Date.parse(samples[i].at) <= 45000 ? [`${pts[i]} ${pts[i + 1]}`] : [],
+      Date.parse(s.at) - Date.parse(samples[i].at) <= maxGap ? [`${pts[i]} ${pts[i + 1]}`] : [],
     );
   return (
     <div className="engine-trend">
