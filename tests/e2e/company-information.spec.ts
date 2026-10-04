@@ -66,6 +66,7 @@ async function fixture(
         role: options.limited ? 'MEMBER' : 'TENANT_ADMIN',
         workspaces: [],
       });
+    if (path.endsWith('/company-information/suggestions')) return json([]);
     if (path.endsWith('/company-information')) {
       if (revoked) return json({ contractVersion: '1.0', code: 'TENANT_ACCESS_DENIED' }, 403);
       if (route.request().method() === 'GET') return json(info);
@@ -189,4 +190,97 @@ test('read-only details have no mutation and revocation removes displayed conten
   await expect(page.getByText('合成业务', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: '没有访问权限' })).toBeVisible();
   expect(state.posts).toHaveLength(0);
+});
+
+test('suggestion comparison keeps the same KEEP request after response loss and hides revoked evidence', async ({
+  page,
+  context,
+}) => {
+  const state = await fixture(context);
+  let available = true,
+    completed = false;
+  const choices: Record<string, unknown>[] = [];
+  const suggestion = {
+    id: id(40),
+    revision: 1,
+    field: 'BUSINESS',
+    targetId: id(9),
+    label: '篮球培训',
+    meaning: '',
+    createdAt: date,
+    evidence: [
+      {
+        chunkId: id(41),
+        versionId: id(42),
+        filename: '合成企业介绍.txt',
+        locator: '第1段',
+        quote: '主营篮球培训。',
+      },
+    ],
+  };
+  await context.route('**/company-information/suggestions**', async (route) => {
+    if (route.request().method() === 'GET')
+      return route.fulfill({ json: available && !completed ? [suggestion] : [] });
+    const body = route.request().postDataJSON();
+    choices.push(body);
+    completed = true;
+    state.info.groups.find((g) => g.field === 'BUSINESS')!.revision = 2;
+    if (choices.length === 1) return route.abort('failed');
+    return route.fulfill({
+      json: { requestId: body.requestId, suggestionId: suggestion.id, action: body.action, revision: 2 },
+    });
+  });
+  await page.goto(start);
+  await page.getByRole('button', { name: '主营业务 · 篮球培训', exact: true }).click();
+  await expect(page.getByRole('dialog')).toContainText('合成业务');
+  await expect(page.getByRole('dialog')).toContainText('篮球培训');
+  await page.getByText('查看依据', { exact: true }).click();
+  await expect(page.getByRole('dialog')).toContainText('主营篮球培训。');
+  await page.setViewportSize({ width: 360, height: 900 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: '.local/admin-company/mobile-suggestion.png', fullPage: true });
+  await page.getByRole('button', { name: '保留当前', exact: true }).click();
+  await page.getByRole('button', { name: '重试同一次操作', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  expect(choices).toHaveLength(2);
+  expect(choices[0]).toEqual(choices[1]);
+  expect(choices[1].action).toBe('KEEP');
+  await expect(page.getByRole('button', { name: '合成业务', exact: true })).toBeVisible();
+  completed = false;
+  await page.getByRole('button', { name: '刷新', exact: true }).click();
+  await page.getByRole('button', { name: '主营业务 · 篮球培训', exact: true }).click();
+  available = false;
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByText('主营篮球培训。', { exact: true })).toHaveCount(0);
+});
+
+test('source revocation closes an open tag even while other company fields remain readable', async ({
+  page,
+  context,
+}) => {
+  const state = await fixture(context);
+  state.info.groups.find((g) => g.field === 'BUSINESS')!.tags[0].origin = 'AI';
+  await context.route('**/company-information/tags/*/evidence?*', (route) =>
+    route.fulfill({
+      json: [
+        {
+          chunkId: id(41),
+          versionId: id(42),
+          filename: '企业介绍.txt',
+          locator: '第1段',
+          quote: '合成依据。',
+        },
+      ],
+    }),
+  );
+  await page.goto(start);
+  await page.getByRole('button', { name: '合成业务', exact: true }).click();
+  await page.getByRole('button', { name: '信息依据', exact: true }).click();
+  await expect(page.getByRole('dialog')).toContainText('合成依据。');
+  state.info.groups.find((g) => g.field === 'BUSINESS')!.tags = [];
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: '企业背景信息', exact: true })).toBeVisible();
+  await expect(page.getByText('合成依据。', { exact: true })).toHaveCount(0);
 });

@@ -26,7 +26,7 @@ public class ProfileService {
     private final GovernanceAccess governance; private final IdentityAudit audit;
     private final com.dreamcore.workspace.departure.DepartureAccess departure;
     public ProfileService(JdbcTemplate db,IdentityService identities,MaterialAccess materials,GovernanceAccess governance,IdentityAudit audit,com.dreamcore.workspace.departure.DepartureAccess departure){this.departure=departure;this.db=db;this.identities=identities;this.materials=materials;this.governance=governance;this.audit=audit;}
-    private static final String SELECT="SELECT e.*,v.value,v.provenance,v.status,v.expires_at,v.changed_by,v.created_at AS changed_at,v.revision AS version_revision,v.id AS version_id,NOT v.scrubbed AND object_is_active('PROFILE_VERSION',v.id) AS body_available FROM profile_entries e JOIN profile_versions v ON v.entry_id=e.id AND v.tenant_id=e.tenant_id ";
+    private static final String SELECT="SELECT e.*,v.value,v.provenance,v.status,v.expires_at,v.changed_by,v.created_at AS changed_at,v.revision AS version_revision,v.id AS version_id,NOT v.scrubbed AND object_is_active('PROFILE_VERSION',v.id) AND company_profile_readable(v.id) AS body_available FROM profile_entries e JOIN profile_versions v ON v.entry_id=e.id AND v.tenant_id=e.tenant_id ";
     private void read(UUID actor,UUID tenant,Scope scope,UUID subject) {
         identities.member(actor,tenant,false);departure.requirePrivateRead(actor,tenant);
         if(subject==null)throw IdentityException.invalid();
@@ -64,12 +64,12 @@ public class ProfileService {
         identities.member(actor,tenant,false);departure.requirePrivateRead(actor,tenant);
         var e=entry(tenant,id,false);read(actor,tenant,Scope.valueOf((String)e.get("scope")),subject(e));
         int revision=version==null?(Integer)e.get("revision"):version;
-        var rows=db.queryForList(SELECT+" WHERE e.tenant_id=? AND e.id=? AND v.revision=? AND NOT v.scrubbed AND object_is_active('PROFILE_VERSION',v.id)",tenant,id,revision);
+        var rows=db.queryForList(SELECT+" WHERE e.tenant_id=? AND e.id=? AND v.revision=? AND NOT v.scrubbed AND object_is_active('PROFILE_VERSION',v.id) AND company_profile_readable(v.id)",tenant,id,revision);
         if(rows.isEmpty())throw new IdentityException(404,"PROFILE_VERSION_NOT_FOUND");return value(rows.getFirst());
     }
     @Transactional public History history(UUID actor,UUID tenant,UUID id,int offset,int limit){
         if(offset<0||offset>100000||limit<1||limit>100)throw IdentityException.invalid();var e=entry(tenant,id,false);Scope scope=Scope.valueOf((String)e.get("scope"));read(actor,tenant,scope,subject(e));
-        var rows=db.query("SELECT v.*,NOT v.scrubbed AND object_is_active('PROFILE_VERSION',v.id) available FROM profile_versions v WHERE v.entry_id=? ORDER BY v.revision DESC LIMIT ? OFFSET ?",(r,n)->{Instant expiry=r.getTimestamp("expires_at")==null?null:r.getTimestamp("expires_at").toInstant();String status=r.getString("status");return new VersionInfo(r.getObject("id",UUID.class),r.getInt("revision"),r.getInt("revision")==((Number)e.get("revision")).intValue(),Status.valueOf(status),!status.equals("WITHDRAWN")&&expiry!=null&&!expiry.isAfter(Instant.now())?"EXPIRED":status,expiry,r.getTimestamp("created_at").toInstant(),r.getBoolean("available"));},id,limit+1,offset);
+        var rows=db.query("SELECT v.*,NOT v.scrubbed AND object_is_active('PROFILE_VERSION',v.id) AND company_profile_readable(v.id) available FROM profile_versions v WHERE v.entry_id=? ORDER BY v.revision DESC LIMIT ? OFFSET ?",(r,n)->{Instant expiry=r.getTimestamp("expires_at")==null?null:r.getTimestamp("expires_at").toInstant();String status=r.getString("status");return new VersionInfo(r.getObject("id",UUID.class),r.getInt("revision"),r.getInt("revision")==((Number)e.get("revision")).intValue(),Status.valueOf(status),!status.equals("WITHDRAWN")&&expiry!=null&&!expiry.isAfter(Instant.now())?"EXPIRED":status,expiry,r.getTimestamp("created_at").toInstant(),r.getBoolean("available"));},id,limit+1,offset);
         return new History(editable(actor,tenant,scope,subject(e)),rows.stream().limit(limit).toList(),rows.size()>limit);
     }
     @Transactional public VersionInfo currentMetadata(UUID actor,UUID tenant,UUID id){return history(actor,tenant,id,0,1).items().getFirst();}

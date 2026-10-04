@@ -35,6 +35,50 @@ export interface CompanyChange {
   label: string;
   meaning: string;
 }
+export interface CompanySuggestion {
+  id: string;
+  revision: number;
+  field: CompanyField;
+  targetId: string | null;
+  label: string;
+  meaning: string;
+  createdAt: string;
+  evidence: { chunkId: string; versionId: string; filename: string; locator: string; quote: string }[];
+}
+export interface CompanyDecision {
+  requestId: string;
+  expectedRevision: number;
+  expectedGroupRevision: number;
+  action: 'ADOPT' | 'KEEP';
+}
+const isSuggestion = (v: unknown): v is CompanySuggestion =>
+  record(v) &&
+  uuid(v.id) &&
+  Number.isSafeInteger(v.revision) &&
+  Number(v.revision) > 0 &&
+  Object.hasOwn(companyFields, String(v.field)) &&
+  (v.targetId === null || uuid(v.targetId)) &&
+  text(v.label) &&
+  v.label.length <= 160 &&
+  typeof v.meaning === 'string' &&
+  v.meaning.length <= 1000 &&
+  text(v.createdAt) &&
+  Number.isFinite(Date.parse(v.createdAt)) &&
+  Array.isArray(v.evidence) &&
+  v.evidence.length > 0 &&
+  v.evidence.length <= 5 &&
+  v.evidence.every(isEvidence);
+function isEvidence(e: unknown): e is CompanySuggestion['evidence'][number] {
+  return (
+    record(e) &&
+    uuid(e.chunkId) &&
+    uuid(e.versionId) &&
+    text(e.filename) &&
+    text(e.locator) &&
+    text(e.quote) &&
+    e.quote.length <= 2000
+  );
+}
 const count = (v: unknown) => Number.isSafeInteger(v) && Number(v) >= 0;
 export const isCompanyInformation = (v: unknown): v is CompanyInformation =>
   record(v) &&
@@ -74,6 +118,47 @@ export function createCompanyClient(fetcher: typeof fetch = fetch) {
     return `/api/v1/tenants/${tenant}/company-information`;
   };
   return {
+    evidence: (tenant: string, tag: string, revision: number, signal?: AbortSignal) => {
+      if (!uuid(tag) || !Number.isSafeInteger(revision) || revision < 1)
+        throw new IdentityError('INVALID_REQUEST', 400);
+      return request(
+        root(tenant) + '/tags/' + tag + '/evidence?revision=' + revision,
+        'GET',
+        (v): v is CompanySuggestion['evidence'] => Array.isArray(v) && v.length <= 5 && v.every(isEvidence),
+        undefined,
+        signal,
+      );
+    },
+    suggestions: (tenant: string, signal?: AbortSignal) =>
+      request(
+        root(tenant) + '/suggestions',
+        'GET',
+        (v): v is CompanySuggestion[] => Array.isArray(v) && v.length <= 100 && v.every(isSuggestion),
+        undefined,
+        signal,
+      ),
+    decide: (tenant: string, suggestion: string, body: CompanyDecision, signal?: AbortSignal) => {
+      if (!uuid(suggestion)) throw new IdentityError('INVALID_REQUEST', 400);
+      return request(
+        root(tenant) + '/suggestions/' + suggestion,
+        'POST',
+        (
+          v,
+        ): v is {
+          requestId: string;
+          suggestionId: string;
+          action: CompanyDecision['action'];
+          revision: number;
+        } =>
+          record(v) &&
+          v.requestId === body.requestId &&
+          v.suggestionId === suggestion &&
+          v.action === body.action &&
+          v.revision === body.expectedRevision + 1,
+        body,
+        signal,
+      );
+    },
     get: (tenant: string, signal?: AbortSignal) =>
       request(
         root(tenant),

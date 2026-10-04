@@ -73,6 +73,8 @@ const actions: Record<string, string> = {
   COMPANY_INFORMATION_ADD: '添加企业信息',
   COMPANY_INFORMATION_EDIT: '调整企业信息',
   COMPANY_INFORMATION_REMOVE: '移除企业信息',
+  COMPANY_INFORMATION_ADOPT: '采用企业信息建议',
+  COMPANY_INFORMATION_KEEP: '保留当前企业信息',
   COMPANY_INFORMATION_CLEAR: '清空企业信息分组',
   COLLECTION_CONFIGURE: '调整自动取数',
   COLLECTION_NOW: '立即更新数据',

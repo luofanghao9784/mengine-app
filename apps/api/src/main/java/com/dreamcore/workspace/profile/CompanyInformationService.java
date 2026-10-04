@@ -32,7 +32,7 @@ public class CompanyInformationService {
               SELECT t.profile_id,t.origin,t.human_protected,v.revision,v.value,v.created_at
               FROM company_information_tags t JOIN profile_entries e ON e.id=t.profile_id
               JOIN profile_versions v ON v.entry_id=e.id AND v.revision=e.revision
-              WHERE t.tenant_id=? AND t.field=? AND v.status='ACTIVE' AND NOT v.scrubbed AND object_is_active('PROFILE_VERSION',v.id)
+              WHERE t.tenant_id=? AND t.field=? AND v.status='ACTIVE' AND NOT v.scrubbed AND object_is_active('PROFILE_VERSION',v.id) AND company_profile_readable(v.id)
               ORDER BY e.created_at,e.id
               """,(r,n)->{var content=json.readTree(r.getString("value"));return new Tag(r.getObject("profile_id",UUID.class),r.getInt("revision"),content.get("label").asString(),content.get("meaning").asString(),r.getString("origin"),r.getBoolean("human_protected"),r.getTimestamp("created_at").toInstant());},tenant,field.name());
             groups.add(new Group(field,state.isEmpty()?0:((Number)state.getFirst().get("revision")).intValue(),!state.isEmpty()&&Boolean.TRUE.equals(state.getFirst().get("manually_cleared")),tags));
@@ -43,6 +43,8 @@ public class CompanyInformationService {
     private UUID append(UUID actor,UUID tenant,UUID id,String label,String meaning,String status){
         int revision=db.queryForObject("SELECT revision FROM profile_entries WHERE id=? FOR UPDATE",Integer.class,id)+1;UUID version=UUID.randomUUID();
         db.update("INSERT INTO profile_versions(id,tenant_id,entry_id,revision,value,provenance,status,changed_by) VALUES (?,?,?,?,?,'人工调整',?,?)",version,tenant,id,revision,json.writeValueAsString(Map.of("label",label,"meaning",meaning)),status,actor);
+        // Editing an inferred label does not silently declassify its source material.
+        db.update("INSERT INTO company_profile_inferences(version_id,run_id) SELECT ?,p.run_id FROM company_profile_inferences p JOIN profile_versions v ON v.id=p.version_id WHERE v.entry_id=? AND v.revision=?",version,id,revision-1);
         db.update("UPDATE profile_entries SET revision=?,kind='FACT' WHERE id=?",revision,id);
         db.update("UPDATE company_information_tags SET origin='HUMAN',human_protected=true WHERE profile_id=?",id);return version;
     }
@@ -63,9 +65,9 @@ public class CompanyInformationService {
         var group=db.queryForMap("SELECT * FROM company_information_groups WHERE tenant_id=? AND field=? FOR UPDATE",tenant,c.field().name());
         if(((Number)group.get("revision")).intValue()!=c.expectedRevision())throw new IdentityException(409,"PROFILE_VERSION_CONFLICT");
         UUID target=c.tagId();
-        if(target!=null&&db.queryForList("SELECT e.id FROM company_information_tags t JOIN profile_entries e ON e.id=t.profile_id JOIN profile_versions v ON v.entry_id=e.id AND v.revision=e.revision WHERE t.tenant_id=? AND t.field=? AND t.profile_id=? AND v.status='ACTIVE' AND NOT v.scrubbed AND object_is_active('PROFILE_VERSION',v.id)",tenant,c.field().name(),target).isEmpty())throw new IdentityException(404,"PROFILE_NOT_FOUND");
+        if(target!=null&&db.queryForList("SELECT e.id FROM company_information_tags t JOIN profile_entries e ON e.id=t.profile_id JOIN profile_versions v ON v.entry_id=e.id AND v.revision=e.revision WHERE t.tenant_id=? AND t.field=? AND t.profile_id=? AND v.status='ACTIVE' AND NOT v.scrubbed AND object_is_active('PROFILE_VERSION',v.id) AND company_profile_readable(v.id)",tenant,c.field().name(),target).isEmpty())throw new IdentityException(404,"PROFILE_NOT_FOUND");
         if(c.action().equals("ADD")){
-            long count=db.queryForObject("SELECT count(*) FROM company_information_tags t JOIN profile_entries e ON e.id=t.profile_id JOIN profile_versions v ON v.entry_id=e.id AND v.revision=e.revision WHERE t.tenant_id=? AND t.field=? AND v.status='ACTIVE' AND NOT v.scrubbed AND object_is_active('PROFILE_VERSION',v.id)",Long.class,tenant,c.field().name());
+            long count=db.queryForObject("SELECT count(*) FROM company_information_tags t JOIN profile_entries e ON e.id=t.profile_id JOIN profile_versions v ON v.entry_id=e.id AND v.revision=e.revision WHERE t.tenant_id=? AND t.field=? AND v.status='ACTIVE' AND NOT v.scrubbed AND object_is_active('PROFILE_VERSION',v.id) AND company_profile_readable(v.id)",Long.class,tenant,c.field().name());
             if(count>=(c.field()==Field.NAME?1:30))throw new IdentityException(409,"COMPANY_TAG_LIMIT");
             target=UUID.randomUUID();db.update("INSERT INTO profile_entries(id,tenant_id,scope,entry_key,kind,created_by) VALUES (?,?,'TENANT',?,'FACT',?)",target,tenant,"company."+c.field().name().toLowerCase(Locale.ROOT)+"."+target,actor);
             db.update("INSERT INTO profile_versions(id,tenant_id,entry_id,revision,value,provenance,status,changed_by) VALUES (?,?,?,1,?,'人工调整','ACTIVE',?)",UUID.randomUUID(),tenant,target,json.writeValueAsString(Map.of("label",label,"meaning",meaning)),actor);
@@ -76,7 +78,7 @@ public class CompanyInformationService {
             var ids=db.queryForList("SELECT t.profile_id FROM company_information_tags t JOIN profile_entries e ON e.id=t.profile_id JOIN profile_versions v ON v.entry_id=e.id AND v.revision=e.revision WHERE t.tenant_id=? AND t.field=? AND v.status='ACTIVE' AND NOT v.scrubbed ORDER BY t.profile_id",UUID.class,tenant,c.field().name());
             for(UUID id:ids)append(actor,tenant,id,"","","WITHDRAWN");
         }
-        db.update("UPDATE company_information_groups SET revision=revision+1,manually_cleared=?,protect_new_inferences=protect_new_inferences OR ? WHERE tenant_id=? AND field=?",c.action().equals("CLEAR"),Set.of("REMOVE","CLEAR").contains(c.action()),tenant,c.field().name());
+        db.update("UPDATE company_information_groups SET revision=revision+1,manually_cleared=?,protect_new_inferences=true WHERE tenant_id=? AND field=?",c.action().equals("CLEAR"),tenant,c.field().name());
         identities.remember(actor,c.requestId(),"COMPANY_INFORMATION",fingerprint,target==null?tenant:target);audit.record(actor,tenant,"COMPANY_INFORMATION_"+c.action(),target==null?tenant:target,"SUCCESS");
         return new Receipt(c.requestId(),c.field(),c.expectedRevision()+1,c.action(),target);
     }

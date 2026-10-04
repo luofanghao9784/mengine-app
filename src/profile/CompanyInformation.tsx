@@ -12,6 +12,7 @@ import {
   type CompanyTag,
 } from './company-client';
 import { profileClient } from './client';
+import { CompanySuggestions } from './CompanySuggestions';
 import './company.css';
 const when = (v: string) => new Date(v).toLocaleString('zh-CN', { hour12: false });
 export function CompanyInformation({ tenant }: { tenant: string }) {
@@ -103,21 +104,36 @@ export function CompanyInformation({ tenant }: { tenant: string }) {
             </section>
           ))
         )}
+        {data.value?.canMaintain && (
+          <CompanySuggestions
+            tenant={tenant}
+            groups={data.value.groups}
+            changed={() => {
+              setNotice('处理结果已保存。');
+              setAttempt((n) => n + 1);
+            }}
+          />
+        )}
       </section>
-      {edit && data.value && (
-        <CompanyEditor
-          key={edit.group.field + (edit.tag?.id || edit.action)}
-          tenant={tenant}
-          {...edit}
-          writable={!!data.value?.canMaintain}
-          close={() => setEdit(null)}
-          changed={() => {
-            setEdit(null);
-            setNotice('企业信息已更新。');
-            setAttempt((n) => n + 1);
-          }}
-        />
-      )}
+      {edit &&
+        data.value &&
+        (!edit.tag ||
+          data.value.groups.some(
+            (g) => g.field === edit.group.field && g.tags.some((t) => t.id === edit.tag?.id),
+          )) && (
+          <CompanyEditor
+            key={edit.group.field + (edit.tag?.id || edit.action)}
+            tenant={tenant}
+            {...edit}
+            writable={!!data.value?.canMaintain}
+            close={() => setEdit(null)}
+            changed={() => {
+              setEdit(null);
+              setNotice('企业信息已更新。');
+              setAttempt((n) => n + 1);
+            }}
+          />
+        )}
     </div>
   );
 }
@@ -141,7 +157,8 @@ function CompanyEditor({
   const [label, setLabel] = useState(tag?.label || ''),
     [meaning, setMeaning] = useState(tag?.meaning || ''),
     [action, setAction] = useState(initialAction),
-    [history, setHistory] = useState(false);
+    [history, setHistory] = useState(false),
+    [evidence, setEvidence] = useState(false);
   const submit = useSubmission<Omit<CompanyChange, 'requestId'>>();
   const locked = submit.busy || submit.uncertain;
   useRequestLock(locked);
@@ -166,6 +183,10 @@ function CompanyEditor({
             修改记录
           </Button>
           {history && <CompanyHistory tenant={tenant} id={tag.id} />}
+          <Button variant="ghost" disabled={locked} onClick={() => setEvidence(!evidence)}>
+            信息依据
+          </Button>
+          {evidence && <CompanyEvidence tenant={tenant} tag={tag} />}
         </>
       )}
       <form
@@ -240,6 +261,32 @@ function CompanyEditor({
         </div>
       </form>
     </Modal>
+  );
+}
+function CompanyEvidence({ tenant, tag }: { tenant: string; tag: CompanyTag }) {
+  const [attempt, setAttempt] = useState(0);
+  const data = useRemote(
+    (signal) => companyClient.evidence(tenant, tag.id, tag.revision, signal),
+    [tenant, tag.id, tag.revision, attempt],
+  );
+  return data.error ? (
+    <Failure error={data.error} retry={() => setAttempt((n) => n + 1)} />
+  ) : !data.value ? (
+    <Loading />
+  ) : (
+    <div className="company-evidence">
+      {!data.value.length ? (
+        <p className="muted">本次内容由人工填写。</p>
+      ) : (
+        data.value.map((e) => (
+          <article key={e.chunkId}>
+            <strong>{e.filename}</strong>
+            <p className="muted">{e.locator}</p>
+            <blockquote>{e.quote}</blockquote>
+          </article>
+        ))
+      )}
+    </div>
   );
 }
 function CompanyHistory({ tenant, id }: { tenant: string; id: string }) {

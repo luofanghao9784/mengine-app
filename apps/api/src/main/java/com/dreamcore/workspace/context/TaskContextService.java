@@ -94,7 +94,9 @@ public class TaskContextService {
  private boolean usable(ProfileService.Value v){return (v.status()==ProfileService.Status.ACTIVE||v.kind()==ProfileService.Kind.INFERENCE&&v.status()==ProfileService.Status.PROPOSED)&&(v.expiresAt()==null||v.expiresAt().isAfter(Instant.now()));}
  private void profileScope(Task t,ProfileService.Value v){if(v.scope()==ProfileService.Scope.WORKSPACE&&!v.subjectId().equals(t.space())||v.scope()==ProfileService.Scope.PERSONAL&&!v.subjectId().equals(t.actor()))throw missing();if(!usable(v))throw missing();}
  private Object profileValue(Task t,ProfileService.Value v,int limit){
-  profileScope(t,v);record(t,"PROFILE",v.id(),Integer.toString(v.revision()),v);
+  profileScope(t,v);
+  dependencies(t,db.queryForList("SELECT DISTINCT c.version_id FROM company_profile_inferences p JOIN company_inference_inputs i ON i.run_id=p.run_id JOIN knowledge_chunks c ON c.id=i.chunk_id WHERE p.version_id=?",UUID.class,v.versionId()));
+  record(t,"PROFILE",v.id(),Integer.toString(v.revision()),v);
   return map("id",v.id(),"revision",v.revision(),"scope",v.scope(),"subjectId",v.subjectId(),"kind",v.kind(),"key",v.key(),"value",clip(v.value(),limit),"truncated",v.value().length()>limit,"provenance",v.provenance(),"effectiveStatus",v.effectiveStatus(),"expiresAt",v.expiresAt(),"authority",false);
  }
  private Object profileList(Task t,Request r){
@@ -102,7 +104,7 @@ public class TaskContextService {
   String q=text(r.query(),200,false);
   var ids=db.queryForList("""
    SELECT e.id FROM profile_entries e JOIN profile_versions v ON v.entry_id=e.id AND v.revision=e.revision
-   WHERE NOT v.scrubbed AND object_is_active('PROFILE_VERSION',v.id) AND e.tenant_id=? AND e.scope=? AND e.workspace_id IS NOT DISTINCT FROM ?::uuid AND e.account_id IS NOT DISTINCT FROM ?::uuid
+   WHERE NOT v.scrubbed AND object_is_active('PROFILE_VERSION',v.id) AND company_profile_readable(v.id) AND e.tenant_id=? AND e.scope=? AND e.workspace_id IS NOT DISTINCT FROM ?::uuid AND e.account_id IS NOT DISTINCT FROM ?::uuid
    AND (v.status='ACTIVE' OR e.kind='INFERENCE' AND v.status='PROPOSED') AND (v.expires_at IS NULL OR v.expires_at>clock_timestamp())
    AND (?='' OR position(lower(?) in lower(e.entry_key||' '||v.value))>0) ORDER BY e.entry_key,e.id LIMIT 6 OFFSET ?
    """,UUID.class,t.tenant(),scope.name(),scope==ProfileService.Scope.WORKSPACE?t.space():null,scope==ProfileService.Scope.PERSONAL?t.actor():null,q,q,offset(r));

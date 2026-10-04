@@ -50,3 +50,41 @@ test('tag changes use current group revision and customer CSRF with exact receip
     createCompanyClient(async () => Response.json({ ...result, revision: 3 })).change(id, change),
   );
 });
+test('suggestion evidence and choice receipts are validated without converting KEEP into ADOPT', async () => {
+  const suggestion = {
+    id,
+    revision: 1,
+    field: 'INDUSTRY',
+    targetId: null,
+    label: '体育教育',
+    meaning: '',
+    createdAt: '2026-10-04T00:00:00Z',
+    evidence: [{ chunkId: id, versionId: id, filename: '合成资料.txt', locator: '第1段', quote: '体育教育' }],
+  };
+  assert.deepEqual(await createCompanyClient(async () => Response.json([suggestion])).suggestions(id), [
+    suggestion,
+  ]);
+  await assert.rejects(
+    createCompanyClient(async () => Response.json([{ ...suggestion, evidence: [] }])).suggestions(id),
+  );
+  const body = { requestId: id, expectedRevision: 1, expectedGroupRevision: 3, action: 'KEEP' as const };
+  const receipt = { requestId: id, suggestionId: id, action: 'KEEP', revision: 2 };
+  const sent: unknown[] = [];
+  const api = createCompanyClient(async (url, init) => {
+    if (String(url).endsWith('/csrf'))
+      return Response.json({ token: 'synthetic', headerName: 'X-CSRF-TOKEN' });
+    sent.push(JSON.parse(String(init?.body)));
+    return Response.json(receipt);
+  });
+  assert.deepEqual(await api.decide(id, id, body), receipt);
+  assert.deepEqual(sent, [body]);
+  await assert.rejects(
+    createCompanyClient(async (url) =>
+      Response.json(
+        String(url).endsWith('/csrf')
+          ? { token: 'synthetic', headerName: 'X-CSRF-TOKEN' }
+          : { ...receipt, action: 'ADOPT' },
+      ),
+    ).decide(id, id, body),
+  );
+});

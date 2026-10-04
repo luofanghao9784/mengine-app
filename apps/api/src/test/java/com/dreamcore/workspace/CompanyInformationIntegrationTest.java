@@ -69,5 +69,7 @@ class CompanyInformationIntegrationTest {
   var read=http.send(HttpRequest.newBuilder(URI.create(base+path)).GET().build(),HttpResponse.BodyHandlers.ofString());assertEquals(200,read.statusCode());assertTrue(read.headers().firstValue("cache-control").orElseThrow().contains("no-store"));
   var body=command(CompanyInformationService.Field.NAME,0,"ADD",null,"企业背景名称","");var post=HttpRequest.newBuilder(URI.create(base+path)).header("Content-Type","application/json").POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body)));assertEquals(403,http.send(post.build(),HttpResponse.BodyHandlers.ofString()).statusCode());
   csrf=json.readTree(http.send(HttpRequest.newBuilder(URI.create(base+"/api/v1/auth/csrf")).GET().build(),HttpResponse.BodyHandlers.ofString()).body());post.header(csrf.get("headerName").asString(),csrf.get("token").asString());assertEquals(200,http.send(post.build(),HttpResponse.BodyHandlers.ofString()).statusCode());
+  var suggestions=http.send(HttpRequest.newBuilder(URI.create(base+path+"/suggestions")).GET().build(),HttpResponse.BodyHandlers.ofString());assertEquals(200,suggestions.statusCode());assertTrue(suggestions.headers().firstValue("cache-control").orElseThrow().contains("no-store"));assertEquals("[]",suggestions.body());
+  assertEquals(403,http.send(HttpRequest.newBuilder(URI.create(base+path+"/suggestions/"+UUID.randomUUID())).header("Content-Type","application/json").POST(HttpRequest.BodyPublishers.ofString("{}" )).build(),HttpResponse.BodyHandlers.ofString()).statusCode());
  }
 }

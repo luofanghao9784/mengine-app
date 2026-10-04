@@ -7,3 +7,9 @@ test('company changes cannot claim AI origin or bypass current group version',()
  const missing={...body};delete missing.expectedRevision;assert.equal(check(missing),false);assert.equal(check({...body,field:'GOAL'}),false);
  assert.ok(spec.paths['/api/v1/tenants/{tenant}/company-information'].post.parameters.some(p=>p.name==='X-CSRF-TOKEN'&&p.required));
 });
+test('company suggestion choices require both revisions and never accept candidate content',()=>{
+ const check=ajv.compile({...spec.components.schemas.CompanyDecision,components:spec.components});const body={requestId:id,expectedRevision:1,expectedGroupRevision:0,action:'KEEP'};assert.ok(check(body));
+ for(const key of ['expectedRevision','expectedGroupRevision']){const missing={...body};delete missing[key];assert.equal(check(missing),false);}
+ assert.equal(check({...body,label:'overwrite'}),false);assert.equal(check({...body,action:'APPROVE'}),false);
+ const evidence=ajv.compile({...spec.components.schemas.CompanySuggestionEvidence,components:spec.components});assert.equal(evidence({chunkId:id,versionId:id,filename:'source',locator:'p1',quote:''}),false);
+});
