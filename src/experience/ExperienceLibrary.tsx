@@ -193,6 +193,10 @@ function Library({
                     readOnly={readOnly}
                     entry={readOnly ? { ...detail.value, canMaintain: false } : detail.value}
                     changed={saved}
+                    stopped={() => {
+                      setSelected(undefined);
+                      refresh();
+                    }}
                     edit={() => setEditor({ entry: detail.value! })}
                     chooseVersion={(version) => setSelected({ id: selected.id, version })}
                     onDenied={onDenied}
@@ -310,6 +314,7 @@ function ExperienceDetail({
   workspace,
   entry,
   changed,
+  stopped,
   edit,
   chooseVersion,
   onDenied,
@@ -318,6 +323,7 @@ function ExperienceDetail({
   workspace: string;
   entry: ExperienceEntry;
   changed: (e: ExperienceEntry) => void;
+  stopped: () => void;
   readOnly: boolean;
   edit: () => void;
   chooseVersion: (version: string) => void;
@@ -355,24 +361,28 @@ function ExperienceDetail({
       {
         action: kind,
         expectedRevision: entry.revision,
-        versionId: entry.version.id,
+        versionId: kind === 'withdraw' ? entry.publishedVersion! : entry.version.id,
         independentCopyConfirmed: confirmed,
       },
       async (b, key) => {
         try {
-          changed(
-            b.action === 'publish'
-              ? await api.publish(tenant, workspace, entry.id, {
-                  requestId: key,
-                  expectedRevision: b.expectedRevision,
-                  versionId: b.versionId,
-                  independentCopyConfirmed: b.independentCopyConfirmed,
-                })
-              : await api.withdraw(tenant, workspace, entry.id, {
-                  requestId: key,
-                  expectedRevision: b.expectedRevision,
-                }),
-          );
+          if (b.action === 'publish')
+            changed(
+              await api.publish(tenant, workspace, entry.id, {
+                requestId: key,
+                expectedRevision: b.expectedRevision,
+                versionId: b.versionId,
+                independentCopyConfirmed: b.independentCopyConfirmed,
+              }),
+            );
+          else {
+            await api.stop(tenant, workspace, entry.id, {
+              requestId: key,
+              expectedRevision: b.expectedRevision,
+              versionId: b.versionId,
+            });
+            stopped();
+          }
         } catch (e) {
           onDenied(e);
           throw e;

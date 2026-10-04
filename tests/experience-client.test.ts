@@ -137,3 +137,25 @@ test('restoration permission is explicit, limited to withdrawn maintainable entr
   assert.equal(isEntry({ ...entry, status: 'WITHDRAWN', canRestore: true, canMaintain: false }), false);
   assert.equal(isEntry({ ...entry, status: 'WITHDRAWN', canRestore: 'yes' }), false);
 });
+
+test('stop verifies its version and action revision independently of a readable method body', async () => {
+  const request = { requestId: ids[0], expectedRevision: 3, versionId: ids[3] };
+  const result = { entryId: ids[2], versionId: ids[3], revision: 4, status: 'WITHDRAWN' };
+  const fetcher = (receipt: unknown) =>
+    (async (url: string | URL | Request) =>
+      String(url).endsWith('/csrf')
+        ? Response.json({ headerName: 'X-CSRF-TOKEN', token: 'synthetic' })
+        : Response.json(receipt)) as typeof fetch;
+  assert.deepEqual(
+    await createExperienceClient(fetcher(result)).stop(ids[0], ids[1], ids[2], request),
+    result,
+  );
+  await assert.rejects(
+    createExperienceClient(fetcher({ ...result, versionId: ids[1] })).stop(ids[0], ids[1], ids[2], request),
+    { code: 'CONTRACT_MISMATCH' },
+  );
+  await assert.rejects(
+    createExperienceClient(fetcher({ ...result, revision: 5 })).stop(ids[0], ids[1], ids[2], request),
+    { code: 'CONTRACT_MISMATCH' },
+  );
+});

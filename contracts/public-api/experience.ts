@@ -91,3 +91,11 @@ export interface ExperienceEvent {
   actorId: string;
   createdAt: string;
 }
+
+/** Mutation receipt contains no method or source body. */
+export interface ExperienceAvailability {
+  entryId: string;
+  versionId: string;
+  revision: number;
+  status: 'WITHDRAWN';
+}

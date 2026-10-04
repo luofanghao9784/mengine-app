@@ -6,7 +6,8 @@ const tenant = id(1),
   entryId = id(4),
   version = id(5);
 async function fixture(context: BrowserContext) {
-  let revoked = false;
+  let revoked = false,
+    eraseAfterStop = false;
   let stopped = false,
     loseNextResponse = false;
   const requests: unknown[] = [];
@@ -174,19 +175,22 @@ async function fixture(context: BrowserContext) {
       publishedVersion: stopped ? null : version,
       canRestore: stopped,
     });
-    if (path.endsWith('/withdraw') || path.endsWith('/restore')) {
+    if (path.endsWith('/stop') || path.endsWith('/restore')) {
       const body = route.request().postDataJSON();
       requests.push(body);
       if (!completed.has(body.requestId)) {
-        stopped = path.endsWith('/withdraw');
+        stopped = path.endsWith('/stop');
         result.revision++;
+        if (stopped && eraseAfterStop) revoked = true;
         completed.add(body.requestId);
       }
       if (loseNextResponse) {
         loseNextResponse = false;
         return route.abort('failed');
       }
-      return json(current());
+      return path.endsWith('/stop')
+        ? json({ entryId, versionId: version, revision: body.expectedRevision + 1, status: 'WITHDRAWN' })
+        : json(current());
     }
     if (path.endsWith('/experiences/' + entryId))
       return revoked ? json({ contractVersion: '1.0', code: 'EXPERIENCE_NOT_FOUND' }, 404) : json(current());
@@ -194,6 +198,9 @@ async function fixture(context: BrowserContext) {
   });
   return {
     mutations,
+    eraseAfterStop: () => {
+      eraseAfterStop = true;
+    },
     requests,
     loseResponse: () => {
       loseNextResponse = true;
@@ -312,4 +319,21 @@ test('stop and restore retain the exact version and reconcile a lost response wi
   expect(state.requests[2]).toMatchObject({ versionId: version, expectedRevision: 3 });
   await page.getByRole('button', { name: '关闭弹窗' }).click();
   await expect(page.locator('.experience-management-card')).toHaveCount(1);
+});
+
+test('a confirmed stop remains successful when the related body becomes unavailable', async ({
+  page,
+  context,
+}) => {
+  const state = await fixture(context);
+  state.eraseAfterStop();
+  await page.goto(start);
+  await page.getByRole('button', { name: /先核对来源口径/ }).click();
+  await page.getByRole('button', { name: '停用经验', exact: true }).click();
+  await page.getByRole('button', { name: '确认停用', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: '经验已停用。' })).toBeVisible();
+  await expect(page.getByText('核对来源范围，再检查实际执行回执。', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '重试原请求' })).toHaveCount(0);
+  await page.getByRole('button', { name: '关闭弹窗' }).click();
+  expect(state.mutations).toHaveLength(1);
 });

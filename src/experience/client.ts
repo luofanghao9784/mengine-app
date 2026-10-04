@@ -1,5 +1,6 @@
 import type {
   ExperienceContent,
+  ExperienceAvailability,
   ExperienceEntry,
   ExperienceEvidence,
   ExperienceEvent,
@@ -208,6 +209,24 @@ export function createExperienceClient(fetcher: typeof fetch = fetch) {
         root(t, w) + '/' + id(e) + '/publish',
         'POST',
         (v): v is ExperienceEntry => scoped(t, w, e)(v) && v.version.id === body.versionId,
+        body,
+      );
+    },
+    stop(
+      t: string,
+      w: string,
+      e: string,
+      body: { requestId: string; expectedRevision: number; versionId: string },
+    ) {
+      return send(
+        root(t, w) + '/' + id(e) + '/stop',
+        'POST',
+        (v): v is ExperienceAvailability =>
+          record(v) &&
+          v.entryId === e &&
+          v.versionId === body.versionId &&
+          v.revision === body.expectedRevision + 1 &&
+          v.status === 'WITHDRAWN',
         body,
       );
     },

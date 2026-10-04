@@ -352,6 +352,7 @@ function ExperienceDrawer({
 }) {
   type Action = { intent: 'stop' | 'restore'; expectedRevision: number; versionId: string };
   const [action, setAction] = useState<Action | null>(null);
+  const [notice, setNotice] = useState('');
   const submission = useSubmission<Action>();
   const blocked = submission.busy || submission.uncertain;
   useRequestLock(blocked);
@@ -390,6 +391,7 @@ function ExperienceDrawer({
         if (!blocked) close();
       }}
     >
+      {notice && <p role="status">{notice}</p>}
       {denied ? (
         <Failure error={denied} retry={() => setAttempt((n) => n + 1)} />
       ) : !e || !c ? (
@@ -423,9 +425,10 @@ function ExperienceDrawer({
                       onClick={() =>
                         void submission.submit(action, async (body, requestId) => {
                           if (body.intent === 'stop')
-                            await experienceClient.withdraw(tenant, selection.space, selection.id, {
+                            await experienceClient.stop(tenant, selection.space, selection.id, {
                               requestId,
                               expectedRevision: body.expectedRevision,
+                              versionId: body.versionId,
                             });
                           else
                             await experienceClient.restore(tenant, selection.space, selection.id, {
@@ -433,6 +436,7 @@ function ExperienceDrawer({
                               expectedRevision: body.expectedRevision,
                               versionId: body.versionId,
                             });
+                          setNotice(body.intent === 'stop' ? '经验已停用。' : '经验已恢复使用。');
                           setAction(null);
                           setAttempt((n) => n + 1);
                           changed();

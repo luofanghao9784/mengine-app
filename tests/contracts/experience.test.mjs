@@ -118,3 +118,10 @@ test('restoration requires the original publication and expected revision', () =
     false,
   );
 });
+
+test('a stop receipt proves the fixed version action without requiring an accessible body', () => {
+  const receipt = { entryId: id, versionId: id, revision: 4, status: 'WITHDRAWN' };
+  assert.ok(check('ExperienceAvailability')(receipt));
+  assert.equal(check('ExperienceAvailability')({ ...receipt, content }), false);
+  assert.equal(check('ExperienceAvailability')({ ...receipt, status: 'PUBLISHED' }), false);
+});

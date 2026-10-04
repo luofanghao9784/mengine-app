@@ -1565,6 +1565,123 @@
         },
         "summary": "恢复最后实际发布且当前来源有效的版本，不发布草稿"
       }
+    },
+    "/api/v1/tenants/{tenant}/workspaces/{workspace}/experiences/{id}/stop": {
+      "post": {
+        "operationId": "stopExperience",
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "workspace",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Persisted authorized result",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperienceAvailability"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation, authorization or concurrency failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Validation, authorization or concurrency failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Validation, authorization or concurrency failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Validation, authorization or concurrency failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Validation, authorization or concurrency failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExperienceRestore"
+              }
+            }
+          }
+        },
+        "summary": "停用当前发布版本，返回不包含正文的操作回执"
+      }
     }
   },
   "components": {
@@ -2464,6 +2581,33 @@
           "versionId": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      },
+      "ExperienceAvailability": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "entryId",
+          "versionId",
+          "revision",
+          "status"
+        ],
+        "properties": {
+          "entryId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "versionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "const": "WITHDRAWN"
           }
         }
       }

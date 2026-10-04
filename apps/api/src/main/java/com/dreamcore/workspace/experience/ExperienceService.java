@@ -27,6 +27,7 @@ public class ExperienceService {
  public record Feedback(UUID id,UUID useId,String result,String note,Instant createdAt) {}
  public record Feedbacks(List<Feedback> items,boolean hasMore) {}
  public record Event(UUID id,int revision,UUID versionId,String action,UUID actorId,Instant createdAt) {}
+ public record Availability(UUID entryId,UUID versionId,int revision,String status) {}
  public record Events(List<Event> items,boolean hasMore) {}
  private final JdbcTemplate db; private final MaterialAccess access; private final GovernanceAccess governance;
  private final IdentityService identities; private final IdentityAudit audit; private final JsonMapper json=new JsonMapper();
@@ -159,9 +160,18 @@ public class ExperienceService {
   UUID v=(UUID)e.get("published_version");if(v==null)throw new IdentityException(409,"EXPERIENCE_NOT_PUBLISHED");
   db.update("UPDATE experience_entries SET status='WITHDRAWN',published_version=NULL,automation_stopped=true,revision=revision+1,updated_at=now() WHERE id=?",id);event(actor,tenant,id,v,expected+1,"WITHDRAWN");identities.remember(actor,key,"EXPERIENCE_WITHDRAW",h,v);return get(actor,tenant,space,id,v);
  }
+ /** Metadata receipt remains valid if stopping also erases a cross-entry dependent version. */
+ @Transactional public Availability stop(UUID actor,UUID tenant,UUID space,UUID id,UUID key,int expected,UUID version){
+  scope(actor,tenant,space,true);String h=hash(tenant,space,id,expected,version);UUID prior=identities.priorRequest(actor,key,"EXPERIENCE_STOP",h);var e=row(actor,tenant,space,id,true);
+  if(prior!=null)return new Availability(id,prior,expected+1,"WITHDRAWN");
+  if(n(e,"revision")!=expected||!"PUBLISHED".equals(e.get("status"))||!version.equals(e.get("published_version")))throw new IdentityException(409,"EXPERIENCE_STATE_CHANGED");
+  versionRow(actor,tenant,space,id,version);
+  db.update("UPDATE experience_entries SET status='WITHDRAWN',published_version=NULL,automation_stopped=true,revision=revision+1,updated_at=now() WHERE id=?",id);event(actor,tenant,id,version,expected+1,"WITHDRAWN");identities.remember(actor,key,"EXPERIENCE_STOP",h,version);
+  return new Availability(id,version,expected+1,"WITHDRAWN");
+ }
  private UUID lastPublished(UUID entry){var ids=db.queryForList("SELECT version_id FROM experience_events WHERE entry_id=? AND action='PUBLISHED' ORDER BY revision DESC,created_at DESC LIMIT 1",UUID.class,entry);return ids.isEmpty()?null:ids.getFirst();}
  private boolean restoreSourcesAvailable(UUID version){
-  return Boolean.TRUE.equals(db.queryForObject("SELECT NOT EXISTS(SELECT 1 FROM experience_automatic_sources s WHERE s.version_id=? AND NOT experience_intake_available(s.source_id)) AND NOT EXISTS(SELECT 1 FROM experience_automatic_dependencies d JOIN experience_versions v ON v.id=d.dependency_version JOIN experience_entries e ON e.id=v.entry_id WHERE d.version_id=? AND (v.scrubbed OR e.automation_stopped OR NOT object_is_active('EXPERIENCE_VERSION',v.id)))",Boolean.class,version,version));
+  return Boolean.TRUE.equals(db.queryForObject("SELECT NOT EXISTS(SELECT 1 FROM experience_automatic_sources s WHERE s.version_id=? AND NOT experience_intake_available(s.source_id)) AND NOT EXISTS(SELECT 1 FROM experience_automatic_dependencies d JOIN experience_versions v ON v.id=d.dependency_version JOIN experience_entries e ON e.id=v.entry_id WHERE d.version_id=? AND (v.scrubbed OR (e.automation_stopped AND e.id<>(SELECT entry_id FROM experience_versions WHERE id=?)) OR NOT object_is_active('EXPERIENCE_VERSION',v.id)))",Boolean.class,version,version,version));
  }
  /** Resume only the last publication, without approving a draft or recreating scrubbed descendants. */
  @Transactional public Entry restore(UUID actor,UUID tenant,UUID space,UUID id,UUID key,int expected,UUID version){
