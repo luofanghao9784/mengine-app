@@ -847,3 +847,21 @@
 .platform-record-reason summary { cursor: pointer; color: var(--blue-ink); }
 .platform-record-reason p { margin-top: 8px; color: var(--muted); }
 .platform-record-directory > .muted, .platform-record-directory > .platform-pagination { margin: 20px 24px; }
+
+/* 页签以文字和下划线提示状态，不使用按钮底框或矩形焦点框。 */
+.admin-platform .platform-enterprise-page > .platform-detail-nav .button:is(:active, :focus, :focus-visible) {
+  background: transparent;
+  box-shadow: none;
+  outline: none;
+  transform: none;
+}
+.admin-platform .platform-enterprise-page > .platform-detail-nav .button:focus-visible {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 5px;
+}
+.admin-platform .platform-enterprise-page > .platform-detail-nav .button[aria-current='page'],
+.admin-platform .platform-enterprise-page > .platform-detail-nav .button:hover:not(:disabled) {
+  background: transparent;
+  box-shadow: none;
+}
