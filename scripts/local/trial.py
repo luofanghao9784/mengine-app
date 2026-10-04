@@ -85,7 +85,7 @@ def available(port):
 
 
 def clean_environment():
-    prefixes = ('SPRING_', 'DATABASE_', 'INVITATION_', 'PHONE_', 'BOOTSTRAP_', 'API_', 'ENGINE_', 'SERVER_', 'MANAGEMENT_', 'DREAMCORE_', 'MATERIAL_', 'KNOWLEDGE_', 'TASK_', 'AGENT_', 'PG')
+    prefixes = ('SPRING_', 'DATABASE_', 'INVITATION_', 'PHONE_', 'BOOTSTRAP_', 'API_', 'ENGINE_', 'SERVER_', 'MANAGEMENT_', 'DREAMCORE_', 'MATERIAL_', 'BACKUP_', 'KNOWLEDGE_', 'TASK_', 'AGENT_', 'PG')
     return {k: v for k, v in os.environ.items() if not k.startswith(prefixes) and k not in ('JAVA_TOOL_OPTIONS', 'JDK_JAVA_OPTIONS')}
 
 

@@ -59,7 +59,7 @@ class LocalTrialBoundaryTest(unittest.TestCase):
                   'DATABASE_URL': 'other-db', 'API_PORT': '9999', 'SERVER_PORT': '9999',
                   'PGHOST': 'other-host', 'PGSERVICE': 'other-service', 'JAVA_TOOL_OPTIONS': 'other-options',
                   'PHONE_DELIVERY': 'local', 'PHONE_LOCAL_PREVIEW': 'true', 'PHONE_OUTBOX': 'other-phone-outbox',
-                  'BOOTSTRAP_EMAIL': 'other-account', 'INVITATION_OUTBOX': 'other-outbox', 'MATERIAL_STORAGE_ROOT': 'other-storage', 'KNOWLEDGE_ENABLED': 'true', 'KNOWLEDGE_PARSER_ROOT': 'other-parser', 'TASK_ENABLED': 'true', 'TASK_ENGINE_TOKEN': 'other-token', 'ENGINE_BASE_URL': 'http://other-project', 'AGENT_TASK_MODE': 'live', 'AGENT_MODEL_API_KEY': 'other-key', 'AGENT_MODEL_PROVIDER': 'deepseek'}
+                  'BOOTSTRAP_EMAIL': 'other-account', 'INVITATION_OUTBOX': 'other-outbox', 'MATERIAL_STORAGE_ROOT': 'other-storage', 'BACKUP_STATUS_FILE': 'other-backup', 'BACKUP_STATUS_STALE_SECONDS': '60', 'KNOWLEDGE_ENABLED': 'true', 'KNOWLEDGE_PARSER_ROOT': 'other-parser', 'TASK_ENABLED': 'true', 'TASK_ENGINE_TOKEN': 'other-token', 'ENGINE_BASE_URL': 'http://other-project', 'AGENT_TASK_MODE': 'live', 'AGENT_MODEL_API_KEY': 'other-key', 'AGENT_MODEL_PROVIDER': 'deepseek'}
         with patch.dict(os.environ, {**unsafe, 'PATH': '/synthetic-bin'}, clear=True):
             self.assertEqual(trial.clean_environment(), {'PATH': '/synthetic-bin'})
 

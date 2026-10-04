@@ -36,6 +36,21 @@ class BackupBoundaryTest(unittest.TestCase):
         self.manifest['expiresAt'] = (backup.datetime.fromisoformat(self.manifest['createdAt']) + timedelta(days=30)).isoformat()
         self.sign()
 
+    def test_cli_verify_writes_projected_success_without_changing_command_result(self):
+        import subprocess
+        status = self.root / 'status.json'
+        result = subprocess.run([sys.executable, str(Path(backup.__file__)), 'verify', '--bundle', str(self.bundle), '--key-file', str(self.key), '--status-file', str(status)], capture_output=True, text=True)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual({'status':'verified','files':1,'tables':0}, json.loads(result.stdout))
+        event = json.loads(status.read_text())['events'][0]
+        self.assertEqual(('VERIFY','SUCCEEDED'), (event['command'], event['state']))
+        self.assertEqual(self.manifest['snapshotId'], event['snapshot']['id'])
+        self.assertNotIn(str(self.bundle), status.read_text())
+        self.dump.write_bytes(b'corrupt')
+        result = subprocess.run([sys.executable, str(Path(backup.__file__)), 'verify', '--bundle', str(self.bundle), '--key-file', str(self.key), '--status-file', str(status)], capture_output=True, text=True)
+        self.assertEqual(1, result.returncode)
+        self.assertEqual('FAILED', json.loads(status.read_text())['events'][0]['state'])
+
     def sign(self):
         trial.private_write(self.bundle / 'manifest.json', {'manifest': self.manifest,
             'signature': hmac.new(self.secret, backup.canonical(self.manifest), hashlib.sha256).hexdigest()})

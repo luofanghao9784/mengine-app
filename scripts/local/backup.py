@@ -443,16 +443,7 @@ def rotate(directory, key_path):
     return {'status': 'rotated', 'removed': removed, 'retained': retained, 'rejected': rejected}
 
 
-def main():
-    os.umask(0o077)
-    parser = argparse.ArgumentParser(description='已停止的本地试用：备份、校验、还原到新目录。备份含业务内容及密码散列，密钥须单独保存。')
-    parser.add_argument('command', choices=['create', 'verify', 'restore', 'repack', 'rotate', 'reconcile', 'activate'])
-    parser.add_argument('--directory', type=Path, default=trial.DEFAULT_DIRECTORY)
-    parser.add_argument('--bundle', type=Path)
-    parser.add_argument('--output', type=Path)
-    parser.add_argument('--current-directory', type=Path)
-    parser.add_argument('--key-file', type=Path, default=KEY_FILE)
-    args = parser.parse_args()
+def execute(args):
     if args.command == 'create' and args.output:
         result = create(args.directory.absolute(), args.output.absolute(), args.key_file.absolute())
     elif args.command == 'verify' and args.bundle:
@@ -471,7 +462,34 @@ def main():
         import backup_recovery
         result = backup_recovery.reconcile(args.directory.absolute(), args.current_directory.absolute(), args.key_file.absolute())
     else:
-        parser.error('create 需要 --output；verify 需要 --bundle；restore/repack 需要 --bundle 与 --output；reconcile/activate 需要 --directory 与 --current-directory；rotate 使用 --directory。')
+        fail('create 需要 --output；verify 需要 --bundle；restore/repack 需要 --bundle 与 --output；reconcile/activate 需要 --directory 与 --current-directory；rotate 使用 --directory。')
+    return result
+
+
+def observation_snapshot(args):
+    # Read only the signed artifact of an already successful command. Never expose its private paths or table data.
+    if args.command in ('create','repack'):
+        return signed_read(args.output.absolute() / 'manifest.json', signing_key(args.key_file.absolute()))
+    if args.command in ('verify','restore'):
+        return signed_read(args.bundle.absolute() / 'manifest.json', signing_key(args.key_file.absolute()))
+    if args.command in ('reconcile','activate'):
+        return signed_read(args.directory.absolute() / 'restore.json', signing_key(args.key_file.absolute()))['snapshot']
+    return None
+
+
+def main():
+    os.umask(0o077)
+    parser = argparse.ArgumentParser(description='已停止的本地试用：备份、校验、还原到新目录。备份含业务内容及密码散列，密钥须单独保存。')
+    parser.add_argument('command', choices=['create', 'verify', 'restore', 'repack', 'rotate', 'reconcile', 'activate'])
+    parser.add_argument('--directory', type=Path, default=trial.DEFAULT_DIRECTORY)
+    parser.add_argument('--bundle', type=Path)
+    parser.add_argument('--output', type=Path)
+    parser.add_argument('--current-directory', type=Path)
+    parser.add_argument('--key-file', type=Path, default=KEY_FILE)
+    parser.add_argument('--status-file', type=Path, help='将有限运行事实写入部署侧私有监测文件；不含备份位置、原文或凭据。')
+    args = parser.parse_args()
+    import backup_status
+    result = backup_status.observe(args.status_file, args.command, lambda: execute(args), lambda: observation_snapshot(args))
     print(json.dumps(result, ensure_ascii=False))
 
 

@@ -1,0 +1,343 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Platform storage and backup observations",
+    "version": "1.0.0",
+    "description": "Deployment-observed bounded historical facts. FRESH is observation age, not backup health or availability. Knowledge bytes are included in database bytes; original bytes are registered, not filesystem measurements. Volume capacity includes other usage. Backup generation, verification, isolated restore, reconciliation and activation are distinct. Plans, total backup occupancy and current recovery availability are unknown. No restore/download/configuration action or customer content."
+  },
+  "security": [
+    {
+      "platformSessionCookie": []
+    }
+  ],
+  "paths": {
+    "/api/platform-admin/v1/storage-status": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Read-only platform metadata",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Independent platform login required"
+          },
+          "403": {
+            "description": "Platform authorization required"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "platformSessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "DREAMCORE_PLATFORM",
+        "description": "独立总台会话；企业用户 Cookie 不授予平台权限。写入前从 /api/platform-admin/v1/auth/csrf 取得令牌。"
+      }
+    },
+    "schemas": {
+      "Snapshot": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "createdAt",
+          "expiresAt",
+          "bytes",
+          "files",
+          "tables"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "files": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "tables": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        }
+      },
+      "Event": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "command",
+          "state",
+          "startedAt",
+          "finishedAt",
+          "snapshot"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "command": {
+            "enum": [
+              "CREATE",
+              "VERIFY",
+              "RESTORE",
+              "REPACK",
+              "ROTATE",
+              "RECONCILE",
+              "ACTIVATE"
+            ]
+          },
+          "state": {
+            "enum": [
+              "RUNNING",
+              "SUCCEEDED",
+              "FAILED",
+              "UNKNOWN"
+            ]
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "snapshot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Snapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "Backup": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "state",
+          "updatedAt",
+          "staleSeconds",
+          "events"
+        ],
+        "properties": {
+          "state": {
+            "enum": [
+              "NOT_CONFIGURED",
+              "UNAVAILABLE",
+              "FRESH",
+              "STALE"
+            ]
+          },
+          "updatedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "staleSeconds": {
+            "type": "integer",
+            "minimum": 60,
+            "maximum": 604800
+          },
+          "events": {
+            "type": "array",
+            "maxItems": 40,
+            "items": {
+              "$ref": "#/components/schemas/Event"
+            }
+          }
+        }
+      },
+      "Capacity": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "state",
+          "totalBytes",
+          "usableBytes"
+        ],
+        "properties": {
+          "state": {
+            "enum": [
+              "NOT_CONFIGURED",
+              "UNAVAILABLE",
+              "OBSERVED"
+            ]
+          },
+          "totalBytes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "usableBytes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "Storage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "databaseBytes",
+          "knowledgeBytes",
+          "registeredOriginalBytes",
+          "originalVolume"
+        ],
+        "properties": {
+          "databaseBytes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "knowledgeBytes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "registeredOriginalBytes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "originalVolume": {
+            "$ref": "#/components/schemas/Capacity"
+          }
+        }
+      },
+      "Cleanup": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "queued",
+          "running",
+          "failed",
+          "completed",
+          "lastCompletedAt"
+        ],
+        "properties": {
+          "queued": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "running": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "failed": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "completed": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "lastCompletedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "Status": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "checkedAt",
+          "storage",
+          "cleanup",
+          "backup"
+        ],
+        "properties": {
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "storage": {
+            "$ref": "#/components/schemas/Storage"
+          },
+          "cleanup": {
+            "$ref": "#/components/schemas/Cleanup"
+          },
+          "backup": {
+            "$ref": "#/components/schemas/Backup"
+          }
+        }
+      }
+    }
+  }
+}
