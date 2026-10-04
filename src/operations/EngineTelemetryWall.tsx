@@ -189,6 +189,7 @@ function Snapshot({
       </div>
       {!compact && <p>输入 · 处理 · 输出</p>}
       <small>{compact ? '环形表示各区构成' : '按记录归组，不是完成百分比'}</small>
+      {compact && <small className="engine-transfer-note">连线为传输演示 · 数字为实际快照</small>}
     </div>
   );
   return (
@@ -225,28 +226,39 @@ function Snapshot({
       )}
       <div className="engine-reactor">
         <svg className="engine-wires" viewBox="0 0 1000 460" preserveAspectRatio="none" aria-hidden="true">
-          {groups.map((g, i) => (
-            <path
-              key={g.id}
-              data-active={sectors[i].end > sectors[i].start ? true : undefined}
-              d={
-                compact
-                  ? g.id === 'input'
-                    ? 'M165 410H500'
-                    : g.id === 'output'
-                      ? 'M500 410H835'
-                      : 'M500 80V410'
-                  : g.id === 'input'
-                    ? 'M330 105H390L500 230'
-                    : g.id === 'process'
-                      ? 'M500 230L610 105H670'
-                      : 'M500 230L610 355H670'
-              }
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-            />
-          ))}
+          {groups.map((g, i) => {
+            const wire = compact
+              ? g.id === 'input'
+                ? 'M165 270V320H500V380'
+                : g.id === 'output'
+                  ? 'M500 380V320H835V270'
+                  : 'M500 270V380'
+              : g.id === 'input'
+                ? 'M330 105H390L500 230'
+                : g.id === 'process'
+                  ? 'M500 230L610 105H670'
+                  : 'M500 230L610 355H670';
+            return (
+              <g key={g.id}>
+                <path
+                  data-active={sectors[i].end > sectors[i].start ? true : undefined}
+                  d={wire}
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                />
+                {compact && (
+                  <circle className="engine-transfer-packet" r="2.8" fill={`var(--engine-${g.id})`}>
+                    <animateMotion
+                      dur={g.id === 'process' ? '3s' : '5s'}
+                      repeatCount="indefinite"
+                      path={wire}
+                    />
+                  </circle>
+                )}
+              </g>
+            );
+          })}
           {!compact && (
             <path
               className="engine-evolution-wire"

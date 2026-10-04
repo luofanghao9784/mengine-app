@@ -638,7 +638,7 @@
 }
 .admin-platform .engine-observatory .engine-input {
   grid-column: 1;
-  grid-row: 2;
+  grid-row: 1;
 }
 .admin-platform .engine-observatory .engine-process {
   grid-column: 2;
@@ -646,7 +646,7 @@
 }
 .admin-platform .engine-observatory .engine-output {
   grid-column: 3;
-  grid-row: 2;
+  grid-row: 1;
 }
 .admin-platform .engine-observatory .engine-wires {
   height: 510px;
@@ -843,5 +843,17 @@
   .admin-platform .engine-observatory .engine-orb::after,
   .admin-platform .engine-observatory .engine-orb > div {
     animation: none;
+  }
+}
+
+.admin-platform .engine-observatory .engine-transfer-packet {
+  filter: drop-shadow(0 0 5px #71dff5);
+}
+.admin-platform .engine-observatory .engine-transfer-note {
+  color: #88a6bc;
+}
+@media (prefers-reduced-motion: reduce) {
+  .admin-platform .engine-observatory .engine-transfer-packet {
+    display: none;
   }
 }
