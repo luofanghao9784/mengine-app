@@ -179,14 +179,18 @@ test('platform defaults to month, filters enterprise with same facts, preserves 
 }) => {
   const f = await fixture(context);
   await page.goto('/platform-admin/#admin=usage');
-  await expect(page.getByRole('combobox', { name: '用量统计期间' })).toHaveValue('THIS_MONTH');
+  await expect(page.getByRole('combobox', { name: '用量统计期间' })).toHaveText('本月');
   await expect(page.getByRole('region', { name: '运行成本' })).toContainText('已核实成本');
   await expect(page.getByRole('region', { name: '用途与计量覆盖' })).toContainText('合成验证');
-  await page.getByRole('combobox', { name: '用量统计期间' }).selectOption('LAST_MONTH');
+  await page.getByRole('combobox', { name: '用量统计期间' }).click();
+  await page
+    .getByRole('listbox', { name: '用量统计期间' })
+    .getByRole('option', { name: '上月', exact: true })
+    .click();
   await expect(page.getByText(/统计：2026\/9\/1/)).toBeVisible();
   await page.getByRole('link', { name: /合成企业 A.*查看用量/ }).click();
   await expect(page.getByRole('link', { name: '返回全平台用量' })).toBeVisible();
-  await expect(page.getByRole('combobox', { name: '用量统计期间' })).toHaveValue('LAST_MONTH');
+  await expect(page.getByRole('combobox', { name: '用量统计期间' })).toHaveText('上月');
   expect(f.paths.some((p) => p.includes(`/tenants/${tenant}/usage?period=LAST_MONTH`))).toBeTruthy();
   await page.getByRole('link', { name: '返回全平台用量' }).click();
   await page.getByRole('textbox', { name: '搜索企业' }).fill('无结果');
@@ -244,10 +248,14 @@ test('platform enterprise detail uses the same scoped usage facts and retains se
   await page.goto(`/platform-admin/#admin=tenants&enterprise=${tenant}&section=usage`);
   await expect(page.getByRole('region', { name: '企业详情' })).toBeVisible();
   await expect(page.getByRole('region', { name: '用途与计量覆盖' })).toBeVisible();
-  await page.getByRole('combobox', { name: '用量统计期间' }).selectOption('LAST_30_DAYS');
+  await page.getByRole('combobox', { name: '用量统计期间' }).click();
+  await page
+    .getByRole('listbox', { name: '用量统计期间' })
+    .getByRole('option', { name: '近 30 天', exact: true })
+    .click();
   await expect(page.getByText(/统计：2026\/9\/5/)).toBeVisible();
   await page.getByRole('button', { name: '刷新详情', exact: true }).click();
-  await expect(page.getByRole('combobox', { name: '用量统计期间' })).toHaveValue('LAST_30_DAYS');
+  await expect(page.getByRole('combobox', { name: '用量统计期间' })).toHaveText('近 30 天');
   expect(
     f.paths.filter((p) => p.includes('/usage?')).every((p) => p.includes(`/tenants/${tenant}/usage?`)),
   ).toBeTruthy();

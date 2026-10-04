@@ -7,10 +7,11 @@ import type {
 } from '../../contracts/public-api/engine-telemetry';
 import { IdentityError } from '../identity/client';
 import { useSession } from '../identity/session';
-import { Button } from '../shared/ui';
+import { Button, PageActions } from '../shared/ui';
 import { Failure, Loading } from '../shared/admin';
 import { getTelemetry } from './telemetry-client';
 import './telemetry.css';
+import './platform-telemetry.css';
 const names: Record<TelemetryChannelCode, string> = {
   COLLECTION: '外部取数',
   KNOWLEDGE: '资料解析',
@@ -115,23 +116,27 @@ function Wall({ scope, tenant }: { scope: 'platform' | 'tenant'; tenant: string 
       document.removeEventListener('visibilitychange', visible);
     };
   }, [scope, tenant, refresh, expire]);
+  const refreshAction = (
+    <Button variant="ghost" icon={RefreshCw} disabled={loading} onClick={() => setRefresh((v) => v + 1)}>
+      {loading ? '更新中…' : '刷新'}
+    </Button>
+  );
   return (
     <section className="engine-page" aria-label="引擎运行监控">
-      <div className="engine-heading">
+      {scope === 'platform' && <PageActions>{refreshAction}</PageActions>}
+      <div className={`engine-heading ${scope === 'platform' ? 'engine-heading--embedded' : ''}`}>
         <div>
-          <h2>{scope === 'tenant' ? '企业引擎运行' : '系统运行'}</h2>
+          {scope === 'tenant' && <h2>企业引擎运行</h2>}
           <p className="muted">{scope === 'tenant' ? '本企业' : '全平台'}的运行记录 · 只读监控</p>
         </div>
-        <Button variant="ghost" icon={RefreshCw} disabled={loading} onClick={() => setRefresh((v) => v + 1)}>
-          {loading ? '更新中…' : '刷新'}
-        </Button>
+        {scope === 'tenant' && refreshAction}
       </div>
       {error ? (
         <Failure error={error} retry={() => setRefresh((v) => v + 1)} />
       ) : !value ? (
         <Loading />
       ) : (
-        <Snapshot value={value} samples={samples} loading={loading} />
+        <Snapshot value={value} samples={samples} loading={loading} compact={scope === 'platform'} />
       )}
     </section>
   );
@@ -140,10 +145,12 @@ function Snapshot({
   value,
   samples,
   loading,
+  compact,
 }: {
   value: EngineTelemetry;
   samples: Sample[];
   loading: boolean;
+  compact: boolean;
 }) {
   const rows = value.channels,
     running = sum(rows, 'running');
@@ -159,9 +166,10 @@ function Snapshot({
     );
     const start = offset;
     offset += running ? (amount / running) * 100 : 0;
-    return { id: g.id, start, end: offset, amount };
+    return { start, end: offset, id: g.id };
   });
   const gradient = sectors.map((s) => `var(--engine-${s.id}) ${s.start}% ${s.end}%`).join(',');
+  const RecentContainer = compact ? 'details' : 'section';
   return (
     <div className="engine-wall">
       <div className="engine-status">
@@ -178,12 +186,13 @@ function Snapshot({
           ['结果待核对', sum(rows, 'unknown')],
           ['保留的失败 / 中断', sum(rows, 'failed')],
         ].map(([label, count]) => (
-          <div key={label}>
+          <div key={label} data-alert={label === '保留的失败 / 中断' && Number(count) > 0 ? true : undefined}>
             <dt>{label}</dt>
             <dd>{n(Number(count))}</dd>
           </div>
         ))}
       </dl>
+      {compact && <p className="engine-scope-note">仅统计已接入的运行记录；保留异常可能包含历史尝试。</p>}
       <div className="engine-reactor">
         <svg className="engine-wires" viewBox="0 0 1000 460" preserveAspectRatio="none" aria-hidden="true">
           <path
@@ -192,7 +201,9 @@ function Snapshot({
             stroke="currentColor"
             strokeWidth="1.5"
           />
-          <circle cx="500" cy="230" r="50" fill="none" stroke="currentColor" strokeDasharray="3 8" />
+          {!compact && (
+            <circle cx="500" cy="230" r="50" fill="none" stroke="currentColor" strokeDasharray="3 8" />
+          )}
         </svg>
         {groups.map((g) => {
           const list = rows.filter((c) => (g.codes as readonly string[]).includes(c.code));
@@ -201,7 +212,7 @@ function Snapshot({
             <section key={g.id} className={`engine-bank engine-${g.id}`} aria-label={`${g.title}运行状态`}>
               <div className="engine-bank-heading">
                 <div>
-                  <small>{g.english}</small>
+                  {!compact && <small>{g.english}</small>}
                   <h3>
                     <g.icon size={19} />
                     {g.title}
@@ -231,7 +242,7 @@ function Snapshot({
                 <span>
                   近 5 分钟处理完成 <b>{n(sum(list, 'completedRecent'))}</b>
                 </span>
-                <span>
+                <span className={sum(list, 'failed') > 0 ? 'engine-bank-alert' : undefined}>
                   保留异常 <b>{n(sum(list, 'failed'))}</b>
                 </span>
               </div>
@@ -239,27 +250,39 @@ function Snapshot({
           );
         })}
         <div className="engine-core">
-          <div
-            className="engine-orb"
-            style={
-              {
-                '--engine-ring': running ? `conic-gradient(${gradient})` : 'conic-gradient(#34506a 0% 100%)',
-              } as CSSProperties
-            }
-          >
-            <div>
-              <small>ENGINE</small>
-              <strong>{n(running)}</strong>
-              <span>登记执行中</span>
-            </div>
-          </div>
-          <p>输入 · 处理 · 输出</p>
-          <small>按记录归组，不是完成百分比</small>
+          {compact ? (
+            <>
+              <Cpu size={28} strokeWidth={1.5} aria-hidden="true" />
+              <span>引擎</span>
+              <small>按运行记录归组</small>
+            </>
+          ) : (
+            <>
+              <div
+                className="engine-orb"
+                style={
+                  {
+                    '--engine-ring': running
+                      ? `conic-gradient(${gradient})`
+                      : 'conic-gradient(#34506a 0% 100%)',
+                  } as CSSProperties
+                }
+              >
+                <div>
+                  <small>ENGINE</small>
+                  <strong>{n(running)}</strong>
+                  <span>登记执行中</span>
+                </div>
+              </div>
+              <p>输入 · 处理 · 输出</p>
+              <small>按记录归组，不是完成百分比</small>
+            </>
+          )}
         </div>
         <section className="engine-bank engine-evolution" aria-label="自进化运行状态">
           <div className="engine-bank-heading">
             <div>
-              <small>EVOLUTION</small>
+              {!compact && <small>EVOLUTION</small>}
               <h3>
                 <GitBranch size={19} />
                 自进化
@@ -268,9 +291,11 @@ function Snapshot({
             <span className="engine-unavailable">未启用</span>
           </div>
           <p>独立自进化执行器尚未接通。</p>
-          <div className="engine-evolution-flow" aria-hidden="true">
-            <span>发现</span>›<span>候选</span>›<span>验证</span>›<span>采用</span>
-          </div>
+          {!compact && (
+            <div className="engine-evolution-flow" aria-hidden="true">
+              <span>发现</span>›<span>候选</span>›<span>验证</span>›<span>采用</span>
+            </div>
+          )}
           <p className="engine-bank-state">基础经验提炼与清洗计入处理区，不作为自进化执行。</p>
         </section>
       </div>
@@ -291,7 +316,18 @@ function Snapshot({
               <dd>未知</dd>
             </div>
           </dl>
-          <p>登记执行中包含真实与验证运行，不等于模型请求数。会话流式输出期间仅计入输出区，避免重复计数。</p>
+          {compact ? (
+            <details className="engine-details">
+              <summary>查看执行口径</summary>
+              <p>
+                登记执行中包含真实与验证运行，不等于模型请求数。会话流式输出期间仅计入输出区，避免重复计数。
+              </p>
+            </details>
+          ) : (
+            <p>
+              登记执行中包含真实与验证运行，不等于模型请求数。会话流式输出期间仅计入输出区，避免重复计数。
+            </p>
+          )}
         </section>
         <section className="engine-panel">
           <h3>
@@ -301,10 +337,14 @@ function Snapshot({
           <p>只连接本页实际读到的快照；空白期间无采样，离开页面后不保留。</p>
         </section>
       </div>
-      <section className="engine-panel engine-recent">
-        <h3>
-          各类最近完成 <small>保留记录的聚合时间，不含内容</small>
-        </h3>
+      <RecentContainer className={`engine-panel engine-recent ${compact ? 'engine-details' : ''}`}>
+        {compact ? (
+          <summary>各类最近完成 · 仅聚合时间，不含内容</summary>
+        ) : (
+          <h3>
+            各类最近完成 <small>保留记录的聚合时间，不含内容</small>
+          </h3>
+        )}
         {recent.length ? (
           <ul>
             {recent.map((c) => (
@@ -318,10 +358,19 @@ function Snapshot({
         ) : (
           <p>暂无已完成记录。</p>
         )}
-      </section>
-      <p className="engine-caption">
-        仅覆盖已接入的运行记录；失败与中断为保留记录数，可能含历史尝试。处理完成不等于业务成功、内容合格或用户已阅读。队列与模型用量分别统计。
-      </p>
+      </RecentContainer>
+      {compact ? (
+        <details className="engine-caption engine-details">
+          <summary>统计范围与状态说明</summary>
+          <p>
+            仅覆盖已接入的运行记录；失败与中断为保留记录数，可能含历史尝试。处理完成不等于业务成功、内容合格或用户已阅读。队列与模型用量分别统计。
+          </p>
+        </details>
+      ) : (
+        <p className="engine-caption">
+          仅覆盖已接入的运行记录；失败与中断为保留记录数，可能含历史尝试。处理完成不等于业务成功、内容合格或用户已阅读。队列与模型用量分别统计。
+        </p>
+      )}
     </div>
   );
 }

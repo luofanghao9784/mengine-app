@@ -7,8 +7,17 @@ import { platformClient } from '../platform/client';
 import { getTelemetry } from '../operations/telemetry-client';
 import { usageClient } from '../operations/usage-client';
 import { adminHref, type AdminRealm } from './navigation';
+import { PlatformOverviewPage } from './PlatformOverviewPage';
 
-export function AdminOverview({
+export function AdminOverview(props: Parameters<typeof ScopedOverview>[0]) {
+  return props.realm === 'platform' ? (
+    <PlatformOverviewPage hash={props.hash} />
+  ) : (
+    <ScopedOverview {...props} />
+  );
+}
+
+function ScopedOverview({
   realm,
   tenant,
   hash,

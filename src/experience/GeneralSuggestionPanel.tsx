@@ -1,3 +1,4 @@
+import { Select } from '../shared/Select';
 import { useEffect, useState } from 'react';
 import type { GeneralExperienceSuggestionChange } from '../../contracts/public-api/general-experience';
 import { IdentityError } from '../identity/client';
@@ -97,7 +98,7 @@ export function GeneralSuggestionPanel({
               }}
             >
               <Field label="目标空间">
-                <select
+                <Select
                   aria-label="目标空间"
                   required
                   disabled={blocked}
@@ -110,10 +111,10 @@ export function GeneralSuggestionPanel({
                       {s.name}
                     </option>
                   ))}
-                </select>
+                </Select>
               </Field>
               <Field label="提交类型">
-                <select
+                <Select
                   aria-label="提交类型"
                   disabled={blocked}
                   value={form.intent}
@@ -121,7 +122,7 @@ export function GeneralSuggestionPanel({
                 >
                   <option value="ADAPTATION">企业补充</option>
                   <option value="FEEDBACK">问题反馈</option>
-                </select>
+                </Select>
               </Field>
               <Field label="内容与依据">
                 <textarea

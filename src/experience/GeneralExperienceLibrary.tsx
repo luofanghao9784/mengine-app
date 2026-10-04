@@ -1,8 +1,9 @@
+import { Select } from '../shared/Select';
 import { useEffect, useState } from 'react';
 import { BookOpen, RefreshCw } from 'lucide-react';
 import { useSession } from '../identity/session';
 import { IdentityError, record, uuid } from '../identity/client';
-import { Badge, Button, Empty, Field, Modal } from '../shared/ui';
+import { Badge, Button, Empty, Field, Modal, PageActions } from '../shared/ui';
 import { Failure, Loading, Pager, SubmitError, useRemote, useSubmission } from '../shared/admin';
 import { pageState, textState, useViewState } from '../shared/useViewState';
 import { generalExperienceClient as api, generalProcessingLabels } from './general-client';
@@ -63,6 +64,11 @@ export function GeneralExperienceLibrary({
   );
   const [attempt, setAttempt] = useState(0);
   const refresh = () => setAttempt((n) => n + 1);
+  const refreshControl = (
+    <Button icon={RefreshCw} variant="ghost" disabled={locked} onClick={refresh}>
+      刷新
+    </Button>
+  );
   const processing = !tenant && tab === 'processing';
   const data = useRemote(
     (signal) => (processing ? Promise.resolve(null) : api.contents(tenant, query, state, page * 20, signal)),
@@ -85,6 +91,7 @@ export function GeneralExperienceLibrary({
   }, [error, select, locked]);
   return (
     <div className="admin-dashboard experience-management">
+      {!tenant && <PageActions>{refreshControl}</PageActions>}
       <div
         className="experience-management-tabs"
         role={tenant ? undefined : 'tablist'}
@@ -114,9 +121,7 @@ export function GeneralExperienceLibrary({
             </Button>
           </>
         )}
-        <Button icon={RefreshCw} variant="ghost" disabled={locked} onClick={refresh}>
-          刷新
-        </Button>
+        {tenant && refreshControl}
       </div>
       {processing ? (
         <p className="muted">自动脱敏、提炼和核验后的积累概况。每 30 秒更新，无需人工审核。</p>
@@ -144,7 +149,7 @@ export function GeneralExperienceLibrary({
             </Field>
             {
               <Field label="状态">
-                <select
+                <Select
                   disabled={locked}
                   aria-label="通用经验状态"
                   value={state}
@@ -156,7 +161,7 @@ export function GeneralExperienceLibrary({
                 >
                   <option value="AVAILABLE">当前可用</option>
                   <option value="STOPPED">{tenant ? '本企业已停用' : '已停用'}</option>
-                </select>
+                </Select>
               </Field>
             }
             <Button type="submit" disabled={locked}>

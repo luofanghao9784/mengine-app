@@ -1,5 +1,7 @@
+import { Select } from '../shared/Select';
 import { useRequestLock, RequestPending } from '../shared/request-guard';
 import { useContext, useState } from 'react';
+import { RefreshCw } from 'lucide-react';
 import type {
   MethodConfiguration,
   MethodFamily,
@@ -8,13 +10,14 @@ import type {
   MethodVersion,
 } from '../../contracts/public-api/methods';
 import { identityClient, useSession } from '../identity/session';
-import { Badge, Button, Field, Modal } from '../shared/ui';
+import { Badge, Button, Field, Modal, PageActions } from '../shared/ui';
 import { Failure, FormActions, Loading, Pager, SubmitError, useRemote, useSubmission } from '../shared/admin';
 import { evaluationClient } from '../evaluation/client';
 import { methodClient as api } from './client';
 import '../evaluation/evaluation.css';
 import { ObjectLifecycleDetail } from '../objectlifecycle/ObjectLifecycleWorkspace';
-export function MethodWorkbench({ tenant }: { tenant?: string }) {
+import './methods.css';
+export function MethodWorkbench({ tenant, embedded = false }: { tenant?: string; embedded?: boolean }) {
   const pending = useContext(RequestPending);
   const { session } = useSession(),
     [workspace, setWorkspace] = useState<string | null>(null),
@@ -43,17 +46,28 @@ export function MethodWorkbench({ tenant }: { tenant?: string }) {
   const f = data.value?.families.items.find((f) => f.id === selected),
     selection = data.value?.selection;
   return (
-    <section className="access-panel evaluation-panel">
+    <section className={`access-panel evaluation-panel ${embedded ? 'method-workbench--embedded' : ''}`}>
+      {embedded && (
+        <PageActions>
+          <Button variant="ghost" icon={RefreshCw} disabled={pending} onClick={changed}>
+            刷新
+          </Button>
+        </PageActions>
+      )}
       <header className="evaluation-heading">
         <div>
-          <h2>{tenant ? '方法采用与回退' : '通用方法维护'}</h2>
+          {!embedded && <h2>{tenant ? '方法采用与回退' : '通用方法维护'}</h2>}
           <p className="muted">
-            正常人工维护独立运行。发布、范围采用和业务效果各有依据；当前排序校验使用合成样例。
+            {embedded
+              ? '固定排序方法的候选、不可变版本与验证记录。当前校验使用合成样例。'
+              : '正常人工维护独立运行。发布、范围采用和业务效果各有依据；当前排序校验使用合成样例。'}
           </p>
         </div>
-        <Button disabled={pending} onClick={changed}>
-          刷新方法
-        </Button>
+        {!embedded && (
+          <Button disabled={pending} onClick={changed}>
+            刷新方法
+          </Button>
+        )}
       </header>
       {data.error || context.error ? (
         <Failure error={data.error ?? context.error} retry={changed} />
@@ -64,7 +78,7 @@ export function MethodWorkbench({ tenant }: { tenant?: string }) {
           <div className="evaluation-toolbar">
             {tenant ? (
               <Field label="方法生效范围">
-                <select
+                <Select
                   disabled={pending}
                   aria-label="方法生效范围"
                   value={workspace ?? ''}
@@ -76,7 +90,7 @@ export function MethodWorkbench({ tenant }: { tenant?: string }) {
                       {w.name}
                     </option>
                   ))}
-                </select>
+                </Select>
               </Field>
             ) : (
               <Badge>通用 RANKING_V1 · 只处理固定排序特征</Badge>
@@ -488,7 +502,7 @@ function CompareEditor({
         >
           <fieldset disabled={submit.busy || submit.uncertain}>
             <Field label="固定排序标准">
-              <select
+              <Select
                 aria-label="固定排序标准"
                 required
                 value={standard}
@@ -508,7 +522,7 @@ function CompareEditor({
                       {a.version.content.title}
                     </option>
                   ))}
-              </select>
+              </Select>
             </Field>
             <p>选择本次同组样例：</p>
             {data.value.samples.items
@@ -660,10 +674,10 @@ function SuiteEditor({ close, done }: { close: () => void; done: () => void }) {
             ))}
           </div>
           <Field label="预期优先条目">
-            <select aria-label="预期优先条目" value={expected} onChange={(e) => setExpected(e.target.value)}>
+            <Select aria-label="预期优先条目" value={expected} onChange={(e) => setExpected(e.target.value)}>
               <option value="A">A 在 B 前</option>
               <option value="B">B 在 A 前</option>
-            </select>
+            </Select>
           </Field>
         </fieldset>
         <SubmitError error={submit.error} uncertain={submit.uncertain} />

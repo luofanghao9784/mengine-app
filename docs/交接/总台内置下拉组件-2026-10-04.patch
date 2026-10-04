@@ -1,0 +1,806 @@
+diff --git a/src/admin/AdminShell.tsx b/src/admin/AdminShell.tsx
+index 58b7c26..cc90d52 100644
+--- a/src/admin/AdminShell.tsx
++++ b/src/admin/AdminShell.tsx
+@@ -1,3 +1,4 @@
++import { CustomSelectContext } from '../shared/Select';
+ import { useContext, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+ import {
+   Activity,
+@@ -160,6 +161,7 @@ export function AdminShell({
+     };
+   }, [hash, title, name, realm]);
+   return (
++    <CustomSelectContext.Provider value={realm === 'platform'}>
+     <PageActionsContext.Provider value={actions}>
+       <div className={`admin-shell admin-${realm} ${mobileOpen ? 'admin-menu-open' : ''}`}>
+         {mobileOpen && (
+@@ -194,47 +196,35 @@ export function AdminShell({
+               onClick={() => setMobileOpen(false)}
+             />
+           </div>
+-          {realm !== 'platform' && (
+-            <div className="admin-scope" title={name}>
+-              {name}
+-            </div>
+-          )}
++          {realm !== 'platform' && <div className="admin-scope" title={name}>{name}</div>}
+           {(realm === 'platform'
+             ? [
+-                {
+-                  label: '平台管理',
+-                  items: nav.filter((item) => ['overview', 'tenants', 'accounts', 'usage'].includes(item.id)),
+-                },
+-                {
+-                  label: '梦核引擎',
+-                  items: nav.filter((item) => ['engine', 'experience', 'capabilities'].includes(item.id)),
+-                },
++                { label: '平台管理', items: nav.filter((item) => ['overview', 'tenants', 'accounts', 'usage'].includes(item.id)) },
++                { label: '梦核引擎', items: nav.filter((item) => ['engine', 'experience', 'capabilities'].includes(item.id)) },
+               ]
+             : [{ label: '', items: nav }]
+-          )
+-            .filter((group) => group.items.length > 0)
+-            .map((group) => (
+-              <section className="admin-nav-group" key={group.label}>
+-                {group.label && <div className="admin-nav-group-title">{group.label}</div>}
+-                <nav aria-label={group.label || '企业管理功能'}>
+-                  {group.items.map(({ id, title, icon: Icon }) => (
+-                    <a
+-                      key={id}
+-                      className={`admin-nav-link ${page === id ? 'active' : ''}`}
+-                      aria-current={page === id ? 'page' : undefined}
+-                      href={adminHref(realm, id, hash)}
+-                      onClick={(e) => {
+-                        if (pending) e.preventDefault();
+-                        else setMobileOpen(false);
+-                      }}
+-                    >
+-                      <Icon size={20} aria-hidden="true" />
+-                      <span>{title}</span>
+-                    </a>
+-                  ))}
+-                </nav>
+-              </section>
+-            ))}
++          ).filter((group) => group.items.length > 0).map((group) => (
++            <section className="admin-nav-group" key={group.label}>
++              {group.label && <div className="admin-nav-group-title">{group.label}</div>}
++              <nav aria-label={group.label || '企业管理功能'}>
++                {group.items.map(({ id, title, icon: Icon }) => (
++              <a
++                key={id}
++                className={`admin-nav-link ${page === id ? 'active' : ''}`}
++                aria-current={page === id ? 'page' : undefined}
++                href={adminHref(realm, id, hash)}
++                onClick={(e) => {
++                  if (pending) e.preventDefault();
++                  else setMobileOpen(false);
++                }}
++              >
++                <Icon size={20} aria-hidden="true" />
++                <span>{title}</span>
++              </a>
++                ))}
++              </nav>
++            </section>
++          ))}
+           <div className="admin-sidebar-footer">
+             {realm === 'platform' && (
+               <a
+@@ -298,5 +288,6 @@ export function AdminShell({
+         </div>
+       </div>
+     </PageActionsContext.Provider>
++    </CustomSelectContext.Provider>
+   );
+ }
+diff --git ab/src/shared/Select.tsx b/src/shared/Select.tsx
+new file mode 100644
+index 0000000..f0c0dac
+--- /dev/null
++++ b/src/shared/Select.tsx
+@@ -0,0 +1,216 @@
++import {
++  createContext,
++  useContext,
++  useId,
++  useLayoutEffect,
++  useRef,
++  useState,
++  type ChangeEvent,
++  type SelectHTMLAttributes,
++} from 'react';
++import { Check, ChevronDown } from 'lucide-react';
++import './select.css';
++
++export const CustomSelectContext = createContext(false);
++type Option = { value: string; label: string; disabled: boolean };
++/** One styled control in the platform console; native form values and validation remain intact. */
++export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
++  const custom = useContext(CustomSelectContext);
++  return custom ? <CustomSelect {...props} /> : <select {...props} />;
++}
++function CustomSelect({
++  children,
++  className = '',
++  style,
++  onChange,
++  onInvalid,
++  ...props
++}: SelectHTMLAttributes<HTMLSelectElement>) {
++  const native = useRef<HTMLSelectElement>(null);
++  const trigger = useRef<HTMLButtonElement>(null);
++  const panel = useRef<HTMLDivElement>(null);
++  const id = useId();
++  const [open, setOpen] = useState(false);
++  const [options, setOptions] = useState<Option[]>([]);
++  const [display, setDisplay] = useState('');
++  const [label, setLabel] = useState<string>();
++  const [active, setActive] = useState(0);
++  const [invalid, setInvalid] = useState(false);
++  const search = useRef({ text: '', at: 0 });
++  useLayoutEffect(() => {
++    const element = native.current!;
++    setDisplay(element.selectedOptions[0]?.text || '请选择');
++    setLabel(props['aria-label'] || element.labels?.[0]?.textContent?.trim() || undefined);
++    if (open) {
++      setOptions(
++        Array.from(element.options, (item) => ({
++          value: item.value,
++          label: item.text,
++          disabled:
++            item.disabled ||
++            (item.parentElement instanceof HTMLOptGroupElement && item.parentElement.disabled),
++        })),
++      );
++      setActive(Math.max(0, element.selectedIndex));
++    }
++  }, [children, props.value, props.defaultValue, props['aria-label'], open]);
++  useLayoutEffect(() => {
++    if (!open) return;
++    const popup = panel.current!;
++    popup.showPopover();
++    const place = () => {
++      const rect = trigger.current!.getBoundingClientRect();
++      popup.style.minWidth = `${rect.width}px`;
++      popup.style.maxWidth = `${innerWidth - 24}px`;
++      const height = popup.offsetHeight;
++      popup.style.left = `${Math.max(12, Math.min(rect.left, innerWidth - popup.offsetWidth - 12))}px`;
++      popup.style.top = `${Math.max(12, rect.bottom + height + 8 < innerHeight ? rect.bottom + 6 : rect.top - height - 6)}px`;
++    };
++    const resize = new ResizeObserver(place);
++    resize.observe(popup);
++    place();
++    const outside = (event: PointerEvent) => {
++      if (!popup.contains(event.target as Node) && !trigger.current?.contains(event.target as Node))
++        setOpen(false);
++    };
++    document.addEventListener('pointerdown', outside);
++    window.addEventListener('resize', place);
++    window.addEventListener('scroll', place, true);
++    return () => {
++      resize.disconnect();
++      popup.hidePopover();
++      document.removeEventListener('pointerdown', outside);
++      window.removeEventListener('resize', place);
++      window.removeEventListener('scroll', place, true);
++    };
++  }, [open]);
++  useLayoutEffect(() => {
++    if (open) panel.current?.querySelector(`[data-index="${active}"]`)?.scrollIntoView({ block: 'nearest' });
++  }, [active, open, options]);
++  const choose = (index: number) => {
++    const option = options[index];
++    if (!option || option.disabled) return;
++    const element = native.current!;
++    const changed = element.value !== option.value;
++    element.value = option.value;
++    setDisplay(option.label);
++    setInvalid(false);
++    setOpen(false);
++    if (changed)
++      onChange?.({
++        target: element,
++        currentTarget: element,
++        type: 'change',
++      } as ChangeEvent<HTMLSelectElement>);
++    trigger.current?.focus();
++  };
++  const move = (step: number) => {
++    for (let n = 1; n <= options.length; n++) {
++      const index = (active + step * n + options.length) % options.length;
++      if (!options[index].disabled) {
++        setActive(index);
++        break;
++      }
++    }
++  };
++  return (
++    <span className={`app-select ${className}`} style={style}>
++      <select
++        {...props}
++        ref={native}
++        className="app-select-native"
++        aria-hidden="true"
++        tabIndex={-1}
++        onChange={onChange}
++        onInvalid={(event) => {
++          event.preventDefault();
++          setInvalid(true);
++          trigger.current?.focus();
++          onInvalid?.(event);
++        }}
++      >
++        {children}
++      </select>
++      <button
++        ref={trigger}
++        type="button"
++        className="app-select-trigger"
++        role="combobox"
++        aria-label={label}
++        aria-haspopup="listbox"
++        aria-expanded={open}
++        aria-controls={open ? id : undefined}
++        aria-activedescendant={open ? `${id}-${active}` : undefined}
++        aria-invalid={invalid || undefined}
++        aria-required={props.required || undefined}
++        disabled={props.disabled}
++        onClick={() => setOpen(!open)}
++        onKeyDown={(event) => {
++          if (['ArrowDown', 'ArrowUp', 'Home', 'End', 'Enter', ' '].includes(event.key)) {
++            event.preventDefault();
++            if (!open) {
++              setOpen(true);
++              return;
++            }
++            if (event.key === 'ArrowDown') move(1);
++            else if (event.key === 'ArrowUp') move(-1);
++            else if (event.key === 'Home')
++              setActive(
++                Math.max(
++                  0,
++                  options.findIndex((item) => !item.disabled),
++                ),
++              );
++            else if (event.key === 'End') setActive(options.findLastIndex((item) => !item.disabled));
++            else choose(active);
++          } else if (event.key === 'Escape' && open) {
++            event.preventDefault();
++            event.stopPropagation();
++            setOpen(false);
++          } else if (event.key === 'Tab') setOpen(false);
++          else if (open && event.key.length === 1) {
++            const now = Date.now();
++            search.current.text = (now - search.current.at > 600 ? '' : search.current.text) + event.key;
++            search.current.at = now;
++            const index = options.findIndex(
++              (item) =>
++                !item.disabled && item.label.toLowerCase().startsWith(search.current.text.toLowerCase()),
++            );
++            if (index >= 0) setActive(index);
++          }
++        }}
++      >
++        <span>{display}</span>
++        <ChevronDown size={14} aria-hidden="true" />
++      </button>
++      {open && (
++        <div
++          ref={panel}
++          popover="manual"
++          className="app-select-popup"
++          role="listbox"
++          id={id}
++          aria-label={label}
++        >
++          {options.map((option, index) => (
++            <div
++              key={`${option.value}-${index}`}
++              role="option"
++              id={`${id}-${index}`}
++              data-index={index}
++              aria-selected={native.current?.value === option.value}
++              aria-disabled={option.disabled || undefined}
++              className={`app-select-option ${index === active ? 'highlighted' : ''}`}
++              onPointerMove={() => !option.disabled && setActive(index)}
++              onPointerDown={(event) => event.preventDefault()}
++              onClick={() => choose(index)}
++            >
++              <span>{option.label}</span>
++              {native.current?.value === option.value && <Check size={15} aria-hidden="true" />}
++            </div>
++          ))}
++        </div>
++      )}
++    </span>
++  );
++}
+diff --git ab/src/shared/select.css b/src/shared/select.css
+new file mode 100644
+index 0000000..0121341
+--- /dev/null
++++ b/src/shared/select.css
+@@ -0,0 +1,99 @@
++.app-select {
++  display: inline-flex;
++  position: relative;
++  min-width: 0;
++  vertical-align: middle;
++}
++.app-select-native {
++  position: absolute;
++  opacity: 0;
++  pointer-events: none;
++  width: 1px !important;
++  height: 1px !important;
++  padding: 0 !important;
++}
++.admin-platform .app-select-trigger {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  gap: 16px;
++  min-height: 36px;
++  width: 100%;
++  padding: 8px 12px;
++  border: 1px solid var(--border, #e4e9f0);
++  border-radius: var(--radius, 8px);
++  background: var(--surface, #fff);
++  color: var(--text, #2d3744);
++  font: inherit;
++  font-size: 13px;
++  text-align: left;
++  cursor: pointer;
++}
++.app-select-trigger > span {
++  overflow: hidden;
++  text-overflow: ellipsis;
++  white-space: nowrap;
++}
++.app-select-trigger > svg {
++  flex-shrink: 0;
++  color: #64748b;
++}
++.admin-platform .app-select-trigger:hover {
++  border-color: #a9bbd4;
++}
++.admin-platform .app-select-trigger:focus-visible,
++.admin-platform .app-select-trigger[aria-expanded='true'] {
++  outline: 2px solid #c5d9fc;
++  outline-offset: 1px;
++  border-color: #3373df;
++}
++.app-select-trigger:disabled {
++  opacity: 0.5;
++  cursor: default;
++}
++.app-select-popup {
++  position: fixed;
++  inset: auto;
++  margin: 0;
++  padding: 5px;
++  max-height: min(320px, calc(100vh - 24px));
++  overflow-y: auto;
++  border: 1px solid #e1e7f0;
++  border-radius: 10px;
++  background: #fff;
++  color: #2d3744;
++  box-shadow: 0 8px 28px #1e355b20;
++  font:
++    13px/1.5 -apple-system,
++    BlinkMacSystemFont,
++    'PingFang SC',
++    'Microsoft YaHei',
++    sans-serif;
++}
++.app-select-option {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  gap: 20px;
++  padding: 8px 10px;
++  border-radius: 6px;
++  cursor: pointer;
++}
++.app-select-option.highlighted {
++  background: #f1f5fc;
++}
++.app-select-option[aria-selected='true'] {
++  color: #175bb7;
++  background: #e8f0ff;
++}
++.app-select-option[aria-disabled='true'] {
++  opacity: 0.45;
++  cursor: default;
++}
++.admin-platform .field .app-select {
++  display: flex;
++  width: 100%;
++}
++.admin-platform .platform-enterprise-catalog .platform-filters > .app-select {
++  margin-left: auto;
++}
+diff --git a/src/platform/PlatformSettings.tsx b/src/platform/PlatformSettings.tsx
+index f567bed..7159da1 100644
+--- a/src/platform/PlatformSettings.tsx
++++ b/src/platform/PlatformSettings.tsx
+@@ -1,3 +1,4 @@
++import { Select } from '../shared/Select';
+ import { useContext, useRef, useState } from 'react';
+ import { History, RefreshCw } from 'lucide-react';
+ import { Button, Badge, Empty, PageActions } from '../shared/ui';
+@@ -97,7 +98,7 @@ function ManagementRecords() {
+       <div className="admin-section-heading">
+         <h2>管理记录</h2>
+         <div className="platform-filters">
+-          <select
++          <Select
+             aria-label="操作类别"
+             value={category}
+             onChange={(e) => {
+@@ -111,8 +112,8 @@ function ManagementRecords() {
+             <option value="STAFF">管理人员</option>
+             <option value="SECURITY">登录与安全</option>
+             <option value="EXPERIENCE">通用经验</option>
+-          </select>
+-          <select
++          </Select>
++          <Select
+             aria-label="执行结果"
+             value={outcome}
+             onChange={(e) => {
+@@ -123,7 +124,7 @@ function ManagementRecords() {
+             <option value="">全部结果</option>
+             <option value="SUCCESS">已完成</option>
+             <option value="DENIED">已拒绝</option>
+-          </select>
++          </Select>
+         </div>
+       </div>
+       <p className="admin-note">企业服务、账号、管理人员与通用经验的操作记录。</p>
+diff --git a/src/platform/PlatformAccounts.tsx b/src/platform/PlatformAccounts.tsx
+index 364d05f..2298895 100644
+--- a/src/platform/PlatformAccounts.tsx
++++ b/src/platform/PlatformAccounts.tsx
+@@ -1,3 +1,4 @@
++import { Select } from '../shared/Select';
+ import { useState } from 'react';
+ import { uuid } from '../identity/client';
+ import { ArrowLeft, Search, Users, RefreshCw } from 'lucide-react';
+@@ -60,7 +61,7 @@ export function PlatformAccounts() {
+             />
+           </label>
+           <Button type="submit">搜索</Button>
+-          <select
++          <Select
+             aria-label="账号状态"
+             value={status}
+             onChange={(e) => {
+@@ -71,7 +72,7 @@ export function PlatformAccounts() {
+             <option value="">全部状态</option>
+             <option value="ACTIVE">已启用</option>
+             <option value="DISABLED">已停用</option>
+-          </select>
++          </Select>
+           {(query || status) && (
+             <Button
+               variant="ghost"
+diff --git a/src/platform/PlatformHome.tsx b/src/platform/PlatformHome.tsx
+index 08a90b6..1703b16 100644
+--- a/src/platform/PlatformHome.tsx
++++ b/src/platform/PlatformHome.tsx
+@@ -1,3 +1,4 @@
++import { Select } from '../shared/Select';
+ import { useContext, useEffect, useState } from 'react';
+ import { Building2, ChevronRight, Plus, RefreshCw, Search, Send } from 'lucide-react';
+ import { useViewState, textState, pageState } from '../shared/useViewState';
+@@ -129,7 +130,7 @@ export function PlatformHome({ embedded: _embedded = false }: { embedded?: boole
+               />
+               <Button type="submit" variant="ghost" icon={Search} aria-label="搜索企业名称" />
+             </div>
+-            <select
++            <Select
+               aria-label="企业状态"
+               value={status}
+               onChange={(e) => {
+@@ -140,7 +141,7 @@ export function PlatformHome({ embedded: _embedded = false }: { embedded?: boole
+               <option value="">全部状态</option>
+               <option value="ACTIVE">正常</option>
+               <option value="SUSPENDED">已暂停</option>
+-            </select>
++            </Select>
+             {(query || status) && (
+               <Button
+                 variant="ghost"
+@@ -200,11 +201,7 @@ export function PlatformHome({ embedded: _embedded = false }: { embedded?: boole
+                           {item.activeMemberCount}
+                         </span>
+                         <time className="platform-created" dateTime={item.createdAt}>
+-                          {new Date(item.createdAt).toLocaleDateString('zh-CN', {
+-                            year: 'numeric',
+-                            month: '2-digit',
+-                            day: '2-digit',
+-                          })}
++                          {new Date(item.createdAt).toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' })}
+                         </time>
+                         <span className="platform-service-label">
+                           <Badge blue={item.status === 'ACTIVE'}>{statusLabel(item.status)}</Badge>
+diff --git a/src/operations/UsagePanel.tsx b/src/operations/UsagePanel.tsx
+index 632cb86..44909d0 100644
+--- a/src/operations/UsagePanel.tsx
++++ b/src/operations/UsagePanel.tsx
+@@ -1,3 +1,4 @@
++import { Select } from '../shared/Select';
+ import { useState, type ReactNode } from 'react';
+ import { RefreshCw, Search, ArrowLeft, ChevronRight } from 'lucide-react';
+ import type {
+@@ -172,7 +173,7 @@ function ScopedUsage({
+   const cost = data.value && 'cost' in data.value ? data.value.cost : undefined;
+   const controls = (
+     <div className="usage-filter">
+-      <select
++      <Select
+         aria-label="用量统计期间"
+         value={period}
+         onChange={(e) => changePeriod(e.target.value as UsagePeriod)}
+@@ -182,7 +183,7 @@ function ScopedUsage({
+             {periods[p]}
+           </option>
+         ))}
+-      </select>
++      </Select>
+       <Button variant="ghost" icon={RefreshCw} onClick={refresh}>
+         更新用量
+       </Button>
+diff --git a/src/operations/PlatformDataOperations.tsx b/src/operations/PlatformDataOperations.tsx
+index 710a42c..89cd7a5 100644
+--- a/src/operations/PlatformDataOperations.tsx
++++ b/src/operations/PlatformDataOperations.tsx
+@@ -1,3 +1,4 @@
++import { Select } from '../shared/Select';
+ import { useState } from 'react';
+ import { ArrowLeft, RefreshCw, Search } from 'lucide-react';
+ import type {
+@@ -70,7 +71,7 @@ function Metrics({ value }: { value: DataOperationCounts }) {
+ }
+ function Filter({ value, change }: { value: DataOperationState; change: (v: DataOperationState) => void }) {
+   return (
+-    <select
++    <Select
+       aria-label="运行状态"
+       value={value}
+       onChange={(e) => change(e.target.value as DataOperationState)}
+@@ -80,7 +81,7 @@ function Filter({ value, change }: { value: DataOperationState; change: (v: Data
+           {label}
+         </option>
+       ))}
+-    </select>
++    </Select>
+   );
+ }
+ export function PlatformDataOperations({ hash }: { hash: string }) {
+diff --git a/src/experience/GeneralExperienceLibrary.tsx b/src/experience/GeneralExperienceLibrary.tsx
+index 1574044..af7f755 100644
+--- a/src/experience/GeneralExperienceLibrary.tsx
++++ b/src/experience/GeneralExperienceLibrary.tsx
+@@ -1,3 +1,4 @@
++import { Select } from '../shared/Select';
+ import { useEffect, useState } from 'react';
+ import { BookOpen, RefreshCw } from 'lucide-react';
+ import { useSession } from '../identity/session';
+@@ -148,7 +149,7 @@ export function GeneralExperienceLibrary({
+             </Field>
+             {
+               <Field label="状态">
+-                <select
++                <Select
+                   disabled={locked}
+                   aria-label="通用经验状态"
+                   value={state}
+@@ -160,7 +161,7 @@ export function GeneralExperienceLibrary({
+                 >
+                   <option value="AVAILABLE">当前可用</option>
+                   <option value="STOPPED">{tenant ? '本企业已停用' : '已停用'}</option>
+-                </select>
++                </Select>
+               </Field>
+             }
+             <Button type="submit" disabled={locked}>
+diff --git a/src/experience/GeneralSuggestionPanel.tsx b/src/experience/GeneralSuggestionPanel.tsx
+index 362a2fd..65c9a8c 100644
+--- a/src/experience/GeneralSuggestionPanel.tsx
++++ b/src/experience/GeneralSuggestionPanel.tsx
+@@ -1,3 +1,4 @@
++import { Select } from '../shared/Select';
+ import { useEffect, useState } from 'react';
+ import type { GeneralExperienceSuggestionChange } from '../../contracts/public-api/general-experience';
+ import { IdentityError } from '../identity/client';
+@@ -97,7 +98,7 @@ export function GeneralSuggestionPanel({
+               }}
+             >
+               <Field label="目标空间">
+-                <select
++                <Select
+                   aria-label="目标空间"
+                   required
+                   disabled={blocked}
+@@ -110,10 +111,10 @@ export function GeneralSuggestionPanel({
+                       {s.name}
+                     </option>
+                   ))}
+-                </select>
++                </Select>
+               </Field>
+               <Field label="提交类型">
+-                <select
++                <Select
+                   aria-label="提交类型"
+                   disabled={blocked}
+                   value={form.intent}
+@@ -121,7 +122,7 @@ export function GeneralSuggestionPanel({
+                 >
+                   <option value="ADAPTATION">企业补充</option>
+                   <option value="FEEDBACK">问题反馈</option>
+-                </select>
++                </Select>
+               </Field>
+               <Field label="内容与依据">
+                 <textarea
+diff --git a/src/methods/MethodWorkbench.tsx b/src/methods/MethodWorkbench.tsx
+index fcccc7e..e411e36 100644
+--- a/src/methods/MethodWorkbench.tsx
++++ b/src/methods/MethodWorkbench.tsx
+@@ -1,3 +1,4 @@
++import { Select } from '../shared/Select';
+ import { useRequestLock, RequestPending } from '../shared/request-guard';
+ import { useContext, useState } from 'react';
+ import { RefreshCw } from 'lucide-react';
+@@ -77,7 +78,7 @@ export function MethodWorkbench({ tenant, embedded = false }: { tenant?: string;
+           <div className="evaluation-toolbar">
+             {tenant ? (
+               <Field label="方法生效范围">
+-                <select
++                <Select
+                   disabled={pending}
+                   aria-label="方法生效范围"
+                   value={workspace ?? ''}
+@@ -89,7 +90,7 @@ export function MethodWorkbench({ tenant, embedded = false }: { tenant?: string;
+                       {w.name}
+                     </option>
+                   ))}
+-                </select>
++                </Select>
+               </Field>
+             ) : (
+               <Badge>通用 RANKING_V1 · 只处理固定排序特征</Badge>
+@@ -501,7 +502,7 @@ function CompareEditor({
+         >
+           <fieldset disabled={submit.busy || submit.uncertain}>
+             <Field label="固定排序标准">
+-              <select
++              <Select
+                 aria-label="固定排序标准"
+                 required
+                 value={standard}
+@@ -521,7 +522,7 @@ function CompareEditor({
+                       {a.version.content.title}
+                     </option>
+                   ))}
+-              </select>
++              </Select>
+             </Field>
+             <p>选择本次同组样例：</p>
+             {data.value.samples.items
+@@ -673,10 +674,10 @@ function SuiteEditor({ close, done }: { close: () => void; done: () => void }) {
+             ))}
+           </div>
+           <Field label="预期优先条目">
+-            <select aria-label="预期优先条目" value={expected} onChange={(e) => setExpected(e.target.value)}>
++            <Select aria-label="预期优先条目" value={expected} onChange={(e) => setExpected(e.target.value)}>
+               <option value="A">A 在 B 前</option>
+               <option value="B">B 在 A 前</option>
+-            </select>
++            </Select>
+           </Field>
+         </fieldset>
+         <SubmitError error={submit.error} uncertain={submit.uncertain} />
+diff --git a/src/governance/RecoveryForm.tsx b/src/governance/RecoveryForm.tsx
+index 135b937..0e95ad9 100644
+--- a/src/governance/RecoveryForm.tsx
++++ b/src/governance/RecoveryForm.tsx
+@@ -1,3 +1,4 @@
++import { Select } from '../shared/Select';
+ import { useState } from 'react';
+ import type { RecoveryReceipt, RecoveryRequest } from '../../contracts/public-api/governance';
+ import { Button, Field } from '../shared/ui';
+@@ -36,14 +37,14 @@ export function RecoveryForm({ tenant, platform = false }: { tenant: string; pla
+         >
+           <fieldset disabled={task.busy || task.uncertain}>
+             <Field label="恢复申请原因">
+-              <select
++              <Select
+                 aria-label="恢复申请原因"
+                 value={reason}
+                 onChange={(e) => setReason(e.target.value as RecoveryRequest['reason'])}
+               >
+                 <option value="OWNER_UNAVAILABLE">负责人无法履职或无法登录</option>
+                 <option value="LEGACY_OWNER_UNVERIFIED">存量企业的负责人尚未核实</option>
+-              </select>
++              </Select>
+             </Field>
+           </fieldset>
+           <SubmitError error={task.error} uncertain={task.uncertain} />
+diff --git a/src/objectlifecycle/ObjectLifecycleWorkspace.tsx b/src/objectlifecycle/ObjectLifecycleWorkspace.tsx
+index 183d2be..92fe1e1 100644
+--- a/src/objectlifecycle/ObjectLifecycleWorkspace.tsx
++++ b/src/objectlifecycle/ObjectLifecycleWorkspace.tsx
+@@ -1,3 +1,4 @@
++import { Select } from '../shared/Select';
+ import { useContext, useState } from 'react';
+ import type { LifecycleItem, ObjectAction, ObjectKind } from '../../contracts/public-api/object-lifecycle';
+ import { identityClient, useSession } from '../identity/session';
+@@ -59,7 +60,7 @@ export function ObjectLifecycleWorkspace({ tenant }: { tenant?: string }) {
+           <div className="object-lifecycle-toolbar">
+             {tenant && (
+               <Field label="维护范围">
+-                <select
++                <Select
+                   disabled={pending}
+                   aria-label="维护范围"
+                   value={space ?? ''}
+@@ -73,11 +74,11 @@ export function ObjectLifecycleWorkspace({ tenant }: { tenant?: string }) {
+                       {w.name}
+                     </option>
+                   ))}
+-                </select>
++                </Select>
+               </Field>
+             )}
+             <Field label="对象类型">
+-              <select
++              <Select
+                 disabled={pending}
+                 aria-label="对象类型"
+                 value={kind ?? ''}
+@@ -92,10 +93,10 @@ export function ObjectLifecycleWorkspace({ tenant }: { tenant?: string }) {
+                     {kindLabel[k]}
+                   </option>
+                 ))}
+-              </select>
++              </Select>
+             </Field>
+             <Field label="生命周期状态">
+-              <select
++              <Select
+                 disabled={pending}
+                 aria-label="生命周期状态"
+                 value={state ?? ''}
+@@ -110,7 +111,7 @@ export function ObjectLifecycleWorkspace({ tenant }: { tenant?: string }) {
+                     {stateLabel[s]}
+                   </option>
+                 ))}
+-              </select>
++              </Select>
+             </Field>
+           </div>
+           <p className="muted">
+@@ -262,7 +263,7 @@ export function ObjectLifecycleDetail({
+             永久清理会擦除在线正文和受其约束的派生内容。独立企业发布副本按自身规则保留；必要身份、原判定与分母、幂等及授权事实保留。此结果不代表所有旧备份已删除。
+           </p>
+           <Field label="维护动作">
+-            <select
++            <Select
+               aria-label="维护动作"
+               disabled={locked}
+               value={action ?? ''}
+@@ -277,7 +278,7 @@ export function ObjectLifecycleDetail({
+                   {actionLabel[a]}
+                 </option>
+               ))}
+-            </select>
++            </Select>
+           </Field>
+           {action === 'PURGE' && (
+             <label>

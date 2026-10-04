@@ -1,0 +1,196 @@
+.platform-dashboard {
+  display: grid;
+  gap: 24px;
+}
+.platform-status-strip {
+  padding: 22px 24px;
+  background: var(--surface, #fff);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+.platform-status-strip dl {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  margin: 0;
+}
+.platform-status-strip dl > div {
+  padding: 0 24px;
+  border-left: 1px solid var(--line);
+  min-width: 0;
+}
+.platform-status-strip dl > div:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+.platform-status-strip dt,
+.platform-monthly-values dt {
+  color: var(--muted);
+  font-size: 13px;
+}
+.platform-status-strip dd {
+  margin: 10px 0 8px;
+  font-size: 28px;
+  line-height: 1.25;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.platform-status-strip dd small {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.platform-status-strip a,
+.platform-status-strip dl > div > span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.platform-status-strip a:hover {
+  color: var(--accent);
+}
+.platform-overview-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(300px, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.platform-dashboard .admin-section-heading a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+.platform-attention-group {
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.platform-attention-group + .platform-attention-group {
+  margin-top: 20px;
+}
+.platform-attention-group h3 {
+  font-size: 13px;
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-weight: 500;
+}
+.platform-attention-group p {
+  margin: 8px 0;
+}
+.platform-attention-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.platform-attention-list li + li {
+  border-top: 1px solid var(--line);
+}
+.platform-attention-list a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  text-decoration: none;
+  color: var(--text, #2d3744);
+  min-height: 64px;
+}
+.platform-attention-list strong {
+  font-size: 14px;
+  font-weight: 550;
+}
+.platform-attention-list small {
+  display: block;
+  font-size: 12px;
+  margin-top: 4px;
+  color: var(--muted);
+}
+.platform-attention-list a:hover strong {
+  color: var(--accent);
+}
+.platform-coverage {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.7;
+}
+.platform-overview-notes {
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.platform-overview-notes summary {
+  cursor: pointer;
+  min-height: 30px;
+  display: list-item;
+  line-height: 30px;
+}
+.platform-overview-notes p {
+  max-width: 70ch;
+  line-height: 1.75;
+  margin: 8px 0;
+}
+.platform-monthly-values {
+  margin: 8px 0 24px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+.platform-monthly-values dd {
+  font-size: 28px;
+  line-height: 1.25;
+  margin: 12px 0 8px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.platform-monthly-values small {
+  font-size: 12px;
+  color: var(--muted);
+}
+.platform-cost-status {
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+}
+.platform-cost-status strong {
+  font-size: 14px;
+  font-weight: 550;
+}
+.platform-cost-status p {
+  margin: 6px 0 14px;
+  font-size: 13px;
+  color: var(--muted);
+}
+@media (max-width: 1100px) {
+  .platform-overview-columns {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 600px) {
+  .platform-dashboard {
+    gap: 20px;
+  }
+  .platform-status-strip {
+    padding: 18px;
+  }
+  .platform-status-strip dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+  }
+  .platform-status-strip dl > div {
+    padding: 0;
+    border: 0;
+  }
+  .platform-status-strip dl > div:first-child {
+    grid-column: 1 / -1;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 16px;
+  }
+  .platform-status-strip dd {
+    font-size: 26px;
+  }
+  .platform-overview-columns {
+    gap: 20px;
+  }
+  .platform-overview-notes summary {
+    line-height: 44px;
+    min-height: 44px;
+  }
+}

@@ -1,0 +1,98 @@
+diff --git a/src/admin/PlatformOverviewPage.tsx b/src/admin/PlatformOverviewPage.tsx
+index 1295c25..a83752b 100644
+--- a/src/admin/PlatformOverviewPage.tsx
++++ b/src/admin/PlatformOverviewPage.tsx
+@@ -1,5 +1,5 @@
+ import { useState } from 'react';
+-import { ArrowRight, Building2, Activity, SlidersHorizontal, RefreshCw } from 'lucide-react';
++import { ArrowRight, RefreshCw } from 'lucide-react';
+ import { platformClient } from '../platform/client';
+ import { getTelemetry } from '../operations/telemetry-client';
+ import { usageClient } from '../operations/usage-client';
+@@ -207,32 +207,6 @@ export function PlatformOverviewPage({ hash }: { hash: string }) {
+           )}
+         </section>
+       </div>
+-      <section className="platform-shortcut-section" aria-label="常用入口">
+-        <h2>常用入口</h2>
+-        <div className="platform-shortcut-links">
+-          <a href={enterpriseHref}>
+-            <Building2 size={20} aria-hidden="true" />
+-            <span>
+-              企业管理<small>服务状态与负责人</small>
+-            </span>
+-            <ArrowRight size={16} aria-hidden="true" />
+-          </a>
+-          <a href={runtimeHref}>
+-            <Activity size={20} aria-hidden="true" />
+-            <span>
+-              运行监控<small>执行、接入与备份</small>
+-            </span>
+-            <ArrowRight size={16} aria-hidden="true" />
+-          </a>
+-          <a href={adminHref('platform', 'capabilities', hash)}>
+-            <SlidersHorizontal size={20} aria-hidden="true" />
+-            <span>
+-              引擎管理<small>能力、规则与版本</small>
+-            </span>
+-            <ArrowRight size={16} aria-hidden="true" />
+-          </a>
+-        </div>
+-      </section>
+     </div>
+   );
+ }
+diff --git a/src/admin/platform-overview.css b/src/admin/platform-overview.css
+index 7c24353..4e15b07 100644
+--- a/src/admin/platform-overview.css
++++ b/src/admin/platform-overview.css
+@@ -158,36 +158,6 @@
+   font-size: 13px;
+   color: var(--muted);
+ }
+-.platform-shortcut-section h2 {
+-  font-size: 17px;
+-  margin: 0 0 14px;
+-}
+-.platform-shortcut-links {
+-  display: grid;
+-  grid-template-columns: repeat(3, minmax(0, 1fr));
+-  border-block: 1px solid var(--line);
+-}
+-.platform-shortcut-links a {
+-  display: flex;
+-  align-items: center;
+-  gap: 12px;
+-  padding: 18px 12px;
+-  color: var(--text, #2d3744);
+-  text-decoration: none;
+-}
+-.platform-shortcut-links a > span {
+-  flex: 1;
+-}
+-.platform-shortcut-links small {
+-  display: block;
+-  color: var(--muted);
+-  font-size: 12px;
+-  margin-top: 4px;
+-}
+-.platform-shortcut-links a:hover {
+-  background: var(--selected);
+-  color: var(--accent);
+-}
+ @media (max-width: 1100px) {
+   .platform-overview-columns {
+     grid-template-columns: 1fr;
+@@ -219,12 +189,6 @@
+   .platform-overview-columns {
+     gap: 20px;
+   }
+-  .platform-shortcut-links {
+-    grid-template-columns: 1fr;
+-  }
+-  .platform-shortcut-links a + a {
+-    border-top: 1px solid var(--line);
+-  }
+   .platform-overview-notes summary {
+     line-height: 44px;
+     min-height: 44px;

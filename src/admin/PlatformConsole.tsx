@@ -10,7 +10,7 @@ import { PlatformHome } from '../platform/PlatformHome';
 import { PlatformAccounts } from '../platform/PlatformAccounts';
 import { PlatformSettings } from '../platform/PlatformSettings';
 import { PlatformUsagePage } from '../operations/UsagePanel';
-import { MethodWorkbench } from '../methods/MethodWorkbench';
+import { PlatformEngineManagement } from './PlatformEngineManagement';
 
 export function PlatformConsole({ logout }: { logout: () => void }) {
   const { session } = useSession();
@@ -37,18 +37,18 @@ export function PlatformConsole({ logout }: { logout: () => void }) {
         <PlatformDataOperations hash={hash} />
       ) : page === 'engine' ? (
         <>
-          <div className="admin-secondary-link">
+          <nav className="platform-runtime-links" aria-label="系统运行次级页面">
             <a href={adminHref('platform', 'engine', hash, { detail: 'data' })}>数据运行</a>
             <a href={adminHref('platform', 'engine', hash, { detail: 'storage' })}>存储与备份</a>
             <a href={adminHref('platform', 'usage', hash)}>查看用量与成本</a>
-          </div>
+          </nav>
           <StorageAlert hash={hash} />
           <EngineTelemetryWall scope="platform" />
         </>
       ) : page === 'usage' ? (
         <PlatformUsagePage hash={hash} />
       ) : page === 'capabilities' ? (
-        <MethodWorkbench />
+        <PlatformEngineManagement hash={hash} />
       ) : page === 'settings' ? (
         <PlatformSettings hash={hash} />
       ) : (

@@ -1,3 +1,4 @@
+import { Select } from '../shared/Select';
 import { useContext, useState } from 'react';
 import type { LifecycleItem, ObjectAction, ObjectKind } from '../../contracts/public-api/object-lifecycle';
 import { identityClient, useSession } from '../identity/session';
@@ -59,7 +60,7 @@ export function ObjectLifecycleWorkspace({ tenant }: { tenant?: string }) {
           <div className="object-lifecycle-toolbar">
             {tenant && (
               <Field label="维护范围">
-                <select
+                <Select
                   disabled={pending}
                   aria-label="维护范围"
                   value={space ?? ''}
@@ -73,11 +74,11 @@ export function ObjectLifecycleWorkspace({ tenant }: { tenant?: string }) {
                       {w.name}
                     </option>
                   ))}
-                </select>
+                </Select>
               </Field>
             )}
             <Field label="对象类型">
-              <select
+              <Select
                 disabled={pending}
                 aria-label="对象类型"
                 value={kind ?? ''}
@@ -92,10 +93,10 @@ export function ObjectLifecycleWorkspace({ tenant }: { tenant?: string }) {
                     {kindLabel[k]}
                   </option>
                 ))}
-              </select>
+              </Select>
             </Field>
             <Field label="生命周期状态">
-              <select
+              <Select
                 disabled={pending}
                 aria-label="生命周期状态"
                 value={state ?? ''}
@@ -110,7 +111,7 @@ export function ObjectLifecycleWorkspace({ tenant }: { tenant?: string }) {
                     {stateLabel[s]}
                   </option>
                 ))}
-              </select>
+              </Select>
             </Field>
           </div>
           <p className="muted">
@@ -262,7 +263,7 @@ export function ObjectLifecycleDetail({
             永久清理会擦除在线正文和受其约束的派生内容。独立企业发布副本按自身规则保留；必要身份、原判定与分母、幂等及授权事实保留。此结果不代表所有旧备份已删除。
           </p>
           <Field label="维护动作">
-            <select
+            <Select
               aria-label="维护动作"
               disabled={locked}
               value={action ?? ''}
@@ -277,7 +278,7 @@ export function ObjectLifecycleDetail({
                   {actionLabel[a]}
                 </option>
               ))}
-            </select>
+            </Select>
           </Field>
           {action === 'PURGE' && (
             <label>

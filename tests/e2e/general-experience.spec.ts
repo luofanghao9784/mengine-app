@@ -573,7 +573,11 @@ test('platform stop and restore require reason, retain fixed version and appear 
   await expect(dialog.getByRole('button', { name: '恢复通用经验', exact: true })).toBeVisible();
   await expect(dialog.getByText('最近操作原因：合成适用范围需要收敛')).toBeVisible();
   await page.getByRole('button', { name: '关闭弹窗' }).click();
-  await page.getByLabel('通用经验状态').selectOption('STOPPED');
+  await page.getByRole('combobox', { name: '通用经验状态' }).click();
+  await page
+    .getByRole('listbox', { name: '通用经验状态' })
+    .getByRole('option', { name: '已停用', exact: true })
+    .click();
   await page
     .getByRole('button')
     .filter({ has: page.getByRole('heading', { name: method.title }) })
@@ -592,7 +596,11 @@ test('platform stop and restore require reason, retain fixed version and appear 
   expect(await page.evaluate(() => JSON.stringify(sessionStorage))).not.toContain('合成验证已完成');
   await page.getByRole('button', { name: '关闭弹窗' }).click();
   await page.goto('/platform-admin/#admin=settings&section=records');
-  await page.getByLabel('操作类别').selectOption('EXPERIENCE');
+  await page.getByRole('combobox', { name: '操作类别' }).click();
+  await page
+    .getByRole('listbox', { name: '操作类别' })
+    .getByRole('option', { name: '通用经验', exact: true })
+    .click();
   await expect(page.getByText(method.title + ' · v1')).toHaveCount(2);
   await expect(page.getByText('内部备注：合成适用范围需要收敛')).toBeVisible();
   await expect(page.getByText('内部备注：合成验证已完成')).toBeVisible();

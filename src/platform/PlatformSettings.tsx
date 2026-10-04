@@ -1,3 +1,4 @@
+import { Select } from '../shared/Select';
 import { useContext, useRef, useState } from 'react';
 import { History, RefreshCw } from 'lucide-react';
 import { Button, Badge, Empty, PageActions } from '../shared/ui';
@@ -97,7 +98,7 @@ function ManagementRecords() {
       <div className="admin-section-heading">
         <h2>管理记录</h2>
         <div className="platform-filters">
-          <select
+          <Select
             aria-label="操作类别"
             value={category}
             onChange={(e) => {
@@ -111,8 +112,8 @@ function ManagementRecords() {
             <option value="STAFF">管理人员</option>
             <option value="SECURITY">登录与安全</option>
             <option value="EXPERIENCE">通用经验</option>
-          </select>
-          <select
+          </Select>
+          <Select
             aria-label="执行结果"
             value={outcome}
             onChange={(e) => {
@@ -123,7 +124,7 @@ function ManagementRecords() {
             <option value="">全部结果</option>
             <option value="SUCCESS">已完成</option>
             <option value="DENIED">已拒绝</option>
-          </select>
+          </Select>
         </div>
       </div>
       <p className="admin-note">企业服务、账号、管理人员与通用经验的操作记录。</p>

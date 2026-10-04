@@ -152,7 +152,11 @@ test('system running opens an independent data subpage; list search and paging s
   await expect(page.getByLabel('搜索企业')).toHaveValue('合成企业');
   await expect(page.getByText('第 2 页', { exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: '合成企业 21', exact: true })).toBeVisible();
-  await page.getByLabel('运行状态').selectOption('ATTENTION');
+  await page.getByRole('combobox', { name: '运行状态' }).click();
+  await page
+    .getByRole('listbox', { name: '运行状态' })
+    .getByRole('option', { name: '需留意', exact: true })
+    .click();
   await expect(page.getByText('第 1 页', { exact: true })).toBeVisible();
   await expect(page.getByText(/匹配 11 家企业/)).toBeVisible();
   await page.getByRole('link', { name: '返回系统运行' }).click();

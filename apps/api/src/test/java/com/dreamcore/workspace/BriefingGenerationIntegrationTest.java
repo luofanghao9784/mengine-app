@@ -30,6 +30,18 @@ class BriefingGenerationIntegrationTest {
   db.update("INSERT INTO workspaces(id,tenant_id,owner_id,name,kind) VALUES (?,?,?,'合成共享空间','SHARED')",space,tenant,actor);
   for(UUID id:List.of(actor,reader))db.update("INSERT INTO workspace_members(tenant_id,workspace_id,account_id,can_maintain) VALUES (?,?,?,true)",tenant,space,id);
  }
+ @Test void manualOnlyDeploymentDoesNotDispatchLegacyAutomaticBatchUntilUserRequestsIt(){
+  var manualOnly=new BriefingGenerationService(db,conversations,contents,identities,access,departure,new AgentSettings("verification",true,false),new com.dreamcore.workspace.plans.PlanClock(),true,"",0,6);
+  org.springframework.test.util.ReflectionTestUtils.setField(manualOnly,"automaticEnabled",false);
+  upload("marker 合成手动画报资料。",true);UUID p=policy(),batch=UUID.randomUUID();
+  db.update("INSERT INTO briefing_generation_batches(id,tenant_id,owner_id,workspace_id,policy_id,policy_epoch,trigger_kind,business_type,status) SELECT ?,tenant_id,owner_id,workspace_id,id,epoch,'INITIALIZATION','INSIGHT','WAITING_CAPABILITY' FROM briefing_generation_policies WHERE id=?",batch,p);
+  assertFalse(manualOnly.candidates().contains(p));manualOnly.tick(p);
+  assertEquals(0,db.queryForObject("SELECT count(*) FROM conversation_tasks WHERE tenant_id=?",Integer.class,tenant));
+  var explicit=manualOnly.generate(actor,tenant,UUID.randomUUID(),space,"INSIGHT");assertEquals(batch,explicit.id());
+  assertTrue(manualOnly.candidates().contains(p));manualOnly.tick(p);
+  assertNotNull(manualOnly.get(actor,tenant,batch).taskId());
+  assertEquals(1,db.queryForObject("SELECT count(*) FROM conversation_tasks WHERE tenant_id=?",Integer.class,tenant));
+ }
  @AfterEach void cleanup(){db.update("DELETE FROM platform_roles WHERE account_id IN (SELECT account_id FROM platform_accounts WHERE login_name LIKE '%@service-platform.test')");db.update("DELETE FROM tenant_service_changes WHERE actor_id IN (SELECT account_id FROM platform_accounts WHERE login_name LIKE '%@service-platform.test')");db.update("DELETE FROM platform_accounts WHERE login_name LIKE '%@service-platform.test'");db.update("UPDATE conversation_tasks SET status='CANCELLED' WHERE tenant_id=? AND status IN ('QUEUED','RUNNING')",tenant);db.update("UPDATE knowledge_runs SET status='CANCELLED' WHERE tenant_id=? AND status IN ('QUEUED','RUNNING')",tenant);}
  MaterialService.UploadReceipt upload(String text,boolean ready){
   return upload("evidence.txt",text,ready);

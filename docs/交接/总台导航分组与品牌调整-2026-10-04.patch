@@ -1,0 +1,87 @@
+diff --git a/src/admin/AdminShell.tsx b/src/admin/AdminShell.tsx
+index 3df7c51..ea06130 100644
+--- a/src/admin/AdminShell.tsx
++++ b/src/admin/AdminShell.tsx
+@@ -36,10 +36,10 @@ const entries: Record<AdminRealm, { id: AdminPage; title: string; icon: LucideIc
+     { id: 'overview', title: '概览', icon: LayoutDashboard },
+     { id: 'tenants', title: '企业管理', icon: Building2 },
+     { id: 'accounts', title: '账号管理', icon: Users },
++    { id: 'usage', title: '用量与成本', icon: Wallet },
+     { id: 'engine', title: '系统运行', icon: Activity },
+     { id: 'experience', title: '经验库', icon: BookOpen },
+     { id: 'capabilities', title: '引擎管理', icon: SlidersHorizontal },
+-    { id: 'usage', title: '用量与成本', icon: Wallet },
+   ],
+ };
+ export function useAdminRoute(realm: AdminRealm) {
+@@ -130,7 +130,7 @@ export function AdminShell({
+     };
+   }, [mobileOpen]);
+   useLayoutEffect(() => {
+-    document.title = `${title} · ${realm === 'platform' ? '梦擎总台' : name + '企业管理'}`;
++    document.title = `${title} · ${realm === 'platform' ? '梦核引擎 Mengine 总台' : name + '企业管理'}`;
+     setMobileOpen(false);
+     const element = main.current;
+     if (!element) return;
+@@ -182,7 +182,8 @@ export function AdminShell({
+           <div className="admin-brand">
+             <DreamcoreLogo />
+             <div>
+-              <strong>梦擎</strong>
++              <strong>{realm === 'platform' ? '梦核引擎' : '梦擎'}</strong>
++              {realm === 'platform' && <span className="admin-brand-english">Mengine</span>}
+               <small>{realm === 'platform' ? '平台总台' : '企业管理'}</small>
+             </div>
+             <Button
+@@ -193,11 +194,18 @@ export function AdminShell({
+               onClick={() => setMobileOpen(false)}
+             />
+           </div>
+-          <div className="admin-scope" title={name}>
+-            {name}
+-          </div>
+-          <nav>
+-            {nav.map(({ id, title, icon: Icon }) => (
++          {realm !== 'platform' && <div className="admin-scope" title={name}>{name}</div>}
++          {(realm === 'platform'
++            ? [
++                { label: '平台管理', items: nav.filter((item) => ['overview', 'tenants', 'accounts', 'usage'].includes(item.id)) },
++                { label: '梦核引擎', items: nav.filter((item) => ['engine', 'experience', 'capabilities'].includes(item.id)) },
++              ]
++            : [{ label: '', items: nav }]
++          ).filter((group) => group.items.length > 0).map((group) => (
++            <section className="admin-nav-group" key={group.label}>
++              {group.label && <div className="admin-nav-group-title">{group.label}</div>}
++              <nav aria-label={group.label || '企业管理功能'}>
++                {group.items.map(({ id, title, icon: Icon }) => (
+               <a
+                 key={id}
+                 className={`admin-nav-link ${page === id ? 'active' : ''}`}
+@@ -211,8 +219,10 @@ export function AdminShell({
+                 <Icon size={20} aria-hidden="true" />
+                 <span>{title}</span>
+               </a>
+-            ))}
+-          </nav>
++                ))}
++              </nav>
++            </section>
++          ))}
+           <div className="admin-sidebar-footer">
+             {realm === 'platform' && (
+               <a
+diff --git a/src/admin/admin.css b/src/admin/admin.css
+index 94ec0f1..b9e22da 100644
+--- a/src/admin/admin.css
++++ b/src/admin/admin.css
+@@ -720,3 +720,10 @@ button.admin-directory-row:hover {
+     align-items: flex-start;
+   }
+ }
++
++/* 总台导航按平台运营与梦核运行分组。 */
++.admin-brand-english { display: block; color: var(--text-secondary, var(--muted)); font-size: 13px; line-height: 1.5; letter-spacing: 0.04em; }
++.admin-platform .admin-brand strong { font-size: 19px; white-space: nowrap; }
++.admin-nav-group { min-width: 0; }
++.admin-platform .admin-nav-group + .admin-nav-group { margin-top: 24px; }
++.admin-nav-group-title { margin: 0 10px 12px; color: var(--muted); font-size: 12px; }

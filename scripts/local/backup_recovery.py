@@ -132,6 +132,9 @@ def quarantine(sql):
     COMMIT;""")
     if has_table(sql,'conversation_live_output'):
         sql("UPDATE conversation_live_output SET state='INTERRUPTED',version=version+1 WHERE state='STREAMING'")
+    if has_table(sql, 'conversation_titles'):
+        # Restoring metadata must not replay a previously accepted paid auxiliary request.
+        sql("UPDATE conversation_titles SET state='UNKNOWN',finished_at=now() WHERE state IN ('QUEUED','RUNNING')")
     if has_table(sql,'task_plan_checks'):
         # Explicit even for an already stopped plan: no old accepted check is executable after restore.
         sql("UPDATE task_plan_checks SET state='CANCELLED' WHERE state='PENDING'")

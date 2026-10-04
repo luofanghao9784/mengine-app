@@ -1,5 +1,6 @@
+import { Select } from '../shared/Select';
 import { useContext, useEffect, useState } from 'react';
-import { Building2, ChevronRight, Plus, RefreshCw, Search, Send } from 'lucide-react';
+import { ArrowLeft, Building2, ChevronRight, Plus, RefreshCw, Search, Send } from 'lucide-react';
 import { useViewState, textState, pageState } from '../shared/useViewState';
 import { useAdminRoute } from '../admin/AdminShell';
 import { adminHref } from '../admin/navigation';
@@ -19,6 +20,7 @@ import type {
 import { platformClient } from './client';
 import '../governance/governance.css';
 import './platform.css';
+import { ownerStateLabel } from '../admin/platform-attention';
 
 const statusLabel = (s: string) => (s === 'ACTIVE' ? '正常' : '已暂停');
 const invitationLabel: Record<string, string> = {
@@ -71,23 +73,7 @@ export function PlatformHome({ embedded: _embedded = false }: { embedded?: boole
   const refresh = () => setAttempt((v) => v + 1);
   if (tenant)
     return (
-      <>
-        <Button
-          variant="ghost"
-          disabled={pending}
-          onClick={() => {
-            location.hash = adminHref('platform', 'tenants', hash);
-          }}
-        >
-          返回企业列表
-        </Button>
-        <TenantView
-          key={tenant}
-          id={tenant}
-          delivery={overview.value?.invitationDelivery}
-          onChange={refresh}
-        />
-      </>
+      <TenantView key={tenant} id={tenant} delivery={overview.value?.invitationDelivery} onChange={refresh} />
     );
   return (
     <>
@@ -108,9 +94,8 @@ export function PlatformHome({ embedded: _embedded = false }: { embedded?: boole
       {overview.value?.invitationDelivery === 'DISABLED' && (
         <p className="platform-help">邀请投递尚未启用，暂不能开通企业。</p>
       )}
-      <section className="access-panel platform-catalog" aria-label="企业列表">
+      <section className="access-panel platform-catalog platform-enterprise-catalog" aria-label="企业列表">
         <div className="platform-list-heading">
-          <h2>企业</h2>
           <form
             className="platform-filters"
             onSubmit={(e) => {
@@ -119,8 +104,7 @@ export function PlatformHome({ embedded: _embedded = false }: { embedded?: boole
               setPage(0);
             }}
           >
-            <label className="platform-search">
-              <Search size={16} />
+            <div className="platform-search">
               <input
                 aria-label="搜索企业"
                 placeholder="搜索企业名称"
@@ -128,9 +112,9 @@ export function PlatformHome({ embedded: _embedded = false }: { embedded?: boole
                 maxLength={100}
                 onChange={(e) => setDraft(e.target.value)}
               />
-            </label>
-            <Button type="submit">搜索</Button>
-            <select
+              <Button type="submit" variant="ghost" icon={Search} aria-label="搜索企业名称" />
+            </div>
+            <Select
               aria-label="企业状态"
               value={status}
               onChange={(e) => {
@@ -141,7 +125,21 @@ export function PlatformHome({ embedded: _embedded = false }: { embedded?: boole
               <option value="">全部状态</option>
               <option value="ACTIVE">正常</option>
               <option value="SUSPENDED">已暂停</option>
-            </select>
+            </Select>
+            {(query || status) && (
+              <Button
+                variant="ghost"
+                disabled={pending}
+                onClick={() => {
+                  setDraft('');
+                  setQuery('');
+                  setStatus('');
+                  setPage(0);
+                }}
+              >
+                清除筛选
+              </Button>
+            )}
           </form>
         </div>
         {list.error ? (
@@ -151,37 +149,62 @@ export function PlatformHome({ embedded: _embedded = false }: { embedded?: boole
         ) : (
           <>
             {list.value.length ? (
-              <ul className="platform-tenant-list">
-                {list.value.slice(0, 20).map((item) => (
-                  <li key={item.id}>
-                    <button
-                      className="platform-tenant-row"
-                      aria-label={`查看企业 ${item.name}`}
-                      onClick={() => {
-                        location.hash = adminHref('platform', 'tenants', hash, { enterprise: item.id });
-                      }}
-                    >
-                      <span className="platform-tenant-icon">
-                        <Building2 size={22} />
-                      </span>
-                      <span className="platform-tenant-name">
-                        <strong>{item.name}</strong>
-                        <small>负责人：{ownerLabel(item.owner)}</small>
-                        <small>
-                          {item.activeMemberCount} 位有效成员 · 开通于 {time(item.createdAt)}
-                        </small>
-                      </span>
-                      <Badge blue={item.status === 'ACTIVE'}>{statusLabel(item.status)}</Badge>
-                      <ChevronRight size={18} />
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              <>
+                <div className="platform-list-columns" aria-hidden="true">
+                  <span>企业</span>
+                  <span>负责人</span>
+                  <span>有效成员</span>
+                  <span>开通时间</span>
+                  <span>服务状态</span>
+                </div>
+                <ul className="platform-tenant-list">
+                  {list.value.slice(0, 20).map((item) => (
+                    <li key={item.id}>
+                      <button
+                        className="platform-tenant-row"
+                        aria-label={`查看企业 ${item.name}`}
+                        onClick={() => {
+                          location.hash = adminHref('platform', 'tenants', hash, { enterprise: item.id });
+                        }}
+                      >
+                        <span className="platform-tenant-identity">
+                          <span className="platform-tenant-name">
+                            <strong>{item.name}</strong>
+                          </span>
+                        </span>
+                        <span
+                          className={`platform-owner-status ${item.owner.state === 'ASSIGNED' ? '' : 'pending'}`}
+                        >
+                          <small className="platform-mobile-label">负责人</small>
+                          {item.owner.state === 'ASSIGNED'
+                            ? item.owner.name
+                            : ownerStateLabel[item.owner.state]}
+                        </span>
+                        <span className="platform-member-count">
+                          <small className="platform-mobile-label">有效成员</small>
+                          {item.activeMemberCount}
+                        </span>
+                        <time className="platform-created" dateTime={item.createdAt}>
+                          {new Date(item.createdAt).toLocaleDateString('zh-CN', {
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit',
+                          })}
+                        </time>
+                        <span className="platform-service-label">
+                          <Badge blue={item.status === 'ACTIVE'}>{statusLabel(item.status)}</Badge>
+                          <ChevronRight size={16} aria-hidden="true" />
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </>
             ) : (
               <Empty
                 icon={Building2}
                 title={query || status ? '没有符合条件的企业' : '还没有企业'}
-                text="开通企业并邀请负责人，开始使用。"
+                text={query || status ? '调整搜索内容或清除筛选后再试。' : '开通企业并邀请负责人，开始使用。'}
               />
             )}
             {(page > 0 || list.value.length > 20) && (
@@ -282,6 +305,7 @@ function TenantView({
   const [attempt, setAttempt] = useState(0);
   const [action, setAction] = useState<'status' | 'invite' | 'revoke'>();
   const [notice, setNotice] = useState('');
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
   const detail = useRemote((signal) => platformClient.detail(id, signal), [id, attempt]);
   const reload = () => {
     setAction(undefined);
@@ -292,16 +316,29 @@ function TenantView({
   const value = detail.value,
     invitation = value.initialAdminInvitation;
   return (
-    <section className="access-panel platform-enterprise-detail" aria-label="企业详情">
+    <section
+      className="access-panel platform-enterprise-detail platform-enterprise-redesign"
+      aria-label="企业详情"
+    >
       <PageActions>
         <Button variant="ghost" icon={RefreshCw} onClick={reload} disabled={pending}>
           刷新详情
         </Button>
       </PageActions>
-      <div className="platform-detail-title">
-        <div>
+      <div className="platform-enterprise-heading">
+        <Button
+          variant="ghost"
+          icon={ArrowLeft}
+          className="platform-detail-back"
+          aria-label="返回企业列表"
+          disabled={pending || !!action}
+          onClick={() => {
+            location.hash = adminHref('platform', 'tenants', hash);
+          }}
+        />
+        <div className="platform-enterprise-heading-text">
           <h2>{value.tenant.name}</h2>
-          <p className="muted">负责人：{ownerLabel(value.owner)}</p>
+          <p>负责人：{ownerLabel(value.owner)}</p>
         </div>
         <Badge blue={value.tenant.status === 'ACTIVE'}>{statusLabel(value.tenant.status)}</Badge>
       </div>
@@ -319,7 +356,7 @@ function TenantView({
           <Button
             key={key}
             disabled={pending || !!action}
-            variant={tab === key ? 'primary' : 'ghost'}
+            variant="ghost"
             aria-current={tab === key ? 'page' : undefined}
             onClick={() => {
               location.hash = adminHref('platform', 'tenants', hash, { enterprise: id, section: key });
@@ -329,20 +366,7 @@ function TenantView({
           </Button>
         ))}
       </nav>
-      {action ? (
-        <TenantAction
-          key={action}
-          detail={value}
-          action={action}
-          delivery={delivery}
-          onBack={reload}
-          onSuccess={() => {
-            setNotice('操作已处理，已重新核对企业状态。');
-            reload();
-            onChange();
-          }}
-        />
-      ) : tab === 'usage' ? (
+      {tab === 'usage' ? (
         <UsagePanel scope="platform" tenant={id} revision={attempt} />
       ) : tab === 'records' ? (
         <Records id={id} revision={attempt} />
@@ -361,11 +385,6 @@ function TenantView({
               <p className="muted">内部处理备注：{value.serviceChange.internalReason}</p>
             </section>
           )}
-          {value.tenant.status === 'SUSPENDED' && (
-            <Button variant="primary" onClick={() => setAction('status')}>
-              恢复服务
-            </Button>
-          )}
           <dl className="platform-facts">
             <div>
               <dt>开通时间</dt>
@@ -380,8 +399,14 @@ function TenantView({
               <dd>{value.workspaceCount}</dd>
             </div>
           </dl>
-          <section className="platform-detail-section">
-            <h3>初始负责人邀请</h3>
+          <details
+            className="platform-detail-section platform-invite-history"
+            open={invitation?.status !== 'ACCEPTED' || undefined}
+          >
+            <summary>
+              {invitation?.status === 'ACCEPTED' ? '初始邀请记录' : '初始负责人邀请'}
+              <span>{invitation && invitationLabel[invitation.status]}</span>
+            </summary>
             {invitation ? (
               <>
                 <div className="platform-invitation-line">
@@ -391,9 +416,7 @@ function TenantView({
                 {invitation.status === 'PENDING' && (
                   <>
                     <p className="muted">有效至 {time(invitation.expiresAt)}</p>
-                    {delivery === 'LOCAL' && (
-                      <LocalInviteLink platform invitation={invitation.id} />
-                    )}
+                    {delivery === 'LOCAL' && <LocalInviteLink platform invitation={invitation.id} />}
                   </>
                 )}
                 {invitation.status === 'ACCEPTED' ? (
@@ -420,17 +443,78 @@ function TenantView({
             ) : (
               <p className="muted">没有初始邀请记录。</p>
             )}
-          </section>
-          <details className="platform-detail-section">
-            <summary>更多管理操作</summary>
-            {value.tenant.status === 'ACTIVE' && (
-              <Button variant="danger" onClick={() => setAction('status')}>
-                暂停服务
-              </Button>
-            )}
-            <RecoveryForm tenant={id} platform />
           </details>
+          <section className="platform-enterprise-management" aria-label="企业管理操作">
+            <h3>管理操作</h3>
+            <div className="platform-management-row">
+              <div>
+                <strong>企业服务</strong>
+                <p>
+                  {value.tenant.status === 'ACTIVE'
+                    ? '调整企业访问与后续运行的服务状态。'
+                    : '企业服务已暂停，可在核对后恢复。'}
+                </p>
+              </div>
+              <Button
+                variant={value.tenant.status === 'ACTIVE' ? 'ghost' : 'primary'}
+                onClick={() => setAction('status')}
+                disabled={pending}
+              >
+                {value.tenant.status === 'ACTIVE' ? '暂停服务' : '恢复服务'}
+              </Button>
+            </div>
+            <div className="platform-management-row">
+              <div>
+                <strong>负责人恢复受理</strong>
+                <p>负责人无法履职或身份未核实时，登记申请并等待核验。</p>
+              </div>
+              <Button variant="ghost" onClick={() => setRecoveryOpen(true)} disabled={pending}>
+                登记申请
+              </Button>
+            </div>
+          </section>
         </>
+      )}
+      {action && (
+        <Modal
+          className="platform-management-modal"
+          title={
+            action === 'invite'
+              ? '重新邀请负责人'
+              : action === 'revoke'
+                ? '撤销邀请'
+                : value.tenant.status === 'ACTIVE'
+                  ? '暂停企业服务'
+                  : '恢复企业服务'
+          }
+          onClose={() => {
+            if (!pending) setAction(undefined);
+          }}
+        >
+          <TenantAction
+            key={action}
+            detail={value}
+            action={action}
+            delivery={delivery}
+            onBack={reload}
+            onSuccess={() => {
+              setNotice('操作已处理，已重新核对企业状态。');
+              reload();
+              onChange();
+            }}
+          />
+        </Modal>
+      )}
+      {recoveryOpen && (
+        <Modal
+          className="platform-management-modal"
+          title="负责人恢复受理"
+          onClose={() => {
+            if (!pending) setRecoveryOpen(false);
+          }}
+        >
+          <RecoveryForm tenant={id} platform />
+        </Modal>
       )}
     </section>
   );
@@ -498,9 +582,7 @@ function TenantAction({
         );
       }}
     >
-      <h3>
-        {label} · {detail.tenant.name}
-      </h3>
+      <p className="platform-action-target">{detail.tenant.name}</p>
       <p className="muted">
         {action === 'revoke'
           ? '撤销后，此邀请立即失效；企业仍保留，可稍后重新邀请。已接受的邀请不能撤销或由总台更换负责人。'
@@ -553,7 +635,7 @@ function TenantAction({
       <SubmitError error={task.error} uncertain={task.uncertain} />
       <FormActions>
         <Button disabled={task.busy || task.uncertain} onClick={onBack}>
-          返回并刷新详情
+          取消
         </Button>
         <Button
           type="submit"
@@ -575,7 +657,6 @@ function Records({ id, revision }: { id: string; revision: number }) {
   );
   return (
     <section className="platform-detail-section">
-      <h3>管理记录</h3>
       {records.error ? (
         <Failure error={records.error} retry={() => setAttempt((v) => v + 1)} />
       ) : !records.value ? (

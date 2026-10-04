@@ -1,0 +1,122 @@
+diff --git a/src/platform/PlatformHome.tsx b/src/platform/PlatformHome.tsx
+index 5ed109b..275ef64 100644
+--- a/src/platform/PlatformHome.tsx
++++ b/src/platform/PlatformHome.tsx
+@@ -109,9 +109,8 @@ export function PlatformHome({ embedded: _embedded = false }: { embedded?: boole
+       {overview.value?.invitationDelivery === 'DISABLED' && (
+         <p className="platform-help">邀请投递尚未启用，暂不能开通企业。</p>
+       )}
+-      <section className="access-panel platform-catalog" aria-label="企业列表">
++      <section className="access-panel platform-catalog platform-enterprise-catalog" aria-label="企业列表">
+         <div className="platform-list-heading">
+-          <h2>企业</h2>
+           <form
+             className="platform-filters"
+             onSubmit={(e) => {
+@@ -120,8 +119,7 @@ export function PlatformHome({ embedded: _embedded = false }: { embedded?: boole
+               setPage(0);
+             }}
+           >
+-            <label className="platform-search">
+-              <Search size={16} />
++            <div className="platform-search">
+               <input
+                 aria-label="搜索企业"
+                 placeholder="搜索企业名称"
+@@ -129,8 +127,8 @@ export function PlatformHome({ embedded: _embedded = false }: { embedded?: boole
+                 maxLength={100}
+                 onChange={(e) => setDraft(e.target.value)}
+               />
+-            </label>
+-            <Button type="submit">搜索</Button>
++              <Button type="submit" variant="ghost" icon={Search} aria-label="搜索企业名称" />
++            </div>
+             <select
+               aria-label="企业状态"
+               value={status}
+@@ -185,9 +183,6 @@ export function PlatformHome({ embedded: _embedded = false }: { embedded?: boole
+                         }}
+                       >
+                         <span className="platform-tenant-identity">
+-                          <span className="platform-tenant-icon">
+-                            <Building2 size={20} aria-hidden="true" />
+-                          </span>
+                           <span className="platform-tenant-name">
+                             <strong>{item.name}</strong>
+                           </span>
+@@ -205,7 +200,7 @@ export function PlatformHome({ embedded: _embedded = false }: { embedded?: boole
+                           {item.activeMemberCount}
+                         </span>
+                         <time className="platform-created" dateTime={item.createdAt}>
+-                          {time(item.createdAt)}
++                          {new Date(item.createdAt).toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' })}
+                         </time>
+                         <span className="platform-service-label">
+                           <Badge blue={item.status === 'ACTIVE'}>{statusLabel(item.status)}</Badge>
+diff --git a/src/platform/platform.css b/src/platform/platform.css
+index 70555bd..877b090 100644
+--- a/src/platform/platform.css
++++ b/src/platform/platform.css
+@@ -471,3 +471,62 @@
+   white-space: pre-wrap;
+   overflow-wrap: anywhere;
+ }
++
++/* 企业目录：单层工具栏与紧凑数据行。 */
++.admin-platform .platform-enterprise-catalog .platform-list-heading {
++  padding: 16px 24px;
++}
++.admin-platform .platform-enterprise-catalog .platform-filters {
++  width: 100%;
++  justify-content: space-between;
++}
++.admin-platform .platform-enterprise-catalog .platform-search {
++  width: min(360px, 100%);
++  padding-left: 0;
++  gap: 0;
++  flex: 0 1 360px;
++}
++.admin-platform .platform-enterprise-catalog .platform-search input {
++  width: 100%;
++  flex: 1;
++  padding-left: 12px;
++}
++.admin-platform .platform-enterprise-catalog .platform-search .button {
++  border: 0;
++  flex-shrink: 0;
++  color: var(--muted);
++}
++.admin-platform .platform-enterprise-catalog .platform-filters select {
++  margin-left: auto;
++}
++.admin-platform .platform-enterprise-catalog .platform-list-columns {
++  background: transparent;
++  padding-block: 10px;
++}
++.admin-platform .platform-enterprise-catalog .platform-tenant-row {
++  min-height: 64px;
++  padding-block: 16px;
++  background: transparent;
++}
++.admin-platform .platform-enterprise-catalog .platform-tenant-row:hover {
++  background: var(--soft);
++}
++.admin-platform .platform-enterprise-catalog .platform-tenant-row:focus-visible {
++  outline: 2px solid var(--accent);
++  outline-offset: -3px;
++}
++@media (max-width: 600px) {
++  .admin-platform .platform-enterprise-catalog .platform-list-heading {
++    padding: 16px 18px;
++  }
++  .admin-platform .platform-enterprise-catalog .platform-filters {
++    grid-template-columns: minmax(0, 1fr) auto;
++  }
++  .admin-platform .platform-enterprise-catalog .platform-search {
++    width: 100%;
++    grid-column: 1 / -1;
++  }
++  .admin-platform .platform-enterprise-catalog .platform-filters select {
++    margin-left: 0;
++  }
++}

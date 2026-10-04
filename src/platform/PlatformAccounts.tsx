@@ -1,3 +1,4 @@
+import { Select } from '../shared/Select';
 import { useState } from 'react';
 import { uuid } from '../identity/client';
 import { ArrowLeft, Search, Users, RefreshCw } from 'lucide-react';
@@ -60,7 +61,7 @@ export function PlatformAccounts() {
             />
           </label>
           <Button type="submit">搜索</Button>
-          <select
+          <Select
             aria-label="账号状态"
             value={status}
             onChange={(e) => {
@@ -71,7 +72,20 @@ export function PlatformAccounts() {
             <option value="">全部状态</option>
             <option value="ACTIVE">已启用</option>
             <option value="DISABLED">已停用</option>
-          </select>
+          </Select>
+          {(query || status) && (
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setDraft('');
+                setQuery('');
+                setStatus('');
+                setPage(0);
+              }}
+            >
+              清除筛选
+            </Button>
+          )}
         </form>
       </div>
       {data.error ? (

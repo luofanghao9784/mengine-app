@@ -219,3 +219,371 @@
   flex: 1;
   width: auto;
 }
+
+/* Platform refinements: retain the shared enterprise baseline above. */
+.admin-platform .usage-page {
+  --usage-maintenance: #657fa8;
+  display: grid;
+  gap: 24px;
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
+}
+.admin-platform .usage-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.admin-platform .usage-heading h2,
+.admin-platform .usage-section h2,
+.admin-platform .usage-heading h3 {
+  margin: 0;
+}
+.admin-platform .usage-filter {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.admin-platform .usage-filter input,
+.admin-platform .usage-filter select {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface, #fff);
+  max-width: 100%;
+  min-width: 0;
+}
+.admin-platform .usage-section {
+  padding: 22px;
+  min-width: 0;
+  display: grid;
+  gap: 14px;
+}
+.admin-platform .usage-section > .badge {
+  justify-self: start;
+}
+.admin-platform .usage-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+.admin-platform .usage-metrics > div {
+  padding: 6px 18px 6px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  min-width: 0;
+  border-right: 1px solid var(--line);
+}
+.admin-platform .usage-metrics > div:last-child {
+  border-right: 0;
+}
+.admin-platform .usage-page dt,
+.admin-platform .usage-page small,
+.admin-platform .usage-page .admin-note {
+  color: var(--muted);
+  font-size: var(--font-caption);
+  line-height: 1.65;
+}
+.admin-platform .usage-page dd {
+  margin: 6px 0;
+  overflow-wrap: anywhere;
+}
+.admin-platform .usage-metrics dd {
+  font-size: var(--font-display);
+  font-weight: 600;
+}
+.admin-platform .usage-groups {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.admin-platform .usage-groups article {
+  border-top: 1px solid var(--line);
+  background: transparent;
+  border-radius: 0;
+  padding: 18px 0 0;
+  min-width: 0;
+}
+.admin-platform .usage-groups dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.admin-platform .usage-groups dd {
+  font-weight: 600;
+  font-size: var(--font-heading);
+}
+.admin-platform .usage-limits {
+  font-size: var(--font-caption);
+  color: var(--muted);
+  line-height: 1.7;
+}
+.admin-platform .usage-tool {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: var(--font-body);
+}
+.admin-platform .usage-directory {
+  display: grid;
+  gap: 4px;
+  margin-top: 14px;
+}
+.admin-platform .usage-directory a {
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+  color: inherit;
+  text-decoration: none;
+}
+.admin-platform .usage-directory a:hover {
+  background: var(--soft);
+}
+.admin-platform .usage-directory small {
+  display: block;
+}
+.admin-platform .usage-directory a > span:last-child {
+  display: flex;
+  align-items: center;
+  font-size: var(--font-caption);
+  color: var(--blue-ink);
+  flex-shrink: 0;
+}
+.admin-platform .usage-bars {
+  height: 170px;
+  display: flex;
+  gap: 4px;
+  align-items: stretch;
+  margin: 25px 0 15px;
+}
+.admin-platform .usage-bars > div {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+}
+.admin-platform .usage-bars > div > div {
+  display: flex;
+  gap: 2px;
+  align-items: flex-end;
+  border-bottom: 1px solid var(--line);
+  height: 145px;
+}
+.admin-platform .usage-bars i {
+  display: block;
+  flex: 1;
+  min-height: 0;
+  background: var(--accent);
+  border-radius: 3px 3px 0 0;
+}
+.admin-platform .usage-bars i + i {
+  background: var(--usage-maintenance, #9ebdfa);
+}
+.admin-platform .usage-bars i.incomplete {
+  border-top: 3px dotted #9c6200;
+  min-height: 4px;
+}
+.admin-platform .usage-bars small {
+  font-size: 10px;
+}
+.admin-platform .usage-trend summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--blue-ink);
+}
+.admin-platform .usage-table {
+  overflow: auto;
+  margin-top: 12px;
+}
+.admin-platform .usage-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.admin-platform .usage-table td,
+.admin-platform .usage-table th {
+  padding: 10px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+@media (max-width: 1100px) {
+  .admin-platform .usage-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 620px) {
+  .admin-platform .usage-section {
+    padding: 16px;
+  }
+  .admin-platform .usage-groups {
+    grid-template-columns: 1fr;
+  }
+  .admin-platform .usage-metrics {
+    gap: 8px;
+  }
+  .admin-platform .usage-metrics > div {
+    padding: 6px 12px 6px 0;
+  }
+  .admin-platform .usage-metrics dd {
+    font-size: 21px;
+  }
+  .admin-platform .usage-bars {
+    gap: 2px;
+  }
+  .admin-platform .usage-bars small {
+    font-size: 9px;
+  }
+  .admin-platform .usage-filter input {
+    width: 190px;
+  }
+  .admin-platform .usage-directory a {
+    padding: 12px 0;
+  }
+}
+.admin-platform .usage-cost-summary {
+  padding: 18px 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  background: var(--soft);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px 32px;
+  align-items: start;
+}
+.admin-platform .usage-cost-summary h2 {
+  margin: 0;
+  font-size: var(--font-heading);
+}
+.admin-platform .usage-cost-summary dl {
+  display: flex;
+  gap: 16px 32px;
+  flex-wrap: wrap;
+  margin: 0;
+}
+.admin-platform .usage-cost-summary dl > div {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+}
+.admin-platform .usage-cost-summary dd {
+  margin: 0;
+  font-weight: 550;
+}
+.admin-platform .usage-cost-summary > p,
+.admin-platform .usage-cost-summary > details {
+  grid-column: 1 / -1;
+}
+.admin-platform .usage-explanation summary,
+.admin-platform .usage-trend summary {
+  width: fit-content;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  color: var(--blue-ink);
+  font-size: var(--font-caption);
+}
+.admin-platform .usage-explanation summary::before,
+.admin-platform .usage-trend summary::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+}
+.admin-platform .usage-explanation[open] > summary::before,
+.admin-platform .usage-trend details[open] > summary::before {
+  transform: rotate(45deg);
+}
+.admin-platform .usage-explanation summary:focus-visible,
+.admin-platform .usage-trend summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+.admin-platform .usage-explanation p + p {
+  margin-top: 12px;
+}
+.admin-platform .usage-explanation p,
+.admin-platform .usage-section > .admin-note {
+  max-width: 75ch;
+}
+.admin-platform .usage-trend-empty {
+  padding-block: 18px;
+}
+.admin-platform .usage-trend-empty strong {
+  font-size: var(--font-body);
+}
+.admin-platform .usage-trend-empty p {
+  margin-top: 8px;
+}
+.admin-platform .usage-chart-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 18px;
+  color: var(--muted);
+  font-size: var(--font-caption);
+}
+.admin-platform .usage-chart-key span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.admin-platform .usage-chart-key i {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+.admin-platform .usage-chart-key span + span i {
+  background: var(--usage-maintenance, #9ebdfa);
+}
+.admin-platform .usage-unknown-note {
+  color: var(--muted);
+  font-size: var(--font-caption);
+  margin-block: 12px;
+}
+@media (max-width: 620px) {
+  .admin-platform .usage-cost-summary {
+    grid-template-columns: 1fr;
+    padding: 16px;
+    gap: 12px;
+  }
+  .admin-platform .usage-cost-summary dl {
+    display: grid;
+    gap: 8px;
+  }
+  .admin-platform .usage-cost-summary dl > div {
+    justify-content: space-between;
+  }
+  .admin-platform .usage-filter .button,
+  .admin-platform .usage-filter select,
+  .admin-platform .usage-filter input {
+    min-height: 44px;
+  }
+  .admin-platform .usage-section .usage-filter input {
+    flex-basis: 100%;
+  }
+  .admin-platform .usage-metrics > div:nth-child(even) {
+    border-right: 0;
+  }
+}
+.admin-platform .usage-section form.usage-filter {
+  display: flex;
+  margin: 14px 0;
+}
+.admin-platform .usage-section .usage-filter input {
+  flex: 1;
+  width: auto;
+}

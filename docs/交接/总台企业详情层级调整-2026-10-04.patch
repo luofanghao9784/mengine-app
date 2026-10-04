@@ -1,0 +1,352 @@
+diff --git a/src/platform/PlatformHome.tsx b/src/platform/PlatformHome.tsx
+index 60762ba..81f49d2 100644
+--- a/src/platform/PlatformHome.tsx
++++ b/src/platform/PlatformHome.tsx
+@@ -1,6 +1,6 @@
+ import { Select } from '../shared/Select';
+ import { useContext, useEffect, useState } from 'react';
+-import { Building2, ChevronRight, Plus, RefreshCw, Search, Send } from 'lucide-react';
++import { ArrowLeft, Building2, ChevronRight, Plus, RefreshCw, Search, Send } from 'lucide-react';
+ import { useViewState, textState, pageState } from '../shared/useViewState';
+ import { useAdminRoute } from '../admin/AdminShell';
+ import { adminHref } from '../admin/navigation';
+@@ -73,23 +73,7 @@ export function PlatformHome({ embedded: _embedded = false }: { embedded?: boole
+   const refresh = () => setAttempt((v) => v + 1);
+   if (tenant)
+     return (
+-      <>
+-        <Button
+-          variant="ghost"
+-          disabled={pending}
+-          onClick={() => {
+-            location.hash = adminHref('platform', 'tenants', hash);
+-          }}
+-        >
+-          返回企业列表
+-        </Button>
+-        <TenantView
+-          key={tenant}
+-          id={tenant}
+-          delivery={overview.value?.invitationDelivery}
+-          onChange={refresh}
+-        />
+-      </>
++      <TenantView key={tenant} id={tenant} delivery={overview.value?.invitationDelivery} onChange={refresh} />
+     );
+   return (
+     <>
+@@ -321,6 +305,7 @@ function TenantView({
+   const [attempt, setAttempt] = useState(0);
+   const [action, setAction] = useState<'status' | 'invite' | 'revoke'>();
+   const [notice, setNotice] = useState('');
++  const [recoveryOpen, setRecoveryOpen] = useState(false);
+   const detail = useRemote((signal) => platformClient.detail(id, signal), [id, attempt]);
+   const reload = () => {
+     setAction(undefined);
+@@ -331,16 +316,29 @@ function TenantView({
+   const value = detail.value,
+     invitation = value.initialAdminInvitation;
+   return (
+-    <section className="access-panel platform-enterprise-detail" aria-label="企业详情">
++    <section
++      className="access-panel platform-enterprise-detail platform-enterprise-redesign"
++      aria-label="企业详情"
++    >
+       <PageActions>
+         <Button variant="ghost" icon={RefreshCw} onClick={reload} disabled={pending}>
+           刷新详情
+         </Button>
+       </PageActions>
+-      <div className="platform-detail-title">
+-        <div>
++      <div className="platform-enterprise-heading">
++        <Button
++          variant="ghost"
++          icon={ArrowLeft}
++          className="platform-detail-back"
++          aria-label="返回企业列表"
++          disabled={pending || !!action}
++          onClick={() => {
++            location.hash = adminHref('platform', 'tenants', hash);
++          }}
++        />
++        <div className="platform-enterprise-heading-text">
+           <h2>{value.tenant.name}</h2>
+-          <p className="muted">负责人：{ownerLabel(value.owner)}</p>
++          <p>负责人：{ownerLabel(value.owner)}</p>
+         </div>
+         <Badge blue={value.tenant.status === 'ACTIVE'}>{statusLabel(value.tenant.status)}</Badge>
+       </div>
+@@ -358,7 +356,7 @@ function TenantView({
+           <Button
+             key={key}
+             disabled={pending || !!action}
+-            variant={tab === key ? 'primary' : 'ghost'}
++            variant="ghost"
+             aria-current={tab === key ? 'page' : undefined}
+             onClick={() => {
+               location.hash = adminHref('platform', 'tenants', hash, { enterprise: id, section: key });
+@@ -368,20 +366,7 @@ function TenantView({
+           </Button>
+         ))}
+       </nav>
+-      {action ? (
+-        <TenantAction
+-          key={action}
+-          detail={value}
+-          action={action}
+-          delivery={delivery}
+-          onBack={reload}
+-          onSuccess={() => {
+-            setNotice('操作已处理，已重新核对企业状态。');
+-            reload();
+-            onChange();
+-          }}
+-        />
+-      ) : tab === 'usage' ? (
++      {tab === 'usage' ? (
+         <UsagePanel scope="platform" tenant={id} revision={attempt} />
+       ) : tab === 'records' ? (
+         <Records id={id} revision={attempt} />
+@@ -400,11 +385,6 @@ function TenantView({
+               <p className="muted">内部处理备注：{value.serviceChange.internalReason}</p>
+             </section>
+           )}
+-          {value.tenant.status === 'SUSPENDED' && (
+-            <Button variant="primary" onClick={() => setAction('status')}>
+-              恢复服务
+-            </Button>
+-          )}
+           <dl className="platform-facts">
+             <div>
+               <dt>开通时间</dt>
+@@ -419,8 +399,14 @@ function TenantView({
+               <dd>{value.workspaceCount}</dd>
+             </div>
+           </dl>
+-          <section className="platform-detail-section">
+-            <h3>初始负责人邀请</h3>
++          <details
++            className="platform-detail-section platform-invite-history"
++            open={invitation?.status !== 'ACCEPTED' || undefined}
++          >
++            <summary>
++              {invitation?.status === 'ACCEPTED' ? '初始邀请记录' : '初始负责人邀请'}
++              <span>{invitation && invitationLabel[invitation.status]}</span>
++            </summary>
+             {invitation ? (
+               <>
+                 <div className="platform-invitation-line">
+@@ -457,18 +443,79 @@ function TenantView({
+             ) : (
+               <p className="muted">没有初始邀请记录。</p>
+             )}
+-          </section>
+-          <details className="platform-detail-section">
+-            <summary>更多管理操作</summary>
+-            {value.tenant.status === 'ACTIVE' && (
+-              <Button variant="danger" onClick={() => setAction('status')}>
+-                暂停服务
+-              </Button>
+-            )}
+-            <RecoveryForm tenant={id} platform />
+           </details>
++          <section className="platform-enterprise-management" aria-label="企业管理操作">
++            <h3>管理操作</h3>
++            <div className="platform-management-row">
++              <div>
++                <strong>企业服务</strong>
++                <p>
++                  {value.tenant.status === 'ACTIVE'
++                    ? '调整企业访问与后续运行的服务状态。'
++                    : '企业服务已暂停，可在核对后恢复。'}
++                </p>
++              </div>
++              <Button
++                variant={value.tenant.status === 'ACTIVE' ? 'ghost' : 'primary'}
++                onClick={() => setAction('status')}
++                disabled={pending}
++              >
++                {value.tenant.status === 'ACTIVE' ? '暂停服务' : '恢复服务'}
++              </Button>
++            </div>
++            <div className="platform-management-row">
++              <div>
++                <strong>负责人恢复受理</strong>
++                <p>负责人无法履职或身份未核实时，登记申请并等待核验。</p>
++              </div>
++              <Button variant="ghost" onClick={() => setRecoveryOpen(true)} disabled={pending}>
++                登记申请
++              </Button>
++            </div>
++          </section>
+         </>
+       )}
++      {action && (
++        <Modal
++          className="platform-management-modal"
++          title={
++            action === 'invite'
++              ? '重新邀请负责人'
++              : action === 'revoke'
++                ? '撤销邀请'
++                : value.tenant.status === 'ACTIVE'
++                  ? '暂停企业服务'
++                  : '恢复企业服务'
++          }
++          onClose={() => {
++            if (!pending) setAction(undefined);
++          }}
++        >
++          <TenantAction
++            key={action}
++            detail={value}
++            action={action}
++            delivery={delivery}
++            onBack={reload}
++            onSuccess={() => {
++              setNotice('操作已处理，已重新核对企业状态。');
++              reload();
++              onChange();
++            }}
++          />
++        </Modal>
++      )}
++      {recoveryOpen && (
++        <Modal
++          className="platform-management-modal"
++          title="负责人恢复受理"
++          onClose={() => {
++            if (!pending) setRecoveryOpen(false);
++          }}
++        >
++          <RecoveryForm tenant={id} platform />
++        </Modal>
++      )}
+     </section>
+   );
+ }
+@@ -535,9 +582,7 @@ function TenantAction({
+         );
+       }}
+     >
+-      <h3>
+-        {label} · {detail.tenant.name}
+-      </h3>
++      <p className="platform-action-target">{detail.tenant.name}</p>
+       <p className="muted">
+         {action === 'revoke'
+           ? '撤销后，此邀请立即失效；企业仍保留，可稍后重新邀请。已接受的邀请不能撤销或由总台更换负责人。'
+@@ -590,7 +635,7 @@ function TenantAction({
+       <SubmitError error={task.error} uncertain={task.uncertain} />
+       <FormActions>
+         <Button disabled={task.busy || task.uncertain} onClick={onBack}>
+-          返回并刷新详情
++          取消
+         </Button>
+         <Button
+           type="submit"
+@@ -612,7 +657,6 @@ function Records({ id, revision }: { id: string; revision: number }) {
+   );
+   return (
+     <section className="platform-detail-section">
+-      <h3>管理记录</h3>
+       {records.error ? (
+         <Failure error={records.error} retry={() => setAttempt((v) => v + 1)} />
+       ) : !records.value ? (
+diff --git a/src/platform/platform.css b/src/platform/platform.css
+index 877b090..78508a2 100644
+--- a/src/platform/platform.css
++++ b/src/platform/platform.css
+@@ -530,3 +530,33 @@
+     margin-left: 0;
+   }
+ }
++
++/* 企业详情：对象信息、内容页签与按需操作。 */
++.admin-platform .platform-enterprise-redesign { margin-top: 0; padding: 0; }
++.platform-enterprise-heading { display: flex; align-items: center; gap: 14px; padding: 24px; }
++.platform-enterprise-heading-text { flex: 1; min-width: 0; }
++.platform-enterprise-heading-text h2 { margin: 0; font-size: 20px; font-weight: 600; }
++.platform-enterprise-heading-text p { margin: 6px 0 0; color: var(--muted); font-size: 13px; }
++.admin-platform .platform-detail-back { border: 1px solid var(--line); width: 36px; height: 36px; padding: 0; flex-shrink: 0; }
++.admin-platform .platform-enterprise-redesign .platform-detail-nav { margin: 0; padding: 0 24px; gap: 24px; border-bottom: 1px solid var(--line); }
++.admin-platform .platform-enterprise-redesign .platform-detail-nav .button { padding: 12px 0; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; color: var(--muted); }
++.admin-platform .platform-enterprise-redesign .platform-detail-nav .button[aria-current='page'] { color: var(--accent); border-bottom-color: var(--accent); }
++.platform-enterprise-redesign > .platform-facts { margin: 0; padding: 24px; grid-template-columns: 1fr 1fr 1fr; border-bottom: 1px solid var(--line); }
++.platform-enterprise-redesign > .platform-detail-section { margin: 0; padding: 20px 24px; border-top: 0; }
++.platform-invite-history > summary { display: flex; align-items: center; gap: 12px; cursor: pointer; font-weight: 550; font-size: 14px; }
++.platform-invite-history > summary::before { content: '›'; color: var(--muted); }
++.platform-invite-history[open] > summary::before { transform: rotate(90deg); }
++.platform-invite-history > summary span { margin-left: auto; font-weight: 400; font-size: 12px; color: var(--muted); }
++.admin-platform .platform-invite-history > summary { margin-bottom: 0; }
++.admin-platform .platform-invite-history[open] > summary { margin-bottom: 20px; }
++.platform-enterprise-management { padding: 20px 24px 8px; border-top: 1px solid var(--line); }
++.platform-enterprise-management h3 { font-size: 13px; color: var(--muted); font-weight: 500; margin: 0 0 8px; }
++.platform-management-row { display: flex; align-items: center; gap: 24px; padding: 16px 0; }
++.platform-management-row + .platform-management-row { border-top: 1px solid var(--line); }
++.platform-management-row > div { flex: 1; }
++.platform-management-row strong { font-size: 14px; font-weight: 550; }
++.platform-management-row p { margin: 5px 0 0; font-size: 13px; color: var(--muted); }
++.platform-enterprise-redesign > .usage-page, .platform-enterprise-redesign > .departure-status, .platform-enterprise-redesign > .platform-service-state, .platform-enterprise-redesign > .access-success { margin: 20px 24px; }
++.platform-management-modal .platform-action-target { margin: 0 0 12px; font-weight: 550; }
++.platform-management-modal .governance-section { border-top: 0; margin-top: 0; padding-top: 0; }
++.platform-management-modal fieldset { border: 0; padding: 0; margin: 16px 0; min-width: 0; }
+diff --git a/src/governance/RecoveryForm.tsx b/src/governance/RecoveryForm.tsx
+index 0e95ad9..0475ce5 100644
+--- a/src/governance/RecoveryForm.tsx
++++ b/src/governance/RecoveryForm.tsx
+@@ -1,3 +1,4 @@
++import { useRequestLock } from '../shared/request-guard';
+ import { Select } from '../shared/Select';
+ import { useState } from 'react';
+ import type { RecoveryReceipt, RecoveryRequest } from '../../contracts/public-api/governance';
+@@ -8,9 +9,10 @@ export function RecoveryForm({ tenant, platform = false }: { tenant: string; pla
+   const [reason, setReason] = useState<RecoveryRequest['reason']>('OWNER_UNAVAILABLE'),
+     [receipt, setReceipt] = useState<RecoveryReceipt>();
+   const task = useSubmission<RecoveryRequest['reason']>();
++  useRequestLock(task.busy || task.uncertain);
+   return (
+     <section className="governance-section">
+-      <h3>负责人恢复受理</h3>
++      {!platform && <h3>负责人恢复受理</h3>}
+       <p className="muted">
+         登记失联或存量责任未核实的情况，等待核验。提交申请不会恢复账号、指定接班人或授予内容访问权。
+       </p>
+diff --git a/src/shared/select.css b/src/shared/select.css
+index 0121341..796dc64 100644
+--- a/src/shared/select.css
++++ b/src/shared/select.css
+@@ -12,7 +12,7 @@
+   height: 1px !important;
+   padding: 0 !important;
+ }
+-.admin-platform .app-select-trigger {
++.app-select-trigger {
+   display: flex;
+   align-items: center;
+   justify-content: space-between;
+@@ -38,11 +38,11 @@
+   flex-shrink: 0;
+   color: #64748b;
+ }
+-.admin-platform .app-select-trigger:hover {
++.app-select-trigger:hover {
+   border-color: #a9bbd4;
+ }
+-.admin-platform .app-select-trigger:focus-visible,
+-.admin-platform .app-select-trigger[aria-expanded='true'] {
++.app-select-trigger:focus-visible,
++.app-select-trigger[aria-expanded='true'] {
+   outline: 2px solid #c5d9fc;
+   outline-offset: 1px;
+   border-color: #3373df;
+@@ -90,7 +90,7 @@
+   opacity: 0.45;
+   cursor: default;
+ }
+-.admin-platform .field .app-select {
++.field .app-select {
+   display: flex;
+   width: 100%;
+ }

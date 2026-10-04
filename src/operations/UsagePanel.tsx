@@ -1,19 +1,22 @@
-import { useState } from 'react';
+import { Select } from '../shared/Select';
+import { useState, type ReactNode } from 'react';
 import { RefreshCw, Search, ArrowLeft, ChevronRight } from 'lucide-react';
 import type {
   UsageClass,
   UsageOverview,
   UsagePeriod,
   ModelUsageGroup,
+  UsageCost,
 } from '../../contracts/public-api/usage';
 import { usagePeriods } from '../../contracts/public-api/usage';
-import { Button, Badge } from '../shared/ui';
+import { Button, Badge, PageActions } from '../shared/ui';
 import { useRemote, Failure, Loading, Pager } from '../shared/admin';
 import { useViewState, textState, pageState } from '../shared/useViewState';
 import { platformClient } from '../platform/client';
 import { adminHref } from '../admin/navigation';
 import { uuid } from '../identity/client';
 import { usageClient as api } from './usage-client';
+import { usageTrendState } from './usage-presentation';
 import './usage.css';
 const numbers = (v: number | null) => (v === null ? '未知' : v.toLocaleString('zh-CN'));
 const names: Record<UsageClass, string> = {
@@ -167,11 +170,31 @@ function ScopedUsage({
     [scope, tenant, period, attempt, revision],
   );
   const value = data.value && ('usage' in data.value ? data.value.usage : data.value);
+  const cost = data.value && 'cost' in data.value ? data.value.cost : undefined;
+  const controls = (
+    <div className="usage-filter">
+      <Select
+        aria-label="用量统计期间"
+        value={period}
+        onChange={(e) => changePeriod(e.target.value as UsagePeriod)}
+      >
+        {usagePeriods.map((p) => (
+          <option value={p} key={p}>
+            {periods[p]}
+          </option>
+        ))}
+      </Select>
+      <Button variant="ghost" icon={RefreshCw} onClick={refresh}>
+        更新用量
+      </Button>
+    </div>
+  );
   return (
     <div className="usage-page">
+      {scope === 'platform' && <PageActions>{controls}</PageActions>}
       <div className="usage-heading">
         <div>
-          <h2>{scope === 'platform' ? '用量与成本' : '本企业用量'}</h2>
+          {scope === 'tenant' && <h2>本企业用量</h2>}
           <p className="admin-note">
             {scope === 'platform' ? (
               tenant ? (
@@ -184,34 +207,20 @@ function ScopedUsage({
             )}
           </p>
         </div>
-        <div className="usage-filter">
-          <select
-            aria-label="用量统计期间"
-            value={period}
-            onChange={(e) => changePeriod(e.target.value as UsagePeriod)}
-          >
-            {usagePeriods.map((p) => (
-              <option value={p} key={p}>
-                {periods[p]}
-              </option>
-            ))}
-          </select>
-          <Button variant="ghost" icon={RefreshCw} onClick={refresh}>
-            更新用量
-          </Button>
-        </div>
+        {scope === 'tenant' && controls}
       </div>
       {data.error ? (
         <Failure error={data.error} retry={refresh} />
       ) : !value ? (
         <Loading />
       ) : (
-        <UsageFacts value={value} platform={scope === 'platform'} />
+        <UsageFacts value={value} cost={cost} />
       )}
     </div>
   );
 }
-function UsageFacts({ value: v, platform }: { value: UsageOverview; platform: boolean }) {
+function UsageFacts({ value: v, cost }: { value: UsageOverview; cost?: UsageCost }) {
+  const platform = !!cost;
   const work = v.groups.find((g) => g.purpose === 'WORK' && g.executionClass === 'live');
   const maintenance = v.groups.find((g) => g.purpose === 'MAINTENANCE' && g.executionClass === 'live');
   const tools = v.tools.find((t) => t.executionClass === 'live');
@@ -221,6 +230,7 @@ function UsageFacts({ value: v, platform }: { value: UsageOverview; platform: bo
         统计：{time(v.from, v.timeZone)} 至 {time(v.until, v.timeZone)} · {v.timeZone}。读取于{' '}
         {time(v.checkedAt, v.timeZone)}。
       </p>
+      {cost && <CostSummary cost={cost} />}
       <dl className="usage-metrics">
         <div>
           <dt>日常模型登记请求</dt>
@@ -248,9 +258,11 @@ function UsageFacts({ value: v, platform }: { value: UsageOverview; platform: bo
       <section className="admin-section usage-section" aria-label="每日用量趋势">
         <h2>每日用量</h2>
         <p className="admin-note">
-          仅正式执行。蓝色为日常请求开始登记，浅蓝为基础维护回执调用（归属运行开始日）；两种口径分别观察，不代表账单或业务效果。
+          {platform
+            ? '仅正式执行；日常请求与维护回执分别计量，不合并为账单。'
+            : '仅正式执行。蓝色为日常请求开始登记，浅蓝为基础维护回执调用（归属运行开始日）；两种口径分别观察，不代表账单或业务效果。'}
         </p>
-        <Trend days={v.days} />
+        <Trend days={v.days} platform={platform} />
       </section>
       <section className="admin-section usage-section" aria-label="用途与计量覆盖">
         <h2>用途与计量覆盖</h2>
@@ -292,22 +304,33 @@ function UsageFacts({ value: v, platform }: { value: UsageOverview; platform: bo
         ) : (
           <p className="admin-note">该期间暂无模型计量记录。</p>
         )}
-        <div className="usage-limits">
-          <p>
-            日常工作：按请求登记时间归集，包含会话、画报、失败、取消与重试；登记请求不保证已被供应商接收。
+        <UsageExplanation platform={platform} summary="查看用途与计量口径">
+          <div className="usage-limits">
+            <p>
+              日常工作：按请求登记时间归集，包含会话、画报、失败、取消与重试；登记请求不保证已被供应商接收。
+            </p>
+            <p>
+              基础维护：企业信息、经验提炼与核验、通用经验处理。按运行开始时间归集回执；尚未收到或未记录的回执不可推算，历史类别未知单列。
+            </p>
+            <p>评测：尚未接入独立计量。自进化：未启用。合成验证不计作正式执行或实际费用。</p>
+            {!platform && (
+              <p>
+                期间另有 {v.coverage.unmeteredWorkAttempts}{' '}
+                次日常尝试未启用请求计量，不能补算为零。这里显示当前保留记录，不作为完整财务账本。
+              </p>
+            )}
+          </div>
+        </UsageExplanation>
+        {platform && (
+          <p className="admin-note">
+            另有 {v.coverage.unmeteredWorkAttempts}{' '}
+            次日常尝试未启用请求计量，不能补算为零；当前保留记录不作为完整财务账本。
           </p>
-          <p>
-            基础维护：企业信息、经验提炼与核验、通用经验处理。按运行开始时间归集回执；尚未收到或未记录的回执不可推算，历史类别未知单列。
-          </p>
-          <p>评测：尚未接入独立计量。自进化：未启用。合成验证不计作正式执行或实际费用。</p>
-          <p>
-            期间另有 {v.coverage.unmeteredWorkAttempts}{' '}
-            次日常尝试未启用请求计量，不能补算为零。这里显示当前保留记录，不作为完整财务账本。
-          </p>
-        </div>
+        )}
       </section>
       <section className="admin-section usage-section" aria-label="工具与存储">
         <h2>工具与存储</h2>
+        {platform && <p className="admin-note">工具耗时包含回执传输延迟；原件登记量不含索引、导出与备份。</p>}
         {v.tools.length ? (
           v.tools.map((t) => (
             <div className="usage-tool" key={t.executionClass}>
@@ -327,69 +350,131 @@ function UsageFacts({ value: v, platform }: { value: UsageOverview; platform: bo
         ) : (
           <p className="admin-note">该期间暂无带开始时间的工具记录。</p>
         )}
-        <p className="admin-note">
-          耗时从服务端接收开始到最终回执，包含回执传输延迟；不代表纯 CPU 用时。维护内部工具尚未接入。另有{' '}
-          {v.coverage.legacyToolReceipts}{' '}
-          条历史回执无开始时间，按末次回执时间识别，未伪造耗时或混入每日开始量。
-        </p>
-        <p className="admin-note">
-          原件为当前未登记物理清理的版本，包含历史版本及回收站，不随期间筛选变化；不含索引、导出与备份。
-        </p>
+        <UsageExplanation platform={platform} summary="查看工具与存储口径">
+          <p className="admin-note">
+            耗时从服务端接收开始到最终回执，包含回执传输延迟；不代表纯 CPU 用时。维护内部工具尚未接入。另有{' '}
+            {v.coverage.legacyToolReceipts}{' '}
+            条历史回执无开始时间，按末次回执时间识别，未伪造耗时或混入每日开始量。
+          </p>
+          <p className="admin-note">
+            原件为当前未登记物理清理的版本，包含历史版本及回收站，不随期间筛选变化；不含索引、导出与备份。
+          </p>
+        </UsageExplanation>
       </section>
-      {platform && (
-        <section className="admin-section usage-section" aria-label="运行成本">
-          <h2>运行成本</h2>
-          <dl className="usage-metrics">
-            <div>
-              <dt>已核实成本</dt>
-              <dd>未接入</dd>
-              <small>尚无供应商对账依据</small>
-            </div>
-            <div>
-              <dt>估算成本</dt>
-              <dd>未配置</dd>
-              <small>不以 Token 数猜测单价</small>
-            </div>
-            <div>
-              <dt>共享基础设施</dt>
-              <dd>未分摊</dd>
-              <small>独立列示，不假定企业分摊</small>
-            </div>
-          </dl>
-          <p className="admin-note">平台运行成本不等于企业售价。计费架构、套餐和账单后续专题设计。</p>
-        </section>
-      )}
       <section className="admin-section usage-section" aria-label="企业额度">
         <h2>{v.tenantId ? '企业额度' : '额度管理'}</h2>
         <Badge>未配置</Badge>
-        <p className="admin-note">
-          计量单位、周期、上限及超额策略尚未确定。剩余额度未知，不以模型单次请求限制代替企业额度。
-        </p>
+        {platform && <p className="admin-note">剩余额度未知，不以模型单次请求限制代替企业额度。</p>}
+        <UsageExplanation platform={platform} summary="查看额度配置范围">
+          <p className="admin-note">
+            计量单位、周期、上限及超额策略尚未确定。
+            {!platform && '剩余额度未知，不以模型单次请求限制代替企业额度。'}
+          </p>
+        </UsageExplanation>
       </section>
     </>
   );
 }
-function Trend({ days }: { days: UsageOverview['days'] }) {
+function UsageExplanation({
+  platform,
+  summary,
+  children,
+}: {
+  platform: boolean;
+  summary: string;
+  children: ReactNode;
+}) {
+  return platform ? (
+    <details className="usage-explanation">
+      <summary>{summary}</summary>
+      {children}
+    </details>
+  ) : (
+    <>{children}</>
+  );
+}
+function CostSummary({ cost }: { cost: UsageCost }) {
+  return (
+    <section className="usage-cost-summary" aria-label="运行成本">
+      <h2>运行成本</h2>
+      <dl>
+        <div>
+          <dt>已核实成本</dt>
+          <dd>{cost.state === 'NOT_CONNECTED' ? '未接入' : '未知'}</dd>
+        </div>
+        <div>
+          <dt>估算成本</dt>
+          <dd>{cost.estimatedMinor === null ? '未配置' : '未知'}</dd>
+        </div>
+        <div>
+          <dt>共享基础设施</dt>
+          <dd>{cost.sharedAllocation === 'NOT_CONFIGURED' ? '未分摊' : '未知'}</dd>
+        </div>
+      </dl>
+      <p className="admin-note">尚无供应商对账依据，平台运行成本不等于企业售价。</p>
+      <details className="usage-explanation">
+        <summary>查看成本口径</summary>
+        <p className="admin-note">
+          不以 Token 数猜测单价；共享费用独立列示，不假定企业分摊。计费架构、套餐和账单后续专题设计。
+        </p>
+      </details>
+    </section>
+  );
+}
+function Trend({ days, platform }: { days: UsageOverview['days']; platform: boolean }) {
+  const state = usageTrendState(days);
   const max = Math.max(1, ...days.flatMap((d) => [d.workRequests, d.maintenanceCalls ?? 0]));
   return (
     <div className="usage-trend">
-      <div className="usage-bars" role="img" aria-label="正式执行每日登记用量">
-        {days.map((d) => (
-          <div
-            key={d.date}
-            title={`${d.date}：日常 ${d.workRequests}，维护 ${numbers(d.maintenanceCalls)}，维护调用数未知 ${d.unknownMaintenanceRuns} 次运行`}
-          >
-            <div>
-              <i style={{ height: `${(d.workRequests / max) * 100}%` }} />
-              <i
-                className={d.unknownMaintenanceRuns ? 'incomplete' : ''}
-                style={{ height: `${((d.maintenanceCalls ?? 0) / max) * 100}%` }}
-              />
+      {state.hasKnownActivity ? (
+        <>
+          {platform && (
+            <div className="usage-chart-key" aria-hidden="true">
+              <span>
+                <i />
+                日常登记请求
+              </span>
+              <span>
+                <i />
+                维护回执调用
+              </span>
             </div>
-            <small>{d.date.slice(-2)}</small>
+          )}
+          <div
+            className="usage-bars"
+            role="img"
+            aria-label="正式执行每日登记用量，日常请求与维护回执分别展示；确切数值见下方每日数值"
+          >
+            {days.map((d) => (
+              <div
+                key={d.date}
+                title={`${d.date}：日常 ${d.workRequests}，维护 ${numbers(d.maintenanceCalls)}，维护调用数未知 ${d.unknownMaintenanceRuns} 次运行`}
+              >
+                <div>
+                  <i style={{ height: `${(d.workRequests / max) * 100}%` }} />
+                  <i
+                    className={d.unknownMaintenanceRuns || d.maintenanceCalls === null ? 'incomplete' : ''}
+                    style={{ height: `${((d.maintenanceCalls ?? 0) / max) * 100}%` }}
+                  />
+                </div>
+                <small>{d.date.slice(-2)}</small>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </>
+      ) : (
+        <div className="usage-trend-empty">
+          <strong>该期间暂无已知每日用量</strong>
+          <p className="admin-note">日常请求与已上报维护调用均无非零登记；未接入、未上报的消耗不计为零。</p>
+        </div>
+      )}
+      {state.hasUnknownMaintenance && (
+        <p className="admin-note usage-unknown-note">
+          维护调用仍有未知值
+          {state.unknownMaintenanceRuns > 0 ? `（${numbers(state.unknownMaintenanceRuns)} 次运行）` : ''}
+          ，未知部分不计为零；可展开每日数值核对。
+        </p>
+      )}
       <details>
         <summary>查看每日数值</summary>
         <div className="usage-table">
@@ -416,7 +501,8 @@ function Trend({ days }: { days: UsageOverview['days'] }) {
         </div>
       </details>
       <p className="admin-note">
-        无登记的日期显示 0 次登记，不代表不存在未接入的实际消耗；带点线的维护柱包含调用数未知的运行。
+        无登记的日期显示 0 次登记，不代表不存在未接入的实际消耗
+        {state.hasKnownActivity && '；带点线的维护柱包含调用数未知的运行'}。
       </p>
     </div>
   );

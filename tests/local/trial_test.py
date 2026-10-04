@@ -2,8 +2,10 @@ import importlib.util
 import os
 from pathlib import Path
 import tempfile
+import sys
 import unittest
 from unittest.mock import patch
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'scripts/local'))
 
 spec = importlib.util.spec_from_file_location('trial', Path(__file__).resolve().parents[2] / 'scripts/local/trial.py')
 trial = importlib.util.module_from_spec(spec)
@@ -98,6 +100,17 @@ class PhoneTrialBoundaryTest(unittest.TestCase):
             with patch('sys.argv', args), patch.object(trial, 'start') as start:
                 with self.assertRaises(trial.TrialError):
                     trial.main()
+                start.assert_not_called()
+
+    def test_explicit_manual_live_preserves_local_phone_without_real_sms(self):
+        with patch('sys.argv', ['trial.py', 'start', '--live', '--enable-live', '--phone-local']), patch.object(trial, 'start') as start:
+            trial.main()
+            self.assertTrue(start.call_args.kwargs['enable_live'])
+            self.assertTrue(start.call_args.kwargs['phone_local'])
+        for args in [['trial.py','start','--enable-live'], ['trial.py','status','--live','--enable-live'],
+                     ['trial.py','start','--live','--enable-live','--reconnect-live']]:
+            with patch('sys.argv', args), patch.object(trial, 'start') as start:
+                with self.assertRaises(trial.TrialError): trial.main()
                 start.assert_not_called()
 
     def test_phone_simulation_requires_an_explicit_start_flag(self):

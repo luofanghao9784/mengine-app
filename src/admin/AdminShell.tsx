@@ -1,4 +1,5 @@
-import { useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { CustomSelectContext } from '../shared/Select';
+import { useContext, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import {
   Activity,
   Archive,
@@ -18,6 +19,7 @@ import {
 import { PageActionsContext, Button } from '../shared/ui';
 import { RequestPending, requestNavigationLocked } from '../shared/request-guard';
 import { adminHref, adminPage, type AdminPage, type AdminRealm } from './navigation';
+import { navigationTabTarget } from './navigation-focus';
 import './admin.css';
 import { DreamcoreLogo } from '../components/DreamcoreLogo';
 
@@ -35,10 +37,10 @@ const entries: Record<AdminRealm, { id: AdminPage; title: string; icon: LucideIc
     { id: 'overview', title: '概览', icon: LayoutDashboard },
     { id: 'tenants', title: '企业管理', icon: Building2 },
     { id: 'accounts', title: '账号管理', icon: Users },
+    { id: 'usage', title: '用量与成本', icon: Wallet },
     { id: 'engine', title: '系统运行', icon: Activity },
     { id: 'experience', title: '经验库', icon: BookOpen },
     { id: 'capabilities', title: '引擎管理', icon: SlidersHorizontal },
-    { id: 'usage', title: '用量与成本', icon: Wallet },
   ],
 };
 export function useAdminRoute(realm: AdminRealm) {
@@ -76,12 +78,60 @@ export function AdminShell({
   const pending = useContext(RequestPending);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [actions, setActions] = useState<HTMLDivElement | null>(null);
+  const navigationId = useId();
+  const sidebar = useRef<HTMLElement>(null);
+  const menuTrigger = useRef<HTMLButtonElement>(null);
   const main = useRef<HTMLElement>(null);
   const scrollPositions = useRef(new Map<string, number>());
   const nav = entries[realm].filter((entry) => !allowedPages || allowedPages.includes(entry.id));
   const title = page === 'settings' ? '设置' : nav.find((x) => x.id === page)?.title || '概览';
+  useEffect(() => {
+    const desktop = window.matchMedia('(min-width: 761px)');
+    const closeOnDesktop = () => {
+      if (desktop.matches) setMobileOpen(false);
+    };
+    desktop.addEventListener('change', closeOnDesktop);
+    return () => desktop.removeEventListener('change', closeOnDesktop);
+  }, []);
   useLayoutEffect(() => {
-    document.title = `${title} · ${realm === 'platform' ? '梦擎总台' : name + '企业管理'}`;
+    if (!mobileOpen || !sidebar.current) return;
+    const navigation = sidebar.current;
+    const focusable = () =>
+      Array.from(
+        navigation.querySelectorAll<HTMLElement>('a[href], button:not(:disabled), [tabindex="0"]'),
+      ).filter((element) => element.getClientRects().length > 0);
+    const focusNavigation = () => {
+      const selected = navigation.querySelector<HTMLElement>('[aria-current="page"]');
+      (selected || focusable()[0] || navigation).focus({ preventScroll: true });
+    };
+    const keydown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        setMobileOpen(false);
+      } else if (event.key === 'Tab') {
+        const target = navigationTabTarget(focusable(), document.activeElement, event.shiftKey);
+        if (target) {
+          event.preventDefault();
+          target.focus({ preventScroll: true });
+        }
+      }
+    };
+    const keepFocusInside = (event: FocusEvent) => {
+      if (event.target instanceof Node && !navigation.contains(event.target)) focusNavigation();
+    };
+    focusNavigation();
+    document.addEventListener('keydown', keydown, true);
+    document.addEventListener('focusin', keepFocusInside);
+    return () => {
+      document.removeEventListener('keydown', keydown, true);
+      document.removeEventListener('focusin', keepFocusInside);
+      const trigger = menuTrigger.current;
+      if (trigger?.isConnected && trigger.getClientRects().length > 0) trigger.focus({ preventScroll: true });
+    };
+  }, [mobileOpen]);
+  useLayoutEffect(() => {
+    document.title = `${title} · ${realm === 'platform' ? '梦核引擎 Mengine 总台' : name + '企业管理'}`;
     setMobileOpen(false);
     const element = main.current;
     if (!element) return;
@@ -111,101 +161,147 @@ export function AdminShell({
     };
   }, [hash, title, name, realm]);
   return (
-    <PageActionsContext.Provider value={actions}>
-      <div className={`admin-shell ${mobileOpen ? 'admin-menu-open' : ''}`}>
-        {mobileOpen && (
-          <button className="admin-scrim" aria-label="关闭导航" onClick={() => setMobileOpen(false)} />
-        )}
-        <aside className="admin-sidebar" aria-label={realm === 'platform' ? '总台导航' : '企业管理导航'}>
-          <div className="admin-brand">
-            <DreamcoreLogo />
-            <div>
-              <strong>梦擎</strong>
-              <small>{realm === 'platform' ? '平台总台' : '企业管理'}</small>
-            </div>
-            <Button
-              className="admin-close-menu"
-              icon={X}
-              variant="ghost"
-              aria-label="关闭导航"
+    <CustomSelectContext.Provider value={realm === 'platform'}>
+      <PageActionsContext.Provider value={actions}>
+        <div className={`admin-shell admin-${realm} ${mobileOpen ? 'admin-menu-open' : ''}`}>
+          {mobileOpen && (
+            <button
+              className="admin-scrim"
+              aria-hidden="true"
+              tabIndex={-1}
               onClick={() => setMobileOpen(false)}
             />
-          </div>
-          <div className="admin-scope" title={name}>
-            {name}
-          </div>
-          <nav>
-            {nav.map(({ id, title, icon: Icon }) => (
-              <a
-                key={id}
-                className={`admin-nav-link ${page === id ? 'active' : ''}`}
-                aria-current={page === id ? 'page' : undefined}
-                href={adminHref(realm, id, hash)}
-                onClick={(e) => {
-                  if (pending) e.preventDefault();
-                }}
-              >
-                <Icon size={20} aria-hidden="true" />
-                <span>{title}</span>
-              </a>
-            ))}
-          </nav>
-          <div className="admin-sidebar-footer">
-            {realm === 'platform' && (
-              <a
-                className={`admin-nav-link ${page === 'settings' ? 'active' : ''}`}
-                aria-current={page === 'settings' ? 'page' : undefined}
-                href={adminHref(realm, 'settings', hash)}
-                onClick={(e) => {
-                  if (pending) e.preventDefault();
-                }}
-              >
-                <Settings size={20} aria-hidden="true" />
-                设置
-              </a>
-            )}
-            {realm === 'tenant' && customerLinks && (
-              <div className="admin-customer-links">{customerLinks}</div>
-            )}
-            <div className="admin-account">
-              <span title={account}>{account}</span>
+          )}
+          <aside
+            className="admin-sidebar"
+            id={navigationId}
+            ref={sidebar}
+            role={mobileOpen ? 'dialog' : undefined}
+            aria-modal={mobileOpen ? true : undefined}
+            tabIndex={mobileOpen ? -1 : undefined}
+            aria-label={realm === 'platform' ? '总台导航' : '企业管理导航'}
+          >
+            <div className="admin-brand">
+              <DreamcoreLogo />
+              <div>
+                <strong>{realm === 'platform' ? '梦核引擎' : '梦擎'}</strong>
+                {realm === 'platform' && <span className="admin-brand-english">Mengine</span>}
+                <small>{realm === 'platform' ? '平台总台' : '企业管理'}</small>
+              </div>
               <Button
+                className="admin-close-menu"
+                icon={X}
                 variant="ghost"
-                icon={LogOut}
-                disabled={pending}
-                onClick={logout}
-                aria-label={realm === 'platform' ? '退出总台' : '退出登录'}
+                aria-label="关闭导航"
+                onClick={() => setMobileOpen(false)}
               />
             </div>
-          </div>
-        </aside>
-        <div className="admin-main">
-          <header className="admin-header">
-            <div className="admin-heading">
-              <Button
-                className="admin-open-menu"
-                icon={Menu}
-                variant="ghost"
-                aria-label="展开导航"
-                onClick={() => setMobileOpen(true)}
-              />
-              <div>
-                <span className="admin-breadcrumb">{realm === 'platform' ? '平台总台' : name}</span>
-                <h1>{title}</h1>
+            {realm !== 'platform' && (
+              <div className="admin-scope" title={name}>
+                {name}
+              </div>
+            )}
+            {(realm === 'platform'
+              ? [
+                  {
+                    label: '平台管理',
+                    items: nav.filter((item) =>
+                      ['overview', 'tenants', 'accounts', 'usage'].includes(item.id),
+                    ),
+                  },
+                  {
+                    label: '梦核引擎',
+                    items: nav.filter((item) => ['engine', 'experience', 'capabilities'].includes(item.id)),
+                  },
+                ]
+              : [{ label: '', items: nav }]
+            )
+              .filter((group) => group.items.length > 0)
+              .map((group) => (
+                <section className="admin-nav-group" key={group.label}>
+                  {group.label && <div className="admin-nav-group-title">{group.label}</div>}
+                  <nav aria-label={group.label || '企业管理功能'}>
+                    {group.items.map(({ id, title, icon: Icon }) => (
+                      <a
+                        key={id}
+                        className={`admin-nav-link ${page === id ? 'active' : ''}`}
+                        aria-current={page === id ? 'page' : undefined}
+                        href={adminHref(realm, id, hash)}
+                        onClick={(e) => {
+                          if (pending) e.preventDefault();
+                          else setMobileOpen(false);
+                        }}
+                      >
+                        <Icon size={20} aria-hidden="true" />
+                        <span>{title}</span>
+                      </a>
+                    ))}
+                  </nav>
+                </section>
+              ))}
+            <div className="admin-sidebar-footer">
+              {realm === 'platform' && (
+                <a
+                  className={`admin-nav-link ${page === 'settings' ? 'active' : ''}`}
+                  aria-current={page === 'settings' ? 'page' : undefined}
+                  href={adminHref(realm, 'settings', hash)}
+                  onClick={(e) => {
+                    if (pending) e.preventDefault();
+                    else setMobileOpen(false);
+                  }}
+                >
+                  <Settings size={20} aria-hidden="true" />
+                  设置
+                </a>
+              )}
+              {realm === 'tenant' && customerLinks && (
+                <div className="admin-customer-links">{customerLinks}</div>
+              )}
+              <div className="admin-account">
+                <span title={account}>{account}</span>
+                <Button
+                  variant="ghost"
+                  icon={LogOut}
+                  disabled={pending}
+                  onClick={logout}
+                  aria-label={realm === 'platform' ? '退出总台' : '退出登录'}
+                />
               </div>
             </div>
-            <div className="admin-page-actions" ref={setActions} />
-          </header>
-          <main className="admin-content" ref={main}>
-            {pending && (
-              <p role="status" className="access-alert">
-                正在核对本次提交，请在当前页面完成后再切换。
-              </p>
-            )}
-            {children}
-          </main>
+          </aside>
+          <div className="admin-main" inert={mobileOpen}>
+            <header className="admin-header">
+              <div className="admin-heading">
+                <button
+                  type="button"
+                  className="button ghost admin-open-menu"
+                  ref={menuTrigger}
+                  aria-label="展开导航"
+                  aria-expanded={mobileOpen}
+                  aria-controls={navigationId}
+                  aria-haspopup="dialog"
+                  onClick={() => setMobileOpen(true)}
+                >
+                  <Menu size={16} strokeWidth={1.7} aria-hidden="true" />
+                </button>
+                <div>
+                  {realm === 'tenant' && <span className="admin-breadcrumb">{name}</span>}
+                  <h1>{title}</h1>
+                </div>
+              </div>
+              <div className="admin-page-actions" ref={setActions} />
+            </header>
+            <main className="admin-content" ref={main}>
+              {pending && (
+                <p role="status" className="access-alert">
+                  正在核对本次提交，请在当前页面完成后再切换。
+                </p>
+              )}
+              {children}
+            </main>
+          </div>
         </div>
-      </div>
-    </PageActionsContext.Provider>
+      </PageActionsContext.Provider>
+    </CustomSelectContext.Provider>
   );
 }

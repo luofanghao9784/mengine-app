@@ -1,3 +1,4 @@
+import { Select } from '../shared/Select';
 import { useState } from 'react';
 import { ArrowLeft, RefreshCw, Search } from 'lucide-react';
 import type {
@@ -70,7 +71,7 @@ function Metrics({ value }: { value: DataOperationCounts }) {
 }
 function Filter({ value, change }: { value: DataOperationState; change: (v: DataOperationState) => void }) {
   return (
-    <select
+    <Select
       aria-label="运行状态"
       value={value}
       onChange={(e) => change(e.target.value as DataOperationState)}
@@ -80,7 +81,7 @@ function Filter({ value, change }: { value: DataOperationState; change: (v: Data
           {label}
         </option>
       ))}
-    </select>
+    </Select>
   );
 }
 export function PlatformDataOperations({ hash }: { hash: string }) {

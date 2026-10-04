@@ -49,8 +49,16 @@ test('settings records filter, preserve position and link to independent enterpr
     return route.fulfill({ status: 404, json: { code: 'UNAVAILABLE' } });
   });
   await page.goto('/platform-admin/#admin=settings&section=records');
-  await page.getByLabel('操作类别').selectOption('ENTERPRISE');
-  await page.getByLabel('执行结果').selectOption('SUCCESS');
+  await page.getByRole('combobox', { name: '操作类别' }).click();
+  await page
+    .getByRole('listbox', { name: '操作类别' })
+    .getByRole('option', { name: '企业服务', exact: true })
+    .click();
+  await page.getByRole('combobox', { name: '执行结果' }).click();
+  await page
+    .getByRole('listbox', { name: '执行结果' })
+    .getByRole('option', { name: '已完成', exact: true })
+    .click();
   await page.getByRole('button', { name: '下一页', exact: true }).click();
   await expect(page.getByText('第 2 页')).toBeVisible();
   await expect(page.getByRole('link', { name: '合成企业', exact: true })).toHaveCount(1);
@@ -58,7 +66,7 @@ test('settings records filter, preserve position and link to independent enterpr
   await expect(page).toHaveURL(new RegExp(`enterprise=${id(2)}&section=records`));
   await page.goBack();
   await expect(page.getByText('第 2 页')).toBeVisible();
-  await expect(page.getByLabel('操作类别')).toHaveValue('ENTERPRISE');
+  await expect(page.getByRole('combobox', { name: '操作类别' })).toHaveText('企业服务');
   expect(
     queries.some(
       (q) => q.includes('offset=20') && q.includes('category=ENTERPRISE') && q.includes('outcome=SUCCESS'),

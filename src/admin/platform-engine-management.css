@@ -1,0 +1,119 @@
+.platform-engine-management {
+  min-width: 0;
+}
+.platform-engine-tabs {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 20px;
+}
+.platform-engine-tabs a {
+  padding: 8px 0 12px;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.platform-engine-tabs a[aria-current] {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 550;
+}
+.platform-engine-tabs a:hover {
+  color: var(--accent);
+}
+.platform-engine-capabilities {
+  display: grid;
+  gap: 20px;
+}
+.platform-capability-section {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  padding: 22px;
+  min-width: 0;
+}
+.platform-capability-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.platform-capability-section h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  margin-bottom: 12px;
+}
+.platform-capability-heading h2 {
+  margin-bottom: 0;
+}
+.platform-capability-heading + p {
+  margin-top: 12px;
+}
+.platform-capability-section p {
+  max-width: 72ch;
+}
+.platform-capability-facts {
+  display: grid;
+  margin: 18px 0;
+}
+.platform-capability-facts > div {
+  display: grid;
+  grid-template-columns: minmax(130px, 0.35fr) minmax(0, 1fr);
+  gap: 16px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+.platform-capability-facts dt {
+  color: var(--muted);
+  font-size: 13px;
+}
+.platform-capability-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.platform-capability-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--accent);
+  margin-top: 6px;
+}
+.platform-capability-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.platform-capability-details {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.platform-capability-details summary,
+.platform-capability-maintenance summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 13px;
+}
+.platform-capability-details summary:focus-visible,
+.platform-capability-maintenance summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+.platform-capability-details p,
+.platform-capability-maintenance p {
+  margin-top: 12px;
+  color: var(--muted);
+  max-width: 72ch;
+  font-size: 13px;
+}
+@media (max-width: 600px) {
+  .platform-capability-section {
+    padding: 18px;
+  }
+  .platform-capability-facts > div {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+}

@@ -1,4 +1,9 @@
-/** Built browser entries against the real M2-A1 API and a disposable PostgreSQL cluster. */
+/**
+ * Built browser entries against the real M2-A1 API and a disposable PostgreSQL cluster.
+ * 历史边界：此脚本保留 M2 邮箱开通、初始管理员邀请和旧服务确认流程。
+ * 本轮仅适配总台下拉、搜索、独立详情导航与取消入口，不代表已迁移或验收手机号负责人流程。
+ * 现行企业详情与邀请交互由 tests/e2e/platform-enterprises.spec.ts 验证。
+ */
 import assert from 'node:assert/strict';
 import Ajv2020 from 'ajv/dist/2020.js';
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -189,7 +194,7 @@ try {
   await expect(page.getByRole('alert')).toContainText('操作结果尚未确认');
   await expect(page.getByLabel('企业名称', { exact: true })).toBeDisabled();
   await page.getByRole('button', { name: '重试本次开通', exact: true }).click();
-  await expect(page.getByRole('dialog')).toContainText('admin-a-b2@example.test');
+  await expect(page.getByRole('region', { name: '企业详情' })).toContainText('admin-a-b2@example.test');
   assert.ok(created);
   assert.equal(submissions.length, 2);
   assert.equal(submissions[0].requestId, submissions[1].requestId);
@@ -200,7 +205,7 @@ try {
   await page.getByRole('button', { name: '重新生成邀请', exact: true }).click();
   await page.getByLabel('初始管理员邮箱', { exact: true }).fill('admin-a-new-b2@example.test');
   await page.getByRole('button', { name: '确认重新生成邀请', exact: true }).click();
-  await expect(page.getByRole('dialog')).toContainText('admin-a-new-b2@example.test');
+  await expect(page.getByRole('region', { name: '企业详情' })).toContainText('admin-a-new-b2@example.test');
   const detailA = await (await context.request.get(`/api/platform-admin/v1/tenants/${a}`)).json();
   assert.equal(detailA.version, 1);
   assert.ok(detailContract(detailA), 'Tenant detail differs from the metadata-only contract');
@@ -228,7 +233,7 @@ try {
     403,
   );
   await page.getByRole('button', { name: '刷新详情', exact: true }).click();
-  await expect(page.getByRole('dialog')).toContainText('已加入');
+  await expect(page.getByRole('region', { name: '企业详情' })).toContainText('已加入');
   await expect(page.getByRole('button', { name: '重新生成邀请', exact: true })).toHaveCount(0);
   await screenshot(page, 'tenant-detail-desktop.png');
 
@@ -241,7 +246,7 @@ try {
   });
   await page.getByRole('button', { name: '确认停用企业', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('企业状态已被其他操作更新');
-  await page.getByRole('button', { name: '返回并刷新详情', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: '取消', exact: true }).click();
   await expect(page.getByRole('button', { name: '恢复使用', exact: true })).toBeVisible();
   assert.equal((await adminContext.request.get(`/api/v1/tenants/${a}/context`)).status(), 403);
   await admin.getByRole('button', { name: '刷新', exact: true }).click();
@@ -254,25 +259,33 @@ try {
   await expect(admin.locator('.access-welcome h2')).toHaveText('合成总台企业 A');
   await page.route(`**/api/platform-admin/v1/tenants/${a}`, (route) => route.abort());
   await page.getByRole('button', { name: '刷新详情', exact: true }).click();
-  await expect(page.getByRole('dialog').getByRole('heading', { name: '暂时无法读取' })).toBeVisible();
+  await expect(page.getByRole('main').getByRole('heading', { name: '暂时无法读取' })).toBeVisible();
   await expect(page.getByRole('button', { name: '停用企业', exact: true })).toHaveCount(0);
   await page.unrouteAll();
-  await page.getByRole('dialog').getByRole('button', { name: '重试', exact: true }).click();
+  await page.getByRole('main').getByRole('button', { name: '重试', exact: true }).click();
   await expect(page.getByRole('button', { name: '停用企业', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '关闭弹窗', exact: true }).click();
+  await page.getByRole('button', { name: '返回企业列表', exact: true }).click();
   await page.getByLabel('搜索企业').fill('不存在');
-  await page.getByRole('button', { name: '搜索', exact: true }).click();
+  await page.getByRole('button', { name: '搜索企业名称', exact: true }).click();
   await expect(page.getByRole('heading', { name: '没有符合条件的企业', exact: true })).toBeVisible();
   await page.getByLabel('搜索企业').fill('合成总台企业 A');
-  await page.getByRole('button', { name: '搜索', exact: true }).click();
+  await page.getByRole('button', { name: '搜索企业名称', exact: true }).click();
   await page.getByRole('button', { name: '查看企业 合成总台企业 A', exact: true }).click();
-  await page.getByRole('button', { name: '关闭弹窗', exact: true }).click();
+  await page.getByRole('button', { name: '返回企业列表', exact: true }).click();
   await expect(page.getByLabel('搜索企业')).toHaveValue('合成总台企业 A');
-  await page.getByLabel('企业状态').selectOption('SUSPENDED');
+  await page.getByRole('combobox', { name: '企业状态' }).click();
+  await page
+    .getByRole('listbox', { name: '企业状态' })
+    .getByRole('option', { name: '已暂停', exact: true })
+    .click();
   await expect(page.getByRole('heading', { name: '没有符合条件的企业', exact: true })).toBeVisible();
-  await page.getByLabel('企业状态').selectOption('');
+  await page.getByRole('combobox', { name: '企业状态' }).click();
+  await page
+    .getByRole('listbox', { name: '企业状态' })
+    .getByRole('option', { name: '全部状态', exact: true })
+    .click();
   await page.getByLabel('搜索企业').fill('');
-  await page.getByRole('button', { name: '搜索', exact: true }).click();
+  await page.getByRole('button', { name: '搜索企业名称', exact: true }).click();
   // Synthetic metadata creates enough rows to exercise server-side bounds and actual paging.
   for (let i = 0; i < 20; i++)
     await post(
@@ -297,10 +310,11 @@ try {
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
   await screenshot(page, 'platform-list-mobile.png');
   await page.locator('.platform-tenant-row').first().click();
-  await expect(page.getByRole('dialog')).toContainText('初始管理员');
-  assert.ok(await page.getByRole('dialog').evaluate((el) => el.scrollWidth <= el.clientWidth));
+  const mobileDetail = page.getByRole('region', { name: '企业详情' });
+  await expect(mobileDetail).toContainText('初始管理员');
+  assert.ok(await mobileDetail.evaluate((el) => el.scrollWidth <= el.clientWidth));
   await screenshot(page, 'tenant-detail-mobile.png');
-  await page.getByRole('button', { name: '关闭弹窗', exact: true }).click();
+  await page.getByRole('button', { name: '返回企业列表', exact: true }).click();
   await page.getByRole('button', { name: '开通企业', exact: true }).click();
   await screenshot(page, 'create-mobile.png');
   await page.getByRole('button', { name: '关闭弹窗', exact: true }).click();

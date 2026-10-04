@@ -278,13 +278,26 @@ for (const realm of ['platform', 'tenant'] as const) {
     await expect(monthly.getByText(/2 次维护运行的调用数尚未知/)).toBeVisible();
     expect(control.paths.some((p) => p.endsWith('/operations'))).toBe(false);
     if (realm === 'tenant') await expect(page.getByText(/采购成本/)).toHaveCount(0);
-    await page.getByRole('link', { name: '查看本月用量', exact: true }).click();
-    await expect(page.getByLabel('用量统计期间')).toHaveValue('THIS_MONTH');
-    await page.getByLabel('用量统计期间').selectOption('LAST_MONTH');
-    await expect(page.getByLabel('用量统计期间')).toHaveValue('LAST_MONTH');
+    const monthlyLinkName = realm === 'platform' ? '查看明细' : '查看本月用量';
+    await page.getByRole('link', { name: monthlyLinkName, exact: true }).click();
+    if (realm === 'platform') {
+      await expect(page.getByRole('combobox', { name: '用量统计期间' })).toHaveText('本月');
+      await page.getByRole('combobox', { name: '用量统计期间' }).click();
+      await page
+        .getByRole('listbox', { name: '用量统计期间' })
+        .getByRole('option', { name: '上月', exact: true })
+        .click();
+      await expect(page.getByRole('combobox', { name: '用量统计期间' })).toHaveText('上月');
+    } else {
+      await expect(page.getByLabel('用量统计期间')).toHaveValue('THIS_MONTH');
+      await page.getByLabel('用量统计期间').selectOption('LAST_MONTH');
+      await expect(page.getByLabel('用量统计期间')).toHaveValue('LAST_MONTH');
+    }
     await page.getByRole('complementary').getByRole('link', { name: '概览', exact: true }).click();
-    await page.getByRole('link', { name: '查看本月用量', exact: true }).click();
-    await expect(page.getByLabel('用量统计期间')).toHaveValue('THIS_MONTH');
+    await page.getByRole('link', { name: monthlyLinkName, exact: true }).click();
+    if (realm === 'platform')
+      await expect(page.getByRole('combobox', { name: '用量统计期间' })).toHaveText('本月');
+    else await expect(page.getByLabel('用量统计期间')).toHaveValue('THIS_MONTH');
     await page.getByRole('complementary').getByRole('link', { name: '概览', exact: true }).click();
     control.mode = 'revoked';
     await page.getByRole('button', { name: '刷新', exact: true }).click();

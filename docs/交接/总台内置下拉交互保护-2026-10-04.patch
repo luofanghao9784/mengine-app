@@ -1,0 +1,40 @@
+--- a/src/shared/Select.tsx
++++ b/src/shared/Select.tsx
+@@ -37,6 +37,10 @@
+   const [active, setActive] = useState(0);
+   const [invalid, setInvalid] = useState(false);
+   const search = useRef({ text: '', at: 0 });
++  // A parent fieldset may lock the control while its popover is already open.
++  useLayoutEffect(() => {
++    if (open && native.current?.matches(':disabled')) setOpen(false);
++  });
+   useLayoutEffect(() => {
+     const element = native.current!;
+     setDisplay(element.selectedOptions[0]?.text || '请选择');
+@@ -91,6 +95,10 @@
+     const option = options[index];
+     if (!option || option.disabled) return;
+     const element = native.current!;
++    if (element.matches(':disabled')) {
++      setOpen(false);
++      return;
++    }
+     const changed = element.value !== option.value;
+     element.value = option.value;
+     setDisplay(option.label);
+@@ -137,11 +145,14 @@
+         className="app-select-trigger"
+         role="combobox"
+         aria-label={label}
++        aria-labelledby={props['aria-labelledby']}
++        aria-describedby={props['aria-describedby']}
+         aria-haspopup="listbox"
+         aria-expanded={open}
+         aria-controls={open ? id : undefined}
+         aria-activedescendant={open ? `${id}-${active}` : undefined}
+-        aria-invalid={invalid || undefined}
++        aria-invalid={invalid || props['aria-invalid']}
++        aria-errormessage={props['aria-errormessage']}
+         aria-required={props.required || undefined}
+         disabled={props.disabled}
+         onClick={() => setOpen(!open)}
