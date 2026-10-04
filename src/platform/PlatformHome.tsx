@@ -293,7 +293,7 @@ function TenantView({
         ))}
       </nav>
       <section
-        className={`platform-enterprise-detail platform-enterprise-redesign ${['accounts', 'records'].includes(tab) ? 'access-panel' : 'platform-overview-layout'} ${tab === 'accounts' ? 'platform-account-catalog' : ''}`}
+        className={`platform-enterprise-detail platform-enterprise-redesign ${['accounts', 'records'].includes(tab) ? 'access-panel' : 'platform-overview-layout'} ${tab === 'accounts' ? 'platform-account-catalog' : tab === 'records' ? 'platform-record-catalog' : ''}`}
         aria-label="企业详情"
       >
         {tab === 'accounts' ? (
@@ -557,15 +557,17 @@ function Records({
     [id, page, revision, attempt],
   );
   return (
-    <section className="platform-detail-section">
+    <section className="platform-record-directory" aria-label="企业管理记录">
       {invitation && (
         <div className="platform-invitation-record">
           <div>
             <strong>初始负责人邀请</strong>
             <Badge>{invitationLabel[invitation.status]}</Badge>
           </div>
-          <p>{invitation.phone || invitation.email}</p>
-          <small className="muted">邀请有效期至 {time(invitation.expiresAt)}</small>
+          <span className="platform-invitation-contact">{invitation.phone || invitation.email}</span>
+          {invitation.status !== 'ACCEPTED' && (
+            <small className="muted">有效期至 {time(invitation.expiresAt)}</small>
+          )}
         </div>
       )}
       {records.error ? (
@@ -574,19 +576,43 @@ function Records({
         <Loading />
       ) : (
         <>
-          <ol className="platform-records">
-            {records.value.slice(0, 20).map((item: ManagementRecord) => (
-              <li key={item.id}>
-                <span>
-                  <strong>{actionLabel[item.action]}</strong>
-                  <small>{item.actorName} · 成功</small>
-                  {item.internalReason && <small>内部：{item.internalReason}</small>}
-                  {item.publicReason && <small>企业可见：{item.publicReason}</small>}
-                </span>
-                <time dateTime={item.createdAt}>{time(item.createdAt)}</time>
-              </li>
-            ))}
-          </ol>
+          {!!records.value.length && (
+            <div className="platform-management-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>操作</th>
+                    <th>操作人</th>
+                    <th>结果</th>
+                    <th>操作时间</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {records.value.slice(0, 20).map((item: ManagementRecord) => (
+                    <tr key={item.id}>
+                      <td>
+                        <strong>{actionLabel[item.action]}</strong>
+                        {(item.internalReason || item.publicReason) && (
+                          <details className="platform-record-reason">
+                            <summary>查看备注</summary>
+                            {item.internalReason && <p>内部：{item.internalReason}</p>}
+                            {item.publicReason && <p>企业可见：{item.publicReason}</p>}
+                          </details>
+                        )}
+                      </td>
+                      <td>{item.actorName}</td>
+                      <td>
+                        <span className="badge platform-running-badge">成功</span>
+                      </td>
+                      <td>
+                        <time dateTime={item.createdAt}>{time(item.createdAt)}</time>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
           {!records.value.length && <p className="muted">暂无管理记录。</p>}
           {(page > 0 || records.value.length > 20) && (
             <Pager page={page} next={records.value.length > 20} onPage={setPage} />

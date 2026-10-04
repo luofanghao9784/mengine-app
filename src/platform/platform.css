@@ -814,3 +814,36 @@
 .platform-account-modal .platform-account-detail-heading { padding-bottom: 20px; }
 .platform-account-modal .platform-account-info { padding: 20px 0; }
 .platform-account-modal .platform-account-safety { padding: 20px 0; }
+
+.admin-platform .platform-enterprise-page .platform-record-catalog { padding: 0; overflow: hidden; }
+.platform-record-directory .platform-invitation-record {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 16px 24px;
+  margin: 0;
+  border-bottom: 1px solid var(--line);
+}
+.platform-record-directory .platform-invitation-record > div { gap: 12px; }
+.platform-invitation-contact { font-size: var(--font-body); }
+.platform-record-directory .platform-invitation-record > small { margin-left: auto; }
+.platform-management-table { overflow-x: auto; }
+.platform-management-table table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.platform-management-table th, .platform-management-table td {
+  text-align: left;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--line);
+  font-size: var(--font-body);
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+.platform-management-table th { color: var(--muted); font-size: var(--font-caption); font-weight: 600; }
+.platform-management-table th:first-child { width: 32%; }
+.platform-management-table th:nth-child(2) { width: 28%; }
+.platform-management-table th:nth-child(3) { width: 12%; }
+.platform-management-table tbody tr:last-child td { border-bottom: 0; }
+.platform-management-table time { font-size: var(--font-caption); color: var(--muted); }
+.platform-record-reason { margin-top: 8px; font-size: var(--font-caption); }
+.platform-record-reason summary { cursor: pointer; color: var(--blue-ink); }
+.platform-record-reason p { margin-top: 8px; color: var(--muted); }
+.platform-record-directory > .muted, .platform-record-directory > .platform-pagination { margin: 20px 24px; }
