@@ -7,7 +7,7 @@ import type {
 } from '../../contracts/public-api/engine-telemetry';
 import { IdentityError } from '../identity/client';
 import { useSession } from '../identity/session';
-import { Button, PageActions } from '../shared/ui';
+import { Button } from '../shared/ui';
 import { Failure, Loading } from '../shared/admin';
 import { getTelemetry } from './telemetry-client';
 import './telemetry.css';
@@ -125,13 +125,12 @@ function Wall({ scope, tenant }: { scope: 'platform' | 'tenant'; tenant: string 
   );
   return (
     <section className="engine-page" aria-label="引擎运行监控">
-      {scope === 'platform' && <PageActions>{refreshAction}</PageActions>}
       <div className={`engine-heading ${scope === 'platform' ? 'engine-heading--embedded' : ''}`}>
         <div>
-          {scope === 'tenant' && <h2>企业引擎运行</h2>}
+          {scope === 'tenant' ? <h2>企业引擎运行</h2> : <h1>引擎仪表盘</h1>}
           <p className="muted">{scope === 'tenant' ? '本企业' : '全平台'}的运行记录 · 只读监控</p>
         </div>
-        {scope === 'tenant' && refreshAction}
+        {refreshAction}
       </div>
       {error ? (
         <Failure error={error} retry={() => setRefresh((v) => v + 1)} />

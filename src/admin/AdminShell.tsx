@@ -166,7 +166,7 @@ export function AdminShell({
     <CustomSelectContext.Provider value={realm === 'platform'}>
       <PageTitleContext.Provider value={titleTarget}>
       <PageActionsContext.Provider value={actions}>
-        <div className={`admin-shell admin-${realm} ${mobileOpen ? 'admin-menu-open' : ''}`}>
+        <div className={`admin-shell admin-${realm} ${realm === 'platform' && page === 'engine' ? 'admin-engine-fullscreen' : ''} ${mobileOpen ? 'admin-menu-open' : ''}`}>
           {mobileOpen && (
             <button
               className="admin-scrim"
