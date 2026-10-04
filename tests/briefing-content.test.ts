@@ -1,6 +1,37 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { isBriefingDocument, formatBriefingNumber } from '../src/briefing-live/content.ts';
+import { readFileSync } from 'node:fs';
+test('dataset briefing binds the snapshot and distinguishes absent business coverage from collection time', () => {
+  const dataset = JSON.parse(
+    readFileSync(new URL('../contracts/fixtures/dataset-briefing.json', import.meta.url), 'utf8'),
+  );
+  assert.ok(isBriefingDocument(dataset));
+  for (const bad of [
+    { snapshotId: 'latest' },
+    { rowCount: -1 },
+    { coverageThrough: undefined },
+    { collectedAt: 'unknown' },
+  ]) {
+    const changed = structuredClone(dataset);
+    Object.assign(changed.content.datasetSource, bad);
+    assert.equal(isBriefingDocument(changed), false);
+  }
+  const changed = structuredClone(dataset);
+  changed.content.schemaVersion = 'briefing-data-v1';
+  assert.equal(isBriefingDocument(changed), false);
+  for (const basis of [
+    undefined,
+    null,
+    { ...dataset.content.datasetBasis, matchedRows: 4 },
+    { ...dataset.content.datasetBasis, ignoredRows: -1 },
+    { ...dataset.content.datasetBasis, groupColumn: '' },
+  ]) {
+    const changed = structuredClone(dataset);
+    changed.content.datasetBasis = basis;
+    assert.equal(isBriefingDocument(changed), false);
+  }
+});
 const id = '00000000-0000-4000-8000-000000000001';
 const row = {
   group: '甲',

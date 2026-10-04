@@ -1,0 +1,320 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dreamcore:dataset-comparison:1.0",
+  "$comment": "Optional datasetComparisonVersion=1.0. POST /internal/v1/agent-access/{task}/compare-dataset, current attempt bearer, no-store. Requires pinned snapshot and registered STARTED compare_dataset receipt. Whole snapshot grouped sum, period exact match, decimal arithmetic, half-up 2 decimals for percent. No partial-page totals, raw SQL or caller-provided rows.",
+  "$defs": {
+    "request": {
+      "type": "object",
+      "properties": {
+        "datasetId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "snapshotId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "groupColumn": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "periodColumn": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "valueColumn": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "baseline": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "current": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        }
+      },
+      "required": [
+        "datasetId",
+        "snapshotId",
+        "groupColumn",
+        "periodColumn",
+        "valueColumn",
+        "baseline",
+        "current"
+      ],
+      "additionalProperties": false
+    },
+    "source": {
+      "type": "object",
+      "properties": {
+        "datasetId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "snapshotId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "rowCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000
+        },
+        "collectedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "coverageThrough": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "datasetId",
+        "snapshotId",
+        "version",
+        "name",
+        "sha256",
+        "rowCount",
+        "collectedAt",
+        "coverageThrough"
+      ],
+      "additionalProperties": false
+    },
+    "row": {
+      "type": "object",
+      "properties": {
+        "group": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "baseline": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^-?\\d{1,64}(?:\\.\\d{1,12})?$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "current": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^-?\\d{1,64}(?:\\.\\d{1,12})?$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "difference": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^-?\\d{1,64}(?:\\.\\d{1,12})?$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "changePercent": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^-?\\d{1,64}(?:\\.\\d{1,12})?$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "baselineRank": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "currentRank": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "issue": {
+          "enum": [
+            null,
+            "MISSING_PERIOD",
+            "NON_POSITIVE_BASELINE",
+            "UNEQUAL_GROUP_COVERAGE"
+          ]
+        }
+      },
+      "required": [
+        "group",
+        "baseline",
+        "current",
+        "difference",
+        "changePercent",
+        "baselineRank",
+        "currentRank",
+        "issue"
+      ],
+      "additionalProperties": false
+    },
+    "calculation": {
+      "type": "object",
+      "properties": {
+        "recipeVersion": {
+          "const": "dataset-compare-1"
+        },
+        "status": {
+          "const": "COMPUTED"
+        },
+        "request": {
+          "$ref": "#/$defs/request"
+        },
+        "inputSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "matchedRows": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000
+        },
+        "ignoredRows": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000
+        },
+        "rows": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 50,
+          "items": {
+            "$ref": "#/$defs/row"
+          }
+        },
+        "totals": {
+          "$ref": "#/$defs/row"
+        }
+      },
+      "required": [
+        "recipeVersion",
+        "status",
+        "request",
+        "inputSha256",
+        "matchedRows",
+        "ignoredRows",
+        "rows",
+        "totals"
+      ],
+      "additionalProperties": false
+    },
+    "result": {
+      "type": "object",
+      "properties": {
+        "contractVersion": {
+          "const": "1.0"
+        },
+        "status": {
+          "const": "COMPUTED"
+        },
+        "datasetSource": {
+          "$ref": "#/$defs/source"
+        },
+        "calculation": {
+          "$ref": "#/$defs/calculation"
+        },
+        "artifact": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "filename": {
+              "type": "string",
+              "pattern": "^dataset-comparison-[a-f0-9]{20}\\.json$"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "bytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65536
+            }
+          },
+          "required": [
+            "id",
+            "filename",
+            "sha256",
+            "bytes"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "contractVersion",
+        "status",
+        "datasetSource",
+        "calculation",
+        "artifact"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

@@ -34,6 +34,7 @@
               "task_plan",
               "task_preference",
               "compare_table",
+              "compare_dataset",
               "deliver_briefing",
               "manage_plan",
               "ask_user"
@@ -117,6 +118,7 @@
             "task_plan",
             "task_preference",
             "compare_table",
+            "compare_dataset",
             "deliver_briefing",
             "manage_plan",
             "ask_user"

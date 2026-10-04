@@ -1,3 +1,5 @@
+import datasetBriefing from '../../contracts/fixtures/dataset-briefing.json' with { type: 'json' };
+import type { BriefingDocument } from '../../contracts/public-api/briefing-content';
 import { test, expect, type Page, type Route } from '@playwright/test';
 
 const uid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -534,7 +536,7 @@ test('正式会话容器可接管区域内横滑，导航区和缩放事件保�
   await expect(page).toHaveURL(/view=conversations$/);
 });
 
-async function readingConversation(page: Page) {
+async function readingConversation(page: Page, document?: BriefingDocument) {
   await fixture(page, accepted);
   const longText = '这是一段用于验证会话阅读与横向卡片滚动的合成内容。'.repeat(80);
   const detail = {
@@ -546,7 +548,12 @@ async function readingConversation(page: Page) {
         executionClass: 'live',
         reply: longText,
         artifacts: [
-          { id: uid(8), filename: 'briefing-text-example.json', sha256: 'a'.repeat(64), bytes: 100 },
+          {
+            id: uid(8),
+            filename: document ? 'briefing-dataset-example.json' : 'briefing-text-example.json',
+            sha256: 'a'.repeat(64),
+            bytes: 100,
+          },
         ],
       },
     ],
@@ -569,7 +576,7 @@ async function readingConversation(page: Page) {
       });
     if (path.endsWith('/tasks/' + taskId + '/briefing'))
       return route.fulfill({
-        json: {
+        json: document ?? {
           artifactId: uid(8),
           sha256: 'a'.repeat(64),
           content: {
@@ -600,7 +607,9 @@ async function readingConversation(page: Page) {
       `view=conversations&conversation=${conversation}&from=briefing&briefingTask=${taskId}&briefingSpace=${space}&briefingRevision=1&briefingAttempt=0`,
     ),
   );
-  await expect(page.locator('[data-deck-id="briefing"] h2')).toHaveText('五店两期收款对比分析');
+  await expect(page.locator('[data-deck-id="briefing"] h2')).toHaveText(
+    document?.content.title ?? '五店两期收款对比分析',
+  );
   return {
     restrict: () => {
       readable = false;
@@ -894,4 +903,30 @@ test('列表与全屏阅读卡片分别跟踪自己的标题边缘，返回顶�
   await expect.poll(() => header.evaluate((n) => getComputedStyle(n, '::after').opacity)).toBe('0');
   await source.getByRole('button', { name: '退出来源全屏' }).click();
   await expect(source).not.toHaveAttribute('aria-modal');
+});
+
+test('数据库画报在正式阅读页面展示固定版本与未知业务覆盖，撤权后清除内容', async ({ page }) => {
+  const state = await readingConversation(page, datasetBriefing as BriefingDocument);
+  const body = page.locator('[data-deck-id="briefing"]');
+  await body.getByText('资料、统计口径与计算依据', { exact: true }).click();
+  await expect(body).toContainText('合成销售数据 · v2');
+  await expect(body).toContainText('业务覆盖时间未提供');
+  await expect(body).toContainText('采集时间不代表数据统计期间');
+  await expect(body).toContainText('纳入比较 5 行，其他期间 1 行不纳入比较');
+  await body.getByText('查看完整对比数据', { exact: true }).click();
+  await expect(body.getByRole('table')).toContainText('200.20');
+  await page.screenshot({ path: '.local/dataset-briefing/desktop.png', fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  const basis = body.locator('.data-briefing-basis');
+  if (!(await basis.evaluate((element) => (element as HTMLDetailsElement).open))) {
+    await basis.locator('summary').click();
+  }
+  await basis.getByText('纳入比较', { exact: false }).scrollIntoViewIfNeeded();
+  await expect(basis.getByText('纳入比较', { exact: false })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: '.local/dataset-briefing/mobile.png', fullPage: true });
+  state.restrict();
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect(body.getByRole('table')).toHaveCount(0);
+  await expect(body.getByText('合成销售数据 · v2', { exact: false })).toHaveCount(0);
 });

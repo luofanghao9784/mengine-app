@@ -106,9 +106,29 @@ export function DataBriefing({
           <details className="data-briefing-basis">
             <summary>资料、统计口径与计算依据</summary>
             <p>
-              {c.source?.filename} · v{c.source?.version} · {ch.range}
+              {c.datasetSource?.name ?? c.source?.filename} · v{c.datasetSource?.version ?? c.source?.version}{' '}
+              · {ch.range}
             </p>
-            <pre>{c.source?.scopeExcerpt}</pre>
+            {c.datasetSource ? (
+              <>
+                <p>数据采集于 {new Date(c.datasetSource.collectedAt).toLocaleString('zh-CN')}。</p>
+                <p>
+                  {c.datasetSource.coverageThrough
+                    ? `业务覆盖截至 ${new Date(c.datasetSource.coverageThrough).toLocaleString('zh-CN')}。`
+                    : '业务覆盖时间未提供，采集时间不代表数据统计期间。'}
+                </p>
+                <p>
+                  分组字段：{c.datasetBasis?.groupColumn}；期间字段：{c.datasetBasis?.periodColumn}
+                  ；数值字段：{ch.metric}。
+                </p>
+                <p>
+                  纳入比较 {c.datasetBasis?.matchedRows} 行，其他期间 {c.datasetBasis?.ignoredRows}{' '}
+                  行不纳入比较。读取范围为完整固定快照，快照本身不证明外部业务数据完整。
+                </p>
+              </>
+            ) : (
+              <pre>{c.source?.scopeExcerpt}</pre>
+            )}
             <p>
               图表与数据表使用同一份计算回执。生成时间：{new Date(c.generatedAt).toLocaleString('zh-CN')}
               。这是固定来源版本的分析，不代表实时经营数据。

@@ -3,6 +3,7 @@ import { planManagementTool } from './plan-management.js';
 import { meteredModel } from './metered-model.js';
 import { inputCoverage } from './input-coverage.js';
 import { briefingDeliveryTool, hasPreparedBriefing } from './briefing-delivery.js';
+import { datasetComparisonTool } from './dataset-comparison.js';
 import { tableComparisonTool } from './table-comparison.js';
 import { workTools } from './task-work.js';
 import { contextTool, taskBootstrap } from './task-context.js';
@@ -84,6 +85,7 @@ export class AgentTasks {
     let contextAvailable: boolean | undefined;
     let workAvailable: boolean | undefined;
     let datasetContextAvailable: boolean | undefined;
+    let datasetComparisonAvailable: boolean | undefined;
     let planAllowed: boolean | undefined;
     let tablesAvailable: boolean | undefined;
     let planManagementAvailable = false;
@@ -130,8 +132,11 @@ export class AgentTasks {
           throw new RuntimeError('TASK_ACCESS_DENIED');
         contextAvailable = context;
         const datasets = response.datasetContextVersion === '1.0';
-        if ((response.datasetContextVersion !== undefined && !datasets) ||
-            (datasets && !context) || (datasetContextAvailable !== undefined && datasetContextAvailable !== datasets))
+        if (
+          (response.datasetContextVersion !== undefined && !datasets) ||
+          (datasets && !context) ||
+          (datasetContextAvailable !== undefined && datasetContextAvailable !== datasets)
+        )
           throw new RuntimeError('TASK_ACCESS_DENIED');
         datasetContextAvailable = datasets;
         const work = response.taskWorkVersion === '1.0';
@@ -155,6 +160,14 @@ export class AgentTasks {
         )
           throw new RuntimeError('TASK_ACCESS_DENIED');
         tablesAvailable = tables;
+        const datasetComparison = response.datasetComparisonVersion === '1.0';
+        if (
+          (response.datasetComparisonVersion !== undefined && !datasetComparison) ||
+          (datasetComparison && !datasets) ||
+          (datasetComparisonAvailable !== undefined && datasetComparisonAvailable !== datasetComparison)
+        )
+          throw new RuntimeError('TASK_ACCESS_DENIED');
+        datasetComparisonAvailable = datasetComparison;
         const briefing = response.briefingContentVersion === '1.0';
         if (
           (response.briefingContentVersion !== undefined && !briefing) ||
@@ -302,6 +315,22 @@ export class AgentTasks {
                 invoke: (body, executionSignal) =>
                   postJson(
                     new URL(`/internal/v1/agent-access/${task.taskId}/deliver-briefing`, this.platform),
+                    task.attemptId,
+                    body,
+                    AbortSignal.any([signal, executionSignal]),
+                    65536,
+                    12000,
+                  ),
+              }),
+            ]
+          : []),
+        ...(datasetComparisonAvailable && task.contractVersion === '1.5'
+          ? [
+              datasetComparisonTool({
+                authorize,
+                invoke: (body, executionSignal) =>
+                  postJson(
+                    new URL(`/internal/v1/agent-access/${task.taskId}/compare-dataset`, this.platform),
                     task.attemptId,
                     body,
                     AbortSignal.any([signal, executionSignal]),
@@ -622,7 +651,11 @@ export class AgentTasks {
             try {
               output = await execute(args, executionSignal);
             } catch (error) {
-              if (tool.name === 'deliver_briefing' || tool.name === 'compare_table')
+              if (
+                tool.name === 'deliver_briefing' ||
+                tool.name === 'compare_table' ||
+                tool.name === 'compare_dataset'
+              )
                 console.warn(
                   JSON.stringify({
                     event: 'TASK_TOOL_REJECTED',

@@ -66,3 +66,6 @@ M7-A1 第七切片：新增 [Model Usage 1.0](engine-api/model-usage.schema.json
 
 
 企业信息自动整理：`engine-api/company-analysis.schema.json` 定义独立可选 `1.0` 协议的固定任务输入、运行描述及结构化结果；读取与取消回执必须携带服务间认证。模型候选不能直接改写企业信息，由平台按当前权限、固定原文及人工保护核验。`public-api/profile.openapi.json` 1.3.0 增加客户域只读 `/company-information/analysis`，输出当前企业的持久计数和真实完成时间，不返回原始资料或模型内容。部署未启用、未知调用用量及结果不明分别表达，不将其替换为成功或零费用。失败恢复和限制见[五批实施记录](../docs/交接/管理端五批实施记录-2026-10-04.md)。
+
+
+数据快照比较：可选 `datasetComparisonVersion:1.0` 在已有 `datasetContextVersion:1.0` 基础上启用 `compare_dataset`；[计算契约](engine-api/dataset-comparison.schema.json)规定当前尝试固定快照、实际列名与平台完整十进制结果。调用前须有已授权读取记录。`briefing-delivery` 增加 `briefing-dataset-v1`，必需 `datasetSource` 与 `datasetBasis`，材料来源 `source` 为 null；旧文件/文本卡允许这两个字段缺省或 null。来源行数与比较纳入/排除行数必须相符，采集时间不替代业务覆盖时间。无新迁移，旧平台不声明能力时新引擎隐藏该工具；自动生成的数据库选数不在本切片完成范围。

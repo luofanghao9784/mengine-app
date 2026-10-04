@@ -19,7 +19,12 @@ export function isBriefingDocument(v: unknown): v is BriefingDocument {
   if (!record(v) || !uuid(v.artifactId) || !hash(v.sha256) || !record(v.content)) return false;
   const c = v.content,
     ch = c.chart,
-    s = c.source;
+    s = c.source,
+    ds = c.datasetSource,
+    basis = c.datasetBasis;
+  const dataset = c.schemaVersion === 'briefing-dataset-v1';
+  if (!dataset && ((ds !== undefined && ds !== null) || (basis !== undefined && basis !== null)))
+    return false;
   if (c.schemaVersion === 'briefing-text-v1')
     return (
       ['INFO', 'INSIGHT', 'SUGGESTION', 'RESULT'].includes(String(c.businessType)) &&
@@ -42,7 +47,7 @@ export function isBriefingDocument(v: unknown): v is BriefingDocument {
       Number.isFinite(Date.parse(c.generatedAt))
     );
   return (
-    c.schemaVersion === 'briefing-data-v1' &&
+    (c.schemaVersion === 'briefing-data-v1' || dataset) &&
     c.businessType === 'DATA' &&
     text(c.title, 4, 80) &&
     text(c.summary, 12, 240) &&
@@ -52,7 +57,7 @@ export function isBriefingDocument(v: unknown): v is BriefingDocument {
     c.analysis.every((p) => text(p, 12, 500)) &&
     record(ch) &&
     ch.type === 'GROUPED_BAR' &&
-    text(ch.metric, 1, 100) &&
+    text(ch.metric, 1, 160) &&
     text(ch.unit, 1, 100) &&
     text(ch.baseline, 1, 100) &&
     text(ch.current, 1, 100) &&
@@ -62,15 +67,39 @@ export function isBriefingDocument(v: unknown): v is BriefingDocument {
     ch.rows.length <= 50 &&
     ch.rows.every((r) => row(r) && r.group !== null) &&
     row(ch.totals) &&
-    record(s) &&
-    uuid(s.id) &&
-    uuid(s.materialId) &&
-    uuid(s.versionId) &&
-    Number.isSafeInteger(s.version) &&
-    Number(s.version) > 0 &&
-    text(s.filename, 1, 255) &&
-    hash(s.sha256) &&
-    text(s.scopeExcerpt, 1, 4000) &&
+    (dataset
+      ? s === null &&
+        record(ds) &&
+        record(basis) &&
+        text(basis.groupColumn, 1, 160) &&
+        text(basis.periodColumn, 1, 160) &&
+        Number.isSafeInteger(basis.matchedRows) &&
+        Number(basis.matchedRows) > 0 &&
+        Number.isSafeInteger(basis.ignoredRows) &&
+        Number(basis.ignoredRows) >= 0 &&
+        Number(basis.matchedRows) + Number(basis.ignoredRows) === ds.rowCount &&
+        uuid(ds.datasetId) &&
+        uuid(ds.snapshotId) &&
+        Number.isSafeInteger(ds.version) &&
+        Number(ds.version) > 0 &&
+        text(ds.name, 1, 160) &&
+        hash(ds.sha256) &&
+        Number.isSafeInteger(ds.rowCount) &&
+        Number(ds.rowCount) >= 0 &&
+        Number(ds.rowCount) <= 100000 &&
+        typeof ds.collectedAt === 'string' &&
+        Number.isFinite(Date.parse(ds.collectedAt)) &&
+        (ds.coverageThrough === null ||
+          (typeof ds.coverageThrough === 'string' && Number.isFinite(Date.parse(ds.coverageThrough))))
+      : record(s) &&
+        uuid(s.id) &&
+        uuid(s.materialId) &&
+        uuid(s.versionId) &&
+        Number.isSafeInteger(s.version) &&
+        Number(s.version) > 0 &&
+        text(s.filename, 1, 255) &&
+        hash(s.sha256) &&
+        text(s.scopeExcerpt, 1, 4000)) &&
     uuid(c.calculationArtifactId) &&
     hash(c.calculationSha256) &&
     typeof c.generatedAt === 'string' &&

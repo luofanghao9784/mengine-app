@@ -34,7 +34,10 @@ export function TaskReadingBody({
   );
   const result = data.value?.tasks[0];
   const hasBriefing = !!result?.artifacts.some(
-    (a) => a.filename.startsWith('briefing-data-') || a.filename.startsWith('briefing-text-'),
+    (a) =>
+      a.filename.startsWith('briefing-data-') ||
+      a.filename.startsWith('briefing-text-') ||
+      a.filename.startsWith('briefing-dataset-'),
   );
   const generated = useRemote(
     (signal) =>

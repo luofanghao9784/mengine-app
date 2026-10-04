@@ -1,0 +1,64 @@
+{
+  "artifactId": "00000000-0000-4000-8000-000000000008",
+  "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "content": {
+    "schemaVersion": "briefing-dataset-v1",
+    "businessType": "DATA",
+    "title": "门店两期收款比较",
+    "summary": "本期合成门店收款较前期增长一倍，数据用于验证画报展示。",
+    "analysis": [
+      "图表使用固定数据快照中的完整记录计算，其他期间未纳入本次比较。",
+      "收款变化不代表经营原因已经明确，还需结合业务背景作进一步分析。"
+    ],
+    "chart": {
+      "type": "GROUPED_BAR",
+      "metric": "收款（元）",
+      "unit": "元",
+      "baseline": "前期",
+      "current": "本期",
+      "range": "全部快照 · 6 行",
+      "rows": [
+        {
+          "group": "合成甲店",
+          "baseline": "100.10",
+          "current": "200.20",
+          "difference": "100.10",
+          "changePercent": "100.00",
+          "baselineRank": 1,
+          "currentRank": 1,
+          "issue": null
+        }
+      ],
+      "totals": {
+        "group": null,
+        "baseline": "100.10",
+        "current": "200.20",
+        "difference": "100.10",
+        "changePercent": "100.00",
+        "baselineRank": null,
+        "currentRank": null,
+        "issue": null
+      }
+    },
+    "source": null,
+    "datasetSource": {
+      "datasetId": "00000000-0000-4000-8000-000000000008",
+      "snapshotId": "00000000-0000-4000-8000-000000000008",
+      "version": 2,
+      "name": "合成销售数据",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "rowCount": 6,
+      "collectedAt": "2026-10-04T03:00:00Z",
+      "coverageThrough": null
+    },
+    "calculationArtifactId": "00000000-0000-4000-8000-000000000008",
+    "calculationSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "generatedAt": "2026-10-04T03:05:00Z",
+    "datasetBasis": {
+      "groupColumn": "门店",
+      "periodColumn": "期间",
+      "matchedRows": 5,
+      "ignoredRows": 1
+    }
+  }
+}

@@ -17,7 +17,10 @@ public class BriefingContentService {
     public record Row(String group,String baseline,String current,String difference,String changePercent,Integer baselineRank,Integer currentRank,String issue) {}
     public record Chart(String type,String metric,String unit,String baseline,String current,String range,List<Row> rows,Row totals) {}
     public record Source(UUID id,UUID materialId,UUID versionId,int version,String filename,String sha256,String scopeExcerpt) {}
-    public record Content(String schemaVersion,String businessType,String title,String summary,List<String> analysis,Chart chart,Source source,UUID calculationArtifactId,String calculationSha256,String generatedAt) {}
+    public record DatasetBasis(String groupColumn,String periodColumn,int matchedRows,int ignoredRows) {}
+    public record Content(String schemaVersion,String businessType,String title,String summary,List<String> analysis,Chart chart,Source source,UUID calculationArtifactId,String calculationSha256,String generatedAt,DatasetCalculationService.Source datasetSource,DatasetBasis datasetBasis) {
+        public Content(String schemaVersion,String businessType,String title,String summary,List<String> analysis,Chart chart,Source source,UUID calculationArtifactId,String calculationSha256,String generatedAt){this(schemaVersion,businessType,title,summary,analysis,chart,source,calculationArtifactId,calculationSha256,generatedAt,null,null);}
+    }
     public record Document(UUID artifactId,String sha256,Content content) {}
     private final JdbcTemplate db;private final IdentityAudit audit;private final JsonMapper json=new JsonMapper();
     public BriefingContentService(JdbcTemplate db,IdentityAudit audit){this.db=db;this.audit=audit;}
@@ -44,10 +47,10 @@ public class BriefingContentService {
         int attempt=db.queryForObject("SELECT attempt FROM conversation_tasks WHERE id=? AND lease_token=? FOR UPDATE",Integer.class,job.id(),job.token());
         if(!type.equals("DATA"))return createText(job,request,type,attempt);
         if(request.calculationArtifactId()==null)throw IdentityException.invalid();
-        var input=db.queryForList("SELECT a.sha256,a.content FROM conversation_artifacts a WHERE a.id=? AND a.task_id=? AND a.attempt_number=? AND object_is_active('ARTIFACT',a.id) AND EXISTS(SELECT 1 FROM identity_audit p WHERE p.target_id=a.id AND p.action='TASK_TABLE_COMPUTED' AND p.outcome='SUCCESS' AND p.tenant_id=a.tenant_id) AND EXISTS(SELECT 1 FROM conversation_tool_receipts r WHERE r.task_id=a.task_id AND r.attempt_number=a.attempt_number AND r.name='compare_table' AND r.status='succeeded')",request.calculationArtifactId(),job.id(),attempt);
+        var input=db.queryForList("SELECT a.sha256,a.content FROM conversation_artifacts a WHERE a.id=? AND a.task_id=? AND a.attempt_number=? AND object_is_active('ARTIFACT',a.id) AND EXISTS(SELECT 1 FROM identity_audit p WHERE p.target_id=a.id AND p.action IN ('TASK_TABLE_COMPUTED','TASK_DATASET_COMPUTED') AND p.outcome='SUCCESS' AND p.tenant_id=a.tenant_id) AND EXISTS(SELECT 1 FROM conversation_tool_receipts r WHERE r.task_id=a.task_id AND r.attempt_number=a.attempt_number AND r.name IN ('compare_table','compare_dataset') AND r.status='succeeded')",request.calculationArtifactId(),job.id(),attempt);
         if(input.size()!=1)throw new IdentityException(403,"BRIEFING_CALCULATION_NOT_GRANTED");
         var item=input.getFirst();byte[] bytes=(byte[])item.get("content");if(!hash(bytes).equals(item.get("sha256")))throw new IdentityException(502,"BRIEFING_CALCULATION_INVALID");
-        var receipt=json.readTree(bytes);var calc=receipt.path("calculation");var params=calc.path("request");
+        var receipt=json.readTree(bytes);if(receipt.has("datasetSource"))return createDataset(job,request,attempt,receipt,(String)item.get("sha256"));var calc=receipt.path("calculation");var params=calc.path("request");
         if(!calc.path("recipeVersion").asText().equals("table-compare-1")||!calc.path("status").asText().equals("COMPUTED")||!calc.path("inputSha256").equals(receipt.path("source").path("sha256")))throw new IdentityException(422,"BRIEFING_CALCULATION_INVALID");
         var source=json.treeToValue(receipt.path("source"),Source.class);
         if(db.queryForObject("SELECT count(*) FROM conversation_agent_grants WHERE task_id=? AND attempt_id=? AND chunk_id=?",Integer.class,job.id(),job.token(),source.id())!=1)throw new IdentityException(403,"BRIEFING_CALCULATION_NOT_GRANTED");
@@ -69,6 +72,22 @@ public class BriefingContentService {
         if(((Number)total.get("n")).intValue()>=8||((Number)total.get("bytes")).longValue()+body.length>65536)throw new IdentityException(413,"BRIEFING_CONTENT_LIMIT");
         UUID id=UUID.randomUUID();String sha=hash(body);db.update("INSERT INTO conversation_artifacts(id,tenant_id,workspace_id,task_id,filename,sha256,content,attempt_number) VALUES (?,?,?,?,?,?,?,?)",id,job.tenant(),job.space(),job.id(),"briefing-data-"+sha.substring(0,20)+".json",sha,body,attempt);
         audit.record(job.actor(),job.tenant(),"TASK_BRIEFING_CREATED",id,"SUCCESS");return new Document(id,sha,content);
+    }
+    private Document createDataset(ConversationService.Job job,Request request,int attempt,tools.jackson.databind.JsonNode receipt,String calculationHash){
+        var source=json.treeToValue(receipt.path("datasetSource"),DatasetCalculationService.Source.class);
+        var calc=json.treeToValue(receipt.path("calculation"),DatasetCalculationService.Calculation.class);
+        if(!"dataset-compare-1".equals(calc.recipeVersion()) || !"COMPUTED".equals(calc.status()) || !source.sha256().equals(calc.inputSha256()) || !source.datasetId().equals(calc.request().datasetId()) || !source.snapshotId().equals(calc.request().snapshotId()))throw new IdentityException(422,"BRIEFING_CALCULATION_INVALID");
+        if(db.queryForObject("SELECT count(*) FROM task_dataset_reads WHERE task_id=? AND attempt_number=? AND dataset_id=? AND snapshot_id=?",Integer.class,job.id(),attempt,source.datasetId(),source.snapshotId())!=1 || db.queryForObject("SELECT count(*) FROM identity_audit WHERE target_id=? AND action='TASK_DATASET_COMPUTED' AND outcome='SUCCESS' AND tenant_id=?",Integer.class,request.calculationArtifactId(),job.tenant())!=1 || db.queryForObject("SELECT count(*) FROM conversation_tool_receipts WHERE task_id=? AND attempt_number=? AND name='compare_dataset' AND status='succeeded'",Integer.class,job.id(),attempt)==0)throw new IdentityException(403,"BRIEFING_CALCULATION_NOT_GRANTED");
+        if(calc.rows()==null || calc.rows().isEmpty() || calc.rows().size()>50 || calc.totals()==null || calc.matchedRows()+calc.ignoredRows()!=source.rowCount())throw new IdentityException(422,"BRIEFING_CHART_INVALID");
+        String metric=calc.request().valueColumn(),unit="原数据数值单位";var match=java.util.regex.Pattern.compile("[（(]([^）)]{1,12})[）)]").matcher(metric);if(match.find())unit=match.group(1);
+        var chart=new Chart("GROUPED_BAR",metric,unit,calc.request().baseline(),calc.request().current(),"全部快照 · "+source.rowCount()+" 行",calc.rows(),calc.totals());
+        var prior=db.queryForList("SELECT a.id,a.sha256,a.content FROM conversation_artifacts a WHERE task_id=? AND attempt_number=? AND EXISTS(SELECT 1 FROM identity_audit p WHERE p.target_id=a.id AND p.action='TASK_BRIEFING_CREATED' AND p.tenant_id=a.tenant_id)",job.id(),attempt);
+        if(!prior.isEmpty()){var doc=read(prior.getFirst());var old=doc.content();if(!Objects.equals(old.calculationArtifactId(),request.calculationArtifactId()) || !old.title().equals(request.title().strip()) || !old.summary().equals(request.summary().strip()) || !old.analysis().equals(request.analysis()))throw new IdentityException(409,"BRIEFING_ALREADY_CREATED");return doc;}
+        var content=new Content("briefing-dataset-v1","DATA",request.title().strip(),request.summary().strip(),List.copyOf(request.analysis()),chart,null,request.calculationArtifactId(),calculationHash,Instant.now().toString(),source,new DatasetBasis(calc.request().groupColumn(),calc.request().periodColumn(),calc.matchedRows(),calc.ignoredRows()));
+        if(!reserve(job,content))return null;
+        byte[] body=json.writeValueAsBytes(content);var size=db.queryForMap("SELECT count(*) n,coalesce(sum(octet_length(content)),0) bytes FROM conversation_artifacts WHERE task_id=? AND attempt_number=?",job.id(),attempt);
+        if(body.length>20000 || ((Number)size.get("n")).intValue()>=8 || ((Number)size.get("bytes")).longValue()+body.length>65536)throw new IdentityException(413,"BRIEFING_CONTENT_LIMIT");
+        UUID id=UUID.randomUUID();String sha=hash(body);db.update("INSERT INTO conversation_artifacts(id,tenant_id,workspace_id,task_id,filename,sha256,content,attempt_number) VALUES (?,?,?,?,?,?,?,?)",id,job.tenant(),job.space(),job.id(),"briefing-dataset-"+sha.substring(0,20)+".json",sha,body,attempt);audit.record(job.actor(),job.tenant(),"TASK_BRIEFING_CREATED",id,"SUCCESS");return new Document(id,sha,content);
     }
     private Document createText(ConversationService.Job job,Request request,String type,int attempt){
         if(request.calculationArtifactId()!=null)throw IdentityException.invalid();
@@ -104,10 +123,10 @@ public class BriefingContentService {
         if(!owner.equals(job.id())&&!"SUCCEEDED".equals(db.queryForObject("SELECT status FROM conversation_tasks WHERE id=?",String.class,owner)))throw new IdentityException(409,"BRIEFING_CONTENT_IN_PROGRESS");
         return owner.equals(job.id());
     }
-    private String contentKey(Content c){return IdentityService.hash(json.writeValueAsString(List.of(c.businessType(),c.source()==null?"PUBLIC":c.source().sha256(),c.chart()!=null?json.writeValueAsString(c.chart()):c.summary().replaceAll("[\\p{P}\\s]", "").toLowerCase(Locale.ROOT))));}
+    private String contentKey(Content c){return IdentityService.hash(json.writeValueAsString(List.of(c.businessType(),c.datasetSource()!=null?c.datasetSource().sha256():c.source()==null?"PUBLIC":c.source().sha256(),c.chart()!=null?json.writeValueAsString(c.chart()):c.summary().replaceAll("[\\p{P}\\s]", "").toLowerCase(Locale.ROOT))));}
     private Document read(Map<String,Object> row){
         byte[] bytes=(byte[])row.get("content");String sha=(String)row.get("sha256");if(!hash(bytes).equals(sha))throw new IdentityException(502,"BRIEFING_CONTENT_INVALID");
-        Content content=json.readValue(bytes,Content.class);if(!Set.of("briefing-data-v1","briefing-text-v1").contains(content.schemaVersion()))throw new IdentityException(502,"BRIEFING_CONTENT_INVALID");
+        Content content=json.readValue(bytes,Content.class);if(!Set.of("briefing-data-v1","briefing-text-v1","briefing-dataset-v1").contains(content.schemaVersion()))throw new IdentityException(502,"BRIEFING_CONTENT_INVALID");
         return new Document((UUID)row.get("id"),sha,content);
     }
     private String hash(byte[] body){try{return HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(body));}catch(Exception e){throw new IllegalStateException(e);}}
