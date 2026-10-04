@@ -37,7 +37,7 @@ const actions: Record<string, string> = {
 function targetHref(r: ManagementRecord) {
   if (r.category === 'ENTERPRISE' && r.tenantId)
     return `#admin=tenants&enterprise=${r.tenantId}&section=records`;
-  if (r.category === 'ACCOUNT' && r.targetId) return `#admin=accounts&account=${r.targetId}`;
+  if (r.category === 'ACCOUNT' && r.targetId) return `#admin=tenants&directory=accounts&account=${r.targetId}`;
   if (r.category === 'STAFF') return '#admin=settings&section=staff';
   return null;
 }

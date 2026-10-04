@@ -36,7 +36,6 @@ const entries: Record<AdminRealm, { id: AdminPage; title: string; icon: LucideIc
   platform: [
     { id: 'overview', title: '概览', icon: LayoutDashboard },
     { id: 'tenants', title: '企业管理', icon: Building2 },
-    { id: 'accounts', title: '账号管理', icon: Users },
     { id: 'usage', title: '用量与成本', icon: Wallet },
     { id: 'engine', title: '系统运行', icon: Activity },
     { id: 'experience', title: '经验库', icon: BookOpen },
@@ -84,7 +83,8 @@ export function AdminShell({
   const main = useRef<HTMLElement>(null);
   const scrollPositions = useRef(new Map<string, number>());
   const nav = entries[realm].filter((entry) => !allowedPages || allowedPages.includes(entry.id));
-  const title = page === 'settings' ? '设置' : nav.find((x) => x.id === page)?.title || '概览';
+  const navigationPage = realm === 'platform' && page === 'accounts' ? 'tenants' : page;
+  const title = navigationPage === 'settings' ? '设置' : nav.find((x) => x.id === navigationPage)?.title || '概览';
   useEffect(() => {
     const desktop = window.matchMedia('(min-width: 761px)');
     const closeOnDesktop = () => {
@@ -206,7 +206,7 @@ export function AdminShell({
                   {
                     label: '平台管理',
                     items: nav.filter((item) =>
-                      ['overview', 'tenants', 'accounts', 'usage'].includes(item.id),
+                      ['overview', 'tenants', 'usage'].includes(item.id),
                     ),
                   },
                   {
@@ -224,7 +224,7 @@ export function AdminShell({
                     {group.items.map(({ id, title, icon: Icon }) => (
                       <a
                         key={id}
-                        className={`admin-nav-link ${page === id ? 'active' : ''}`}
+                        className={`admin-nav-link ${navigationPage === id ? 'active' : ''}`}
                         aria-current={page === id ? 'page' : undefined}
                         href={adminHref(realm, id, hash)}
                         onClick={(e) => {

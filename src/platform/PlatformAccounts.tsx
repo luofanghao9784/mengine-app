@@ -28,7 +28,7 @@ export function PlatformAccounts() {
         id={routeAccount || selected}
         close={() => {
           setSelected('');
-          if (routeAccount) location.hash = 'admin=accounts';
+          if (routeAccount) location.hash = '#admin=tenants&directory=accounts';
         }}
         changed={refresh}
       />
