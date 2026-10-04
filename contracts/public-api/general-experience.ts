@@ -52,6 +52,7 @@ export interface GeneralExperienceUsage {
   entryId: string;
   versionId: string;
   enabled: boolean;
+  usable: boolean;
   revision: number;
   canManage: boolean;
 }

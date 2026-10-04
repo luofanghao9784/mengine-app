@@ -121,8 +121,77 @@ class GeneralExperienceSuggestionIntegrationTest {
   seed();var g=publish(method());var latch=new CountDownLatch(1);try(var pool=Executors.newFixedThreadPool(2)){Callable<String> request=()->{latch.await();try{return submit(g).state();}catch(IdentityException conflict){return conflict.code;}};var a=pool.submit(request);var b=pool.submit(request);latch.countDown();assertEquals(Set.of("WAITING","EXPERIENCE_SUGGESTION_PENDING"),Set.of(a.get(10,TimeUnit.SECONDS),b.get(10,TimeUnit.SECONDS)));}
  }
 
- @Test void localAdaptationsDoNotRecirculateAsIndependentGeneralAssets(){
-  seed();var g=publish(method());var local=admitLocal(g);generalization.discover();assertEquals(0,db.queryForObject("SELECT count(*) FROM experience_generalization_sources WHERE version_id=?",Integer.class,local.versionId()));assertNull(generalization.claim(clientTenant));assertTrue(available(g.versionId()));
+ ExperienceGeneralizationRuntime.Method variation(String title){return new ExperienceGeneralizationRuntime.Method(title+" "+tenant.toString().substring(0,8),"明确期间后核对回执",List.of("先核对期间和口径，再核对实际回执"),List.of("期间证据明确"),List.of("没有依据时停止推断"),List.of("期间"),"FEEDBACK_CORRECTION");}
+ ExperienceGeneralizationRuntime.Job variationJob(){generalization.discover();var j=generalization.claim(clientTenant);assertNotNull(j);generalization.dispatched(j,generalDescriptor());return j;}
+ GeneralExperienceAdmissionService.Receipt contribute(){var j=variationJob();generalization.complete(qualified(j,variation("通用期间核对")));var r=generalAdmission.admit(j.id());assertEquals("CREATED",r.outcome());return r;}
+ @Test void localAdaptationRecirculatesOnlyAfterCleanPrivacyQualityAndKeepsExactAncestry(){
+  seed();var g=publish(method());var local=admitLocal(g);var j=variationJob();assertEquals(local.versionId(),j.source());assertEquals("FEEDBACK_CORRECTION",j.original().basis());
+  assertEquals(0,db.queryForObject("SELECT count(*) FROM general_experience_origins WHERE source_version=?",Integer.class,local.versionId()));
+  generalization.complete(qualified(j,variation("通用期间核对")));var r=generalAdmission.admit(j.id());assertEquals("CREATED",r.outcome());assertTrue(available(r.versionId()));
+  assertEquals(Set.of(g.versionId(),r.versionId()),new HashSet<>(db.queryForList("SELECT base_version FROM general_experience_ancestry WHERE version_id=?",UUID.class,r.versionId())));
+  assertEquals(local.versionId(),db.queryForObject("SELECT source_version FROM general_experience_origins WHERE version_id=?",UUID.class,r.versionId()));assertEquals(r,generalAdmission.admit(j.id()));
+  var body=read(working(),r,0).toString();for(String secret:List.of("private-suggestion",clientActor.toString(),local.versionId().toString(),task.toString()))assertFalse(body.contains(secret),secret);
+ }
+ @Test void recontributedMethodGlobalStopFencesLiveUseRestorationNeverReplaysAndErasureCascades(){
+  seed();var g=publish(method());admitLocal(g);var r=contribute();var done=working();read(done,r,0);finish(done,"派生历史结果");var active=working();read(active,r,0);
+  db.update("UPDATE general_experience_entries SET status='STOPPED' WHERE id=?",g.entryId());assertFalse(available(r.versionId()));assertFalse(agents.active(active));assertNotNull(db.queryForObject("SELECT method::text FROM general_experience_versions WHERE id=?",String.class,r.versionId()));assertEquals("派生历史结果",db.queryForObject("SELECT reply FROM conversation_tasks WHERE id=?",String.class,done.id()));
+  db.update("UPDATE general_experience_entries SET status='AVAILABLE' WHERE id=?",g.entryId());assertTrue(available(r.versionId()));assertFalse(agents.active(active));assertNotNull(read(working(),r,0));
+  db.queryForList("SELECT scrub_lifecycle_object('TASK',?)",task);assertFalse(available(r.versionId()));assertNull(db.queryForObject("SELECT method::text FROM general_experience_versions WHERE id=?",String.class,r.versionId()));assertNull(db.queryForObject("SELECT reply FROM conversation_tasks WHERE id=?",String.class,done.id()));
+ }
+ @Test void ancestorTenantStopAffectsOnlyThatTenantAndDoesNotEraseContributedAsset(){
+  seed();var g=publish(method());admitLocal(g);var r=contribute();var active=working();read(active,r,0);
+  db.update("INSERT INTO tenant_general_experience_usage(tenant_id,entry_id,enabled,revision) VALUES (?,?,false,1)",clientTenant,g.entryId());assertTrue(available(r.versionId()));assertFalse(agents.active(active));
+  assertFalse(db.queryForObject("SELECT general_experience_dependencies_enabled(?,?)",Boolean.class,clientTenant,r.versionId()));assertTrue(db.queryForObject("SELECT general_experience_dependencies_enabled(?,?)",Boolean.class,tenant,r.versionId()));assertThrows(IdentityException.class,()->read(working(),r,0));assertFalse(suggestions.list(clientActor,clientTenant,r.entryId(),r.versionId(),true).canSubmit());
+  db.update("UPDATE tenant_general_experience_usage SET enabled=true,revision=revision+1 WHERE tenant_id=? AND entry_id=?",clientTenant,g.entryId());assertTrue(available(r.versionId()));assertFalse(agents.active(active));assertNotNull(read(working(),r,0));
+ }
+ @Test void baseNewPublicationPreservesPinnedRecontributionAndActiveConsumers(){
+  seed();var g=publish(method());admitLocal(g);var r=contribute();var active=working();read(active,r,0);UUID newer=UUID.randomUUID();
+  db.update("INSERT INTO general_experience_versions(id,entry_id,number,method,content_fingerprint) SELECT ?,entry_id,number+1,method,content_fingerprint FROM general_experience_versions WHERE id=?",newer,g.versionId());db.update("INSERT INTO general_experience_origins(version_id,source_version) SELECT ?,source_version FROM general_experience_origins WHERE version_id=?",newer,g.versionId());db.update("UPDATE general_experience_entries SET published_version=?,revision=revision+1 WHERE id=?",newer,g.entryId());
+  assertTrue(available(r.versionId()));assertTrue(agents.active(active));assertEquals(Set.of(g.versionId(),r.versionId()),new HashSet<>(db.queryForList("SELECT base_version FROM general_experience_ancestry WHERE version_id=?",UUID.class,r.versionId())));
+ }
+ @Test void stoppedPendingRecontributionCannotPublishAfterAncestorRestores(){
+  seed();var g=publish(method());var local=admitLocal(g);var j=variationJob();generalization.complete(qualified(j,variation("在途通用期间")));
+  db.update("UPDATE general_experience_entries SET status='STOPPED' WHERE id=?",g.entryId());db.update("UPDATE general_experience_entries SET status='AVAILABLE' WHERE id=?",g.entryId());assertEquals("SOURCE_UNAVAILABLE",generalState(local.versionId()));assertEquals("SOURCE_UNAVAILABLE",generalAdmission.admit(j.id()).outcome());generalization.discover();assertNull(generalization.claim(clientTenant));
+ }
+ @Test void tenantStopPermanentlyCancelsDispatchedRecontribution(){
+  seed();var g=publish(method());var local=admitLocal(g);var j=variationJob();db.update("INSERT INTO tenant_general_experience_usage(tenant_id,entry_id,enabled,revision) VALUES (?,?,false,1)",clientTenant,g.entryId());db.update("UPDATE tenant_general_experience_usage SET enabled=true,revision=2 WHERE tenant_id=? AND entry_id=?",clientTenant,g.entryId());assertFalse(generalization.active(j.id(),j.lease()));assertEquals("CANCELLED",db.queryForObject("SELECT state FROM experience_generalization_runs WHERE id=?",String.class,j.id()));assertEquals("SOURCE_UNAVAILABLE",generalState(local.versionId()));
+ }
+
+ @Autowired TenantGeneralExperienceUsage tenantUsage;
+ ExperienceAdmissionService.Receipt localWithTitle(GeneralExperienceAdmissionService.Receipt g,String title){
+  submit(g);var j=localClaim();queue.dispatched(j,descriptor());var r=localResult(j,"QUALIFIED",null);var c=r.candidate();
+  queue.complete(new Result(r.contractVersion(),r.engineVersion(),r.executionClass(),r.runId(),r.lease(),r.source(),false,r.outcome(),r.code(),new Candidate(null,title,c.summary(),c.steps(),c.applicable(),c.excluded(),c.tags(),c.evidence()),r.review(),r.stages()));return admission.admit(j.id());
+ }
+ @Test void multipleContributionHopsRetainAllAncestorsAndEraseTransitively(){
+  seed();var root=publish(method());admitLocal(root);var middle=contribute();var local=localWithTitle(middle,"第三阶段企业核对");var j=variationJob();assertEquals(local.versionId(),j.source());generalization.complete(qualified(j,variation("第三阶段通用核对")));var last=generalAdmission.admit(j.id());assertEquals("CREATED",last.outcome());
+  assertEquals(Set.of(root.versionId(),middle.versionId(),last.versionId()),new HashSet<>(db.queryForList("SELECT base_version FROM general_experience_ancestry WHERE version_id=?",UUID.class,last.versionId())));
+  var t=working();read(t,last,0);var pending=submit(last);assertTrue(tenantUsage.state(clientActor,clientTenant,last.entryId(),last.versionId()).usable());
+  db.update("INSERT INTO tenant_general_experience_usage(tenant_id,entry_id,enabled,revision) VALUES (?,?,false,1)",clientTenant,root.entryId());var state=tenantUsage.state(clientActor,clientTenant,last.entryId(),last.versionId());assertTrue(state.enabled());assertFalse(state.usable());assertFalse(agents.active(t));assertFalse(intake.available(pending.id()));assertTrue(available(last.versionId()));
+  db.queryForList("SELECT scrub_lifecycle_object('TASK',?)",task);assertFalse(available(middle.versionId()));assertFalse(available(last.versionId()));assertNull(db.queryForObject("SELECT method::text FROM general_experience_versions WHERE id=?",String.class,last.versionId()));
+ }
+ @Test void variationCannotPublishBeforeReceiptOrUpgradeEvidenceBasis(){
+  seed();var root=publish(method());admitLocal(root);var j=variationJob();
+  var stronger=method();assertThrows(IdentityException.class,()->generalization.complete(qualified(j,stronger)));
+  // A failed quality check cannot create a public asset; incomplete receipts also remain rejected.
+  assertThrows(IdentityException.class,()->generalAdmission.admit(j.id()));assertEquals(0,db.queryForObject("SELECT count(*) FROM general_experience_origins WHERE source_version=?",Integer.class,j.source()));
+ }
+
+
+ @Autowired org.springframework.transaction.PlatformTransactionManager transactions;
+ @Test void admissionWaitsForAncestorLockThenRechecksStopInsteadOfPublishingStaleQualification()throws Exception{
+  seed();var root=publish(method());admitLocal(root);var j=variationJob();generalization.complete(qualified(j,variation("并发期间核对")));
+  var locked=new CountDownLatch(1);var release=new CountDownLatch(1);var pid=new java.util.concurrent.atomic.AtomicInteger();
+  try(var pool=Executors.newFixedThreadPool(2)){
+   var stopper=pool.submit(()->new org.springframework.transaction.support.TransactionTemplate(transactions).execute(status->{
+    db.queryForList("SELECT id FROM general_experience_entries WHERE id=? FOR UPDATE",root.entryId());pid.set(db.queryForObject("SELECT pg_backend_pid()",Integer.class));locked.countDown();
+    try{assertTrue(release.await(5,TimeUnit.SECONDS));}catch(InterruptedException e){throw new RuntimeException(e);}
+    db.update("UPDATE general_experience_entries SET status='STOPPED' WHERE id=?",root.entryId());return true;
+   }));
+   assertTrue(locked.await(5,TimeUnit.SECONDS));var publishing=pool.submit(()->generalAdmission.admit(j.id()));
+   boolean waiting=false;try{for(int n=0;n<100&&!waiting;n++){waiting=Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM pg_stat_activity a WHERE ?=ANY(pg_blocking_pids(a.pid)))",Boolean.class,pid.get()));if(!waiting)Thread.sleep(20);}assertTrue(waiting,"publisher must wait on the exact ancestor transaction");}finally{release.countDown();}
+   assertTrue(stopper.get(5,TimeUnit.SECONDS));assertEquals("SOURCE_UNAVAILABLE",publishing.get(5,TimeUnit.SECONDS).outcome());
+  }
+  assertEquals(0,db.queryForObject("SELECT count(*) FROM general_experience_origins WHERE source_version=?",Integer.class,j.source()));
  }
  @Test void completedQualificationCannotAdmitAfterGlobalStopAndRestore(){
   seed();var g=publish(method());var a=submit(g);var j=localClaim();queue.dispatched(j,descriptor());queue.complete(localResult(j,"QUALIFIED",null));db.update("UPDATE general_experience_entries SET status='STOPPED' WHERE id=?",g.entryId());db.update("UPDATE general_experience_entries SET status='AVAILABLE' WHERE id=?",g.entryId());assertEquals("SOURCE_UNAVAILABLE",admission.admit(j.id()).outcome());assertFalse(intake.available(a.id()));assertEquals(0,db.queryForObject("SELECT count(*) FROM experience_entries WHERE tenant_id=?",Integer.class,clientTenant));

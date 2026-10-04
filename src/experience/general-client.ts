@@ -82,12 +82,14 @@ export const isGeneralProcessing = (v: unknown): v is GeneralExperienceProcessin
   count(v.withdrawn) &&
   date(v.checkedAt);
 export const isGeneralUsage = (v: unknown): v is GeneralExperienceUsage =>
-  exact(v, ['entryId', 'versionId', 'enabled', 'revision', 'canManage']) &&
+  exact(v, ['entryId', 'versionId', 'enabled', 'usable', 'revision', 'canManage']) &&
   uuid(v.entryId) &&
   uuid(v.versionId) &&
   typeof v.enabled === 'boolean' &&
   count(v.revision) &&
-  typeof v.canManage === 'boolean';
+  typeof v.canManage === 'boolean' &&
+  typeof v.usable === 'boolean' &&
+  (!v.usable || v.enabled);
 export const isGeneralUsageReceipt = (v: unknown): v is GeneralExperienceUsageReceipt =>
   exact(v, ['requestId', 'entryId', 'versionId', 'enabled', 'revision']) &&
   uuid(v.requestId) &&

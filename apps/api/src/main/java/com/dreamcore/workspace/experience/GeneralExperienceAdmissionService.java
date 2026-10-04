@@ -15,8 +15,12 @@ public class GeneralExperienceAdmissionService {
  private List<String> clean(List<String> items){return items.stream().map(String::strip).distinct().toList();}
  private Method canonical(Method m){return new Method(m.title().strip(),m.summary().strip(),clean(m.steps()),clean(m.applicable()),clean(m.excluded()),m.tags().stream().map(s->s.strip().toLowerCase(Locale.ROOT)).distinct().sorted().toList(),m.basis());}
  @Transactional public Receipt admit(UUID id){
-  var metadata=db.queryForList("SELECT r.tenant_id,r.source_id,v.entry_id FROM experience_generalization_runs r JOIN experience_versions v ON v.id=r.source_id WHERE r.id=?",id);if(metadata.isEmpty())throw new IdentityException(404,"GENERALIZATION_NOT_FOUND");var initial=metadata.getFirst();
+  var metadata=db.queryForList("SELECT r.tenant_id,r.source_id,v.entry_id,r.method::text method FROM experience_generalization_runs r JOIN experience_versions v ON v.id=r.source_id WHERE r.id=?",id);if(metadata.isEmpty())throw new IdentityException(404,"GENERALIZATION_NOT_FOUND");var initial=metadata.getFirst();
+  // Same fingerprint-first order as platform stop and exact dedup, before ancestor entry locks.
+  if(initial.get("method")!=null)db.queryForList("SELECT pg_advisory_xact_lock(hashtextextended(?,0))","general-experience:"+IdentityService.hash(json.writeValueAsString(canonical(json.readValue(initial.get("method").toString(),Method.class)))));
   db.queryForList("SELECT id FROM tenants WHERE id=? FOR SHARE",initial.get("tenant_id"));
+  db.queryForList("SELECT pg_advisory_xact_lock_shared(hashtextextended('general-use:'||?::text,0))",initial.get("tenant_id"));
+  db.queryForList("SELECT e.id FROM experience_general_dependency_closure d JOIN general_experience_versions v ON v.id=d.general_version_id JOIN general_experience_entries e ON e.id=v.entry_id WHERE d.version_id=? ORDER BY e.id,v.id FOR SHARE OF e,v",initial.get("source_id"));
   db.queryForList("SELECT id FROM experience_entries WHERE id=? FOR SHARE",initial.get("entry_id"));
   db.queryForList("SELECT id FROM experience_versions WHERE id=? FOR SHARE",initial.get("source_id"));
   db.queryForList("SELECT version_id FROM experience_generalization_sources WHERE version_id=? FOR UPDATE",initial.get("source_id"));

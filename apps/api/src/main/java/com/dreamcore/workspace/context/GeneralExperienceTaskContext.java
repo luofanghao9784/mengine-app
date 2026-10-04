@@ -16,7 +16,8 @@ public class GeneralExperienceTaskContext {
  private String text(String value,int max,boolean required){String s=value==null?"":value.strip();if(s.length()>max||required&&s.isBlank()||s.codePoints().anyMatch(c->Character.isISOControl(c)&&c!=10&&c!=13&&c!=9))throw IdentityException.invalid();return s;}
  private Map<String,Object> exact(UUID tenant,UUID entry,UUID version){
   if(entry==null||version==null)throw IdentityException.invalid();
-  var rows=db.queryForList("SELECT e.id,v.id version_id,v.number,v.method FROM general_experience_entries e JOIN general_experience_versions v ON v.entry_id=e.id WHERE e.id=? AND v.id=? AND general_experience_available(v.id) AND tenant_general_experience_enabled(?,e.id) FOR SHARE OF e,v",entry,version,tenant);
+  db.queryForList("SELECT e.id FROM general_experience_ancestry a JOIN general_experience_versions v ON v.id=a.base_version JOIN general_experience_entries e ON e.id=v.entry_id WHERE a.version_id=? ORDER BY e.id,v.id FOR SHARE OF e,v",version);
+  var rows=db.queryForList("SELECT e.id,v.id version_id,v.number,v.method FROM general_experience_entries e JOIN general_experience_versions v ON v.entry_id=e.id WHERE e.id=? AND v.id=? AND general_experience_available(v.id) AND general_experience_dependencies_enabled(?,v.id) FOR SHARE OF e,v",entry,version,tenant);
   if(rows.isEmpty())throw new IdentityException(404,"EXPERIENCE_NOT_FOUND");return rows.getFirst();
  }
  private ExperienceGeneralizationRuntime.Method method(Map<String,Object> row){return json.readValue(row.get("method").toString(),ExperienceGeneralizationRuntime.Method.class);}
@@ -34,7 +35,7 @@ public class GeneralExperienceTaskContext {
   int offset=r.offset()==null?0:r.offset();if(offset<0||offset>1000)throw IdentityException.invalid();
   if(r.action().equals("general_experience_search")){
    String query=text(r.query(),200,true);
-   var rows=db.queryForList("SELECT e.id,v.id version_id FROM general_experience_entries e JOIN general_experience_versions v ON v.id=e.published_version WHERE general_experience_available(v.id) AND tenant_general_experience_enabled(?,e.id) AND strpos(lower(concat_ws(' ',v.method->>'title',v.method->>'summary',v.method->'tags')),lower(?))>0 ORDER BY e.updated_at DESC,e.id LIMIT 4 OFFSET ?",tenant,query,offset);
+   var rows=db.queryForList("SELECT e.id,v.id version_id FROM general_experience_entries e JOIN general_experience_versions v ON v.id=e.published_version WHERE general_experience_available(v.id) AND general_experience_dependencies_enabled(?,v.id) AND strpos(lower(concat_ws(' ',v.method->>'title',v.method->>'summary',v.method->'tags')),lower(?))>0 ORDER BY e.updated_at DESC,e.id LIMIT 4 OFFSET ?",tenant,query,offset);
    var items=new ArrayList<Object>();for(var id:rows.stream().limit(3).toList()){
     var row=exact(tenant,(UUID)id.get("id"),(UUID)id.get("version_id"));pin(task,attempt,row);var m=method(row);
     items.add(map("entryId",row.get("id"),"versionId",row.get("version_id"),"number",row.get("number"),"title",m.title(),"summary",m.summary(),"tags",m.tags(),"authority",false));

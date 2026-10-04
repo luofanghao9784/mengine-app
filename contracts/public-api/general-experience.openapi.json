@@ -1589,7 +1589,8 @@
           "versionId",
           "enabled",
           "revision",
-          "canManage"
+          "canManage",
+          "usable"
         ],
         "properties": {
           "entryId": {
@@ -1609,6 +1610,10 @@
           },
           "canManage": {
             "type": "boolean"
+          },
+          "usable": {
+            "type": "boolean",
+            "description": "Effective availability of this exact version including fixed general ancestors; enabled remains the enterprise switch."
           }
         }
       },

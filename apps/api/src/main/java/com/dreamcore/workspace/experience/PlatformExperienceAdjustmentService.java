@@ -150,8 +150,9 @@ public class PlatformExperienceAdjustmentService {
   if(m==null)throw changed();m=new ExperienceGeneralizationRuntime.Method(m.title().strip(),m.summary().strip(),clean(m.steps()),clean(m.applicable()),clean(m.excluded()),m.tags().stream().map(s->s.strip().toLowerCase(Locale.ROOT)).distinct().sorted().toList(),m.basis());
   String body=json.writeValueAsString(m),fingerprint=IdentityService.hash(body);
   // Protect every fixed general ancestor from erasure before taking the entry/publication lock.
-  db.queryForList("WITH RECURSIVE bases(id) AS (SELECT ?::uuid UNION SELECT d.base_version FROM general_experience_version_dependencies d JOIN bases b ON b.id=d.version_id) SELECT v.id FROM general_experience_versions v JOIN bases b ON b.id=v.id ORDER BY v.id FOR SHARE OF v",initial.get("version_id"));
+  db.queryForList("WITH RECURSIVE bases(id) AS (SELECT ?::uuid UNION SELECT d.base_version FROM general_experience_version_edges d JOIN bases b ON b.id=d.version_id) SELECT v.id FROM general_experience_versions v JOIN bases b ON b.id=v.id ORDER BY v.id FOR SHARE OF v",initial.get("version_id"));
   db.queryForList("SELECT pg_advisory_xact_lock(hashtextextended(?,0))","general-experience:"+fingerprint);
+  db.queryForList("SELECT e.id FROM general_experience_ancestry a JOIN general_experience_versions v ON v.id=a.base_version JOIN general_experience_entries e ON e.id=v.entry_id WHERE a.version_id=? AND e.id<>? ORDER BY e.id FOR SHARE OF e",initial.get("version_id"),initial.get("entry_id"));
   db.queryForList("SELECT id FROM general_experience_entries WHERE id=? FOR UPDATE",initial.get("entry_id"));var p=proposal(id,true);
   if(!"PUBLISHING".equals(p.get("state")))return project(p);
   if(!available(id)){terminal(id,"UNAVAILABLE","GENERAL_ADJUSTMENT_SOURCE_CHANGED");return project(proposal(id,false));}

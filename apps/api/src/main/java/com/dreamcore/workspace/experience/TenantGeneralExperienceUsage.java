@@ -9,7 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class TenantGeneralExperienceUsage {
- public record State(UUID entryId,UUID versionId,boolean enabled,int revision,boolean canManage) {}
+ public record State(UUID entryId,UUID versionId,boolean enabled,boolean usable,int revision,boolean canManage) {}
  public record Change(UUID requestId,UUID versionId,Integer expectedRevision,Boolean enabled) {}
  public record Receipt(UUID requestId,UUID entryId,UUID versionId,boolean enabled,int revision) {}
  private final JdbcTemplate db;private final GeneralExperienceLibrary library;private final GovernanceAccess governance;private final IdentityAudit audit;
@@ -17,7 +17,7 @@ public class TenantGeneralExperienceUsage {
  private Map<String,Object> current(UUID tenant,UUID entry){var rows=db.queryForList("SELECT enabled,revision FROM tenant_general_experience_usage WHERE tenant_id=? AND entry_id=?",tenant,entry);return rows.isEmpty()?Map.of("enabled",true,"revision",0):rows.getFirst();}
  @Transactional public State state(UUID actor,UUID tenant,UUID entry,UUID version){
   library.detail(actor,tenant,entry,version);var r=current(tenant,entry);
-  return new State(entry,version,(Boolean)r.get("enabled"),((Number)r.get("revision")).intValue(),governance.allows(actor,tenant,GovernanceAccess.Capability.TENANT_CONFIG,null));
+  return new State(entry,version,(Boolean)r.get("enabled"),Boolean.TRUE.equals(db.queryForObject("SELECT general_experience_dependencies_enabled(?,?)",Boolean.class,tenant,version)),((Number)r.get("revision")).intValue(),governance.allows(actor,tenant,GovernanceAccess.Capability.TENANT_CONFIG,null));
  }
  @Transactional public Receipt change(UUID actor,UUID tenant,UUID entry,Change change){
   governance.require(actor,tenant,GovernanceAccess.Capability.TENANT_CONFIG,null);

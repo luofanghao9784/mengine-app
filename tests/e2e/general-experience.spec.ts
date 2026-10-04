@@ -25,6 +25,7 @@ async function fixture(
     dropAdjustmentFirst?: boolean;
     denyAdjustment?: boolean;
     noSuggestionScope?: boolean;
+    dependencyStopped?: boolean;
   } = {},
 ) {
   let enabled = true,
@@ -184,7 +185,7 @@ async function fixture(
       }
       return json({
         enabled: true,
-        canSubmit: enabled && suggestionScope,
+        canSubmit: enabled && suggestionScope && !options.dependencyStopped,
         scopes: suggestionScope ? [{ id: id(20), name: '合成业务空间' }] : [],
         items: suggestions,
       });
@@ -276,6 +277,7 @@ async function fixture(
             enabled,
             revision,
             canManage: options.canManage !== false,
+            usable: enabled && !options.dependencyStopped,
           });
     }
     if (path.endsWith('/activity')) {
@@ -826,3 +828,15 @@ for (const realm of ['platform', 'tenant'] as const)
     await expect(dialog.getByText('保留的旧版本步骤')).toHaveCount(0);
     await expect(dialog.getByText(method.steps[0])).toHaveCount(0);
   });
+
+test('enabled enterprise switch does not claim a stopped dependency is usable', async ({ context, page }) => {
+  await fixture(context, { dependencyStopped: true });
+  await openTenantMethod(page);
+  await expect(page.getByText('本企业：关联经验已停用，当前暂停参考')).toBeVisible();
+  await expect(page.getByRole('button', { name: '停止本企业使用', exact: true })).toBeVisible();
+  await expect(page.getByText('本企业：可供引擎参考', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '补充或反馈', exact: true })).toHaveCount(0);
+  await page.setViewportSize({ width: 360, height: 900 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: '/tmp/general-dependency-stopped-360.png', fullPage: true });
+});

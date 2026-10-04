@@ -23,7 +23,7 @@ public class GeneralExperienceSuggestionService {
  @Transactional public Page list(UUID actor,UUID tenant,UUID entry,UUID version,boolean enabled){
   library.detail(actor,tenant,entry,version);var scopes=scopes(actor,tenant);UUID[] ids=scopes.stream().map(ExperienceManagementService.Scope::id).toArray(UUID[]::new);
   var records=db.queryForList("SELECT id FROM general_experience_suggestions WHERE tenant_id=? AND entry_id=? AND actor_id=? AND workspace_id=ANY(?::uuid[]) ORDER BY created_at DESC,id DESC LIMIT 10",UUID.class,tenant,entry,actor,ids);
-  return new Page(enabled,!scopes.isEmpty()&&Boolean.TRUE.equals(db.queryForObject("SELECT tenant_general_experience_enabled(?,?)",Boolean.class,tenant,entry)),scopes,records.stream().map(id->project(actor,tenant,entry,id)).toList());
+  return new Page(enabled,!scopes.isEmpty()&&Boolean.TRUE.equals(db.queryForObject("SELECT general_experience_dependencies_enabled(?,?)",Boolean.class,tenant,version)),scopes,records.stream().map(id->project(actor,tenant,entry,id)).toList());
  }
  @Transactional public Suggestion submit(UUID actor,UUID tenant,UUID entry,Change change){
   if(change==null||change.requestId()==null||change.versionId()==null||change.workspaceId()==null||change.intent()==null||!Set.of("FEEDBACK","ADAPTATION").contains(change.intent())||change.content()==null||change.content().isBlank()||change.content().length()>12000||change.content().codePoints().anyMatch(c->Character.isISOControl(c)&&c!=10&&c!=13&&c!=9))throw IdentityException.invalid();
@@ -31,7 +31,7 @@ public class GeneralExperienceSuggestionService {
   db.queryForList("SELECT pg_advisory_xact_lock_shared(hashtextextended('general-use:'||?::text,0))",tenant);
   String body=change.content().strip(),fingerprint=IdentityService.hash(json.writeValueAsString(List.of(tenant,entry,change.versionId(),change.workspaceId(),change.intent(),body)));UUID prior=identities.priorRequest(actor,change.requestId(),"GENERAL_EXPERIENCE_SUGGESTION",fingerprint);
   if(prior!=null)return project(actor,tenant,entry,prior);
-  db.queryForList("SELECT e.id FROM general_experience_entries e JOIN general_experience_versions v ON v.entry_id=e.id WHERE e.id=? AND v.id=? FOR SHARE OF e,v",entry,change.versionId());
+  db.queryForList("SELECT e.id FROM general_experience_ancestry a JOIN general_experience_versions v ON v.id=a.base_version JOIN general_experience_entries e ON e.id=v.entry_id WHERE a.version_id=? ORDER BY e.id,v.id FOR SHARE OF e,v",change.versionId());
   var original=library.detail(actor,tenant,entry,change.versionId());if(json.writeValueAsString(original.method()).length()+body.length()>56000)throw IdentityException.invalid();
   db.queryForList("SELECT pg_advisory_xact_lock(hashtextextended(?,0))","general-suggestion:"+tenant+":"+entry+":"+actor);
   if(Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM general_experience_suggestions WHERE tenant_id=? AND workspace_id=? AND entry_id=? AND actor_id=? AND NOT finished)",Boolean.class,tenant,change.workspaceId(),entry,actor)))throw new IdentityException(409,"EXPERIENCE_SUGGESTION_PENDING");

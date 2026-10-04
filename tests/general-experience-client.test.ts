@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createGeneralExperienceClient,
+  isGeneralUsage,
   isGeneralActivity,
   isGeneralVersions,
   isGeneralHistorical,
@@ -327,4 +328,13 @@ test('usage aggregates cannot imply business success, include private rows or cr
   await api.activity(id, id, id, version);
   response = { ...response, versionId: id };
   await assert.rejects(api.activity(id, id, id, version));
+});
+
+test('effective general usage cannot be inferred from the enterprise switch', () => {
+  const state = { entryId: id, versionId: version, enabled: true, usable: false, revision: 0, canManage: true };
+  assert.equal(isGeneralUsage(state), true);
+  assert.equal(isGeneralUsage({ ...state, enabled: false, usable: true }), false);
+  const { usable, ...old } = state;
+  assert.equal(isGeneralUsage(old), false);
+  assert.equal(isGeneralUsage({ ...state, originTenant: id }), false);
 });

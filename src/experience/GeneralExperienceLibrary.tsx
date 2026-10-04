@@ -451,13 +451,20 @@ function TenantUsage({
         <Loading />
       ) : (
         <>
-          <p>本企业：{d.enabled ? '可供引擎参考' : '已停止使用'}</p>
+          <p>
+            本企业：{d.usable ? '可供引擎参考' : d.enabled ? '关联经验已停用，当前暂停参考' : '已停止使用'}
+          </p>
+          {d.enabled && !d.usable && (
+            <p className="muted">
+              本条使用开关仍开启；关联经验恢复可用后，后续任务才可参考，已中断任务不会自动恢复。
+            </p>
+          )}
           {!d.canManage && <p className="muted">企业负责人或管理员可调整本企业使用状态。</p>}
           {action ? (
             <>
               <p>
                 {action.enabled
-                  ? '恢复后，后续任务可参考此经验；已中断的任务不会自动恢复。'
+                  ? '恢复本条使用开关；关联经验也可用时，后续任务才可参考。已中断的任务不会自动恢复。'
                   : '停止本企业后续检索与采用，正在引用此经验的任务需重新执行。已完成结果保留，其他企业不受影响。'}
               </p>
               <SubmitError error={submission.error} uncertain={submission.uncertain} />

@@ -73,9 +73,9 @@ test('usage control request and receipt carry exact version, revision and idempo
   assert.equal(check({ ...request, expectedRevision: -1 }), false);
   assert.equal(check({ ...request, enabled: 'false' }), false);
   const state = ajv.compile(spec.components.schemas.Usage);
-  assert.ok(state({ entryId: id, versionId: id, revision: 0, enabled: true, canManage: false }));
+  assert.ok(state({ entryId: id, versionId: id, revision: 0, enabled: true, usable: true, canManage: false }));
   assert.equal(
-    state({ entryId: id, versionId: id, revision: 0, enabled: true, canManage: false, reason: 'private' }),
+    state({ entryId: id, versionId: id, revision: 0, enabled: true, usable: true, canManage: false, reason: 'private' }),
     false,
   );
 });

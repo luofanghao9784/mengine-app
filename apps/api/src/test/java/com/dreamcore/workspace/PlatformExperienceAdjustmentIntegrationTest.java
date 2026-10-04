@@ -72,6 +72,16 @@ class PlatformExperienceAdjustmentIntegrationTest {
  PlatformExperienceAdjustmentService.Adjustment adjusted(GeneralExperienceAdmissionService.Receipt base){var a=submit(base);var x=extraction();adjustments.complete(correction(x));var g=cleaning();adjustments.complete(cleaned(g));return adjustments.publish(a.id());}
  String proposalState(UUID id){return db.queryForObject("SELECT state FROM general_experience_adjustments WHERE id=?",String.class,id);}
  void cleared(UUID id){assertNull(db.queryForObject("SELECT content FROM general_experience_adjustments WHERE id=?",String.class,id));assertEquals(0,db.queryForObject("SELECT count(*) FROM general_experience_adjustment_runs WHERE proposal_id=? AND receipt IS NOT NULL",Integer.class,id));}
+
+ @Autowired GeneralExperienceSuggestionService suggestions;
+ @Test void platformAdjustmentOfRecontributionKeepsOriginalCrossEntryAncestor(){
+  seed();var root=publish(method());grant();suggestions.submit(owner,tenant,root.entryId(),new GeneralExperienceSuggestionService.Change(UUID.randomUUID(),root.versionId(),space,"ADAPTATION","明确期间覆盖范围再进行判断"));var j=queue.claim(tenant);assertNotNull(j);queue.dispatched(j,descriptor());var evidence=j.inputs().stream().map(i->new Evidence(i.id(),i.text().substring(0,Math.min(90,i.text().length())))).toList();
+  var c=new Candidate(null,"企业期间核对","先核对期间再判断",List.of("核对覆盖期间"),List.of("期间比较"),List.of("无依据停止"),List.of("期间"),evidence);
+  queue.complete(new Result("1.0","synthetic-v1","live",j.id(),j.lease(),j.source(),false,"QUALIFIED",null,c,new Review(Map.of("grounded","PASS","reusable","PASS","bounded","PASS","privacySafe","PASS","novel","PASS"),"FEEDBACK_CORRECTION",evidence),List.of(new Stage("EXTRACT","synthetic",1,10L,2L),new Stage("VERIFY","synthetic",1,10L,2L))));var local=admission.admit(j.id());assertEquals("CREATED",local.outcome());
+  var contribution=new ExperienceGeneralizationRuntime.Method("通用期间核对 "+tenant.toString().substring(0,8),"先核对覆盖期间",List.of("核对期间依据"),List.of("有明确依据"),List.of("无依据停止"),List.of("期间"),"FEEDBACK_CORRECTION");var contributed=publish(contribution);assertEquals("CREATED",contributed.outcome());
+  var adjusted=adjusted(contributed);assertEquals("ADMITTED",adjusted.state());assertTrue(available(adjusted.resultVersionId()));assertEquals(Set.of(root.versionId(),contributed.versionId(),adjusted.resultVersionId()),new HashSet<>(db.queryForList("SELECT base_version FROM general_experience_ancestry WHERE version_id=?",UUID.class,adjusted.resultVersionId())));
+  db.update("UPDATE general_experience_entries SET status='STOPPED' WHERE id=?",root.entryId());assertFalse(available(adjusted.resultVersionId()));assertNotNull(db.queryForObject("SELECT method::text FROM general_experience_versions WHERE id=?",String.class,adjusted.resultVersionId()));db.queryForList("SELECT scrub_lifecycle_object('TASK',?)",task);assertNull(db.queryForObject("SELECT method::text FROM general_experience_versions WHERE id=?",String.class,adjusted.resultVersionId()));
+ }
  @Test void onlyFiveQualifiedStagesPublishVersionAndRetainRealSourceWithoutPrivateProjection(){
   seed();var base=publish(method());var request=change(base);var a=adjustments.submit(platform,base.entryId(),request);
   assertEquals(a,adjustments.submit(platform,base.entryId(),request));assertEquals("QUEUED",a.state());
