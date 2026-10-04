@@ -869,3 +869,179 @@
   font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
+
+/* Each sector visualizes its own type of work. */
+.admin-platform .engine-observatory .engine-input {
+  background: radial-gradient(ellipse at 50% 90%, #17526a44, transparent 70%), #112638;
+}
+.admin-platform .engine-observatory .engine-process {
+  background: linear-gradient(135deg, #1c2b49, #112638);
+}
+.admin-platform .engine-observatory .engine-output {
+  background: radial-gradient(ellipse at 50% 50%, #144e4644, transparent 75%), #112638;
+}
+.admin-platform .engine-input-chart {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  padding: 8px 0;
+}
+.admin-platform .engine-input-chart > div {
+  text-align: center;
+  min-width: 0;
+}
+.admin-platform .engine-input-column {
+  height: 112px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.admin-platform .engine-input-column > strong {
+  font-size: 18px;
+  color: #71dff5;
+  font-weight: 500;
+}
+.admin-platform .engine-input-track {
+  flex: 1;
+  position: relative;
+  border-bottom: 1px solid #71dff555;
+  background: repeating-linear-gradient(
+    to top,
+    #71dff513 0px,
+    #71dff513 1px,
+    transparent 1px,
+    transparent 23px
+  );
+}
+.admin-platform .engine-input-track i {
+  display: block;
+  position: absolute;
+  bottom: 0;
+  left: 30%;
+  width: 40%;
+  background: linear-gradient(to top, #228aa1, #71dff5);
+  border-radius: 4px 4px 0 0;
+  transition: height 0.5s ease;
+}
+.admin-platform .engine-input-chart span {
+  display: block;
+  margin-top: 10px;
+  font-size: 11px;
+  color: #aec5da;
+}
+.admin-platform .engine-process-map {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 5px 0;
+}
+.admin-platform .engine-process-map > div {
+  display: grid;
+  grid-template-columns: 6px minmax(0, 1fr) auto;
+  gap: 7px;
+  align-items: center;
+  border: 1px solid #8db9ff25;
+  border-radius: 8px;
+  background: #8db9ff08;
+  padding: 10px;
+}
+.admin-platform .engine-process-map > div:last-child {
+  grid-column: 1 / -1;
+}
+.admin-platform .engine-process-map i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #58738e;
+}
+.admin-platform .engine-process-map [data-running] i {
+  background: #8db9ff;
+  box-shadow: 0 0 8px #8db9ff;
+}
+.admin-platform .engine-process-map span {
+  font-size: 11px;
+  color: #aec5da;
+}
+.admin-platform .engine-process-map strong {
+  font-size: 16px;
+  color: #8db9ff;
+}
+.admin-platform .engine-output-chart {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  padding: 4px 0;
+}
+.admin-platform .engine-output-chart > div {
+  position: relative;
+  text-align: center;
+}
+.admin-platform .engine-output-chart svg {
+  display: block;
+  width: 108px;
+  max-width: 100%;
+  margin: 0 auto;
+}
+.admin-platform .engine-output-chart strong {
+  position: absolute;
+  top: 40px;
+  left: 0;
+  right: 0;
+  color: #76e3bb;
+  font-size: 22px;
+  line-height: 28px;
+}
+.admin-platform .engine-output-chart span {
+  display: block;
+  margin-top: 5px;
+  color: #aec5da;
+  font-size: 11px;
+}
+.admin-platform .engine-observatory .engine-evolution {
+  background:
+    radial-gradient(ellipse at 50% 50%, #7953ab20, transparent 65%), linear-gradient(110deg, #25253c, #191e31);
+}
+.admin-platform .engine-learning-layout {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr) 150px;
+  gap: 24px;
+  align-items: center;
+}
+.admin-platform .engine-learning-intro {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  color: #bca0e2;
+}
+.admin-platform .engine-learning-intro strong {
+  color: #d9caee;
+  font-size: 14px;
+  font-weight: 500;
+}
+.admin-platform .engine-learning-intro p {
+  margin-top: 8px;
+  font-size: 11px;
+  color: #a79bb8;
+}
+.admin-platform .engine-learning-diagram {
+  width: 100%;
+  max-height: 125px;
+}
+.admin-platform .engine-learning-note {
+  border-left: 1px solid #ad91dc25;
+  padding-left: 20px;
+  color: #a79bb8;
+  font-size: 11px;
+}
+.admin-platform .engine-learning-note span {
+  color: #bca0e2;
+}
+.admin-platform .engine-learning-note p {
+  margin-top: 10px;
+  line-height: 1.8;
+}
+@media (prefers-reduced-motion: reduce) {
+  .admin-platform .engine-input-track i {
+    transition: none;
+  }
+}

@@ -326,19 +326,23 @@ function Snapshot({
                   <small>登记执行中</small>
                 </strong>
               </div>
-              <div>
-                <div className="engine-channels">
-                  {list.map((c) => (
-                    <div key={c.code} className="engine-channel">
-                      <span>{names[c.code]}</span>
-                      <i aria-hidden="true">
-                        <b style={{ width: `${count ? (c.running / count) * 100 : 0}%` }} />
-                      </i>
-                      <strong>{n(c.running)}</strong>
-                    </div>
-                  ))}
+              {compact ? (
+                <ChannelChart kind={g.id} channels={list} />
+              ) : (
+                <div>
+                  <div className="engine-channels">
+                    {list.map((c) => (
+                      <div key={c.code} className="engine-channel">
+                        <span>{names[c.code]}</span>
+                        <i aria-hidden="true">
+                          <b style={{ width: `${count ? (c.running / count) * 100 : 0}%` }} />
+                        </i>
+                        <strong>{n(c.running)}</strong>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
               <p className="engine-bank-state">
                 排队 {n(sum(list, 'queued'))} · 等待 {n(sum(list, 'waiting'))} · 待核对{' '}
                 {n(sum(list, 'unknown'))}
@@ -366,25 +370,60 @@ function Snapshot({
             </div>
             <span className="engine-unavailable">未启用</span>
           </div>
-          <div className="engine-evolution-body">
-            <p>独立自进化执行器尚未接通。</p>
-            <div className="engine-evolution-flow" aria-hidden="true">
-              <span>发现</span>›<span>候选</span>›<span>验证</span>›<span>采用</span>
+          {compact ? (
+            <div className="engine-learning-layout">
+              <div className="engine-learning-intro">
+                <GitBranch size={34} strokeWidth={1.2} aria-hidden="true" />
+                <div>
+                  <strong>持续改进闭环</strong>
+                  <p>独立执行器尚未接通</p>
+                </div>
+              </div>
+              <svg
+                className="engine-learning-diagram"
+                viewBox="0 0 620 130"
+                role="img"
+                aria-label="预留自进化流程：发现、候选、验证、采用，形成循环；当前未启用"
+              >
+                <path d="M65 52H555V110H65V52" fill="none" stroke="#af95de55" strokeWidth="1.5" />
+                {[
+                  ['发现', '运行反馈'],
+                  ['候选', '改进方案'],
+                  ['验证', '效果核验'],
+                  ['采用', '经验更新'],
+                ].map(([label, caption], i) => (
+                  <g key={label} transform={`translate(${65 + i * 163} 52)`}>
+                    <circle r="25" fill="#24283e" stroke="#ad91dc77" />
+                    <text textAnchor="middle" y="4" fill="#d2bce9" fontSize="12">
+                      {label}
+                    </text>
+                    <text textAnchor="middle" y="44" fill="#a79bb8" fontSize="10">
+                      {caption}
+                    </text>
+                  </g>
+                ))}
+                <path d="M65 110l7 -5v10z" fill="#af95de77" />
+              </svg>
+              <div className="engine-learning-note">
+                <span>流程预留</span>
+                <p>
+                  经验提炼与清洗
+                  <br />
+                  仍计入处理区
+                </p>
+              </div>
             </div>
-            {compact && (
-              <dl className="engine-evolution-results">
-                <div>
-                  <dt>验证结果</dt>
-                  <dd>未接入</dd>
+          ) : (
+            <>
+              <div className="engine-evolution-body">
+                <p>独立自进化执行器尚未接通。</p>
+                <div className="engine-evolution-flow" aria-hidden="true">
+                  <span>发现</span>›<span>候选</span>›<span>验证</span>›<span>采用</span>
                 </div>
-                <div>
-                  <dt>最近采用</dt>
-                  <dd>未接入</dd>
-                </div>
-              </dl>
-            )}
-          </div>
-          <p className="engine-bank-state">基础经验提炼与清洗计入处理区，不作为自进化执行。</p>
+              </div>
+              <p className="engine-bank-state">基础经验提炼与清洗计入处理区，不作为自进化执行。</p>
+            </>
+          )}
         </section>
       </div>
       <div className="engine-secondary">
@@ -459,6 +498,67 @@ function Snapshot({
           仅覆盖已接入的运行记录；失败与中断为保留记录数，可能含历史尝试。处理完成不等于业务成功、内容合格或用户已阅读。队列与模型用量分别统计。
         </p>
       )}
+    </div>
+  );
+}
+function ChannelChart({
+  kind,
+  channels,
+}: {
+  kind: 'input' | 'process' | 'output';
+  channels: TelemetryChannel[];
+}) {
+  const total = sum(channels, 'running');
+  const max = Math.max(1, ...channels.map((c) => c.running));
+  if (kind === 'input')
+    return (
+      <div className="engine-input-chart" aria-label="输入通道执行数量柱形图">
+        {channels.map((c) => (
+          <div key={c.code}>
+            <div className="engine-input-column">
+              <strong>{n(c.running)}</strong>
+              <div className="engine-input-track">
+                <i style={{ height: `${(c.running / max) * 100}%` }} />
+              </div>
+            </div>
+            <span>{names[c.code]}</span>
+          </div>
+        ))}
+      </div>
+    );
+  if (kind === 'process')
+    return (
+      <div className="engine-process-map" aria-label="处理任务节点图">
+        {channels.map((c) => (
+          <div key={c.code} data-running={c.running > 0 ? true : undefined}>
+            <i aria-hidden="true" />
+            <span>{names[c.code]}</span>
+            <strong>{n(c.running)}</strong>
+          </div>
+        ))}
+      </div>
+    );
+  return (
+    <div className="engine-output-chart" aria-label="输出执行数量与构成">
+      {channels.map((c) => (
+        <div key={c.code}>
+          <svg viewBox="0 0 100 100" aria-hidden="true">
+            <circle cx="50" cy="50" r="36" fill="none" stroke="#76e3bb18" strokeWidth="5" />
+            <circle
+              cx="50"
+              cy="50"
+              r="36"
+              fill="none"
+              stroke="#76e3bb"
+              strokeWidth="5"
+              strokeDasharray={`${total ? (c.running / total) * 226.2 : 0} 226.2`}
+              transform="rotate(-90 50 50)"
+            />
+          </svg>
+          <strong>{n(c.running)}</strong>
+          <span>{names[c.code]}</span>
+        </div>
+      ))}
     </div>
   );
 }
