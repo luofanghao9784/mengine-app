@@ -54,6 +54,10 @@ export type TenantAction =
   | 'WORKSPACE_REVOKE'
   | 'WORKSPACE_MAINTAIN'
   | 'WORKSPACE_READONLY'
+  | 'COMPANY_INFORMATION_ADD'
+  | 'COMPANY_INFORMATION_EDIT'
+  | 'COMPANY_INFORMATION_REMOVE'
+  | 'COMPANY_INFORMATION_CLEAR'
   | 'COLLECTION_CONFIGURE'
   | 'COLLECTION_NOW'
   | 'TENANT_RENAME';
@@ -95,4 +99,11 @@ export interface SpaceOwnerChange {
   createdAt: string;
 }
 
-export interface TenantMemberDetail { tenantId: string; member: TenantMember; owner: boolean; canOffboard: boolean; offboarded: boolean; departureId: string | null }
+export interface TenantMemberDetail {
+  tenantId: string;
+  member: TenantMember;
+  owner: boolean;
+  canOffboard: boolean;
+  offboarded: boolean;
+  departureId: string | null;
+}

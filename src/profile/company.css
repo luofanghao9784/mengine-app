@@ -1,0 +1,84 @@
+.company-header,
+.company-group-heading,
+.company-tags,
+.company-editor-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.company-editor fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.company-header {
+  justify-content: space-between;
+  align-items: start;
+}
+.company-header p {
+  line-height: 1.7;
+}
+.company-group {
+  padding: 24px 0;
+  border-top: 1px solid var(--line);
+}
+.company-group-heading {
+  margin-bottom: 14px;
+}
+.company-group-heading h3 {
+  margin: 0;
+  font-size: 16px;
+}
+.company-group-heading span {
+  font-size: 12px;
+}
+.company-tags {
+  margin-bottom: 10px;
+}
+.company-tag,
+.company-name {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--soft);
+  padding: 10px 14px;
+  text-align: left;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.company-tag:hover,
+.company-name:hover {
+  background: var(--selected);
+  border-color: var(--accent);
+}
+.company-name {
+  font-size: 18px;
+  font-weight: 600;
+}
+.company-clear {
+  display: block;
+  margin-top: 12px;
+}
+.company-editor-actions {
+  justify-content: flex-end;
+  margin-top: 18px;
+}
+.company-history {
+  max-height: 280px;
+  overflow: auto;
+  margin: 12px 0;
+  padding: 12px;
+  background: var(--soft);
+  border-radius: 8px;
+}
+.company-history article {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+.company-history strong,
+.company-history small {
+  font-size: 12px;
+  color: var(--muted);
+}

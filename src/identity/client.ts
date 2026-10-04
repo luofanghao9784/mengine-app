@@ -108,6 +108,8 @@ export class IdentityError extends Error {
       HANDOVER_UNAVAILABLE: '交接状态或原负责人资格已变化，请重新核实。',
       HANDOVER_NOT_FOUND: '没有可由你处理的交接请求。',
       HANDOVER_ALREADY_PENDING: '已有交接等待处理，请先撤销当前交接再选择其他接任者。',
+      COMPANY_TAG_LIMIT: '此项已达到标签数量上限，请调整已有标签。',
+      PROFILE_MANAGED_COMPANY_INFORMATION: '请在企业信息页调整此标签。',
       PROFILE_READ_ONLY: '当前档案范围为只读。',
       PROFILE_NOT_FOUND: '档案不存在或你已没有访问权限。',
       PROFILE_KEY_EXISTS: '此范围已有同名档案，请修订已有记录。',

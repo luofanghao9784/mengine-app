@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Dreamcore Profiles API",
-    "version": "1.0.0"
+    "version": "1.1.0"
   },
   "security": [
     {
@@ -388,6 +388,100 @@
             }
           }
         ]
+      }
+    },
+    "/api/v1/tenants/{tenant}/company-information": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "读取可选企业信息标签；不修改企业身份名称",
+        "responses": {
+          "400": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "401": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "403": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "404": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "409": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "200": {
+            "description": "当前真实状态；private, no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyInformation"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "按分组版本增改、移除或清空标签；保存人工保护标记及历史",
+        "description": "只允许当前获权人员人工维护。origin、保护状态和档案版本由服务端设置；AI 自动补充通过后续受控内部能力接入，不开放伪装 AI 的客户请求。",
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompanyChange"
+              }
+            }
+          }
+        },
+        "responses": {
+          "400": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "401": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "403": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "404": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "409": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "200": {
+            "description": "当前真实状态；private, no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyReceipt"
+                }
+              }
+            }
+          }
+        }
       }
     }
   },
@@ -789,6 +883,212 @@
           "items",
           "hasMore"
         ]
+      },
+      "CompanyTag": {
+        "type": "object",
+        "required": [
+          "id",
+          "revision",
+          "label",
+          "meaning",
+          "origin",
+          "humanProtected",
+          "updatedAt"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "meaning": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "origin": {
+            "enum": [
+              "HUMAN",
+              "AI"
+            ]
+          },
+          "humanProtected": {
+            "type": "boolean"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CompanyGroup": {
+        "type": "object",
+        "required": [
+          "field",
+          "revision",
+          "manuallyCleared",
+          "tags"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "field": {
+            "type": "string",
+            "enum": [
+              "NAME",
+              "INDUSTRY",
+              "BUSINESS",
+              "TERM"
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "manuallyCleared": {
+            "type": "boolean"
+          },
+          "tags": {
+            "type": "array",
+            "maxItems": 30,
+            "items": {
+              "$ref": "#/components/schemas/CompanyTag"
+            }
+          }
+        }
+      },
+      "CompanyInformation": {
+        "type": "object",
+        "required": [
+          "tenantId",
+          "canMaintain",
+          "groups"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "canMaintain": {
+            "type": "boolean"
+          },
+          "groups": {
+            "type": "array",
+            "minItems": 4,
+            "maxItems": 4,
+            "items": {
+              "$ref": "#/components/schemas/CompanyGroup"
+            }
+          }
+        }
+      },
+      "CompanyChange": {
+        "type": "object",
+        "required": [
+          "requestId",
+          "field",
+          "expectedRevision",
+          "action",
+          "tagId",
+          "label",
+          "meaning"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "field": {
+            "type": "string",
+            "enum": [
+              "NAME",
+              "INDUSTRY",
+              "BUSINESS",
+              "TERM"
+            ]
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "action": {
+            "enum": [
+              "ADD",
+              "EDIT",
+              "REMOVE",
+              "CLEAR"
+            ]
+          },
+          "tagId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "meaning": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        }
+      },
+      "CompanyReceipt": {
+        "type": "object",
+        "required": [
+          "requestId",
+          "field",
+          "revision",
+          "action",
+          "tagId"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "field": {
+            "type": "string",
+            "enum": [
+              "NAME",
+              "INDUSTRY",
+              "BUSINESS",
+              "TERM"
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "action": {
+            "enum": [
+              "ADD",
+              "EDIT",
+              "REMOVE",
+              "CLEAR"
+            ]
+          },
+          "tagId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        }
       }
     }
   }

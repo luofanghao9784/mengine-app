@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ExternalLink, ArrowLeft, ShieldX } from 'lucide-react';
 import { AdminShell, useAdminRoute } from './AdminShell';
 import { AdminOverview } from './AdminOverview';
-import { adminHref } from './navigation';
+import { adminHref, type AdminPage } from './navigation';
 import { returnToWorkspaceHref } from '../identity/navigation';
 import { useSession } from '../identity/session';
 import { governanceClient } from '../governance/client';
@@ -13,7 +13,7 @@ import { TenantAdminHome, ManagedSpaces } from '../tenant/TenantAdminHome';
 import { TenantMemberDetail } from '../tenant/TenantMemberDetail';
 import { OperationsPanel } from '../operations/OperationsPanel';
 import { TenantDatabase } from '../database/TenantDatabase';
-import { Profiles } from '../profile/Profiles';
+import { CompanyInformation } from '../profile/CompanyInformation';
 import { TenantMaterials } from '../material/TenantMaterials';
 import { WorkspaceExperiences } from '../experience/WorkspaceExperiences';
 import { DeparturePanel } from '../departure/DeparturePanel';
@@ -30,10 +30,12 @@ export function TenantConsole({ tenant, name }: { tenant: string; name: string }
   );
   const refresh = () => setAttempt((n) => n + 1);
   const limited = governance.value && !governance.value.canConfigure;
-  const page =
-    limited && !['members', 'database', 'materials', 'experience'].includes(requestedPage)
-      ? 'members'
-      : requestedPage;
+  const limitedPages: AdminPage[] = ['members', 'database', 'materials', 'experience'];
+  if (
+    governance.value?.capabilities.some((c) => c.capability === 'PROFILE_MAINTAIN' && c.workspaceId === null)
+  )
+    limitedPages.push('company');
+  const page = limited && !limitedPages.includes(requestedPage) ? 'members' : requestedPage;
   const params = new URLSearchParams(hash.slice(1));
   const secondary =
     params.get('detail') ||
@@ -53,7 +55,7 @@ export function TenantConsole({ tenant, name }: { tenant: string; name: string }
   return (
     <AdminShell
       realm="tenant"
-      allowedPages={limited ? ['members', 'database', 'materials', 'experience'] : undefined}
+      allowedPages={limited ? limitedPages : undefined}
       name={name}
       account={session.identity?.account.displayName || ''}
       page={page}
@@ -162,14 +164,14 @@ export function TenantConsole({ tenant, name }: { tenant: string; name: string }
         <TenantMaterials key={tenant} tenant={tenant} hash={hash} />
       ) : page === 'experience' ? (
         <WorkspaceExperiences tenant={tenant} management={governance.value} readOnly />
-      ) : secondary === 'records' ? (
+      ) : secondary === 'records' && governance.value.canConfigure ? (
         <>
           <a className="button ghost" href={adminHref('tenant', 'company', hash)}>
             返回企业信息
           </a>
           <TenantAdminHome tenant={tenant} compact initialTab="records" />
         </>
-      ) : secondary === 'retention' ? (
+      ) : secondary === 'retention' && governance.value.canConfigure ? (
         <>
           <a className="button ghost" href={adminHref('tenant', 'company', hash)}>
             返回企业信息
@@ -178,11 +180,13 @@ export function TenantConsole({ tenant, name }: { tenant: string; name: string }
         </>
       ) : (
         <>
-          <div className="admin-secondary-link">
-            <a href={adminHref('tenant', 'company', hash, { detail: 'records' })}>管理记录</a>
-            <a href={adminHref('tenant', 'company', hash, { detail: 'retention' })}>保留与退出</a>
-          </div>
-          <Profiles tenant={tenant} management={governance.value} />
+          {governance.value.canConfigure && (
+            <div className="admin-secondary-link">
+              <a href={adminHref('tenant', 'company', hash, { detail: 'records' })}>管理记录</a>
+              <a href={adminHref('tenant', 'company', hash, { detail: 'retention' })}>保留与退出</a>
+            </div>
+          )}
+          <CompanyInformation tenant={tenant} />
         </>
       )}
     </AdminShell>

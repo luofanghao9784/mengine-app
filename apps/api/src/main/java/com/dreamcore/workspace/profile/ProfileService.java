@@ -86,6 +86,7 @@ public class ProfileService {
         return get(actor,tenant,(UUID)rows.getFirst().get("entry_id"),(Integer)rows.getFirst().get("revision"));
     }
     @Transactional public Value create(UUID actor,UUID tenant,Scope scope,UUID subject,String key,Kind kind,Content c,UUID request) {
+        if(scope==Scope.TENANT&&key!=null&&key.startsWith("company."))throw new IdentityException(409,"PROFILE_MANAGED_COMPANY_INFORMATION");
         validate(c);if(key==null||!key.matches("[\\p{L}\\p{N}_.-]{1,100}")||kind==null)throw IdentityException.invalid();
         String hash=fingerprint(tenant,scope,subject,key,kind,c);UUID prior=identities.priorRequest(actor,request,"PROFILE_CREATE",hash);
         write(actor,tenant,scope,subject);if(prior!=null)return replay(actor,tenant,prior);
@@ -99,6 +100,7 @@ public class ProfileService {
         identities.member(actor,tenant,false,false);
         validate(c);String hash=fingerprint(tenant,id,expected,c);UUID prior=identities.priorRequest(actor,request,"PROFILE_SAVE",hash);
         var first=entry(tenant,id,false);write(actor,tenant,Scope.valueOf((String)first.get("scope")),subject(first));
+        if(!db.queryForList("SELECT profile_id FROM company_information_tags WHERE profile_id=?",id).isEmpty())throw new IdentityException(409,"PROFILE_MANAGED_COMPANY_INFORMATION");
         if(prior!=null)return replay(actor,tenant,prior);var e=entry(tenant,id,true);
         if(expected<1||expected!=(Integer)e.get("revision"))throw new IdentityException(409,"PROFILE_VERSION_CONFLICT");
         int next=expected+1;UUID saved=append(actor,tenant,id,next,c);db.update("UPDATE profile_entries SET revision=? WHERE id=?",next,id);
@@ -108,6 +110,7 @@ public class ProfileService {
         identities.member(actor,tenant,false,false);
         String hash=fingerprint(tenant,id,expected);UUID prior=identities.priorRequest(actor,request,"PROFILE_WITHDRAW",hash);
         var first=entry(tenant,id,false);write(actor,tenant,Scope.valueOf((String)first.get("scope")),subject(first));
+        if(!db.queryForList("SELECT profile_id FROM company_information_tags WHERE profile_id=?",id).isEmpty())throw new IdentityException(409,"PROFILE_MANAGED_COMPANY_INFORMATION");
         if(prior!=null)return replay(actor,tenant,prior);var e=entry(tenant,id,true);
         if(expected<1||expected!=(Integer)e.get("revision"))throw new IdentityException(409,"PROFILE_VERSION_CONFLICT");
         var current=get(actor,tenant,id,expected);int next=expected+1;
