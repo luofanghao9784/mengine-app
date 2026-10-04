@@ -1,0 +1,571 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "独立总台管理人员邀请与资格",
+    "version": "1.0.0",
+    "description": "新人员独立创建平台凭据；已有平台人员验证其平台密码。接受后才授予资格。撤销不能移除最后有效管理员，客户身份保持不变。本地合成投递不等于真实短信发送。"
+  },
+  "paths": {
+    "/api/platform-admin/v1/staff/invitations": {
+      "get": {
+        "operationId": "listStaffInvitations",
+        "security": [
+          {
+            "platformSessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "操作成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StaffInvitation"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "输入不符合规则"
+          },
+          "401": {
+            "description": "平台会话失效"
+          },
+          "403": {
+            "description": "独立平台资格、受邀身份或 CSRF 不符合"
+          },
+          "409": {
+            "description": "最后管理员保护、邀请不可用或幂等冲突"
+          },
+          "503": {
+            "description": "投递不可用，不创建邀请"
+          }
+        }
+      },
+      "post": {
+        "operationId": "invitePlatformStaff",
+        "security": [
+          {
+            "platformSessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "操作成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffInvitation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "输入不符合规则"
+          },
+          "401": {
+            "description": "平台会话失效"
+          },
+          "403": {
+            "description": "独立平台资格、受邀身份或 CSRF 不符合"
+          },
+          "409": {
+            "description": "最后管理员保护、邀请不可用或幂等冲突"
+          },
+          "503": {
+            "description": "投递不可用，不创建邀请"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Invite"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/platform-admin/v1/staff/invitations/{id}/revoke": {
+      "post": {
+        "operationId": "revokeStaffInvitation",
+        "security": [
+          {
+            "platformSessionCookie": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "操作成功"
+          },
+          "400": {
+            "description": "输入不符合规则"
+          },
+          "401": {
+            "description": "平台会话失效"
+          },
+          "403": {
+            "description": "独立平台资格、受邀身份或 CSRF 不符合"
+          },
+          "409": {
+            "description": "最后管理员保护、邀请不可用或幂等冲突"
+          },
+          "503": {
+            "description": "投递不可用，不创建邀请"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Mutation"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/platform-admin/v1/staff/{id}/revoke": {
+      "post": {
+        "operationId": "revokePlatformStaff",
+        "security": [
+          {
+            "platformSessionCookie": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "操作成功"
+          },
+          "400": {
+            "description": "输入不符合规则"
+          },
+          "401": {
+            "description": "平台会话失效"
+          },
+          "403": {
+            "description": "独立平台资格、受邀身份或 CSRF 不符合"
+          },
+          "409": {
+            "description": "最后管理员保护、邀请不可用或幂等冲突"
+          },
+          "503": {
+            "description": "投递不可用，不创建邀请"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Revoke"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/platform-admin/v1/staff/invitations/{id}/local-link": {
+      "get": {
+        "operationId": "localStaffInviteLink",
+        "security": [
+          {
+            "platformSessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "操作成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalLink"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "输入不符合规则"
+          },
+          "401": {
+            "description": "平台会话失效"
+          },
+          "403": {
+            "description": "独立平台资格、受邀身份或 CSRF 不符合"
+          },
+          "409": {
+            "description": "最后管理员保护、邀请不可用或幂等冲突"
+          },
+          "503": {
+            "description": "投递不可用，不创建邀请"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/platform-admin/v1/auth/invitation/preview": {
+      "post": {
+        "operationId": "previewStaffInvitation",
+        "security": [
+          {
+            "platformSessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "操作成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Preview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "输入不符合规则"
+          },
+          "401": {
+            "description": "平台会话失效"
+          },
+          "403": {
+            "description": "独立平台资格、受邀身份或 CSRF 不符合"
+          },
+          "409": {
+            "description": "最后管理员保护、邀请不可用或幂等冲突"
+          },
+          "503": {
+            "description": "投递不可用，不创建邀请"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Token"
+              }
+            }
+          }
+        },
+        "description": "无需已登录管理员，但必须先获取同域匿名 Cookie 和 CSRF。邀请令牌只进入请求正文，不进入查询参数。"
+      }
+    },
+    "/api/platform-admin/v1/auth/invitation/accept": {
+      "post": {
+        "operationId": "acceptStaffInvitation",
+        "security": [
+          {
+            "platformSessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "操作成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "identity.openapi.json#/components/schemas/Me"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "输入不符合规则"
+          },
+          "401": {
+            "description": "平台会话失效"
+          },
+          "403": {
+            "description": "独立平台资格、受邀身份或 CSRF 不符合"
+          },
+          "409": {
+            "description": "最后管理员保护、邀请不可用或幂等冲突"
+          },
+          "503": {
+            "description": "投递不可用，不创建邀请"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Accept"
+              }
+            }
+          }
+        },
+        "description": "无需已登录管理员，但必须先获取同域匿名 Cookie 和 CSRF。邀请令牌只进入请求正文，不进入查询参数。"
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "platformSessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "DREAMCORE_PLATFORM"
+      }
+    },
+    "schemas": {
+      "StaffInvitation": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "loginName": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "ACCEPTED",
+              "REVOKED",
+              "EXPIRED"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deliveryMode": {
+            "type": "string",
+            "enum": [
+              "LOCAL",
+              "DISABLED"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "loginName",
+          "status",
+          "createdAt",
+          "expiresAt",
+          "deliveryMode"
+        ]
+      },
+      "Invite": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "phone": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          }
+        },
+        "required": [
+          "requestId",
+          "phone"
+        ]
+      },
+      "Mutation": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "requestId"
+        ]
+      },
+      "Token": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{43}$",
+            "minLength": 43,
+            "maxLength": 43
+          }
+        },
+        "required": [
+          "token"
+        ]
+      },
+      "Preview": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "loginName": {
+            "type": "string"
+          },
+          "existingAccount": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "loginName",
+          "existingAccount"
+        ]
+      },
+      "Accept": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{43}$",
+            "minLength": 43,
+            "maxLength": 43
+          },
+          "username": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 254
+          },
+          "password": {
+            "type": "string",
+            "minLength": 6,
+            "maxLength": 128
+          },
+          "displayName": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 80
+          }
+        },
+        "required": [
+          "token",
+          "username",
+          "password"
+        ]
+      },
+      "LocalLink": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^/platform-admin/#invite=[A-Za-z0-9_-]{43}$"
+          }
+        },
+        "required": [
+          "path"
+        ]
+      },
+      "Revoke": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "requestId",
+          "expectedVersion"
+        ]
+      }
+    }
+  }
+}

@@ -36,6 +36,12 @@ public class LocalInvitationDelivery {
         catch (IOException failure) { throw new IdentityException(404,"INVITATION_UNAVAILABLE"); }
     }
     public void deliver(UUID id, String email, String token) {
+        deliver(id,email,token,"/workspace/#invite=");
+    }
+    public void deliverPlatform(UUID id,String contact,String token) {
+        deliver(id,contact,token,"/platform-admin/#invite=");
+    }
+    private void deliver(UUID id,String email,String token,String entry) {
         if (!local || !"local".equals(mode)) throw new IdentityException(503, "INVITATION_DELIVERY_UNAVAILABLE");
         Path file = directory.resolve(id + ".json");
         try {
@@ -50,7 +56,7 @@ public class LocalInvitationDelivery {
                     }
                 }
             });
-            Files.writeString(file, json.writeValueAsString(Map.of("invitationId", id, email.startsWith("+") ? "phone" : "email", email, "token", token, "path", "/workspace/#invite=" + token)),
+            Files.writeString(file, json.writeValueAsString(Map.of("invitationId", id, email.startsWith("+") ? "phone" : "email", email, "token", token, "path", entry + token)),
                     StandardCharsets.UTF_8, StandardOpenOption.WRITE);
         } catch (IOException | UnsupportedOperationException failure) { throw new IdentityException(503, "INVITATION_DELIVERY_UNAVAILABLE"); }
     }

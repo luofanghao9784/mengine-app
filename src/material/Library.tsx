@@ -43,7 +43,7 @@ const message = (error: unknown) =>
   error instanceof IdentityError ? error.message : '请求未完成，请稍后重试。';
 const accessDenied = (error: unknown) =>
   error instanceof IdentityError && [401, 403, 404].includes(error.status);
-export function LiveLibrary({ tenant }: { tenant: string }) {
+export function LiveLibrary({ tenant, administration = false }: { tenant: string; administration?: boolean }) {
   const { session } = useSession();
   const [attempt, setAttempt] = useState(0);
   const context = useRemote(
@@ -55,11 +55,11 @@ export function LiveLibrary({ tenant }: { tenant: string }) {
   ) : !context.value ? (
     <Loading />
   ) : (
-    <LibraryContents tenant={tenant} context={context.value} />
+    <LibraryContents tenant={tenant} context={context.value} administration={administration} />
   );
 }
 
-function LibraryContents({ tenant, context }: { tenant: string; context: TenantContext }) {
+function LibraryContents({ tenant, context, administration = false }: { tenant: string; context: TenantContext; administration?: boolean }) {
   const [hash, setHash] = useState(location.hash);
   useEffect(() => {
     const change = () => {
@@ -69,7 +69,7 @@ function LibraryContents({ tenant, context }: { tenant: string; context: TenantC
     return () => window.removeEventListener('hashchange', change);
   }, []);
   const params = new URLSearchParams(hash.slice(1)),
-    scope = params.get('scope') || 'personal',
+    scope = params.get('scope') || (administration ? 'enterprise' : 'personal'),
     folder = params.get('folder');
   const selected =
     scope === 'personal'
@@ -77,10 +77,10 @@ function LibraryContents({ tenant, context }: { tenant: string; context: TenantC
       : context.workspaces.find((s) => s.id === scope);
   const enterprise = scope === 'enterprise',
     all = scope === 'all';
-  const allowed = enterprise || all || !!selected;
+  const allowed = (enterprise || all || !!selected) && (!administration || enterprise || selected?.kind === 'SHARED');
   return (
     <>
-      <PageActions>
+      {!administration && <PageActions>
         <div className="material-tabs" aria-label="资料范围">
           <Button
             variant={selected?.kind === 'PERSONAL' ? 'primary' : 'ghost'}
@@ -99,7 +99,7 @@ function LibraryContents({ tenant, context }: { tenant: string; context: TenantC
             企业资料库
           </Button>
         </div>
-      </PageActions>
+      </PageActions>}
       {!allowed || (folder && !uuid(folder)) ? (
         <Empty icon={Folder} title="此位置暂不可用" text="空间或文件夹不存在，或你没有查看权限。" />
       ) : (

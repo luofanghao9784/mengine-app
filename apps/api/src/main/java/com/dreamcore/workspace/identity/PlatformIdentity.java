@@ -79,7 +79,7 @@ public class PlatformIdentity {
     }
     @Transactional
     public IdentityService.Me login(String username,String password,HttpServletRequest request,HttpServletResponse response) {
-        String normalized=IdentityService.email(username);
+        String normalized=loginName(username);
         if(!throttle.allow("platform:"+normalized,"platform:"+request.getRemoteAddr())) throw new IdentityException(429,"LOGIN_THROTTLED");
         if(password==null || password.length()>128) throw new IdentityException(401,"INVALID_CREDENTIALS");
         var rows=db.queryForList("SELECT p.* FROM platform_accounts p JOIN accounts a ON a.id=p.account_id WHERE login_name=? AND a.status='ACTIVE'",normalized);
@@ -92,11 +92,14 @@ public class PlatformIdentity {
         audit.record(actor,null,"PLATFORM_LOGIN",actor,"SUCCESS");
         return me(actor);
     }
+    static String loginName(String value) {
+        return value!=null && value.contains("@")?IdentityService.email(value):PhoneNumbers.normalize(value);
+    }
     public IdentityService.Me me(UUID actor) {
         identities.platform(actor);
         var account=identities.account(actor);
         String login=db.queryForObject("SELECT login_name FROM platform_accounts WHERE account_id=?",String.class,actor);
-        return new IdentityService.Me(new IdentityService.Account(actor,login,account.displayName(),null,0),true,List.of());
+        return new IdentityService.Me(new IdentityService.Account(actor,login.contains("@")?login:null,account.displayName(),login.contains("@")?null:login,0),true,List.of());
     }
     @Transactional
     public void logout(HttpServletRequest request,HttpServletResponse response) {

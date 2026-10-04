@@ -1,0 +1,473 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "总台客户账号与管理人员",
+    "version": "1.0.0",
+    "description": "只提供账号与企业身份元信息。总台主体排除在客户列表和客户安全操作之外；停用/恢复不改写成员身份或空间授权。"
+  },
+  "paths": {
+    "/api/platform-admin/v1/accounts": {
+      "get": {
+        "operationId": "listCustomerAccounts",
+        "security": [
+          {
+            "platformSessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "当前管理投影",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CustomerAccount"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "总台独立会话无效"
+          },
+          "403": {
+            "description": "平台资格或 CSRF 不符合"
+          },
+          "404": {
+            "description": "账号不存在或属于平台身份域"
+          },
+          "409": {
+            "description": "版本或幂等内容冲突"
+          }
+        },
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 180
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "",
+                "ACTIVE",
+                "DISABLED"
+              ]
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ]
+      }
+    },
+    "/api/platform-admin/v1/accounts/{id}": {
+      "get": {
+        "operationId": "getCustomerAccount",
+        "security": [
+          {
+            "platformSessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "当前管理投影",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "总台独立会话无效"
+          },
+          "403": {
+            "description": "平台资格或 CSRF 不符合"
+          },
+          "404": {
+            "description": "账号不存在或属于平台身份域"
+          },
+          "409": {
+            "description": "版本或幂等内容冲突"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/platform-admin/v1/accounts/{id}/status": {
+      "post": {
+        "operationId": "changeCustomerAccountStatus",
+        "security": [
+          {
+            "platformSessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "当前管理投影",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "总台独立会话无效"
+          },
+          "403": {
+            "description": "平台资格或 CSRF 不符合"
+          },
+          "404": {
+            "description": "账号不存在或属于平台身份域"
+          },
+          "409": {
+            "description": "版本或幂等内容冲突"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountStatus"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/platform-admin/v1/staff": {
+      "get": {
+        "operationId": "listPlatformStaff",
+        "security": [
+          {
+            "platformSessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "当前管理投影",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Staff"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "总台独立会话无效"
+          },
+          "403": {
+            "description": "平台资格或 CSRF 不符合"
+          },
+          "404": {
+            "description": "账号不存在或属于平台身份域"
+          },
+          "409": {
+            "description": "版本或幂等内容冲突"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "platformSessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "DREAMCORE_PLATFORM"
+      }
+    },
+    "schemas": {
+      "CustomerAccount": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "DISABLED"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "tenantCount": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "id",
+          "displayName",
+          "phone",
+          "email",
+          "status",
+          "version",
+          "tenantCount"
+        ]
+      },
+      "Membership": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantName": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "TENANT_ADMIN",
+              "MEMBER"
+            ]
+          },
+          "membershipStatus": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "DISABLED"
+            ]
+          },
+          "serviceStatus": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "SUSPENDED"
+            ]
+          }
+        },
+        "required": [
+          "tenantId",
+          "tenantName",
+          "role",
+          "membershipStatus",
+          "serviceStatus"
+        ]
+      },
+      "Change": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "actorName": {
+            "type": "string"
+          },
+          "previousStatus": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "DISABLED"
+            ]
+          },
+          "nextStatus": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "DISABLED"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "actorName",
+          "previousStatus",
+          "nextStatus",
+          "reason",
+          "createdAt"
+        ]
+      },
+      "AccountDetail": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "account": {
+            "$ref": "#/components/schemas/CustomerAccount"
+          },
+          "memberships": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Membership"
+            }
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Change"
+            }
+          }
+        },
+        "required": [
+          "account",
+          "memberships",
+          "records"
+        ]
+      },
+      "Staff": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "loginName": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "DISABLED"
+            ]
+          },
+          "administrator": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "id",
+          "displayName",
+          "loginName",
+          "status",
+          "administrator",
+          "version"
+        ]
+      },
+      "AccountStatus": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "DISABLED"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "requestId",
+          "expectedVersion",
+          "status",
+          "reason"
+        ]
+      }
+    }
+  }
+}

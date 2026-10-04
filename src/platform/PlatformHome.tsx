@@ -1,3 +1,4 @@
+import { useViewState, textState, pageState } from '../shared/useViewState';
 import { LocalInviteLink } from '../identity/LocalInviteLink';
 import { DepartureStatus } from '../departure/DepartureStatus';
 import { ObjectLifecycleWorkspace } from '../objectlifecycle/ObjectLifecycleWorkspace';
@@ -53,19 +54,19 @@ const actionLabel: Record<string, string> = {
 };
 const time = (date: string) => new Date(date).toLocaleString('zh-CN', { hour12: false });
 
-export function PlatformHome() {
+export function PlatformHome({ embedded = false }: { embedded?: boolean }) {
   const pendingRequest = useContext(RequestPending);
   const [tab, setTab] = useState<'tenants' | 'operations' | 'evaluation' | 'methods' | 'content-lifecycle'>(
     'tenants',
   );
   const [attempt, setAttempt] = useState(0);
   const [writing, setWriting] = useState(false);
-  const [draftQuery, setDraftQuery] = useState('');
-  const [query, setQuery] = useState('');
-  const [status, setStatus] = useState('');
-  const [page, setPage] = useState(0);
+  const [draftQuery, setDraftQuery] = useViewState('platform','tenants:draft','',textState);
+  const [query, setQuery] = useViewState('platform','tenants:query','',textState);
+  const [status, setStatus] = useViewState('platform','tenants:status','',textState);
+  const [page, setPage] = useViewState('platform','tenants:page',0,pageState);
   const [createOpen, setCreateOpen] = useState(false);
-  const [tenant, setTenant] = useState<string>();
+  const [tenant, setTenant] = useViewState<string | undefined>('platform','tenants:selected',undefined,(v):v is string | undefined=>v===undefined || (typeof v==='string' && /^[a-f0-9-]{36}$/i.test(v)));
   const [notice, setNotice] = useState('');
   const list = useRemote(
     (signal) => platformClient.tenants(query, status, page * 20, 21, signal),
@@ -93,7 +94,7 @@ export function PlatformHome() {
           {notice}
         </p>
       )}
-      {overview.error ? (
+      {!embedded && (overview.error ? (
         <section className="access-panel">
           <Failure error={overview.error} retry={refresh} />
         </section>
@@ -101,8 +102,8 @@ export function PlatformHome() {
         <Overview value={overview.value} />
       ) : (
         <Loading />
-      )}
-      <nav className="platform-tabs" aria-label="总台管理功能" inert={pendingRequest || undefined}>
+      ))}
+      {!embedded && <nav className="platform-tabs" aria-label="总台管理功能" inert={pendingRequest || undefined}>
         <Button
           variant={tab === 'tenants' ? 'primary' : 'ghost'}
           aria-current={tab === 'tenants' ? 'page' : undefined}
@@ -139,7 +140,7 @@ export function PlatformHome() {
         >
           内容回收与清理
         </Button>
-      </nav>
+      </nav>}
       {tab === 'content-lifecycle' ? (
         <ObjectLifecycleWorkspace />
       ) : tab === 'evaluation' ? (

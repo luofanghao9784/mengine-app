@@ -30,7 +30,7 @@ public class PlatformSecurity {
             // A dedicated session-bound CSRF token is checked below, including login/logout.
             .csrf(c->c.disable()).requestCache(c->c.disable()).formLogin(c->c.disable())
             .httpBasic(c->c.disable()).logout(c->c.disable())
-            .authorizeHttpRequests(a->a.requestMatchers("/api/platform-admin/v1/auth/csrf","/api/platform-admin/v1/auth/login").permitAll().anyRequest().authenticated())
+            .authorizeHttpRequests(a->a.requestMatchers("/api/platform-admin/v1/auth/csrf","/api/platform-admin/v1/auth/login","/api/platform-admin/v1/auth/invitation/preview","/api/platform-admin/v1/auth/invitation/accept").permitAll().anyRequest().authenticated())
             .exceptionHandling(e->e.authenticationEntryPoint((q,r,x)->IdentitySecurity.writeError(r,401,"AUTHENTICATION_REQUIRED"))
                 .accessDeniedHandler((q,r,x)->IdentitySecurity.writeError(r,403,"ACCESS_DENIED")))
             .addFilterBefore(new OncePerRequestFilter() {

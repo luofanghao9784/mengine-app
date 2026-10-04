@@ -1,3 +1,4 @@
+import { TenantConsole } from '../admin/TenantConsole';
 import { UploadProvider } from '../material/UploadManager';
 import { phoneClient } from './phone-client';
 import { PhoneAuth, ChangePassword } from './PhoneAuth';
@@ -286,6 +287,7 @@ function GuardedAccessShell({
                     ? conversationHref(id)
                     : `tenant=${encodeURIComponent(id)}${new URLSearchParams(location.hash.slice(1)).get('view') === 'spaces' ? '&view=spaces' : ''}`;
   };
+  if (surface === 'tenant-admin' && selected) return <UploadProvider><TenantConsole key={tenant} tenant={tenant} name={selected.tenantName} /></UploadProvider>;
   return (
     <UploadShell key={`${identity.account.id}:${tenant}:${allowed}`} actionsTarget={actionsTarget}>
       <div

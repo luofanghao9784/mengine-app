@@ -27,6 +27,7 @@ export interface ExperienceLibraryProps {
   workspaceName: string;
   verification?: unknown;
   initialExperience?: string;
+  readOnly?: boolean;
 }
 /** Both employee and tenant maintenance surfaces render this component against the identical workspace object. */
 export function ExperienceLibrary(props: ExperienceLibraryProps) {
@@ -35,7 +36,7 @@ export function ExperienceLibrary(props: ExperienceLibraryProps) {
     <Library key={`${session.identity.account.id}:${props.tenant}:${props.workspace}`} {...props} />
   ) : null;
 }
-function Library({ tenant, workspace, workspaceName, verification, initialExperience }: ExperienceLibraryProps) {
+function Library({ tenant, workspace, workspaceName, verification, initialExperience, readOnly = false }: ExperienceLibraryProps) {
   const outerGate = useContext(MutationGate);
   const [busy, setBusy] = useState(false);
   const [locks, setLocks] = useState<ReadonlySet<string>>(new Set());
@@ -136,7 +137,7 @@ function Library({ tenant, workspace, workspaceName, verification, initialExperi
                 >
                   刷新
                 </Button>
-                {list.value.canMaintain && (
+                {!readOnly && list.value.canMaintain && (
                   <Button
                     disabled={blocked}
                     variant="primary"
@@ -182,7 +183,7 @@ function Library({ tenant, workspace, workspaceName, verification, initialExperi
                     key={`${detail.value.id}:${detail.value.version.id}:${detail.value.revision}`}
                     tenant={tenant}
                     workspace={workspace}
-                    entry={detail.value}
+                    entry={readOnly ? { ...detail.value, canMaintain: false } : detail.value}
                     changed={saved}
                     edit={() => setEditor({ entry: detail.value! })}
                     chooseVersion={(version) => setSelected({ id: selected.id, version })}
@@ -220,7 +221,7 @@ function Library({ tenant, workspace, workspaceName, verification, initialExperi
                     />
                   </Field>
                   <Button type="submit">检索</Button>
-                  {list.value.canMaintain && (
+                  {!readOnly && list.value.canMaintain && (
                     <label className="experience-checkbox">
                       <input
                         type="checkbox"
@@ -270,7 +271,7 @@ function Library({ tenant, workspace, workspaceName, verification, initialExperi
                   />
                 )}
                 <Pager page={page} next={list.value.hasMore} onPage={setPage} />
-                {list.value.canMaintain && (
+                {!readOnly && list.value.canMaintain && (
                   <section className="experience-seeds">
                     <h3>可选的起步方法</h3>
                     <p>

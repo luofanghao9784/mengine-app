@@ -10,9 +10,11 @@ import { ExperienceLibrary } from './ExperienceLibrary';
 export function WorkspaceExperiences({
   tenant,
   management,
+  readOnly = false,
 }: {
   tenant: string;
   management?: GovernanceSnapshot;
+  readOnly?: boolean;
 }) {
   const { session } = useSession();
   const [selected, setSelected] = useState(
@@ -68,6 +70,7 @@ export function WorkspaceExperiences({
         <ExperienceLibrary
           key={`${tenant}:${active.id}`}
           tenant={tenant}
+          readOnly={readOnly}
           workspace={active.id}
           workspaceName={active.name}
           verification={context.value}

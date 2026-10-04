@@ -1,7 +1,8 @@
+import { useViewState, textState, pageState } from '../shared/useViewState';
 import { LocalInviteLink } from '../identity/LocalInviteLink';
 import { RequestPending } from '../shared/request-guard';
 import { useContext } from 'react';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { OperationsPanel } from '../operations/OperationsPanel';
 import {
   Building2,
@@ -74,11 +75,33 @@ const actions: Record<string, string> = {
 };
 const time = (date: string) => new Date(date).toLocaleString('zh-CN', { hour12: false });
 const role = (value: string) => (value === 'TENANT_ADMIN' ? '企业管理员' : '成员');
-export function TenantAdminHome({ tenant }: { tenant: string }) {
+export function TenantAdminHome({
+  tenant,
+  compact = false,
+  initialTab,
+}: {
+  tenant: string;
+  compact?: boolean;
+  initialTab?: Tab;
+}) {
   const { session, refresh: refreshIdentity } = useSession();
-  const [tab, setTab] = useState<Tab>(() =>
-    new URLSearchParams(location.hash.slice(1)).get('tab') === 'spaces' ? 'spaces' : 'members',
+  const [tab, setTab] = useState<Tab>(
+    () =>
+      initialTab ||
+      (new URLSearchParams(location.hash.slice(1)).get('tab') === 'spaces'
+        ? 'spaces'
+        : new URLSearchParams(location.hash.slice(1)).get('tab') === 'invitations'
+          ? 'invitations'
+          : 'members'),
   );
+  useEffect(() => {
+    const change = () => {
+      const next = new URLSearchParams(location.hash.slice(1)).get('tab');
+      if (next === 'spaces' || next === 'invitations' || next === 'members') setTab(next);
+    };
+    window.addEventListener('hashchange', change);
+    return () => window.removeEventListener('hashchange', change);
+  }, []);
   const pendingRequest = useContext(RequestPending);
   const [attempt, setAttempt] = useState(0);
   const [dialog, setDialog] = useState<Dialog | undefined>(() => {
@@ -100,14 +123,16 @@ export function TenantAdminHome({ tenant }: { tenant: string }) {
         <Button variant="ghost" icon={RefreshCw} onClick={refresh} disabled={writing}>
           刷新
         </Button>
-        <Button
-          variant="primary"
-          icon={Plus}
-          onClick={() => setDialog({ kind: 'invite' })}
-          disabled={overview.value?.invitationDelivery !== 'LOCAL'}
-        >
-          邀请成员
-        </Button>
+        {tab !== 'records' && (
+          <Button
+            variant="primary"
+            icon={Plus}
+            onClick={() => setDialog({ kind: 'invite' })}
+            disabled={overview.value?.invitationDelivery !== 'LOCAL'}
+          >
+            邀请成员
+          </Button>
+        )}
       </PageActions>
       {notice && (
         <p className="access-success" role="status">
@@ -122,31 +147,57 @@ export function TenantAdminHome({ tenant }: { tenant: string }) {
         <Loading />
       ) : (
         <>
-          <section className="access-panel access-welcome">
-            <div>
-              <span className="eyebrow">企业管理</span>
-              <h2>{overview.value.name}</h2>
-              <p>
-                {overview.value.activeMemberCount} 位启用成员 · {overview.value.sharedWorkspaceCount}{' '}
-                个共享空间
-              </p>
-            </div>
-            <Badge blue>企业管理员</Badge>
-          </section>
-          <nav className="tenant-tabs" aria-label="企业管理功能">
-            {tabs.map(([key, label, Icon]) => (
-              <Button
-                key={key}
-                disabled={pendingRequest || writing}
-                icon={Icon}
-                variant={tab === key ? 'primary' : 'ghost'}
-                aria-current={tab === key ? 'page' : undefined}
-                onClick={() => setTab(key)}
-              >
-                {label}
-              </Button>
-            ))}
-          </nav>
+          {!compact && (
+            <section className="access-panel access-welcome">
+              <div>
+                <span className="eyebrow">企业管理</span>
+                <h2>{overview.value.name}</h2>
+                <p>
+                  {overview.value.activeMemberCount} 位启用成员 · {overview.value.sharedWorkspaceCount}{' '}
+                  个共享空间
+                </p>
+              </div>
+              <Badge blue>企业管理员</Badge>
+            </section>
+          )}
+          {!compact && (
+            <nav className="tenant-tabs" aria-label="企业管理功能">
+              {tabs.map(([key, label, Icon]) => (
+                <Button
+                  key={key}
+                  disabled={pendingRequest || writing}
+                  icon={Icon}
+                  variant={tab === key ? 'primary' : 'ghost'}
+                  aria-current={tab === key ? 'page' : undefined}
+                  onClick={() => setTab(key)}
+                >
+                  {label}
+                </Button>
+              ))}
+            </nav>
+          )}
+          {compact && !initialTab && (
+            <nav className="tenant-tabs" aria-label="成员与空间">
+              {tabs
+                .filter(([key]) => ['members', 'invitations', 'spaces'].includes(key))
+                .map(([key, label, Icon]) => (
+                  <Button
+                    key={key}
+                    icon={Icon}
+                    variant={tab === key ? 'primary' : 'ghost'}
+                    disabled={pendingRequest || writing}
+                    onClick={() => {
+                      setTab(key);
+                      const params = new URLSearchParams(location.hash.slice(1));
+                      params.set('tab', key);
+                      location.hash = '#' + params;
+                    }}
+                  >
+                    {label}
+                  </Button>
+                ))}
+            </nav>
+          )}
           <section className="access-panel tenant-section" key={tab}>
             {tab === 'members' && (
               <Members
@@ -312,15 +363,17 @@ export function TenantAdminHome({ tenant }: { tenant: string }) {
   );
 }
 function Filter({
+  initial = '',
   label,
   submit,
   children,
 }: {
+  initial?: string;
   label: string;
   submit: (value: string) => void;
   children?: ReactNode;
 }) {
-  const [draft, setDraft] = useState('');
+  const [draft, setDraft] = useState(initial);
   return (
     <form
       className="platform-filters"
@@ -357,9 +410,9 @@ function Members({
   onStatus: (m: TenantMember) => void;
   onEmergency: (m: TenantMember) => void;
 }) {
-  const [q, setQ] = useState(''),
-    [status, setStatus] = useState(''),
-    [page, setPage] = useState(0);
+  const [q, setQ] = useViewState(tenant, 'admin:members:query', '', textState),
+    [status, setStatus] = useViewState(tenant, 'admin:members:status', '', textState),
+    [page, setPage] = useViewState(tenant, 'admin:members:page', 0, pageState);
   const data = useRemote(
     (signal) => api.members(tenant, q, status, page * 20, signal),
     [tenant, q, status, page, attempt],
@@ -369,6 +422,7 @@ function Members({
       <div className="platform-list-heading">
         <h2>企业成员</h2>
         <Filter
+          initial={q}
           label="搜索姓名或手机号"
           submit={(q) => {
             setQ(q);
@@ -504,14 +558,15 @@ function Spaces({
   create: () => void;
   open: (id: string) => void;
 }) {
-  const [q, setQ] = useState(''),
-    [page, setPage] = useState(0);
+  const [q, setQ] = useViewState(tenant, 'admin:spaces:query', '', textState),
+    [page, setPage] = useViewState(tenant, 'admin:spaces:page', 0, pageState);
   const data = useRemote((signal) => api.spaces(tenant, q, page * 20, signal), [tenant, q, page, attempt]);
   return (
     <>
       <div className="platform-list-heading">
         <h2>共享空间</h2>
         <Filter
+          initial={q}
           label="搜索空间"
           submit={(q) => {
             setQ(q);
