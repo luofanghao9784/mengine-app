@@ -650,3 +650,11 @@
   border: 1px solid var(--line);
   border-radius: var(--radius-panel);
 }
+.admin-platform .enterprise-daily-card .usage-table {
+  max-height: 240px;
+  margin-top: 16px;
+}
+.enterprise-daily-card thead th {
+  position: sticky;
+  top: 0;
+}

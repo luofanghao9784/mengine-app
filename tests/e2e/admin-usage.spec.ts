@@ -247,6 +247,9 @@ test('platform enterprise detail uses the same scoped usage facts and retains se
   const f = await fixture(context);
   await page.goto(`/platform-admin/#admin=tenants&enterprise=${tenant}&section=usage`);
   await expect(page.getByRole('region', { name: '企业详情' })).toBeVisible();
+  await expect(page.getByRole('region', { name: '每日数值', exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: '每日数值', exact: true }).getByRole('table')).toContainText('未知');
+  await expect(page.getByRole('region', { name: '每日用量趋势' }).getByRole('table')).toHaveCount(0);
   const cards = page.locator('.enterprise-usage > .usage-metrics');
   await expect(cards).toContainText('日常登记请求');
   await expect(cards.locator('div').nth(0).locator('dd')).toHaveText('5');

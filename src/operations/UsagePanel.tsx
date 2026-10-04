@@ -281,7 +281,7 @@ function EnterpriseUsageFacts({ value: v, cost }: { value: UsageOverview; cost?:
       <div className="enterprise-usage-grid">
         <section className="enterprise-usage-card" aria-label="每日用量趋势">
           <h2>每日用量</h2>
-          <Trend days={v.days} platform />
+          <Trend days={v.days} platform showDailyValues={false} />
         </section>
         <section className="enterprise-usage-card" aria-label="用量构成">
           <h2>用量构成</h2>
@@ -310,6 +310,10 @@ function EnterpriseUsageFacts({ value: v, cost }: { value: UsageOverview; cost?:
           <p className="admin-note">Token 仅累计正式执行的已上报部分；剩余额度未知。</p>
         </section>
       </div>
+      <section className="enterprise-usage-card enterprise-daily-card" aria-label="每日数值">
+        <h2>每日数值</h2>
+        <DailyValues days={v.days} />
+      </section>
       <div className="enterprise-usage-footer">
         <p className="admin-note">
           统计：{time(v.from, v.timeZone)} 至 {time(v.until, v.timeZone)} · {v.timeZone}
@@ -540,7 +544,15 @@ function CostSummary({ cost }: { cost: UsageCost }) {
     </section>
   );
 }
-function Trend({ days, platform }: { days: UsageOverview['days']; platform: boolean }) {
+function Trend({
+  days,
+  platform,
+  showDailyValues = true,
+}: {
+  days: UsageOverview['days'];
+  platform: boolean;
+  showDailyValues?: boolean;
+}) {
   const state = usageTrendState(days);
   const max = Math.max(1, ...days.flatMap((d) => [d.workRequests, d.maintenanceCalls ?? 0]));
   return (
@@ -591,38 +603,46 @@ function Trend({ days, platform }: { days: UsageOverview['days']; platform: bool
         <p className="admin-note usage-unknown-note">
           维护调用仍有未知值
           {state.unknownMaintenanceRuns > 0 ? `（${numbers(state.unknownMaintenanceRuns)} 次运行）` : ''}
-          ，未知部分不计为零；可展开每日数值核对。
+          ，未知部分不计为零；{showDailyValues ? '可展开' : '可查看下方'}每日数值核对。
         </p>
       )}
-      <details>
-        <summary>查看每日数值</summary>
-        <div className="usage-table">
-          <table>
-            <thead>
-              <tr>
-                <th>日期</th>
-                <th>日常请求</th>
-                <th>维护调用</th>
-                <th>调用未知运行</th>
-              </tr>
-            </thead>
-            <tbody>
-              {days.map((d) => (
-                <tr key={d.date}>
-                  <td>{d.date}</td>
-                  <td>{numbers(d.workRequests)}</td>
-                  <td>{numbers(d.maintenanceCalls)}</td>
-                  <td>{d.unknownMaintenanceRuns}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </details>
+      {showDailyValues && (
+        <details>
+          <summary>查看每日数值</summary>
+          <DailyValues days={days} />
+        </details>
+      )}
       <p className="admin-note">
         无登记的日期显示 0 次登记，不代表不存在未接入的实际消耗
         {state.hasKnownActivity && '；带点线的维护柱包含调用数未知的运行'}。
       </p>
+    </div>
+  );
+}
+
+function DailyValues({ days }: { days: UsageOverview['days'] }) {
+  return (
+    <div className="usage-table">
+      <table>
+        <thead>
+          <tr>
+            <th>日期</th>
+            <th>日常请求</th>
+            <th>维护调用</th>
+            <th>调用未知运行</th>
+          </tr>
+        </thead>
+        <tbody>
+          {days.map((d) => (
+            <tr key={d.date}>
+              <td>{d.date}</td>
+              <td>{numbers(d.workRequests)}</td>
+              <td>{numbers(d.maintenanceCalls)}</td>
+              <td>{d.unknownMaintenanceRuns}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
