@@ -511,6 +511,7 @@ function ExperienceDrawer({
             </Badge>
           </div>
           {e.canMaintain &&
+            e.version.origin === 'AUTOMATIC' &&
             !adjusting &&
             ((e.status === 'PUBLISHED' && e.publishedVersion === e.version.id) || e.canRestore || action) && (
               <section className="experience-availability" aria-label="经验使用状态">
@@ -581,8 +582,10 @@ function ExperienceDrawer({
               </section>
             )}
           <p className="experience-detail-meta">
-            {e.version.origin === 'AUTOMATIC' ? '系统积累 · 自动核验通过' : '历史人工经验 · 未评测'} ·{' '}
-            {stamp(e.version.createdAt)}
+            {e.version.origin === 'AUTOMATIC'
+              ? '系统积累 · 自动核验通过'
+              : '历史人工经验 · 未自动核验，仅供查看'}{' '}
+            · {stamp(e.version.createdAt)}
           </p>
           {references.error && !referenceDenied ? (
             <fieldset className="general-experience-control-group" disabled={blocked || adjusting}>

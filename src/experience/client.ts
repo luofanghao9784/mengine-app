@@ -8,7 +8,6 @@ import type {
   ExperiencePage,
   ExperienceSummary,
   ExperienceUse,
-  ExperienceUseInput,
   ExperienceVersion,
 } from '../../contracts/public-api/experience.ts';
 import { createIdentityRequest, IdentityError, record, uuid } from '../identity/client.ts';
@@ -174,44 +173,6 @@ export function createExperienceClient(fetcher: typeof fetch = fetch) {
         signal,
       );
     },
-    create(
-      t: string,
-      w: string,
-      body: { requestId: string; content: ExperienceContent; evidence: ExperienceEvidence[] },
-    ) {
-      return send(root(t, w), 'POST', scoped(t, w), body);
-    },
-    revise(
-      t: string,
-      w: string,
-      e: string,
-      body: {
-        requestId: string;
-        expectedRevision: number;
-        content: ExperienceContent;
-        evidence: ExperienceEvidence[];
-      },
-    ) {
-      return send(root(t, w) + '/' + id(e) + '/versions', 'POST', scoped(t, w, e), body);
-    },
-    publish(
-      t: string,
-      w: string,
-      e: string,
-      body: {
-        requestId: string;
-        expectedRevision: number;
-        versionId: string;
-        independentCopyConfirmed: boolean;
-      },
-    ) {
-      return send(
-        root(t, w) + '/' + id(e) + '/publish',
-        'POST',
-        (v): v is ExperienceEntry => scoped(t, w, e)(v) && v.version.id === body.versionId,
-        body,
-      );
-    },
     stop(
       t: string,
       w: string,
@@ -238,9 +199,6 @@ export function createExperienceClient(fetcher: typeof fetch = fetch) {
     ) {
       return send(root(t, w) + '/' + id(e) + '/restore', 'POST', scoped(t, w, e), body);
     },
-    withdraw(t: string, w: string, e: string, body: { requestId: string; expectedRevision: number }) {
-      return send(root(t, w) + '/' + id(e) + '/withdraw', 'POST', scoped(t, w, e), body);
-    },
     versions(t: string, w: string, e: string, offset = 0, signal?: AbortSignal) {
       return send(
         root(t, w) + '/' + id(e) + `/versions?offset=${offset}&limit=20`,
@@ -259,14 +217,6 @@ export function createExperienceClient(fetcher: typeof fetch = fetch) {
         signal,
       );
     },
-    use(t: string, w: string, e: string, body: { requestId: string; use: ExperienceUseInput }) {
-      return send(
-        root(t, w) + '/' + id(e) + '/uses',
-        'POST',
-        (v): v is ExperienceUse => isUse(v) && v.entryId === e && v.versionId === body.use.versionId,
-        body,
-      );
-    },
     uses(t: string, w: string, e: string, offset = 0, signal?: AbortSignal) {
       return send(
         root(t, w) + '/' + id(e) + `/uses?offset=${offset}&limit=20`,
@@ -274,20 +224,6 @@ export function createExperienceClient(fetcher: typeof fetch = fetch) {
         page((v): v is ExperienceUse => isUse(v) && v.entryId === e),
         undefined,
         signal,
-      );
-    },
-    feedback(
-      t: string,
-      w: string,
-      e: string,
-      use: string,
-      body: { requestId: string; result: ExperienceFeedback['result']; note: string },
-    ) {
-      return send(
-        root(t, w) + '/' + id(e) + '/uses/' + id(use) + '/feedback',
-        'POST',
-        (v): v is ExperienceFeedback => isFeedback(v) && v.useId === use,
-        body,
       );
     },
     feedbacks(t: string, w: string, e: string, use: string, offset = 0, signal?: AbortSignal) {

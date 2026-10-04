@@ -174,23 +174,6 @@
           }
         ],
         "responses": {
-          "201": {
-            "description": "Persisted authorized result",
-            "headers": {
-              "Cache-Control": {
-                "schema": {
-                  "const": "private, no-store"
-                }
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ExperienceEntry"
-                }
-              }
-            }
-          },
           "400": {
             "description": "Validation, authorization or concurrency failure",
             "content": {
@@ -240,6 +223,23 @@
                 }
               }
             }
+          },
+          "410": {
+            "description": "Manual workflow retired; use automatic accumulation and checked adjustment proposals.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            }
           }
         },
         "requestBody": {
@@ -251,7 +251,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "description": "Retired manual workflow. After session, CSRF and workspace access checks, returns 410 EXPERIENCE_MANUAL_WORKFLOW_RETIRED. No candidate, publication, withdrawal, usage or feedback write occurs. Retained request schemas document old clients only."
       }
     },
     "/api/v1/tenants/{tenant}/workspaces/{workspace}/experiences/{id}": {
@@ -522,23 +524,6 @@
           }
         ],
         "responses": {
-          "201": {
-            "description": "Persisted authorized result",
-            "headers": {
-              "Cache-Control": {
-                "schema": {
-                  "const": "private, no-store"
-                }
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ExperienceEntry"
-                }
-              }
-            }
-          },
           "400": {
             "description": "Validation, authorization or concurrency failure",
             "content": {
@@ -588,6 +573,23 @@
                 }
               }
             }
+          },
+          "410": {
+            "description": "Manual workflow retired; use automatic accumulation and checked adjustment proposals.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            }
           }
         },
         "requestBody": {
@@ -599,7 +601,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "description": "Retired manual workflow. After session, CSRF and workspace access checks, returns 410 EXPERIENCE_MANUAL_WORKFLOW_RETIRED. No candidate, publication, withdrawal, usage or feedback write occurs. Retained request schemas document old clients only."
       }
     },
     "/api/v1/tenants/{tenant}/workspaces/{workspace}/experiences/{id}/publish": {
@@ -638,23 +642,6 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "Persisted authorized result",
-            "headers": {
-              "Cache-Control": {
-                "schema": {
-                  "const": "private, no-store"
-                }
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ExperienceEntry"
-                }
-              }
-            }
-          },
           "400": {
             "description": "Validation, authorization or concurrency failure",
             "content": {
@@ -704,6 +691,23 @@
                 }
               }
             }
+          },
+          "410": {
+            "description": "Manual workflow retired; use automatic accumulation and checked adjustment proposals.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            }
           }
         },
         "requestBody": {
@@ -715,7 +719,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "description": "Retired manual workflow. After session, CSRF and workspace access checks, returns 410 EXPERIENCE_MANUAL_WORKFLOW_RETIRED. No candidate, publication, withdrawal, usage or feedback write occurs. Retained request schemas document old clients only."
       }
     },
     "/api/v1/tenants/{tenant}/workspaces/{workspace}/experiences/{id}/withdraw": {
@@ -754,23 +760,6 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "Persisted authorized result",
-            "headers": {
-              "Cache-Control": {
-                "schema": {
-                  "const": "private, no-store"
-                }
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ExperienceEntry"
-                }
-              }
-            }
-          },
           "400": {
             "description": "Validation, authorization or concurrency failure",
             "content": {
@@ -820,6 +809,23 @@
                 }
               }
             }
+          },
+          "410": {
+            "description": "Manual workflow retired; use automatic accumulation and checked adjustment proposals.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            }
           }
         },
         "requestBody": {
@@ -831,7 +837,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "description": "Retired manual workflow. After session, CSRF and workspace access checks, returns 410 EXPERIENCE_MANUAL_WORKFLOW_RETIRED. No candidate, publication, withdrawal, usage or feedback write occurs. Retained request schemas document old clients only."
       }
     },
     "/api/v1/tenants/{tenant}/workspaces/{workspace}/experiences/{id}/events": {
@@ -1114,23 +1122,6 @@
           }
         ],
         "responses": {
-          "201": {
-            "description": "Persisted authorized result",
-            "headers": {
-              "Cache-Control": {
-                "schema": {
-                  "const": "private, no-store"
-                }
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ExperienceUse"
-                }
-              }
-            }
-          },
           "400": {
             "description": "Validation, authorization or concurrency failure",
             "content": {
@@ -1180,6 +1171,23 @@
                 }
               }
             }
+          },
+          "410": {
+            "description": "Manual workflow retired; use automatic accumulation and checked adjustment proposals.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            }
           }
         },
         "requestBody": {
@@ -1191,7 +1199,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "description": "Retired manual workflow. After session, CSRF and workspace access checks, returns 410 EXPERIENCE_MANUAL_WORKFLOW_RETIRED. No candidate, publication, withdrawal, usage or feedback write occurs. Retained request schemas document old clients only."
       }
     },
     "/api/v1/tenants/{tenant}/workspaces/{workspace}/experiences/{id}/uses/{use}/feedback": {
@@ -1369,23 +1379,6 @@
           }
         ],
         "responses": {
-          "201": {
-            "description": "Persisted authorized result",
-            "headers": {
-              "Cache-Control": {
-                "schema": {
-                  "const": "private, no-store"
-                }
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ExperienceFeedback"
-                }
-              }
-            }
-          },
           "400": {
             "description": "Validation, authorization or concurrency failure",
             "content": {
@@ -1435,6 +1428,23 @@
                 }
               }
             }
+          },
+          "410": {
+            "description": "Manual workflow retired; use automatic accumulation and checked adjustment proposals.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            }
           }
         },
         "requestBody": {
@@ -1446,7 +1456,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "description": "Retired manual workflow. After session, CSRF and workspace access checks, returns 410 EXPERIENCE_MANUAL_WORKFLOW_RETIRED. No candidate, publication, withdrawal, usage or feedback write occurs. Retained request schemas document old clients only."
       }
     },
     "/api/v1/tenants/{tenant}/workspaces/{workspace}/experiences/{id}/restore": {

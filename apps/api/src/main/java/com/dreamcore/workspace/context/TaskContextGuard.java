@@ -26,7 +26,7 @@ public class TaskContextGuard {
      WHERE NOT v.scrubbed AND object_is_active('PROFILE_VERSION',v.id) AND company_profile_readable(v.id) AND e.id=r.reference_id AND (e.revision::text=r.version_key OR EXISTS(SELECT 1 FROM task_preference_saves s WHERE s.task_id=t.id AND s.attempt_number=t.attempt AND s.profile_id=e.id AND s.profile_revision=e.revision AND s.owner_id=t.requested_by AND e.scope='PERSONAL' AND e.account_id=t.requested_by AND e.kind='PREFERENCE')) AND
       (v.status='ACTIVE' AND (v.expires_at IS NULL OR v.expires_at>clock_timestamp()) OR e.kind='INFERENCE' AND v.status='PROPOSED' AND (v.expires_at IS NULL OR v.expires_at>clock_timestamp()))))
     OR (r.kind='EXPERIENCE' AND NOT EXISTS(SELECT 1 FROM experience_entries e JOIN experience_versions v ON v.id=e.published_version
-     WHERE e.id=r.reference_id AND e.status='PUBLISHED' AND v.id::text=r.version_key AND NOT v.scrubbed AND object_is_active('EXPERIENCE_VERSION',v.id)))
+     WHERE e.id=r.reference_id AND e.status='PUBLISHED' AND v.origin='AUTOMATIC' AND v.evaluation='AUTOMATIC_CHECKED' AND v.id::text=r.version_key AND NOT v.scrubbed AND object_is_active('EXPERIENCE_VERSION',v.id)))
    ))
    """,Boolean.class,task));
   if(stale || !Boolean.TRUE.equals(db.queryForObject("SELECT task_datasets_readable(?) AND NOT EXISTS(SELECT 1 FROM task_dataset_fences f JOIN conversation_tasks t ON t.id=f.task_id AND t.attempt=f.attempt_number WHERE t.id=?)",Boolean.class,task,task)))throw new IdentityException(409,"TASK_CONTEXT_CHANGED");

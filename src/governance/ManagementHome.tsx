@@ -12,7 +12,7 @@ import { RequestPending, requestNavigationLocked } from '../shared/request-guard
 import { useContext, useEffect } from 'react';
 import { Attention } from '../attention/Attention';
 import { featureEntries } from '../shared/feature-entries';
-import { WorkspaceExperiences } from '../experience/WorkspaceExperiences';
+import { TenantExperiences } from '../experience/TenantExperiences';
 import { useState } from 'react';
 import { useSession } from '../identity/session';
 import { Building2 } from 'lucide-react';
@@ -246,7 +246,7 @@ export function ManagementHome({ tenant }: { tenant: string }) {
           </Empty>
         )
       ) : mode === 'experiences' ? (
-        <WorkspaceExperiences tenant={tenant} management={data.value} />
+        <TenantExperiences tenant={tenant} />
       ) : mode === 'profiles' ? (
         <Profiles tenant={tenant} management={data.value} />
       ) : (

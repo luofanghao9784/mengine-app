@@ -107,10 +107,21 @@ public class ExperienceService {
   if(!maintain&&!Objects.equals(selected,e.get("published_version"))&&!Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM experience_events WHERE entry_id=? AND version_id=? AND action='PUBLISHED')",Boolean.class,id,selected)))throw missing();
   return new Entry(id,tenant,space,n(e,"revision"),(String)e.get("status"),n(e,"latest_number"),(UUID)e.get("published_version"),maintain,projectVersion(actor,tenant,versionRow(actor,tenant,space,id,selected)),maintain&&"WITHDRAWN".equals(e.get("status"))&&selected.equals(lastPublished(id))&&restoreSourcesAvailable(selected));
  }
+ /** Retired public manual workflows never create candidates, publish or self-certify use. */
+ @Transactional public <T> T retiredManualWrite(UUID actor,UUID tenant,UUID space,boolean maintain){
+  scope(actor,tenant,space,maintain);throw new IdentityException(410,"EXPERIENCE_MANUAL_WORKFLOW_RETIRED");
+ }
+ @Transactional public Page engineList(UUID actor,UUID tenant,UUID space,String query,int offset,int limit){
+  return listContent(actor,tenant,space,query,"",false,offset,limit,true);
+ }
  @Transactional public Page list(UUID actor,UUID tenant,UUID space,String query,String tag,boolean maintenance,int offset,int limit){
+  return listContent(actor,tenant,space,query,tag,maintenance,offset,limit,false);
+ }
+ private Page listContent(UUID actor,UUID tenant,UUID space,String query,String tag,boolean maintenance,int offset,int limit,boolean qualifiedOnly){
   paging(offset,limit);boolean can=scope(actor,tenant,space,maintenance);query=text(query,200,false);tag=text(tag,40,false).toLowerCase(Locale.ROOT);
   var args=new ArrayList<Object>(List.of(actor,tenant,space));
   String sql="WITH principal AS (SELECT ?::uuid actor) SELECT e.id entry_id,e.revision,e.status,v.* FROM experience_entries e JOIN experience_versions v ON v.entry_id=e.id AND "+(maintenance?"v.number=e.latest_number":"v.id=e.published_version AND e.status='PUBLISHED'")+" CROSS JOIN principal p WHERE e.tenant_id=? AND e.workspace_id=? AND "+VISIBLE;
+  if(qualifiedOnly)sql+=" AND v.origin='AUTOMATIC' AND v.evaluation='AUTOMATIC_CHECKED'";
   var tokens=terms(query);if(!query.isBlank()&&tokens.isEmpty())return new Page(List.of(),false,can,"READY");
   if(!tokens.isEmpty()){sql+=" AND v.search_terms @> ?::text[]";args.add(tokens.toArray(String[]::new));}
   if(!tag.isBlank()){sql+=" AND v.tags @> ?::text[]";args.add(new String[]{tag});}
@@ -142,17 +153,21 @@ public class ExperienceService {
  UUID appendAutomatic(UUID actor,UUID entry,int number,Content c,List<Evidence> refs,String fingerprint){UUID version=append(actor,entry,number,normalize(c),refs);db.update("UPDATE experience_versions SET origin='AUTOMATIC',evaluation='AUTOMATIC_CHECKED',content_fingerprint=? WHERE id=?",fingerprint,version);return version;}
  private void forbidAutomaticWrite(UUID entry){if(Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM experience_versions WHERE entry_id=? AND origin='AUTOMATIC')",Boolean.class,entry)))throw new IdentityException(409,"EXPERIENCE_AUTOMATIC_MANAGED");}
  private void event(UUID actor,UUID tenant,UUID entry,UUID version,int revision,String action){db.update("INSERT INTO experience_events(id,entry_id,version_id,revision,action,actor_id) VALUES (?,?,?,?,?,?)",UUID.randomUUID(),entry,version,revision,action,actor);audit.record(actor,tenant,"EXPERIENCE_"+action,entry,"SUCCESS");}
+ /** Legacy import/fixture support only; no controller or feedback write path calls this. */
+ @Deprecated(forRemoval=true)
  @Transactional public Entry create(UUID actor,UUID tenant,UUID space,UUID key,Content body,List<Evidence> evidence){
   scope(actor,tenant,space,true);var c=normalize(body);var refs=normalizeRefs(actor,tenant,c,evidence);String h=hash(tenant,space,c,refs);UUID prior=identities.priorRequest(actor,key,"EXPERIENCE_CREATE",h);
   if(prior!=null){UUID id=db.queryForObject("SELECT entry_id FROM experience_versions WHERE id=?",UUID.class,prior);return get(actor,tenant,space,id,prior);}
   UUID id=UUID.randomUUID();db.update("INSERT INTO experience_entries(id,tenant_id,workspace_id,created_by) VALUES (?,?,?,?)",id,tenant,space,actor);UUID v=append(actor,id,1,c,refs);event(actor,tenant,id,v,1,"CREATED");identities.remember(actor,key,"EXPERIENCE_CREATE",h,v);return get(actor,tenant,space,id,v);
  }
+ @Deprecated(forRemoval=true)
  @Transactional public Entry revise(UUID actor,UUID tenant,UUID space,UUID id,UUID key,int expected,Content body,List<Evidence> evidence){
   scope(actor,tenant,space,true);var c=normalize(body);var refs=normalizeRefs(actor,tenant,c,evidence);String h=hash(tenant,space,id,expected,c,refs);UUID prior=identities.priorRequest(actor,key,"EXPERIENCE_REVISE",h);var e=row(actor,tenant,space,id,true);
   if(prior!=null)return get(actor,tenant,space,id,prior);forbidAutomaticWrite(id);if(n(e,"revision")!=expected)throw new IdentityException(409,"EXPERIENCE_STATE_CHANGED");
   versionRow(actor,tenant,space,id,db.queryForObject("SELECT id FROM experience_versions WHERE entry_id=? AND number=?",UUID.class,id,n(e,"latest_number")));
   UUID v=append(actor,id,n(e,"latest_number")+1,c,refs);db.update("UPDATE experience_entries SET latest_number=latest_number+1,revision=revision+1,updated_at=now() WHERE id=?",id);event(actor,tenant,id,v,expected+1,"REVISED");identities.remember(actor,key,"EXPERIENCE_REVISE",h,v);return get(actor,tenant,space,id,v);
  }
+ @Deprecated(forRemoval=true)
  @Transactional public Entry publish(UUID actor,UUID tenant,UUID space,UUID id,UUID key,int expected,UUID version,boolean independentCopyConfirmed){
   scope(actor,tenant,space,true);String h=hash(tenant,space,id,expected,version,independentCopyConfirmed);UUID prior=identities.priorRequest(actor,key,"EXPERIENCE_PUBLISH",h);var e=row(actor,tenant,space,id,true);
   if(prior!=null)return get(actor,tenant,space,id,prior);forbidAutomaticWrite(id);if(n(e,"revision")!=expected)throw new IdentityException(409,"EXPERIENCE_STATE_CHANGED");

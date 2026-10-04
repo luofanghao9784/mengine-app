@@ -264,3 +264,69 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* Shared read-only detail styles retained after retiring the manual editor bundle. */
+.experience-section-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 20px;
+}
+.experience-detail {
+  min-width: 0;
+}
+.experience-detail h3 {
+  font-size: 22px;
+  margin: 8px 0;
+}
+.experience-detail h4 {
+  margin: 24px 0 8px;
+}
+.experience-detail p {
+  line-height: 1.8;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.experience-detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  color: var(--muted);
+  font-size: 12px;
+  margin: 14px 0;
+}
+.experience-refs {
+  padding: 0;
+  list-style: none;
+}
+.experience-refs li {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+  overflow-wrap: anywhere;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.experience-refs li > span {
+  flex: 1;
+  min-width: 100px;
+}
+.experience-refs small {
+  display: block;
+  width: 100%;
+  color: var(--muted);
+}
+.experience-history ul {
+  list-style: none;
+  padding: 0;
+}
+.experience-history li {
+  padding: 8px 0;
+  overflow-wrap: anywhere;
+}
+.experience-history small {
+  display: block;
+  margin: 6px;
+  color: var(--muted);
+}

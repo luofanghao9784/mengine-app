@@ -5,7 +5,7 @@ const tenant = id(1),
   space = id(3),
   entryId = id(4),
   version = id(5);
-async function fixture(context: BrowserContext) {
+async function fixture(context: BrowserContext, legacy = false) {
   let revoked = false,
     eraseAfterStop = false;
   let stopped = false,
@@ -58,8 +58,8 @@ async function fixture(context: BrowserContext) {
       schemaVersion: 1,
       content,
       evidence: [{ kind: 'TASK', referenceId: id(6), workspaceId: space }],
-      origin: 'AUTOMATIC',
-      evaluation: 'AUTOMATIC_CHECKED',
+      origin: legacy ? 'MANUAL' : 'AUTOMATIC',
+      evaluation: legacy ? 'NOT_EVALUATED' : 'AUTOMATIC_CHECKED',
       createdBy: person,
       createdAt: '2026-10-04T00:00:00Z',
     },
@@ -135,8 +135,8 @@ async function fixture(context: BrowserContext) {
                     revision: 2,
                     status: stopped ? 'WITHDRAWN' : 'PUBLISHED',
                     ...content,
-                    origin: 'AUTOMATIC',
-                    evaluation: 'AUTOMATIC_CHECKED',
+                    origin: legacy ? 'MANUAL' : 'AUTOMATIC',
+                    evaluation: legacy ? 'NOT_EVALUATED' : 'AUTOMATIC_CHECKED',
                   },
                 },
               ],
@@ -202,6 +202,7 @@ async function fixture(context: BrowserContext) {
         entryId,
         versionId: fixed,
         canReference:
+          !legacy &&
           !stopped &&
           fixed === (adjusted ? id(22) : version) &&
           generalReferences.every((r) => r.useState === 'AVAILABLE'),
@@ -215,8 +216,8 @@ async function fixture(context: BrowserContext) {
           {
             id: version,
             number: 1,
-            origin: 'AUTOMATIC',
-            evaluation: 'AUTOMATIC_CHECKED',
+            origin: legacy ? 'MANUAL' : 'AUTOMATIC',
+            evaluation: legacy ? 'NOT_EVALUATED' : 'AUTOMATIC_CHECKED',
             createdAt: '2026-10-04T00:00:00Z',
             current: true,
           },
@@ -563,6 +564,34 @@ test('reference navigation cannot discard an editing or uncertain adjustment', a
   await expect(page.getByLabel('调整原因与依据')).toHaveValue('固定版本中的口径需补充');
   await page.getByRole('button', { name: '重试原调整' }).click();
   await expect(next).toBeEnabled();
-  await expect.poll(()=>f.requests.length).toBe(2);
+  await expect.poll(() => f.requests.length).toBe(2);
   expect(f.requests[0]).toEqual(f.requests[1]);
+});
+
+test('legacy management link keeps manual records read-only with no editor, direct publication or adoption forms', async ({
+  page,
+  context,
+}) => {
+  const f = await fixture(context, true);
+  await page.goto(`/tenant-admin/#tenant=${tenant}&manage=experiences&scope=${space}`);
+  await page
+    .getByRole('button')
+    .filter({ has: page.getByRole('heading', { name: '先核对来源口径' }) })
+    .click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toContainText('历史人工经验 · 未自动核验，仅供查看');
+  await expect(dialog).toContainText('暂停参考');
+  await expect(dialog.getByText('核对来源范围，再检查实际执行回执。', { exact: true })).toBeVisible();
+  for (const name of [
+    '整理经验',
+    '保存候选',
+    '发布此版本',
+    '整理新版本',
+    '调整经验内容',
+    '停用经验',
+    '恢复使用',
+    '记录采用',
+  ])
+    await expect(page.getByRole('button', { name, exact: false })).toHaveCount(0);
+  expect(f.mutations).toEqual([]);
 });

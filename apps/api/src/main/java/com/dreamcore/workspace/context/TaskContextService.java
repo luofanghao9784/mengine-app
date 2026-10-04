@@ -133,7 +133,7 @@ public class TaskContextService {
   return map("items",items,"hasMore",rows.size()>2,"scope","CURRENT_PRIVATE_CONVERSATION","completeHistory",false);
  }
  private Object search(Task t,Request r){
-  var found=experiences.list(t.actor(),t.tenant(),t.space(),text(r.query(),200,true),"",false,offset(r),3);
+  var found=experiences.engineList(t.actor(),t.tenant(),t.space(),text(r.query(),200,true),offset(r),3);
   // Even summaries can contain source data; track their dependencies before exposing them.
   var items=new ArrayList<Object>();for(var s:found.items()){
    if(!Boolean.TRUE.equals(db.queryForObject("SELECT experience_general_dependencies_current(?,?)",Boolean.class,t.tenant(),s.versionId())))continue;
@@ -144,6 +144,7 @@ public class TaskContextService {
  private ExperienceService.Entry experienceEntry(Task t,UUID id,UUID version){
   if(id==null||version==null)throw IdentityException.invalid();var e=experiences.get(t.actor(),t.tenant(),t.space(),id,version);
   if(!Boolean.TRUE.equals(db.queryForObject("SELECT experience_general_dependencies_current(?,?)",Boolean.class,t.tenant(),version)))throw new IdentityException(409,"EXPERIENCE_NOT_CURRENT");
+  if(!e.version().origin().equals("AUTOMATIC")||!e.version().evaluation().equals("AUTOMATIC_CHECKED"))throw new IdentityException(409,"EXPERIENCE_NOT_CHECKED");
   if(!e.status().equals("PUBLISHED")||!version.equals(e.publishedVersion()))throw new IdentityException(409,"EXPERIENCE_NOT_CURRENT");
   if(e.version().content().accessMode().equals("SOURCE_BOUND"))for(var ref:e.version().evidence())if(ref.kind().equals("TASK"))readableTask(t,ref.referenceId());
   return e;

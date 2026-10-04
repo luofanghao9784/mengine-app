@@ -161,7 +161,7 @@ const id = (v: string) => {
   return v;
 };
 const messages: Record<string, string> = {
-  EXPERIENCE_CLIENT_DISABLED: '首版客户端暂不提供经验维护，请继续当前工作。',
+  EXPERIENCE_MANUAL_WORKFLOW_RETIRED: '手工经验流程已停用，反馈将按自动积累规则处理。',
   FEEDBACK_NOT_FOUND: '反馈已不可读取，请核对源内容权限。',
   FEEDBACK_TARGET_UNAVAILABLE: '原任务或独立发布副本已不可读取。',
   FEEDBACK_SOURCE_UNAVAILABLE: '原反馈依赖的资料已不可读取。',
@@ -299,6 +299,8 @@ export function createFeedbackClient(fetcher: typeof fetch = fetch) {
       f: string,
       body: { requestId: string; expectedRevision: number; action: FeedbackFollowUp },
     ) {
+      if (!['PREFERENCE', 'CORRECTION'].includes(body.action.kind))
+        throw new IdentityError('EXPERIENCE_MANUAL_WORKFLOW_RETIRED', 410);
       return send(
         root(t) + '/' + id(f) + '/actions',
         'POST',

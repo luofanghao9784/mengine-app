@@ -1246,6 +1246,9 @@
                 }
               }
             }
+          },
+          "410": {
+            "description": "Manual experience workflow retired"
           }
         },
         "requestBody": {
@@ -1258,7 +1261,7 @@
             }
           }
         },
-        "description": "Only personal preference and correction actions are available in the first client release. EXPERIENCE_CANDIDATE returns 409 EXPERIENCE_CLIENT_DISABLED after access verification, without creating an action or candidate. Retained schemas describe historical/internal records."
+        "description": "Only personal preference and correction followups. Old EXPERIENCE_CANDIDATE requests return 410 EXPERIENCE_MANUAL_WORKFLOW_RETIRED after access verification, without creating an action or candidate."
       }
     }
   },
@@ -1966,37 +1969,9 @@
                 "type": "null"
               }
             }
-          },
-          {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "kind",
-              "confirmed",
-              "preference",
-              "correction",
-              "candidate"
-            ],
-            "properties": {
-              "kind": {
-                "const": "EXPERIENCE_CANDIDATE"
-              },
-              "confirmed": {
-                "const": true
-              },
-              "preference": {
-                "type": "null"
-              },
-              "correction": {
-                "type": "null"
-              },
-              "candidate": {
-                "$ref": "#/components/schemas/FeedbackCandidate"
-              }
-            }
           }
         ],
-        "description": "Explicit independent confirmation required. Preference uses safe enums only. Correction creates a source-bound private task, not a successful correction. Candidate is manual, source-bound, unevaluated and never auto-published."
+        "description": "Only preference and correction followups. Historical candidate receipts remain readable in retained records; no new manual candidate workflow."
       },
       "FeedbackAct": {
         "type": "object",

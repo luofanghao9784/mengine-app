@@ -165,56 +165,33 @@ export async function governanceJourney(
       enabled: true,
     });
     const experienceRoot = `${root}/workspaces/${space.id}/experiences`;
-    const experience = await post(
+    // The old shared manual author/publish journey is retired. Granted maintenance still cannot bypass automatic checks.
+    const retired = await post(
       memberContext.request,
       experienceRoot,
       {
         requestId: randomUUID(),
         content: {
           kind: 'METHOD',
-          title: '双入口合成方法',
-          summary: '验证两端维护同一对象',
-          body: '原始方法正文',
+          title: '退役流程合成检查',
+          summary: '不应生成候选',
+          body: '不应写入',
           tags: [],
-          applicable: '当前合成测试',
-          excluded: '不用于真实业务结论',
+          applicable: '测试',
+          excluded: '',
           dependencies: '',
-          basis: '人工编写，尚未评测',
+          basis: '未核验',
           accessMode: 'INDEPENDENT_COPY',
         },
         evidence: [],
       },
-      201,
+      410,
     );
-    await post(memberContext.request, experienceRoot + `/${experience.id}/publish`, {
-      requestId: randomUUID(),
-      expectedRevision: experience.revision,
-      versionId: experience.version.id,
-      independentCopyConfirmed: true,
-    });
-    await member.goto(`/workspace/#tenant=${tenant}&view=experiences&scope=${space.id}`);
-    await member.getByRole('button', { name: /双入口合成方法/ }).click();
-    await expect(member.locator('.experience-detail')).toContainText('原始方法正文');
-    await member.goto(`/tenant-admin/#tenant=${tenant}`);
-    await member.getByRole('button', { name: '经验维护', exact: true }).click();
-    await expect(member.getByLabel('经验范围', { exact: true })).toHaveValue(space.id);
-    await member.getByRole('button', { name: /双入口合成方法/ }).click();
-    await member.getByRole('button', { name: '整理新版本', exact: true }).click();
-    await member.getByLabel('可复用方法与检查步骤').fill('企业维护端更新的同一份方法');
-    await member.getByRole('button', { name: '保存候选', exact: true }).click();
-    await expect(member.locator('.experience-detail')).toContainText('当前查看 v2');
-    await member.getByRole('checkbox', { name: /我确认此处手工填写的经验正文/ }).check();
-    await member.getByRole('button', { name: '发布此版本 v2', exact: true }).click();
-    await expect(member.locator('.experience-detail-meta')).toContainText('此版本当前生效');
-    await screenshot(member, 'experience-management-same-object.png');
-    await member.goto(`/workspace/#tenant=${tenant}&view=experiences&scope=${space.id}`);
-    await member.getByRole('button', { name: /双入口合成方法/ }).click();
-    await expect(member.locator('.experience-detail')).toContainText('企业维护端更新的同一份方法');
-    const sharedExperience = await (
-      await memberContext.request.get(experienceRoot + `/${experience.id}`)
+    assert.equal(retired.code, 'EXPERIENCE_MANUAL_WORKFLOW_RETIRED');
+    const afterRetirement = await (
+      await memberContext.request.get(experienceRoot + '?maintenance=true')
     ).json();
-    assert.equal(sharedExperience.version.number, 2);
-    assert.equal(sharedExperience.publishedVersion, sharedExperience.version.id);
+    assert.equal(afterRetirement.items.length, 0);
     await member.goto(`/tenant-admin/#tenant=${tenant}`);
     await member.getByRole('link', { name: '工作空间', exact: true }).click();
     await member.getByRole('button', { name: '更多工作与管理', exact: true }).click();

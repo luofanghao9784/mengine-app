@@ -59,7 +59,7 @@ public class ExperienceManagementService {
   var items=db.query("SELECT e.id,v.id,v.number,v.method->>'title' title,v.id=e.published_version is_current,CASE WHEN e.status<>'AVAILABLE' THEN 'GLOBAL_STOPPED' WHEN NOT tenant_general_experience_enabled(?,e.id) THEN 'TENANT_STOPPED' ELSE 'AVAILABLE' END use_state FROM experience_general_dependency_closure d JOIN general_experience_versions v ON v.id=d.general_version_id JOIN general_experience_entries e ON e.id=v.entry_id WHERE d.version_id=? ORDER BY e.id,v.number,v.id LIMIT 21 OFFSET ?",(r,n)->new GeneralReference(r.getObject(1,UUID.class),r.getObject(2,UUID.class),r.getInt(3),r.getString(4),r.getBoolean(5),r.getString(6)),tenant,version,offset);
   // Recheck after locking: never retain even a cleaned title after the original dependency was erased.
   local=experiences.analysisEntry(actor,tenant,space,entry,version);
-  boolean usable=local.status().equals("PUBLISHED")&&version.equals(local.publishedVersion())&&Boolean.TRUE.equals(db.queryForObject("SELECT experience_general_dependencies_current(?,?)",Boolean.class,tenant,version));
+  boolean usable=local.version().origin().equals("AUTOMATIC")&&local.version().evaluation().equals("AUTOMATIC_CHECKED")&&local.status().equals("PUBLISHED")&&version.equals(local.publishedVersion())&&Boolean.TRUE.equals(db.queryForObject("SELECT experience_general_dependencies_current(?,?)",Boolean.class,tenant,version));
   return new GeneralReferences(entry,version,usable,items.stream().limit(20).toList(),items.size()>20);
  }
  static final String PROCESSING="""

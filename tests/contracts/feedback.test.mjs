@@ -58,7 +58,7 @@ test('follow-up requires one explicit action and candidate is source-bound manua
     basis: '未评测',
     accessMode: 'SOURCE_BOUND',
   };
-  assert.ok(
+  assert.equal(
     check('FeedbackFollowUp')({
       kind: 'EXPERIENCE_CANDIDATE',
       confirmed: true,
@@ -66,6 +66,7 @@ test('follow-up requires one explicit action and candidate is source-bound manua
       correction: null,
       candidate,
     }),
+    false,
   );
   assert.equal(
     check('FeedbackFollowUp')({

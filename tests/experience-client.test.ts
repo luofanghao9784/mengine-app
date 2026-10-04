@@ -95,24 +95,10 @@ test('candidate cannot be returned through available search results', async () =
   await assert.rejects(client.list(ids[0], ids[1]), { code: 'CONTRACT_MISMATCH' });
   assert.equal((await client.list(ids[0], ids[1], '', '', true)).items.length, 1);
 });
-test('stable mutation ID and CSRF are transmitted without inferring permissions', async () => {
-  const calls: { url: string; body?: string }[] = [];
-  const client = createExperienceClient((async (input, init) => {
-    calls.push({ url: String(input), body: typeof init?.body === 'string' ? init.body : undefined });
-    if (String(input).endsWith('/csrf'))
-      return Response.json({ headerName: 'X-CSRF-TOKEN', token: 'synthetic' });
-    assert.equal((init?.headers as Record<string, string>)['X-CSRF-TOKEN'], 'synthetic');
-    return Response.json(entry);
-  }) as typeof fetch);
-  const body = {
-    requestId: ids[3],
-    content: content as Parameters<typeof client.create>[2]['content'],
-    evidence: [],
-  };
-  await client.create(ids[0], ids[1], body);
-  await client.create(ids[0], ids[1], body);
-  assert.equal(JSON.parse(calls.filter((c) => c.body)[0].body!).requestId, ids[3]);
-  assert.equal(calls.filter((c) => c.body)[0].body, calls.filter((c) => c.body)[1].body);
+test('client exposes automatic adjustment/availability reads but no retired manual mutation methods', () => {
+  const client = createExperienceClient();
+  for (const name of ['create', 'revise', 'publish', 'withdraw', 'use', 'feedback'])
+    assert.equal(name in client, false);
 });
 
 test('automatic entries remain readable with truthful provenance and reject mixed evaluation labels', async () => {

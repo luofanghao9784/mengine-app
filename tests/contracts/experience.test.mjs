@@ -70,7 +70,7 @@ test('all routes scoped and mutations require CSRF and stable request ID', () =>
     }
   }
 });
-test('publishing independent content is an explicit, revision-bound action', () => {
+test('retained historical publish request describes old revision-bound clients', () => {
   assert.ok(
     check('ExperiencePublish')({
       requestId: id,
@@ -165,4 +165,19 @@ test('adjustment observations return bounded status metadata, never proposal or 
   assert.equal(validate({ enabled: true, items: Array(11).fill(receipt) }), false);
   for (const extra of [{ content }, { reason: 'private' }, { state: 'APPROVED' }])
     assert.equal(validate({ enabled: true, items: [{ ...receipt, ...extra }] }), false);
+});
+
+test('manual creation, revision, publication and self-reported use are retired without success responses', () => {
+  const posts = Object.entries(spec.paths).filter(
+    ([path, verbs]) => verbs.post && !/\/(stop|restore|adjustments)$/.test(path),
+  );
+  assert.equal(posts.length, 6);
+  for (const [, verbs] of posts) {
+    assert.equal(verbs.post.deprecated, true);
+    assert.ok(verbs.post.responses['410']);
+    assert.equal(
+      Object.keys(verbs.post.responses).some((code) => code.startsWith('2')),
+      false,
+    );
+  }
 });

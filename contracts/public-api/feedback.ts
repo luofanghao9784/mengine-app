@@ -1,4 +1,3 @@
-import type { ExperienceContent } from './experience';
 export interface TaskFeedbackTarget {
   kind: 'BRIEFING' | 'TASK';
   taskId: string;
@@ -78,23 +77,16 @@ export interface FeedbackPreferenceState {
   status: 'UNSET' | 'ACTIVE' | 'PROPOSED' | 'WITHDRAWN' | 'EXPIRED' | 'UNAVAILABLE';
   style: PreferenceStyle | null;
 }
-/** EXPERIENCE_CANDIDATE is retained for historical/internal records; client POST rejects it with 409 EXPERIENCE_CLIENT_DISABLED. */
+/** New followups only; historical candidate actions remain read-only records. */
 export type FeedbackFollowUp =
   | { kind: 'PREFERENCE'; confirmed: true; preference: FeedbackPreference; correction: null; candidate: null }
-  | { kind: 'CORRECTION'; confirmed: true; preference: null; correction: string; candidate: null }
-  | {
-      kind: 'EXPERIENCE_CANDIDATE';
-      confirmed: true;
-      preference: null;
-      correction: null;
-      candidate: ExperienceContent;
-    };
+  | { kind: 'CORRECTION'; confirmed: true; preference: null; correction: string; candidate: null };
 export interface FeedbackAction {
   targetWorkspaceId?: string;
   id: string;
   feedbackId: string;
   feedbackRevision: number;
-  kind: FeedbackFollowUp['kind'];
+  kind: FeedbackFollowUp['kind'] | 'EXPERIENCE_CANDIDATE';
   status: 'APPLIED' | 'TASK_CREATED' | 'CANDIDATE_CREATED';
   targetId: string;
   targetVersion: string | null;

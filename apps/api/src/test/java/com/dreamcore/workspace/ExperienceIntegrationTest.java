@@ -173,10 +173,21 @@ class ExperienceIntegrationTest {
   Client client=new Client();String path="/api/v1/tenants/"+tenant+"/workspaces/"+space+"/experiences";assertEquals(401,client.send("GET",path,null,false).statusCode());
   assertEquals(200,client.send("POST","/api/v1/auth/login",Map.of("email",email(owner),"password",password),true).statusCode());
   var body=Map.of("requestId",UUID.randomUUID(),"content",content("INDEPENDENT_COPY"),"evidence",List.of());assertEquals(403,client.send("POST",path,body,false).statusCode());
-  var response=client.send("POST",path,body,true);assertEquals(201,response.statusCode(),response.body());assertTrue(response.headers().firstValue("cache-control").orElse("").contains("no-store"));
-  assertEquals(1,json.readTree(client.send("GET",path+"?maintenance=true",null,false).body()).get("items").size());
-  var draft=json.readTree(response.body());UUID entry=UUID.fromString(draft.get("id").asString()),v=UUID.fromString(draft.get("version").get("id").asString());service.publish(owner,tenant,space,entry,UUID.randomUUID(),1,v,true);
-  var conflict=client.send("POST",path+"/"+entry+"/publish",Map.of("requestId",UUID.randomUUID(),"expectedRevision",1,"versionId",v,"independentCopyConfirmed",true),true);assertEquals(409,conflict.statusCode());assertEquals("1.0",json.readTree(conflict.body()).get("contractVersion").asString());assertEquals("EXPERIENCE_STATE_CHANGED",json.readTree(conflict.body()).get("code").asString());
+  var response=client.send("POST",path,body,true);assertEquals(410,response.statusCode(),response.body());assertTrue(response.headers().firstValue("cache-control").orElse("").contains("no-store"));
+  assertEquals("EXPERIENCE_MANUAL_WORKFLOW_RETIRED",json.readTree(response.body()).get("code").asString());
+  assertEquals(0,db.queryForObject("SELECT count(*) FROM experience_entries WHERE tenant_id=?",Integer.class,tenant));
+  var legacy=publish(create("INDEPENDENT_COPY",false));UUID entry=legacy.id(),v=legacy.version().id();
+  for(var request:Map.of("/versions",Map.of("requestId",UUID.randomUUID(),"expectedRevision",legacy.revision(),"content",content("INDEPENDENT_COPY"),"evidence",List.of()),
+   "/publish",Map.of("requestId",UUID.randomUUID(),"expectedRevision",legacy.revision(),"versionId",v,"independentCopyConfirmed",true),
+   "/withdraw",Map.of("requestId",UUID.randomUUID(),"expectedRevision",legacy.revision()),
+   "/uses",Map.of("requestId",UUID.randomUUID(),"use",usage(v,"manual-retired","DIRECT",true)),
+   "/uses/"+UUID.randomUUID()+"/feedback",Map.of("requestId",UUID.randomUUID(),"result","COMPLETED","note","不得手工证明结果")).entrySet()){
+   var retired=client.send("POST",path+"/"+entry+request.getKey(),request.getValue(),true);
+   assertEquals(410,retired.statusCode(),retired.body());assertEquals("EXPERIENCE_MANUAL_WORKFLOW_RETIRED",json.readTree(retired.body()).get("code").asString());
+  }
+  assertEquals(legacy.revision(),service.get(owner,tenant,space,entry,v).revision());
+  assertEquals(1,db.queryForObject("SELECT count(*) FROM experience_versions WHERE entry_id=?",Integer.class,entry));
+  assertEquals(0,db.queryForObject("SELECT count(*) FROM experience_uses WHERE entry_id=?",Integer.class,entry));
   String base="/api/v1/tenants/"+tenant+"/workspaces/"+personal;
   var notRestorable=client.send("POST",base+"/lifecycle/MATERIAL/"+material,Map.of("requestId",UUID.randomUUID(),"expectedRevision",0,"action","RESTORE"),true);assertEquals(409,notRestorable.statusCode());assertEquals("LIFECYCLE_NOT_RESTORABLE",json.readTree(notRestorable.body()).get("code").asString());
   for(String badPath:List.of(base+"/sources/not-a-uuid","/api/v1/tenants/"+tenant+"/attention?offset=-1")){var bad=client.send("GET",badPath,null,false);assertEquals(400,bad.statusCode());assertEquals("1.0",json.readTree(bad.body()).get("contractVersion").asString());assertEquals("INVALID_REQUEST",json.readTree(bad.body()).get("code").asString());}
