@@ -172,6 +172,26 @@ function Snapshot({
   });
   const gradient = sectors.map((s) => `var(--engine-${s.id}) ${s.start}% ${s.end}%`).join(',');
   const RecentContainer = compact ? 'details' : 'section';
+  const core = (
+    <div className="engine-core">
+      <div
+        className="engine-orb"
+        style={
+          {
+            '--engine-ring': running ? `conic-gradient(${gradient})` : 'conic-gradient(#34506a 0% 100%)',
+          } as CSSProperties
+        }
+      >
+        <div>
+          <small>ENGINE</small>
+          <strong>{n(running)}</strong>
+          <span>{compact ? '全链路执行中' : '登记执行中'}</span>
+        </div>
+      </div>
+      {!compact && <p>输入 · 处理 · 输出</p>}
+      <small>{compact ? '环形表示各区构成' : '按记录归组，不是完成百分比'}</small>
+    </div>
+  );
   return (
     <div
       className={`engine-wall ${compact ? 'engine-observatory' : ''}`}
@@ -207,25 +227,33 @@ function Snapshot({
               key={g.id}
               data-active={sectors[i].end > sectors[i].start ? true : undefined}
               d={
-                g.id === 'input'
-                  ? 'M330 105H390L500 230'
-                  : g.id === 'process'
-                    ? 'M500 230L610 105H670'
-                    : 'M500 230L610 355H670'
+                compact
+                  ? g.id === 'input'
+                    ? 'M300 230H355'
+                    : g.id === 'output'
+                      ? 'M645 230H700'
+                      : ''
+                  : g.id === 'input'
+                    ? 'M330 105H390L500 230'
+                    : g.id === 'process'
+                      ? 'M500 230L610 105H670'
+                      : 'M500 230L610 355H670'
               }
               fill="none"
               stroke="currentColor"
               strokeWidth="1.5"
             />
           ))}
-          <path
-            className="engine-evolution-wire"
-            d="M330 355H390L500 230"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeDasharray="3 8"
-          />
+          {!compact && (
+            <path
+              className="engine-evolution-wire"
+              d="M330 355H390L500 230"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeDasharray="3 8"
+            />
+          )}
           {!compact && (
             <circle cx="500" cy="230" r="50" fill="none" stroke="currentColor" strokeDasharray="3 8" />
           )}
@@ -248,16 +276,19 @@ function Snapshot({
                   <small>登记执行中</small>
                 </strong>
               </div>
-              <div className="engine-channels">
-                {list.map((c) => (
-                  <div key={c.code} className="engine-channel">
-                    <span>{names[c.code]}</span>
-                    <i aria-hidden="true">
-                      <b style={{ width: `${count ? (c.running / count) * 100 : 0}%` }} />
-                    </i>
-                    <strong>{n(c.running)}</strong>
-                  </div>
-                ))}
+              <div className={compact && g.id === 'process' ? 'engine-processing-body' : undefined}>
+                {compact && g.id === 'process' && core}
+                <div className="engine-channels">
+                  {list.map((c) => (
+                    <div key={c.code} className="engine-channel">
+                      <span>{names[c.code]}</span>
+                      <i aria-hidden="true">
+                        <b style={{ width: `${count ? (c.running / count) * 100 : 0}%` }} />
+                      </i>
+                      <strong>{n(c.running)}</strong>
+                    </div>
+                  ))}
+                </div>
               </div>
               <p className="engine-bank-state">
                 排队 {n(sum(list, 'queued'))} · 等待 {n(sum(list, 'waiting'))} · 待核对{' '}
@@ -274,24 +305,7 @@ function Snapshot({
             </section>
           );
         })}
-        <div className="engine-core">
-          <div
-            className="engine-orb"
-            style={
-              {
-                '--engine-ring': running ? `conic-gradient(${gradient})` : 'conic-gradient(#34506a 0% 100%)',
-              } as CSSProperties
-            }
-          >
-            <div>
-              <small>ENGINE</small>
-              <strong>{n(running)}</strong>
-              <span>登记执行中</span>
-            </div>
-          </div>
-          <p>输入 · 处理 · 输出</p>
-          <small>按记录归组，不是完成百分比</small>
-        </div>
+        {!compact && core}
         <section className="engine-bank engine-evolution" aria-label="自进化运行状态">
           <div className="engine-bank-heading">
             <div>
@@ -303,9 +317,23 @@ function Snapshot({
             </div>
             <span className="engine-unavailable">未启用</span>
           </div>
-          <p>独立自进化执行器尚未接通。</p>
-          <div className="engine-evolution-flow" aria-hidden="true">
-            <span>发现</span>›<span>候选</span>›<span>验证</span>›<span>采用</span>
+          <div className="engine-evolution-body">
+            <p>独立自进化执行器尚未接通。</p>
+            <div className="engine-evolution-flow" aria-hidden="true">
+              <span>发现</span>›<span>候选</span>›<span>验证</span>›<span>采用</span>
+            </div>
+            {compact && (
+              <dl className="engine-evolution-results">
+                <div>
+                  <dt>验证结果</dt>
+                  <dd>未接入</dd>
+                </div>
+                <div>
+                  <dt>最近采用</dt>
+                  <dd>未接入</dd>
+                </div>
+              </dl>
+            )}
           </div>
           <p className="engine-bank-state">基础经验提炼与清洗计入处理区，不作为自进化执行。</p>
         </section>

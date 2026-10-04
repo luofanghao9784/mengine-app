@@ -629,3 +629,123 @@
     transition: none;
   }
 }
+
+/* The execution pipeline and the independent improvement layer. */
+.admin-platform .engine-observatory .engine-reactor {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: auto auto;
+  gap: 28px 30px;
+}
+.admin-platform .engine-observatory .engine-input {
+  grid-column: 1;
+  grid-row: 1;
+}
+.admin-platform .engine-observatory .engine-process {
+  grid-column: 2;
+  grid-row: 1;
+}
+.admin-platform .engine-observatory .engine-output {
+  grid-column: 3;
+  grid-row: 1;
+}
+.admin-platform .engine-observatory .engine-wires {
+  height: 290px;
+}
+.admin-platform .engine-observatory .engine-bank:not(.engine-evolution) {
+  display: flex;
+  flex-direction: column;
+}
+.admin-platform .engine-observatory .engine-bank:not(.engine-evolution) > .engine-bank-state {
+  margin-top: auto;
+  padding-top: 18px;
+}
+.admin-platform .engine-observatory .engine-processing-body {
+  display: grid;
+  grid-template-columns: 102px minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+}
+.admin-platform .engine-observatory .engine-processing-body .engine-channel {
+  grid-template-columns: minmax(0, 1fr) 24px 18px;
+  gap: 6px;
+}
+.admin-platform .engine-observatory .engine-core {
+  position: static;
+  grid-area: auto;
+  gap: 12px;
+}
+.admin-platform .engine-observatory .engine-orb {
+  width: 92px;
+  height: 92px;
+  box-shadow:
+    0 0 0 5px #72b9f309,
+    0 0 0 10px #72b9f305,
+    0 0 30px #58beff20;
+}
+.admin-platform .engine-observatory .engine-orb strong {
+  font-size: 28px;
+}
+.admin-platform .engine-observatory .engine-orb span {
+  font-size: 10px;
+}
+.admin-platform .engine-observatory .engine-core > small {
+  text-align: center;
+  font-size: 9px;
+}
+.admin-platform .engine-observatory .engine-evolution {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  background: linear-gradient(110deg, #25253c, #191e31 65%);
+  border-color: #b298e530;
+  border-top-color: #ad91dc;
+}
+.admin-platform .engine-observatory .engine-evolution-body {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr 1fr;
+  gap: 30px;
+  align-items: center;
+}
+.admin-platform .engine-observatory .engine-evolution-body > p {
+  margin: 0;
+}
+.admin-platform .engine-observatory .engine-evolution-flow {
+  margin-top: 0;
+  justify-content: center;
+}
+.admin-platform .engine-observatory .engine-evolution-results {
+  display: flex;
+  gap: 30px;
+  margin: 0;
+  padding-left: 24px;
+  border-left: 1px solid #b298e525;
+}
+.admin-platform .engine-observatory .engine-evolution-results dt {
+  color: #b6a5cb;
+  font-size: 11px;
+  margin-bottom: 6px;
+}
+.admin-platform .engine-observatory .engine-evolution-results dd {
+  margin: 0;
+  color: #9d91ac;
+  font-size: 13px;
+}
+.admin-platform .engine-observatory .engine-evolution > .engine-bank-state {
+  margin-bottom: 0;
+}
+
+.admin-platform .engine-observatory .engine-evolution-flow {
+  position: relative;
+  padding-bottom: 18px;
+}
+.admin-platform .engine-observatory .engine-evolution-flow::after {
+  content: '↶ 持续改进 · 流程预留';
+  position: absolute;
+  bottom: -5px;
+  left: 15%;
+  right: 15%;
+  border-top: 1px solid #b298e525;
+  padding-top: 4px;
+  text-align: center;
+  font-size: 10px;
+  color: #9d86c3;
+}
