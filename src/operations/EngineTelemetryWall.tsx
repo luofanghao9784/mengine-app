@@ -131,7 +131,7 @@ function Wall({ scope, tenant }: { scope: 'platform' | 'tenant'; tenant: string 
           {scope === 'tenant' && <p className="muted">本企业的运行记录 · 只读监控</p>}
         </div>
         <div className="engine-refresh">
-          {refreshAction}
+          {scope === 'tenant' && refreshAction}
           {scope === 'platform' && value && <small>快照 {time(value.checkedAt)} · 可见时每 3 秒更新</small>}
         </div>
       </div>

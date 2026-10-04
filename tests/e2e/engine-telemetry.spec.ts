@@ -78,6 +78,7 @@ for (const realm of ['platform', 'tenant'] as const)
     const f = await fixture(context),
       errors: string[] = [];
     page.on('pageerror', (e) => errors.push(e.message));
+    if (realm === 'platform') await page.clock.install();
     await page.goto(
       realm === 'platform' ? '/platform-admin/#admin=engine' : `/tenant-admin/#tenant=${tenant}&admin=engine`,
     );
@@ -86,7 +87,10 @@ for (const realm of ['platform', 'tenant'] as const)
       await expect(wall.getByRole('heading', { name, exact: true })).toBeVisible();
     await expect(wall.getByLabel('自进化运行状态')).toContainText('未启用');
     await expect(wall).toContainText('等待下一次采样');
-    await page.getByRole('button', { name: '刷新', exact: true }).click();
+    if (realm === 'platform') {
+      await expect(page.getByRole('button', { name: '刷新', exact: true })).toHaveCount(0);
+      await page.clock.runFor(3010);
+    } else await page.getByRole('button', { name: '刷新', exact: true }).click();
     await expect(wall.getByRole('img', { name: /已采样 2 次/ })).toBeVisible();
     expect(f.reads()).toBe(2);
     expect(f.mutations).toEqual([]);
@@ -106,7 +110,10 @@ for (const realm of ['platform', 'tenant'] as const)
     expect(storage).not.toContain('completedRecent');
     expect(errors).toEqual([]);
     f.revoke();
-    await page.getByRole('button', { name: '刷新', exact: true }).click();
+    if (realm === 'platform') {
+      await expect(page.getByRole('button', { name: '刷新', exact: true })).toHaveCount(0);
+      await page.clock.runFor(3010);
+    } else await page.getByRole('button', { name: '刷新', exact: true }).click();
     await expect(wall.getByRole('heading', { name: '没有访问权限', exact: true })).toBeVisible();
     await expect(page.locator('.engine-wall')).toHaveCount(0);
   });

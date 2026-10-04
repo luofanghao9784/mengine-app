@@ -1090,3 +1090,17 @@
   color: #91ebf7;
   background: #173247;
 }
+
+.admin-platform.admin-engine-fullscreen .engine-page {
+  padding-top: 18px;
+}
+.admin-platform.admin-engine-fullscreen .engine-heading--embedded {
+  margin-bottom: 6px;
+  padding-bottom: 10px;
+}
+.admin-platform.admin-engine-fullscreen .engine-heading h1 {
+  margin: 0;
+}
+.admin-platform.admin-engine-fullscreen .engine-reactor {
+  padding-top: 12px;
+}
