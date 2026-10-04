@@ -24,6 +24,7 @@ export function useBriefingGeneration(tenant: string, workspace?: string, busine
   );
   const requestRef = useRef(requested);
   requestRef.current = requested;
+  const [ready, setReady] = useState(false);
   const [batches, setBatches] = useState<GenerationBatch[]>([]);
   const [slots, setSlots] = useState<GenerationSlot[]>([]);
   const [error, setError] = useState<unknown>();
@@ -74,6 +75,7 @@ export function useBriefingGeneration(tenant: string, workspace?: string, busine
           return generationOpen(batch) || batch.status === 'SUCCEEDED' ? [{ batch }] : [];
         });
         setBatches(state.batches);
+        setReady(true);
         setError(undefined);
         setSlots((old) =>
           next.map(({ batch }) => ({
@@ -118,9 +120,10 @@ export function useBriefingGeneration(tenant: string, workspace?: string, busine
     (!workspace || b.workspaceId === workspace) &&
     (!businessType || !b.businessType || b.businessType === businessType);
   const visible = batches.filter(matches);
-  const active = visible.find((b) => generationOpen(b) && b.businessType === (businessType || null));
+  const active = batches.find(generationOpen);
   const current = active || visible.find((b) => b.id === requested) || visible[0];
-  const generate = () =>
+  const generate = () => {
+    if (!ready || active || submission.busy || slots.some((slot) => !slot.item)) return;
     void submission.submit({ workspaceId: workspace, businessType }, async (body, requestId) => {
       const batch = await api.generate(tenant, { ...body, requestId });
       requestRef.current = batch.id;
@@ -130,6 +133,7 @@ export function useBriefingGeneration(tenant: string, workspace?: string, busine
       setSlots((old) => [...old.filter((s) => s.batch.id !== batch.id), { batch }]);
       refresh();
     });
+  };
   const cancel = async (id: string) => {
     if (cancelBusy) return;
     setCancelBusy(id);
@@ -154,6 +158,8 @@ export function useBriefingGeneration(tenant: string, workspace?: string, busine
     ),
     current,
     active,
+    pendingSlot: slots.find((slot) => !slot.item),
+    ready,
     submission,
     error,
     generate,

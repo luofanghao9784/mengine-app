@@ -1,8 +1,10 @@
 import type {
   Conversation,
+  ConversationManagementReceipt,
   ConversationTask,
   ConversationPage,
   ConversationDetail,
+  BriefingDiscussion,
   ConversationEvents,
   SendTask,
   TaskArtifact,
@@ -34,7 +36,14 @@ const conversation = (v: unknown): v is Conversation =>
   uuid(v.workspaceId) &&
   text(v.title) &&
   text(v.updatedAt) &&
-  Number.isFinite(Date.parse(v.updatedAt));
+  Number.isFinite(Date.parse(v.updatedAt)) &&
+  (v.managementRevision === undefined || count(v.managementRevision)) &&
+  (v.running === undefined || typeof v.running === 'boolean') &&
+  (v.unread === undefined || typeof v.unread === 'boolean') &&
+  (v.briefingDiscussion === undefined || typeof v.briefingDiscussion === 'boolean') &&
+  (v.replyRevision === undefined || count(v.replyRevision)) &&
+  (v.latestReplyTaskId === undefined || v.latestReplyTaskId === null || uuid(v.latestReplyTaskId)) &&
+  (v.trashedAt === undefined || v.trashedAt === null || (text(v.trashedAt) && Number.isFinite(Date.parse(v.trashedAt))));
 const safePublicLink = (value: unknown) => {
   if (!text(value) || value.length > 2048) return false;
   try {
@@ -112,6 +121,9 @@ const task = (v: unknown): v is ConversationTask =>
   (v.waitReason === undefined || nullable(v.waitReason)) &&
   (v.requiredInput === undefined ||
     (nullable(v.requiredInput) && (v.requiredInput === null || String(v.requiredInput).length <= 1000))) &&
+  (v.supplementalInput === undefined ||
+    v.supplementalInput === null ||
+    (typeof v.supplementalInput === 'string' && v.supplementalInput.length <= 12000)) &&
   (v.reconciliationRequired === undefined || typeof v.reconciliationRequired === 'boolean') &&
   Array.isArray(v.artifacts) &&
   v.artifacts.length <= 8 &&
@@ -139,6 +151,13 @@ const task = (v: unknown): v is ConversationTask =>
 export const isDetail = (v: unknown): v is ConversationDetail =>
   record(v) &&
   conversation(v.conversation) &&
+  (v.briefingContext == null ||
+    (record(v.briefingContext) &&
+      uuid(v.briefingContext.conversationId) &&
+      uuid(v.briefingContext.taskId) &&
+      uuid(v.briefingContext.workspaceId) &&
+      count(v.briefingContext.taskRevision) &&
+      count(v.briefingContext.attempt))) &&
   count(v.cursor) &&
   typeof v.hasMore === 'boolean' &&
   Array.isArray(v.tasks) &&
@@ -165,9 +184,9 @@ export function createConversationClient(fetcher: typeof fetch = fetch) {
       v.conversation.tenantId === tenant &&
       (!conversationId || v.conversation.id === conversationId);
   return {
-    list(tenant: string, offset = 0, signal?: AbortSignal) {
+    list(tenant: string, offset = 0, signal?: AbortSignal, trash = false) {
       return request(
-        root(tenant) + `?offset=${offset}&limit=20`,
+        root(tenant) + `${trash ? '/trash' : ''}?offset=${offset}&limit=20`,
         'GET',
         (v): v is ConversationPage =>
           record(v) &&
@@ -180,6 +199,31 @@ export function createConversationClient(fetcher: typeof fetch = fetch) {
           v.items.every((c) => conversation(c) && c.tenantId === tenant),
         undefined,
         signal,
+      );
+    },
+    manage(tenant: string, conversationId: string, body: {requestId: string; expectedRevision: number; action: 'TRASH' | 'RESTORE'; stopRunning: boolean}) {
+      return request(root(tenant) + `/${id(conversationId)}/management`, 'POST',
+        (v): v is ConversationManagementReceipt => record(v) && v.id === conversationId && count(v.revision) &&
+          (v.trashedAt === null || (text(v.trashedAt) && Number.isFinite(Date.parse(v.trashedAt)))), body);
+    },
+    read(tenant: string, conversationId: string, replyRevision: number, signal?: AbortSignal) {
+      return request(root(tenant) + `/${id(conversationId)}/read`, 'POST',
+        (v): v is {id:string;readReplyRevision:number} => record(v) && v.id === conversationId && count(v.readReplyRevision) && v.readReplyRevision >= replyRevision,
+        {replyRevision}, signal);
+    },
+    discussion(
+      tenant: string,
+      source: { conversationId: string; taskId: string; taskRevision: number; attempt: number },
+    ) {
+      return request(
+        root(tenant) +
+          `/${id(source.conversationId)}/tasks/${id(source.taskId)}/discussion?revision=${source.taskRevision}&attempt=${source.attempt}`,
+        'GET',
+        (v): v is BriefingDiscussion =>
+          record(v) && (v.conversationId === null || uuid(v.conversationId)) && text(v.title) &&
+          record(v.briefingContext) && v.briefingContext.conversationId === source.conversationId &&
+          v.briefingContext.taskId === source.taskId && uuid(v.briefingContext.workspaceId) &&
+          v.briefingContext.taskRevision === source.taskRevision && v.briefingContext.attempt === source.attempt,
       );
     },
     detail(tenant: string, conversation: string, offset = 0, signal?: AbortSignal) {
@@ -216,12 +260,24 @@ export function createConversationClient(fetcher: typeof fetch = fetch) {
       );
     },
     send(tenant: string, conversation: string | undefined, body: SendTask, signal?: AbortSignal) {
+      const reference = body.briefingContext;
+      // Reading state may include card geometry; the API accepts only the versioned reference.
+      const payload = reference ? {
+        ...body,
+        briefingContext: {
+          conversationId: reference.conversationId,
+          taskId: reference.taskId,
+          workspaceId: reference.workspaceId,
+          taskRevision: reference.taskRevision,
+          attempt: reference.attempt,
+        },
+      } : body;
       return request(
         root(tenant) + (conversation ? `/${id(conversation)}/tasks` : ''),
         'POST',
         (v): v is ConversationDetail =>
           scoped(tenant, conversation)(v) && v.conversation.workspaceId === body.workspaceId,
-        body,
+        payload,
         signal,
       );
     },
@@ -229,7 +285,13 @@ export function createConversationClient(fetcher: typeof fetch = fetch) {
       tenant: string,
       conversation: string,
       task: string,
-      body: { requestId: string; expectedRevision: number; action: TaskAction; input?: string },
+      body: {
+        requestId: string;
+        expectedRevision: number;
+        action: TaskAction;
+        input?: string;
+        originals?: { materialId: string; versionId: string }[];
+      },
       signal?: AbortSignal,
     ) {
       return request(
@@ -374,7 +436,7 @@ export function createConversationClient(fetcher: typeof fetch = fetch) {
               e.seq > (i === 0 ? after : (a[i - 1] as { seq: number }).seq) &&
               e.seq <= (v.cursor as number) &&
               uuid(e.taskId) &&
-              states.includes(String(e.kind)) &&
+              (states.includes(String(e.kind)) || e.kind === 'TITLE_UPDATED') &&
               count(e.revision),
           ),
         undefined,

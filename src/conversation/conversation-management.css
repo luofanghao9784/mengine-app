@@ -1,0 +1,121 @@
+.live-conversation-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.live-conversation-group .live-conversation-row > a {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  gap: 6px;
+}
+.live-conversation-group .live-conversation-row > a > .conversation-list-title {
+  flex: 1;
+  min-width: 0;
+}
+.live-conversation-group .live-conversation-row .conversation-briefing-tag {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  color: #3767b6;
+  background: #edf3ff;
+  overflow: visible;
+}
+.live-conversation-group .live-conversation-row .conversation-list-indicators {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 7px;
+  overflow: visible;
+}
+.conversation-running-icon {
+  color: var(--accent);
+  animation: conversation-running 1.3s linear infinite;
+}
+.conversation-unread-dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.conversation-row-delete {
+  flex: none;
+  width: 0;
+  overflow: hidden;
+}
+.conversation-row-delete > button {
+  width: 28px;
+  height: 28px;
+  visibility: hidden;
+}
+.live-conversation-row:is(.is-delete-revealed, :has(:focus-visible)) > .conversation-row-delete {
+  width: 32px;
+}
+.live-conversation-row:is(.is-delete-revealed, :has(:focus-visible)) > .conversation-row-delete > button {
+  visibility: visible;
+}
+@media (hover: hover) and (pointer: fine) {
+  .live-conversation-row:hover > .conversation-row-delete {
+    width: 32px;
+  }
+  .live-conversation-row:hover > .conversation-row-delete > button {
+    visibility: visible;
+  }
+}
+@media (pointer: coarse) {
+  .live-conversation-row > a {
+    -webkit-touch-callout: none;
+    user-select: none;
+    touch-action: pan-y;
+  }
+}
+.conversation-delete-dialog.modal {
+  width: min(420px, calc(100vw - 32px));
+  border-radius: 24px;
+}
+.conversation-delete-dialog p {
+  line-height: 1.7;
+}
+.conversation-delete-title {
+  display: block;
+  margin-top: 12px;
+  overflow-wrap: anywhere;
+}
+.conversation-trash-items {
+  display: grid;
+  gap: 8px;
+}
+.conversation-trash-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+.conversation-trash-item > span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.conversation-trash-item > .access-alert {
+  grid-column: 1/-1;
+}
+@keyframes conversation-running {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .conversation-running-icon {
+    animation: none;
+  }
+}

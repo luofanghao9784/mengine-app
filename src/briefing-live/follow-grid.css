@@ -1,0 +1,122 @@
+.live-follow-tile .live-briefing-controls:empty {
+  display: none;
+}
+.live-follow-tile .live-briefing-body {
+  cursor: grab;
+}
+.live-follow-tile:is(:hover, :focus-within, .is-resizing) > .briefing-resize-handle,
+.live-follow-board.is-editing .briefing-resize-handle {
+  opacity: 1;
+  pointer-events: auto;
+}
+.live-follow-tile.is-moving {
+  outline: 1px dashed #9ab9e4;
+  border-radius: 24px;
+}
+.live-follow-tile.is-moving > * {
+  opacity: 0.25;
+}
+.live-follow-tile:is(.is-moving, .is-resizing) .live-briefing-card {
+  translate: none;
+}
+.live-follow-drag .live-follow-tile {
+  container-type: size;
+}
+.live-follow-drag .live-briefing-card {
+  height: 100%;
+}
+.live-follow-drag .briefing-move-ghost {
+  border-radius: 24px;
+}
+@media (pointer: coarse) {
+  .live-follow-board:not(.is-editing) .briefing-resize-handle:not(:focus-visible) {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .live-follow-board.is-editing .briefing-resize-handle {
+    width: 48px;
+    height: 48px;
+  }
+}
+
+.live-follow-edit-control {
+  position: fixed;
+  right: 28px;
+  top: 16px;
+  z-index: 50;
+  background: var(--canvas, #f7f8fa);
+  border-radius: 12px;
+}
+
+/* The live entry does not load demo styles.css. Keep the grip self-contained. */
+.live-follow-tile > .briefing-resize-handle {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  border-radius: 0 0 24px 0;
+  color: #8798ae;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms ease;
+  clip-path: polygon(100% 0, 100% 100%, 0 100%, 0 66%, 66% 66%, 66% 0);
+  cursor: nwse-resize;
+  touch-action: none;
+  user-select: none;
+  z-index: 4;
+}
+.live-follow-tile > .briefing-resize-handle svg {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  display: block;
+  width: 36px;
+  height: 36px;
+  overflow: visible;
+  stroke: currentColor;
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+.live-follow-tile > .briefing-resize-handle:focus-visible {
+  color: var(--blue-ink);
+  filter: drop-shadow(0 0 3px #65717d80);
+}
+.live-follow-board > .briefing-resize-hint {
+  position: fixed;
+  left: -100px;
+  top: -100px;
+  z-index: 60;
+  padding: 6px 12px;
+  border-radius: 9px;
+  background: #fff;
+  color: var(--blue-ink);
+  box-shadow: 0 3px 16px #1d365125;
+  pointer-events: none;
+}
+.live-follow-tile.is-resizing {
+  z-index: 6;
+}
+.live-follow-tile .live-briefing-card {
+  translate: none !important;
+}
+.live-follow-drag .briefing-move-ghost {
+  position: fixed;
+  z-index: 100;
+  margin: 0;
+  pointer-events: none;
+  box-shadow: 0 16px 40px #294c7b26;
+  transition: none;
+}
+.live-follow-drag .briefing-move-ghost .briefing-resize-handle {
+  display: none;
+}
+@media (pointer: coarse) {
+  .live-follow-board.is-editing .live-follow-tile > .briefing-resize-handle {
+    width: 48px;
+    height: 48px;
+  }
+}

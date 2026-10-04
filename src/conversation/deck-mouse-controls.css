@@ -1,0 +1,274 @@
+.live-mouse-deck .live-deck-scroller {
+  scrollbar-width: none;
+}
+.live-mouse-deck .live-deck-scroller::-webkit-scrollbar {
+  height: 0;
+}
+.live-demo-deck.live-mouse-deck .deck-scroller {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+@media (min-width: 1001px) {
+  .workspace-conversation-page:has(.live-mouse-deck),
+  .workspace-conversation-overlay:has(.live-mouse-deck) {
+    padding-bottom: 0;
+  }
+  /* Move the existing bottom gutter inside the scroll viewport so each card's
+     shadow can fade naturally, without reducing the card's reading height. */
+  .live-demo-deck.live-mouse-deck .deck-scroller {
+    padding-bottom: 26px;
+  }
+  /* Intermediate cards retain a compact contact shadow on the previous card.
+     Only the stack's back/front cards cast the wider surrounding shadows. */
+  .live-mouse-deck .deck-card[data-shadow-muted]:not(.live-reader-fullscreen):not(.deck-drag-ghost) {
+    box-shadow: -3px 0 5px -2px #1e355b24;
+  }
+}
+.live-reading-deck.live-mouse-deck .deck-scroller {
+  padding-top: 44px;
+}
+.live-mouse-deck:has(.deck-fold-bubbles) > .live-deck-toolbar .live-deck-caption {
+  display: none;
+}
+.deck-fold-bubbles {
+  position: absolute;
+  z-index: 96;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+/* Elevate the title's entire stacking context above neighboring bubbles.
+   Raising only the label cannot escape its parent's stacking context. */
+.deck-fold-bubbles:has(.deck-fold-bubble-entry:hover),
+.deck-fold-bubbles:has(.deck-fold-bubble-entry:focus-visible),
+.deck-fold-bubbles:has(.deck-fold-bubble-entry[data-card-hover]) {
+  z-index: 97;
+}
+.deck-fold-bubble-entry {
+  /* Release the animated opacity's backdrop root after entry, so title blur
+     can sample neighboring bubbles rather than an empty isolated layer. */
+  animation: deck-bubble-enter 280ms backwards;
+  position: relative;
+  flex: 0 0 38.4px;
+  width: 38.4px;
+  height: 38.4px;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  pointer-events: auto;
+}
+.deck-fold-bubble,
+.workspace-conversations .live-mouse-deck .live-deck-arrows .icon-button {
+  display: grid;
+  place-items: center;
+  flex: 0 0 38.4px;
+  width: 38.4px;
+  height: 38.4px;
+  padding: 0;
+  border: 1px solid #dce5f2;
+  border-radius: 50%;
+  color: #5e7cac;
+  background: #fff;
+  box-shadow: 0 2px 8px #213d6714;
+}
+/* The circular shoulders flow into a sharp lower tip through Bezier curves.
+   Keep the original button footprint and upright icon independently of its surface. */
+.deck-fold-bubble {
+  position: relative;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  --deck-bubble-fill: #fff;
+}
+.deck-fold-bubble > .deck-fold-bubble-surface {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 38.4px;
+  height: 46.08px;
+  overflow: visible;
+  fill: var(--deck-bubble-fill);
+  stroke: #dce5f2;
+  stroke-width: 1;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 2px 4px #213d6714);
+  pointer-events: none;
+}
+.deck-fold-bubble > svg:not(.deck-fold-bubble-surface) {
+  position: relative;
+}
+.deck-fold-bubble-entry:hover .deck-fold-bubble,
+.deck-fold-bubble-entry:focus-visible .deck-fold-bubble,
+.deck-fold-bubble-entry[data-card-hover] .deck-fold-bubble,
+.workspace-conversations
+  .live-mouse-deck
+  .live-deck-arrows
+  .icon-button:not(:disabled):is(:hover, :focus-visible) {
+  color: #2d67ba;
+  background: #edf3ff;
+}
+.deck-fold-bubble-entry:is(:hover, :focus-visible, [data-card-hover]) .deck-fold-bubble {
+  --deck-bubble-fill: #edf3ff;
+  background: transparent;
+}
+.deck-fold-bubble-label {
+  position: absolute;
+  z-index: 1;
+  left: 38.4px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: none;
+  width: max-content;
+  max-width: calc(var(--fold-title-width) + 6px);
+  pointer-events: none;
+}
+.deck-fold-bubble-entry:hover .deck-fold-bubble-label,
+.deck-fold-bubble-entry:focus-visible .deck-fold-bubble-label,
+.deck-fold-bubble-entry[data-card-hover] .deck-fold-bubble-label {
+  display: block;
+}
+.deck-fold-bubbles[data-title-side='left'] .deck-fold-bubble-label {
+  left: auto;
+  right: 44.4px;
+}
+.live-demo-deck .deck-fold-bubble-label .deck-stack-hint {
+  display: block;
+  position: relative;
+  min-width: 0;
+  width: max-content;
+  max-width: var(--fold-title-width);
+  margin-left: 6px;
+  padding: 2px 8px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+/* Long titles need a full-width blur core. Ellipse masks fade the first and
+   last characters too early, leaving nearby icons visible through the text. */
+.live-demo-deck .deck-fold-bubble-label .deck-stack-hint::before,
+.live-demo-deck .deck-fold-bubble-label .deck-stack-hint::after {
+  background: color-mix(in srgb, var(--canvas) 50%, transparent);
+  mask-image:
+    linear-gradient(to right, #0000, #000 24px, #000 calc(100% - 24px), #0000),
+    linear-gradient(to bottom, #0000, #000 12px, #000 calc(100% - 12px), #0000);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+}
+.live-demo-deck .deck-fold-bubble-label .deck-stack-hint::after {
+  background: color-mix(in srgb, var(--canvas) 70%, transparent);
+  mask-image:
+    linear-gradient(to right, #0000, #000 16px, #000 calc(100% - 16px), #0000),
+    linear-gradient(to bottom, #0000, #000 8px, #000 calc(100% - 8px), #0000);
+}
+.live-demo-deck .deck-fold-bubble-label .deck-stack-hint > span {
+  display: block;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+@media (max-width: 1000px) {
+  .live-demo-deck.live-mouse-deck .deck-scroller {
+    padding-top: 16px;
+    padding-bottom: 20px;
+  }
+  .deck-fold-bubbles {
+    display: none;
+  }
+}
+
+@media (min-width: 1001px) and (hover: hover) {
+  .live-mouse-deck .deck-scroller:not([data-reordering]) .deck-card[data-needs-reveal]:hover::before {
+    opacity: 0.12;
+  }
+}
+
+/* Toolbar controls use the same bubble surface and icon size. */
+.live-mouse-deck .live-deck-arrows .icon-button svg {
+  width: 19.2px;
+  height: 19.2px;
+}
+.deck-fold-bubbles[data-leaving] .deck-fold-bubble-entry {
+  animation: deck-bubble-exit 160ms ease-in both;
+  pointer-events: none;
+}
+.deck-fold-bubbles[data-leaving] .deck-fold-bubble-label {
+  display: none;
+}
+@keyframes deck-bubble-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.78, 0.9);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1.06, 0.97);
+  }
+  82% {
+    transform: translateY(1px) scale(0.99, 1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes deck-bubble-exit {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.86, 0.9);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .deck-fold-bubble-entry,
+  .deck-fold-bubbles[data-leaving] .deck-fold-bubble-entry {
+    animation-duration: 1ms;
+  }
+}
+
+.deck-fold-bubble-entry[data-deck-reorder-id] {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.deck-fold-bubble-entry[data-deck-reorder-id]:active {
+  cursor: grabbing;
+}
+
+.live-mouse-deck:has(.deck-scroller[data-reordering]) .deck-fold-bubble-label {
+  display: none;
+}
+
+/* Keep the source slot stable while its floating bubble follows the card. */
+.deck-fold-bubble-entry[data-bubble-dragging] {
+  visibility: hidden;
+}
+.deck-fold-bubble-entry.deck-bubble-drag-ghost {
+  position: fixed;
+  z-index: 1002;
+  animation: none;
+  pointer-events: none;
+  cursor: grabbing;
+}
+.deck-bubble-drag-ghost .deck-fold-bubble {
+  color: #2d67ba;
+  --deck-bubble-fill: #edf3ff;
+}
+
+@media (min-width: 1001px) {
+  /* Keep list and reader stack side by side; never raise the list over a reader. */
+  .live-mouse-deck .deck-card:not(.deck-list):not(.deck-drag-ghost):not(.live-reader-fullscreen) {
+    translate: calc(var(--deck-elastic-x, 0px) + var(--list-open-shift, 0px)) 0;
+  }
+}
+
+@media (min-width: 1001px) {
+  .live-mouse-deck .deck-card[data-fold-width-clipped]:not(.deck-drag-ghost):not(.live-reader-fullscreen) {
+    clip-path: var(--fold-edge-clip);
+  }
+}

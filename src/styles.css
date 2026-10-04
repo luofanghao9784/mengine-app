@@ -104,6 +104,9 @@
     transform 160ms ease,
     visibility 160ms ease;
 }
+.sidebar .nav-label {
+  left: calc(100% + 4px);
+}
 /* Two masked blur layers dissolve into the page without a capsule edge. */
 .nav-label::before,
 .nav-label::after,

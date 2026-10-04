@@ -1,4 +1,12 @@
-import { Children, isValidElement, useRef, type CSSProperties, type ReactNode, type RefObject } from 'react';
+import {
+  Children,
+  isValidElement,
+  useEffect,
+  useRef,
+  type CSSProperties,
+  type ReactNode,
+  type RefObject,
+} from 'react';
 import { deckLimits } from '../conversationDeck';
 
 // Reorder the keyed elements themselves, so Tab and reading order match the
@@ -57,9 +65,12 @@ export function DeckCard({
   const min = baseMin + widthExtension,
     max = baseMax + widthExtension;
   const initial = defaultWidth ?? fallback;
-  const drag = useRef<{ x: number; width: number } | null>(null);
+  const stopDrag = useRef<(() => void) | null>(null);
+  useEffect(() => () => stopDrag.current?.(), []);
   const value = (width || initial) + widthExtension;
   const resize = (next: number) => onWidth(Math.max(min, Math.min(max, next)) - widthExtension);
+  const latestResize = useRef(resize);
+  latestResize.current = resize;
   const needsReveal = covered || clipped;
   return (
     <section
@@ -102,25 +113,33 @@ export function DeckCard({
         onPointerDown={(event) => {
           if (event.button !== 0) return;
           event.preventDefault();
-          event.currentTarget.setPointerCapture(event.pointerId);
-          drag.current = {
-            x: event.clientX,
-            width: event.currentTarget.parentElement!.getBoundingClientRect().width,
+          stopDrag.current?.();
+          const pointer = event.pointerId;
+          const startX = event.clientX;
+          const startWidth = event.currentTarget.parentElement!.getBoundingClientRect().width;
+          // The handle may become covered/hidden as sticky cards overlap. Keep
+          // document listeners alive until release even if capture is lost.
+          const handle = event.currentTarget;
+          handle.setPointerCapture(pointer);
+          const move = (next: PointerEvent) => {
+            if (next.pointerId === pointer) latestResize.current(startWidth + next.clientX - startX);
           };
-        }}
-        onPointerMove={(event) => {
-          if (drag.current) resize(drag.current.width + event.clientX - drag.current.x);
-        }}
-        onPointerUp={(event) => {
-          drag.current = null;
-          if (event.currentTarget.hasPointerCapture(event.pointerId))
-            event.currentTarget.releasePointerCapture(event.pointerId);
-        }}
-        onPointerCancel={() => {
-          drag.current = null;
-        }}
-        onLostPointerCapture={() => {
-          drag.current = null;
+          const finish = () => {
+            document.removeEventListener('pointermove', move, true);
+            document.removeEventListener('pointerup', end, true);
+            document.removeEventListener('pointercancel', end, true);
+            window.removeEventListener('blur', finish);
+            if (handle.hasPointerCapture(pointer)) handle.releasePointerCapture(pointer);
+            stopDrag.current = null;
+          };
+          const end = (next: PointerEvent) => {
+            if (next.pointerId === pointer) finish();
+          };
+          stopDrag.current = finish;
+          document.addEventListener('pointermove', move, true);
+          document.addEventListener('pointerup', end, true);
+          document.addEventListener('pointercancel', end, true);
+          window.addEventListener('blur', finish);
         }}
         onDoubleClick={() => (onResetWidth ? onResetWidth() : onWidth(initial))}
         onKeyDown={(event) => {

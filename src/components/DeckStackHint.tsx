@@ -33,7 +33,7 @@ export function DeckStackHint({
       setHint({
         title: card.dataset.deckTitle || '',
         left: Math.max(rail.getBoundingClientRect().left, box.left) + 8,
-        top: box.top - 8,
+        top: box.top - (parseFloat(getComputedStyle(rail).getPropertyValue('--deck-hint-gap')) || 8),
       });
     };
     const move = (event: PointerEvent) => {

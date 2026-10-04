@@ -24,6 +24,7 @@ public class BriefingContentService {
     public record Document(UUID artifactId,String sha256,Content content) {}
     private final JdbcTemplate db;private final IdentityAudit audit;private final JsonMapper json=new JsonMapper();
     public BriefingContentService(JdbcTemplate db,IdentityAudit audit){this.db=db;this.audit=audit;}
+    public boolean statusOnly(Request request){return request!=null&&request.title()!=null&&request.title().strip().matches("(?i)^(暂无|没有|无)(新的?|新增)?(内容|画报|卡片|结果)[。.!！]*$|^no new (content|briefing|cards?)[.!]*$");}
     // Audit provenance, not a user-supplied filename, determines whether an artifact is a generated briefing.
     public static final String ELIGIBLE="""
        SELECT a.id,a.sha256,a.content FROM conversation_artifacts a
@@ -37,10 +38,11 @@ public class BriefingContentService {
     }
     public Document create(ConversationService.Job job,Request request){
         if(request==null)throw IdentityException.invalid();
+        if(statusOnly(request))throw new IdentityException(422,"BRIEFING_STATUS_ONLY");
         String type=request.businessType()==null?"DATA":request.businessType();
         if(!Set.of("INFO","DATA","INSIGHT","SUGGESTION","RESULT").contains(type))throw IdentityException.invalid();
         var desired=db.queryForList("SELECT business_type FROM briefing_generation_batches WHERE task_id=? AND business_type IS NOT NULL",String.class,job.id());
-        if(!desired.isEmpty()&&!desired.getFirst().equals(type))throw new IdentityException(422,"BRIEFING_TYPE_MISMATCH");
+        if(!desired.isEmpty()&&!desired.getFirst().equals(type)||desired.isEmpty()&&type.equals("INFO")&&Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM briefing_generation_batches WHERE task_id=?)",Boolean.class,job.id())))throw new IdentityException(422,"BRIEFING_TYPE_MISMATCH");
         text(request.title(),4,80,false);text(request.summary(),12,240,true);
         if(request.analysis()==null||request.analysis().size()<2||request.analysis().size()>4)throw new IdentityException(422,"BRIEFING_ANALYSIS_REQUIRED");
         request.analysis().forEach(s->text(s,12,500,true));

@@ -100,4 +100,31 @@ public class EngineTaskRuntime implements TaskRuntime {
         finally{if(future!=null && !future.isDone())future.cancel(true);}
     }
 
+    public record TitleResult(String contractVersion,UUID conversationId,UUID requestId,String title,String modelName,Long inputTokens,Long outputTokens) {}
+    public TitleResult executeTitle(ConversationTitles.Job job,java.util.function.BooleanSupplier active) {
+        if(token.length()<32)throw new IdentityException(503,"TASK_RUNTIME_UNAVAILABLE");
+        CompletableFuture<HttpResponse<byte[]>> future=null;
+        try {
+            if(!active.getAsBoolean())throw new IdentityException(403,"TASK_SOURCE_UNAVAILABLE");
+            String version=compatible(true).engineVersion();
+            var request=HttpRequest.newBuilder(uri.resolve("/internal/v1/conversation-title")).timeout(Duration.ofSeconds(18))
+                .header("Authorization","Bearer "+token).header("Content-Type","application/json").header("X-Dreamcore-Engine-Version",version)
+                .POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(Map.of("contractVersion","1.0","conversationId",job.conversation(),"requestId",job.request(),"prompt",job.prompt())))).build();
+            if(!active.getAsBoolean())throw new IdentityException(403,"TASK_SOURCE_UNAVAILABLE");
+            future=http.sendAsync(request,info->new BoundedBody());
+            long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(20);
+            while(true){
+                if(!active.getAsBoolean())throw new IdentityException(403,"TASK_SOURCE_UNAVAILABLE");
+                if(System.nanoTime()>deadline)throw new IdentityException(503,"TITLE_TIMEOUT");
+                try{
+                    var response=future.get(300,TimeUnit.MILLISECONDS);
+                    if(response.statusCode()!=200)throw new IdentityException(503,"TITLE_UNAVAILABLE");
+                    return json.readValue(response.body(),TitleResult.class);
+                }catch(TimeoutException waiting){}
+            }
+        }catch(IdentityException error){throw error;}
+        catch(Exception error){if(error instanceof InterruptedException)Thread.currentThread().interrupt();throw new IdentityException(503,"TITLE_UNAVAILABLE");}
+        finally{if(future!=null&&!future.isDone())future.cancel(true);}
+    }
+
 }

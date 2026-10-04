@@ -41,7 +41,7 @@ public class AgentTaskService {
     }
     private String scope(UUID task){return db.queryForObject("SELECT source_scope FROM conversation_tasks WHERE id=?",String.class,task);}
     private List<UUID> grants(ConversationService.Job job){return db.queryForList("SELECT chunk_id FROM conversation_agent_grants WHERE task_id=? AND attempt_id=? ORDER BY chunk_id",UUID.class,job.id(),job.token());}
-    @Transactional public Map<String,Object> check(UUID task,UUID attempt){authorized(task,attempt);String query=db.queryForObject("SELECT public_query FROM conversation_tasks WHERE id=?",String.class,task);var response=new LinkedHashMap<String,Object>(Map.of("allowed",true,"executionClass",settings.mode(),"publicQuery",query==null?"":query,"candidateTrialsAllowed",settings.candidateTrialsEnabled() && query!=null,"contextVersion","1.0","taskWorkVersion","1.0","tableComparisonVersion",tables.available()?"1.0":"","briefingContentVersion","1.0","planManagementVersion","1.0","planAllowed",db.queryForObject("SELECT EXISTS(SELECT 1 FROM ongoing_plan_runs WHERE task_id=?)",Boolean.class,task)));response.put("datasetComparisonVersion","1.0");response.put("datasetContextVersion","1.0");response.put("generalExperienceVersion","1.0");response.put("realtimeVersion","1.0");response.put("briefingGeneration",db.queryForObject("SELECT EXISTS(SELECT 1 FROM briefing_generation_batches WHERE task_id=?)",Boolean.class,task));return response;}
+    @Transactional public Map<String,Object> check(UUID task,UUID attempt){authorized(task,attempt);String query=db.queryForObject("SELECT public_query FROM conversation_tasks WHERE id=?",String.class,task);var response=new LinkedHashMap<String,Object>(Map.of("allowed",true,"executionClass",settings.mode(),"publicQuery",query==null?"":query,"candidateTrialsAllowed",settings.candidateTrialsEnabled() && query!=null,"contextVersion","1.0","taskWorkVersion","1.0","tableComparisonVersion",tables.available()?"1.0":"","briefingContentVersion","1.0","planManagementVersion","1.0","planAllowed",db.queryForObject("SELECT EXISTS(SELECT 1 FROM ongoing_plan_runs WHERE task_id=?)",Boolean.class,task)));response.put("datasetComparisonVersion","1.0");response.put("datasetContextVersion","1.0");response.put("generalExperienceVersion","1.0");response.put("realtimeVersion","1.0");response.put("answerStreamVersion","1.0");response.put("briefingGeneration",db.queryForObject("SELECT EXISTS(SELECT 1 FROM briefing_generation_batches WHERE task_id=?)",Boolean.class,task));return response;}
     public record ExecutionOpen(String contractVersion,List<String> tools) {}
     public record ToolReceipt(Integer sequence,String name,String status) {}
     private static final Set<String> REGISTERED_TOOLS=Set.of("deliver_briefing","compare_table","compare_dataset","search_sources","run_javascript","find_skills","activate_skill","public_search","read_public_page","candidate_tool","list_originals","read_original","process_original","ask_user","task_control","task_context","task_plan","task_preference","manage_plan");
@@ -86,7 +86,10 @@ public class AgentTaskService {
         var known=new HashSet<>(grants(job));var result=new ArrayList<Input>();var included=new ArrayList<KnowledgeService.Chunk>();
         var selected=originals.list(job.actor(),job.tenant(),job.space(),job.id()).stream().map(TaskOriginals.File::versionId).toList();
         String scope=scope(task);
-        var found="WORKSPACE".equals(scope)?knowledge.searchForAttempt(job.actor(),job.tenant(),job.space(),query,3,selected.isEmpty()?null:selected,task,attempt):knowledge.searchClientTask(job.actor(),job.tenant(),job.space(),query,10,("SELECTED".equals(scope) || query.isBlank() && !selected.isEmpty())?selected:null,task,attempt,job.conversation());
+        boolean briefingOverview=query.isBlank()&&!selected.isEmpty()&&Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM briefing_generation_batches WHERE task_id=?)",Boolean.class,task));
+        // Reserve four of the ten grants for targeted evidence after the overview.
+        int limit=briefingOverview?6:10;
+        var found="WORKSPACE".equals(scope)?knowledge.searchForAttempt(job.actor(),job.tenant(),job.space(),query,3,selected.isEmpty()?null:selected,task,attempt):knowledge.searchClientTask(job.actor(),job.tenant(),job.space(),query,limit,("SELECTED".equals(scope) || query.isBlank() && !selected.isEmpty())?selected:null,task,attempt,job.conversation());
         boolean more=found.hasMore();
         for(var chunk:found.items()){
             if(known.size()>=10 && !known.contains(chunk.id())){more=true;continue;}
@@ -123,6 +126,11 @@ public class AgentTaskService {
     @Transactional public Map<String,Object> deliverBriefing(UUID task,UUID attempt,BriefingContentService.Request request){
         var job=authorized(task,attempt);
         if(db.queryForObject("SELECT count(*) FROM conversation_attempts WHERE task_id=? AND attempt_id=? AND allowed_tools @> '[\"deliver_briefing\"]'::jsonb",Integer.class,task,attempt)!=1||db.queryForObject("SELECT count(*) FROM conversation_tool_receipts WHERE task_id=? AND attempt_number=(SELECT attempt FROM conversation_tasks WHERE id=?) AND name='deliver_briefing' AND status='STARTED'",Integer.class,task,task)==0)throw denied();
+        if(briefings.statusOnly(request)&&Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM briefing_generation_batches WHERE task_id=?)",Boolean.class,task))){
+            if(grants(job).isEmpty())throw new IdentityException(422,"BRIEFING_SOURCES_REQUIRED");
+            audit.record(job.actor(),job.tenant(),"TASK_BRIEFING_SKIPPED",job.token(),"SUCCESS");
+            return Map.of("contractVersion","1.0","status","NO_NEW_CONTENT","reason","NO_USEFUL_CONTENT");
+        }
         var doc=briefings.create(job,request);
         if(doc==null){
             audit.record(job.actor(),job.tenant(),"TASK_BRIEFING_DUPLICATE",job.token(),"SUCCESS");
@@ -134,6 +142,35 @@ public class AgentTaskService {
         var detail=conversations.taskDetail(actor,tenant,conversation,task);var value=detail.tasks().getFirst();
         if(value.revision()!=revision||value.attempt()!=attempt||!"SUCCEEDED".equals(value.status())||value.sourcesUnavailable())throw new IdentityException(409,"BRIEFING_VERSION_UNAVAILABLE");
         var doc=briefings.find(task,attempt);if(doc==null)throw new IdentityException(404,"BRIEFING_NOT_FOUND");download(actor,tenant,conversation,task,doc.artifactId());return doc;
+    }
+    public record Discussion(UUID conversationId,String title,ConversationService.BriefingReference briefingContext) {}
+    /** Opening a card discussion is read-only; a user send establishes the thread atomically. */
+    @Transactional public Discussion discussion(UUID actor,UUID tenant,UUID sourceConversation,UUID sourceTask,int revision,int attempt){
+        var doc=briefing(actor,tenant,sourceConversation,sourceTask,revision,attempt);
+        var source=conversations.require(actor,tenant,sourceConversation,false);
+        var existing=db.queryForList("SELECT conversation_id FROM briefing_discussions WHERE owner_id=? AND source_task_id=? AND source_revision=? AND source_attempt=?",UUID.class,actor,sourceTask,revision,attempt);
+        UUID destination=existing.isEmpty()?null:existing.getFirst();
+        if(destination!=null)conversations.require(actor,tenant,destination,false);
+        return new Discussion(destination,doc.content().title(),new ConversationService.BriefingReference(sourceConversation,sourceTask,source.workspaceId(),revision,attempt));
+    }
+    @Transactional public ConversationService.Detail sendDiscussion(UUID actor,UUID tenant,UUID draft,ConversationService.BriefingReference source,UUID space,UUID request,String prompt,String mode,String publicQuery,List<TaskOriginals.Selection> selected,String sourceScope){
+        if(source==null || source.conversationId()==null || source.taskId()==null || source.workspaceId()==null || source.taskRevision()<0 || source.attempt()<0)throw IdentityException.invalid();
+        String key="briefing-discussion:"+tenant+":"+actor+":"+source.taskId()+":"+source.taskRevision()+":"+source.attempt();
+        db.queryForList("SELECT pg_advisory_xact_lock(hashtextextended(?,0))",key);
+        var opened=discussion(actor,tenant,source.conversationId(),source.taskId(),source.taskRevision(),source.attempt());
+        if(!opened.briefingContext().workspaceId().equals(source.workspaceId()) || space!=null && !space.equals(source.workspaceId()))throw IdentityException.invalid();
+        UUID destination=opened.conversationId();
+        if(destination!=null && draft!=null && !destination.equals(draft))throw new IdentityException(409,"CONVERSATION_PURPOSE_MISMATCH");
+        if(destination==null){
+            if(draft!=null){
+                var candidate=conversations.require(actor,tenant,draft,true);
+                if(!candidate.workspaceId().equals(source.workspaceId()) || !Boolean.TRUE.equals(db.queryForObject("SELECT purpose='BUSINESS' AND NOT EXISTS(SELECT 1 FROM conversation_tasks t WHERE t.conversation_id=c.id) FROM conversations c WHERE c.id=?",Boolean.class,draft)))throw new IdentityException(409,"CONVERSATION_PURPOSE_MISMATCH");
+                destination=draft;
+            }else destination=conversations.draft(actor,tenant,source.workspaceId(),UUID.nameUUIDFromBytes(key.getBytes(java.nio.charset.StandardCharsets.UTF_8))).id();
+            db.update("INSERT INTO briefing_discussions VALUES(?,?,?,?,?)",destination,source.taskId(),source.taskRevision(),source.attempt(),actor);
+            db.update("UPDATE conversations SET title=? WHERE id=?",opened.title().substring(0,Math.min(80,opened.title().length())),destination);
+        }
+        return conversations.submitClient(actor,tenant,destination,source.workspaceId(),request,prompt,mode,publicQuery,selected,sourceScope);
     }
     public boolean active(ConversationService.Job job){try{return Boolean.TRUE.equals(transactions.execute(status->{authorized(job.id(),job.token());return true;}));}catch(IdentityException error){return false;}}
     private void incompatible(){throw new IdentityException(502,"TASK_RUNTIME_INCOMPATIBLE");}
@@ -156,7 +193,15 @@ public class AgentTaskService {
         String outcome="1.4".equals(r.contractVersion())?"COMPLETE":r.outcome();
         if(outcome==null || !Set.of("COMPLETE","PARTIAL","WAITING_INPUT","WAITING_CAPABILITY").contains(outcome) || r.requiredInput()!=null && r.requiredInput().length()>1000 || "WAITING_INPUT".equals(outcome) && (r.requiredInput()==null || r.requiredInput().isBlank()))incompatible();
         if("1.4".equals(r.contractVersion()) && (r.outcome()!=null || r.requiredInput()!=null || r.tools().stream().anyMatch(t->t!=null && (!"succeeded".equals(t.status()) || Set.of("ask_user","task_control","task_context","task_plan","task_preference","manage_plan").contains(t.name()==null?"":t.name())))))incompatible();
-        if("COMPLETE".equals(outcome) && r.tools().stream().anyMatch(t->t!=null && !"succeeded".equals(t.status())))incompatible();
+        boolean terminalProof=briefings.find(job.id(),db.queryForObject("SELECT attempt FROM conversation_tasks WHERE id=?",Integer.class,job.id()))!=null || Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM identity_audit WHERE tenant_id=? AND target_id=? AND action IN ('TASK_BRIEFING_DUPLICATE','TASK_BRIEFING_SKIPPED') AND outcome='SUCCESS')",Boolean.class,job.tenant(),job.token()));
+        // Recovery is limited to native generation with a current, platform-verified terminal delivery.
+        boolean recoveredDelivery="1.5".equals(r.contractVersion())
+            && Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM briefing_generation_batches WHERE task_id=?)",Boolean.class,job.id()))
+            && terminalProof && !r.tools().isEmpty() && r.tools().getLast()!=null
+            && "deliver_briefing".equals(r.tools().getLast().name()) && "succeeded".equals(r.tools().getLast().status())
+            && Boolean.TRUE.equals(db.queryForObject("SELECT coalesce((SELECT name='deliver_briefing' AND status='succeeded' FROM conversation_tool_receipts WHERE task_id=? AND attempt_number=(SELECT attempt FROM conversation_tasks WHERE id=?) ORDER BY sequence DESC LIMIT 1),false)",Boolean.class,job.id(),job.id()))
+            && r.tools().stream().allMatch(t->t!=null&&("succeeded".equals(t.status())||"deliver_briefing".equals(t.name())&&"failed".equals(t.status())));
+        if("COMPLETE".equals(outcome) && r.tools().stream().anyMatch(t->t!=null && !"succeeded".equals(t.status()))&&!recoveredDelivery)incompatible();
         if(Set.of("WAITING_INPUT","WAITING_CAPABILITY").contains(outcome) && r.tools().stream().noneMatch(t->t!=null && ("task_control".equals(t.name()) || "WAITING_INPUT".equals(outcome) && "ask_user".equals(t.name()) && Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM conversation_live_questions WHERE task_id=? AND attempt_number=(SELECT attempt FROM conversation_tasks WHERE id=?) AND blocking)",Boolean.class,job.id(),job.id()))) && "succeeded".equals(t.status())))incompatible();
         if("1.5".equals(r.contractVersion())){
             var stored=db.queryForList("SELECT name,status FROM conversation_tool_receipts WHERE task_id=? AND attempt_number=(SELECT attempt FROM conversation_tasks WHERE id=?) ORDER BY sequence",job.id(),job.id());
@@ -175,7 +220,7 @@ public class AgentTaskService {
         if(!r.artifacts().isEmpty() && !code)incompatible();
         if(r.tools().stream().anyMatch(t->"deliver_briefing".equals(t.name())&&"succeeded".equals(t.status()))
             && briefings.find(job.id(),db.queryForObject("SELECT attempt FROM conversation_tasks WHERE id=?",Integer.class,job.id()))==null
-            && !Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM identity_audit WHERE tenant_id=? AND target_id=? AND action='TASK_BRIEFING_DUPLICATE' AND outcome='SUCCESS')",Boolean.class,job.tenant(),job.token())))incompatible();
+            && !Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM identity_audit WHERE tenant_id=? AND target_id=? AND action IN ('TASK_BRIEFING_DUPLICATE','TASK_BRIEFING_SKIPPED') AND outcome='SUCCESS')",Boolean.class,job.tenant(),job.token())))incompatible();
         validateResearch(job,r);
         int total=db.queryForObject("SELECT coalesce(sum(octet_length(content)),0) FROM conversation_artifacts WHERE task_id=? AND attempt_number=(SELECT attempt FROM conversation_tasks WHERE id=?)",Integer.class,job.id(),job.id());
         if(r.artifacts().size()+db.queryForObject("SELECT count(*) FROM conversation_artifacts WHERE task_id=? AND attempt_number=(SELECT attempt FROM conversation_tasks WHERE id=?)",Integer.class,job.id(),job.id())>8)incompatible();

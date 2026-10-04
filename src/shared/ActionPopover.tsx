@@ -7,11 +7,13 @@ export function ActionPopover({
   label,
   children,
   onClose,
+  align = 'end',
 }: {
   anchor: RefObject<HTMLElement | null>;
   label: string;
   children: ReactNode;
   onClose: () => void;
+  align?: 'start' | 'end';
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const close = useRef(onClose);
@@ -24,7 +26,7 @@ export function ActionPopover({
       if (!target) return;
       const width = panel.offsetWidth,
         height = panel.offsetHeight;
-      panel.style.left = `${Math.max(12, Math.min(innerWidth - width - 12, target.right - width))}px`;
+      panel.style.left = `${Math.max(12, Math.min(innerWidth - width - 12, align === 'start' ? target.left : target.right - width))}px`;
       panel.style.top = `${Math.max(
         12,
         Math.min(
@@ -62,7 +64,7 @@ export function ActionPopover({
       window.removeEventListener('resize', place);
       window.removeEventListener('scroll', place, true);
     };
-  }, [anchor]);
+  }, [anchor, align]);
   return (
     <div ref={ref} popover="manual" className="workspace-action-popover" role="dialog" aria-label={label}>
       {children}

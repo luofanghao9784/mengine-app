@@ -88,4 +88,37 @@ class MaterialLifecycleIntegrationTest {
   assertEquals(2,db.queryForObject("SELECT retention_policy_revision FROM content_lifecycle WHERE object_id=?",Integer.class,two.id()));
  }
 
+ @Test void recycleViewsSearchBeforePagingAndNeverLeakAnotherWorkspace(){
+  UUID parent=materials.createFolder(owner,tenant,space,null,"原目录",UUID.randomUUID()).id();
+  var one=upload(space,parent,"月报100%.txt");var two=upload(space,parent,"月报其他.txt");var active=upload(space,null,"月报未删除.txt");
+  act(space,"MATERIAL",one.id(),"TRASH");act(space,"MATERIAL",two.id(),"TRASH");
+  var privateFile=upload(personal,null,"月报私人.txt");act(personal,"MATERIAL",privateFile.id(),"TRASH");
+  var literal=lifecycle.list(owner,tenant,space,0,1,"TRASH","100%");
+  assertEquals(List.of(one.id()),literal.items().stream().map(MaterialLifecycleService.Item::id).toList());assertFalse(literal.hasMore());
+  assertEquals(List.of("共享","原目录"),literal.items().getFirst().path());assertTrue(literal.items().getFirst().parentAvailable());
+  var first=lifecycle.list(owner,tenant,space,0,1,"TRASH","月报");var second=lifecycle.list(owner,tenant,space,1,1,"TRASH","月报");
+  assertTrue(first.hasMore());assertFalse(second.hasMore());assertNotEquals(first.items().getFirst().id(),second.items().getFirst().id());
+  assertFalse(lifecycle.list(owner,tenant,space,0,50,"TRASH","").items().stream().anyMatch(i->i.id().equals(active.id())||i.id().equals(privateFile.id())));
+  purgeGrant();act(space,"MATERIAL",one.id(),"PURGE");
+  assertEquals(List.of(two.id()),lifecycle.list(owner,tenant,space,0,50,"TRASH","").items().stream().map(MaterialLifecycleService.Item::id).toList());
+  assertEquals(List.of(one.id()),lifecycle.list(owner,tenant,space,0,50,"RECORDS","").items().stream().map(MaterialLifecycleService.Item::id).toList());
+  denied(()->lifecycle.list(reader,tenant,space,0,50,"TRASH","") );
+  denied(()->lifecycle.list(admin,tenant,personal,0,50,"RECORDS","") );
+  denied(()->lifecycle.list(owner,tenant,space,0,50,"invented","") );
+  denied(()->lifecycle.list(owner,tenant,space,0,50,"TRASH","x".repeat(181)) );
+  var job=cleanup.claim();for(UUID blob:cleanup.pending(job)){cleanup.remove(blob);cleanup.removed(job,blob);}cleanup.finish(job);
+  assertEquals("PURGED",lifecycle.list(owner,tenant,space,0,50,"RECORDS","").items().getFirst().state());
+ }
+ @Test void parentUnavailableIsExplicitAndExpiredTrashIsNotOfferedForRestore(){
+  UUID parent=materials.createFolder(owner,tenant,personal,null,"父目录",UUID.randomUUID()).id();var child=upload(personal,parent,"子资料.txt");
+  act(personal,"MATERIAL",child.id(),"TRASH");act(personal,"FOLDER",parent,"TRASH");
+  var before=lifecycle.preview(owner,tenant,personal,"MATERIAL",child.id()).item();assertFalse(before.parentAvailable());assertEquals(List.of("私人","父目录"),before.path());
+  var error=assertThrows(IdentityException.class,()->act(personal,"MATERIAL",child.id(),"RESTORE"));assertEquals("LIFECYCLE_PARENT_UNAVAILABLE",error.code);
+  act(personal,"FOLDER",parent,"RESTORE");assertTrue(lifecycle.preview(owner,tenant,personal,"MATERIAL",child.id()).item().parentAvailable());
+  db.update("UPDATE content_lifecycle SET purge_after=now()-interval '1 second' WHERE object_id=?",child.id());
+  assertTrue(lifecycle.list(owner,tenant,personal,0,20,"TRASH","").items().isEmpty());
+  assertEquals(child.id(),lifecycle.list(owner,tenant,personal,0,20,"RECORDS","").items().getFirst().id());
+  denied(()->act(personal,"MATERIAL",child.id(),"RESTORE"));
+ }
+
 }

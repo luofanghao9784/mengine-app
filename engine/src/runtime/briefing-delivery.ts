@@ -41,7 +41,7 @@ export function briefingDeliveryTool(options: {
       if (
         !isRecord(r) ||
         r.contractVersion !== '1.0' ||
-        (!(r.status === 'NO_NEW_CONTENT' && r.reason === 'DUPLICATE_CONTENT') &&
+        (!(r.status === 'NO_NEW_CONTENT' && ['DUPLICATE_CONTENT', 'NO_USEFUL_CONTENT'].includes(String(r.reason))) &&
           (r.status !== 'PREPARED' ||
             typeof r.artifactId !== 'string' ||
             typeof r.title !== 'string' ||
@@ -64,10 +64,17 @@ export function hasPreparedBriefing(
     last?.name === 'deliver_briefing' &&
     isRecord(r) &&
     r.contractVersion === '1.0' &&
-    ((r.status === 'NO_NEW_CONTENT' && r.reason === 'DUPLICATE_CONTENT') ||
+    ((r.status === 'NO_NEW_CONTENT' && ['DUPLICATE_CONTENT', 'NO_USEFUL_CONTENT'].includes(String(r.reason))) ||
       (r.status === 'PREPARED' &&
         typeof r.artifactId === 'string' &&
         /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(r.artifactId) &&
         r.visibility === 'PRIVATE_AFTER_TASK_SUCCEEDS'))
   );
+}
+
+/** Native card delivery can recover earlier rejected delivery arguments; other failed work remains partial. */
+export function hasTerminalBriefing(tools: Parameters<typeof hasPreparedBriefing>[0]): boolean {
+  const last = tools.at(-1);
+  return !!last && hasPreparedBriefing([last]) && tools.slice(0, -1).every((tool) =>
+    tool.status === 'succeeded' || (tool.name === 'deliver_briefing' && tool.status === 'failed'));
 }

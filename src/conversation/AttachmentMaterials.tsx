@@ -1,3 +1,4 @@
+import { ActionPopover } from '../shared/ActionPopover';
 import type { MaterialDetail } from '../../contracts/public-api/material';
 import { useSession } from '../identity/session';
 import { materialClient } from '../material/client';
@@ -25,11 +26,12 @@ export async function uploadAttachment(
   draftRequestId: string,
   requestId: string,
   file: File,
+  workspaceId?: string,
 ) {
   const form = new FormData();
   form.set(
     'metadata',
-    new Blob([JSON.stringify({ conversationId: conversation, draftRequestId, requestId })], {
+    new Blob([JSON.stringify({ conversationId: conversation, draftRequestId, requestId, workspaceId })], {
       type: 'application/json',
     }),
   );
@@ -211,6 +213,7 @@ export function AttachmentMaterials({
   tenant,
   conversation,
   draftRequestId,
+  workspaceId,
   context,
   files,
   setFiles,
@@ -223,15 +226,17 @@ export function AttachmentMaterials({
   tenant: string;
   conversation?: string;
   draftRequestId: string;
+  workspaceId?: string;
   context: TenantContext;
   files: TaskOriginal[];
   setFiles: (files: TaskOriginal[]) => void;
-  onConversation: (id: string) => void;
+  onConversation: (id: string, workspaceId?: string) => void;
   onBusy: (busy: boolean) => void;
   onReady: (id: string, ready: boolean) => void;
   dropped?: { files: File[]; sequence: number };
   verification?: boolean;
 }) {
+  const addAnchor = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null),
     lock = useRef(false),
     currentFiles = useRef(files),
@@ -270,7 +275,8 @@ export function AttachmentMaterials({
       controller.signal,
     )
       .then((r) => {
-        if (!controller.signal.aborted && r.conversation) onConversation(r.conversation.id);
+        if (!controller.signal.aborted && r.conversation)
+          onConversation(r.conversation.id, r.conversation.workspaceId);
       })
       .catch(() => {});
     return () => controller.abort();
@@ -299,11 +305,12 @@ export function AttachmentMaterials({
             draftRequestId,
             item.id,
             item.file,
+            workspaceId,
           );
           const v = receipt.file.acceptedVersion;
           if (!v) throw new Error('本次上传版本回执不完整，请重试核对。');
           currentConversation.current = receipt.conversation.id;
-          onConversation(receipt.conversation.id);
+          onConversation(receipt.conversation.id, receipt.conversation.workspaceId);
           const next = [
             ...currentFiles.current,
             {
@@ -335,11 +342,19 @@ export function AttachmentMaterials({
   }, [dropped?.sequence]);
   return (
     <div className="attachment-materials">
-      <Button icon={Paperclip} variant="ghost" aria-expanded={open} onClick={() => setOpen(!open)}>
-        添加资料
-      </Button>
+      <div ref={addAnchor} className="attachment-add-anchor">
+        <Button
+          icon={Paperclip}
+          variant="ghost"
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          onClick={() => setOpen(!open)}
+        >
+          添加资料
+        </Button>
+      </div>
       {open && (
-        <div className="attachment-add-options">
+        <ActionPopover anchor={addAnchor} label="添加资料" onClose={() => setOpen(false)}>
           <Button
             icon={Upload}
             onClick={() => {
@@ -358,8 +373,7 @@ export function AttachmentMaterials({
           >
             选择已有资料
           </Button>
-          <small>也可拖入文件；上传的资料先保留在此私有会话中。</small>
-        </div>
+        </ActionPopover>
       )}
       <input
         ref={input}

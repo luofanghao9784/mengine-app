@@ -1,4 +1,4 @@
-import { useContext, useState } from 'react';
+import { useContext, useState, type ReactNode } from 'react';
 import type { GovernanceSnapshot } from '../../contracts/public-api/governance';
 import type {
   ProfileEntryInfo,
@@ -67,9 +67,11 @@ export function Profiles({
   const active = choices.find((x) => x.id === selected) || choices[0];
   return (
     <section className="access-panel governance-panel">
-      <h2>{personalOnly ? '我的档案与偏好' : '档案'}</h2>
+      <h2>{personalOnly ? 'AI 偏好与个人档案' : '档案'}</h2>
       <p className="muted">
-        事实、推断、目标和偏好分别保存。档案描述不会授予权限，也不会自行启动任务或持续计划。
+        {personalOnly
+          ? '记录你的工作背景、目标和回答偏好，帮助 AI 理解你的需求。'
+          : '事实、推断、目标和偏好分别保存。档案描述不会授予权限，也不会自行启动任务或持续计划。'}
       </p>
       {!active ? (
         <p>当前职责没有档案维护范围。其他工作仍可在工作空间中继续。</p>
@@ -94,6 +96,7 @@ export function Profiles({
           <ProfileList
             key={`${tenant}:${active.id}`}
             tenant={tenant}
+            compact={personalOnly}
             scope={active.scope}
             subject={active.subject}
           />
@@ -102,7 +105,17 @@ export function Profiles({
     </section>
   );
 }
-function ProfileList({ tenant, scope, subject }: { tenant: string; scope: ProfileScope; subject: string }) {
+function ProfileList({
+  tenant,
+  scope,
+  subject,
+  compact = false,
+}: {
+  tenant: string;
+  scope: ProfileScope;
+  subject: string;
+  compact?: boolean;
+}) {
   const { session } = useSession();
   const pending = useContext(RequestPending);
   const [page, setPage] = useState(0),
@@ -114,6 +127,7 @@ function ProfileList({ tenant, scope, subject }: { tenant: string; scope: Profil
     value?: ProfileValue;
     entry?: ProfileEntryInfo;
   }>();
+  const Detail = compact ? InlineProfileDetail : Modal;
   const data = useRemote(
     (signal) => api.list(tenant, scope, subject, page * 20, signal),
     [tenant, scope, subject, page, attempt, session.identity],
@@ -129,90 +143,101 @@ function ProfileList({ tenant, scope, subject }: { tenant: string; scope: Profil
   if (!data.value) return <Loading />;
   return (
     <MutationGate.Provider value={setBusy}>
-      <div className="governance-toolbar">
-        <Badge>{data.value.canMaintain ? '可以维护' : '只读'}</Badge>
-        <Button onClick={reload} disabled={locked}>
-          刷新档案
-        </Button>
-        {data.value.canMaintain && (
-          <Button disabled={locked} variant="primary" onClick={() => setDialog({ mode: 'create' })}>
-            新增档案记录
-          </Button>
-        )}
-      </div>
-      {notice && (
-        <p role="status" className="access-success">
-          {notice}
-        </p>
-      )}
-      {!data.value.entries.length ? (
-        <p className="muted">此范围尚无档案记录。</p>
-      ) : (
-        <ul className="profile-records">
-          {data.value.entries.map((entry) => {
-            const v = data.value!.items.find((x) => x.id === entry.id);
-            return (
-              <li key={entry.id}>
-                <div className="governance-toolbar">
-                  <strong>{entry.key}</strong>
-                  <Badge>{kindLabels[entry.kind]}</Badge>
-                  {v && <Badge>{statusLabels[v.effectiveStatus]}</Badge>}
-                  <span>版本 {entry.revision}</span>
-                </div>
-                {v ? (
-                  <>
-                    <p className="profile-value">{v.value}</p>
-                    <p className="muted">依据：{v.provenance}</p>
-                    <p className="muted">
-                      {v.expiresAt
-                        ? `有效至 ${new Date(v.expiresAt).toLocaleString('zh-CN')}`
-                        : '未设置到期时间'}{' '}
-                      · 修改于 {new Date(v.changedAt).toLocaleString('zh-CN')}
-                    </p>
-                  </>
-                ) : (
-                  <p className="muted">正文不可用。保留必要版本索引，可查看历史与维护状态。</p>
-                )}
-                <div className="governance-toolbar">
-                  <Button disabled={locked} onClick={() => setDialog({ mode: 'history', entry })}>
-                    查看版本
-                  </Button>
-                  {!v && data.value!.canMaintain && (
-                    <Button disabled={locked} onClick={() => setDialog({ mode: 'edit', entry })}>
-                      填写新版本
-                    </Button>
-                  )}
-                  {v && data.value!.canMaintain && (
-                    <>
-                      <Button disabled={locked} onClick={() => setDialog({ mode: 'edit', value: v })}>
-                        修订
+      {(!compact || !dialog) && (
+        <>
+          <div className="governance-toolbar">
+            {!compact && <Badge>{data.value.canMaintain ? '可以维护' : '只读'}</Badge>}
+            {!compact && (
+              <Button onClick={reload} disabled={locked}>
+                刷新档案
+              </Button>
+            )}
+            {data.value.canMaintain && (
+              <Button disabled={locked} variant="primary" onClick={() => setDialog({ mode: 'create' })}>
+                新增档案记录
+              </Button>
+            )}
+          </div>
+          {notice && (
+            <p role="status" className="access-success">
+              {notice}
+            </p>
+          )}
+          {!data.value.entries.length ? (
+            <p className="muted">此范围尚无档案记录。</p>
+          ) : (
+            <ul className="profile-records">
+              {data.value.entries.map((entry) => {
+                const v = data.value!.items.find((x) => x.id === entry.id);
+                return (
+                  <li key={entry.id}>
+                    <div className="governance-toolbar">
+                      <strong>{entry.key}</strong>
+                      <Badge>{kindLabels[entry.kind]}</Badge>
+                      {!compact && v && <Badge>{statusLabels[v.effectiveStatus]}</Badge>}
+                      {!compact && <span>版本 {entry.revision}</span>}
+                    </div>
+                    {v ? (
+                      <>
+                        <p className="profile-value">{v.value}</p>
+                        <details open={compact ? undefined : true}>
+                          <summary>记录详情</summary>
+                          <p className="muted">依据：{v.provenance}</p>
+                          <p className="muted">
+                            {v.expiresAt
+                              ? `有效至 ${new Date(v.expiresAt).toLocaleString('zh-CN')}`
+                              : '未设置到期时间'}{' '}
+                            · 修改于 {new Date(v.changedAt).toLocaleString('zh-CN')}
+                          </p>
+                        </details>
+                      </>
+                    ) : (
+                      <p className="muted">正文不可用。保留必要版本索引，可查看历史与维护状态。</p>
+                    )}
+                    <div className="governance-toolbar">
+                      <Button disabled={locked} onClick={() => setDialog({ mode: 'history', entry })}>
+                        查看版本
                       </Button>
-                      {v.status !== 'WITHDRAWN' && (
-                        <Button
-                          disabled={locked}
-                          variant="danger"
-                          onClick={() => setDialog({ mode: 'withdraw', value: v })}
-                        >
-                          撤回
+                      {!v && data.value!.canMaintain && (
+                        <Button disabled={locked} onClick={() => setDialog({ mode: 'edit', entry })}>
+                          填写新版本
                         </Button>
                       )}
-                    </>
-                  )}
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+                      {v && data.value!.canMaintain && (
+                        <>
+                          <Button disabled={locked} onClick={() => setDialog({ mode: 'edit', value: v })}>
+                            修订
+                          </Button>
+                          {v.status !== 'WITHDRAWN' && (
+                            <Button
+                              disabled={locked}
+                              variant="danger"
+                              onClick={() => setDialog({ mode: 'withdraw', value: v })}
+                            >
+                              撤回
+                            </Button>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {(!compact || page > 0 || data.value.hasMore) && (
+            <Pager
+              page={page}
+              next={data.value.hasMore}
+              onPage={(v) => {
+                if (!locked) setPage(v);
+              }}
+            />
+          )}
+        </>
       )}
-      <Pager
-        page={page}
-        next={data.value.hasMore}
-        onPage={(v) => {
-          if (!locked) setPage(v);
-        }}
-      />
       {dialog && (
-        <Modal
+        <Detail
           title={
             { create: '新增档案记录', edit: '修订档案', history: '档案版本', withdraw: '撤回档案' }[
               dialog.mode
@@ -244,9 +269,34 @@ function ProfileList({ tenant, scope, subject }: { tenant: string; scope: Profil
               done={() => done(dialog.mode === 'create' ? '档案记录已保存。' : '修订已保存为新版本。')}
             />
           )}
-        </Modal>
+        </Detail>
       )}
     </MutationGate.Provider>
+  );
+}
+function InlineProfileDetail({
+  title,
+  children,
+  onClose,
+}: {
+  title: string;
+  children: ReactNode;
+  onClose: () => void;
+  wide?: boolean;
+}) {
+  const [dirty, setDirty] = useState(false);
+  return (
+    <section className="profile-inline-editor" onChangeCapture={() => setDirty(true)}>
+      <Button
+        onClick={() => {
+          if (!dirty || window.confirm('还有未保存的内容，确定返回吗？')) onClose();
+        }}
+      >
+        返回档案
+      </Button>
+      <h3>{title}</h3>
+      {children}
+    </section>
   );
 }
 function ProfileForm({

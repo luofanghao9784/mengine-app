@@ -1,12 +1,12 @@
+import { feedbackChangedEvent } from './FeedbackMark';
 import { useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import { ThumbsUp, ThumbsDown, MessageSquare, X } from 'lucide-react';
+import { ThumbsUp, ThumbsDown, X } from 'lucide-react';
 import type { FeedbackAssessment, FeedbackTarget } from '../../contracts/public-api/feedback';
 import { NavIconButton, useNavHover, useNavLabelSide } from '../components/NavIconButton';
 import { feedbackClient as api } from '../feedback/client';
-import { FeedbackPanel } from '../feedback/FeedbackPanel';
 import { AdjustmentPanel } from '../feedback-adjustment/AdjustmentPanel';
 import { RequestPending, requestNavigationLocked, useRequestLock } from '../shared/request-guard';
-import { Button, Modal } from '../shared/ui';
+import { Button } from '../shared/ui';
 import { SubmitError, useRemote, useSubmission } from '../shared/admin';
 import { ActionPopover } from '../shared/ActionPopover';
 
@@ -32,7 +32,7 @@ export function FeedbackActions({
     negative = useRef<HTMLDivElement>(null);
   const { expanded, interaction } = useNavHover(rail, JSON.stringify(target));
   const side = useNavLabelSide(rail);
-  const [panel, setPanel] = useState<'reasons' | 'custom' | 'history' | 'adjust' | null>(null);
+  const [panel, setPanel] = useState<'reasons' | 'custom' | 'adjust' | null>(null);
   const [suggestion, setSuggestion] = useState(''),
     [attempt, setAttempt] = useState(0);
   const [notice, setNotice] = useState('');
@@ -65,6 +65,7 @@ export function FeedbackActions({
         label: body.assessment.rating === 'USEFUL' ? '有用' : '没用',
         revision: (body.revision || 0) + 1,
       };
+      window.dispatchEvent(new CustomEvent(feedbackChangedEvent, { detail: { tenant } }));
       setPanel(null);
       setNotice(body.withdraw ? '已撤销反馈' : '已收到反馈');
       refresh();
@@ -83,7 +84,6 @@ export function FeedbackActions({
   const disabled = pending || locked || !lookup.value;
   const close = () => {
     if (!locked && !requestNavigationLocked()) {
-      if (panel === 'history') refresh();
       setPanel(null);
     }
   };
@@ -180,14 +180,6 @@ export function FeedbackActions({
           )}
         </div>
         {children}
-        <NavIconButton
-          label="评价记录与建议"
-          Icon={MessageSquare}
-          expanded={expanded === 'history'}
-          interaction={interaction('history')}
-          disabled={pending}
-          onClick={() => setPanel('history')}
-        />
       </div>
       {notice && (
         <span className="live-feedback-receipt" role="status">
@@ -204,24 +196,6 @@ export function FeedbackActions({
             {submission.uncertain ? '重试本次评价' : '重新读取评价'}
           </Button>
         </div>
-      )}
-      {panel === 'history' && (
-        <Modal title="评价与建议" onClose={close}>
-          <FeedbackPanel
-            tenant={tenant}
-            target={target}
-            label={
-              target.kind === 'PUBLICATION'
-                ? '只评价这份独立企业副本，不涉及发布者的私人会话；你的反馈仅自己可见。'
-                : undefined
-            }
-            onOpenConversation={(id) => {
-              location.hash =
-                '#' +
-                new URLSearchParams({ tenant, view: 'conversations', conversation: id, from: 'briefing' });
-            }}
-          />
-        </Modal>
       )}
       {panel === 'adjust' && (
         <AdjustmentPanel

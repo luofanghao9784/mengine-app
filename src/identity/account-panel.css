@@ -1,0 +1,137 @@
+.account-quick.modal {
+  width: min(340px, calc(100vw - 32px));
+  margin: auto auto 24px 82px;
+}
+.account-identity {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 4px 6px 18px;
+}
+.account-identity p {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 6px 0 0;
+  overflow-wrap: anywhere;
+}
+.account-menu {
+  border-top: 1px solid var(--line);
+  padding: 7px 0;
+}
+.account-menu > button,
+.account-menu > a,
+.account-current,
+.account-company-list > button {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  padding: 12px 10px;
+  border: 0;
+  border-radius: 10px;
+  text-align: left;
+  background: transparent;
+  color: inherit;
+}
+.account-menu span,
+.account-current span,
+.account-company-list span {
+  flex: 1;
+}
+.account-menu small,
+.account-current small,
+.account-company-list small {
+  color: var(--muted);
+}
+.account-menu > button:hover,
+.account-menu > a:hover,
+.account-company-list > button:hover:not(:disabled) {
+  background: var(--soft);
+}
+.account-settings.modal {
+  width: min(880px, calc(100vw - 32px));
+}
+.account-back {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  padding: 4px 0 16px;
+}
+.account-settings-layout {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 24px;
+  min-height: 300px;
+}
+.account-settings-layout > nav {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-right: 1px solid var(--line);
+  padding-right: 16px;
+}
+.account-settings-layout > nav button {
+  text-align: left;
+  padding: 12px;
+  border-radius: 10px;
+}
+.account-settings-layout > nav button[aria-current] {
+  color: var(--blue-ink);
+  background: var(--selected);
+}
+.account-settings-content {
+  min-width: 0;
+}
+.account-settings-content h3 {
+  margin: 0 0 20px;
+}
+.account-settings-content dl {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 18px;
+  margin: 24px 0;
+}
+.account-settings-content dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.account-settings-content dt {
+  color: var(--muted);
+}
+.account-settings-content .access-panel {
+  padding: 0;
+  box-shadow: none;
+  border: 0;
+  background: transparent;
+}
+.account-company-list {
+  margin-bottom: 20px;
+}
+.account-settings-content .profile-records {
+  padding: 0;
+}
+.profile-inline-editor {
+  padding: 16px 0;
+}
+@media (max-width: 600px) {
+  .account-quick.modal {
+    margin: auto auto 18px;
+  }
+  .account-settings-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+  .account-settings-layout > nav {
+    display: grid;
+    grid-template-columns: 1fr 1.5fr 1fr;
+    border: 0;
+    border-bottom: 1px solid var(--line);
+    padding: 0 0 8px;
+  }
+  .account-settings-layout > nav button {
+    padding: 10px 5px;
+    font-size: 12px;
+    text-align: center;
+  }
+}

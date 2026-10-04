@@ -70,3 +70,17 @@ export interface BriefingLayoutReceipt {
   appliedRevision: number;
   currentRevision: number;
 }
+
+/** Date summaries cover all readable cards for the local completion day. */
+export interface BriefingDay {
+  date: string;
+  total: number;
+  items: BriefingCard[];
+}
+export interface BriefingTimelinePage {
+  tenantId: string;
+  zone: string;
+  asOf: string;
+  items: BriefingDay[];
+  hasMore: boolean;
+}

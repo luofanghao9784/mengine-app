@@ -1,28 +1,31 @@
+import { PersonalFollowGrid } from '../briefing-live/PersonalFollowGrid';
+import { FollowInteraction } from '../briefing-live/FollowGrid';
 import { generationTiles } from '../briefing-live/GenerationPanel';
 import type { BriefingGeneration } from '../briefing-live/useBriefingGeneration';
 import { ContinueWithMaterial } from '../conversation/AttachmentMaterials';
 import { AnalysisPanel } from '../material/Knowledge';
 import { briefingTypeLabels } from '../briefing-live/content';
-import { useViewState, pageState } from '../shared/useViewState';
+import { useInfiniteBriefing, BriefingFeedTail } from '../briefing-live/useInfiniteBriefing';
 import { ForwardPublicationButton } from '../forwarding/ForwardPublicationButton';
 import { featureEntries } from '../shared/feature-entries';
 import { useContext, useEffect, useRef, useState } from 'react';
 import { Download, Newspaper, Share2, Star } from 'lucide-react';
 import type { RecommendationItem } from '../../contracts/public-api/recommendation';
-import { Failure, Loading, Pager, SubmitError, useRemote, useSubmission } from '../shared/admin';
+import { Failure, Loading, SubmitError, useRemote, useSubmission } from '../shared/admin';
 import { RequestPending, useRequestLock } from '../shared/request-guard';
 import { Button, Empty } from '../shared/ui';
 import { useSession } from '../identity/session';
 import { materialClient } from '../material/client';
 import { conversationHref } from '../conversation/Conversations';
-import { FeedbackActions } from '../briefing-live/FeedbackActions';
 import { FollowButton } from '../briefing-live/FollowButton';
 import { Modal } from '../shared/ui';
 import { recommendationClient as api } from './client';
 import { MagazineGrid } from '../briefing-live/MagazineGrid';
 import { MagazineBody, RailButton } from '../briefing-live/Magazine';
 import { ReadingDialog } from '../briefing-live/ReadingDialog';
+import { captureCardPresentation, type CardPresentation } from '../briefing-live/card-presentation';
 import './recommendation.css';
+const ignoreArranging = () => {};
 export function Recommendations({
   tenant,
   workspace,
@@ -31,7 +34,9 @@ export function Recommendations({
   focused = false,
   onSettled,
   generation,
+  onArranging,
 }: {
+  onArranging?: (active: boolean) => void;
   generation?: BriefingGeneration;
   tenant: string;
   workspace: string | null;
@@ -42,55 +47,39 @@ export function Recommendations({
 }) {
   const { session } = useSession(),
     pending = useContext(RequestPending);
-  const [page, setPage] = useViewState(
-      tenant,
-      'recommendation:page:' +
-        workspace +
-        ':' +
-        (businessType || 'ALL') +
-        ':' +
-        focused +
-        ':' +
+  const [attempt, setAttempt] = useState(0);
+  const data = useInfiniteBriefing<import('../../contracts/public-api/recommendation').RecommendationPage>(
+    (offset, previous, signal) =>
+      api.list(tenant, workspace, offset, previous?.snapshot, signal, {
+        businessType,
         publicationsOnly,
-      0,
-      pageState,
-    ),
-    [attempt, setAttempt] = useState(0),
-    [snapshot, setSnapshot] = useViewState<string | undefined>(
-      tenant,
-      'recommendation:snapshot:' +
-        workspace +
-        ':' +
-        (businessType || 'ALL') +
-        ':' +
-        focused +
-        ':' +
-        publicationsOnly,
-      undefined,
-      (v): v is string | undefined => v === undefined || (typeof v === 'string' && v.length < 1000),
-    );
-  const data = useRemote(
-    (signal) =>
-      api
-        .list(tenant, workspace, page * 20, page ? snapshot : undefined, signal, {
-          businessType,
-          publicationsOnly,
-          focused,
-        })
-        .then(
-          (result) => {
-            if (!signal.aborted) onSettled?.(true);
-            return result;
-          },
-          (error) => {
-            if (!signal.aborted) onSettled?.(false);
-            throw error;
-          },
-        ),
-    [tenant, workspace, businessType, publicationsOnly, focused, page, attempt, session.identity],
+        focused,
+      }),
+    [tenant, workspace, businessType, publicationsOnly, focused, attempt, session.identity],
+    (item) => item.content.id,
+  );
+  // Notify the page after the cards have committed, so arrival/refresh animation
+  // cannot finish on the loading placeholder before asynchronous data arrives.
+  const settled = useRef(onSettled);
+  settled.current = onSettled;
+  useEffect(() => {
+    if (data.value || data.error) settled.current?.(!data.error);
+  }, [data.value, data.error]);
+  // Background ranking changes update content/authority, but keep the reading
+  // order until the user explicitly refreshes or changes the filter/page.
+  const readingOrder = useRef<{ key: string; ids: string[] }>({ key: '', ids: [] });
+  const orderKey = JSON.stringify([tenant, workspace, businessType, publicationsOnly, focused, attempt]);
+  if (readingOrder.current.key !== orderKey) readingOrder.current = { key: orderKey, ids: [] };
+  const incoming = data.value?.items || [];
+  const present = new Set(incoming.map((item) => item.content.id));
+  readingOrder.current.ids = readingOrder.current.ids.filter((id) => present.has(id));
+  for (const item of incoming)
+    if (!readingOrder.current.ids.includes(item.content.id)) readingOrder.current.ids.push(item.content.id);
+  const ordered = [...incoming].sort(
+    (a, b) => readingOrder.current.ids.indexOf(a.content.id) - readingOrder.current.ids.indexOf(b.content.id),
   );
   const reserved = new Set(generation?.slots.flatMap((slot) => slot.batch.cardIds) || []);
-  const visibleItems = (data.value?.items || []).filter((item) => !reserved.has(item.content.id));
+  const visibleItems = ordered.filter((item) => !reserved.has(item.content.id));
   const tiles = [
     ...visibleItems.map((item) => ({
       id: item.content.id + ':' + item.content.versionKey,
@@ -99,15 +88,17 @@ export function Recommendations({
       chart: !!item.briefing?.content.chart,
       render: <RecommendationCard tenant={tenant} item={item} />,
     })),
-    ...(generation ? generationTiles(generation, (item) => <RecommendationCard tenant={tenant} item={item} />) : []),
+    ...(generation
+      ? generationTiles(generation, (item) => <RecommendationCard tenant={tenant} item={item} />)
+      : []),
   ];
   const submission = useSubmission<{ expectedRevision: number; enabled: boolean }>();
   useRequestLock(submission.busy || submission.uncertain);
   const refresh = () => {
-    setPage(0);
-    setSnapshot(undefined);
     setAttempt((n) => n + 1);
   };
+  if (focused && data.value && !data.error && !visibleItems.length && !data.value.hasMore && !generation)
+    return null;
   return (
     <section className="recommendations" aria-label={focused ? '关注的企业成果' : '工作推荐'}>
       <SubmitError error={submission.error} uncertain={submission.uncertain} />
@@ -140,41 +131,58 @@ export function Recommendations({
               项获权成果排序，另有更早成果。可按空间缩小范围，或在会话、资料库查找。
             </p>
           )}
-          {!visibleItems.length && !generation && (
+          {!focused && !visibleItems.length && !generation && (
             <Empty
               icon={Newspaper}
               title="画报正在等待可用资料"
-              text="资料就绪后系统会自动准备画报。也可以在下方生成更多。"
+              text={
+                generation
+                  ? '资料就绪后系统会自动准备画报。也可以在下方生成更多。'
+                  : '资料就绪后系统会自动准备画报。也可以前往推荐栏生成更多。'
+              }
             >
               <a className="button" href={conversationHref(tenant)}>
                 发起会话
               </a>
             </Empty>
           )}
-          <MagazineGrid items={tiles} />
-          {(page > 0 || data.value.hasMore) && (
-            <Pager
-              page={page}
-              next={data.value.hasMore}
-              onPage={(next) => {
-                if (pending) return;
-                setSnapshot(data.value!.snapshot);
-                setPage(next);
-              }}
+          {focused ? (
+            <PersonalFollowGrid
+              tenant={tenant}
+              board="PUBLICATIONS"
+              items={tiles}
+              onArranging={onArranging || ignoreArranging}
             />
+          ) : (
+            <MagazineGrid items={tiles} />
           )}
+          <BriefingFeedTail feed={data} blocked={pending} />
         </>
       )}
-      {generation && (!data.value || !data.value.settings.enabled || !!data.error) && (
+      {generation && ((data.value && !data.value.settings.enabled) || !!data.error) && (
         <GeneratedBriefings tenant={tenant} generation={generation} />
       )}
     </section>
   );
 }
-export function GeneratedBriefings({ tenant, generation }: { tenant: string; generation: BriefingGeneration }) {
-  return <MagazineGrid items={generationTiles(generation, (item) => <RecommendationCard tenant={tenant} item={item} />)} />;
+export function GeneratedBriefings({
+  tenant,
+  generation,
+}: {
+  tenant: string;
+  generation: BriefingGeneration;
+}) {
+  return (
+    <MagazineGrid
+      items={generationTiles(generation, (item) => (
+        <RecommendationCard tenant={tenant} item={item} />
+      ))}
+    />
+  );
 }
 function RecommendationCard({ tenant, item }: { tenant: string; item: RecommendationItem }) {
+  const [presentation, setPresentation] = useState<CardPresentation>();
+  const follow = useContext(FollowInteraction);
   const c = item.content,
     pending = useContext(RequestPending),
     { expire } = useSession();
@@ -292,7 +300,15 @@ function RecommendationCard({ tenant, item }: { tenant: string; item: Recommenda
           type="button"
           className="live-briefing-body"
           disabled={pending || busy}
-          onClick={() => void open()}
+          onPointerDown={follow?.onPointerDown}
+          onKeyDown={follow?.onKeyDown}
+          aria-keyshortcuts={follow ? 'Alt+Enter' : undefined}
+          onClick={(event) => {
+            if (!follow?.editing) {
+              setPresentation(captureCardPresentation(event.currentTarget));
+              void open();
+            }
+          }}
           aria-label={'阅读：' + c.title}
         >
           <MagazineBody
@@ -304,17 +320,11 @@ function RecommendationCard({ tenant, item }: { tenant: string; item: Recommenda
             date={c.createdAt}
             publication={c.kind === 'PUBLICATION'}
             pinned={pinned}
+            feedback={item.feedbackTarget ? { tenant, target: item.feedbackTarget } : undefined}
             verification={c.executionClass === 'verification'}
             footer={c.kind === 'PUBLICATION' ? <span>v{c.materialVersion}</span> : undefined}
           />
         </button>
-        {!reading && item.feedbackTarget && (
-          <div className="live-card-action-rail">
-            <FeedbackActions tenant={tenant} target={item.feedbackTarget}>
-              {actions}
-            </FeedbackActions>
-          </div>
-        )}
         {!reading && <SubmitError error={error} uncertain={false} />}
       </article>
       {reading && (
@@ -332,6 +342,7 @@ function RecommendationCard({ tenant, item }: { tenant: string; item: Recommenda
                   taskRevision: c.taskRevision!,
                   attempt: c.attempt!,
                   workspaceId: c.workspaceId,
+                  presentation,
                 }
               : undefined
           }

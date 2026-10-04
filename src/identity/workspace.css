@@ -80,6 +80,8 @@
   position: relative;
 }
 .workspace-briefing .access-content {
+  /* Keep grid width stable when square cards cross the vertical overflow threshold. */
+  overflow-y: scroll;
   padding-bottom: 230px;
 }
 /* Same dimensions, border and send control as the reference Demo draft composer. */
@@ -122,19 +124,39 @@
   background: transparent;
   outline: none !important;
   resize: none;
-  min-height: 68px;
+  min-height: 0;
   max-height: 160px;
   padding: 18px 18px 4px;
   font-size: var(--font-body, 14px);
   line-height: 1.7;
+  transition:
+    height 180ms cubic-bezier(0.2, 0, 0, 1),
+    padding 180ms cubic-bezier(0.2, 0, 0, 1);
 }
 .workspace-composer:not(.is-expanded) .live-composer-input textarea {
-  min-height: 54px;
-  height: 54px !important;
+  height: 54px;
   padding: 14px 58px 14px 18px;
 }
-.workspace-composer:not(.is-expanded) :is(.live-composer-tools, .live-web-options) {
-  display: none;
+.workspace-composer .live-composer-controls {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  visibility: visible;
+  transition:
+    grid-template-rows 180ms cubic-bezier(0.2, 0, 0, 1),
+    opacity 180ms ease,
+    visibility 0s;
+}
+.workspace-composer .live-composer-controls-content {
+  display: block;
+  min-height: 0;
+  overflow: hidden;
+}
+.workspace-composer:not(.is-expanded) .live-composer-controls {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  visibility: hidden;
+  transition-delay: 0s, 0s, 180ms;
 }
 .workspace-composer .live-composer-tools {
   min-height: 44px;
@@ -182,12 +204,11 @@
   box-shadow: 0 4px 20px #21344912;
 }
 .workspace-conversations {
-  --canvas: #fff;
-  background: #fff;
+  background: var(--canvas);
 }
 .workspace-conversations .access-main .topbar {
   --topbar-row-height: 64px;
-  background: #fff;
+  background: var(--canvas);
 }
 .workspace-conversations .access-content {
   display: flex;
@@ -298,6 +319,16 @@
   height: 80px;
   padding: 0 24px 0 16px;
 }
+.workspace-conversation-page .live-deck-toolbar {
+  padding-left: 0;
+}
+@media (min-width: 1001px) {
+  .workspace-conversation-page .live-deck-scroller {
+    /* Let the rail's shadow gutter extend under navigation so the first card
+       aligns with the briefing grid, while preserving sticky deck geometry. */
+    margin-left: calc(-1 * var(--deck-padding, 16px));
+  }
+}
 .workspace-conversations .live-deck-caption {
   margin: 0;
   font-size: 16px;
@@ -309,8 +340,8 @@
   height: 32px;
   background: #ffffffbd;
 }
-.workspace-conversations .live-deck-arrows .icon-button:last-child {
-  margin-left: 8px;
+.workspace-conversations .live-deck-arrows {
+  gap: 8px;
 }
 @media (max-width: 800px) {
   .workspace-conversation-page,
@@ -339,7 +370,9 @@
     border-radius 180ms ease;
 }
 @media (prefers-reduced-motion: reduce) {
-  .workspace-composer {
+  .workspace-composer,
+  .workspace-composer .live-composer-input textarea,
+  .workspace-composer .live-composer-controls {
     transition: none;
   }
 }
@@ -392,6 +425,20 @@
 .workspace-nav-items {
   display: contents;
 }
+.workspace-nav-items .nav-link {
+  translate: 0 0;
+  transition:
+    background 160ms ease,
+    color 160ms ease,
+    translate 180ms ease,
+    box-shadow 180ms ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .workspace-nav-items .nav-link:hover {
+    translate: 0 -2px;
+    box-shadow: 0 8px 18px -5px #294c7b29, 0 3px 8px -3px #294c7b1a;
+  }
+}
 .workspace-nav-items .nav-label::before {
   background: color-mix(in srgb, var(--canvas) 20%, transparent);
 }
@@ -402,5 +449,17 @@
   .workspace-nav-items .nav-link,
   .workspace-nav-items .nav-label {
     transition: none;
+  }
+  .workspace-nav-items .nav-link:hover {
+    translate: 0 0;
+  }
+}
+
+/* Let briefing shadows paint into the rail gutter without moving the cards.
+   The sidebar remains above the scroll surface for its buttons and labels. */
+@media (min-width: 801px) {
+  .workspace-shell.workspace-briefing .access-content {
+    margin-left: -28px;
+    padding-left: 28px;
   }
 }

@@ -19,6 +19,12 @@ public class BriefingController {
     @GetMapping public BriefingService.Page list(Authentication auth,@PathVariable UUID tenant,@RequestParam(required=false) UUID workspaceId,@RequestParam(defaultValue="LATEST") String view,@RequestParam(required=false) String date,@RequestParam(defaultValue="Asia/Shanghai") String zone,@RequestParam(defaultValue="0") int offset,@RequestParam(defaultValue="20") int limit,@RequestParam(defaultValue="false") boolean generatedOnly,@RequestParam(required=false) String businessType,@RequestParam(required=false) java.time.Instant asOf) {
         return service.list(UUID.fromString(auth.getName()),tenant,workspaceId,view,date,zone,offset,limit,generatedOnly,businessType,asOf);
     }
+    @GetMapping("/timeline") public BriefingService.Timeline timeline(Authentication auth,@PathVariable UUID tenant,@RequestParam(defaultValue="Asia/Shanghai") String zone,@RequestParam(defaultValue="0") int offset,@RequestParam(defaultValue="20") int limit,@RequestParam(required=false) java.time.Instant asOf){
+        return service.timeline(UUID.fromString(auth.getName()),tenant,zone,offset,limit,asOf);
+    }
+    @GetMapping("/timeline/{date}") public BriefingService.Page timelineDay(Authentication auth,@PathVariable UUID tenant,@PathVariable String date,@RequestParam(defaultValue="Asia/Shanghai") String zone,@RequestParam(defaultValue="0") int offset,@RequestParam(defaultValue="20") int limit,@RequestParam(required=false) java.time.Instant asOf){
+        return service.timelineDay(UUID.fromString(auth.getName()),tenant,date,zone,offset,limit,asOf);
+    }
     @PostMapping("/{conversation}") public BriefingService.Preference update(Authentication auth,@PathVariable UUID tenant,@PathVariable UUID conversation,@Valid @RequestBody Update body) {
         return service.update(UUID.fromString(auth.getName()),tenant,conversation,body.requestId(),body.expectedRevision(),body.pinned(),body.hidden(),body.size());
     }

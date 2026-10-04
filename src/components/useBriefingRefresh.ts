@@ -5,6 +5,7 @@ type Phase = 'idle' | 'pulling' | 'ready' | 'refreshing' | 'done';
 type Options = {
   page: RefObject<HTMLElement | null>;
   ready: boolean;
+  label?: string;
   blocked: boolean;
   viewKey: string;
   onRefresh?: () => void;
@@ -70,7 +71,9 @@ function useBriefingArrival(page: RefObject<HTMLElement | null>, ready: boolean)
     // Settle before a mouse reaches a small control, so canceling on press
     // cannot move that button out from under the subsequent pointerup.
     const hover = (event: PointerEvent) => {
-      if (event.pointerType !== 'touch') cancel();
+      // Async live cards can appear underneath a stationary pointer. That is
+      // not an interaction and must not cancel every card's staggered entrance.
+      if (event.pointerType !== 'touch' && !root?.classList.contains('live-briefing')) cancel();
     };
     root?.addEventListener('pointerover', hover);
     root?.addEventListener('pointerdown', cancel, true);
@@ -112,7 +115,9 @@ export function useBriefingRefresh(options: Options) {
     arrival.cancel();
     const token = ++generation.current;
     change('refreshing', 54);
-    setAnnouncement(latest.current.reload ? '正在刷新智能画报' : '正在演示刷新智能画报');
+    setAnnouncement(
+      latest.current.reload ? `正在刷新${latest.current.label || '智能画报'}` : '正在演示刷新智能画报',
+    );
     const scroller = latest.current.page.current?.closest('main');
     scroller?.scrollTo({ top: 0, behavior: 'instant' });
     const finish = (success = true) => {
@@ -123,7 +128,11 @@ export function useBriefingRefresh(options: Options) {
         return;
       }
       change('done', 54);
-      setAnnouncement(latest.current.reload ? '画报已刷新' : '已刷新画报排列，内容与历史记录已保留');
+      setAnnouncement(
+        latest.current.reload
+          ? `${latest.current.label || '画报'}已刷新`
+          : '已刷新画报排列，内容与历史记录已保留',
+      );
       timers.current.push(
         setTimeout(() => {
           if (generation.current !== token) return;

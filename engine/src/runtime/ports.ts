@@ -15,6 +15,8 @@ export interface ModelPort {
   generate(request: {
     messages: { role: 'system' | 'user' | 'assistant'; content: ModelBlock[] }[];
     tools: { name: string; description: string; parameters: Record<string, unknown> }[];
+    /** Trusted workflow selection, only after a verified prerequisite receipt. */
+    requiredTool?: string;
     signal: AbortSignal;
     maxTokens: number;
   }): AsyncIterable<ModelPart>;

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { setTimeout as delay } from 'node:timers/promises';
 import { runHarness } from '../dist/runtime/harness.js';
 import { createTaskTools } from '../dist/runtime/task-tools.js';
+import { RuntimeError } from '../dist/runtime/ports.js';
 
 // Scripted transport fixture only. It never ships in the engine HTTP entrypoint.
 const reply = (text) => [
@@ -30,6 +31,46 @@ const noSandbox = {
 };
 const files = (text) => [{ handle: 'current.txt', bytes: Buffer.from(text) }];
 const tools = (text) => createTaskTools({ files: files(text), allowJavaScript: false, sandbox: noSandbox });
+
+test('tool diagnostics cover invalid arguments and execution failures without private payloads', async () => {
+  for (const scenario of ['schema', 'runtime', 'unexpected']) {
+    const diagnostics = [];
+    const result = await runHarness({
+      prompt: 'synthetic',
+      onToolFailure: (failure) => diagnostics.push(failure),
+      tools: [
+        {
+          name: 'search_sources',
+          description: 'synthetic',
+          parameters: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] },
+          async execute() {
+            if (scenario === 'runtime') throw new RuntimeError('INVALID_QUERY');
+            throw new Error('private-key and raw document contents');
+          },
+        },
+      ],
+      model: fixture([
+        call('search_sources', scenario === 'schema' ? {} : { query: 'private source text' }),
+        reply('Unable to retrieve supporting data.'),
+      ]),
+    });
+    assert.equal(result.tools[0].status, 'failed');
+    assert.deepEqual(diagnostics, [
+      {
+        tool: 'search_sources',
+        callId: 'call-1',
+        executionStarted: scenario !== 'schema',
+        code:
+          scenario === 'schema'
+            ? 'INVALID_TOOL_ARGUMENTS'
+            : scenario === 'runtime'
+              ? 'INVALID_QUERY'
+              : 'TOOL_FAILED',
+      },
+    ]);
+    assert.doesNotMatch(JSON.stringify(diagnostics), /private/);
+  }
+});
 
 test('no model is configured by default; aborted requests do not call an adapter', async () => {
   await assert.rejects(runHarness({ prompt: 'test', tools: [] }), { code: 'MODEL_NOT_CONFIGURED' });
@@ -206,6 +247,87 @@ test('reserved final response uses the existing budget and cannot execute anothe
   }
 });
 
+test('ordinary final response preserves projected evidence and recovers once inside eight calls', async () => {
+  let executions = 0, consumedRejectedFinish = false;
+  const steps = Array.from({ length: 6 }, (_, i) => call('search_sources', {}, `search-${i}`));
+  const inspectFinal = (request) => {
+    assert.deepEqual(request.tools, []);
+    assert.ok(request.messages.flatMap(m => m.content).every(b => b.type === 'text'));
+    const text = JSON.stringify(request.messages);
+    assert.match(text, /Which store is most profitable/);
+    assert.match(text, /receipt-citation-42/);
+    assert.match(text, /Receipts only; costs missing/);
+    assert.doesNotMatch(text, /PRIVATE_UNPROJECTED/);
+    assert.doesNotMatch(text, /Let me search again/);
+  };
+  steps.push(request => {
+    inspectFinal(request);
+    return (async function* () {
+      yield { type: 'text', text: 'Let me search again' };
+      yield call('search_sources', {}, 'forbidden-final')[0];
+      consumedRejectedFinish = true;
+      yield { type: 'finish', reason: 'tool_calls' };
+    })();
+  });
+  steps.push(request => {
+    assert.equal(consumedRejectedFinish, true);
+    inspectFinal(request);
+    return reply('Receipts are supported [receipt-citation-42], but costs are missing: profit cannot be ranked.');
+  });
+  const result = await runHarness({
+    prompt: 'Which store is most profitable?', reserveFinalResponse: true,
+    limits: { modelCalls: 8, toolCalls: 8, timeoutMs: 55000 },
+    tools: [{ name: 'search_sources', description: 'synthetic', parameters: { type: 'object' },
+      async execute() { executions++; return { evidence: 'Receipts only; costs missing', citation: 'receipt-citation-42', private: 'PRIVATE_UNPROJECTED' }; },
+      modelOutput(value) { return { evidence: value.evidence, citation: value.citation }; },
+    }], model: fixture(steps),
+  });
+  assert.equal(result.status, 'completed');
+  assert.equal(result.modelCalls, 8);
+  assert.equal(executions, 6);
+  assert.equal(result.finalResponseReserved, true);
+  assert.match(result.text, /profit cannot be ranked/);
+  assert.doesNotMatch(result.text, /Let me/);
+});
+
+test('ordinary final correction cannot loop or execute a forbidden tool', async () => {
+  let executions = 0;
+  const result = await runHarness({
+    prompt: 'Report evidence.', reserveFinalResponse: true,
+    limits: { modelCalls: 3, toolCalls: 4 },
+    tools: [{ name: 'search_sources', description: 'synthetic', parameters: { type: 'object' },
+      async execute() { executions++; return { evidence: 'No costs' }; } }],
+    model: fixture([call('search_sources', {}), call('search_sources', {}, 'blocked-1'), call('search_sources', {}, 'blocked-2')]),
+  });
+  assert.equal(result.status, 'limit');
+  assert.equal(result.code, 'MODEL_CALL_LIMIT');
+  assert.equal(result.modelCalls, 3);
+  assert.equal(executions, 1);
+  assert.equal(result.text, '');
+});
+
+test('final correction obeys cancellation and never publishes a rejected prefix', async () => {
+  const controller = new AbortController();
+  let calls = 0, executions = 0;
+  const result = await runHarness({
+    prompt: 'Answer with existing evidence.', reserveFinalResponse: true, signal: controller.signal,
+    limits: { modelCalls: 3, toolCalls: 4 },
+    tools: [{ name: 'search_sources', description: 'synthetic', parameters: { type: 'object' },
+      async execute() { executions++; return { evidence: 'Costs unavailable' }; } }],
+    model: { async *generate(request) {
+      calls++;
+      if (calls === 1) yield* call('search_sources', {});
+      else if (calls === 2) { yield { type: 'text', text: 'Let me retrieve more' }; yield* call('search_sources', {}, 'forbidden'); }
+      else { assert.deepEqual(request.tools, []); controller.abort(); request.signal.throwIfAborted(); }
+    } },
+  });
+  assert.equal(result.status, 'cancelled');
+  assert.equal(result.code, 'CANCELLED');
+  assert.equal(result.modelCalls, 3);
+  assert.equal(executions, 1);
+  assert.equal(result.text, '');
+});
+
 test('slow evidence retrieval reserves wall time for a final reply even with calls remaining', async () => {
   let calls = 0;
   const result = await runHarness({
@@ -234,7 +356,7 @@ test('slow evidence retrieval reserves wall time for a final reply even with cal
           assert.ok(
             request.messages
               .flatMap((m) => m.content)
-              .some((b) => b.type === 'tool_result' && b.content.includes('42 yuan')),
+              .some((b) => b.type === 'text' && b.text.includes('42 yuan')),
           );
           await delay(100);
           yield* reply('42 yuan for the matched partial period; chart generation remains unavailable.');

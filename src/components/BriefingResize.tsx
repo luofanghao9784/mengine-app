@@ -15,7 +15,10 @@ type Rect = { x: number; y: number; width: number; height: number };
 
 // Capture the currently painted rectangles, including unfinished animations, before each reflow.
 // Retargeting from those rectangles prevents snapping back when another grid boundary is crossed.
-export function useBriefingReflow(page: RefObject<HTMLDivElement | null>) {
+export function useBriefingReflow(
+  page: RefObject<HTMLDivElement | null>,
+  selector = '.briefing-grid > *, .briefing-date-divider',
+) {
   const pending = useRef<Map<HTMLElement, Rect> | null>(null);
   const animations = useRef(new Map<HTMLElement, Animation>());
   const rect = (el: HTMLElement): Rect => {
@@ -25,11 +28,9 @@ export function useBriefingReflow(page: RefObject<HTMLDivElement | null>) {
   };
   const capture = useCallback(() => {
     pending.current = new Map(
-      [
-        ...(page.current?.querySelectorAll<HTMLElement>('.briefing-grid > *, .briefing-date-divider') || []),
-      ].map((el) => [el, rect(el)]),
+      [...(page.current?.querySelectorAll<HTMLElement>(selector) || [])].map((el) => [el, rect(el)]),
     );
-  }, [page]);
+  }, [page, selector]);
   useLayoutEffect(() => {
     const before = pending.current;
     if (!before) return;
@@ -104,6 +105,7 @@ type Gesture = Preview & {
   moved: boolean;
 };
 type Options = {
+  reflowSelector?: string;
   page: RefObject<HTMLDivElement | null>;
   columns: number;
   unit: number;
@@ -123,7 +125,7 @@ export function useBriefingResize(options: Options) {
   });
   const [announcement, setAnnouncement] = useState('');
   const hint = useRef<HTMLDivElement>(null);
-  const capture = useBriefingReflow(options.page);
+  const capture = useBriefingReflow(options.page, options.reflowSelector);
   const retainPosition = useCallback((current: Pick<Preview, 'id' | 'position'>) => {
     const { viewKey, columns } = latest.current;
     const key = `${viewKey}/${columns}`;

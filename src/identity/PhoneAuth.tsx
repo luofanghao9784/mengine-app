@@ -1,3 +1,4 @@
+import { useRequestLock } from '../shared/request-guard';
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import type { Identity, Membership } from '../../contracts/public-api/identity';
@@ -287,6 +288,7 @@ export function PhoneAuth({
       setBusy(false);
     }
   };
+  useRequestLock(busy);
   if (inviting && !binding && mode === 'login' && !preview)
     return (
       <>
@@ -520,6 +522,7 @@ export function ChangePassword({ done }: { done: () => void }) {
     [next, setNext] = useState(''),
     [error, setError] = useState(''),
     [busy, setBusy] = useState(false);
+  useRequestLock(busy);
   return (
     <form
       onSubmit={async (e) => {

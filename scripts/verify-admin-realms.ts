@@ -98,7 +98,7 @@ try {
   const clientUrl = client.url();
   await client.getByRole('button', { name: '个人设置与账号', exact: true }).click();
   const popup = context.waitForEvent('page');
-  await client.getByRole('link', { name: '在新标签页打开企业管理端', exact: true }).click();
+  await client.getByRole('link', { name: '企业管理端', exact: true }).click();
   const admin = await popup;
   admin.on('pageerror', e => errors.push(e.name));
   await expect(admin.locator('.admin-shell')).toBeVisible();

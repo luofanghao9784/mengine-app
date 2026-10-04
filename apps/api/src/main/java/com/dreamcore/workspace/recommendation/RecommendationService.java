@@ -56,10 +56,10 @@ public class RecommendationService {
      t.revision task_revision,t.attempt,coalesce(p.revision,0) preference_revision,NULL::uuid material_id,0 material_version,'' filename,coalesce(p.pinned,false) pinned
     FROM conversations c JOIN spaces w ON w.id=c.workspace_id
     JOIN LATERAL(SELECT t.* FROM conversation_tasks t WHERE t.conversation_id=c.id AND t.status='SUCCEEDED' AND t.mode='AGENT' AND t.reply IS NOT NULL
-      AND EXISTS(SELECT 1 FROM readable_source_tasks r WHERE r.id=t.id) AND (NOT ? OR EXISTS (%s)) AND (?::text IS NULL OR EXISTS(SELECT 1 FROM (%s) classified WHERE convert_from(classified.content,'UTF8')::jsonb->>'businessType'=?)) ORDER BY t.finished_at DESC,t.id DESC %s) t ON true
+      AND EXISTS(SELECT 1 FROM readable_source_tasks r WHERE r.id=t.id) AND (t.origin='USER' OR ?) AND (NOT ? OR EXISTS (%s)) AND (?::text IS NULL OR EXISTS(SELECT 1 FROM (%s) classified WHERE convert_from(classified.content,'UTF8')::jsonb->>'businessType'=?)) ORDER BY t.finished_at DESC,t.id DESC %s) t ON true
     LEFT JOIN LATERAL (%s) b ON true
     LEFT JOIN %s AND p.owner_id=c.owner_id
-    WHERE c.tenant_id=? AND c.owner_id=? AND c.purpose='BUSINESS' AND NOT coalesce(p.hidden,false) AND NOT ? AND (NOT ? OR coalesce(p.pinned,false))
+    WHERE c.tenant_id=? AND c.owner_id=? AND c.purpose IN ('BUSINESS','BRIEFING_GENERATION') AND NOT coalesce(p.hidden,false) AND NOT ? AND (NOT ? OR coalesce(p.pinned,false))
      AND NOT EXISTS(SELECT 1 FROM ongoing_plan_runs r JOIN ongoing_plans p ON p.id=r.plan_id WHERE r.task_id=t.id AND NOT p.notify)
     UNION ALL
     SELECT v.id,'PUBLICATION','publication:'||v.id,v.workspace_id,w.name,v.filename,''::text,false,v.created_at,'PUBLISHED_COPY',NULL::uuid,
@@ -75,7 +75,7 @@ public class RecommendationService {
    ORDER BY c.created_at DESC,c.id LIMIT 1000
    """.formatted(BriefingContentService.ELIGIBLE,BriefingContentService.ELIGIBLE,generatedOnly?"":"LIMIT 1",BriefingContentService.ELIGIBLE,generatedOnly?"briefing_card_preferences p ON p.task_id=t.id":"briefing_preferences p ON p.conversation_id=c.id");
   final long[] total={0};db.execute("SET LOCAL statement_timeout='3s'");
-  var items=db.query(sql,(r,n)->{total[0]=r.getLong("eligible_total");return new Candidate(r.getObject("id",UUID.class),r.getString("kind"),r.getString("version_key"),r.getObject("workspace_id",UUID.class),r.getString("workspace_name"),r.getString("title"),r.getString("excerpt"),r.getBoolean("truncated"),r.getTimestamp("created_at").toInstant(),r.getString("execution_class"),r.getObject("conversation_id",UUID.class),r.getInt("task_revision"),r.getInt("attempt"),r.getInt("preference_revision"),r.getObject("material_id",UUID.class),r.getInt("material_version"),r.getString("filename"),r.getBoolean("pinned"),r.getTimestamp("opened_at")==null?null:r.getTimestamp("opened_at").toInstant());},actor,tenant,workspace,workspace,actor,generatedOnly,businessType,businessType,tenant,actor,publicationsOnly,focused,actor,businessType,businessType,focused,tenant,actor);
+  var items=db.query(sql,(r,n)->{total[0]=r.getLong("eligible_total");return new Candidate(r.getObject("id",UUID.class),r.getString("kind"),r.getString("version_key"),r.getObject("workspace_id",UUID.class),r.getString("workspace_name"),r.getString("title"),r.getString("excerpt"),r.getBoolean("truncated"),r.getTimestamp("created_at").toInstant(),r.getString("execution_class"),r.getObject("conversation_id",UUID.class),r.getInt("task_revision"),r.getInt("attempt"),r.getInt("preference_revision"),r.getObject("material_id",UUID.class),r.getInt("material_version"),r.getString("filename"),r.getBoolean("pinned"),r.getTimestamp("opened_at")==null?null:r.getTimestamp("opened_at").toInstant());},actor,tenant,workspace,workspace,actor,generatedOnly,generatedOnly,businessType,businessType,tenant,actor,publicationsOnly,focused,actor,businessType,businessType,focused,tenant,actor);
   return new Pool(items,total[0]);
  }
  private Presentation presentation(UUID actor,UUID tenant){

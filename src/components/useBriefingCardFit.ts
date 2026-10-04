@@ -9,7 +9,10 @@ export function useBriefingCardFit(
   key: string,
   columns: number,
   unit: number,
-  selectors = { cards: '.briefing-grid .briefing-card', button: '.briefing-card-main' },
+  selectors: { cards: string; button: string; growVertically?: boolean; measureFullSummary?: boolean } = {
+    cards: '.briefing-grid .briefing-card',
+    button: '.briefing-card-main',
+  },
 ) {
   const [measured, setMeasured] = useState<{ key: string; limits: BriefingFit }>({ key, limits: {} });
   const limits = measured.key === key ? measured.limits : {};
@@ -51,6 +54,17 @@ export function useBriefingCardFit(
                   : 0;
               return sum + (period?.getBoundingClientRect().height || 0) + chartHeight + 5;
             }
+            if (selectors.measureFullSummary && element.matches('.magazine-summary')) {
+              // A date preview must not earn a smaller span just because its
+              // provisional one-cell summary has already been line-clamped.
+              const style = getComputedStyle(element);
+              const probe = element.cloneNode(true) as HTMLElement;
+              probe.style.cssText = `position:fixed;visibility:hidden;pointer-events:none;display:block;left:-10000px;top:0;width:${element.getBoundingClientRect().width}px;height:auto;max-height:none;-webkit-line-clamp:unset;font:${style.font};line-height:${style.lineHeight};letter-spacing:${style.letterSpacing};`;
+              element.parentElement!.append(probe);
+              const fullHeight = probe.getBoundingClientRect().height;
+              probe.remove();
+              return sum + fullHeight;
+            }
             return sum + element.getBoundingClientRect().height;
           }, 0) +
           Math.max(0, blocks.length - 1) * parseFloat(getComputedStyle(copy).rowGap);
@@ -80,7 +94,7 @@ export function useBriefingCardFit(
           height = Number(size[2]);
         // Try a wider short card first: extra vertical area should be earned by
         // media or a chart, not introduced just to fit another line of text.
-        const wider = columns > 1 && width === 1;
+        const wider = !selectors.growVertically && columns > 1 && width === 1;
         // Prefer the four standard sizes. Exceptionally long custom titles may
         // use extra whole grid rows after the largest standard size is exhausted.
         const next: CardSize = wider ? `2×${height as 1 | 2}` : `${width as 1 | 2}×2`;

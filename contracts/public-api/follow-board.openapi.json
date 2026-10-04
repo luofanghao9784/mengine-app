@@ -1,0 +1,93 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "个人关注画报布局",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/v1/tenants/{tenant}/briefing/boards/{board}": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "board",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "enum": [
+              "PRIVATE",
+              "PUBLICATIONS"
+            ]
+          }
+        }
+      ],
+      "get": {
+        "summary": "读取当前账号在企业中的关注布局",
+        "responses": {
+          "200": {
+            "description": "tenantId, board, revision, preference；不存在时 revision=0、preference=null"
+          },
+          "403": {
+            "description": "企业、成员或离职权限不允许"
+          }
+        }
+      },
+      "post": {
+        "summary": "按版本与幂等 requestId 保存或恢复自动布局",
+        "description": "请求形状见 follow-board.ts。仅保存标识与几何信息，不授予任何资料或卡片访问权限；业务内容仍由原读取接口逐次鉴权。最多 2000 个位置；columns 1—12、row 0—10000、col 0—columns-1。positions 不接受正文或标题字段。preference=null 恢复自动排列。使用现有会话认证与 CSRF。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "requestId",
+                  "expectedRevision"
+                ],
+                "properties": {
+                  "requestId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "expectedRevision": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "preference": {
+                    "type": [
+                      "object",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "appliedRevision 与 current；重试返回原应用版本和当前最新布局，不重新覆盖"
+          },
+          "400": {
+            "description": "格式或几何参数不合法"
+          },
+          "403": {
+            "description": "账号无当前企业访问权限"
+          },
+          "409": {
+            "description": "BRIEFING_LAYOUT_CHANGED 或 requestId 与原请求内容不一致"
+          }
+        }
+      }
+    }
+  }
+}

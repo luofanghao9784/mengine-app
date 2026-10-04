@@ -25,7 +25,9 @@ export async function postJson(
       throw new RuntimeError(
         response.status === 401 || response.status === 403 || response.status === 404
           ? 'REMOTE_ACCESS_DENIED'
-          : 'REMOTE_UNAVAILABLE',
+          : response.status === 400 || response.status === 422
+            ? 'REMOTE_BAD_REQUEST'
+            : 'REMOTE_UNAVAILABLE',
       );
     if (!response.headers.get('content-type')?.includes('application/json') || !response.body)
       throw new RuntimeError('INVALID_REMOTE_RESPONSE');

@@ -50,7 +50,52 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "view",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ALL",
+                "TRASH",
+                "RECORDS"
+              ],
+              "default": "ALL"
+            },
+            "description": "TRASH only includes unexpired recoverable items; RECORDS includes clearing, cleared and expired items."
+          },
+          {
+            "name": "query",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 180
+            },
+            "description": "Literal name search within this authorized workspace and selected view."
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000,
+              "default": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 50
+            }
+          }
+        ]
       }
     },
     "/api/v1/tenants/{tenant}/workspaces/{space}/lifecycle/{kind}/{id}": {
@@ -232,7 +277,9 @@
           "trashedAt",
           "purgeAfter",
           "cleanupJobId",
-          "canPurge"
+          "canPurge",
+          "path",
+          "parentAvailable"
         ],
         "properties": {
           "id": {
@@ -296,6 +343,15 @@
             ]
           },
           "canPurge": {
+            "type": "boolean"
+          },
+          "path": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "parentAvailable": {
             "type": "boolean"
           }
         }

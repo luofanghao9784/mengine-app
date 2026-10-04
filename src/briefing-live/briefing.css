@@ -27,20 +27,6 @@
   opacity: 0.42;
   cursor: default;
 }
-.live-briefing-refresh {
-  display: grid;
-  place-items: center;
-  border: 0;
-  background: transparent;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  color: #687382;
-  cursor: pointer;
-}
-.live-briefing-refresh:hover {
-  background: #edf1f7;
-}
 .live-briefing-filters {
   display: flex;
   gap: 12px;
@@ -77,11 +63,6 @@
 .live-briefing-view-options[open] .field {
   margin-top: 6px;
 }
-.live-briefing-filter-note {
-  font-size: 12px;
-  color: #7c8693;
-  padding-bottom: 9px;
-}
 .live-briefing-day h2 {
   font-size: 14px;
   font-weight: 500;
@@ -107,7 +88,7 @@
     box-shadow 160ms,
     border-color 160ms;
 }
-.live-briefing-card:is(:hover, :focus-within) {
+.live-briefing-card:not(.conversation-briefing-preview):is(:hover, :focus-within) {
   border-color: #d5dce6;
   box-shadow: 0 9px 28px #26374a0d;
   z-index: 4;
@@ -345,16 +326,20 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 17px 22px 12px 32px;
+  padding: var(--card-header-padding-block) var(--card-header-padding-inline);
+  height: var(--card-header-height);
+  min-height: var(--card-header-height);
   flex-shrink: 0;
   color: #35465e;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
 }
 .live-reading-header > span:first-child {
   flex: 1;
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .live-reading-close {
   display: grid;
@@ -547,9 +532,8 @@
     border-radius: 20px;
   }
   .live-reading-header {
-    padding: 12px 14px 8px 20px;
+    padding-inline: 16px;
     gap: 10px;
-    font-size: 12px;
   }
   .live-reading-article {
     padding: 12px 20px 20px;
@@ -591,6 +575,12 @@
 }
 .live-feedback-actions .nav-item {
   width: 44px;
+  height: 44px;
+}
+.live-feedback-actions .nav-symbol {
+  width: 100%;
+  height: 100%;
+  flex: 1 1 auto;
 }
 .live-feedback-actions .nav-link {
   width: 44px;
@@ -679,15 +669,7 @@
   opacity: 1;
 }
 .live-reading-dialog[open] {
-  animation: live-reading-enter 180ms ease-out;
-}
-@keyframes live-reading-enter {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  animation: briefing-detail-in 180ms ease-out;
 }
 @media (max-width: 650px) {
   .live-card-action-rail {
@@ -708,6 +690,7 @@
   }
   .live-feedback-actions .nav-item {
     width: 36px;
+    height: 36px;
   }
   .live-feedback-actions .nav-symbol > svg {
     width: 18px;
@@ -785,16 +768,18 @@
   gap: 8px;
   flex-wrap: wrap;
 }
-.live-briefing-type-options button {
-  padding: 6px 12px;
-  border-radius: 16px;
-  font-size: 12px;
-  color: var(--muted);
-  background: transparent;
+.live-briefing-type-options button.magazine-type {
+  border: 0;
+  cursor: pointer;
+  transition: box-shadow 140ms ease-out;
 }
-.live-briefing-type-options button[aria-pressed='true'] {
-  color: var(--blue-ink);
-  background: var(--selected);
+.live-briefing-type-options button[aria-pressed='true'],
+.live-briefing-type-options button:focus-visible {
+  outline: 1px solid var(--magazine-color);
+  outline-offset: 2px;
+}
+.live-briefing-type-options button:hover {
+  box-shadow: 0 2px 8px #21344912;
 }
 
 /* Match the fixed Demo's pull gesture and compact feedback, with real read completion. */
@@ -845,4 +830,41 @@
   .live-briefing-refresh-spinner {
     animation: none;
   }
+}
+
+.live-briefing[data-briefing-arriving] .live-magazine-grid .live-briefing-card {
+  opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .live-briefing[data-briefing-arriving] .live-magazine-grid .live-briefing-card {
+    opacity: 1;
+  }
+}
+
+/* Match the primary navigation's 48px control and 21px Lucide glyph. */
+.live-reading-rail .live-feedback-actions .nav-item,
+.live-reading-rail .live-feedback-actions .nav-link {
+  width: 48px;
+  height: 48px;
+}
+.live-reading-rail .live-feedback-actions .nav-link {
+  padding: 0;
+  background: #fff;
+  box-shadow: 0 2px 10px #2636470d;
+}
+.live-reading-rail .live-feedback-actions .nav-symbol {
+  width: 46px;
+  height: 46px;
+  flex: 0 0 46px;
+  display: grid;
+  place-items: center;
+}
+.live-reading-rail .live-feedback-actions .nav-symbol > svg {
+  display: block;
+  width: 21px;
+  height: 21px;
+  stroke-width: 1.65;
+}
+.live-reading-rail .live-feedback-actions .nav-link.active {
+  background: var(--selected);
 }

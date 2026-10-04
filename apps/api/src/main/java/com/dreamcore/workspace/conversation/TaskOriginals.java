@@ -33,7 +33,7 @@ public class TaskOriginals {
             access.require(actor,tenant,sourceSpace,false);var file=metadata(tenant,sourceSpace,selection);total+=file.bytes();
             boolean raw="verification".equals(db.queryForObject("SELECT execution_class FROM conversation_tasks WHERE id=?",String.class,task));
             if(file.bytes()>(raw?262144:20971520) || total>(raw?524288:62914560))throw new IdentityException(413,"TASK_ORIGINAL_TOO_LARGE");
-            db.update("INSERT INTO conversation_originals(tenant_id,workspace_id,task_id,material_id,version_id) VALUES (?,?,?,?,?)",tenant,sourceSpace,task,selection.materialId(),selection.versionId());
+            db.update("INSERT INTO conversation_originals(tenant_id,workspace_id,task_id,material_id,version_id) VALUES (?,?,?,?,?) ON CONFLICT (task_id,version_id) DO NOTHING",tenant,sourceSpace,task,selection.materialId(),selection.versionId());
         }
     }
     public List<File> list(UUID actor,UUID tenant,UUID space,UUID task){

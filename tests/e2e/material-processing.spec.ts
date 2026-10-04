@@ -200,7 +200,7 @@ test('file navigation preserves admin realm and client return; recycle uses same
   await page.getByRole('link', { name: '文件与目录' }).click();
   await page.getByRole('button', { name: '全部资料', exact: true }).click();
   await expect(page).toHaveURL(/admin=materials.*section=files.*scope=all/);
-  await expect(page.getByRole('button', { name: /合成月度数据说明/ })).toBeVisible();
+  await expect(page.locator('button.material-entry').filter({ hasText: '合成月度数据说明' })).toBeVisible();
   expect(new URLSearchParams(new URL(page.url()).hash.slice(1)).get('back')).toBe(
     '#tenant=' + tenant + '&view=briefing',
   );
@@ -210,4 +210,28 @@ test('file navigation preserves admin realm and client return; recycle uses same
   await page.getByRole('button', { name: '合成销售空间', exact: true }).click();
   await expect(page.getByText('此空间没有回收或清理记录。')).toBeVisible();
   await expect(page.getByText('当前目录没有资料。可返回资料库选择其他目录。')).toHaveCount(0);
+});
+
+
+test('inline recycle and deletion records retain the enterprise realm, shared scope and client return', async ({ page, context }) => {
+  await fixture(context);
+  await page.goto(start + '&section=files&scope=' + space);
+  await page.locator('.library-page').getByRole('button', { name: '回收站', exact: true }).click();
+  await expect(page.getByLabel('资料回收站', { exact: true })).toBeVisible();
+  const assertLocation = async (recycle: string | null) => {
+    const params = new URLSearchParams(new URL(page.url()).hash.slice(1));
+    expect(new URL(page.url()).pathname).toBe('/tenant-admin/');
+    expect(params.get('admin')).toBe('materials');
+    expect(params.get('scope')).toBe(space);
+    expect(params.get('back')).toBe('#tenant=' + tenant + '&view=briefing');
+    expect(params.get('recycle')).toBe(recycle);
+    await expect(page.locator('.admin-shell')).toBeVisible();
+  };
+  await assertLocation('trash');
+  await page.getByRole('button', { name: '删除记录', exact: true }).click();
+  await expect(page.getByLabel('资料删除记录', { exact: true })).toBeVisible();
+  await assertLocation('records');
+  await page.getByLabel('文件夹路径', { exact: true }).getByRole('button', { name: '合成销售空间', exact: true }).click();
+  await assertLocation(null);
+  await expect(page.locator('button.material-entry').filter({ hasText: '合成月度数据说明' })).toBeVisible();
 });

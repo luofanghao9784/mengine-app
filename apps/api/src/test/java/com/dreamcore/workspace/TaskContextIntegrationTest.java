@@ -58,6 +58,17 @@ class TaskContextIntegrationTest {
   denied(409,()->guard.requireCurrent(t.id()));assertFalse(agents.active(t));denied(409,()->finish(t,"不可接受旧人工方法的新结果",List.of()));
   assertNull(db.queryForObject("SELECT reply FROM conversation_tasks WHERE id=?",String.class,t.id()));
  }
+ @Test void bootstrapUsesOnlyTheAuthorizedTaskTenantIdentityEvenWithoutProfiles(){
+  UUID otherTenant=UUID.randomUUID();db.update("INSERT INTO tenants(id,name) VALUES (?,'另一企业不能成为当前上下文')",otherTenant);
+  db.update("INSERT INTO tenant_memberships(tenant_id,account_id,role) VALUES (?,?,'MEMBER')",otherTenant,owner);
+  var t=task();var boot=run(t,request("bootstrap"));
+  assertEquals("合成上下文企业",boot.get("organization").get("name").asString());
+  assertEquals("CURRENT_TENANT",boot.get("organization").get("source").asString());
+  assertFalse(boot.get("organization").get("authority").asBoolean());
+  assertFalse(boot.toString().contains("另一企业"));
+  assertEquals(0,run(t,new TaskContextService.Request("profiles","TENANT","",0,null,null,null,null,null,null,null)).get("items").size());
+  denied(403,()->contexts.context(t.id(),UUID.randomUUID(),request("bootstrap")));
+ }
  @Test void scopedProfilesSeparateInferenceAndExcludeExpiredWithdrawnAndOtherPeople(){
   var fact=profile("fact",ProfileService.Kind.FACT,ProfileService.Status.ACTIVE,null);profile("inference",ProfileService.Kind.INFERENCE,ProfileService.Status.PROPOSED,null);profile("expired",ProfileService.Kind.GOAL,ProfileService.Status.ACTIVE,Instant.now().minusSeconds(1));var withdrawn=profile("withdrawn",ProfileService.Kind.PREFERENCE,ProfileService.Status.ACTIVE,null);profiles.withdraw(owner,tenant,withdrawn.id(),1,UUID.randomUUID());
   var secret=profiles.create(other,tenant,ProfileService.Scope.PERSONAL,other,"other",ProfileService.Kind.FACT,new ProfileService.Content("其他人的秘密","合成",ProfileService.Status.ACTIVE,null),UUID.randomUUID());

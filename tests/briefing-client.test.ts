@@ -109,3 +109,25 @@ test('briefing updates retain request id, revision and CSRF without replaying lo
   );
   assert.equal(sends, 1);
 });
+
+test('timeline validates whole-day counts, descending dates, distinct visible cards and snapshot-bound expansion', async () => {
+  const asOf = '2026-09-23T09:00:00Z';
+  const summary = { tenantId: tenant, zone: filter.zone, asOf, items: [{ date: '2026-09-23', total: 1, items: [card] }], hasMore: false };
+  assert.deepEqual(await createBriefingClient(async () => response(summary)).timeline(tenant, filter.zone), summary);
+  for (const value of [
+    { ...summary, tenantId: id }, { ...summary, zone: 'UTC' }, { ...summary, asOf: 'bad' },
+    { ...summary, items: [{ date: '2026-09-23', total: 4, items: [card] }] },
+    { ...summary, items: [{ date: '2026-09-23', total: 2, items: [card, card] }] },
+    { ...summary, items: [{ date: '2026-09-23', total: 1, items: [{ ...card, preference: { ...preference, hidden: true } }] }] },
+    { ...summary, items: [...summary.items, ...summary.items] },
+  ]) await assert.rejects(createBriefingClient(async () => response(value)).timeline(tenant, filter.zone),
+    (e) => e instanceof IdentityError && e.code === 'CONTRACT_MISMATCH');
+  await createBriefingClient(async (url) => {
+    const u = new URL(String(url), 'http://localhost');
+    assert.equal(u.pathname.endsWith('/timeline/2026-09-23'), true);
+    assert.equal(u.searchParams.get('offset'), '3');assert.equal(u.searchParams.get('asOf'), asOf);
+    return response({ ...page, date: '2026-09-23', asOf });
+  }).timelineDay(tenant, '2026-09-23', filter.zone, 3, asOf);
+  await assert.rejects(createBriefingClient(async () => response({ ...page, date: '2026-09-23', asOf: '2026-09-22T09:00:00Z' }))
+    .timelineDay(tenant, '2026-09-23', filter.zone, 3, asOf));
+});

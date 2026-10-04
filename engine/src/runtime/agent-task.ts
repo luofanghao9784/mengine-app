@@ -1,8 +1,9 @@
 import type { RealtimePort } from './realtime.js';
+import { sourceQueries } from './source-query.js';
 import { planManagementTool } from './plan-management.js';
 import { meteredModel } from './metered-model.js';
 import { inputCoverage } from './input-coverage.js';
-import { briefingDeliveryTool, hasPreparedBriefing } from './briefing-delivery.js';
+import { briefingDeliveryTool, hasPreparedBriefing, hasTerminalBriefing } from './briefing-delivery.js';
 import { datasetComparisonTool } from './dataset-comparison.js';
 import { tableComparisonTool } from './table-comparison.js';
 import { workTools } from './task-work.js';
@@ -78,11 +79,15 @@ export class AgentTasks {
     const sources = new Map<string, Source>();
     const tableHandles = new Map<string, string>();
     let briefingGeneration: boolean | undefined;
+    let briefingSearches = 0;
+    const briefingSearchLimit = 3;
+    let briefingCalculationReady = false;
     let denied = false;
     let realtimeAvailable = false;
     let publicQuery: string | undefined;
     let candidatesAllowed: boolean | undefined;
     let contextAvailable: boolean | undefined;
+    let answerStream = false;
     let workAvailable: boolean | undefined;
     let datasetContextAvailable: boolean | undefined;
     let generalExperienceAvailable: boolean | undefined;
@@ -157,6 +162,7 @@ export class AgentTasks {
           throw new RuntimeError('TASK_ACCESS_DENIED');
         workAvailable = work;
         planAllowed = plan;
+        answerStream = response.answerStreamVersion === '1.0' && !realtimeAvailable;
         const tables = response.tableComparisonVersion === '1.0';
         if (
           (response.tableComparisonVersion !== undefined &&
@@ -246,25 +252,60 @@ export class AgentTasks {
             )
           : invoke(action, body, 4096),
       );
+      let answerStep = 0;
       const model: ModelPort = {
         async *generate(request) {
           await authorize();
-          yield* metered.generate({
+          const step = ++answerStep;
+          let text = '',
+            version = 0,
+            sent = '',
+            last = 0;
+          const flush = async (state: 'STREAMING' | 'COMPLETE') => {
+            if (!answerStream || !text || (text === sent && state === 'STREAMING')) return;
+            const receipt = await invoke('answer', { step, version: ++version, text, state }, 4096);
+            if (!isRecord(receipt) || receipt.accepted !== true)
+              throw new RuntimeError('INVALID_REMOTE_RESPONSE');
+            sent = text;
+            last = performance.now();
+          };
+          const deliveryReady = briefingGeneration && briefingCalculationReady;
+          const messages = briefingGeneration
+            ? [{ role: 'system' as const, content: [{ type: 'text' as const,
+                text: deliveryReady
+                  ? 'The platform has verified one complete table calculation for this briefing. Retrieval and calculation are now closed. Call deliver_briefing with its existing calculation artifact, preserving its periods, scope and gaps. Write one complete theme; do not compute another range or repeat searches. A duplicate receipt means no new card, never fabricate novelty.'
+                  : `System briefing retrieval: ${briefingSearches}/${briefingSearchLimit} internal searches used. The first lookup reads the selected versions; at most two targeted lookups follow. Do not repeat searches to fill the budget. ${briefingSearches >= briefingSearchLimit
+                  ? 'Internal search is now closed. Use the existing granted evidence to calculate and deliver one grounded theme. If evidence is insufficient, explain the concrete gap without claiming a card was generated.'
+                  : 'Once evidence supports a useful theme, use compare_table only for DATA and deliver_briefing for the card. A text reply is not card delivery.'}` } ] }, ...request.messages]
+            : request.messages;
+          for await (const part of metered.generate({
             ...request,
+            messages,
             tools: request.tools.filter(
               (t) =>
+                (t.name !== 'search_sources' || !briefingGeneration || briefingSearches < briefingSearchLimit) &&
                 (!publicTools.has(t.name) || activated.has('public-research')) &&
+                (!deliveryReady || t.name === 'deliver_briefing') &&
                 (t.name !== 'candidate_tool' || activated.has('candidate-trials')) &&
                 (t.name !== 'process_original' || activated.has('file-processing')),
             ),
+            ...(deliveryReady ? { requiredTool: 'deliver_briefing' } : {}),
             signal: AbortSignal.any([signal, request.signal]),
-          });
+          })) {
+            if (part.type === 'text') {
+              text += part.text;
+              if (text.length > 65536) throw new RuntimeError('MODEL_OUTPUT_LIMIT');
+              if (!sent || performance.now() - last >= 100) await flush('STREAMING');
+            }
+            if (part.type === 'finish') await flush('COMPLETE');
+            yield part;
+          }
         },
       };
       const search: TaskTool = {
         name: 'search_sources',
         description:
-          'Literal keyword search: begin with a short keyword, not a sentence; space-separated terms must all occur in the passage. Search the platform-authorized scope: interactive tasks may use the authorized library across workspaces; selected-only tasks and existing plans remain restricted. An empty query reads selected file excerpts first. Selected versions are exact. Returns fixed citations, coverage and truncation; never claim partial excerpts are complete files.',
+          'Literal keyword search: begin with a short keyword, not a sentence; space-separated terms must all occur in the passage. Search the platform-authorized scope: interactive tasks may use the authorized library across workspaces; selected-only tasks and existing plans remain restricted. An empty query reads selected file excerpts first; without selected files provide a short literal keyword, such as the current organization name. SEARCH_QUERY_REQUIRED or REMOTE_BAD_REQUEST means correct the query, not that no sources exist. Selected versions are exact. Returns fixed citations, coverage and truncation; never claim partial excerpts are complete files.',
 
         parameters: {
           type: 'object',
@@ -272,12 +313,38 @@ export class AgentTasks {
           required: ['query'],
           additionalProperties: false,
         },
-        execute: async (args) => {
+        execute: async (args): Promise<Json> => {
           await authorize();
           const query = (args as { query: string }).query;
           if (query.length > 200 || query.trim().split(/\s+/).length > 8)
             throw new RuntimeError('INVALID_QUERY');
-          const response = await invoke('search', { query });
+          if (briefingGeneration && briefingSearches >= briefingSearchLimit)
+            return {
+              items: [], scope: 'previously-authorized-excerpts', searchPerformed: false,
+              reuseExistingEvidence: true,
+              notice: 'Retrieval is closed. No search was dispatched. Use the existing granted evidence for one calculation if DATA needs it, then deliver; do not request another search.',
+              retrievalBudget: { used: briefingSearches, max: briefingSearchLimit, searchClosed: true },
+            };
+          const selectedBriefing = briefingGeneration && isRecord(continuity) &&
+            isRecord(continuity.result) && Array.isArray(continuity.result.selectedMaterials) &&
+            continuity.result.selectedMaterials.length > 0;
+          const queries = sourceQueries(task.prompt,
+            selectedBriefing && briefingSearches === 0 ? '' : query, continuity);
+          if (briefingGeneration) briefingSearches++;
+          let effectiveQuery = queries[0];
+          let response = await invoke('search', { query: effectiveQuery });
+          // Only a valid empty result can trigger a second keyword lookup. Errors never mean no match.
+          if (
+            queries.length > 1 &&
+            isRecord(response) &&
+            Array.isArray(response.items) &&
+            response.items.length === 0 &&
+            response.matchStatus === 'NO_MATCH'
+          ) {
+            inputCoverage(response);
+            effectiveQuery = queries[1];
+            response = await invoke('search', { query: effectiveQuery });
+          }
           if (!isRecord(response) || !Array.isArray(response.items) || response.items.length > 10)
             throw new RuntimeError('INVALID_SOURCE_RESPONSE');
           const items: Json[] = [];
@@ -306,9 +373,20 @@ export class AgentTasks {
               inputHandle: `${source.id}.txt`,
             });
           }
-          return { items, scope: 'authorized-excerpts', ...inputCoverage(response) };
+          return {
+            items,
+            scope: 'authorized-excerpts',
+            requestedQuery: query,
+            effectiveQuery,
+            ...(briefingGeneration ? { retrievalBudget: {
+              used: briefingSearches, max: briefingSearchLimit,
+              searchClosed: briefingSearches >= briefingSearchLimit,
+            } } : {}),
+            ...inputCoverage(response),
+          };
         },
       };
+      let sequence = 0;
       const tools: TaskTool[] = [
         search,
         ...(task.contractVersion === '1.5' && workAvailable && planManagementAvailable && !planAllowed
@@ -647,7 +725,6 @@ export class AgentTasks {
           registered.policy !== (workAvailable ? 'SCOPED_PRIVATE_V2' : 'READ_ONLY_PRIVATE_V1')
         )
           throw new RuntimeError('TASK_RUNTIME_INCOMPATIBLE');
-        let sequence = 0;
         for (const tool of tools) {
           const execute = tool.execute.bind(tool);
           tool.execute = async (args, executionSignal) => {
@@ -655,6 +732,8 @@ export class AgentTasks {
             await invoke('execution/tool', { sequence: number, name: tool.name, status: 'STARTED' });
             let output: Json;
             try {
+              if (briefingGeneration && briefingCalculationReady && ['compare_table', 'compare_dataset'].includes(tool.name))
+                throw new RuntimeError('BRIEFING_DELIVERY_REQUIRED');
               output = await execute(args, executionSignal);
             } catch (error) {
               if (
@@ -677,6 +756,7 @@ export class AgentTasks {
               throw error;
             }
             await invoke('execution/tool', { sequence: number, name: tool.name, status: 'succeeded' });
+            if (briefingGeneration && ['compare_table', 'compare_dataset'].includes(tool.name)) briefingCalculationReady = true;
             return output;
           };
         }
@@ -691,9 +771,28 @@ export class AgentTasks {
         signal,
         limits: { timeoutMs: 55000, modelCalls: 8, toolCalls: 8 },
         reserveFinalResponse: task.contractVersion === '1.5',
+        onToolFailure: async (failure) => {
+          // Record local schema rejection too. No business action is dispatched for invalid arguments.
+          if (task.contractVersion === '1.5' && !failure.executionStarted &&
+              failure.code === 'INVALID_TOOL_ARGUMENTS') {
+            const number = ++sequence;
+            await invoke('execution/tool', { sequence: number, name: failure.tool, status: 'STARTED' });
+            await invoke('execution/tool', { sequence: number, name: failure.tool, status: 'failed' });
+          }
+          console.warn(
+            JSON.stringify({
+              event: 'TASK_TOOL_REJECTED',
+              taskId: task.taskId,
+              attemptId: task.attemptId,
+              tool: failure.tool,
+              callId: failure.callId,
+              code: failure.code,
+            }),
+          );
+        },
         finalResponseReserveMs: briefingGeneration ? 10000 : undefined,
         finishOnDeliverable: briefingGeneration,
-        hasCompletedDeliverable: hasPreparedBriefing,
+        hasCompletedDeliverable: briefingGeneration ? hasTerminalBriefing : hasPreparedBriefing,
       });
       if (realtime && (result.status === 'cancelled' || (await realtime.control()).stop)) {
         await invoke('live/stopped', {});
@@ -712,25 +811,28 @@ export class AgentTasks {
             toolCalls: result.tools.length,
           }),
         );
-      if (briefingGeneration && result.status === 'completed' && hasPreparedBriefing(result.tools)) {
+      const terminalBriefing = briefingGeneration && hasTerminalBriefing(result.tools);
+      if (terminalBriefing && result.status === 'completed') {
         // This is a system delivery acknowledgement, not model-authored analysis.
         // The immutable card content already came from the model's checked tool call.
         const receipt = result.tools.at(-1)?.output;
         result.text =
           isRecord(receipt) && receipt.status === 'NO_NEW_CONTENT'
-            ? '本次没有新增画报：相同内容已存在。'
+            ? receipt.reason === 'NO_USEFUL_CONTENT'
+              ? '本次没有新增画报：所选资料暂无独立的新主题。'
+              : '本次没有新增画报：相同内容已存在。'
             : '画报已生成，可在智能画报查看。';
       }
       if (result.code === 'CONTROL_UNAVAILABLE') throw new RuntimeError('TASK_RESULT_UNKNOWN');
       if (result.status !== 'completed' || !result.text.trim() || result.text.length > 16000)
         throw new RuntimeError(result.status === 'limit' ? 'TASK_LIMIT' : 'TASK_MODEL_FAILED');
-      if (result.finalResponseReserved && outcome === 'COMPLETE' && !hasPreparedBriefing(result.tools)) {
+      if (result.finalResponseReserved && outcome === 'COMPLETE' && !terminalBriefing && !hasPreparedBriefing(result.tools)) {
         outcome = 'PARTIAL';
         requiredInput =
           '本次执行预算已用于资料处理，已保留有依据的阶段结果；请核对回复中的缺口与未完成事项。';
       }
       // Failed tools cannot be turned into a successful business task by an apologetic model reply.
-      if (result.tools.some((t) => t.status !== 'succeeded')) {
+      if (result.tools.some((t) => t.status !== 'succeeded') && !terminalBriefing) {
         if (task.contractVersion === '1.4') throw new RuntimeError(recipeFailure ?? 'TASK_TOOL_FAILED');
         if ((outcome as string) === 'COMPLETE') outcome = 'PARTIAL';
       }

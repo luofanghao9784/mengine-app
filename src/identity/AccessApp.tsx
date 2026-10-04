@@ -2,8 +2,8 @@ import { SuspendedEnterprise } from './SuspendedEnterprise';
 import { TenantConsole } from '../admin/TenantConsole';
 import { UploadProvider } from '../material/UploadManager';
 import { phoneClient } from './phone-client';
-import { PhoneAuth, ChangePassword } from './PhoneAuth';
-import { contactLabel, uuid } from './client';
+import { PhoneAuth } from './PhoneAuth';
+import { uuid } from './client';
 import { entryTenant, rememberedTenant, rememberTenant } from './entry';
 import { WorkspaceNavigation } from './WorkspaceNavigation';
 import { WorkspaceComposer } from './WorkspaceComposer';
@@ -13,12 +13,12 @@ import { RequestGuard, RequestPending, requestNavigationLocked } from '../shared
 import { useContext } from 'react';
 import { Plans } from '../plans/Plans';
 import { featureEntries } from '../shared/feature-entries';
-import { AccountWorkspaces } from './AccountWorkspaces';
+import { AccountPanel } from './AccountPanel';
 import { Documents } from '../documents/Documents';
 import { documentsHref } from '../documents/routes';
 import { Conversations, conversationHref } from '../conversation/Conversations';
 import { LiveBriefing, briefingHref } from '../briefing-live/Briefing';
-import { MessageSquare, Newspaper, ExternalLink } from 'lucide-react';
+import { MessageSquare, LayoutPanelTop, ExternalLink } from 'lucide-react';
 import { ManagementHome } from '../governance/ManagementHome';
 import { Profiles } from '../profile/Profiles';
 import { governanceClient } from '../governance/client';
@@ -31,10 +31,8 @@ import { useViewScroll } from '../shared/useViewState';
 import {
   CalendarClock,
   Building2,
-  CircleUserRound,
   FolderOpen,
   LibraryBig,
-  LogOut,
   RefreshCw,
   ShieldX,
   ShieldCheck,
@@ -42,7 +40,7 @@ import {
 } from 'lucide-react';
 import type { Identity } from '../../contracts/public-api/identity';
 import { DreamcoreLogo } from '../components/DreamcoreLogo';
-import { Button, Badge, Empty, Modal } from '../shared/ui';
+import { Button, Badge, Empty } from '../shared/ui';
 import { NavigationButton, PageHeader } from '../shared/layout';
 import { IdentityError } from './client';
 import { useSession } from './session';
@@ -196,7 +194,6 @@ function GuardedAccessShell({
   const { refresh, logout } = useSession();
   const pendingRequest = useContext(RequestPending);
   const [accountOpen, setAccountOpen] = useState(false);
-  const [changingPassword, setChangingPassword] = useState(false);
   const [actionsTarget, setActionsTarget] = useState<HTMLDivElement | null>(null);
   const governance = useRemote(
     async (signal) => ({
@@ -224,6 +221,11 @@ function GuardedAccessShell({
       ? identity.memberships.filter((m) => management.includes(m.tenantId))
       : identity.memberships;
   const [routeHash, setRouteHash] = useState(location.hash);
+  const [briefingMonth, setBriefingMonth] = useState<string | null>(null);
+  const editionDate = new Date();
+  const editionLabel = briefingMonth
+    ? `${briefingMonth.slice(0, 4)}年${Number(briefingMonth.slice(5))}月`
+    : editionDate.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' });
   const params = new URLSearchParams(routeHash.slice(1));
   const tenant = entryTenant(
     params.get('tenant'),
@@ -318,7 +320,7 @@ function GuardedAccessShell({
                     active: conversations,
                     href: conversationHref(tenant),
                   },
-                  { label: '智能画报', icon: Newspaper, active: briefing, href: briefingHref(tenant) },
+                  { label: '智能画报', icon: LayoutPanelTop, active: briefing, href: briefingHref(tenant) },
                   {
                     label: '资料库',
                     icon: LibraryBig,
@@ -375,12 +377,8 @@ function GuardedAccessShell({
                                   : labels[surface]}
                 </h1>
                 {surface === 'workspace' && briefing && (
-                  <time className="workspace-edition" dateTime={new Date().toLocaleDateString('en-CA')}>
-                    {new Date().toLocaleDateString('zh-CN', {
-                      month: 'long',
-                      day: 'numeric',
-                      weekday: 'long',
-                    })}
+                  <time className="workspace-edition" dateTime={briefingMonth ?? editionDate.toLocaleDateString('en-CA')}>
+                    {editionLabel}
                   </time>
                 )}
               </>
@@ -505,6 +503,7 @@ function GuardedAccessShell({
                 briefing={briefing}
                 conversations={conversations}
                 overlay={conversations && fromBriefing}
+                onMonthChange={setBriefingMonth}
               />
             ) : view === 'spaces' ? (
               <Status title="正在打开资料库" detail="请稍候…" />
@@ -522,60 +521,21 @@ function GuardedAccessShell({
             />
           )}
         </div>
-        {changingPassword && (
-          <Modal title="修改密码" onClose={() => setChangingPassword(false)}>
-            <ChangePassword done={() => setChangingPassword(false)} />
-          </Modal>
-        )}
         {accountOpen && (
-          <Modal title="个人设置与账号" onClose={() => setAccountOpen(false)}>
-            <div className="access-account">
-              <CircleUserRound size={32} />
-              <strong>{identity.account.displayName}</strong>
-              <p>{contactLabel(identity.account)}</p>
-            </div>
-            <AccountWorkspaces
-              tenant={tenant}
-              memberships={surface === 'platform-admin' ? [] : eligible}
-              links={links
-                .filter((link) => link !== 'workspace' && link !== surface)
-                .map((link) => ({
-                  label: link === 'tenant-admin' ? '切换到企业管理端' : '切换到系统管理端',
-                  newTabLabel:
-                    link === 'tenant-admin' ? '在新标签页打开企业管理端' : '在新标签页打开系统管理端',
-                  href: surfaceHref(link),
-                  icon: icons[link],
-                }))}
-              onChoose={(id) => {
-                choose(id);
-                setAccountOpen(false);
-              }}
-              onNavigate={() => setAccountOpen(false)}
-            />
-            <div className="access-account-actions">
-              {selected && (
-                <a
-                  className="button"
-                  href={'/workspace/#' + new URLSearchParams({ tenant, view: 'profiles' })}
-                  onClick={() => setAccountOpen(false)}
-                >
-                  我的档案与偏好
-                </a>
-              )}
-              <Button onClick={onInvite}>接受另一企业邀请</Button>
-              <Button
-                onClick={() => {
-                  setAccountOpen(false);
-                  setChangingPassword(true);
-                }}
-              >
-                修改密码
-              </Button>
-              <Button icon={LogOut} onClick={() => void logout().catch(() => {})}>
-                退出登录
-              </Button>
-            </div>
-          </Modal>
+          <AccountPanel
+            identity={identity}
+            tenant={tenant}
+            memberships={identity.memberships}
+            links={links
+              .filter((link) => link !== surface)
+              .map((link) => ({
+                label: link === 'workspace' ? '工作空间' : link === 'tenant-admin' ? '企业管理端' : '总台',
+                href: surfaceHref(link),
+              }))}
+            onChoose={choose}
+            onClose={() => setAccountOpen(false)}
+            onLogout={logout}
+          />
         )}
       </div>
     </UploadShell>
@@ -588,11 +548,13 @@ function WorkspaceConversationPages({
   briefing,
   conversations,
   overlay,
+  onMonthChange,
 }: {
   tenant: string;
   briefing: boolean;
   conversations: boolean;
   overlay: boolean;
+  onMonthChange: (month: string | null) => void;
 }) {
   const actions = useContext(PageActionsContext);
   return (
@@ -600,7 +562,7 @@ function WorkspaceConversationPages({
       {(briefing || overlay) && (
         <div className="workspace-briefing-background" inert={overlay || undefined}>
           <PageActionsContext.Provider value={overlay ? null : actions}>
-            <LiveBriefing tenant={tenant} />
+            <LiveBriefing tenant={tenant} onMonthChange={onMonthChange} />
           </PageActionsContext.Provider>
         </div>
       )}

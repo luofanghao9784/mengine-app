@@ -18,11 +18,13 @@ export function PublicationPanel({
   id,
   version,
   disabled,
+  historyOnly = false,
 }: {
   tenant: string;
   id: string;
   version: DocumentVersion;
   disabled: boolean;
+  historyOnly?: boolean;
 }) {
   const { session } = useSession();
   const [open, setOpen] = useState(false),
@@ -35,10 +37,10 @@ export function PublicationPanel({
   );
   return (
     <section className="document-publications">
-      <Button icon={Share2} disabled={disabled} onClick={() => setOpen(true)}>
+      {!historyOnly && <Button icon={Share2} disabled={disabled} onClick={() => setOpen(true)}>
         发布到企业资料库
-      </Button>
-      <p className="muted">只发布选定的文稿版本。企业副本由目标空间权限管理，之后的个人修改不会自动同步。</p>
+      </Button>}
+      {!historyOnly && <p className="muted">只发布选定的文稿版本。企业副本由目标空间权限管理，之后的个人修改不会自动同步。</p>}
       {receipt && history.value?.items.some((p) => p.id === receipt.id) && (
         <p role="status" className="access-success">
           已发布到企业资料 v{receipt.materialVersion}：{receipt.filename}。
@@ -85,7 +87,7 @@ export function PublicationPanel({
     </section>
   );
 }
-function PublishDialog({
+export function PublishDialog({
   tenant,
   id,
   version,

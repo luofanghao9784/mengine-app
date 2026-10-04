@@ -1,14 +1,14 @@
 import { adminHref } from '../admin/navigation';
-import { LibraryToolbar } from './LibraryToolbar';
+import { LibraryToolbar, LibrarySearch } from './LibraryToolbar';
 import { SharedActivity } from '../activity/Activity';
 import { ContinueWithMaterial } from '../conversation/AttachmentMaterials';
 import { DocumentCard } from '../documents/Documents';
 import { useViewState, textState, pageState } from '../shared/useViewState';
 import { LiveConversationDeck } from '../conversation/LiveConversationDeck';
-import { MoreActions } from '../shared/MoreActions';
+import { useBriefingRefresh } from '../components/useBriefingRefresh';
 import { ExportBatchPanel } from '../export/ExportBatchPanel';
-import { requestNavigationLocked } from '../shared/request-guard';
-import { useEffect, useRef, useState } from 'react';
+import { requestNavigationLocked, RequestPending } from '../shared/request-guard';
+import { useContext, useEffect, useRef, useState } from 'react';
 import {
   Info,
   FileText,
@@ -18,6 +18,8 @@ import {
   Download,
   ChevronRight,
   RefreshCw,
+  Trash2,
+  Activity,
   LibraryBig,
 } from 'lucide-react';
 import type { TenantContext } from '../../contracts/public-api/identity';
@@ -31,7 +33,8 @@ import './material.css';
 import { AnalysisPanel, ContentSearch } from './Knowledge';
 import { MaterialUploadDialog } from './BatchUpload';
 import { useUploads } from './UploadManager';
-import { MaterialMaintenance } from '../lifecycle/MaterialMaintenance';
+import { MaterialRecycle } from '../lifecycle/MaterialRecycle';
+import { MaterialEntryActions } from '../lifecycle/MaterialActions';
 export const libraryHref = (tenant: string, scope = 'personal', folder?: string) =>
   '#' + new URLSearchParams({ tenant, view: 'library', scope, ...(folder ? { folder } : {}) });
 const size = (bytes: number) =>
@@ -85,7 +88,8 @@ function LibraryContents({
   }, []);
   const params = new URLSearchParams(hash.slice(1)),
     scope = params.get('scope') || (administration ? 'enterprise' : 'personal'),
-    folder = params.get('folder');
+    folder = params.get('folder'),
+    recycle = params.get('recycle');
   const selected =
     scope === 'personal'
       ? context.workspaces.find((s) => s.kind === 'PERSONAL')
@@ -132,6 +136,7 @@ function LibraryContents({
           all={all}
           administration={administration}
           hash={hash}
+          recycle={recycle === 'trash' ? 'TRASH' : recycle === 'records' ? 'RECORDS' : undefined}
         />
       )}
     </>
@@ -146,6 +151,7 @@ function LibraryListing({
   all,
   administration,
   hash,
+  recycle,
 }: {
   tenant: string;
   context: TenantContext;
@@ -155,6 +161,7 @@ function LibraryListing({
   all: boolean;
   administration: boolean;
   hash: string;
+  recycle?: 'TRASH' | 'RECORDS';
 }) {
   const href = (tenant: string, scope = 'personal', folder?: string) =>
     administration
@@ -162,7 +169,6 @@ function LibraryListing({
       : libraryHref(tenant, scope, folder);
   const [draftDocument, setDraftDocument] = useState<string>();
   const [contentSearch, setContentSearch] = useState(false);
-  const [maintenanceOpen, setMaintenanceOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
   const listingKey =
     (administration ? 'admin-library:' : 'library:') +
@@ -228,12 +234,95 @@ function LibraryListing({
     }
   }, [data.error, data.value, workspace, modal, uploadTarget, context]);
   useEffect(() => {
-    if (data.error || (data.value && !data.value.canMaintain)) setMaintenanceOpen(false);
     if (data.error) setActivityOpen(false);
   }, [data.error, data.value]);
+  const refreshRoot = useRef<HTMLDivElement>(null);
+  const refreshDone = useRef<((success: boolean) => void) | undefined>(undefined);
+  const pending = useContext(RequestPending);
+  useEffect(() => {
+    if (data.value || data.error) {
+      refreshDone.current?.(!data.error);
+      refreshDone.current = undefined;
+    }
+  }, [data.value, data.error]);
+  useEffect(() => () => refreshDone.current?.(false), []);
+  const pullRefresh = useBriefingRefresh({
+    page: refreshRoot,
+    label: '资料库',
+    ready: !!data.value,
+    blocked: pending || !!recycle || !!modal || activityOpen || !!document || !!draftDocument,
+    viewKey: listingKey + q + page,
+    reload: () =>
+      new Promise<boolean>((resolve) => {
+        refreshDone.current = resolve;
+        refresh();
+      }),
+  });
   const personal = current?.kind === 'PERSONAL';
+  const recycleHref = (view: 'TRASH' | 'RECORDS') =>
+    href(tenant, personal ? 'personal' : workspace!, folder || undefined) +
+    '&recycle=' +
+    view.toLowerCase();
+  const returnScroll = useRef<number | null>(null);
+  useEffect(() => {
+    if (recycle || !data.value || returnScroll.current === null) return;
+    // The shorter recycle page can clamp scroll before the shared route cleanup saves it (Firefox).
+    // Capture before leaving and restore after the normal list and route scroll restoration commit.
+    const root = refreshRoot.current?.closest<HTMLElement>('.access-content');
+    if (!root) return;
+    const position = returnScroll.current;
+    const frame = requestAnimationFrame(() => {
+      root.scrollTop = Math.min(position, Math.max(0, root.scrollHeight - root.clientHeight));
+      returnScroll.current = null;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [recycle, data.value]);
+  if (recycle && workspace && current)
+    return (
+      <MaterialRecycle
+        key={workspace + recycle}
+        tenant={tenant}
+        workspace={workspace}
+        workspaceName={personal ? '个人空间' : current.name}
+        view={recycle}
+        verification={context}
+        changed={refresh}
+        back={() => {
+          location.hash = href(tenant, personal ? 'personal' : workspace, folder || undefined);
+        }}
+        navigate={(view) => {
+          location.hash = recycleHref(view);
+        }}
+      />
+    );
   return (
-    <>
+    <div ref={refreshRoot} className="library-page" data-refresh-phase={pullRefresh.phase}>
+      <div
+        className="library-pull-refresh"
+        style={{ height: pullRefresh.distance }}
+        aria-hidden={pullRefresh.phase === 'idle'}
+      >
+        {pullRefresh.phase !== 'idle' && (
+          <>
+            <RefreshCw
+              size={17}
+              className={pullRefresh.phase === 'refreshing' ? 'library-refresh-spinner' : ''}
+            />
+            <span>
+              {pullRefresh.phase === 'refreshing'
+                ? '正在刷新'
+                : pullRefresh.phase === 'done'
+                  ? '已刷新'
+                  : pullRefresh.phase === 'ready'
+                    ? '松开刷新'
+                    : '下拉刷新'}
+            </span>
+          </>
+        )}
+      </div>
+      <span className="sr-only" role="status">
+        {pullRefresh.announcement}
+      </span>
       {current?.kind === 'SHARED' && (
         <ExportBatchPanel
           tenant={tenant}
@@ -242,23 +331,24 @@ function LibraryListing({
           scope="ENTERPRISE"
         />
       )}
-      <PageActions>
-        <MoreActions label="资料操作">
-          {(enterprise || all || current?.kind === 'SHARED') && (
-            <Button onClick={() => setActivityOpen(true)}>资料动态</Button>
-          )}
-          <Button variant="ghost" icon={RefreshCw} onClick={refresh}>
-            刷新
-          </Button>
-          {workspace && data.value?.canMaintain && (
-            <Button onClick={() => setMaintenanceOpen(true)}>维护与回收站</Button>
-          )}
-          {data.value?.canMaintain && (
-            <Button icon={FolderPlus} onClick={() => setModal('folder')}>
-              新建文件夹
-            </Button>
-          )}
-        </MoreActions>
+      <PageActions placement="meta">
+        {(enterprise || all || current?.kind === 'SHARED') && (
+          <IconButton icon={Activity} label="资料动态" onClick={() => setActivityOpen(true)} />
+        )}
+        <LibrarySearch
+          disabled={pending}
+          query={query}
+          onQuery={setQuery}
+          onSearch={() => {
+            setQ(query.trim());
+            setPage(0);
+          }}
+          onClear={() => {
+            setQuery('');
+            setQ('');
+            setPage(0);
+          }}
+        />
         {(data.value?.canMaintain || enterprise || all) && (
           <Button
             variant="primary"
@@ -273,61 +363,58 @@ function LibraryListing({
         )}
       </PageActions>
       <LibraryToolbar
-        query={query}
-        onQuery={setQuery}
+        onCreateFolder={data.value?.canMaintain ? () => setModal('folder') : undefined}
+        onMaintenance={
+          workspace && data.value?.canMaintain
+            ? () => {
+                returnScroll.current =
+                  refreshRoot.current?.closest<HTMLElement>('.access-content')?.scrollTop || 0;
+                location.hash = recycleHref('TRASH');
+              }
+            : undefined
+        }
         layout={layout}
         onLayout={setLayout}
-        onSearch={() => {
-          setQ(query.trim());
-          setPage(0);
-        }}
-        onClear={() => {
-          setQuery('');
-          setQ('');
-          setPage(0);
-        }}
       >
-        {(folder || all || (current && !personal)) && (
-          <nav className="material-crumbs" aria-label="文件夹路径">
-            <button
-              onClick={() => {
-                location.hash = href(tenant, personal ? 'personal' : 'enterprise');
-              }}
-            >
-              {personal ? '个人空间' : '企业资料库'}
-            </button>
-            {current && !personal && (
-              <>
-                <ChevronRight size={14} />
-                <button
-                  onClick={() => {
-                    location.hash = href(tenant, workspace!);
-                  }}
-                >
-                  {current.name}
-                </button>
-              </>
-            )}
-            {all && (
-              <>
-                <ChevronRight size={14} />
-                <span>全部资料</span>
-              </>
-            )}
-            {data.value?.trail.map((c) => (
-              <span key={c.id}>
-                <ChevronRight size={14} />
-                <button
-                  onClick={() => {
-                    location.hash = href(tenant, personal ? 'personal' : workspace!, c.id);
-                  }}
-                >
-                  {c.name}
-                </button>
-              </span>
-            ))}
-          </nav>
-        )}
+        <nav className="material-crumbs" aria-label="文件夹路径">
+          <button
+            onClick={() => {
+              location.hash = href(tenant, personal ? 'personal' : 'enterprise');
+            }}
+          >
+            {personal ? '个人空间' : '企业资料库'}
+          </button>
+          {current && !personal && (
+            <>
+              <ChevronRight size={14} />
+              <button
+                onClick={() => {
+                  location.hash = href(tenant, workspace!);
+                }}
+              >
+                {current.name}
+              </button>
+            </>
+          )}
+          {all && (
+            <>
+              <ChevronRight size={14} />
+              <span>全部资料</span>
+            </>
+          )}
+          {data.value?.trail.map((c) => (
+            <span key={c.id}>
+              <ChevronRight size={14} />
+              <button
+                onClick={() => {
+                  location.hash = href(tenant, personal ? 'personal' : workspace!, c.id);
+                }}
+              >
+                {c.name}
+              </button>
+            </span>
+          ))}
+        </nav>
       </LibraryToolbar>
       {activityOpen && (enterprise || all || current?.kind === 'SHARED') && (
         <Modal title="资料动态" onClose={() => setActivityOpen(false)}>
@@ -389,53 +476,64 @@ function LibraryListing({
         <Loading />
       ) : (
         <>
-          {workspace && (
-            <p className="material-caption">
-              {data.value.canMaintain ? '可上传与维护' : '只读 · 可查看与下载'}
-              {q ? ' · 搜索名称与正文，包含当前目录及子目录' : ''}
-            </p>
-          )}
           <div className={`material-entries ${layout}`}>
             {data.value.items.map((item) => (
-              <button
-                key={item.id}
-                className="material-entry"
-                onClick={() =>
-                  item.kind === 'FOLDER'
-                    ? (location.hash = href(tenant, personal ? 'personal' : item.workspaceId, item.id))
-                    : item.kind === 'DRAFT'
-                      ? setDraftDocument(item.id)
-                      : setDocument({ id: item.id, workspaceId: item.workspaceId })
-                }
-              >
-                <div className="material-cover">
-                  {item.kind === 'FOLDER' ? <Folder size={32} /> : <FileText size={32} />}
-                  <span>
-                    {item.kind === 'FOLDER'
-                      ? '文件夹'
+              <div key={item.id} className="material-entry-shell">
+                <button
+                  className="material-entry"
+                  onClick={() =>
+                    item.kind === 'FOLDER'
+                      ? (location.hash = href(
+                          tenant,
+                          personal ? 'personal' : item.workspaceId,
+                          item.id,
+                        ))
                       : item.kind === 'DRAFT'
-                        ? '文稿'
-                        : item.name.includes('.')
-                          ? item.name.split('.').at(-1)?.toUpperCase()
-                          : '文件'}
-                  </span>
-                  {item.kind === 'DOCUMENT' && <strong>{item.name}</strong>}
-                </div>
-                <div className="material-entry-body">
-                  <strong>{item.name}</strong>
-                  <small>
-                    {q || !workspace
-                      ? item.path.join(' / ')
-                      : item.kind === 'DOCUMENT'
-                        ? `${size(item.sizeBytes!)} · v${item.version}`
-                        : '打开文件夹'}
-                  </small>
-                  <small>
-                    {new Date(item.updatedAt).toLocaleDateString('zh-CN')}
-                    {item.kind === 'DOCUMENT' ? ' · 原件已保存' : ''}
-                  </small>
-                </div>
-              </button>
+                        ? setDraftDocument(item.id)
+                        : setDocument({ id: item.id, workspaceId: item.workspaceId })
+                  }
+                >
+                  <div className="material-cover">
+                    {item.kind === 'FOLDER' ? <Folder size={32} /> : <FileText size={32} />}
+                    <span>
+                      {item.kind === 'FOLDER'
+                        ? '文件夹'
+                        : item.kind === 'DRAFT'
+                          ? '文稿'
+                          : item.name.includes('.')
+                            ? item.name.split('.').at(-1)?.toUpperCase()
+                            : '文件'}
+                    </span>
+                    <div className="material-cover-art" aria-hidden="true">
+                      {item.kind === 'FOLDER' ? <Folder strokeWidth={1.3} /> : <FileText strokeWidth={1.3} />}
+                    </div>
+                  </div>
+                  <div className="material-entry-body">
+                    <strong>{item.name}</strong>
+                    {(q || !workspace || item.kind === 'DOCUMENT') && (
+                      <small>
+                        {q || !workspace
+                          ? item.path.join(' / ')
+                          : `${size(item.sizeBytes!)} · v${item.version}`}
+                      </small>
+                    )}
+                    <small>
+                      {new Date(item.updatedAt).toLocaleDateString('zh-CN')}
+                      {item.kind === 'DOCUMENT' ? ' · 原件已保存' : ''}
+                    </small>
+                  </div>
+                </button>
+                {item.kind !== 'DRAFT' && item.canMaintain && (
+                  <MaterialEntryActions
+                    tenant={tenant}
+                    workspace={item.workspaceId}
+                    id={item.id}
+                    kind={item.kind === 'FOLDER' ? 'FOLDER' : 'MATERIAL'}
+                    name={item.name}
+                    changed={refresh}
+                  />
+                )}
+              </div>
             ))}
           </div>
           {!data.value.items.length && (
@@ -458,16 +556,6 @@ function LibraryListing({
           space={workspace}
           close={() => setContentSearch(false)}
           verification={context}
-        />
-      )}
-      {maintenanceOpen && workspace && (
-        <MaterialMaintenance
-          tenant={tenant}
-          workspace={workspace}
-          entries={data.value?.items || []}
-          verification={context}
-          close={() => setMaintenanceOpen(false)}
-          changed={refresh}
         />
       )}
       {modal === 'folder' && workspace && (
@@ -520,7 +608,7 @@ function LibraryListing({
           administration={administration}
         />
       )}
-    </>
+    </div>
   );
 }
 function FolderDialog({
@@ -539,12 +627,15 @@ function FolderDialog({
   denied: (error: unknown) => void;
 }) {
   const [name, setName] = useState('');
+  const nameInput = useRef<HTMLInputElement>(null);
   const submit = useSubmission<{ name: string }>();
   const controller = useRef(new AbortController());
   useEffect(() => () => controller.current.abort(), []);
+  useEffect(() => nameInput.current?.focus({ preventScroll: true }), []);
   return (
     <Modal
       title="新建文件夹"
+      className="material-folder-dialog"
       onClose={() => {
         if (!submit.busy) close();
       }}
@@ -570,13 +661,29 @@ function FolderDialog({
       >
         <fieldset disabled={submit.busy || submit.uncertain}>
           <Field label="文件夹名称">
-            <input value={name} maxLength={180} required onChange={(e) => setName(e.target.value)} />
+            <input
+              ref={nameInput}
+              placeholder="输入文件夹名称"
+              value={name}
+              maxLength={180}
+              required
+              onChange={(e) => setName(e.target.value)}
+            />
           </Field>
         </fieldset>
         <SubmitError error={submit.error} uncertain={submit.uncertain} />
-        <Button type="submit" variant="primary" disabled={submit.busy}>
-          {submit.busy ? '正在创建…' : submit.uncertain ? '重试本次创建' : '创建文件夹'}
-        </Button>
+        <div className="modal-actions">
+          <Button disabled={submit.busy} onClick={close}>
+            取消
+          </Button>
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={submit.busy || (!submit.uncertain && !name.trim())}
+          >
+            {submit.busy ? '正在创建…' : submit.uncertain ? '重试本次创建' : '创建文件夹'}
+          </Button>
+        </div>
       </form>
     </Modal>
   );
@@ -802,7 +909,7 @@ export function DocumentDialog({
   return (
     <>
       <Modal
-        title="资料与历史版本"
+        title="资料阅读"
         onClose={() => {
           if (!requestNavigationLocked()) close();
         }}
@@ -815,7 +922,6 @@ export function DocumentDialog({
           persistenceKey={readerKey}
           title={title}
           onClose={close}
-          onRefresh={refreshReader}
           reveal={reveal}
           mainActions={
             !failure &&

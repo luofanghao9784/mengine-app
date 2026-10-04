@@ -5,6 +5,9 @@
   gap: 10px;
   align-items: stretch;
 }
+.live-briefing-grid.live-magazine-grid[data-sizing='workspace'] {
+  grid-template-columns: repeat(var(--briefing-columns), minmax(0, var(--briefing-unit)));
+}
 .live-briefing-tile {
   position: relative;
   min-width: 0;
@@ -38,15 +41,15 @@
 .live-magazine-grid .live-briefing-controls {
   flex: none;
 }
-.live-magazine-grid .live-briefing-card:is(:hover, :focus-within) {
+.live-magazine-grid:not([data-static]) .live-briefing-card:is(:hover, :focus-within) {
   border-color: var(--card-edge);
   box-shadow: var(--card-shadow);
 }
 @media (hover: hover) and (pointer: fine) {
-  .live-briefing-tile:has(:hover, :focus-visible) {
+  .live-magazine-grid:not([data-static]) > .live-briefing-tile:has(:hover, :focus-visible) {
     z-index: 2;
   }
-  .live-magazine-grid .live-briefing-card:is(:hover, :has(:focus-visible)) {
+  .live-magazine-grid:not([data-static]) .live-briefing-card:is(:hover, :has(:focus-visible)) {
     translate: 0 -4px;
     border-color: #cedaed;
     box-shadow:

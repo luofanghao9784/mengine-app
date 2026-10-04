@@ -2,45 +2,48 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { packMagazineTiles } from '../src/briefingGrid.ts';
 
-test('generation slots append after the existing magazine layout without filling earlier holes', () => {
-  const base = [
-    { id: 'chart', size: '2×2' as const, fixed: true },
-    { id: 'wide', size: '2×1' as const, fixed: true },
-  ];
-  const before = packMagazineTiles(base, 3);
-  const pending = packMagazineTiles(
+test('generation placeholders and the more entry fill earlier available cells', () => {
+  const result = packMagazineTiles(
     [
-      ...base,
-      { id: 'batch', size: '1×1', fixed: true, append: true },
-      { id: 'more', size: '1×1', fixed: true, append: true },
+      { id: 'chart', size: '2×2', fixed: true },
+      { id: 'wide', size: '2×1', fixed: true },
+      { id: 'batch', size: '1×1', fixed: true },
+      { id: 'more', size: '1×1', fixed: true },
     ],
     3,
   );
-  assert.deepEqual(pending.slice(0, before.length), before);
   assert.deepEqual(
-    pending.map((p) => p.id),
-    ['chart', 'wide', 'batch', 'more'],
-  );
-  assert.ok(
-    pending[2].row * 3 + pending[2].col >
-      Math.max(...before.map((p) => (p.row + p.height - 1) * 3 + p.col + p.width - 1)),
+    result.map(({ id, row, col }) => [id, row, col]),
+    [
+      ['chart', 0, 0],
+      ['batch', 0, 2],
+      ['more', 1, 2],
+      ['wide', 2, 0],
+    ],
   );
 });
 
-test('generated content may grow without moving earlier cards and the generation entry stays last', () => {
-  const base = [{ id: 'old', size: '2×2' as const, fixed: true }];
+test('automatic measured cards narrow into gaps without losing their content height', () => {
   for (const columns of [1, 2, 3, 4, 5]) {
-    const before = packMagazineTiles(base, columns);
-    const result = packMagazineTiles(
-      [
-        ...base,
-        { id: 'batch', size: '2×2', fixed: true, append: true },
-        { id: 'more', size: '1×1', fixed: true, append: true },
-      ],
-      columns,
-    );
-    assert.deepEqual(result[0], before[0]);
-    assert.equal(result.at(-1)?.id, 'more');
-    assert.equal(result.at(-1)?.size, '1×1');
+    const cards = Array.from({ length: 12 }, (_, i) => ({
+      id: String(i),
+      size: '2×2' as const,
+      rows: (i % 3) + 2,
+    }));
+    const before = structuredClone(cards);
+    const result = packMagazineTiles(cards, columns);
+    const occupied = new Set<number>();
+    for (const tile of result) {
+      assert.ok(tile.height >= cards[Number(tile.id)].rows);
+      for (let y = 0; y < tile.height; y++)
+        for (let x = 0; x < tile.width; x++) {
+          const cell = (tile.row + y) * columns + tile.col + x;
+          assert.ok(!occupied.has(cell));
+          occupied.add(cell);
+        }
+    }
+    const lastStart = Math.max(...result.map((p) => p.row * columns + p.col));
+    for (let cell = 0; cell <= lastStart; cell++) assert.ok(occupied.has(cell), `gap at ${columns}:${cell}`);
+    assert.deepEqual(cards, before);
   }
 });

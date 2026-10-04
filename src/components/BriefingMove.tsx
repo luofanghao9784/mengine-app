@@ -48,6 +48,10 @@ type Gesture = MovePreview & {
   layer: HTMLElement | null;
 };
 type Options = {
+  reflowSelector?: string;
+  cardSelector?: string;
+  surfaceSelector?: string;
+  dragLayerClass?: string;
   page: RefObject<HTMLDivElement | null>;
   columns: number;
   unit: number;
@@ -83,7 +87,7 @@ export function useBriefingMove(options: Options) {
   } | null>(null);
   const [preview, setPreview] = useState<MovePreview | null>(null);
   const [announcement, setAnnouncement] = useState('');
-  const capture = useBriefingReflow(options.page);
+  const capture = useBriefingReflow(options.page, options.reflowSelector);
   const suppressUntil = useRef(0);
   const clearTouch = useCallback(() => {
     if (pendingTouch.current) clearTimeout(pendingTouch.current.timer);
@@ -129,7 +133,7 @@ export function useBriefingMove(options: Options) {
       latest.current.onStart();
       if (g.kind === 'touch') latest.current.onTouchHold();
       if (g.kind === 'mouse' && g.pointerId !== undefined) g.captureTarget.setPointerCapture(g.pointerId);
-      const card = g.surface.closest<HTMLElement>('.briefing-card')!;
+      const card = g.surface.closest<HTMLElement>(latest.current.cardSelector || '.briefing-card')!;
       const box = card.getBoundingClientRect();
       g.ghost = card.cloneNode(true) as HTMLElement;
       g.ghost.classList.add('briefing-move-ghost');
@@ -144,7 +148,7 @@ export function useBriefingMove(options: Options) {
       for (const name of ['--briefing-ink', '--briefing-muted', '--briefing-line'])
         g.ghost.style.setProperty(name, styles.getPropertyValue(name));
       g.layer = document.createElement('div');
-      g.layer.className = 'briefing-grid briefing-drag-layer';
+      g.layer.className = latest.current.dragLayerClass || 'briefing-grid briefing-drag-layer';
       g.layer.setAttribute('aria-hidden', 'true');
       g.layer.append(g.ghost);
       document.body.append(g.layer);
@@ -232,7 +236,7 @@ export function useBriefingMove(options: Options) {
   );
   const track = useCallback(
     (g: Gesture, x: number, y: number) => {
-      const box = g.surface.closest('.briefing-card')!.getBoundingClientRect();
+      const box = g.surface.closest(latest.current.cardSelector || '.briefing-card')!.getBoundingClientRect();
       Object.assign(g, { x, y, startX: x, startY: y, offsetX: x - box.left, offsetY: y - box.top });
       const tick = () => {
         if (gesture.current !== g) return;
@@ -294,7 +298,9 @@ export function useBriefingMove(options: Options) {
         return;
       }
       if (blocked() || gesture.current || !(e.target instanceof Element)) return;
-      const surface = e.target.closest<HTMLButtonElement>('.briefing-card-main');
+      const surface = e.target.closest<HTMLButtonElement>(
+        latest.current.surfaceSelector || '.briefing-card-main',
+      );
       if (!surface || !page.contains(surface)) return;
       const t = e.touches[0],
         scroller = page.closest('main')!;
@@ -386,7 +392,8 @@ export function useBriefingMove(options: Options) {
       if (pendingTouch.current || gesture.current?.kind === 'touch') e.preventDefault();
     };
     const dragStart = (e: DragEvent) => {
-      if ((e.target as Element).closest('.briefing-card-main')) e.preventDefault();
+      if ((e.target as Element).closest(latest.current.surfaceSelector || '.briefing-card-main'))
+        e.preventDefault();
     };
     const cancel = () => finish(false);
     document.addEventListener('pointermove', move, { passive: false });

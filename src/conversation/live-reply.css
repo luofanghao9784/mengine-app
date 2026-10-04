@@ -1,0 +1,53 @@
+.reply-progress {
+  margin: 12px 0 8px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #6d7d91;
+}
+.reply-progress-flow {
+  display: inline-block;
+  color: #6d7d91;
+  background: linear-gradient(100deg, #6d7d91 30%, #b7c6d8 45%, #5076a5 50%, #b7c6d8 55%, #6d7d91 70%);
+  background-size: 250% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: reply-progress-flow 2.4s linear infinite;
+}
+@keyframes reply-progress-flow {
+  from {
+    background-position: 140% 0;
+  }
+  to {
+    background-position: -40% 0;
+  }
+}
+.live-conversations .live-process-preview {
+  color: #748296;
+  font-size: 13px;
+}
+.live-process-preview strong {
+  font-weight: 500;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reply-progress-flow {
+    animation: none;
+    background: none;
+    -webkit-text-fill-color: currentColor;
+  }
+}
+
+.reply-process-history {
+  margin: 12px 0;
+  font-size: 12px;
+  color: #748296;
+}
+.reply-process-history summary {
+  cursor: pointer;
+  width: fit-content;
+}
+.reply-process-history .live-process-preview {
+  margin-top: 10px;
+  font-size: 13px;
+  line-height: 1.8;
+}

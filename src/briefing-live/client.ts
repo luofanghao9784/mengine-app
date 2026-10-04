@@ -1,5 +1,6 @@
 import { isBriefingDocument } from './content.ts';
 import type {
+  BriefingTimelinePage,
   BriefingCard,
   BriefingPreference,
   BriefingPage,
@@ -55,6 +56,68 @@ export function createBriefingClient(fetcher: typeof fetch = fetch) {
   const request = createIdentityRequest(fetcher);
   const root = (tenant: string) => `/api/v1/tenants/${id(tenant)}/briefing`;
   return {
+    timeline(tenant: string, zone: string, offset = 0, asOf?: string, signal?: AbortSignal) {
+      const query = new URLSearchParams({ zone, offset: String(offset), limit: '20' });
+      if (asOf) query.set('asOf', asOf);
+      return request(
+        root(tenant) + '/timeline?' + query,
+        'GET',
+        (v): v is BriefingTimelinePage =>
+          record(v) &&
+          v.tenantId === tenant &&
+          v.zone === zone &&
+          text(v.asOf) &&
+          Number.isFinite(Date.parse(v.asOf)) &&
+          (!asOf || v.asOf === asOf) &&
+          typeof v.hasMore === 'boolean' &&
+          Array.isArray(v.items) &&
+          v.items.length <= 20 &&
+          v.items.every(
+            (day, index, days) =>
+              record(day) &&
+              text(day.date) &&
+              /^\d{4}-\d{2}-\d{2}$/.test(day.date) &&
+              (!index || String(days[index - 1].date) > day.date) &&
+              count(day.total) &&
+              day.total > 0 &&
+              Array.isArray(day.items) &&
+              day.items.length === Math.min(3, day.total) &&
+              day.items.every((c) => card(c) && !c.preference.hidden) &&
+              new Set(day.items.map((c) => c.cardId || c.taskId)).size === day.items.length,
+          ),
+        undefined,
+        signal,
+      );
+    },
+    timelineDay(
+      tenant: string,
+      date: string,
+      zone: string,
+      offset: number,
+      asOf: string,
+      signal?: AbortSignal,
+    ) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new IdentityError('INVALID_REQUEST', 400);
+      const query = new URLSearchParams({ zone, offset: String(offset), limit: '20', asOf });
+      return request(
+        root(tenant) + '/timeline/' + date + '?' + query,
+        'GET',
+        (v): v is BriefingPage =>
+          record(v) &&
+          v.tenantId === tenant &&
+          v.view === 'LATEST' &&
+          v.date === date &&
+          v.zone === zone &&
+          v.asOf === asOf &&
+          typeof v.hasMore === 'boolean' &&
+          Array.isArray(v.items) &&
+          v.items.length <= 20 &&
+          v.items.every((c) => card(c) && !c.preference.hidden) &&
+          new Set(v.items.map((c) => c.cardId || c.taskId)).size === v.items.length,
+        undefined,
+        signal,
+      );
+    },
     cardPreference(tenant: string, card: string) {
       return request(root(tenant) + '/cards/' + id(card) + '/preference', 'GET', isPreference);
     },

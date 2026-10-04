@@ -13,6 +13,8 @@ const item = {
   purgeAfter: '2026-10-31T00:00:00Z',
   cleanupJobId: null,
   canPurge: false,
+  path: ['个人空间', '合成目录'],
+  parentAvailable: true,
 };
 const response = (v: unknown) =>
   new Response(JSON.stringify(v), { headers: { 'content-type': 'application/json' } });
@@ -65,4 +67,33 @@ test('online cleanup cannot claim backups complete or impossible blob counts', (
   assert.ok(isCleanup(value));
   assert.equal(isCleanup({ ...value, originalsRemoved: 4 }), false);
   assert.equal(isCleanup({ ...value, backupState: 'ALL_BACKUPS_PURGED' }), false);
+});
+
+test('recycle name search and pagination are scoped on the server, not filtered from one page', async () => {
+  const client = createLifecycleClient(async (path) => {
+    const url = new URL(String(path), 'http://synthetic.test');
+    assert.equal(url.pathname, `/api/v1/tenants/${id(1)}/workspaces/${id(2)}/lifecycle`);
+    assert.equal(url.searchParams.get('view'), 'TRASH');
+    assert.equal(url.searchParams.get('query'), '合成 & 100%');
+    assert.equal(url.searchParams.get('offset'), '20');
+    return response({ items: [item], hasMore: true });
+  });
+  const page = await client.list(id(1), id(2), 20, undefined, { view: 'TRASH', query: '合成 & 100%' });
+  assert.deepEqual(page.items[0].path, item.path);
+  assert.equal(page.hasMore, true);
+  assert.equal(isLifecycleItem({ ...item, path: ['目录', 42] }), false);
+  assert.equal(isLifecycleItem({ ...item, parentAvailable: 'yes' }), false);
+});
+test('recycle response cannot include active or already cleared content as recoverable', async () => {
+  for (const state of ['ACTIVE', 'PURGING', 'PURGED'])
+    await assert.rejects(
+      createLifecycleClient(async () => response({ items: [{ ...item, state }], hasMore: false })).list(
+        id(1),
+        id(2),
+        0,
+        undefined,
+        { view: 'TRASH', query: '' },
+      ),
+      (e) => e instanceof IdentityError && e.code === 'CONTRACT_MISMATCH',
+    );
 });

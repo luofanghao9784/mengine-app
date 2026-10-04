@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={"dreamcore.tasks.enabled=true","dreamcore.tasks.initial-delay-ms=3600000","dreamcore.knowledge.enabled=true","dreamcore.knowledge.initial-delay-ms=3600000"})
 class ConversationIntegrationTest {
     @DynamicPropertySource static void paths(DynamicPropertyRegistry r){Path root=Path.of("").toAbsolutePath();if(root.endsWith("api"))root=root.getParent().getParent();String parser=root.resolve("workers/parser").toString();r.add("dreamcore.knowledge.parser-root",()->parser);}
-    @Autowired JdbcTemplate db;@Autowired ConversationService conversations;@Autowired KnowledgeService knowledge;@Autowired MaterialService materials;@Autowired DocumentParser parser;@Autowired PasswordEncoder passwords;
+    @Autowired ConversationManagement management;@Autowired JdbcTemplate db;@Autowired ConversationService conversations;@Autowired KnowledgeService knowledge;@Autowired MaterialService materials;@Autowired DocumentParser parser;@Autowired PasswordEncoder passwords;
     @LocalServerPort int port;
     UUID tenant,other,owner,reader,admin,space,personal;
     @BeforeEach void fixture(){
@@ -98,10 +98,75 @@ class ConversationIntegrationTest {
         assertEquals(200,http.send(HttpRequest.newBuilder(URI.create(root+"/api/v1/auth/login")).header(csrf.get("headerName").asString(),csrf.get("token").asString()).header("Content-Type","application/json").POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(Map.of("email",owner+"@example.test","password","synthetic-conversation-password")))).build(),HttpResponse.BodyHandlers.ofString()).statusCode());
         var read=http.send(HttpRequest.newBuilder(URI.create(root+path)).GET().build(),HttpResponse.BodyHandlers.ofString());assertEquals(200,read.statusCode());assertTrue(read.headers().firstValue("cache-control").orElseThrow().contains("no-store"));assertTrue(read.body().contains("SOURCE_LOOKUP"));
         assertEquals(403,http.send(HttpRequest.newBuilder(URI.create(root+path+"/tasks")).header("Content-Type","application/json").POST(HttpRequest.BodyPublishers.ofString("{}")).build(),HttpResponse.BodyHandlers.ofString()).statusCode());
+        String body=json.writeValueAsString(Map.of("requestId",UUID.randomUUID(),"expectedRevision",0,"action","TRASH","stopRunning",true));
+        assertEquals(403,http.send(HttpRequest.newBuilder(URI.create(root+path+"/management")).header("Content-Type","application/json").POST(HttpRequest.BodyPublishers.ofString(body)).build(),HttpResponse.BodyHandlers.ofString()).statusCode());
+        csrf=json.readTree(http.send(HttpRequest.newBuilder(URI.create(root+"/api/v1/auth/csrf")).GET().build(),HttpResponse.BodyHandlers.ofString()).body());
+        assertEquals(200,http.send(HttpRequest.newBuilder(URI.create(root+path+"/management")).header(csrf.get("headerName").asString(),csrf.get("token").asString()).header("Content-Type","application/json").POST(HttpRequest.BodyPublishers.ofString(body)).build(),HttpResponse.BodyHandlers.ofString()).statusCode());
+        assertEquals(404,http.send(HttpRequest.newBuilder(URI.create(root+path)).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
+        var trash=http.send(HttpRequest.newBuilder(URI.create(root+"/api/v1/tenants/"+tenant+"/conversations/trash")).GET().build(),HttpResponse.BodyHandlers.ofString());
+        assertEquals(200,trash.statusCode());assertTrue(trash.body().contains(d.conversation().id().toString()));assertTrue(trash.headers().firstValue("cache-control").orElseThrow().contains("no-store"));
+
     }
     @Test void defaultPlatformDoesNotExposePublicWebOrAcceptExternalQuery(){
         assertFalse(conversations.list(owner,tenant,0,20).publicWebEnabled());
         denied(403,()->conversations.submit(owner,tenant,null,personal,UUID.randomUUID(),"研究","AGENT","公开主题"));
+    }
+
+    @Test void unreadTracksNewAcceptedRepliesAndReadReceiptsAreMonotonic() {
+        var d=send(owner,personal);UUID id=d.conversation().id(),task=task(d).id();
+        assertTrue(detail(id).conversation().running());assertFalse(detail(id).conversation().unread());
+        db.update("UPDATE conversations SET title='仅更新标题' WHERE id=?",id);
+        assertFalse(detail(id).conversation().unread());
+        db.update("UPDATE conversation_tasks SET status='SUCCEEDED',reply='合成第一回复',attempt=1 WHERE id=?",task);
+        assertTrue(detail(id).conversation().unread());assertFalse(detail(id).conversation().running());
+        assertEquals(1,detail(id).conversation().replyRevision());
+        db.update("UPDATE conversation_tasks SET status='SUCCEEDED',reply='合成第一回复' WHERE id=?",task);
+        assertEquals(1,detail(id).conversation().replyRevision());
+        denied(404,()->management.read(reader,tenant,id,1));denied(404,()->management.read(admin,tenant,id,1));
+        denied(409,()->management.read(owner,tenant,id,2));
+        management.read(owner,tenant,id,1);assertFalse(detail(id).conversation().unread());
+        db.update("UPDATE conversation_tasks SET reply='合成第二回复' WHERE id=?",task);
+        management.read(owner,tenant,id,1);assertTrue(detail(id).conversation().unread());
+        assertEquals(2,management.read(owner,tenant,id,2).readReplyRevision());
+        assertEquals(2,management.read(owner,tenant,id,0).readReplyRevision());assertFalse(detail(id).conversation().unread());
+    }
+    @Test void trashStopsRunningFencesLateWritesAndRestoreDoesNotRestart() {
+        var d=send(owner,personal);UUID id=d.conversation().id();var job=conversations.claim();assertNotNull(job);
+        denied(409,()->management.action(owner,tenant,id,UUID.randomUUID(),0,"TRASH",false));
+        assertEquals("RUNNING",task(detail(id)).status());
+        var removed=management.action(owner,tenant,id,UUID.randomUUID(),0,"TRASH",true);
+        assertNotNull(removed.trashedAt());assertEquals(1,removed.revision());
+        assertTrue(conversations.list(owner,tenant,0,20).items().isEmpty());
+        assertEquals(1,conversations.list(owner,tenant,0,20,true).items().size());
+        denied(404,()->detail(id));denied(404,()->conversations.events(owner,tenant,id,0));
+        denied(404,()->conversations.finish(job,result(job,List.of())));
+        denied(404,()->conversations.submit(owner,tenant,id,personal,UUID.randomUUID(),"新任务","SOURCE_LOOKUP"));
+        management.action(owner,tenant,id,UUID.randomUUID(),1,"RESTORE",false);
+        assertEquals("CANCELLED",task(detail(id)).status());assertNull(conversations.claim());
+        conversations.finish(job,result(job,List.of()));assertEquals("CANCELLED",task(detail(id)).status());
+        assertTrue(conversations.list(owner,tenant,0,20,true).items().isEmpty());assertFalse(detail(id).conversation().running());
+    }
+    @Test void trashRestoreAreOwnerOnlyAndOldIdempotentDeleteNeverDeletesRestoredHistory() {
+        var d=send(owner,personal);UUID id=d.conversation().id(),key=UUID.randomUUID();
+        denied(404,()->management.action(reader,tenant,id,UUID.randomUUID(),0,"TRASH",true));
+        denied(404,()->management.action(admin,tenant,id,UUID.randomUUID(),0,"TRASH",true));
+        denied(403,()->management.action(owner,other,id,UUID.randomUUID(),0,"TRASH",true));
+        var removed=management.action(owner,tenant,id,key,0,"TRASH",true);
+        assertEquals(removed,management.action(owner,tenant,id,key,0,"TRASH",true));
+        denied(409,()->management.action(owner,tenant,id,key,0,"RESTORE",true));
+        denied(409,()->management.action(owner,tenant,id,UUID.randomUUID(),0,"RESTORE",false));
+        var restored=management.action(owner,tenant,id,UUID.randomUUID(),1,"RESTORE",false);
+        assertEquals(restored,management.action(owner,tenant,id,key,0,"TRASH",true));
+        assertNull(detail(id).conversation().trashedAt());assertEquals(1,conversations.list(owner,tenant,0,20).items().size());
+    }
+    @Test void trashPreservesIndependentSourceMaterialsAndCurrentWorkspaceAccessStillApplies() {
+        UUID citation=source(space);var d=send(owner,space);UUID id=d.conversation().id();var job=conversations.claim();
+        conversations.finish(job,result(job,List.of(citation)));
+        management.action(owner,tenant,id,UUID.randomUUID(),0,"TRASH",false);
+        assertEquals(citation,knowledge.citation(owner,tenant,citation).id());
+        db.update("DELETE FROM workspace_members WHERE workspace_id=? AND account_id=?",space,owner);
+        assertTrue(conversations.list(owner,tenant,0,20,true).items().isEmpty());
+        denied(404,()->management.action(owner,tenant,id,UUID.randomUUID(),1,"RESTORE",false));
     }
 
 }

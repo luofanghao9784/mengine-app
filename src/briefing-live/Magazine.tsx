@@ -1,3 +1,5 @@
+import { FeedbackMark } from './FeedbackMark';
+import type { FeedbackTarget } from '../../contracts/public-api/feedback';
 import { briefingTypeLabels } from './content';
 import type { BriefingDocument } from '../../contracts/public-api/briefing-content';
 import { BriefingChart } from './DataBriefing';
@@ -12,12 +14,12 @@ import {
   Star,
   type LucideIcon,
 } from 'lucide-react';
-import { useRef, type ReactNode } from 'react';
+import { useLayoutEffect, useRef, type ReactNode } from 'react';
 import { NavIconButton, useNavHover } from '../components/NavIconButton';
 import { briefingTime } from '../briefingTypography';
 import '../briefingMagazine.css';
 
-const icons = {
+export const briefingTypeIcons = {
   INFO: Newspaper,
   DATA: ChartNoAxesCombined,
   INSIGHT: Lightbulb,
@@ -29,19 +31,22 @@ const icons = {
 export function BriefingStatusMarks({
   pinned = false,
   conversation = false,
+  feedback,
 }: {
   pinned?: boolean;
   conversation?: boolean;
+  feedback?: { tenant: string; target: FeedbackTarget };
 }) {
   return (
     <span className="live-briefing-marks">
+      {feedback && <FeedbackMark {...feedback} />}
       {pinned && (
         <span role="img" aria-label="已关注" title="已关注">
           <Star size={16} fill="currentColor" />
         </span>
       )}
       {conversation && (
-        <span role="img" aria-label="来自会话" title="来自会话">
+        <span role="img" aria-label="AI 生成" title="AI 生成">
           <MessageSquare size={16} />
         </span>
       )}
@@ -50,6 +55,7 @@ export function BriefingStatusMarks({
 }
 
 export function MagazineBody({
+  compact = false,
   title,
   excerpt,
   truncated,
@@ -60,7 +66,9 @@ export function MagazineBody({
   verification = false,
   footer,
   briefing,
+  feedback,
 }: {
+  compact?: boolean;
   title: string;
   excerpt: string;
   truncated: boolean;
@@ -71,12 +79,30 @@ export function MagazineBody({
   verification?: boolean;
   footer?: ReactNode;
   briefing?: BriefingDocument | null;
+  feedback?: { tenant: string; target: FeedbackTarget };
 }) {
   const content = briefing?.content;
-  const chart = content?.chart;
+  const chart = compact ? undefined : content?.chart;
   const type = content ? briefingTypeLabels[content.businessType] : publication ? '成果' : '会话';
-  const Icon = content ? icons[content.businessType] : publication ? FileCheck2 : MessagesSquare;
+  const Icon = content ? briefingTypeIcons[content.businessType] : publication ? FileCheck2 : MessagesSquare;
   const summary = content?.summary ?? excerpt;
+  const copyRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const copy = copyRef.current;
+    const paragraph = copy?.querySelector<HTMLElement>('.magazine-summary');
+    if (!copy || !paragraph || chart || compact) return;
+    const measure = () => {
+      const lineHeight = parseFloat(getComputedStyle(paragraph).lineHeight);
+      const available = copy.getBoundingClientRect().bottom - paragraph.getBoundingClientRect().top;
+      const lines = Math.max(1, Math.floor((available + 0.5) / lineHeight));
+      paragraph.style.webkitLineClamp = String(lines);
+    };
+    const observer = new ResizeObserver(measure);
+    observer.observe(copy);
+    for (const child of copy.children) if (child !== paragraph) observer.observe(child);
+    measure();
+    return () => observer.disconnect();
+  }, [summary, title, content?.title, chart, compact]);
   return (
     <>
       <div
@@ -93,7 +119,7 @@ export function MagazineBody({
           </time>
         </div>
         <div className="magazine-main">
-          <div className="magazine-copy">
+          <div className="magazine-copy" ref={copyRef}>
             <h3>{content?.title ?? title}</h3>
             {chart && <BriefingChart document={briefing!} compact />}
             <p className="magazine-summary live-briefing-excerpt" title={summary}>
@@ -111,7 +137,7 @@ export function MagazineBody({
         </div>
         {verification && <span className="live-verification-label">联调验证 · 未调用真实模型</span>}
       </div>
-      <BriefingStatusMarks pinned={pinned} conversation={!publication && !briefing} />
+      <BriefingStatusMarks feedback={feedback} pinned={pinned} conversation={!publication && !briefing} />
     </>
   );
 }

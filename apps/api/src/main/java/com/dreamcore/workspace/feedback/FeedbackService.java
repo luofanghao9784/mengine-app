@@ -81,7 +81,10 @@ public class FeedbackService {
     boolean issued=Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM recommendation_presentations WHERE id=? AND tenant_id=? AND actor_id=? AND task_id=? AND task_revision=? AND attempt=?)",Boolean.class,t.presentationRevision(),r.get("tenant_id"),r.get("requested_by"),t.taskId(),t.taskRevision(),t.attempt()));
     if(!issued)throw new IdentityException(409,"FEEDBACK_TARGET_CHANGED");
    }else{
-    Integer revision=db.queryForObject("SELECT coalesce((SELECT revision FROM briefing_preferences WHERE conversation_id=?),0)",Integer.class,r.get("conversation_id"));
+    boolean delivered=Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM conversation_tasks t WHERE t.id=? AND EXISTS("+com.dreamcore.workspace.conversation.BriefingContentService.ELIGIBLE+"))",Boolean.class,t.taskId()));
+    Integer revision=delivered
+      ? db.queryForObject("SELECT coalesce((SELECT revision FROM briefing_card_preferences WHERE task_id=?),0)",Integer.class,t.taskId())
+      : db.queryForObject("SELECT coalesce((SELECT revision FROM briefing_preferences WHERE conversation_id=?),0)",Integer.class,r.get("conversation_id"));
     if(revision!=t.presentationRevision())throw new IdentityException(409,"FEEDBACK_TARGET_CHANGED");
    }
   }

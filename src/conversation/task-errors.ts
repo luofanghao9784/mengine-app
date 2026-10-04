@@ -6,7 +6,7 @@ const messages: Record<string, string> = {
   TASK_PLAN_EXPIRED: '关联计划已到期，本次执行已中断。',
 
   TASK_STATE_CHANGED: '任务状态已变化，已刷新最新状态，请核对后操作。',
-  CONVERSATION_BUSY: '本会话已有正在执行的任务，请等待完成或先暂停该任务。',
+  CONVERSATION_BUSY: '本会话已有正在执行的任务，请先停止当前执行，再处理此卡片。',
 
   MODEL_NOT_CONFIGURED: '模型能力当前关闭，任务已保存。',
   TASK_INPUT_REQUIRED: '请补充本任务需要的信息后继续。',
@@ -27,6 +27,6 @@ const messages: Record<string, string> = {
   TASK_FILE_DATA:
     '文件内容无法按要求完整处理。请检查表格结构、空值和数字格式；公式、金额符号、千分位等不会自动作为数字计算。',
   TASK_TOOL_FAILED: '工具未能完成任务，本次没有交付成功结果。可以调整要求后重新发起。',
-  TASK_LIMIT: '任务达到本次执行上限，未交付成功结果。可以缩小要求后重新发起。',
+  TASK_LIMIT: '本次处理达到系统执行上限，未能完成回答。你可以再次尝试。',
 };
 export const taskErrorMessage = (code: string) => messages[code] ?? '执行服务暂不可用，请稍后重试。';

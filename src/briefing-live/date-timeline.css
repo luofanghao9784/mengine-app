@@ -1,0 +1,198 @@
+.live-date-timeline {
+  --timeline-line: #dbe5f2;
+  --timeline-rail: 100px;
+  padding: 4px 0 36px;
+}
+.timeline-day {
+  display: grid;
+  grid-template-columns: var(--timeline-rail) minmax(0, 1fr);
+  position: relative;
+  gap: 28px;
+  padding-bottom: 34px;
+  scroll-margin-top: 20px;
+}
+.timeline-day::before {
+  content: '';
+  position: absolute;
+  top: 13px;
+  bottom: -18px;
+  left: calc(var(--timeline-rail) - 1px);
+  width: 1px;
+  background: var(--timeline-line);
+}
+.timeline-date {
+  position: relative;
+  padding-top: 1px;
+}
+.timeline-date time {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.timeline-date strong {
+  color: #33475f;
+  font-size: 25px;
+  font-weight: 550;
+  line-height: 1.15;
+}
+.timeline-date time > span {
+  color: #8793a4;
+  font-size: 12px;
+}
+.timeline-dot {
+  position: absolute;
+  top: 9px;
+  right: -4px;
+  width: 9px;
+  height: 9px;
+  border: 2px solid #f8faff;
+  border-radius: 50%;
+  background: #7aa5ef;
+  box-shadow: 0 0 0 3px #eaf1ff;
+}
+.timeline-day-heading {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin: 3px 0 12px;
+  color: #8490a2;
+  font-size: 12px;
+}
+.timeline-day-content {
+  min-width: 0;
+}
+.timeline-card-scroll {
+  overflow-x: auto;
+  overflow-y: clip;
+  /* Keep the scrollport beyond the full card shadow without changing grid dimensions. */
+  padding: 32px;
+  margin: -32px -32px -16px;
+  scrollbar-width: thin;
+}
+.timeline-card-scroll:focus-visible {
+  outline: 2px solid #9cbdf3;
+  outline-offset: 2px;
+  border-radius: 24px;
+}
+.timeline-stack-face {
+  height: 100%;
+  pointer-events: none;
+}
+.timeline-card-scroll .live-briefing-tile[data-stacked] {
+  isolation: isolate;
+  z-index: 1;
+}
+.timeline-card-scroll .live-briefing-tile[data-stacked]::before,
+.timeline-card-scroll .live-briefing-tile[data-stacked]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 1px solid #dce6f4;
+  border-radius: 24px;
+  background: #edf3fc;
+  z-index: -1;
+  pointer-events: none;
+}
+.timeline-card-scroll .live-briefing-tile[data-stacked]::before {
+  transform: translate(12px, 12px) rotate(1.2deg);
+}
+.timeline-card-scroll .live-briefing-tile[data-stacked]::after {
+  background: #f6f9ff;
+  transform: translate(6px, 6px) rotate(0.6deg);
+}
+.timeline-stack-open {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 16px;
+  border: 0;
+  border-radius: 24px;
+  color: #3568b8;
+  background: linear-gradient(transparent 70%, #f5f9fff5);
+  cursor: pointer;
+}
+.timeline-stack-open > span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border: 1px solid #d9e5f8;
+  border-radius: 12px;
+  background: #f8fbff;
+  box-shadow: 0 2px 7px #356fe50d;
+  font-size: 14px;
+  font-weight: 600;
+}
+.timeline-stack-open > span > span {
+  font-size: 11px;
+  font-weight: 500;
+}
+.timeline-stack-open:hover > span {
+  background: #eaf2ff;
+  border-color: #bcd3f6;
+}
+.timeline-stack-open:focus-visible {
+  outline: 2px solid #6099f3;
+  outline-offset: 3px;
+}
+.timeline-stack-open:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.timeline-expand {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: auto;
+  padding: 4px 8px;
+  border: 0;
+  background: transparent;
+  color: #6385b6;
+  cursor: pointer;
+  font-size: 12px;
+}
+.timeline-expand:hover {
+  color: var(--accent, #356fe5);
+}
+.timeline-expand[aria-expanded='true'] svg {
+  transform: rotate(180deg);
+}
+.timeline-expand:focus-visible {
+  outline: 2px solid #9cbdf3;
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+.timeline-expand:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.timeline-day-tail {
+  grid-column: 1 / -1;
+}
+@media (max-width: 1100px) {
+  .live-date-timeline {
+    --timeline-rail: 76px;
+  }
+  .timeline-day {
+    gap: 22px;
+  }
+}
+@media (max-width: 700px) {
+  .live-date-timeline {
+    --timeline-rail: 48px;
+  }
+  .timeline-day {
+    gap: 16px;
+    padding-bottom: 28px;
+  }
+  .timeline-date strong {
+    font-size: 19px;
+  }
+  .timeline-date time > span {
+    font-size: 10px;
+  }
+}

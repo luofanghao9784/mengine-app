@@ -8,6 +8,9 @@ import type { FeedbackTarget } from '../../contracts/public-api/feedback';
 import { FeedbackActions } from './FeedbackActions';
 import { RequestPending } from '../shared/request-guard';
 import { prepareViewportMotion } from '../conversation/viewport-motion';
+import { conversationClient } from '../conversation/client';
+import { useSubmission, SubmitError } from '../shared/admin';
+import { useRequestLock } from '../shared/request-guard';
 import { briefingConversationHref } from '../conversation/briefing-context';
 import { TaskReadingBody, type ReadingTask } from './TaskReadingBody';
 import { RailButton, BriefingStatusMarks } from './Magazine';
@@ -30,7 +33,7 @@ export function ReadingDialog({
 }: {
   title: string;
   workspace: string;
-  date: string;
+  date?: string;
   tenant: string;
   task?: ReadingTask;
   onClose: () => void;
@@ -48,6 +51,14 @@ export function ReadingDialog({
   const pending = useContext(RequestPending),
     titleId = useId();
   const sizing = useBriefingDetailWidth();
+  const discussion = useSubmission<Record<string, never>>();
+  useRequestLock(discussion.busy || discussion.uncertain);
+  const [destination, setDestination] = useState<string>();
+  useEffect(() => {
+    if (!destination || discussion.busy || pending) return;
+    window.location.hash = destination;
+    onClose();
+  }, [destination, discussion.busy, pending, onClose]);
   const [showFeedback, setShowFeedback] = useState(false);
   useEffect(() => {
     const element = ref.current;
@@ -78,7 +89,7 @@ export function ReadingDialog({
     >
       <div className="live-reading-card">
         <header className="live-reading-header">
-          <span>
+          <span title={`${contentLabel || (task ? '会话' : '企业副本')} · ${workspace}`}>
             {contentLabel || (task ? '会话' : '企业副本')} · {workspace}
           </span>
           <BriefingStatusMarks pinned={pinned} conversation={!!task} />
@@ -94,7 +105,7 @@ export function ReadingDialog({
         </header>
         <div className="live-reading-scroll">
           <article className="live-reading-article">
-            <time dateTime={date}>{briefingTime(date, true)}</time>
+            {date && <time dateTime={date}>{briefingTime(date, true)}</time>}
             <h2 id={titleId}>{title}</h2>
             {preface}
             {task && <TaskReadingBody tenant={tenant} task={task} onRead={onRead} />}
@@ -107,13 +118,14 @@ export function ReadingDialog({
           )}
         </div>
         {task && (
-          <a
+          <button
+            type="button"
             className="briefing-conversation-cta live-conversation-cta"
-            aria-disabled={pending}
-            href={briefingConversationHref(tenant, task)}
-            onClick={(e) => {
-              if (pending) e.preventDefault();
-              else {
+            disabled={discussion.busy || (pending && !discussion.uncertain)}
+            onClick={() => {
+              if (!task) return;
+              void discussion.submit({}, async () => {
+                const result = await conversationClient.discussion(tenant, task);
                 const card = ref.current?.querySelector<HTMLElement>('.live-reading-card');
                 if (card)
                   prepareViewportMotion(
@@ -122,14 +134,17 @@ export function ReadingDialog({
                     'briefing',
                     card.querySelector('.live-reading-scroll')?.scrollTop || 0,
                   );
-                onClose();
-              }
+                setDestination(briefingConversationHref(tenant, task, result.conversationId || undefined));
+              });
             }}
           >
             <MessageSquare size={20} strokeWidth={1.65} />
-            <span>继续会话</span>
-          </a>
+            <span>
+              {discussion.busy ? '正在准备会话…' : discussion.uncertain ? '重试打开会话' : '发起会话'}
+            </span>
+          </button>
         )}
+        <SubmitError error={discussion.error} uncertain={discussion.uncertain} />
       </div>
       <div className="live-reading-resizer is-left" {...sizing.handle('left')} />
       <div

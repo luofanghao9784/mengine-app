@@ -1,6 +1,7 @@
 import { hasNestedScroll, wheelGestureAxis } from '../shared/gesture-routing';
 import { useLayoutEffect, type RefObject } from 'react';
 import { deckSpacing } from '../conversationDeck';
+import { deckMagneticDelta, type DeckSnapRange } from '../conversation/deck-snap';
 
 // Keep elasticity in painted offsets: widths, sticky anchors, scroll range and
 // folding semantics stay unchanged. The list is the fixed end of the spring.
@@ -9,6 +10,7 @@ export function useDeckElasticScroll(
   layoutKey: string,
   enabled: boolean,
   bounds: (card: HTMLElement) => DOMRect,
+  snapRanges?: RefObject<DeckSnapRange[]>,
 ) {
   useLayoutEffect(() => {
     const deck = scroller.current;
@@ -104,6 +106,7 @@ export function useDeckElasticScroll(
     };
     const maxScroll = () => (side ? extent : Math.max(0, deck.scrollWidth - deck.clientWidth));
     const move = (delta: number, releaseAfterPause = true, allowPull = true) => {
+      if (snapRanges) delta = deckMagneticDelta(snapRanges.current, deck.scrollLeft, delta);
       const max = maxScroll();
       const before = Math.max(0, Math.min(max, deck.scrollLeft));
       const after = Math.max(0, Math.min(max, before + delta));
@@ -268,5 +271,5 @@ export function useDeckElasticScroll(
       window.removeEventListener('blur', interrupt);
       preference.removeEventListener('change', interrupt);
     };
-  }, [scroller, layoutKey, enabled, bounds]);
+  }, [scroller, layoutKey, enabled, bounds, snapRanges]);
 }

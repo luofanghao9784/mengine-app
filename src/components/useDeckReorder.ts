@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 
-// Pointer capture is confined to card titles: reading, selecting and scrolling
+// Pointer capture is confined to card titles and their shortcut bubbles: reading, selecting and scrolling
 // within card bodies keep their native behavior on both mouse and touch devices.
 export function useDeckReorder(
   scroller: RefObject<HTMLDivElement | null>,
@@ -24,6 +24,7 @@ export function useDeckReorder(
   useEffect(() => {
     const rail = scroller.current;
     if (!rail || !enabled) return;
+    const controls = rail.parentElement!;
     const card = (id: string) =>
       Array.from(rail.querySelectorAll<HTMLElement>('[data-deck-id]')).find(
         (node) => node.dataset.deckId === id,
@@ -47,8 +48,12 @@ export function useDeckReorder(
       left: number;
       top: number;
       active: boolean;
+      bubbleOrigin: boolean;
+      captureTarget: HTMLElement;
+      bubbleAnchors?: Map<string, number>;
       next: string[];
       ghost?: HTMLElement;
+      bubbleGhost?: HTMLElement;
     } | null = null;
     let frame = 0;
     const clearMarker = () =>
@@ -60,21 +65,29 @@ export function useDeckReorder(
       drag = null;
       cancelAnimationFrame(frame);
       current.ghost?.remove();
+      current.bubbleGhost?.remove();
+      current.header.removeAttribute('data-bubble-dragging');
       card(current.id)?.removeAttribute('data-dragging');
       rail.removeAttribute('data-reordering');
       clearMarker();
-      if (rail.hasPointerCapture(current.pointerId)) rail.releasePointerCapture(current.pointerId);
+      if (current.captureTarget.hasPointerCapture(current.pointerId))
+        current.captureTarget.releasePointerCapture(current.pointerId);
       setPreviewOrder(null);
       // Capture retargets the click to the rail; never treat a title tap/drop as
       // a click on the empty overlay canvas, including after the effect restarts.
-      rail.dataset.suppressDeckClick = 'true';
-      setTimeout(() => {
-        rail.removeAttribute('data-suppress-deck-click');
-      }, 0);
+      if (!current.bubbleOrigin || current.active) {
+        rail.dataset.suppressDeckClick = 'true';
+        setTimeout(() => {
+          rail.removeAttribute('data-suppress-deck-click');
+        }, 0);
+      }
       if (current.active) {
         if (commit) callback.current(current.next);
         setMessage(commit ? '卡片位置已保存' : '已取消移动');
-        current.header.focus({ preventScroll: true });
+        const focusTarget = current.header.isConnected
+          ? current.header
+          : card(current.id)?.querySelector<HTMLElement>('.deck-card-header, .reader-header');
+        focusTarget?.focus({ preventScroll: true });
       }
     };
     const updateTarget = () => {
@@ -93,7 +106,7 @@ export function useDeckReorder(
       } else {
         index = others.findIndex((id) => {
           const box = bounds(card(id));
-          return drag!.x < box.left + box.width / 2;
+          return drag!.x < (drag!.bubbleAnchors?.get(id) ?? box.left + box.width / 2);
         });
         if (index < 0) index = others.length;
       }
@@ -124,16 +137,22 @@ export function useDeckReorder(
     const down = (event: PointerEvent) => {
       if (!event.isPrimary || event.button !== 0 || drag || order.length < 2) return;
       const target = event.target as HTMLElement;
-      if (target.closest('button, a, input, textarea, select, [role="button"], [contenteditable="true"]'))
+      const bubble = target.closest<HTMLElement>('[data-deck-reorder-id]');
+      if (
+        !bubble &&
+        target.closest('button, a, input, textarea, select, [role="button"], [contenteditable="true"]')
+      )
         return;
-      const header = target.closest<HTMLElement>('[data-deck-draggable]');
-      const id = header?.closest<HTMLElement>('[data-deck-id]')?.dataset.deckId;
+      const header = bubble || target.closest<HTMLElement>('[data-deck-draggable]');
+      const id =
+        bubble?.dataset.deckReorderId || header?.closest<HTMLElement>('[data-deck-id]')?.dataset.deckId;
       if (!header || !id || !order.includes(id)) return;
-      event.preventDefault();
+      // A bubble tap must still trigger its ordinary card-switch click.
+      if (!bubble) event.preventDefault();
       const rect = card(id).getBoundingClientRect();
       // The rail stays mounted while React moves keyed cards during live preview.
       // Capturing on a moving header can lose the touch stream on DOM reordering.
-      rail.setPointerCapture(event.pointerId);
+      if (!bubble) rail.setPointerCapture(event.pointerId);
       drag = {
         id,
         pointerId: event.pointerId,
@@ -142,9 +161,20 @@ export function useDeckReorder(
         startY: event.clientY,
         x: event.clientX,
         y: event.clientY,
-        left: rect.left,
+        left: bubble ? event.clientX - rect.width / 2 : rect.left,
         top: rect.top,
         active: false,
+        bubbleOrigin: !!bubble,
+        captureTarget: bubble ? controls : rail,
+        // Keep targets stable while drag preview temporarily hides the bubbles.
+        bubbleAnchors: bubble
+          ? new Map(
+              [...controls.querySelectorAll<HTMLElement>('[data-deck-reorder-id]')].map((entry) => {
+                const box = entry.getBoundingClientRect();
+                return [entry.dataset.deckReorderId!, box.left + box.width / 2];
+              }),
+            )
+          : undefined,
         next: order,
       };
     };
@@ -156,12 +186,18 @@ export function useDeckReorder(
       event.preventDefault();
       if (!drag.active) {
         drag.active = true;
+        drag.captureTarget.setPointerCapture(event.pointerId);
         const original = card(drag.id);
         const rect = original.getBoundingClientRect();
         const ghost = original.cloneNode(true) as HTMLElement;
         ghost.querySelectorAll('[id]').forEach((node) => node.removeAttribute('id'));
         ghost.removeAttribute('id');
         ghost.removeAttribute('data-deck-id');
+        // A folded source must become a readable floating card while moving.
+        ghost.removeAttribute('data-folding');
+        ghost.removeAttribute('data-folded');
+        ghost.removeAttribute('data-needs-reveal');
+        ghost.removeAttribute('data-stack-highlight');
         ghost.removeAttribute('aria-label');
         ghost.setAttribute('aria-hidden', 'true');
         ghost.inert = true;
@@ -174,17 +210,40 @@ export function useDeckReorder(
         });
         document.body.append(ghost);
         drag.ghost = ghost;
+        if (drag.bubbleOrigin) {
+          const bubbleBox = drag.header.getBoundingClientRect();
+          const bubbleGhost = drag.header.cloneNode(true) as HTMLElement;
+          bubbleGhost.querySelector('.deck-fold-bubble-label')?.remove();
+          bubbleGhost.removeAttribute('data-deck-reorder-id');
+          bubbleGhost.removeAttribute('data-card-id');
+          bubbleGhost.removeAttribute('id');
+          bubbleGhost.setAttribute('aria-hidden', 'true');
+          bubbleGhost.inert = true;
+          bubbleGhost.classList.add('deck-bubble-drag-ghost');
+          Object.assign(bubbleGhost.style, {
+            left: `${bubbleBox.left}px`,
+            top: `${bubbleBox.top}px`,
+          });
+          document.body.append(bubbleGhost);
+          drag.bubbleGhost = bubbleGhost;
+          drag.header.dataset.bubbleDragging = 'true';
+        }
         original.dataset.dragging = 'true';
         rail.dataset.reordering = 'true';
         frame = requestAnimationFrame(tick);
       }
       drag.ghost!.style.transform = `translate(${drag.x - drag.startX}px, ${drag.y - drag.startY}px) rotate(0.4deg)`;
+      if (drag.bubbleGhost)
+        drag.bubbleGhost.style.transform = `translate(${drag.x - drag.startX}px, ${drag.y - drag.startY}px)`;
       updateTarget();
     };
     const up = (event: PointerEvent) => {
       if (event.pointerId === drag?.pointerId) finish(true);
     };
     const cancel = () => finish(false);
+    const lostCapture = (event: PointerEvent) => {
+      if (event.target === drag?.captureTarget) finish(false);
+    };
     const keyboard = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && drag) {
         event.preventDefault();
@@ -193,8 +252,11 @@ export function useDeckReorder(
       }
       if (!event.altKey || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
       const header = event.target as HTMLElement;
-      if (!header.matches('[data-deck-draggable]')) return;
-      const id = header.closest<HTMLElement>('[data-deck-id]')!.dataset.deckId!;
+      if (!controls.contains(header) || !header.matches('[data-deck-draggable], [data-deck-reorder-id]'))
+        return;
+      const id =
+        header.dataset.deckReorderId || header.closest<HTMLElement>('[data-deck-id]')!.dataset.deckId!;
+      if (!order.includes(id)) return;
       const from = order.indexOf(id);
       const to =
         event.key === 'Home'
@@ -216,12 +278,12 @@ export function useDeckReorder(
         rail.removeAttribute('data-suppress-deck-click');
       }
     };
-    rail.addEventListener('pointerdown', down);
-    rail.addEventListener('pointermove', move);
-    rail.addEventListener('pointerup', up);
-    rail.addEventListener('pointercancel', cancel);
-    rail.addEventListener('lostpointercapture', cancel);
-    rail.addEventListener('click', click, true);
+    controls.addEventListener('pointerdown', down);
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', up);
+    document.addEventListener('pointercancel', cancel);
+    controls.addEventListener('lostpointercapture', lostCapture);
+    controls.addEventListener('click', click, true);
     document.addEventListener('keydown', keyboard, true);
     window.addEventListener('blur', cancel);
     window.addEventListener('resize', cancel);
@@ -232,12 +294,12 @@ export function useDeckReorder(
         header.removeAttribute('data-deck-draggable');
         header.removeAttribute('title');
       });
-      rail.removeEventListener('pointerdown', down);
-      rail.removeEventListener('pointermove', move);
-      rail.removeEventListener('pointerup', up);
-      rail.removeEventListener('pointercancel', cancel);
-      rail.removeEventListener('lostpointercapture', cancel);
-      rail.removeEventListener('click', click, true);
+      controls.removeEventListener('pointerdown', down);
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', up);
+      document.removeEventListener('pointercancel', cancel);
+      controls.removeEventListener('lostpointercapture', lostCapture);
+      controls.removeEventListener('click', click, true);
       document.removeEventListener('keydown', keyboard, true);
       window.removeEventListener('blur', cancel);
       window.removeEventListener('resize', cancel);

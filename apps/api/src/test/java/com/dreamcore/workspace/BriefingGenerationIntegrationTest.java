@@ -32,7 +32,10 @@ class BriefingGenerationIntegrationTest {
  }
  @AfterEach void cleanup(){db.update("DELETE FROM platform_roles WHERE account_id IN (SELECT account_id FROM platform_accounts WHERE login_name LIKE '%@service-platform.test')");db.update("DELETE FROM tenant_service_changes WHERE actor_id IN (SELECT account_id FROM platform_accounts WHERE login_name LIKE '%@service-platform.test')");db.update("DELETE FROM platform_accounts WHERE login_name LIKE '%@service-platform.test'");db.update("UPDATE conversation_tasks SET status='CANCELLED' WHERE tenant_id=? AND status IN ('QUEUED','RUNNING')",tenant);db.update("UPDATE knowledge_runs SET status='CANCELLED' WHERE tenant_id=? AND status IN ('QUEUED','RUNNING')",tenant);}
  MaterialService.UploadReceipt upload(String text,boolean ready){
-  var f=materials.uploadReceipt(actor,tenant,space,null,null,null,UUID.randomUUID(),new MockMultipartFile("file","evidence.txt","text/plain",text.getBytes(StandardCharsets.UTF_8)));
+  return upload("evidence.txt",text,ready);
+ }
+ MaterialService.UploadReceipt upload(String filename,String text,boolean ready){
+  var f=materials.uploadReceipt(actor,tenant,space,null,null,null,UUID.randomUUID(),new MockMultipartFile("file",filename,"application/octet-stream",text.getBytes(StandardCharsets.UTF_8)));
   if(ready){var j=knowledge.claim();assertEquals(f.acceptedVersion().id(),j.version());knowledge.finish(j,new DocumentParser.Result("synthetic","READY",List.of(),List.of(new DocumentParser.Fragment("L1",text,"TEXT"))));}return f;
  }
  UUID policy(){for(int i=0;i<50;i++){generation.discover();var found=generation.state(actor,tenant).policies();if(!found.isEmpty())return found.getFirst().id();}throw new AssertionError("bounded discovery did not reach fixture");}
@@ -81,6 +84,111 @@ class BriefingGenerationIntegrationTest {
   assertFalse(db.queryForObject("SELECT enabled FROM briefing_generation_policies WHERE id=?",Boolean.class,readerPolicy));
   assertEquals("SUCCEEDED",generation.get(actor,tenant,batch.id()).status());
  }
+ BriefingContentService.Request content(String title,String type){return new BriefingContentService.Request(null,title,"合成资料支持这一条独立且完整的分析结论。",List.of("这是有合成来源支持的第一段完整分析。","这是用于验证交付和历史保留的第二段分析。"),type);}
+ void record(ConversationService.Job j,int sequence,String name,String status){agents.toolReceipt(j.id(),j.token(),new AgentTaskService.ToolReceipt(sequence,name,status));}
+ AgentResult terminal(ConversationService.Job j,List<AgentResult.Tool> tools){
+  agents.openUsage(j.id(),j.token());agents.startUsage(j.id(),j.token(),new AgentUsageLedger.Start(1,2048));usage.finish(j.id(),j.token(),new AgentUsageLedger.Receipt(1,"RETURNED",100L,50L));
+  var sources=db.queryForList("SELECT chunk_id FROM conversation_agent_grants WHERE task_id=? AND attempt_id=?",UUID.class,j.id(),j.token());
+  return new AgentResult("1.5","0.15.4",j.id(),j.token(),"AGENT","verification","synthetic","合成系统交付确认。",sources,tools,List.of(),1,new AgentResult.Usage(100,50),List.of(),List.of(),List.of(),"COMPLETE",null);
+ }
+ @Test void correctedNativeDeliveryKeepsFailedReceiptAndFinishesOnlyWithVerifiedArtifact(){
+  upload("marker 合成参数恢复证据。",true);var b=manual();UUID p=policy();generation.tick(p);var j=conversations.claim();agents.search(j.id(),j.token(),"marker");
+  agents.openExecution(j.id(),j.token(),new AgentTaskService.ExecutionOpen("1.6",List.of("deliver_briefing")));
+  record(j,1,"deliver_briefing","STARTED");
+  assertThrows(IdentityException.class,()->agents.deliverBriefing(j.id(),j.token(),new BriefingContentService.Request(null,"合成参数恢复画报","合成资料支持完整的分析结论。",null,"INSIGHT")));
+  record(j,1,"deliver_briefing","failed");record(j,2,"deliver_briefing","STARTED");
+  assertEquals("PREPARED",agents.deliverBriefing(j.id(),j.token(),content("合成参数恢复画报","INSIGHT")).get("status"));record(j,2,"deliver_briefing","succeeded");
+  agents.finish(j,terminal(j,List.of(new AgentResult.Tool("bad","deliver_briefing","failed"),new AgentResult.Tool("corrected","deliver_briefing","succeeded"))));generation.tick(p);
+  assertEquals("SUCCEEDED",generation.get(actor,tenant,b.id()).status());assertEquals(1,feed.list(actor,tenant,space,"LATEST",null,"Asia/Shanghai",0,20,true).items().size());
+  assertEquals(List.of("failed","succeeded"),db.queryForList("SELECT status FROM conversation_tool_receipts WHERE task_id=? ORDER BY sequence",String.class,j.id()));
+ }
+ @Test void nativeStatusOnlyReturnsAuditedNoNewContentWithoutAnArtifact(){
+  upload("marker 合成无新主题证据。",true);var b=manual();UUID p=policy();generation.tick(p);var j=conversations.claim();
+  agents.openExecution(j.id(),j.token(),new AgentTaskService.ExecutionOpen("1.6",List.of("deliver_briefing")));record(j,1,"deliver_briefing","STARTED");
+  assertEquals("BRIEFING_SOURCES_REQUIRED",assertThrows(IdentityException.class,()->agents.deliverBriefing(j.id(),j.token(),content("暂无新内容","INFO"))).code);
+  agents.search(j.id(),j.token(),"marker");var receipt=agents.deliverBriefing(j.id(),j.token(),content("暂无新内容","INFO"));
+  assertEquals("NO_NEW_CONTENT",receipt.get("status"));assertEquals("NO_USEFUL_CONTENT",receipt.get("reason"));record(j,1,"deliver_briefing","succeeded");
+  agents.finish(j,terminal(j,List.of(new AgentResult.Tool("none","deliver_briefing","succeeded"))));generation.tick(p);
+  assertEquals("NO_NEW_CONTENT",generation.get(actor,tenant,b.id()).status());assertTrue(feed.list(actor,tenant,space,"LATEST",null,"Asia/Shanghai",0,20,true).items().isEmpty());
+  assertEquals(0,db.queryForObject("SELECT count(*) FROM conversation_artifacts WHERE task_id=?",Integer.class,j.id()));
+  assertEquals(1,db.queryForObject("SELECT count(*) FROM identity_audit WHERE target_id=? AND action='TASK_BRIEFING_SKIPPED' AND outcome='SUCCESS'",Integer.class,j.token()));
+ }
+ @Test void nativeAutoCannotPublishAnInfoCard(){
+  upload("marker 合成默认类型证据。",true);generation.generate(actor,tenant,UUID.randomUUID(),space,null);generation.tick(policy());var j=conversations.claim();agents.search(j.id(),j.token(),"marker");
+  agents.openExecution(j.id(),j.token(),new AgentTaskService.ExecutionOpen("1.6",List.of("deliver_briefing")));record(j,1,"deliver_briefing","STARTED");
+  assertEquals("BRIEFING_TYPE_MISMATCH",assertThrows(IdentityException.class,()->agents.deliverBriefing(j.id(),j.token(),content("合成资讯类型画报","INFO"))).code);
+ }
+ @Test void ordinaryStatusOnlyIsRejectedAndDeliveryFailureCannotBecomeComplete(){
+  upload("marker 合成普通会话证据。",true);conversations.submit(actor,tenant,null,space,UUID.randomUUID(),"合成普通会话画报","AGENT");var j=conversations.claim();agents.search(j.id(),j.token(),"marker");
+  agents.openExecution(j.id(),j.token(),new AgentTaskService.ExecutionOpen("1.6",List.of("deliver_briefing")));record(j,1,"deliver_briefing","STARTED");
+  assertEquals("BRIEFING_STATUS_ONLY",assertThrows(IdentityException.class,()->agents.deliverBriefing(j.id(),j.token(),content("暂无新内容","INSIGHT"))).code);record(j,1,"deliver_briefing","failed");
+  record(j,2,"deliver_briefing","STARTED");agents.deliverBriefing(j.id(),j.token(),content("合成普通会话画报","INSIGHT"));record(j,2,"deliver_briefing","succeeded");
+  assertEquals("TASK_RUNTIME_INCOMPATIBLE",assertThrows(IdentityException.class,()->agents.finish(j,terminal(j,List.of(new AgentResult.Tool("bad","deliver_briefing","failed"),new AgentResult.Tool("ok","deliver_briefing","succeeded"))))).code);
+ }
+ @Test void nativeRecoveryCannotConcealFailedRetrievalOrUnverifiedDelivery(){
+  for(boolean forged:List.of(false,true)){
+   upload("marker 合成失败边界 "+forged,true);manual();generation.tick(policy());var j=conversations.claim();agents.search(j.id(),j.token(),"marker");
+   agents.openExecution(j.id(),j.token(),new AgentTaskService.ExecutionOpen("1.6",List.of("deliver_briefing","search_sources")));
+   String failed=forged?"deliver_briefing":"search_sources";record(j,1,failed,"STARTED");record(j,1,failed,"failed");record(j,2,"deliver_briefing","STARTED");
+   if(!forged)agents.deliverBriefing(j.id(),j.token(),content("合成未完成检索画报","INSIGHT"));record(j,2,"deliver_briefing","succeeded");
+   assertEquals("TASK_RUNTIME_INCOMPATIBLE",assertThrows(IdentityException.class,()->agents.finish(j,terminal(j,List.of(new AgentResult.Tool("bad",failed,"failed"),new AgentResult.Tool("last","deliver_briefing","succeeded"))))).code);
+   db.update("UPDATE conversation_tasks SET status='FAILED',lease_token=NULL,lease_until=NULL WHERE id=?",j.id());generation.tick(policy());
+  }
+ }
+ @Test void tenBackgroundDeliveriesDoNotCreateUserConversationsAndRemainReadable(){
+  upload("marker 后台内容生成合成证据。",true);UUID p=policy();
+  var many=new BriefingGenerationService(db,conversations,contents,identities,access,departure,new AgentSettings("verification",true,false),new com.dreamcore.workspace.plans.PlanClock(),true,"",0,24);
+  for(int i=0;i<10;i++){
+   var b=many.generate(actor,tenant,UUID.randomUUID(),space,"INSIGHT");many.tick(p);var job=conversations.claim();
+   assertEquals("BRIEFING_GENERATION",db.queryForObject("SELECT purpose FROM conversations WHERE id=?",String.class,job.conversation()));
+   assertEquals("SYSTEM_BRIEFING",db.queryForObject("SELECT origin FROM conversation_tasks WHERE id=?",String.class,job.id()));
+   deliver(job,"第"+i+"个具有独立价值的合成洞察依据保留。");many.tick(p);
+   assertEquals("SUCCEEDED",many.get(actor,tenant,b.id()).status());
+   assertTrue(conversations.list(actor,tenant,0,50).items().isEmpty());
+   assertTrue(conversations.detail(actor,tenant,job.conversation(),0,20).tasks().isEmpty());
+   assertEquals(job.id(),conversations.taskDetail(actor,tenant,job.conversation(),job.id()).tasks().getFirst().id());
+   assertEquals(409,assertThrows(IdentityException.class,()->conversations.submitClient(actor,tenant,job.conversation(),space,UUID.randomUUID(),"不能把后台记录当用户对话","AGENT",null,List.of(),null)).status);
+  }
+  assertEquals(10,feed.list(actor,tenant,space,"LATEST",null,"Asia/Shanghai",0,20,true).items().size());
+  assertEquals(10,recommendations.list(actor,tenant,space,0,20,null,true).items().size());
+  assertTrue(recommendations.list(actor,tenant,space,0,20,null,false).items().isEmpty());
+ }
+ @Test void cardOpeningIsReadOnlyAndFirstSendIsIdempotentAndSourceBound(){
+  upload("marker 私人讨论合成依据。",true);var b=manual();UUID p=policy();generation.tick(p);var job=conversations.claim();deliver(job,"后台画报与用户讨论分别保留有据内容。");generation.tick(p);
+  var source=conversations.taskDetail(actor,tenant,job.conversation(),job.id()).tasks().getFirst();
+  for(int i=0;i<3;i++)assertNull(agents.discussion(actor,tenant,job.conversation(),job.id(),source.revision(),source.attempt()).conversationId());
+  assertEquals(1,db.queryForObject("SELECT count(*) FROM conversations WHERE tenant_id=?",Integer.class,tenant));
+  var ref=agents.discussion(actor,tenant,job.conversation(),job.id(),source.revision(),source.attempt()).briefingContext();
+  UUID key=UUID.randomUUID();var first=agents.sendDiscussion(actor,tenant,null,ref,space,key,"解释这个发现","AGENT",null,List.of(),null);
+  var retry=agents.sendDiscussion(actor,tenant,null,ref,space,key,"解释这个发现","AGENT",null,List.of(),null);
+  assertEquals(first.conversation().id(),retry.conversation().id());assertEquals(1,retry.tasks().size());
+  assertEquals(1,conversations.list(actor,tenant,0,50).items().size());
+  assertEquals(first.conversation().id(),agents.discussion(actor,tenant,job.conversation(),job.id(),source.revision(),source.attempt()).conversationId());
+  assertEquals(ref,first.briefingContext());assertEquals("解释这个发现",first.tasks().getFirst().prompt());
+  // Fresh reads retain their origin independently of the browser URL.
+  assertTrue(conversations.detail(actor,tenant,first.conversation().id(),0,20).conversation().briefingDiscussion());
+  assertTrue(conversations.list(actor,tenant,0,50).items().getFirst().briefingDiscussion());
+  var ordinary=conversations.submitClient(actor,tenant,null,space,UUID.randomUUID(),"普通合成会话","AGENT",null,List.of(),null);
+  assertFalse(ordinary.conversation().briefingDiscussion());
+  assertFalse(conversations.list(actor,tenant,0,50).items().stream().filter(c->c.id().equals(ordinary.conversation().id())).findFirst().orElseThrow().briefingDiscussion());
+  assertThrows(IdentityException.class,()->agents.sendDiscussion(reader,tenant,null,ref,space,UUID.randomUUID(),"越权追问","AGENT",null,List.of(),null));
+  db.update("DELETE FROM workspace_members WHERE workspace_id=? AND account_id=?",space,actor);
+  assertThrows(IdentityException.class,()->conversations.detail(actor,tenant,first.conversation().id(),0,20));
+  assertThrows(IdentityException.class,()->agents.sendDiscussion(actor,tenant,null,ref,space,UUID.randomUUID(),"撤权后不得发送","AGENT",null,List.of(),null));
+ }
+ @Test void invalidFirstSendRollsBackThreadAndOwnedAttachmentDraftCanBeReused(){
+  upload("marker 首次发送事务合成依据。",true);manual();UUID p=policy();generation.tick(p);var job=conversations.claim();deliver(job,"没有发送成功时不会留下新的讨论记录。");generation.tick(p);
+  var task=conversations.taskDetail(actor,tenant,job.conversation(),job.id()).tasks().getFirst();
+  var ref=agents.discussion(actor,tenant,job.conversation(),job.id(),task.revision(),task.attempt()).briefingContext();
+  assertThrows(IdentityException.class,()->agents.sendDiscussion(actor,tenant,null,ref,space,UUID.randomUUID(),"","AGENT",null,List.of(),null));
+  assertEquals(0,db.queryForObject("SELECT count(*) FROM briefing_discussions WHERE owner_id=?",Integer.class,actor));
+  assertEquals(1,db.queryForObject("SELECT count(*) FROM conversations WHERE tenant_id=?",Integer.class,tenant));
+  var draft=conversations.draft(actor,tenant,space,UUID.randomUUID());assertTrue(conversations.list(actor,tenant,0,50).items().isEmpty());
+  var other=conversations.draft(reader,tenant,space,UUID.randomUUID());
+  assertThrows(IdentityException.class,()->agents.sendDiscussion(actor,tenant,other.id(),ref,space,UUID.randomUUID(),"不能绑定他人草稿","AGENT",null,List.of(),null));
+  var sent=agents.sendDiscussion(actor,tenant,draft.id(),ref,space,UUID.randomUUID(),"带附件草稿追问","AGENT",null,List.of(),null);
+  assertEquals(draft.id(),sent.conversation().id());assertEquals(1,conversations.list(actor,tenant,0,50).items().size());
+ }
  @Test void initializationNeedsNoConversationOrPersonalPlanAndIsDurable(){
   upload("marker 经营事实仅用于合成验收。",true);UUID policy=policy();generation.tick(policy);
   var b=generation.state(actor,tenant).batches().getFirst();assertEquals("INITIALIZATION",b.trigger());assertEquals("RUNNING",b.status());assertNotNull(b.taskId());
@@ -117,6 +225,40 @@ class BriefingGenerationIntegrationTest {
   deliver(j,"首批固定资料的合成证据已完成分析。");generation.tick(p);generation.tick(p);
   var next=generation.state(actor,tenant).batches().getFirst();assertEquals("RUNNING",next.status());
   assertEquals(1,db.queryForObject("SELECT count(*) FROM conversation_originals WHERE task_id=?",Integer.class,next.taskId()));
+ }
+ @Test void autoBatchKeepsCurrentWorkbookAsContextForUnseenDocuments(){
+  var table=upload("current.xlsx","marker 合成表格来源。",true);UUID p=policy();generation.tick(p);complete(conversations.claim());generation.tick(p);
+  var docs=new ArrayList<UUID>();for(int i=0;i<4;i++)docs.add(upload("guide-"+i+".md","marker 合成字段说明 "+i,true).acceptedVersion().id());
+  generation.generate(actor,tenant,UUID.randomUUID(),space,null);generation.tick(p);var j=conversations.claim();
+  var selected=db.queryForList("SELECT version_id FROM conversation_originals WHERE task_id=?",UUID.class,j.id());
+  assertEquals(3,selected.size());assertTrue(selected.contains(table.acceptedVersion().id()));
+  assertEquals(2,selected.stream().filter(docs::contains).count());
+  complete(j);generation.tick(p);generation.tick(p);j=conversations.claim();
+  selected=db.queryForList("SELECT version_id FROM conversation_originals WHERE task_id=?",UUID.class,j.id());
+  assertEquals(3,selected.size());assertTrue(selected.contains(table.acceptedVersion().id()));
+  assertEquals(2,selected.stream().filter(docs::contains).count());
+ }
+ @Test void explicitInsightDoesNotReplaceSelectedDocumentsWithAnOldWorkbook(){
+  upload("current.xlsx","marker 合成旧表格。",true);UUID p=policy();generation.tick(p);complete(conversations.claim());generation.tick(p);
+  var docs=new ArrayList<UUID>();for(int i=0;i<3;i++)docs.add(upload("guide-"+i+".md","marker 合成字段说明。",true).acceptedVersion().id());
+  manual();generation.tick(p);var j=conversations.claim();
+  assertEquals(new HashSet<>(docs),new HashSet<>(db.queryForList("SELECT version_id FROM conversation_originals WHERE task_id=?",UUID.class,j.id())));
+ }
+ @Test void briefingOverviewCoversEverySelectedVersionAndLeavesRoomForTargetedEvidence(){
+  var versions=new ArrayList<UUID>();
+  for(int i=0;i<3;i++){
+   var f=upload("source-"+i+".md","synthetic",false);versions.add(f.acceptedVersion().id());var parse=knowledge.claim();
+   var chunks=new ArrayList<DocumentParser.Fragment>();for(int n=0;n<12;n++)chunks.add(new DocumentParser.Fragment("L"+n,"marker source="+i+" ordinal="+n,"TEXT"));
+   knowledge.finish(parse,new DocumentParser.Result("synthetic","READY",List.of(),chunks));
+  }
+  manual();generation.tick(policy());var j=conversations.claim();var overview=agents.searchResult(j.id(),j.token(),"");
+  assertEquals(6,overview.items().size());assertTrue(overview.hasMore());
+  assertEquals(3,overview.items().stream().map(AgentTaskService.Input::filename).distinct().count());
+  assertTrue(overview.items().stream().allMatch(x->x.content().matches(".*ordinal=[01]$")));
+  var targeted=agents.search(j.id(),j.token(),"source=0 ordinal=9");assertEquals(1,targeted.size());assertTrue(targeted.getFirst().content().endsWith("ordinal=9"));
+  assertEquals(7,db.queryForObject("SELECT count(*) FROM conversation_agent_grants WHERE task_id=?",Integer.class,j.id()));
+  db.update("DELETE FROM workspace_members WHERE workspace_id=? AND account_id=?",space,actor);
+  assertThrows(IdentityException.class,()->agents.search(j.id(),j.token(),"source=0 ordinal=10"));
  }
  @Test void explicitRecoveryUnblocksRemainingSourcesAfterAutomaticFailure(){
   for(int i=0;i<4;i++)upload("marker recovery source "+i,true);UUID p=policy();generation.tick(p);
@@ -278,6 +420,43 @@ class BriefingGenerationIntegrationTest {
   time.set(time.get().plusSeconds(86400));limited.tick(p);assertEquals("RUNNING",limited.get(actor,tenant,more.id()).status());
  }
 
+ @Test void backgroundMigrationPreservesMixedUserHistoryCardsAndMisleadingTitles() throws Exception {
+  String schema="background_migration_"+UUID.randomUUID().toString().replace("-","");
+  UUID system=UUID.randomUUID(),mixed=UUID.randomUUID(),user=UUID.randomUUID(),systemTask=UUID.randomUUID(),mixedSystem=UUID.randomUUID(),mixedUser=UUID.randomUUID(),userTask=UUID.randomUUID(),policy=UUID.randomUUID(),artifact=UUID.randomUUID();
+  try{
+   org.flywaydb.core.Flyway.configure().dataSource(db.getDataSource()).schemas(schema).defaultSchema(schema).target("50").load().migrate();
+   try(var connection=db.getDataSource().getConnection()){
+    connection.setAutoCommit(false);try(var statement=connection.createStatement()){statement.execute("SET LOCAL search_path TO "+schema+",public");}
+    var isolated=new JdbcTemplate(new org.springframework.jdbc.datasource.SingleConnectionDataSource(connection,true));
+    isolated.update("INSERT INTO accounts(id,email,display_name,password_hash) VALUES (?,'migration@example.test','合成迁移用户','unused')",actor);
+    isolated.update("INSERT INTO tenants(id,name) VALUES (?,'合成后台迁移')",tenant);
+    isolated.update("INSERT INTO tenant_memberships(tenant_id,account_id,role) VALUES (?,?,'MEMBER')",tenant,actor);
+    isolated.update("INSERT INTO workspaces(id,tenant_id,owner_id,name,kind) VALUES (?,?,?,'个人空间','PERSONAL')",space,tenant,actor);
+    for(UUID c:List.of(system,mixed,user))isolated.update("INSERT INTO conversations(id,tenant_id,workspace_id,owner_id,title) VALUES (?,?,?,?,'系统智能画报生成。用户也可能使用这个标题')",c,tenant,space,actor);
+    for(var pair:List.of(List.of(systemTask,system),List.of(mixedSystem,mixed),List.of(mixedUser,mixed),List.of(userTask,user)))isolated.update("INSERT INTO conversation_tasks(id,tenant_id,workspace_id,conversation_id,requested_by,prompt,mode,status,reply,execution_class,finished_at) VALUES (?,?,?,?,?,?,'AGENT','SUCCEEDED','原始回复应完整保留','verification',now())",pair.get(0),tenant,space,pair.get(1),actor,pair.get(0).equals(mixedUser)?"用户已追问这张画报":"系统智能画报生成。原提示内容");
+    isolated.update("INSERT INTO briefing_generation_policies(id,tenant_id,owner_id,workspace_id) VALUES (?,?,?,?)",policy,tenant,actor,space);
+    for(UUID task:List.of(systemTask,mixedSystem))isolated.update("INSERT INTO briefing_generation_batches(id,tenant_id,owner_id,workspace_id,policy_id,policy_epoch,trigger_kind,status,task_id) VALUES (?,?,?,?,?,1,'GENERATE_MORE','NO_NEW_CONTENT',?)",UUID.randomUUID(),tenant,actor,space,policy,task);
+    isolated.update("INSERT INTO briefing_card_preferences(task_id,tenant_id,workspace_id,owner_id,pinned,size) VALUES (?,?,?,?,true,'WIDE')",systemTask,tenant,space,actor);
+    isolated.update("INSERT INTO conversation_artifacts(id,tenant_id,workspace_id,task_id,filename,sha256,content) VALUES (?,?,?,?,'briefing.json',?,?::bytea)",artifact,tenant,space,systemTask,"a".repeat(64),"原卡片内容".getBytes(StandardCharsets.UTF_8));connection.commit();
+   }
+   // Exercise this client migration in the synthetic legacy schema. Admin migrations assume the deployed public schema.
+   try(var connection=db.getDataSource().getConnection()){
+    connection.setAutoCommit(false);try(var statement=connection.createStatement()){
+     statement.execute("SET LOCAL search_path TO "+schema+",public");
+     statement.execute(new org.springframework.core.io.ClassPathResource("db/migration/V83__background_briefing_conversations.sql").getContentAsString(StandardCharsets.UTF_8));
+    }connection.commit();
+   }
+   assertEquals("BRIEFING_GENERATION",db.queryForObject("SELECT purpose FROM "+schema+".conversations WHERE id=?",String.class,system));
+   assertEquals("BUSINESS",db.queryForObject("SELECT purpose FROM "+schema+".conversations WHERE id=?",String.class,mixed));
+   assertEquals("用户已追问这张画报",db.queryForObject("SELECT title FROM "+schema+".conversations WHERE id=?",String.class,mixed));
+   assertEquals("BUSINESS",db.queryForObject("SELECT purpose FROM "+schema+".conversations WHERE id=?",String.class,user));
+   assertEquals("USER",db.queryForObject("SELECT origin FROM "+schema+".conversation_tasks WHERE id=?",String.class,userTask));
+   assertEquals(2,db.queryForObject("SELECT count(*) FROM "+schema+".conversation_tasks WHERE origin='SYSTEM_BRIEFING'",Integer.class));
+   assertEquals(4,db.queryForObject("SELECT count(*) FROM "+schema+".conversation_tasks WHERE reply='原始回复应完整保留'",Integer.class));
+   assertEquals("原卡片内容",new String(db.queryForObject("SELECT content FROM "+schema+".conversation_artifacts WHERE id=?",byte[].class,artifact),StandardCharsets.UTF_8));
+   assertTrue(db.queryForObject("SELECT pinned AND size='WIDE' FROM "+schema+".briefing_card_preferences WHERE task_id=?",Boolean.class,systemTask));
+  }finally{db.execute("DROP SCHEMA IF EXISTS "+schema+" CASCADE");}
+ }
  @Test void migrationCopiesLegacyPreferencesToOnlyTheirLatestDelivery() throws Exception {
   String schema="briefing_migration_"+UUID.randomUUID().toString().replace("-","");UUID c=UUID.randomUUID(),older=UUID.randomUUID(),latest=UUID.randomUUID();
   try{
@@ -299,7 +478,7 @@ class BriefingGenerationIntegrationTest {
     }
     isolated.update("INSERT INTO briefing_preferences(tenant_id,workspace_id,conversation_id,owner_id,pinned,hidden,size) VALUES (?,?,?,?,true,false,'WIDE')",tenant,space,c,actor);connection.commit();
    }
-   org.flywaydb.core.Flyway.configure().dataSource(db.getDataSource()).schemas(schema).defaultSchema(schema).load().migrate();
+   org.flywaydb.core.Flyway.configure().dataSource(db.getDataSource()).schemas(schema).defaultSchema(schema).target("47").load().migrate();
    assertEquals(List.of(latest),db.queryForList("SELECT task_id FROM "+schema+".briefing_card_preferences WHERE pinned AND size='WIDE'",UUID.class));
    assertEquals(1,db.queryForObject("SELECT count(*) FROM "+schema+".briefing_preferences",Integer.class));
   }finally{db.execute("DROP SCHEMA IF EXISTS "+schema+" CASCADE");}

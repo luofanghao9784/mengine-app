@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Dreamcore Private Conversation API",
-    "version": "1.6.0",
-    "description": "私人会话及可恢复任务。SOURCE_LOOKUP 可独立运行；模型关闭时 AGENT 保存为等待能力，不自动重试。执行区分 verification 联调与 live 模型，支持等待输入、暂停恢复、部分结果、未知结果核对及分次历史。支持受鉴权 SSE 过程快照与轮询降级、答案增量、途中补充及问题卡；过程文本不是已完成成果。来源、回复、下载均重新检查当前权限，成果不自动共享。"
+    "version": "1.7.0",
+    "description": "私人会话及可恢复任务。SOURCE_LOOKUP 可独立运行；模型关闭时 AGENT 保存为等待能力，不自动重试。执行区分 verification 联调与 live 模型，支持等待输入、暂停恢复、部分结果、未知结果核对及分次历史。任务状态沿用事件轮询；答案通过 SSE 传递真实模型增量的短周期完整快照，断线可重连或轮询快照。来源、回复、下载均重新检查当前权限，成果不自动共享。 会话列表提供进行中与未读元数据；未读由接受的新 AI 回复推进，已读按实际看到的回复版本单调更新。删除停止本会话执行并移入私人回收站；恢复历史不启动任务，不能越过当前授权。"
   },
   "security": [
     {
@@ -837,6 +837,432 @@
           }
         ]
       }
+    },
+    "/api/v1/tenants/{tenant}/conversations/{conversation}/tasks/{task}/discussion": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "conversation",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "task",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "summary": "只读准备或接续当前画报版本的本人讨论；首次发送前不创建会话或模型任务",
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "revision",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "attempt",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "经当前权限核验的画报引用与已有讨论 ID；没有讨论时 ID 为 null",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BriefingDiscussion"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无权或来源不可用"
+          },
+          "404": {
+            "description": "非本人或内容不存在"
+          },
+          "409": {
+            "description": "画报版本变化"
+          }
+        },
+        "deprecated": true
+      },
+      "get": {
+        "summary": "只读准备或接续当前画报版本的本人讨论；首次发送前不创建会话或模型任务",
+        "parameters": [
+          {
+            "name": "revision",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "attempt",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "经当前权限核验的画报引用与已有讨论 ID；没有讨论时 ID 为 null",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BriefingDiscussion"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无权或来源不可用"
+          },
+          "404": {
+            "description": "非本人或内容不存在"
+          },
+          "409": {
+            "description": "画报版本变化"
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/conversations/{conversation}/answer-snapshot": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "conversation",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "读取当前会话的流式答案快照",
+        "responses": {
+          "200": {
+            "description": "Cache-Control: no-store。最多 20 个当前轮次的最新文字快照；最终回复覆盖临时文字；当前无权读取的来源不返回。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveAnswerSnapshot"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "登录失效"
+          },
+          "403": {
+            "description": "当前权限失效"
+          },
+          "404": {
+            "description": "会话不可访问"
+          },
+          "429": {
+            "description": "同时订阅数量超限"
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/conversations/{conversation}/answer-stream": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "conversation",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "订阅当前会话的流式答案",
+        "responses": {
+          "200": {
+            "description": "Cache-Control: no-store。最多 20 个当前轮次的最新文字快照；最终回复覆盖临时文字；当前无权读取的来源不返回。 SSE answer 事件 data 为 LiveAnswerSnapshot；denied 事件后关闭并清除客户端临时文字。连接最长 30 秒，自动重连发送完整快照，不依赖事件游标；每账户最多 4 个连接。COMPLETE 仅表示文本结束，任务完成仍以任务状态为准。",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string",
+                  "description": "event: answer\ndata: {\"items\":[...]}\n\n"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "登录失效"
+          },
+          "403": {
+            "description": "当前权限失效"
+          },
+          "404": {
+            "description": "会话不可访问"
+          },
+          "429": {
+            "description": "同时订阅数量超限"
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/conversations/trash": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "列出本人当前仍有权访问的私人会话",
+        "responses": {
+          "200": {
+            "description": "经当前权限校验，Cache-Control: private, no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "无效格式、模式或参数"
+          },
+          "401": {
+            "description": "需要登录"
+          },
+          "403": {
+            "description": "企业不可用、无成员权限或 CSRF 拒绝"
+          },
+          "404": {
+            "description": "会话不存在、非本人或空间已撤权"
+          },
+          "409": {
+            "description": "请求键冲突、任务版本变化或已有运行任务"
+          },
+          "503": {
+            "description": "执行服务未启用"
+          }
+        },
+        "parameters": [
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000,
+              "default": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            }
+          }
+        ],
+        "description": "仅当前账号、当前有效授权可见的回收站会话。"
+      }
+    },
+    "/api/v1/tenants/{tenant}/conversations/{conversation}/management": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "conversation",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConversationManagement"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "完成",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationManagementReceipt"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无有效授权或 CSRF 无效"
+          },
+          "404": {
+            "description": "非本人、不可访问或已删除（已读接口）"
+          },
+          "409": {
+            "description": "状态版本冲突、幂等内容冲突或未同意停止正在执行的会话"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenant}/conversations/{conversation}/read": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "conversation",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConversationRead"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "完成",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationReadReceipt"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无有效授权或 CSRF 无效"
+          },
+          "404": {
+            "description": "非本人、不可访问或已删除（已读接口）"
+          },
+          "409": {
+            "description": "状态版本冲突、幂等内容冲突或未同意停止正在执行的会话"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -868,6 +1294,38 @@
           },
           "updatedAt": {
             "type": "string",
+            "format": "date-time"
+          },
+          "managementRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "running": {
+            "type": "boolean"
+          },
+          "unread": {
+            "type": "boolean"
+          },
+          "briefingDiscussion": {
+            "type": "boolean",
+            "description": "会话是否由画报讨论建立，依据持久化来源关联。"
+          },
+          "replyRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "latestReplyTaskId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "trashedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "date-time"
           }
         },
@@ -1204,6 +1662,13 @@
           },
           "reconciliationRequired": {
             "type": "boolean"
+          },
+          "supplementalInput": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 12000
           }
         },
         "required": [
@@ -1248,6 +1713,16 @@
           "cursor": {
             "type": "integer",
             "minimum": 0
+          },
+          "briefingContext": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BriefingReference"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -1321,7 +1796,8 @@
               "WAITING_INPUT",
               "WAITING_CAPABILITY",
               "PARTIAL",
-              "RESULT_UNKNOWN"
+              "RESULT_UNKNOWN",
+              "TITLE_UPDATED"
             ]
           },
           "revision": {
@@ -1422,6 +1898,40 @@
               "AUTHORIZED_LIBRARY",
               "SELECTED"
             ]
+          },
+          "briefingContext": {
+            "type": "object",
+            "properties": {
+              "conversationId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "taskId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "workspaceId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "taskRevision": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "attempt": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "conversationId",
+              "taskId",
+              "workspaceId",
+              "taskRevision",
+              "attempt"
+            ],
+            "additionalProperties": false,
+            "description": "从画报首次发送时携带固定版本引用，服务端原子创建或复用本人讨论。"
           }
         },
         "required": [
@@ -1501,13 +2011,37 @@
               "RETRY",
               "PAUSE",
               "RESUME",
-              "RECONCILE"
+              "RECONCILE",
+              "SUPPLEMENT"
             ]
           },
           "input": {
             "type": "string",
             "minLength": 1,
             "maxLength": 2000
+          },
+          "originals": {
+            "type": "array",
+            "maxItems": 3,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "materialId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "versionId": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              },
+              "required": [
+                "materialId",
+                "versionId"
+              ]
+            },
+            "description": "仅 AGENT verification；同一任务空间的明确版本，单份 256 KiB、合计 512 KiB。非空时原件读取和片段检索均限于所选版本。"
           }
         },
         "required": [
@@ -1528,7 +2062,43 @@
                 "action": {
                   "enum": [
                     "RESUME",
-                    "RETRY"
+                    "RETRY",
+                    "SUPPLEMENT"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "action": {
+                  "const": "SUPPLEMENT"
+                }
+              },
+              "required": [
+                "action"
+              ]
+            },
+            "then": {
+              "required": [
+                "input"
+              ]
+            }
+          },
+          {
+            "if": {
+              "required": [
+                "originals"
+              ]
+            },
+            "then": {
+              "properties": {
+                "action": {
+                  "enum": [
+                    "RESUME",
+                    "RETRY",
+                    "SUPPLEMENT"
                   ]
                 }
               }
@@ -2422,6 +2992,205 @@
                 }
               }
             }
+          }
+        }
+      },
+      "BriefingReference": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "taskId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "taskRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "attempt": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "conversationId",
+          "taskId",
+          "workspaceId",
+          "taskRevision",
+          "attempt"
+        ],
+        "additionalProperties": false
+      },
+      "BriefingDiscussion": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "conversationId",
+          "title",
+          "briefingContext"
+        ],
+        "properties": {
+          "conversationId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "briefingContext": {
+            "$ref": "#/components/schemas/BriefingReference"
+          }
+        }
+      },
+      "LiveAnswer": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "taskId",
+          "attempt",
+          "step",
+          "version",
+          "text",
+          "state"
+        ],
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "attempt": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "step": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 65536
+          },
+          "state": {
+            "enum": [
+              "STREAMING",
+              "COMPLETE",
+              "INTERRUPTED"
+            ]
+          }
+        }
+      },
+      "LiveAnswerSnapshot": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "$ref": "#/components/schemas/LiveAnswer"
+            }
+          }
+        }
+      },
+      "ConversationManagement": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requestId",
+          "expectedRevision",
+          "action",
+          "stopRunning"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "action": {
+            "enum": [
+              "TRASH",
+              "RESTORE"
+            ]
+          },
+          "stopRunning": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ConversationManagementReceipt": {
+        "type": "object",
+        "required": [
+          "id",
+          "revision",
+          "trashedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "trashedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "ConversationRead": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "replyRevision"
+        ],
+        "properties": {
+          "replyRevision": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "ConversationReadReceipt": {
+        "type": "object",
+        "required": [
+          "id",
+          "readReplyRevision"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "readReplyRevision": {
+            "type": "integer",
+            "minimum": 0
           }
         }
       }

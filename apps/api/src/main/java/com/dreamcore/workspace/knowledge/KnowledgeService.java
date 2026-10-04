@@ -112,12 +112,14 @@ public class KnowledgeService {
         if(!library){if(space==null)scope+=" AND w.kind='SHARED'";else {scope+=" AND m.workspace_id=?";args.add(space);}}
         if(selectedVersions==null){scope+=" AND (m.in_library OR m.attachment_conversation_id=?::uuid OR requested.version_id=v.id)";args.add(conversation);}
 
-        String match="SELECT c.*,s.number,s.filename,s.run_created_at,s.selected FROM knowledge_chunks c JOIN scoped s ON c.run_id=s.run_id AND c.version_id=s.id AND c.tenant_id=s.tenant_id AND c.workspace_id=s.workspace_id WHERE s.parse_status IN ('READY','PARTIAL')";
+        boolean overview=query.isEmpty()&&selectedVersions!=null;
+        String match="SELECT c.*,s.number,s.filename,s.run_created_at,s.selected,"+(overview?"row_number() OVER(PARTITION BY c.version_id ORDER BY c.ordinal,c.id)":"0")+" AS excerpt_round FROM knowledge_chunks c JOIN scoped s ON c.run_id=s.run_id AND c.version_id=s.id AND c.tenant_id=s.tenant_id AND c.workspace_id=s.workspace_id WHERE s.parse_status IN ('READY','PARTIAL')";
         for(String term:terms){match+=" AND strpos(lower(c.content),lower(?))>0";args.add(term);}
         args.add(limit+1);args.add(offset);
         // One snapshot covers authorization-filtered totals, the bounded version receipt and the result page.
         // A not-yet-parsed file is scope coverage, never a claim that it is relevant to the query.
-        String sql="WITH scoped AS MATERIALIZED ("+scope+"),matched AS MATERIALIZED ("+match+"), page AS (SELECT * FROM matched ORDER BY selected DESC,run_created_at DESC,ordinal,id LIMIT ? OFFSET ?) "+"""
+        // A selected-file overview visits each version before taking its next excerpt.
+        String sql="WITH scoped AS MATERIALIZED ("+scope+"),matched AS MATERIALIZED ("+match+"), page AS (SELECT * FROM matched ORDER BY selected DESC,excerpt_round,run_created_at DESC,ordinal,id LIMIT ? OFFSET ?) "+"""
             SELECT count(*) AS total,
               count(*) FILTER(WHERE parse_status IN ('READY','PARTIAL')) AS searchable,
               count(*) FILTER(WHERE parse_status='PARTIAL') AS partial,
@@ -125,7 +127,7 @@ public class KnowledgeService {
               coalesce((SELECT jsonb_agg(jsonb_build_object(
                 'id',p.id,'tenantId',p.tenant_id,'workspaceId',p.workspace_id,'materialId',p.material_id,
                 'versionId',p.version_id,'runId',p.run_id,'version',p.number,'filename',p.filename,
-                'locator',p.locator,'method',p.method,'content',p.content) ORDER BY p.selected DESC,p.run_created_at DESC,p.ordinal,p.id) FROM page p),'[]') AS items,
+                'locator',p.locator,'method',p.method,'content',p.content) ORDER BY p.selected DESC,p.excerpt_round,p.run_created_at DESC,p.ordinal,p.id) FROM page p),'[]') AS items,
               coalesce((SELECT jsonb_agg(jsonb_build_object(
                 'materialId',v.material_id,'versionId',v.id,'version',v.number,'runId',v.run_id,'generation',v.generation,
                 'status',v.parse_status,'warnings',CASE WHEN v.warnings='' THEN ARRAY[]::text[] ELSE string_to_array(v.warnings,',') END,

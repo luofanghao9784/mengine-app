@@ -1,9 +1,18 @@
-import { useRealtime } from './useRealtime';
-import { LiveProcess } from './LiveProcess';
-import { liveClient } from './realtime-client';
-import type { LiveTask } from '../../contracts/public-api/conversation';
+import { LiveReply, ReplyProgress } from './LiveReply';
+import { ReplyText } from './ReplyText';
+import { CardTypeTag } from './CardTypeTag';
+import { ReplyReferences } from './ReplyReferences';
+import { ConversationRow } from './ConversationRow';
+import { useConversationReadReceipt } from './useConversationReadReceipt';
+import { useConversationScroll } from './useConversationScroll';
+import { useLiveAnswers, type LiveAnswer } from './useLiveAnswers';
+import { useComposerHeight } from './useComposerHeight';
+import { TaskInterventionCard } from './TaskInterventionCard';
+import { TaskSendControl } from './TaskSendControl';
+import { DreamcoreLogo } from '../components/DreamcoreLogo';
+import { useConversationList, ConversationListTail } from './useConversationList';
 import { useViewState } from '../shared/useViewState';
-import { FeedbackPanel } from '../feedback/FeedbackPanel';
+import { ReplyFeedback } from './ReplyFeedback';
 import { TaskWorkNotices } from '../taskwork/TaskWorkNotices';
 import { RequestPending, requestNavigationLocked, useRequestLock } from '../shared/request-guard';
 import { useContext } from 'react';
@@ -14,15 +23,21 @@ import { SaveAsDocument } from '../documents/Documents';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Info,
+  Copy,
+  Check,
+  History,
+  MoreHorizontal,
   ArrowUp,
   FileText,
   Files,
   Folder,
   ListChecks,
-  MessageCircle,
   Plus,
   Paperclip,
   ChevronDown,
+  ChevronUp,
+  ChevronRight,
+  ChevronLeft,
   RefreshCw,
   Search,
   Sparkles,
@@ -39,8 +54,9 @@ import type { TenantContext } from '../../contracts/public-api/identity';
 import { identityClient, useSession } from '../identity/session';
 import { IdentityError, record, uuid } from '../identity/client';
 import { Button, Badge, Field, PageActions, DocumentText, IconButton } from '../shared/ui';
-import { TaskReadingBody, type ReadingTask } from '../briefing-live/TaskReadingBody';
-import { readBriefingContext, retainConversationContext } from './briefing-context';
+import { TaskReadingBody, type ReadingTask, type ReadingHeader } from '../briefing-live/TaskReadingBody';
+import { briefingConversationHref, readBriefingContext, retainConversationContext } from './briefing-context';
+import { ReadingDialog } from '../briefing-live/ReadingDialog';
 import { LiveConversationDeck } from './LiveConversationDeck';
 import type { ReactNode } from 'react';
 import { Failure, Loading, Pager, SubmitError, useRemote, useSubmission } from '../shared/admin';
@@ -54,12 +70,11 @@ import './conversation.css';
 export const conversationHref = (tenant: string, id?: string) =>
   '#' + new URLSearchParams({ tenant, view: 'conversations', ...(id ? { conversation: id } : {}) });
 export function Conversations({ tenant }: { tenant: string }) {
-  const { session, expire } = useSession();
+  const { session } = useSession();
   const pendingRequest = useContext(RequestPending);
   const [contextAttempt, setContextAttempt] = useState(0);
   const [hash, setHash] = useState(location.hash),
-    [attempt, setAttempt] = useState(0),
-    [page, setPage] = useState(0);
+    [attempt, setAttempt] = useState(0);
   useEffect(() => {
     const change = () => {
       if (!requestNavigationLocked()) setHash(location.hash);
@@ -67,28 +82,20 @@ export function Conversations({ tenant }: { tenant: string }) {
     window.addEventListener('hashchange', change);
     return () => window.removeEventListener('hashchange', change);
   }, []);
+  const [removedSelection, setRemovedSelection] = useState<{ tenant: string; id: string }>();
   const selected = new URLSearchParams(hash.slice(1)).get('conversation') || undefined;
+  useEffect(() => {
+    if (!removedSelection || pendingRequest || requestNavigationLocked()) return;
+    setRemovedSelection(undefined);
+    if (removedSelection.tenant === tenant && removedSelection.id === selected)
+      location.hash = conversationHref(tenant);
+  }, [removedSelection, pendingRequest, tenant, selected]);
   const focused = new URLSearchParams(hash.slice(1)).get('task') || undefined;
   const context = useRemote(
     (signal) => identityClient.context(tenant, signal),
     [tenant, session.identity, contextAttempt],
   );
-  const [list, setList] = useState<{ value?: ConversationPage; error?: unknown }>({});
-  useEffect(() => {
-    const controller = new AbortController();
-    void api
-      .list(tenant, page * 20, controller.signal)
-      .then((value) => {
-        if (!controller.signal.aborted) setList({ value });
-      })
-      .catch((error) => {
-        if (!controller.signal.aborted) {
-          setList({ error });
-          if (error instanceof IdentityError && error.status === 401) expire();
-        }
-      });
-    return () => controller.abort();
-  }, [tenant, page, attempt, session.identity, expire]);
+  const list = useConversationList(tenant, attempt);
   const changed = useCallback(() => setAttempt((x) => x + 1), []);
   return (
     <>
@@ -117,7 +124,8 @@ export function Conversations({ tenant }: { tenant: string }) {
         <Loading />
       ) : (
         <ConversationView
-          key={(selected || 'new') + ':' + (focused || '') + ':' + (readBriefingContext(hash)?.taskId || '')}
+          key={tenant}
+          selectedTitle={list.value.items.find((item) => item.id === selected)?.title}
           tenant={tenant}
           selected={selected}
           focused={focused}
@@ -132,18 +140,17 @@ export function Conversations({ tenant }: { tenant: string }) {
               <div className="live-list-tools">
                 <header className="deck-card-header live-card-heading">
                   <h2>会话列表</h2>
-                  <span>仅自己可见</span>
+                  <Button
+                    className="live-new-conversation"
+                    icon={Plus}
+                    disabled={pendingRequest}
+                    onClick={() => {
+                      location.hash = retainConversationContext(conversationHref(tenant), location.hash);
+                    }}
+                  >
+                    新会话
+                  </Button>
                 </header>
-                <Button
-                  className="live-new-conversation"
-                  icon={Plus}
-                  disabled={pendingRequest}
-                  onClick={() => {
-                    location.hash = retainConversationContext(conversationHref(tenant), location.hash);
-                  }}
-                >
-                  新会话
-                </Button>
               </div>
               <div className="live-conversation-links">
                 {context.value.workspaces.map((space) => {
@@ -155,18 +162,17 @@ export function Conversations({ tenant }: { tenant: string }) {
                         {space.kind === 'PERSONAL' ? '个人空间' : space.name}
                       </summary>
                       {conversations.map((c) => (
-                        <a
+                        <ConversationRow
                           key={c.id}
-                          className={selected === c.id ? 'selected' : ''}
+                          tenant={tenant}
+                          item={c}
+                          selected={selected === c.id}
                           href={retainConversationContext(conversationHref(tenant, c.id), hash)}
-                          aria-current={selected === c.id ? 'page' : undefined}
-                          onClick={(event) => {
-                            if (pendingRequest) event.preventDefault();
+                          changed={() => {
+                            setRemovedSelection({ tenant, id: c.id });
+                            changed();
                           }}
-                        >
-                          <MessageCircle size={15} />
-                          <span title={c.title}>{c.title}</span>
-                        </a>
+                        />
                       ))}
                     </details>
                   ) : null;
@@ -181,34 +187,31 @@ export function Conversations({ tenant }: { tenant: string }) {
                         (item) => !context.value!.workspaces.some((space) => space.id === item.workspaceId),
                       )
                       .map((c) => (
-                        <a
+                        <ConversationRow
                           key={c.id}
-                          className={selected === c.id ? 'selected' : ''}
+                          tenant={tenant}
+                          item={c}
+                          selected={selected === c.id}
                           href={retainConversationContext(conversationHref(tenant, c.id), hash)}
-                          aria-current={selected === c.id ? 'page' : undefined}
-                          onClick={(event) => {
-                            if (pendingRequest) event.preventDefault();
+                          changed={() => {
+                            setRemovedSelection({ tenant, id: c.id });
+                            changed();
                           }}
-                        >
-                          <MessageCircle size={15} />
-                          <span title={c.title}>{c.title}</span>
-                        </a>
+                        />
                       ))}
                   </section>
                 )}
                 {!list.value.items.length && (
                   <p className="live-list-empty">从一件具体的工作开始。发送后，会话会保存在这里。</p>
                 )}
-              </div>
-              {(page > 0 || list.value.hasMore) && (
-                <Pager
-                  page={page}
-                  next={list.value.hasMore}
-                  onPage={(next) => {
-                    if (!pendingRequest) setPage(next);
-                  }}
+                <ConversationListTail
+                  hasMore={list.value.hasMore}
+                  loading={list.loading}
+                  error={list.moreError}
+                  blocked={pendingRequest}
+                  loadMore={list.loadMore}
                 />
-              )}
+              </div>
             </nav>
           }
         />
@@ -217,6 +220,7 @@ export function Conversations({ tenant }: { tenant: string }) {
   );
 }
 function ConversationView({
+  selectedTitle,
   tenant,
   selected,
   focused,
@@ -226,8 +230,9 @@ function ConversationView({
   publicWebEnabled,
   changed,
   navigation,
-  briefingContext,
+  briefingContext: linkedBriefing,
 }: {
+  selectedTitle?: string;
   briefingContext?: ReadingTask;
   navigation: ReactNode;
   tenant: string;
@@ -241,10 +246,38 @@ function ConversationView({
 }) {
   const { session, expire } = useSession();
   const pendingRequest = useContext(RequestPending);
+  const sessionKey = JSON.stringify([
+    selected,
+    focused,
+    linkedBriefing?.taskId,
+    linkedBriefing?.taskRevision,
+    linkedBriefing?.attempt,
+  ]);
+  const [sessionKeySeen, setSessionKeySeen] = useState(sessionKey);
   const [data, setData] = useState<{ value?: ConversationDetail; error?: unknown }>({});
+  const sourceContext = data.value?.briefingContext || linkedBriefing;
+  const briefingContext =
+    sourceContext &&
+    linkedBriefing?.presentation &&
+    sourceContext.taskId === linkedBriefing.taskId &&
+    sourceContext.taskRevision === linkedBriefing.taskRevision &&
+    sourceContext.attempt === linkedBriefing.attempt &&
+    sourceContext.conversationId === linkedBriefing.conversationId
+      ? { ...sourceContext, presentation: linkedBriefing.presentation }
+      : sourceContext;
   const [attempt, setAttempt] = useState(0),
     [page, setPage] = useState(0);
-  const readerKey = 'conversation:' + (selected || 'new');
+  const readerKey =
+    'conversation:' +
+    (selected ||
+      (briefingContext
+        ? 'briefing:' +
+          briefingContext.taskId +
+          ':' +
+          briefingContext.taskRevision +
+          ':' +
+          briefingContext.attempt
+        : 'new'));
   const [citations, setCitations] = useViewState<{ id: string; title: string }[]>(
     tenant,
     readerKey + ':citations',
@@ -261,8 +294,10 @@ function ConversationView({
     (v): v is string[] => Array.isArray(v) && v.length <= 50 && v.every(uuid),
   );
   const [reveal, setReveal] = useState<{ id: string; sequence: number }>();
-  const [briefingOpen, setBriefingOpen] = useState(!!briefingContext);
-  const [briefingTitle, setBriefingTitle] = useState<string>();
+  const [briefingOpen, setBriefingOpen] = useState(true);
+  const [briefingHeader, setBriefingHeader] = useState<ReadingHeader>();
+  const briefingTitle = briefingHeader?.title;
+  const [briefingReading, setBriefingReading] = useState(false);
   const openCitation = (id: string, title: string) => {
     setCitations((all) => (all.some((c) => c.id === id) ? all : [...all, { id, title }]));
     setReveal((previous) => ({ id, sequence: (previous?.sequence || 0) + 1 }));
@@ -275,8 +310,11 @@ function ConversationView({
     let timer: ReturnType<typeof setTimeout>;
     const failure = (error: unknown) => {
       if (controller.signal.aborted) return;
-      valueRef.current = undefined;
-      setData({ error });
+      const accessDenied = error instanceof IdentityError && [401, 403, 404].includes(error.status);
+      if (accessDenied || !valueRef.current) {
+        valueRef.current = undefined;
+        setData({ error });
+      }
       if (error instanceof IdentityError && [403, 404].includes(error.status)) changed();
       if (error instanceof IdentityError && error.status === 401) expire();
     };
@@ -292,15 +330,18 @@ function ConversationView({
     const poll = async () => {
       try {
         const events = await api.events(tenant, selected, valueRef.current?.cursor || 0, controller.signal);
-        if (events.items.some((e) => e.kind !== 'LIVE') && !pendingRequest) {
+        if (events.items.length && !pendingRequest) {
           await load();
           changed();
         }
-        if (valueRef.current && events.cursor > valueRef.current.cursor)
-          valueRef.current = { ...valueRef.current, cursor: events.cursor };
-        if (!controller.signal.aborted) timer = setTimeout(poll, events.hasMore ? 0 : 1500);
+        if (!controller.signal.aborted) timer = setTimeout(poll, 1500);
       } catch (error) {
         failure(error);
+        if (
+          !controller.signal.aborted &&
+          !(error instanceof IdentityError && [401, 403, 404].includes(error.status))
+        )
+          timer = setTimeout(poll, 3000);
       }
     };
     if (!uuid(selected)) {
@@ -317,6 +358,9 @@ function ConversationView({
       clearTimeout(timer);
     };
   }, [tenant, selected, focused, page, attempt, session.identity, context, expire, changed, pendingRequest]);
+  const liveDenied = useCallback(() => setAttempt((x) => x + 1), []);
+  const live = useLiveAnswers(tenant, selected, liveDenied);
+  const messageScroll = useConversationScroll(`${tenant}/${selected || 'new'}`, !focused && page === 0);
   const refresh = () => {
     setAttempt((x) => x + 1);
     changed();
@@ -327,298 +371,283 @@ function ConversationView({
       setBriefingOpen(false);
     }
   }, [data.value]);
-  const live = useRealtime(tenant, selected);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const following = useRef(true);
-  const [newContent, setNewContent] = useState(false);
-  useEffect(() => {
-    following.current = true;
-    setNewContent(false);
-  }, [selected]);
-  useEffect(() => {
-    if (live.denied) {
-      valueRef.current = undefined;
-      setData({ error: live.denied });
-      if (live.denied.status === 401) expire();
-    }
-  }, [live.denied, expire]);
-  useEffect(() => {
-    const node = scrollRef.current;
-    if (!node) return;
-    if (following.current) node.scrollTop = node.scrollHeight;
-    else setNewContent(true);
-  }, [live.snapshot, data.value]);
-  const activeTask = data.value?.tasks.find((t) => ['QUEUED', 'RUNNING'].includes(t.status));
-  const active = !!activeTask;
-  const activeLive = live.snapshot?.items.find(
-    (t) => t.taskId === activeTask?.id && t.attempt === activeTask.attempt,
+  const [responseId, setResponseId] = useViewState<string | null>(
+    tenant,
+    readerKey + ':response-target',
+    'auto',
+    (value): value is string | null => value === null || value === 'auto' || uuid(value),
   );
-  const ongoing =
-    activeTask?.status === 'RUNNING' && activeLive?.enabled && !activeLive.stopping
-      ? { id: activeTask.id, attempt: activeTask.attempt }
+  const controlTask =
+    !focused && page === 0
+      ? data.value?.tasks.find((t) => ['QUEUED', 'RUNNING'].includes(t.status))
       : undefined;
-  if (data.error)
-    return (
-      <section className="conversation-reader">
-        <Failure error={data.error} retry={refresh} />
-      </section>
-    );
-  if (selected && !data.value) return <Loading />;
+  const latestTask = data.value?.tasks.at(-1);
+  const responseTask =
+    !controlTask && page === 0
+      ? data.value?.tasks.find(
+          (t) =>
+            t.id ===
+              (responseId === 'auto' && latestTask?.status === 'WAITING_INPUT'
+                ? latestTask.id
+                : responseId) && t.status === 'WAITING_INPUT',
+        )
+      : undefined;
+  // Reset session-owned state before committing a new selection; keep the deck/list DOM mounted.
+  if (sessionKeySeen !== sessionKey) {
+    setSessionKeySeen(sessionKey);
+    setData({});
+    valueRef.current = undefined;
+    setPage(0);
+    setAttempt(0);
+    setReveal(undefined);
+    setSuggestion(undefined);
+    setBriefingOpen(true);
+    setBriefingHeader(undefined);
+    setBriefingReading(false);
+  }
+  useConversationReadReceipt(
+    tenant,
+    sessionKeySeen === sessionKey && !focused && page === 0 && selected === data.value?.conversation.id
+      ? data.value?.conversation
+      : undefined,
+    messageScroll.element,
+    changed,
+  );
+  const loading = Boolean(selected && !data.value && !data.error);
+  const conversationTitle =
+    data.value?.conversation.title ||
+    selectedTitle ||
+    (selected ? '会话' : briefingContext ? briefingTitle || '画报讨论' : '新会话');
   return (
-    <LiveConversationDeck
-      tenant={tenant}
-      navigation={navigation}
-      persistenceKey={readerKey}
-      title={data.value?.conversation.title || '新会话'}
-      reveal={reveal}
-      onRefresh={() => {
-        if (!requestNavigationLocked()) refresh();
-      }}
-      onClose={() => {
-        if (!requestNavigationLocked()) location.hash = '#tenant=' + tenant + '&view=briefing';
-      }}
-      cards={[
-        ...(briefingContext && briefingOpen
-          ? [
-              {
-                id: 'briefing',
-                kind: 'source' as const,
-                title: briefingTitle || '画报卡片',
-                label: '画报卡片',
-                close: () => setBriefingOpen(false),
-                content: (
-                  <TaskReadingBody
-                    tenant={tenant}
-                    task={briefingContext}
-                    onSource={openCitation}
-                    onTitle={setBriefingTitle}
-                  />
-                ),
-              },
-            ]
-          : []),
-        ...citations.flatMap((c) => [
-          {
-            id: c.id,
-            kind: 'file' as const,
-            title: c.title,
-            label: '资料来源 ' + c.title,
-            actions: (
-              <IconButton
-                icon={Info}
-                label={'查看资料属性 ' + c.title}
-                onClick={() => {
-                  setProperties((all) => (all.includes(c.id) ? all : [...all, c.id]));
-                  setReveal((previous) => ({
-                    id: 'properties:' + c.id,
-                    sequence: (previous?.sequence || 0) + 1,
-                  }));
-                }}
-              />
-            ),
-            close: () => {
-              setCitations((all) => all.filter((item) => item.id !== c.id));
-              setProperties((all) => all.filter((id) => id !== c.id));
-            },
-            content: <Citation tenant={tenant} id={c.id} verification={context} embedded back={() => {}} />,
-          },
-          ...(properties.includes(c.id)
+    <>
+      <LiveConversationDeck
+        tenant={tenant}
+        navigation={navigation}
+        persistenceKey={readerKey}
+        title={conversationTitle}
+        reveal={reveal}
+        onRefresh={() => {
+          if (!requestNavigationLocked()) refresh();
+        }}
+        onClose={() => {
+          if (!requestNavigationLocked()) location.hash = '#tenant=' + tenant + '&view=briefing';
+        }}
+        cards={[
+          ...(briefingContext && briefingOpen
             ? [
                 {
-                  id: 'properties:' + c.id,
-                  parentId: c.id,
-                  kind: 'properties' as const,
-                  title: c.title,
-                  label: '资料属性 ' + c.title,
-                  close: () => setProperties((all) => all.filter((id) => id !== c.id)),
+                  id: 'briefing',
+                  kind: 'source' as const,
+                  title: briefingTitle || '画报卡片',
+                  label: '画报卡片',
+                  close: () => setBriefingOpen(false),
+                  expand: () => setBriefingReading(true),
                   content: (
-                    <Citation
+                    <TaskReadingBody
                       tenant={tenant}
-                      id={c.id}
-                      verification={context}
-                      embedded
-                      propertiesOnly
-                      back={() => {}}
+                      task={briefingContext}
+                      onSource={openCitation}
+                      onHeader={setBriefingHeader}
                     />
                   ),
                 },
               ]
             : []),
-        ]),
-      ]}
-    >
-      <section className={`conversation-reader ${!selected ? 'is-new-conversation' : ''}`}>
-        <header className="deck-card-header live-card-heading">
-          <div>
-            <h2>{data.value?.conversation.title || '新会话'}</h2>
-            {agentMode !== 'live' && (
-              <p className="muted">
-                {agentMode === 'off'
-                  ? '模型暂不可用 · 任务可保存等待'
-                  : agentMode === 'verification'
-                    ? '联调验证 · 未调用真实模型'
-                    : '描述需求，让 AI 协助完成工作'}
-              </p>
+          ...citations.flatMap((c) => [
+            {
+              id: c.id,
+              kind: 'file' as const,
+              title: c.title,
+              label: '资料来源 ' + c.title,
+              actions: (
+                <IconButton
+                  icon={Info}
+                  label={'查看资料属性 ' + c.title}
+                  onClick={() => {
+                    setProperties((all) => (all.includes(c.id) ? all : [...all, c.id]));
+                    setReveal((previous) => ({
+                      id: 'properties:' + c.id,
+                      sequence: (previous?.sequence || 0) + 1,
+                    }));
+                  }}
+                />
+              ),
+              close: () => {
+                setCitations((all) => all.filter((item) => item.id !== c.id));
+                setProperties((all) => all.filter((id) => id !== c.id));
+              },
+              content: <Citation tenant={tenant} id={c.id} verification={context} embedded back={() => {}} />,
+            },
+            ...(properties.includes(c.id)
+              ? [
+                  {
+                    id: 'properties:' + c.id,
+                    parentId: c.id,
+                    kind: 'properties' as const,
+                    title: c.title,
+                    label: '资料属性 ' + c.title,
+                    close: () => setProperties((all) => all.filter((id) => id !== c.id)),
+                    content: (
+                      <Citation
+                        tenant={tenant}
+                        id={c.id}
+                        verification={context}
+                        embedded
+                        propertiesOnly
+                        back={() => {}}
+                      />
+                    ),
+                  },
+                ]
+              : []),
+          ]),
+        ]}
+      >
+        <section className={`conversation-reader ${!selected ? 'is-new-conversation' : ''}`}>
+          <header className="deck-card-header live-card-heading">
+            <div>
+              <CardTypeTag type="会话" />
+              <h2 title={conversationTitle}>{conversationTitle}</h2>
+              {agentMode !== 'live' && (
+                <p className="muted">
+                  {agentMode === 'off'
+                    ? '模型暂不可用 · 任务可保存等待'
+                    : agentMode === 'verification'
+                      ? '联调验证 · 未调用真实模型'
+                      : '描述需求，让 AI 协助完成工作'}
+                </p>
+              )}
+            </div>
+          </header>
+          <div
+            className="conversation-messages"
+            data-scroll-key={focused || page > 0 ? 'messages' : undefined}
+            aria-live="polite"
+            ref={messageScroll.ref}
+          >
+            {data.error ? (
+              <Failure error={data.error} retry={refresh} />
+            ) : loading ? (
+              <Loading />
+            ) : (
+              <>
+                {briefingContext && (
+                  <section className="conversation-briefing-context" aria-label="画报讨论上下文">
+                    <TaskReadingBody
+                      tenant={tenant}
+                      task={briefingContext}
+                      preview={{
+                        workspace:
+                          context.workspaces.find((space) => space.id === briefingContext.workspaceId)
+                            ?.name || '',
+                        open: () => setBriefingOpen(true),
+                      }}
+                    />
+                  </section>
+                )}
+                {data.value?.tasks.map((task) => (
+                  <TaskCard
+                    live={live.items.find((item) => item.taskId === task.id && item.attempt === task.attempt)}
+                    reconnecting={live.reconnecting}
+                    key={task.id}
+                    tenant={tenant}
+                    conversation={selected!}
+                    task={task}
+                    context={context}
+                    workspaceId={data.value!.conversation.workspaceId}
+                    executing={!!controlTask}
+                    respond={() => {
+                      setResponseId(task.id);
+                      requestAnimationFrame(() =>
+                        document
+                          .querySelector<HTMLTextAreaElement>('.conversation-composer textarea')
+                          ?.focus(),
+                      );
+                    }}
+                    changed={refresh}
+                    citation={(id) => {
+                      const source = task.sources.find((s) => s.id === id);
+                      if (source) openCitation(id, source.filename + ' · v' + source.version);
+                    }}
+                  />
+                ))}
+                {!data.value && !briefingContext && (
+                  <section className="conversation-intro conversation-welcome" aria-label="新会话引导">
+                    <DreamcoreLogo />
+                    <h3>
+                      有什么想法？<span>我帮你实现。</span>
+                    </h3>
+                  </section>
+                )}
+                {data.value && !focused && (page > 0 || data.value.hasMore) && (
+                  <Pager
+                    page={page}
+                    next={data.value.hasMore}
+                    onPage={(next) => {
+                      if (!pendingRequest) setPage(next);
+                    }}
+                  />
+                )}
+              </>
             )}
           </div>
-        </header>
-        <div
-          ref={scrollRef}
-          className="conversation-messages"
-          data-scroll-key="messages"
-          onScroll={(e) => {
-            const n = e.currentTarget;
-            following.current = n.scrollHeight - n.scrollTop - n.clientHeight < 48;
-            if (following.current) setNewContent(false);
-          }}
-        >
-          {live.disconnected && <p role="status">连接恢复中，已显示内容仍保留</p>}
-          {data.value?.tasks.map((task) => (
-            <TaskCard
-              key={task.id}
+          {focused ? (
+            <p className="conversation-history-note">
+              正在查看指定任务及其当前状态。
+              <Button
+                onClick={() => {
+                  location.hash = retainConversationContext(
+                    conversationHref(tenant, selected),
+                    location.hash,
+                  );
+                }}
+              >
+                返回最新对话并继续
+              </Button>
+            </p>
+          ) : (
+            <ConversationComposer
+              key={sessionKey}
+              loading={loading || !!data.error}
+              onSending={messageScroll.followLatest}
+              controlTask={controlTask}
+              responseTask={responseTask}
+              clearResponse={() => setResponseId(null)}
+              suggestion={suggestion}
               tenant={tenant}
-              conversation={selected!}
-              task={task}
-              live={live.snapshot?.items.find((t) => t.taskId === task.id && t.attempt === task.attempt)}
-              changed={refresh}
-              citation={(id) => {
-                const source = task.sources.find((s) => s.id === id);
-                if (source) openCitation(id, source.filename + ' · v' + source.version);
-              }}
-            />
-          ))}
-          {!data.value && (
-            <section className="conversation-intro" aria-label="新会话启动建议">
-              <h3>从一件具体的工作开始</h3>
-              <p>选一个方向，或直接写下你想完成的事。</p>
-              <div className="live-starter-grid">
-                {[
-                  {
-                    title: '整理资料',
-                    description: '提炼结论，找出待确认的问题',
-                    icon: Files,
-                    text: '请整理所选范围内的相关资料，提炼关键结论、依据和待确认的问题。',
-                  },
-                  {
-                    title: '起草方案',
-                    description: '明确需求，形成可讨论的初稿',
-                    icon: FileText,
-                    text: '请协助起草一份工作方案，先确认目标、需求和交付范围。',
-                  },
-                  {
-                    title: '分析问题',
-                    description: '结合资料，梳理原因与建议',
-                    icon: Search,
-                    text: '请结合可用资料分析当前问题，区分已有依据与需要核实的判断。',
-                  },
-                  {
-                    title: '规划下一步',
-                    description: '拆解目标，理清行动与优先级',
-                    icon: ListChecks,
-                    text: '请帮我拆解当前工作目标，整理下一步行动、优先级和待确认项。',
-                  },
-                ].map(({ title, description, icon: Icon, text }) => (
-                  <button
-                    type="button"
-                    key={title}
-                    disabled={pendingRequest}
-                    onClick={() =>
-                      setSuggestion({
-                        text,
-                        sequence: (suggestion?.sequence || 0) + 1,
-                      })
-                    }
-                  >
-                    <Icon size={20} strokeWidth={1.6} />
-                    <strong>{title}</strong>
-                    <span>{description}</span>
-                  </button>
-                ))}
-              </div>
-              <div className="live-inline-suggestions" aria-label="提示词建议">
-                <small>也可以这样开始</small>
-                {['总结一份资料', '准备一份周报', '规划下一步'].map((text) => (
-                  <button
-                    type="button"
-                    key={text}
-                    onClick={() => setSuggestion({ text, sequence: (suggestion?.sequence || 0) + 1 })}
-                  >
-                    {text}
-                  </button>
-                ))}
-              </div>
-              <p className="live-intro-capability">
-                {agentMode === 'off'
-                  ? '模型暂不可用。你可以先写下需求，发送后保存为等待中的任务。'
-                  : agentMode === 'verification'
-                    ? '联调任务可使用所选范围内已解析的资料片段，也可指定文件版本供工具处理。'
-                    : 'AI 任务可检索所选范围内已解析的资料片段，再生成回复。'}
-                {agentMode !== 'off' && publicWebEnabled && '也可查找你指定的公开内容。'}
-              </p>
-            </section>
-          )}
-          {data.value && !focused && (page > 0 || data.value.hasMore) && (
-            <Pager
-              page={page}
-              next={data.value.hasMore}
-              onPage={(next) => {
-                if (!pendingRequest) setPage(next);
-              }}
-            />
-          )}
-        </div>
-        {newContent && (
-          <Button
-            className="conversation-new-content"
-            onClick={() => {
-              following.current = true;
-              setNewContent(false);
-              if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-            }}
-          >
-            有新内容 ↓
-          </Button>
-        )}
-        {focused ? (
-          <p className="conversation-history-note">
-            正在查看指定任务及其当前状态。
-            <Button
-              onClick={() => {
-                location.hash = retainConversationContext(conversationHref(tenant, selected), location.hash);
-              }}
-            >
-              返回最新对话并继续
-            </Button>
-          </p>
-        ) : (
-          <ConversationComposer
-            suggestion={suggestion}
-            tenant={tenant}
-            selected={selected}
-            space={data.value?.conversation.workspaceId}
-            context={context}
-            ongoing={ongoing}
-            enabled={enabled && (!active || !!ongoing) && page === 0 && !pendingRequest}
-            agentMode={agentMode}
-            publicWebEnabled={publicWebEnabled}
-            disabledReason={
-              pendingRequest
-                ? '请先完成本次评价提交的核对。'
-                : !enabled
-                  ? '会话暂未开放。'
-                  : active && !ongoing
-                    ? activeLive?.stopping
-                      ? '正在停止任务…'
-                      : '正在准备执行，可先编辑补充。'
+              selected={selected}
+              space={data.value?.conversation.workspaceId || briefingContext?.workspaceId}
+              briefingContext={briefingContext}
+              context={context}
+              enabled={enabled && page === 0 && !pendingRequest}
+              agentMode={agentMode}
+              publicWebEnabled={publicWebEnabled}
+              disabledReason={
+                pendingRequest
+                  ? '请先完成本次评价提交的核对。'
+                  : !enabled
+                    ? '会话暂未开放。'
                     : page !== 0
                       ? '返回最新记录后可继续发送。'
                       : ''
-            }
-            changed={refresh}
-          />
-        )}
-      </section>
-    </LiveConversationDeck>
+              }
+              changed={refresh}
+            />
+          )}
+        </section>
+      </LiveConversationDeck>
+      {briefingReading && briefingContext && (
+        <ReadingDialog
+          tenant={tenant}
+          title={briefingTitle || '画报卡片'}
+          workspace={context.workspaces.find((space) => space.id === briefingContext.workspaceId)?.name || ''}
+          date={briefingHeader?.date}
+          contentLabel={briefingHeader?.contentLabel}
+          task={briefingContext}
+          onClose={() => setBriefingReading(false)}
+        />
+      )}
+    </>
   );
 }
 const labels: Record<string, string> = {
@@ -635,114 +664,87 @@ const labels: Record<string, string> = {
   RESULT_UNKNOWN: '执行结果待核对',
 };
 function TaskCard({
+  live,
+  reconnecting,
   tenant,
   conversation,
   task,
-  live,
   changed,
   citation,
+  context,
+  workspaceId,
+  executing,
+  respond,
 }: {
+  live?: LiveAnswer;
+  reconnecting?: boolean;
   tenant: string;
   conversation: string;
   task: ConversationTask;
-  live?: LiveTask;
   changed: () => void;
   citation: (id: string) => void;
+  context: TenantContext;
+  workspaceId: string;
+  executing: boolean;
+  respond: () => void;
 }) {
   const [readingOriginal, setReadingOriginal] = useState<TaskOriginal>();
   const { expire } = useSession();
+  const [processSteps, setProcessSteps] = useState<LiveAnswer[]>([]);
+  useEffect(() => {
+    if (live?.state !== 'COMPLETE') return;
+    setProcessSteps((old) =>
+      [...old.filter((item) => item.attempt === live.attempt && item.step !== live.step), live].slice(-8),
+    );
+  }, [live?.attempt, live?.step, live?.version]);
+  const retainedProcess = processSteps.filter(
+    (item) => task.reply && item.text.trim() !== task.reply.trim() && !task.reply.includes(item.text.trim()),
+  );
   const pendingRequest = useContext(RequestPending);
   const downloadController = useRef<AbortController | null>(null);
   useEffect(() => () => downloadController.current?.abort(), []);
   const [downloadError, setDownloadError] = useState<unknown>();
   const [downloading, setDownloading] = useState(false);
-  const submit = useSubmission<{ expectedRevision: number; action: TaskAction; input?: string }>();
-  useRequestLock(submit.busy || submit.uncertain);
-  const [submittedAction, setSubmittedAction] = useState<TaskAction>();
-  const [input, setInput] = useState('');
   const [historyOpen, setHistoryOpen] = useState(false);
-  const actions: { action: TaskAction; label: string }[] = [];
-  if (!task.sourcesUnavailable && task.reconciliationRequired)
-    actions.push({ action: 'RECONCILE', label: '核对执行影响' });
-  else if (
-    !task.sourcesUnavailable &&
-    ['PAUSED', 'WAITING_INPUT', 'WAITING_CAPABILITY', 'PARTIAL'].includes(task.status)
-  )
-    actions.push({
-      action: 'RESUME',
-      label: task.status === 'WAITING_INPUT' ? '提交补充并继续' : '恢复任务',
-    });
-  else if (!task.sourcesUnavailable && ['FAILED', 'CANCELLED', 'INTERRUPTED'].includes(task.status))
-    actions.push({ action: 'RETRY', label: '重试任务' });
-  if (['QUEUED', 'WAITING_INPUT', 'WAITING_CAPABILITY', 'PARTIAL'].includes(task.status))
-    actions.push({ action: 'PAUSE', label: '暂停任务' });
-  if (
-    [
-      'QUEUED',
-      'RUNNING',
-      'WAITING_INPUT',
-      'WAITING_CAPABILITY',
-      'PARTIAL',
-      'PAUSED',
-      'RESULT_UNKNOWN',
-    ].includes(task.status)
-  )
-    actions.push({
-      action: 'CANCEL',
-      label: live?.stopping && task.status === 'RUNNING' ? '正在停止…' : '停止任务',
-    });
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [copyNotice, setCopyNotice] = useState('');
+  useEffect(() => {
+    if (copyNotice !== '已复制') return;
+    const timer = setTimeout(() => setCopyNotice(''), 1800);
+    return () => clearTimeout(timer);
+  }, [copyNotice]);
+  const moreAnchor = useRef<HTMLDivElement>(null);
   return (
-    <article className="conversation-turn">
+    <article className="conversation-turn" data-task-id={task.id}>
       <p className="conversation-user">{task.prompt}</p>
       <div className="conversation-result">
-        <div className="live-answer-heading">
-          <span className="live-answer-avatar">{task.mode === 'AGENT' ? 'AI' : <Search size={16} />}</span>
-          <strong>
-            {live?.stopping && task.status === 'RUNNING'
-              ? '正在停止…'
-              : task.mode === 'AGENT' && task.status === 'RUNNING'
-                ? '正在执行任务'
-                : task.mode === 'AGENT' && task.status === 'SUCCEEDED'
-                  ? '本次处理完成'
-                  : labels[task.status]}
-          </strong>
-          {task.mode === 'AGENT' && (
-            <Badge>{task.executionClass === 'verification' ? '联调验证 · 未调用真实模型' : 'AI 任务'}</Badge>
-          )}
-        </div>
-        {live && !task.sourcesUnavailable && (
-          <LiveProcess
-            live={live}
-            task={task}
-            tenant={tenant}
-            conversation={conversation}
-            changed={changed}
-          />
+        {task.executionClass === 'verification' && (
+          <div className="live-answer-heading">
+            <Badge>联调验证 · 未调用真实模型</Badge>
+          </div>
+        )}
+        {!task.reply && !task.sourcesUnavailable && live?.text && (
+          <LiveReply live={live} running={['QUEUED', 'RUNNING'].includes(task.status)} />
         )}
         {task.reply && (
           <div className="conversation-reply">
-            <DocumentText text={task.reply} />
+            <ReplyText text={task.reply} />
           </div>
         )}
-        {task.mode === 'AGENT' && !task.sourcesUnavailable && (
-          <TaskWorkNotices tenant={tenant} task={task.id} verification={task.revision} />
-        )}
-        {task.mode === 'AGENT' && task.status === 'SUCCEEDED' && task.reply && (
-          <SaveAsDocument tenant={tenant} conversation={conversation} task={task.id} />
-        )}
-        {task.status === 'SUCCEEDED' &&
-          task.artifacts
-            .filter((file) => /\.(txt|md)$/i.test(file.filename))
-            .map((file) => (
-              <SaveAsDocument
-                key={file.id}
-                tenant={tenant}
-                conversation={conversation}
-                task={task.id}
-                artifact={file.id}
-                label={'编辑 ' + file.filename}
-              />
+        {task.reply && retainedProcess.length > 0 && (
+          <details className="reply-process-history">
+            <summary>查看处理过程</summary>
+            {retainedProcess.map((item) => (
+              <div className="live-process-preview" key={`${item.attempt}:${item.step}`}>
+                <ReplyText text={item.text} />
+              </div>
             ))}
+          </details>
+        )}
+        <ReplyProgress status={task.status} reconnecting={reconnecting} />
+        {live?.state === 'INTERRUPTED' && !task.reply && !['QUEUED', 'RUNNING'].includes(task.status) && (
+          <p className="reply-progress">已保留中断前的内容</p>
+        )}
         {task.mode === 'SOURCE_LOOKUP' && task.status === 'SUCCEEDED' && (
           <p>
             {task.sourcesUnavailable
@@ -752,7 +754,7 @@ function TaskCard({
                 : '以下是匹配的资料来源；未进行 AI 总结。'}
           </p>
         )}
-        {task.errorCode && <p className="access-alert">{taskErrorMessage(task.errorCode)}</p>}
+
         {readingOriginal && (
           <AttachmentReader
             tenant={tenant}
@@ -761,203 +763,232 @@ function TaskCard({
             close={() => setReadingOriginal(undefined)}
           />
         )}
-        {task.originals.length > 0 && (
-          <div className="conversation-originals" aria-label="本次指定的原件">
-            {task.originals.map((file) => (
-              <p key={file.versionId}>
-                <Button variant="ghost" onClick={() => setReadingOriginal(file)}>
-                  {file.filename} · v{file.version}
-                </Button>
-                <span>
-                  {file.read
-                    ? '已读取原件'
-                    : task.sources.some((source) => source.versionId === file.versionId)
-                      ? '已读取解析内容'
-                      : '已选用'}
-                </span>
-              </p>
-            ))}
-          </div>
-        )}
-        {task.publicQuery && <p className="muted">公开检索内容：{task.publicQuery}</p>}
-        {task.webSources.length > 0 && (
-          <div className="conversation-web-sources" aria-label="公开网页来源">
-            {task.webSources.map((source) => (
-              <details key={source.id}>
-                <summary>
-                  {source.title} · {source.kind === 'PAGE' ? '已读取页面' : '检索线索 · 未读取页面'}
-                </summary>
-                <a href={source.url} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">
-                  打开公开来源
-                </a>
-                <p>{source.excerpt}</p>
-                <small>
-                  {new Date(source.retrievedAt).toLocaleString()} ·{' '}
-                  {source.truncated ? '内容已截取' : '本次获取的文本快照'}
-                </small>
+        {(task.originals.length > 0 ||
+          task.webSources.length > 0 ||
+          task.skills.length > 0 ||
+          task.publicQuery) && (
+          <details className="reply-references">
+            <summary>参考资料与使用能力</summary>
+            {task.originals.length > 0 && (
+              <div className="conversation-originals" aria-label="本次指定的原件">
+                {task.originals.map((file) => (
+                  <p key={file.versionId}>
+                    <Button variant="ghost" onClick={() => setReadingOriginal(file)}>
+                      {file.filename} · v{file.version}
+                    </Button>
+                    <span>
+                      {file.read
+                        ? '已读取原件'
+                        : task.sources.some((source) => source.versionId === file.versionId)
+                          ? '已读取解析内容'
+                          : '已选用'}
+                    </span>
+                  </p>
+                ))}
+              </div>
+            )}
+            {task.publicQuery && <p className="muted">公开检索内容：{task.publicQuery}</p>}
+            {task.webSources.length > 0 && (
+              <div className="conversation-web-sources" aria-label="公开网页来源">
+                {task.webSources.map((source) => (
+                  <details key={source.id}>
+                    <summary>
+                      {source.title} · {source.kind === 'PAGE' ? '已读取页面' : '检索线索 · 未读取页面'}
+                    </summary>
+                    <a
+                      href={source.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      referrerPolicy="no-referrer"
+                    >
+                      打开公开来源
+                    </a>
+                    <p>{source.excerpt}</p>
+                    <small>
+                      {new Date(source.retrievedAt).toLocaleString()} ·{' '}
+                      {source.truncated ? '内容已截取' : '本次获取的文本快照'}
+                    </small>
+                  </details>
+                ))}
+              </div>
+            )}
+            {task.skills.length > 0 && (
+              <details className="conversation-skills">
+                <summary>本次使用的能力</summary>
+                {task.skills.map((skill) => (
+                  <p key={skill.id}>
+                    {skill.id === 'public-research'
+                      ? '公开资料研究'
+                      : skill.id === 'candidate-trials'
+                        ? '候选工具隔离试验'
+                        : skill.id === 'source-review'
+                          ? '资料核对'
+                          : skill.id}{' '}
+                    · v{skill.version}
+                  </p>
+                ))}
               </details>
-            ))}
-          </div>
-        )}
-        {task.skills.length > 0 && (
-          <details className="conversation-skills">
-            <summary>本次使用的能力</summary>
-            {task.skills.map((skill) => (
-              <p key={skill.id}>
-                {skill.id === 'public-research'
-                  ? '公开资料研究'
-                  : skill.id === 'candidate-trials'
-                    ? '候选工具隔离试验'
-                    : skill.id === 'source-review'
-                      ? '资料核对'
-                      : skill.id}{' '}
-                · v{skill.version}
-              </p>
-            ))}
+            )}
           </details>
         )}
         {task.artifacts.map((file) => (
-          <Button
-            key={file.id}
-            disabled={downloading}
-            onClick={async () => {
-              const controller = new AbortController();
-              downloadController.current = controller;
-              setDownloading(true);
-              setDownloadError(undefined);
-              try {
-                const blob = await api.download(tenant, conversation, task.id, file, controller.signal);
-                if (controller.signal.aborted) return;
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = file.filename;
-                link.click();
-                setTimeout(() => URL.revokeObjectURL(url), 1000);
-              } catch (error) {
-                if (controller.signal.aborted) return;
-                setDownloadError(error);
-                if (error instanceof IdentityError && error.status === 401) expire();
-              } finally {
-                if (!controller.signal.aborted) setDownloading(false);
-              }
-            }}
-          >
-            下载 {file.filename}
-          </Button>
+          <div className="reply-artifact" key={file.id}>
+            <FileText size={22} aria-hidden="true" />
+            <strong>{file.filename}</strong>
+            <Button
+              key={file.id}
+              disabled={downloading}
+              onClick={async () => {
+                const controller = new AbortController();
+                downloadController.current = controller;
+                setDownloading(true);
+                setDownloadError(undefined);
+                try {
+                  const blob = await api.download(tenant, conversation, task.id, file, controller.signal);
+                  if (controller.signal.aborted) return;
+                  const url = URL.createObjectURL(blob);
+                  const link = document.createElement('a');
+                  link.href = url;
+                  link.download = file.filename;
+                  link.click();
+                  setTimeout(() => URL.revokeObjectURL(url), 1000);
+                } catch (error) {
+                  if (controller.signal.aborted) return;
+                  setDownloadError(error);
+                  if (error instanceof IdentityError && error.status === 401) expire();
+                } finally {
+                  if (!controller.signal.aborted) setDownloading(false);
+                }
+              }}
+            >
+              下载
+            </Button>
+            {task.status === 'SUCCEEDED' && /\.(txt|md)$/i.test(file.filename) && (
+              <SaveAsDocument
+                tenant={tenant}
+                conversation={conversation}
+                task={task.id}
+                artifact={file.id}
+                label="编辑资料"
+              />
+            )}
+          </div>
         ))}
         <SubmitError error={downloadError} uncertain={false} />
-        <div className="conversation-sources">
-          {task.sources.map((s) => (
-            <button key={s.id} onClick={() => citation(s.id)}>
-              <strong>
-                {s.filename} · v{s.version}
-              </strong>
-              <small>
-                {s.locator}
-                {s.method === 'OCR' ? ' · OCR 需核对' : ''}
-              </small>
-              <span>{s.content.slice(0, 220)}</span>
-            </button>
-          ))}
-        </div>
-        {task.requiredInput && !live?.questions.length && <p>{task.requiredInput}</p>}
-        {task.status === 'WAITING_CAPABILITY' && (
-          <p className="muted">任务已保存，当前没有可用执行能力；不会自动反复调用。能力恢复后可继续。</p>
+        <ReplyReferences sources={task.sources} citation={citation} />
+        {task.supplementalInput && !task.sourcesUnavailable && (
+          <details className="task-supplement-receipt">
+            <summary>已补充</summary>
+            <p>{task.supplementalInput}</p>
+          </details>
         )}
-        {task.reconciliationRequired && (
-          <p className="access-alert">
-            回执不足，尚不能确认结果。系统只会依据已记录的工具范围核对是否可安全重试。
-          </p>
-        )}
-        {!live?.questions.some((q) => !q.answered) &&
-          task.mode === 'AGENT' &&
-          actions.some((a) => ['RESUME', 'RETRY'].includes(a.action)) && (
-            <Field label="补充本任务（可选）">
-              <textarea
-                aria-label="补充本任务（可选）"
-                disabled={pendingRequest || submit.busy || submit.uncertain}
-                maxLength={2000}
-                rows={2}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-              />
-            </Field>
-          )}
-        <div className="conversation-task-actions">
-          {actions
-            .filter((a) => !(a.action === 'RESUME' && live?.questions.some((q) => q.blocking && !q.answered)))
-            .map(({ action, label }) => (
-              <Button
-                key={action}
-                disabled={
-                  (task.status === 'RUNNING' && live?.stopping) ||
-                  (pendingRequest && !submit.uncertain) ||
-                  submit.busy ||
-                  (submit.uncertain && action !== submittedAction) ||
-                  (task.status === 'WAITING_INPUT' && action === 'RESUME' && !input.trim())
-                }
-                onClick={() => {
-                  if (!submit.uncertain) setSubmittedAction(action);
-                  void submit.submit(
-                    {
-                      expectedRevision: task.revision,
-                      action,
-                      ...(input.trim() && ['RESUME', 'RETRY'].includes(action)
-                        ? { input: input.trim() }
-                        : {}),
-                    },
-                    async (body, requestId) => {
-                      await api.action(tenant, conversation, task.id, { ...body, requestId });
-                      setInput('');
-                      changed();
-                    },
-                  );
-                }}
-              >
-                {submit.uncertain && action === submittedAction ? '重试本次操作' : label}
-              </Button>
-            ))}
-          {!task.sourcesUnavailable && task.attempt > 0 && (
-            <Button variant="ghost" onClick={() => setHistoryOpen(!historyOpen)}>
-              {historyOpen ? '收起执行历史' : '查看执行历史'}
-            </Button>
-          )}
-        </div>
-        {!task.sourcesUnavailable &&
-          ['SUCCEEDED', 'PARTIAL', 'FAILED', 'CANCELLED', 'INTERRUPTED', 'RESULT_UNKNOWN'].includes(
-            task.status,
-          ) && (
-            <FeedbackPanel
-              tenant={tenant}
-              target={{
-                kind: 'TASK',
-                taskId: task.id,
-                taskRevision: task.revision,
-                attempt: task.attempt,
-                presentationVersion: 'task-v1',
-                presentationRevision: 0,
-              }}
-              onOpenConversation={(id) => {
-                location.hash = retainConversationContext(conversationHref(tenant, id), location.hash);
+        <TaskInterventionCard
+          tenant={tenant}
+          conversation={conversation}
+          task={task}
+          context={context}
+          workspaceId={workspaceId}
+          executing={executing}
+          respond={respond}
+          changed={changed}
+        />
+        <div className="reply-actions" aria-label="回复操作">
+          {task.reply && (
+            <Button
+              icon={copyNotice === '已复制' ? Check : Copy}
+              className={copyNotice === '已复制' ? 'is-copied' : undefined}
+              variant="ghost"
+              aria-label="复制回复"
+              title={copyNotice || '复制'}
+              onClick={() => {
+                void navigator.clipboard.writeText(task.reply!).then(
+                  () => setCopyNotice('已复制'),
+                  () => setCopyNotice('复制失败，请选中文字复制'),
+                );
               }}
             />
           )}
+          {!task.sourcesUnavailable &&
+            ['SUCCEEDED', 'PARTIAL', 'FAILED', 'CANCELLED', 'INTERRUPTED', 'RESULT_UNKNOWN'].includes(
+              task.status,
+            ) && (
+              <ReplyFeedback
+                tenant={tenant}
+                target={{
+                  kind: 'TASK',
+                  taskId: task.id,
+                  taskRevision: task.revision,
+                  attempt: task.attempt,
+                  presentationVersion: 'task-v1',
+                  presentationRevision: 0,
+                }}
+              />
+            )}
+          {!task.sourcesUnavailable && (task.attempt > 0 || (task.status === 'SUCCEEDED' && task.reply)) && (
+            <div ref={moreAnchor} className="reply-more">
+              <Button
+                icon={MoreHorizontal}
+                variant="ghost"
+                aria-label="更多回复操作"
+                aria-expanded={moreOpen}
+                disabled={pendingRequest}
+                onClick={() => {
+                  if (!requestNavigationLocked()) setMoreOpen(!moreOpen);
+                }}
+              />
+              {moreOpen && (
+                <ActionPopover
+                  anchor={moreAnchor}
+                  label="更多回复操作"
+                  onClose={() => {
+                    if (!requestNavigationLocked()) setMoreOpen(false);
+                  }}
+                >
+                  {task.mode === 'AGENT' && task.status === 'SUCCEEDED' && task.reply && (
+                    <SaveAsDocument tenant={tenant} conversation={conversation} task={task.id} />
+                  )}
+                  {task.attempt > 0 && (
+                    <Button
+                      icon={History}
+                      variant="ghost"
+                      onClick={() => {
+                        if (requestNavigationLocked()) return;
+                        setHistoryOpen(!historyOpen);
+                        setMoreOpen(false);
+                      }}
+                    >
+                      {historyOpen ? '收起过程' : '查看过程'}
+                    </Button>
+                  )}
+                </ActionPopover>
+              )}
+            </div>
+          )}
+          {copyNotice && copyNotice !== '已复制' && (
+            <span role="status" className="reply-action-notice">
+              {copyNotice}
+            </span>
+          )}
+        </div>
         {!task.sourcesUnavailable && historyOpen && (
-          <AttemptHistory
-            tenant={tenant}
-            conversation={conversation}
-            task={task.id}
-            revision={task.revision}
-          />
-        )}
-        {submit.error instanceof IdentityError &&
-        (submit.error.code.startsWith('TASK_') || submit.error.code === 'CONVERSATION_BUSY') ? (
-          <p role="alert" className="access-alert">
-            {taskErrorMessage(submit.error.code)}
-          </p>
-        ) : (
-          <SubmitError error={submit.error} uncertain={submit.uncertain} />
+          <section className="reply-process" aria-label="回复处理过程">
+            <header className="reply-process-heading">
+              <span>
+                <History size={15} aria-hidden="true" />
+                处理过程
+              </span>
+              <Button icon={ChevronUp} variant="ghost" onClick={() => setHistoryOpen(false)}>
+                收起过程
+              </Button>
+            </header>
+            <TaskWorkNotices tenant={tenant} task={task.id} verification={task.revision} />
+            <AttemptHistory
+              tenant={tenant}
+              conversation={conversation}
+              task={task.id}
+              revision={task.revision}
+            />
+          </section>
         )}
       </div>
     </article>
@@ -994,70 +1025,89 @@ function AttemptHistory({
       {history.value.items.map((a) => (
         <details key={a.number}>
           <summary>
-            第 {a.number} 次执行 · {labels[a.status]}
+            <ChevronRight size={15} className="attempt-chevron" aria-hidden="true" />
+            <span>第 {a.number} 次执行</span>
+            <span className="attempt-status">{labels[a.status]}</span>
             {a.provenance === 'LEGACY_CURRENT_ONLY' ? ' · 旧记录仅保留当次事实' : ''}
           </summary>
-          <p className="muted">
-            {a.startedAt ? new Date(a.startedAt).toLocaleString() : '开始时间未知'}
-            {a.finishedAt ? ' — ' + new Date(a.finishedAt).toLocaleString() : ''}
-          </p>
-          <p className="conversation-reply">{a.input}</p>
-          {a.reply && <p className="conversation-reply">{a.reply}</p>}
-          {a.errorCode && <p>{taskErrorMessage(a.errorCode)}</p>}
-          {a.tools.map((t) => (
-            <p key={t.callId}>
-              {t.name} ·{' '}
-              {t.status === 'succeeded' ? '工具已返回' : t.status === 'failed' ? '工具失败' : '结果未收到'}
+          <div className="attempt-content">
+            <p className="muted">
+              {a.startedAt ? new Date(a.startedAt).toLocaleString() : '开始时间未知'}
+              {a.finishedAt ? ' — ' + new Date(a.finishedAt).toLocaleString() : ''}
             </p>
-          ))}
-          {a.sources.map((source) => (
-            <p key={source.id}>
-              {source.filename} · v{source.version} · {source.locator}
-            </p>
-          ))}
-          {a.artifacts.map((file) => (
-            <Button
-              key={file.id}
-              onClick={async () => {
-                download.current?.abort();
-                const controller = new AbortController();
-                download.current = controller;
-                setDownloadError(undefined);
-                try {
-                  const blob = await api.download(tenant, conversation, task, file, controller.signal);
-                  if (controller.signal.aborted) return;
-                  const url = URL.createObjectURL(blob);
-                  const link = document.createElement('a');
-                  link.href = url;
-                  link.download = file.filename;
-                  link.click();
-                  setTimeout(() => URL.revokeObjectURL(url), 1000);
-                } catch (error) {
-                  if (!controller.signal.aborted) setDownloadError(error);
-                }
-              }}
-            >
-              下载 {file.filename}
-            </Button>
-          ))}
-          {a.reconciliationCode && <p>已核对：允许工具不包含业务写入，可重新尝试；原结果仍未确认。</p>}
+            <p className="conversation-reply">{a.input}</p>
+            {a.reply && <DocumentText text={a.reply} />}
+            {a.errorCode && <p>{taskErrorMessage(a.errorCode)}</p>}
+            {a.tools.map((t) => (
+              <p key={t.callId}>
+                {t.name} ·{' '}
+                {t.status === 'succeeded' ? '工具已返回' : t.status === 'failed' ? '工具失败' : '结果未收到'}
+              </p>
+            ))}
+            {a.sources.map((source) => (
+              <p key={source.id}>
+                {source.filename} · v{source.version} · {source.locator}
+              </p>
+            ))}
+            {a.artifacts.map((file) => (
+              <Button
+                icon={FileText}
+                variant="ghost"
+                key={file.id}
+                onClick={async () => {
+                  download.current?.abort();
+                  const controller = new AbortController();
+                  download.current = controller;
+                  setDownloadError(undefined);
+                  try {
+                    const blob = await api.download(tenant, conversation, task, file, controller.signal);
+                    if (controller.signal.aborted) return;
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = file.filename;
+                    link.click();
+                    setTimeout(() => URL.revokeObjectURL(url), 1000);
+                  } catch (error) {
+                    if (!controller.signal.aborted) setDownloadError(error);
+                  }
+                }}
+              >
+                下载 {file.filename}
+              </Button>
+            ))}
+            {a.reconciliationCode && <p>已核对：允许工具不包含业务写入，可重新尝试；原结果仍未确认。</p>}
+          </div>
         </details>
       ))}
       <SubmitError error={downloadError} uncertain={false} />
-      <Button disabled={page === 0} onClick={() => setPage(page - 1)}>
-        上一页
-      </Button>
-      <Button disabled={!history.value.hasMore} onClick={() => setPage(page + 1)}>
-        更早的执行
-      </Button>
+      {(page > 0 || history.value.hasMore) && (
+        <nav className="attempt-pagination" aria-label="执行历史翻页">
+          <Button icon={ChevronLeft} variant="ghost" disabled={page === 0} onClick={() => setPage(page - 1)}>
+            上一页
+          </Button>
+          <Button
+            icon={ChevronRight}
+            variant="ghost"
+            disabled={!history.value.hasMore}
+            onClick={() => setPage(page + 1)}
+          >
+            更早的执行
+          </Button>
+        </nav>
+      )}
     </section>
   );
 }
-type PendingSend = SendTask & { liveTask?: string; liveAttempt?: number };
 export function ConversationComposer({
-  ongoing,
+  loading = false,
+  onSending,
+  controlTask,
+  responseTask,
+  clearResponse,
   suggestion,
   fromBriefing = false,
+  briefingContext,
   tenant,
   selected,
   space,
@@ -1068,6 +1118,12 @@ export function ConversationComposer({
   disabledReason,
   changed,
 }: {
+  loading?: boolean;
+  onSending?: () => void;
+  briefingContext?: ReadingTask;
+  controlTask?: ConversationTask;
+  responseTask?: ConversationTask;
+  clearResponse?: () => void;
   tenant: string;
   selected?: string;
   space?: string;
@@ -1079,11 +1135,20 @@ export function ConversationComposer({
   changed: () => void;
   suggestion?: { text: string; sequence: number };
   fromBriefing?: boolean;
-  ongoing?: { id: string; attempt: number };
 }) {
   const { session, expire } = useSession();
   const pendingRequest = useContext(RequestPending);
-  const key = `dreamcore:composer:${session.identity?.account.id}:${tenant}:${selected || 'new'}`;
+  type Followup = {
+    task: string;
+    expectedRevision: number;
+    action: TaskAction;
+    input: string;
+    originals?: { materialId: string; versionId: string }[];
+  };
+  const followup = useSubmission<Followup>();
+  const [lastFollowup, setLastFollowup] = useState<Followup>();
+  useRequestLock(followup.busy || followup.uncertain);
+  const key = `dreamcore:composer:${session.identity?.account.id}:${tenant}:${selected || (briefingContext ? 'briefing:' + briefingContext.taskId + ':' + briefingContext.taskRevision + ':' + briefingContext.attempt : 'new')}`;
   const [loaded] = useState(() => readTabDraft(key));
   const initial = useRef(record(loaded.value) ? loaded.value : {});
   const [stored, setStored] = useState(!loaded.unreadable);
@@ -1119,19 +1184,20 @@ export function ConversationComposer({
   const [selectedOnly, setSelectedOnly] = useState(initial.current.selectedOnly === true);
   const preparing = uploading || originals.some((f) => f.workspaceId && !prepared[f.versionId]);
   const restored = initial.current.pending;
-  const [pending, setPending] = useState<PendingSend | undefined>(
+  const [pending, setPending] = useState<SendTask | undefined>(
     record(restored) &&
       uuid(restored.requestId) &&
       uuid(restored.workspaceId) &&
       typeof restored.prompt === 'string' &&
       ['SOURCE_LOOKUP', 'AGENT'].includes(String(restored.mode))
-      ? (restored as unknown as PendingSend)
+      ? (restored as unknown as SendTask)
       : undefined,
   );
   const [busy, setBusy] = useState(false),
     [error, setError] = useState<unknown>();
   const textarea = useRef<HTMLTextAreaElement>(null);
   const form = useRef<HTMLFormElement>(null);
+  const [noticeHost, setNoticeHost] = useState<HTMLDivElement | null>(null);
   const composing = useRef(false);
   const submitting = useRef(false);
   const [focused, setFocused] = useState(false);
@@ -1171,12 +1237,7 @@ export function ConversationComposer({
     );
     delete initial.current.focus;
   }, []);
-  useEffect(() => {
-    if (!textarea.current) return;
-    textarea.current.style.height = 'auto';
-    textarea.current.style.height =
-      Math.min(160, Math.max(fromBriefing ? (expanded ? 68 : 54) : 70, textarea.current.scrollHeight)) + 'px';
-  }, [text, expanded, fromBriefing]);
+  useComposerHeight(textarea, text, expanded, fromBriefing);
   useEffect(() => {
     if (!suggestion || busy || pending) return;
     setText(suggestion.text);
@@ -1214,10 +1275,16 @@ export function ConversationComposer({
     <form
       ref={form}
       className={`conversation-composer ${fromBriefing ? 'workspace-composer' : ''} ${expanded ? 'is-expanded' : ''} ${isCollapsed ? 'is-collapsed' : ''}`}
+      inert={loading}
+      aria-busy={loading}
       aria-label={fromBriefing ? '从画报发起会话' : undefined}
       onFocusCapture={() => setFocused(true)}
       onBlurCapture={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocused(false);
+        if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+        // Safari may blur the input before a toolbar click focuses its popover.
+        requestAnimationFrame(() => {
+          if (form.current) setFocused(form.current.contains(document.activeElement));
+        });
       }}
       onDragOver={(e) => {
         if (e.dataTransfer.types.includes('Files')) e.preventDefault();
@@ -1225,12 +1292,46 @@ export function ConversationComposer({
       onDrop={(e) => {
         if (e.dataTransfer.files.length) {
           e.preventDefault();
-          if (!busy && !pending && !ongoing)
+          if (!busy && !pending)
             setDropped({ files: Array.from(e.dataTransfer.files), sequence: Date.now() });
         }
       }}
       onSubmit={async (event) => {
         event.preventDefault();
+        if (selected && (controlTask || responseTask || followup.uncertain)) {
+          if (
+            followup.busy ||
+            composing.current ||
+            preparing ||
+            (!followup.uncertain && (!enabled || !text.trim()))
+          )
+            return;
+          const target = controlTask || responseTask;
+          const body =
+            followup.uncertain && lastFollowup
+              ? lastFollowup
+              : target
+                ? {
+                    task: target.id,
+                    expectedRevision: target.revision,
+                    action: controlTask ? ('SUPPLEMENT' as const) : ('RESUME' as const),
+                    input: text.trim(),
+                    originals: originals.map(({ materialId, versionId }) => ({ materialId, versionId })),
+                  }
+                : undefined;
+          if (!body) return;
+          onSending?.();
+          setLastFollowup(body);
+          await followup.submit(body, async (value, requestId) => {
+            const { task, ...payload } = value;
+            await api.action(tenant, selected, task, { ...payload, requestId });
+            setText((current) => (current.trim() === value.input ? '' : current));
+            setOriginals([]);
+            clearResponse?.();
+            changed();
+          });
+          return;
+        }
         if (
           submitting.current ||
           composing.current ||
@@ -1243,7 +1344,7 @@ export function ConversationComposer({
           return;
         const body = pending || {
           requestId: crypto.randomUUID(),
-          ...(ongoing ? { liveTask: ongoing.id, liveAttempt: ongoing.attempt } : {}),
+          ...(!selected && briefingContext ? { briefingContext } : {}),
           workspaceId: space || location,
           prompt: text.trim(),
           mode,
@@ -1270,29 +1371,14 @@ export function ConversationComposer({
           }),
         );
         setPending(body);
+        onSending?.();
         submitting.current = true;
         setBusy(true);
         setError(undefined);
         const request = new AbortController();
         controller.current = request;
         try {
-          if (body.liveTask && selected && body.liveAttempt) {
-            await liveClient.input(
-              tenant,
-              selected,
-              body.liveTask,
-              { requestId: body.requestId, attempt: body.liveAttempt, text: body.prompt },
-              request.signal,
-            );
-            if (request.signal.aborted) return;
-            setText('');
-            setPending(undefined);
-            setStored(removeTabDraft(key));
-            changed();
-            return;
-          }
-          const { liveTask: _task, liveAttempt: _attempt, ...sendBody } = body;
-          const result = await api.send(tenant, selected || draftConversation, sendBody, request.signal);
+          const result = await api.send(tenant, selected || draftConversation, body, request.signal);
           if (request.signal.aborted) return;
           setText('');
           setPublicQuery('');
@@ -1329,20 +1415,29 @@ export function ConversationComposer({
         </button>
       )}
       <div className="live-composer-surface" hidden={isCollapsed}>
-        <fieldset disabled={busy || !!pending}>
+        <div className="composer-notices" ref={setNoticeHost}>
+          <SubmitError error={followup.error} uncertain={followup.uncertain} />
+          <DraftWarning unavailable={!stored} unreadable={loaded.unreadable} pending={!!pending} />
+          <SubmitError error={error} uncertain={!!pending && !busy} />
+        </div>
+        <fieldset disabled={loading || busy || !!pending || followup.busy || followup.uncertain}>
+          {responseTask && (
+            <div className="composer-response-target">
+              <span>回复：{responseTask.requiredInput || '补充所需信息'}</span>
+              <Button
+                variant="ghost"
+                disabled={followup.busy || followup.uncertain}
+                onClick={() => clearResponse?.()}
+              >
+                另起话题
+              </Button>
+            </div>
+          )}
           <div className="live-composer-input">
             <Field label={mode === 'AGENT' ? '工作要求' : '资料关键词'}>
               <textarea
                 ref={textarea}
-                aria-label={
-                  ongoing
-                    ? '补充要求'
-                    : fromBriefing
-                      ? '新的工作需求'
-                      : mode === 'AGENT'
-                        ? '工作要求'
-                        : '资料关键词'
-                }
+                aria-label={fromBriefing ? '新的工作需求' : mode === 'AGENT' ? '工作要求' : '资料关键词'}
                 onKeyDown={(event) => {
                   if (
                     event.key === 'Enter' &&
@@ -1365,118 +1460,179 @@ export function ConversationComposer({
                 rows={3}
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                placeholder={ongoing ? '补充要求，AI 将在后续步骤采用' : '有什么工作想交给 AI？'}
+                placeholder="告诉我你想处理的工作"
               />
             </Field>
           </div>
-          <div className="live-composer-tools">
-            {!ongoing && (
-            <AttachmentMaterials
-              tenant={tenant}
-              conversation={selected || draftConversation}
-              draftRequestId={draftRequestId}
-              context={context}
-              files={originals}
-              setFiles={setOriginals}
-              onConversation={setDraftConversation}
-              onBusy={setUploading}
-              onReady={onReady}
-              dropped={dropped}
-              verification={agentMode === 'verification'}
-            />
-            )}
-          </div>
-          {originals.length > 0 && (
-            <label className="attachment-scope">
-              <input
-                type="checkbox"
-                checked={selectedOnly}
-                onChange={(e) => setSelectedOnly(e.target.checked)}
-              />
-              只用所选资料
-            </label>
-          )}
-          {!ongoing && mode === 'AGENT' && !selectedOnly && publicWebEnabled && (
-            <details className="live-web-options">
-              <summary>查找公开资料（可选）</summary>
-              <Field label="公开检索内容（可选）">
-                <input
-                  aria-label="公开检索内容（可选）"
-                  value={publicQuery}
-                  maxLength={2048}
-                  pattern="([hH][tT][tT][pP][sS]://.*|.{0,200})"
-                  title="公开关键词最多 200 字，HTTPS 网址最多 2048 字"
-                  onChange={(e) => setPublicQuery(e.target.value)}
-                  placeholder="公开关键词，或一个 https 网页地址"
+          <div className="live-composer-controls" inert={fromBriefing && !expanded}>
+            <div className="live-composer-controls-content">
+              <div className="live-composer-tools">
+                <div ref={toolsAnchor} className="live-composer-workspace">
+                  {selected || draftConversation ? (
+                    <span className="button live-workspace-label" title="会话工作空间">
+                      <Folder size={16} aria-hidden="true" />
+                      {context.workspaces.find((s) => s.id === (space || location))?.name || '工作空间不可用'}
+                    </span>
+                  ) : (
+                    <Button
+                      icon={Folder}
+                      variant="ghost"
+                      aria-label="选择工作空间"
+                      aria-expanded={toolsOpen}
+                      disabled={uploading || pendingRequest}
+                      onClick={() => setToolsOpen(!toolsOpen)}
+                    >
+                      {context.workspaces.find((s) => s.id === location)?.name || '选择工作空间'}
+                      <ChevronDown size={12} />
+                    </Button>
+                  )}
+                  {toolsOpen && !selected && !draftConversation && (
+                    <ActionPopover
+                      anchor={toolsAnchor}
+                      label="选择工作空间"
+                      onClose={() => setToolsOpen(false)}
+                    >
+                      {context.workspaces.map((workspace) => (
+                        <Button
+                          key={workspace.id}
+                          icon={Folder}
+                          variant="ghost"
+                          aria-pressed={location === workspace.id}
+                          onClick={() => {
+                            setLocation(workspace.id);
+                            setToolsOpen(false);
+                          }}
+                        >
+                          {workspace.name}
+                        </Button>
+                      ))}
+                    </ActionPopover>
+                  )}
+                </div>
+                <AttachmentMaterials
+                  tenant={tenant}
+                  conversation={selected || draftConversation}
+                  draftRequestId={draftRequestId}
+                  workspaceId={space || location}
+                  context={context}
+                  files={originals}
+                  setFiles={setOriginals}
+                  onConversation={(id, workspaceId) => {
+                    setDraftConversation(id);
+                    if (workspaceId) setLocation(workspaceId);
+                  }}
+                  onBusy={setUploading}
+                  onReady={onReady}
+                  dropped={dropped}
+                  verification={agentMode === 'verification'}
                 />
-                <small>仅将这里填写的内容用于外部检索或访问；请勿填写企业机密。留空则不联网查找。</small>
-              </Field>
-            </details>
-          )}
+              </div>
+              {originals.length > 0 && (
+                <label className="attachment-scope">
+                  <input
+                    type="checkbox"
+                    checked={selectedOnly}
+                    onChange={(e) => setSelectedOnly(e.target.checked)}
+                  />
+                  只用所选资料
+                </label>
+              )}
+              {mode === 'AGENT' && !selectedOnly && publicWebEnabled && (
+                <details className="live-web-options">
+                  <summary>查找公开资料（可选）</summary>
+                  <Field label="公开检索内容（可选）">
+                    <input
+                      aria-label="公开检索内容（可选）"
+                      value={publicQuery}
+                      maxLength={2048}
+                      pattern="([hH][tT][tT][pP][sS]://.*|.{0,200})"
+                      title="公开关键词最多 200 字，HTTPS 网址最多 2048 字"
+                      onChange={(e) => setPublicQuery(e.target.value)}
+                      placeholder="公开关键词，或一个 https 网页地址"
+                    />
+                    <small>仅将这里填写的内容用于外部检索或访问；请勿填写企业机密。留空则不联网查找。</small>
+                  </Field>
+                </details>
+              )}
+            </div>
+          </div>
         </fieldset>
-        <Button
-          icon={ArrowUp}
-          className="live-composer-submit"
-          type="submit"
-          variant="primary"
-          aria-label={
-            busy
-              ? '提交中…'
-              : pending
-                ? '重试上次发送'
-                : fromBriefing
-                  ? '发送消息'
-                  : mode === 'AGENT'
-                    ? ongoing
-                      ? '发送补充'
-                      : '开始任务'
-                    : '查找资料'
-          }
-          title={
-            busy
-              ? '提交中…'
-              : pending
-                ? '重试上次发送'
-                : fromBriefing
-                  ? '发送消息'
-                  : mode === 'AGENT'
-                    ? ongoing
-                      ? '发送补充'
-                      : '开始任务'
-                    : '查找资料'
-          }
-          disabled={busy || preparing || !enabled || !allowed || !text.trim()}
-        >
-          <span className="live-visually-hidden">
-            {busy
-              ? '提交中…'
-              : pending
-                ? '重试上次发送'
-                : fromBriefing
-                  ? '发送消息'
-                  : mode === 'AGENT'
-                    ? ongoing
-                      ? '发送补充'
-                      : '开始任务'
-                    : '查找资料'}
-          </span>
-        </Button>
+        {controlTask && selected && (
+          <TaskSendControl
+            tenant={tenant}
+            conversation={selected}
+            task={controlTask}
+            besideSend={!!text.trim() || followup.uncertain}
+            noticeHost={noticeHost}
+            changed={changed}
+          />
+        )}
+        {(!controlTask || !!text.trim() || followup.uncertain) && (
+          <Button
+            icon={ArrowUp}
+            className="live-composer-submit"
+            type="submit"
+            variant="primary"
+            aria-label={
+              followup.uncertain
+                ? '重试本次发送'
+                : controlTask
+                  ? '发送补充'
+                  : responseTask
+                    ? '提交回答并继续'
+                    : busy
+                      ? '提交中…'
+                      : pending
+                        ? '重试上次发送'
+                        : fromBriefing
+                          ? '发送消息'
+                          : mode === 'AGENT'
+                            ? '开始任务'
+                            : '查找资料'
+            }
+            title={
+              preparing
+                ? '资料准备中'
+                : !enabled && disabledReason
+                  ? disabledReason
+                  : busy
+                    ? '提交中…'
+                    : pending
+                      ? '重试上次发送'
+                      : fromBriefing
+                        ? '发送消息'
+                        : mode === 'AGENT'
+                          ? '开始任务'
+                          : '查找资料'
+            }
+            disabled={
+              busy ||
+              preparing ||
+              followup.busy ||
+              (!followup.uncertain && (!enabled || !allowed || !text.trim()))
+            }
+          >
+            <span className="live-visually-hidden">
+              {busy
+                ? '提交中…'
+                : pending
+                  ? '重试上次发送'
+                  : fromBriefing
+                    ? '发送消息'
+                    : mode === 'AGENT'
+                      ? '开始任务'
+                      : '查找资料'}
+            </span>
+          </Button>
+        )}
       </div>
-      {mode === 'AGENT' && agentMode === 'off' && (
-        <p className="muted">模型暂不可用。发送后会保存任务，等待模型恢复；不会生成 AI 回复。</p>
-      )}
-      {(preparing || disabledReason) && (
-        <div className="conversation-send">
-          <small>{preparing ? '资料准备中，可先编辑问题' : disabledReason}</small>
-        </div>
-      )}
-      <DraftWarning unavailable={!stored} unreadable={loaded.unreadable} pending={!!pending} />
-      <SubmitError error={error} uncertain={!!pending && !busy} />
     </form>
   );
   function locationHash(id: string) {
-    window.location.hash = fromBriefing
-      ? conversationHref(tenant, id) + '&from=briefing'
-      : retainConversationContext(conversationHref(tenant, id), window.location.hash);
+    window.location.hash = briefingContext
+      ? briefingConversationHref(tenant, briefingContext, id)
+      : fromBriefing
+        ? conversationHref(tenant, id) + '&from=briefing'
+        : retainConversationContext(conversationHref(tenant, id), window.location.hash);
   }
 }

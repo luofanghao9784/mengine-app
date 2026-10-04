@@ -40,6 +40,8 @@ class TaskDatasetIntegrationTest extends TaskDatasetFixture {
   var content=new com.dreamcore.workspace.experience.ExperienceService.Content("METHOD","合成数据参考","摘要","基于来源的合成方法",List.of("测试"),"适用","排除","无","合成","SOURCE_BOUND");
   var e=experiences.create(owner,tenant,privateSpace,UUID.randomUUID(),content,List.of(new com.dreamcore.workspace.experience.ExperienceService.Evidence("TASK",source.id(),privateSpace)));
   e=experiences.publish(owner,tenant,privateSpace,e.id(),UUID.randomUUID(),e.revision(),e.version().id(),false);
+  // Synthetic admitted provenance only: the test exercises downstream dataset dependence, not model quality.
+  db.update("UPDATE experience_versions SET origin='AUTOMATIC',evaluation='AUTOMATIC_CHECKED' WHERE id=?",e.version().id());
   var current=task(null,"AUTHORIZED_LIBRARY");call(current,request("experience_read",e.id(),e.version().id(),0));finish(current);
   db.update("UPDATE business_datasets SET status='WITHDRAWN' WHERE id=?",dataset);
   assertEquals(0,db.queryForObject("SELECT count(*) FROM readable_source_tasks WHERE id IN (?,?)",Integer.class,source.id(),current.id()));

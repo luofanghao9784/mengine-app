@@ -24,7 +24,10 @@ export const isLifecycleItem = (v: unknown): v is LifecycleItem =>
   nullableTime(v.trashedAt) &&
   nullableTime(v.purgeAfter) &&
   nullableId(v.cleanupJobId) &&
-  typeof v.canPurge === 'boolean';
+  typeof v.canPurge === 'boolean' &&
+  Array.isArray(v.path) &&
+  v.path.every((p) => typeof p === 'string') &&
+  typeof v.parentAvailable === 'boolean';
 export const isLifecycleReceipt = (v: unknown): v is LifecycleReceipt =>
   record(v) &&
   uuid(v.objectId) &&
@@ -60,14 +63,26 @@ export function createLifecycleClient(fetcher: typeof fetch = fetch) {
     return `/${k}/${id(oid)}`;
   };
   return {
-    list: (tenant: string, workspace: string, offset = 0, signal?: AbortSignal) =>
+    list: (
+      tenant: string,
+      workspace: string,
+      offset = 0,
+      signal?: AbortSignal,
+      filter?: { view: 'TRASH' | 'RECORDS'; query: string },
+    ) =>
       request(
-        base(tenant, workspace) + `?offset=${offset}&limit=20`,
+        base(tenant, workspace) +
+          `?offset=${offset}&limit=20` +
+          (filter ? '&' + new URLSearchParams({ view: filter.view, query: filter.query }) : ''),
         'GET',
         (v): v is { items: LifecycleItem[]; hasMore: boolean } =>
           record(v) &&
           Array.isArray(v.items) &&
-          v.items.every(isLifecycleItem) &&
+          v.items.every(
+            (item) =>
+              isLifecycleItem(item) &&
+              (!filter || (filter.view === 'TRASH' ? item.state === 'TRASHED' : item.state !== 'ACTIVE')),
+          ) &&
           new Set(v.items.map((x) => x.kind + x.id)).size === v.items.length &&
           typeof v.hasMore === 'boolean',
         undefined,

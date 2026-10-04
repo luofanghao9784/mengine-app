@@ -14,9 +14,13 @@ public class ConversationAttachments {
  private final JdbcTemplate db; private final ConversationService conversations; private final MaterialService materials; private final IdentityService identities;
  public ConversationAttachments(JdbcTemplate db,ConversationService conversations,MaterialService materials,IdentityService identities){this.db=db;this.conversations=conversations;this.materials=materials;this.identities=identities;}
  @Transactional public Receipt upload(UUID actor,UUID tenant,UUID conversation,UUID draftRequest,UUID request,MultipartFile file){
+  return upload(actor,tenant,conversation,draftRequest,request,file,null);
+ }
+ @Transactional public Receipt upload(UUID actor,UUID tenant,UUID conversation,UUID draftRequest,UUID request,MultipartFile file,UUID workspace){
   identities.member(actor,tenant,false);
   UUID personal=db.queryForObject("SELECT id FROM workspaces WHERE tenant_id=? AND kind='PERSONAL' AND owner_id=?",UUID.class,tenant,actor);
-  var c=conversation==null?conversations.draft(actor,tenant,personal,Objects.requireNonNull(draftRequest)):conversations.require(actor,tenant,conversation,true);
+  var c=conversation==null?conversations.draft(actor,tenant,workspace==null?personal:workspace,Objects.requireNonNull(draftRequest)):conversations.require(actor,tenant,conversation,true);
+  if(workspace!=null&&!workspace.equals(c.workspaceId()))throw new IdentityException(409,"CONVERSATION_WORKSPACE_CHANGED");
   String fingerprint=IdentityService.hash(tenant+"\n"+c.id()+"\n"+request);
   UUID prior=identities.priorRequest(actor,request,"ATTACHMENT_SCOPE",fingerprint);
   // The stable scope request is independent of MaterialService's exact upload receipt.

@@ -5,6 +5,18 @@ export interface Conversation {
   workspaceId: string;
   title: string;
   updatedAt: string;
+  managementRevision?: number;
+  running?: boolean;
+  unread?: boolean;
+  briefingDiscussion?: boolean;
+  replyRevision?: number;
+  latestReplyTaskId?: string | null;
+  trashedAt?: string | null;
+}
+export interface ConversationManagementReceipt {
+  id: string;
+  revision: number;
+  trashedAt: string | null;
 }
 export interface TaskArtifact {
   id: string;
@@ -66,6 +78,7 @@ export interface ConversationTask {
     | 'RESULT_UNKNOWN';
   waitReason?: string | null;
   requiredInput?: string | null;
+  supplementalInput?: string | null;
   reconciliationRequired?: boolean;
   revision: number;
   attempt: number;
@@ -84,7 +97,20 @@ export interface ConversationPage {
   items: Conversation[];
   hasMore: boolean;
 }
+export interface BriefingReference {
+  conversationId: string;
+  taskId: string;
+  workspaceId: string;
+  taskRevision: number;
+  attempt: number;
+}
+export interface BriefingDiscussion {
+  conversationId: string | null;
+  title: string;
+  briefingContext: BriefingReference;
+}
 export interface ConversationDetail {
+  briefingContext?: BriefingReference | null;
   conversation: Conversation;
   tasks: ConversationTask[];
   hasMore: boolean;
@@ -97,6 +123,7 @@ export interface ConversationEvents {
   hasMore: boolean;
 }
 export interface SendTask {
+  briefingContext?: BriefingReference;
   sourceScope?: 'AUTHORIZED_LIBRARY' | 'SELECTED';
   originals?: OriginalSelection[];
   publicQuery?: string;
@@ -106,7 +133,7 @@ export interface SendTask {
   mode: 'SOURCE_LOOKUP' | 'AGENT';
 }
 
-export type TaskAction = 'CANCEL' | 'RETRY' | 'PAUSE' | 'RESUME' | 'RECONCILE';
+export type TaskAction = 'CANCEL' | 'RETRY' | 'PAUSE' | 'RESUME' | 'RECONCILE' | 'SUPPLEMENT';
 export interface TaskAttempt {
   number: number;
   status: ConversationTask['status'];

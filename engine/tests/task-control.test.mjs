@@ -96,7 +96,24 @@ test('missing capability is a persistent outcome, not automatic model retries', 
   assert.equal(calls, 2);
 });
 test('failed actual tool remains failed and yields partial delivery rather than completed business success', async (t) => {
+  const warnings = [];
+  t.mock.method(console, 'warn', (line) => warnings.push(JSON.parse(line)));
   const { result, receipts } = await fixture(t, 'failed-tool');
+  assert.equal(warnings.length, 1);
+  assert.equal(warnings[0].event, 'TASK_TOOL_REJECTED');
+  assert.equal(warnings[0].tool, 'search_sources');
+  assert.equal(warnings[0].code, 'INVALID_QUERY');
+  assert.equal(warnings[0].callId, 'call-1');
+  assert.match(warnings[0].taskId, /^[0-9a-f-]{36}$/);
+  assert.match(warnings[0].attemptId, /^[0-9a-f-]{36}$/);
+  assert.deepEqual(Object.keys(warnings[0]).sort(), [
+    'attemptId',
+    'callId',
+    'code',
+    'event',
+    'taskId',
+    'tool',
+  ]);
   assert.equal(result.outcome, 'PARTIAL');
   assert.equal(result.tools[0].status, 'failed');
   assert.deepEqual(
@@ -119,5 +136,5 @@ test('repeated searches retain a partial response within eight metered calls, ne
   assert.equal(result.outcome, 'PARTIAL');
   assert.match(result.requiredInput, /预算/);
   assert.match(result.text, /仍需确认缺少的数据/);
-  assert.equal(receipts.filter((r) => r.status === 'succeeded').length, 7);
+  assert.equal(receipts.filter((r) => r.status === 'succeeded').length, 6);
 });

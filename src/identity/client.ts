@@ -11,6 +11,8 @@ export class IdentityError extends Error {
   readonly status: number;
   constructor(code: string, status = 0) {
     const messages: Record<string, string> = {
+      CONVERSATION_BUSY: '会话正在执行，请选择停止并删除。',
+      CONVERSATION_STATE_CHANGED: '会话状态已变化，请刷新后重试。',
       PHONE_INVALID: '请输入正确的手机号；海外号码请带国家区号。',
       PHONE_IN_USE: '此手机号已关联其他账号，请使用原账号登录或联系管理员核实。',
       PHONE_ALREADY_BOUND: '账号已绑定手机号，请重新登录。',

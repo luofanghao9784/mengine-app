@@ -1,7 +1,8 @@
 import { RuntimeError, type ModelPart, type ModelPort } from './ports.js';
 import type { TokenUsage } from './metered-model.js';
 import { isRecord } from './http-json.js';
-import { postStream } from './http-stream.js';
+import { chatFrames } from './chat-stream.js';
+import { randomUUID } from 'node:crypto';
 
 /** Shared wire format only. Each provider validates its own endpoint and capabilities. */
 export class ChatCompletionsModel implements ModelPort {
@@ -29,6 +30,9 @@ export class ChatCompletionsModel implements ModelPort {
   }
   async *generate(request: Parameters<ModelPort['generate']>[0]): AsyncIterable<ModelPart> {
     this.lastUsage = null;
+    if (request.requiredTool !== undefined &&
+        !request.tools.some((tool) => tool.name === request.requiredTool))
+      throw new RuntimeError('INVALID_MODEL_INPUT');
     const messages = request.messages.flatMap((message) => {
       const tools = message.content.filter((b) => b.type === 'tool_result');
       if (tools.length) {
@@ -67,109 +71,109 @@ export class ChatCompletionsModel implements ModelPort {
       ...this.config.modeParameters,
       max_tokens: request.maxTokens,
       ...(request.tools.length
-        ? { tools: request.tools.map((t) => ({ type: 'function', function: t })) }
-        : {}),
+        ? { tools: request.tools.map((t) => ({ type: 'function', function: t })),
+            ...(request.requiredTool ? { tool_choice: {
+              type: 'function', function: { name: request.requiredTool },
+            } } : {}),
+          }
+        : { tool_choice: 'none' }),
     };
     if (Buffer.byteLength(JSON.stringify(input)) > 262144) throw new RuntimeError('MODEL_INPUT_LIMIT');
     let body: unknown;
-    let streamed = false,
-      content = '',
-      finish: unknown = null,
-      usage: unknown;
-    const fragments = new Map<
+    let finish: string | undefined,
+      usage: unknown,
+      textBytes = 0;
+    const streamCalls = new Map<
       number,
       { id: string; type: string; function: { name: string; arguments: string } }
     >();
     try {
-      for await (const chunk of postStream(
+      for await (const frame of chatFrames(
         this.config.endpoint,
         this.config.apiKey,
         input,
         request.signal,
         this.config.timeoutMs,
       )) {
-        if (!isRecord(chunk) || !Array.isArray(chunk.choices))
-          throw new RuntimeError('INVALID_MODEL_RESPONSE');
-        if (chunk.usage) usage = chunk.usage;
-        if (!chunk.choices.length) continue;
-        if (chunk.choices.length !== 1 || !isRecord(chunk.choices[0]))
-          throw new RuntimeError('INVALID_MODEL_RESPONSE');
-        const choice = chunk.choices[0];
-        // Some compatible providers return complete JSON even when streaming is requested.
-        if (choice.message) {
-          if (streamed || body) throw new RuntimeError('INVALID_MODEL_RESPONSE');
-          body = chunk;
+        if (!frame.streaming) {
+          body = frame.data;
           continue;
         }
-        if (body || !isRecord(choice.delta) || choice.index !== 0 || finish !== null)
+        const value = frame.data;
+        if (!isRecord(value) || !Array.isArray(value.choices) || value.choices.length > 1 || value.error)
           throw new RuntimeError('INVALID_MODEL_RESPONSE');
-        streamed = true;
+        if (value.usage) usage = value.usage;
+        if (!value.choices.length) continue;
+        const choice = value.choices[0];
+        if (!isRecord(choice) || choice.index !== 0 || !isRecord(choice.delta))
+          throw new RuntimeError('INVALID_MODEL_RESPONSE');
         const delta = choice.delta;
         if (delta.reasoning_content || (delta.role !== undefined && delta.role !== 'assistant'))
           throw new RuntimeError('INVALID_MODEL_RESPONSE');
+        if (finish && (delta.content || delta.tool_calls)) throw new RuntimeError('INVALID_MODEL_RESPONSE');
         if (delta.content !== undefined && delta.content !== null) {
           if (typeof delta.content !== 'string') throw new RuntimeError('INVALID_MODEL_RESPONSE');
-          content += delta.content;
-          if (Buffer.byteLength(content) > 65536) throw new RuntimeError('MODEL_OUTPUT_LIMIT');
+          textBytes += Buffer.byteLength(delta.content);
+          if (textBytes > 65536) throw new RuntimeError('MODEL_OUTPUT_LIMIT');
           if (delta.content) yield { type: 'text', text: delta.content };
         }
         if (delta.tool_calls !== undefined) {
           if (!Array.isArray(delta.tool_calls)) throw new RuntimeError('INVALID_MODEL_RESPONSE');
-          for (const call of delta.tool_calls) {
+          for (const part of delta.tool_calls) {
             if (
-              !isRecord(call) ||
-              !Number.isInteger(call.index) ||
-              (call.index as number) < 0 ||
-              (call.index as number) > 3
+              !isRecord(part) ||
+              !Number.isInteger(part.index) ||
+              Number(part.index) < 0 ||
+              Number(part.index) > 3
             )
               throw new RuntimeError('INVALID_MODEL_RESPONSE');
-            const key = call.index as number;
-            const prior = fragments.get(key) ?? {
+            const call = streamCalls.get(Number(part.index)) ?? {
               id: '',
               type: 'function',
               function: { name: '', arguments: '' },
             };
-            if (call.id !== undefined) {
-              if (typeof call.id !== 'string' || prior.id) throw new RuntimeError('INVALID_MODEL_RESPONSE');
-              prior.id = call.id;
+            if (part.id !== undefined) {
+              if (typeof part.id !== 'string') throw new RuntimeError('INVALID_MODEL_RESPONSE');
+              call.id += part.id;
             }
-            if (call.type !== undefined && call.type !== 'function')
+            if (part.type !== undefined && part.type !== 'function')
               throw new RuntimeError('INVALID_MODEL_RESPONSE');
-            if (call.function !== undefined) {
-              if (!isRecord(call.function)) throw new RuntimeError('INVALID_MODEL_RESPONSE');
-              for (const field of ['name', 'arguments'] as const)
-                if (call.function[field] !== undefined) {
-                  if (typeof call.function[field] !== 'string')
+            if (part.function !== undefined) {
+              if (!isRecord(part.function)) throw new RuntimeError('INVALID_MODEL_RESPONSE');
+              for (const key of ['name', 'arguments'] as const)
+                if (part.function[key] !== undefined) {
+                  if (typeof part.function[key] !== 'string')
                     throw new RuntimeError('INVALID_MODEL_RESPONSE');
-                  prior.function[field] += call.function[field];
+                  call.function[key] += part.function[key];
                 }
             }
             if (
-              prior.function.arguments.length > 65536 ||
-              prior.function.name.length > 64 ||
-              prior.id.length > 128
+              call.id.length > 128 ||
+              call.function.name.length > 64 ||
+              call.function.arguments.length > 65536
             )
               throw new RuntimeError('MODEL_OUTPUT_LIMIT');
-            fragments.set(key, prior);
+            streamCalls.set(Number(part.index), call);
           }
         }
-        if (choice.finish_reason !== undefined && choice.finish_reason !== null)
-          finish = choice.finish_reason;
+        if (choice.finish_reason !== null && choice.finish_reason !== undefined) {
+          if (finish || !['stop', 'tool_calls', 'length'].includes(String(choice.finish_reason)))
+            throw new RuntimeError('INVALID_MODEL_RESPONSE');
+          finish = String(choice.finish_reason);
+        }
       }
-      if (streamed)
+      if (body === undefined) {
+        if (!finish) throw new RuntimeError('MODEL_INCOMPLETE');
         body = {
           usage,
           choices: [
             {
               finish_reason: finish,
-              message: {
-                role: 'assistant',
-                content,
-                tool_calls: [...fragments.entries()].sort(([a], [b]) => a - b).map(([, v]) => v),
-              },
+              message: { role: 'assistant', content: '', tool_calls: [...streamCalls.values()] },
             },
           ],
         };
+      }
     } catch (error) {
       this.usageIncomplete = true;
       this.usage = null;
@@ -216,41 +220,51 @@ export class ChatCompletionsModel implements ModelPort {
     )
       throw new RuntimeError('INVALID_MODEL_RESPONSE');
     const calls = message.tool_calls ?? [];
+    const forcedCall = request.requiredTool !== undefined && Array.isArray(calls) && calls.length === 1 &&
+      ['stop', 'tool_calls'].includes(String(choice.finish_reason));
     if (
       !Array.isArray(calls) ||
       calls.length > 4 ||
-      (choice.finish_reason === 'tool_calls') !== calls.length > 0
+      (request.requiredTool !== undefined && !forcedCall) ||
+      ((choice.finish_reason === 'tool_calls') !== calls.length > 0 && !forcedCall)
     )
       throw new RuntimeError('INVALID_MODEL_RESPONSE');
     const parts: ModelPart[] = [];
-    if (message.content && !streamed) parts.push({ type: 'text', text: message.content as string });
+    if (message.content) parts.push({ type: 'text', text: message.content as string });
     const ids = new Set();
     for (const call of calls) {
+      // A provider can omit routing labels for a specifically selected function.
+      // These labels correlate messages only; authority still comes from the task and actual tool receipt.
+      const id = isRecord(call) && forcedCall && (call.id === undefined || call.id === '')
+        ? randomUUID() : isRecord(call) ? call.id : undefined;
+      const name = isRecord(call) && isRecord(call.function) && forcedCall &&
+        (call.function.name === undefined || call.function.name === '')
+        ? request.requiredTool : isRecord(call) && isRecord(call.function) ? call.function.name : undefined;
       if (
         !isRecord(call) ||
         call.type !== 'function' ||
-        typeof call.id !== 'string' ||
-        ids.has(call.id) ||
+        typeof id !== 'string' ||
+        !/^[\x21-\x7e]{1,128}$/.test(id) ||
+        ids.has(id) ||
         !isRecord(call.function) ||
-        typeof call.function.name !== 'string' ||
+        typeof name !== 'string' ||
+        (request.requiredTool !== undefined && name !== request.requiredTool) ||
         typeof call.function.arguments !== 'string'
       )
         throw new RuntimeError('INVALID_MODEL_RESPONSE');
-      if (streamed)
-        try {
-          JSON.parse(call.function.arguments);
-        } catch {
-          throw new RuntimeError('INVALID_MODEL_RESPONSE');
-        }
-      ids.add(call.id);
+      if (id !== call.id || name !== call.function.name || (forcedCall && choice.finish_reason === 'stop'))
+        console.warn(JSON.stringify({ event: 'MODEL_SELECTED_TOOL_NORMALIZED', tool: name,
+          missingCallId: id !== call.id, missingToolName: name !== call.function.name,
+          stopWithToolCall: choice.finish_reason === 'stop' }));
+      ids.add(id);
       parts.push({
         type: 'tool_call',
-        id: call.id,
-        name: call.function.name,
+        id,
+        name,
         arguments: call.function.arguments,
       });
     }
     yield* parts;
-    yield { type: 'finish', reason: choice.finish_reason as 'stop' | 'tool_calls' | 'length' };
+    yield { type: 'finish', reason: forcedCall ? 'tool_calls' : choice.finish_reason as 'stop' | 'tool_calls' | 'length' };
   }
 }

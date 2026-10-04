@@ -1,3 +1,5 @@
+import { MagazineBody } from './Magazine';
+import { MagazineGrid } from './MagazineGrid';
 import { DataBriefing } from './DataBriefing';
 import { readBriefing } from './content';
 import { useEffect, useRef, useState } from 'react';
@@ -6,6 +8,7 @@ import { Failure, Loading, useRemote } from '../shared/admin';
 import { conversationClient } from '../conversation/client';
 import { conversationHref } from '../conversation/Conversations';
 import { readableTask } from './reading-state';
+import type { CardPresentation } from './card-presentation';
 
 export type ReadingTask = {
   conversationId: string;
@@ -13,19 +16,23 @@ export type ReadingTask = {
   taskRevision: number;
   attempt: number;
   workspaceId: string;
+  presentation?: CardPresentation;
 };
+export type ReadingHeader = { title: string; date: string; contentLabel?: string };
 export function TaskReadingBody({
   tenant,
   task,
   onRead,
   onSource,
-  onTitle,
+  onHeader,
+  preview,
 }: {
   tenant: string;
   task: ReadingTask;
   onRead?: () => void;
   onSource?: (id: string, title: string) => void;
-  onTitle?: (title: string | undefined) => void;
+  onHeader?: (header: ReadingHeader | undefined) => void;
+  preview?: { workspace: string; open: () => void };
 }) {
   const [attempt, setAttempt] = useState(0);
   const data = useRemote(
@@ -47,11 +54,14 @@ export function TaskReadingBody({
     [tenant, task.conversationId, task.taskId, task.taskRevision, task.attempt, hasBriefing, attempt],
   );
   const state = readableTask(data.value, task);
-  const title =
-    state === 'ready' && !data.error && !generated.error ? generated.value?.content.title : undefined;
+  const headerReady = state === 'ready' && !data.error && !generated.error &&
+    (!hasBriefing || !!generated.value);
+  const title = headerReady ? generated.value?.content.title ?? data.value?.conversation.title : undefined;
+  const date = headerReady ? generated.value?.content.generatedAt ?? result?.createdAt : undefined;
+  const contentLabel = generated.value?.content.schemaVersion === 'briefing-data-v1' ? '数据分析' : undefined;
   useEffect(() => {
-    onTitle?.(title);
-  }, [onTitle, title]);
+    onHeader?.(title && date ? { title, date, contentLabel } : undefined);
+  }, [onHeader, title, date, contentLabel]);
   const notified = useRef(false),
     read = useRef(onRead);
   read.current = onRead;
@@ -74,6 +84,54 @@ export function TaskReadingBody({
         <Button onClick={() => setAttempt((n) => n + 1)}>重新核对</Button>
       </div>
     );
+  if (preview) {
+    if (generated.error) return <Failure error={generated.error} retry={() => setAttempt((n) => n + 1)} />;
+    if (hasBriefing && !generated.value) return <Loading />;
+    const document = generated.value;
+    return (
+      <div className="conversation-briefing-cover">
+        <MagazineGrid
+          sizing="workspace"
+          presentation={task.presentation}
+          interactive={false}
+          items={[
+            {
+              id: task.taskId,
+              title: document?.content.title ?? data.value.conversation.title,
+              summary: document?.content.summary ?? (result.reply || '').slice(0, 240),
+              chart: !!document?.content.chart,
+              fixedSize: task.presentation?.size ?? (document?.content.chart ? '2×2' : undefined),
+              render: (
+                <article className="live-briefing-card conversation-briefing-preview">
+                  <button
+                    type="button"
+                    className="live-briefing-body"
+                    onClick={preview.open}
+                    aria-label={`查看画报：${document?.content.title ?? data.value.conversation.title}`}
+                  >
+                    <MagazineBody
+                      briefing={document}
+                      title={document?.content.title ?? data.value.conversation.title}
+                      excerpt={document?.content.summary ?? (result.reply || '').slice(0, 240)}
+                      truncated={!document && (result.reply?.length ?? 0) > 240}
+                      workspace={preview.workspace}
+                      date={document?.content.generatedAt ?? result.createdAt}
+                      footer={
+                        result.artifacts.length > 0 ? (
+                          <span>{result.artifacts.length} 份成果</span>
+                        ) : undefined
+                      }
+                      verification={result.executionClass === 'verification'}
+                    />
+                  </button>
+                </article>
+              ),
+            },
+          ]}
+        />
+      </div>
+    );
+  }
   return (
     <>
       {result.executionClass === 'verification' && (

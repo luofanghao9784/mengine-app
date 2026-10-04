@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { deckSpacing } from '../conversationDeck';
+import { deckFoldFade, type DeckSnapRange } from '../conversation/deck-snap';
 
 /** The fixed 9POP demo's sticky stack geometry, independent of data and permissions. */
 export function useDeckLayout(
@@ -14,6 +15,7 @@ export function useDeckLayout(
     {},
   );
   const cardScrollRanges = useRef<Record<string, { from: number; to: number }>>({});
+  const cardSnapRanges = useRef<DeckSnapRange[]>([]);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   // Each following card covers the previous one while leaving a clickable spine.
@@ -26,6 +28,7 @@ export function useDeckLayout(
     );
     const tail = element.querySelector<HTMLElement>('.deck-scroll-tail')!;
     const update = () => {
+      const listExpanded = element.parentElement?.hasAttribute('data-list-expanded');
       const previousExtent = element.scrollWidth;
       const atEnd =
         element.scrollLeft > 0 && element.scrollLeft + element.clientWidth >= element.scrollWidth - 4;
@@ -35,7 +38,6 @@ export function useDeckLayout(
         setDeckSize((prior) =>
           prior.width === nextSize.width && prior.list === nextSize.list ? prior : nextSize,
         );
-      const centerWidth = center.current?.offsetWidth || 560;
       const { gap, spine, padding } = deckSpacing;
       const conversationIndex = cards.findIndex((card) => card.dataset.deckId === 'conversation');
       const following = cards.length - conversationIndex - 1;
@@ -45,14 +47,10 @@ export function useDeckLayout(
       );
       const total =
         cards.reduce((sum, card) => sum + card.offsetWidth, 0) + (cards.length - 1) * gap + padding * 2;
-      // Center the whole deck so the list has the same gap as every other card.
-      // A new chat still prioritizes centering the editor, with its list beside it.
-
-      const inset = mobile
-        ? 0
-        : cluster && cards.length === 2
-          ? Math.max(0, (element.clientWidth - centerWidth) / 2 - cards[0].offsetWidth - gap - padding)
-          : Math.max(0, (element.clientWidth - total) / 2);
+      // Keep the list at the rail's padding edge for the two-card conversation view.
+      // Extra reader cards retain the existing whole-deck centering behavior.
+      const inset =
+        mobile || (cluster && cards.length === 2) ? 0 : Math.max(0, (element.clientWidth - total) / 2);
       cards.forEach((card, index) => {
         card.style.marginLeft = index === 0 && !mobile ? `${inset}px` : '0px';
       });
@@ -96,10 +94,22 @@ export function useDeckLayout(
           : `${Math.max(0, element.clientWidth - (cards.at(-1)?.offsetWidth || 0) - lastAnchor - padding)}px`;
       // A new anchor can release width that was constrained by the previous viewport.
       // If the user reached the end, follow the new end instead of leaving the last file clipped.
-      if (atEnd && !mobile && Math.abs(element.scrollWidth - previousExtent) > 1)
+      if (atEnd && !mobile && !listExpanded && Math.abs(element.scrollWidth - previousExtent) > 1)
         element.scrollTo({ left: element.scrollWidth, behavior: 'instant' });
+      // Reserve room for the list by moving the entire reader stack equally.
+      // Equal translation preserves every companion's existing overlap.
+      const root = element.parentElement!;
+      const previousShift = parseFloat(root.style.getPropertyValue('--list-open-shift')) || 0;
+      const list = cards.find((card) => card.dataset.deckId === 'list');
+      const firstReader = cards.find((card) => card.dataset.deckId !== 'list');
+      const shift =
+        !mobile && listExpanded && list && firstReader
+          ? Math.max(0, reflow.bounds(list).right + gap - reflow.bounds(firstReader).left + previousShift)
+          : 0;
+      root.style.setProperty('--list-open-shift', `${shift.toFixed(3)}px`);
       const nextFolds: Record<string, { covered: boolean; folded: boolean; clipped: boolean }> = {};
       const viewport = element.getBoundingClientRect();
+      cardSnapRanges.current = [];
       cards.forEach((card, index) => {
         let fade = 0;
         const current = reflow.bounds(card);
@@ -110,15 +120,25 @@ export function useDeckLayout(
             !mobile &&
             (current.left < viewport.left - 1 || current.right > viewport.left + element.clientWidth + 1),
         };
-        if (index !== cards.length - 1 && !mobile) {
+        const independentList =
+          card.dataset.deckId === 'list' && element.parentElement?.hasAttribute('data-list-expanded');
+        if (index !== cards.length - 1 && !mobile && !independentList) {
           const next = reflow.bounds(cards[index + 1]);
           const visibleSpine = spine;
           const overlap = Math.max(0, current.right - next.left);
           const coverage = Math.min(1, overlap / Math.max(1, current.width - visibleSpine));
-          // Remain sharp through the first half, then dissolve with the actual
-          // overlap. Updating CSS directly keeps rapid reversals tied to scroll.
-          const progress = Math.max(0, (coverage - 0.5) * 2);
-          fade = progress * progress * (3 - 2 * progress);
+          // Begin dissolving only above 60% coverage, tied directly to actual overlap.
+          fade = deckFoldFade(coverage);
+          const anchor = parseFloat(card.style.getPropertyValue('--stack-left')) || 0;
+          const nextAnchor = parseFloat(cards[index + 1].style.getPropertyValue('--stack-left')) || 0;
+          const remaining = Math.max(spine, nextAnchor - anchor);
+          // Open at the natural gap; overlap begins one gap later.
+          const start = cardScrollRanges.current[card.dataset.deckId!].to;
+          const end = Math.min(
+            element.scrollWidth - element.clientWidth,
+            start + gap + current.width - remaining,
+          );
+          if (end > start + 12) cardSnapRanges.current.push({ id: card.dataset.deckId!, start, end });
           nextFolds[card.dataset.deckId!] = {
             ...nextFolds[card.dataset.deckId!],
             covered: next.left < current.right - 1,
@@ -131,6 +151,32 @@ export function useDeckLayout(
         card.style.setProperty('--fold-blur', `${(fade * 8).toFixed(3)}px`);
         card.style.setProperty('--fold-opacity', (1 - fade).toFixed(4));
       });
+      // Keep natural widths for scrolling/reopening, but a folded stack paints
+      // only as far as its foreground card. Wider hidden readers must not leave
+      // an empty base sticking out on the right.
+      cards.forEach((card, index) => {
+        let front = index;
+        while (front < cards.length - 1 && nextFolds[cards[front].dataset.deckId!]?.folded) front++;
+        const hiddenRight =
+          !mobile && front > index
+            ? Math.max(0, reflow.bounds(card).right - reflow.bounds(cards[front]).right + 1)
+            : 0;
+        card.style.setProperty('--fold-hidden-right', `${hiddenRight.toFixed(3)}px`);
+        if (hiddenRight > 0) {
+          const right = card.offsetWidth - hiddenRight;
+          const height = card.offsetHeight;
+          const radius = Math.min(
+            parseFloat(getComputedStyle(card).borderTopRightRadius) || 24,
+            right / 2,
+            height / 2,
+          );
+          // Curve the visible right edge at the card's actual top/bottom, while
+          // leaving room for the exposed spine's left, upper and lower shadows.
+          const path = `M -40 -40 H ${right - radius} V 0 Q ${right} 0 ${right} ${radius} V ${height - radius} Q ${right} ${height} ${right - radius} ${height} V ${height + 40} H -40 Z`;
+          card.style.setProperty('--fold-edge-clip', `path('${path}')`);
+        } else card.style.removeProperty('--fold-edge-clip');
+        card.toggleAttribute('data-fold-width-clipped', hiddenRight > 0);
+      });
       setFolds((prior) => (JSON.stringify(prior) === JSON.stringify(nextFolds) ? prior : nextFolds));
       setCanScrollLeft(!mobile && element.scrollLeft > 1);
       setCanScrollRight(!mobile && element.scrollLeft + element.clientWidth < element.scrollWidth - 4);
@@ -138,13 +184,20 @@ export function useDeckLayout(
     update();
     reflow.animate();
     element.addEventListener('scroll', update, { passive: true });
-    const observer = new ResizeObserver(update);
+    // Changing the expanded card's sticky anchor can release its width cap.
+    // Measure the resulting size on the next frame, outside observer delivery.
+    let resizeFrame = 0;
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(resizeFrame);
+      resizeFrame = requestAnimationFrame(update);
+    });
     observer.observe(element);
     cards.forEach((card) => observer.observe(card));
     return () => {
       element.removeEventListener('scroll', update);
       observer.disconnect();
+      cancelAnimationFrame(resizeFrame);
     };
   }, [layoutKey, cluster, reflow.animate, reflow.bounds]);
-  return { deckSize, folds, cardScrollRanges, canScrollLeft, canScrollRight };
+  return { deckSize, folds, cardScrollRanges, cardSnapRanges, canScrollLeft, canScrollRight };
 }

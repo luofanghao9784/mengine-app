@@ -139,6 +139,27 @@ class TableCalculationIntegrationTest {
         conversations.action(owner,tenant,j.conversation(),j.id(),UUID.randomUUID(),1,"CANCEL");assertTrue(recommendations.list(owner,tenant,null,0,20,null,true).items().isEmpty());denied(403,()->agents.deliverBriefing(j.id(),j.token(),cardRequest(calc)));
     }
 
+    @Test void cardDiscussionIsPreparedOnceAndUsesCardWithoutGenerationHistory(){
+        upload(space,null,null,"0.60",false);var j=start(space);UUID source=grant(j),calc=computed(j,source);agents.deliverBriefing(j.id(),j.token(),cardRequest(calc));finishCard(j,source);
+        var original=conversations.taskDetail(owner,tenant,j.conversation(),j.id()).tasks().getFirst();
+        var discussion=agents.discussion(owner,tenant,j.conversation(),j.id(),original.revision(),original.attempt());
+        assertNull(discussion.conversationId());assertEquals(cardRequest(calc).title(),discussion.title());assertEquals(j.id(),discussion.briefingContext().taskId());
+        assertNull(agents.discussion(owner,tenant,j.conversation(),j.id(),original.revision(),original.attempt()).conversationId());
+        denied(404,()->agents.discussion(reader,tenant,j.conversation(),j.id(),original.revision(),original.attempt()));
+        denied(409,()->agents.discussion(owner,tenant,j.conversation(),j.id(),original.revision()+1,original.attempt()));
+        var sent=agents.sendDiscussion(owner,tenant,null,discussion.briefingContext(),space,UUID.randomUUID(),"解释这张画报","AGENT",null,List.of(),null);var next=conversations.claim();
+        assertEquals(sent.conversation().id(),agents.discussion(owner,tenant,j.conversation(),j.id(),original.revision(),original.attempt()).conversationId());
+        var request=new com.dreamcore.workspace.context.TaskContextService.Request("bootstrap",null,null,null,null,null,null,null,null,null,null);
+        var result=json.valueToTree(context.context(next.id(),next.token(),request)).path("result").path("latestBriefing");
+        assertEquals(cardRequest(calc).title(),result.path("title").asText());assertEquals("0.60",result.path("chart").path("rows").get(0).path("current").asText());
+        var history=new com.dreamcore.workspace.context.TaskContextService.Request("history",null,"",0,null,null,null,null,null,null,null);
+        assertEquals(0,json.valueToTree(context.context(next.id(),next.token(),history)).path("result").path("items").size());
+        assertEquals(1,conversations.detail(owner,tenant,j.conversation(),0,20).tasks().size());
+        db.update("DELETE FROM workspace_members WHERE workspace_id=? AND account_id=?",space,owner);
+        assertThrows(IdentityException.class,()->context.context(next.id(),next.token(),request));
+        assertThrows(IdentityException.class,()->conversations.detail(owner,tenant,sent.conversation().id(),0,20));
+    }
+
     @Test void continuationReceivesActualGeneratedContentAndTracksSourceRevocation(){
         upload(space,null,null,"0.60",false);var j=start(space);UUID source=grant(j),calc=computed(j,source);agents.deliverBriefing(j.id(),j.token(),cardRequest(calc));finishCard(j,source);
         conversations.submit(owner,tenant,j.conversation(),space,UUID.randomUUID(),"继续解释画报变化","AGENT");var next=conversations.claim();

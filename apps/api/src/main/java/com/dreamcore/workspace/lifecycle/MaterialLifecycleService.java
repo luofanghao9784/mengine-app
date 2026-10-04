@@ -13,7 +13,7 @@ import tools.jackson.databind.json.JsonMapper;
 /** Material lifecycle is platform state. Model output and UI visibility cannot override it. */
 @Service
 public class MaterialLifecycleService {
-    public record Item(UUID id,String kind,String name,String state,int revision,Instant trashedAt,Instant purgeAfter,UUID cleanupJobId,boolean canPurge) {}
+    public record Item(UUID id,String kind,String name,String state,int revision,Instant trashedAt,Instant purgeAfter,UUID cleanupJobId,boolean canPurge,List<String> path,boolean parentAvailable) {}
     public record Page(List<Item> items,boolean hasMore) {}
     public record Preview(Item item,long documents,long versions,long folders,String restoration) {}
     public record Receipt(UUID objectId,String kind,String action,String resultingState,int revision,Instant occurredAt,Instant purgeAfter,UUID cleanupJobId) {}
@@ -30,8 +30,12 @@ public class MaterialLifecycleService {
     private Map<String,Object> object(UUID tenant,UUID space,String kind,UUID id){var rows=db.queryForList("SELECT * FROM "+table(kind)+" WHERE tenant_id=? AND workspace_id=? AND id=?",tenant,space,id);if(rows.isEmpty())throw missing();return rows.getFirst();}
     private Item item(UUID actor,UUID tenant,UUID space,String kind,UUID id){
         var original=object(tenant,space,kind,id);var states=db.queryForList("SELECT * FROM content_lifecycle WHERE object_kind=? AND object_id=?",kind,id);
-        boolean purge=canPurge(actor,tenant,space);if(states.isEmpty())return new Item(id,kind,(String)original.get("name"),"ACTIVE",0,null,null,null,purge);
-        var l=states.getFirst();return new Item(id,kind,(String)original.get("name"),(String)l.get("state"),(Integer)l.get("revision"),time(l,"trashed_at"),time(l,"purge_after"),(UUID)l.get("purge_job_id"),purge);
+        boolean purge=canPurge(actor,tenant,space);
+        UUID parent=(UUID)original.get(kind.equals("MATERIAL")?"folder_id":"parent_id");
+        var path=originalPath(tenant,space,parent);
+        boolean parentAvailable=parent==null || !db.queryForList("SELECT id FROM active_material_folders WHERE tenant_id=? AND workspace_id=? AND id=?",tenant,space,parent).isEmpty();
+        if(states.isEmpty())return new Item(id,kind,(String)original.get("name"),"ACTIVE",0,null,null,null,purge,path,parentAvailable);
+        var l=states.getFirst();return new Item(id,kind,(String)original.get("name"),(String)l.get("state"),(Integer)l.get("revision"),time(l,"trashed_at"),time(l,"purge_after"),(UUID)l.get("purge_job_id"),purge,path,parentAvailable);
     }
     private void ancestorActive(UUID tenant,UUID space,String kind,UUID id){
         var obj=object(tenant,space,kind,id);UUID parent=(UUID)obj.get(kind.equals("MATERIAL")?"folder_id":"parent_id");
@@ -43,9 +47,32 @@ public class MaterialLifecycleService {
         access.require(actor,tenant,space,true);var item=item(actor,tenant,space,kind,id);var docs=materials(tenant,space,kind,id);long count=0;for(UUID material:docs)count+=db.queryForObject("SELECT count(*) FROM material_versions WHERE material_id=?",Long.class,material);
         return new Preview(item,docs.size(),count,kind.equals("FOLDER")?folders(tenant,space,id).size():0,"CURRENT_PERMISSIONS_NO_TASK_RESTART");
     }
+    // Only names and original directory metadata are exposed; deleted bodies stay unreadable.
+    private List<String> originalPath(UUID tenant,UUID space,UUID parent){
+        var path=new ArrayList<String>();
+        path.add(db.queryForObject("SELECT name FROM workspaces WHERE tenant_id=? AND id=?",String.class,tenant,space));
+        if(parent!=null)path.addAll(db.queryForList("""
+            WITH RECURSIVE trail AS (
+              SELECT id,parent_id,name,0 AS depth FROM material_folders WHERE tenant_id=? AND workspace_id=? AND id=?
+              UNION ALL SELECT f.id,f.parent_id,f.name,t.depth+1 FROM material_folders f JOIN trail t ON t.parent_id=f.id
+                WHERE f.tenant_id=? AND f.workspace_id=? AND t.depth<128
+            ) SELECT name FROM trail ORDER BY depth DESC
+            """,String.class,tenant,space,parent,tenant,space));
+        return List.copyOf(path);
+    }
     @Transactional public Page list(UUID actor,UUID tenant,UUID space,int offset,int limit){
-        if(offset<0 || offset>100000 || limit<1 || limit>50)throw IdentityException.invalid();access.require(actor,tenant,space,true);
-        var rows=db.queryForList("SELECT object_kind,object_id FROM content_lifecycle WHERE tenant_id=? AND workspace_id=? AND state<>'ACTIVE' ORDER BY changed_at DESC,object_id LIMIT ? OFFSET ?",tenant,space,limit+1,offset);
+        return list(actor,tenant,space,offset,limit,"ALL","");
+    }
+    @Transactional public Page list(UUID actor,UUID tenant,UUID space,int offset,int limit,String view,String query){
+        if(offset<0 || offset>100000 || limit<1 || limit>50 || view==null || !Set.of("ALL","TRASH","RECORDS").contains(view) || query==null || query.length()>180)throw IdentityException.invalid();
+        access.require(actor,tenant,space,true);
+        String filter=switch(view){case "TRASH"->"l.state='TRASHED' AND l.purge_after>now()";case "RECORDS"->"(l.state IN ('PURGING','PURGED') OR (l.state='TRASHED' AND l.purge_after<=now()))";default->"l.state<>'ACTIVE'";};
+        var rows=db.queryForList("""
+            SELECT l.object_kind,l.object_id FROM content_lifecycle l
+            LEFT JOIN materials m ON l.object_kind='MATERIAL' AND m.id=l.object_id AND m.tenant_id=l.tenant_id AND m.workspace_id=l.workspace_id
+            LEFT JOIN material_folders f ON l.object_kind='FOLDER' AND f.id=l.object_id AND f.tenant_id=l.tenant_id AND f.workspace_id=l.workspace_id
+            WHERE l.tenant_id=? AND l.workspace_id=? AND
+            """+filter+" AND strpos(lower(coalesce(m.name,f.name,'')),lower(?))>0 ORDER BY l.changed_at DESC,l.object_kind,l.object_id LIMIT ? OFFSET ?",tenant,space,query.trim(),limit+1,offset);
         return new Page(rows.stream().limit(limit).map(r->item(actor,tenant,space,(String)r.get("object_kind"),(UUID)r.get("object_id"))).toList(),rows.size()>limit);
     }
     @Transactional public Receipt act(UUID actor,UUID tenant,UUID space,String kind,UUID id,UUID key,int revision,String action){

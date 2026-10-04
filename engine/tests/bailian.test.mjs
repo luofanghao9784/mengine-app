@@ -31,6 +31,50 @@ const local = (url, timeoutMs = 150) =>
     timeoutMs,
   });
 
+test('a verified delivery phase selects its exact function on the provider wire', async (t) => {
+  let calls = 0;
+  const server = createServer(async (req, res) => {
+    calls++;
+    const input = await body(req);
+    assert.deepEqual(input.tool_choice, { type: 'function', function: { name: 'deliver_briefing' } });
+    assert.deepEqual(input.tools.map((tool) => tool.function.name), ['deliver_briefing']);
+    json(res, completion(null, [call('delivery', 'deliver_briefing', {})]));
+  });
+  const url = await listen(server);t.after(() => close(server));
+  const backend = local(url, 2000);
+  const input = { ...request(), tools: [{ name: 'deliver_briefing', description: 'synthetic', parameters: { type: 'object' } }], requiredTool: 'deliver_briefing' };
+  assert.equal((await collect(backend.generate(input)))[0].name, 'deliver_briefing');
+  await assert.rejects(collect(backend.generate({ ...input, requiredTool: 'unavailable_tool' })), { code: 'INVALID_MODEL_INPUT' });
+  assert.equal(calls, 1, 'invalid tool selection never dispatches a provider request');
+});
+
+test('selected-function routing labels are normalized only for the exact required tool', async (t) => {
+  t.mock.method(console, 'warn', () => {});
+  let wrong = false, empty = false;
+  const server = createServer(async (req, res) => {
+    await body(req);
+    if (empty) return json(res, completion('No actual tool was called.'));
+    const value = completion(null, [{ type: 'function', function: {
+      ...(wrong ? { name: 'another_tool' } : {}), arguments: '{"title":"synthetic"}',
+    } }]);
+    value.choices[0].finish_reason = 'stop';json(res, value);
+  });
+  const url = await listen(server);t.after(() => close(server));
+  const backend = local(url, 2000);
+  const input = { ...request(), tools: [{ name: 'deliver_briefing', description: 'synthetic', parameters: { type: 'object' } }], requiredTool: 'deliver_briefing' };
+  const parts = await collect(backend.generate(input));
+  assert.match(parts[0].id, /^[0-9a-f-]{36}$/);
+  assert.equal(parts[0].name, 'deliver_briefing');
+  assert.equal(parts[0].arguments, '{"title":"synthetic"}');
+  assert.equal(parts.at(-1).reason, 'tool_calls');
+  wrong = true;
+  await assert.rejects(collect(backend.generate(input)), { code: 'INVALID_MODEL_RESPONSE' });
+  wrong = false;
+  await assert.rejects(collect(backend.generate({ ...input, requiredTool: undefined })), { code: 'INVALID_MODEL_RESPONSE' });
+  empty = true;
+  await assert.rejects(collect(backend.generate(input)), { code: 'INVALID_MODEL_RESPONSE' });
+});
+
 test('Bailian configuration stays scoped to a Beijing workspace and reviewed model snapshots', () => {
   assert.ok(new BailianModel(config));
   for (const patch of [
@@ -106,6 +150,57 @@ test('Bailian wire → real Harness → tool result → final text preserves cal
   assert.equal(requests.length, 2);
   assert.equal(result.tools[0].status, 'succeeded');
   assert.deepEqual(model.usage, { inputTokens: 20, outputTokens: 10 });
+});
+
+test('reserved final round explicitly disables tools on the wire within the eight-call budget', async (t) => {
+  for (const ignoresConstraint of [false, true]) {
+    let calls = 0,
+      executions = 0;
+    const server = createServer(async (req, res) => {
+      const input = await body(req);
+      calls++;
+      if (calls < 7) {
+        assert.ok(input.tools.some((tool) => tool.function.name === 'search_sources'));
+        assert.equal(input.tool_choice, undefined);
+        return json(res, completion(null, [call(`search-${calls}`, 'search_sources', {})]));
+      }
+      assert.ok(calls === 7 || (ignoresConstraint && calls === 8), 'at most one correction within original budget');
+      assert.equal(input.tool_choice, 'none');
+      assert.equal(input.tools, undefined);
+      assert.equal(input.messages.filter((message) => message.role === 'tool').length, 0);
+      assert.equal(input.messages.filter((message) => message.content?.includes('Reference data from a successful tool')).length, 6);
+      json(
+        res,
+        ignoresConstraint
+          ? completion(null, [call('forbidden-final', 'search_sources', {})])
+          : completion('根据已查到的合成资料给出阶段说明，仍缺少企业简介。'),
+      );
+    });
+    const url = await listen(server);
+    t.after(() => close(server));
+    const result = await runHarness({
+      prompt: '介绍合成企业',
+      model: local(url, 2000),
+      reserveFinalResponse: true,
+      limits: { modelCalls: 8, toolCalls: 8, timeoutMs: 55000 },
+      tools: [
+        {
+          name: 'search_sources',
+          description: '合成检索',
+          parameters: { type: 'object' },
+          async execute() {
+            executions++;
+            return { items: [] };
+          },
+        },
+      ],
+    });
+    assert.equal(calls, ignoresConstraint ? 8 : 7);
+    assert.equal(executions, 6);
+    assert.equal(result.finalResponseReserved, true);
+    assert.equal(result.status, ignoresConstraint ? 'limit' : 'completed');
+    assert.equal(result.text, ignoresConstraint ? '' : '根据已查到的合成资料给出阶段说明，仍缺少企业简介。');
+  }
 });
 
 test('missing usage remains unknown and truncated completion is not a successful Harness task', async (t) => {

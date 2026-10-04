@@ -17,6 +17,8 @@ Use `npm ci --ignore-scripts` and `npm run licenses:write` to regenerate. Keep t
 | @deepseek-ai/dsh-session | 0.1.5-rc.2 | MIT |
 | @deepseek-ai/dsh-session-persistence | 0.1.5-rc.2 | MIT |
 | @deepseek-ai/dsh-session-projection | 0.1.5-rc.2 | MIT |
+| @deepseek-ai/dsh-session-title | 0.1.5-rc.2 | MIT |
+| @deepseek-ai/dsh-session-title-llm | 0.1.5-rc.2 | MIT |
 | @deepseek-ai/dsh-settings | 0.1.5-rc.2 | MIT |
 | @deepseek-ai/dsh-system-prompt | 0.1.5-rc.2 | MIT |
 | @deepseek-ai/dsh-timeout | 0.1.5-rc.2 | MIT |
@@ -58,7 +60,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## @deepseek-ai/dsh-agent@0.1.5-rc.2, @deepseek-ai/dsh-agent-loop@0.1.5-rc.2, @deepseek-ai/dsh-brand@0.1.5-rc.2, @deepseek-ai/dsh-code-runtime@0.1.5-rc.2, @deepseek-ai/dsh-invariants@0.1.5-rc.2, @deepseek-ai/dsh-llm@0.1.5-rc.2, @deepseek-ai/dsh-scope@0.1.5-rc.2, @deepseek-ai/dsh-session@0.1.5-rc.2, @deepseek-ai/dsh-session-persistence@0.1.5-rc.2, @deepseek-ai/dsh-session-projection@0.1.5-rc.2, @deepseek-ai/dsh-settings@0.1.5-rc.2, @deepseek-ai/dsh-system-prompt@0.1.5-rc.2, @deepseek-ai/dsh-timeout@0.1.5-rc.2, @deepseek-ai/dsh-tools@0.1.5-rc.2, @deepseek-ai/dsh-typert-protocol@0.1.5-rc.2, @deepseek-ai/dsh-user-approval@0.1.5-rc.2, @deepseek-ai/dsh-util-crypto@0.1.5-rc.2, @deepseek-ai/dsh-util-values@0.1.5-rc.2
+## @deepseek-ai/dsh-agent@0.1.5-rc.2, @deepseek-ai/dsh-agent-loop@0.1.5-rc.2, @deepseek-ai/dsh-brand@0.1.5-rc.2, @deepseek-ai/dsh-code-runtime@0.1.5-rc.2, @deepseek-ai/dsh-invariants@0.1.5-rc.2, @deepseek-ai/dsh-llm@0.1.5-rc.2, @deepseek-ai/dsh-scope@0.1.5-rc.2, @deepseek-ai/dsh-session@0.1.5-rc.2, @deepseek-ai/dsh-session-persistence@0.1.5-rc.2, @deepseek-ai/dsh-session-projection@0.1.5-rc.2, @deepseek-ai/dsh-session-title@0.1.5-rc.2, @deepseek-ai/dsh-session-title-llm@0.1.5-rc.2, @deepseek-ai/dsh-settings@0.1.5-rc.2, @deepseek-ai/dsh-system-prompt@0.1.5-rc.2, @deepseek-ai/dsh-timeout@0.1.5-rc.2, @deepseek-ai/dsh-tools@0.1.5-rc.2, @deepseek-ai/dsh-typert-protocol@0.1.5-rc.2, @deepseek-ai/dsh-user-approval@0.1.5-rc.2, @deepseek-ai/dsh-util-crypto@0.1.5-rc.2, @deepseek-ai/dsh-util-values@0.1.5-rc.2
 
 ```text
 MIT License

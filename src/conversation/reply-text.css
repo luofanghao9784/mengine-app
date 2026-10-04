@@ -1,0 +1,47 @@
+.live-conversations .conversation-reply .reply-text {
+  color: #293b50;
+  font-size: 15px;
+  line-height: 1.85;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.live-conversations .reply-text p {
+  margin: 0 0 12px;
+  color: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
+.live-conversations .reply-text h3,
+.live-conversations .reply-text h4,
+.live-conversations .reply-text h5 {
+  margin: 22px 0 10px;
+  color: inherit;
+  font-size: 16px;
+  line-height: 1.6;
+  font-weight: 600;
+}
+.live-conversations .reply-text h3 { font-size: 17px; }
+.live-conversations .reply-text strong { color: inherit; font-weight: 600; }
+.live-conversations .reply-text ol,
+.live-conversations .reply-text ul { margin: 0 0 16px; padding-inline-start: 1.65em; }
+.live-conversations .reply-text li { padding-inline-start: 3px; }
+.live-conversations .reply-text li + li { margin-top: 10px; }
+.live-conversations .reply-text li::marker { color: #6d809a; font-size: 0.9em; }
+.live-conversations .reply-text li > p { margin-bottom: 6px; }
+.live-conversations .reply-text li > ol,
+.live-conversations .reply-text li > ul { margin-top: 8px; margin-bottom: 0; }
+.live-conversations .reply-text li > :last-child { margin-bottom: 0; }
+.live-conversations .reply-text blockquote {
+  margin: 16px 0;
+  padding: 8px 14px;
+  border-left: 3px solid #dbe5f2;
+  color: #60738b;
+}
+.live-conversations .reply-text code { padding: 1px 4px; border-radius: 4px; background: #f2f5f9; font-size: 0.88em; }
+.live-conversations .reply-text pre { margin: 16px 0; padding: 14px; border: 1px solid #e8edf4; border-radius: 9px; background: #f8fafc; white-space: pre-wrap; line-height: 1.7; }
+.live-conversations .reply-text pre code { padding: 0; background: transparent; }
+.live-conversations .reply-text hr { margin: 20px 0; border: 0; border-top: 1px solid #e8edf4; }
+.live-conversations .reply-text a { color: #356fc3; text-decoration: underline; text-underline-offset: 3px; }
+.live-conversations .reply-text > .document-text { margin-block: 16px; }
+.live-conversations .reply-text > :first-child { margin-top: 0; }
+.live-conversations .reply-text > :last-child { margin-bottom: 0; }

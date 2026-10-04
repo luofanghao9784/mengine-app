@@ -200,11 +200,20 @@ public class BriefingGenerationService {
         int tenantConcurrent=db.queryForObject("SELECT count(*) FROM briefing_generation_batches b JOIN conversation_tasks t ON t.id=b.task_id WHERE b.tenant_id=? AND t.status IN ('QUEUED','RUNNING')",Integer.class,tenant);
         if(used>=dailyLimit||concurrent>=1||tenantUsed>=48||tenantConcurrent>=2){waiting(batch,"WAITING_RESOURCE",used>=dailyLimit?"DAILY_RUN_LIMIT":tenantUsed>=48?"TENANT_DAILY_LIMIT":tenantConcurrent>=2?"TENANT_CONCURRENCY_LIMIT":"OWNER_CONCURRENCY_LIMIT");return;}
         // One complete topic per batch. Explicit bounded source selection is visible to the model and reader.
-        List<Source> selected=(info||unseen.isEmpty()?sources:unseen).stream().filter(s->!"RESULT".equals(type)||!s.dataset()&&completedPublication(s.versionId())).sorted(Comparator.comparing(Source::changedAt,Comparator.reverseOrder()).thenComparing(Source::filename)).limit(3).toList();
+        var order=Comparator.comparing(Source::changedAt,Comparator.reverseOrder()).thenComparing(Source::filename);
+        List<Source> selected=(info||unseen.isEmpty()?sources:unseen).stream().filter(s->!"RESULT".equals(type)||!s.dataset()&&completedPublication(s.versionId())).sorted(order).limit(3).toList();
+        // An unchanged current workbook can ground a new topic; consumption is not a ban on reuse.
+        // Keep two unseen documents, the same authorized workspace and the three-version bound.
+        if((type==null||"DATA".equals(type))&&selected.stream().noneMatch(this::workbook)){
+            var reference=sources.stream().filter(this::workbook).sorted(order).findFirst();
+            if(reference.isPresent()){
+                var grounded=new ArrayList<Source>();grounded.add(reference.get());grounded.addAll(selected.stream().limit(2).toList());selected=List.copyOf(grounded);
+            }
+        }
         if(selected.isEmpty()){waiting(batch,"WAITING_DATA","RESULT_NOT_READY");return;}
         String previous=recent(actor,tenant,space);String prompt="系统智能画报生成。触发："+b.get("trigger_kind")+"。本批最多生成一张有独立价值的新卡。类型："+(type==null?"按证据选择 DATA、INSIGHT、SUGGESTION 或 RESULT":type)+"。"+
             (info?"先用 task_context profiles 读取当前企业和工作空间背景，再读取所选授权资料，分析当前企业主营业务、工作空间或项目目标和近期关注点，再从获准公开资讯源筛选与这些上下文有直接关系的资讯。卡片必须说明资讯与企业或项目的关联及价值，并标注原文网址、发布时间和检索时间。缺日期应明确未核实，不把旧文当今天新闻。没有相关资讯就说明暂无新内容。外部请求只允许配置的公开来源，不能把内部资料、人员或经营数值发送到公开搜索。": "仅根据本次固定的所选资料版本分析，不代表全部企业资料；部分解析时明确资料缺口，不能声称完整统计。选取范围："+selected.stream().map(Source::filename).toList()+"。")+
-            "本批固定来源类型："+selected.stream().map(s->s.kind()+":"+s.filename()).toList()+"。文件调用 search_sources 空查询；数据集调用 task_context dataset_search 查询后，用 dataset_read 查看实际列与期间。最多两次针对性检索，选择一个资料完整的主题。工具调用前不要输出分析草稿，正文只在 deliver_briefing 中给出。计算参数只使用已返回的表头、单元格范围和来源 ID，不猜测参数。若是 CONTEXT_CHANGED 触发，先用 task_context profiles 读取当前企业、工作空间和个人的目标或洞察，区分已确认事实与推断。DATA 根据来源调用 compare_table 或 compare_dataset；数据库必须计算完整固定快照，不从分页样本推算汇总，图表数值不可自行填写，其他类型无需调用表格工具。使用 deliver_briefing 交付。缺证据或与已有内容重复时直接说明暂无新内容，不凑卡。区分事实和推断，保留数据统计期间。已有内容仅用于避免重复，不作为新事实：\n"+previous;
+            "本批固定来源类型："+selected.stream().map(s->s.kind()+":"+s.filename()).toList()+"。文件调用 search_sources 空查询；数据集调用 task_context dataset_search 查询后，用 dataset_read 查看实际列与期间。最多两次针对性检索，选择一个资料完整的主题。所选当前底表可作为新主题的参考，重复使用不代表数据更新，保留原统计期间。工具调用前不要输出分析草稿，正文只在 deliver_briefing 中给出。计算参数只使用已返回的表头、单元格范围和来源 ID，不猜测参数。若是 CONTEXT_CHANGED 触发，先用 task_context profiles 读取当前企业、工作空间和个人的目标或洞察，区分已确认事实与推断。DATA 根据来源调用 compare_table 或 compare_dataset；数据库必须计算完整固定快照，不从分页样本推算汇总，图表数值不可自行填写，其他类型无需调用表格工具。使用 deliver_briefing 交付。缺证据或与已有内容重复时直接说明暂无新内容，不凑卡。区分事实和推断，保留数据统计期间。已有内容仅用于避免重复，不作为新事实：\n"+previous;
         if(prompt.length()>2000)prompt=prompt.substring(0,2000);
         var detail=tasks.submitBriefing(actor,tenant,space,batch,prompt,info?newsSource:null,selected.stream().filter(s->!s.dataset()).map(s->new TaskOriginals.Selection(s.materialId(),s.versionId())).toList());
         UUID task=detail.tasks().getLast().id();
@@ -212,6 +221,7 @@ public class BriefingGenerationService {
         for(var source:selected)if(source.dataset())db.update("INSERT INTO briefing_dataset_selections(task_id,batch_id,dataset_id,snapshot_id) VALUES (?,?,?,?)",task,batch,source.materialId(),source.versionId());
         db.update("UPDATE briefing_generation_policies SET reason=NULL WHERE id=?",id);
     }
+    private boolean workbook(Source source){return source.filename().toLowerCase(Locale.ROOT).endsWith(".xlsx");}
     private String contextKey(UUID actor,UUID tenant,UUID space){
         var profiles=db.queryForList("SELECT v.id FROM profile_entries e JOIN profile_versions v ON v.entry_id=e.id AND v.revision=e.revision WHERE e.tenant_id=? AND e.kind IN ('GOAL','INFERENCE') AND (e.scope='TENANT' OR e.scope='WORKSPACE' AND e.workspace_id=? OR e.scope='PERSONAL' AND e.account_id=?) AND NOT v.scrubbed AND object_is_active('PROFILE_VERSION',v.id) AND v.status='ACTIVE' AND (v.expires_at IS NULL OR v.expires_at>?) ORDER BY e.id",UUID.class,tenant,space,actor,time(clock.now()));
         var insight=db.queryForList("SELECT t.id FROM conversation_tasks t JOIN conversations c ON c.id=t.conversation_id JOIN LATERAL ("+BriefingContentService.ELIGIBLE+") b ON true WHERE c.tenant_id=? AND c.owner_id=? AND c.workspace_id=? AND t.status='SUCCEEDED' AND convert_from(b.content,'UTF8')::jsonb->>'businessType'='INSIGHT' AND EXISTS(SELECT 1 FROM readable_source_tasks r WHERE r.id=t.id) ORDER BY t.finished_at DESC,t.id DESC LIMIT 1",UUID.class,tenant,actor,space);

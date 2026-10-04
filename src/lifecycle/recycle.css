@@ -1,0 +1,237 @@
+.material-entry-shell {
+  position: relative;
+  min-width: 0;
+  display: flex;
+}
+.material-entry-shell > .material-entry {
+  width: 100%;
+  flex: 1;
+}
+.material-entry-actions {
+  position: absolute;
+  top: 23px;
+  right: 22px;
+  z-index: 1;
+}
+.material-entry-actions > .icon-button {
+  width: 30px;
+  height: 30px;
+  min-height: 30px;
+  border-radius: 9px;
+  background: #fff9;
+}
+.material-entries.list .material-entry-actions {
+  top: 50%;
+  right: 14px;
+  transform: translateY(-50%);
+}
+.material-entries.list .material-entry-shell > .material-entry {
+  padding-right: 60px;
+}
+.material-entry-shell:has(.material-entry-actions:hover) .material-entry {
+  translate: none;
+}
+.material-action-dialog {
+  width: min(420px, calc(100vw - 32px));
+  border-radius: 24px;
+}
+.material-action-dialog p {
+  color: var(--muted);
+  line-height: 1.8;
+  font-size: 13px;
+}
+.material-action-dialog .material-action-name {
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+.material-action-dialog .modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 18px;
+  margin-top: 20px;
+  border-top: 1px solid var(--line);
+}
+.material-recycle .library-toolbar {
+  gap: 10px;
+}
+.material-recycle .library-controls {
+  gap: 8px;
+}
+.material-recycle .empty-state p:empty {
+  display: none;
+}
+.recycle-list-heading,
+.material-entries.list .recycle-entry {
+  display: grid;
+  grid-template-columns: minmax(160px, 1.3fr) minmax(120px, 1fr) minmax(130px, 0.8fr) minmax(
+      130px,
+      0.8fr
+    ) 110px;
+  gap: 12px;
+  align-items: center;
+  padding: 18px 20px;
+}
+.recycle-list-heading {
+  color: var(--muted);
+  font-size: 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--soft);
+}
+.recycle-entry {
+  font-size: 13px;
+  color: var(--muted);
+}
+.recycle-item-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.recycle-item-name > svg {
+  flex: none;
+  color: var(--blue-ink);
+}
+.recycle-item-name strong {
+  color: var(--ink);
+  font-weight: 550;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.recycle-path {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.recycle-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: flex-end;
+}
+.recycle-item-actions > .button {
+  padding: 6px 10px;
+  font-size: 12px;
+  min-height: 32px;
+}
+.material-entries.list .recycle-entry > .material-cover {
+  display: none;
+}
+.recycle-entry:hover {
+  translate: none !important;
+  box-shadow: var(--card-shadow) !important;
+}
+.recycle-item-message,
+.recycle-cleanup {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+.recycle-item-message:empty {
+  display: none;
+}
+.recycle-item-message .access-alert {
+  margin: 0;
+}
+.recycle-cleanup {
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.recycle-cleanup summary {
+  cursor: pointer;
+  font-size: 12px;
+}
+.recycle-cleanup p {
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.recycle-mobile-label {
+  display: none;
+}
+.material-entries.cards .recycle-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-bottom: 16px;
+}
+.material-entries.cards .recycle-entry > :not(.material-cover) {
+  margin-inline: 16px;
+}
+.material-entries.cards .recycle-item-name > svg {
+  display: none;
+}
+.material-entries.cards .recycle-mobile-label {
+  display: inline;
+  padding-right: 8px;
+  font-size: 12px;
+}
+.material-entries.cards .recycle-item-actions {
+  margin-top: auto;
+  padding-top: 6px;
+}
+@media (max-width: 1050px) {
+  .recycle-list-heading,
+  .material-entries.list .recycle-entry {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 110px;
+  }
+  .recycle-list-heading {
+    display: none;
+  }
+  .material-entries.list .recycle-item-name {
+    grid-column: 1 / 3;
+  }
+  .material-entries.list .recycle-path {
+    grid-column: 1 / 3;
+    grid-row: 2;
+  }
+  .material-entries.list .recycle-item-actions {
+    grid-column: 3;
+    grid-row: 1 / 4;
+  }
+  .material-entries.list .recycle-mobile-label {
+    display: inline;
+    padding-right: 6px;
+    font-size: 12px;
+  }
+}
+@media (max-width: 640px) {
+  .material-recycle .library-toolbar {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .material-recycle .library-toolbar > .material-crumbs {
+    flex-basis: 100%;
+  }
+  .material-recycle .library-controls {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  .material-recycle .library-view-switch {
+    margin-left: auto;
+    margin-right: 0;
+  }
+  .material-entries.list .recycle-entry {
+    padding: 16px;
+    gap: 10px;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .material-entries.list .recycle-item-name {
+    grid-column: 1;
+  }
+  .material-entries.list .recycle-path {
+    grid-column: 1 / -1;
+    grid-row: auto;
+  }
+  .material-entries.list .recycle-item-actions {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .material-entries.list .recycle-date,
+  .material-entries.list .recycle-deadline,
+  .material-entries.list .recycle-state {
+    grid-column: 1 / -1;
+  }
+}

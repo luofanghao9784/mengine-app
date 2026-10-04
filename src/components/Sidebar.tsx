@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { LayoutGrid, LibraryBig, MessageSquare, Newspaper } from 'lucide-react';
+import { LayoutGrid, LibraryBig, MessageSquare, LayoutPanelTop } from 'lucide-react';
 import { useDemo, useUI } from '../store';
 import { DreamcoreLogo } from './DreamcoreLogo';
 import { NavIconButton, useNavHover } from './NavIconButton';
@@ -19,7 +19,7 @@ export function Sidebar() {
   };
   const nav = [
     { path: 'conversations', label: '会话', Icon: MessageSquare },
-    { path: 'briefing', label: '智能画报', Icon: Newspaper },
+    { path: 'briefing', label: '智能画报', Icon: LayoutPanelTop },
     { path: `library/${ui.libraryScope}`, label: '资料库', Icon: LibraryBig },
     { path: 'apps/all', label: '应用', Icon: LayoutGrid },
   ];

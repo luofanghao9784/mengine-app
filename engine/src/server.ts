@@ -2,6 +2,7 @@ import { ENGINE_VERSION, TASK_PROTOCOLS } from './release.js';
 import { createServer } from 'node:http';
 import { timingSafeEqual } from 'node:crypto';
 import { AgentTasks } from './runtime/agent-task.js';
+import { ConversationTitleTasks } from './runtime/conversation-title.js';
 import { RuntimeError } from './runtime/ports.js';
 import type { CompanyAnalysis } from './runtime/company-analysis.js';
 import type { ExperienceGeneralization } from './runtime/experience-generalization.js';
@@ -18,6 +19,7 @@ export function createEngineServer(
     generalization?: ExperienceGeneralization;
   } = {},
 ) {
+  const titles = options.agent ? new ConversationTitleTasks(options.agent.config) : undefined;
   const enabled = !!options.token && options.token.length >= 32;
   return createServer(async (request, response) => {
     response.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -110,7 +112,7 @@ export function createEngineServer(
     }
     if (
       request.method === 'POST' &&
-      ['/internal/v1/agent-results', '/internal/v1/source-results'].includes(request.url || '')
+      ['/internal/v1/agent-results', '/internal/v1/source-results', '/internal/v1/conversation-title'].includes(request.url || '')
     ) {
       if (!authorized) return send(401, { code: 'UNAUTHORIZED' });
       // A process may change after preflight. Refuse the wrong artifact before parsing input or calling tools/model.
@@ -118,7 +120,7 @@ export function createEngineServer(
       if (selected !== undefined && selected !== ENGINE_VERSION)
         return send(409, { code: 'TASK_RUNTIME_INCOMPATIBLE' });
     }
-    if (request.method === 'POST' && request.url === '/internal/v1/agent-results') {
+    if (request.method === 'POST' && ['/internal/v1/agent-results', '/internal/v1/conversation-title'].includes(request.url || '')) {
       const expected = Buffer.from(`Bearer ${options.token}`),
         provided = Buffer.from(request.headers.authorization || '');
       if (!enabled || provided.length !== expected.length || !timingSafeEqual(provided, expected))
@@ -136,7 +138,7 @@ export function createEngineServer(
           if (bytes > 100000) return send(413, { code: 'TOO_LARGE' });
           chunks.push(chunk);
         }
-        const result = await options.agent.run(
+        const result = await (request.url === '/internal/v1/conversation-title' ? titles! : options.agent).run(
           JSON.parse(Buffer.concat(chunks).toString('utf8')),
           abort.signal,
         );

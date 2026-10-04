@@ -753,6 +753,11 @@
           "conversationId": {
             "type": "string",
             "format": "uuid"
+          },
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "新会话的获权工作空间；省略沿用个人空间。已有会话如提供必须与会话空间一致。附件仍属于上传者个人资料。"
           }
         }
       },

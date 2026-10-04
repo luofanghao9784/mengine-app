@@ -1,4 +1,4 @@
-import { Sparkles, ArrowUpRight } from 'lucide-react';
+import { Sparkles, Square, RotateCw } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { RecommendationItem } from '../../contracts/public-api/recommendation';
 import { SubmitError } from '../shared/admin';
@@ -43,8 +43,10 @@ function GenerationPlaceholder({
   const completed = batch?.status === 'SUCCEEDED';
   return (
     <article
-      className={'live-briefing-card generation-placeholder' + (loading ? ' is-generating' : '')}
-      aria-label="新画报占位"
+      className={
+        'live-briefing-card briefing-generation generation-placeholder' + (loading ? ' is-generating' : '')
+      }
+      aria-label="生成新画报"
       aria-busy={loading || !!slot?.reading}
       data-batch-id={batch?.id}
     >
@@ -63,23 +65,41 @@ function GenerationPlaceholder({
               ? '正在确认生成请求'
               : '正在准备新画报'}
         </h3>
-        <p>
-          {(batch?.reason && reasons[batch.reason]) ||
-            (completed ? '读取成功后会在这里展示。' : '新内容准备好后，会在这里呈现。')}
-        </p>
+        <p>{(batch?.reason && reasons[batch.reason]) || (completed ? '读取后自动显示' : '完成后自动显示')}</p>
+        <SubmitError
+          error={generation.submission.error || generation.error}
+          uncertain={generation.submission.uncertain}
+        />
+        {!batch && generation.submission.uncertain && (
+          <Button
+            className="generation-icon-button"
+            icon={RotateCw}
+            aria-label="重试本次请求"
+            title="重试本次请求"
+            disabled={generation.submission.busy}
+            onClick={generation.generate}
+          />
+        )}
         {batch && generationOpen(batch) && (
           <Button
             variant="ghost"
+            className="generation-icon-button"
+            icon={Square}
+            aria-label="取消本次"
+            title="取消生成"
             disabled={!!generation.cancelBusy}
             onClick={() => void generation.cancel(batch.id)}
-          >
-            取消本次
-          </Button>
+          />
         )}
         {completed && !slot?.reading && (
-          <Button variant="ghost" onClick={generation.refresh}>
-            重新读取
-          </Button>
+          <Button
+            variant="ghost"
+            className="generation-icon-button"
+            icon={RotateCw}
+            aria-label="重新读取"
+            title="重新读取"
+            onClick={generation.refresh}
+          />
         )}
       </div>
     </article>
@@ -87,28 +107,34 @@ function GenerationPlaceholder({
 }
 export function GenerationPanel({ generation }: { generation: BriefingGeneration }) {
   const { submission, current, active } = generation;
+  const pendingSlot = generation.active ? { batch: generation.active } : generation.pendingSlot;
+  if (pendingSlot || submission.busy || submission.uncertain)
+    return <GenerationPlaceholder generation={generation} slot={pendingSlot} />;
   const terminal = current && !generationOpen(current) && current.status !== 'SUCCEEDED';
   return (
     <article className="live-briefing-card briefing-generation" aria-label="生成新画报">
       <div className="generation-card-copy">
-        <span className="generation-eyebrow">继续探索</span>
-        <h3>让资料带来新发现</h3>
-        <p>结合已有资料，生成一张有新内容的画报。资料更新后也会自动生成。</p>
-        {terminal && (
-          <p className="generation-result" role="status">
-            {label[current.status]}
-            {current.reason && reasons[current.reason] && '。' + reasons[current.reason]}
-          </p>
-        )}
+        <h3>发现新内容</h3>
+        <p
+          className="generation-result"
+          role={terminal ? 'status' : undefined}
+          title={terminal && current.reason ? reasons[current.reason] : undefined}
+        >
+          {terminal
+            ? current.reason === 'TASK_LIMIT'
+              ? '本次未完成，可稍后重试'
+              : (current.reason && reasons[current.reason]) || label[current.status]
+            : '基于已有资料，生成新的画报'}
+        </p>
         <SubmitError error={submission.error || generation.error} uncertain={submission.uncertain} />
         <Button
+          className="generation-icon-button"
           icon={Sparkles}
-          disabled={submission.busy || (!!active && !submission.uncertain)}
+          aria-label="生成更多"
+          title="生成更多"
+          disabled={!generation.ready || submission.busy || !!active}
           onClick={generation.generate}
-        >
-          {submission.uncertain ? '重试本次请求' : submission.busy || active ? '正在准备新画报' : '生成更多'}
-          {!submission.busy && !active && !submission.uncertain && <ArrowUpRight size={15} />}
-        </Button>
+        />
       </div>
     </article>
   );
@@ -117,30 +143,20 @@ export function generationTiles(
   generation: BriefingGeneration,
   render: (item: RecommendationItem) => ReactNode,
 ): MagazineGridItem[] {
-  const items: MagazineGridItem[] = generation.slots.map((slot) => ({
-    id: 'generation:' + slot.batch.id,
-    title: slot.item?.briefing?.content.title ?? slot.item?.content.title ?? '',
-    summary: slot.item?.briefing?.content.summary ?? slot.item?.content.excerpt ?? '',
-    chart: !!slot.item?.briefing?.content.chart,
-    fixedSize: slot.item ? undefined : '1×1',
-    append: true,
-    render: slot.item ? render(slot.item) : <GenerationPlaceholder generation={generation} slot={slot} />,
-  }));
-  if ((generation.submission.busy || generation.submission.uncertain) && !generation.active)
-    items.push({
-      id: 'generation:request',
-      title: '',
-      summary: '',
-      fixedSize: '1×1',
-      append: true,
-      render: <GenerationPlaceholder generation={generation} />,
-    });
+  const items: MagazineGridItem[] = generation.slots
+    .filter((slot) => !!slot.item)
+    .map((slot) => ({
+      id: 'generation:' + slot.batch.id,
+      title: slot.item!.briefing?.content.title ?? slot.item!.content.title,
+      summary: slot.item!.briefing?.content.summary ?? slot.item!.content.excerpt,
+      chart: !!slot.item!.briefing?.content.chart,
+      render: render(slot.item!),
+    }));
   items.push({
     id: 'generation:more',
     title: '',
     summary: '',
     fixedSize: '1×1',
-    append: true,
     render: <GenerationPanel generation={generation} />,
   });
   return items;

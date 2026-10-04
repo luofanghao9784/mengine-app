@@ -1,51 +1,43 @@
+import { DateTimeline } from './DateTimeline';
+import { FollowInteraction } from './FollowGrid';
+import { PersonalFollowGrid } from './PersonalFollowGrid';
+import { useInfiniteBriefing, BriefingFeedTail } from './useInfiniteBriefing';
 import { MagazineGrid } from './MagazineGrid';
 import { useBriefingTabs } from '../components/useBriefingTabs';
 import { useBriefingRefresh } from '../components/useBriefingRefresh';
 import { useBriefingGeneration } from './useBriefingGeneration';
 import { briefingTypeLabels } from './content';
-import { useViewState, textState, pageState } from '../shared/useViewState';
+import { useViewState, textState } from '../shared/useViewState';
 import { ForwardInbox } from '../forwarding/ForwardInbox';
-import { Recommendations, GeneratedBriefings } from '../recommendation/Recommendations';
-import { FeedbackActions } from './FeedbackActions';
-import { MoreActions } from '../shared/MoreActions';
+import { Recommendations } from '../recommendation/Recommendations';
 import { RequestPending, useRequestLock } from '../shared/request-guard';
 import { useContext } from 'react';
 import { Attention } from '../attention/Attention';
 import { featureEntries } from '../shared/feature-entries';
 import { useEffect, useRef, useState } from 'react';
-import {
-  Eye,
-  EyeOff,
-  Newspaper,
-  Star,
-  RefreshCw,
-  ArrowDown,
-  Check,
-  Expand,
-  Minimize,
-  Share2,
-} from 'lucide-react';
-import { MagazineBody, RailButton } from './Magazine';
+import { Newspaper, Star, RefreshCw, ArrowDown, Check, Share2 } from 'lucide-react';
+import { MagazineBody, RailButton, briefingTypeIcons } from './Magazine';
 import { ReadingDialog } from './ReadingDialog';
-import type {
-  BriefingCard,
-  BriefingView,
-  BriefingPreference,
-  BriefingLayoutMove,
-} from '../../contracts/public-api/briefing';
+import { captureCardPresentation, type CardPresentation } from './card-presentation';
+import type { BriefingCard, BriefingView, BriefingPreference } from '../../contracts/public-api/briefing';
 import { identityClient, useSession } from '../identity/session';
-import { Button, Empty, Field, PageActions, Modal } from '../shared/ui';
-import { Failure, Loading, Pager, SubmitError, useRemote, useSubmission } from '../shared/admin';
+import { Button, Empty, PageActions, Modal } from '../shared/ui';
+import { Failure, Loading, SubmitError, useRemote, useSubmission } from '../shared/admin';
 import { conversationHref } from '../conversation/Conversations';
 import { briefingClient as api } from './client';
 import './briefing.css';
 
 export const briefingHref = (tenant: string) => '#' + new URLSearchParams({ tenant, view: 'briefing' });
-export function LiveBriefing({ tenant }: { tenant: string }) {
+type BriefingProps = { tenant: string; onMonthChange: (month: string | null) => void };
+const ignoreMonth = () => {};
+export function LiveBriefing({
+  tenant,
+  onMonthChange = ignoreMonth,
+}: Omit<BriefingProps, 'onMonthChange'> & Partial<Pick<BriefingProps, 'onMonthChange'>>) {
   const { session } = useSession();
-  return <BriefingPage key={tenant + ':' + session.identity} tenant={tenant} />;
+  return <BriefingPage key={tenant + ':' + session.identity} tenant={tenant} onMonthChange={onMonthChange} />;
 }
-function BriefingPage({ tenant }: { tenant: string }) {
+function BriefingPage({ tenant, onMonthChange }: BriefingProps) {
   const { session } = useSession();
   const pendingRequest = useContext(RequestPending);
   const [view, setView] = useViewState<BriefingView | 'RECOMMENDED'>(
@@ -56,15 +48,16 @@ function BriefingPage({ tenant }: { tenant: string }) {
       typeof v === 'string' && ['RECOMMENDED', 'FOCUSED', 'LATEST', 'HIDDEN'].includes(v),
   );
   const [tab, setTab] = useViewState(tenant, 'briefing:tab', '推荐', textState);
-  const [date, setDate] = useViewState(tenant, 'briefing:date', '', textState),
-    [space, setSpace] = useViewState(tenant, 'briefing:space', '', textState);
-  const [page, setPage] = useViewState(tenant, 'briefing:page', 0, pageState),
-    [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    if (tab !== '日期') onMonthChange(null);
+    return () => onMonthChange(null);
+  }, [tab, onMonthChange]);
+  const [space, setSpace] = useViewState(tenant, 'briefing:space', '', textState);
+  const [attempt, setAttempt] = useState(0);
   const [businessType, setBusinessType] = useViewState(tenant, 'briefing:type', '', textState);
   const selectedType = tab === '类型' ? businessType : '';
   const selectedSpace = tab === '空间' ? space : '';
   const generation = useBriefingGeneration(tenant, selectedSpace || undefined, selectedType || undefined);
-  const selectedDate = tab === '日期' ? date : '';
   const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const refresh = () => setAttempt((n) => n + 1);
   const pageRef = useRef<HTMLElement>(null);
@@ -93,32 +86,7 @@ function BriefingPage({ tenant }: { tenant: string }) {
     }
   };
   useEffect(() => () => reloadState.current?.finish(false), []);
-  const [moving, setMoving] = useState<string>();
-  const [layoutNotice, setLayoutNotice] = useState('');
-  const layout = useRemote(
-    (signal) =>
-      trackRead('layout', view === 'FOCUSED' ? api.layout(tenant, signal) : Promise.resolve(null), signal),
-    [tenant, view, attempt, session.identity],
-  );
-  const layoutSubmit = useSubmission<Omit<BriefingLayoutMove, 'requestId'>>();
-  useRequestLock(layoutSubmit.busy || layoutSubmit.uncertain);
-  const move = (anchorId: string, direction: BriefingLayoutMove['direction'], source = moving) => {
-    if (!source || !layout.value) return;
-    setMoving(source);
-    void layoutSubmit.submit(
-      { expectedRevision: layout.value.revision, conversationId: source, anchorId, direction },
-      async (body, requestId) => {
-        const receipt = await api.cardMove(tenant, { ...body, requestId });
-        setMoving(undefined);
-        setLayoutNotice(
-          receipt.currentRevision === receipt.appliedRevision
-            ? '关注布局已保存。其他视图和成果版本保持原有顺序与内容。'
-            : '原移动已经保存，布局随后又有修改；当前显示最新顺序。',
-        );
-        refresh();
-      },
-    );
-  };
+  const [arranging, setArranging] = useState(false);
   const context = useRemote(
     (signal) => trackRead('context', identityClient.context(tenant, signal), signal),
     [tenant, session.identity, attempt],
@@ -128,18 +96,18 @@ function BriefingPage({ tenant }: { tenant: string }) {
     tenant,
     view,
     selectedType,
-    selectedDate,
+    tab,
     zone,
     selectedSpace,
     session.identity,
     attempt,
   ]);
   if (anchor.current.key !== anchorKey) anchor.current = { key: anchorKey };
-  const feed = useRemote(
-    (signal) =>
+  const feed = useInfiniteBriefing<import('../../contracts/public-api/briefing').BriefingPage>(
+    (offset, _previous, signal) =>
       trackRead(
-        'feed',
-        view === 'RECOMMENDED'
+        tab === '日期' ? 'unused-feed' : 'feed',
+        view === 'RECOMMENDED' || tab === '日期'
           ? Promise.resolve(null)
           : api
               .list(
@@ -148,11 +116,11 @@ function BriefingPage({ tenant }: { tenant: string }) {
                   view,
                   asOf: anchor.current.asOf,
                   businessType: selectedType || undefined,
-                  date: selectedDate || null,
+                  date: null,
                   zone,
                   ...(selectedSpace ? { workspaceId: selectedSpace } : {}),
                 },
-                page * 20,
+                offset,
                 signal,
               )
               .then((result) => {
@@ -161,13 +129,39 @@ function BriefingPage({ tenant }: { tenant: string }) {
               }),
         signal,
       ),
-    [tenant, view, selectedType, selectedDate, zone, selectedSpace, page, session.identity, attempt],
+    [tenant, view, tab, selectedType, zone, selectedSpace, session.identity, attempt],
+    (card) => card.cardId || card.taskId,
   );
+  const timeline = useInfiniteBriefing<import('../../contracts/public-api/briefing').BriefingTimelinePage>(
+    (offset, _previous, signal) =>
+      trackRead(
+        tab === '日期' ? 'feed' : 'unused-timeline',
+        tab === '日期'
+          ? api.timeline(tenant, zone, offset, anchor.current.asOf, signal).then((result) => {
+              if (!signal.aborted && anchor.current.key === anchorKey) anchor.current.asOf = result.asOf;
+              return result;
+            })
+          : Promise.resolve(null),
+        signal,
+      ),
+    [tenant, tab, zone, session.identity, attempt],
+    (day) => day.date,
+    true,
+  );
+  const recommendationKey = JSON.stringify([tenant, view, selectedSpace, selectedType, attempt]);
+  const [recommendationReady, setRecommendationReady] = useState<string>();
+  const recommendationsSettled = (success: boolean) => {
+    setRecommendationReady(success ? recommendationKey : undefined);
+    settled('recommendations', attempt, success);
+  };
   const pullRefresh = useBriefingRefresh({
     page: pageRef,
-    ready: !!context.value && (view === 'RECOMMENDED' || !!feed.value),
-    viewKey: JSON.stringify([tenant, view, tab, selectedType, selectedSpace, selectedDate]),
-    blocked: pendingRequest || !!moving,
+    ready:
+      !!context.value &&
+      (tab === '日期' ? !!timeline.value : view === 'RECOMMENDED' || !!feed.value) &&
+      (!['RECOMMENDED', 'FOCUSED'].includes(view) || recommendationReady === recommendationKey),
+    viewKey: JSON.stringify([tenant, view, tab, selectedType, selectedSpace]),
+    blocked: pendingRequest || arranging,
     reload: () =>
       new Promise<boolean>((finish) => {
         reloadState.current?.finish(false);
@@ -176,13 +170,12 @@ function BriefingPage({ tenant }: { tenant: string }) {
           attempt: revision,
           pending: new Set([
             'context',
-            'layout',
             'feed',
             ...(['RECOMMENDED', 'FOCUSED'].includes(view) ? ['recommendations'] : []),
           ]),
           finish,
         };
-        setPage(0);
+
         setAttempt(revision);
       }),
   });
@@ -191,29 +184,19 @@ function BriefingPage({ tenant }: { tenant: string }) {
     page: pageRef,
     index: Math.max(0, tabs.indexOf(tab)),
     count: tabs.length,
-    blocked: pendingRequest || pullRefresh.active || !!moving,
+    blocked: pendingRequest || pullRefresh.active || arranging,
     onSelect: (index) => {
       const label = tabs[index];
       pageRef.current?.closest('main')?.scrollTo({ top: 0, behavior: 'instant' });
       setTab(label);
-      setPage(0);
-      setDate('');
-      setMoving(undefined);
+
+      setArranging(false);
       setView(label === '关注' ? 'FOCUSED' : label === '日期' ? 'LATEST' : 'RECOMMENDED');
     },
   });
-  useEffect(() => {
-    const check = () => {
-      if (!pendingRequest && !reloadState.current && document.visibilityState === 'visible')
-        setAttempt((n) => n + 1);
-    };
-    window.addEventListener('focus', check);
-    document.addEventListener('visibilitychange', check);
-    return () => {
-      window.removeEventListener('focus', check);
-      document.removeEventListener('visibilitychange', check);
-    };
-  }, [pendingRequest]);
+  // useRemote already revalidates on focus without discarding mounted cards.
+  // Only explicit refresh/filter changes should reset the recommendation grid.
+
   const groups = new Map<string, BriefingCard[]>();
   for (const card of feed.value?.items || []) {
     const day =
@@ -247,47 +230,13 @@ function BriefingPage({ tenant }: { tenant: string }) {
           ))}
         </div>
       </PageActions>
-      <PageActions placement="meta">
-        <MoreActions label="更多画报视图">
-          <Field label="画报视图">
-            <select
-              aria-label="画报视图"
-              disabled={pendingRequest || pullRefresh.active}
-              value={view}
-              onChange={(e) => {
-                const next = e.target.value as BriefingView | 'RECOMMENDED';
-                setView(next);
-                setPage(0);
-                setMoving(undefined);
-                if (next === 'RECOMMENDED' || next === 'FOCUSED') {
-                  setDate('');
-                  setTab(next === 'RECOMMENDED' ? '推荐' : '关注');
-                }
-              }}
-            >
-              <option value="RECOMMENDED">工作推荐</option>
-              <option value="LATEST">最新会话成果</option>
-              <option value="FOCUSED">关注</option>
-              <option value="HIDDEN">已隐藏</option>
-            </select>
-          </Field>
-        </MoreActions>
-        <button
-          className="live-briefing-refresh"
-          aria-label="刷新智能画报"
-          title="刷新画报内容"
-          disabled={pendingRequest || pullRefresh.active}
-          onClick={pullRefresh.refresh}
-        >
-          <RefreshCw size={17} />
-        </button>
-      </PageActions>
       <section
         className="live-briefing"
         id="live-briefing-panel"
         role="tabpanel"
         ref={pageRef}
         data-refresh-phase={pullRefresh.phase}
+        data-briefing-arriving={pullRefresh.arriving || undefined}
       >
         <div
           className="live-briefing-refresh-space"
@@ -321,24 +270,29 @@ function BriefingPage({ tenant }: { tenant: string }) {
         </span>
         {featureEntries.attention && <Attention tenant={tenant} refreshToken={attempt} />}
         {featureEntries.forwarding && <ForwardInbox tenant={tenant} />}
-        {['类型', '空间', '日期'].includes(tab) && (
+        {['类型', '空间'].includes(tab) && (
           <div className="live-briefing-filters">
             {tab === '类型' && (
               <div className="live-briefing-type-options" role="group" aria-label="内容类型">
-                {[['', '全部'], ...Object.entries(briefingTypeLabels)].map(([value, label]) => (
-                  <button
-                    type="button"
-                    key={value}
-                    aria-pressed={businessType === value}
-                    disabled={pendingRequest}
-                    onClick={() => {
-                      setBusinessType(value);
-                      setPage(0);
-                    }}
-                  >
-                    {label}
-                  </button>
-                ))}
+                {[['', '全部'], ...Object.entries(briefingTypeLabels)].map(([value, label]) => {
+                  const Icon = briefingTypeIcons[value as keyof typeof briefingTypeIcons];
+                  return (
+                    <button
+                      type="button"
+                      key={value}
+                      className="magazine-type"
+                      data-briefing-type={label}
+                      aria-pressed={businessType === value}
+                      disabled={pendingRequest}
+                      onClick={() => {
+                        setBusinessType(value);
+                      }}
+                    >
+                      {Icon && <Icon size={14} aria-hidden="true" />}
+                      {label}
+                    </button>
+                  );
+                })}
               </div>
             )}
             {tab === '空间' && (
@@ -348,7 +302,6 @@ function BriefingPage({ tenant }: { tenant: string }) {
                 value={space}
                 onChange={(e) => {
                   setSpace(e.target.value);
-                  setPage(0);
                 }}
               >
                 <option value="">全部可访问空间</option>
@@ -359,30 +312,26 @@ function BriefingPage({ tenant }: { tenant: string }) {
                 ))}
               </select>
             )}
-            {tab === '日期' && (
-              <Field label="完成日期">
-                <input
-                  type="date"
-                  aria-label="查看日期"
-                  disabled={pendingRequest}
-                  value={date}
-                  onChange={(e) => {
-                    setDate(e.target.value);
-                    setPage(0);
-                  }}
-                />
-              </Field>
-            )}
-            {tab === '日期' && <span className="live-briefing-filter-note">按完成日期查看本人会话成果</span>}
           </div>
         )}
         {!!context.error && <Failure error={context.error} retry={refresh} />}
-        {view === 'RECOMMENDED' ? (
+        {tab === '日期' ? (
+          <DateTimeline
+            tenant={tenant}
+            zone={zone}
+            feed={timeline}
+            revision={attempt}
+            onMonthChange={onMonthChange}
+            renderCard={(card) => (
+              <Card key={card.cardId || card.taskId} tenant={tenant} card={card} changed={refresh} />
+            )}
+          />
+        ) : view === 'RECOMMENDED' ? (
           <Recommendations
             key={tenant + ':' + selectedSpace + ':' + selectedType + ':' + attempt}
             tenant={tenant}
-            generation={generation}
-            onSettled={(success) => settled('recommendations', attempt, success)}
+            generation={tab === '推荐' ? generation : undefined}
+            onSettled={recommendationsSettled}
             workspace={selectedSpace || null}
             businessType={selectedType || undefined}
           />
@@ -396,39 +345,13 @@ function BriefingPage({ tenant }: { tenant: string }) {
               <Recommendations
                 key={'publication-focus:' + selectedSpace + ':' + selectedType + ':' + attempt}
                 tenant={tenant}
-                onSettled={(success) => settled('recommendations', attempt, success)}
+                onSettled={recommendationsSettled}
                 workspace={selectedSpace || null}
                 businessType={selectedType || undefined}
                 publicationsOnly
+                onArranging={setArranging}
                 focused
               />
-            )}
-            {view === 'FOCUSED' && (
-              <section className="focus-layout-tools" aria-label="关注布局">
-                <details>
-                  <summary>调整关注布局</summary>
-                  <p className="muted">
-                    拖动卡片的移动按钮调整顺序，也可选择卡片后跨页指定位置。宽度和顺序仅影响自己的关注画报。
-                  </p>
-                </details>
-                {!!layout.error && <Failure error={layout.error} retry={refresh} />}
-                {moving && (
-                  <p role="status">已选择待移动卡片。请拖到另一张卡片前，或选择“移到此卡前 / 后”。</p>
-                )}
-                {layoutNotice && <p role="status">{layoutNotice}</p>}
-                <SubmitError error={layoutSubmit.error} uncertain={layoutSubmit.uncertain} />
-                {layoutSubmit.uncertain ? (
-                  <Button disabled={layoutSubmit.busy} onClick={() => move(moving!, 'BEFORE')}>
-                    重试本次布局
-                  </Button>
-                ) : (
-                  moving && (
-                    <Button disabled={pendingRequest} onClick={() => setMoving(undefined)}>
-                      取消移动
-                    </Button>
-                  )
-                )}
-              </section>
             )}
             {!feed.value.items.length && (
               <Empty
@@ -440,11 +363,7 @@ function BriefingPage({ tenant }: { tenant: string }) {
                       ? '还没有关注的卡片'
                       : '暂时没有生成的画报'
                 }
-                text={
-                  date
-                    ? '这一天没有符合当前范围的画报。可切换日期或空间。'
-                    : '系统会在资料就绪后自动生成，也可以在下方生成更多。'
-                }
+                text={'系统会在资料就绪后自动生成，也可以前往推荐栏生成更多。'}
               >
                 <a className="button" href={conversationHref(tenant)}>
                   进入会话
@@ -453,8 +372,12 @@ function BriefingPage({ tenant }: { tenant: string }) {
             )}
             {[...groups].map(([day, cards]) => (
               <section className="live-briefing-day" key={day}>
-                <h2>{day}</h2>
-                <MagazineGrid
+                {view !== 'FOCUSED' && <h2>{day}</h2>}
+                <FeedGrid
+                  tenant={tenant}
+                  focused={view === 'FOCUSED'}
+                  board="PRIVATE"
+                  onArranging={setArranging}
                   items={cards.map((card) => ({
                     id: card.cardId || card.taskId,
                     title: card.briefing?.content.title ?? card.title,
@@ -462,65 +385,39 @@ function BriefingPage({ tenant }: { tenant: string }) {
                     chart: !!card.briefing?.content.chart,
                     wide: card.preference.size === 'WIDE',
                     render: (
-                      <Card
-                        key={card.cardId || card.taskId}
-                        tenant={tenant}
-                        card={card}
-                        changed={refresh}
-                        focused={view === 'FOCUSED'}
-                        moving={moving}
-                        canMove={!!layout.value}
-                        pick={() => setMoving(card.cardId || card.taskId)}
-                        move={(direction) => move(card.cardId || card.taskId, direction)}
-                        drop={(anchor) => move(anchor, 'BEFORE', card.cardId || card.taskId)}
-                      />
+                      <Card key={card.cardId || card.taskId} tenant={tenant} card={card} changed={refresh} />
                     ),
                   }))}
                 />
               </section>
             ))}
-            {feed.value.items.length > 0 && (
-              <Pager
-                page={page}
-                next={feed.value.hasMore}
-                onPage={(next) => {
-                  if (!pendingRequest) setPage(next);
-                }}
-              />
-            )}
+            <BriefingFeedTail feed={feed} blocked={pendingRequest} />
           </>
         )}
-        {view !== 'RECOMMENDED' && <GeneratedBriefings tenant={tenant} generation={generation} />}
       </section>
     </>
   );
 }
+function FeedGrid(props: React.ComponentProps<typeof PersonalFollowGrid> & { focused: boolean }) {
+  return props.focused ? <PersonalFollowGrid {...props} /> : <MagazineGrid items={props.items} />;
+}
+
 function Card({
   tenant,
   card,
   changed,
-  focused,
-  moving,
-  canMove,
-  pick,
-  move,
-  drop,
+  compact = false,
 }: {
   tenant: string;
   card: BriefingCard;
   changed: () => void;
-  focused: boolean;
-  moving?: string;
-  canMove: boolean;
-  pick: () => void;
-  move: (direction: BriefingLayoutMove['direction']) => void;
-  drop: (anchor: string) => void;
+  compact?: boolean;
 }) {
+  const [presentation, setPresentation] = useState<CardPresentation>();
   const pendingRequest = useContext(RequestPending);
   const [reading, setReading] = useState(false),
     [shareInfo, setShareInfo] = useState(false);
-  const drag = useRef<{ x: number; y: number; moved: boolean } | undefined>(undefined);
-  const ignoreClick = useRef(false);
+  const follow = useContext(FollowInteraction);
   const submission = useSubmission<Omit<BriefingPreference, 'revision'> & { expectedRevision: number }>();
   useRequestLock(submission.busy || submission.uncertain);
   const edit = (change: Partial<Omit<BriefingPreference, 'revision'>>) =>
@@ -558,20 +455,6 @@ function Card({
       {featureEntries.forwarding && (
         <RailButton label="转发" icon={Share2} disabled={pendingRequest} onClick={() => setShareInfo(true)} />
       )}
-      <MoreActions label="卡片设置">
-        <RailButton
-          label={card.preference.hidden ? '恢复显示' : '隐藏'}
-          icon={card.preference.hidden ? Eye : EyeOff}
-          disabled={submission.busy || pendingRequest}
-          onClick={() => edit({ hidden: !card.preference.hidden })}
-        />
-        <RailButton
-          label={card.preference.size === 'WIDE' ? '标准卡片' : '加宽卡片'}
-          icon={card.preference.size === 'WIDE' ? Minimize : Expand}
-          disabled={submission.busy || pendingRequest}
-          onClick={() => edit({ size: card.preference.size === 'WIDE' ? 'STANDARD' : 'WIDE' })}
-        />
-      </MoreActions>
     </>
   );
   return (
@@ -579,6 +462,7 @@ function Card({
       <article
         className={
           'live-briefing-card ' +
+          (compact ? 'timeline-summary-card ' : '') +
           (card.briefing ? 'has-data-briefing ' : '') +
           (card.preference.size === 'WIDE' ? 'wide' : '')
         }
@@ -589,9 +473,19 @@ function Card({
           type="button"
           className="live-briefing-body"
           disabled={pendingRequest}
-          onClick={() => setReading(true)}
+          onPointerDown={follow?.onPointerDown}
+          onKeyDown={follow?.onKeyDown}
+          aria-keyshortcuts={follow ? 'Alt+Enter' : undefined}
+          aria-describedby={follow ? 'briefing-move-help' : undefined}
+          onClick={(event) => {
+            if (!follow?.editing) {
+              setPresentation(captureCardPresentation(event.currentTarget));
+              setReading(true);
+            }
+          }}
         >
           <MagazineBody
+            compact={compact}
             briefing={card.briefing}
             title={card.title}
             excerpt={card.excerpt}
@@ -599,69 +493,11 @@ function Card({
             workspace={card.workspaceName}
             date={card.completedAt}
             pinned={card.preference.pinned}
+            feedback={{ tenant, target: feedbackTarget }}
             verification={card.executionClass === 'verification'}
             footer={card.artifactCount > 0 ? <span>{card.artifactCount} 份成果</span> : undefined}
           />
         </button>
-        <div className="live-briefing-controls">
-          {focused && (
-            <Button
-              variant="ghost"
-              disabled={pendingRequest || !canMove}
-              style={{ touchAction: 'none', cursor: 'grab' }}
-              onPointerDown={(event) => {
-                if (event.button !== 0) return;
-                drag.current = { x: event.clientX, y: event.clientY, moved: false };
-                event.currentTarget.setPointerCapture(event.pointerId);
-              }}
-              onPointerMove={(event) => {
-                if (
-                  drag.current &&
-                  Math.hypot(event.clientX - drag.current.x, event.clientY - drag.current.y) > 6
-                )
-                  drag.current.moved = true;
-              }}
-              onPointerUp={(event) => {
-                const moved = drag.current?.moved;
-                drag.current = undefined;
-                ignoreClick.current = !!moved;
-                if (moved && !pendingRequest) {
-                  const target = document
-                    .elementFromPoint(event.clientX, event.clientY)
-                    ?.closest<HTMLElement>('.live-briefing-card[data-conversation-id]');
-                  const id = target?.dataset.conversationId;
-                  if (id && id !== (card.cardId || card.taskId)) drop(id);
-                }
-              }}
-              onPointerCancel={() => {
-                drag.current = undefined;
-              }}
-              onClick={() => {
-                if (ignoreClick.current) ignoreClick.current = false;
-                else pick();
-              }}
-            >
-              {moving === (card.cardId || card.taskId) ? '已选择此卡' : '移动此卡'}
-            </Button>
-          )}
-          {focused && moving && moving !== (card.cardId || card.taskId) && (
-            <>
-              <Button variant="ghost" disabled={pendingRequest || !canMove} onClick={() => move('BEFORE')}>
-                移到此卡前
-              </Button>
-              <Button variant="ghost" disabled={pendingRequest || !canMove} onClick={() => move('AFTER')}>
-                移到此卡后
-              </Button>
-            </>
-          )}
-        </div>
-        {!reading && (
-          <div className="live-card-action-rail">
-            <FeedbackActions tenant={tenant} target={feedbackTarget}>
-              {actions}
-            </FeedbackActions>
-          </div>
-        )}
         <SubmitError error={submission.error} uncertain={submission.uncertain} />
       </article>
       {reading && (
@@ -677,6 +513,7 @@ function Card({
             taskRevision: card.taskRevision,
             attempt: card.attempt,
             workspaceId: card.workspaceId,
+            presentation,
           }}
           pinned={card.preference.pinned}
           onClose={() => setReading(false)}

@@ -1,10 +1,13 @@
 /** Presentation fixture only: synthetic data, no session, API or model calls. */
-import { useState } from 'react';
+import { useContext, useState, type ComponentProps } from 'react';
+import { FollowGrid, FollowInteraction } from '../../../src/briefing-live/FollowGrid';
+import type { FollowPreference } from '../../../src/components/useBriefingFollowLayout';
 import { createRoot } from 'react-dom/client';
 import type { BriefingDocument } from '../../../contracts/public-api/briefing-content';
 import { MagazineBody } from '../../../src/briefing-live/Magazine';
 import { DataBriefing } from '../../../src/briefing-live/DataBriefing';
 import { MagazineGrid } from '../../../src/briefing-live/MagazineGrid';
+import { SessionProvider } from '../../../src/identity/session';
 import { ReadingDialog } from '../../../src/briefing-live/ReadingDialog';
 import '../../../src/styles.css';
 import '../../../src/briefing-live/briefing.css';
@@ -96,12 +99,46 @@ longTitle.content.title =
 documents.push(longTitle);
 documents.push(edge);
 
+function FixtureGrid({ items }: ComponentProps<typeof MagazineGrid>) {
+  const [saved, setSaved] = useState<FollowPreference | undefined>(
+    () => JSON.parse(sessionStorage.getItem('fixture-follow') || 'null') || undefined,
+  );
+  const [, setArranging] = useState(false);
+  return location.search.includes('follow') ? (
+    <FollowGrid
+      items={items}
+      saved={saved}
+      owner="fixture"
+      blocked={false}
+      onArranging={setArranging}
+      onSave={(value) => {
+        setSaved(value);
+        sessionStorage.setItem('fixture-follow', JSON.stringify(value || null));
+      }}
+    />
+  ) : (
+    <MagazineGrid items={items} />
+  );
+}
+function ReadButton({ onClick, ...props }: ComponentProps<'button'>) {
+  const follow = useContext(FollowInteraction);
+  return (
+    <button
+      {...props}
+      onPointerDown={follow?.onPointerDown}
+      onKeyDown={follow?.onKeyDown}
+      onClick={(event) => {
+        if (!follow?.editing) onClick?.(event);
+      }}
+    />
+  );
+}
 function Fixture() {
   const [reading, setReading] = useState<BriefingDocument>();
   return (
     <main className="live-briefing" style={{ padding: 24 }}>
       <h1 style={{ fontSize: 16 }}>画报卡面 · 合成视觉验证</h1>
-      <MagazineGrid
+      <FixtureGrid
         items={documents.map((briefing, i) => ({
           id: `fixture-${i}`,
           title: briefing.content.title,
@@ -109,7 +146,7 @@ function Fixture() {
           chart: !!briefing.content.chart,
           render: (
             <article className={`live-briefing-card recommendation-card${i === 1 ? ' is-read' : ''}`}>
-              <button
+              <ReadButton
                 className="live-briefing-body"
                 onClick={() => setReading(briefing)}
                 aria-label={`阅读：${briefing.content.title}`}
@@ -123,12 +160,13 @@ function Fixture() {
                   briefing={briefing}
                   pinned={i === 1}
                 />
-              </button>
+              </ReadButton>
             </article>
           ),
         }))}
       />
       {reading && (
+        <SessionProvider>
         <ReadingDialog
           title={reading.content.title}
           workspace="合成工作空间"
@@ -139,6 +177,7 @@ function Fixture() {
         >
           <DataBriefing document={reading} />
         </ReadingDialog>
+        </SessionProvider>
       )}
     </main>
   );
