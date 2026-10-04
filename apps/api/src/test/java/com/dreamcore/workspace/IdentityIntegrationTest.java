@@ -121,7 +121,7 @@ class IdentityIntegrationTest {
         assertNotEquals(adminSpaces.get(0).get("id"),employeeSpaces.get(0).get("id"));
         var operations = platform.ok("GET","/api/platform-admin/v1/tenants",null,200);
         assertTrue(operations.isArray());
-        for (var tenant : operations) assertEquals(3,tenant.size()); // id/name/status only
+        for (var tenant : operations) assertEquals(6,tenant.size()); // id/name/status plus opening time, member count and owner metadata
         assertEquals(404,platform.send("GET","/api/platform-admin/v1/tenants/"+tenantA+"/content",null,false).statusCode());
     }
     @Test void tenantForeignKeysAndRequestSchemaRejectPrivilegeInjection() throws Exception {
@@ -244,7 +244,7 @@ class IdentityIntegrationTest {
         String id=created.get("tenant").get("id").asString();
         String path="/api/platform-admin/v1/tenants/"+id;
         var detail=platform.ok("GET",path,null,200);
-        assertEquals(6,detail.size());
+        assertEquals(7,detail.size());
         assertEquals(0,detail.get("version").asLong());
         assertEquals(0,detail.get("activeMemberCount").asLong());
         assertEquals("catalog-admin@example.test",detail.get("initialAdminInvitation").get("email").asString());
@@ -295,6 +295,46 @@ class IdentityIntegrationTest {
         var records=platform.ok("GET",path+"/records",null,200);
         assertEquals(List.of("TENANT_RESUME","TENANT_SUSPEND","TENANT_CREATE"),java.util.stream.StreamSupport.stream(records.spliterator(),false).map(n->n.get("action").asString()).toList());
         assertFalse(records.toString().contains("suspend-pending@example.test"));
+    }
+    @Test void initialOwnerProjectionAndRevokeAreVersionedAndDoNotReplaceAcceptedOwner() throws Exception {
+        var created=platform.ok("POST","/api/platform-admin/v1/tenants",Map.of("requestId",UUID.randomUUID(),"name","负责人投影合成企业","adminEmail","owner-projection@example.test","designateAuthorizationOwner",true),201);
+        String id=created.get("tenant").get("id").asString(),path="/api/platform-admin/v1/tenants/"+id;
+        String original=created.get("invitation").get("id").asString();
+        assertEquals("AWAITING_INVITATION",platform.ok("GET",path,null,200).get("owner").get("state").asString());
+        var revoke=Map.of("requestId",UUID.randomUUID(),"expectedVersion",0);
+        assertEquals(401,adminA.send("POST",path+"/initial-admin-invitation/revoke",revoke,true).statusCode());
+        assertEquals(403,platform.send("POST",path+"/initial-admin-invitation/revoke",revoke,false).statusCode());
+        var revoked=platform.ok("POST",path+"/initial-admin-invitation/revoke",revoke,200);
+        assertEquals("INVITATION_INACTIVE",revoked.get("owner").get("state").asString());
+        assertEquals(revoked,platform.ok("POST",path+"/initial-admin-invitation/revoke",revoke,200));
+        assertEquals(409,new Client().send("POST","/api/v1/auth/invitations/accept",Map.of("token",token(original),"displayName","合成","password",PASSWORD),true).statusCode());
+        assertEquals(409,platform.send("POST",path+"/initial-admin-invitation/revoke",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0),true).statusCode());
+        var next=platform.ok("POST",path+"/initial-admin-invitation",Map.of("requestId",UUID.randomUUID(),"expectedVersion",1,"email","owner-projection@example.test"),200);
+        // Replaying a prior revocation cannot revoke the new invitation.
+        assertEquals("PENDING",platform.ok("POST",path+"/initial-admin-invitation/revoke",revoke,200).get("initialAdminInvitation").get("status").asString());
+        Client owner=acceptNew(next.get("initialAdminInvitation").get("id").asString(),"owner-projection@example.test");
+        assertEquals("AWAITING_RESPONSIBILITY",platform.ok("GET",path,null,200).get("owner").get("state").asString());
+        assertEquals(409,platform.send("POST",path+"/initial-admin-invitation/revoke",Map.of("requestId",UUID.randomUUID(),"expectedVersion",2),true).statusCode());
+        String governance="/api/v1/tenants/"+id+"/governance";
+        var snapshot=owner.ok("GET",governance,null,200);
+        owner.ok("POST",governance+"/accept-initial-responsibility",Map.of("requestId",UUID.randomUUID(),"expectedVersion",snapshot.get("revision").asLong()),200);
+        var assigned=platform.ok("GET",path,null,200).get("owner");
+        assertEquals("ASSIGNED",assigned.get("state").asString());
+        assertEquals("合成账号",assigned.get("name").asString());
+        var catalog=platform.ok("GET","/api/platform-admin/v1/tenants?q="+java.net.URLEncoder.encode("负责人投影合成企业",java.nio.charset.StandardCharsets.UTF_8),null,200).get(0);
+        assertEquals(assigned,catalog.get("owner"));assertEquals(1,catalog.get("activeMemberCount").asLong());
+        assertTrue(catalog.has("createdAt"));assertFalse(catalog.toString().contains("owner-projection@example.test"));
+        assertEquals(1,java.util.stream.StreamSupport.stream(platform.ok("GET",path+"/records",null,200).spliterator(),false).filter(n->n.get("action").asString().equals("INITIAL_ADMIN_INVITATION_REVOKE")).count());
+    }
+    @Test void revokeAndAcceptInitialInvitationCannotBothSucceed() throws Exception {
+        var created=create("初始邀请并发合成企业","initial-revoke-race@example.test");
+        String id=created.get("tenant").get("id").asString(),invite=created.get("invitation").get("id").asString();
+        String token=token(invite);
+        try(var executor=Executors.newFixedThreadPool(2)) {
+            var revoke=executor.submit(()->platform.send("POST","/api/platform-admin/v1/tenants/"+id+"/initial-admin-invitation/revoke",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0),true).statusCode());
+            var accept=executor.submit(()->new Client().send("POST","/api/v1/auth/invitations/accept",Map.of("token",token,"displayName","合成并发","password",PASSWORD),true).statusCode());
+            assertEquals(List.of(200,409),java.util.stream.Stream.of(revoke.get(15,java.util.concurrent.TimeUnit.SECONDS),accept.get(15,java.util.concurrent.TimeUnit.SECONDS)).sorted().toList());
+        }
     }
     @Test void initialAdminReplacementInvalidatesOldInvitationAndRollsBackFailedDelivery() throws Exception {
         var created=create("初始邀请合成企业","initial-old@example.test");

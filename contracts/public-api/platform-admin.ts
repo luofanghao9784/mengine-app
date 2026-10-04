@@ -9,7 +9,19 @@ export interface PlatformOverview {
   invitationDelivery: 'LOCAL' | 'DISABLED';
   checkedAt: string;
 }
+export interface TenantOwner {
+  accountId: string | null;
+  name: string | null;
+  state:
+    'ASSIGNED' | 'UNDESIGNATED' | 'AWAITING_RESPONSIBILITY' | 'AWAITING_INVITATION' | 'INVITATION_INACTIVE';
+}
+export interface TenantSummary extends Tenant {
+  createdAt: string;
+  activeMemberCount: number;
+  owner: TenantOwner;
+}
 export interface TenantDetail {
+  owner: TenantOwner;
   tenant: Tenant;
   version: number;
   createdAt: string;
@@ -18,7 +30,11 @@ export interface TenantDetail {
   workspaceCount: number;
 }
 export type PlatformAction =
-  'TENANT_CREATE' | 'TENANT_SUSPEND' | 'TENANT_RESUME' | 'INITIAL_ADMIN_INVITATION_REPLACE';
+  | 'TENANT_CREATE'
+  | 'TENANT_SUSPEND'
+  | 'TENANT_RESUME'
+  | 'INITIAL_ADMIN_INVITATION_REPLACE'
+  | 'INITIAL_ADMIN_INVITATION_REVOKE';
 export interface ManagementRecord {
   id: number;
   actorId: string;

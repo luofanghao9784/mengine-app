@@ -279,3 +279,27 @@
     align-items: flex-start;
   }
 }
+
+.platform-enterprise-detail {
+  padding: 28px;
+  min-width: 0;
+}
+.platform-enterprise-detail h2 {
+  overflow-wrap: anywhere;
+}
+.platform-detail-nav {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 24px 0;
+}
+.platform-enterprise-detail > .platform-detail-section > summary {
+  cursor: pointer;
+  color: var(--muted);
+  margin-bottom: 20px;
+}
+@media (max-width: 600px) {
+  .platform-enterprise-detail {
+    padding: 18px;
+  }
+}

@@ -6,6 +6,7 @@ const id = '00000000-0000-4000-8000-000000000001';
 const other = '00000000-0000-4000-8000-000000000002';
 const detail = {
   tenant: { id, name: '合成企业', status: 'ACTIVE' },
+  owner: { accountId: null, name: null, state: 'UNDESIGNATED' },
   version: 0,
   createdAt: '2026-09-22T01:00:00Z',
   initialAdminInvitation: null,
@@ -48,14 +49,25 @@ test('platform record projection rejects employee activity outside the managemen
   assert.equal((await client([{ ...record, action: 'TENANT_CREATE' }]).records(id)).length, 1);
 });
 
-
 test('platform writes obtain platform CSRF and never borrow a customer session token', async () => {
   const calls: { path: string; init?: RequestInit }[] = [];
   const api = createPlatformClient(async (path, init) => {
     calls.push({ path: String(path), init });
-    return Response.json(String(path).endsWith('/csrf') ? { token: 'platform-csrf', headerName: 'X-CSRF-TOKEN' } : detail);
+    return Response.json(
+      String(path).endsWith('/csrf') ? { token: 'platform-csrf', headerName: 'X-CSRF-TOKEN' } : detail,
+    );
   });
   await api.status(id, { requestId: other, expectedVersion: 0, status: 'SUSPENDED' });
   assert.equal(calls[0].path, '/api/platform-admin/v1/auth/csrf');
-  assert.equal((calls[1].init?.headers as Record<string,string>)['X-CSRF-TOKEN'], 'platform-csrf');
+  assert.equal((calls[1].init?.headers as Record<string, string>)['X-CSRF-TOKEN'], 'platform-csrf');
+});
+
+test('platform owner state rejects invented assigned identities and incomplete catalog metadata', async () => {
+  await assert.rejects(
+    client({ ...detail, owner: { accountId: null, name: null, state: 'ASSIGNED' } }).detail(id),
+    mismatch,
+  );
+  await assert.rejects(client([detail.tenant]).tenants('', ''), mismatch);
+  const item = { ...detail.tenant, createdAt: detail.createdAt, activeMemberCount: 0, owner: detail.owner };
+  assert.equal((await client([item]).tenants('', ''))[0].owner.state, 'UNDESIGNATED');
 });

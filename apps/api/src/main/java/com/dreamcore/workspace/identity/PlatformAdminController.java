@@ -28,7 +28,7 @@ public class PlatformAdminController {
         return governance.platformRecoveryRecord(IdentityController.actor(auth),tenant,id);
     }
     @GetMapping("/tenants")
-    public List<IdentityService.Tenant> tenants(Authentication auth, @RequestParam(defaultValue="") String q,
+    public List<PlatformAdminService.TenantSummary> tenants(Authentication auth, @RequestParam(defaultValue="") String q,
             @RequestParam(defaultValue="") String status, @RequestParam(defaultValue="0") int offset, @RequestParam(defaultValue="50") int limit) {
         return service.tenants(IdentityController.actor(auth),q,status,offset,limit);
     }
@@ -47,6 +47,11 @@ public class PlatformAdminController {
     @PostMapping("/tenants/{tenant}/initial-admin-invitation")
     public PlatformAdminService.Detail initial(Authentication auth, @PathVariable UUID tenant, @Valid @RequestBody InitialAdmin body) {
         return service.replaceInitialInvitation(IdentityController.actor(auth),tenant,body.requestId(),body.expectedVersion(),PhoneNumbers.contact(body.phone(),body.email()));
+    }
+    public record RevokeInitial(@NotNull UUID requestId, @NotNull @Min(0) Long expectedVersion) {}
+    @PostMapping("/tenants/{tenant}/initial-admin-invitation/revoke")
+    public PlatformAdminService.Detail revokeInitial(Authentication auth,@PathVariable UUID tenant,@Valid @RequestBody RevokeInitial body) {
+        return service.revokeInitialInvitation(IdentityController.actor(auth),tenant,body.requestId(),body.expectedVersion());
     }
     @GetMapping("/tenants/{tenant}/records")
     public List<PlatformAdminService.AuditEntry> records(Authentication auth, @PathVariable UUID tenant,

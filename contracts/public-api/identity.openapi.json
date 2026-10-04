@@ -401,7 +401,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/Tenant"
+                    "$ref": "#/components/schemas/TenantSummary"
                   }
                 }
               }
@@ -4082,6 +4082,141 @@
           }
         ]
       }
+    },
+    "/api/platform-admin/v1/tenants/{tenant}/initial-admin-invitation/revoke": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "operationId": "revokeInitialAdminInvitation",
+        "summary": "撤销尚未接受的初始负责人邀请",
+        "description": "独立总台身份及 CSRF。校验请求标识、企业版本并串行核对邀请状态；接受后禁止撤销。重试只返回当前状态，不撤销后续新邀请。企业暂停时仍可撤销；不撤销成员资格或负责人职责。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "输入无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "登录无效或已失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CSRF 或权限校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态或重复请求冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务异常，不返回内部细节",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "企业不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "邀请投递不可用，事务已回滚",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "requestId",
+                  "expectedVersion"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "requestId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "expectedVersion": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "platformSessionCookie": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -4698,6 +4833,9 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 9007199254740991
+          },
+          "owner": {
+            "$ref": "#/components/schemas/TenantOwner"
           }
         },
         "required": [
@@ -4706,7 +4844,8 @@
           "createdAt",
           "initialAdminInvitation",
           "activeMemberCount",
-          "workspaceCount"
+          "workspaceCount",
+          "owner"
         ],
         "additionalProperties": false
       },
@@ -4730,7 +4869,8 @@
               "TENANT_CREATE",
               "TENANT_SUSPEND",
               "TENANT_RESUME",
-              "INITIAL_ADMIN_INVITATION_REPLACE"
+              "INITIAL_ADMIN_INVITATION_REPLACE",
+              "INITIAL_ADMIN_INVITATION_REVOKE"
             ]
           },
           "targetId": {
@@ -5795,6 +5935,120 @@
           "departureId",
           "offboarded"
         ]
+      },
+      "TenantOwner": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "accountId",
+          "name",
+          "state"
+        ],
+        "properties": {
+          "accountId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "enum": [
+              "ASSIGNED",
+              "UNDESIGNATED",
+              "AWAITING_RESPONSIBILITY",
+              "AWAITING_INVITATION",
+              "INVITATION_INACTIVE"
+            ]
+          }
+        },
+        "oneOf": [
+          {
+            "properties": {
+              "state": {
+                "const": "ASSIGNED"
+              },
+              "accountId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "properties": {
+              "state": {
+                "enum": [
+                  "UNDESIGNATED",
+                  "AWAITING_RESPONSIBILITY",
+                  "AWAITING_INVITATION",
+                  "INVITATION_INACTIVE"
+                ]
+              },
+              "accountId": {
+                "type": "null"
+              },
+              "name": {
+                "type": "null"
+              }
+            }
+          }
+        ]
+      },
+      "TenantSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "SUSPENDED"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "activeMemberCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "owner": {
+            "$ref": "#/components/schemas/TenantOwner"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "status",
+          "createdAt",
+          "activeMemberCount",
+          "owner"
+        ],
+        "additionalProperties": false
       }
     }
   }

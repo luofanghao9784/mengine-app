@@ -10,8 +10,10 @@ import org.springframework.transaction.annotation.Transactional;
 /** Platform management projections are explicitly limited to operational metadata. */
 @Service
 public class PlatformAdminService {
+    public record Owner(UUID accountId, String name, String state) {}
+    public record TenantSummary(UUID id, String name, String status, Instant createdAt, long activeMemberCount, Owner owner) {}
     public record Detail(IdentityService.Tenant tenant, long version, Instant createdAt,
-                         IdentityService.Invitation initialAdminInvitation, long activeMemberCount, long workspaceCount) {}
+                         IdentityService.Invitation initialAdminInvitation, long activeMemberCount, long workspaceCount, Owner owner) {}
     public record Overview(long totalTenants, long activeTenants, long suspendedTenants,
                            String platform, String database, String invitationDelivery, Instant checkedAt) {}
     public record AuditEntry(long id, UUID actorId, String actorName, String action, UUID targetId, String outcome, Instant createdAt) {}
@@ -23,13 +25,23 @@ public class PlatformAdminService {
     public PlatformAdminService(JdbcTemplate db, IdentityService identities, IdentityAudit audit, LocalInvitationDelivery delivery,com.dreamcore.workspace.departure.DepartureAccess departure) {this.departure=departure;
         this.db=db; this.identities=identities; this.audit=audit; this.delivery=delivery;
     }
-    public List<IdentityService.Tenant> tenants(UUID actor, String query, String status, int offset, int limit) {
+    public List<TenantSummary> tenants(UUID actor, String query, String status, int offset, int limit) {
         identities.platform(actor); bounds(offset,limit);
         if (query == null || query.length()>100 || status == null || !List.of("","ACTIVE","SUSPENDED").contains(status)) throw IdentityException.invalid();
         return db.query("""
-            SELECT id,name,status FROM tenants WHERE strpos(lower(name),lower(?))>0 AND (?='' OR status=?)
-            ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?
-            """, (r,n) -> new IdentityService.Tenant(r.getObject("id",UUID.class),r.getString("name"),r.getString("status")),query.strip(),status,status,limit,offset);
+            SELECT t.id,t.name,t.status,t.created_at,
+              (SELECT count(*) FROM tenant_memberships m WHERE m.tenant_id=t.id AND m.status='ACTIVE') member_count,
+              g.owner_id,a.display_name,i.status invitation_status,
+              (d.tenant_id IS NOT NULL) designated,i.expires_at
+            FROM tenants t LEFT JOIN tenant_governance g ON g.tenant_id=t.id
+            LEFT JOIN accounts a ON a.id=g.owner_id
+            LEFT JOIN tenant_initial_admin initial ON initial.tenant_id=t.id
+            LEFT JOIN invitations i ON i.id=initial.invitation_id
+            LEFT JOIN governance_initial_designations d ON d.tenant_id=t.id AND d.invitation_id=i.id
+            WHERE strpos(lower(t.name),lower(?))>0 AND (?='' OR t.status=?)
+            ORDER BY t.created_at DESC,t.id DESC LIMIT ? OFFSET ?
+            """, (r,n) -> new TenantSummary(r.getObject("id",UUID.class),r.getString("name"),r.getString("status"),
+                    r.getTimestamp("created_at").toInstant(),r.getLong("member_count"), ownerProjection(r)),query.strip(),status,status,limit,offset);
     }
     public Overview overview(UUID actor) {
         identities.platform(actor);
@@ -44,13 +56,34 @@ public class PlatformAdminService {
     private Detail projection(UUID tenant) {
         var rows=db.query("SELECT * FROM tenants WHERE id=?",(r,n) -> new Detail(
                 new IdentityService.Tenant(r.getObject("id",UUID.class),r.getString("name"),r.getString("status")),
-                r.getLong("management_version"),r.getTimestamp("created_at").toInstant(),null,0,0),tenant);
+                r.getLong("management_version"),r.getTimestamp("created_at").toInstant(),null,0,0,null),tenant);
         if (rows.isEmpty()) throw new IdentityException(404,"TENANT_NOT_FOUND");
         var item=rows.getFirst();
         var invites=db.queryForList("SELECT invitation_id FROM tenant_initial_admin WHERE tenant_id=?",UUID.class,tenant);
         return new Detail(item.tenant(),item.version(),item.createdAt(),invites.isEmpty()?null:identities.invitation(invites.getFirst()),
                 db.queryForObject("SELECT count(*) FROM tenant_memberships WHERE tenant_id=? AND status='ACTIVE'",Long.class,tenant),
-                db.queryForObject("SELECT count(*) FROM workspaces WHERE tenant_id=?",Long.class,tenant));
+                db.queryForObject("SELECT count(*) FROM workspaces WHERE tenant_id=?",Long.class,tenant),owner(tenant));
+    }
+    private Owner ownerProjection(java.sql.ResultSet r) throws java.sql.SQLException {
+        UUID id=r.getObject("owner_id",UUID.class);
+        if(id!=null)return new Owner(id,r.getString("display_name"),"ASSIGNED");
+        if(!r.getBoolean("designated"))return new Owner(null,null,"UNDESIGNATED");
+        String invitation=r.getString("invitation_status");
+        if("ACCEPTED".equals(invitation))return new Owner(null,null,"AWAITING_RESPONSIBILITY");
+        if("PENDING".equals(invitation) && r.getTimestamp("expires_at").toInstant().isAfter(Instant.now()))
+            return new Owner(null,null,"AWAITING_INVITATION");
+        return new Owner(null,null,"INVITATION_INACTIVE");
+    }
+    private Owner owner(UUID tenant) {
+        return db.queryForObject("""
+            SELECT g.owner_id,a.display_name,i.status invitation_status,i.expires_at,(d.tenant_id IS NOT NULL) designated
+            FROM tenants t LEFT JOIN tenant_governance g ON g.tenant_id=t.id
+            LEFT JOIN accounts a ON a.id=g.owner_id
+            LEFT JOIN tenant_initial_admin initial ON initial.tenant_id=t.id
+            LEFT JOIN invitations i ON i.id=initial.invitation_id
+            LEFT JOIN governance_initial_designations d ON d.tenant_id=t.id AND d.invitation_id=i.id
+            WHERE t.id=?
+            """,(r,n)->ownerProjection(r),tenant);
     }
     private long lock(UUID tenant) {
         var rows=db.queryForList("SELECT management_version FROM tenants WHERE id=? FOR UPDATE",Long.class,tenant);
@@ -104,6 +137,28 @@ public class PlatformAdminService {
         identities.remember(actor,requestId,"INITIAL_ADMIN_INVITE",fingerprint,tenant);
         return projection(tenant);
     }
+    @Transactional
+    public Detail revokeInitialInvitation(UUID actor, UUID tenant, UUID requestId, long expectedVersion) {
+        identities.platform(actor);
+        if(expectedVersion<0)throw IdentityException.invalid();
+        String fingerprint=IdentityService.hash(tenant+"\n"+expectedVersion);
+        UUID prior=identities.priorRequest(actor,requestId,"INITIAL_ADMIN_INVITE_REVOKE",fingerprint);
+        long current=lock(tenant);identities.platform(actor);
+        if(prior!=null)return projection(tenant);
+        version(current,expectedVersion);
+        var initial=db.queryForList("SELECT invitation_id FROM tenant_initial_admin WHERE tenant_id=?",UUID.class,tenant);
+        if(initial.isEmpty())throw new IdentityException(409,"INITIAL_ADMIN_UNAVAILABLE");
+        var invite=identities.invitation(initial.getFirst());
+        if("ACCEPTED".equals(invite.status()) || db.queryForObject("SELECT count(*) FROM tenant_memberships WHERE tenant_id=? AND role='TENANT_ADMIN'",Long.class,tenant)>0)
+            throw new IdentityException(409,"INITIAL_ADMIN_ALREADY_SET");
+        if(!"REVOKED".equals(invite.status())) {
+            db.update("UPDATE invitations SET status='REVOKED' WHERE id=?",invite.id());
+            db.update("UPDATE tenants SET management_version=management_version+1 WHERE id=?",tenant);
+            audit.record(actor,tenant,"INITIAL_ADMIN_INVITATION_REVOKE",invite.id(),"SUCCESS");
+        }
+        identities.remember(actor,requestId,"INITIAL_ADMIN_INVITE_REVOKE",fingerprint,tenant);
+        return projection(tenant);
+    }
     public List<AuditEntry> records(UUID actor, UUID tenant, int offset, int limit) {
         identities.platform(actor); bounds(offset,limit);
         if (!Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM tenants WHERE id=?)",Boolean.class,tenant))) throw new IdentityException(404,"TENANT_NOT_FOUND");
@@ -111,7 +166,7 @@ public class PlatformAdminService {
         return db.query("""
             SELECT e.id,e.actor_id,a.display_name,e.action,e.target_id,e.outcome,e.created_at
             FROM identity_audit e LEFT JOIN accounts a ON a.id=e.actor_id WHERE e.tenant_id=?
-            AND e.action IN ('TENANT_CREATE','TENANT_SUSPEND','TENANT_RESUME','INITIAL_ADMIN_INVITATION_REPLACE')
+            AND e.action IN ('TENANT_CREATE','TENANT_SUSPEND','TENANT_RESUME','INITIAL_ADMIN_INVITATION_REPLACE','INITIAL_ADMIN_INVITATION_REVOKE')
             ORDER BY e.id DESC LIMIT ? OFFSET ?
             """,(r,n)->new AuditEntry(r.getLong("id"),r.getObject("actor_id",UUID.class),r.getString("display_name"),
                     r.getString("action"),r.getObject("target_id",UUID.class),r.getString("outcome"),r.getTimestamp("created_at").toInstant()),tenant,limit,offset);

@@ -2,6 +2,8 @@ import type { CreateTenant, Invitation, Tenant, TenantCreated } from '../../cont
 import type {
   PlatformOverview,
   TenantDetail,
+  TenantOwner,
+  TenantSummary,
   ManagementRecord,
   ChangeTenantStatus,
   ReplaceInitialInvitation,
@@ -20,6 +22,17 @@ const isInvitation = (v: unknown): v is Invitation =>
   v.role === 'TENANT_ADMIN' &&
   ['PENDING', 'ACCEPTED', 'REVOKED', 'EXPIRED'].includes(String(v.status)) &&
   date(v.expiresAt);
+const isOwner = (v: unknown): v is TenantOwner =>
+  record(v) &&
+  (v.state === 'ASSIGNED'
+    ? uuid(v.accountId) && text(v.name)
+    : ['UNDESIGNATED', 'AWAITING_RESPONSIBILITY', 'AWAITING_INVITATION', 'INVITATION_INACTIVE'].includes(
+        String(v.state),
+      ) &&
+      v.accountId === null &&
+      v.name === null);
+const isSummary = (v: unknown): v is TenantSummary =>
+  isTenant(v) && record(v) && date(v.createdAt) && count(v.activeMemberCount) && isOwner(v.owner);
 export const isDetail = (v: unknown): v is TenantDetail =>
   record(v) &&
   isTenant(v.tenant) &&
@@ -27,6 +40,7 @@ export const isDetail = (v: unknown): v is TenantDetail =>
   date(v.createdAt) &&
   count(v.activeMemberCount) &&
   count(v.workspaceCount) &&
+  isOwner(v.owner) &&
   (v.initialAdminInvitation === null ||
     (isInvitation(v.initialAdminInvitation) && v.initialAdminInvitation.tenantId === v.tenant.id));
 const isOverview = (v: unknown): v is PlatformOverview =>
@@ -49,9 +63,13 @@ const isRecord = (v: unknown): v is ManagementRecord =>
   uuid(v.targetId) &&
   v.outcome === 'SUCCESS' &&
   date(v.createdAt) &&
-  ['TENANT_CREATE', 'TENANT_SUSPEND', 'TENANT_RESUME', 'INITIAL_ADMIN_INVITATION_REPLACE'].includes(
-    String(v.action),
-  );
+  [
+    'TENANT_CREATE',
+    'TENANT_SUSPEND',
+    'TENANT_RESUME',
+    'INITIAL_ADMIN_INVITATION_REPLACE',
+    'INITIAL_ADMIN_INVITATION_REVOKE',
+  ].includes(String(v.action));
 const list =
   <T>(check: (v: unknown) => v is T) =>
   (v: unknown): v is T[] =>
@@ -76,7 +94,7 @@ export function createPlatformClient(fetcher: typeof fetch = fetch) {
         '/api/platform-admin/v1/tenants?' +
           new URLSearchParams({ q, status, offset: String(offset), limit: String(limit) }),
         'GET',
-        list(isTenant),
+        list(isSummary),
         undefined,
         signal,
       ),
@@ -85,6 +103,8 @@ export function createPlatformClient(fetcher: typeof fetch = fetch) {
     status: (id: string, body: ChangeTenantStatus) => detail(id, '/status', body),
     replaceInvitation: (id: string, body: ReplaceInitialInvitation) =>
       detail(id, '/initial-admin-invitation', body),
+    revokeInvitation: (id: string, body: { requestId: string; expectedVersion: number }) =>
+      detail(id, '/initial-admin-invitation/revoke', body),
     records: (id: string, offset = 0, signal?: AbortSignal) =>
       request(path(id) + `/records?offset=${offset}&limit=21`, 'GET', list(isRecord), undefined, signal),
   };

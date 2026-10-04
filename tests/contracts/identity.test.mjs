@@ -36,3 +36,13 @@ test('all documented writes require CSRF including anonymous invitation acceptan
   assert.deepEqual(spec.paths['/api/v1/auth/invitations/accept'].post.security, []);
   for (const path of Object.keys(spec.paths)) assert.doesNotMatch(path, /impersonate|content|conversation/);
 });
+
+
+test('platform owner projection distinguishes accepted invitation from accepted responsibility without private content', () => {
+  const owner = ajv.compile({...spec.components.schemas.TenantOwner,components:spec.components});
+  assert.equal(owner({accountId:null,name:null,state:'AWAITING_RESPONSIBILITY'}),true);
+  assert.equal(owner({accountId:null,name:null,state:'ASSIGNED'}),false);
+  assert.equal(owner({accountId:'synthetic',name:'合成',state:'ASSIGNED',conversation:'private'}),false);
+  const endpoint=spec.paths['/api/platform-admin/v1/tenants/{tenant}/initial-admin-invitation/revoke'].post;
+  assert.deepEqual(endpoint.security,[{platformSessionCookie:[]}]);
+});
