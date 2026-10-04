@@ -249,6 +249,91 @@
           }
         }
       }
+    },
+    "/api/v1/tenants/{tenant}/experience-library/{entry}/general-references": {
+      "get": {
+        "operationId": "experienceManagementHistory",
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000,
+              "default": 0
+            }
+          },
+          {
+            "name": "entry",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized content or metadata-only processing",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GeneralReferences"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Customer session required"
+          },
+          "403": {
+            "description": "Tenant or scope denied"
+          },
+          "400": {
+            "description": "Invalid filter"
+          },
+          "404": {
+            "description": "No readable published history"
+          }
+        },
+        "description": "Exact published local version and cleaned general references. Local content authorization is required; no tenant contribution identities, private proposals, or raw sources. Usage state is checked independently of whether the fixed base is still the latest general version."
+      }
     }
   },
   "components": {
@@ -710,6 +795,81 @@
             "maxItems": 20,
             "items": {
               "$ref": "#/components/schemas/HistoryVersion"
+            }
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        }
+      },
+      "GeneralReference": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "entryId",
+          "versionId",
+          "number",
+          "title",
+          "current",
+          "useState"
+        ],
+        "properties": {
+          "entryId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "versionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "current": {
+            "type": "boolean"
+          },
+          "useState": {
+            "enum": [
+              "AVAILABLE",
+              "GLOBAL_STOPPED",
+              "TENANT_STOPPED"
+            ]
+          }
+        }
+      },
+      "GeneralReferences": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "entryId",
+          "versionId",
+          "canReference",
+          "items",
+          "hasMore"
+        ],
+        "properties": {
+          "entryId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "versionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "canReference": {
+            "type": "boolean"
+          },
+          "items": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "$ref": "#/components/schemas/GeneralReference"
             }
           },
           "hasMore": {

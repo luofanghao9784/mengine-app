@@ -14,6 +14,14 @@ async function fixture(context: BrowserContext) {
   const completed = new Set<string>();
   const mutations: string[] = [];
   const queries: URLSearchParams[] = [];
+  let generalReferences: {
+    entryId: string;
+    versionId: string;
+    number: number;
+    title: string;
+    current: boolean;
+    useState: 'AVAILABLE' | 'GLOBAL_STOPPED' | 'TENANT_STOPPED';
+  }[] = [];
   let waiting = 3;
   let adjustment: {
     id: string;
@@ -185,6 +193,22 @@ async function fixture(context: BrowserContext) {
         ],
         hasMore: false,
       });
+    if (path.endsWith('/general-references')) {
+      if (revoked) return json({ code: 'EXPERIENCE_NOT_FOUND' }, 404);
+      const params = new URL(route.request().url()).searchParams,
+        offset = Number(params.get('offset') || 0);
+      const fixed = params.get('version');
+      return json({
+        entryId,
+        versionId: fixed,
+        canReference:
+          !stopped &&
+          fixed === (adjusted ? id(22) : version) &&
+          generalReferences.every((r) => r.useState === 'AVAILABLE'),
+        items: generalReferences.slice(offset, offset + 20),
+        hasMore: offset + 20 < generalReferences.length,
+      });
+    }
     if (path.endsWith('/history'))
       return json({
         items: [
@@ -232,6 +256,9 @@ async function fixture(context: BrowserContext) {
     return json({ contractVersion: '1.0', code: 'NOT_FOUND' }, 404);
   });
   return {
+    setReferences: (items: typeof generalReferences) => {
+      generalReferences = items;
+    },
     mutations,
     finishAdjustment: (state: string) => {
       if (adjustment) {
@@ -442,4 +469,100 @@ test('a submission-time access rejection clears the draft and stale method witho
   await expect(page.getByRole('textbox', { name: '调整原因与依据', exact: true })).toHaveCount(0);
   await expect(page.getByText('核对来源范围，再检查实际执行回执。', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '关闭弹窗' })).toBeEnabled();
+});
+
+test('enterprise detail keeps its exact general reference and distinguishes global stop from local publication', async ({
+  page,
+  context,
+}) => {
+  const f = await fixture(context);
+  const ref = {
+    entryId: id(60),
+    versionId: id(61),
+    number: 1,
+    title: '已清洗的通用核对方法',
+    current: false,
+    useState: 'AVAILABLE' as const,
+  };
+  f.setReferences([ref]);
+  await page.goto(`/tenant-admin/#tenant=${tenant}&admin=experience`);
+  await page
+    .getByRole('button')
+    .filter({ has: page.getByRole('heading', { name: '先核对来源口径' }) })
+    .click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByRole('heading', { name: '引用的通用经验' })).toBeVisible();
+  await expect(dialog.getByText(ref.title + ' · v1', { exact: true })).toBeVisible();
+  await expect(dialog.getByText('总库已有新版，本经验继续引用此固定版本。')).toBeVisible();
+  await expect(dialog.getByRole('button', { name: '调整内容', exact: true })).toBeVisible();
+  f.setReferences([{ ...ref, useState: 'GLOBAL_STOPPED' }]);
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect(dialog.getByText('总库已停用', { exact: true })).toBeVisible();
+  await expect(dialog.getByText('v1 · 暂停参考', { exact: false })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: '调整内容', exact: true })).toHaveCount(0);
+  await expect(dialog.getByText('核对来源范围，再检查实际执行回执。', { exact: true })).toBeVisible();
+  await page.setViewportSize({ width: 360, height: 1000 });
+  expect(await dialog.evaluate((e) => e.scrollWidth <= e.clientWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/enterprise-general-reference.png', fullPage: true });
+  f.revoke();
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect(dialog.getByText(ref.title + ' · v1', { exact: true })).toHaveCount(0);
+});
+test('reference pagination retains exact versions and local stop is scoped separately', async ({
+  page,
+  context,
+}) => {
+  const f = await fixture(context);
+  f.setReferences(
+    Array.from({ length: 22 }, (_, i) => ({
+      entryId: id(60 + i),
+      versionId: id(100 + i),
+      number: 1,
+      title: '通用方法 ' + i,
+      current: true,
+      useState: i === 21 ? 'TENANT_STOPPED' : 'AVAILABLE',
+    })),
+  );
+  await page.goto(`/tenant-admin/#tenant=${tenant}&admin=experience`);
+  await page
+    .getByRole('button')
+    .filter({ has: page.getByRole('heading', { name: '先核对来源口径' }) })
+    .click();
+  const refs = page.getByRole('region', { name: '引用的通用经验' });
+  await expect(refs.getByText('引用的通用经验已停用，当前企业版本暂停供引擎参考。')).toBeVisible();
+  await refs.getByRole('button', { name: '下一页', exact: true }).click();
+  await expect(refs.getByText('通用方法 21 · v1', { exact: true })).toBeVisible();
+  await expect(refs.getByText('本企业已停用', { exact: true })).toBeVisible();
+  await expect(refs.getByText('通用方法 0 · v1', { exact: true })).toHaveCount(0);
+});
+
+test('reference navigation cannot discard an editing or uncertain adjustment', async ({ page, context }) => {
+  const f = await fixture(context);
+  f.setReferences(
+    Array.from({ length: 21 }, (_, i) => ({
+      entryId: id(60 + i),
+      versionId: id(100 + i),
+      number: 1,
+      title: '通用方法 ' + i,
+      current: true,
+      useState: 'AVAILABLE',
+    })),
+  );
+  await page.goto(start);
+  await page.getByRole('button', { name: /先核对来源口径/ }).click();
+  await page.getByRole('button', { name: '调整内容', exact: true }).click();
+  await page.getByLabel('调整原因与依据').fill('固定版本中的口径需补充');
+  const next = page
+    .getByRole('region', { name: '引用的通用经验' })
+    .getByRole('button', { name: '下一页', exact: true });
+  await expect(next).toBeDisabled();
+  f.loseResponse();
+  await page.getByRole('button', { name: '提交调整', exact: true }).click();
+  await expect(page.getByRole('button', { name: '重试原调整' })).toBeVisible();
+  await expect(next).toBeDisabled();
+  await expect(page.getByLabel('调整原因与依据')).toHaveValue('固定版本中的口径需补充');
+  await page.getByRole('button', { name: '重试原调整' }).click();
+  await expect(next).toBeEnabled();
+  await expect.poll(()=>f.requests.length).toBe(2);
+  expect(f.requests[0]).toEqual(f.requests[1]);
 });

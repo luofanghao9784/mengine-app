@@ -155,6 +155,23 @@ async function fixture(
         items: suggestions,
       });
     }
+    if (path.endsWith('/general-references'))
+      return json({
+        entryId: id(31),
+        versionId: id(32),
+        canReference: enabled,
+        items: [
+          {
+            entryId: entry,
+            versionId: version,
+            number: 1,
+            title: method.title,
+            current: true,
+            useState: enabled ? 'AVAILABLE' : 'TENANT_STOPPED',
+          },
+        ],
+        hasMore: false,
+      });
     if (path.includes('/experiences/')) {
       if (path.endsWith('/adjustments')) return json({ enabled: true, items: [] });
       if (path.endsWith('/history'))

@@ -214,3 +214,17 @@
   margin: 0;
   min-width: 0;
 }
+
+.experience-general-references {
+  margin: 18px 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.experience-reference-row {
+  margin-top: 12px;
+  overflow-wrap: anywhere;
+}
+.experience-reference-row .badge {
+  margin-left: 8px;
+}

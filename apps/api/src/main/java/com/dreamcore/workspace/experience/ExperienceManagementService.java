@@ -17,6 +17,8 @@ public class ExperienceManagementService {
  public record ContentPage(List<Scope> scopes,List<Item> items,boolean hasMore) {}
  public record Version(UUID id,int number,String origin,String evaluation,Instant createdAt,boolean current) {}
  public record History(List<Version> items,boolean hasMore) {}
+ public record GeneralReference(UUID entryId,UUID versionId,int number,String title,boolean current,String useState) {}
+ public record GeneralReferences(UUID entryId,UUID versionId,boolean canReference,List<GeneralReference> items,boolean hasMore) {}
  public record Processing(UUID id,String sourceKind,String state,String reason,Instant updatedAt,UUID entryId,UUID versionId,UUID workspaceId) {}
  public record ProcessingPage(boolean enabled,List<Scope> scopes,Map<String,Long> counts,List<Processing> items,boolean hasMore) {}
  private final JdbcTemplate db;private final GovernanceAccess governance;private final ExperienceService experiences;private final JsonMapper json=new JsonMapper();
@@ -44,6 +46,20 @@ public class ExperienceManagementService {
   String base="WITH principal AS(SELECT ?::uuid actor) SELECT v.id,v.number,v.origin,v.evaluation,v.created_at,(v.id=e.published_version) is_current FROM experience_entries e JOIN experience_versions v ON v.entry_id=e.id CROSS JOIN principal p WHERE e.tenant_id=? AND e.workspace_id=? AND e.id=? AND EXISTS(SELECT 1 FROM experience_events event WHERE event.entry_id=e.id AND event.version_id=v.id AND event.action='PUBLISHED') AND "+ExperienceService.VISIBLE;
   if(db.queryForList(base+" LIMIT 1",actor,tenant,space,entry).isEmpty())throw new IdentityException(404,"EXPERIENCE_NOT_FOUND");
   var rows=db.query(base+" ORDER BY v.number DESC LIMIT 21 OFFSET ?",(r,n)->new Version(r.getObject(1,UUID.class),r.getInt(2),r.getString(3),r.getString(4),r.getTimestamp(5).toInstant(),r.getBoolean(6)),actor,tenant,space,entry,offset);return new History(rows.stream().limit(20).toList(),rows.size()>20);
+ }
+ /** References are cleaned general identities only. A management role never bypasses the local method's source scope. */
+ @Transactional public GeneralReferences generalReferences(UUID actor,UUID tenant,UUID space,UUID entry,UUID version,int offset){
+  paging(offset);selected(scopes(actor,tenant),space);if(space==null||version==null)throw IdentityException.invalid();
+  var local=experiences.analysisEntry(actor,tenant,space,entry,version);
+  if(!Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM experience_events WHERE entry_id=? AND version_id=? AND action='PUBLISHED')",Boolean.class,entry,version)))throw new IdentityException(404,"EXPERIENCE_NOT_FOUND");
+  db.queryForList("SELECT pg_advisory_xact_lock_shared(hashtextextended('general-use:'||?::text,0))",tenant);
+  // Holding the fixed general rows makes concurrent source withdrawal observe this authorized read.
+  db.queryForList("SELECT e.id FROM experience_general_dependency_closure d JOIN general_experience_versions v ON v.id=d.general_version_id JOIN general_experience_entries e ON e.id=v.entry_id WHERE d.version_id=? ORDER BY e.id,v.id FOR SHARE OF e,v",version);
+  var items=db.query("SELECT e.id,v.id,v.number,v.method->>'title' title,v.id=e.published_version is_current,CASE WHEN e.status<>'AVAILABLE' THEN 'GLOBAL_STOPPED' WHEN NOT tenant_general_experience_enabled(?,e.id) THEN 'TENANT_STOPPED' ELSE 'AVAILABLE' END use_state FROM experience_general_dependency_closure d JOIN general_experience_versions v ON v.id=d.general_version_id JOIN general_experience_entries e ON e.id=v.entry_id WHERE d.version_id=? ORDER BY e.id,v.number,v.id LIMIT 21 OFFSET ?",(r,n)->new GeneralReference(r.getObject(1,UUID.class),r.getObject(2,UUID.class),r.getInt(3),r.getString(4),r.getBoolean(5),r.getString(6)),tenant,version,offset);
+  // Recheck after locking: never retain even a cleaned title after the original dependency was erased.
+  local=experiences.analysisEntry(actor,tenant,space,entry,version);
+  boolean usable=local.status().equals("PUBLISHED")&&version.equals(local.publishedVersion())&&Boolean.TRUE.equals(db.queryForObject("SELECT experience_general_dependencies_current(?,?)",Boolean.class,tenant,version));
+  return new GeneralReferences(entry,version,usable,items.stream().limit(20).toList(),items.size()>20);
  }
  static final String PROCESSING="""
  SELECT i.id,i.kind source_kind,i.workspace_id,a.entry_id,a.version_id,

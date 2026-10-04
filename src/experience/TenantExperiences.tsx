@@ -453,9 +453,30 @@ function ExperienceDrawer({
   );
   const e = detail.value,
     c = e?.version.content;
+  const [referencePage, setReferencePage] = useState(0);
+  useEffect(() => setReferencePage(0), [selection.id, selection.version]);
+  const references = useRemote(
+    (signal) =>
+      e
+        ? api.generalReferences(
+            tenant,
+            selection.space,
+            selection.id,
+            e.version.id,
+            referencePage * 20,
+            signal,
+          )
+        : Promise.resolve(null),
+    [tenant, selection.space, selection.id, e?.version.id, referencePage, attempt],
+  );
+  const referenceDenied =
+    references.error instanceof IdentityError && [401, 403, 404].includes(references.error.status)
+      ? references.error
+      : undefined;
   const denied =
     detail.error ||
     history.error ||
+    referenceDenied ||
     (submission.error instanceof IdentityError && [401, 403, 404].includes(submission.error.status)
       ? submission.error
       : undefined);
@@ -481,7 +502,11 @@ function ExperienceDrawer({
               {e.status === 'WITHDRAWN'
                 ? '已停用'
                 : e.publishedVersion === e.version.id
-                  ? '当前可用'
+                  ? references.value?.canReference
+                    ? '当前可用'
+                    : references.value
+                      ? '暂停参考'
+                      : '当前版本'
                   : '历史版本'}
             </Badge>
           </div>
@@ -559,26 +584,66 @@ function ExperienceDrawer({
             {e.version.origin === 'AUTOMATIC' ? '系统积累 · 自动核验通过' : '历史人工经验 · 未评测'} ·{' '}
             {stamp(e.version.createdAt)}
           </p>
+          {references.error && !referenceDenied ? (
+            <fieldset className="general-experience-control-group" disabled={blocked || adjusting}>
+              <Failure error={references.error} retry={() => setAttempt((n) => n + 1)} />
+            </fieldset>
+          ) : references.value && (references.value.items.length > 0 || references.value.hasMore) ? (
+            <section className="experience-general-references" aria-label="引用的通用经验">
+              <h3>引用的通用经验</h3>
+              <p className="muted">保留形成当前企业版本时的通用版本，后续总库更新不会自动覆盖企业内容。</p>
+              {e.status === 'PUBLISHED' &&
+                e.publishedVersion === e.version.id &&
+                !references.value.canReference && (
+                  <p role="status">引用的通用经验已停用，当前企业版本暂停供引擎参考。</p>
+                )}
+              {references.value.items.map((item) => (
+                <div className="experience-reference-row" key={item.versionId}>
+                  <strong>
+                    {item.title} · v{item.number}
+                  </strong>
+                  <Badge>
+                    {item.useState === 'GLOBAL_STOPPED'
+                      ? '总库已停用'
+                      : item.useState === 'TENANT_STOPPED'
+                        ? '本企业已停用'
+                        : '可供参考'}
+                  </Badge>
+                  <p className="muted">
+                    {item.current ? '引用的是总库当前版本。' : '总库已有新版，本经验继续引用此固定版本。'}
+                  </p>
+                </div>
+              ))}
+              {(referencePage > 0 || references.value.hasMore) && (
+                <fieldset className="general-experience-control-group" disabled={blocked || adjusting}>
+                  <Pager page={referencePage} next={references.value.hasMore} onPage={setReferencePage} />
+                </fieldset>
+              )}
+            </section>
+          ) : null}
           <p>{c.summary}</p>
           <div className="experience-management-tags">
             {c.tags.map((tag) => (
               <Badge key={tag}>{tag}</Badge>
             ))}
           </div>
-          {e.canMaintain && c.kind === 'METHOD' && !action && (
-            <ExperienceAdjustmentPanel
-              tenant={tenant}
-              space={selection.space}
-              entry={e}
-              editing={setAdjusting}
-              locked={setAdjustmentBlocked}
-              chooseVersion={chooseVersion}
-              changed={() => {
-                setAttempt((n) => n + 1);
-                changed();
-              }}
-            />
-          )}
+          {e.canMaintain &&
+            c.kind === 'METHOD' &&
+            !action &&
+            (references.value?.canReference || (!references.value && (adjusting || adjustmentBlocked))) && (
+              <ExperienceAdjustmentPanel
+                tenant={tenant}
+                space={selection.space}
+                entry={e}
+                editing={setAdjusting}
+                locked={setAdjustmentBlocked}
+                chooseVersion={chooseVersion}
+                changed={() => {
+                  setAttempt((n) => n + 1);
+                  changed();
+                }}
+              />
+            )}
           <details open>
             <summary>方法与适用条件</summary>
             <DocumentText text={c.body} />

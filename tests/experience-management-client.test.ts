@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   createExperienceManagementClient,
   isProcessingPage,
+  isGeneralReferences,
   processingLabels,
 } from '../src/experience/management-client.ts';
 const id = '00000000-0000-4000-8000-000000000001';
@@ -45,4 +46,32 @@ test('processing sends filters without changing them or making mutation requests
   assert.match(calls[0], /state=FAILED/);
   assert.match(calls[0], /offset=20/);
   assert.match(calls[0], new RegExp('workspace=' + id));
+});
+
+test('fixed general references reject substituted local versions and any private source fields', async () => {
+  const other = '00000000-0000-4000-8000-000000000002';
+  const ref = {
+    entryId: other,
+    versionId: other,
+    number: 1,
+    title: '清洗方法',
+    current: false,
+    useState: 'AVAILABLE',
+  };
+  const body = { entryId: id, versionId: id, canReference: true, items: [ref], hasMore: false };
+  assert.ok(isGeneralReferences(body));
+  for (const key of ['tenantId', 'actorId', 'sourceId', 'proposal', 'method'])
+    assert.equal(isGeneralReferences({ ...body, items: [{ ...ref, [key]: 'private' }] }), false);
+  const calls: string[] = [];
+  let response = { ...body };
+  const api = createExperienceManagementClient((async (url) => {
+    calls.push(String(url));
+    return Response.json(response);
+  }) as typeof fetch);
+  assert.deepEqual(await api.generalReferences(id, id, id, id), body);
+  assert.ok(calls[0].includes('version=' + id));
+  assert.ok(calls[0].includes('workspace=' + id));
+  response = { ...body, versionId: other };
+  await assert.rejects(api.generalReferences(id, id, id, id));
+  await assert.rejects(api.generalReferences(id, id, id, id, -1));
 });

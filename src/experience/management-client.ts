@@ -1,10 +1,11 @@
 import type {
   ExperienceHistory,
+  ExperienceGeneralReferences,
   ExperienceContentPage,
   ExperienceProcessingPage,
   ExperienceProcessingState,
 } from '../../contracts/public-api/experience-management.ts';
-import { createIdentityRequest, record, uuid } from '../identity/client.ts';
+import { createIdentityRequest, IdentityError, record, uuid } from '../identity/client.ts';
 import { isSummary } from './client.ts';
 export const processingLabels: Record<ExperienceProcessingState, string> = {
   WAITING: '等待处理',
@@ -78,6 +79,29 @@ export const isProcessingPage = (v: unknown): v is ExperienceProcessingPage =>
         ),
       ),
   );
+export const isGeneralReferences = (v: unknown): v is ExperienceGeneralReferences =>
+  record(v) &&
+  uuid(v.entryId) &&
+  uuid(v.versionId) &&
+  typeof v.canReference === 'boolean' &&
+  typeof v.hasMore === 'boolean' &&
+  Object.keys(v).length === 5 &&
+  Array.isArray(v.items) &&
+  v.items.length <= 20 &&
+  v.items.every(
+    (i) =>
+      record(i) &&
+      Object.keys(i).length === 6 &&
+      uuid(i.entryId) &&
+      uuid(i.versionId) &&
+      Number.isSafeInteger(i.number) &&
+      Number(i.number) > 0 &&
+      typeof i.title === 'string' &&
+      i.title.length > 0 &&
+      i.title.length <= 160 &&
+      typeof i.current === 'boolean' &&
+      ['AVAILABLE', 'GLOBAL_STOPPED', 'TENANT_STOPPED'].includes(String(i.useState)),
+  );
 export function createExperienceManagementClient(fetcher: typeof fetch = fetch) {
   const request = createIdentityRequest(fetcher);
   const url = (
@@ -94,6 +118,32 @@ export function createExperienceManagementClient(fetcher: typeof fetch = fetch) 
     return `/api/v1/tenants/${tenant}/experience-library${part}?${params}`;
   };
   return {
+    generalReferences: async (
+      tenant: string,
+      workspace: string,
+      entry: string,
+      version: string,
+      offset = 0,
+      signal?: AbortSignal,
+    ) => {
+      if (
+        ![tenant, workspace, entry, version].every(uuid) ||
+        !Number.isSafeInteger(offset) ||
+        offset < 0 ||
+        offset > 100000
+      )
+        throw new IdentityError('INVALID_REQUEST', 400);
+      const result = await request(
+        url(tenant, `/${entry}/general-references`, workspace, 'ALL', offset) + `&version=${version}`,
+        'GET',
+        isGeneralReferences,
+        undefined,
+        signal,
+      );
+      if (result.entryId !== entry || result.versionId !== version)
+        throw new IdentityError('CONTRACT_MISMATCH');
+      return result;
+    },
     history: (tenant: string, workspace: string, entry: string, offset = 0, signal?: AbortSignal) => {
       if (!uuid(entry)) throw new Error('Invalid entry');
       return request(

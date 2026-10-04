@@ -46,3 +46,23 @@ test('observation endpoints have customer scope, no write or review actions, and
     assert.equal(operations.get.responses['200'].headers['Cache-Control'].schema.const, 'private, no-store');
   }
 });
+
+test('general references carry only a cleaned title, fixed version and independent usage status', () => {
+  const check = ajv.compile({ ...spec.components.schemas.GeneralReferences, components: spec.components });
+  const ref = {
+    entryId: id,
+    versionId: id,
+    number: 1,
+    title: '已清洗方法',
+    current: false,
+    useState: 'AVAILABLE',
+  };
+  const value = { entryId: id, versionId: id, canReference: true, items: [ref], hasMore: false };
+  assert.ok(check(value));
+  for (const key of ['tenantId', 'actorId', 'sourceId', 'proposal', 'method', 'original'])
+    assert.equal(check({ ...value, items: [{ ...ref, [key]: 'private' }] }), false);
+  assert.equal(check({ ...value, items: [{ ...ref, useState: 'SOURCE_AVAILABLE' }] }), false);
+  const endpoint = spec.paths['/api/v1/tenants/{tenant}/experience-library/{entry}/general-references'].get;
+  for (const name of ['workspace', 'version'])
+    assert.ok(endpoint.parameters.some((p) => p.name === name && p.required));
+});

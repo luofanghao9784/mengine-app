@@ -54,3 +54,18 @@ export interface ExperienceHistory {
   }[];
   hasMore: boolean;
 }
+
+export interface ExperienceGeneralReferences {
+  entryId: string;
+  versionId: string;
+  canReference: boolean;
+  items: {
+    entryId: string;
+    versionId: string;
+    number: number;
+    title: string;
+    current: boolean;
+    useState: 'AVAILABLE' | 'GLOBAL_STOPPED' | 'TENANT_STOPPED';
+  }[];
+  hasMore: boolean;
+}
