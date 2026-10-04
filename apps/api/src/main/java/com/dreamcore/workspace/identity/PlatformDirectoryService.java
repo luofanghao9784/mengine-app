@@ -32,6 +32,14 @@ public class PlatformDirectoryService {
         return db.query(CUSTOMERS+" AND (?='' OR a.status=?) AND (?='' OR strpos(lower(a.display_name||' '||coalesce(a.phone,'')||' '||coalesce(a.email,'')),lower(?))>0) ORDER BY a.created_at DESC,a.id OFFSET ? LIMIT ?",
             CUSTOMER,status,status,q,q,offset,limit);
     }
+    @Transactional(readOnly=true)
+    public List<Customer> enterpriseCustomers(UUID actor, UUID tenant, String q, String status, int offset, int limit) {
+        identities.platform(actor);TenantAdminService.page(offset,limit);
+        if(q==null || q.length()>180 || !List.of("","ACTIVE","DISABLED").contains(status)) throw IdentityException.invalid();
+        if(db.queryForObject("SELECT count(*) FROM tenants WHERE id=?",Long.class,tenant)==0) throw new IdentityException(404,"TENANT_NOT_FOUND");
+        return db.query(CUSTOMERS+" AND EXISTS(SELECT 1 FROM tenant_memberships m WHERE m.account_id=a.id AND m.tenant_id=?) AND (?='' OR a.status=?) AND (?='' OR strpos(lower(a.display_name||' '||coalesce(a.phone,'')||' '||coalesce(a.email,'')),lower(?))>0) ORDER BY a.created_at DESC,a.id OFFSET ? LIMIT ?",
+            CUSTOMER,tenant,status,status,q,q,offset,limit);
+    }
     private Customer customer(UUID id) {
         var rows=db.query(CUSTOMERS+" AND a.id=?",CUSTOMER,id);
         if(rows.isEmpty()) throw new IdentityException(404,"ACCOUNT_NOT_FOUND");

@@ -1,47 +1,42 @@
 import { Select } from '../shared/Select';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { uuid } from '../identity/client';
-import { ArrowLeft, Search, Users, RefreshCw } from 'lucide-react';
-import { Button, Badge, Empty, Field, Modal, PageActions } from '../shared/ui';
+import { ArrowLeft, Search, Users } from 'lucide-react';
+import { Button, Badge, Empty, Field, Modal } from '../shared/ui';
 import { Failure, Loading, Pager, SubmitError, useRemote, useSubmission } from '../shared/admin';
 import { useViewState, textState, pageState } from '../shared/useViewState';
 import { useRequestLock } from '../shared/request-guard';
 import { directoryClient as api, type CustomerAccount } from './directory-client';
 
-export function PlatformAccounts() {
+export function PlatformAccounts({ tenant, revision = 0 }: { tenant: string; revision?: number }) {
   const suppliedAccount = new URLSearchParams(location.hash.slice(1)).get('account');
   const routeAccount = uuid(suppliedAccount) ? suppliedAccount : null;
-  const [query, setQuery] = useViewState('platform', 'accounts:query', '', textState);
+  const [query, setQuery] = useViewState('platform', `accounts:${tenant}:query`, '', textState);
   const [draft, setDraft] = useState(query);
-  const [status, setStatus] = useViewState('platform', 'accounts:status', '', textState);
-  const [page, setPage] = useViewState('platform', 'accounts:page', 0, pageState);
-  const [selected, setSelected] = useViewState('platform', 'accounts:selected', '', textState);
+  const [status, setStatus] = useViewState('platform', `accounts:${tenant}:status`, '', textState);
+  const [page, setPage] = useViewState('platform', `accounts:${tenant}:page`, 0, pageState);
+  const [selected, setSelected] = useViewState('platform', `accounts:${tenant}:selected`, '', textState);
   const [attempt, setAttempt] = useState(0);
   const refresh = () => setAttempt((n) => n + 1);
   const data = useRemote(
-    (signal) => api.list(query, status, page * 20, signal),
-    [query, status, page, attempt],
+    (signal) => api.list(tenant, query, status, page * 20, signal),
+    [tenant, query, status, page, attempt, revision],
   );
   if (routeAccount || selected)
     return (
       <AccountDetail
         id={routeAccount || selected}
+        tenant={tenant}
         close={() => {
           setSelected('');
-          if (routeAccount) location.hash = '#admin=tenants&directory=accounts';
+          if (routeAccount) location.hash = `#admin=tenants&enterprise=${tenant}&section=accounts`;
         }}
         changed={refresh}
       />
     );
   return (
     <section className="admin-section">
-      <PageActions>
-        <Button icon={RefreshCw} variant="ghost" onClick={refresh}>
-          刷新
-        </Button>
-      </PageActions>
       <div className="platform-list-heading admin-directory-heading">
-        <h2>客户账号</h2>
         <form
           className="platform-filters"
           onSubmit={(e) => {
@@ -112,7 +107,7 @@ export function PlatformAccounts() {
                   <strong>{account.displayName}</strong>
                   <small>{account.phone || account.email}</small>
                 </span>
-                <span>{account.tenantCount} 家企业</span>
+
                 <Badge>{account.status === 'ACTIVE' ? '已启用' : '已停用'}</Badge>
               </button>
             ))}
@@ -123,14 +118,16 @@ export function PlatformAccounts() {
     </section>
   );
 }
-function AccountDetail({ id, close, changed }: { id: string; close: () => void; changed: () => void }) {
+function AccountDetail({ id, tenant, close, changed }: { id: string; tenant: string; close: () => void; changed: () => void }) {
   const [attempt, setAttempt] = useState(0),
     [confirm, setConfirm] = useState(false);
   const refresh = () => setAttempt((n) => n + 1);
   const data = useRemote((signal) => api.detail(id, signal), [id, attempt]);
   if (data.error) return <Failure error={data.error} retry={refresh} />;
   if (!data.value) return <Loading />;
-  const { account, memberships, records } = data.value;
+  const { account, records } = data.value;
+  const memberships = data.value.memberships.filter((m) => m.tenantId === tenant);
+  if (!memberships.length) return <Empty icon={Users} title="该账号不属于当前企业" text="返回企业账号列表查看。" />;
   return (
     <div className="admin-dashboard">
       <div>
@@ -263,4 +260,16 @@ function AccountStatus({
       </form>
     </Modal>
   );
+}
+
+/** 旧账号审计链接定位到关联企业，不再打开全平台账号目录。 */
+export function AccountEnterpriseLink({ id }: { id: string }) {
+  const data = useRemote((signal) => api.detail(id, signal), [id]);
+  const membership = data.value?.memberships[0];
+  useEffect(() => {
+    if (membership) location.hash = `#admin=tenants&enterprise=${membership.tenantId}&section=accounts&account=${id}`;
+  }, [membership, id]);
+  if (data.error) return <Failure error={data.error} retry={() => location.reload()} />;
+  if (!data.value || membership) return <Loading />;
+  return <Empty icon={Users} title="该账号暂无关联企业" text="企业接受成员后，可在对应企业中查看账号。" />;
 }

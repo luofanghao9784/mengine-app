@@ -99,9 +99,9 @@ export const directoryClient = {
     ),
   acceptInvite: (body: { token: string; username: string; password: string; displayName: string }) =>
     request('/api/platform-admin/v1/auth/invitation/accept', 'POST', isIdentity, body),
-  list: (q: string, status: string, offset: number, signal?: AbortSignal) =>
+  list: (tenant: string, q: string, status: string, offset: number, signal?: AbortSignal) =>
     request(
-      '/api/platform-admin/v1/accounts?' +
+      `/api/platform-admin/v1/tenants/${tenant}/accounts?` +
         new URLSearchParams({ q, status, offset: String(offset), limit: '21' }),
       'GET',
       (v): v is CustomerAccount[] => Array.isArray(v) && v.every(customer),

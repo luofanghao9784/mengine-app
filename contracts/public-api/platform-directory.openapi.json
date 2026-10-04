@@ -310,6 +310,93 @@
           }
         }
       }
+    },
+    "/api/platform-admin/v1/tenants/{tenant}/accounts": {
+      "get": {
+        "operationId": "listEnterpriseCustomerAccounts",
+        "security": [
+          {
+            "platformSessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "当前管理投影",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CustomerAccount"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "总台独立会话无效"
+          },
+          "403": {
+            "description": "平台资格或 CSRF 不符合"
+          },
+          "404": {
+            "description": "账号不存在或属于平台身份域"
+          },
+          "409": {
+            "description": "版本或幂等内容冲突"
+          }
+        },
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 180
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "",
+                "ACTIVE",
+                "DISABLED"
+              ]
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ],
+        "description": "仅返回指定企业关联的客户账号，在服务端过滤后分页。"
+      }
     }
   },
   "components": {

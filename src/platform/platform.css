@@ -672,23 +672,4 @@
   min-width: 0;
 }
 
-/* 企业与跨企业客户账号共用企业管理入口。 */
-.platform-directory-tabs {
-  display: flex;
-  gap: 24px;
-  margin-bottom: 20px;
-  border-bottom: 1px solid var(--line, #e4ebf4);
-}
-.platform-directory-tabs a {
-  padding: 0 2px 12px;
-  color: var(--muted, #526780);
-  text-decoration: none;
-  border-bottom: 2px solid transparent;
-  font-size: 14px;
-  font-weight: 600;
-}
-.platform-directory-tabs a[aria-current='page'] {
-  color: var(--primary, #0866e9);
-  border-bottom-color: currentColor;
-}
-.platform-directory-tabs a:hover { color: var(--primary, #0866e9); }
+.platform-enterprise-detail .admin-section { box-shadow: none; }

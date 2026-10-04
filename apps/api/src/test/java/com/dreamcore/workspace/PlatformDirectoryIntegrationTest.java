@@ -40,6 +40,19 @@ class PlatformDirectoryIntegrationTest {
         assertThrows(IdentityException.class,()->directory.customers(customer,"","",0,21));
         assertEquals(404,assertThrows(IdentityException.class,()->directory.detail(actor,actor)).status);
     }
+    @Test void enterpriseCatalogFiltersBeforePaginationAndRequiresPlatformIdentity() {
+        UUID otherTenant=UUID.randomUUID(), otherCustomer=UUID.randomUUID();
+        db.update("INSERT INTO tenants(id,name) VALUES (?,?)",otherTenant,"另一合成企业");
+        db.update("INSERT INTO accounts(id,email,display_name,password_hash) VALUES (?,?,?,'not-used')",otherCustomer,otherCustomer+"@directory.test","同名客户");
+        db.update("INSERT INTO tenant_memberships(tenant_id,account_id,role) VALUES (?,?,'MEMBER')",otherTenant,otherCustomer);
+        var scoped=directory.enterpriseCustomers(actor,tenant,"","",0,1);
+        assertEquals(1,scoped.size());assertEquals(customer,scoped.getFirst().id());
+        assertTrue(directory.enterpriseCustomers(actor,tenant,"同名客户","",0,21).isEmpty());
+        assertEquals(otherCustomer,directory.enterpriseCustomers(actor,otherTenant,"","",0,21).getFirst().id());
+        assertThrows(IdentityException.class,()->directory.enterpriseCustomers(customer,tenant,"","",0,21));
+        assertEquals(404,assertThrows(IdentityException.class,()->directory.enterpriseCustomers(actor,UUID.randomUUID(),"","",0,21)).status);
+        assertThrows(IdentityException.class,()->directory.enterpriseCustomers(actor,tenant,"","",-1,21));
+    }
     @Test void statusIsVersionedIdempotentAndDoesNotRewriteMemberships() {
         UUID request=UUID.randomUUID();
         var disabled=directory.status(actor,customer,request,0,"DISABLED","合成安全处置");

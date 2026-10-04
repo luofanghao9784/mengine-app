@@ -1,3 +1,4 @@
+import { PlatformAccounts } from './PlatformAccounts';
 import { Select } from '../shared/Select';
 import { useContext, useEffect, useState } from 'react';
 import { ArrowLeft, Building2, ChevronRight, Plus, RefreshCw, Search, Send } from 'lucide-react';
@@ -350,6 +351,7 @@ function TenantView({
       <nav className="platform-detail-nav" aria-label="企业详情内容">
         {[
           ['basic', '基本信息'],
+          ['accounts', '企业账号'],
           ['usage', '运行与用量'],
           ['records', '管理记录'],
         ].map(([key, label]) => (
@@ -366,7 +368,9 @@ function TenantView({
           </Button>
         ))}
       </nav>
-      {tab === 'usage' ? (
+      {tab === 'accounts' ? (
+        <PlatformAccounts key={id} tenant={id} revision={attempt} />
+      ) : tab === 'usage' ? (
         <UsagePanel scope="platform" tenant={id} revision={attempt} />
       ) : tab === 'records' ? (
         <Records id={id} revision={attempt} />
