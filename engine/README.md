@@ -91,3 +91,22 @@ M7-A1 第七切片：平台回调升级 1.4，Agent 1.4 不变。模型调用前
 ## 本机真实模型配置入口（2026-10-01）
 
 本项目已提供 `npm run model:configure`（隐藏输入）、`npm run model:check:local`（零请求）、`npm run model:smoke`（一次64输出token上限的合成内容真实请求）及 `npm run trial:start:live`。smoke 可加 `-- --tools` 验证两轮工具回放，失败不重试。启动使用本工作树私有配置；普通试用仍默认 off。专用Key尚未准备，云端真实验收未完成，详见[配置与验收指南](../docs/交接/真实模型本机验收-2026-10-01.md)。
+
+
+## 经验提炼与自动核验（B4 内部协议 1.0）
+
+可选 `/internal/v1/experience/runtime` 与 `/internal/v1/experience/results` 使用同一服务间认证及编译固定的引擎版本。POST 接收最多 8 段固定输入（每段 8000 字符、标明是否完整）、最多 5 个获权的现有经验版本及部署侧提供的敏感值。GET `/results/{run}/{lease}` 恢复原回执，DELETE 取消该次执行。没有客户直接调用接口、来源授权工具、网络/命令执行或发布工具。完整格式见[内部契约](../contracts/engine-api/experience-analysis.schema.json)。
+
+每次最多提炼一个方法或正常跳过，随后用新模型实例和新 Harness 会话重新读取原始依据、现有经验及候选。两阶段各最多 6 次模型调用、16 次工具调用、45 秒；每实例最多 2 个经验任务并发。两个会话使用同一配置的模型，独立指上下文和调用分开，不声称是两个不同供应商或独立客观效果评测。检查来源支持、复用价值、适用边界、隐私和新增价值；未知或不通过不得返回可用候选。用户评分、模型回复和任务成功状态不能直接证明业务正确性。执行依据需要实际执行记录，反馈纠正还须关联被纠正的内容。
+
+候选的可展示字段另有敏感值和常见标识符检查，处理 Unicode 宽字符及常见零宽混淆；这是附加围栏，不把正则表达式或一次模型判断等同于完整脱敏保证。原文引用只作为内部依据，**不得把整个回执转发给企业/总台页面或通用经验库**。QUALIFIED 仅表示本次自动检查通过，`admitted` 恒为 false；平台必须再查当前授权、来源版本、执行类别和现有经验冲突，实际准入另行提交。
+
+SKIPPED、REJECTED 与 FAILED/CANCELLED 分开，均不返回候选正文；没有待人工审核状态。真实用量按两个阶段记录，未知 token 保持 null。相同 run/lease 的输入变化拒绝；并发重放共用同一次执行。完成回执在内存保留 10 分钟，进程重启会丢失，平台只能查询原回执，不能因此重新执行未知请求。后续持久化派发器仍待连接；目前新增运行时本身不会扫描来源或自动调用模型。
+
+本地验证使用实际 Harness 和合成 ModelPort，未调用真实提供商，不证明真实提炼/脱敏质量：
+
+```bash
+npm --prefix engine test
+./apps/api/mvnw -f apps/api/pom.xml -q -Dtest=ExperienceAnalysisRuntimeTest,ExperienceAnalysisHarnessIT test
+npm run test:contracts
+```

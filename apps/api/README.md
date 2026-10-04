@@ -221,3 +221,10 @@ V13 保存私人文稿固定版本与独立企业文件版本的映射、回执�
 ```bash
 python3 scripts/with-test-postgres.py ./apps/api/mvnw -f apps/api/pom.xml -q -Dtest=ExperienceIntakeIntegrationTest,ObjectLifecycleIntegrationTest,ProfileMethodLifecycleIntegrationTest,FeedbackIntegrationTest,PublicationFeedbackIntegrationTest,FeedbackAdjustmentIntegrationTest,TaskDatasetIntegrationTest,TaskContextIntegrationTest test
 ```
+
+
+### 经验提炼引擎适配（接续）
+
+`ExperienceAnalysisRuntime` 已连接内部 experience 1.0 的运行描述、POST、GET 恢复与 DELETE 取消；固定 run/lease/source、引擎版本和 live/verification 类别。接收回执时重新检查两阶段、非空实际调用、全部核验项、引用原文、当前提供的现有版本及敏感标识；坏回执按结果未知处理，不冒充质量不合格。响应丢失后只查询原回执，不自动重新 POST。未发送的来源失效与已发送的未知结果分开。
+
+当前适配器尚未与来源登记扫描器、持久派发账本和自动准入连接，不能算已启用自动积累。默认扫描开关仍关闭，不新增公开页面或写入经验版本。真实 HTTP + 实际 Harness 两阶段验证使用合成 ModelPort，命令及资源限制见[引擎说明](../../engine/README.md#经验提炼与自动核验b4-内部协议-10)。

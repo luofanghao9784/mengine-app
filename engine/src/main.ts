@@ -3,6 +3,7 @@ import { AgentTasks } from './runtime/agent-task.js';
 import { PublicReader, SearxSearch } from './runtime/public-web.js';
 import { configuredModel } from './runtime/model-config.js';
 import { CompanyAnalysis } from './runtime/company-analysis.js';
+import { ExperienceAnalysis } from './runtime/experience-analysis.js';
 
 if (process.env.AGENT_CANDIDATE_TRIALS_ENABLED === 'true')
   throw new Error('Candidate trials are available only through the local verification fixture');
@@ -35,7 +36,14 @@ const company = model
       createModel: model.createModel,
     })
   : undefined;
-const server = createEngineServer({ token: process.env.TASK_ENGINE_TOKEN, agent, company });
+const experience = model
+  ? new ExperienceAnalysis({
+      executionClass: 'live',
+      modelName: model.modelName,
+      createModel: model.createModel,
+    })
+  : undefined;
+const server = createEngineServer({ token: process.env.TASK_ENGINE_TOKEN, agent, company, experience });
 server.listen(port, host, () => {
   console.log(`Dreamcore engine listening on ${host}:${port}; model gateway ${agent ? 'configured' : 'off'}`);
 });
@@ -43,6 +51,7 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.once(signal, () => {
     agent?.stop();
     company?.stop();
+    experience?.stop();
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(1), 5000).unref();
   });

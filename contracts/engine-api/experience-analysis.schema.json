@@ -1,0 +1,660 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dreamcore:experience-analysis:1.0",
+  "description": "Authenticated internal extraction and fresh-session verification. Contains private source evidence: never forward whole receipts to tenant/platform UI or general library. QUALIFIED is not admission; platform must recheck current authority, execution class, source versions and conflicts. No human review state.",
+  "$defs": {
+    "Candidate": {
+      "type": "object",
+      "properties": {
+        "targetVersionId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "\\S"
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 600,
+          "pattern": "\\S"
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 800,
+            "pattern": "\\S"
+          },
+          "minItems": 1,
+          "maxItems": 10,
+          "uniqueItems": true
+        },
+        "applicable": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "\\S"
+          },
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true
+        },
+        "excluded": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "\\S"
+          },
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50,
+            "pattern": "\\S"
+          },
+          "minItems": 1,
+          "maxItems": 10,
+          "uniqueItems": true
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "inputId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "quote": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000,
+                "pattern": "\\S"
+              }
+            },
+            "required": ["inputId", "quote"],
+            "additionalProperties": false
+          },
+          "minItems": 1,
+          "maxItems": 8
+        }
+      },
+      "required": [
+        "targetVersionId",
+        "title",
+        "summary",
+        "steps",
+        "applicable",
+        "excluded",
+        "tags",
+        "evidence"
+      ],
+      "additionalProperties": false
+    },
+    "Review": {
+      "type": "object",
+      "properties": {
+        "checks": {
+          "type": "object",
+          "properties": {
+            "grounded": {
+              "enum": ["PASS", "FAIL", "UNKNOWN"]
+            },
+            "reusable": {
+              "enum": ["PASS", "FAIL", "UNKNOWN"]
+            },
+            "bounded": {
+              "enum": ["PASS", "FAIL", "UNKNOWN"]
+            },
+            "privacySafe": {
+              "enum": ["PASS", "FAIL", "UNKNOWN"]
+            },
+            "novel": {
+              "enum": ["PASS", "FAIL", "UNKNOWN"]
+            }
+          },
+          "required": ["grounded", "reusable", "bounded", "privacySafe", "novel"],
+          "additionalProperties": false
+        },
+        "basis": {
+          "enum": ["OBSERVED_EXECUTION", "FEEDBACK_CORRECTION", "REPORTED_ONLY", "INSUFFICIENT"]
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "inputId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "quote": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000,
+                "pattern": "\\S"
+              }
+            },
+            "required": ["inputId", "quote"],
+            "additionalProperties": false
+          },
+          "minItems": 1,
+          "maxItems": 8
+        }
+      },
+      "required": ["checks", "basis", "evidence"],
+      "additionalProperties": false
+    },
+    "Stage": {
+      "type": "object",
+      "properties": {
+        "stage": {
+          "enum": ["EXTRACT", "VERIFY"]
+        },
+        "modelName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "\\S"
+        },
+        "modelCalls": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 6
+        },
+        "inputTokens": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "outputTokens": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": ["stage", "modelName", "modelCalls", "inputTokens", "outputTokens"],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "inputTokens": {
+                "type": "null"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "outputTokens": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "outputTokens": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "Request": {
+      "type": "object",
+      "properties": {
+        "contractVersion": {
+          "const": "1.0"
+        },
+        "job": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "lease": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "tenant": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "source": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "inputs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "kind": {
+                    "enum": ["TASK_INPUT", "TASK_RESULT", "FEEDBACK", "EXECUTION_RECORD", "SOURCE_EXCERPT"]
+                  },
+                  "text": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 8000,
+                    "pattern": "\\S"
+                  },
+                  "complete": {
+                    "type": "boolean"
+                  }
+                },
+                "required": ["id", "kind", "text", "complete"],
+                "additionalProperties": false
+              },
+              "minItems": 1,
+              "maxItems": 8
+            },
+            "existing": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "versionId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160,
+                    "pattern": "\\S"
+                  },
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 600,
+                    "pattern": "\\S"
+                  },
+                  "steps": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 800,
+                      "pattern": "\\S"
+                    },
+                    "minItems": 1,
+                    "maxItems": 10,
+                    "uniqueItems": true
+                  },
+                  "applicable": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 300,
+                      "pattern": "\\S"
+                    },
+                    "minItems": 1,
+                    "maxItems": 8,
+                    "uniqueItems": true
+                  },
+                  "excluded": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 300,
+                      "pattern": "\\S"
+                    },
+                    "minItems": 1,
+                    "maxItems": 8,
+                    "uniqueItems": true
+                  }
+                },
+                "required": ["versionId", "title", "summary", "steps", "applicable", "excluded"],
+                "additionalProperties": false
+              },
+              "minItems": 0,
+              "maxItems": 5
+            },
+            "protectedValues": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 300,
+                "pattern": "\\S"
+              },
+              "minItems": 0,
+              "maxItems": 100,
+              "uniqueItems": true
+            }
+          },
+          "required": ["id", "lease", "tenant", "source", "inputs", "existing", "protectedValues"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["contractVersion", "job"],
+      "additionalProperties": false
+    },
+    "Result": {
+      "type": "object",
+      "properties": {
+        "contractVersion": {
+          "const": "1.0"
+        },
+        "engineVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "\\S"
+        },
+        "executionClass": {
+          "enum": ["live", "verification"]
+        },
+        "runId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "lease": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "source": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "admitted": {
+          "const": false
+        },
+        "outcome": {
+          "enum": ["QUALIFIED", "SKIPPED", "REJECTED", "FAILED", "CANCELLED"]
+        },
+        "code": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80,
+              "pattern": "\\S"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "candidate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Candidate"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "review": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Review"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Stage"
+          },
+          "minItems": 1,
+          "maxItems": 2,
+          "prefixItems": [
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/Stage"
+                },
+                {
+                  "properties": {
+                    "stage": {
+                      "const": "EXTRACT"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/Stage"
+                },
+                {
+                  "properties": {
+                    "stage": {
+                      "const": "VERIFY"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "required": [
+        "contractVersion",
+        "engineVersion",
+        "executionClass",
+        "runId",
+        "lease",
+        "source",
+        "admitted",
+        "outcome",
+        "code",
+        "candidate",
+        "review",
+        "stages"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "QUALIFIED"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "candidate": {
+                "$ref": "#/$defs/Candidate"
+              },
+              "review": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/Review"
+                  },
+                  {
+                    "properties": {
+                      "checks": {
+                        "properties": {
+                          "grounded": {
+                            "const": "PASS"
+                          },
+                          "reusable": {
+                            "const": "PASS"
+                          },
+                          "bounded": {
+                            "const": "PASS"
+                          },
+                          "privacySafe": {
+                            "const": "PASS"
+                          },
+                          "novel": {
+                            "const": "PASS"
+                          }
+                        }
+                      },
+                      "basis": {
+                        "enum": ["OBSERVED_EXECUTION", "FEEDBACK_CORRECTION"]
+                      }
+                    }
+                  }
+                ]
+              },
+              "stages": {
+                "minItems": 2,
+                "items": {
+                  "properties": {
+                    "modelCalls": {
+                      "minimum": 1
+                    }
+                  }
+                }
+              },
+              "code": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "candidate": {
+                "type": "null"
+              },
+              "code": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "enum": ["FAILED", "CANCELLED", "SKIPPED"]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "review": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "SKIPPED"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "stages": {
+                "maxItems": 1
+              },
+              "code": {
+                "enum": [
+                  "NO_REUSABLE_METHOD",
+                  "DUPLICATE",
+                  "PREFERENCE_ONLY",
+                  "PRODUCT_ISSUE",
+                  "INSUFFICIENT_EVIDENCE"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "REJECTED"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "code": {
+                "enum": ["PROTECTED_CONTENT", "QUALITY_NOT_ESTABLISHED"]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "FAILED"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "code": {
+                "const": "EXPERIENCE_ANALYSIS_FAILED"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "CANCELLED"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "code": {
+                "const": "CANCELLED"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

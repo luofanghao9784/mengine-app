@@ -4,11 +4,17 @@ import { timingSafeEqual } from 'node:crypto';
 import { AgentTasks } from './runtime/agent-task.js';
 import { RuntimeError } from './runtime/ports.js';
 import type { CompanyAnalysis } from './runtime/company-analysis.js';
+import type { ExperienceAnalysis } from './runtime/experience-analysis.js';
 const uuid = (v: unknown): v is string =>
   typeof v === 'string' && /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(v);
 /** Authenticated internal task transport. Agent execution requires an explicitly supplied runtime. */
 export function createEngineServer(
-  options: { token?: string; agent?: AgentTasks; company?: CompanyAnalysis } = {},
+  options: {
+    token?: string;
+    agent?: AgentTasks;
+    company?: CompanyAnalysis;
+    experience?: ExperienceAnalysis;
+  } = {},
 ) {
   const enabled = !!options.token && options.token.length >= 32;
   return createServer(async (request, response) => {
@@ -22,32 +28,39 @@ export function createEngineServer(
     const expected = Buffer.from(`Bearer ${options.token}`);
     const provided = Buffer.from(request.headers.authorization || '');
     const authorized = enabled && provided.length === expected.length && timingSafeEqual(provided, expected);
-    if (request.url?.startsWith('/internal/v1/company-information')) {
+    const feature = request.url?.startsWith('/internal/v1/experience')
+      ? { path: '/internal/v1/experience', runtime: options.experience, prefix: 'EXPERIENCE' }
+      : request.url?.startsWith('/internal/v1/company-information')
+        ? { path: '/internal/v1/company-information', runtime: options.company, prefix: 'COMPANY' }
+        : undefined;
+    if (feature) {
       if (!authorized) return send(401, { code: 'UNAUTHORIZED' });
-      if (request.method === 'GET' && request.url === '/internal/v1/company-information/runtime')
+      if (request.method === 'GET' && request.url === feature.path + '/runtime')
         return send(200, {
           contractVersion: '1.0',
           engineVersion: ENGINE_VERSION,
-          configured: !!options.company,
-          executionClass: options.company?.config.executionClass ?? null,
+          configured: !!feature.runtime,
+          executionClass: feature.runtime?.config.executionClass ?? null,
         });
-      if (!options.company) return send(503, { code: 'MODEL_NOT_CONFIGURED' });
-      const match = /^\/internal\/v1\/company-information\/results\/([0-9a-f-]+)\/([0-9a-f-]+)$/.exec(
-        request.url,
+      if (!feature.runtime) return send(503, { code: 'MODEL_NOT_CONFIGURED' });
+      const match = new RegExp('^' + feature.path + '/results/([0-9a-f-]+)/([0-9a-f-]+)$').exec(
+        request.url ?? '',
       );
       if (match && uuid(match[1]) && uuid(match[2])) {
         if (request.method === 'DELETE') {
-          options.company.cancel(match[1], match[2]);
+          feature.runtime.cancel(match[1], match[2]);
           return send(200, { accepted: true });
         }
         if (request.method === 'GET') {
-          const result = options.company.lookup(match[1], match[2]);
+          const result = feature.runtime.lookup(match[1], match[2]);
           return result
             ? send(200, result)
-            : send(options.company.known(match[1], match[2]) ? 202 : 404, { code: 'COMPANY_RESULT_PENDING' });
+            : send(feature.runtime.known(match[1], match[2]) ? 202 : 404, {
+                code: feature.prefix + '_RESULT_PENDING',
+              });
         }
       }
-      if (request.method !== 'POST' || request.url !== '/internal/v1/company-information/results')
+      if (request.method !== 'POST' || request.url !== feature.path + '/results')
         return send(404, { code: 'NOT_FOUND' });
       if (request.headers['x-dreamcore-engine-version'] !== ENGINE_VERSION)
         return send(409, { code: 'TASK_RUNTIME_INCOMPATIBLE' });
@@ -62,11 +75,14 @@ export function createEngineServer(
           }
           parts.push(part);
         }
-        const result = await options.company.run(JSON.parse(Buffer.concat(parts).toString('utf8')));
+        const result = await feature.runtime.run(JSON.parse(Buffer.concat(parts).toString('utf8')));
         if (!response.destroyed) return send(200, result);
       } catch (error) {
-        const code = error instanceof RuntimeError ? error.code : 'INVALID_COMPANY_REQUEST';
-        return send(code === 'ENGINE_BUSY' ? 429 : code === 'COMPANY_ATTEMPT_CONFLICT' ? 409 : 400, { code });
+        const code = error instanceof RuntimeError ? error.code : 'INVALID_' + feature.prefix + '_REQUEST';
+        return send(
+          code === 'ENGINE_BUSY' ? 429 : code === feature.prefix + '_ATTEMPT_CONFLICT' ? 409 : 400,
+          { code },
+        );
       }
       return;
     }

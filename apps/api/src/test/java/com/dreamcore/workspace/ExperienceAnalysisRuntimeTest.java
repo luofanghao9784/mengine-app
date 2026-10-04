@@ -1,0 +1,46 @@
+package com.dreamcore.workspace;
+import com.dreamcore.workspace.experience.ExperienceAnalysisRuntime;
+import com.sun.net.httpserver.HttpServer;
+import java.net.*;import java.util.*;import java.util.concurrent.atomic.*;
+import org.junit.jupiter.api.*;import static org.junit.jupiter.api.Assertions.*;
+import tools.jackson.databind.json.JsonMapper;
+
+class ExperienceAnalysisRuntimeTest {
+ final JsonMapper json=new JsonMapper();HttpServer server;String base;final String token="synthetic-experience-runtime-012345678901234567890";
+ final AtomicReference<String> response=new AtomicReference<>();final AtomicInteger code=new AtomicInteger(200),posts=new AtomicInteger();
+ ExperienceAnalysisRuntime runtime;ExperienceAnalysisRuntime.Job job;
+ @BeforeEach void start()throws Exception{job=ExperienceAnalysisHarnessIT.job();server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);server.createContext("/internal/v1/experience",exchange->{
+  if(exchange.getRequestMethod().equals("POST"))posts.incrementAndGet();String body=exchange.getRequestURI().getPath().endsWith("/runtime")?"{\"contractVersion\":\"1.0\",\"engineVersion\":\"synthetic-v1\",\"configured\":true,\"executionClass\":\"verification\"}":response.get();
+  var bytes=body.getBytes(java.nio.charset.StandardCharsets.UTF_8);exchange.sendResponseHeaders(code.get(),bytes.length);exchange.getResponseBody().write(bytes);exchange.close();
+ });server.start();base="http://127.0.0.1:"+server.getAddress().getPort();runtime=new ExperienceAnalysisRuntime(base,token,"verification");response.set(json.writeValueAsString(receipt()));}
+ @AfterEach void stop(){server.stop(0);}
+ Map<String,Object> receipt(){
+  var evidence=List.of(Map.of("inputId",ExperienceAnalysisHarnessIT.id(6),"quote","两期覆盖范围不一致，未计算不可靠的增长率"));
+  var candidate=new LinkedHashMap<String,Object>();candidate.put("targetVersionId",null);candidate.put("title","合成方法");candidate.put("summary","先比较覆盖范围");candidate.put("steps",List.of("检查覆盖范围"));candidate.put("applicable",List.of("固定期间"));candidate.put("excluded",List.of("缺少口径"));candidate.put("tags",List.of("比较"));candidate.put("evidence",evidence);
+  var review=Map.of("checks",Map.of("grounded","PASS","reusable","PASS","bounded","PASS","privacySafe","PASS","novel","PASS"),"basis","OBSERVED_EXECUTION","evidence",evidence);
+  var result=new LinkedHashMap<String,Object>();result.put("contractVersion","1.0");result.put("engineVersion","synthetic-v1");result.put("executionClass","verification");result.put("runId",job.id());result.put("lease",job.lease());result.put("source",job.source());result.put("admitted",false);result.put("outcome","QUALIFIED");result.put("code",null);result.put("candidate",candidate);result.put("review",review);result.put("stages",List.of(stage("EXTRACT"),stage("VERIFY")));return result;
+ }
+ Map<String,Object> stage(String name){var s=new LinkedHashMap<String,Object>();s.put("stage",name);s.put("modelName","synthetic");s.put("modelCalls",1);s.put("inputTokens",null);s.put("outputTokens",null);return s;}
+ void reject(Map<String,Object> r){response.set(json.writeValueAsString(r));var ex=assertThrows(ExperienceAnalysisRuntime.Failure.class,()->runtime.recover(job,"synthetic-v1"));assertEquals("EXPERIENCE_RESULT_UNKNOWN",ex.code);assertTrue(ex.sent);}
+ @Test void wrongSourceLeaseRuntimeOrPrematureAdmissionCannotBeAccepted(){for(String field:List.of("source","lease","runId","engineVersion","executionClass","admitted")){var r=receipt();r.put(field,field.equals("admitted")?true:field.endsWith("Version")?"wrong":field.equals("executionClass")?"live":UUID.randomUUID());reject(r);}}
+ @Test void partialChecksOrUnreliableEvidenceCannotQualify(){
+  for(String quality:List.of("UNKNOWN","FAIL")){var r=receipt();r.put("review",Map.of("checks",Map.of("grounded","PASS","reusable","PASS","bounded","PASS","privacySafe",quality,"novel","PASS"),"basis","OBSERVED_EXECUTION","evidence",List.of(Map.of("inputId",ExperienceAnalysisHarnessIT.id(6),"quote","两期覆盖范围不一致"))));reject(r);}
+  var r=receipt();r.put("review",Map.of("checks",Map.of("grounded","PASS","reusable","PASS","bounded","PASS","privacySafe","PASS","novel","PASS"),"basis","REPORTED_ONLY","evidence",List.of(Map.of("inputId",ExperienceAnalysisHarnessIT.id(6),"quote","两期覆盖范围不一致"))));reject(r);
+ }
+ @SuppressWarnings("unchecked") @Test void fabricatedQuotesAndPrivateCandidateTextAreFencedAgainByPlatform(){
+  for(String title:List.of("合成客户甲","合成\u200b客户甲","user@example.com")){var r=receipt();((Map<String,Object>)r.get("candidate")).put("title",title);reject(r);}
+  var r=receipt();((Map<String,Object>)r.get("candidate")).put("evidence",List.of(Map.of("inputId",ExperienceAnalysisHarnessIT.id(6),"quote","无此原文")));reject(r);
+ }
+ @Test void missingReviewerAndHalfKnownUsageAreNotValidReceipts(){
+  var r=receipt();r.put("stages",List.of(stage("EXTRACT")));reject(r);
+  r=receipt();var second=stage("VERIFY");second.put("inputTokens",10);r.put("stages",List.of(stage("EXTRACT"),second));reject(r);
+  r=receipt();second=stage("VERIFY");second.put("modelCalls",0);r.put("stages",List.of(stage("EXTRACT"),second));reject(r);
+ }
+ @Test void pendingAndUnknownRecoveriesDoNotSendAnotherPost(){
+  code.set(202);assertNull(runtime.recover(job,"synthetic-v1"));code.set(404);assertThrows(ExperienceAnalysisRuntime.Failure.class,()->runtime.recover(job,"synthetic-v1"));assertEquals(0,posts.get());
+ }
+ @Test void modelOffAndUnsafeEndpointsFailBeforeDispatch(){
+  assertFalse(new ExperienceAnalysisRuntime(base,token,"off").configured());assertThrows(ExperienceAnalysisRuntime.Failure.class,()->new ExperienceAnalysisRuntime(base,token,"off").preflight());
+  for(String path:List.of("file:///tmp/engine","https://user:password@example.test","https://example.test/path","https://example.test?query"))assertThrows(IllegalArgumentException.class,()->new ExperienceAnalysisRuntime(path,token,"verification"));assertEquals(0,posts.get());
+ }
+}
