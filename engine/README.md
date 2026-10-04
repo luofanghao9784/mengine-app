@@ -110,3 +110,15 @@ npm --prefix engine test
 ./apps/api/mvnw -f apps/api/pom.xml -q -Dtest=ExperienceAnalysisRuntimeTest,ExperienceAnalysisHarnessIT test
 npm run test:contracts
 ```
+
+## 通用经验清洗与独立核验（B4 内部协议 1.0，工程准备）
+
+引擎 `0.17.0` 新增可选 `/internal/v1/experience-generalization/runtime`、POST `/results` 及 GET/DELETE `/results/{run}/{lease}`，复用服务间认证和编译版本围栏。输入限定为一个获权、固定版本的已核验方法及敏感值列表，不接受原任务、完整会话、附件或来源链接字段。具体结构见[契约](../contracts/engine-api/experience-generalization.schema.json)。来源授权和原核验真实性仍由后续平台派发器执行；内部协议接通不等于总库已开放。
+
+CLEAN 提炼清洗，PRIVACY 以新 Harness 会话对照原方法与清洗结果，QUALITY 再以新会话只读取清洗后的方法。第三阶段没有原文读取工具，上下文不含企业/来源标识、敏感值列表或前两阶段历史。每阶段最多 6 次模型、12 次工具、45 秒；该运行时最多 2 个并行任务。三个会话使用同一配置的模型，不声称供应商独立或客观业务评测。
+
+所有文本字段须通过已知敏感值和常见标识符检查；隐私检查另覆盖组合识别、来源支持、必要条件保留和依据性质，通用质量检查覆盖复用性、边界、清晰度、依据诚实性和可识别细节。不明或失败不形成可用方法。不能保留意义的私有经验正常跳过，不转成人工审核。
+
+仅 QUALIFIED 回执包含清洗后的 `method`，其他结果不含方法正文；检查只返回有限枚举，不返回原文引用、自由文本评价或来源详细信息。回执本身仍含内部运行身份，**不得整包展示或存入公开总库**。平台必须复核当前来源/权限、live 证据性质和版本冲突后再准入，`admitted` 始终 false。使用默认模型配置不会主动扫描或自动发送任务；持久队列、总库准入、检索采用与两端页面尚待接通。
+
+每次 run/lease 固定输入，相同请求复用同次执行，变更输入拒绝；已完成回执保留 10 分钟，未知只查询不重放。新 Java 运行时校验三阶段与全部检查、身份/版本、原依据类型、额外私有字段及敏感值。真实用量缺失保持 null。`npm run test:engine` 和 `./apps/api/mvnw -f apps/api/pom.xml -q -Dtest=ExperienceGeneralizationRuntimeTest,ExperienceAnalysisRuntimeTest test` 覆盖合成实际 Harness 与真实本机 HTTP。没有付费模型调用；正则与合成检查不等于真实隐私/质量验收。

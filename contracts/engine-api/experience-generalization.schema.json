@@ -1,0 +1,523 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dreamcore:experience-generalization:1.0",
+  "description": "Internal enterprise method generalization: separate CLEAN, PRIVACY and QUALITY sessions. Only QUALITY receives the cleaned method alone. Original must be an authorized fixed automatically checked method; no raw task/conversation/attachment inputs. Receipt is private operational data, never a platform UI or a public library entry. QUALIFIED does not admit; backend must recheck authorization, live provenance, fixed source, conflicts and withdrawal. Method is the sole cleaned content projection. No human approval workflow.",
+  "$defs": {
+    "Method": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "\\S"
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 600,
+          "pattern": "\\S"
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 800,
+            "pattern": "\\S"
+          },
+          "minItems": 1,
+          "maxItems": 10,
+          "uniqueItems": true
+        },
+        "applicable": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "\\S"
+          },
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true
+        },
+        "excluded": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "\\S"
+          },
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40,
+            "pattern": "\\S"
+          },
+          "minItems": 1,
+          "maxItems": 10,
+          "uniqueItems": true
+        },
+        "basis": {
+          "enum": ["OBSERVED_EXECUTION", "FEEDBACK_CORRECTION"]
+        }
+      },
+      "required": ["title", "summary", "steps", "applicable", "excluded", "tags", "basis"],
+      "additionalProperties": false
+    },
+    "Privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identifiersRemoved",
+        "combinationsSafe",
+        "sourceSupported",
+        "conditionsPreserved",
+        "claimsPreserved"
+      ],
+      "properties": {
+        "identifiersRemoved": {
+          "enum": ["PASS", "FAIL", "UNKNOWN"]
+        },
+        "combinationsSafe": {
+          "enum": ["PASS", "FAIL", "UNKNOWN"]
+        },
+        "sourceSupported": {
+          "enum": ["PASS", "FAIL", "UNKNOWN"]
+        },
+        "conditionsPreserved": {
+          "enum": ["PASS", "FAIL", "UNKNOWN"]
+        },
+        "claimsPreserved": {
+          "enum": ["PASS", "FAIL", "UNKNOWN"]
+        }
+      }
+    },
+    "Quality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reusable", "bounded", "clear", "evidenceHonest", "nonIdentifying"],
+      "properties": {
+        "reusable": {
+          "enum": ["PASS", "FAIL", "UNKNOWN"]
+        },
+        "bounded": {
+          "enum": ["PASS", "FAIL", "UNKNOWN"]
+        },
+        "clear": {
+          "enum": ["PASS", "FAIL", "UNKNOWN"]
+        },
+        "evidenceHonest": {
+          "enum": ["PASS", "FAIL", "UNKNOWN"]
+        },
+        "nonIdentifying": {
+          "enum": ["PASS", "FAIL", "UNKNOWN"]
+        }
+      }
+    },
+    "Stage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stage", "modelName", "modelCalls", "inputTokens", "outputTokens"],
+      "properties": {
+        "stage": {
+          "enum": ["CLEAN", "PRIVACY", "QUALITY"]
+        },
+        "modelName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "modelCalls": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 6
+        },
+        "inputTokens": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "outputTokens": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "inputTokens": {
+                "type": "null"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "outputTokens": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "outputTokens": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "Request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contractVersion", "job"],
+      "properties": {
+        "contractVersion": {
+          "const": "1.0"
+        },
+        "job": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "lease", "tenant", "source", "original", "protectedValues"],
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "lease": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "tenant": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "source": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "original": {
+              "$ref": "#/$defs/Method"
+            },
+            "protectedValues": {
+              "type": "array",
+              "maxItems": 100,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 300,
+                "pattern": "\\S"
+              }
+            }
+          }
+        }
+      }
+    },
+    "Result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contractVersion",
+        "engineVersion",
+        "executionClass",
+        "runId",
+        "lease",
+        "source",
+        "admitted",
+        "outcome",
+        "code",
+        "method",
+        "privacy",
+        "quality",
+        "stages"
+      ],
+      "properties": {
+        "contractVersion": {
+          "const": "1.0"
+        },
+        "engineVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "executionClass": {
+          "enum": ["live", "verification"]
+        },
+        "runId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "lease": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "source": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "admitted": {
+          "const": false
+        },
+        "outcome": {
+          "enum": ["QUALIFIED", "SKIPPED", "REJECTED", "FAILED", "CANCELLED"]
+        },
+        "code": {
+          "type": ["string", "null"]
+        },
+        "method": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Method"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "privacy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Privacy"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "quality": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Quality"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stages": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "items": {
+            "$ref": "#/$defs/Stage"
+          },
+          "prefixItems": [
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/Stage"
+                },
+                {
+                  "properties": {
+                    "stage": {
+                      "const": "CLEAN"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/Stage"
+                },
+                {
+                  "properties": {
+                    "stage": {
+                      "const": "PRIVACY"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/Stage"
+                },
+                {
+                  "properties": {
+                    "stage": {
+                      "const": "QUALITY"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "QUALIFIED"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "code": {
+                "type": "null"
+              },
+              "method": {
+                "$ref": "#/$defs/Method"
+              },
+              "privacy": {
+                "type": "object",
+                "properties": {
+                  "identifiersRemoved": {
+                    "const": "PASS"
+                  },
+                  "combinationsSafe": {
+                    "const": "PASS"
+                  },
+                  "sourceSupported": {
+                    "const": "PASS"
+                  },
+                  "conditionsPreserved": {
+                    "const": "PASS"
+                  },
+                  "claimsPreserved": {
+                    "const": "PASS"
+                  }
+                }
+              },
+              "quality": {
+                "type": "object",
+                "properties": {
+                  "reusable": {
+                    "const": "PASS"
+                  },
+                  "bounded": {
+                    "const": "PASS"
+                  },
+                  "clear": {
+                    "const": "PASS"
+                  },
+                  "evidenceHonest": {
+                    "const": "PASS"
+                  },
+                  "nonIdentifying": {
+                    "const": "PASS"
+                  }
+                }
+              },
+              "stages": {
+                "minItems": 3,
+                "items": {
+                  "properties": {
+                    "modelCalls": {
+                      "minimum": 1
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "not": {
+                  "const": "QUALIFIED"
+                }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "method": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "SKIPPED"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "code": {
+                "enum": ["REQUIRES_PRIVATE_CONTEXT", "INSUFFICIENT_EVIDENCE", "NO_GENERAL_VALUE"]
+              },
+              "privacy": {
+                "type": "null"
+              },
+              "quality": {
+                "type": "null"
+              },
+              "stages": {
+                "maxItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "REJECTED"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "code": {
+                "enum": ["PROTECTED_CONTENT", "PRIVACY_NOT_ESTABLISHED", "QUALITY_NOT_ESTABLISHED"]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "FAILED"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "code": {
+                "const": "GENERALIZATION_FAILED"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "CANCELLED"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "code": {
+                "const": "CANCELLED"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

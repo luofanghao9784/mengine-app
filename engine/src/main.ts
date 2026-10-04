@@ -3,6 +3,7 @@ import { AgentTasks } from './runtime/agent-task.js';
 import { PublicReader, SearxSearch } from './runtime/public-web.js';
 import { configuredModel } from './runtime/model-config.js';
 import { CompanyAnalysis } from './runtime/company-analysis.js';
+import { ExperienceGeneralization } from './runtime/experience-generalization.js';
 import { ExperienceAnalysis } from './runtime/experience-analysis.js';
 
 if (process.env.AGENT_CANDIDATE_TRIALS_ENABLED === 'true')
@@ -43,7 +44,20 @@ const experience = model
       createModel: model.createModel,
     })
   : undefined;
-const server = createEngineServer({ token: process.env.TASK_ENGINE_TOKEN, agent, company, experience });
+const generalization = model
+  ? new ExperienceGeneralization({
+      executionClass: 'live',
+      modelName: model.modelName,
+      createModel: model.createModel,
+    })
+  : undefined;
+const server = createEngineServer({
+  token: process.env.TASK_ENGINE_TOKEN,
+  agent,
+  company,
+  experience,
+  generalization,
+});
 server.listen(port, host, () => {
   console.log(`Dreamcore engine listening on ${host}:${port}; model gateway ${agent ? 'configured' : 'off'}`);
 });
@@ -52,6 +66,7 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     agent?.stop();
     company?.stop();
     experience?.stop();
+    generalization?.stop();
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(1), 5000).unref();
   });

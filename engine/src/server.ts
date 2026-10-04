@@ -4,6 +4,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { AgentTasks } from './runtime/agent-task.js';
 import { RuntimeError } from './runtime/ports.js';
 import type { CompanyAnalysis } from './runtime/company-analysis.js';
+import type { ExperienceGeneralization } from './runtime/experience-generalization.js';
 import type { ExperienceAnalysis } from './runtime/experience-analysis.js';
 const uuid = (v: unknown): v is string =>
   typeof v === 'string' && /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(v);
@@ -14,6 +15,7 @@ export function createEngineServer(
     agent?: AgentTasks;
     company?: CompanyAnalysis;
     experience?: ExperienceAnalysis;
+    generalization?: ExperienceGeneralization;
   } = {},
 ) {
   const enabled = !!options.token && options.token.length >= 32;
@@ -28,11 +30,17 @@ export function createEngineServer(
     const expected = Buffer.from(`Bearer ${options.token}`);
     const provided = Buffer.from(request.headers.authorization || '');
     const authorized = enabled && provided.length === expected.length && timingSafeEqual(provided, expected);
-    const feature = request.url?.startsWith('/internal/v1/experience')
-      ? { path: '/internal/v1/experience', runtime: options.experience, prefix: 'EXPERIENCE' }
-      : request.url?.startsWith('/internal/v1/company-information')
-        ? { path: '/internal/v1/company-information', runtime: options.company, prefix: 'COMPANY' }
-        : undefined;
+    const feature = request.url?.startsWith('/internal/v1/experience-generalization')
+      ? {
+          path: '/internal/v1/experience-generalization',
+          runtime: options.generalization,
+          prefix: 'GENERALIZATION',
+        }
+      : request.url?.startsWith('/internal/v1/experience')
+        ? { path: '/internal/v1/experience', runtime: options.experience, prefix: 'EXPERIENCE' }
+        : request.url?.startsWith('/internal/v1/company-information')
+          ? { path: '/internal/v1/company-information', runtime: options.company, prefix: 'COMPANY' }
+          : undefined;
     if (feature) {
       if (!authorized) return send(401, { code: 'UNAUTHORIZED' });
       if (request.method === 'GET' && request.url === feature.path + '/runtime')
