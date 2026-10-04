@@ -20,13 +20,14 @@ SET SESSION TRANSACTION READ ONLY;
 START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY;
 SET @cutoff=NOW();
 SELECT JSON_OBJECT('readonly',@@session.transaction_read_only,'coverageThrough',DATE_FORMAT(CONVERT_TZ(@cutoff,'+08:00','+00:00'),'%Y-%m-%dT%H:%i:%sZ'));
-SELECT JSON_ARRAY(DATE_FORMAT(p.confirmed_at,'%Y-%m-%d'),s.name,CAST(COUNT(*) AS CHAR),CAST(SUM(p.paid_amount_cents) AS CHAR),CAST(SUM(p.status!='finance_confirmed') AS CHAR),CAST(SUM(IF(p.status!='finance_confirmed',p.paid_amount_cents,0)) AS CHAR))
+SELECT JSON_ARRAY(period,name,CAST(payments AS CHAR),CAST(receipts AS CHAR),CAST(pending_count AS CHAR),CAST(pending_amount AS CHAR)) FROM (
+SELECT DATE_FORMAT(p.confirmed_at,'%Y-%m-%d') AS period,s.id AS store_id,s.name,COUNT(*) AS payments,SUM(p.paid_amount_cents) AS receipts,SUM(p.status!='finance_confirmed') AS pending_count,SUM(IF(p.status!='finance_confirmed',p.paid_amount_cents,0)) AS pending_amount
 FROM payment_orders p JOIN full_orders f ON f.id=p.full_order_id JOIN stores s ON s.id=p.store_id
 WHERE f.deleted_at IS NULL AND f.order_status!='canceled'
 AND p.status IN ('confirmed_pending_voucher','voucher_uploaded','finance_rejected','finance_confirmed')
 AND p.confirmed_at>=DATE_SUB(DATE(@cutoff),INTERVAL 89 DAY) AND p.confirmed_at<@cutoff
 GROUP BY DATE_FORMAT(p.confirmed_at,'%Y-%m-%d'),s.id,s.name
-ORDER BY DATE_FORMAT(p.confirmed_at,'%Y-%m-%d'),s.id;
+) AS aggregates ORDER BY period,store_id;
 ROLLBACK;
 """
 
