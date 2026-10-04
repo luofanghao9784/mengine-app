@@ -789,3 +789,22 @@
 .platform-account-history { border-top: 1px solid var(--line); padding-top: 20px; }
 .platform-account-history summary { cursor: pointer; font-size: 13px; color: var(--muted); }
 .platform-account-history summary span { margin-left: 10px; font-size: 12px; }
+/* 桌面企业概览：压缩纵向节奏，完整呈现数据与管理操作。 */
+.platform-overview-layout .enterprise-overview-cards { gap: 14px; }
+.platform-overview-layout .enterprise-info-card,
+.platform-overview-layout .enterprise-metric-card,
+.platform-overview-layout .enterprise-usage-card { padding: 18px 20px; }
+.platform-overview-layout .enterprise-info-card dl { margin-top: 14px; }
+.platform-overview-layout .enterprise-info-card dd { margin-top: 6px; }
+.platform-overview-layout .enterprise-metric-grid { gap: 14px; }
+.platform-overview-layout .enterprise-metric-card h3 { margin-bottom: 12px; }
+.platform-overview-layout .enterprise-metric-card > strong { font-size: 26px; }
+.platform-overview-layout .enterprise-metric-card p { margin-top: 8px; }
+.platform-overview-layout .enterprise-usage-metrics { margin-top: 18px; gap: 24px; }
+.platform-overview-layout .enterprise-usage-metrics > div { gap: 8px; }
+.platform-overview-layout .enterprise-usage-metrics strong { font-size: 26px; }
+.platform-overview-layout .enterprise-usage-note { margin-top: 16px; padding-top: 12px; }
+.admin-platform .platform-overview-layout .platform-enterprise-management { margin-top: 14px; padding: 16px 20px; }
+.admin-platform .platform-overview-layout .platform-enterprise-management h3 { margin-bottom: 12px; }
+.admin-platform .platform-overview-layout .platform-management-row { padding: 0; }
+.admin-platform .platform-overview-layout .platform-management-row p { margin-top: 6px; }
