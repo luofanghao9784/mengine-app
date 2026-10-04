@@ -19,7 +19,7 @@ import tools.jackson.databind.json.JsonMapper;
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,
- properties={"dreamcore.auth.ip-attempts=1000","dreamcore.auth.email-attempts=1000"})
+ properties={"dreamcore.auth.ip-attempts=1000","dreamcore.auth.email-attempts=1000","dreamcore.platform.cookie-name=DREAMCORE_PLATFORM_SYNTHETIC"})
 class PlatformIdentityIntegrationTest {
     private static final JsonMapper JSON=new JsonMapper();
     private static final String PLATFORM="/api/platform-admin/v1/auth";
@@ -51,6 +51,28 @@ class PlatformIdentityIntegrationTest {
         HttpResponse<String> post(String realm,String action,Object body) throws Exception { return send("POST",realm+action,body,csrf(realm)); }
         int get(String path) throws Exception { return send("GET",path,null,null).statusCode(); }
     }
+    @Test void bootstrapWithLegacyCustomerRoleCreatesIndependentOperatorWithoutChangingCustomer() throws Exception {
+        String login="legacy-"+UUID.randomUUID()+"@example.test";
+        String customerPassword="synthetic-customer-legacy",platformPassword="synthetic-platform-new";
+        UUID customer=UUID.randomUUID();String before=passwords.encode(customerPassword);
+        db.update("INSERT INTO accounts(id,email,display_name,password_hash) VALUES (?,?,?,?)",customer,login,"旧企业账号",before);
+        db.update("INSERT INTO platform_roles(account_id,role) VALUES (?,'PLATFORM_ADMIN')",customer);
+        provisionedPlatform=identities.bootstrap(login,"独立总台账号",platformPassword);
+        assertNotEquals(customer,provisionedPlatform);
+        assertEquals(before,db.queryForObject("SELECT password_hash FROM accounts WHERE id=?",String.class,customer));
+        assertEquals(0,db.queryForObject("SELECT count(*) FROM tenant_memberships WHERE account_id=?",Integer.class,provisionedPlatform));
+        var browser=new Browser();
+        assertEquals(200,browser.post(CUSTOMER,"/login",Map.of("email",login,"password",customerPassword)).statusCode());
+        assertEquals(401,browser.get(PLATFORM+"/me"));
+        assertEquals(401,browser.post(PLATFORM,"/login",Map.of("username",login,"password",customerPassword)).statusCode());
+        assertEquals(200,browser.post(PLATFORM,"/login",Map.of("username",login,"password",platformPassword)).statusCode());
+        assertEquals(customer.toString(),JSON.readTree(browser.send("GET","/api/v1/me",null,null).body()).get("account").get("id").asString());
+        db.update("DELETE FROM platform_roles WHERE account_id=?",customer);
+    }
+    @Test void deploymentCannotConfigureInvalidOrSharedCustomerCookieName() {
+        assertThrows(IllegalArgumentException.class,()->new com.dreamcore.workspace.identity.PlatformIdentity(db,passwords,identities,null,null,"bad;name","CUSTOMER"));
+        assertThrows(IllegalArgumentException.class,()->new com.dreamcore.workspace.identity.PlatformIdentity(db,passwords,identities,null,null,"SAME","SAME"));
+    }
     @Test void separateCredentialsCookiesCsrfRevocationAndLogout() throws Exception {
         String login="platform-"+UUID.randomUUID()+"@example.test";
         String customerPassword="customer-synthetic-123",platformPassword="platform-synthetic-456";
@@ -70,6 +92,11 @@ class PlatformIdentityIntegrationTest {
         assertEquals(403,browser.send("POST",PLATFORM+"/login",Map.of("username",login,"password",platformPassword),browser.csrf(CUSTOMER)).statusCode());
         var signedIn=browser.post(PLATFORM,"/login",Map.of("username",login,"password",platformPassword));
         assertEquals(200,signedIn.statusCode(),signedIn.body());
+        String issuedCookie=signedIn.headers().firstValue("set-cookie").orElseThrow();
+        assertTrue(issuedCookie.startsWith("DREAMCORE_PLATFORM_SYNTHETIC="));
+        assertTrue(issuedCookie.contains("Path=/api/platform-admin/"));
+        assertTrue(issuedCookie.contains("HttpOnly"));
+        assertTrue(issuedCookie.contains("SameSite=Strict"));
         assertEquals(platform.toString(),JSON.readTree(signedIn.body()).get("account").get("id").asString());
         assertEquals(0,JSON.readTree(signedIn.body()).get("memberships").size());
         assertEquals(200,browser.get("/api/platform-admin/v1/overview"));

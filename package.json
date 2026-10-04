@@ -30,6 +30,7 @@
     "trial:status": "python3 scripts/local/trial.py status",
     "trial:invitation": "python3 scripts/local/trial.py invitation",
     "test:three-surfaces": "node --experimental-strip-types scripts/verify-three-surfaces.ts",
+    "test:admin-realms": "node --experimental-strip-types scripts/verify-admin-realms.ts",
     "trial:invitations": "python3 scripts/local/trial.py invitations",
     "test:trial-safety": "python3 -m unittest discover -s tests/local -p \"*_test.py\"",
     "test:materials": "node --experimental-strip-types scripts/verify-three-surfaces.ts --materials",

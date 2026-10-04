@@ -16,7 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 /** Platform credentials and cookies never use or invalidate a customer HttpSession. */
 @Service
 public class PlatformIdentity {
-    static final String COOKIE = "DREAMCORE_PLATFORM";
+    private final String cookieName;
     private static final String PATH = "/api/platform-admin/";
     private final JdbcTemplate db;
     private final PasswordEncoder passwords;
@@ -27,7 +27,11 @@ public class PlatformIdentity {
     private final String dummy;
     public record Session(String tokenHash, String csrfHash, UUID actor) {}
     public PlatformIdentity(JdbcTemplate db, PasswordEncoder passwords, IdentityService identities,
-                            IdentityAudit audit, LoginThrottle throttle) {
+                            IdentityAudit audit, LoginThrottle throttle,
+                            @org.springframework.beans.factory.annotation.Value("${dreamcore.platform.cookie-name:DREAMCORE_PLATFORM}") String cookieName,
+                            @org.springframework.beans.factory.annotation.Value("${server.servlet.session.cookie.name:DREAMCORE_SESSION}") String customerCookieName) {
+        if (!cookieName.matches("[A-Za-z0-9_]{1,100}") || cookieName.equals(customerCookieName)) throw new IllegalArgumentException("Invalid or shared platform cookie name");
+        this.cookieName=cookieName;
         this.db=db; this.passwords=passwords; this.identities=identities; this.audit=audit; this.throttle=throttle;
         dummy=passwords.encode(UUID.randomUUID().toString());
     }
@@ -36,14 +40,14 @@ public class PlatformIdentity {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
     private void cookie(HttpServletRequest request, HttpServletResponse response, String value, long seconds) {
-        response.addHeader("Set-Cookie", ResponseCookie.from(COOKIE,value).httpOnly(true)
+        response.addHeader("Set-Cookie", ResponseCookie.from(cookieName,value).httpOnly(true)
             .secure(request.isSecure()).sameSite("Strict").path(PATH).maxAge(seconds).build().toString());
         response.setHeader("Cache-Control","no-store");
     }
     public Session read(HttpServletRequest request) {
         if (request.getCookies()==null) return null;
         for (var cookie:request.getCookies()) {
-            if (!COOKIE.equals(cookie.getName()) || cookie.getValue().length()!=43) continue;
+            if (!cookieName.equals(cookie.getName()) || cookie.getValue().length()!=43) continue;
             var rows=db.query("""
                 SELECT s.token_hash,s.csrf_hash,s.account_id FROM platform_sessions s
                 LEFT JOIN platform_accounts p ON p.account_id=s.account_id
@@ -67,7 +71,7 @@ public class PlatformIdentity {
     public Map<String,String> csrf(HttpServletRequest request,HttpServletResponse response) {
         Session session=read(request); String token=null;
         if(session==null) token=issue(request,response,null,null);
-        else for(var cookie:request.getCookies()) if(COOKIE.equals(cookie.getName())) token=IdentityService.hash("csrf:"+cookie.getValue());
+        else for(var cookie:request.getCookies()) if(cookieName.equals(cookie.getName())) token=IdentityService.hash("csrf:"+cookie.getValue());
         db.update("DELETE FROM platform_sessions WHERE expires_at<=now()");
         response.setHeader("Cache-Control","no-store");
         return Map.of("token",token,"headerName","X-CSRF-TOKEN");

@@ -85,8 +85,21 @@ def available(port):
 
 
 def clean_environment():
-    prefixes = ('SPRING_', 'DATABASE_', 'INVITATION_', 'PHONE_', 'BOOTSTRAP_', 'API_', 'ENGINE_', 'SERVER_', 'MANAGEMENT_', 'DREAMCORE_', 'MATERIAL_', 'BACKUP_', 'OPERATIONS_', 'KNOWLEDGE_', 'TASK_', 'AGENT_', 'PG')
+    prefixes = ('SPRING_', 'DATABASE_', 'INVITATION_', 'PHONE_', 'BOOTSTRAP_', 'API_', 'ENGINE_', 'SERVER_', 'MANAGEMENT_', 'DREAMCORE_', 'MATERIAL_', 'BACKUP_', 'OPERATIONS_', 'KNOWLEDGE_', 'TASK_', 'AGENT_', 'PLATFORM_', 'COMPANY_', 'COLLECTION_', 'EXPERIENCE_', 'GENERAL_EXPERIENCE_', 'PG')
     return {k: v for k, v in os.environ.items() if not k.startswith(prefixes) and k not in ('JAVA_TOOL_OPTIONS', 'JDK_JAVA_OPTIONS')}
+
+
+def platform_login(account):
+    # Existing private trial files used email. This is a login-name compatibility read only:
+    # bootstrap still creates an independent platform principal, never upgrades the customer.
+    login = account.get('loginName') or account.get('email')
+    if not isinstance(login, str) or not login.strip() or not isinstance(account.get('password'), str) or not account['password']:
+        raise TrialError('本地总台账号配置不完整；需要独立管理账号和密码。')
+    return login
+
+
+def platform_initialized(query):
+    return bool(query("SELECT to_regclass('public.platform_accounts')")) and int(query('SELECT count(*) FROM platform_accounts')) > 0
 
 
 def config(root):
@@ -253,7 +266,7 @@ def start(root, model_config=None, reconnect_live=False, phone_local=False):
             settings = {'format': FORMAT, 'workspace': str(WORKSPACE), 'agentMode': mode, 'ports': {'database': database_port, 'api': api_port, 'web': web_port}}
             private_write(root / 'config.json', settings)
             private_write(root / 'database.json', {'password': secrets.token_urlsafe(32)})
-            private_write(root / 'accounts.json', {'platform': {'email': 'platform@trial.example.test', 'password': secrets.token_urlsafe(24)}})
+            private_write(root / 'accounts.json', {'platform': {'loginName': 'platform@trial.example.test', 'realm': 'platform', 'password': secrets.token_urlsafe(24)}})
         settings = config(root)
         # Recheck after locking: a concurrent first start can have created the configuration.
         if restored:
@@ -277,6 +290,7 @@ def start(root, model_config=None, reconnect_live=False, phone_local=False):
         env = {**clean_environment(), 'TASK_ENABLED':'true', 'TASK_ENGINE_TOKEN':engine_token, 'ENGINE_BASE_URL':f'http://127.0.0.1:{engine_port}', 'DATABASE_URL': f"jdbc:postgresql://127.0.0.1:{settings['ports']['database']}/dreamcore_trial", 'DATABASE_USER': 'dreamcore_trial', 'DATABASE_PASSWORD': secret,
                'KNOWLEDGE_ENABLED': str((WORKSPACE / 'workers/parser/.venv/bin/python').exists()).lower(), 'KNOWLEDGE_PARSER_ROOT': str(WORKSPACE / 'workers/parser'), 'MATERIAL_STORAGE_ROOT': str(root / 'objects'), 'SPRING_PROFILES_ACTIVE': 'local', 'INVITATION_DELIVERY': 'local', 'INVITATION_OUTBOX': str(root / 'invitations'), 'API_HOST': '127.0.0.1', 'API_PORT': str(settings['ports']['api']), 'SERVER_SERVLET_SESSION_COOKIE_NAME': 'DREAMCORE_TRIAL_' + hashlib.sha256(str(root).encode()).hexdigest()[:12]}
         env.update({'PHONE_DELIVERY': 'local' if phone_local else 'disabled', 'PHONE_LOCAL_PREVIEW': str(phone_local).lower(), 'PHONE_OUTBOX': str(root / 'phone-sms')})
+        env['PLATFORM_COOKIE_NAME'] = 'DREAMCORE_PLATFORM_TRIAL_' + hashlib.sha256(str(root).encode()).hexdigest()[:12]
         env.update(model_api_env)
         model_status = {'agentMode': mode, 'model': model['model'] if model else None, 'cloudVerifiedByStartup': False}
         private_write(root / 'runtime.json', {'runId': run_id, 'state': 'starting', 'webUrl': f"http://127.0.0.1:{settings['ports']['web']}", **model_status, 'revision': subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'], cwd=WORKSPACE, text=True).strip(), 'apiSha256': hashlib.sha256(jar.read_bytes()).hexdigest()})
@@ -300,17 +314,15 @@ def start(root, model_config=None, reconnect_live=False, phone_local=False):
             if psql(root, settings, "SELECT count(*) FROM pg_database WHERE datname='dreamcore_trial'", log) == '0':
                 psql(root, settings, 'CREATE DATABASE dreamcore_trial', log)
             # Flyway runs before bootstrap. Bootstrap only once; subsequent starts preserve accounts.
-            table = run([executables['psql'], '-h', '127.0.0.1', '-p', str(settings['ports']['database']), '-U', 'dreamcore_trial', '-d', 'dreamcore_trial', '-At', '-c', "SELECT to_regclass('public.platform_roles')"], {**env, 'PGPASSWORD': secret}, log, True)
-            if table:
-                count = run([executables['psql'], '-h', '127.0.0.1', '-p', str(settings['ports']['database']), '-U', 'dreamcore_trial', '-d', 'dreamcore_trial', '-At', '-c', 'SELECT count(*) FROM platform_roles'], {**env, 'PGPASSWORD': secret}, log, True)
-            else:
-                count = '0'
-            if count == '0':
+            def identity_query(statement):
+                return run([executables['psql'], '-h', '127.0.0.1', '-p', str(settings['ports']['database']), '-U', 'dreamcore_trial', '-d', 'dreamcore_trial', '-At', '-c', statement], {**env, 'PGPASSWORD': secret}, log, True).strip()
+            if not platform_initialized(identity_query):
                 account = private_read(root / 'accounts.json')['platform']
+                login_name = platform_login(account)
                 password_file = root / 'bootstrap-password'
                 password_file.write_text(account['password']); password_file.chmod(0o600)
                 try:
-                    run([executables['java'], '-jar', str(jar), '--bootstrap-admin'], {**env, 'BOOTSTRAP_EMAIL': account['email'], 'BOOTSTRAP_NAME': '本地试用平台管理员', 'BOOTSTRAP_PASSWORD_FILE': str(password_file)}, log)
+                    run([executables['java'], '-jar', str(jar), '--bootstrap-admin'], {**env, 'BOOTSTRAP_EMAIL': login_name, 'BOOTSTRAP_NAME': '本地试用平台管理员', 'BOOTSTRAP_PASSWORD_FILE': str(password_file)}, log)
                 finally:
                     password_file.unlink(missing_ok=True)
             engine = subprocess.Popen([executables['node'], 'engine/dist/main.js'], cwd=WORKSPACE, env=engine_env, stdout=log, stderr=log)

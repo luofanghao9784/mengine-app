@@ -11,6 +11,22 @@ spec.loader.exec_module(trial)
 
 
 class LocalTrialBoundaryTest(unittest.TestCase):
+    def test_independent_platform_initialization_ignores_legacy_customer_roles(self):
+        seen=[]
+        def query(statement):
+            seen.append(statement)
+            return 'platform_accounts' if 'to_regclass' in statement else '0'
+        self.assertFalse(trial.platform_initialized(query))
+        self.assertFalse(any('platform_roles' in s for s in seen))
+        self.assertTrue(trial.platform_initialized(lambda q: 'platform_accounts' if 'to_regclass' in q else '1'))
+        self.assertFalse(trial.platform_initialized(lambda q: ''))
+
+    def test_platform_login_accepts_new_and_old_private_formats_without_customer_conversion(self):
+        self.assertEqual(trial.platform_login({'loginName':'new@example.test','password':'synthetic'}), 'new@example.test')
+        self.assertEqual(trial.platform_login({'email':'legacy@example.test','password':'synthetic'}), 'legacy@example.test')
+        self.assertEqual(trial.platform_login({'loginName':'new@example.test','email':'legacy@example.test','password':'synthetic'}), 'new@example.test')
+        with self.assertRaises(trial.TrialError):trial.platform_login({'password':'synthetic'})
+
     def test_nonempty_unowned_directory_is_never_initialized(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
@@ -60,6 +76,9 @@ class LocalTrialBoundaryTest(unittest.TestCase):
                   'PGHOST': 'other-host', 'PGSERVICE': 'other-service', 'JAVA_TOOL_OPTIONS': 'other-options',
                   'PHONE_DELIVERY': 'local', 'PHONE_LOCAL_PREVIEW': 'true', 'PHONE_OUTBOX': 'other-phone-outbox',
                   'BOOTSTRAP_EMAIL': 'other-account', 'INVITATION_OUTBOX': 'other-outbox', 'MATERIAL_STORAGE_ROOT': 'other-storage', 'BACKUP_STATUS_FILE': 'other-backup', 'BACKUP_STATUS_STALE_SECONDS': '60', 'OPERATIONS_TIME_ZONE': 'other-zone', 'KNOWLEDGE_ENABLED': 'true', 'KNOWLEDGE_PARSER_ROOT': 'other-parser', 'TASK_ENABLED': 'true', 'TASK_ENGINE_TOKEN': 'other-token', 'ENGINE_BASE_URL': 'http://other-project', 'AGENT_TASK_MODE': 'live', 'AGENT_MODEL_API_KEY': 'other-key', 'AGENT_MODEL_PROVIDER': 'deepseek'}
+        unsafe.update({'PLATFORM_COOKIE_NAME':'other-platform','COMPANY_INFORMATION_ENABLED':'true',
+                       'COLLECTION_EXECUTABLE':'/other/collector','EXPERIENCE_ENABLED':'true',
+                       'GENERAL_EXPERIENCE_ENABLED':'true'})
         with patch.dict(os.environ, {**unsafe, 'PATH': '/synthetic-bin'}, clear=True):
             self.assertEqual(trial.clean_environment(), {'PATH': '/synthetic-bin'})
 
