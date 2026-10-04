@@ -642,14 +642,14 @@
 }
 .admin-platform .engine-observatory .engine-process {
   grid-column: 2;
-  grid-row: 2;
+  grid-row: 1;
 }
 .admin-platform .engine-observatory .engine-output {
   grid-column: 3;
   grid-row: 2;
 }
 .admin-platform .engine-observatory .engine-wires {
-  height: 430px;
+  height: 510px;
 }
 .admin-platform .engine-observatory .engine-bank:not(.engine-evolution) {
   display: flex;
@@ -661,8 +661,8 @@
 }
 .admin-platform .engine-observatory .engine-core {
   position: static;
-  grid-column: 1 / -1;
-  grid-row: 1;
+  grid-column: 2;
+  grid-row: 2;
   gap: 12px;
   padding: 8px 0;
 }
@@ -796,5 +796,52 @@
 @media (min-width: 761px) {
   .admin-platform.admin-engine-fullscreen .admin-header {
     display: none;
+  }
+}
+
+/* Ambient mechanical motion does not imply an executing task. */
+.admin-platform .engine-observatory .engine-process {
+  padding: 14px 20px;
+}
+.admin-platform .engine-observatory .engine-process .engine-channels {
+  gap: 6px;
+}
+.admin-platform .engine-observatory .engine-orb::before {
+  border-color: #71dff55c;
+  animation: engine-orbit-turn 24s linear infinite;
+}
+.admin-platform .engine-observatory .engine-orb::after {
+  content: '';
+  position: absolute;
+  inset: -20px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  border-top-color: #71dff599;
+  border-bottom-color: #8db9ff66;
+  animation: engine-orbit-turn 14s linear infinite reverse;
+  pointer-events: none;
+}
+.admin-platform .engine-observatory .engine-orb > div {
+  animation: engine-core-breathe 4s ease-in-out infinite;
+}
+@keyframes engine-orbit-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes engine-core-breathe {
+  0%,
+  100% {
+    box-shadow: inset 0 0 18px #71dff50d;
+  }
+  50% {
+    box-shadow: inset 0 0 32px #71dff535;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .admin-platform .engine-observatory .engine-orb::before,
+  .admin-platform .engine-observatory .engine-orb::after,
+  .admin-platform .engine-observatory .engine-orb > div {
+    animation: none;
   }
 }

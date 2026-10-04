@@ -232,10 +232,10 @@ function Snapshot({
               d={
                 compact
                   ? g.id === 'input'
-                    ? 'M165 255L500 80'
+                    ? 'M165 410H500'
                     : g.id === 'output'
-                      ? 'M500 80L835 255'
-                      : 'M500 80V255'
+                      ? 'M500 410H835'
+                      : 'M500 80V410'
                   : g.id === 'input'
                     ? 'M330 105H390L500 230'
                     : g.id === 'process'
