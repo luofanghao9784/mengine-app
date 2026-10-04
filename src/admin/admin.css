@@ -744,3 +744,12 @@ button.admin-directory-row:hover {
   color: var(--muted);
   font-size: 12px;
 }
+
+.admin-default-title:not(:only-child) { display: none; }
+.admin-platform .admin-title-slot { min-width: 0; }
+.admin-platform .admin-heading:has(.platform-enterprise-heading) { flex: 1; min-width: 0; }
+.admin-platform .admin-header .platform-enterprise-heading { padding: 0; gap: 14px; }
+.admin-platform .admin-header .platform-enterprise-heading h1 { margin: 0; font-size: 20px; }
+.admin-platform .admin-header .platform-enterprise-heading-text { flex: initial; }
+.admin-platform .admin-header .platform-enterprise-heading-text p { margin-top: 4px; }
+.admin-platform .admin-header .platform-enterprise-heading .badge { margin-left: 10px; }

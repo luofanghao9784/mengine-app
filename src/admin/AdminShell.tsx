@@ -16,7 +16,7 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react';
-import { PageActionsContext, Button } from '../shared/ui';
+import { PageActionsContext, PageTitleContext, Button } from '../shared/ui';
 import { RequestPending, requestNavigationLocked } from '../shared/request-guard';
 import { adminHref, adminPage, type AdminPage, type AdminRealm } from './navigation';
 import { navigationTabTarget } from './navigation-focus';
@@ -76,6 +76,7 @@ export function AdminShell({
 }) {
   const pending = useContext(RequestPending);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [titleTarget, setTitleTarget] = useState<HTMLDivElement | null>(null);
   const [actions, setActions] = useState<HTMLDivElement | null>(null);
   const navigationId = useId();
   const sidebar = useRef<HTMLElement>(null);
@@ -162,6 +163,7 @@ export function AdminShell({
   }, [hash, title, name, realm]);
   return (
     <CustomSelectContext.Provider value={realm === 'platform'}>
+      <PageTitleContext.Provider value={titleTarget}>
       <PageActionsContext.Provider value={actions}>
         <div className={`admin-shell admin-${realm} ${mobileOpen ? 'admin-menu-open' : ''}`}>
           {mobileOpen && (
@@ -284,9 +286,11 @@ export function AdminShell({
                 >
                   <Menu size={16} strokeWidth={1.7} aria-hidden="true" />
                 </button>
-                <div>
-                  {realm === 'tenant' && <span className="admin-breadcrumb">{name}</span>}
-                  <h1>{title}</h1>
+                <div className="admin-title-slot" ref={setTitleTarget}>
+                  <div className="admin-default-title">
+                    {realm === 'tenant' && <span className="admin-breadcrumb">{name}</span>}
+                    <h1>{title}</h1>
+                  </div>
                 </div>
               </div>
               <div className="admin-page-actions" ref={setActions} />
@@ -302,6 +306,7 @@ export function AdminShell({
           </div>
         </div>
       </PageActionsContext.Provider>
+      </PageTitleContext.Provider>
     </CustomSelectContext.Provider>
   );
 }

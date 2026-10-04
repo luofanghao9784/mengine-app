@@ -10,7 +10,7 @@ import { DepartureStatus } from '../departure/DepartureStatus';
 import { RecoveryForm } from '../governance/RecoveryForm';
 import { UsagePanel } from '../operations/UsagePanel';
 import { useRemote, Failure, Loading, Pager, useSubmission, SubmitError, FormActions } from '../shared/admin';
-import { Badge, Button, Empty, Field, Modal, PageActions } from '../shared/ui';
+import { Badge, Button, Empty, Field, Modal, PageActions, PageTitle } from '../shared/ui';
 import type {
   PlatformOverview,
   TenantDetail,
@@ -273,6 +273,7 @@ function TenantView({
           刷新详情
         </Button>
       </PageActions>
+      <PageTitle>
       <div className="platform-enterprise-heading">
         <Button
           variant="ghost"
@@ -285,11 +286,12 @@ function TenantView({
           }}
         />
         <div className="platform-enterprise-heading-text">
-          <h2>{value.tenant.name}</h2>
+          <h1>{value.tenant.name}</h1>
           <p>负责人：{ownerLabel(value.owner)}</p>
         </div>
         <Badge blue={value.tenant.status === 'ACTIVE'}>{statusLabel(value.tenant.status)}</Badge>
       </div>
+      </PageTitle>
       {notice && (
         <p className="access-success" role="status">
           {notice}

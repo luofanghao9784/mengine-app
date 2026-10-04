@@ -62,6 +62,13 @@ export function Empty({
     </div>
   );
 }
+export const PageTitleContext = createContext<HTMLDivElement | null>(null);
+
+export function PageTitle({ children }: { children: ReactNode }) {
+  const target = useContext(PageTitleContext);
+  return target ? createPortal(children, target) : null;
+}
+
 export const PageActionsContext = createContext<HTMLDivElement | null>(null);
 
 export function PageActions({
