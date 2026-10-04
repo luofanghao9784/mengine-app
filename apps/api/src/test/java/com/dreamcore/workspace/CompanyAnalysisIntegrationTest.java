@@ -7,7 +7,7 @@ class CompanyAnalysisIntegrationTest extends CompanyAnalysisFixture {
   var job=claim();assertEquals(1,job.inputs().size());assertEquals(chunk,job.inputs().getFirst().chunkId());assertNull(queue.claim(tenant));queue.discover();assertEquals(1,db.queryForObject("SELECT count(*) FROM company_analysis_items WHERE tenant_id=?",Integer.class,tenant));
  }
  @Test void committedResultsAreIdempotentAndRetainRealUsageWithoutRescanning(){
-  var job=claim();queue.dispatched(job,descriptor());var result=result(job,"COMPLETE");queue.complete(result);queue.complete(result);queue.discover();assertEquals("SUCCEEDED",state());assertNull(queue.claim(tenant));
+  var job=claim();queue.dispatched(job,descriptor());assertEquals(descriptor().executionClass(),db.queryForObject("SELECT execution_class FROM company_analysis_attempts WHERE run_id=?",String.class,job.id()));var result=result(job,"COMPLETE");queue.complete(result);queue.complete(result);queue.discover();assertEquals("SUCCEEDED",state());assertNull(queue.claim(tenant));
   assertEquals(1,information.get(reader,tenant).groups().stream().filter(g->g.field()==CompanyInformationService.Field.INDUSTRY).findFirst().orElseThrow().tags().size());assertEquals(12L,db.queryForObject("SELECT input_tokens FROM company_analysis_attempts WHERE run_id=?",Long.class,job.id()));assertEquals("IDLE",queue.status(reader,tenant,true).state());
  }
  @Test void confirmedModelFailuresBackOffAndStopAfterThreeAttempts(){

@@ -161,7 +161,7 @@ test('enterprise usage remains a secondary page and returns to the same enterpri
   await page.goto(`/tenant-admin/#tenant=${tenant}&admin=engine`);
   await expect(page.locator('.engine-wall')).toBeVisible();
   await page.getByRole('link', { name: '查看本企业用量' }).click();
-  await expect(page.getByRole('heading', { name: '运行概览', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '本企业用量', exact: true })).toBeVisible();
   expect(new URLSearchParams(new URL(page.url()).hash.slice(1)).get('tenant')).toBe(tenant);
   await page.getByRole('link', { name: '返回引擎运行' }).click();
   await expect(page.locator('.engine-wall')).toBeVisible();

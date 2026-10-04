@@ -1,3 +1,4 @@
+import { OperationRetentionStatus } from '../retention/OperationRetentionStatus';
 import { useState } from 'react';
 import { ArrowLeft, RefreshCw, HardDrive, Database, Archive, ShieldCheck } from 'lucide-react';
 import type {
@@ -206,6 +207,7 @@ function BackupFacts({ backup }: { backup: BackupObservation }) {
   );
 }
 function Facts({ value: v }: { value: StorageStatus }) {
+  const [retentionOpen, setRetentionOpen] = useState(false);
   const s = v.storage,
     volume = s.originalVolume;
   return (
@@ -263,6 +265,13 @@ function Facts({ value: v }: { value: StorageStatus }) {
         </div>
       </section>
       <BackupFacts backup={v.backup} />
+      <details
+        className="admin-section storage-section"
+        onToggle={(e) => setRetentionOpen(e.currentTarget.open)}
+      >
+        <summary>查看任务通知清理</summary>
+        {retentionOpen && <OperationRetentionStatus />}
+      </details>
       <section className="admin-section storage-section" aria-label="资料清理状态">
         <h2>
           <Database size={20} />

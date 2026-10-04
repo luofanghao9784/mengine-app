@@ -67,10 +67,10 @@ public class AgentTaskService {
         if(found.isEmpty()){
             if(Boolean.TRUE.equals(db.queryForObject("SELECT stop_requested FROM conversation_attempts WHERE task_id=? AND attempt_id=?",Boolean.class,task,attempt)))throw new IdentityException(409,"TASK_STOPPING");
             if(!body.status().equals("STARTED") || body.sequence()!=1+db.queryForObject("SELECT count(*) FROM conversation_tool_receipts WHERE task_id=? AND attempt_number=?",Integer.class,task,row.get("attempt_number")))throw new IdentityException(409,"TASK_STATE_CHANGED");
-            db.update("INSERT INTO conversation_tool_receipts(task_id,attempt_number,sequence,name,status) VALUES (?,?,?,?,'STARTED')",task,row.get("attempt_number"),body.sequence(),body.name());
+            db.update("INSERT INTO conversation_tool_receipts(task_id,attempt_number,sequence,name,status,started_at) VALUES (?,?,?,?,'STARTED',clock_timestamp())",task,row.get("attempt_number"),body.sequence(),body.name());
         }else{
             var prior=found.getFirst();if(!body.name().equals(prior.get("name")) || !body.status().equals(prior.get("status")) && !"STARTED".equals(prior.get("status")))throw new IdentityException(409,"TASK_STATE_CHANGED");
-            db.update("UPDATE conversation_tool_receipts SET status=?,received_at=now() WHERE task_id=? AND attempt_number=? AND sequence=?",body.status(),task,row.get("attempt_number"),body.sequence());
+            if(!body.status().equals(prior.get("status")))db.update("UPDATE conversation_tool_receipts SET status=?,received_at=clock_timestamp(),finished_at=greatest(clock_timestamp(),started_at) WHERE task_id=? AND attempt_number=? AND sequence=?",body.status(),task,row.get("attempt_number"),body.sequence());
         }
     }
     @Transactional public Map<String,Object> openUsage(UUID task,UUID attempt){authorized(task,attempt);return usage.open(task,attempt);}

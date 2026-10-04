@@ -35,6 +35,18 @@ async function fixture(context: BrowserContext) {
           lastCompletedAt: null,
         })),
       });
+    if (p.endsWith('/operation-cleanup'))
+      return json({
+        tenantId: null,
+        pending: 2,
+        failed: 0,
+        complete: 3,
+        removedEvents: 12,
+        removedAudit: 4,
+        nextDeadline: null,
+        coverage: 'NEW_CLOSED_TASK_NOTIFICATIONS',
+        protectedRecords: 'BUSINESS_RESULTS_USAGE_IDEMPOTENCY_AUTHORIZATION_DELETION',
+      });
     if (p.endsWith('/storage-status')) {
       if (mode === 'revoked') return json({ code: 'ACCESS_DENIED' }, 403);
       const snapshot = { id: id(9), createdAt: past, expiresAt: future, bytes: 102400, files: 8, tables: 30 };
@@ -102,6 +114,11 @@ test('system wall opens read-only storage page with separate restore and opening
   await page.screenshot({ path: '/tmp/platform-storage-1440.png', fullPage: true });
   await page.getByRole('region', { name: '部署操作记录' }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: '/tmp/platform-storage-events-1440.png' });
+  await page.getByText('查看任务通知清理', { exact: true }).click();
+  await expect(page.getByRole('region', { name: '任务通知清理状态' })).toContainText('已清理通知 12');
+  await expect(page.getByRole('region', { name: '任务通知清理状态' })).toContainText(
+    '此状态不代表备份已清理',
+  );
   await page.getByRole('link', { name: '返回系统运行' }).click();
   await expect(page.getByRole('heading', { name: '存储与备份', exact: true })).toHaveCount(0);
   expect(f.methods.every((m) => m === 'GET')).toBeTruthy();

@@ -31,7 +31,7 @@ public class CompanyAnalysisQueue {
  }
  @Transactional public void dispatched(CompanyInferenceService.Job job,CompanyAnalysisRuntime.Descriptor runtime){
   if(!inference.active(job.id(),job.lease()))throw new IdentityException(409,"COMPANY_SOURCE_CHANGED");
-  int n=db.update("UPDATE company_analysis_attempts SET state='DISPATCHED',engine_version=? WHERE run_id=? AND state='CLAIMED'",runtime.engineVersion(),job.id());
+  int n=db.update("UPDATE company_analysis_attempts SET state='DISPATCHED',engine_version=?,execution_class=? WHERE run_id=? AND state='CLAIMED'",runtime.engineVersion(),runtime.executionClass(),job.id());
   if(n!=1)throw new IdentityException(409,"COMPANY_INFERENCE_UNAVAILABLE");
   db.update("UPDATE company_analysis_items SET attempts=attempts+1 WHERE run_id=? AND state='RUNNING'",job.id());
  }

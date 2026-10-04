@@ -9,7 +9,7 @@ import { AdminOverview } from './AdminOverview';
 import { PlatformHome } from '../platform/PlatformHome';
 import { PlatformAccounts } from '../platform/PlatformAccounts';
 import { PlatformSettings } from '../platform/PlatformSettings';
-import { OperationsPanel } from '../operations/OperationsPanel';
+import { PlatformUsagePage } from '../operations/UsagePanel';
 import { MethodWorkbench } from '../methods/MethodWorkbench';
 
 export function PlatformConsole({ logout }: { logout: () => void }) {
@@ -46,7 +46,7 @@ export function PlatformConsole({ logout }: { logout: () => void }) {
           <EngineTelemetryWall scope="platform" />
         </>
       ) : page === 'usage' ? (
-        <OperationsPanel scope="platform" />
+        <PlatformUsagePage hash={hash} />
       ) : page === 'capabilities' ? (
         <MethodWorkbench />
       ) : page === 'settings' ? (

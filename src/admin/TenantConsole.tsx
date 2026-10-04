@@ -12,7 +12,7 @@ import { Failure, Loading, useRemote } from '../shared/admin';
 import { Button, Empty } from '../shared/ui';
 import { TenantAdminHome, ManagedSpaces } from '../tenant/TenantAdminHome';
 import { TenantMemberDetail } from '../tenant/TenantMemberDetail';
-import { OperationsPanel } from '../operations/OperationsPanel';
+import { UsagePanel } from '../operations/UsagePanel';
 import { TenantDatabase } from '../database/TenantDatabase';
 import { CompanyInformation } from '../profile/CompanyInformation';
 import { TenantMaterials } from '../material/TenantMaterials';
@@ -125,7 +125,7 @@ export function TenantConsole({ tenant, name }: { tenant: string; name: string }
             <a className="button ghost" href={adminHref('tenant', 'engine', hash)}>
               返回引擎运行
             </a>
-            <OperationsPanel scope="tenant" tenant={tenant} />
+            <UsagePanel scope="tenant" tenant={tenant} />
           </>
         ) : (
           <>

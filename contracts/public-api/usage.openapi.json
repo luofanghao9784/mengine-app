@@ -1,0 +1,629 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Scoped usage and cost observations",
+    "version": "1.0.0",
+    "description": "Work requests grouped by request start, including retries and failures. Maintenance receipts grouped by run start, incomplete receipts remain visible. Daily series only live class; verification and legacy unknown are separate. Tool elapsed time measures server receipt interval, including delivery, not CPU. Legacy starts are not backfilled. Registered original bytes are current regardless of period. No supplier prices, billing or quota policy inferred; platform cost fields never enter tenant responses. Retained records are not a complete financial ledger."
+  },
+  "paths": {
+    "/api/platform-admin/v1/usage": {
+      "get": {
+        "security": [
+          {
+            "platformSessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "period",
+            "in": "query",
+            "schema": {
+              "enum": [
+                "THIS_MONTH",
+                "LAST_MONTH",
+                "LAST_30_DAYS"
+              ],
+              "default": "THIS_MONTH"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bounded usage facts; unknown is not zero cost",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Platform"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Realm login required"
+          },
+          "403": {
+            "description": "Scope denied"
+          },
+          "400": {
+            "description": "Invalid period"
+          },
+          "404": {
+            "description": "No such tenant"
+          }
+        }
+      }
+    },
+    "/api/platform-admin/v1/tenants/{tenant}/usage": {
+      "get": {
+        "security": [
+          {
+            "platformSessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "period",
+            "in": "query",
+            "schema": {
+              "enum": [
+                "THIS_MONTH",
+                "LAST_MONTH",
+                "LAST_30_DAYS"
+              ],
+              "default": "THIS_MONTH"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bounded usage facts; unknown is not zero cost",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Platform"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Realm login required"
+          },
+          "403": {
+            "description": "Scope denied"
+          },
+          "400": {
+            "description": "Invalid period"
+          },
+          "404": {
+            "description": "No such tenant"
+          }
+        }
+      }
+    },
+    "/api/tenant-admin/v1/tenants/{tenant}/usage": {
+      "get": {
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "period",
+            "in": "query",
+            "schema": {
+              "enum": [
+                "THIS_MONTH",
+                "LAST_MONTH",
+                "LAST_30_DAYS"
+              ],
+              "default": "THIS_MONTH"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bounded usage facts; unknown is not zero cost",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Usage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Realm login required"
+          },
+          "403": {
+            "description": "Scope denied"
+          },
+          "400": {
+            "description": "Invalid period"
+          },
+          "404": {
+            "description": "No such tenant"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "DREAMCORE_SESSION"
+      },
+      "platformSessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "DREAMCORE_PLATFORM",
+        "description": "独立总台会话；企业用户 Cookie 不授予平台权限。写入前从 /api/platform-admin/v1/auth/csrf 取得令牌。"
+      }
+    },
+    "schemas": {
+      "Group": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "purpose",
+          "executionClass",
+          "basis",
+          "units",
+          "reportedUnits",
+          "unknownCallUnits",
+          "pendingUnits",
+          "modelCalls",
+          "inputTokens",
+          "outputTokens"
+        ],
+        "properties": {
+          "purpose": {
+            "enum": [
+              "WORK",
+              "MAINTENANCE"
+            ]
+          },
+          "executionClass": {
+            "enum": [
+              "live",
+              "verification",
+              "unknown"
+            ]
+          },
+          "basis": {
+            "enum": [
+              "REQUEST_STARTED",
+              "RUN_STARTED"
+            ]
+          },
+          "units": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "reportedUnits": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "unknownCallUnits": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "pendingUnits": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "modelCalls": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "inputTokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "outputTokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "Day": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "date",
+          "workRequests",
+          "maintenanceCalls",
+          "unknownMaintenanceRuns",
+          "inputTokens",
+          "outputTokens"
+        ],
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "workRequests": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "maintenanceCalls": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "unknownMaintenanceRuns": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "inputTokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "outputTokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "Tool": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "executionClass",
+          "starts",
+          "succeeded",
+          "failed",
+          "pending",
+          "timed",
+          "elapsedMillis"
+        ],
+        "properties": {
+          "executionClass": {
+            "enum": [
+              "live",
+              "verification",
+              "unknown"
+            ]
+          },
+          "starts": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "succeeded": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "failed": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "pending": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "timed": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "elapsedMillis": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "Storage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "originals",
+          "versions",
+          "registeredBytes"
+        ],
+        "properties": {
+          "originals": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "versions": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "registeredBytes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        }
+      },
+      "Coverage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "unmeteredWorkAttempts",
+          "legacyToolReceipts",
+          "evaluation",
+          "evolution"
+        ],
+        "properties": {
+          "unmeteredWorkAttempts": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "legacyToolReceipts": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "evaluation": {
+            "const": "NOT_CONNECTED"
+          },
+          "evolution": {
+            "const": "NOT_ENABLED"
+          }
+        }
+      },
+      "Quota": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "state",
+          "unit",
+          "limit",
+          "remaining"
+        ],
+        "properties": {
+          "state": {
+            "const": "NOT_CONFIGURED"
+          },
+          "unit": {
+            "type": "null"
+          },
+          "limit": {
+            "type": "null"
+          },
+          "remaining": {
+            "type": "null"
+          }
+        }
+      },
+      "Cost": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "state",
+          "currency",
+          "verifiedMinor",
+          "estimatedMinor",
+          "sharedAllocation"
+        ],
+        "properties": {
+          "state": {
+            "const": "NOT_CONNECTED"
+          },
+          "currency": {
+            "type": "null"
+          },
+          "verifiedMinor": {
+            "type": "null"
+          },
+          "estimatedMinor": {
+            "type": "null"
+          },
+          "sharedAllocation": {
+            "const": "NOT_CONFIGURED"
+          }
+        }
+      },
+      "Usage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "tenantId",
+          "period",
+          "timeZone",
+          "from",
+          "until",
+          "checkedAt",
+          "groups",
+          "days",
+          "tools",
+          "storage",
+          "coverage",
+          "quota"
+        ],
+        "properties": {
+          "tenantId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "period": {
+            "enum": [
+              "THIS_MONTH",
+              "LAST_MONTH",
+              "LAST_30_DAYS"
+            ]
+          },
+          "timeZone": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "from": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "until": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "groups": {
+            "type": "array",
+            "maxItems": 6,
+            "items": {
+              "$ref": "#/components/schemas/Group"
+            }
+          },
+          "days": {
+            "type": "array",
+            "maxItems": 31,
+            "items": {
+              "$ref": "#/components/schemas/Day"
+            }
+          },
+          "tools": {
+            "type": "array",
+            "maxItems": 3,
+            "items": {
+              "$ref": "#/components/schemas/Tool"
+            }
+          },
+          "storage": {
+            "$ref": "#/components/schemas/Storage"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/Coverage"
+          },
+          "quota": {
+            "$ref": "#/components/schemas/Quota"
+          }
+        }
+      },
+      "Platform": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "usage",
+          "cost"
+        ],
+        "properties": {
+          "usage": {
+            "$ref": "#/components/schemas/Usage"
+          },
+          "cost": {
+            "$ref": "#/components/schemas/Cost"
+          }
+        }
+      }
+    }
+  }
+}

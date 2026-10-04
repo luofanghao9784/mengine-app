@@ -7,7 +7,7 @@ import { RequestPending, useRequestLock } from '../shared/request-guard';
 import { LocalInviteLink } from '../identity/LocalInviteLink';
 import { DepartureStatus } from '../departure/DepartureStatus';
 import { RecoveryForm } from '../governance/RecoveryForm';
-import { OperationsPanel } from '../operations/OperationsPanel';
+import { UsagePanel } from '../operations/UsagePanel';
 import { useRemote, Failure, Loading, Pager, useSubmission, SubmitError, FormActions } from '../shared/admin';
 import { Badge, Button, Empty, Field, Modal, PageActions } from '../shared/ui';
 import type {
@@ -343,7 +343,7 @@ function TenantView({
           }}
         />
       ) : tab === 'usage' ? (
-        <OperationsPanel scope="platform" tenant={id} revision={attempt} />
+        <UsagePanel scope="platform" tenant={id} revision={attempt} />
       ) : tab === 'records' ? (
         <Records id={id} revision={attempt} />
       ) : (
