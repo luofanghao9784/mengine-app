@@ -136,12 +136,14 @@ public class TaskContextService {
   var found=experiences.list(t.actor(),t.tenant(),t.space(),text(r.query(),200,true),"",false,offset(r),3);
   // Even summaries can contain source data; track their dependencies before exposing them.
   var items=new ArrayList<Object>();for(var s:found.items()){
+   if(!Boolean.TRUE.equals(db.queryForObject("SELECT experience_general_dependencies_current(?,?)",Boolean.class,t.tenant(),s.versionId())))continue;
    var exact=experienceEntry(t,s.id(),s.versionId());trackExperience(t,exact);record(t,"EXPERIENCE",exact.id(),exact.version().id().toString(),exact.version());items.add(s);
   }
   return map("items",items,"hasMore",found.hasMore(),"scope","CURRENT_WORKSPACE_PUBLISHED","applicationOutcome","UNKNOWN");
  }
  private ExperienceService.Entry experienceEntry(Task t,UUID id,UUID version){
   if(id==null||version==null)throw IdentityException.invalid();var e=experiences.get(t.actor(),t.tenant(),t.space(),id,version);
+  if(!Boolean.TRUE.equals(db.queryForObject("SELECT experience_general_dependencies_current(?,?)",Boolean.class,t.tenant(),version)))throw new IdentityException(409,"EXPERIENCE_NOT_CURRENT");
   if(!e.status().equals("PUBLISHED")||!version.equals(e.publishedVersion()))throw new IdentityException(409,"EXPERIENCE_NOT_CURRENT");
   if(e.version().content().accessMode().equals("SOURCE_BOUND"))for(var ref:e.version().evidence())if(ref.kind().equals("TASK"))readableTask(t,ref.referenceId());
   return e;

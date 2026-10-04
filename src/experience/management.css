@@ -207,3 +207,10 @@
   margin: 8px 0;
   white-space: pre-wrap;
 }
+
+.general-experience-control-group {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}

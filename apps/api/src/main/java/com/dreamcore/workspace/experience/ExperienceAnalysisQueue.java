@@ -32,6 +32,12 @@ public class ExperienceAnalysisQueue {
  }
  private List<Input> inputs(Map<String,Object> s,List<UUID> fixedChunks){
   UUID id=(UUID)s.get("id"),task=(UUID)s.get("task_id");var inputs=new ArrayList<Input>();
+  if(s.get("kind").equals("GENERAL_SUGGESTION")){
+   var proposal=db.queryForMap("SELECT s.content,v.method FROM general_experience_suggestions s JOIN general_experience_versions v ON v.id=s.version_id WHERE s.id=?",s.get("general_suggestion_id"));if(proposal.get("content")==null||proposal.get("method")==null)throw changed();
+   segmented(inputs,id,"original","SOURCE_EXCERPT","通用经验的固定版本，仅供核对，不是新的执行证明：\n"+proposal.get("method"));
+   segmented(inputs,id,"suggestion","FEEDBACK","用户对通用经验的反馈或企业补充，不是已核验事实。只在依据充分时形成新的企业经验，targetVersionId 必须为空，不得改写总库。不得将待核验的补充直接当作执行证明：\n"+proposal.get("content"));
+   if(inputs.size()>8)throw IdentityException.invalid();return List.copyOf(inputs);
+  }
   if(s.get("kind").equals("ADJUSTMENT")){
    var a=db.queryForMap("SELECT * FROM experience_adjustments WHERE id=?",s.get("adjustment_id"));if(a.get("content")==null)throw changed();
    var original=experiences.analysisEntry((UUID)s.get("owner_id"),(UUID)s.get("tenant_id"),(UUID)s.get("workspace_id"),(UUID)a.get("entry_id"),(UUID)a.get("version_id"));
@@ -81,14 +87,14 @@ public class ExperienceAnalysisQueue {
   UUID source=ids.getFirst();var s=source(source);
   try{
    eligible(s);var chunks=s.get("kind").equals("FEEDBACK")&&s.get("task_id")==null?db.queryForList("SELECT c.id FROM knowledge_chunks c JOIN knowledge_runs r ON r.id=c.run_id JOIN feedback_entries f ON f.material_version_id=c.version_id WHERE f.id=? AND r.status IN ('READY','PARTIAL') AND r.generation=(SELECT max(x.generation) FROM knowledge_runs x WHERE x.version_id=c.version_id AND x.status IN ('READY','PARTIAL')) ORDER BY c.ordinal,c.id LIMIT 4",UUID.class,s.get("feedback_id")):List.<UUID>of();
-   var versions=s.get("kind").equals("ADJUSTMENT")?db.queryForList("SELECT version_id FROM experience_adjustments WHERE id=?",UUID.class,s.get("adjustment_id")):experiences.list((UUID)s.get("owner_id"),tenant,(UUID)s.get("workspace_id"),"","",false,0,5).items().stream().map(ExperienceService.Summary::versionId).filter(v->{try{existing(s,v);return true;}catch(IdentityException unavailable){return false;}}).toList();
+   var versions=s.get("kind").equals("GENERAL_SUGGESTION")?List.<UUID>of():s.get("kind").equals("ADJUSTMENT")?db.queryForList("SELECT version_id FROM experience_adjustments WHERE id=?",UUID.class,s.get("adjustment_id")):experiences.list((UUID)s.get("owner_id"),tenant,(UUID)s.get("workspace_id"),"","",false,0,5).items().stream().map(ExperienceService.Summary::versionId).filter(v->{try{existing(s,v);return true;}catch(IdentityException unavailable){return false;}}).toList();
    var run=new HashMap<String,Object>();run.put("id",UUID.randomUUID());run.put("lease",UUID.randomUUID());run.put("source_id",source);run.put("manifest",json.writeValueAsString(Map.of("chunks",chunks,"versions",versions)));
    var job=job(run);
    db.update("INSERT INTO experience_analysis_runs(id,source_id,tenant_id,lease,lease_until,state,job_hash,manifest) VALUES (?,?,?,?,now()+interval '10 minutes','CLAIMED',?,?::jsonb)",job.id(),source,tenant,job.lease(),hash(job),run.get("manifest"));
    db.update("UPDATE experience_analysis_items SET state='RUNNING',run_id=?,error_code=NULL,updated_at=now() WHERE source_id=?",job.id(),source);return job;
   }catch(IdentityException unavailable){
    String state=intake.available(source)?"RETRY_WAIT":"SOURCE_UNAVAILABLE";
-   db.update("UPDATE experience_analysis_items SET state=?,error_code=?,next_attempt_at=now()+interval '5 minutes',updated_at=now() WHERE source_id=?",state,unavailable.code,source);return null;
+   db.update("UPDATE experience_analysis_items SET state=?,error_code=?,next_attempt_at=now()+interval '5 minutes',updated_at=now() WHERE source_id=?",state,unavailable.code,source);if(state.equals("SOURCE_UNAVAILABLE"))finishAdjustment(source);return null;
   }
  }
  private Map<String,Object> run(UUID id,boolean lock){var rows=db.queryForList("SELECT * FROM experience_analysis_runs WHERE id=?"+(lock?" FOR UPDATE":""),id);if(rows.isEmpty())throw changed();return rows.getFirst();}
@@ -117,7 +123,7 @@ public class ExperienceAnalysisQueue {
   db.update("UPDATE experience_analysis_items SET state=?,error_code=?,updated_at=now() WHERE run_id=?",result.outcome(),result.code(),result.runId());
   if(!result.outcome().equals("QUALIFIED"))finishAdjustment(result.source());
  }
- private void finishAdjustment(UUID source){db.update("UPDATE experience_adjustments SET finished=true,content=NULL WHERE id=?",source);}
+ private void finishAdjustment(UUID source){db.update("UPDATE general_experience_suggestions SET finished=true,content=NULL WHERE id=?",source);db.update("UPDATE experience_adjustments SET finished=true,content=NULL WHERE id=?",source);}
  @Transactional public void fail(UUID id,String code,boolean sent,Result result){
   var r=run(id,true);if(!Set.of("CLAIMED","DISPATCHED").contains(r.get("state")))return;
   boolean changed=code.equals("EXPERIENCE_SOURCE_CHANGED"),unknown=code.equals("EXPERIENCE_RESULT_UNKNOWN");

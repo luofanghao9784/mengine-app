@@ -66,7 +66,7 @@ export const isProcessingPage = (v: unknown): v is ExperienceProcessingPage =>
     (i) =>
       record(i) &&
       uuid(i.id) &&
-      ['TASK', 'FEEDBACK', 'ADJUSTMENT'].includes(String(i.sourceKind)) &&
+      ['TASK', 'FEEDBACK', 'ADJUSTMENT', 'GENERAL_SUGGESTION'].includes(String(i.sourceKind)) &&
       String(i.state) in processingLabels &&
       (i.reason === null || (typeof i.reason === 'string' && i.reason in reasonLabels)) &&
       date(i.updatedAt) &&

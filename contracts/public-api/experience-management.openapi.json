@@ -453,7 +453,8 @@
             "enum": [
               "TASK",
               "FEEDBACK",
-              "ADJUSTMENT"
+              "ADJUSTMENT",
+              "GENERAL_SUGGESTION"
             ]
           },
           "state": {

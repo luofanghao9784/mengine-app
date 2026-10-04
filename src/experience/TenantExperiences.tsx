@@ -10,6 +10,7 @@ import { experienceClient } from './client';
 import { experienceManagementClient as api, processingLabels, reasonLabels } from './management-client';
 import './management.css';
 import { GeneralExperienceLibrary } from './GeneralExperienceLibrary';
+import type { LocalExperienceSelection } from './GeneralSuggestionPanel';
 import { ExperienceAdjustmentPanel } from './ExperienceAdjustmentPanel';
 const stamp = (date: string) => new Date(date).toLocaleString('zh-CN', { hour12: false });
 type Selection = { id: string; version: string | null; space: string };
@@ -31,6 +32,7 @@ export function TenantExperiences({ tenant }: { tenant: string }) {
     (v): v is string => v === 'enterprise' || v === 'general',
   );
   const [locked, setLocked] = useState(false);
+  const [localSelection, setLocalSelection] = useState<LocalExperienceSelection | null>(null);
   const params = new URLSearchParams(location.hash.slice(1));
   const linkedEntry =
     uuid(params.get('experience')) && uuid(params.get('scope')) ? params.get('experience') : null;
@@ -45,7 +47,10 @@ export function TenantExperiences({ tenant }: { tenant: string }) {
           value={source}
           disabled={locked}
           onChange={(e) => {
-            if (!requestNavigationLocked()) setSource(e.target.value);
+            if (!requestNavigationLocked()) {
+              setLocalSelection(null);
+              setSource(e.target.value);
+            }
           }}
         >
           <option value="enterprise">企业经验</option>
@@ -53,14 +58,29 @@ export function TenantExperiences({ tenant }: { tenant: string }) {
         </select>
       </Field>
       {source === 'general' ? (
-        <GeneralExperienceLibrary tenant={tenant} onLocked={setLocked} />
+        <GeneralExperienceLibrary
+          tenant={tenant}
+          onLocked={setLocked}
+          chooseLocal={(selection) => {
+            setLocalSelection(selection);
+            setSource('enterprise');
+          }}
+        />
       ) : (
-        <EnterpriseExperiences tenant={tenant} onLocked={setLocked} />
+        <EnterpriseExperiences tenant={tenant} onLocked={setLocked} initialSelection={localSelection} />
       )}
     </div>
   );
 }
-function EnterpriseExperiences({ tenant, onLocked }: { tenant: string; onLocked: (value: boolean) => void }) {
+function EnterpriseExperiences({
+  tenant,
+  onLocked,
+  initialSelection,
+}: {
+  tenant: string;
+  onLocked: (value: boolean) => void;
+  initialSelection?: LocalExperienceSelection | null;
+}) {
   const { session } = useSession();
   const params = new URLSearchParams(location.hash.slice(1));
   const legacySpace = uuid(params.get('scope')) ? params.get('scope')! : '';
@@ -113,6 +133,9 @@ function EnterpriseExperiences({ tenant, onLocked }: { tenant: string; onLocked:
     onLocked(locked);
     return () => onLocked(false);
   }, [locked, onLocked]);
+  useEffect(() => {
+    if (initialSelection) select(initialSelection);
+  }, [initialSelection, select]);
   const [attempt, setAttempt] = useState(0);
   const refresh = () => setAttempt((n) => n + 1);
   const data = useRemote(
@@ -288,11 +311,13 @@ function EnterpriseExperiences({ tenant, onLocked }: { tenant: string; onLocked:
                   <article key={item.id} className="admin-section">
                     <div>
                       <strong>
-                        {item.sourceKind === 'ADJUSTMENT'
-                          ? '经验内容调整'
-                          : item.sourceKind === 'FEEDBACK'
-                            ? '反馈关联内容'
-                            : '任务执行结果'}
+                        {item.sourceKind === 'GENERAL_SUGGESTION'
+                          ? '通用经验补充与反馈'
+                          : item.sourceKind === 'ADJUSTMENT'
+                            ? '经验内容调整'
+                            : item.sourceKind === 'FEEDBACK'
+                              ? '反馈关联内容'
+                              : '任务执行结果'}
                       </strong>
                       <Badge>{processingLabels[item.state]}</Badge>
                     </div>

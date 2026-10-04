@@ -7,6 +7,7 @@ import { Failure, Loading, Pager, SubmitError, useRemote, useSubmission } from '
 import { pageState, textState, useViewState } from '../shared/useViewState';
 import { generalExperienceClient as api, generalProcessingLabels } from './general-client';
 import './management.css';
+import { GeneralSuggestionPanel, type LocalExperienceSelection } from './GeneralSuggestionPanel';
 import { requestNavigationLocked, useRequestLock } from '../shared/request-guard';
 import type {
   GeneralExperienceUsageChange,
@@ -20,9 +21,11 @@ const stamp = (v: string) => new Date(v).toLocaleString('zh-CN', { hour12: false
 export function GeneralExperienceLibrary({
   tenant,
   onLocked,
+  chooseLocal,
 }: {
   tenant?: string;
   onLocked?: (value: boolean) => void;
+  chooseLocal?: (selection: LocalExperienceSelection) => void;
 }) {
   const { session } = useSession();
   const scope = tenant || 'platform';
@@ -256,6 +259,7 @@ export function GeneralExperienceLibrary({
           }}
           lock={setLocked}
           changed={refresh}
+          chooseLocal={chooseLocal}
         />
       )}
     </div>
@@ -268,13 +272,21 @@ function GeneralDetail({
   close,
   lock,
   changed,
+  chooseLocal,
 }: {
   tenant?: string;
   selection: Selection;
   close: () => void;
   lock: (value: boolean) => void;
   changed: () => void;
+  chooseLocal?: (selection: LocalExperienceSelection) => void;
 }) {
+  const [usageBlocked, setUsageBlocked] = useState(false),
+    [suggestionBlocked, setSuggestionBlocked] = useState(false);
+  useEffect(() => {
+    lock(usageBlocked || suggestionBlocked);
+    return () => lock(false);
+  }, [usageBlocked, suggestionBlocked, lock]);
   const { session } = useSession();
   const [attempt, setAttempt] = useState(0);
   const data = useRemote(
@@ -304,17 +316,22 @@ function GeneralDetail({
             <span>v{d.number}</span>
           </div>
           {tenant ? (
-            <TenantUsage
-              tenant={tenant}
-              selection={selection}
-              lock={lock}
-              changed={changed}
-              denied={setDenied}
-            />
+            <fieldset className="general-experience-control-group" disabled={suggestionBlocked}>
+              <TenantUsage
+                tenant={tenant}
+                selection={selection}
+                lock={setUsageBlocked}
+                changed={() => {
+                  setAttempt((n) => n + 1);
+                  changed();
+                }}
+                denied={setDenied}
+              />
+            </fieldset>
           ) : (
             <PlatformAvailability
               selection={selection}
-              lock={lock}
+              lock={setUsageBlocked}
               denied={setDenied}
               changed={() => {
                 setAttempt((n) => n + 1);
@@ -348,6 +365,18 @@ function GeneralDetail({
               <li key={i}>{s}</li>
             ))}
           </ul>
+          {tenant && (
+            <fieldset className="general-experience-control-group" disabled={usageBlocked}>
+              <GeneralSuggestionPanel
+                tenant={tenant}
+                entry={selection.id}
+                version={selection.version}
+                locked={setSuggestionBlocked}
+                denied={setDenied}
+                chooseLocal={chooseLocal}
+              />
+            </fieldset>
+          )}
           <details>
             <summary>依据说明</summary>
             <p>

@@ -1,5 +1,8 @@
 import type {
   GeneralExperiencePage,
+  GeneralExperienceSuggestionChange,
+  GeneralExperienceSuggestion,
+  GeneralExperienceSuggestions,
   GeneralExperienceAvailability,
   GeneralExperienceAvailabilityChange,
   GeneralExperienceAvailabilityReceipt,
@@ -103,6 +106,34 @@ export const isGeneralAvailabilityReceipt = (v: unknown): v is GeneralExperience
   ['AVAILABLE', 'STOPPED'].includes(String(v.status)) &&
   count(v.revision) &&
   Number(v.revision) > 1;
+export const isGeneralSuggestion = (v: unknown): v is GeneralExperienceSuggestion =>
+  exact(v, [
+    'id',
+    'versionId',
+    'workspaceId',
+    'intent',
+    'state',
+    'resultEntryId',
+    'resultVersionId',
+    'createdAt',
+  ]) &&
+  uuid(v.id) &&
+  uuid(v.versionId) &&
+  uuid(v.workspaceId) &&
+  ['FEEDBACK', 'ADAPTATION'].includes(String(v.intent)) &&
+  Object.hasOwn(generalProcessingLabels, String(v.state)) &&
+  ((v.resultEntryId === null && v.resultVersionId === null) ||
+    (uuid(v.resultEntryId) && uuid(v.resultVersionId))) &&
+  date(v.createdAt);
+export const isGeneralSuggestions = (v: unknown): v is GeneralExperienceSuggestions =>
+  exact(v, ['enabled', 'canSubmit', 'scopes', 'items']) &&
+  typeof v.enabled === 'boolean' &&
+  typeof v.canSubmit === 'boolean' &&
+  Array.isArray(v.scopes) &&
+  v.scopes.every((s) => exact(s, ['id', 'name']) && uuid(s.id) && text(s.name, 160)) &&
+  Array.isArray(v.items) &&
+  v.items.length <= 10 &&
+  v.items.every(isGeneralSuggestion);
 export function createGeneralExperienceClient(fetcher: typeof fetch = fetch) {
   const request = createIdentityRequest(fetcher);
   const path = (tenant?: string) => {
@@ -210,6 +241,40 @@ export function createGeneralExperienceClient(fetcher: typeof fetch = fetch) {
       )
         throw new IdentityError('CONTRACT_MISMATCH');
       return v;
+    },
+    suggestions: (tenant: string, id: string, version: string, signal?: AbortSignal) => {
+      if (![tenant, id, version].every(uuid)) throw new IdentityError('INVALID_REQUEST', 400);
+      return request(
+        path(tenant) + `/${id}/suggestions?version=${version}`,
+        'GET',
+        isGeneralSuggestions,
+        undefined,
+        signal,
+      );
+    },
+    suggest: async (tenant: string, id: string, body: GeneralExperienceSuggestionChange) => {
+      if (
+        ![tenant, id, body.requestId, body.versionId, body.workspaceId].every(uuid) ||
+        !['FEEDBACK', 'ADAPTATION'].includes(body.intent) ||
+        !text(body.content, 12000)
+      )
+        throw new IdentityError('INVALID_REQUEST', 400);
+      try {
+        return await request(
+          path(tenant) + `/${id}/suggestions`,
+          'POST',
+          (v): v is GeneralExperienceSuggestion =>
+            isGeneralSuggestion(v) &&
+            v.versionId === body.versionId &&
+            v.workspaceId === body.workspaceId &&
+            v.intent === body.intent,
+          body,
+        );
+      } catch (error) {
+        if (error instanceof IdentityError && error.code === 'EXPERIENCE_SUGGESTION_PENDING')
+          error.message = '这个空间已有补充或反馈正在处理，请等待结果。';
+        throw error;
+      }
     },
     processing: (signal?: AbortSignal) =>
       request(path() + '/processing', 'GET', isGeneralProcessing, undefined, signal),

@@ -91,3 +91,27 @@ export interface GeneralExperienceAvailabilityReceipt {
   status: 'AVAILABLE' | 'STOPPED';
   revision: number;
 }
+
+export interface GeneralExperienceSuggestionChange {
+  requestId: string;
+  versionId: string;
+  workspaceId: string;
+  intent: 'FEEDBACK' | 'ADAPTATION';
+  content: string;
+}
+export interface GeneralExperienceSuggestion {
+  id: string;
+  versionId: string;
+  workspaceId: string;
+  intent: 'FEEDBACK' | 'ADAPTATION';
+  state: GeneralProcessingState;
+  resultEntryId: string | null;
+  resultVersionId: string | null;
+  createdAt: string;
+}
+export interface GeneralExperienceSuggestions {
+  enabled: boolean;
+  canSubmit: boolean;
+  scopes: { id: string; name: string }[];
+  items: GeneralExperienceSuggestion[];
+}

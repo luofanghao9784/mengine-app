@@ -2,7 +2,7 @@
 import { ExperienceAnalysis } from '../../dist/runtime/experience-analysis.js';
 import { createEngineServer } from '../../dist/server.js';
 const [token, mode] = process.argv.slice(2);
-if (!token?.startsWith('synthetic-') || !['skip', 'qualify', 'adjust'].includes(mode))
+if (!token?.startsWith('synthetic-') || !['skip', 'qualify', 'adjust', 'suggestion'].includes(mode))
   throw Error('Local fixture only');
 const experience = new ExperienceAnalysis({
   executionClass: 'verification',
@@ -38,13 +38,12 @@ const experience = new ExperienceAnalysis({
         else if (verify && !outputs.some((o) => o.candidate)) yield send('experience_candidate', {}, 11);
         else {
           const record = outputs.find((o) => o.kind === 'EXECUTION_RECORD');
-          if (!record && mode !== 'adjust') throw Error('No execution record');
-          const evidence =
-            mode === 'adjust'
-              ? outputs
-                  .filter((o) => ['FEEDBACK', 'SOURCE_EXCERPT'].includes(o.kind))
-                  .map((o) => ({ inputId: o.id, quote: o.text.slice(0, 700) }))
-              : [{ inputId: record.id, quote: record.text }];
+          if (!record && !['adjust', 'suggestion'].includes(mode)) throw Error('No execution record');
+          const evidence = ['adjust', 'suggestion'].includes(mode)
+            ? outputs
+                .filter((o) => ['FEEDBACK', 'SOURCE_EXCERPT'].includes(o.kind))
+                .map((o) => ({ inputId: o.id, quote: o.text.slice(0, 700) }))
+            : [{ inputId: record.id, quote: record.text }];
           if (verify)
             yield send(
               'verify_experience',
@@ -52,7 +51,7 @@ const experience = new ExperienceAnalysis({
                 checks: Object.fromEntries(
                   ['grounded', 'reusable', 'bounded', 'privacySafe', 'novel'].map((k) => [k, 'PASS']),
                 ),
-                basis: mode === 'adjust' ? 'FEEDBACK_CORRECTION' : 'OBSERVED_EXECUTION',
+                basis: ['adjust', 'suggestion'].includes(mode) ? 'FEEDBACK_CORRECTION' : 'OBSERVED_EXECUTION',
                 evidence,
               },
               12,

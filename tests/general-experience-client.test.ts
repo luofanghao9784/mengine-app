@@ -7,6 +7,8 @@ import {
   isGeneralProcessing,
   generalProcessingLabels,
   isGeneralAvailability,
+  isGeneralSuggestion,
+  isGeneralSuggestions,
 } from '../src/experience/general-client.ts';
 const id = '00000000-0000-4000-8000-000000000001',
   version = '00000000-0000-4000-8000-000000000002';
@@ -165,4 +167,53 @@ test('platform availability never routes through customer identity and rejects m
       version,
     ),
   );
+});
+
+test('suggestion projections accept only own finite metadata and exact submitted scope', async () => {
+  const suggestion = {
+    id,
+    versionId: version,
+    workspaceId: id,
+    intent: 'ADAPTATION',
+    state: 'WAITING',
+    resultEntryId: null,
+    resultVersionId: null,
+    createdAt: detail.updatedAt,
+  };
+  assert.ok(isGeneralSuggestion(suggestion));
+  for (const key of ['content', 'sourceId', 'actorId', 'candidate'])
+    assert.equal(isGeneralSuggestion({ ...suggestion, [key]: 'private' }), false);
+  assert.equal(isGeneralSuggestion({ ...suggestion, resultEntryId: id }), false);
+  assert.ok(
+    isGeneralSuggestions({
+      enabled: false,
+      canSubmit: true,
+      scopes: [{ id, name: '空间' }],
+      items: [suggestion],
+    }),
+  );
+  let response = { ...suggestion };
+  const calls: string[] = [];
+  const api = createGeneralExperienceClient((async (url, init) => {
+    calls.push(String(url));
+    if (String(url).endsWith('/csrf'))
+      return Response.json({ headerName: 'X-CSRF-TOKEN', token: 'synthetic' });
+    assert.equal(init?.method, 'POST');
+    assert.equal((init?.headers as Record<string, string>)['X-CSRF-TOKEN'], 'synthetic');
+    return Response.json(response);
+  }) as typeof fetch);
+  const body = {
+    requestId: id,
+    versionId: version,
+    workspaceId: id,
+    intent: 'ADAPTATION' as const,
+    content: '说明依据',
+  };
+  assert.equal((await api.suggest(id, id, body)).id, id);
+  response = { ...suggestion, versionId: id };
+  await assert.rejects(
+    api.suggest(id, id, body),
+    (e: unknown) => typeof e === 'object' && e !== null && 'code' in e && e.code === 'CONTRACT_MISMATCH',
+  );
+  assert.ok(calls.every((p) => !p.includes('platform-admin')));
 });

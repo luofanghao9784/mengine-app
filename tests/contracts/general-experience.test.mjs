@@ -40,7 +40,9 @@ test('realm contracts keep customer usage writes separate and require exact vers
   for (const [path, operations] of Object.entries(spec.paths)) {
     assert.deepEqual(
       Object.keys(operations),
-      path.endsWith('/usage') || path.endsWith('/availability') ? ['get', 'post'] : ['get'],
+      path.endsWith('/usage') || path.endsWith('/availability') || path.endsWith('/suggestions')
+        ? ['get', 'post']
+        : ['get'],
     );
     if (operations.post) {
       assert.deepEqual(operations.post.security, [
@@ -100,4 +102,34 @@ test('platform availability requires an exact version, current revision and boun
     receipt({ requestId: id, entryId: id, versionId: id, revision: 2, status: 'STOPPED', method: 'private' }),
     false,
   );
+});
+
+test('enterprise suggestion metadata excludes private bodies and original contribution identifiers', () => {
+  const validate = ajv.compile({ ...spec.components.schemas.Suggestions, components: spec.components });
+  const item = {
+    id,
+    versionId: id,
+    workspaceId: id,
+    intent: 'FEEDBACK',
+    state: 'WAITING',
+    resultEntryId: null,
+    resultVersionId: null,
+    createdAt: '2026-10-04T00:00:00Z',
+  };
+  const page = { enabled: false, canSubmit: true, scopes: [{ id, name: '获权空间' }], items: [item] };
+  assert.ok(validate(page));
+  for (const key of ['content', 'actorId', 'sourceId', 'review', 'candidate'])
+    assert.equal(validate({ ...page, items: [{ ...item, [key]: 'private' }] }), false);
+  assert.equal(validate({ ...page, items: [{ ...item, resultEntryId: id }] }), false);
+  const change = ajv.compile(spec.components.schemas.SuggestionChange);
+  const body = { requestId: id, versionId: id, workspaceId: id, intent: 'ADAPTATION', content: '核对口径' };
+  assert.ok(change(body));
+  for (const bad of [
+    { ...body, intent: 'APPROVE' },
+    { ...body, content: '' },
+    { ...body, content: 'x'.repeat(12001) },
+    { ...body, sourceId: id },
+  ])
+    assert.equal(change(bad), false);
+  assert.ok(!Object.keys(spec.paths).some((p) => p.includes('platform-admin') && p.endsWith('/suggestions')));
 });

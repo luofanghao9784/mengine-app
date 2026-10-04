@@ -588,6 +588,152 @@
           }
         }
       }
+    },
+    "/api/v1/tenants/{tenant}/general-experiences/{entry}/suggestions": {
+      "get": {
+        "description": "Explicitly writable shared workspaces and the caller’s recent submission metadata only. No private proposal or contribution source body.",
+        "security": [
+          {
+            "customerCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entry",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized projection",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Suggestions"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Management scope required"
+          },
+          "404": {
+            "description": "Version no longer available"
+          }
+        },
+        "operationId": "getTenantGeneralExperienceUsage"
+      },
+      "post": {
+        "description": "Submit a private fixed-version proposal for automatic checking. A qualified result becomes a separate enterprise method in the selected authorized workspace. Does not rewrite the general library.",
+        "security": [
+          {
+            "customerCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entry",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-CSRF-TOKEN",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized projection",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Suggestion"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Management scope required"
+          },
+          "404": {
+            "description": "Version no longer available"
+          },
+          "409": {
+            "description": "Revision or request identity conflict"
+          }
+        },
+        "operationId": "changeTenantGeneralExperienceUsage",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuggestionChange"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1087,6 +1233,180 @@
           "revision": {
             "type": "integer",
             "minimum": 2
+          }
+        }
+      },
+      "SuggestionChange": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requestId",
+          "versionId",
+          "workspaceId",
+          "intent",
+          "content"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "versionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "intent": {
+            "enum": [
+              "FEEDBACK",
+              "ADAPTATION"
+            ]
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 12000
+          }
+        }
+      },
+      "Suggestion": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "versionId",
+          "workspaceId",
+          "intent",
+          "state",
+          "resultEntryId",
+          "resultVersionId",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "versionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "intent": {
+            "enum": [
+              "FEEDBACK",
+              "ADAPTATION"
+            ]
+          },
+          "state": {
+            "enum": [
+              "WAITING",
+              "PROCESSING",
+              "RETRYING",
+              "ADMITTED",
+              "DUPLICATE",
+              "NOT_ADMITTED",
+              "UNAVAILABLE",
+              "FAILED",
+              "UNKNOWN"
+            ]
+          },
+          "resultEntryId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "resultVersionId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "resultEntryId": {
+                  "type": "null"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "resultVersionId": {
+                  "type": "null"
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "resultVersionId": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "Suggestions": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "enabled",
+          "canSubmit",
+          "scopes",
+          "items"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "canSubmit": {
+            "type": "boolean"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "name"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                }
+              }
+            }
+          },
+          "items": {
+            "type": "array",
+            "maxItems": 10,
+            "items": {
+              "$ref": "#/components/schemas/Suggestion"
+            }
           }
         }
       }

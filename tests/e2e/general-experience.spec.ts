@@ -20,6 +20,8 @@ async function fixture(
     dropFirst?: boolean;
     dropPlatformFirst?: boolean;
     denyPlatformMutation?: boolean;
+    dropSuggestionFirst?: boolean;
+    noSuggestionScope?: boolean;
   } = {},
 ) {
   let enabled = true,
@@ -33,6 +35,9 @@ async function fixture(
   const globalRecords: unknown[] = [];
   let globalReceipt: unknown;
   let revoked = false;
+  const suggestionChanges: Record<string, unknown>[] = [];
+  const suggestions: Record<string, unknown>[] = [];
+  let suggestionScope = !options.noSuggestionScope;
   const calls: string[] = [];
   const mutations: string[] = [];
   await context.route('**/api/**', async (route) => {
@@ -125,6 +130,81 @@ async function fixture(
             changedAt: '2026-10-04T00:00:00Z',
           });
     }
+    if (path.endsWith('/suggestions')) {
+      if (route.request().method() === 'POST') {
+        const body = route.request().postDataJSON();
+        suggestionChanges.push(body);
+        if (!suggestions.length)
+          suggestions.push({
+            id: id(30),
+            versionId: body.versionId,
+            workspaceId: body.workspaceId,
+            intent: body.intent,
+            state: 'WAITING',
+            resultEntryId: null,
+            resultVersionId: null,
+            createdAt: '2026-10-04T00:00:00Z',
+          });
+        if (options.dropSuggestionFirst && suggestionChanges.length === 1) return route.abort('failed');
+        return json(suggestions[0]);
+      }
+      return json({
+        enabled: true,
+        canSubmit: enabled && suggestionScope,
+        scopes: suggestionScope ? [{ id: id(20), name: '合成业务空间' }] : [],
+        items: suggestions,
+      });
+    }
+    if (path.includes('/experiences/')) {
+      if (path.endsWith('/adjustments')) return json({ enabled: true, items: [] });
+      if (path.endsWith('/history'))
+        return json({
+          items: [
+            {
+              id: id(32),
+              number: 1,
+              origin: 'AUTOMATIC',
+              evaluation: 'AUTOMATIC_CHECKED',
+              createdAt: '2026-10-04T00:00:00Z',
+              current: true,
+            },
+          ],
+          hasMore: false,
+        });
+      return json({
+        id: id(31),
+        tenantId: tenant,
+        workspaceId: id(20),
+        revision: 2,
+        status: 'PUBLISHED',
+        latestNumber: 1,
+        publishedVersion: id(32),
+        canMaintain: true,
+        canRestore: false,
+        version: {
+          id: id(32),
+          number: 1,
+          schemaVersion: 1,
+          content: {
+            kind: 'METHOD',
+            title: '企业核对补充',
+            summary: '合成企业补充摘要',
+            body: '合成企业专用方法',
+            tags: ['核对'],
+            applicable: '有依据',
+            excluded: '无依据不使用',
+            dependencies: '',
+            basis: '自动核验',
+            accessMode: 'SOURCE_BOUND',
+          },
+          evidence: [],
+          origin: 'AUTOMATIC',
+          evaluation: 'AUTOMATIC_CHECKED',
+          createdBy: actor,
+          createdAt: '2026-10-04T00:00:00Z',
+        },
+      });
+    }
     if (path.endsWith('/usage')) {
       if (route.request().method() === 'POST') {
         const body = route.request().postDataJSON();
@@ -197,6 +277,14 @@ async function fixture(
     mutations,
     changes,
     globalChanges,
+    suggestionChanges,
+    loseSuggestionScope: () => {
+      suggestionScope = false;
+    },
+    admitSuggestion: () => {
+      if (suggestions.length)
+        Object.assign(suggestions[0], { state: 'ADMITTED', resultEntryId: id(31), resultVersionId: id(32) });
+    },
     revoke: () => {
       revoked = true;
     },
@@ -446,4 +534,75 @@ test('platform permission loss during mutation removes method and reason form fr
   await expect(dialog.getByText('没有访问权限', { exact: true })).toBeVisible();
   await expect(dialog.getByText(method.steps[0])).toHaveCount(0);
   await expect(dialog.getByLabel('操作原因')).toHaveCount(0);
+});
+
+test('enterprise supplement submits a fixed private input, locks an uncertain request and opens the qualified local version', async ({
+  page,
+  context,
+}) => {
+  const f = await fixture(context, { dropSuggestionFirst: true });
+  await page.goto(`/tenant-admin/#tenant=${tenant}&admin=experience`);
+  await page.getByLabel('经验来源').selectOption('general');
+  await page
+    .getByRole('button')
+    .filter({ has: page.getByRole('heading', { name: method.title }) })
+    .click();
+  await page.getByRole('button', { name: '补充或反馈', exact: true }).click();
+  await expect(page.getByLabel('目标空间')).toHaveValue('');
+  await page.getByLabel('目标空间').selectOption(id(20));
+  await page.getByLabel('内容与依据').fill('private-human-proposal 核对覆盖期间');
+  await page.setViewportSize({ width: 360, height: 980 });
+  const dialog = page.getByRole('dialog');
+  expect(await dialog.evaluate((e) => e.scrollWidth <= e.clientWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/general-enterprise-suggestion.png', fullPage: true });
+  await page.getByRole('button', { name: '提交自动处理', exact: true }).click();
+  await expect(page.getByRole('button', { name: '重试原请求', exact: true })).toBeVisible();
+  await expect(page.getByLabel('内容与依据')).toBeDisabled();
+  await expect(page.getByLabel('经验来源')).toBeDisabled();
+  await expect(page.getByRole('button', { name: '停止本企业使用', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: '关闭弹窗' }).click();
+  await expect(dialog).toBeVisible();
+  await page.getByRole('button', { name: '重试原请求', exact: true }).click();
+  await expect(page.getByText('等待处理', { exact: true })).toBeVisible();
+  expect(f.suggestionChanges).toHaveLength(2);
+  expect(f.suggestionChanges[0]).toEqual(f.suggestionChanges[1]);
+  expect(f.suggestionChanges[0]).toMatchObject({
+    versionId: version,
+    workspaceId: id(20),
+    intent: 'ADAPTATION',
+  });
+  expect(await page.evaluate(() => JSON.stringify(sessionStorage))).not.toContain('private-human-proposal');
+  f.admitSuggestion();
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await page.getByRole('button', { name: '查看企业经验', exact: true }).click();
+  await expect(page.getByLabel('经验来源')).toHaveValue('enterprise');
+  await expect(page.getByText('合成企业专用方法', { exact: true })).toBeVisible();
+  expect(f.calls.some((c) => c.includes(`/experiences/${id(31)}?version=${id(32)}`))).toBe(true);
+});
+test('workspace permission removal clears the unsent proposal and platform never shows enterprise submission controls', async ({
+  page,
+  context,
+}) => {
+  const f = await fixture(context);
+  await page.goto(`/tenant-admin/#tenant=${tenant}&admin=experience`);
+  await page.getByLabel('经验来源').selectOption('general');
+  await page
+    .getByRole('button')
+    .filter({ has: page.getByRole('heading', { name: method.title }) })
+    .click();
+  await page.getByRole('button', { name: '补充或反馈', exact: true }).click();
+  await page.getByLabel('目标空间').selectOption(id(20));
+  await page.getByLabel('内容与依据').fill('待提交的私有补充');
+  f.loseSuggestionScope();
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect(page.getByLabel('内容与依据')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '补充或反馈', exact: true })).toHaveCount(0);
+  expect(f.suggestionChanges).toHaveLength(0);
+  await page.goto('/platform-admin/#admin=experience');
+  await page
+    .getByRole('button')
+    .filter({ has: page.getByRole('heading', { name: method.title }) })
+    .click();
+  await expect(page.getByText(method.steps[0], { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '企业补充与反馈' })).toHaveCount(0);
 });
