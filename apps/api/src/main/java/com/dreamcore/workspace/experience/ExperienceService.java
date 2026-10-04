@@ -17,7 +17,7 @@ public class ExperienceService {
  public record Content(String kind,String title,String summary,String body,List<String> tags,String applicable,String excluded,String dependencies,String basis,String accessMode) {}
  public record Evidence(String kind,UUID referenceId,UUID workspaceId) {}
  public record Version(UUID id,int number,int schemaVersion,Content content,List<Evidence> evidence,String origin,String evaluation,UUID createdBy,Instant createdAt) {}
- public record Entry(UUID id,UUID tenantId,UUID workspaceId,int revision,String status,int latestNumber,UUID publishedVersion,boolean canMaintain,Version version) {}
+ public record Entry(UUID id,UUID tenantId,UUID workspaceId,int revision,String status,int latestNumber,UUID publishedVersion,boolean canMaintain,Version version,boolean canRestore) {}
  public record Summary(UUID id,UUID versionId,int number,int revision,String status,String title,String summary,List<String> tags,String applicable,String excluded,String origin,String evaluation) {}
  public record Page(List<Summary> items,boolean hasMore,boolean canMaintain,String indexStatus) {}
  public record Versions(List<Version> items,boolean hasMore) {}
@@ -104,7 +104,7 @@ public class ExperienceService {
   if(selected==null)throw missing();
   // Historical versions are readable by authorized readers; candidate versions require maintenance.
   if(!maintain&&!Objects.equals(selected,e.get("published_version"))&&!Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM experience_events WHERE entry_id=? AND version_id=? AND action='PUBLISHED')",Boolean.class,id,selected)))throw missing();
-  return new Entry(id,tenant,space,n(e,"revision"),(String)e.get("status"),n(e,"latest_number"),(UUID)e.get("published_version"),maintain,projectVersion(actor,tenant,versionRow(actor,tenant,space,id,selected)));
+  return new Entry(id,tenant,space,n(e,"revision"),(String)e.get("status"),n(e,"latest_number"),(UUID)e.get("published_version"),maintain,projectVersion(actor,tenant,versionRow(actor,tenant,space,id,selected)),maintain&&"WITHDRAWN".equals(e.get("status"))&&selected.equals(lastPublished(id))&&restoreSourcesAvailable(selected));
  }
  @Transactional public Page list(UUID actor,UUID tenant,UUID space,String query,String tag,boolean maintenance,int offset,int limit){
   paging(offset,limit);boolean can=scope(actor,tenant,space,maintenance);query=text(query,200,false);tag=text(tag,40,false).toLowerCase(Locale.ROOT);
@@ -158,6 +158,24 @@ public class ExperienceService {
   if(prior!=null)return get(actor,tenant,space,id,prior);if(n(e,"revision")!=expected)throw new IdentityException(409,"EXPERIENCE_STATE_CHANGED");
   UUID v=(UUID)e.get("published_version");if(v==null)throw new IdentityException(409,"EXPERIENCE_NOT_PUBLISHED");
   db.update("UPDATE experience_entries SET status='WITHDRAWN',published_version=NULL,automation_stopped=true,revision=revision+1,updated_at=now() WHERE id=?",id);event(actor,tenant,id,v,expected+1,"WITHDRAWN");identities.remember(actor,key,"EXPERIENCE_WITHDRAW",h,v);return get(actor,tenant,space,id,v);
+ }
+ private UUID lastPublished(UUID entry){var ids=db.queryForList("SELECT version_id FROM experience_events WHERE entry_id=? AND action='PUBLISHED' ORDER BY revision DESC,created_at DESC LIMIT 1",UUID.class,entry);return ids.isEmpty()?null:ids.getFirst();}
+ private boolean restoreSourcesAvailable(UUID version){
+  return Boolean.TRUE.equals(db.queryForObject("SELECT NOT EXISTS(SELECT 1 FROM experience_automatic_sources s WHERE s.version_id=? AND NOT experience_intake_available(s.source_id)) AND NOT EXISTS(SELECT 1 FROM experience_automatic_dependencies d JOIN experience_versions v ON v.id=d.dependency_version JOIN experience_entries e ON e.id=v.entry_id WHERE d.version_id=? AND (v.scrubbed OR e.automation_stopped OR NOT object_is_active('EXPERIENCE_VERSION',v.id)))",Boolean.class,version,version));
+ }
+ /** Resume only the last publication, without approving a draft or recreating scrubbed descendants. */
+ @Transactional public Entry restore(UUID actor,UUID tenant,UUID space,UUID id,UUID key,int expected,UUID version){
+  scope(actor,tenant,space,true);db.queryForList("SELECT id FROM tenants WHERE id=? FOR SHARE",tenant);
+  String h=hash(tenant,space,id,expected,version);UUID prior=identities.priorRequest(actor,key,"EXPERIENCE_RESTORE",h);
+  versionRow(actor,tenant,space,id,version);
+  db.queryForList("SELECT i.id FROM experience_intake_sources i JOIN experience_automatic_sources s ON s.source_id=i.id WHERE s.version_id=? ORDER BY i.id FOR SHARE OF i",version);
+  db.queryForList("SELECT id FROM experience_versions WHERE id=? FOR SHARE",version);
+  var e=row(actor,tenant,space,id,true);if(prior!=null)return get(actor,tenant,space,id,prior);
+  if(n(e,"revision")!=expected||!"WITHDRAWN".equals(e.get("status"))||!version.equals(lastPublished(id)))throw new IdentityException(409,"EXPERIENCE_STATE_CHANGED");
+  versionRow(actor,tenant,space,id,version);if(!restoreSourcesAvailable(version))throw new IdentityException(409,"EXPERIENCE_EVIDENCE_UNAVAILABLE");
+  db.update("UPDATE experience_entries SET status='PUBLISHED',published_version=?,automation_stopped=false,revision=revision+1,updated_at=now() WHERE id=?",version,id);
+  db.update("INSERT INTO experience_events(id,entry_id,version_id,revision,action,actor_id) VALUES (?,?,?,?,'PUBLISHED',?)",UUID.randomUUID(),id,version,expected+1,actor);
+  audit.record(actor,tenant,"EXPERIENCE_RESTORED",id,"SUCCESS");identities.remember(actor,key,"EXPERIENCE_RESTORE",h,version);return get(actor,tenant,space,id,version);
  }
  @Transactional public Events events(UUID actor,UUID tenant,UUID space,UUID id,int offset,int limit){
   paging(offset,limit);row(actor,tenant,space,id,true);

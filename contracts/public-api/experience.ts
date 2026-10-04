@@ -36,6 +36,8 @@ export interface ExperienceEntry {
   status: 'CANDIDATE' | 'PUBLISHED' | 'WITHDRAWN';
   latestNumber: number;
   publishedVersion: string | null;
+  /** Omitted by older servers; never infer restoration permission from status alone. */
+  canRestore?: boolean;
   canMaintain: boolean;
   version: ExperienceVersion;
 }

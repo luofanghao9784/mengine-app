@@ -16,6 +16,7 @@ public class ExperienceController {
  public record Draft(@NotNull UUID requestId,@NotNull ExperienceService.Content content,@NotNull List<ExperienceService.Evidence> evidence) {}
  public record Revision(@NotNull UUID requestId,@NotNull Integer expectedRevision,@NotNull ExperienceService.Content content,@NotNull List<ExperienceService.Evidence> evidence) {}
  public record Publish(@NotNull UUID requestId,@NotNull Integer expectedRevision,@NotNull UUID versionId,@NotNull Boolean independentCopyConfirmed) {}
+ public record Restore(@NotNull UUID requestId,@NotNull Integer expectedRevision,@NotNull UUID versionId) {}
  public record Withdraw(@NotNull UUID requestId,@NotNull Integer expectedRevision) {}
  public record Use(@NotNull UUID requestId,@NotNull ExperienceService.UseInput use) {}
  public record Feedback(@NotNull UUID requestId,@NotNull String result,@NotNull String note) {}
@@ -29,6 +30,7 @@ public class ExperienceController {
  @GetMapping("/{id}/versions") public ExperienceService.Versions versions(Authentication a,@PathVariable UUID tenant,@PathVariable UUID workspace,@PathVariable UUID id,@RequestParam(defaultValue="0") int offset,@RequestParam(defaultValue="20") int limit){return service.versions(actor(a),tenant,workspace,id,offset,limit);}
  @PostMapping("/{id}/publish") public ExperienceService.Entry publish(Authentication a,@PathVariable UUID tenant,@PathVariable UUID workspace,@PathVariable UUID id,@Valid @RequestBody Publish b){return service.publish(actor(a),tenant,workspace,id,b.requestId(),b.expectedRevision(),b.versionId(),b.independentCopyConfirmed());}
  @PostMapping("/{id}/withdraw") public ExperienceService.Entry withdraw(Authentication a,@PathVariable UUID tenant,@PathVariable UUID workspace,@PathVariable UUID id,@Valid @RequestBody Withdraw b){return service.withdraw(actor(a),tenant,workspace,id,b.requestId(),b.expectedRevision());}
+ @PostMapping("/{id}/restore") public ExperienceService.Entry restore(Authentication a,@PathVariable UUID tenant,@PathVariable UUID workspace,@PathVariable UUID id,@Valid @RequestBody Restore b){return service.restore(actor(a),tenant,workspace,id,b.requestId(),b.expectedRevision(),b.versionId());}
  @GetMapping("/{id}/events") public ExperienceService.Events events(Authentication a,@PathVariable UUID tenant,@PathVariable UUID workspace,@PathVariable UUID id,@RequestParam(defaultValue="0") int offset,@RequestParam(defaultValue="20") int limit){return service.events(actor(a),tenant,workspace,id,offset,limit);}
  @PostMapping("/{id}/uses") @ResponseStatus(HttpStatus.CREATED) public ExperienceService.Use use(Authentication a,@PathVariable UUID tenant,@PathVariable UUID workspace,@PathVariable UUID id,@Valid @RequestBody Use b){return service.recordUse(actor(a),tenant,workspace,id,b.requestId(),b.use());}
  @GetMapping("/{id}/uses") public ExperienceService.Uses uses(Authentication a,@PathVariable UUID tenant,@PathVariable UUID workspace,@PathVariable UUID id,@RequestParam(defaultValue="0") int offset,@RequestParam(defaultValue="20") int limit){return service.uses(actor(a),tenant,workspace,id,offset,limit);}

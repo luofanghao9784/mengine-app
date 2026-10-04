@@ -130,3 +130,10 @@ test('automatic entries remain readable with truthful provenance and reject mixe
     false,
   );
 });
+
+test('restoration permission is explicit, limited to withdrawn maintainable entries', () => {
+  assert.ok(isEntry({ ...entry, status: 'WITHDRAWN', canRestore: true }));
+  assert.equal(isEntry({ ...entry, canRestore: true }), false);
+  assert.equal(isEntry({ ...entry, status: 'WITHDRAWN', canRestore: true, canMaintain: false }), false);
+  assert.equal(isEntry({ ...entry, status: 'WITHDRAWN', canRestore: 'yes' }), false);
+});

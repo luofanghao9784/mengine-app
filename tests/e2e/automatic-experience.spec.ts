@@ -7,6 +7,10 @@ const tenant = id(1),
   version = id(5);
 async function fixture(context: BrowserContext) {
   let revoked = false;
+  let stopped = false,
+    loseNextResponse = false;
+  const requests: unknown[] = [];
+  const completed = new Set<string>();
   const mutations: string[] = [];
   const queries: URLSearchParams[] = [];
   let waiting = 3;
@@ -47,6 +51,7 @@ async function fixture(context: BrowserContext) {
     const path = new URL(route.request().url()).pathname;
     const json = (value: unknown, status = 200) => route.fulfill({ json: value, status });
     if (route.request().method() !== 'GET') mutations.push(path);
+    if (path === '/api/v1/auth/csrf') return json({ headerName: 'X-CSRF-TOKEN', token: 'synthetic' });
     if (path.endsWith('/phone/configuration')) return json({ delivery: 'DISABLED', localPreview: false });
     if (path === '/api/v1/me')
       return json({
@@ -76,25 +81,26 @@ async function fixture(context: BrowserContext) {
       queries.push(new URL(route.request().url()).searchParams);
       return json({
         scopes: [{ id: space, name: '合成共享空间' }],
-        items: revoked
-          ? []
-          : [
-              {
-                workspaceId: space,
-                workspaceName: '合成共享空间',
-                updatedAt: '2026-10-04T00:00:00Z',
-                experience: {
-                  id: entryId,
-                  versionId: version,
-                  number: 1,
-                  revision: 2,
-                  status: 'PUBLISHED',
-                  ...content,
-                  origin: 'AUTOMATIC',
-                  evaluation: 'AUTOMATIC_CHECKED',
+        items:
+          revoked || (new URL(route.request().url()).searchParams.get('state') === 'STOPPED') !== stopped
+            ? []
+            : [
+                {
+                  workspaceId: space,
+                  workspaceName: '合成共享空间',
+                  updatedAt: '2026-10-04T00:00:00Z',
+                  experience: {
+                    id: entryId,
+                    versionId: version,
+                    number: 1,
+                    revision: 2,
+                    status: stopped ? 'WITHDRAWN' : 'PUBLISHED',
+                    ...content,
+                    origin: 'AUTOMATIC',
+                    evaluation: 'AUTOMATIC_CHECKED',
+                  },
                 },
-              },
-            ],
+              ],
         hasMore: false,
       });
     }
@@ -162,12 +168,36 @@ async function fixture(context: BrowserContext) {
         ],
         hasMore: false,
       });
+    const current = () => ({
+      ...result,
+      status: stopped ? 'WITHDRAWN' : 'PUBLISHED',
+      publishedVersion: stopped ? null : version,
+      canRestore: stopped,
+    });
+    if (path.endsWith('/withdraw') || path.endsWith('/restore')) {
+      const body = route.request().postDataJSON();
+      requests.push(body);
+      if (!completed.has(body.requestId)) {
+        stopped = path.endsWith('/withdraw');
+        result.revision++;
+        completed.add(body.requestId);
+      }
+      if (loseNextResponse) {
+        loseNextResponse = false;
+        return route.abort('failed');
+      }
+      return json(current());
+    }
     if (path.endsWith('/experiences/' + entryId))
-      return revoked ? json({ contractVersion: '1.0', code: 'EXPERIENCE_NOT_FOUND' }, 404) : json(result);
+      return revoked ? json({ contractVersion: '1.0', code: 'EXPERIENCE_NOT_FOUND' }, 404) : json(current());
     return json({ contractVersion: '1.0', code: 'NOT_FOUND' }, 404);
   });
   return {
     mutations,
+    requests,
+    loseResponse: () => {
+      loseNextResponse = true;
+    },
     queries,
     setWaiting: (n: number) => {
       waiting = n;
@@ -254,4 +284,32 @@ test('mobile processing and drawer fit the viewport', async ({ page, context }) 
   await expect(page.locator('.experience-detail')).toBeVisible();
   expect(await page.locator('dialog').evaluate((e) => e.scrollWidth <= e.clientWidth)).toBe(true);
   await page.screenshot({ path: '/tmp/experience-drawer-mobile.png', fullPage: true });
+});
+
+test('stop and restore retain the exact version and reconcile a lost response with the same request', async ({
+  page,
+  context,
+}) => {
+  const state = await fixture(context);
+  await page.goto(start);
+  await page.getByRole('button', { name: /先核对来源口径/ }).click();
+  await page.getByRole('button', { name: '停用经验', exact: true }).click();
+  await expect(page.getByText(/依赖它的自动经验会失效/)).toBeVisible();
+  state.loseResponse();
+  await page.getByRole('button', { name: '确认停用', exact: true }).click();
+  await expect(page.getByRole('button', { name: '重试原请求' })).toBeVisible();
+  await page.getByRole('button', { name: '关闭弹窗' }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.experience-detail')).toBeVisible();
+  await expect(page.getByRole('button', { name: '取消并刷新' })).toBeDisabled();
+  await page.getByRole('button', { name: '重试原请求' }).click();
+  await expect(page.getByRole('button', { name: '恢复使用', exact: true })).toBeVisible();
+  expect(state.requests[0]).toEqual(state.requests[1]);
+  await page.getByRole('button', { name: '恢复使用', exact: true }).click();
+  await expect(page.getByText(/已清理的内容和下游任务不会恢复/)).toBeVisible();
+  await page.getByRole('button', { name: '确认恢复', exact: true }).click();
+  await expect(page.getByRole('button', { name: '停用经验', exact: true })).toBeVisible();
+  expect(state.requests[2]).toMatchObject({ versionId: version, expectedRevision: 3 });
+  await page.getByRole('button', { name: '关闭弹窗' }).click();
+  await expect(page.locator('.experience-management-card')).toHaveCount(1);
 });

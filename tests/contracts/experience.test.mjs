@@ -108,3 +108,13 @@ test('automatic checking is a distinct origin pair, never interchangeable with m
   assert.equal(validate({ ...version, origin: 'MANUAL' }), false);
   assert.equal(validate({ ...version, evaluation: 'NOT_EVALUATED' }), false);
 });
+
+test('restoration requires the original publication and expected revision', () => {
+  assert.ok(check('ExperienceRestore')({ requestId: id, expectedRevision: 3, versionId: id }));
+  assert.equal(check('ExperienceRestore')({ requestId: id, expectedRevision: 3 }), false);
+  assert.equal(check('ExperienceRestore')({ requestId: id, expectedRevision: 0, versionId: id }), false);
+  assert.equal(
+    check('ExperienceRestore')({ requestId: id, expectedRevision: 3, versionId: id, content }),
+    false,
+  );
+});

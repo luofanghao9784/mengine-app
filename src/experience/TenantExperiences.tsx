@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { BookOpen, RefreshCw } from 'lucide-react';
-import { uuid } from '../identity/client';
+import { IdentityError, uuid } from '../identity/client';
 import { useSession } from '../identity/session';
 import { Badge, Button, DocumentText, Empty, Field, Modal } from '../shared/ui';
-import { Failure, Loading, Pager, useRemote } from '../shared/admin';
+import { Failure, Loading, Pager, SubmitError, useRemote, useSubmission } from '../shared/admin';
 import { pageState, textState, useViewState } from '../shared/useViewState';
-import { requestNavigationLocked } from '../shared/request-guard';
+import { requestNavigationLocked, useRequestLock } from '../shared/request-guard';
 import { experienceClient } from './client';
 import { experienceManagementClient as api, processingLabels, reasonLabels } from './management-client';
 import './management.css';
@@ -69,6 +69,7 @@ export function TenantExperiences({ tenant }: { tenant: string }) {
       select(legacyEntry);
     }
   }, [legacyEntry?.id, legacySpace, setSpace, select]);
+  const [locked, setLocked] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const refresh = () => setAttempt((n) => n + 1);
   const data = useRemote(
@@ -101,6 +102,7 @@ export function TenantExperiences({ tenant }: { tenant: string }) {
           role="tab"
           aria-selected={tab !== 'processing'}
           variant={tab !== 'processing' ? 'primary' : 'ghost'}
+          disabled={locked}
           onClick={() => setTab('content')}
         >
           经验内容
@@ -109,11 +111,12 @@ export function TenantExperiences({ tenant }: { tenant: string }) {
           role="tab"
           aria-selected={tab === 'processing'}
           variant={tab === 'processing' ? 'primary' : 'ghost'}
+          disabled={locked}
           onClick={() => setTab('processing')}
         >
           积累与改进
         </Button>
-        <Button icon={RefreshCw} variant="ghost" onClick={refresh}>
+        <Button icon={RefreshCw} variant="ghost" disabled={locked} onClick={refresh}>
           刷新
         </Button>
       </div>
@@ -127,6 +130,7 @@ export function TenantExperiences({ tenant }: { tenant: string }) {
       >
         <Field label="经验范围">
           <select
+            disabled={locked}
             aria-label="经验范围"
             value={space}
             onChange={(e) => {
@@ -147,6 +151,7 @@ export function TenantExperiences({ tenant }: { tenant: string }) {
         {tab === 'processing' ? (
           <Field label="处理状态">
             <select
+              disabled={locked}
               aria-label="处理状态"
               value={state}
               onChange={(e) => {
@@ -166,6 +171,7 @@ export function TenantExperiences({ tenant }: { tenant: string }) {
           <>
             <Field label="搜索经验">
               <input
+                disabled={locked}
                 aria-label="搜索经验"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -175,6 +181,7 @@ export function TenantExperiences({ tenant }: { tenant: string }) {
             </Field>
             <Field label="状态">
               <select
+                disabled={locked}
                 aria-label="经验状态"
                 value={contentState}
                 onChange={(e) => {
@@ -186,7 +193,9 @@ export function TenantExperiences({ tenant }: { tenant: string }) {
                 <option value="STOPPED">已停用</option>
               </select>
             </Field>
-            <Button type="submit">搜索</Button>
+            <Button type="submit" disabled={locked}>
+              搜索
+            </Button>
           </>
         )}
       </form>
@@ -315,7 +324,11 @@ export function TenantExperiences({ tenant }: { tenant: string }) {
         <ExperienceDrawer
           tenant={tenant}
           selection={selection}
-          close={() => select(null)}
+          close={() => {
+            if (!locked) select(null);
+          }}
+          changed={refresh}
+          lock={setLocked}
           chooseVersion={(version) => select({ ...selection, version })}
         />
       )}
@@ -327,12 +340,25 @@ function ExperienceDrawer({
   selection,
   close,
   chooseVersion,
+  changed,
+  lock,
 }: {
   tenant: string;
   selection: Selection;
   close: () => void;
   chooseVersion: (version: string) => void;
+  changed: () => void;
+  lock: (value: boolean) => void;
 }) {
+  type Action = { intent: 'stop' | 'restore'; expectedRevision: number; versionId: string };
+  const [action, setAction] = useState<Action | null>(null);
+  const submission = useSubmission<Action>();
+  const blocked = submission.busy || submission.uncertain;
+  useRequestLock(blocked);
+  useEffect(() => {
+    lock(blocked);
+    return () => lock(false);
+  }, [blocked, lock]);
   const [attempt, setAttempt] = useState(0),
     [historyOpen, setHistoryOpen] = useState(false),
     [historyPage, setHistoryPage] = useState(0);
@@ -350,9 +376,20 @@ function ExperienceDrawer({
   );
   const e = detail.value,
     c = e?.version.content;
-  const denied = detail.error || history.error;
+  const denied =
+    detail.error ||
+    history.error ||
+    (submission.error instanceof IdentityError && [401, 403, 404].includes(submission.error.status)
+      ? submission.error
+      : undefined);
   return (
-    <Modal title="经验详情" className="experience-management-drawer" onClose={close}>
+    <Modal
+      title="经验详情"
+      className="experience-management-drawer"
+      onClose={() => {
+        if (!blocked) close();
+      }}
+    >
       {denied ? (
         <Failure error={denied} retry={() => setAttempt((n) => n + 1)} />
       ) : !e || !c ? (
@@ -362,9 +399,81 @@ function ExperienceDrawer({
           <div className="experience-section-head">
             <h3>{c.title}</h3>
             <Badge>
-              v{e.version.number} · {e.publishedVersion === e.version.id ? '当前可用' : '历史版本'}
+              v{e.version.number} ·{' '}
+              {e.status === 'WITHDRAWN'
+                ? '已停用'
+                : e.publishedVersion === e.version.id
+                  ? '当前可用'
+                  : '历史版本'}
             </Badge>
           </div>
+          {e.canMaintain &&
+            ((e.status === 'PUBLISHED' && e.publishedVersion === e.version.id) || e.canRestore || action) && (
+              <section className="experience-availability" aria-label="经验使用状态">
+                {action ? (
+                  <>
+                    <p>
+                      {action.intent === 'stop'
+                        ? '停用后，引擎不再检索采用此经验，自动更新暂停；依赖它的自动经验会失效。历史版本保留。'
+                        : '恢复最后发布版本供后续任务参考，并允许系统继续自动更新；已清理的内容和下游任务不会恢复。'}
+                    </p>
+                    <SubmitError error={submission.error} uncertain={submission.uncertain} />
+                    <Button
+                      disabled={submission.busy}
+                      onClick={() =>
+                        void submission.submit(action, async (body, requestId) => {
+                          if (body.intent === 'stop')
+                            await experienceClient.withdraw(tenant, selection.space, selection.id, {
+                              requestId,
+                              expectedRevision: body.expectedRevision,
+                            });
+                          else
+                            await experienceClient.restore(tenant, selection.space, selection.id, {
+                              requestId,
+                              expectedRevision: body.expectedRevision,
+                              versionId: body.versionId,
+                            });
+                          setAction(null);
+                          setAttempt((n) => n + 1);
+                          changed();
+                        })
+                      }
+                    >
+                      {submission.busy
+                        ? '正在提交…'
+                        : submission.uncertain
+                          ? '重试原请求'
+                          : action.intent === 'stop'
+                            ? '确认停用'
+                            : '确认恢复'}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      disabled={blocked}
+                      onClick={() => {
+                        setAction(null);
+                        setAttempt((n) => n + 1);
+                      }}
+                    >
+                      取消并刷新
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    onClick={() =>
+                      setAction({
+                        intent: e.status === 'PUBLISHED' ? 'stop' : 'restore',
+                        expectedRevision: e.revision,
+                        versionId: e.version.id,
+                      })
+                    }
+                  >
+                    {e.status === 'PUBLISHED' ? '停用经验' : '恢复使用'}
+                  </Button>
+                )}
+              </section>
+            )}
           <p className="experience-detail-meta">
             {e.version.origin === 'AUTOMATIC' ? '系统积累 · 自动核验通过' : '历史人工经验 · 未评测'} ·{' '}
             {stamp(e.version.createdAt)}
@@ -408,7 +517,7 @@ function ExperienceDrawer({
                       <li key={v.id}>
                         <Button
                           variant="ghost"
-                          disabled={selection.version === v.id}
+                          disabled={blocked || !!action || selection.version === v.id}
                           onClick={() => chooseVersion(v.id)}
                         >
                           v{v.number}

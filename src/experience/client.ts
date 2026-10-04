@@ -57,6 +57,8 @@ export const isEntry = (v: unknown): v is ExperienceEntry =>
   (v.publishedVersion === null || uuid(v.publishedVersion)) &&
   (v.status === 'PUBLISHED' ? uuid(v.publishedVersion) : v.publishedVersion === null) &&
   typeof v.canMaintain === 'boolean' &&
+  (v.canRestore === undefined ||
+    (typeof v.canRestore === 'boolean' && (!v.canRestore || (v.canMaintain && v.status === 'WITHDRAWN')))) &&
   isVersion(v.version) &&
   v.version.number <= v.latestNumber;
 export const isSummary = (v: unknown): v is ExperienceSummary =>
@@ -208,6 +210,14 @@ export function createExperienceClient(fetcher: typeof fetch = fetch) {
         (v): v is ExperienceEntry => scoped(t, w, e)(v) && v.version.id === body.versionId,
         body,
       );
+    },
+    restore(
+      t: string,
+      w: string,
+      e: string,
+      body: { requestId: string; expectedRevision: number; versionId: string },
+    ) {
+      return send(root(t, w) + '/' + id(e) + '/restore', 'POST', scoped(t, w, e), body);
     },
     withdraw(t: string, w: string, e: string, body: { requestId: string; expectedRevision: number }) {
       return send(root(t, w) + '/' + id(e) + '/withdraw', 'POST', scoped(t, w, e), body);

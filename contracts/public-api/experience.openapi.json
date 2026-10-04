@@ -1448,6 +1448,123 @@
           }
         }
       }
+    },
+    "/api/v1/tenants/{tenant}/workspaces/{workspace}/experiences/{id}/restore": {
+      "post": {
+        "operationId": "restoreExperience",
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "workspace",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Persisted authorized result",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperienceEntry"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation, authorization or concurrency failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Validation, authorization or concurrency failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Validation, authorization or concurrency failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Validation, authorization or concurrency failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Validation, authorization or concurrency failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExperienceRestore"
+              }
+            }
+          }
+        },
+        "summary": "恢复最后实际发布且当前来源有效的版本，不发布草稿"
+      }
     }
   },
   "components": {
@@ -1631,10 +1748,16 @@
             "maxItems": 100
           },
           "origin": {
-            "enum": ["MANUAL", "AUTOMATIC"]
+            "enum": [
+              "MANUAL",
+              "AUTOMATIC"
+            ]
           },
           "evaluation": {
-            "enum": ["NOT_EVALUATED", "AUTOMATIC_CHECKED"]
+            "enum": [
+              "NOT_EVALUATED",
+              "AUTOMATIC_CHECKED"
+            ]
           },
           "createdBy": {
             "type": "string",
@@ -1705,8 +1828,36 @@
           },
           "version": {
             "$ref": "#/components/schemas/ExperienceVersion"
+          },
+          "canRestore": {
+            "type": "boolean",
+            "description": "True only for the currently readable last published version of a withdrawn entry and an authorized maintainer. Older servers may omit."
           }
-        }
+        },
+        "allOf": [
+          {
+            "if": {
+              "required": [
+                "canRestore"
+              ],
+              "properties": {
+                "canRestore": {
+                  "const": true
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "status": {
+                  "const": "WITHDRAWN"
+                },
+                "canMaintain": {
+                  "const": true
+                }
+              }
+            }
+          }
+        ]
       },
       "ExperienceSummary": {
         "oneOf": [
@@ -1797,10 +1948,16 @@
             "maxLength": 2000
           },
           "origin": {
-            "enum": ["MANUAL", "AUTOMATIC"]
+            "enum": [
+              "MANUAL",
+              "AUTOMATIC"
+            ]
           },
           "evaluation": {
-            "enum": ["NOT_EVALUATED", "AUTOMATIC_CHECKED"]
+            "enum": [
+              "NOT_EVALUATED",
+              "AUTOMATIC_CHECKED"
+            ]
           }
         }
       },
@@ -2284,6 +2441,29 @@
           "code": {
             "type": "string",
             "maxLength": 100
+          }
+        }
+      },
+      "ExperienceRestore": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requestId",
+          "expectedRevision",
+          "versionId"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "versionId": {
+            "type": "string",
+            "format": "uuid"
           }
         }
       }
