@@ -194,3 +194,16 @@
 .experience-adjustment-status {
   margin-top: 12px;
 }
+
+.general-experience-heading {
+  font-size: 18px;
+  margin: 8px 0 0;
+}
+.general-experience-detail {
+  overflow-wrap: anywhere;
+  line-height: 1.75;
+}
+.general-experience-detail li {
+  margin: 8px 0;
+  white-space: pre-wrap;
+}

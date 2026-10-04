@@ -1,0 +1,113 @@
+import type {
+  GeneralExperiencePage,
+  GeneralExperienceDetail,
+  GeneralExperienceProcessing,
+  GeneralMethod,
+  GeneralProcessingState,
+} from '../../contracts/public-api/general-experience.ts';
+import { createIdentityRequest, IdentityError, record, uuid } from '../identity/client.ts';
+export const generalProcessingLabels: Record<GeneralProcessingState, string> = {
+  WAITING: '等待处理',
+  PROCESSING: '处理中',
+  RETRYING: '等待重试',
+  ADMITTED: '已入库',
+  DUPLICATE: '无新增',
+  NOT_ADMITTED: '未入库',
+  UNAVAILABLE: '来源已失效',
+  FAILED: '执行失败',
+  UNKNOWN: '结果未确认',
+};
+const exact = (v: unknown, keys: string[]): v is Record<string, unknown> =>
+  record(v) && Object.keys(v).length === keys.length && keys.every((k) => Object.hasOwn(v, k));
+const text = (v: unknown, max: number): v is string =>
+  typeof v === 'string' && v.trim().length > 0 && v.length <= max;
+const date = (v: unknown) => typeof v === 'string' && Number.isFinite(Date.parse(v));
+const count = (v: unknown) => Number.isSafeInteger(v) && Number(v) >= 0;
+const strings = (v: unknown, max: number, length: number) =>
+  Array.isArray(v) && v.length > 0 && v.length <= length && v.every((s) => text(s, max));
+const method = (v: unknown): v is GeneralMethod =>
+  exact(v, ['title', 'summary', 'steps', 'applicable', 'excluded', 'tags', 'basis']) &&
+  text(v.title, 160) &&
+  text(v.summary, 600) &&
+  strings(v.steps, 800, 10) &&
+  strings(v.applicable, 300, 8) &&
+  strings(v.excluded, 300, 8) &&
+  strings(v.tags, 40, 10) &&
+  ['OBSERVED_EXECUTION', 'FEEDBACK_CORRECTION'].includes(String(v.basis));
+const identity = (v: Record<string, unknown>) =>
+  uuid(v.id) &&
+  uuid(v.versionId) &&
+  count(v.number) &&
+  Number(v.number) > 0 &&
+  ['AVAILABLE', 'STOPPED'].includes(String(v.status)) &&
+  date(v.updatedAt);
+export const isGeneralPage = (v: unknown): v is GeneralExperiencePage =>
+  exact(v, ['items', 'hasMore']) &&
+  typeof v.hasMore === 'boolean' &&
+  Array.isArray(v.items) &&
+  v.items.length <= 20 &&
+  v.items.every(
+    (i) =>
+      exact(i, ['id', 'versionId', 'number', 'status', 'title', 'summary', 'tags', 'updatedAt']) &&
+      identity(i) &&
+      text(i.title, 160) &&
+      text(i.summary, 600) &&
+      strings(i.tags, 40, 10),
+  );
+export const isGeneralDetail = (v: unknown): v is GeneralExperienceDetail =>
+  exact(v, ['id', 'versionId', 'number', 'status', 'method', 'updatedAt']) && identity(v) && method(v.method);
+export const isGeneralProcessing = (v: unknown): v is GeneralExperienceProcessing =>
+  exact(v, ['enabled', 'counts', 'available', 'stopped', 'withdrawn', 'checkedAt']) &&
+  typeof v.enabled === 'boolean' &&
+  exact(v.counts, Object.keys(generalProcessingLabels)) &&
+  Object.values(v.counts).every(count) &&
+  count(v.available) &&
+  count(v.stopped) &&
+  count(v.withdrawn) &&
+  date(v.checkedAt);
+export function createGeneralExperienceClient(fetcher: typeof fetch = fetch) {
+  const request = createIdentityRequest(fetcher);
+  const path = (tenant?: string) => {
+    if (tenant !== undefined && !uuid(tenant)) throw new IdentityError('INVALID_REQUEST', 400);
+    return tenant === undefined
+      ? '/api/platform-admin/v1/experience-library'
+      : `/api/v1/tenants/${tenant}/general-experiences`;
+  };
+  return {
+    contents: (
+      tenant: string | undefined,
+      query: string,
+      state: string,
+      offset: number,
+      signal?: AbortSignal,
+    ) =>
+      request(
+        path(tenant) + '?' + new URLSearchParams({ query, state, offset: String(offset) }),
+        'GET',
+        (v): v is GeneralExperiencePage =>
+          isGeneralPage(v) && (tenant === undefined || v.items.every((i) => i.status === 'AVAILABLE')),
+        undefined,
+        signal,
+      ),
+    detail: async (tenant: string | undefined, id: string, version: string, signal?: AbortSignal) => {
+      if (!uuid(id) || !uuid(version)) throw new IdentityError('INVALID_REQUEST', 400);
+      const value = await request(
+        path(tenant) + `/${id}?version=${version}`,
+        'GET',
+        isGeneralDetail,
+        undefined,
+        signal,
+      );
+      if (
+        value.id !== id ||
+        value.versionId !== version ||
+        (tenant !== undefined && value.status !== 'AVAILABLE')
+      )
+        throw new IdentityError('CONTRACT_MISMATCH');
+      return value;
+    },
+    processing: (signal?: AbortSignal) =>
+      request(path() + '/processing', 'GET', isGeneralProcessing, undefined, signal),
+  };
+}
+export const generalExperienceClient = createGeneralExperienceClient();

@@ -9,6 +9,7 @@ import { requestNavigationLocked, useRequestLock } from '../shared/request-guard
 import { experienceClient } from './client';
 import { experienceManagementClient as api, processingLabels, reasonLabels } from './management-client';
 import './management.css';
+import { GeneralExperienceLibrary } from './GeneralExperienceLibrary';
 import { ExperienceAdjustmentPanel } from './ExperienceAdjustmentPanel';
 const stamp = (date: string) => new Date(date).toLocaleString('zh-CN', { hour12: false });
 type Selection = { id: string; version: string | null; space: string };
@@ -23,6 +24,43 @@ const isSelection = (v: unknown): v is Selection | null =>
     (v.version === null || uuid(v.version)) &&
     uuid(v.space));
 export function TenantExperiences({ tenant }: { tenant: string }) {
+  const [source, setSource] = useViewState(
+    tenant,
+    'experience:source',
+    'enterprise',
+    (v): v is string => v === 'enterprise' || v === 'general',
+  );
+  const [locked, setLocked] = useState(false);
+  const params = new URLSearchParams(location.hash.slice(1));
+  const linkedEntry =
+    uuid(params.get('experience')) && uuid(params.get('scope')) ? params.get('experience') : null;
+  useEffect(() => {
+    if (linkedEntry) setSource('enterprise');
+  }, [tenant, linkedEntry, setSource]);
+  return (
+    <div className="admin-dashboard">
+      <Field label="经验来源">
+        <select
+          aria-label="经验来源"
+          value={source}
+          disabled={locked}
+          onChange={(e) => {
+            if (!requestNavigationLocked()) setSource(e.target.value);
+          }}
+        >
+          <option value="enterprise">企业经验</option>
+          <option value="general">通用经验</option>
+        </select>
+      </Field>
+      {source === 'general' ? (
+        <GeneralExperienceLibrary tenant={tenant} />
+      ) : (
+        <EnterpriseExperiences tenant={tenant} onLocked={setLocked} />
+      )}
+    </div>
+  );
+}
+function EnterpriseExperiences({ tenant, onLocked }: { tenant: string; onLocked: (value: boolean) => void }) {
   const { session } = useSession();
   const params = new URLSearchParams(location.hash.slice(1));
   const legacySpace = uuid(params.get('scope')) ? params.get('scope')! : '';
@@ -71,6 +109,10 @@ export function TenantExperiences({ tenant }: { tenant: string }) {
     }
   }, [legacyEntry?.id, legacySpace, setSpace, select]);
   const [locked, setLocked] = useState(false);
+  useEffect(() => {
+    onLocked(locked);
+    return () => onLocked(false);
+  }, [locked, onLocked]);
   const [attempt, setAttempt] = useState(0);
   const refresh = () => setAttempt((n) => n + 1);
   const data = useRemote(

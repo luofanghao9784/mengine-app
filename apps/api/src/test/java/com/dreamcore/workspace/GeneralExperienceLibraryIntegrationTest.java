@@ -1,0 +1,117 @@
+package com.dreamcore.workspace;
+import com.dreamcore.workspace.experience.*;import com.dreamcore.workspace.identity.IdentityException;import com.dreamcore.workspace.feedback.FeedbackService;
+import java.util.*;import java.util.concurrent.*;
+import org.junit.jupiter.api.*;import org.springframework.beans.factory.annotation.Autowired;import org.springframework.boot.test.context.SpringBootTest;import org.springframework.jdbc.core.JdbcTemplate;
+import static org.junit.jupiter.api.Assertions.*;import static org.mockito.Mockito.*;import static org.mockito.ArgumentMatchers.*;import static com.dreamcore.workspace.experience.ExperienceAnalysisRuntime.*;
+
+@SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={"dreamcore.tasks.enabled=false","dreamcore.experience-intake.enabled=false","dreamcore.experience-analysis.enabled=false"})
+class GeneralExperienceLibraryIntegrationTest {
+ @Autowired ExperienceService experiences;@Autowired ExperienceAdmissionService admission;@Autowired JdbcTemplate db;@Autowired ExperienceAnalysisQueue queue;@Autowired ExperienceIntakeService intake;@Autowired FeedbackService feedback;
+ @Autowired com.dreamcore.workspace.material.MaterialService materials;
+ @Autowired ExperienceGeneralizationQueue generalization;@Autowired GeneralExperienceAdmissionService generalAdmission;
+ UUID tenant,owner,space,task;
+ @BeforeEach void fixture(){
+  tenant=UUID.randomUUID();owner=UUID.randomUUID();space=UUID.randomUUID();task=UUID.randomUUID();UUID conversation=UUID.randomUUID();
+  db.update("INSERT INTO tenants(id,name) VALUES (?,'合成调度企业')",tenant);db.update("INSERT INTO accounts(id,email,display_name,password_hash) VALUES (?,?,'合成主体','unused')",owner,owner+"@dispatch.test");db.update("INSERT INTO tenant_memberships(tenant_id,account_id,role) VALUES (?,?,'MEMBER')",tenant,owner);
+  db.update("INSERT INTO workspaces(id,tenant_id,owner_id,name,kind) VALUES (?,?,?,'合成共享空间','SHARED')",space,tenant,owner);db.update("INSERT INTO workspace_members(tenant_id,workspace_id,account_id) VALUES (?,?,?)",tenant,space,owner);
+  db.update("INSERT INTO conversations(id,tenant_id,workspace_id,owner_id,title) VALUES (?,?,?,?,'private-title')",conversation,tenant,space,owner);
+  // Synthetic live-classified fixture only: no actual model/provider/business result.
+  db.update("INSERT INTO conversation_tasks(id,tenant_id,workspace_id,conversation_id,requested_by,prompt,mode,status,revision,attempt,reply,execution_class,engine_version,finished_at) VALUES (?,?,?,?,?,'private-prompt','AGENT','SUCCEEDED',3,1,'private-reply','live','synthetic-fixture',now())",task,tenant,space,conversation,owner);
+  db.update("INSERT INTO conversation_attempts(task_id,attempt_number,attempt_id,input,status,provenance,snapshot) SELECT id,1,?,'private-input','SUCCEEDED','RECORDED',to_jsonb(t) FROM conversation_tasks t WHERE id=?",UUID.randomUUID(),task);
+  db.update("INSERT INTO conversation_tool_receipts(task_id,attempt_number,sequence,name,status) VALUES (?,1,1,'compare_dataset','succeeded')",task);
+ }
+ Job claim(){queue.discover();var job=queue.claim(tenant);assertNotNull(job);return job;}
+ String state(Job j){return db.queryForObject("SELECT state FROM experience_analysis_items WHERE source_id=?",String.class,j.source());}
+ Descriptor descriptor(){return new Descriptor("1.0","synthetic-v1",true,"live");}
+ Result result(Job j,String outcome){
+  var input=j.inputs().stream().filter(i->i.kind().equals("EXECUTION_RECORD")).findFirst().orElseThrow();var evidence=List.of(new Evidence(input.id(),input.text()));
+  var c=new Candidate(null,"先核验工具状态","回执只证明执行状态，不直接证明业务结论。",List.of("检查工具回执，区分执行与业务结果"),List.of("存在明确工具回执"),List.of("没有回执时不推断成功"),List.of("执行状态"),evidence);
+  var r=new Review(Map.of("grounded","PASS","reusable","PASS","bounded","PASS","privacySafe","PASS","novel","PASS"),"OBSERVED_EXECUTION",evidence);
+  return new Result("1.0","synthetic-v1","live",j.id(),j.lease(),j.source(),false,outcome,outcome.equals("QUALIFIED")?null:outcome.equals("SKIPPED")?"DUPLICATE":"QUALITY_NOT_ESTABLISHED",outcome.equals("QUALIFIED")?c:null,outcome.equals("QUALIFIED")?r:null,outcome.equals("SKIPPED")?List.of(new Stage("EXTRACT","synthetic",1,10L,2L)):List.of(new Stage("EXTRACT","synthetic",1,10L,2L),new Stage("VERIFY","synthetic",1,10L,2L)));
+ }
+
+ Job returned(String title,UUID target){
+  var j=claim();queue.dispatched(j,descriptor());var r=result(j,"QUALIFIED");var c=r.candidate();
+  var candidate=new Candidate(target,title,c.summary(),c.steps(),c.applicable(),c.excluded(),c.tags(),c.evidence());
+  queue.complete(new Result(r.contractVersion(),r.engineVersion(),r.executionClass(),r.runId(),r.lease(),r.source(),false,r.outcome(),r.code(),candidate,r.review(),r.stages()));return j;
+ }
+ UUID nextTask(){UUID next=UUID.randomUUID();db.update("INSERT INTO conversation_tasks(id,tenant_id,workspace_id,conversation_id,requested_by,prompt,mode,status,revision,attempt,reply,execution_class,engine_version,finished_at) SELECT ?,tenant_id,workspace_id,conversation_id,requested_by,prompt,mode,status,revision,attempt,reply,execution_class,engine_version,now() FROM conversation_tasks WHERE id=?",next,task);db.update("INSERT INTO conversation_attempts(task_id,attempt_number,attempt_id,input,status,provenance,snapshot) SELECT id,1,?,'synthetic','SUCCEEDED','RECORDED',to_jsonb(t) FROM conversation_tasks t WHERE id=?",UUID.randomUUID(),next);db.update("INSERT INTO conversation_tool_receipts(task_id,attempt_number,sequence,name,status) VALUES (?,1,1,'compare_dataset','succeeded')",next);task=next;return next;}
+ void grant(){db.update("INSERT INTO governance_capabilities(tenant_id,account_id,workspace_id,capability,granted_by) VALUES (?,?,?,'EXPERIENCE_MAINTAIN',?)",tenant,owner,space,owner);}
+ ExperienceService.Entry entry(ExperienceAdmissionService.Receipt r){return experiences.get(owner,tenant,space,r.entryId(),r.versionId());}
+ boolean scrubbed(UUID version){return db.queryForObject("SELECT scrubbed FROM experience_versions WHERE id=?",Boolean.class,version);}
+
+ ExperienceAdmissionService.Receipt seed(){return admission.admit(returned("已核验的企业方法",null).id());}
+ ExperienceGeneralizationRuntime.Job generalClaim(){generalization.discover();var j=generalization.claim(tenant);assertNotNull(j);return j;}
+ ExperienceGeneralizationRuntime.Descriptor generalDescriptor(){return new ExperienceGeneralizationRuntime.Descriptor("1.0","synthetic-general-v1",true,"live");}
+ Map<String,String> pass(Set<String> keys){var map=new HashMap<String,String>();keys.forEach(k->map.put(k,"PASS"));return map;}
+ ExperienceGeneralizationRuntime.Method method(){return new ExperienceGeneralizationRuntime.Method("合成通用核对 "+tenant.toString().substring(0,8),"回执只证明执行状态",List.of("核对工具实际状态与业务依据"),List.of("有固定执行记录"),List.of("没有依据不宣称成功"),List.of("核对"),"OBSERVED_EXECUTION");}
+ ExperienceGeneralizationRuntime.Result qualified(ExperienceGeneralizationRuntime.Job j,ExperienceGeneralizationRuntime.Method m){return new ExperienceGeneralizationRuntime.Result("1.0","synthetic-general-v1","live",j.id(),j.lease(),j.source(),false,"QUALIFIED",null,m,pass(ExperienceGeneralizationRuntime.PRIVACY),pass(ExperienceGeneralizationRuntime.QUALITY),List.of("CLEAN","PRIVACY","QUALITY").stream().map(n->new ExperienceGeneralizationRuntime.Stage(n,"synthetic",1,10L,2L)).toList());}
+ GeneralExperienceAdmissionService.Receipt publish(ExperienceGeneralizationRuntime.Method m){var j=generalClaim();generalization.dispatched(j,generalDescriptor());generalization.complete(qualified(j,m));return generalAdmission.admit(j.id());}
+ boolean available(UUID version){return db.queryForObject("SELECT general_experience_available(?)",Boolean.class,version);}
+ String generalState(UUID version){return db.queryForObject("SELECT state FROM experience_generalization_sources WHERE version_id=?",String.class,version);}
+
+ @Autowired GeneralExperienceLibrary library;
+ @Autowired org.springframework.security.crypto.password.PasswordEncoder passwords;
+ @org.springframework.boot.test.web.server.LocalServerPort int port;
+ UUID platform;
+ @BeforeEach void platformFixture(){platform=UUID.randomUUID();db.update("INSERT INTO accounts(id,email,display_name,password_hash) VALUES (?,?,'合成平台人员','unused')",platform,platform+"@platform.test");db.update("INSERT INTO platform_roles(account_id,role) VALUES (?,'PLATFORM_ADMIN')",platform);db.update("INSERT INTO platform_accounts(account_id,login_name,password_hash) VALUES (?,?,?)",platform,platform+"@platform.test",passwords.encode("synthetic-platform-456"));}
+ @AfterEach void cleanup(){db.update("DELETE FROM platform_sessions WHERE account_id=?",platform);db.update("DELETE FROM platform_accounts WHERE account_id=?",platform);db.update("DELETE FROM platform_roles WHERE account_id=?",platform);}
+ @Test void sameCleanMethodAcrossRealmsNeverContainsInternalProvenance(){
+  var source=seed();var r=publish(method());grant();
+  var platformDetail=library.detail(platform,null,r.entryId(),r.versionId());assertEquals(platformDetail,library.detail(owner,tenant,r.entryId(),r.versionId()));
+  var json=new tools.jackson.databind.json.JsonMapper();String serialized=json.writeValueAsString(platformDetail);
+  for(String secret:List.of(tenant.toString(),space.toString(),owner.toString(),source.versionId().toString(),task.toString(),"private-prompt","private-reply","actorId","sourceId","runId","tenantId","evidence"))assertFalse(serialized.contains(secret),secret);
+  assertEquals(r.versionId(),library.contents(platform,null,method().title(),"AVAILABLE",0).items().getFirst().versionId());
+  assertFalse(json.writeValueAsString(library.contents(platform,null,method().title(),"AVAILABLE",0)).contains("steps"));
+ }
+ @Test void customerNeedsManagementScopeAndCannotCallPlatformService(){
+  seed();var r=publish(method());assertThrows(IdentityException.class,()->library.detail(owner,tenant,r.entryId(),r.versionId()));assertThrows(IdentityException.class,()->library.detail(owner,null,r.entryId(),r.versionId()));assertThrows(IdentityException.class,()->library.processing(owner,false));
+  grant();assertNotNull(library.detail(owner,tenant,r.entryId(),r.versionId()));
+  UUID otherTenant=UUID.randomUUID();assertThrows(IdentityException.class,()->library.contents(owner,otherTenant,"","AVAILABLE",0));
+  db.update("DELETE FROM governance_capabilities WHERE tenant_id=? AND account_id=?",tenant,owner);assertThrows(IdentityException.class,()->library.detail(owner,tenant,r.entryId(),r.versionId()));
+  UUID admin=UUID.randomUUID();db.update("INSERT INTO accounts(id,email,display_name,password_hash) VALUES (?, ?,'合成管理员','unused')",admin,admin+"@admin.test");db.update("INSERT INTO tenant_memberships(tenant_id,account_id,role) VALUES (?,?,'TENANT_ADMIN')",tenant,admin);assertNotNull(library.detail(admin,tenant,r.entryId(),r.versionId()));
+ }
+ @Test void sourceRevocationRemovesBothRealmsAndRegrantDoesNotRestore(){
+  seed();var r=publish(method());grant();db.update("DELETE FROM workspace_members WHERE workspace_id=? AND account_id=?",space,owner);
+  assertTrue(library.contents(platform,null,method().title(),"AVAILABLE",0).items().isEmpty());assertThrows(IdentityException.class,()->library.detail(platform,null,r.entryId(),r.versionId()));
+  db.update("INSERT INTO workspace_members(tenant_id,workspace_id,account_id) VALUES (?,?,?)",tenant,space,owner);assertThrows(IdentityException.class,()->library.detail(owner,tenant,r.entryId(),r.versionId()));
+ }
+ @Test void stopRemainsPlatformReadableOnlyWhileSourceIsValid(){
+  seed();var r=publish(method());grant();db.update("UPDATE general_experience_entries SET status='STOPPED' WHERE id=?",r.entryId());
+  assertEquals("STOPPED",library.detail(platform,null,r.entryId(),r.versionId()).status());assertEquals(1,library.contents(platform,null,method().title(),"STOPPED",0).items().size());
+  assertThrows(IdentityException.class,()->library.detail(owner,tenant,r.entryId(),r.versionId()));assertThrows(IdentityException.class,()->library.contents(owner,tenant,"","STOPPED",0));
+  db.queryForList("SELECT scrub_lifecycle_object('TASK',?)",task);assertThrows(IdentityException.class,()->library.detail(platform,null,r.entryId(),r.versionId()));assertTrue(library.contents(platform,null,method().title(),"STOPPED",0).items().isEmpty());
+ }
+ @Test void exactVersionAndLiteralSearchNeverSubstituteOrTreatWildcardsAsAll(){
+  seed();var r=publish(method());assertThrows(IdentityException.class,()->library.detail(platform,null,r.entryId(),UUID.randomUUID()));assertThrows(IdentityException.class,()->library.detail(platform,null,UUID.randomUUID(),r.versionId()));
+  assertTrue(library.contents(platform,null,"%_'", "AVAILABLE",0).items().isEmpty());assertThrows(IdentityException.class,()->library.contents(platform,null,"","AVAILABLE",-1));assertThrows(IdentityException.class,()->library.contents(platform,null,"x".repeat(201),"AVAILABLE",0));
+ }
+ @Test void visibilityIsAppliedBeforePagingAndCountsAreProcessingNotAssets(){
+  seed();var r=publish(method());var before=library.processing(platform,false);assertFalse(before.enabled());
+  // Synthetic duplicate asset rows use the same valid source; pagination is independent of source totals.
+  for(int n=0;n<22;n++){UUID e=UUID.randomUUID(),v=UUID.randomUUID();db.update("INSERT INTO general_experience_entries(id,status) VALUES (?,?)",e,n==0?"STOPPED":"AVAILABLE");db.update("INSERT INTO general_experience_versions(id,entry_id,number,method,content_fingerprint) SELECT ?,?,1,method,content_fingerprint FROM general_experience_versions WHERE id=?",v,e,r.versionId());db.update("INSERT INTO general_experience_origins(version_id,source_version) SELECT ?,source_version FROM general_experience_origins WHERE version_id=?",v,r.versionId());db.update("UPDATE general_experience_entries SET published_version=? WHERE id=?",v,e);}
+  var first=library.contents(platform,null,method().title(),"AVAILABLE",0);var second=library.contents(platform,null,method().title(),"AVAILABLE",20);assertEquals(20,first.items().size());assertTrue(first.hasMore());assertEquals(2,second.items().size());assertFalse(second.hasMore());assertTrue(Collections.disjoint(first.items().stream().map(GeneralExperienceLibrary.Summary::id).toList(),second.items().stream().map(GeneralExperienceLibrary.Summary::id).toList()));
+  var after=library.processing(platform,false);assertEquals(before.available()+21,after.available());assertEquals(before.stopped()+1,after.stopped());assertEquals(before.counts(),after.counts());
+ }
+ @Test void pendingCandidatesAndRawFailuresAreOnlyFiniteAggregates(){
+  seed();var j=generalClaim();generalization.dispatched(j,generalDescriptor());generalization.complete(qualified(j,method()));
+  assertTrue(library.contents(platform,null,method().title(),"AVAILABLE",0).items().isEmpty());
+  db.update("UPDATE experience_generalization_sources SET error_code='private-provider-message' WHERE version_id=?",j.source());
+  String observation=new tools.jackson.databind.json.JsonMapper().writeValueAsString(library.processing(platform,false));for(String secret:List.of("private",method().title(),tenant.toString(),j.id().toString(),j.source().toString(),"method","error_code"))assertFalse(observation.contains(secret));
+ }
+ final class Browser {
+  final java.net.http.HttpClient http=java.net.http.HttpClient.newBuilder().cookieHandler(new java.net.CookieManager(null,java.net.CookiePolicy.ACCEPT_ALL)).build();
+  final tools.jackson.databind.json.JsonMapper json=new tools.jackson.databind.json.JsonMapper();
+  java.net.http.HttpResponse<String> get(String path)throws Exception{return http.send(java.net.http.HttpRequest.newBuilder(java.net.URI.create("http://127.0.0.1:"+port+path)).GET().build(),java.net.http.HttpResponse.BodyHandlers.ofString());}
+  void login(String realm,Map<String,String> body)throws Exception{String path=realm.equals("platform")?"/api/platform-admin/v1/auth":"/api/v1/auth";var csrf=json.readTree(get(path+"/csrf").body());var response=http.send(java.net.http.HttpRequest.newBuilder(java.net.URI.create("http://127.0.0.1:"+port+path+"/login")).header("Content-Type","application/json").header(csrf.get("headerName").asString(),csrf.get("token").asString()).POST(java.net.http.HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body))).build(),java.net.http.HttpResponse.BodyHandlers.ofString());assertEquals(200,response.statusCode(),response.body());}
+ }
+ @Test void actualHttpSeparatesSessionsAndNeverCachesBodies()throws Exception{
+  seed();var r=publish(method());grant();db.update("UPDATE accounts SET password_hash=? WHERE id=?",passwords.encode("synthetic-customer-123"),owner);
+  String publicPath="/api/v1/tenants/"+tenant+"/general-experiences",platformPath="/api/platform-admin/v1/experience-library";
+  var customer=new Browser();assertEquals(401,customer.get(publicPath).statusCode());customer.login("customer",Map.of("email",owner+"@dispatch.test","password","synthetic-customer-123"));assertEquals(401,customer.get(platformPath).statusCode());assertEquals(401,customer.get(platformPath+"/processing").statusCode());
+  var admin=new Browser();admin.login("platform",Map.of("username",platform+"@platform.test","password","synthetic-platform-456"));assertEquals(401,admin.get(publicPath).statusCode());
+  for(var response:List.of(customer.get(publicPath),customer.get(publicPath+"/"+r.entryId()+"?version="+r.versionId()),admin.get(platformPath),admin.get(platformPath+"/processing"),admin.get(platformPath+"/"+r.entryId()+"?version="+r.versionId()))){assertEquals(200,response.statusCode(),response.body());assertTrue(response.headers().firstValue("cache-control").orElseThrow().contains("no-store"));}
+  assertEquals(400,admin.get(platformPath+"/"+r.entryId()).statusCode());
+  db.queryForList("SELECT scrub_lifecycle_object('TASK',?)",task);assertEquals(404,admin.get(platformPath+"/"+r.entryId()+"?version="+r.versionId()).statusCode());assertEquals(404,customer.get(publicPath+"/"+r.entryId()+"?version="+r.versionId()).statusCode());
+ }
+}

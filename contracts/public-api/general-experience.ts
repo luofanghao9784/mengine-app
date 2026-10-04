@@ -1,0 +1,49 @@
+export interface GeneralMethod {
+  title: string;
+  summary: string;
+  steps: string[];
+  applicable: string[];
+  excluded: string[];
+  tags: string[];
+  basis: 'OBSERVED_EXECUTION' | 'FEEDBACK_CORRECTION';
+}
+export interface GeneralExperienceSummary {
+  id: string;
+  versionId: string;
+  number: number;
+  status: 'AVAILABLE' | 'STOPPED';
+  title: string;
+  summary: string;
+  tags: string[];
+  updatedAt: string;
+}
+export interface GeneralExperiencePage {
+  items: GeneralExperienceSummary[];
+  hasMore: boolean;
+}
+export interface GeneralExperienceDetail {
+  id: string;
+  versionId: string;
+  number: number;
+  status: 'AVAILABLE' | 'STOPPED';
+  method: GeneralMethod;
+  updatedAt: string;
+}
+export type GeneralProcessingState =
+  | 'WAITING'
+  | 'PROCESSING'
+  | 'RETRYING'
+  | 'ADMITTED'
+  | 'DUPLICATE'
+  | 'NOT_ADMITTED'
+  | 'UNAVAILABLE'
+  | 'FAILED'
+  | 'UNKNOWN';
+export interface GeneralExperienceProcessing {
+  enabled: boolean;
+  counts: Record<GeneralProcessingState, number>;
+  available: number;
+  stopped: number;
+  withdrawn: number;
+  checkedAt: string;
+}

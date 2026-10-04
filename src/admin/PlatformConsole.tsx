@@ -1,6 +1,5 @@
-import { BookOpen } from 'lucide-react';
 import { useSession } from '../identity/session';
-import { Empty } from '../shared/ui';
+import { GeneralExperienceLibrary } from '../experience/GeneralExperienceLibrary';
 import { AdminShell, useAdminRoute } from './AdminShell';
 import { AdminOverview } from './AdminOverview';
 import { PlatformHome } from '../platform/PlatformHome';
@@ -34,13 +33,7 @@ export function PlatformConsole({ logout }: { logout: () => void }) {
       ) : page === 'settings' ? (
         <PlatformSettings hash={hash} />
       ) : (
-        <section className="admin-section">
-          <Empty
-            icon={BookOpen}
-            title="通用经验库尚未启用"
-            text="启用后，这里展示经过自动脱敏、提炼和核验的通用经验。企业原始会话与资料不会在此展示。"
-          />
-        </section>
+        <GeneralExperienceLibrary />
       )}
     </AdminShell>
   );

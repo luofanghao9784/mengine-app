@@ -28,6 +28,7 @@ public class ExperienceManagementService {
   var scopes=db.query("SELECT w.id,w.name FROM workspaces w JOIN workspace_members m ON m.workspace_id=w.id AND m.tenant_id=w.tenant_id AND m.account_id=? WHERE w.tenant_id=? AND w.kind='SHARED' AND (? OR EXISTS(SELECT 1 FROM governance_capabilities g WHERE g.tenant_id=w.tenant_id AND g.workspace_id=w.id AND g.account_id=? AND g.capability='EXPERIENCE_MAINTAIN')) ORDER BY w.name,w.id",(r,n)->new Scope(r.getObject(1,UUID.class),r.getString(2)),actor,tenant,admin,actor);
   if(!admin&&scopes.isEmpty())throw new IdentityException(403,"CAPABILITY_REQUIRED");return scopes;
  }
+ void requireLibraryAccess(UUID actor,UUID tenant){scopes(actor,tenant);}
  private UUID[] selected(List<Scope> scopes,UUID space){if(space!=null&&scopes.stream().noneMatch(s->s.id().equals(space)))throw new IdentityException(403,"WORKSPACE_ACCESS_DENIED");return scopes.stream().map(Scope::id).filter(id->space==null||id.equals(space)).toArray(UUID[]::new);}
  private void paging(int offset){if(offset<0||offset>100000)throw IdentityException.invalid();}
  @Transactional public ContentPage contents(UUID actor,UUID tenant,UUID space,String query,String state,int offset){
