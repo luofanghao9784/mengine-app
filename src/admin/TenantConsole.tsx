@@ -1,3 +1,4 @@
+import { EngineTelemetryWall } from '../operations/EngineTelemetryWall';
 import { useEffect, useRef, useState } from 'react';
 import { ExternalLink, ArrowLeft, ShieldX } from 'lucide-react';
 import { AdminShell, useAdminRoute } from './AdminShell';
@@ -119,7 +120,21 @@ export function TenantConsole({ tenant, name }: { tenant: string; name: string }
           }
         />
       ) : page === 'engine' ? (
-        <OperationsPanel scope="tenant" tenant={tenant} />
+        secondary === 'usage' ? (
+          <>
+            <a className="button ghost" href={adminHref('tenant', 'engine', hash)}>
+              返回引擎运行
+            </a>
+            <OperationsPanel scope="tenant" tenant={tenant} />
+          </>
+        ) : (
+          <>
+            <div className="admin-secondary-link">
+              <a href={adminHref('tenant', 'engine', hash, { detail: 'usage' })}>查看本企业用量</a>
+            </div>
+            <EngineTelemetryWall scope="tenant" tenant={tenant} />
+          </>
+        )
       ) : page === 'members' ? (
         secondary === 'member' && params.get('member') ? (
           <TenantMemberDetail

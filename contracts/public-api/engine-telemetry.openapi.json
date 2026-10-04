@@ -1,0 +1,213 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Engine operational telemetry",
+    "version": "1.0.0",
+    "description": "Read-only database-state snapshot; no physical utilization or autonomous evolution is inferred. Active records have no creation-time cutoff. Completed means processing completion, not quality, delivery or business success. No business identifiers or text. Historic failures retained. Streaming task counted only in output."
+  },
+  "paths": {
+    "/api/platform-admin/v1/engine-telemetry": {
+      "get": {
+        "security": [
+          {
+            "platformSessionCookie": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Snapshot. No private content or model diagnostics.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Current management authority required"
+          }
+        }
+      }
+    },
+    "/api/tenant-admin/v1/tenants/{tenant}/engine-telemetry": {
+      "get": {
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Snapshot. No private content or model diagnostics.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Current management authority required"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "DREAMCORE_SESSION"
+      },
+      "platformSessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "DREAMCORE_PLATFORM",
+        "description": "独立总台会话；企业用户 Cookie 不授予平台权限。写入前从 /api/platform-admin/v1/auth/csrf 取得令牌。"
+      }
+    },
+    "schemas": {
+      "Snapshot": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "tenantId",
+          "checkedAt",
+          "recentSeconds",
+          "evolution",
+          "channels"
+        ],
+        "properties": {
+          "tenantId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "recentSeconds": {
+            "const": 300
+          },
+          "evolution": {
+            "const": "NOT_CONNECTED"
+          },
+          "channels": {
+            "type": "array",
+            "minItems": 9,
+            "maxItems": 10,
+            "items": {
+              "$ref": "#/components/schemas/Channel"
+            }
+          }
+        }
+      },
+      "Channel": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "running",
+          "queued",
+          "waiting",
+          "failed",
+          "unknown",
+          "completedRecent",
+          "lastCompletedAt"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "COLLECTION",
+              "KNOWLEDGE",
+              "RETRIEVAL",
+              "TASK",
+              "COMPANY",
+              "EXPERIENCE",
+              "GENERALIZATION",
+              "GENERAL_ADJUSTMENT",
+              "RESPONSE",
+              "EXPORT"
+            ]
+          },
+          "running": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "queued": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "waiting": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "failed": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "unknown": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "completedRecent": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "lastCompletedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      }
+    }
+  }
+}

@@ -19,9 +19,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import tools.jackson.databind.json.JsonMapper;
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={"dreamcore.tasks.enabled=true","dreamcore.tasks.initial-delay-ms=3600000","dreamcore.knowledge.initial-delay-ms=3600000"})
+@SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={"dreamcore.tasks.enabled=true","dreamcore.tasks.initial-delay-ms=3600000","dreamcore.knowledge.enabled=true","dreamcore.knowledge.initial-delay-ms=3600000"})
 class OperationsIntegrationTest {
-    @Autowired OperationsService operations; @Autowired ConversationService conversations; @Autowired MaterialService materials;
+    @Autowired OperationsService operations; @Autowired EngineTelemetryService telemetry; @Autowired ConversationService conversations; @Autowired MaterialService materials;
     @Autowired JdbcTemplate db; @Autowired PasswordEncoder passwords; @LocalServerPort int port;
     UUID tenant,other,admin,member,operator,space,foreign;
     static final String PASSWORD="synthetic-operations-password",SECRET="private-content-never-project";
@@ -51,6 +51,36 @@ class OperationsIntegrationTest {
     }
     UUID task(String status){return row(tenant,space,status,"SOURCE_LOOKUP",null,null,status.equals("QUEUED")?0:1,0,null);}
     void denied(int status,Runnable work){assertEquals(status,assertThrows(IdentityException.class,work::run).status);}
+    EngineTelemetryService.Channel channel(EngineTelemetryService.Snapshot s,String code){return s.channels().stream().filter(c->c.code().equals(code)).findFirst().orElseThrow();}
+    @Test void telemetryCountsCurrentJobsBeyondTheWindowAndMovesStreamingWithoutDuplication(){
+        UUID task=row(tenant,space,"RUNNING","AGENT","live",null,1,40,null);
+        row(other,foreign,"RUNNING","AGENT","live",null,1,0,null);
+        var before=telemetry.read(admin,tenant,false);assertEquals(1,channel(before,"TASK").running());assertEquals(0,channel(before,"RESPONSE").running());
+        db.update("INSERT INTO conversation_attempts(task_id,attempt_number,input,status,provenance) VALUES (?,1,?,'RUNNING','RECORDED')",task,SECRET);
+        db.update("INSERT INTO conversation_live_output(task_id,attempt_number,step,version,text,state) VALUES (?,1,1,1,?,'STREAMING'),(?,1,2,1,?,'STREAMING')",task,SECRET,task,SECRET);
+        var streaming=telemetry.read(admin,tenant,false);assertEquals(0,channel(streaming,"TASK").running());assertEquals(1,channel(streaming,"RESPONSE").running());
+        assertEquals(1,streaming.channels().stream().mapToLong(EngineTelemetryService.Channel::running).sum());
+        db.update("UPDATE conversation_tasks SET status='SUCCEEDED',finished_at=now() WHERE id=?",task);
+        var done=telemetry.read(admin,tenant,false);assertEquals(0,channel(done,"RESPONSE").running());assertEquals(1,channel(done,"TASK").completedRecent());
+        assertFalse(new JsonMapper().writeValueAsString(done).contains(SECRET));assertEquals("NOT_CONNECTED",done.evolution());
+    }
+    @Test void telemetryKeepsScopeUnknownAndPartialStatesAndBoundsCompletionWindow(){
+        task("QUEUED");task("WAITING_INPUT");task("RESULT_UNKNOWN");task("PARTIAL");task("FAILED");task("SUCCEEDED");
+        UUID old=task("SUCCEEDED");db.update("UPDATE conversation_tasks SET finished_at=now()-interval '6 minutes' WHERE id=?",old);
+        UUID future=task("SUCCEEDED");db.update("UPDATE conversation_tasks SET finished_at=now()+interval '1 hour' WHERE id=?",future);
+        var s=telemetry.read(admin,tenant,false);var input=channel(s,"RETRIEVAL");assertEquals(1,input.queued());assertEquals(2,input.waiting());assertEquals(1,input.unknown());assertEquals(1,input.failed());assertEquals(1,input.completedRecent());assertTrue(input.lastCompletedAt().isBefore(s.checkedAt()));
+        assertEquals(9,s.channels().size());assertEquals(10,telemetry.read(operator,null,true).channels().size());
+        denied(403,()->telemetry.read(member,tenant,false));denied(403,()->telemetry.read(admin,other,false));denied(403,()->telemetry.read(admin,null,true));
+        db.update("UPDATE tenant_memberships SET role='MEMBER' WHERE tenant_id=? AND account_id=?",tenant,admin);denied(403,()->telemetry.read(admin,tenant,false));
+    }
+    @Test void telemetryReadsCollectionAndParsingWithoutContentAndUsesOneRowPerRun(){
+        UUID connection=UUID.randomUUID();db.update("INSERT INTO data_connections(id,tenant_id,name,route_label,access_summary,status,time_zone) VALUES (?,?,?,?,?,'READY','UTC')",connection,tenant,SECRET,SECRET,SECRET);
+        db.update("INSERT INTO collection_runs(id,tenant_id,connection_id,execution_epoch,trigger_kind,status) VALUES (?,?,?,0,'SCHEDULED','RUNNING')",UUID.randomUUID(),tenant,connection);
+        materials.upload(member,tenant,space,null,null,null,UUID.randomUUID(),new MockMultipartFile("file",SECRET+".txt","text/plain",SECRET.getBytes()));
+        var s=telemetry.read(admin,tenant,false);assertEquals(1,channel(s,"COLLECTION").running());assertEquals(1,channel(s,"KNOWLEDGE").queued());
+        var serialized=new JsonMapper().writeValueAsString(s);for(String forbidden:List.of(SECRET,connection.toString(),member.toString(),"workspaceId","prompt","filename"))assertFalse(serialized.contains(forbidden));
+        db.update("UPDATE collection_runs SET status='SUCCEEDED',finished_at=now() WHERE connection_id=?",connection);assertEquals(1,channel(telemetry.read(admin,tenant,false),"COLLECTION").completedRecent());
+    }
     @Test void emptySnapshotKeepsUnknownModelUsageDistinctFromZero(){
         var r=operations.tenant(admin,tenant,7);assertEquals(0,r.tasks().total());assertEquals(0,r.storage().originalBytes());assertTrue(r.models().isEmpty());assertTrue(r.errors().isEmpty());assertEquals(7*86400,r.checkedAt().getEpochSecond()-r.from().getEpochSecond());
     }
@@ -140,7 +170,16 @@ class OperationsIntegrationTest {
         var login=HttpRequest.newBuilder(URI.create(base+"/api/v1/auth/login")).header(csrf.get("headerName").asString(),csrf.get("token").asString()).header("Content-Type","application/json").POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(Map.of("email",admin+"@example.test","password",PASSWORD)))).build();assertEquals(200,http.send(login,HttpResponse.BodyHandlers.ofString()).statusCode());
         var r=http.send(HttpRequest.newBuilder(URI.create(base+path)).GET().build(),HttpResponse.BodyHandlers.ofString());assertEquals(200,r.statusCode());assertEquals("private, no-store",r.headers().firstValue("Cache-Control").orElseThrow());
         for(String secret:List.of(SECRET,member.toString(),space.toString(),"prompt","filename","conversationId","modelName","@example.test"))assertFalse(r.body().contains(secret));
+        var monitor=http.send(HttpRequest.newBuilder(URI.create(base+"/api/tenant-admin/v1/tenants/"+tenant+"/engine-telemetry")).GET().build(),HttpResponse.BodyHandlers.ofString());assertEquals(200,monitor.statusCode());assertEquals("private, no-store",monitor.headers().firstValue("Cache-Control").orElseThrow());assertFalse(monitor.body().contains(SECRET));
+        assertEquals(401,http.send(HttpRequest.newBuilder(URI.create(base+"/api/platform-admin/v1/engine-telemetry")).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
+        db.update("INSERT INTO platform_accounts(account_id,login_name,password_hash) VALUES (?,?,?)",operator,operator+"@example.test",passwords.encode(PASSWORD));
+        var platformCsrf=json.readTree(http.send(HttpRequest.newBuilder(URI.create(base+"/api/platform-admin/v1/auth/csrf")).GET().build(),HttpResponse.BodyHandlers.ofString()).body());
+        var platformLogin=HttpRequest.newBuilder(URI.create(base+"/api/platform-admin/v1/auth/login")).header(platformCsrf.get("headerName").asString(),platformCsrf.get("token").asString()).header("Content-Type","application/json").POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(Map.of("username",operator+"@example.test","password",PASSWORD)))).build();
+        assertEquals(200,http.send(platformLogin,HttpResponse.BodyHandlers.ofString()).statusCode());
+        var platformMonitor=http.send(HttpRequest.newBuilder(URI.create(base+"/api/platform-admin/v1/engine-telemetry")).GET().build(),HttpResponse.BodyHandlers.ofString());assertEquals(200,platformMonitor.statusCode());assertEquals("private, no-store",platformMonitor.headers().firstValue("Cache-Control").orElseThrow());assertFalse(platformMonitor.body().contains(SECRET));
+        db.update("DELETE FROM platform_roles WHERE account_id=?",operator);
+        assertEquals(401,http.send(HttpRequest.newBuilder(URI.create(base+"/api/platform-admin/v1/engine-telemetry")).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
         assertEquals(400,http.send(HttpRequest.newBuilder(URI.create(base+path+"?days=8")).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
-        assertEquals(403,http.send(HttpRequest.newBuilder(URI.create(base+"/api/platform-admin/v1/operations")).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
+        assertEquals(401,http.send(HttpRequest.newBuilder(URI.create(base+"/api/platform-admin/v1/operations")).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
     }
 }

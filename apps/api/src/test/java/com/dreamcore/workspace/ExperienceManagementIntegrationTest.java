@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.*;import static org.mockito.Mocki
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={"dreamcore.tasks.enabled=false","dreamcore.experience-intake.enabled=false","dreamcore.experience-analysis.enabled=false"})
 class ExperienceManagementIntegrationTest {
  @org.springframework.boot.test.web.server.LocalServerPort int port;
- @Autowired org.springframework.security.crypto.password.PasswordEncoder passwords;@Autowired ExperienceManagementService management;@Autowired ExperienceService experiences;@Autowired ExperienceAdmissionService admission;@Autowired JdbcTemplate db;@Autowired ExperienceAnalysisQueue queue;@Autowired ExperienceIntakeService intake;@Autowired FeedbackService feedback;
+ @Autowired org.springframework.security.crypto.password.PasswordEncoder passwords;@Autowired com.dreamcore.workspace.identity.EngineTelemetryService telemetry;@Autowired ExperienceManagementService management;@Autowired ExperienceService experiences;@Autowired ExperienceAdmissionService admission;@Autowired JdbcTemplate db;@Autowired ExperienceAnalysisQueue queue;@Autowired ExperienceIntakeService intake;@Autowired FeedbackService feedback;
  UUID tenant,owner,space,task;
  @BeforeEach void fixture(){
   tenant=UUID.randomUUID();owner=UUID.randomUUID();space=UUID.randomUUID();task=UUID.randomUUID();UUID conversation=UUID.randomUUID();
@@ -40,6 +40,12 @@ class ExperienceManagementIntegrationTest {
  boolean scrubbed(UUID version){return db.queryForObject("SELECT scrubbed FROM experience_versions WHERE id=?",Boolean.class,version);}
 
  UUID manager(boolean shared){UUID a=UUID.randomUUID();db.update("INSERT INTO accounts(id,email,display_name,password_hash) VALUES (?,?,'manager',?)",a,a+"@management.test",passwords.encode("synthetic-management-password"));db.update("INSERT INTO tenant_memberships(tenant_id,account_id,role) VALUES (?,?,'TENANT_ADMIN')",tenant,a);if(shared)db.update("INSERT INTO workspace_members(tenant_id,workspace_id,account_id) VALUES (?,?,?)",tenant,space,a);return a;}
+ @Test void telemetryDoesNotLeaveAdmittedExperienceWaitingForAdmission(){
+  UUID admin=manager(false);var job=returned("监控合成方法",null);
+  var pending=telemetry.read(admin,tenant,false).channels().stream().filter(c->c.code().equals("EXPERIENCE")).findFirst().orElseThrow();assertEquals(1,pending.waiting());assertEquals(0,pending.completedRecent());
+  admission.admit(job.id());var done=telemetry.read(admin,tenant,false).channels().stream().filter(c->c.code().equals("EXPERIENCE")).findFirst().orElseThrow();assertEquals(0,done.waiting());assertEquals(1,done.completedRecent());
+  String json=new tools.jackson.databind.json.JsonMapper().writeValueAsString(done);assertFalse(json.contains("监控合成方法"));assertFalse(json.contains(owner.toString()));
+ }
  @Test void administratorDoesNotGainPrivateMethodOrSourceTextButCanObserveSharedScopeCounts(){
   var receipt=admission.admit(returned("先核验工具状态",null).id());UUID admin=manager(true);
   assertEquals(0,management.contents(admin,tenant,null,"","AVAILABLE",0).items().size());var view=management.processing(admin,tenant,null,"ALL",0,false);assertEquals(1,view.counts().get("ADMITTED"));assertFalse(view.enabled());assertNull(view.items().getFirst().entryId());assertNull(view.items().getFirst().versionId());assertNotEquals(task,view.items().getFirst().id());String data=new tools.jackson.databind.json.JsonMapper().writeValueAsString(view);for(String secret:List.of("private-prompt","private-reply","private-title",owner.toString(),task.toString(),receipt.entryId().toString(),"candidate","review","evidence"))assertFalse(data.contains(secret),secret);

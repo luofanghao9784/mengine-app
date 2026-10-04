@@ -1,3 +1,5 @@
+import { adminHref } from './navigation';
+import { EngineTelemetryWall } from '../operations/EngineTelemetryWall';
 import { useSession } from '../identity/session';
 import { GeneralExperienceLibrary } from '../experience/GeneralExperienceLibrary';
 import { AdminShell, useAdminRoute } from './AdminShell';
@@ -26,7 +28,14 @@ export function PlatformConsole({ logout }: { logout: () => void }) {
         <PlatformHome embedded />
       ) : page === 'accounts' ? (
         <PlatformAccounts />
-      ) : page === 'engine' || page === 'usage' ? (
+      ) : page === 'engine' ? (
+        <>
+          <div className="admin-secondary-link">
+            <a href={adminHref('platform', 'usage', hash)}>查看用量与成本</a>
+          </div>
+          <EngineTelemetryWall scope="platform" />
+        </>
+      ) : page === 'usage' ? (
         <OperationsPanel scope="platform" />
       ) : page === 'capabilities' ? (
         <MethodWorkbench />

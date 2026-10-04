@@ -111,6 +111,9 @@ export function AdminOverview({
               <a className="button" href={adminHref(realm, 'members', hash, { tab: 'invitations' })}>
                 成员邀请
               </a>
+              <a className="button" href={adminHref(realm, 'engine', hash, { detail: 'usage' })}>
+                本企业用量
+              </a>
               <a className="button" href={adminHref(realm, 'members', hash, { tab: 'spaces' })}>
                 共享空间
               </a>
