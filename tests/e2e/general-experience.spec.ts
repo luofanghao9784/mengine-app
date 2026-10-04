@@ -13,11 +13,25 @@ const method = {
   tags: ['核对'],
   basis: 'OBSERVED_EXECUTION',
 };
-async function fixture(context: BrowserContext, options: { canManage?: boolean; dropFirst?: boolean } = {}) {
+async function fixture(
+  context: BrowserContext,
+  options: {
+    canManage?: boolean;
+    dropFirst?: boolean;
+    dropPlatformFirst?: boolean;
+    denyPlatformMutation?: boolean;
+  } = {},
+) {
   let enabled = true,
     revision = 0;
   const changes: Record<string, unknown>[] = [];
   let receipt: unknown;
+  let globalStatus = 'AVAILABLE',
+    globalRevision = 1,
+    globalReason: string | null = null;
+  const globalChanges: Record<string, unknown>[] = [];
+  const globalRecords: unknown[] = [];
+  let globalReceipt: unknown;
   let revoked = false;
   const calls: string[] = [];
   const mutations: string[] = [];
@@ -61,6 +75,56 @@ async function fixture(context: BrowserContext, options: { canManage?: boolean; 
       });
     if (path.endsWith('/experience-library') && path.startsWith('/api/v1/'))
       return json({ scopes: [], items: [], hasMore: false });
+    if (path === '/api/platform-admin/v1/records') return json(globalRecords);
+    if (path.endsWith('/availability')) {
+      if (route.request().method() === 'POST') {
+        if (options.denyPlatformMutation) return json({ contractVersion: '1.0', code: 'ACCESS_DENIED' }, 403);
+        const body = route.request().postDataJSON();
+        globalChanges.push(body);
+        if (
+          globalChanges.length === 1 ||
+          body.requestId !== globalChanges[globalChanges.length - 2].requestId
+        ) {
+          globalStatus = body.status;
+          globalReason = body.reason;
+          globalRevision++;
+          globalReceipt = {
+            requestId: body.requestId,
+            entryId: entry,
+            versionId: version,
+            status: globalStatus,
+            revision: globalRevision,
+          };
+          globalRecords.unshift({
+            id: globalRevision,
+            category: 'EXPERIENCE',
+            action: globalStatus === 'STOPPED' ? 'GENERAL_EXPERIENCE_STOP' : 'GENERAL_EXPERIENCE_RESTORE',
+            outcome: 'SUCCESS',
+            actorId: actor,
+            actorName: '合成平台人员',
+            targetId: id(50 + globalRevision),
+            targetName: method.title + ' · v1',
+            tenantId: null,
+            tenantName: null,
+            createdAt: '2026-10-04T00:00:00Z',
+            internalReason: body.reason,
+            publicReason: null,
+          });
+        }
+        if (options.dropPlatformFirst && globalChanges.length === 1) return route.abort('failed');
+        return json(globalReceipt);
+      }
+      return revoked
+        ? json({ contractVersion: '1.0', code: 'EXPERIENCE_NOT_FOUND' }, 404)
+        : json({
+            entryId: entry,
+            versionId: version,
+            status: globalStatus,
+            revision: globalRevision,
+            reason: globalReason,
+            changedAt: '2026-10-04T00:00:00Z',
+          });
+    }
     if (path.endsWith('/usage')) {
       if (route.request().method() === 'POST') {
         const body = route.request().postDataJSON();
@@ -108,16 +172,19 @@ async function fixture(context: BrowserContext, options: { canManage?: boolean; 
         id: entry,
         versionId: version,
         number: 1,
-        status: path.includes('general-experiences') ? 'AVAILABLE' : state,
+        status: globalStatus,
         updatedAt: '2026-10-04T00:00:00Z',
       };
       if (path.endsWith('/' + entry))
-        return revoked
+        return revoked || (path.includes('general-experiences') && globalStatus === 'STOPPED')
           ? json({ contractVersion: '1.0', code: 'EXPERIENCE_NOT_FOUND' }, 404)
           : json({ ...row, method });
       return json({
         items:
-          revoked || (path.includes('general-experiences') && (state === 'AVAILABLE') !== enabled)
+          revoked ||
+          (path.includes('general-experiences')
+            ? globalStatus === 'STOPPED' || (state === 'AVAILABLE') !== enabled
+            : state !== globalStatus)
             ? []
             : [{ ...row, title: method.title, summary: method.summary, tags: method.tags }],
         hasMore: url.searchParams.get('offset') !== '20',
@@ -129,6 +196,7 @@ async function fixture(context: BrowserContext, options: { canManage?: boolean; 
     calls,
     mutations,
     changes,
+    globalChanges,
     revoke: () => {
       revoked = true;
     },
@@ -288,4 +356,94 @@ test('space maintainer sees enterprise use status without enterprise-wide mutati
   await expect(dialog.getByText('企业负责人或管理员可调整本企业使用状态。')).toBeVisible();
   await expect(dialog.getByRole('button', { name: /停止本企业使用|恢复本企业使用/ })).toHaveCount(0);
   expect(f.mutations).toEqual([]);
+});
+
+async function openPlatformMethod(page: import('@playwright/test').Page) {
+  await page.goto('/platform-admin/#admin=experience');
+  await page
+    .getByRole('button')
+    .filter({ has: page.getByRole('heading', { name: method.title }) })
+    .click();
+}
+test('platform stop and restore require reason, retain fixed version and appear in platform records', async ({
+  page,
+  context,
+}) => {
+  const f = await fixture(context);
+  await openPlatformMethod(page);
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('button', { name: '停用通用经验', exact: true }).click();
+  await expect(dialog.getByRole('button', { name: '确认停用' })).toBeDisabled();
+  await expect(
+    dialog.getByText('停止所有企业后续检索与采用，正在引用此经验的任务需重新执行。已完成结果保留。'),
+  ).toBeVisible();
+  await dialog.getByLabel('操作原因').fill('合成适用范围需要收敛');
+  await page.setViewportSize({ width: 360, height: 1000 });
+  expect(await dialog.evaluate((e) => e.scrollWidth <= e.clientWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/general-platform-stop.png', fullPage: true });
+  await dialog.getByRole('button', { name: '确认停用' }).click();
+  await expect(dialog.getByRole('button', { name: '恢复通用经验', exact: true })).toBeVisible();
+  await expect(dialog.getByText('最近操作原因：合成适用范围需要收敛')).toBeVisible();
+  await page.getByRole('button', { name: '关闭弹窗' }).click();
+  await page.getByLabel('通用经验状态').selectOption('STOPPED');
+  await page
+    .getByRole('button')
+    .filter({ has: page.getByRole('heading', { name: method.title }) })
+    .click();
+  await dialog.getByRole('button', { name: '恢复通用经验', exact: true }).click();
+  await expect(
+    dialog.getByText('恢复当前发布版本供后续任务参考。企业自行停用的状态保持，旧任务不会自动恢复。'),
+  ).toBeVisible();
+  await dialog.getByLabel('操作原因').fill('合成验证已完成');
+  await dialog.getByRole('button', { name: '确认恢复' }).click();
+  await expect(dialog.getByRole('button', { name: '停用通用经验', exact: true })).toBeVisible();
+  expect(f.globalChanges.map((c) => [c.status, c.expectedRevision, c.versionId])).toEqual([
+    ['STOPPED', 1, version],
+    ['AVAILABLE', 2, version],
+  ]);
+  expect(await page.evaluate(() => JSON.stringify(sessionStorage))).not.toContain('合成验证已完成');
+  await page.getByRole('button', { name: '关闭弹窗' }).click();
+  await page.goto('/platform-admin/#admin=settings&section=records');
+  await page.getByLabel('操作类别').selectOption('EXPERIENCE');
+  await expect(page.getByText(method.title + ' · v1')).toHaveCount(2);
+  await expect(page.getByText('内部备注：合成适用范围需要收敛')).toBeVisible();
+  await expect(page.getByText('内部备注：合成验证已完成')).toBeVisible();
+  expect(f.calls.every((c) => c.startsWith('/api/platform-admin/'))).toBe(true);
+});
+test('platform lost response retains exact reason and disables tabs until original request is reconciled', async ({
+  page,
+  context,
+}) => {
+  const f = await fixture(context, { dropPlatformFirst: true });
+  await openPlatformMethod(page);
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('button', { name: '停用通用经验', exact: true }).click();
+  await dialog.getByLabel('操作原因').fill('合成原始原因');
+  await dialog.getByRole('button', { name: '确认停用' }).click();
+  await expect(dialog.getByRole('button', { name: '重试原请求' })).toBeVisible();
+  await expect(dialog.getByLabel('操作原因')).toBeDisabled();
+  await expect(page.getByRole('tab', { name: '积累与改进' })).toBeDisabled();
+  await dialog.getByRole('button', { name: '关闭弹窗' }).click();
+  await expect(dialog).toBeVisible();
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect(dialog.getByRole('button', { name: '重试原请求' })).toBeVisible();
+  await dialog.getByRole('button', { name: '重试原请求' }).click();
+  await expect(dialog.getByRole('button', { name: '恢复通用经验', exact: true })).toBeVisible();
+  expect(f.globalChanges).toHaveLength(2);
+  expect(f.globalChanges[0]).toEqual(f.globalChanges[1]);
+  await expect(page.getByRole('tab', { name: '积累与改进' })).toBeEnabled();
+});
+test('platform permission loss during mutation removes method and reason form from the drawer', async ({
+  page,
+  context,
+}) => {
+  await fixture(context, { denyPlatformMutation: true });
+  await openPlatformMethod(page);
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('button', { name: '停用通用经验', exact: true }).click();
+  await dialog.getByLabel('操作原因').fill('合成暂存原因');
+  await dialog.getByRole('button', { name: '确认停用' }).click();
+  await expect(dialog.getByText('没有访问权限', { exact: true })).toBeVisible();
+  await expect(dialog.getByText(method.steps[0])).toHaveCount(0);
+  await expect(dialog.getByLabel('操作原因')).toHaveCount(0);
 });

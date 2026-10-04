@@ -11,6 +11,8 @@ import { PlatformStaffList } from './PlatformStaff';
 import { settingsClient as api, type ManagementRecord } from './settings-client';
 
 const actions: Record<string, string> = {
+  GENERAL_EXPERIENCE_STOP: '停用通用经验',
+  GENERAL_EXPERIENCE_RESTORE: '恢复通用经验',
   TENANT_CREATE: '开通企业',
   TENANT_SUSPEND: '暂停企业服务',
   TENANT_RESUME: '恢复企业服务',
@@ -106,6 +108,7 @@ function ManagementRecords() {
             <option value="ACCOUNT">客户账号</option>
             <option value="STAFF">管理人员</option>
             <option value="SECURITY">登录与安全</option>
+            <option value="EXPERIENCE">通用经验</option>
           </select>
           <select
             aria-label="执行结果"
@@ -121,7 +124,7 @@ function ManagementRecords() {
           </select>
         </div>
       </div>
-      <p className="admin-note">企业服务、账号和管理人员的操作记录。</p>
+      <p className="admin-note">企业服务、账号、管理人员与通用经验的操作记录。</p>
       {data.error ? (
         <Failure error={data.error} retry={refresh} />
       ) : !data.value ? (

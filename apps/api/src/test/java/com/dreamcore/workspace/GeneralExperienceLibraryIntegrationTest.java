@@ -158,4 +158,72 @@ class GeneralExperienceLibraryIntegrationTest {
   assertEquals(200,customer.get(path+"?version="+r.versionId()).statusCode());
   var adminBrowser=new Browser();adminBrowser.login("platform",Map.of("username",platform+"@platform.test","password","synthetic-platform-456"));assertEquals(401,adminBrowser.get(path+"?version="+r.versionId()).statusCode());
  }
+
+ @Autowired GeneralExperienceManagement management;
+ @Autowired com.dreamcore.workspace.identity.PlatformRecordsService platformRecords;
+ @Autowired org.springframework.transaction.PlatformTransactionManager transactionManager;
+ GeneralExperienceManagement.Change globalChange(GeneralExperienceAdmissionService.Receipt r,int revision,String status,String reason){return new GeneralExperienceManagement.Change(UUID.randomUUID(),r.versionId(),revision,status,reason);}
+ @Test void platformStopRestoreUsesFixedVersionAndPrivateReasonWithoutPublishingAnythingNew(){
+  seed();var r=publish(method());grant();var initial=management.state(platform,r.entryId(),r.versionId());assertEquals(1,initial.revision());assertNull(initial.reason());
+  var stop=globalChange(r,1,"STOPPED"," 合成适用边界需收敛 ");
+  assertEquals(403,assertThrows(IdentityException.class,()->management.change(owner,r.entryId(),stop)).status);
+  assertEquals(400,assertThrows(IdentityException.class,()->management.change(platform,r.entryId(),globalChange(r,1,"STOPPED"," "))).status);
+  var receipt=management.change(platform,r.entryId(),stop);assertEquals(2,receipt.revision());assertEquals(receipt,management.change(platform,r.entryId(),stop));
+  assertEquals("合成适用边界需收敛",management.state(platform,r.entryId(),r.versionId()).reason());assertFalse(available(r.versionId()));assertNotNull(library.detail(platform,null,r.entryId(),r.versionId()));assertTrue(library.contents(owner,tenant,method().title(),"AVAILABLE",0).items().isEmpty());
+  assertEquals(409,assertThrows(IdentityException.class,()->management.change(platform,r.entryId(),new GeneralExperienceManagement.Change(stop.requestId(),r.versionId(),1,"STOPPED","另外原因"))).status);
+  assertEquals(409,assertThrows(IdentityException.class,()->management.change(platform,r.entryId(),globalChange(r,1,"AVAILABLE","合成恢复"))).status);
+  assertEquals(404,assertThrows(IdentityException.class,()->management.change(platform,r.entryId(),new GeneralExperienceManagement.Change(UUID.randomUUID(),UUID.randomUUID(),2,"AVAILABLE","合成恢复"))).status);
+  var restored=management.change(platform,r.entryId(),globalChange(r,2,"AVAILABLE","合成补充验证完成"));assertEquals(3,restored.revision());assertTrue(available(r.versionId()));assertEquals(receipt,management.change(platform,r.entryId(),stop));assertEquals("AVAILABLE",management.state(platform,r.entryId(),r.versionId()).status());
+  assertEquals(1,db.queryForObject("SELECT count(*) FROM general_experience_versions WHERE entry_id=?",Integer.class,r.entryId()));
+  String publicBody=new tools.jackson.databind.json.JsonMapper().writeValueAsString(library.detail(owner,tenant,r.entryId(),r.versionId()));assertFalse(publicBody.contains("原因"));assertFalse(publicBody.contains("合成补充验证完成"));
+  var events=platformRecords.list(platform,"EXPERIENCE","SUCCESS",0,100).stream().filter(e->platform.equals(e.actorId())).toList();assertEquals(2,events.size());assertTrue(events.stream().allMatch(e->e.targetName().equals(method().title()+" · v1")));assertTrue(events.stream().allMatch(e->e.tenantId()==null&&e.tenantName()==null&&e.publicReason()==null&&e.internalReason()!=null));
+  String records=new tools.jackson.databind.json.JsonMapper().writeValueAsString(events);for(UUID secret:List.of(tenant,owner,space,task))assertFalse(records.contains(secret.toString()));
+ }
+ @Test void erasedSourceAllowsOnlyOriginalPlatformReceiptNotRestorationOrContent(){
+  seed();var r=publish(method());var stop=globalChange(r,1,"STOPPED","合成停止");var receipt=management.change(platform,r.entryId(),stop);
+  db.queryForList("SELECT scrub_lifecycle_object('TASK',?)",task);
+  assertEquals(receipt,management.change(platform,r.entryId(),stop));assertEquals(404,assertThrows(IdentityException.class,()->management.state(platform,r.entryId(),r.versionId())).status);
+  assertEquals(404,assertThrows(IdentityException.class,()->management.change(platform,r.entryId(),globalChange(r,3,"AVAILABLE","合成恢复请求"))).status);
+  assertTrue(platformRecords.list(platform,"EXPERIENCE","SUCCESS",0,100).stream().filter(e->platform.equals(e.actorId())).allMatch(e->e.targetName().equals("已失效的通用经验")));
+  assertEquals("WITHDRAWN",db.queryForObject("SELECT status FROM general_experience_entries WHERE id=?",String.class,r.entryId()));assertNull(db.queryForObject("SELECT method FROM general_experience_versions WHERE id=?",String.class,r.versionId()));
+  db.update("DELETE FROM platform_roles WHERE account_id=?",platform);assertEquals(403,assertThrows(IdentityException.class,()->management.change(platform,r.entryId(),stop)).status);
+ }
+ @Test void concurrentPlatformChangesApplyExactlyOnceAndDoNotCreateTwoEvents()throws Exception{
+  seed();var r=publish(method());var first=globalChange(r,1,"STOPPED","合成首次");var second=globalChange(r,1,"STOPPED","合成同时请求");var start=new CountDownLatch(1);
+  try(var pool=Executors.newFixedThreadPool(2)){
+   var futures=List.of(first,second).stream().map(c->pool.submit(()->{start.await();try{return management.change(platform,r.entryId(),c);}catch(IdentityException e){return e;}})).toList();start.countDown();
+   var results=new ArrayList<Object>();for(var f:futures)results.add(f.get(10,TimeUnit.SECONDS));assertEquals(1,results.stream().filter(x->x instanceof GeneralExperienceManagement.Receipt).count());assertEquals(1,results.stream().filter(x->x instanceof IdentityException e && e.status==409).count());
+  }
+  assertEquals(1,db.queryForObject("SELECT count(*) FROM general_experience_management_events WHERE entry_id=?",Integer.class,r.entryId()));assertEquals(2,management.state(platform,r.entryId(),r.versionId()).revision());
+ }
+ @Test void platformRevocationWinsWhileAChangeWaitsOnStaffAuthorizationLock()throws Exception{
+  seed();var r=publish(method());var change=globalChange(r,1,"STOPPED","合成等待中");var started=new CountDownLatch(1);
+  try(var pool=Executors.newSingleThreadExecutor()){
+   var future=new org.springframework.transaction.support.TransactionTemplate(transactionManager).execute(status->{
+    db.queryForList("SELECT pg_advisory_xact_lock(hashtextextended('platform-staff-management',0))");
+    var pending=pool.submit(()->{started.countDown();try{return (Object)management.change(platform,r.entryId(),change);}catch(IdentityException e){return e;}});
+    try{assertTrue(started.await(10,TimeUnit.SECONDS));assertThrows(TimeoutException.class,()->pending.get(200,TimeUnit.MILLISECONDS));}catch(InterruptedException e){throw new RuntimeException(e);}
+    db.update("DELETE FROM platform_roles WHERE account_id=?",platform);return pending;
+   });
+   var result=future.get(10,TimeUnit.SECONDS);assertInstanceOf(IdentityException.class,result);assertEquals(403,((IdentityException)result).status);
+  }
+  assertTrue(available(r.versionId()));assertEquals(0,db.queryForObject("SELECT count(*) FROM general_experience_management_events WHERE entry_id=?",Integer.class,r.entryId()));
+ }
+ @Test void automaticallyRediscoveredSameMethodCannotBypassPlatformStop(){
+  seed();var r=publish(method());management.change(platform,r.entryId(),globalChange(r,1,"STOPPED","合成停止复用"));
+  nextTask();admission.admit(returned("另一项已核验企业方法",null).id());var j=generalClaim();generalization.dispatched(j,generalDescriptor());generalization.complete(qualified(j,method()));
+  assertEquals("CONFLICT",generalAdmission.admit(j.id()).outcome());assertEquals("STOPPED",management.state(platform,r.entryId(),r.versionId()).status());assertEquals(1,library.contents(platform,null,method().title(),"STOPPED",0).items().size());
+ }
+ @Test void platformManagementHttpRequiresSeparateSessionCsrfAndNoStore()throws Exception{
+  seed();var r=publish(method());grant();db.update("UPDATE accounts SET password_hash=? WHERE id=?",passwords.encode("synthetic-customer-123"),owner);
+  String path="/api/platform-admin/v1/experience-library/"+r.entryId()+"/availability";
+  var customer=new Browser();customer.login("customer",Map.of("email",owner+"@dispatch.test","password","synthetic-customer-123"));assertEquals(401,customer.get(path+"?version="+r.versionId()).statusCode());
+  var adminBrowser=new Browser();adminBrowser.login("platform",Map.of("username",platform+"@platform.test","password","synthetic-platform-456"));
+  var state=adminBrowser.get(path+"?version="+r.versionId());assertEquals(200,state.statusCode(),state.body());assertTrue(state.headers().firstValue("cache-control").orElseThrow().contains("no-store"));
+  var change=globalChange(r,1,"STOPPED","合成 HTTP 操作原因");var builder=java.net.http.HttpRequest.newBuilder(java.net.URI.create("http://127.0.0.1:"+port+path)).header("Content-Type","application/json").POST(java.net.http.HttpRequest.BodyPublishers.ofString(adminBrowser.json.writeValueAsString(change)));
+  assertEquals(403,adminBrowser.http.send(builder.build(),java.net.http.HttpResponse.BodyHandlers.ofString()).statusCode());
+  var csrf=adminBrowser.json.readTree(adminBrowser.get("/api/platform-admin/v1/auth/csrf").body());builder.header(csrf.get("headerName").asString(),csrf.get("token").asString());
+  var response=adminBrowser.http.send(builder.build(),java.net.http.HttpResponse.BodyHandlers.ofString());assertEquals(200,response.statusCode(),response.body());assertTrue(response.headers().firstValue("cache-control").orElseThrow().contains("no-store"));assertEquals(response.body(),adminBrowser.http.send(builder.build(),java.net.http.HttpResponse.BodyHandlers.ofString()).body());
+  assertEquals(404,customer.get("/api/v1/tenants/"+tenant+"/general-experiences/"+r.entryId()+"?version="+r.versionId()).statusCode());
+ }
 }

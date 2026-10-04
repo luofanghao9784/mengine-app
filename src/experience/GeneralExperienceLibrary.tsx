@@ -1,14 +1,17 @@
 import { useEffect, useState } from 'react';
 import { BookOpen, RefreshCw } from 'lucide-react';
 import { useSession } from '../identity/session';
-import { record, uuid } from '../identity/client';
+import { IdentityError, record, uuid } from '../identity/client';
 import { Badge, Button, Empty, Field, Modal } from '../shared/ui';
 import { Failure, Loading, Pager, SubmitError, useRemote, useSubmission } from '../shared/admin';
 import { pageState, textState, useViewState } from '../shared/useViewState';
 import { generalExperienceClient as api, generalProcessingLabels } from './general-client';
 import './management.css';
 import { requestNavigationLocked, useRequestLock } from '../shared/request-guard';
-import type { GeneralExperienceUsageChange } from '../../contracts/public-api/general-experience';
+import type {
+  GeneralExperienceUsageChange,
+  GeneralExperienceAvailabilityChange,
+} from '../../contracts/public-api/general-experience';
 type Selection = { id: string; version: string };
 const selectionState = (v: unknown): v is Selection | null =>
   v === null || (record(v) && uuid(v.id) && uuid(v.version));
@@ -84,6 +87,7 @@ export function GeneralExperienceLibrary({
           <>
             <Button
               role="tab"
+              disabled={locked}
               aria-selected={!processing}
               variant={!processing ? 'primary' : 'ghost'}
               onClick={() => setTab('content')}
@@ -92,6 +96,7 @@ export function GeneralExperienceLibrary({
             </Button>
             <Button
               role="tab"
+              disabled={locked}
               aria-selected={processing}
               variant={processing ? 'primary' : 'ghost'}
               onClick={() => setTab('processing')}
@@ -277,10 +282,18 @@ function GeneralDetail({
     [tenant, selection.id, selection.version, attempt, session.identity],
   );
   const d = data.value;
+  const [denied, setDenied] = useState<unknown>();
+  const error = data.error || denied;
   return (
     <Modal title="通用经验详情" className="experience-management-drawer" onClose={close}>
-      {data.error ? (
-        <Failure error={data.error} retry={() => setAttempt((n) => n + 1)} />
+      {error ? (
+        <Failure
+          error={error}
+          retry={() => {
+            setDenied(undefined);
+            setAttempt((n) => n + 1);
+          }}
+        />
       ) : !d ? (
         <Loading />
       ) : (
@@ -290,7 +303,26 @@ function GeneralDetail({
             <Badge>{d.status === 'STOPPED' ? '已停用' : tenant ? '通用版本可用' : '当前可用'}</Badge>
             <span>v{d.number}</span>
           </div>
-          {tenant && <TenantUsage tenant={tenant} selection={selection} lock={lock} changed={changed} />}
+          {tenant ? (
+            <TenantUsage
+              tenant={tenant}
+              selection={selection}
+              lock={lock}
+              changed={changed}
+              denied={setDenied}
+            />
+          ) : (
+            <PlatformAvailability
+              selection={selection}
+              lock={lock}
+              denied={setDenied}
+              changed={() => {
+                setAttempt((n) => n + 1);
+                changed();
+              }}
+            />
+          )}
+
           <h2>{d.method.title}</h2>
           <p>{d.method.summary}</p>
           <div className="experience-management-tags">
@@ -335,8 +367,10 @@ function TenantUsage({
   selection,
   lock,
   changed,
+  denied,
 }: {
   tenant: string;
+  denied: (error: unknown) => void;
   selection: Selection;
   lock: (value: boolean) => void;
   changed: () => void;
@@ -357,6 +391,10 @@ function TenantUsage({
     [tenant, selection.id, selection.version, attempt],
   );
   const d = data.value;
+  useEffect(() => {
+    const e = data.error || submission.error;
+    if (e instanceof IdentityError && [401, 403, 404].includes(e.status)) denied(e);
+  }, [data.error, submission.error, denied]);
   return (
     <section className="experience-availability" aria-label="本企业使用状态">
       {notice && <p role="status">{notice}</p>}
@@ -423,6 +461,117 @@ function TenantUsage({
                 {d.enabled ? '停止本企业使用' : '恢复本企业使用'}
               </Button>
             )
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+function PlatformAvailability({
+  selection,
+  lock,
+  changed,
+  denied,
+}: {
+  selection: Selection;
+  lock: (value: boolean) => void;
+  changed: () => void;
+  denied: (error: unknown) => void;
+}) {
+  type Action = Omit<GeneralExperienceAvailabilityChange, 'requestId' | 'reason'>;
+  const [attempt, setAttempt] = useState(0),
+    [action, setAction] = useState<Action | null>(null),
+    [reason, setReason] = useState('');
+  const submission = useSubmission<Omit<GeneralExperienceAvailabilityChange, 'requestId'>>();
+  const blocked = submission.busy || submission.uncertain;
+  useRequestLock(blocked);
+  useEffect(() => {
+    lock(blocked);
+    return () => lock(false);
+  }, [blocked, lock]);
+  const data = useRemote(
+    (signal) => api.availability(selection.id, selection.version, signal),
+    [selection.id, selection.version, attempt],
+  );
+  useEffect(() => {
+    const e = data.error || submission.error;
+    if (e instanceof IdentityError && [401, 403, 404].includes(e.status)) denied(e);
+  }, [data.error, submission.error, denied]);
+  const d = data.value;
+  return (
+    <section className="experience-availability" aria-label="总库使用状态">
+      {data.error ? (
+        <Failure error={data.error} retry={() => setAttempt((n) => n + 1)} />
+      ) : !d ? (
+        <Loading />
+      ) : (
+        <>
+          {d.reason && <p>最近操作原因：{d.reason}</p>}
+          {action ? (
+            <>
+              <p>
+                {action.status === 'STOPPED'
+                  ? '停止所有企业后续检索与采用，正在引用此经验的任务需重新执行。已完成结果保留。'
+                  : '恢复当前发布版本供后续任务参考。企业自行停用的状态保持，旧任务不会自动恢复。'}
+              </p>
+              <Field label="操作原因">
+                <textarea
+                  aria-label="操作原因"
+                  value={reason}
+                  maxLength={500}
+                  rows={3}
+                  disabled={blocked}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="简要说明原因，仅总台可见"
+                />
+              </Field>
+              <SubmitError error={submission.error} uncertain={submission.uncertain} />
+              <Button
+                disabled={submission.busy || !reason.trim()}
+                onClick={() =>
+                  void submission.submit({ ...action, reason: reason.trim() }, async (body, requestId) => {
+                    await api.changeAvailability(selection.id, { ...body, requestId });
+                    setAction(null);
+                    setReason('');
+                    changed();
+                  })
+                }
+              >
+                {submission.busy
+                  ? '正在提交…'
+                  : submission.uncertain
+                    ? '重试原请求'
+                    : action.status === 'STOPPED'
+                      ? '确认停用'
+                      : '确认恢复'}
+              </Button>
+              <Button
+                variant="ghost"
+                disabled={blocked}
+                onClick={() => {
+                  setAction(null);
+                  setReason('');
+                  setAttempt((n) => n + 1);
+                }}
+              >
+                取消
+              </Button>
+            </>
+          ) : (
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setReason('');
+                setAction({
+                  versionId: selection.version,
+                  expectedRevision: d.revision,
+                  status: d.status === 'AVAILABLE' ? 'STOPPED' : 'AVAILABLE',
+                });
+              }}
+            >
+              {d.status === 'AVAILABLE' ? '停用通用经验' : '恢复通用经验'}
+            </Button>
           )}
         </>
       )}

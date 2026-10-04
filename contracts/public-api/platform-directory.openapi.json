@@ -246,7 +246,8 @@
                 "ENTERPRISE",
                 "ACCOUNT",
                 "STAFF",
-                "SECURITY"
+                "SECURITY",
+                "EXPERIENCE"
               ],
               "default": ""
             }
@@ -578,7 +579,8 @@
               "ENTERPRISE",
               "ACCOUNT",
               "STAFF",
-              "SECURITY"
+              "SECURITY",
+              "EXPERIENCE"
             ]
           },
           "action": {

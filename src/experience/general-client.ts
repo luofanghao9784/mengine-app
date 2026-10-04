@@ -1,5 +1,8 @@
 import type {
   GeneralExperiencePage,
+  GeneralExperienceAvailability,
+  GeneralExperienceAvailabilityChange,
+  GeneralExperienceAvailabilityReceipt,
   GeneralExperienceUsage,
   GeneralExperienceUsageChange,
   GeneralExperienceUsageReceipt,
@@ -83,6 +86,23 @@ export const isGeneralUsageReceipt = (v: unknown): v is GeneralExperienceUsageRe
   typeof v.enabled === 'boolean' &&
   count(v.revision) &&
   Number(v.revision) > 0;
+export const isGeneralAvailability = (v: unknown): v is GeneralExperienceAvailability =>
+  exact(v, ['entryId', 'versionId', 'status', 'revision', 'reason', 'changedAt']) &&
+  uuid(v.entryId) &&
+  uuid(v.versionId) &&
+  ['AVAILABLE', 'STOPPED'].includes(String(v.status)) &&
+  count(v.revision) &&
+  Number(v.revision) > 0 &&
+  (v.reason === null || text(v.reason, 500)) &&
+  date(v.changedAt);
+export const isGeneralAvailabilityReceipt = (v: unknown): v is GeneralExperienceAvailabilityReceipt =>
+  exact(v, ['requestId', 'entryId', 'versionId', 'status', 'revision']) &&
+  uuid(v.requestId) &&
+  uuid(v.entryId) &&
+  uuid(v.versionId) &&
+  ['AVAILABLE', 'STOPPED'].includes(String(v.status)) &&
+  count(v.revision) &&
+  Number(v.revision) > 1;
 export function createGeneralExperienceClient(fetcher: typeof fetch = fetch) {
   const request = createIdentityRequest(fetcher);
   const path = (tenant?: string) => {
@@ -152,6 +172,40 @@ export function createGeneralExperienceClient(fetcher: typeof fetch = fetch) {
         v.versionId !== body.versionId ||
         v.requestId !== body.requestId ||
         v.enabled !== body.enabled ||
+        v.revision !== body.expectedRevision + 1
+      )
+        throw new IdentityError('CONTRACT_MISMATCH');
+      return v;
+    },
+    availability: async (id: string, version: string, signal?: AbortSignal) => {
+      if (!uuid(id) || !uuid(version)) throw new IdentityError('INVALID_REQUEST', 400);
+      const v = await request(
+        path() + `/${id}/availability?version=${version}`,
+        'GET',
+        isGeneralAvailability,
+        undefined,
+        signal,
+      );
+      if (v.entryId !== id || v.versionId !== version) throw new IdentityError('CONTRACT_MISMATCH');
+      return v;
+    },
+    changeAvailability: async (id: string, body: GeneralExperienceAvailabilityChange) => {
+      if (
+        !uuid(id) ||
+        !uuid(body.requestId) ||
+        !uuid(body.versionId) ||
+        !count(body.expectedRevision) ||
+        body.expectedRevision < 1 ||
+        !['AVAILABLE', 'STOPPED'].includes(body.status) ||
+        !text(body.reason, 500)
+      )
+        throw new IdentityError('INVALID_REQUEST', 400);
+      const v = await request(path() + `/${id}/availability`, 'POST', isGeneralAvailabilityReceipt, body);
+      if (
+        v.entryId !== id ||
+        v.versionId !== body.versionId ||
+        v.requestId !== body.requestId ||
+        v.status !== body.status ||
         v.revision !== body.expectedRevision + 1
       )
         throw new IdentityError('CONTRACT_MISMATCH');

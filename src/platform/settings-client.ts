@@ -7,7 +7,7 @@ const entry = (v: unknown): v is ManagementRecord =>
   record(v) &&
   Number.isSafeInteger(v.id) &&
   Number(v.id) > 0 &&
-  ['ENTERPRISE', 'ACCOUNT', 'STAFF', 'SECURITY'].includes(String(v.category)) &&
+  ['ENTERPRISE', 'ACCOUNT', 'STAFF', 'SECURITY', 'EXPERIENCE'].includes(String(v.category)) &&
   text(v.action) &&
   ['SUCCESS', 'DENIED'].includes(String(v.outcome)) &&
   nullableId(v.actorId) &&

@@ -53,4 +53,14 @@ test('records reject invalid outcome/category, timestamp and unsafe identity ids
   assert.deepEqual(await createSettingsClient(async () => Response.json([record])).records('', '', 0), [
     record,
   ]);
+  const experience = {
+    ...record,
+    category: 'EXPERIENCE',
+    action: 'GENERAL_EXPERIENCE_STOP',
+    internalReason: '合成原因',
+  };
+  assert.deepEqual(
+    await createSettingsClient(async () => Response.json([experience])).records('EXPERIENCE', '', 0),
+    [experience],
+  );
 });

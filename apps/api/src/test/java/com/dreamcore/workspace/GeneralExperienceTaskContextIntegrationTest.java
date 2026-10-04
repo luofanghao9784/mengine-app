@@ -169,4 +169,28 @@ class GeneralExperienceTaskContextIntegrationTest {
   }finally{release.countDown();}
   assertFalse(agents.active(job));localUse(r,1,true);assertFalse(agents.active(job));
  }
+
+ @Autowired GeneralExperienceManagement globalManagement;
+ UUID platformManager;
+ UUID platformManager(){if(platformManager!=null)return platformManager;platformManager=UUID.randomUUID();db.update("INSERT INTO accounts(id,email,display_name,password_hash) VALUES (?,?,'合成总台人员','unused')",platformManager,platformManager+"@general-platform.test");db.update("INSERT INTO platform_accounts(account_id,login_name,password_hash) VALUES (?,?,'unused')",platformManager,platformManager+"@general-platform.test");db.update("INSERT INTO platform_roles(account_id,role) VALUES (?,'PLATFORM_ADMIN')",platformManager);return platformManager;}
+ @AfterEach void removePlatformManager(){if(platformManager!=null){db.update("DELETE FROM platform_roles WHERE account_id=?",platformManager);db.update("DELETE FROM platform_accounts WHERE account_id=?",platformManager);}}
+ GeneralExperienceManagement.Receipt globalUse(GeneralExperienceAdmissionService.Receipt r,int revision,String status){return globalManagement.change(platformManager(),r.entryId(),new GeneralExperienceManagement.Change(UUID.randomUUID(),r.versionId(),revision,status,"合成总台维护"));}
+ @Test void platformRestoreNeverRestartsTasksOrOverridesEnterpriseLocalStop(){
+  seed();var r=publish(method());var done=working();read(done,r,0);finish(done,"保留合成完成历史");var active=working();read(active,r,0);
+  globalUse(r,1,"STOPPED");assertFalse(agents.active(active));assertTrue(db.queryForObject("SELECT EXISTS(SELECT 1 FROM readable_source_tasks WHERE id=?)",Boolean.class,done.id()));
+  globalUse(r,2,"AVAILABLE");assertFalse(agents.active(active));localUse(r,0,false);
+  globalUse(r,3,"STOPPED");globalUse(r,4,"AVAILABLE");
+  var next=working();assertEquals(0,search(next).get("items").size());denied(404,()->read(next,r,0));assertTrue(available(r.versionId()));
+  localUse(r,1,true);assertNotNull(read(next,r,0));assertFalse(agents.active(active));
+ }
+ @Test void platformStopWaitsForAnOngoingContextTransactionBeforeFencing()throws Exception{
+  seed();var r=publish(method());var job=working();read(job,r,0);UUID manager=platformManager();var held=new CountDownLatch(1);var release=new CountDownLatch(1);
+  try(var pool=Executors.newFixedThreadPool(2)){
+   var reader=pool.submit(()->new org.springframework.transaction.support.TransactionTemplate(transactionManager).execute(status->{guard.requireCurrent(job.id());held.countDown();try{assertTrue(release.await(10,TimeUnit.SECONDS));}catch(InterruptedException e){throw new RuntimeException(e);}return true;}));
+   assertTrue(held.await(10,TimeUnit.SECONDS));var writer=pool.submit(()->globalManagement.change(manager,r.entryId(),new GeneralExperienceManagement.Change(UUID.randomUUID(),r.versionId(),1,"STOPPED","合成并发停用")));
+   try{assertThrows(TimeoutException.class,()->writer.get(200,TimeUnit.MILLISECONDS));}finally{release.countDown();}
+   assertTrue(reader.get(10,TimeUnit.SECONDS));assertEquals("STOPPED",writer.get(10,TimeUnit.SECONDS).status());
+  }finally{release.countDown();}
+  assertFalse(agents.active(job));globalUse(r,2,"AVAILABLE");assertFalse(agents.active(job));
+ }
 }

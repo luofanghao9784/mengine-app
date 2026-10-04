@@ -68,3 +68,26 @@ export interface GeneralExperienceUsageReceipt {
   enabled: boolean;
   revision: number;
 }
+
+export interface GeneralExperienceAvailability {
+  entryId: string;
+  versionId: string;
+  status: 'AVAILABLE' | 'STOPPED';
+  revision: number;
+  reason: string | null;
+  changedAt: string;
+}
+export interface GeneralExperienceAvailabilityChange {
+  requestId: string;
+  versionId: string;
+  expectedRevision: number;
+  status: 'AVAILABLE' | 'STOPPED';
+  reason: string;
+}
+export interface GeneralExperienceAvailabilityReceipt {
+  requestId: string;
+  entryId: string;
+  versionId: string;
+  status: 'AVAILABLE' | 'STOPPED';
+  revision: number;
+}

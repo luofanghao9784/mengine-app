@@ -38,10 +38,14 @@ test('cleaned method contract refuses source identities, raw evidence and invent
 });
 test('realm contracts keep customer usage writes separate and require exact versions', () => {
   for (const [path, operations] of Object.entries(spec.paths)) {
-    assert.deepEqual(Object.keys(operations), path.endsWith('/usage') ? ['get', 'post'] : ['get']);
+    assert.deepEqual(
+      Object.keys(operations),
+      path.endsWith('/usage') || path.endsWith('/availability') ? ['get', 'post'] : ['get'],
+    );
     if (operations.post) {
-      assert.ok(path.startsWith('/api/v1/tenants/'));
-      assert.deepEqual(operations.post.security, [{ customerCookie: [] }]);
+      assert.deepEqual(operations.post.security, [
+        { [path.includes('platform-admin') ? 'platformCookie' : 'customerCookie']: [] },
+      ]);
       assert.ok(operations.post.parameters.some((p) => p.in === 'header' && p.required));
     }
     const platform = path.includes('platform-admin');
@@ -67,6 +71,33 @@ test('usage control request and receipt carry exact version, revision and idempo
   assert.ok(state({ entryId: id, versionId: id, revision: 0, enabled: true, canManage: false }));
   assert.equal(
     state({ entryId: id, versionId: id, revision: 0, enabled: true, canManage: false, reason: 'private' }),
+    false,
+  );
+});
+
+test('platform availability requires an exact version, current revision and bounded reason without source fields', () => {
+  const check = ajv.compile(spec.components.schemas.AvailabilityChange);
+  const body = {
+    requestId: id,
+    versionId: id,
+    expectedRevision: 1,
+    status: 'STOPPED',
+    reason: '合成适用范围',
+  };
+  assert.ok(check(body));
+  for (const key of ['tenantId', 'actorId', 'method', 'sourceId'])
+    assert.equal(check({ ...body, [key]: id }), false);
+  for (const invalid of [
+    { expectedRevision: 0 },
+    { reason: '' },
+    { reason: 'x'.repeat(501) },
+    { status: 'WITHDRAWN' },
+  ])
+    assert.equal(check({ ...body, ...invalid }), false);
+  const receipt = ajv.compile(spec.components.schemas.AvailabilityReceipt);
+  assert.ok(receipt({ requestId: id, entryId: id, versionId: id, revision: 2, status: 'STOPPED' }));
+  assert.equal(
+    receipt({ requestId: id, entryId: id, versionId: id, revision: 2, status: 'STOPPED', method: 'private' }),
     false,
   );
 });

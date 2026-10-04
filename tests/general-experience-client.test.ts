@@ -6,6 +6,7 @@ import {
   isGeneralPage,
   isGeneralProcessing,
   generalProcessingLabels,
+  isGeneralAvailability,
 } from '../src/experience/general-client.ts';
 const id = '00000000-0000-4000-8000-000000000001',
   version = '00000000-0000-4000-8000-000000000002';
@@ -113,4 +114,55 @@ test('usage mutations use customer CSRF, exact version, revision and unchanged r
   bad = true;
   await assert.rejects(api.changeUsage(id, id, body));
   await assert.rejects(api.changeUsage('', id, body));
+});
+
+test('platform availability never routes through customer identity and rejects mismatched operation receipts', async () => {
+  const calls: { url: string; body: unknown }[] = [];
+  let bad = false;
+  const api = createGeneralExperienceClient((async (url, init) => {
+    if (String(url).endsWith('/csrf')) {
+      assert.equal(String(url), '/api/platform-admin/v1/auth/csrf');
+      return Response.json({ headerName: 'X-CSRF-TOKEN', token: 'synthetic-platform' });
+    }
+    assert.equal(new Headers(init?.headers).get('X-CSRF-TOKEN'), 'synthetic-platform');
+    calls.push({ url: String(url), body: JSON.parse(String(init?.body)) });
+    return Response.json({
+      requestId: id,
+      entryId: id,
+      versionId: bad ? id : version,
+      revision: 2,
+      status: 'STOPPED',
+    });
+  }) as typeof fetch);
+  const body = {
+    requestId: id,
+    versionId: version,
+    expectedRevision: 1,
+    status: 'STOPPED' as const,
+    reason: '合成停止原因',
+  };
+  await api.changeAvailability(id, body);
+  await api.changeAvailability(id, body);
+  assert.deepEqual(calls[0], calls[1]);
+  assert.equal(calls[0].url, `/api/platform-admin/v1/experience-library/${id}/availability`);
+  bad = true;
+  await assert.rejects(api.changeAvailability(id, body));
+  await assert.rejects(api.changeAvailability(id, { ...body, reason: '' }));
+  const state = {
+    entryId: id,
+    versionId: version,
+    revision: 1,
+    status: 'AVAILABLE',
+    reason: null,
+    changedAt: detail.updatedAt,
+  };
+  assert.ok(isGeneralAvailability(state));
+  for (const field of ['actorId', 'tenantId', 'sourceId', 'method'])
+    assert.equal(isGeneralAvailability({ ...state, [field]: id }), false);
+  await assert.rejects(
+    createGeneralExperienceClient(async () => Response.json({ ...state, versionId: id })).availability(
+      id,
+      version,
+    ),
+  );
 });

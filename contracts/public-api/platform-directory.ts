@@ -49,7 +49,7 @@ export interface StaffInvitePreview {
 /** Allowlisted platform management metadata; excludes customer content/activity. */
 export interface ManagementRecord {
   id: number;
-  category: 'ENTERPRISE' | 'ACCOUNT' | 'STAFF' | 'SECURITY';
+  category: 'ENTERPRISE' | 'ACCOUNT' | 'STAFF' | 'SECURITY' | 'EXPERIENCE';
   action: string;
   outcome: 'SUCCESS' | 'DENIED';
   actorId: string | null;

@@ -15,6 +15,7 @@ test('directory metadata excludes credentials and content and all routes require
 });
 test('global records contain only management metadata and bounded authenticated filters',()=>{
  const valid=schema('ManagementRecord'), row={id:1,category:'SECURITY',action:'PLATFORM_LOGIN',outcome:'SUCCESS',actorId:null,actorName:null,targetId:null,targetName:null,tenantId:null,tenantName:null,createdAt:'2026-10-04T00:00:00Z',internalReason:null,publicReason:null};
+ assert.ok(valid({...row,category:'EXPERIENCE',action:'GENERAL_EXPERIENCE_STOP',internalReason:'合成原因'}));
  assert.ok(valid(row));for(const key of ['password','conversation','content','token'])assert.equal(valid({...row,[key]:'private'}),false);
  assert.equal(valid({...row,category:'CUSTOMER_ACTIVITY'}),false);
  const op=spec.paths['/api/platform-admin/v1/records'].get;

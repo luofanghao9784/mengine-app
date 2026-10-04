@@ -460,6 +460,134 @@
           }
         }
       }
+    },
+    "/api/platform-admin/v1/experience-library/{entry}/availability": {
+      "get": {
+        "description": "Only cleaned current general content; no tenant sources. Fixed version required for details.",
+        "security": [
+          {
+            "platformCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entry",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized projection",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Availability"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Management scope required"
+          },
+          "404": {
+            "description": "Version no longer available"
+          }
+        },
+        "operationId": "getGeneralExperienceAvailability"
+      },
+      "post": {
+        "description": "Only cleaned current general content; no tenant sources. Fixed version required for details.",
+        "security": [
+          {
+            "platformCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entry",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-CSRF-TOKEN",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized projection",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AvailabilityReceipt"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Management scope required"
+          },
+          "404": {
+            "description": "Version no longer available"
+          },
+          "409": {
+            "description": "Revision or request identity conflict; no mutation applied"
+          }
+        },
+        "operationId": "changeGeneralExperienceAvailability",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AvailabilityChange"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -837,6 +965,128 @@
           "revision": {
             "type": "integer",
             "minimum": 1
+          }
+        }
+      },
+      "Availability": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "entryId",
+          "versionId",
+          "status",
+          "revision",
+          "reason",
+          "changedAt"
+        ],
+        "properties": {
+          "entryId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "versionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "AVAILABLE",
+              "STOPPED"
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "reason": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              }
+            ]
+          },
+          "changedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AvailabilityChange": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requestId",
+          "versionId",
+          "expectedRevision",
+          "status",
+          "reason"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "versionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "AVAILABLE",
+              "STOPPED"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        }
+      },
+      "AvailabilityReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requestId",
+          "entryId",
+          "versionId",
+          "status",
+          "revision"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "entryId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "versionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "AVAILABLE",
+              "STOPPED"
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 2
           }
         }
       }
