@@ -44,14 +44,14 @@ export function PlatformUsagePage({ hash }: { hash: string }) {
   const requested = new URLSearchParams(hash.slice(1)).get('enterprise');
   const tenant = uuid(requested) ? requested : null;
   return (
-    <div className="usage-page">
+    <div className="usage-page platform-usage-summary">
       {tenant && (
         <a className="button ghost" href={adminHref('platform', 'usage', hash)}>
           <ArrowLeft size={16} />
           返回全平台用量
         </a>
       )}
-      <UsagePanel key={tenant || 'all'} scope="platform" tenant={tenant} hash={hash} />
+      <UsagePanel key={tenant || 'all'} scope="platform" tenant={tenant} hash={hash} compact />
       <TenantUsageDirectory hash={hash} />
     </div>
   );
@@ -98,7 +98,7 @@ function TenantUsageDirectory({ hash }: { hash: string }) {
               <a key={t.id} href={adminHref('platform', 'usage', hash, { enterprise: t.id })}>
                 <span>
                   {t.name}
-                  <small>{t.status === 'ACTIVE' ? '正常服务' : '服务暂停'}</small>
+                  <small>{t.status === 'ACTIVE' ? '运行中' : '已暂停'}</small>
                 </span>
                 <span>
                   查看用量
@@ -107,7 +107,9 @@ function TenantUsageDirectory({ hash }: { hash: string }) {
               </a>
             ))}
           </div>
-          <Pager page={page} next={data.value.length > 20} onPage={setPage} />
+          {(page > 0 || data.value.length > 20) && (
+            <Pager page={page} next={data.value.length > 20} onPage={setPage} />
+          )}
         </>
       ) : (
         <p className="admin-note">没有匹配的企业。</p>
@@ -222,19 +224,31 @@ function ScopedUsage({
           {scope === 'tenant' && controls}
         </div>
       )}
+      {compact && hash !== undefined && (
+        <p className="admin-note usage-scope-note">
+          {tenant ? (
+            <>
+              <TenantName tenant={tenant} /> · 企业用量
+            </>
+          ) : (
+            '全平台汇总 · 包含暂停服务企业与平台维护 · 仅正式执行'
+          )}
+        </p>
+      )}
       {data.error ? (
         <Failure error={data.error} retry={refresh} />
       ) : !value ? (
         <Loading />
       ) : compact ? (
-        <EnterpriseUsageFacts value={value} cost={cost} />
+        <CompactUsageFacts value={value} cost={cost} />
       ) : (
         <UsageFacts value={value} cost={cost} />
       )}
     </div>
   );
 }
-function EnterpriseUsageFacts({ value: v, cost }: { value: UsageOverview; cost?: UsageCost }) {
+function CompactUsageFacts({ value: v, cost }: { value: UsageOverview; cost?: UsageCost }) {
+  const overall = v.tenantId === null;
   const work = v.groups.find((g) => g.purpose === 'WORK' && g.executionClass === 'live');
   const maintenance = v.groups.find((g) => g.purpose === 'MAINTENANCE' && g.executionClass === 'live');
   const live = v.groups.filter((g) => g.executionClass === 'live');
@@ -284,7 +298,7 @@ function EnterpriseUsageFacts({ value: v, cost }: { value: UsageOverview; cost?:
           <Trend days={v.days} platform showDailyValues={false} />
         </section>
         <section className="enterprise-usage-card" aria-label="用量构成">
-          <h2>用量构成</h2>
+          <h2>{overall ? '全平台用量构成' : '用量构成'}</h2>
           <dl className="enterprise-usage-breakdown">
             <div>
               <dt>输入 Token</dt>
@@ -303,11 +317,15 @@ function EnterpriseUsageFacts({ value: v, cost }: { value: UsageOverview; cost?:
               <dd>{cost?.state === 'NOT_CONNECTED' ? '未接入' : '未知'}</dd>
             </div>
             <div>
-              <dt>企业额度</dt>
-              <dd>未配置</dd>
+              <dt>{overall ? '共享费用分摊' : '企业额度'}</dt>
+              <dd>{overall ? '未分摊' : '未配置'}</dd>
             </div>
           </dl>
-          <p className="admin-note">Token 仅累计正式执行的已上报部分；剩余额度未知。</p>
+          <p className="admin-note">
+            {overall
+              ? 'Token 汇总企业与平台维护的已上报用量；成本未对账，不代表企业售价。'
+              : 'Token 仅累计正式执行的已上报部分；剩余额度未知。'}
+          </p>
         </section>
       </div>
       <section className="enterprise-usage-card enterprise-daily-card" aria-label="每日数值">

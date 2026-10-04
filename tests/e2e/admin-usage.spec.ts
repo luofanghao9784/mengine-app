@@ -180,6 +180,9 @@ test('platform defaults to month, filters enterprise with same facts, preserves 
   const f = await fixture(context);
   await page.goto('/platform-admin/#admin=usage');
   await expect(page.getByRole('combobox', { name: '用量统计期间' })).toHaveText('本月');
+  await expect(page.getByText('全平台汇总 · 包含暂停服务企业与平台维护 · 仅正式执行')).toBeVisible();
+  await expect(page.locator('.usage-metrics').first().locator('div').nth(1).locator('dd')).toHaveText('150');
+  await page.getByText('计量明细与说明', { exact: true }).click();
   await expect(page.getByRole('region', { name: '运行成本' })).toContainText('已核实成本');
   await expect(page.getByRole('region', { name: '用途与计量覆盖' })).toContainText('合成验证');
   await page.getByRole('combobox', { name: '用量统计期间' }).click();
@@ -198,7 +201,7 @@ test('platform defaults to month, filters enterprise with same facts, preserves 
   await expect(page.getByText('没有匹配的企业。')).toBeVisible();
   expect(f.methods.every((m) => m === 'GET')).toBeTruthy();
   await page.screenshot({ path: '/tmp/usage-platform-details-1440.png' });
-  await page.locator('.usage-heading').first().scrollIntoViewIfNeeded();
+  await page.locator('.usage-scope-note').first().scrollIntoViewIfNeeded();
   await page.screenshot({ path: '/tmp/usage-platform-1440.png' });
 });
 test('enterprise page omits procurement cost, shows incomplete usage and quota without inventing limits', async ({
@@ -234,6 +237,8 @@ test('empty observations do not imply free service or complete monitoring', asyn
   const f = await fixture(context);
   f.mode('empty');
   await page.goto('/platform-admin/#admin=usage');
+  await expect(page.getByText('该期间暂无已知每日用量')).toBeVisible();
+  await page.getByText('计量明细与说明', { exact: true }).click();
   await expect(page.getByText('该期间暂无模型计量记录。')).toBeVisible();
   await expect(page.getByRole('region', { name: '运行成本' })).toContainText('未接入');
   await expect(page.getByRole('region', { name: '企业额度' })).toContainText('未配置');

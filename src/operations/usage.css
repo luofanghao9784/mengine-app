@@ -658,3 +658,10 @@
   position: sticky;
   top: 0;
 }
+
+.admin-platform .platform-usage-summary,
+.admin-platform .platform-usage-summary > .enterprise-usage { gap: 16px; }
+.admin-platform .platform-usage-summary .usage-scope-note { margin: 0; }
+.admin-platform .platform-usage-summary .usage-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.admin-platform .platform-usage-summary > .usage-section { padding: 20px; }
+.admin-platform .platform-usage-summary .usage-directory a:last-child { border-bottom: 0; }
