@@ -1,3 +1,4 @@
+import { adminHref } from '../admin/navigation';
 import { SpaceOwnerForm } from './SpaceOwnerForm';
 import { useRequestLock } from '../shared/request-guard';
 import { useViewState, textState, pageState } from '../shared/useViewState';
@@ -208,15 +209,7 @@ export function TenantAdminHome({
             </nav>
           )}
           <section className="access-panel tenant-section" key={tab}>
-            {tab === 'members' && (
-              <Members
-                tenant={tenant}
-                attempt={attempt}
-                refresh={refresh}
-                onStatus={(member) => setDialog({ kind: 'status', member })}
-                onEmergency={(member) => setDialog({ kind: 'emergency', member })}
-              />
-            )}
+            {tab === 'members' && <Members tenant={tenant} attempt={attempt} refresh={refresh} />}
             {tab === 'invitations' && (
               <Invitations
                 tenant={tenant}
@@ -403,19 +396,7 @@ function Filter({
     </form>
   );
 }
-function Members({
-  tenant,
-  attempt,
-  refresh,
-  onStatus,
-  onEmergency,
-}: {
-  tenant: string;
-  attempt: number;
-  refresh: () => void;
-  onStatus: (m: TenantMember) => void;
-  onEmergency: (m: TenantMember) => void;
-}) {
+function Members({ tenant, attempt, refresh }: { tenant: string; attempt: number; refresh: () => void }) {
   const [q, setQ] = useViewState(tenant, 'admin:members:query', '', textState),
     [status, setStatus] = useViewState(tenant, 'admin:members:status', '', textState),
     [page, setPage] = useViewState(tenant, 'admin:members:page', 0, pageState);
@@ -470,14 +451,16 @@ function Members({
                       ? '已启用'
                       : '已停用'}
                 </Badge>
-                {m.status === 'ACTIVE' && (
-                  <Button variant="danger" onClick={() => onEmergency(m)}>
-                    紧急安全停用
-                  </Button>
-                )}
-                <Button variant="ghost" onClick={() => onStatus(m)}>
-                  {m.status === 'ACTIVE' ? '停用' : '恢复'}
-                </Button>
+                <a
+                  className="button ghost"
+                  href={adminHref('tenant', 'members', location.hash, {
+                    detail: 'member',
+                    member: m.accountId,
+                  })}
+                  aria-label={`查看成员 ${m.displayName}`}
+                >
+                  查看详情
+                </a>
               </li>
             ))}
           </ul>
@@ -712,7 +695,7 @@ function TextForm({
     </form>
   );
 }
-function Confirm({
+export function Confirm({
   action,
   danger = false,
   submit,
@@ -724,6 +707,7 @@ function Confirm({
   children: ReactNode;
 }) {
   const task = useSubmission<null>();
+  useRequestLock(task.busy || task.uncertain);
   return (
     <div className="platform-form">
       {children}
@@ -1009,7 +993,7 @@ function AddGrant({
   );
 }
 
-function EmergencyStop({
+export function EmergencyStop({
   tenant,
   member,
   complete,
@@ -1020,6 +1004,7 @@ function EmergencyStop({
 }) {
   const [acknowledged, setAcknowledged] = useState(false);
   const task = useSubmission<boolean>();
+  useRequestLock(task.busy || task.uncertain);
   return (
     <form
       onSubmit={(e) => {

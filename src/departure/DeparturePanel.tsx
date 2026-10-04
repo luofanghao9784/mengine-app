@@ -70,6 +70,7 @@ function useActionRunner(reload: () => void) {
       if (mounted.current) {
         setUncertain(false);
         reload();
+        window.dispatchEvent(new Event('departure-state-changed'));
       }
     } catch (e) {
       if (e instanceof IdentityError && e.status === 401) expire();
@@ -106,17 +107,26 @@ export function DeparturePanel({
   tenant,
   verification = 0,
   recordsOnly = false,
+  memberId,
+  executionId,
+  only,
 }: {
   tenant: string;
   verification?: number;
   recordsOnly?: boolean;
+  memberId?: string;
+  executionId?: string;
+  only?: 'member' | 'exit';
 }) {
   return (
     <DepartureSession
-      key={`${tenant}:${recordsOnly}`}
+      key={`${tenant}:${recordsOnly}:${only || ''}:${memberId || ''}:${executionId || ''}`}
       tenant={tenant}
       verification={verification}
       recordsOnly={recordsOnly}
+      memberId={memberId}
+      executionId={executionId}
+      only={only}
     />
   );
 }
@@ -124,37 +134,70 @@ function DepartureSession({
   tenant,
   verification,
   recordsOnly,
+  memberId,
+  executionId,
+  only,
 }: {
   tenant: string;
   verification: number;
   recordsOnly: boolean;
+  memberId?: string;
+  executionId?: string;
+  only?: 'member' | 'exit';
 }) {
   const [nonce, setNonce] = useState(0),
     [page, setPage] = useState(0),
-    [mode, setMode] = useState<'list' | 'offboard' | 'exit'>('list'),
-    [selected, setSelected] = useState<string>();
+    [mode, setMode] = useState<'list' | 'offboard' | 'exit'>(memberId ? 'offboard' : 'list'),
+    [selected, setSelected] = useState<string | undefined>(executionId);
   const reload = () => {
       setNonce((x) => x + 1);
-      window.dispatchEvent(new Event('departure-state-changed'));
     },
     action = useActionRunner(reload);
   const list = useRemote(
-    (signal) => api.list(tenant, page * 20, signal),
-    [tenant, page, nonce, verification],
+    (signal) =>
+      memberId
+        ? Promise.resolve({ items: [], hasMore: false })
+        : api.list(
+            tenant,
+            page * 20,
+            signal,
+            only === 'exit' ? 'TENANT_EXIT' : only === 'member' ? 'MEMBER_OFFBOARD' : undefined,
+          ),
+    [tenant, page, nonce, verification, only],
   );
   const options = useRemote(
-    (signal) => (recordsOnly ? Promise.resolve(null) : api.options(tenant, undefined, 0, 0, signal)),
+    (signal) =>
+      recordsOnly || memberId ? Promise.resolve(null) : api.options(tenant, undefined, 0, 0, signal),
     [tenant, nonce, verification, recordsOnly],
   );
   return (
     <Actions.Provider value={{ blocked: action.blocked, run: action.run, reload }}>
-      <section className="departure-panel" aria-label={recordsOnly ? '迁出与清理记录' : '离职与企业退出'}>
+      <section
+        className="departure-panel"
+        aria-label={
+          memberId || only === 'member'
+            ? '成员离职办理'
+            : only === 'exit'
+              ? '企业退出'
+              : recordsOnly
+                ? '迁出与清理记录'
+                : '离职与企业退出'
+        }
+      >
         <header className="departure-header">
           <div>
             <p className="departure-kicker">
               <ShieldCheck size={16} /> 生效执行与回执
             </p>
-            <h2>{recordsOnly ? '迁出与清理记录' : '离职与企业退出'}</h2>
+            <h2>
+              {memberId || only === 'member'
+                ? '成员离职办理'
+                : only === 'exit'
+                  ? '企业退出'
+                  : recordsOnly
+                    ? '迁出与清理记录'
+                    : '离职与企业退出'}
+            </h2>
             <p>
               {recordsOnly
                 ? '查看当前获权的执行记录，按指定范围迁出资料。'
@@ -171,41 +214,43 @@ function DepartureSession({
             重试未确认请求
           </Button>
         )}
-        <nav className="departure-tabs">
-          <Button
-            disabled={action.blocked}
-            onClick={() => {
-              setMode('list');
-              setSelected(undefined);
-            }}
-          >
-            执行记录
-          </Button>
-          {!recordsOnly && options.value?.canOffboard && (
+        {!memberId && (
+          <nav className="departure-tabs">
             <Button
               disabled={action.blocked}
-              icon={ArrowRightLeft}
               onClick={() => {
-                setMode('offboard');
+                setMode('list');
                 setSelected(undefined);
               }}
             >
-              办理员工离职
+              执行记录
             </Button>
-          )}
-          {!recordsOnly && options.value?.canExit && (
-            <Button
-              disabled={action.blocked}
-              icon={LogOut}
-              onClick={() => {
-                setMode('exit');
-                setSelected(undefined);
-              }}
-            >
-              办理企业退出
-            </Button>
-          )}
-        </nav>
+            {!recordsOnly && only !== 'exit' && options.value?.canOffboard && (
+              <Button
+                disabled={action.blocked}
+                icon={ArrowRightLeft}
+                onClick={() => {
+                  setMode('offboard');
+                  setSelected(undefined);
+                }}
+              >
+                办理员工离职
+              </Button>
+            )}
+            {!recordsOnly && only !== 'member' && options.value?.canExit && (
+              <Button
+                disabled={action.blocked}
+                icon={LogOut}
+                onClick={() => {
+                  setMode('exit');
+                  setSelected(undefined);
+                }}
+              >
+                办理企业退出
+              </Button>
+            )}
+          </nav>
+        )}
         {selected ? (
           <Execution
             key={selected}
@@ -214,14 +259,16 @@ function DepartureSession({
             id={selected}
             nonce={nonce + verification}
             close={() => setSelected(undefined)}
+            focused={!!memberId}
           />
         ) : !recordsOnly && mode === 'offboard' ? (
           <Offboard
             tenant={tenant}
+            memberId={memberId}
             nonce={nonce + verification}
             opened={(id) => {
               setSelected(id);
-              setMode('list');
+              if (!memberId) setMode('list');
             }}
           />
         ) : !recordsOnly && mode === 'exit' ? (
@@ -280,6 +327,7 @@ function DepartureSession({
   );
 }
 function Offboard({
+  memberId,
   tenant,
   nonce,
   opened,
@@ -287,19 +335,23 @@ function Offboard({
   tenant: string;
   nonce: number;
   opened: (id: string) => void;
+  memberId?: string;
 }) {
   const { blocked, run, reload } = useContext(Actions),
     { session } = useSession();
   const [memberPage, setMemberPage] = useState(0),
     [responsibilityPage, setResponsibilityPage] = useState(0),
-    [member, setMember] = useState<DepartureMember>(),
+    [selection, setMember] = useState<DepartureMember | undefined>(
+      memberId ? { id: memberId, name: '正在读取…', status: 'ACTIVE', revision: 0 } : undefined,
+    ),
     [reason, setReason] = useState(''),
     [accepted, setAccepted] = useState(false),
     [handover, setHandover] = useState<SharedResponsibility>();
   const remote = useRemote(
-    (signal) => api.options(tenant, member?.id, memberPage * 20, responsibilityPage * 20, signal),
-    [tenant, member?.id, memberPage, responsibilityPage, nonce],
+    (signal) => api.options(tenant, selection?.id, memberPage * 20, responsibilityPage * 20, signal),
+    [tenant, selection?.id, memberPage, responsibilityPage, nonce],
   );
+  const member = remote.value?.selectedMember || selection;
   return (
     <div className="departure-form">
       <h3>员工离职</h3>
@@ -313,38 +365,59 @@ function Offboard({
       ) : (
         <>
           <fieldset disabled={blocked}>
-            <Field label="离职员工">
-              <select
-                aria-label="离职员工"
-                value={member?.id ?? ''}
-                onChange={(e) => {
-                  setMember(remote.value!.members.find((m) => m.id === e.target.value));
-                  setResponsibilityPage(0);
-                  setHandover(undefined);
-                }}
-              >
-                <option value="">选择员工</option>
-                {member && !remote.value.members.some((m) => m.id === member.id) && (
-                  <option value={member.id}>{member.name}</option>
-                )}
-                {remote.value.members
-                  .filter((m) => m.id !== session.identity?.account.id)
-                  .map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name} · {m.status === 'ACTIVE' ? '在职' : '已停用'}
-                    </option>
-                  ))}
-              </select>
-            </Field>
-            <Pager
-              page={memberPage}
-              next={remote.value.membersHaveMore}
-              onPage={(p) => {
-                setMemberPage(p);
-                setMember(undefined);
-                setHandover(undefined);
-              }}
-            />
+            {memberId ? (
+              <p>
+                离职成员：<strong>{member?.name}</strong>
+              </p>
+            ) : (
+              <>
+                <Field label="离职员工">
+                  <select
+                    aria-label="离职员工"
+                    value={member?.id ?? ''}
+                    onChange={(e) => {
+                      setMember(remote.value!.members.find((m) => m.id === e.target.value));
+                      setResponsibilityPage(0);
+                      setHandover(undefined);
+                    }}
+                  >
+                    <option value="">选择员工</option>
+                    {member && !remote.value.members.some((m) => m.id === member.id) && (
+                      <option value={member.id}>{member.name}</option>
+                    )}
+                    {remote.value.members
+                      .filter((m) => m.id !== session.identity?.account.id)
+                      .map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name} · {m.status === 'ACTIVE' ? '在职' : '已停用'}
+                        </option>
+                      ))}
+                  </select>
+                </Field>
+                <Pager
+                  page={memberPage}
+                  next={remote.value.membersHaveMore}
+                  onPage={(p) => {
+                    setMemberPage(p);
+                    setMember(undefined);
+                    setHandover(undefined);
+                  }}
+                />
+              </>
+            )}
+            {remote.value.selectedOwner && <p role="alert">该成员是企业负责人，请先完成企业负责人交接。</p>}
+            {remote.value.currentExecutionId && (
+              <p>
+                该成员已有离职记录。
+                <Button onClick={() => opened(remote.value!.currentExecutionId!)}>查看执行结果</Button>
+              </p>
+            )}
+            {remote.value.isolationDays !== undefined && (
+              <p>
+                当前私人内容隔离期为 {remote.value.isolationDays}{' '}
+                天，办理时固定清理截止时间；在允许的撤销期内可恢复尚未清理的内容。不会恢复原共享授权。
+              </p>
+            )}
             {member && (
               <section className="departure-responsibilities">
                 <h4>当前可维护的共享责任</h4>
@@ -364,11 +437,13 @@ function Offboard({
                     </div>
                   ))
                 )}
-                <Pager
-                  page={responsibilityPage}
-                  next={remote.value.responsibilitiesHaveMore}
-                  onPage={setResponsibilityPage}
-                />
+                {(responsibilityPage > 0 || remote.value.responsibilitiesHaveMore) && (
+                  <Pager
+                    page={responsibilityPage}
+                    next={remote.value.responsibilitiesHaveMore}
+                    onPage={setResponsibilityPage}
+                  />
+                )}
               </section>
             )}
             <Field label="执行原因">
@@ -385,14 +460,21 @@ function Offboard({
             </label>
             <Button
               variant="danger"
-              disabled={!member || !reason.trim() || !accepted}
+              disabled={
+                !member ||
+                !remote.value.selectedMember ||
+                !!remote.value.selectedOwner ||
+                !!remote.value.currentExecutionId ||
+                !reason.trim() ||
+                !accepted
+              }
               onClick={() => {
                 if (member)
                   run(async (requestId) => {
                     const v = await api.offboard(tenant, {
                       requestId,
                       targetAccountId: member.id,
-                      expectedMemberRevision: remote.value!.members.find((m) => m.id === member.id)!.revision,
+                      expectedMemberRevision: remote.value!.selectedMember!.revision,
                       reason,
                       acceptScheduledCleanup: accepted,
                     });
@@ -441,12 +523,14 @@ function Handover({
         </p>
         <a
           className="button"
+          target="_blank"
+          rel="noopener noreferrer"
           href={
             '/tenant-admin/#' +
             new URLSearchParams({ tenant, admin: 'members', tab: 'spaces', space: value.workspaceId })
           }
         >
-          打开空间负责人管理
+          新标签页办理空间交接
         </a>
         <Button onClick={close}>返回</Button>
       </section>
@@ -675,6 +759,7 @@ function ExitForm({
   );
 }
 function Execution({
+  focused = false,
   recordsOnly,
   tenant,
   id,
@@ -686,6 +771,7 @@ function Execution({
   nonce: number;
   recordsOnly: boolean;
   close: () => void;
+  focused?: boolean;
 }) {
   const { blocked, run, reload } = useContext(Actions);
   const [inventoryId, setInventoryId] = useState<string>(),
@@ -693,9 +779,11 @@ function Execution({
   const remote = useRemote((signal) => api.get(tenant, id, signal), [tenant, id, nonce]);
   return (
     <section className="departure-detail">
-      <Button disabled={blocked} icon={ArrowLeft} onClick={close}>
-        返回执行记录
-      </Button>
+      {!focused && (
+        <Button disabled={blocked} icon={ArrowLeft} onClick={close}>
+          返回执行记录
+        </Button>
+      )}
       {remote.error ? (
         <Failure error={remote.error} retry={reload} />
       ) : !remote.value ? (

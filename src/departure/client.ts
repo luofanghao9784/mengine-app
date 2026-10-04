@@ -101,6 +101,19 @@ export const isDepartureOptions = (v: unknown): v is DepartureOptions =>
       uuid(x.responsibleId) &&
       num(x.revision),
   ) &&
+  (v.selectedMember === undefined ||
+    nullable(
+      v.selectedMember,
+      (x) =>
+        record(x) &&
+        uuid(x.id) &&
+        str(x.name, 180) &&
+        one(x.status, ['ACTIVE', 'DISABLED']) &&
+        num(x.revision),
+    )) &&
+  (v.selectedOwner === undefined || typeof v.selectedOwner === 'boolean') &&
+  (v.currentExecutionId === undefined || nullable(v.currentExecutionId, uuid)) &&
+  (v.isolationDays === undefined || num(v.isolationDays, 1, 365)) &&
   ['membersHaveMore', 'responsibilitiesHaveMore', 'canOffboard', 'canExit'].every(
     (k) => typeof v[k] === 'boolean',
   );
@@ -209,11 +222,14 @@ export function createDepartureClient(fetcher: typeof fetch = fetch) {
         undefined,
         signal,
       ),
-    list: (t: string, offset = 0, signal?: AbortSignal) =>
+    list: (t: string, offset = 0, signal?: AbortSignal, kind?: 'MEMBER_OFFBOARD' | 'TENANT_EXIT') =>
       request(
-        root(t) + `?offset=${offset}&limit=20`,
+        root(t) + `?offset=${offset}&limit=20${kind ? `&kind=${kind}` : ''}`,
         'GET',
-        page((v): v is DepartureSummary => isDepartureSummary(v) && v.tenantId === t),
+        page(
+          (v): v is DepartureSummary =>
+            isDepartureSummary(v) && v.tenantId === t && (!kind || v.kind === kind),
+        ),
         undefined,
         signal,
       ),
@@ -231,7 +247,7 @@ export function createDepartureClient(fetcher: typeof fetch = fetch) {
           `/options?memberOffset=${memberOffset}&responsibilityOffset=${responsibilityOffset}&limit=20` +
           (target ? `&targetAccountId=${id(target)}` : ''),
         'GET',
-        isDepartureOptions,
+        (v): v is DepartureOptions => isDepartureOptions(v) && (!target || v.selectedMember?.id === target),
         undefined,
         signal,
       ),

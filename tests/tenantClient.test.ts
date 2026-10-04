@@ -5,7 +5,17 @@ import { IdentityError } from '../src/identity/client.ts';
 const tenant = '00000000-0000-4000-8000-000000000001',
   other = '00000000-0000-4000-8000-000000000002',
   spaceId = '00000000-0000-4000-8000-000000000003';
-const space = { id: spaceId, tenantId: tenant, name: '共享空间', kind: 'SHARED', version: 0, memberCount: 0, ownerId: null, ownerName: null, description: '' };
+const space = {
+  id: spaceId,
+  tenantId: tenant,
+  name: '共享空间',
+  kind: 'SHARED',
+  version: 0,
+  memberCount: 0,
+  ownerId: null,
+  ownerName: null,
+  description: '',
+};
 const mismatch = (e: unknown) => e instanceof IdentityError && e.code === 'CONTRACT_MISMATCH';
 const client = (v: unknown) =>
   createTenantClient(
@@ -84,4 +94,31 @@ test('tenant client rejects platform roles and non-management activity records',
     mismatch,
   );
   assert.equal(await client(null).revoke(tenant, other), null);
+});
+
+test('member detail binds both tenant and member and exposes no implicit offboarding authority', async () => {
+  const value = {
+    tenantId: tenant,
+    member: {
+      accountId: other,
+      email: null,
+      phone: '+8619900000001',
+      displayName: '成员',
+      role: 'MEMBER',
+      status: 'ACTIVE',
+      accountStatus: 'ACTIVE',
+      version: 7,
+    },
+    owner: false,
+    canOffboard: false,
+    offboarded: false,
+    departureId: null,
+  };
+  assert.deepEqual(await client(value).member(tenant, other), value);
+  await assert.rejects(client({ ...value, tenantId: other }).member(tenant, other), mismatch);
+  await assert.rejects(
+    client({ ...value, member: { ...value.member, accountId: spaceId } }).member(tenant, other),
+    mismatch,
+  );
+  await assert.rejects(client({ ...value, canOffboard: undefined }).member(tenant, other), mismatch);
 });

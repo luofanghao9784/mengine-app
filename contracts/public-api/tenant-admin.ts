@@ -92,3 +92,5 @@ export interface SpaceOwnerChange {
   previousAccess: 'READ' | 'MAINTAIN' | 'REMOVE' | 'NONE';
   createdAt: string;
 }
+
+export interface TenantMemberDetail { tenantId: string; member: TenantMember; owner: boolean; canOffboard: boolean; offboarded: boolean; departureId: string | null }

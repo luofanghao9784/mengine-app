@@ -33,6 +33,8 @@ public class TenantAdminController {
             @RequestParam(defaultValue="") String status, @RequestParam(defaultValue="0") int offset, @RequestParam(defaultValue="50") int limit) {
         return service.members(IdentityController.actor(auth),tenant,q,status,offset,limit);
     }
+    @GetMapping("/members/{account}")
+    public TenantAdminService.MemberDetail member(Authentication auth,@PathVariable UUID tenant,@PathVariable UUID account) {return service.memberDetail(IdentityController.actor(auth),tenant,account);}
     @PostMapping("/members/{account}/status")
     public TenantAdminService.Member status(Authentication auth, @PathVariable UUID tenant, @PathVariable UUID account, @Valid @RequestBody Status body) {
         return service.status(IdentityController.actor(auth),tenant,account,body.requestId(),body.expectedVersion(),body.status());

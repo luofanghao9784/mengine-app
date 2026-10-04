@@ -41,6 +41,19 @@
               "minimum": 1,
               "maximum": 50
             }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "",
+                "MEMBER_OFFBOARD",
+                "TENANT_EXIT"
+              ],
+              "default": ""
+            }
           }
         ],
         "responses": {
@@ -2185,6 +2198,60 @@
           },
           "canExit": {
             "type": "boolean"
+          },
+          "selectedMember": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "name",
+                  "status",
+                  "revision"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "ACTIVE",
+                      "DISABLED"
+                    ]
+                  },
+                  "revision": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              }
+            ]
+          },
+          "selectedOwner": {
+            "type": "boolean"
+          },
+          "currentExecutionId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "isolationDays": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 365
           }
         }
       },

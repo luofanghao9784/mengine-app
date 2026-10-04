@@ -69,6 +69,10 @@ export interface DepartureOptions {
   responsibilitiesHaveMore: boolean;
   canOffboard: boolean;
   canExit: boolean;
+  selectedMember?: DepartureMember | null;
+  selectedOwner?: boolean;
+  currentExecutionId?: string | null;
+  isolationDays?: number;
 }
 export interface DeparturePage<T> {
   items: T[];

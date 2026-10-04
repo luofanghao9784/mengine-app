@@ -20,6 +20,40 @@ class DepartureIntegrationTest {
  UUID upload(UUID space,String name){return materials.upload(member,tenant,space,null,null,null,UUID.randomUUID(),new MockMultipartFile("file",name,"text/plain",("合成内容 "+name).getBytes())).id();}
  void drain(){for(int i=0;i<100;i++){var job=cleanup.claim();if(job==null)break;for(UUID object:cleanup.pending(job)){cleanup.remove(object);cleanup.removed(job,object);}cleanup.finish(job);}for(UUID id:objectCleanup.pending())objectCleanup.clean(id);}
  void generateArchives(){for(int i=0;i<200;i++){archiveWorker.runOnce();if(db.queryForObject("SELECT count(*) FROM departure_export_parts WHERE state='QUEUED'",Integer.class)==0)break;}}
+ @Autowired com.dreamcore.workspace.identity.TenantAdminService tenantAdmin;
+ @Test void selectedMemberIsIndependentOfPagingAndNeverLeaksForeignMembership(){
+  db.update("UPDATE accounts SET display_name='ZZZ selected employee' WHERE id=?",member);
+  var options=service.options(admin,tenant,member,20,0,1);
+  assertEquals(0,options.members().size());assertTrue(options.members().stream().noneMatch(m->m.id().equals(member)));
+  assertEquals(member,options.selectedMember().id());assertEquals(30,options.isolationDays());assertFalse(options.selectedOwner());assertNull(options.currentExecutionId());
+  assertEquals(404,assertThrows(IdentityException.class,()->service.options(admin,tenant,UUID.randomUUID(),0,0,20)).status);
+  assertEquals(403,assertThrows(IdentityException.class,()->service.options(reader,tenant,member,0,0,20)).status);
+  var execution=offboard();assertEquals(execution.execution().id(),service.options(admin,tenant,member,0,0,20).currentExecutionId());
+ }
+ @Test void memberDetailIsTenantScopedMetadataAndDoesNotGrantOffboarding(){
+  var detail=tenantAdmin.memberDetail(admin,tenant,member);assertEquals(tenant,detail.tenantId());assertEquals(member,detail.member().accountId());assertTrue(detail.canOffboard());assertFalse(detail.owner());
+  assertFalse(tenantAdmin.memberDetail(admin,tenant,admin).canOffboard());
+  assertEquals(403,assertThrows(IdentityException.class,()->tenantAdmin.memberDetail(reader,tenant,member)).status);
+  assertEquals(404,assertThrows(IdentityException.class,()->tenantAdmin.memberDetail(admin,tenant,UUID.randomUUID())).status);
+  assertFalse(json.writeValueAsString(detail).contains("私人"));
+  db.update("DELETE FROM governance_capabilities WHERE tenant_id=? AND account_id=? AND capability='MEMBER_OFFBOARD'",tenant,admin);
+  assertFalse(tenantAdmin.memberDetail(admin,tenant,member).canOffboard());
+  grant(admin,"MEMBER_OFFBOARD",null);offboard();db.update("DELETE FROM governance_capabilities WHERE tenant_id=? AND account_id=? AND capability='MEMBER_OFFBOARD'",tenant,admin);
+  assertTrue(tenantAdmin.memberDetail(admin,tenant,member).offboarded());assertNull(tenantAdmin.memberDetail(admin,tenant,member).departureId());
+ }
+ @Test void realHttpMemberDetailDeniesOutsidersAndShowsAuthoritativeOffboardingRecord()throws Exception {
+  var c=new Client();assertEquals(200,c.send("POST","/api/v1/auth/login",Map.of("email",email(admin),"password",password),true).statusCode());
+  var path="/api/tenant-admin/v1/tenants/"+tenant+"/members/"+member;
+  var response=c.send("GET",path,null,false);assertEquals(200,response.statusCode());assertTrue(response.headers().firstValue("cache-control").orElse("").contains("no-store"));
+  var execution=offboard();var result=json.readTree(c.send("GET",path,null,false).body());assertEquals(execution.execution().id().toString(),result.get("departureId").asString());
+  var outsider=new Client();assertEquals(200,outsider.send("POST","/api/v1/auth/login",Map.of("email",email(reader),"password",password),true).statusCode());assertEquals(403,outsider.send("GET",path,null,false).statusCode());
+ }
+ @Test void recordFiltersStayWithinAuthorizedExecutionKinds(){
+  var e=offboard();assertEquals(List.of(e.execution().id()),service.list(admin,tenant,0,20,"MEMBER_OFFBOARD").items().stream().map(DepartureService.Summary::id).toList());
+  assertTrue(service.list(admin,tenant,0,20,"TENANT_EXIT").items().isEmpty());
+  assertEquals(403,assertThrows(IdentityException.class,()->service.list(reader,tenant,0,20,"MEMBER_OFFBOARD")).status);
+  assertEquals(400,assertThrows(IdentityException.class,()->service.list(admin,tenant,0,20,"ALL_PRIVATE")).status);
+ }
  @Test void exportDesignationUsesRecipientRightsWithinCallersReadableScopes(){grant(reader,"BULK_EXPORT",shared);assertEquals(List.of(shared),service.exportScopes(admin,tenant,reader,0,20).stream().map(DepartureService.ExportScope::workspaceId).toList());assertTrue(service.exportScopes(admin,tenant,successor,0,20).isEmpty());db.update("DELETE FROM workspace_members WHERE tenant_id=? AND workspace_id=? AND account_id=?",tenant,shared,admin);assertTrue(service.exportScopes(admin,tenant,reader,0,20).isEmpty());assertThrows(IdentityException.class,()->service.exportScopes(reader,tenant,admin,0,20));}
  @Test void offboardRequiresExplicitCapabilityAndNeverTransfersPrivateOwnership(){assertEquals(403,assertThrows(IdentityException.class,()->service.beginOffboard(successor,tenant,member,UUID.randomUUID(),0,"无权",true)).status);var result=offboard();assertEquals("ISOLATING",result.execution().state());assertEquals("DISABLED",db.queryForObject("SELECT status FROM tenant_memberships WHERE tenant_id=? AND account_id=?",String.class,tenant,member));assertEquals(0,db.queryForObject("SELECT count(*) FROM workspace_members WHERE tenant_id=? AND account_id=?",Integer.class,tenant,member));assertEquals(member,db.queryForObject("SELECT owner_id FROM workspaces WHERE id=?",UUID.class,personal));assertThrows(IdentityException.class,()->gate.requireActiveBusiness(member,tenant));assertFalse(gate.allowsTask(task));assertThrows(IdentityException.class,()->gate.requireMemberActivation(tenant,member));assertThrows(Exception.class,()->db.update("UPDATE tenant_memberships SET status='ACTIVE' WHERE tenant_id=? AND account_id=?",tenant,member));}
  @Test void confirmedSpaceResponsibilitiesCannotBypassExplicitOldAccessChoiceThroughLegacyHandover(){db.update("UPDATE workspaces SET responsibility_confirmed=true WHERE id=?",shared);var error=assertThrows(IdentityException.class,()->service.handover(admin,tenant,UUID.randomUUID(),"WORKSPACE_OWNER",shared,shared,member,successor,0));assertEquals("SPACE_OWNER_USE_MANAGEMENT",error.code);assertEquals(member,db.queryForObject("SELECT owner_id FROM workspaces WHERE id=?",UUID.class,shared));}

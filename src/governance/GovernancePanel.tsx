@@ -251,7 +251,16 @@ function OwnerControls({
     (signal) => tenantClient.members(tenant, query, '', page * 20, signal),
     [tenant, query, page, snapshot.revision],
   );
-  const selected = members.value?.find((m) => m.accountId === target);
+  const inPage = members.value?.find((m) => m.accountId === target);
+  const targetDetail = useRemote(
+    (signal) =>
+      target && members.value && !inPage
+        ? tenantClient.member(tenant, target, signal)
+        : Promise.resolve(null),
+    [tenant, target, members.value, inPage, snapshot.revision],
+  );
+  const selected =
+    inPage || (targetDetail.value?.member.accountId === target ? targetDetail.value.member : undefined);
   return (
     <section className="governance-section">
       <h3>管理员与负责人</h3>
@@ -281,6 +290,11 @@ function OwnerControls({
               onChange={(e) => select({ ...selection, target: e.target.value })}
             >
               <option value="">选择成员</option>
+              {selected && !inPage && (
+                <option value={selected.accountId}>
+                  {selected.displayName} · {selected.phone || selected.email}
+                </option>
+              )}
               {members.value.slice(0, 20).map((m) => (
                 <option value={m.accountId} key={m.accountId}>
                   {m.displayName} · {m.phone || m.email}
@@ -296,6 +310,7 @@ function OwnerControls({
               if (!locked) select({ ...selection, page: p, target: '' });
             }}
           />
+          {targetDetail.error && <Failure error={targetDetail.error} retry={changed} />}
           {selected && (
             <MemberDuties
               key={`${selected.accountId}:${snapshot.revision}:${selected.version}`}

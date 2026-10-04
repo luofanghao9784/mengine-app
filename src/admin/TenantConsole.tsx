@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ExternalLink, ArrowLeft, ShieldX } from 'lucide-react';
 import { AdminShell, useAdminRoute } from './AdminShell';
 import { AdminOverview } from './AdminOverview';
@@ -10,6 +10,7 @@ import { GovernancePanel, type MemberSelection } from '../governance/GovernanceP
 import { Failure, Loading, useRemote } from '../shared/admin';
 import { Button, Empty } from '../shared/ui';
 import { TenantAdminHome, ManagedSpaces } from '../tenant/TenantAdminHome';
+import { TenantMemberDetail } from '../tenant/TenantMemberDetail';
 import { OperationsPanel } from '../operations/OperationsPanel';
 import { BusinessSources } from '../governance/BusinessSources';
 import { Profiles } from '../profile/Profiles';
@@ -36,6 +37,10 @@ export function TenantConsole({ tenant, name }: { tenant: string; name: string }
   const secondary =
     params.get('detail') ||
     (['records', 'settings'].includes(params.get('tab') || '') ? params.get('tab') : params.get('manage'));
+  const selectedAccount = secondary === 'duties' ? params.get('member') : null;
+  useEffect(() => {
+    if (selectedAccount) select({ query: '', page: 0, target: selectedAccount });
+  }, [selectedAccount]);
   const back = useRef(returnToWorkspaceHref(hash, tenant)).current;
   const signOut = async () => {
     try {
@@ -113,7 +118,14 @@ export function TenantConsole({ tenant, name }: { tenant: string; name: string }
       ) : page === 'engine' ? (
         <OperationsPanel scope="tenant" tenant={tenant} />
       ) : page === 'members' ? (
-        secondary === 'duties' ? (
+        secondary === 'member' && params.get('member') ? (
+          <TenantMemberDetail
+            key={params.get('member')}
+            tenant={tenant}
+            account={params.get('member')!}
+            hash={hash}
+          />
+        ) : secondary === 'duties' ? (
           <>
             <a className="button ghost" href={adminHref('tenant', 'members', hash)}>
               返回成员与空间
@@ -131,7 +143,16 @@ export function TenantConsole({ tenant, name }: { tenant: string; name: string }
             <div className="admin-secondary-link">
               <a href={adminHref('tenant', 'members', hash, { detail: 'duties' })}>职责与交接</a>
             </div>
-            {limited ? <ManagedSpaces tenant={tenant} /> : <TenantAdminHome tenant={tenant} compact />}
+            {limited ? (
+              <>
+                {governance.value.capabilities.some(
+                  (c) => c.capability === 'MEMBER_OFFBOARD' && c.workspaceId === null,
+                ) && <DeparturePanel tenant={tenant} only="member" />}
+                <ManagedSpaces tenant={tenant} />
+              </>
+            ) : (
+              <TenantAdminHome tenant={tenant} compact />
+            )}
           </>
         )
       ) : page === 'database' ? (
@@ -166,7 +187,7 @@ export function TenantConsole({ tenant, name }: { tenant: string; name: string }
           <a className="button ghost" href={adminHref('tenant', 'company', hash)}>
             返回企业信息
           </a>
-          <DeparturePanel tenant={tenant} />
+          <DeparturePanel tenant={tenant} only="exit" />
         </>
       ) : (
         <>

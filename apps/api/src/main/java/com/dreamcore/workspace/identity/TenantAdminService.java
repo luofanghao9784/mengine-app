@@ -11,6 +11,15 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class TenantAdminService {
     public record Member(UUID accountId, String email, String displayName, String role, String status, String accountStatus, long version, String phone) {}
+    public record MemberDetail(UUID tenantId,Member member,boolean owner,boolean canOffboard,boolean offboarded,UUID departureId) {}
+    @Transactional public MemberDetail memberDetail(UUID actor,UUID tenant,UUID account) {
+        identities.member(actor,tenant,true);
+        var current=member(tenant,account);
+        boolean canOffboard=governance.allows(actor,tenant,com.dreamcore.workspace.governance.GovernanceAccess.Capability.MEMBER_OFFBOARD,null);
+        var executions=db.queryForList("SELECT id FROM departure_executions WHERE tenant_id=? AND target_account_id=? AND kind='MEMBER_OFFBOARD' AND state<>'CANCELLED' ORDER BY effective_at DESC LIMIT 1",UUID.class,tenant,account);
+        boolean owner=Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM tenant_governance WHERE tenant_id=? AND owner_id=?)",Boolean.class,tenant,account));
+        return new MemberDetail(tenant,current,owner,canOffboard&&!actor.equals(account),!executions.isEmpty(),!canOffboard||executions.isEmpty()?null:executions.getFirst());
+    }
     public record EmergencyDisableReceipt(UUID accountId, String status, long version, String securityAction,
                                           UUID recoveryRequestId, String recoveryStatus) {}
     public record SharedWorkspace(UUID id, UUID tenantId, String name, String kind, long version, long memberCount, UUID ownerId, String ownerName, String description) {}

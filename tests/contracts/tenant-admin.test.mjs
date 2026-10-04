@@ -16,7 +16,9 @@ test('managed spaces exclude personal content and undeclared fields', () => {
       kind: 'SHARED',
       version: 0,
       memberCount: 0,
-      ownerId:null, ownerName:null, description:'',
+      ownerId: null,
+      ownerName: null,
+      description: '',
     };
   assert.ok(check(space));
   assert.equal(check({ ...space, kind: 'PERSONAL' }), false);
@@ -40,12 +42,37 @@ test('membership and space mutations require optimistic version and idempotency 
   }
 });
 
-test('new shared spaces require explicit responsibility and transfers require an old-access choice',()=>{
- const create=schema('CreateSharedWorkspace');
- assert.equal(create({requestId:'synthetic',name:'空间'}),false);
- assert.ok(create({requestId:'synthetic',name:'空间',ownerId:'synthetic',description:''}));
- const change=schema('ChangeSpaceOwner');
- const body={requestId:'synthetic',expectedVersion:0,ownerId:'synthetic',previousAccess:'READ'};
- assert.ok(change(body));assert.equal(change({...body,previousAccess:'ALL_TENANTS'}),false);
- assert.equal(change({...body,expectedVersion:undefined}),false);
+test('new shared spaces require explicit responsibility and transfers require an old-access choice', () => {
+  const create = schema('CreateSharedWorkspace');
+  assert.equal(create({ requestId: 'synthetic', name: '空间' }), false);
+  assert.ok(create({ requestId: 'synthetic', name: '空间', ownerId: 'synthetic', description: '' }));
+  const change = schema('ChangeSpaceOwner');
+  const body = { requestId: 'synthetic', expectedVersion: 0, ownerId: 'synthetic', previousAccess: 'READ' };
+  assert.ok(change(body));
+  assert.equal(change({ ...body, previousAccess: 'ALL_TENANTS' }), false);
+  assert.equal(change({ ...body, expectedVersion: undefined }), false);
+});
+
+test('member detail is scoped metadata without private records', () => {
+  const check = schema('TenantMemberDetail');
+  const value = {
+    tenantId: 'synthetic',
+    member: {
+      accountId: 'synthetic',
+      email: null,
+      phone: '+8619900000001',
+      displayName: '成员',
+      role: 'MEMBER',
+      status: 'ACTIVE',
+      accountStatus: 'ACTIVE',
+      version: 0,
+    },
+    owner: false,
+    canOffboard: false,
+    offboarded: false,
+    departureId: null,
+  };
+  assert.ok(check(value), JSON.stringify(check.errors));
+  assert.equal(check({ ...value, conversations: [] }), false);
+  assert.equal(check({ ...value, tenantId: undefined }), false);
 });

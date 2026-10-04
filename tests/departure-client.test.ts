@@ -171,3 +171,29 @@ test('uncertain explicit exit is not automatically retried and retains supplied 
   await assert.rejects(client.exit(id(1), body), { code: 'UNCERTAIN_RESULT' });
   assert.deepEqual(sent, [body, body]);
 });
+
+test('selected departure member is explicitly bound even when absent from current page', async () => {
+  const data = {
+    tenantRevision: 0,
+    members: [],
+    membersHaveMore: false,
+    responsibilities: [],
+    responsibilitiesHaveMore: false,
+    canOffboard: true,
+    canExit: false,
+    selectedMember: { id: id(2), name: '合成成员', status: 'ACTIVE', revision: 9 },
+    selectedOwner: false,
+    currentExecutionId: null,
+    isolationDays: 30,
+  };
+  const api = (body: unknown) => createDepartureClient(async () => new Response(JSON.stringify(body)));
+  assert.deepEqual(await api(data).options(id(1), id(2)), data);
+  await assert.rejects(
+    api({ ...data, selectedMember: { ...data.selectedMember, id: id(4) } }).options(id(1), id(2)),
+  );
+  await assert.rejects(api({ ...data, selectedMember: null }).options(id(1), id(2)));
+  await assert.rejects(api({ ...data, isolationDays: -1 }).options(id(1), id(2)));
+  await assert.rejects(
+    api({ items: [summary], hasMore: false }).list(id(1), 0, undefined, 'MEMBER_OFFBOARD'),
+  );
+});

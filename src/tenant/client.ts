@@ -3,6 +3,7 @@ import type {
   SpaceOwnerChange,
   TenantOverview,
   TenantMember,
+  TenantMemberDetail,
   SharedWorkspace,
   WorkspaceGrant,
   TenantRecord,
@@ -115,6 +116,22 @@ export function createTenantClient(fetcher: typeof fetch = fetch) {
       request(path(tenant) + '/overview', 'GET', scoped(tenant, isOverview), undefined, signal),
     settings: (tenant: string, body: VersionedChange & { name: string }) =>
       request(path(tenant) + '/settings', 'POST', scoped(tenant, isOverview), body),
+    member: (tenant: string, account: string, signal?: AbortSignal) =>
+      request(
+        path(tenant) + `/members/${id(account)}`,
+        'GET',
+        (v): v is TenantMemberDetail =>
+          record(v) &&
+          isMember(v.member) &&
+          v.tenantId === tenant &&
+          v.member.accountId === account &&
+          typeof v.owner === 'boolean' &&
+          typeof v.canOffboard === 'boolean' &&
+          typeof v.offboarded === 'boolean' &&
+          (v.departureId === null || uuid(v.departureId)),
+        undefined,
+        signal,
+      ),
     members: (tenant: string, q = '', status = '', offset = 0, signal?: AbortSignal) =>
       request(
         path(tenant) + '/members' + page(offset, { q, status }),
