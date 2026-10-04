@@ -1,0 +1,126 @@
+.processing-metrics {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+.processing-metrics .admin-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px;
+}
+.processing-metrics span {
+  color: var(--muted);
+  font-size: 14px;
+}
+.processing-metrics strong {
+  font-size: 28px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.processing-filters {
+  display: flex;
+  gap: 12px;
+  align-items: end;
+  flex-wrap: wrap;
+}
+.processing-filters .field {
+  flex: 1;
+  min-width: 150px;
+  margin: 0;
+}
+.processing-filters input,
+.processing-filters select {
+  width: 100%;
+}
+.processing-caption {
+  font-size: 12px;
+  margin: 16px 0;
+}
+.processing-row {
+  display: grid;
+  grid-template-columns: 24px minmax(160px, 1fr) minmax(120px, auto) minmax(130px, auto) auto;
+  gap: 16px;
+  align-items: center;
+  text-align: left;
+  width: 100%;
+  padding: 20px 4px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.processing-row:hover {
+  background: var(--soft);
+}
+.processing-row > div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.processing-row strong {
+  overflow-wrap: anywhere;
+  font-weight: 600;
+}
+.processing-row small {
+  color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.processing-row > span:last-child {
+  font-size: 13px;
+  color: var(--accent);
+}
+.processing-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.processing-detail-actions,
+.processing-recycle-spaces {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+@media (max-width: 1050px) {
+  .processing-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .processing-row {
+    grid-template-columns: 24px minmax(100px, 1fr) auto;
+  }
+  .processing-row > small {
+    grid-column: 2;
+  }
+}
+@media (max-width: 620px) {
+  .processing-metrics {
+    gap: 8px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .processing-metrics .admin-section {
+    padding: 16px;
+  }
+  .processing-row {
+    gap: 10px;
+    grid-template-columns: 22px minmax(0, 1fr);
+  }
+  .processing-row > .badge {
+    grid-column: 2;
+    justify-self: start;
+  }
+  .processing-row > span:last-child {
+    grid-column: 2;
+  }
+  .processing-filters {
+    align-items: stretch;
+  }
+  .processing-filters > * {
+    width: 100%;
+  }
+  .material-processing .material-section {
+    align-items: start;
+  }
+}

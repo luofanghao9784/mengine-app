@@ -17,6 +17,7 @@ export function MaterialMaintenance({
   tenant,
   workspace,
   entries,
+  recycleOnly = false,
   verification,
   close,
   changed,
@@ -24,6 +25,7 @@ export function MaterialMaintenance({
   tenant: string;
   workspace: string;
   entries: MaterialEntry[];
+  recycleOnly?: boolean;
   verification: unknown;
   close: () => void;
   changed: () => void;
@@ -59,7 +61,7 @@ export function MaterialMaintenance({
           />
         ) : (
           <>
-            <h3>当前列表的资料</h3>
+            {!recycleOnly && <h3>当前列表的资料</h3>}
             <ul className="lifecycle-list">
               {entries.map((e) => (
                 <li key={e.id}>
@@ -74,7 +76,7 @@ export function MaterialMaintenance({
                 </li>
               ))}
             </ul>
-            {!entries.length && <p>当前目录没有资料。可返回资料库选择其他目录。</p>}
+            {!recycleOnly && !entries.length && <p>当前目录没有资料。可返回资料库选择其他目录。</p>}
             <h3>回收与清理记录</h3>
             {recycle.error ? (
               <Failure error={recycle.error} retry={() => setRefresh((x) => x + 1)} />

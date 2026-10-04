@@ -1,4 +1,5 @@
 import type {
+  MaterialProcessingPage,
   KnowledgeAnalysis,
   KnowledgeChunk,
   KnowledgeResults,
@@ -36,6 +37,46 @@ export const isAnalysis = (v: unknown): v is KnowledgeAnalysis =>
       c.materialId === v.materialId &&
       c.versionId === v.versionId,
   );
+export const isProcessing = (v: unknown): v is MaterialProcessingPage =>
+  record(v) &&
+  uuid(v.tenantId) &&
+  (v.workspaceId === null || uuid(v.workspaceId)) &&
+  typeof v.query === 'string' &&
+  ['ALL', 'READY', 'PROCESSING', 'ATTENTION', 'NOT_STARTED'].includes(String(v.state)) &&
+  typeof v.parserAvailable === 'boolean' &&
+  count(v.maxUploadBytes) &&
+  v.maxUploadBytes > 0 &&
+  record(v.summary) &&
+  [v.summary.total, v.summary.ready, v.summary.processing, v.summary.attention, v.summary.notStarted].every(
+    count,
+  ) &&
+  v.summary.total ===
+    Number(v.summary.ready) +
+      Number(v.summary.processing) +
+      Number(v.summary.attention) +
+      Number(v.summary.notStarted) &&
+  typeof v.hasMore === 'boolean' &&
+  Array.isArray(v.items) &&
+  v.items.length <= 50 &&
+  v.items.every(
+    (x) =>
+      record(x) &&
+      [x.materialId, x.workspaceId, x.versionId].every(uuid) &&
+      (v.workspaceId === null || x.workspaceId === v.workspaceId) &&
+      text(x.workspaceName) &&
+      text(x.name) &&
+      count(x.version) &&
+      x.version > 0 &&
+      count(x.sizeBytes) &&
+      count(x.generation) &&
+      ['NOT_STARTED', 'QUEUED', 'RUNNING', 'READY', 'PARTIAL', 'FAILED', 'UNSUPPORTED', 'CANCELLED'].includes(
+        String(x.status),
+      ) &&
+      text(x.updatedAt) &&
+      Number.isFinite(Date.parse(x.updatedAt)) &&
+      (x.finishedAt === null || (text(x.finishedAt) && Number.isFinite(Date.parse(x.finishedAt)))) &&
+      typeof x.canMaintain === 'boolean',
+  );
 const id = (value: string) => {
   if (!uuid(value)) throw new IdentityError('INVALID_REQUEST', 400);
   return value;
@@ -54,6 +95,29 @@ export function createKnowledgeClient(fetcher: typeof fetch = fetch) {
       v.materialId === material &&
       v.versionId === version;
   return {
+    processing(
+      tenant: string,
+      space: string | null,
+      q: string,
+      state: MaterialProcessingPage['state'],
+      offset = 0,
+      signal?: AbortSignal,
+    ) {
+      const params = new URLSearchParams({ q, state, offset: String(offset), limit: '20' });
+      if (space) params.set('workspace', id(space));
+      return request(
+        root(tenant) + '/knowledge/processing?' + params,
+        'GET',
+        (v): v is MaterialProcessingPage =>
+          isProcessing(v) &&
+          v.tenantId === tenant &&
+          v.workspaceId === space &&
+          v.query === q.trim() &&
+          v.state === state,
+        undefined,
+        signal,
+      );
+    },
     analysis(
       tenant: string,
       space: string,

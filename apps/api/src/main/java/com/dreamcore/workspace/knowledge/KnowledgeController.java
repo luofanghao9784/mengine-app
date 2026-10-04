@@ -12,8 +12,8 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/v1/tenants/{tenant}")
 public class KnowledgeController {
     public record ParseRequest(@NotNull UUID requestId,@NotNull @Min(0) Integer expectedGeneration) {}
-    private final KnowledgeService service;
-    public KnowledgeController(KnowledgeService service) {this.service=service;}
+    private final KnowledgeService service; private final MaterialProcessingService processing;
+    public KnowledgeController(KnowledgeService service,MaterialProcessingService processing) {this.service=service;this.processing=processing;}
     private UUID actor(Authentication auth) {return UUID.fromString(auth.getName());}
     @ModelAttribute public void privateResponse(HttpServletResponse response) {response.setHeader("Cache-Control","private, no-store");response.setHeader("X-Content-Type-Options","nosniff");}
     @GetMapping("/workspaces/{workspace}/materials/{material}/versions/{version}/analysis")
@@ -23,6 +23,11 @@ public class KnowledgeController {
     @PostMapping("/workspaces/{workspace}/materials/{material}/versions/{version}/analysis") @ResponseStatus(HttpStatus.ACCEPTED)
     public KnowledgeService.Analysis parse(Authentication auth,@PathVariable UUID tenant,@PathVariable UUID workspace,@PathVariable UUID material,@PathVariable UUID version,@Valid @RequestBody ParseRequest body) {
         return service.request(actor(auth),tenant,workspace,material,version,body.requestId(),body.expectedGeneration());
+    }
+    @GetMapping("/knowledge/processing")
+    public MaterialProcessingService.Page processing(Authentication auth,@PathVariable UUID tenant,@RequestParam(required=false) UUID workspace,
+            @RequestParam(defaultValue="") String q,@RequestParam(defaultValue="ALL") String state,@RequestParam(defaultValue="0") int offset,@RequestParam(defaultValue="20") int limit){
+        return processing.list(actor(auth),tenant,workspace,q,state,offset,limit);
     }
     @GetMapping("/knowledge/search")
     public KnowledgeService.Results search(Authentication auth,@PathVariable UUID tenant,@RequestParam(required=false) UUID workspace,@RequestParam String q,@RequestParam(defaultValue="0") int offset,@RequestParam(defaultValue="20") int limit) {

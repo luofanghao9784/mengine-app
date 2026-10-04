@@ -1,3 +1,4 @@
+import { adminHref } from '../admin/navigation';
 import { LibraryToolbar } from './LibraryToolbar';
 import { SharedActivity } from '../activity/Activity';
 import { ContinueWithMaterial } from '../conversation/AttachmentMaterials';
@@ -43,7 +44,13 @@ const message = (error: unknown) =>
   error instanceof IdentityError ? error.message : '请求未完成，请稍后重试。';
 const accessDenied = (error: unknown) =>
   error instanceof IdentityError && [401, 403, 404].includes(error.status);
-export function LiveLibrary({ tenant, administration = false }: { tenant: string; administration?: boolean }) {
+export function LiveLibrary({
+  tenant,
+  administration = false,
+}: {
+  tenant: string;
+  administration?: boolean;
+}) {
   const { session } = useSession();
   const [attempt, setAttempt] = useState(0);
   const context = useRemote(
@@ -59,7 +66,15 @@ export function LiveLibrary({ tenant, administration = false }: { tenant: string
   );
 }
 
-function LibraryContents({ tenant, context, administration = false }: { tenant: string; context: TenantContext; administration?: boolean }) {
+function LibraryContents({
+  tenant,
+  context,
+  administration = false,
+}: {
+  tenant: string;
+  context: TenantContext;
+  administration?: boolean;
+}) {
   const [hash, setHash] = useState(location.hash);
   useEffect(() => {
     const change = () => {
@@ -77,29 +92,33 @@ function LibraryContents({ tenant, context, administration = false }: { tenant: 
       : context.workspaces.find((s) => s.id === scope);
   const enterprise = scope === 'enterprise',
     all = scope === 'all';
-  const allowed = (enterprise || all || !!selected) && (!administration || enterprise || selected?.kind === 'SHARED');
+  const allowed =
+    (enterprise || all || !!selected) &&
+    (!administration || enterprise || all || selected?.kind === 'SHARED');
   return (
     <>
-      {!administration && <PageActions>
-        <div className="material-tabs" aria-label="资料范围">
-          <Button
-            variant={selected?.kind === 'PERSONAL' ? 'primary' : 'ghost'}
-            onClick={() => {
-              location.hash = libraryHref(tenant);
-            }}
-          >
-            个人空间
-          </Button>
-          <Button
-            variant={selected?.kind === 'SHARED' || enterprise || all ? 'primary' : 'ghost'}
-            onClick={() => {
-              location.hash = libraryHref(tenant, 'enterprise');
-            }}
-          >
-            企业资料库
-          </Button>
-        </div>
-      </PageActions>}
+      {!administration && (
+        <PageActions>
+          <div className="material-tabs" aria-label="资料范围">
+            <Button
+              variant={selected?.kind === 'PERSONAL' ? 'primary' : 'ghost'}
+              onClick={() => {
+                location.hash = libraryHref(tenant);
+              }}
+            >
+              个人空间
+            </Button>
+            <Button
+              variant={selected?.kind === 'SHARED' || enterprise || all ? 'primary' : 'ghost'}
+              onClick={() => {
+                location.hash = libraryHref(tenant, 'enterprise');
+              }}
+            >
+              企业资料库
+            </Button>
+          </div>
+        </PageActions>
+      )}
       {!allowed || (folder && !uuid(folder)) ? (
         <Empty icon={Folder} title="此位置暂不可用" text="空间或文件夹不存在，或你没有查看权限。" />
       ) : (
@@ -111,6 +130,8 @@ function LibraryContents({ tenant, context, administration = false }: { tenant: 
           folder={folder}
           enterprise={enterprise}
           all={all}
+          administration={administration}
+          hash={hash}
         />
       )}
     </>
@@ -123,6 +144,8 @@ function LibraryListing({
   folder,
   enterprise,
   all,
+  administration,
+  hash,
 }: {
   tenant: string;
   context: TenantContext;
@@ -130,22 +153,37 @@ function LibraryListing({
   folder: string | null;
   enterprise: boolean;
   all: boolean;
+  administration: boolean;
+  hash: string;
 }) {
+  const href = (tenant: string, scope = 'personal', folder?: string) =>
+    administration
+      ? adminHref('tenant', 'materials', hash, { section: 'files', scope, ...(folder ? { folder } : {}) })
+      : libraryHref(tenant, scope, folder);
   const [draftDocument, setDraftDocument] = useState<string>();
   const [contentSearch, setContentSearch] = useState(false);
   const [maintenanceOpen, setMaintenanceOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
-  const listingKey = 'library:' + (workspace || (all ? 'all' : 'enterprise')) + ':' + (folder || 'root');
+  const listingKey =
+    (administration ? 'admin-library:' : 'library:') +
+    (workspace || (all ? 'all' : 'enterprise')) +
+    ':' +
+    (folder || 'root');
   const [query, setQuery] = useViewState(tenant, listingKey + ':input', '', textState);
   const [q, setQ] = useViewState(tenant, listingKey + ':query', '', textState);
   const [page, setPage] = useViewState(tenant, listingKey + ':page', 0, pageState);
   const [attempt, setAttempt] = useState(0);
   const { queue } = useUploads();
-  const savedUploads = queue.jobs.reduce((n, job) => n + job.run.files.filter(row => row.state === 'succeeded').length, 0);
-  useEffect(() => { setAttempt(n => n + 1); }, [savedUploads]);
+  const savedUploads = queue.jobs.reduce(
+    (n, job) => n + job.run.files.filter((row) => row.state === 'succeeded').length,
+    0,
+  );
+  useEffect(() => {
+    setAttempt((n) => n + 1);
+  }, [savedUploads]);
   const [layout, setLayout] = useViewState<'cards' | 'list'>(
     tenant,
-    'library:layout',
+    administration ? 'admin-library:layout' : 'library:layout',
     'cards',
     (v): v is 'cards' | 'list' => v === 'cards' || v === 'list',
   );
@@ -253,7 +291,7 @@ function LibraryListing({
           <nav className="material-crumbs" aria-label="文件夹路径">
             <button
               onClick={() => {
-                location.hash = libraryHref(tenant, personal ? 'personal' : 'enterprise');
+                location.hash = href(tenant, personal ? 'personal' : 'enterprise');
               }}
             >
               {personal ? '个人空间' : '企业资料库'}
@@ -263,7 +301,7 @@ function LibraryListing({
                 <ChevronRight size={14} />
                 <button
                   onClick={() => {
-                    location.hash = libraryHref(tenant, workspace!);
+                    location.hash = href(tenant, workspace!);
                   }}
                 >
                   {current.name}
@@ -281,7 +319,7 @@ function LibraryListing({
                 <ChevronRight size={14} />
                 <button
                   onClick={() => {
-                    location.hash = libraryHref(tenant, personal ? 'personal' : workspace!, c.id);
+                    location.hash = href(tenant, personal ? 'personal' : workspace!, c.id);
                   }}
                 >
                   {c.name}
@@ -314,7 +352,7 @@ function LibraryListing({
             <Button
               variant="ghost"
               onClick={() => {
-                location.hash = libraryHref(tenant, 'all');
+                location.hash = href(tenant, 'all');
               }}
             >
               全部资料
@@ -328,7 +366,7 @@ function LibraryListing({
                   key={s.id}
                   className="material-space-card"
                   onClick={() => {
-                    location.hash = libraryHref(tenant, s.id);
+                    location.hash = href(tenant, s.id);
                   }}
                 >
                   <Folder size={28} />
@@ -364,7 +402,7 @@ function LibraryListing({
                 className="material-entry"
                 onClick={() =>
                   item.kind === 'FOLDER'
-                    ? (location.hash = libraryHref(tenant, personal ? 'personal' : item.workspaceId, item.id))
+                    ? (location.hash = href(tenant, personal ? 'personal' : item.workspaceId, item.id))
                     : item.kind === 'DRAFT'
                       ? setDraftDocument(item.id)
                       : setDocument({ id: item.id, workspaceId: item.workspaceId })
@@ -443,9 +481,14 @@ function LibraryListing({
         />
       )}
       {modal === 'upload' && (
-        <MaterialUploadDialog tenant={tenant} workspace={uploadTarget} parent={workspace ? folder : null}
-          workspaceName={context.workspaces.find(space => space.id === uploadTarget)?.name || ''}
-          scope={personal ? 'personal' : uploadTarget} close={() => setModal(undefined)}>
+        <MaterialUploadDialog
+          tenant={tenant}
+          workspace={uploadTarget}
+          parent={workspace ? folder : null}
+          workspaceName={context.workspaces.find((space) => space.id === uploadTarget)?.name || ''}
+          scope={personal ? 'personal' : uploadTarget}
+          close={() => setModal(undefined)}
+        >
           {!workspace && (
             <Field label="保存到共享空间" hint="仅具备资料维护权限时可以上传。">
               <select required value={uploadTarget} onChange={(e) => setUploadTarget(e.target.value)}>
@@ -474,6 +517,7 @@ function LibraryListing({
           close={() => setDocument(null)}
           changed={refresh}
           verification={context}
+          administration={administration}
         />
       )}
     </>
@@ -627,13 +671,14 @@ function UploadDialog({
     </Modal>
   );
 }
-function DocumentDialog({
+export function DocumentDialog({
   tenant,
   entry,
   maxBytes,
   close,
   changed,
   verification,
+  administration = false,
 }: {
   tenant: string;
   entry: Pick<MaterialEntry, 'id' | 'workspaceId'>;
@@ -641,12 +686,13 @@ function DocumentDialog({
   close: () => void;
   changed: () => void;
   verification: TenantContext;
+  administration?: boolean;
 }) {
   const { session, expire } = useSession();
   const [page, setPage] = useState(0),
     [attempt, setAttempt] = useState(0),
     [upload, setUpload] = useState<number>();
-  const readerKey = 'material:' + entry.workspaceId + ':' + entry.id;
+  const readerKey = (administration ? 'admin:' : '') + 'material:' + entry.workspaceId + ':' + entry.id;
   const [analysis, setAnalysis] = useViewState<MaterialVersion | null>(
     tenant,
     readerKey + ':version',
@@ -665,7 +711,7 @@ function DocumentDialog({
   const [properties, setProperties] = useViewState(
     tenant,
     readerKey + ':properties',
-    false,
+    administration,
     (v): v is boolean => typeof v === 'boolean',
   );
   const [reveal, setReveal] = useState<{ id: string; sequence: number }>();
@@ -863,13 +909,15 @@ function DocumentDialog({
                 <>
                   <div className="live-reader-version-bar">
                     <Badge>v{selectedVersion.number}</Badge>
-                    <ContinueWithMaterial
-                      tenant={tenant}
-                      space={entry.workspaceId}
-                      material={entry.id}
-                      version={selectedVersion.id}
-                      close={close}
-                    />
+                    {!administration && (
+                      <ContinueWithMaterial
+                        tenant={tenant}
+                        space={entry.workspaceId}
+                        material={entry.id}
+                        version={selectedVersion.id}
+                        close={close}
+                      />
+                    )}
                     <Button icon={Download} disabled={busy} onClick={() => void download(selectedVersion)}>
                       下载原件
                     </Button>

@@ -35,3 +35,12 @@ test('internal search callback keeps old item fields and bounds coverage separat
  assert.ok(check({items:[],matchStatus:'NO_MATCH',coverage,hasMore:false}));
  assert.equal(check({items:[],matchStatus:'NO_MATCH',coverage,hasMore:false,attemptId:id}),false);
 });
+test('management processing is a current-version projection with no raw parser payload',()=>{
+ const check=ajv.compile({...spec.components.schemas.ProcessingPage,components:spec.components});
+ const item={materialId:id,workspaceId:id,workspaceName:'合成空间',name:'file.txt',versionId:id,version:1,sizeBytes:2,status:'PARTIAL',generation:1,updatedAt:'2026-10-04T00:00:00Z',finishedAt:null,canMaintain:false};
+ const value={tenantId:id,workspaceId:null,query:'',state:'ALL',parserAvailable:false,maxUploadBytes:20971520,summary:{total:1,ready:0,processing:0,attention:1,notStarted:0},items:[item],hasMore:false};
+ assert.ok(check(value),JSON.stringify(check.errors));
+ for(const patch of [{content:'private body'},{objectKey:'private/key'},{rawError:'server credentials'},{version:0},{status:'MADE_UP'}])assert.equal(check({...value,items:[{...item,...patch}]}),false);
+ assert.equal(check({...value,summary:{...value.summary,privateFiles:20}}),false);
+ assert.ok(spec.paths['/api/v1/tenants/{tenant}/knowledge/processing'].get);
+});

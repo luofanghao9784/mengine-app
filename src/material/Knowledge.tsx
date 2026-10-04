@@ -6,7 +6,7 @@ import { Button, Modal, Badge, Field } from '../shared/ui';
 import { Failure, Loading, Pager, useRemote, useSubmission, SubmitError } from '../shared/admin';
 import { knowledgeClient as api } from './knowledge-client';
 import { IdentityError } from '../identity/client';
-const statuses: Record<string, string> = {
+export const processingStatusLabel: Record<string, string> = {
   NOT_STARTED: '尚未解析',
   QUEUED: '等待解析',
   RUNNING: '正在解析',
@@ -88,7 +88,7 @@ export function AnalysisPanel({
   return (
     <section className="knowledge-analysis" aria-label="版本解析内容">
       <div className="material-section">
-        <h3>{statuses[value.status]}</h3>
+        <h3>{processingStatusLabel[value.status]}</h3>
         {value.canMaintain && value.available && !busy && (
           <Button
             disabled={submit.busy}

@@ -58,3 +58,30 @@ export interface KnowledgeResults {
   matchStatus?: 'MATCHED' | 'NO_MATCH';
   coverage?: KnowledgeCoverage;
 }
+
+/** Counts refer to current versions of the same authorized shared library, independent of list filters. */
+export interface MaterialProcessingPage {
+  tenantId: string;
+  workspaceId: string | null;
+  query: string;
+  state: 'ALL' | 'READY' | 'PROCESSING' | 'ATTENTION' | 'NOT_STARTED';
+  parserAvailable: boolean;
+  maxUploadBytes: number;
+  summary: { total: number; ready: number; processing: number; attention: number; notStarted: number };
+  items: MaterialProcessingItem[];
+  hasMore: boolean;
+}
+export interface MaterialProcessingItem {
+  materialId: string;
+  workspaceId: string;
+  workspaceName: string;
+  name: string;
+  versionId: string;
+  version: number;
+  sizeBytes: number;
+  status: KnowledgeAnalysis['status'];
+  generation: number;
+  updatedAt: string;
+  finishedAt: string | null;
+  canMaintain: boolean;
+}

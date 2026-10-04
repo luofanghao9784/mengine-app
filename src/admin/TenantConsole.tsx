@@ -14,9 +14,8 @@ import { TenantMemberDetail } from '../tenant/TenantMemberDetail';
 import { OperationsPanel } from '../operations/OperationsPanel';
 import { TenantDatabase } from '../database/TenantDatabase';
 import { Profiles } from '../profile/Profiles';
-import { LiveLibrary } from '../material/Library';
+import { TenantMaterials } from '../material/TenantMaterials';
 import { WorkspaceExperiences } from '../experience/WorkspaceExperiences';
-import { ObjectLifecycleWorkspace } from '../objectlifecycle/ObjectLifecycleWorkspace';
 import { DeparturePanel } from '../departure/DeparturePanel';
 
 export function TenantConsole({ tenant, name }: { tenant: string; name: string }) {
@@ -160,21 +159,7 @@ export function TenantConsole({ tenant, name }: { tenant: string; name: string }
       ) : page === 'database' ? (
         <TenantDatabase key={tenant} tenant={tenant} hash={hash} />
       ) : page === 'materials' ? (
-        secondary === 'content-lifecycle' ? (
-          <>
-            <a className="button ghost" href={adminHref('tenant', 'materials', hash)}>
-              返回资料库
-            </a>
-            <ObjectLifecycleWorkspace tenant={tenant} />
-          </>
-        ) : (
-          <>
-            <div className="admin-secondary-link">
-              <a href={adminHref('tenant', 'materials', hash, { detail: 'content-lifecycle' })}>回收与清理</a>
-            </div>
-            <LiveLibrary tenant={tenant} administration />
-          </>
-        )
+        <TenantMaterials key={tenant} tenant={tenant} hash={hash} />
       ) : page === 'experience' ? (
         <WorkspaceExperiences tenant={tenant} management={governance.value} readOnly />
       ) : secondary === 'records' ? (
