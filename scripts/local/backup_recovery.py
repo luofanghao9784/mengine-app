@@ -68,6 +68,9 @@ def coverage(sql):
 
 def quarantine(sql):
     # This executes in the private, offline database before any application can start.
+    import backup_experience
+    sql = backup_experience.isolated_sql(sql)
+    backup_experience.stop_pending(sql)
     platform_reset = ''
     if has_table(sql, 'platform_accounts'):
         platform_reset = """
@@ -338,6 +341,8 @@ def reconcile(root, current_root, key_path):
             # Keep the original instance locked/offline throughout comparison and mutation.
             with backup.offline_database(root) as (_, __, sql):
                 coverage(sql)
+                import backup_experience
+                sql = backup_experience.isolated_sql(sql)
                 applied = apply_current(sql, root, evidence)
                 import backup_lifecycle
                 applied['methodHeads']=backup_lifecycle.method_heads(sql,current_sql)
@@ -386,6 +391,8 @@ def password_hash(password):
 def reopen_current(sql, current_sql, root):
     """Only current-authorized intersections are reopened; unsupported identities remain disabled."""
     import secrets
+    import backup_experience
+    sql = backup_experience.isolated_sql(sql)
     accounts = {x['id']: x for x in json_rows(current_sql, "SELECT id::text,email,phone FROM accounts WHERE status='ACTIVE'")}
     local_accounts = json_rows(sql, 'SELECT id::text,email,phone FROM accounts')
     eligible = {x['id'] for x in local_accounts if x == accounts.get(x['id'])}
@@ -545,6 +552,8 @@ def sync_retention(sql, current_sql, held):
 
 def reopen_configurations(sql, current_sql):
     """Re-enable only exact retained configuration versions that are effective NOW in the authority."""
+    import backup_experience
+    sql = backup_experience.isolated_sql(sql)
     counts={'profiles':0,'experiences':0,'sources':0,'methodAdoptions':0}
     def keyed(db,table,exclude=()):
         rows=json_rows(db,'SELECT * FROM '+table)
@@ -690,6 +699,8 @@ def activate(root, current_root, key_path):
             if evidence['transaction']<snapshot['sourceTransaction']: backup.fail('当前权威实例早于快照。')
             with backup.offline_database(root) as (_,__,sql):
                 coverage(sql)
+                import backup_experience
+                sql = backup_experience.isolated_sql(sql)
                 applied=apply_current(sql,root,evidence)
                 import backup_lifecycle
                 applied['methodHeads']=backup_lifecycle.method_heads(sql,current_sql)
@@ -705,6 +716,7 @@ def activate(root, current_root, key_path):
                 sync_retention(sql,current_sql,set(reopened['heldTenantIds']))
                 reopened['effectiveConfigurations']=reopen_configurations(sql,current_sql)
                 applied['residual']=backup_lifecycle.residual(sql,current_sql)
+                backup_experience.revalidate(sql)
                 cluster=sql('SELECT system_identifier::text FROM pg_control_system()')
                 if sql("SELECT (SELECT count(*) FROM conversation_tasks WHERE status IN('QUEUED','RUNNING'))+(SELECT count(*) FROM ongoing_plans WHERE status='ACTIVE')+(SELECT count(*) FROM knowledge_runs WHERE status IN('QUEUED','RUNNING'))+(SELECT count(*) FROM spring_session)")!='0':
                     backup.fail('旧执行或会话未被封闭；保持隔离。')

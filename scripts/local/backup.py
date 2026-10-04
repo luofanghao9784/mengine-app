@@ -195,7 +195,7 @@ def offline_database(root, initialize=False):
                     run([pg('psql'), '-X', '-h', temp, '-p', str(port), '-U', 'dreamcore_trial', '-d', 'postgres',
                          '-v', 'ON_ERROR_STOP=1', '-c', 'CREATE DATABASE dreamcore_trial'])
                 def sql(query, fingerprint=False):
-                    command = [pg('psql'), '-X', *args, '-At', '-v', 'ON_ERROR_STOP=1', '-c', query]
+                    command = [pg('psql'), '-X', *args, '-qAt', '-v', 'ON_ERROR_STOP=1', '-c', query]
                     if not fingerprint:
                         return run(command, True).decode().strip()
                     # Stream large bytea tables through a private temporary file, not process memory.
