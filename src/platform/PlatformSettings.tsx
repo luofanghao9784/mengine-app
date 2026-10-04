@@ -11,6 +11,8 @@ import { PlatformStaffList } from './PlatformStaff';
 import { settingsClient as api, type ManagementRecord } from './settings-client';
 
 const actions: Record<string, string> = {
+  GENERAL_EXPERIENCE_ADJUSTMENT_SUBMITTED: '提交经验调整',
+  GENERAL_EXPERIENCE_ADJUSTMENT_PUBLISHED: '自动发布经验调整',
   GENERAL_EXPERIENCE_STOP: '停用通用经验',
   GENERAL_EXPERIENCE_RESTORE: '恢复通用经验',
   TENANT_CREATE: '开通企业',

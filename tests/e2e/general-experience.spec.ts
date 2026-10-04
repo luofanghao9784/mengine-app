@@ -21,6 +21,8 @@ async function fixture(
     dropPlatformFirst?: boolean;
     denyPlatformMutation?: boolean;
     dropSuggestionFirst?: boolean;
+    dropAdjustmentFirst?: boolean;
+    denyAdjustment?: boolean;
     noSuggestionScope?: boolean;
   } = {},
 ) {
@@ -36,6 +38,9 @@ async function fixture(
   let globalReceipt: unknown;
   let revoked = false;
   const suggestionChanges: Record<string, unknown>[] = [];
+  const adjustmentChanges: Record<string, unknown>[] = [],
+    adjustments: Record<string, unknown>[] = [];
+  let currentVersion = version;
   const suggestions: Record<string, unknown>[] = [];
   let suggestionScope = !options.noSuggestionScope;
   const calls: string[] = [];
@@ -96,7 +101,7 @@ async function fixture(
           globalReceipt = {
             requestId: body.requestId,
             entryId: entry,
-            versionId: version,
+            versionId: currentVersion,
             status: globalStatus,
             revision: globalRevision,
           };
@@ -123,12 +128,40 @@ async function fixture(
         ? json({ contractVersion: '1.0', code: 'EXPERIENCE_NOT_FOUND' }, 404)
         : json({
             entryId: entry,
-            versionId: version,
+            versionId: currentVersion,
             status: globalStatus,
             revision: globalRevision,
             reason: globalReason,
             changedAt: '2026-10-04T00:00:00Z',
           });
+    }
+    if (path.includes('/platform-admin/') && path.endsWith('/adjustments')) {
+      if (revoked || (options.denyAdjustment && route.request().method() === 'POST'))
+        return json({ code: 'ACCESS_DENIED' }, 403);
+      if (route.request().method() === 'POST') {
+        const body = route.request().postDataJSON();
+        adjustmentChanges.push(body);
+        if (!adjustments.length)
+          adjustments.push({
+            id: id(60),
+            versionId: body.versionId,
+            state: 'QUEUED',
+            resultVersionId: null,
+            createdAt: '2026-10-04T00:00:00Z',
+          });
+        if (options.dropAdjustmentFirst && adjustmentChanges.length === 1) return route.abort('failed');
+        return json(adjustments[0]);
+      }
+      return json({
+        enabled: true,
+        canSubmit:
+          globalStatus === 'AVAILABLE' &&
+          url.searchParams.get('version') === currentVersion &&
+          adjustments.every((a) => a.state === 'ADMITTED'),
+        revision: globalRevision,
+        currentVersionId: currentVersion,
+        items: adjustments,
+      });
     }
     if (path.endsWith('/suggestions')) {
       if (route.request().method() === 'POST') {
@@ -267,8 +300,8 @@ async function fixture(
       const state = url.searchParams.get('state') || 'AVAILABLE';
       const row = {
         id: entry,
-        versionId: version,
-        number: 1,
+        versionId: currentVersion,
+        number: currentVersion === version ? 1 : 2,
         status: globalStatus,
         updatedAt: '2026-10-04T00:00:00Z',
       };
@@ -295,6 +328,12 @@ async function fixture(
     changes,
     globalChanges,
     suggestionChanges,
+    adjustmentChanges,
+    admitAdjustment: () => {
+      currentVersion = id(61);
+      globalRevision++;
+      Object.assign(adjustments[0], { state: 'ADMITTED', resultVersionId: currentVersion });
+    },
     loseSuggestionScope: () => {
       suggestionScope = false;
     },
@@ -622,4 +661,67 @@ test('workspace permission removal clears the unsent proposal and platform never
     .click();
   await expect(page.getByText(method.steps[0], { exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: '企业补充与反馈' })).toHaveCount(0);
+});
+
+test('platform correction stays in the drawer and only a published result opens a new fixed version', async ({
+  page,
+  context,
+}) => {
+  const f = await fixture(context);
+  await openPlatformMethod(page);
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('button', { name: '提出内容调整' }).click();
+  await dialog.getByLabel('调整建议与依据').fill('私有调整建议示例：增加适用范围核对。');
+  await page.setViewportSize({ width: 360, height: 1000 });
+  expect(await dialog.evaluate((e) => e.scrollWidth <= e.clientWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/platform-experience-adjustment-mobile.png', fullPage: true });
+  await dialog.getByRole('button', { name: '提交自动核验' }).click();
+  await expect(dialog.getByText('等待核验', { exact: true })).toBeVisible();
+  expect(f.adjustmentChanges).toHaveLength(1);
+  expect(f.adjustmentChanges[0].versionId).toBe(version);
+  expect(f.adjustmentChanges[0].expectedRevision).toBe(1);
+  expect(await page.evaluate(() => JSON.stringify({ ...sessionStorage, ...localStorage }))).not.toContain(
+    '私有调整建议示例',
+  );
+  f.admitAdjustment();
+  await dialog.getByRole('button', { name: '刷新调整状态' }).click();
+  await expect(dialog.getByText('v2', { exact: true })).toBeVisible();
+  await expect(dialog.getByText('已发布新版本', { exact: true })).toBeVisible();
+  expect(f.calls).toContain(`/api/platform-admin/v1/experience-library/${entry}?version=${id(61)}`);
+  expect(f.calls.some((p) => p.startsWith('/api/v1/'))).toBe(false);
+});
+test('platform correction lost response retains original key and locks sibling controls until resolved', async ({
+  page,
+  context,
+}) => {
+  const f = await fixture(context, { dropAdjustmentFirst: true });
+  await openPlatformMethod(page);
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('button', { name: '提出内容调整' }).click();
+  await dialog.getByLabel('调整建议与依据').fill('合成需要核验的调整');
+  await dialog.getByRole('button', { name: '提交自动核验' }).click();
+  await expect(dialog.getByRole('button', { name: '重试原请求' })).toBeVisible();
+  await expect(dialog.getByLabel('调整建议与依据')).toBeDisabled();
+  await expect(dialog.getByRole('button', { name: '刷新调整状态' })).toBeDisabled();
+  await expect(dialog.getByRole('region', { name: '总库使用状态' }).getByRole('button')).toBeDisabled();
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await dialog.getByRole('button', { name: '关闭弹窗' }).click();
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: '重试原请求' }).click();
+  await expect(dialog.getByText('等待核验', { exact: true })).toBeVisible();
+  expect(f.adjustmentChanges).toHaveLength(2);
+  expect(f.adjustmentChanges[0]).toEqual(f.adjustmentChanges[1]);
+});
+test('loss of platform rights clears adjustment form and cleaned method content', async ({
+  page,
+  context,
+}) => {
+  await fixture(context, { denyAdjustment: true });
+  await openPlatformMethod(page);
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('button', { name: '提出内容调整' }).click();
+  await dialog.getByLabel('调整建议与依据').fill('失权后不可保留的调整');
+  await dialog.getByRole('button', { name: '提交自动核验' }).click();
+  await expect(dialog.getByLabel('调整建议与依据')).toHaveCount(0);
+  await expect(dialog.getByRole('heading', { name: method.title })).toHaveCount(0);
 });

@@ -7,6 +7,7 @@ import { Failure, Loading, Pager, SubmitError, useRemote, useSubmission } from '
 import { pageState, textState, useViewState } from '../shared/useViewState';
 import { generalExperienceClient as api, generalProcessingLabels } from './general-client';
 import './management.css';
+import { PlatformExperienceAdjustmentPanel } from './PlatformExperienceAdjustmentPanel';
 import { GeneralSuggestionPanel, type LocalExperienceSelection } from './GeneralSuggestionPanel';
 import { requestNavigationLocked, useRequestLock } from '../shared/request-guard';
 import type {
@@ -260,6 +261,12 @@ export function GeneralExperienceLibrary({
           lock={setLocked}
           changed={refresh}
           chooseLocal={chooseLocal}
+          chooseVersion={(version) => {
+            if (!locked) {
+              select({ id: selection.id, version });
+              refresh();
+            }
+          }}
         />
       )}
     </div>
@@ -273,12 +280,14 @@ function GeneralDetail({
   lock,
   changed,
   chooseLocal,
+  chooseVersion,
 }: {
   tenant?: string;
   selection: Selection;
   close: () => void;
   lock: (value: boolean) => void;
   changed: () => void;
+  chooseVersion: (version: string) => void;
   chooseLocal?: (selection: LocalExperienceSelection) => void;
 }) {
   const [usageBlocked, setUsageBlocked] = useState(false),
@@ -329,15 +338,17 @@ function GeneralDetail({
               />
             </fieldset>
           ) : (
-            <PlatformAvailability
-              selection={selection}
-              lock={setUsageBlocked}
-              denied={setDenied}
-              changed={() => {
-                setAttempt((n) => n + 1);
-                changed();
-              }}
-            />
+            <fieldset className="general-experience-control-group" disabled={suggestionBlocked}>
+              <PlatformAvailability
+                selection={selection}
+                lock={setUsageBlocked}
+                denied={setDenied}
+                changed={() => {
+                  setAttempt((n) => n + 1);
+                  changed();
+                }}
+              />
+            </fieldset>
           )}
 
           <h2>{d.method.title}</h2>
@@ -374,6 +385,17 @@ function GeneralDetail({
                 locked={setSuggestionBlocked}
                 denied={setDenied}
                 chooseLocal={chooseLocal}
+              />
+            </fieldset>
+          )}
+          {!tenant && (
+            <fieldset className="general-experience-control-group" disabled={usageBlocked}>
+              <PlatformExperienceAdjustmentPanel
+                entry={selection.id}
+                version={selection.version}
+                locked={setSuggestionBlocked}
+                denied={setDenied}
+                chooseVersion={chooseVersion}
               />
             </fieldset>
           )}

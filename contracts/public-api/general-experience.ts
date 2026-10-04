@@ -115,3 +115,37 @@ export interface GeneralExperienceSuggestions {
   scopes: { id: string; name: string }[];
   items: GeneralExperienceSuggestion[];
 }
+
+export type GeneralAdjustmentState =
+  | 'QUEUED'
+  | 'RETRY_WAIT'
+  | 'RUNNING'
+  | 'UNCERTAIN'
+  | 'PUBLISHING'
+  | 'ADMITTED'
+  | 'SKIPPED'
+  | 'REJECTED'
+  | 'FAILED'
+  | 'UNKNOWN'
+  | 'UNAVAILABLE'
+  | 'CONFLICT';
+export interface GeneralExperienceAdjustmentChange {
+  requestId: string;
+  versionId: string;
+  expectedRevision: number;
+  content: string;
+}
+export interface GeneralExperienceAdjustment {
+  id: string;
+  versionId: string;
+  state: GeneralAdjustmentState;
+  resultVersionId: string | null;
+  createdAt: string;
+}
+export interface GeneralExperienceAdjustments {
+  enabled: boolean;
+  canSubmit: boolean;
+  revision: number;
+  currentVersionId: string;
+  items: GeneralExperienceAdjustment[];
+}

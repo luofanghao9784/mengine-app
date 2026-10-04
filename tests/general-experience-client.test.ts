@@ -9,6 +9,8 @@ import {
   isGeneralAvailability,
   isGeneralSuggestion,
   isGeneralSuggestions,
+  isGeneralAdjustment,
+  isGeneralAdjustments,
 } from '../src/experience/general-client.ts';
 const id = '00000000-0000-4000-8000-000000000001',
   version = '00000000-0000-4000-8000-000000000002';
@@ -216,4 +218,35 @@ test('suggestion projections accept only own finite metadata and exact submitted
     (e: unknown) => typeof e === 'object' && e !== null && 'code' in e && e.code === 'CONTRACT_MISMATCH',
   );
   assert.ok(calls.every((p) => !p.includes('platform-admin')));
+});
+
+test('platform adjustment metadata rejects private inputs, other realms and unfinished result links', async () => {
+  const receipt = {
+    id,
+    versionId: version,
+    state: 'QUEUED',
+    resultVersionId: null,
+    createdAt: '2026-10-04T00:00:00Z',
+  };
+  const page = { enabled: false, canSubmit: true, revision: 1, currentVersionId: version, items: [receipt] };
+  assert.ok(isGeneralAdjustment(receipt));
+  assert.ok(isGeneralAdjustments(page));
+  for (const key of ['content', 'actorId', 'tenantId', 'runId'])
+    assert.equal(isGeneralAdjustments({ ...page, items: [{ ...receipt, [key]: 'private' }] }), false);
+  assert.equal(isGeneralAdjustment({ ...receipt, resultVersionId: id }), false);
+  const calls: { url: string; body: unknown }[] = [];
+  const api = createGeneralExperienceClient(async (url, options) => {
+    const path = String(url);
+    if (path.endsWith('/csrf'))
+      return new Response(JSON.stringify({ headerName: 'X-CSRF-TOKEN', token: 'synthetic' }));
+    calls.push({ url: path, body: options?.body ? JSON.parse(String(options.body)) : null });
+    return new Response(JSON.stringify(options?.method === 'POST' ? receipt : page));
+  });
+  assert.deepEqual(await api.adjustments(id, version), page);
+  assert.deepEqual(
+    await api.adjust(id, { requestId: id, versionId: version, expectedRevision: 1, content: '合成调整建议' }),
+    receipt,
+  );
+  assert.ok(calls.every((c) => c.url.startsWith('/api/platform-admin/')));
+  assert.equal((calls[1].body as { content: string }).content, '合成调整建议');
 });

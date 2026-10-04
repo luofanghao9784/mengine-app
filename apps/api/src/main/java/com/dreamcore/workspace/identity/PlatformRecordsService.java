@@ -25,7 +25,7 @@ public class PlatformRecordsService {
             WITH events AS (
               SELECT e.*,CASE
                 WHEN e.action IN ('TENANT_CREATE','TENANT_SUSPEND','TENANT_RESUME','INITIAL_ADMIN_INVITATION_REPLACE','INITIAL_ADMIN_INVITATION_REVOKE') THEN 'ENTERPRISE'
-                WHEN e.action IN ('GENERAL_EXPERIENCE_STOP','GENERAL_EXPERIENCE_RESTORE') THEN 'EXPERIENCE'
+                WHEN e.action IN ('GENERAL_EXPERIENCE_STOP','GENERAL_EXPERIENCE_RESTORE','GENERAL_EXPERIENCE_ADJUSTMENT_SUBMITTED','GENERAL_EXPERIENCE_ADJUSTMENT_PUBLISHED') THEN 'EXPERIENCE'
                 WHEN e.action IN ('CUSTOMER_ACCOUNT_DISABLE','CUSTOMER_ACCOUNT_ENABLE') THEN 'ACCOUNT'
                 WHEN e.action IN ('PLATFORM_BOOTSTRAP','PLATFORM_STAFF_INVITE','PLATFORM_INVITE_REVOKE','PLATFORM_STAFF_REVOKE','PLATFORM_INVITE_ACCEPT') THEN 'STAFF'
                 ELSE 'SECURITY' END AS category
@@ -33,12 +33,12 @@ public class PlatformRecordsService {
                 'TENANT_CREATE','TENANT_SUSPEND','TENANT_RESUME','INITIAL_ADMIN_INVITATION_REPLACE','INITIAL_ADMIN_INVITATION_REVOKE',
                 'CUSTOMER_ACCOUNT_DISABLE','CUSTOMER_ACCOUNT_ENABLE',
                 'PLATFORM_BOOTSTRAP','PLATFORM_STAFF_INVITE','PLATFORM_INVITE_REVOKE','PLATFORM_STAFF_REVOKE','PLATFORM_INVITE_ACCEPT',
-                'GENERAL_EXPERIENCE_STOP','GENERAL_EXPERIENCE_RESTORE',
+                'GENERAL_EXPERIENCE_STOP','GENERAL_EXPERIENCE_RESTORE','GENERAL_EXPERIENCE_ADJUSTMENT_SUBMITTED','GENERAL_EXPERIENCE_ADJUSTMENT_PUBLISHED',
                 'PLATFORM_LOGIN','PLATFORM_LOGOUT','PLATFORM_LOGIN_FAILED','PLATFORM_PASSWORD_CHANGE','PLATFORM_PASSWORD_CHANGE_FAILED')
             )
             SELECT e.*,a.display_name AS actor_name,t.name AS tenant_name,
               CASE WHEN e.category='ENTERPRISE' THEN t.name
-                WHEN e.category='EXPERIENCE' THEN CASE WHEN general_experience_history_readable(management.version_id) THEN concat(method.method->>'title',' · v',method.number) ELSE '已失效的通用经验' END
+                WHEN e.category='EXPERIENCE' THEN CASE WHEN general_experience_history_readable(method.id) THEN concat(method.method->>'title',' · v',method.number) ELSE '已失效的通用经验' END
                 WHEN e.category='STAFF' THEN coalesce(i.login_name,target.display_name)
                 ELSE target.display_name END AS target_name,
               CASE WHEN e.category='EXPERIENCE' THEN management.reason ELSE s.internal_reason END AS internal_reason,s.public_reason
@@ -48,7 +48,8 @@ public class PlatformRecordsService {
             LEFT JOIN platform_staff_invitations i ON i.id=e.target_id AND e.category='STAFF'
             LEFT JOIN tenant_service_changes s ON s.id=e.target_id AND s.tenant_id=e.tenant_id AND e.action IN ('TENANT_SUSPEND','TENANT_RESUME')
             LEFT JOIN general_experience_management_events management ON management.id=e.target_id AND e.category='EXPERIENCE'
-            LEFT JOIN general_experience_versions method ON method.id=management.version_id
+            LEFT JOIN general_experience_adjustments adjustment ON adjustment.id=e.target_id AND e.action IN ('GENERAL_EXPERIENCE_ADJUSTMENT_SUBMITTED','GENERAL_EXPERIENCE_ADJUSTMENT_PUBLISHED')
+            LEFT JOIN general_experience_versions method ON method.id=coalesce(management.version_id,CASE WHEN e.action='GENERAL_EXPERIENCE_ADJUSTMENT_PUBLISHED' THEN adjustment.result_version ELSE adjustment.version_id END)
             WHERE (?='' OR e.category=?) AND (?='' OR e.outcome=?)
             ORDER BY e.id DESC LIMIT ? OFFSET ?
             """,(r,n)->new Entry(r.getLong("id"),r.getString("category"),r.getString("action"),r.getString("outcome"),

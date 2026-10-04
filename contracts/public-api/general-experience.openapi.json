@@ -734,6 +734,134 @@
           }
         }
       }
+    },
+    "/api/platform-admin/v1/experience-library/{entry}/adjustments": {
+      "get": {
+        "description": "Platform-only adjustment of a cleaned fixed method. No contributing tenant or source content. Own proposal metadata only; suggestions are automatically checked, never directly published. Current version is explicit. All terminal states clear private proposal bodies.",
+        "security": [
+          {
+            "platformCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entry",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized projection",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Adjustments"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Management scope required"
+          },
+          "404": {
+            "description": "Version no longer available"
+          }
+        },
+        "operationId": "getGeneralExperienceAdjustments"
+      },
+      "post": {
+        "description": "Platform-only adjustment of a cleaned fixed method. No contributing tenant or source content. Own proposal metadata only; suggestions are automatically checked, never directly published. Current version is explicit. All terminal states clear private proposal bodies.",
+        "security": [
+          {
+            "platformCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entry",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-CSRF-TOKEN",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized projection",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Adjustment"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Management scope required"
+          },
+          "404": {
+            "description": "Version no longer available"
+          },
+          "409": {
+            "description": "Revision or request identity conflict; no mutation applied"
+          }
+        },
+        "operationId": "proposeGeneralExperienceAdjustment",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdjustmentChange"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1409,6 +1537,142 @@
             }
           }
         }
+      },
+      "AdjustmentChange": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "versionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 12000,
+            "pattern": "\\S"
+          }
+        },
+        "required": [
+          "requestId",
+          "versionId",
+          "expectedRevision",
+          "content"
+        ],
+        "additionalProperties": false
+      },
+      "Adjustment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "versionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "enum": [
+              "QUEUED",
+              "RETRY_WAIT",
+              "RUNNING",
+              "UNCERTAIN",
+              "PUBLISHING",
+              "ADMITTED",
+              "SKIPPED",
+              "REJECTED",
+              "FAILED",
+              "UNKNOWN",
+              "UNAVAILABLE",
+              "CONFLICT"
+            ]
+          },
+          "resultVersionId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "versionId",
+          "state",
+          "resultVersionId",
+          "createdAt"
+        ],
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "state": {
+                  "not": {
+                    "const": "ADMITTED"
+                  }
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "resultVersionId": {
+                  "type": "null"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "Adjustments": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "canSubmit": {
+            "type": "boolean"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "currentVersionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Adjustment"
+            },
+            "maxItems": 10
+          }
+        },
+        "required": [
+          "enabled",
+          "canSubmit",
+          "revision",
+          "currentVersionId",
+          "items"
+        ],
+        "additionalProperties": false
       }
     }
   }

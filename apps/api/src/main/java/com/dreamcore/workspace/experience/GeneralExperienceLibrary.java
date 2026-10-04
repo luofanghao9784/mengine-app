@@ -22,7 +22,7 @@ public class GeneralExperienceLibrary {
   SELECT e.id,e.status,e.updated_at,v.id version_id,v.number,v.method
   FROM general_experience_entries e JOIN general_experience_versions v ON v.id=e.published_version AND v.entry_id=e.id
   WHERE v.method IS NOT NULL AND (general_experience_available(v.id) OR
-   (? AND e.status='STOPPED' AND EXISTS(SELECT 1 FROM general_experience_origins o WHERE o.version_id=v.id AND generalization_source_available(o.source_version))))
+   (? AND e.status='STOPPED' AND general_experience_history_readable(v.id)))
   """;
  private void access(UUID actor,UUID tenant){if(tenant==null)identities.platform(actor);else management.requireLibraryAccess(actor,tenant);}
  private ExperienceGeneralizationRuntime.Method method(Map<String,Object> row){return json.readValue(row.get("method").toString(),ExperienceGeneralizationRuntime.Method.class);}
@@ -49,7 +49,10 @@ public class GeneralExperienceLibrary {
    SELECT state,count(*) total FROM (SELECT CASE
     WHEN state='QUEUED' THEN 'WAITING' WHEN state IN ('RUNNING','QUALIFIED') THEN 'PROCESSING'
     WHEN state='RETRY_WAIT' THEN 'RETRYING' WHEN state IN ('SKIPPED','REJECTED','CONFLICT') THEN 'NOT_ADMITTED'
-    WHEN state='SOURCE_UNAVAILABLE' THEN 'UNAVAILABLE' ELSE state END state FROM experience_generalization_sources) s GROUP BY state
+    WHEN state='SOURCE_UNAVAILABLE' THEN 'UNAVAILABLE' ELSE state END state FROM experience_generalization_sources
+    UNION ALL SELECT CASE WHEN state='QUEUED' THEN 'WAITING' WHEN state IN ('RUNNING','UNCERTAIN','PUBLISHING') THEN 'PROCESSING'
+     WHEN state='RETRY_WAIT' THEN 'RETRYING' WHEN state IN ('SKIPPED','REJECTED','CONFLICT') THEN 'NOT_ADMITTED'
+     ELSE state END state FROM general_experience_adjustments) s GROUP BY state
    """))counts.put((String)r.get("state"),((Number)r.get("total")).longValue());
   var rows=db.queryForList("SELECT status,count(*) total FROM ("+BASE+") readable GROUP BY status",true);
   long available=0,stopped=0;for(var r:rows){if(r.get("status").equals("AVAILABLE"))available=((Number)r.get("total")).longValue();else stopped=((Number)r.get("total")).longValue();}

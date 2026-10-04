@@ -40,7 +40,10 @@ test('realm contracts keep customer usage writes separate and require exact vers
   for (const [path, operations] of Object.entries(spec.paths)) {
     assert.deepEqual(
       Object.keys(operations),
-      path.endsWith('/usage') || path.endsWith('/availability') || path.endsWith('/suggestions')
+      path.endsWith('/usage') ||
+        path.endsWith('/availability') ||
+        path.endsWith('/suggestions') ||
+        path === '/api/platform-admin/v1/experience-library/{entry}/adjustments'
         ? ['get', 'post']
         : ['get'],
     );
@@ -132,4 +135,31 @@ test('enterprise suggestion metadata excludes private bodies and original contri
   ])
     assert.equal(change(bad), false);
   assert.ok(!Object.keys(spec.paths).some((p) => p.includes('platform-admin') && p.endsWith('/suggestions')));
+});
+
+test('platform adjustments expose own metadata only, have no customer endpoint or approval action', () => {
+  const check = ajv.compile({ ...spec.components.schemas.Adjustments, components: spec.components });
+  const item = {
+    id,
+    versionId: id,
+    state: 'ADMITTED',
+    resultVersionId: id,
+    createdAt: '2026-10-04T00:00:00Z',
+  };
+  const page = { enabled: false, canSubmit: true, revision: 1, currentVersionId: id, items: [item] };
+  assert.ok(check(page), JSON.stringify(check.errors));
+  for (const key of ['content', 'actorId', 'tenantId', 'sourceId', 'runId', 'receipt', 'evidence'])
+    assert.equal(check({ ...page, items: [{ ...item, [key]: 'private' }] }), false);
+  assert.equal(check({ ...page, items: [{ ...item, state: 'RUNNING' }] }), false);
+  assert.equal(
+    check({ ...page, items: [{ ...item, state: 'AWAITING_APPROVAL', resultVersionId: null }] }),
+    false,
+  );
+  const route = spec.paths['/api/platform-admin/v1/experience-library/{entry}/adjustments'];
+  assert.deepEqual(route.post.security, [{ platformCookie: [] }]);
+  assert.ok(route.post.parameters.some((p) => p.name === 'X-CSRF-TOKEN'));
+  assert.equal(
+    Object.keys(spec.paths).some((p) => p.startsWith('/api/v1/') && p.endsWith('/adjustments')),
+    false,
+  );
 });

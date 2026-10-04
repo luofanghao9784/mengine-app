@@ -1,4 +1,8 @@
 import type {
+  GeneralExperienceAdjustmentChange,
+  GeneralExperienceAdjustment,
+  GeneralExperienceAdjustments,
+  GeneralAdjustmentState,
   GeneralExperiencePage,
   GeneralExperienceSuggestionChange,
   GeneralExperienceSuggestion,
@@ -134,6 +138,37 @@ export const isGeneralSuggestions = (v: unknown): v is GeneralExperienceSuggesti
   Array.isArray(v.items) &&
   v.items.length <= 10 &&
   v.items.every(isGeneralSuggestion);
+export const generalAdjustmentLabels: Record<GeneralAdjustmentState, string> = {
+  QUEUED: '等待核验',
+  RETRY_WAIT: '等待重试',
+  RUNNING: '自动核验中',
+  UNCERTAIN: '正在核对结果',
+  PUBLISHING: '准备发布',
+  ADMITTED: '已发布新版本',
+  SKIPPED: '无新增',
+  REJECTED: '未通过核验',
+  FAILED: '执行失败',
+  UNKNOWN: '结果未确认',
+  UNAVAILABLE: '已失效',
+  CONFLICT: '未形成新版本',
+};
+export const isGeneralAdjustment = (v: unknown): v is GeneralExperienceAdjustment =>
+  exact(v, ['id', 'versionId', 'state', 'resultVersionId', 'createdAt']) &&
+  uuid(v.id) &&
+  uuid(v.versionId) &&
+  Object.hasOwn(generalAdjustmentLabels, String(v.state)) &&
+  (v.resultVersionId === null || (v.state === 'ADMITTED' && uuid(v.resultVersionId))) &&
+  date(v.createdAt);
+export const isGeneralAdjustments = (v: unknown): v is GeneralExperienceAdjustments =>
+  exact(v, ['enabled', 'canSubmit', 'revision', 'currentVersionId', 'items']) &&
+  typeof v.enabled === 'boolean' &&
+  typeof v.canSubmit === 'boolean' &&
+  count(v.revision) &&
+  Number(v.revision) > 0 &&
+  uuid(v.currentVersionId) &&
+  Array.isArray(v.items) &&
+  v.items.length <= 10 &&
+  v.items.every(isGeneralAdjustment);
 export function createGeneralExperienceClient(fetcher: typeof fetch = fetch) {
   const request = createIdentityRequest(fetcher);
   const path = (tenant?: string) => {
@@ -273,6 +308,38 @@ export function createGeneralExperienceClient(fetcher: typeof fetch = fetch) {
       } catch (error) {
         if (error instanceof IdentityError && error.code === 'EXPERIENCE_SUGGESTION_PENDING')
           error.message = '这个空间已有补充或反馈正在处理，请等待结果。';
+        throw error;
+      }
+    },
+    adjustments: (id: string, version: string, signal?: AbortSignal) => {
+      if (![id, version].every(uuid)) throw new IdentityError('INVALID_REQUEST', 400);
+      return request(
+        path() + `/${id}/adjustments?version=${version}`,
+        'GET',
+        (v): v is GeneralExperienceAdjustments =>
+          isGeneralAdjustments(v) && (!v.canSubmit || v.currentVersionId === version),
+        undefined,
+        signal,
+      );
+    },
+    adjust: async (id: string, body: GeneralExperienceAdjustmentChange) => {
+      if (
+        ![id, body.requestId, body.versionId].every(uuid) ||
+        !count(body.expectedRevision) ||
+        body.expectedRevision < 1 ||
+        !text(body.content, 12000)
+      )
+        throw new IdentityError('INVALID_REQUEST', 400);
+      try {
+        return await request(
+          path() + `/${id}/adjustments`,
+          'POST',
+          (v): v is GeneralExperienceAdjustment => isGeneralAdjustment(v) && v.versionId === body.versionId,
+          body,
+        );
+      } catch (error) {
+        if (error instanceof IdentityError && error.code === 'GENERAL_ADJUSTMENT_PENDING')
+          error.message = '这条经验已有调整正在自动处理，请等待结果。';
         throw error;
       }
     },
