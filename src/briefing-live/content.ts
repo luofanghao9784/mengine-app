@@ -23,10 +23,26 @@ export function isBriefingDocument(v: unknown): v is BriefingDocument {
     ds = c.datasetSource,
     basis = c.datasetBasis;
   const dataset = c.schemaVersion === 'briefing-dataset-v1';
-  if (!dataset && ((ds !== undefined && ds !== null) || (basis !== undefined && basis !== null)))
-    return false;
+  const datasetSourceValid =
+    record(ds) &&
+    uuid(ds.datasetId) &&
+    uuid(ds.snapshotId) &&
+    Number.isSafeInteger(ds.version) &&
+    Number(ds.version) > 0 &&
+    text(ds.name, 1, 160) &&
+    hash(ds.sha256) &&
+    Number.isSafeInteger(ds.rowCount) &&
+    Number(ds.rowCount) >= 0 &&
+    Number(ds.rowCount) <= 100000 &&
+    typeof ds.collectedAt === 'string' &&
+    Number.isFinite(Date.parse(ds.collectedAt)) &&
+    (ds.coverageThrough === null ||
+      (typeof ds.coverageThrough === 'string' && Number.isFinite(Date.parse(ds.coverageThrough))));
+  if (!dataset && basis !== undefined && basis !== null) return false;
+  if (c.schemaVersion === 'briefing-data-v1' && ds !== undefined && ds !== null) return false;
   if (c.schemaVersion === 'briefing-text-v1')
     return (
+      (ds === undefined || ds === null || datasetSourceValid) &&
       ['INFO', 'INSIGHT', 'SUGGESTION', 'RESULT'].includes(String(c.businessType)) &&
       text(c.title, 4, 80) &&
       text(c.summary, 12, 240) &&
@@ -78,19 +94,7 @@ export function isBriefingDocument(v: unknown): v is BriefingDocument {
         Number.isSafeInteger(basis.ignoredRows) &&
         Number(basis.ignoredRows) >= 0 &&
         Number(basis.matchedRows) + Number(basis.ignoredRows) === ds.rowCount &&
-        uuid(ds.datasetId) &&
-        uuid(ds.snapshotId) &&
-        Number.isSafeInteger(ds.version) &&
-        Number(ds.version) > 0 &&
-        text(ds.name, 1, 160) &&
-        hash(ds.sha256) &&
-        Number.isSafeInteger(ds.rowCount) &&
-        Number(ds.rowCount) >= 0 &&
-        Number(ds.rowCount) <= 100000 &&
-        typeof ds.collectedAt === 'string' &&
-        Number.isFinite(Date.parse(ds.collectedAt)) &&
-        (ds.coverageThrough === null ||
-          (typeof ds.coverageThrough === 'string' && Number.isFinite(Date.parse(ds.coverageThrough))))
+        datasetSourceValid
       : record(s) &&
         uuid(s.id) &&
         uuid(s.materialId) &&

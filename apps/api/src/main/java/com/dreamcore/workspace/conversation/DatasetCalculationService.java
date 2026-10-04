@@ -55,7 +55,7 @@ public class DatasetCalculationService {
             JOIN task_dataset_reads pin ON pin.task_id=t.id AND pin.attempt_number=t.attempt
             JOIN dataset_snapshots s ON s.id=pin.snapshot_id AND s.dataset_id=pin.dataset_id
             JOIN business_datasets d ON d.id=s.dataset_id AND d.tenant_id=t.tenant_id
-            WHERE t.id=? AND t.lease_token=? AND t.source_scope<>'SELECTED' AND d.id=? AND s.id=?
+            WHERE t.id=? AND t.lease_token=? AND (t.source_scope<>'SELECTED' OR EXISTS(SELECT 1 FROM briefing_dataset_selections chosen WHERE chosen.task_id=t.id AND chosen.dataset_id=d.id AND chosen.snapshot_id=s.id AND NOT chosen.invalidated)) AND d.id=? AND s.id=?
               AND d.status='ACTIVE' AND NOT d.scrubbed AND NOT s.scrubbed
             """,job.id(),job.token(),request.datasetId(),request.snapshotId());
         if (sources.size()!=1) throw new IdentityException(403,"DATASET_CALCULATION_NOT_GRANTED");

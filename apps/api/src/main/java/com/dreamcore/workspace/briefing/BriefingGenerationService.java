@@ -17,7 +17,11 @@ import tools.jackson.databind.json.JsonMapper;
 /** Durable system-owned triggers; delegates execution to the same metered product runtime as conversations. */
 @Service
 public class BriefingGenerationService {
-    public record Source(UUID materialId,UUID versionId,String filename,String parseStatus,Instant changedAt) {}
+    public record Source(UUID materialId,UUID versionId,String filename,String parseStatus,Instant changedAt,String kind) {
+        Source(UUID id,UUID version,String name,String status,Instant changed){this(id,version,name,status,changed,"MATERIAL");}
+        boolean dataset(){return "DATASET".equals(kind);}
+        Map<String,Object> selection(){return dataset()?Map.of("kind","DATASET","datasetId",materialId,"snapshotId",versionId):Map.of("materialId",materialId,"versionId",versionId);}
+    }
     public record Batch(UUID id,UUID workspaceId,String trigger,String businessType,String status,String reason,UUID taskId,List<UUID> cardIds,Instant createdAt,Instant finishedAt) {}
     public record Policy(UUID id,UUID workspaceId,String workspaceName,boolean enabled,int revision,String reason) {}
     public record State(List<Policy> policies,List<Batch> batches) {}
@@ -51,7 +55,7 @@ public class BriefingGenerationService {
         var spaces=db.queryForList("""
           SELECT w.id FROM workspaces w WHERE w.tenant_id=? AND ((w.kind='PERSONAL' AND w.owner_id=?) OR EXISTS(
           SELECT 1 FROM workspace_members g WHERE g.workspace_id=w.id AND g.tenant_id=w.tenant_id AND g.account_id=?))
-          ORDER BY EXISTS(SELECT 1 FROM active_materials m WHERE m.workspace_id=w.id AND m.in_library) DESC,w.kind='PERSONAL' DESC,w.id LIMIT 1
+          ORDER BY (EXISTS(SELECT 1 FROM active_materials m WHERE m.workspace_id=w.id AND m.in_library) OR EXISTS(SELECT 1 FROM business_datasets d JOIN dataset_snapshots s ON s.id=d.current_snapshot WHERE d.workspace_id=w.id AND d.status='ACTIVE' AND NOT d.scrubbed AND NOT s.scrubbed)) DESC,w.kind='PERSONAL' DESC,w.id LIMIT 1
           """,UUID.class,tenant,actor,actor);
         if(spaces.isEmpty())throw new IdentityException(409,"BRIEFING_WORKSPACE_REQUIRED");
         authority(actor,tenant,spaces.getFirst());return spaces.getFirst();
@@ -116,13 +120,19 @@ public class BriefingGenerationService {
           """);
     }
     public List<UUID> candidates(){return db.queryForList("SELECT id FROM briefing_generation_policies WHERE enabled OR EXISTS(SELECT 1 FROM briefing_generation_batches b WHERE b.policy_id=briefing_generation_policies.id AND b.status IN ('QUEUED','RUNNING','WAITING_DATA','WAITING_RESOURCE','WAITING_CAPABILITY')) ORDER BY checked_at NULLS FIRST,id LIMIT 20",UUID.class);}
-    private List<Source> sources(UUID tenant,UUID space){return db.query("""
+    private List<Source> sources(UUID tenant,UUID space){var sources=new ArrayList<>(db.query("""
         SELECT m.id,v.id version_id,v.filename,v.created_at,coalesce(k.status,'NOT_REQUESTED') parse_status FROM active_materials m
         JOIN material_versions v ON v.material_id=m.id AND v.number=m.current_version
         LEFT JOIN LATERAL(SELECT status FROM knowledge_runs WHERE version_id=v.id ORDER BY generation DESC LIMIT 1) k ON true
         WHERE m.tenant_id=? AND m.workspace_id=? AND m.in_library ORDER BY m.id LIMIT 1001
-        """,(r,n)->new Source(r.getObject(1,UUID.class),r.getObject(2,UUID.class),r.getString(3),r.getString("parse_status"),r.getTimestamp("created_at").toInstant()),tenant,space);}
-    private String fingerprint(List<Source> sources){return IdentityService.hash(json.writeValueAsString(sources.stream().map(s->List.of(s.materialId(),s.versionId())).toList()));}
+        """,(r,n)->new Source(r.getObject(1,UUID.class),r.getObject(2,UUID.class),r.getString(3),r.getString("parse_status"),r.getTimestamp("created_at").toInstant()),tenant,space));
+        sources.addAll(db.query("""
+          SELECT d.id,s.id snapshot_id,d.name,s.collected_at FROM business_datasets d JOIN dataset_snapshots s ON s.id=d.current_snapshot
+          WHERE d.tenant_id=? AND d.workspace_id=? AND d.status='ACTIVE' AND NOT d.scrubbed AND NOT s.scrubbed ORDER BY d.id LIMIT 1001
+          """,(r,n)->new Source(r.getObject(1,UUID.class),r.getObject(2,UUID.class),r.getString(3),"READY",r.getTimestamp(4).toInstant(),"DATASET"),tenant,space));
+        return sources.stream().sorted(Comparator.comparing(Source::kind).thenComparing(Source::materialId)).limit(1001).toList();
+    }
+    private String fingerprint(List<Source> sources){return IdentityService.hash(json.writeValueAsString(sources.stream().map(s->List.of(s.kind(),s.materialId(),s.versionId())).toList()));}
     private void waiting(UUID batch,String status,String reason){db.update("UPDATE briefing_generation_batches SET status=?,reason=? WHERE id=?",status,reason,batch);}
     private void finish(UUID batch,String status,String reason){db.update("UPDATE briefing_generation_batches SET status=?,reason=?,finished_at=? WHERE id=?",status,reason,time(clock.now()),batch);}
     @Transactional public void tick(UUID id){
@@ -141,7 +151,7 @@ public class BriefingGenerationService {
         }
         List<Source> sources=sources(tenant,space);String contextKey=contextKey(actor,tenant,space);
         String key=IdentityService.hash(fingerprint(sources)+contextKey);
-        Set<String> seen=new HashSet<>(db.queryForList("SELECT v->>'versionId' FROM briefing_generation_batches b CROSS JOIN LATERAL jsonb_array_elements(b.source_versions) v WHERE b.policy_id=? AND b.status IN ('SUCCEEDED','NO_NEW_CONTENT') AND coalesce(b.business_type,'AUTO')<>'INFO'",String.class,id));
+        Set<String> seen=new HashSet<>(db.queryForList("SELECT coalesce(v->>'snapshotId',v->>'versionId') FROM briefing_generation_batches b CROSS JOIN LATERAL jsonb_array_elements(b.source_versions) v WHERE b.policy_id=? AND b.status IN ('SUCCEEDED','NO_NEW_CONTENT') AND coalesce(b.business_type,'AUTO')<>'INFO'",String.class,id));
         Instant resumed=db.queryForObject("SELECT service_resumed_at FROM tenants WHERE id=?",(r,n)->r.getTimestamp(1)==null?null:r.getTimestamp(1).toInstant(),tenant);
         var unseen=sources.stream().filter(source->!seen.contains(source.versionId().toString()) && (resumed==null||source.changedAt().isAfter(resumed))).toList();
         if(Boolean.TRUE.equals(p.get("service_resume_pending"))){
@@ -162,7 +172,7 @@ public class BriefingGenerationService {
                   AND recovered.status IN ('SUCCEEDED','NO_NEW_CONTENT') AND recovered.finished_at>failed.finished_at))
                 """,Boolean.class,id,key);
             if(changed&&!failedSame){
-                boolean result=unseen.stream().anyMatch(source->completedPublication(source.versionId()));
+                boolean result=unseen.stream().anyMatch(source->!source.dataset()&&completedPublication(source.versionId()));
                 enqueue(id,p.get("data_key")==null?"INITIALIZATION":goalChanged?"CONTEXT_CHANGED":result?"RESULT_READY":"DATA_READY",goalChanged?"SUGGESTION":result?"RESULT":null,null);
             }
             else if(!sources.isEmpty()&&!newsSource.isBlank()&&agents.publicWebEnabled()&&(now.atZone(ZoneId.of("Asia/Shanghai")).getHour()>=9) && (p.get("info_day")==null||!((java.sql.Date)p.get("info_day")).toLocalDate().equals(now.atZone(ZoneId.of("Asia/Shanghai")).toLocalDate()))){
@@ -190,15 +200,16 @@ public class BriefingGenerationService {
         int tenantConcurrent=db.queryForObject("SELECT count(*) FROM briefing_generation_batches b JOIN conversation_tasks t ON t.id=b.task_id WHERE b.tenant_id=? AND t.status IN ('QUEUED','RUNNING')",Integer.class,tenant);
         if(used>=dailyLimit||concurrent>=1||tenantUsed>=48||tenantConcurrent>=2){waiting(batch,"WAITING_RESOURCE",used>=dailyLimit?"DAILY_RUN_LIMIT":tenantUsed>=48?"TENANT_DAILY_LIMIT":tenantConcurrent>=2?"TENANT_CONCURRENCY_LIMIT":"OWNER_CONCURRENCY_LIMIT");return;}
         // One complete topic per batch. Explicit bounded source selection is visible to the model and reader.
-        List<Source> selected=(info||unseen.isEmpty()?sources:unseen).stream().filter(s->!"RESULT".equals(type)||completedPublication(s.versionId())).sorted(Comparator.comparing(Source::changedAt,Comparator.reverseOrder()).thenComparing(Source::filename)).limit(3).toList();
+        List<Source> selected=(info||unseen.isEmpty()?sources:unseen).stream().filter(s->!"RESULT".equals(type)||!s.dataset()&&completedPublication(s.versionId())).sorted(Comparator.comparing(Source::changedAt,Comparator.reverseOrder()).thenComparing(Source::filename)).limit(3).toList();
         if(selected.isEmpty()){waiting(batch,"WAITING_DATA","RESULT_NOT_READY");return;}
         String previous=recent(actor,tenant,space);String prompt="系统智能画报生成。触发："+b.get("trigger_kind")+"。本批最多生成一张有独立价值的新卡。类型："+(type==null?"按证据选择 DATA、INSIGHT、SUGGESTION 或 RESULT":type)+"。"+
             (info?"先用 task_context profiles 读取当前企业和工作空间背景，再读取所选授权资料，分析当前企业主营业务、工作空间或项目目标和近期关注点，再从获准公开资讯源筛选与这些上下文有直接关系的资讯。卡片必须说明资讯与企业或项目的关联及价值，并标注原文网址、发布时间和检索时间。缺日期应明确未核实，不把旧文当今天新闻。没有相关资讯就说明暂无新内容。外部请求只允许配置的公开来源，不能把内部资料、人员或经营数值发送到公开搜索。": "仅根据本次固定的所选资料版本分析，不代表全部企业资料；部分解析时明确资料缺口，不能声称完整统计。选取范围："+selected.stream().map(Source::filename).toList()+"。")+
-            "优先调用 search_sources 空查询读取所选资料；最多两次针对性检索，选择一个资料完整的主题。工具调用前不要输出分析草稿，正文只在 deliver_briefing 中给出。计算参数只使用已返回的表头、单元格范围和来源 ID，不猜测参数。若是 CONTEXT_CHANGED 触发，先用 task_context profiles 读取当前企业、工作空间和个人的目标或洞察，区分已确认事实与推断。DATA 必须调用 compare_table，图表数值不可自行填写，其他类型无需调用表格工具。使用 deliver_briefing 交付。缺证据或与已有内容重复时直接说明暂无新内容，不凑卡。区分事实和推断，保留数据统计期间。已有内容仅用于避免重复，不作为新事实：\n"+previous;
+            "本批固定来源类型："+selected.stream().map(s->s.kind()+":"+s.filename()).toList()+"。文件调用 search_sources 空查询；数据集调用 task_context dataset_search 查询后，用 dataset_read 查看实际列与期间。最多两次针对性检索，选择一个资料完整的主题。工具调用前不要输出分析草稿，正文只在 deliver_briefing 中给出。计算参数只使用已返回的表头、单元格范围和来源 ID，不猜测参数。若是 CONTEXT_CHANGED 触发，先用 task_context profiles 读取当前企业、工作空间和个人的目标或洞察，区分已确认事实与推断。DATA 根据来源调用 compare_table 或 compare_dataset；数据库必须计算完整固定快照，不从分页样本推算汇总，图表数值不可自行填写，其他类型无需调用表格工具。使用 deliver_briefing 交付。缺证据或与已有内容重复时直接说明暂无新内容，不凑卡。区分事实和推断，保留数据统计期间。已有内容仅用于避免重复，不作为新事实：\n"+previous;
         if(prompt.length()>2000)prompt=prompt.substring(0,2000);
-        var detail=tasks.submitBriefing(actor,tenant,space,batch,prompt,info?newsSource:null,selected.stream().map(s->new TaskOriginals.Selection(s.materialId(),s.versionId())).toList());
+        var detail=tasks.submitBriefing(actor,tenant,space,batch,prompt,info?newsSource:null,selected.stream().filter(s->!s.dataset()).map(s->new TaskOriginals.Selection(s.materialId(),s.versionId())).toList());
         UUID task=detail.tasks().getLast().id();
-        db.update("UPDATE briefing_generation_batches SET task_id=?,status='RUNNING',reason=NULL,source_key=?,context_key=?,source_versions=?::jsonb,started_at=? WHERE id=?",task,key,contextKey,json.writeValueAsString(selected.stream().map(s->new TaskOriginals.Selection(s.materialId(),s.versionId())).toList()),time(now),batch);
+        db.update("UPDATE briefing_generation_batches SET task_id=?,status='RUNNING',reason=NULL,source_key=?,context_key=?,source_versions=?::jsonb,started_at=? WHERE id=?",task,key,contextKey,json.writeValueAsString(selected.stream().map(Source::selection).toList()),time(now),batch);
+        for(var source:selected)if(source.dataset())db.update("INSERT INTO briefing_dataset_selections(task_id,batch_id,dataset_id,snapshot_id) VALUES (?,?,?,?)",task,batch,source.materialId(),source.versionId());
         db.update("UPDATE briefing_generation_policies SET reason=NULL WHERE id=?",id);
     }
     private String contextKey(UUID actor,UUID tenant,UUID space){

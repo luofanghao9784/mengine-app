@@ -69,3 +69,6 @@ M7-A1 第七切片：新增 [Model Usage 1.0](engine-api/model-usage.schema.json
 
 
 数据快照比较：可选 `datasetComparisonVersion:1.0` 在已有 `datasetContextVersion:1.0` 基础上启用 `compare_dataset`；[计算契约](engine-api/dataset-comparison.schema.json)规定当前尝试固定快照、实际列名与平台完整十进制结果。调用前须有已授权读取记录。`briefing-delivery` 增加 `briefing-dataset-v1`，必需 `datasetSource` 与 `datasetBasis`，材料来源 `source` 为 null；旧文件/文本卡允许这两个字段缺省或 null。来源行数与比较纳入/排除行数必须相符，采集时间不替代业务覆盖时间。无新迁移，旧平台不声明能力时新引擎隐藏该工具；自动生成的数据库选数不在本切片完成范围。
+
+
+自动画报来源接续：系统 SELECTED 批次可在 bootstrap 返回 `selectedDatasets`，数据库工具只读取该批固定快照；普通所选文件任务仍拒绝数据库。新快照触发沿既有画报节奏，与取数频率独立。`briefing-text-v1` 的可选 `datasetSource` 现在允许实际已读快照元信息，`datasetBasis` 仍须缺省或 null；文本依据不代表执行汇总计算。原件 DATA 卡继续拒绝数据库来源混用。V67 固定系统选择并覆盖入队前后失效及清理，详见[实施记录](../docs/交接/管理端五批实施记录-2026-10-04.md)。

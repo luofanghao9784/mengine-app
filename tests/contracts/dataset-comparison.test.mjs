@@ -42,3 +42,19 @@ test('dataset card is a distinct source kind and requires explicit business cove
   confused.content.schemaVersion = 'briefing-data-v1';
   assert.equal(valid(confused), false);
 });
+
+test('text dataset insight retains source identity but cannot claim a chart calculation', async () => {
+  const valid = ajv.compile({ $ref: briefing.$id + '#/$defs/document' });
+  const doc = await load('fixtures/dataset-briefing.json');
+  Object.assign(doc.content, {
+    schemaVersion: 'briefing-text-v1',
+    businessType: 'INSIGHT',
+    chart: null,
+    calculationArtifactId: null,
+    calculationSha256: null,
+    datasetBasis: null,
+  });
+  assert.ok(valid(doc), JSON.stringify(valid.errors));
+  doc.content.datasetBasis = { groupColumn: '门店', periodColumn: '期间', matchedRows: 5, ignoredRows: 1 };
+  assert.equal(valid(doc), false);
+});

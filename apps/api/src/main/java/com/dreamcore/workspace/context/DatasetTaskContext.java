@@ -21,13 +21,15 @@ public class DatasetTaskContext {
           SELECT d.id,d.workspace_id,d.name,d.description,d.column_names,s.id snapshot_id,s.version,s.row_count,s.coverage_through,s.collected_at
           FROM business_datasets d JOIN workspace_members g ON g.tenant_id=d.tenant_id AND g.workspace_id=d.workspace_id AND g.account_id=?
           LEFT JOIN task_dataset_reads pin ON pin.task_id=? AND pin.attempt_number=? AND pin.dataset_id=d.id
-          JOIN dataset_snapshots s ON s.dataset_id=d.id AND s.id=coalesce(pin.snapshot_id,d.current_snapshot)
+          JOIN dataset_snapshots s ON s.dataset_id=d.id AND s.id=coalesce(pin.snapshot_id,
+            (SELECT pick.snapshot_id FROM briefing_dataset_selections pick WHERE pick.task_id=? AND pick.dataset_id=d.id AND NOT pick.invalidated),d.current_snapshot)
           WHERE d.tenant_id=? AND d.status='ACTIVE' AND NOT d.scrubbed AND NOT s.scrubbed
+           AND (?<>'SELECTED' OR EXISTS(SELECT 1 FROM briefing_dataset_selections pick WHERE pick.task_id=? AND pick.dataset_id=d.id AND pick.snapshot_id=s.id AND NOT pick.invalidated))
            AND (?='AUTHORIZED_LIBRARY' OR d.workspace_id=?::uuid) AND departure_content_readable(?,d.tenant_id,d.workspace_id)
            AND (?::uuid IS NULL OR d.id=?::uuid) AND (?::uuid IS NULL OR s.id=?::uuid)
            AND (?='' OR strpos(lower(d.name||' '||d.description),lower(?))>0)
           ORDER BY d.name,d.id LIMIT ? OFFSET ?
-          """,t.get("requested_by"),t.get("id"),t.get("attempt"),t.get("tenant_id"),t.get("source_scope"),t.get("workspace_id"),t.get("requested_by"),dataset,dataset,snapshot,snapshot,q,q,limit,offset);
+          """,t.get("requested_by"),t.get("id"),t.get("attempt"),t.get("id"),t.get("tenant_id"),t.get("source_scope"),t.get("id"),t.get("source_scope"),t.get("workspace_id"),t.get("requested_by"),dataset,dataset,snapshot,snapshot,q,q,limit,offset);
     }
     private void pin(Map<String,Object> t,Map<String,Object> d){
         access.require((UUID)t.get("requested_by"),(UUID)t.get("tenant_id"),(UUID)d.get("workspace_id"),false);
@@ -44,7 +46,7 @@ public class DatasetTaskContext {
     }
     public Object read(UUID task,TaskContextService.Request r){
         db.queryForList("SELECT id FROM conversation_tasks WHERE id=? FOR UPDATE",task);var t=task(task);
-        if("SELECTED".equals(t.get("source_scope")))return r.action().equals("dataset_search")?map("items",List.of(),"hasMore",false,"reason","SELECTED_ONLY"):map("unavailable",true,"reason","SELECTED_ONLY");
+        if("SELECTED".equals(t.get("source_scope")) && db.queryForObject("SELECT count(*) FROM briefing_dataset_selections WHERE task_id=? AND NOT invalidated",Integer.class,task)==0)return r.action().equals("dataset_search")?map("items",List.of(),"hasMore",false,"reason","SELECTED_ONLY"):map("unavailable",true,"reason","SELECTED_ONLY");
         int offset=r.offset()==null?0:r.offset();if(offset<0||offset>100000)throw IdentityException.invalid();
         if(r.action().equals("dataset_search")){
             String query=r.query()==null?"":r.query().strip();if(query.length()>200)throw IdentityException.invalid();

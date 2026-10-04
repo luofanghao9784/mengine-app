@@ -110,3 +110,20 @@ test('chart labels preserve exact decimals and missing is never zero', () => {
   assert.equal(formatBriefingNumber(null), '缺数据');
   assert.equal(formatBriefingNumber('0.00'), '0.00');
 });
+
+test('text insight may cite a dataset snapshot without claiming a calculation', () => {
+  const doc = JSON.parse(
+    readFileSync(new URL('../contracts/fixtures/dataset-briefing.json', import.meta.url), 'utf8'),
+  );
+  Object.assign(doc.content, {
+    schemaVersion: 'briefing-text-v1',
+    businessType: 'INSIGHT',
+    chart: null,
+    calculationArtifactId: null,
+    calculationSha256: null,
+    datasetBasis: null,
+  });
+  assert.ok(isBriefingDocument(doc));
+  doc.content.datasetSource.snapshotId = 'latest';
+  assert.equal(isBriefingDocument(doc), false);
+});

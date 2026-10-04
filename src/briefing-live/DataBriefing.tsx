@@ -55,6 +55,22 @@ export function DataBriefing({
                 <pre>{c.source?.scopeExcerpt}</pre>
               </details>
             )}
+            {c.datasetSource && (
+              <details>
+                <summary>数据依据</summary>
+                <p>
+                  {c.datasetSource.name} · v{c.datasetSource.version} · 快照共 {c.datasetSource.rowCount} 行
+                </p>
+                <p>
+                  采集于 {new Date(c.datasetSource.collectedAt).toLocaleString('zh-CN')}；
+                  {c.datasetSource.coverageThrough
+                    ? `业务覆盖截至 ${new Date(c.datasetSource.coverageThrough).toLocaleString('zh-CN')}`
+                    : '业务覆盖时间未提供'}
+                  。
+                </p>
+                <p>这是任务所读的固定数据版本；快照行数不代表逐行阅读或完整业务覆盖。</p>
+              </details>
+            )}
             <small>生成于 {new Date(c.generatedAt).toLocaleString('zh-CN')}；完整引用见来源卡片。</small>
           </>
         )}

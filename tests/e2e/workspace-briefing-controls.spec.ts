@@ -908,11 +908,17 @@ test('列表与全屏阅读卡片分别跟踪自己的标题边缘，返回顶�
 test('数据库画报在正式阅读页面展示固定版本与未知业务覆盖，撤权后清除内容', async ({ page }) => {
   const state = await readingConversation(page, datasetBriefing as BriefingDocument);
   const body = page.locator('[data-deck-id="briefing"]');
+  if (await body.getAttribute('data-needs-reveal')) {
+    await body.locator('h2').click();
+    await expect(body).not.toHaveAttribute('data-needs-reveal', 'true');
+  }
+  await body.getByRole('button', { name: '全屏查看画报卡片', exact: true }).click();
+  await expect(body.getByRole('button', { name: '退出来源全屏', exact: true })).toBeVisible();
   await body.getByText('资料、统计口径与计算依据', { exact: true }).click();
   await expect(body).toContainText('合成销售数据 · v2');
   await expect(body).toContainText('业务覆盖时间未提供');
   await expect(body).toContainText('采集时间不代表数据统计期间');
-  await expect(body).toContainText('纳入比较 5 行，其他期间 1 行不纳入比较');
+  await expect(body.getByText('纳入比较 5 行，其他期间 1 行不纳入比较', { exact: false })).toBeVisible();
   await body.getByText('查看完整对比数据', { exact: true }).click();
   await expect(body.getByRole('table')).toContainText('200.20');
   await page.screenshot({ path: '.local/dataset-briefing/desktop.png', fullPage: true });
@@ -929,4 +935,33 @@ test('数据库画报在正式阅读页面展示固定版本与未知业务覆�
   await page.evaluate(() => window.dispatchEvent(new Event('focus')));
   await expect(body.getByRole('table')).toHaveCount(0);
   await expect(body.getByText('合成销售数据 · v2', { exact: false })).toHaveCount(0);
+});
+
+test('数据库洞察画报显示版本依据，不显示未进行的图表计算', async ({ page }) => {
+  const document = structuredClone(datasetBriefing) as BriefingDocument;
+  Object.assign(document.content, {
+    schemaVersion: 'briefing-text-v1',
+    businessType: 'INSIGHT',
+    chart: null,
+    calculationArtifactId: null,
+    calculationSha256: null,
+    datasetBasis: null,
+  });
+  const state = await readingConversation(page, document);
+  const body = page.locator('[data-deck-id="briefing"]');
+  if (await body.getAttribute('data-needs-reveal')) {
+    await body.locator('h2').click();
+    await expect(body).not.toHaveAttribute('data-needs-reveal', 'true');
+  }
+  await body.getByRole('button', { name: '全屏查看画报卡片', exact: true }).click();
+  await expect(body.getByRole('button', { name: '退出来源全屏', exact: true })).toBeVisible();
+  await body.getByText('数据依据', { exact: true }).click();
+  await expect(body).toContainText('合成销售数据 · v2');
+  await expect(body.getByText('快照行数不代表逐行阅读', { exact: false })).toBeVisible();
+  await expect(body.getByRole('table')).toHaveCount(0);
+  await expect(body.locator('.data-briefing-chart')).toHaveCount(0);
+  await page.screenshot({ path: '.local/dataset-briefing/insight.png', fullPage: true });
+  state.restrict();
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect(body.getByText('数据依据', { exact: true })).toHaveCount(0);
 });
