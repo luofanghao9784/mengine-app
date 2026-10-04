@@ -7,7 +7,6 @@ import { adminHref } from '../admin/navigation';
 import { RequestPending, useRequestLock } from '../shared/request-guard';
 import { LocalInviteLink } from '../identity/LocalInviteLink';
 import { DepartureStatus } from '../departure/DepartureStatus';
-import { RecoveryForm } from '../governance/RecoveryForm';
 import { UsagePanel } from '../operations/UsagePanel';
 import { useRemote, Failure, Loading, Pager, useSubmission, SubmitError, FormActions } from '../shared/admin';
 import { Badge, Button, Empty, Field, Modal, PageActions, PageTitle } from '../shared/ui';
@@ -236,7 +235,6 @@ function TenantView({
   const [attempt, setAttempt] = useState(0);
   const [action, setAction] = useState<'status' | 'invite' | 'revoke'>();
   const [notice, setNotice] = useState('');
-  const [recoveryOpen, setRecoveryOpen] = useState(false);
   const detail = useRemote((signal) => platformClient.detail(id, signal), [id, attempt]);
   const reload = () => {
     setAction(undefined);
@@ -387,15 +385,7 @@ function TenantView({
                   {value.tenant.status === 'ACTIVE' ? '暂停服务' : '恢复服务'}
                 </Button>
               </div>
-              <div className="platform-management-row">
-                <div>
-                  <strong>负责人恢复受理</strong>
-                  <p>负责人无法履职或身份未核实时，登记申请并等待核验。</p>
-                </div>
-                <Button variant="ghost" onClick={() => setRecoveryOpen(true)} disabled={pending}>
-                  登记申请
-                </Button>
-              </div>
+
             </section>
           </>
         )}
@@ -430,17 +420,7 @@ function TenantView({
           />
         </Modal>
       )}
-      {recoveryOpen && (
-        <Modal
-          className="platform-management-modal"
-          title="负责人恢复受理"
-          onClose={() => {
-            if (!pending) setRecoveryOpen(false);
-          }}
-        >
-          <RecoveryForm tenant={id} platform />
-        </Modal>
-      )}
+
     </div>
   );
 }
