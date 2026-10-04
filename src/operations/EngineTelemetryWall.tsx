@@ -161,6 +161,8 @@ function Snapshot({
     width: number;
     height: number;
     paths: Record<string, string>;
+    feedback: string;
+    returnFlow: string;
   }>();
   useLayoutEffect(() => {
     if (!compact || !reactor.current) return;
@@ -178,11 +180,24 @@ function Snapshot({
           return [g.id, g.id === 'output' ? `M${x} ${y}H${cx}V${cy}` : `M${cx} ${cy}V${y}H${x}`];
         }),
       );
-      setGeometry({ width: bounds.width, height: bounds.height, paths });
+      const hub = root.querySelector('.engine-learning-hub')!.getBoundingClientRect();
+      const hx = hub.left + hub.width / 2 - bounds.left;
+      const hy = hub.top - bounds.top - 16;
+      const sy = orb.bottom - bounds.top + 18;
+      const elbow = hy - 24;
+      setGeometry({
+        width: bounds.width,
+        height: bounds.height,
+        paths,
+        feedback: `M${x} ${sy}V${elbow}H${hx}V${hy}`,
+        returnFlow: `M${hx} ${hy}V${elbow}H${x}V${sy}`,
+      });
     };
     const observer = new ResizeObserver(measure);
     observer.observe(root);
-    root.querySelectorAll('.engine-bank, .engine-orb').forEach((node) => observer.observe(node));
+    root
+      .querySelectorAll('.engine-bank, .engine-orb, .engine-learning-diagram')
+      .forEach((node) => observer.observe(node));
     measure();
     return () => observer.disconnect();
   }, [compact]);
@@ -308,6 +323,22 @@ function Snapshot({
             <circle cx="500" cy="230" r="50" fill="none" stroke="currentColor" strokeDasharray="3 8" />
           )}
         </svg>
+        {compact && geometry && (
+          <svg
+            className="engine-coupling-wire"
+            viewBox={`0 0 ${geometry.width} ${geometry.height}`}
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
+            <path d={geometry.feedback} fill="none" stroke="#a98cda" strokeOpacity="0.45" strokeWidth="1.5" />
+            <circle className="engine-transfer-packet" r="3" fill="#73dcee">
+              <animateMotion dur="6s" repeatCount="indefinite" path={geometry.feedback} />
+            </circle>
+            <circle className="engine-transfer-packet" r="3" fill="#d0adff">
+              <animateMotion dur="6s" begin="-3s" repeatCount="indefinite" path={geometry.returnFlow} />
+            </circle>
+          </svg>
+        )}
         {groups.map((g) => {
           const list = rows.filter((c) => (g.codes as readonly string[]).includes(c.code));
           const count = sum(list, 'running');
@@ -411,7 +442,13 @@ function Snapshot({
                     strokeWidth="1.5"
                     strokeDasharray="28 12 3 15"
                   />
-                  <circle r="51" fill="#21283d" stroke="#ad91dc66" strokeWidth="2" />
+                  <circle
+                    className="engine-learning-hub"
+                    r="51"
+                    fill="#21283d"
+                    stroke="#ad91dc66"
+                    strokeWidth="2"
+                  />
                   <text textAnchor="middle" y="-19" fill="#baa0d5" fontSize="10" letterSpacing="2">
                     EVOLVE
                   </text>

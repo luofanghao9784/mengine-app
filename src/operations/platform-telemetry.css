@@ -1067,6 +1067,15 @@
 }
 
 /* Independent animated evolution circuit; illustrative while disconnected. */
+.admin-platform .engine-coupling-wire {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  pointer-events: none;
+  overflow: visible;
+}
 .admin-platform .engine-learning-demo {
   position: relative;
 }
