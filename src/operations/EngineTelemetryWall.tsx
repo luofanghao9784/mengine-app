@@ -371,47 +371,85 @@ function Snapshot({
             <span className="engine-unavailable">未启用</span>
           </div>
           {compact ? (
-            <div className="engine-learning-layout">
-              <div className="engine-learning-intro">
-                <GitBranch size={34} strokeWidth={1.2} aria-hidden="true" />
-                <div>
-                  <strong>持续改进闭环</strong>
-                  <p>独立执行器尚未接通</p>
-                </div>
-              </div>
+            <div className="engine-learning-demo">
               <svg
                 className="engine-learning-diagram"
-                viewBox="0 0 620 130"
+                viewBox="0 0 1000 190"
                 role="img"
-                aria-label="预留自进化流程：发现、候选、验证、采用，形成循环；当前未启用"
+                aria-label="自进化流程演示：进化核心连接发现、候选、验证、采用并循环返回；独立执行器未启用"
               >
-                <path d="M65 52H555V110H65V52" fill="none" stroke="#af95de55" strokeWidth="1.5" />
+                <path
+                  d="M200 95H255V60H860V154H255V95H200"
+                  fill="none"
+                  stroke="#ad91dc55"
+                  strokeWidth="1.5"
+                />
+                <circle className="engine-transfer-packet" r="3" fill="#d3b4ff">
+                  <animateMotion path="M200 95H255V60H860V154H255V95H200" dur="8s" repeatCount="indefinite" />
+                </circle>
+                <circle className="engine-transfer-packet" r="2" fill="#e8d7ff">
+                  <animateMotion
+                    path="M200 95H255V60H860V154H255V95H200"
+                    dur="8s"
+                    begin="-4s"
+                    repeatCount="indefinite"
+                  />
+                </circle>
+                <g transform="translate(145 95)">
+                  <circle
+                    className="engine-learning-halo"
+                    r="66"
+                    fill="none"
+                    stroke="#ad91dc33"
+                    strokeWidth="1"
+                  />
+                  <circle
+                    className="engine-learning-orbit"
+                    r="59"
+                    fill="none"
+                    stroke="#c4a0ef"
+                    strokeWidth="1.5"
+                    strokeDasharray="28 12 3 15"
+                  />
+                  <circle r="51" fill="#21283d" stroke="#ad91dc66" strokeWidth="2" />
+                  <text textAnchor="middle" y="-19" fill="#baa0d5" fontSize="10" letterSpacing="2">
+                    EVOLVE
+                  </text>
+                  <GitBranch x="-14" y="-8" size={28} color="#d4b8f4" strokeWidth={1.3} aria-hidden="true" />
+                  <text textAnchor="middle" y="35" fill="#d4b8f4" fontSize="11">
+                    进化核心
+                  </text>
+                </g>
                 {[
                   ['发现', '运行反馈'],
                   ['候选', '改进方案'],
                   ['验证', '效果核验'],
                   ['采用', '经验更新'],
                 ].map(([label, caption], i) => (
-                  <g key={label} transform={`translate(${65 + i * 163} 52)`}>
-                    <circle r="25" fill="#24283e" stroke="#ad91dc77" />
-                    <text textAnchor="middle" y="4" fill="#d2bce9" fontSize="12">
+                  <g
+                    className="engine-learning-stage"
+                    key={label}
+                    transform={`translate(${350 + i * 170} 60)`}
+                    style={{ '--stage-delay': `${i * 2}s` } as CSSProperties}
+                  >
+                    <rect x="-65" y="-32" width="130" height="64" rx="10" fill="#24283e" stroke="#ad91dc55" />
+                    <text x="-49" y="-12" fill="#a990c6" fontSize="9">
+                      0{i + 1}
+                    </text>
+                    <text textAnchor="middle" y="-2" fill="#e0d0f2" fontSize="14">
                       {label}
                     </text>
-                    <text textAnchor="middle" y="44" fill="#a79bb8" fontSize="10">
+                    <text textAnchor="middle" y="18" fill="#aa9bb9" fontSize="10">
                       {caption}
                     </text>
                   </g>
                 ))}
-                <path d="M65 110l7 -5v10z" fill="#af95de77" />
+                <path d="M485 154l8 -4v8z" fill="#ad91dc99" />
+                <text x="600" y="177" textAnchor="middle" fill="#a990c6" fontSize="10">
+                  反馈回路
+                </text>
               </svg>
-              <div className="engine-learning-note">
-                <span>流程预留</span>
-                <p>
-                  经验提炼与清洗
-                  <br />
-                  仍计入处理区
-                </p>
-              </div>
+              <span className="engine-learning-demo-label">流程演示 · 独立执行器未接通</span>
             </div>
           ) : (
             <>

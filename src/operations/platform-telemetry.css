@@ -1001,45 +1001,6 @@
   background:
     radial-gradient(ellipse at 50% 50%, #7953ab20, transparent 65%), linear-gradient(110deg, #25253c, #191e31);
 }
-.admin-platform .engine-learning-layout {
-  display: grid;
-  grid-template-columns: 220px minmax(0, 1fr) 150px;
-  gap: 24px;
-  align-items: center;
-}
-.admin-platform .engine-learning-intro {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  color: #bca0e2;
-}
-.admin-platform .engine-learning-intro strong {
-  color: #d9caee;
-  font-size: 14px;
-  font-weight: 500;
-}
-.admin-platform .engine-learning-intro p {
-  margin-top: 8px;
-  font-size: 11px;
-  color: #a79bb8;
-}
-.admin-platform .engine-learning-diagram {
-  width: 100%;
-  max-height: 125px;
-}
-.admin-platform .engine-learning-note {
-  border-left: 1px solid #ad91dc25;
-  padding-left: 20px;
-  color: #a79bb8;
-  font-size: 11px;
-}
-.admin-platform .engine-learning-note span {
-  color: #bca0e2;
-}
-.admin-platform .engine-learning-note p {
-  margin-top: 10px;
-  line-height: 1.8;
-}
 @media (prefers-reduced-motion: reduce) {
   .admin-platform .engine-input-track i {
     transition: none;
@@ -1103,4 +1064,61 @@
 }
 .admin-platform.admin-engine-fullscreen .engine-reactor {
   padding-top: 12px;
+}
+
+/* Independent animated evolution circuit; illustrative while disconnected. */
+.admin-platform .engine-learning-demo {
+  position: relative;
+}
+.admin-platform .engine-learning-diagram {
+  display: block;
+  width: 100%;
+  max-height: 205px;
+}
+.admin-platform .engine-learning-demo-label {
+  display: block;
+  text-align: right;
+  color: #a990c6;
+  font-size: 10px;
+  margin-top: 2px;
+}
+.admin-platform .engine-learning-orbit {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: engine-orbit-turn 20s linear infinite reverse;
+}
+.admin-platform .engine-learning-halo {
+  animation: engine-learning-halo 4s ease-in-out infinite;
+}
+.admin-platform .engine-learning-stage rect {
+  animation: engine-learning-stage 8s ease-in-out infinite;
+  animation-delay: var(--stage-delay);
+}
+@keyframes engine-learning-stage {
+  0%,
+  20%,
+  100% {
+    stroke: #ad91dc55;
+    fill: #24283e;
+  }
+  8% {
+    stroke: #d3b4ff;
+    fill: #3b3054;
+  }
+}
+@keyframes engine-learning-halo {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .admin-platform .engine-learning-orbit,
+  .admin-platform .engine-learning-halo,
+  .admin-platform .engine-learning-stage rect {
+    animation: none;
+  }
 }
