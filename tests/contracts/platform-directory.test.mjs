@@ -13,3 +13,11 @@ test('directory metadata excludes credentials and content and all routes require
  assert.ok(valid(body));for(const key of ['passwordHash','conversation','workspaceContent'])assert.equal(valid({...body,[key]:'not allowed'}),false);
  for(const verbs of Object.values(spec.paths))for(const operation of Object.values(verbs))assert.deepEqual(operation.security,[{platformSessionCookie:[]}]);
 });
+test('global records contain only management metadata and bounded authenticated filters',()=>{
+ const valid=schema('ManagementRecord'), row={id:1,category:'SECURITY',action:'PLATFORM_LOGIN',outcome:'SUCCESS',actorId:null,actorName:null,targetId:null,targetName:null,tenantId:null,tenantName:null,createdAt:'2026-10-04T00:00:00Z',internalReason:null,publicReason:null};
+ assert.ok(valid(row));for(const key of ['password','conversation','content','token'])assert.equal(valid({...row,[key]:'private'}),false);
+ assert.equal(valid({...row,category:'CUSTOMER_ACTIVITY'}),false);
+ const op=spec.paths['/api/platform-admin/v1/records'].get;
+ assert.equal(op.parameters.find(p=>p.name==='limit').schema.maximum,100);
+ assert.equal(op.parameters.find(p=>p.name==='offset').schema.minimum,0);
+});

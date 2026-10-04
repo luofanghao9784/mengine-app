@@ -339,3 +339,12 @@ button.admin-directory-row:hover {
 }
 
 .space-owner-form p { overflow-wrap: anywhere; }
+
+.admin-credentials { max-width: 620px; }
+.admin-account-record > a { display: block; margin-top: 8px; overflow-wrap: anywhere; }
+
+.admin-records .platform-pagination > span { white-space: nowrap; }
+@media (max-width: 600px) {
+  .admin-records > .admin-section-heading { display: block; }
+  .admin-records > .admin-section-heading .platform-filters { margin-top: 16px; }
+}

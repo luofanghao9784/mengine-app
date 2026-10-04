@@ -92,6 +92,27 @@ public class PlatformIdentity {
         audit.record(actor,null,"PLATFORM_LOGIN",actor,"SUCCESS");
         return me(actor);
     }
+    @Transactional
+    public void changePassword(UUID actor,String currentPassword,String password,HttpServletRequest request,HttpServletResponse response) {
+        IdentityService.password(password);
+        if(!throttle.allow("platform-password:"+actor,"platform-password:"+request.getRemoteAddr())) throw new IdentityException(429,"LOGIN_THROTTLED");
+        // Same order as staff changes: revoked credentials cannot win a concurrent password change.
+        db.queryForList("SELECT pg_advisory_xact_lock(hashtextextended('platform-staff-management',0))");
+        db.queryForList("SELECT account_id FROM platform_accounts WHERE account_id=? FOR UPDATE",actor);
+        identities.platform(actor);
+        Session session=read(request);
+        if(session==null || !actor.equals(session.actor())) throw new IdentityException(401,"AUTHENTICATION_REQUIRED");
+        String encoded=db.queryForObject("SELECT password_hash FROM platform_accounts WHERE account_id=?",String.class,actor);
+        if(currentPassword==null || currentPassword.length()>128 || !passwords.matches(currentPassword,encoded)) {
+            audit.denial(actor,"PLATFORM_PASSWORD_CHANGE_FAILED");
+            throw new IdentityException(400,"CURRENT_PASSWORD_INCORRECT");
+        }
+        if(passwords.matches(password,encoded)) throw new IdentityException(400,"PASSWORD_UNCHANGED");
+        db.update("UPDATE platform_accounts SET password_hash=?,credential_version=credential_version+1 WHERE account_id=?",passwords.encode(password),actor);
+        db.update("DELETE FROM platform_sessions WHERE account_id=?",actor);
+        audit.record(actor,null,"PLATFORM_PASSWORD_CHANGE",actor,"SUCCESS");
+        cookie(request,response,"",0);
+    }
     static String loginName(String value) {
         return value!=null && value.contains("@")?IdentityService.email(value):PhoneNumbers.normalize(value);
     }

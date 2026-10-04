@@ -4217,6 +4217,65 @@
           }
         ]
       }
+    },
+    "/api/platform-admin/v1/auth/password": {
+      "post": {
+        "operationId": "changeOwnPlatformPassword",
+        "summary": "修改本人独立总台密码，成功后使其全部总台会话失效，不影响客户会话",
+        "security": [
+          {
+            "platformSessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "currentPassword",
+                  "password"
+                ],
+                "properties": {
+                  "currentPassword": {
+                    "type": "string",
+                    "maxLength": 128
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 6,
+                    "maxLength": 128
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "改密完成，请重新登录总台"
+          },
+          "400": {
+            "description": "当前密码不正确、新旧密码相同或密码格式无效"
+          },
+          "401": {
+            "description": "会话已失效"
+          },
+          "403": {
+            "description": "CSRF 或权限不符合"
+          },
+          "429": {
+            "description": "请稍后重试"
+          }
+        }
+      }
     }
   },
   "components": {

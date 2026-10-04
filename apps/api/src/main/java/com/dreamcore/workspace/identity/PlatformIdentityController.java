@@ -20,6 +20,11 @@ public class PlatformIdentityController {
     @PostMapping("/login") public IdentityService.Me login(@Valid @RequestBody Login body,HttpServletRequest request,HttpServletResponse response) {
         return identities.login(body.username(),body.password(),request,response);
     }
+    public record Password(@NotNull @Size(max=128) String currentPassword,@NotNull @Size(min=6,max=128) String password) {}
+    @PostMapping("/password") @ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT)
+    public void password(Authentication auth,@Valid @RequestBody Password body,HttpServletRequest request,HttpServletResponse response) {
+        identities.changePassword(IdentityController.actor(auth),body.currentPassword(),body.password(),request,response);
+    }
     @GetMapping("/me") public IdentityService.Me me(Authentication auth) { return identities.me(IdentityController.actor(auth)); }
     @PostMapping("/logout") @ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT)
     public void logout(HttpServletRequest request,HttpServletResponse response) { identities.logout(request,response); }

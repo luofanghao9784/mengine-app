@@ -227,6 +227,88 @@
           }
         }
       }
+    },
+    "/api/platform-admin/v1/records": {
+      "get": {
+        "operationId": "platformManagementRecords",
+        "security": [
+          {
+            "platformSessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "category",
+            "schema": {
+              "enum": [
+                "",
+                "ENTERPRISE",
+                "ACCOUNT",
+                "STAFF",
+                "SECURITY"
+              ],
+              "default": ""
+            }
+          },
+          {
+            "in": "query",
+            "name": "outcome",
+            "schema": {
+              "enum": [
+                "",
+                "SUCCESS",
+                "DENIED"
+              ],
+              "default": ""
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000,
+              "default": 0
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 21
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "仅平台管理事件，排除客户工作内容与动态",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ManagementRecord"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "筛选或分页无效"
+          },
+          "401": {
+            "description": "总台独立登录失效"
+          },
+          "403": {
+            "description": "无平台管理资格"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -467,6 +549,103 @@
           "status",
           "reason"
         ]
+      },
+      "ManagementRecord": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "category",
+          "action",
+          "outcome",
+          "createdAt",
+          "actorId",
+          "targetId",
+          "tenantId",
+          "actorName",
+          "targetName",
+          "tenantName",
+          "internalReason",
+          "publicReason"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "category": {
+            "enum": [
+              "ENTERPRISE",
+              "ACCOUNT",
+              "STAFF",
+              "SECURITY"
+            ]
+          },
+          "action": {
+            "type": "string"
+          },
+          "outcome": {
+            "enum": [
+              "SUCCESS",
+              "DENIED"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actorId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "targetId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "actorName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "targetName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tenantName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "internalReason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "publicReason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
       }
     }
   }

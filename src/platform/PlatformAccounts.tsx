@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { uuid } from '../identity/client';
 import { ArrowLeft, Search, Users, RefreshCw } from 'lucide-react';
 import { Button, Badge, Empty, Field, Modal, PageActions } from '../shared/ui';
 import { Failure, Loading, Pager, SubmitError, useRemote, useSubmission } from '../shared/admin';
@@ -7,6 +8,8 @@ import { useRequestLock } from '../shared/request-guard';
 import { directoryClient as api, type CustomerAccount } from './directory-client';
 
 export function PlatformAccounts() {
+  const suppliedAccount = new URLSearchParams(location.hash.slice(1)).get('account');
+  const routeAccount = uuid(suppliedAccount) ? suppliedAccount : null;
   const [query, setQuery] = useViewState('platform', 'accounts:query', '', textState);
   const [draft, setDraft] = useState(query);
   const [status, setStatus] = useViewState('platform', 'accounts:status', '', textState);
@@ -18,7 +21,17 @@ export function PlatformAccounts() {
     (signal) => api.list(query, status, page * 20, signal),
     [query, status, page, attempt],
   );
-  if (selected) return <AccountDetail id={selected} close={() => setSelected('')} changed={refresh} />;
+  if (routeAccount || selected)
+    return (
+      <AccountDetail
+        id={routeAccount || selected}
+        close={() => {
+          setSelected('');
+          if (routeAccount) location.hash = 'admin=accounts';
+        }}
+        changed={refresh}
+      />
+    );
   return (
     <section className="admin-section">
       <PageActions>

@@ -75,7 +75,10 @@ export const directoryClient = {
       requestId,
     }),
   revokeStaff: (id: string, requestId: string, expectedVersion: number) =>
-    request(`/api/platform-admin/v1/staff/${id}/revoke`, 'POST', (v): v is null => v === null, { requestId }),
+    request(`/api/platform-admin/v1/staff/${id}/revoke`, 'POST', (v): v is null => v === null, {
+      requestId,
+      expectedVersion,
+    }),
   localLink: (id: string) =>
     request(
       `/api/platform-admin/v1/staff/invitations/${id}/local-link`,

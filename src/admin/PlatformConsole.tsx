@@ -5,7 +5,7 @@ import { AdminShell, useAdminRoute } from './AdminShell';
 import { AdminOverview } from './AdminOverview';
 import { PlatformHome } from '../platform/PlatformHome';
 import { PlatformAccounts } from '../platform/PlatformAccounts';
-import { PlatformStaffList } from '../platform/PlatformStaff';
+import { PlatformSettings } from '../platform/PlatformSettings';
 import { OperationsPanel } from '../operations/OperationsPanel';
 import { MethodWorkbench } from '../methods/MethodWorkbench';
 
@@ -32,7 +32,7 @@ export function PlatformConsole({ logout }: { logout: () => void }) {
       ) : page === 'capabilities' ? (
         <MethodWorkbench />
       ) : page === 'settings' ? (
-        <PlatformStaffList />
+        <PlatformSettings hash={hash} />
       ) : (
         <section className="admin-section">
           <Empty

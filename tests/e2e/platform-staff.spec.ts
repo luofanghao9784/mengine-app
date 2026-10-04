@@ -57,6 +57,7 @@ test('staff invite and qualification actions stay within settings and separate i
     }
     if (path.endsWith('/local-link')) return json({ path: '/platform-admin/#invite=' + token });
     if (path.endsWith(`/staff/${id(2)}/revoke`)) {
+      expect(route.request().postDataJSON().expectedVersion).toBe(1);
       revoked = true;
       return route.fulfill({ status: 204 });
     }

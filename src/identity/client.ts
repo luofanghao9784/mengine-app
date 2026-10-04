@@ -40,6 +40,8 @@ export class IdentityError extends Error {
       AUTHENTICATION_REQUIRED: '登录已失效，请重新登录。',
       ACCESS_DENIED: '当前账号没有访问权限，或页面验证已过期，请刷新后重试。',
       LOGIN_THROTTLED: '尝试次数较多，请稍后再试。',
+      CURRENT_PASSWORD_INCORRECT: '当前密码不正确。',
+      PASSWORD_UNCHANGED: '新密码需要与当前密码不同。',
       PASSWORD_POLICY: '密码需要 6–128 个字符。',
       INVALID_REQUEST: '请检查填写内容。',
       KNOWLEDGE_NOT_FOUND: '此来源不存在，或你已没有查看权限。',

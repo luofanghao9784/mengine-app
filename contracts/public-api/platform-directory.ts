@@ -45,3 +45,20 @@ export interface StaffInvitePreview {
   loginName: string;
   existingAccount: boolean;
 }
+
+/** Allowlisted platform management metadata; excludes customer content/activity. */
+export interface ManagementRecord {
+  id: number;
+  category: 'ENTERPRISE' | 'ACCOUNT' | 'STAFF' | 'SECURITY';
+  action: string;
+  outcome: 'SUCCESS' | 'DENIED';
+  actorId: string | null;
+  actorName: string | null;
+  targetId: string | null;
+  targetName: string | null;
+  tenantId: string | null;
+  tenantName: string | null;
+  createdAt: string;
+  internalReason: string | null;
+  publicReason: string | null;
+}
