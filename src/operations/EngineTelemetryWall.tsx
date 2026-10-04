@@ -205,21 +205,25 @@ function Snapshot({
           快照 {time(value.checkedAt)} · 可见时每 {compact ? 3 : 15} 秒更新
         </span>
       </div>
-      <dl className="engine-totals">
-        {[
-          ['登记执行中', running],
-          ['排队', sum(rows, 'queued')],
-          ['等待 / 部分完成', sum(rows, 'waiting')],
-          ['结果待核对', sum(rows, 'unknown')],
-          ['保留的失败 / 中断', sum(rows, 'failed')],
-        ].map(([label, count]) => (
-          <div key={label} data-alert={label === '保留的失败 / 中断' && Number(count) > 0 ? true : undefined}>
-            <dt>{label}</dt>
-            <dd>{n(Number(count))}</dd>
-          </div>
-        ))}
-      </dl>
-      {compact && <p className="engine-scope-note">仅统计已接入的运行记录；保留异常可能包含历史尝试。</p>}
+      {!compact && (
+        <dl className="engine-totals">
+          {[
+            ['登记执行中', running],
+            ['排队', sum(rows, 'queued')],
+            ['等待 / 部分完成', sum(rows, 'waiting')],
+            ['结果待核对', sum(rows, 'unknown')],
+            ['保留的失败 / 中断', sum(rows, 'failed')],
+          ].map(([label, count]) => (
+            <div
+              key={label}
+              data-alert={label === '保留的失败 / 中断' && Number(count) > 0 ? true : undefined}
+            >
+              <dt>{label}</dt>
+              <dd>{n(Number(count))}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
       <div className="engine-reactor">
         <svg className="engine-wires" viewBox="0 0 1000 460" preserveAspectRatio="none" aria-hidden="true">
           {groups.map((g, i) => (
@@ -229,10 +233,10 @@ function Snapshot({
               d={
                 compact
                   ? g.id === 'input'
-                    ? 'M300 230H355'
+                    ? 'M165 255L500 80'
                     : g.id === 'output'
-                      ? 'M645 230H700'
-                      : ''
+                      ? 'M500 80L835 255'
+                      : 'M500 80V255'
                   : g.id === 'input'
                     ? 'M330 105H390L500 230'
                     : g.id === 'process'
@@ -276,8 +280,7 @@ function Snapshot({
                   <small>登记执行中</small>
                 </strong>
               </div>
-              <div className={compact && g.id === 'process' ? 'engine-processing-body' : undefined}>
-                {compact && g.id === 'process' && core}
+              <div>
                 <div className="engine-channels">
                   {list.map((c) => (
                     <div key={c.code} className="engine-channel">
@@ -305,7 +308,7 @@ function Snapshot({
             </section>
           );
         })}
-        {!compact && core}
+        {core}
         <section className="engine-bank engine-evolution" aria-label="自进化运行状态">
           <div className="engine-bank-heading">
             <div>
