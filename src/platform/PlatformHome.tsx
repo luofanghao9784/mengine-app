@@ -1,3 +1,4 @@
+import { EnterpriseOverview } from './EnterpriseOverview';
 import { PlatformAccounts } from './PlatformAccounts';
 import { useContext, useEffect, useState } from 'react';
 import { ArrowLeft, Building2, ChevronRight, Plus, Send } from 'lucide-react';
@@ -20,7 +21,7 @@ import '../governance/governance.css';
 import './platform.css';
 import { ownerStateLabel } from '../admin/platform-attention';
 
-const statusLabel = (s: string) => (s === 'ACTIVE' ? '正常' : '已暂停');
+const statusLabel = (s: string) => (s === 'ACTIVE' ? '运行中' : '已暂停');
 const invitationLabel: Record<string, string> = {
   PENDING: '等待接受邀请',
   ACCEPTED: '已接受邀请',
@@ -261,7 +262,9 @@ function TenantView({
           <div className="platform-enterprise-heading-text">
             <h1>{value.tenant.name}</h1>
           </div>
-          <Badge blue={value.tenant.status === 'ACTIVE'}>{statusLabel(value.tenant.status)}</Badge>
+          <span className={`badge ${value.tenant.status === 'ACTIVE' ? 'platform-running-badge' : ''}`}>
+            {statusLabel(value.tenant.status)}
+          </span>
         </div>
       </PageTitle>
       {notice && (
@@ -271,7 +274,7 @@ function TenantView({
       )}
       <nav className="platform-detail-nav" aria-label="企业详情内容">
         {[
-          ['basic', '基本信息'],
+          ['basic', '企业概览'],
           ['accounts', '企业账号'],
           ['usage', '运行与用量'],
           ['records', '管理记录'],
@@ -290,7 +293,7 @@ function TenantView({
         ))}
       </nav>
       <section
-        className="access-panel platform-enterprise-detail platform-enterprise-redesign"
+        className={`platform-enterprise-detail platform-enterprise-redesign ${['accounts', 'usage', 'records'].includes(tab) ? 'access-panel' : 'platform-overview-layout'}`}
         aria-label="企业详情"
       >
         {tab === 'accounts' ? (
@@ -314,20 +317,7 @@ function TenantView({
                 <p className="muted">内部处理备注：{value.serviceChange.internalReason}</p>
               </section>
             )}
-            <dl className="platform-facts">
-              <div>
-                <dt>开通时间</dt>
-                <dd>{time(value.createdAt)}</dd>
-              </div>
-              <div>
-                <dt>有效成员</dt>
-                <dd>{value.activeMemberCount}</dd>
-              </div>
-              <div>
-                <dt>空间数量</dt>
-                <dd>{value.workspaceCount}</dd>
-              </div>
-            </dl>
+            <EnterpriseOverview detail={value} revision={attempt} hash={hash} />
             {invitation?.status !== 'ACCEPTED' && (
               <details className="platform-detail-section platform-invite-history" open>
                 <summary>
@@ -385,7 +375,6 @@ function TenantView({
                   {value.tenant.status === 'ACTIVE' ? '暂停服务' : '恢复服务'}
                 </Button>
               </div>
-
             </section>
           </>
         )}
@@ -420,7 +409,6 @@ function TenantView({
           />
         </Modal>
       )}
-
     </div>
   );
 }

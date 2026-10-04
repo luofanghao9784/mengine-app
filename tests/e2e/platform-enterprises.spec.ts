@@ -179,6 +179,6 @@ test('service suspension and resume require separate internal and public reasons
   await resume.getByLabel('内部处理备注').fill('核对完成');
   await resume.getByLabel('企业可见说明').fill('服务已恢复');
   await resume.getByRole('button', { name: '确认恢复服务' }).click();
-  await expect(page.getByText('正常', { exact: true })).toBeVisible();
+  await expect(page.getByText('运行中', { exact: true })).toBeVisible();
   expect(writes[1].body.expectedVersion).toBe(1);
 });

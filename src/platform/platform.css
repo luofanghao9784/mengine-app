@@ -726,3 +726,33 @@
 .platform-invitation-record { padding-bottom: 20px; margin-bottom: 20px; border-bottom: 1px solid var(--line); }
 .platform-invitation-record > div { display: flex; align-items: center; gap: 12px; }
 .platform-invitation-record p { margin: 8px 0; }
+
+.platform-running-badge { color: #16804a; background: #e7f6ed; }
+.admin-platform .platform-detail-back { width: 44px; height: 44px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.admin-platform .platform-detail-back svg { width: 22px; height: 22px; }
+.admin-platform .platform-detail-back:hover { background: var(--soft); color: var(--accent); }
+.admin-platform .platform-enterprise-page .platform-overview-layout { padding: 0; background: transparent; border: 0; }
+.enterprise-overview-cards { display: grid; gap: 20px; }
+.enterprise-info-card, .enterprise-metric-card, .enterprise-usage-card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 24px; }
+.enterprise-overview-cards h2 { margin: 0; font-size: 16px; }
+.enterprise-info-card dl { display: grid; grid-template-columns: 1fr 1fr; margin: 22px 0 0; gap: 24px; }
+.enterprise-info-card dt, .enterprise-usage-metrics span { font-size: 13px; color: var(--muted); }
+.enterprise-info-card dd { margin: 8px 0 0; font-size: 14px; }
+.enterprise-metric-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+.enterprise-metric-card h3 { margin: 0 0 18px; font-size: 13px; color: var(--muted); font-weight: 500; }
+.enterprise-metric-card > strong { font-size: 28px; font-weight: 600; }
+.enterprise-metric-card strong small { margin-left: 8px; font-size: 13px; font-weight: 400; color: var(--muted); }
+.enterprise-metric-card p { margin: 12px 0 0; font-size: 12px; color: var(--muted); }
+.enterprise-card-heading { display: flex; justify-content: space-between; align-items: center; }
+.enterprise-card-heading a { font-size: 13px; color: var(--muted); text-decoration: none; }
+.enterprise-card-heading a:hover { color: var(--accent); }
+.enterprise-usage-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; margin-top: 24px; }
+.enterprise-usage-metrics > div { display: flex; flex-direction: column; gap: 12px; }
+.enterprise-usage-metrics strong { font-size: 28px; font-weight: 600; }
+.enterprise-usage-metrics small, .enterprise-usage-note { font-size: 12px; color: var(--muted); }
+.enterprise-usage-note { margin: 24px 0 0; padding-top: 16px; border-top: 1px solid var(--line); }
+.admin-platform .platform-overview-layout .platform-enterprise-management { margin-top: 20px; padding: 24px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
+.admin-platform .platform-overview-layout .platform-invite-history { margin-top: 20px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
+.admin-platform .admin-header .badge.platform-running-badge { color: #16804a; background: #e7f6ed; }
+.admin-platform .admin-header .platform-enterprise-heading .button.platform-detail-back { width: 44px; height: 44px; min-width: 44px; padding: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.admin-platform .admin-header .platform-enterprise-heading .button.platform-detail-back:hover { background: var(--soft); color: var(--accent); }
