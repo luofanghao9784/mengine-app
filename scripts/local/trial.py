@@ -85,7 +85,7 @@ def available(port):
 
 
 def clean_environment():
-    prefixes = ('SPRING_', 'DATABASE_', 'INVITATION_', 'PHONE_', 'BOOTSTRAP_', 'API_', 'ENGINE_', 'SERVER_', 'MANAGEMENT_', 'DREAMCORE_', 'MATERIAL_', 'BACKUP_', 'OPERATIONS_', 'KNOWLEDGE_', 'TASK_', 'AGENT_', 'PLATFORM_', 'COMPANY_', 'COLLECTION_', 'EXPERIENCE_', 'GENERAL_EXPERIENCE_', 'PG')
+    prefixes = ('SPRING_', 'DATABASE_', 'INVITATION_', 'PHONE_', 'BOOTSTRAP_', 'API_', 'ENGINE_', 'SERVER_', 'MANAGEMENT_', 'DREAMCORE_', 'MATERIAL_', 'BACKUP_', 'OPERATIONS_', 'KNOWLEDGE_', 'TASK_', 'AGENT_', 'PLATFORM_', 'COMPANY_', 'COLLECTION_', 'EXPERIENCE_', 'GENERAL_EXPERIENCE_', 'BRIEFING_', 'ONGOING_', 'PG')
     return {k: v for k, v in os.environ.items() if not k.startswith(prefixes) and k not in ('JAVA_TOOL_OPTIONS', 'JDK_JAVA_OPTIONS')}
 
 
@@ -186,7 +186,7 @@ def verify_engine(engine_port, engine_token, mode):
         raise TrialError('引擎身份、版本或运行模式核验失败；API 尚未启动，未发送模型请求。')
 
 
-def model_environments(model, engine_port, engine_token, api_port):
+def model_environments(model, engine_port, engine_token, api_port, manual_acceptance=False):
     engine_env = {'PATH': os.environ.get('PATH', '/usr/bin:/bin'), 'ENGINE_HOST': '127.0.0.1',
                   'ENGINE_PORT': str(engine_port), 'TASK_ENGINE_TOKEN': engine_token}
     api_env = {'AGENT_TASK_MODE': 'off'}
@@ -195,15 +195,21 @@ def model_environments(model, engine_port, engine_token, api_port):
         engine_env.update(live_model.engine_environment(model))
         engine_env['AGENT_PLATFORM_URL'] = f'http://127.0.0.1:{api_port}'
         api_env['AGENT_TASK_MODE'] = 'live'
+    if manual_acceptance:
+        api_env.update({'COMPANY_INFORMATION_ENABLED': 'false', 'EXPERIENCE_INTAKE_ENABLED': 'false',
+                        'EXPERIENCE_ANALYSIS_ENABLED': 'false', 'EXPERIENCE_GENERALIZATION_ENABLED': 'false',
+                        'BRIEFING_AUTOMATIC_ENABLED': 'false', 'ONGOING_PLANS_ENABLED': 'false'})
     return api_env, engine_env
 
 
-def validate_instance_mode(settings, mode, restored=False, reconnect_live=False):
+def validate_instance_mode(settings, mode, restored=False, reconnect_live=False, enable_live=False):
     previous = settings.get('agentMode', 'off')
+    if enable_live and (restored or reconnect_live or mode != 'live' or settings.get('agentMode') not in ('off', 'live')):
+        raise TrialError('--enable-live 仅适用于已初始化的非恢复实例和显式真实模型启动。')
     if reconnect_live and (not restored or mode != 'live'):
         raise TrialError('重新接入仅适用于已完成显式 activate 的恢复实例，并需同时指定 --live。')
-    if previous not in ('off', 'live') or (previous != mode and not (previous == 'off' and restored and reconnect_live and mode == 'live')):
-        raise TrialError('该数据目录的模型模式与本次启动不一致；使用原启动命令，真实验收请使用独立新目录。已开放恢复实例可显式 --reconnect-live。')
+    if previous not in ('off', 'live') or (previous != mode and not (previous == 'off' and mode == 'live' and (enable_live or (restored and reconnect_live)))):
+        raise TrialError('该数据目录的模型模式与本次启动不一致；保留数据接入真实验收需显式 --enable-live。已开放恢复实例可显式 --reconnect-live。')
 
 
 def collection_environment(path):
@@ -218,7 +224,7 @@ def collection_environment(path):
     return {'DREAMCORE_COLLECTION_EXECUTABLE': str(executable)}
 
 
-def start(root, model_config=None, reconnect_live=False, phone_local=False, collection_config=None):
+def start(root, model_config=None, reconnect_live=False, phone_local=False, collection_config=None, enable_live=False):
     os.umask(0o077)
     collection_env = collection_environment(collection_config)
     model = None
@@ -243,7 +249,9 @@ def start(root, model_config=None, reconnect_live=False, phone_local=False, coll
     if not (root / 'config.json').exists() and any(root.iterdir()):
         raise TrialError('目标目录不是空目录，也没有有效试用配置；拒绝初始化。')
     if (root / 'config.json').exists():
-        validate_instance_mode(config(root), mode, restored, reconnect_live)
+        validate_instance_mode(config(root), mode, restored, reconnect_live, enable_live)
+    elif enable_live:
+        raise TrialError('--enable-live 需要已有实例，不创建或重新初始化验收数据。')
     jar = WORKSPACE / 'apps/api/target/workspace-api-0.1.0-SNAPSHOT.jar'
     if not jar.is_file() or not (WORKSPACE / 'dist/tenant-admin/index.html').is_file() or not (WORKSPACE / 'engine/dist/main.js').is_file():
         raise TrialError('缺少构建产物；先运行 npm run trial:build。')
@@ -284,9 +292,11 @@ def start(root, model_config=None, reconnect_live=False, phone_local=False, coll
         # Recheck after locking: a concurrent first start can have created the configuration.
         if restored:
             backup_recovery.require_activation(root)
-        validate_instance_mode(settings, mode, restored, reconnect_live)
-        if settings.get('agentMode', 'off') != mode:
+        validate_instance_mode(settings, mode, restored, reconnect_live, enable_live)
+        if settings.get('agentMode', 'off') != mode or (enable_live and not settings.get('manualModelAcceptance')):
             settings['agentMode'] = mode
+            if enable_live:
+                settings['manualModelAcceptance'] = True
             private_write(root / 'config.json', settings)
         for port in settings['ports'].values():
             available(port)
@@ -299,7 +309,7 @@ def start(root, model_config=None, reconnect_live=False, phone_local=False, coll
             raise TrialError('数据库目录不能是符号链接。')
         engine_port=free_port()
         engine_token=secrets.token_urlsafe(48)
-        model_api_env, engine_env = model_environments(model, engine_port, engine_token, settings['ports']['api'])
+        model_api_env, engine_env = model_environments(model, engine_port, engine_token, settings['ports']['api'], settings.get('manualModelAcceptance', False))
         env = {**clean_environment(), 'TASK_ENABLED':'true', 'TASK_ENGINE_TOKEN':engine_token, 'ENGINE_BASE_URL':f'http://127.0.0.1:{engine_port}', 'DATABASE_URL': f"jdbc:postgresql://127.0.0.1:{settings['ports']['database']}/dreamcore_trial", 'DATABASE_USER': 'dreamcore_trial', 'DATABASE_PASSWORD': secret,
                'KNOWLEDGE_ENABLED': str((WORKSPACE / 'workers/parser/.venv/bin/python').exists()).lower(), 'KNOWLEDGE_PARSER_ROOT': str(WORKSPACE / 'workers/parser'), 'MATERIAL_STORAGE_ROOT': str(root / 'objects'), 'SPRING_PROFILES_ACTIVE': 'local', 'INVITATION_DELIVERY': 'local', 'INVITATION_OUTBOX': str(root / 'invitations'), 'API_HOST': '127.0.0.1', 'API_PORT': str(settings['ports']['api']), 'SERVER_SERVLET_SESSION_COOKIE_NAME': 'DREAMCORE_TRIAL_' + hashlib.sha256(str(root).encode()).hexdigest()[:12]}
         env.update({'PHONE_DELIVERY': 'local' if phone_local else 'disabled', 'PHONE_LOCAL_PREVIEW': str(phone_local).lower(), 'PHONE_OUTBOX': str(root / 'phone-sms')})
@@ -423,10 +433,11 @@ def main():
     parser.add_argument('command', choices=['start', 'stop', 'status', 'invitations', 'invitation'])
     parser.add_argument('invitation_id', nargs='?')
     parser.add_argument('--directory', type=Path, default=DEFAULT_DIRECTORY)
-    parser.add_argument('--phone-local', action='store_true', help='在隔离的非 live 实例启用本地测试短信与邀请预览，不发送真实短信。')
+    parser.add_argument('--phone-local', action='store_true', help='在隔离实例启用本地测试短信与邀请预览；真实模型验收同时要求 --enable-live，不发送真实短信。')
     parser.add_argument('--live', action='store_true', help='显式开启真实模型；只适用于 start。')
     parser.add_argument('--model-config', type=Path, help='本工作树 .local/model-private 内的私有模型配置。')
     parser.add_argument('--reconnect-live', action='store_true', help='已 activate 的恢复实例显式重新接入真实模型；旧任务/计划不自动恢复。')
+    parser.add_argument('--enable-live', action='store_true', help='明确授权已有非恢复实例接入真实模型，保留数据；关闭自动分析/画报与定时计划，只供手动验收。')
     parser.add_argument('--collection-config', type=Path, help='部署维护的 0600 采集器配置；不从继承环境读取。')
     args = parser.parse_args()
     if args.collection_config and args.command != 'start':
@@ -435,13 +446,15 @@ def main():
         raise TrialError('模型参数仅适用于 start --live。')
     if args.reconnect_live and (args.command != 'start' or not args.live):
         raise TrialError('--reconnect-live 仅适用于 start --live。')
-    if args.phone_local and (args.command != 'start' or args.live):
-        raise TrialError('--phone-local 仅适用于非 live 的 start。')
+    if args.enable_live and (args.command != 'start' or not args.live or args.reconnect_live):
+        raise TrialError('--enable-live 仅适用于非恢复实例的 start --live。')
+    if args.phone_local and (args.command != 'start' or (args.live and not args.enable_live)):
+        raise TrialError('--phone-local 仅适用于非 live 启动或显式 --enable-live 的手动真实验收。')
     root = args.directory.absolute()
     if args.command == 'start':
         if args.live:
             from live_model import DEFAULT_CONFIG
-            start(root, args.model_config or DEFAULT_CONFIG, args.reconnect_live, collection_config=args.collection_config)
+            start(root, args.model_config or DEFAULT_CONFIG, args.reconnect_live, phone_local=args.phone_local, collection_config=args.collection_config, enable_live=args.enable_live)
         else:
             start(root, phone_local=args.phone_local, collection_config=args.collection_config)
     elif args.command == 'invitation':

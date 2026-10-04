@@ -108,6 +108,28 @@ class LiveModelBoundaryTest(unittest.TestCase):
         for settings, mode in [({}, 'live'), ({'agentMode': 'live'}, 'off'), ({'agentMode': 'invalid'}, 'off')]:
             with self.assertRaises(trial.TrialError): trial.validate_instance_mode(settings, mode)
 
+    def test_explicit_existing_live_acceptance_is_not_a_restore_bypass(self):
+        for previous in ['off', 'live']:
+            trial.validate_instance_mode({'agentMode': previous}, 'live', enable_live=True)
+        for settings, mode, restored, reconnect in [({}, 'live', False, False),
+                ({'agentMode': 'off'}, 'off', False, False),
+                ({'agentMode': 'off'}, 'live', True, False),
+                ({'agentMode': 'off'}, 'live', True, True)]:
+            with self.assertRaises(trial.TrialError):
+                trial.validate_instance_mode(settings, mode, restored, reconnect, enable_live=True)
+
+    def test_manual_acceptance_keeps_background_dispatch_off_and_model_key_private(self):
+        api, engine = trial.model_environments(self.value, 23001, 'synthetic-service-token', 23002, True)
+        self.assertEqual(api['AGENT_TASK_MODE'], 'live')
+        for field in ['COMPANY_INFORMATION_ENABLED', 'EXPERIENCE_INTAKE_ENABLED',
+                      'EXPERIENCE_ANALYSIS_ENABLED', 'EXPERIENCE_GENERALIZATION_ENABLED',
+                      'BRIEFING_AUTOMATIC_ENABLED', 'ONGOING_PLANS_ENABLED']:
+            self.assertEqual(api[field], 'false')
+        self.assertNotIn(self.value['apiKey'], json.dumps(api))
+        self.assertEqual(engine['AGENT_MODEL_API_KEY'], self.value['apiKey'])
+        with patch.dict(os.environ, {'BRIEFING_AUTOMATIC_ENABLED':'true', 'ONGOING_PLANS_ENABLED':'true'}, clear=True):
+            self.assertEqual(trial.clean_environment(), {})
+
     def test_reconnect_requires_explicit_live_and_verified_restore(self):
         trial.validate_instance_mode({}, 'live', restored=True, reconnect_live=True)
         for mode, restored, explicit in [('live', True, False), ('live', False, True), ('off', True, True)]:

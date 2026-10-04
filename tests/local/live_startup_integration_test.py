@@ -86,9 +86,11 @@ class LiveStartupIntegrationTest(unittest.TestCase):
         else:
             raise AssertionError('Owned runtime did not fully stop; its temporary data was retained at ' + str(self.root))
 
-    def start_instance(self):
+    def start_instance(self, live=True, enable=False):
+        arguments = ['--live', '--model-config', str(self.model_path)] if live else []
+        if enable: arguments += ['--enable-live', '--phone-local']
         self.child = subprocess.Popen(
-            self.command('start', '--live', '--model-config', str(self.model_path)),
+            self.command('start', *arguments),
             cwd=trial.WORKSPACE, env=self.environment, stdin=subprocess.DEVNULL,
             stdout=self.output, stderr=self.output)
         deadline = time.monotonic() + 100
@@ -100,7 +102,7 @@ class LiveStartupIntegrationTest(unittest.TestCase):
             if runtime_file.is_file():
                 runtime = trial.private_read(runtime_file)
                 if runtime.get('state') == 'ready':
-                    self.assertEqual(runtime.get('agentMode'), 'live')
+                    self.assertEqual(runtime.get('agentMode'), 'live' if live else 'off')
                     self.assertIs(runtime.get('cloudVerifiedByStartup'), False)
                     return runtime
             time.sleep(0.2)
@@ -116,13 +118,13 @@ class LiveStartupIntegrationTest(unittest.TestCase):
         self.assertFalse((self.instance / 'postgres/postmaster.pid').exists(), 'Owned PostgreSQL remains running')
         runtime = trial.private_read(self.instance / 'runtime.json')
         self.assertEqual(runtime['state'], 'stopped')
-        self.assertEqual(runtime['agentMode'], 'live')
+        self.assertEqual(runtime['agentMode'], trial.config(self.instance)['agentMode'])
         self.assertIs(runtime['cloudVerifiedByStartup'], False)
 
     def request(self, opener, base, path, body=None, expected=200):
         headers = {}
         if body is not None:
-            csrf = self.request(opener, base, '/api/v1/auth/csrf')
+            csrf = self.request(opener, base, ('/api/platform-admin/v1/auth' if path.startswith('/api/platform-admin/') else '/api/v1/auth') + '/csrf')
             headers = {'Content-Type': 'application/json', csrf['headerName']: csrf['token']}
         request = urllib.request.Request(base + path,
                                          data=None if body is None else json.dumps(body).encode(),
@@ -154,7 +156,7 @@ class LiveStartupIntegrationTest(unittest.TestCase):
         # System metadata is intentionally public; account/management data requires login.
         self.request(opener, base, '/api/v1/me', expected=401)
         account = trial.private_read(self.instance / 'accounts.json')['platform']
-        identity = self.request(opener, base, '/api/v1/auth/login', account)
+        identity = self.request(opener, base, '/api/platform-admin/v1/auth/login', {'username':trial.platform_login(account),'password':account['password']})
         self.assertIs(identity['platformAdmin'], True)
         info = self.request(opener, base, '/api/v1/system/info')
         self.assertEqual(info['engine']['runtimeMode'], 'agent-live')
@@ -192,6 +194,34 @@ class LiveStartupIntegrationTest(unittest.TestCase):
                 self.assertFalse(self.fake_key.encode() in path.read_bytes(),
                                  'Synthetic model key appeared in runtime metadata or log: ' + path.name)
         self.assertFalse(self.model_path.is_relative_to(self.instance))
+
+    def test_explicit_off_to_manual_live_preserves_instance_and_local_phone_without_cloud_requests(self):
+        first = self.start_instance(live=False)
+        first_config = trial.config(self.instance)
+        account = trial.private_read(self.instance / 'accounts.json')['platform']
+        opener = self.client()
+        before = self.request(opener, first['webUrl'], '/api/platform-admin/v1/auth/login',
+                              {'username':trial.platform_login(account),'password':account['password']})
+        tenant = self.request(opener, first['webUrl'], '/api/platform-admin/v1/tenants', {
+            'requestId':str(uuid.uuid4()), 'name':'Synthetic manual live acceptance',
+            'adminEmail':'synthetic-manual-live@example.test'}, expected=201)['tenant']
+        account_hash=hashlib.sha256((self.instance/'accounts.json').read_bytes()).hexdigest()
+        self.stop_instance()
+        second=self.start_instance(enable=True)
+        current=trial.config(self.instance)
+        self.assertEqual(current['ports'],first_config['ports'])
+        self.assertEqual(current['agentMode'],'live')
+        self.assertTrue(current['manualModelAcceptance'])
+        opener,account_id=self.live_capabilities(second)
+        self.assertEqual(account_id,before['account']['id'])
+        self.assertEqual(self.request(opener,second['webUrl'],'/api/platform-admin/v1/tenants')[0]['id'],tenant['id'])
+        phone=self.request(opener,second['webUrl'],'/api/v1/auth/phone/configuration')
+        self.assertEqual(phone['delivery'],'LOCAL')
+        self.assertTrue(phone['localPreview'])
+        self.assertEqual(hashlib.sha256((self.instance/'accounts.json').read_bytes()).hexdigest(),account_hash)
+        self.assertEqual(self.database_counters()['tenants'],1)
+        self.stop_instance();self.assert_no_key_in_instance()
+        print('PASS: explicit off-to-manual-live activation, retained tenant/account/ports, local phone, zero model requests.')
 
     def test_live_runtime_restarts_keep_data_without_model_requests(self):
         first = self.start_instance()
