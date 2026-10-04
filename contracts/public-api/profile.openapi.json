@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Dreamcore Profiles API",
-    "version": "1.2.0"
+    "version": "1.3.0"
   },
   "security": [
     {
@@ -664,6 +664,40 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/company-information/analysis": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "企业信息自动整理的持久状态；只含本企业计数，不含源正文或模型内容",
+        "responses": {
+          "200": {
+            "description": "DISABLED 表示部署未启用；其他状态来自队列，不代表实时引擎健康。人工调整优先。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyAnalysisStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "客户身份未登录"
+          },
+          "403": {
+            "description": "没有当前企业访问权限"
           }
         }
       }
@@ -1424,6 +1458,47 @@
           "revision": {
             "type": "integer",
             "minimum": 1
+          }
+        }
+      },
+      "CompanyAnalysisStatus": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "state",
+          "pending",
+          "running",
+          "attention",
+          "lastCompletedAt"
+        ],
+        "properties": {
+          "state": {
+            "enum": [
+              "DISABLED",
+              "PROCESSING",
+              "ATTENTION",
+              "WAITING",
+              "IDLE"
+            ]
+          },
+          "pending": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "running": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "attention": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "lastCompletedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           }
         }
       }

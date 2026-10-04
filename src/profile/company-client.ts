@@ -26,6 +26,20 @@ export interface CompanyInformation {
   canMaintain: boolean;
   groups: CompanyGroup[];
 }
+export interface CompanyAnalysisStatus {
+  state: 'DISABLED' | 'PROCESSING' | 'ATTENTION' | 'WAITING' | 'IDLE';
+  pending: number;
+  running: number;
+  attention: number;
+  lastCompletedAt: string | null;
+}
+export const isCompanyAnalysisStatus = (v: unknown): v is CompanyAnalysisStatus =>
+  record(v) &&
+  ['DISABLED', 'PROCESSING', 'ATTENTION', 'WAITING', 'IDLE'].includes(String(v.state)) &&
+  count(v.pending) &&
+  count(v.running) &&
+  count(v.attention) &&
+  (v.lastCompletedAt === null || (text(v.lastCompletedAt) && Number.isFinite(Date.parse(v.lastCompletedAt))));
 export interface CompanyChange {
   requestId: string;
   field: CompanyField;
@@ -118,6 +132,8 @@ export function createCompanyClient(fetcher: typeof fetch = fetch) {
     return `/api/v1/tenants/${tenant}/company-information`;
   };
   return {
+    analysis: (tenant: string, signal?: AbortSignal) =>
+      request(root(tenant) + '/analysis', 'GET', isCompanyAnalysisStatus, undefined, signal),
     evidence: (tenant: string, tag: string, revision: number, signal?: AbortSignal) => {
       if (!uuid(tag) || !Number.isSafeInteger(revision) || revision < 1)
         throw new IdentityError('INVALID_REQUEST', 400);

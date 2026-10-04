@@ -10,9 +10,13 @@ import org.springframework.web.bind.annotation.*;
 public class CompanyInformationController {
  private final CompanyInformationService service;
  private final CompanyInferenceService inference;
- public CompanyInformationController(CompanyInformationService service,CompanyInferenceService inference){this.service=service;this.inference=inference;}
+ private final CompanyAnalysisQueue analysis;
+ private final CompanyAnalysisRuntime runtime;
+ private final boolean analysisEnabled;
+ public CompanyInformationController(CompanyInformationService service,CompanyInferenceService inference,CompanyAnalysisQueue analysis,CompanyAnalysisRuntime runtime,@org.springframework.beans.factory.annotation.Value("${dreamcore.company-analysis.enabled:false}") boolean enabled){this.service=service;this.inference=inference;this.analysis=analysis;this.runtime=runtime;this.analysisEnabled=enabled;}
  @ModelAttribute public void headers(HttpServletResponse response){response.setHeader("Cache-Control","private, no-store");}
  @GetMapping public CompanyInformationService.Page get(Authentication auth,@PathVariable UUID tenant){return service.get(UUID.fromString(auth.getName()),tenant);}
+ @GetMapping("/analysis") public CompanyAnalysisQueue.Status analysis(Authentication auth,@PathVariable UUID tenant){return analysis.status(UUID.fromString(auth.getName()),tenant,analysisEnabled&&runtime.configured());}
  @PostMapping public CompanyInformationService.Receipt change(Authentication auth,@PathVariable UUID tenant,@RequestBody CompanyInformationService.Change body){return service.change(UUID.fromString(auth.getName()),tenant,body);}
  @GetMapping("/suggestions") public java.util.List<CompanyInferenceService.Suggestion> suggestions(Authentication auth,@PathVariable UUID tenant){return inference.suggestions(UUID.fromString(auth.getName()),tenant);}
  @GetMapping("/tags/{tag}/evidence") public java.util.List<CompanyInferenceService.Source> evidence(Authentication auth,@PathVariable UUID tenant,@PathVariable UUID tag,@RequestParam int revision){return inference.evidence(UUID.fromString(auth.getName()),tenant,tag,revision);}

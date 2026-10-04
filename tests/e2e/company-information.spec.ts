@@ -66,6 +66,8 @@ async function fixture(
         role: options.limited ? 'MEMBER' : 'TENANT_ADMIN',
         workspaces: [],
       });
+    if (path.endsWith('/company-information/analysis'))
+      return json({ state: 'IDLE', pending: 0, running: 0, attention: 0, lastCompletedAt: null });
     if (path.endsWith('/company-information/suggestions')) return json([]);
     if (path.endsWith('/company-information')) {
       if (revoked) return json({ contractVersion: '1.0', code: 'TENANT_ACCESS_DENIED' }, 403);
@@ -117,6 +119,35 @@ async function fixture(
   };
 }
 const start = `/tenant-admin/#tenant=${tenant}&admin=company`;
+test('automatic status refreshes without discarding an open manual edit', async ({ page, context }) => {
+  const fixtureState = await fixture(context);
+  let completed = false;
+  await context.route('**/company-information/analysis', (route) =>
+    route.fulfill({
+      json: {
+        state: completed ? 'IDLE' : 'PROCESSING',
+        pending: 0,
+        running: completed ? 0 : 1,
+        attention: 0,
+        lastCompletedAt: completed ? date : null,
+      },
+    }),
+  );
+  await page.clock.install();
+  await page.goto(start);
+  await expect(page.locator('.company-analysis')).toContainText('正在自动整理');
+  await page.getByRole('button', { name: '合成业务', exact: true }).click();
+  await page.getByLabel('标签名称').fill('尚未提交的人工调整');
+  completed = true;
+  fixtureState.info.groups.find((g) => g.field === 'BUSINESS')!.tags[0].label = '已自动更新的业务';
+  await page.clock.fastForward(31000);
+  await expect(page.getByLabel('标签名称')).toHaveValue('尚未提交的人工调整');
+  await page.getByRole('button', { name: '关闭弹窗' }).click();
+  await page.clock.fastForward(31000);
+  await expect(page.locator('.company-analysis')).toContainText('最近完成');
+  await expect(page.getByRole('button', { name: '已自动更新的业务', exact: true })).toBeVisible();
+  expect(fixtureState.posts).toHaveLength(0);
+});
 test('optional tags support committed-response retry, edit, remove and clear without changing tenant identity', async ({
   page,
   context,

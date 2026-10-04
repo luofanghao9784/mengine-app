@@ -63,3 +63,6 @@ M7-A1 第二切片：新增认证 `GET /internal/v1/runtime` / [Runtime 1.0](eng
 M7-A1 第三切片新增 [Operations API 1.0.0](public-api/operations.openapi.json) / [类型](public-api/operations.ts)。总台全平台/指定企业和企业管理员本企业均为只读汇总，窗口按任务创建时间选择，状态与存储来自同一查询快照。成功 Agent 回执分 live/verification、显示 Token 覆盖率；失败消耗未完整计量，不用于账单或额度。异常仅固定类型和数量，不投影私人内容、任务/会话/成员标识。业务数据库 V14、引擎/内部任务协议不变，见[边界](../docs/技术/M7-A1运行概览边界.md)。
 
 M7-A1 第七切片：新增 [Model Usage 1.0](engine-api/model-usage.schema.json)，回调声明 1.4，Agent 请求/结果仍 1.4。Operations 1.1.0 必需字段 `attemptUsage` 按尝试开始时间汇总，仅覆盖 V15 新记录，旧 `models` 不相加；平台和管理端配套升级。新平台兼容旧引擎回调 1.3，新引擎拒绝缺失计量握手的旧平台。详见[计量边界](../docs/技术/M7-A1模型尝试计量与执行限制.md)。
+
+
+企业信息自动整理：`engine-api/company-analysis.schema.json` 定义独立可选 `1.0` 协议的固定任务输入、运行描述及结构化结果；读取与取消回执必须携带服务间认证。模型候选不能直接改写企业信息，由平台按当前权限、固定原文及人工保护核验。`public-api/profile.openapi.json` 1.3.0 增加客户域只读 `/company-information/analysis`，输出当前企业的持久计数和真实完成时间，不返回原始资料或模型内容。部署未启用、未知调用用量及结果不明分别表达，不将其替换为成功或零费用。失败恢复和限制见[五批实施记录](../docs/交接/管理端五批实施记录-2026-10-04.md)。

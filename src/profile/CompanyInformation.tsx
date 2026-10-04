@@ -7,6 +7,7 @@ import { RequestPending, useRequestLock } from '../shared/request-guard';
 import {
   companyClient,
   companyFields,
+  type CompanyAnalysisStatus,
   type CompanyChange,
   type CompanyGroup,
   type CompanyTag,
@@ -25,6 +26,17 @@ export function CompanyInformation({ tenant }: { tenant: string }) {
     tag?: CompanyTag;
     action: CompanyChange['action'];
   } | null>(null);
+  const analysis = useRemote(
+    (signal) => companyClient.analysis(tenant, signal),
+    [tenant, attempt, session.identity],
+  );
+  useEffect(() => {
+    if (pending || edit) return;
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') setAttempt((n) => n + 1);
+    }, 30000);
+    return () => window.clearInterval(timer);
+  }, [pending, edit, tenant]);
   const data = useRemote((signal) => companyClient.get(tenant, signal), [tenant, attempt, session.identity]);
   return (
     <div className="admin-dashboard company-information">
@@ -43,6 +55,13 @@ export function CompanyInformation({ tenant }: { tenant: string }) {
             刷新
           </Button>
         </header>
+        <p className="company-analysis muted" role="status">
+          {analysis.error
+            ? '暂时无法读取自动整理状态，可刷新重试。'
+            : analysis.value
+              ? analysisSummary(analysis.value)
+              : '正在读取自动整理状态…'}
+        </p>
         {notice && (
           <p role="status" className="access-success">
             {notice}
@@ -135,6 +154,25 @@ export function CompanyInformation({ tenant }: { tenant: string }) {
           />
         )}
     </div>
+  );
+}
+function analysisSummary(status: CompanyAnalysisStatus) {
+  const labels = {
+    DISABLED: '自动整理未启用',
+    PROCESSING: '正在自动整理企业信息',
+    ATTENTION: '部分资料未完成自动整理',
+    WAITING: '等待自动整理',
+    IDLE: '暂无待整理资料',
+  };
+  const counts =
+    status.state === 'DISABLED' || status.pending + status.running + status.attention === 0
+      ? ''
+      : ` · 资料片段：待处理 ${status.pending} · 处理中 ${status.running} · 未完成 ${status.attention}`;
+  return (
+    labels[status.state] +
+    counts +
+    (status.lastCompletedAt ? ` · 最近完成 ${when(status.lastCompletedAt)}` : '') +
+    '。人工调整优先保留。'
   );
 }
 function CompanyEditor({

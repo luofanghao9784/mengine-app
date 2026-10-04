@@ -29,6 +29,11 @@ public class CompanyInferenceService {
  private void lock(UUID tenant,CompanyInformationService.Field field){db.queryForList("SELECT pg_advisory_xact_lock(hashtextextended(?,0))","company-information:"+tenant+":"+field);db.update("INSERT INTO company_information_groups(tenant_id,field) VALUES (?,?) ON CONFLICT DO NOTHING",tenant,field.name());}
  private IdentityException unavailable(){return new IdentityException(409,"COMPANY_INFERENCE_UNAVAILABLE");}
  private boolean readable(UUID run){return Boolean.TRUE.equals(db.queryForObject("SELECT company_inference_readable(?)",Boolean.class,run));}
+ @Transactional public boolean active(UUID run,UUID lease){
+  var rows=db.queryForList("SELECT * FROM company_inference_runs WHERE id=? AND lease_token=? AND state='RUNNING' AND lease_until>clock_timestamp()",run,lease);
+  if(rows.isEmpty())return false;var r=rows.getFirst();
+  try{write((UUID)r.get("actor_id"),(UUID)r.get("tenant_id"));return readable(run);}catch(IdentityException denied){return false;}
+ }
 
  /** Called by a platform worker, not a client endpoint. All model inputs are fixed here. */
  @Transactional public Job begin(UUID actor,UUID tenant,List<UUID> chunks){

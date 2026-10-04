@@ -1,0 +1,439 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dreamcore:company-analysis:1.0",
+  "description": "Dedicated authenticated optional company-information worker protocol. Bounded fixed input; no user dispatch endpoint. Delivery stages candidates only; platform authority and evidence validation decide admission. Unknown usage stays null.",
+  "$defs": {
+    "Evidence": {
+      "type": "object",
+      "properties": {
+        "chunkId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "quote": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        }
+      },
+      "required": [
+        "chunkId",
+        "quote"
+      ],
+      "additionalProperties": false
+    },
+    "Candidate": {
+      "type": "object",
+      "properties": {
+        "field": {
+          "enum": [
+            "NAME",
+            "INDUSTRY",
+            "BUSINESS",
+            "TERM"
+          ]
+        },
+        "targetId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "meaning": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "minItems": 1,
+          "maxItems": 5
+        }
+      },
+      "required": [
+        "field",
+        "targetId",
+        "label",
+        "meaning",
+        "evidence"
+      ],
+      "additionalProperties": false
+    },
+    "Input": {
+      "type": "object",
+      "properties": {
+        "chunkId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "versionId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "filename": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "locator": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 180
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8000
+        }
+      },
+      "required": [
+        "chunkId",
+        "versionId",
+        "filename",
+        "locator",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "Tag": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "meaning": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "origin": {
+          "enum": [
+            "HUMAN",
+            "AI"
+          ]
+        },
+        "humanProtected": {
+          "type": "boolean"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "label",
+        "meaning",
+        "origin",
+        "humanProtected",
+        "updatedAt"
+      ],
+      "additionalProperties": false
+    },
+    "Group": {
+      "type": "object",
+      "properties": {
+        "field": {
+          "enum": [
+            "NAME",
+            "INDUSTRY",
+            "BUSINESS",
+            "TERM"
+          ]
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "manuallyCleared": {
+          "type": "boolean"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Tag"
+          },
+          "minItems": 0,
+          "maxItems": 30
+        }
+      },
+      "required": [
+        "field",
+        "revision",
+        "manuallyCleared",
+        "tags"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "field": {
+                "const": "NAME"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "tags": {
+                "maxItems": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "Request": {
+      "type": "object",
+      "properties": {
+        "contractVersion": {
+          "const": "1.0"
+        },
+        "job": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "lease": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "tenant": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "inputs": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Input"
+              },
+              "minItems": 1,
+              "maxItems": 5
+            },
+            "groups": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Group"
+              },
+              "minItems": 4,
+              "maxItems": 4
+            }
+          },
+          "required": [
+            "id",
+            "lease",
+            "tenant",
+            "inputs",
+            "groups"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "contractVersion",
+        "job"
+      ],
+      "additionalProperties": false
+    },
+    "Descriptor": {
+      "type": "object",
+      "properties": {
+        "contractVersion": {
+          "const": "1.0"
+        },
+        "engineVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "configured": {
+          "type": "boolean"
+        },
+        "executionClass": {
+          "enum": [
+            "live",
+            "verification",
+            null
+          ]
+        }
+      },
+      "required": [
+        "contractVersion",
+        "engineVersion",
+        "configured",
+        "executionClass"
+      ],
+      "additionalProperties": false
+    },
+    "Result": {
+      "type": "object",
+      "properties": {
+        "contractVersion": {
+          "const": "1.0"
+        },
+        "engineVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "runId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "lease": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "outcome": {
+          "enum": [
+            "COMPLETE",
+            "FAILED",
+            "CANCELLED"
+          ]
+        },
+        "code": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "candidates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Candidate"
+          },
+          "minItems": 0,
+          "maxItems": 12
+        },
+        "modelName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "modelCalls": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 8
+        },
+        "inputTokens": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "outputTokens": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "contractVersion",
+        "engineVersion",
+        "runId",
+        "lease",
+        "outcome",
+        "code",
+        "candidates",
+        "modelName",
+        "modelCalls",
+        "inputTokens",
+        "outputTokens"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "COMPLETE"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "modelCalls": {
+                "minimum": 1
+              },
+              "code": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "candidates": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "inputTokens": {
+                "type": "null"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "outputTokens": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "outputTokens": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

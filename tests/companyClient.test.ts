@@ -3,6 +3,19 @@ import assert from 'node:assert/strict';
 import { createCompanyClient } from '../src/profile/company-client.ts';
 import { IdentityError } from '../src/identity/client.ts';
 const id = '00000000-0000-4000-8000-000000000001';
+test('analysis state preserves disabled and unknown activity without inventing completion', async () => {
+  const status = { state: 'DISABLED', pending: 0, running: 0, attention: 0, lastCompletedAt: null };
+  assert.deepEqual(await createCompanyClient(async () => Response.json(status)).analysis(id), status);
+  for (const wrong of [
+    { ...status, state: 'HEALTHY' },
+    { ...status, pending: -1 },
+    { ...status, lastCompletedAt: 'unknown' },
+  ])
+    await assert.rejects(
+      createCompanyClient(async () => Response.json(wrong)).analysis(id),
+      (e: unknown) => e instanceof IdentityError && e.code === 'CONTRACT_MISMATCH',
+    );
+});
 const page = {
   tenantId: id,
   canMaintain: true,
