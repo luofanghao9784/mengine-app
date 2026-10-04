@@ -808,3 +808,9 @@
 .admin-platform .platform-overview-layout .platform-enterprise-management h3 { margin-bottom: 12px; }
 .admin-platform .platform-overview-layout .platform-management-row { padding: 0; }
 .admin-platform .platform-overview-layout .platform-management-row p { margin-top: 6px; }
+
+.modal.platform-account-modal { width: min(760px, calc(100vw - 64px)); max-width: 760px; }
+.platform-account-modal .platform-account-detail { padding: 0; }
+.platform-account-modal .platform-account-detail-heading { padding-bottom: 20px; }
+.platform-account-modal .platform-account-info { padding: 20px 0; }
+.platform-account-modal .platform-account-safety { padding: 20px 0; }
