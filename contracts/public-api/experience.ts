@@ -23,8 +23,8 @@ export interface ExperienceVersion {
   schemaVersion: 1;
   content: ExperienceContent;
   evidence: ExperienceEvidence[];
-  origin: 'MANUAL';
-  evaluation: 'NOT_EVALUATED';
+  origin: 'MANUAL' | 'AUTOMATIC';
+  evaluation: 'NOT_EVALUATED' | 'AUTOMATIC_CHECKED';
   createdBy: string;
   createdAt: string;
 }
@@ -50,8 +50,8 @@ export interface ExperienceSummary {
   tags: string[];
   applicable: string;
   excluded: string;
-  origin: 'MANUAL';
-  evaluation: 'NOT_EVALUATED';
+  origin: 'MANUAL' | 'AUTOMATIC';
+  evaluation: 'NOT_EVALUATED' | 'AUTOMATIC_CHECKED';
 }
 export interface ExperiencePage {
   items: ExperienceSummary[];

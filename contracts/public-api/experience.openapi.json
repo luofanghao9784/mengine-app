@@ -1573,6 +1573,28 @@
         }
       },
       "ExperienceVersion": {
+        "oneOf": [
+          {
+            "properties": {
+              "origin": {
+                "const": "MANUAL"
+              },
+              "evaluation": {
+                "const": "NOT_EVALUATED"
+              }
+            }
+          },
+          {
+            "properties": {
+              "origin": {
+                "const": "AUTOMATIC"
+              },
+              "evaluation": {
+                "const": "AUTOMATIC_CHECKED"
+              }
+            }
+          }
+        ],
         "type": "object",
         "additionalProperties": false,
         "required": [
@@ -1609,10 +1631,10 @@
             "maxItems": 100
           },
           "origin": {
-            "const": "MANUAL"
+            "enum": ["MANUAL", "AUTOMATIC"]
           },
           "evaluation": {
-            "const": "NOT_EVALUATED"
+            "enum": ["NOT_EVALUATED", "AUTOMATIC_CHECKED"]
           },
           "createdBy": {
             "type": "string",
@@ -1687,6 +1709,28 @@
         }
       },
       "ExperienceSummary": {
+        "oneOf": [
+          {
+            "properties": {
+              "origin": {
+                "const": "MANUAL"
+              },
+              "evaluation": {
+                "const": "NOT_EVALUATED"
+              }
+            }
+          },
+          {
+            "properties": {
+              "origin": {
+                "const": "AUTOMATIC"
+              },
+              "evaluation": {
+                "const": "AUTOMATIC_CHECKED"
+              }
+            }
+          }
+        ],
         "type": "object",
         "additionalProperties": false,
         "required": [
@@ -1753,10 +1797,10 @@
             "maxLength": 2000
           },
           "origin": {
-            "const": "MANUAL"
+            "enum": ["MANUAL", "AUTOMATIC"]
           },
           "evaluation": {
-            "const": "NOT_EVALUATED"
+            "enum": ["NOT_EVALUATED", "AUTOMATIC_CHECKED"]
           }
         }
       },

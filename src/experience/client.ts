@@ -42,8 +42,8 @@ export const isVersion = (v: unknown): v is ExperienceVersion =>
   Array.isArray(v.evidence) &&
   v.evidence.length <= 100 &&
   v.evidence.every(isEvidence) &&
-  v.origin === 'MANUAL' &&
-  v.evaluation === 'NOT_EVALUATED' &&
+  ((v.origin === 'MANUAL' && v.evaluation === 'NOT_EVALUATED') ||
+    (v.origin === 'AUTOMATIC' && v.evaluation === 'AUTOMATIC_CHECKED')) &&
   uuid(v.createdBy) &&
   date(v.createdAt);
 export const isEntry = (v: unknown): v is ExperienceEntry =>
@@ -72,8 +72,8 @@ const isSummary = (v: unknown): v is ExperienceSummary =>
   v.tags.every((t) => str(t, 40)) &&
   str(v.applicable, 2000) &&
   str(v.excluded, 2000, true) &&
-  v.origin === 'MANUAL' &&
-  v.evaluation === 'NOT_EVALUATED';
+  ((v.origin === 'MANUAL' && v.evaluation === 'NOT_EVALUATED') ||
+    (v.origin === 'AUTOMATIC' && v.evaluation === 'AUTOMATIC_CHECKED'));
 export const isUse = (v: unknown): v is ExperienceUse =>
   record(v) &&
   uuid(v.id) &&
@@ -121,6 +121,7 @@ const messages: Record<string, string> = {
   EXPERIENCE_EVIDENCE_UNAVAILABLE: '来源已不可读取，请核对当前权限与资料状态。',
   EXPERIENCE_NOT_CURRENT: '此版本已经停用或被替换，请重新检索。',
   EXPERIENCE_USE_EXISTS: '本次案例或任务已记录过此版本，请在原记录下补充反馈。',
+  EXPERIENCE_AUTOMATIC_MANAGED: '此经验由系统自动积累和更新，可查看版本或停用。',
   EXPERIENCE_COPY_CONFIRMATION_REQUIRED: '发布独立副本前，请确认手工整理的正文可在目标空间共享。',
   EXPERIENCE_TASK_UNFINISHED: '请在任务结束后再关联为经验依据。',
 };

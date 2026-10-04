@@ -52,7 +52,7 @@ public class ExperienceAnalysisQueue {
  private List<String> parts(String s,int length,int max){if(s==null||s.isBlank())return List.of("原版本未提供此项");var p=new ArrayList<String>();for(int i=0;i<s.length();){int end=Math.min(i+length,s.length());if(end<s.length()&&Character.isHighSurrogate(s.charAt(end-1)))end--;p.add(s.substring(i,end));i=end;}if(p.size()>max)throw changed();return p.stream().distinct().toList();}
  private Existing existing(Map<String,Object> s,UUID version){
   UUID entry=db.queryForObject("SELECT entry_id FROM experience_versions WHERE id=?",UUID.class,version);
-  var e=experiences.get((UUID)s.get("owner_id"),(UUID)s.get("tenant_id"),(UUID)s.get("workspace_id"),entry,version);
+  var e=experiences.analysisEntry((UUID)s.get("owner_id"),(UUID)s.get("tenant_id"),(UUID)s.get("workspace_id"),entry,version);
   if(!e.status().equals("PUBLISHED")||!Objects.equals(e.publishedVersion(),version))throw changed();var c=e.version().content();
   return new Existing(version,c.title(),c.summary(),parts(c.body(),800,10),parts(c.applicable(),300,8),parts(c.excluded(),300,8));
  }
@@ -83,6 +83,7 @@ public class ExperienceAnalysisQueue {
  }
  private Map<String,Object> run(UUID id,boolean lock){var rows=db.queryForList("SELECT * FROM experience_analysis_runs WHERE id=?"+(lock?" FOR UPDATE":""),id);if(rows.isEmpty())throw changed();return rows.getFirst();}
  @Transactional public Job restore(UUID id){var r=run(id,false);if((Boolean)r.get("invalidated"))throw changed();var j=job(r);if(!Objects.equals(r.get("job_hash"),hash(j)))throw changed();return j;}
+ @Transactional public Job restoreForAdmission(UUID id){try{return restore(id);}catch(IdentityException unavailable){return null;}}
  @Transactional public boolean active(UUID id,UUID lease){
   try{var r=run(id,false);if(!lease.equals(r.get("lease"))||!Set.of("CLAIMED","DISPATCHED").contains(r.get("state"))||Boolean.TRUE.equals(r.get("invalidated"))||!Boolean.TRUE.equals(db.queryForObject("SELECT lease_until>clock_timestamp() FROM experience_analysis_runs WHERE id=?",Boolean.class,id)))return false;restore(id);return true;}catch(IdentityException changed){return false;}
  }

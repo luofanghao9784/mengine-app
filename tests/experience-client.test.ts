@@ -114,3 +114,19 @@ test('stable mutation ID and CSRF are transmitted without inferring permissions'
   assert.equal(JSON.parse(calls.filter((c) => c.body)[0].body!).requestId, ids[3]);
   assert.equal(calls.filter((c) => c.body)[0].body, calls.filter((c) => c.body)[1].body);
 });
+
+test('automatic entries remain readable with truthful provenance and reject mixed evaluation labels', async () => {
+  const automatic = {
+    ...entry,
+    status: 'PUBLISHED',
+    publishedVersion: ids[3],
+    version: { ...entry.version, origin: 'AUTOMATIC', evaluation: 'AUTOMATIC_CHECKED' },
+  };
+  const client = createExperienceClient((async () => Response.json(automatic)) as typeof fetch);
+  assert.equal((await client.get(ids[0], ids[1], ids[2])).version.origin, 'AUTOMATIC');
+  assert.equal(isEntry({ ...automatic, version: { ...automatic.version, origin: 'MANUAL' } }), false);
+  assert.equal(
+    isEntry({ ...automatic, version: { ...automatic.version, evaluation: 'NOT_EVALUATED' } }),
+    false,
+  );
+});

@@ -8,12 +8,13 @@ import org.springframework.beans.factory.annotation.Value;import org.springframe
 @EnableScheduling
 @org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication(type=org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication.Type.SERVLET)
 public class ExperienceAnalysisWorker {
- private final ExperienceAnalysisQueue queue;private final ExperienceAnalysisRuntime runtime;private final boolean enabled;
+ private final ExperienceAnalysisQueue queue;private final ExperienceAnalysisRuntime runtime;private final ExperienceAdmissionService admission;private final boolean enabled;
  private final ExecutorService pool=Executors.newVirtualThreadPerTaskExecutor();private final Semaphore capacity=new Semaphore(2);private final Set<UUID> local=ConcurrentHashMap.newKeySet();
- public ExperienceAnalysisWorker(ExperienceAnalysisQueue queue,ExperienceAnalysisRuntime runtime,@Value("${dreamcore.experience-analysis.enabled:false}") boolean enabled){this.queue=queue;this.runtime=runtime;this.enabled=enabled;}
+ public ExperienceAnalysisWorker(ExperienceAnalysisQueue queue,ExperienceAnalysisRuntime runtime,ExperienceAdmissionService admission,@Value("${dreamcore.experience-analysis.enabled:false}") boolean enabled){this.queue=queue;this.runtime=runtime;this.admission=admission;this.enabled=enabled;}
  @Scheduled(fixedDelayString="${dreamcore.experience-analysis.poll-ms:30000}",initialDelayString="${dreamcore.experience-analysis.initial-delay-ms:30000}")
  public void tick(){if(enabled&&runtime.configured())runOnce();}
  public void runOnce(){
+  for(UUID run:admission.pending())try{admission.admit(run);}catch(IdentityException unavailable){/* Leave source conflicts for the next source check. */}
   for(var recovery:queue.recoveries())if(!local.contains(recovery.id()))recover(recovery);
   queue.discover();
   for(UUID tenant:queue.tenants()){
@@ -41,7 +42,7 @@ public class ExperienceAnalysisWorker {
  }
  public void accept(ExperienceAnalysisRuntime.Result result){
   if(!Set.of("QUALIFIED","SKIPPED","REJECTED").contains(result.outcome())){queue.fail(result.runId(),result.outcome().equals("CANCELLED")?"EXPERIENCE_SOURCE_CHANGED":"EXPERIENCE_ANALYSIS_FAILED",true,result);return;}
-  try{queue.complete(result);}
+  try{queue.complete(result);if(result.outcome().equals("QUALIFIED"))admission.admit(result.runId());}
   catch(IdentityException changed){queue.fail(result.runId(),changed.code.equals("EXPERIENCE_VERIFICATION_ONLY")?changed.code:changed.status==422||changed.status==400?"EXPERIENCE_EVIDENCE_INVALID":"EXPERIENCE_SOURCE_CHANGED",true,result);}
  }
  public void recover(ExperienceAnalysisQueue.Recovery r){

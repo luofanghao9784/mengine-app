@@ -36,7 +36,14 @@ export function ExperienceLibrary(props: ExperienceLibraryProps) {
     <Library key={`${session.identity.account.id}:${props.tenant}:${props.workspace}`} {...props} />
   ) : null;
 }
-function Library({ tenant, workspace, workspaceName, verification, initialExperience, readOnly = false }: ExperienceLibraryProps) {
+function Library({
+  tenant,
+  workspace,
+  workspaceName,
+  verification,
+  initialExperience,
+  readOnly = false,
+}: ExperienceLibraryProps) {
   const outerGate = useContext(MutationGate);
   const [busy, setBusy] = useState(false);
   const [locks, setLocks] = useState<ReadonlySet<string>>(new Set());
@@ -183,6 +190,7 @@ function Library({ tenant, workspace, workspaceName, verification, initialExperi
                     key={`${detail.value.id}:${detail.value.version.id}:${detail.value.revision}`}
                     tenant={tenant}
                     workspace={workspace}
+                    readOnly={readOnly}
                     entry={readOnly ? { ...detail.value, canMaintain: false } : detail.value}
                     changed={saved}
                     edit={() => setEditor({ entry: detail.value! })}
@@ -236,7 +244,7 @@ function Library({ tenant, workspace, workspaceName, verification, initialExperi
                   )}
                 </form>
                 <p className="experience-note">
-                  关键词与标签检索 · 索引已就绪 · 手工整理，尚未评测。
+                  关键词与标签检索 · 索引已就绪 · 每条经验标注来源与核验状态。
                   {maintenance ? '修改候选不会自动替换当前生效版本。' : '这里只显示当前可读取的生效版本。'}
                 </p>
                 {list.value.items.length ? (
@@ -249,7 +257,9 @@ function Library({ tenant, workspace, workspaceName, verification, initialExperi
                       >
                         <div>
                           <Badge>{states[item.status]}</Badge>
-                          <span>v{item.number} · 未评测</span>
+                          <span>
+                            v{item.number} · {item.origin === 'AUTOMATIC' ? '自动核验通过' : '未评测'}
+                          </span>
                         </div>
                         <h3>{item.title}</h3>
                         <p>{item.summary}</p>
@@ -267,7 +277,7 @@ function Library({ tenant, workspace, workspaceName, verification, initialExperi
                   <Empty
                     icon={BookOpen}
                     title={query || tag ? '当前范围内没有匹配经验' : '还没有可用经验'}
-                    text="你可以继续原工作。候选需要明确发布，来源受限或已撤回的经验不会混入结果。"
+                    text="系统积累的经验通过核验后自动入库；来源受限或已停用的经验不会混入结果。"
                   />
                 )}
                 <Pager page={page} next={list.value.hasMore} onPage={setPage} />
@@ -295,6 +305,7 @@ function Library({ tenant, workspace, workspaceName, verification, initialExperi
   );
 }
 function ExperienceDetail({
+  readOnly,
   tenant,
   workspace,
   entry,
@@ -307,6 +318,7 @@ function ExperienceDetail({
   workspace: string;
   entry: ExperienceEntry;
   changed: (e: ExperienceEntry) => void;
+  readOnly: boolean;
   edit: () => void;
   chooseVersion: (version: string) => void;
   onDenied: (e: unknown) => void;
@@ -335,7 +347,8 @@ function ExperienceDetail({
     [tenant, workspace, entry.id, history, eventPage],
   );
   const c = entry.version.content,
-    current = entry.publishedVersion === entry.version.id;
+    current = entry.publishedVersion === entry.version.id,
+    automatic = entry.version.origin === 'AUTOMATIC';
   const perform = (kind: 'publish' | 'withdraw') => {
     if (!action.uncertain) setActiveAction(kind);
     void action.submit(
@@ -379,7 +392,7 @@ function ExperienceDetail({
         </Badge>
       </div>
       <div className="experience-detail-meta">
-        <span>人工整理 · 尚未评测</span>
+        <span>{automatic ? '系统积累 · 自动核验通过' : '人工整理 · 尚未评测'}</span>
         <span>
           {current ? '此版本当前生效' : `当前生效版本：${entry.publishedVersion ? '另一个版本' : '无'}`}
         </span>
@@ -417,14 +430,16 @@ function ExperienceDetail({
       {entry.canMaintain && (
         <section className="experience-maintain">
           <div className="experience-actions">
-            <Button disabled={blocked} onClick={edit}>
-              整理新版本
-            </Button>
+            {!automatic && (
+              <Button disabled={blocked} onClick={edit}>
+                整理新版本
+              </Button>
+            )}
             <Button disabled={blocked} onClick={() => setHistory(!history)}>
               {history ? '收起版本与发布记录' : '版本与发布记录'}
             </Button>
           </div>
-          {!current && c.accessMode === 'INDEPENDENT_COPY' && (
+          {!automatic && !current && c.accessMode === 'INDEPENDENT_COPY' && (
             <label className="experience-checkbox">
               <input
                 type="checkbox"
@@ -436,7 +451,7 @@ function ExperienceDetail({
             </label>
           )}
           <div className="experience-actions">
-            {!current && (
+            {!automatic && !current && (
               <Button
                 variant="primary"
                 disabled={
@@ -455,7 +470,7 @@ function ExperienceDetail({
                 disabled={(blocked && !action.uncertain) || (action.uncertain && activeAction !== 'withdraw')}
                 onClick={() => perform('withdraw')}
               >
-                {action.uncertain ? '重试同次撤回' : '撤回当前生效版本'}
+                {action.uncertain ? '重试同次停用' : automatic ? '停用此经验' : '撤回当前生效版本'}
               </Button>
             )}
           </div>
@@ -521,7 +536,9 @@ function ExperienceDetail({
           )}
         </section>
       )}
-      <ExperienceUsePanel tenant={tenant} workspace={workspace} entry={entry} onDenied={onDenied} />
+      {!readOnly && !automatic && (
+        <ExperienceUsePanel tenant={tenant} workspace={workspace} entry={entry} onDenied={onDenied} />
+      )}
     </article>
   );
 }

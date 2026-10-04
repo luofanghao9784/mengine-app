@@ -90,3 +90,21 @@ test('publishing independent content is an explicit, revision-bound action', () 
     false,
   );
 });
+
+test('automatic checking is a distinct origin pair, never interchangeable with manual provenance', () => {
+  const version = {
+    id,
+    number: 1,
+    schemaVersion: 1,
+    content,
+    evidence: [],
+    origin: 'AUTOMATIC',
+    evaluation: 'AUTOMATIC_CHECKED',
+    createdBy: id,
+    createdAt: '2026-10-01T00:00:00Z',
+  };
+  const validate = check('ExperienceVersion');
+  assert.ok(validate(version));
+  assert.equal(validate({ ...version, origin: 'MANUAL' }), false);
+  assert.equal(validate({ ...version, evaluation: 'NOT_EVALUATED' }), false);
+});

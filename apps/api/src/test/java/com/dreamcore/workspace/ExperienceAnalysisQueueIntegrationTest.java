@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.*;import static org.mockito.Mocki
 
 @SpringBootTest(properties={"dreamcore.tasks.enabled=false","dreamcore.experience-intake.enabled=false","dreamcore.experience-analysis.enabled=false"})
 class ExperienceAnalysisQueueIntegrationTest {
- @Autowired JdbcTemplate db;@Autowired ExperienceAnalysisQueue queue;@Autowired ExperienceIntakeService intake;@Autowired FeedbackService feedback;
+ @Autowired ExperienceAdmissionService admission;@Autowired JdbcTemplate db;@Autowired ExperienceAnalysisQueue queue;@Autowired ExperienceIntakeService intake;@Autowired FeedbackService feedback;
  UUID tenant,owner,space,task;
  @BeforeEach void fixture(){
   tenant=UUID.randomUUID();owner=UUID.randomUUID();space=UUID.randomUUID();task=UUID.randomUUID();UUID conversation=UUID.randomUUID();
@@ -81,7 +81,7 @@ class ExperienceAnalysisQueueIntegrationTest {
   var root=java.nio.file.Path.of("").toAbsolutePath();if(root.endsWith("api"))root=root.getParent().getParent();String token="synthetic-dispatch-012345678901234567890";
   var engine=new ProcessBuilder("node",root.resolve("engine/tests/fixtures/experience-dispatch-server.mjs").toString(),token,mode).redirectError(ProcessBuilder.Redirect.INHERIT).start();
   try(var pool=Executors.newSingleThreadExecutor();var lines=new java.io.BufferedReader(new java.io.InputStreamReader(engine.getInputStream()))){
-   String endpoint=pool.submit(lines::readLine).get(5,TimeUnit.SECONDS);var runtime=new ExperienceAnalysisRuntime(endpoint,token,"verification");Job j;var worker=new ExperienceAnalysisWorker(queue,runtime,mode.equals("skip"));
+   String endpoint=pool.submit(lines::readLine).get(5,TimeUnit.SECONDS);var runtime=new ExperienceAnalysisRuntime(endpoint,token,"verification");Job j;var worker=new ExperienceAnalysisWorker(queue,runtime,admission,mode.equals("skip"));
    try{
     if(mode.equals("skip")){
      long until=System.nanoTime()+TimeUnit.SECONDS.toNanos(8);
@@ -97,9 +97,9 @@ class ExperienceAnalysisQueueIntegrationTest {
  }
  @Test void recoveryAfterLostResponseUsesGetOnlyAndCommitsTheSameRun(){
   var j=claim();var runtime=mock(ExperienceAnalysisRuntime.class);when(runtime.preflight()).thenReturn(descriptor());when(runtime.execute(eq(j),any(),any())).thenThrow(new ExperienceAnalysisRuntime.Failure("EXPERIENCE_RESULT_UNKNOWN",true));
-  var original=new ExperienceAnalysisWorker(queue,runtime,false);try{original.execute(j);}finally{original.stop();}assertEquals("RUNNING",state(j));
+  var original=new ExperienceAnalysisWorker(queue,runtime,admission,false);try{original.execute(j);}finally{original.stop();}assertEquals("RUNNING",state(j));
   db.update("UPDATE experience_analysis_runs SET created_at=now()-interval '6 seconds' WHERE id=?",j.id());var recovery=queue.recoveries().stream().filter(r->r.id().equals(j.id())).findFirst().orElseThrow();when(runtime.recover(eq(j),eq("synthetic-v1"))).thenReturn(result(j,"SKIPPED"));
-  var restarted=new ExperienceAnalysisWorker(queue,runtime,false);try{restarted.recover(recovery);}finally{restarted.stop();}
+  var restarted=new ExperienceAnalysisWorker(queue,runtime,admission,false);try{restarted.recover(recovery);}finally{restarted.stop();}
   assertEquals("SKIPPED",state(j));verify(runtime,times(1)).execute(eq(j),any(),any());verify(runtime,times(1)).recover(eq(j),eq("synthetic-v1"));assertEquals(1,db.queryForObject("SELECT attempts FROM experience_analysis_items WHERE source_id=?",Integer.class,j.source()));
  }
  @Test void discoveryContinuesPastAlreadyQueuedPages(){

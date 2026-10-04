@@ -135,7 +135,7 @@ public class TaskContextService {
   var found=experiences.list(t.actor(),t.tenant(),t.space(),text(r.query(),200,true),"",false,offset(r),3);
   // Even summaries can contain source data; track their dependencies before exposing them.
   var items=new ArrayList<Object>();for(var s:found.items()){
-   var exact=experienceEntry(t,s.id(),s.versionId());trackExperience(t,exact);items.add(s);
+   var exact=experienceEntry(t,s.id(),s.versionId());trackExperience(t,exact);record(t,"EXPERIENCE",exact.id(),exact.version().id().toString(),exact.version());items.add(s);
   }
   return map("items",items,"hasMore",found.hasMore(),"scope","CURRENT_WORKSPACE_PUBLISHED","applicationOutcome","UNKNOWN");
  }

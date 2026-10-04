@@ -11,7 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.json.JsonMapper;
 
-/** Human-authored reusable methods. Search hits and reported outcomes are never execution proof. */
+/** Source-bounded reusable methods. Search hits and reported outcomes are never execution proof. */
 @Service
 public class ExperienceService {
  public record Content(String kind,String title,String summary,String body,List<String> tags,String applicable,String excluded,String dependencies,String basis,String accessMode) {}
@@ -93,8 +93,10 @@ public class ExperienceService {
  private Version projectVersion(UUID actor,UUID tenant,Map<String,Object> r){
   UUID id=(UUID)r.get("id");var refs=refs(id);String mode=(String)r.get("access_mode");
   if(mode.equals("SOURCE_BOUND"))requireEvidence(actor,tenant,refs);
-  return new Version(id,n(r,"number"),1,json.readValue(r.get("content").toString(),Content.class),refs.stream().filter(ref->evidenceAllowed(actor,tenant,ref)).toList(),"MANUAL","NOT_EVALUATED",(UUID)r.get("created_by"),time(r.get("created_at")));
+  return new Version(id,n(r,"number"),1,json.readValue(r.get("content").toString(),Content.class),refs.stream().filter(ref->evidenceAllowed(actor,tenant,ref)).toList(),(String)r.get("origin"),(String)r.get("evaluation"),(UUID)r.get("created_by"),time(r.get("created_at")));
  }
+ // Internal analysis runs in the caller transaction; expected read rejection must not poison its outcome record.
+ Entry analysisEntry(UUID actor,UUID tenant,UUID space,UUID id,UUID version){return get(actor,tenant,space,id,version);}
  @Transactional public Entry get(UUID actor,UUID tenant,UUID space,UUID id,UUID version){
   var e=row(actor,tenant,space,id,false);boolean maintain=scope(actor,tenant,space,false);
   UUID selected=version;
@@ -113,7 +115,7 @@ public class ExperienceService {
   if(!tag.isBlank()){sql+=" AND v.tags @> ?::text[]";args.add(new String[]{tag});}
   sql+=" ORDER BY e.updated_at DESC,e.id LIMIT ? OFFSET ?";args.add(limit+1);args.add(offset);
   var rows=db.queryForList(sql,args.toArray());
-  var summaries=rows.stream().limit(limit).map(r->{var c=json.readValue(r.get("content").toString(),Content.class);return new Summary((UUID)r.get("entry_id"),(UUID)r.get("id"),n(r,"number"),n(r,"revision"),(String)r.get("status"),c.title(),c.summary(),c.tags(),c.applicable(),c.excluded(),"MANUAL","NOT_EVALUATED");}).toList();
+  var summaries=rows.stream().limit(limit).map(r->{var c=json.readValue(r.get("content").toString(),Content.class);return new Summary((UUID)r.get("entry_id"),(UUID)r.get("id"),n(r,"number"),n(r,"revision"),(String)r.get("status"),c.title(),c.summary(),c.tags(),c.applicable(),c.excluded(),(String)r.get("origin"),(String)r.get("evaluation"));}).toList();
   return new Page(summaries,rows.size()>limit,can,"READY");
  }
  @Transactional public Versions versions(UUID actor,UUID tenant,UUID space,UUID id,int offset,int limit){
@@ -128,6 +130,10 @@ public class ExperienceService {
   for(var r:refs)db.update("INSERT INTO experience_evidence(version_id,kind,reference_id,source_workspace_id,material_version_id,task_id) VALUES (?,?,?,?,?,?)",v,r.kind(),r.referenceId(),r.workspaceId(),r.kind().equals("MATERIAL_VERSION")?r.referenceId():null,r.kind().equals("TASK")?r.referenceId():null);
   return v;
  }
+ Content automaticContent(Content c){return normalize(c);}
+ List<Evidence> automaticEvidence(UUID actor,UUID tenant,Content c,List<Evidence> refs){return normalizeRefs(actor,tenant,normalize(c),refs);}
+ UUID appendAutomatic(UUID actor,UUID entry,int number,Content c,List<Evidence> refs,String fingerprint){UUID version=append(actor,entry,number,normalize(c),refs);db.update("UPDATE experience_versions SET origin='AUTOMATIC',evaluation='AUTOMATIC_CHECKED',content_fingerprint=? WHERE id=?",fingerprint,version);return version;}
+ private void forbidAutomaticWrite(UUID entry){if(Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM experience_versions WHERE entry_id=? AND origin='AUTOMATIC')",Boolean.class,entry)))throw new IdentityException(409,"EXPERIENCE_AUTOMATIC_MANAGED");}
  private void event(UUID actor,UUID tenant,UUID entry,UUID version,int revision,String action){db.update("INSERT INTO experience_events(id,entry_id,version_id,revision,action,actor_id) VALUES (?,?,?,?,?,?)",UUID.randomUUID(),entry,version,revision,action,actor);audit.record(actor,tenant,"EXPERIENCE_"+action,entry,"SUCCESS");}
  @Transactional public Entry create(UUID actor,UUID tenant,UUID space,UUID key,Content body,List<Evidence> evidence){
   scope(actor,tenant,space,true);var c=normalize(body);var refs=normalizeRefs(actor,tenant,c,evidence);String h=hash(tenant,space,c,refs);UUID prior=identities.priorRequest(actor,key,"EXPERIENCE_CREATE",h);
@@ -136,13 +142,13 @@ public class ExperienceService {
  }
  @Transactional public Entry revise(UUID actor,UUID tenant,UUID space,UUID id,UUID key,int expected,Content body,List<Evidence> evidence){
   scope(actor,tenant,space,true);var c=normalize(body);var refs=normalizeRefs(actor,tenant,c,evidence);String h=hash(tenant,space,id,expected,c,refs);UUID prior=identities.priorRequest(actor,key,"EXPERIENCE_REVISE",h);var e=row(actor,tenant,space,id,true);
-  if(prior!=null)return get(actor,tenant,space,id,prior);if(n(e,"revision")!=expected)throw new IdentityException(409,"EXPERIENCE_STATE_CHANGED");
+  if(prior!=null)return get(actor,tenant,space,id,prior);forbidAutomaticWrite(id);if(n(e,"revision")!=expected)throw new IdentityException(409,"EXPERIENCE_STATE_CHANGED");
   versionRow(actor,tenant,space,id,db.queryForObject("SELECT id FROM experience_versions WHERE entry_id=? AND number=?",UUID.class,id,n(e,"latest_number")));
   UUID v=append(actor,id,n(e,"latest_number")+1,c,refs);db.update("UPDATE experience_entries SET latest_number=latest_number+1,revision=revision+1,updated_at=now() WHERE id=?",id);event(actor,tenant,id,v,expected+1,"REVISED");identities.remember(actor,key,"EXPERIENCE_REVISE",h,v);return get(actor,tenant,space,id,v);
  }
  @Transactional public Entry publish(UUID actor,UUID tenant,UUID space,UUID id,UUID key,int expected,UUID version,boolean independentCopyConfirmed){
   scope(actor,tenant,space,true);String h=hash(tenant,space,id,expected,version,independentCopyConfirmed);UUID prior=identities.priorRequest(actor,key,"EXPERIENCE_PUBLISH",h);var e=row(actor,tenant,space,id,true);
-  if(prior!=null)return get(actor,tenant,space,id,prior);if(n(e,"revision")!=expected)throw new IdentityException(409,"EXPERIENCE_STATE_CHANGED");
+  if(prior!=null)return get(actor,tenant,space,id,prior);forbidAutomaticWrite(id);if(n(e,"revision")!=expected)throw new IdentityException(409,"EXPERIENCE_STATE_CHANGED");
   var v=versionRow(actor,tenant,space,id,version);requireEvidence(actor,tenant,refs(version));
   if("INDEPENDENT_COPY".equals(v.get("access_mode"))&&!independentCopyConfirmed)throw new IdentityException(409,"EXPERIENCE_COPY_CONFIRMATION_REQUIRED");
   db.update("UPDATE experience_entries SET status='PUBLISHED',published_version=?,revision=revision+1,updated_at=now() WHERE id=?",version,id);event(actor,tenant,id,version,expected+1,"PUBLISHED");identities.remember(actor,key,"EXPERIENCE_PUBLISH",h,version);return get(actor,tenant,space,id,version);
@@ -151,7 +157,7 @@ public class ExperienceService {
   scope(actor,tenant,space,true);String h=hash(tenant,space,id,expected);UUID prior=identities.priorRequest(actor,key,"EXPERIENCE_WITHDRAW",h);var e=row(actor,tenant,space,id,true);
   if(prior!=null)return get(actor,tenant,space,id,prior);if(n(e,"revision")!=expected)throw new IdentityException(409,"EXPERIENCE_STATE_CHANGED");
   UUID v=(UUID)e.get("published_version");if(v==null)throw new IdentityException(409,"EXPERIENCE_NOT_PUBLISHED");
-  db.update("UPDATE experience_entries SET status='WITHDRAWN',published_version=NULL,revision=revision+1,updated_at=now() WHERE id=?",id);event(actor,tenant,id,v,expected+1,"WITHDRAWN");identities.remember(actor,key,"EXPERIENCE_WITHDRAW",h,v);return get(actor,tenant,space,id,v);
+  db.update("UPDATE experience_entries SET status='WITHDRAWN',published_version=NULL,automation_stopped=true,revision=revision+1,updated_at=now() WHERE id=?",id);event(actor,tenant,id,v,expected+1,"WITHDRAWN");identities.remember(actor,key,"EXPERIENCE_WITHDRAW",h,v);return get(actor,tenant,space,id,v);
  }
  @Transactional public Events events(UUID actor,UUID tenant,UUID space,UUID id,int offset,int limit){
   paging(offset,limit);row(actor,tenant,space,id,true);
