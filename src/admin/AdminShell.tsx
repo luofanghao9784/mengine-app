@@ -207,14 +207,14 @@ export function AdminShell({
             {(realm === 'platform'
               ? [
                   {
+                    label: '梦核引擎',
+                    items: nav.filter((item) => ['engine', 'data', 'experience', 'capabilities'].includes(item.id)),
+                  },
+                  {
                     label: '平台管理',
                     items: nav.filter((item) =>
                       ['overview', 'tenants', 'usage'].includes(item.id),
                     ),
-                  },
-                  {
-                    label: '梦核引擎',
-                    items: nav.filter((item) => ['engine', 'data', 'experience', 'capabilities'].includes(item.id)),
                   },
                 ]
               : [{ label: '', items: nav }]
