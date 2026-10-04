@@ -1,0 +1,183 @@
+.data-ops-page {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+.data-ops-page > .button {
+  justify-self: start;
+}
+.data-ops-nav {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.data-ops-nav a {
+  padding: 10px 18px;
+  border-radius: 10px;
+  color: var(--muted);
+  text-decoration: none;
+}
+.data-ops-nav a.active {
+  color: #1160dd;
+  background: #e5efff;
+}
+.data-ops-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.data-ops-heading h2,
+.data-ops-heading h3 {
+  margin: 0;
+}
+.data-ops-filters {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 18px 0;
+}
+.data-ops-filters label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 160px;
+  max-width: 400px;
+}
+.data-ops-filters input {
+  min-width: 0;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+  background: var(--surface, #fff);
+}
+.data-ops-page select {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+  background: var(--surface, #fff);
+  max-width: 100%;
+}
+.data-ops-metrics {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+  margin: 20px 0;
+}
+.data-ops-metrics div {
+  background: #f3f7fd;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px;
+}
+.data-ops-metrics dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+.data-ops-metrics dd {
+  margin: 5px 0 0;
+  font-size: 25px;
+}
+.data-ops-tenants {
+  display: grid;
+  gap: 10px;
+}
+.data-ops-tenants > a {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  text-decoration: none;
+  color: inherit;
+}
+.data-ops-tenants > a:hover {
+  background: #f4f8ff;
+  border-color: #bdd4f5;
+}
+.data-ops-tenants h3 {
+  margin: 0 0 7px;
+}
+.data-ops-tenants > a > div:last-child {
+  display: grid;
+  gap: 8px;
+  justify-items: end;
+}
+.data-ops-tenants small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.data-ops-records {
+  display: grid;
+  gap: 14px;
+}
+.data-ops-records article {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 18px;
+}
+.data-ops-records h3 {
+  font-size: 15px;
+}
+.data-ops-records dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 18px 0 0;
+}
+.data-ops-records dl > div {
+  min-width: 0;
+}
+.data-ops-records dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+.data-ops-records dd {
+  margin: 5px 0 0;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.data-ops-diagnostic {
+  margin: 16px 0 0;
+  padding: 12px;
+  background: #fff5eb;
+  border-radius: 8px;
+  color: #925526;
+  font-size: 13px;
+  line-height: 1.6;
+}
+@media (max-width: 950px) {
+  .data-ops-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 550px) {
+  .data-ops-tenants > a {
+    flex-direction: column;
+    padding: 14px;
+  }
+  .data-ops-tenants > a > div:last-child {
+    justify-items: start;
+  }
+  .data-ops-records dl {
+    grid-template-columns: 1fr;
+  }
+  .data-ops-metrics div {
+    padding: 10px;
+  }
+  .data-ops-metrics dd {
+    font-size: 22px;
+  }
+  .data-ops-filters label {
+    flex-basis: 100%;
+    max-width: none;
+  }
+  .data-ops-heading h2 {
+    font-size: 19px;
+  }
+}

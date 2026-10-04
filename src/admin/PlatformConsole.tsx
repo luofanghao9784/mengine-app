@@ -1,3 +1,4 @@
+import { PlatformDataOperations } from '../operations/PlatformDataOperations';
 import { adminHref } from './navigation';
 import { EngineTelemetryWall } from '../operations/EngineTelemetryWall';
 import { useSession } from '../identity/session';
@@ -13,6 +14,7 @@ import { MethodWorkbench } from '../methods/MethodWorkbench';
 export function PlatformConsole({ logout }: { logout: () => void }) {
   const { session } = useSession();
   const { page, hash } = useAdminRoute('platform');
+  const detail = new URLSearchParams(hash.slice(1)).get('detail');
   return (
     <AdminShell
       realm="platform"
@@ -28,9 +30,12 @@ export function PlatformConsole({ logout }: { logout: () => void }) {
         <PlatformHome embedded />
       ) : page === 'accounts' ? (
         <PlatformAccounts />
+      ) : page === 'engine' && detail === 'data' ? (
+        <PlatformDataOperations hash={hash} />
       ) : page === 'engine' ? (
         <>
           <div className="admin-secondary-link">
+            <a href={adminHref('platform', 'engine', hash, { detail: 'data' })}>数据运行</a>
             <a href={adminHref('platform', 'usage', hash)}>查看用量与成本</a>
           </div>
           <EngineTelemetryWall scope="platform" />

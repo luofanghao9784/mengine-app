@@ -1,0 +1,497 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Platform data operations",
+    "version": "1.0.0",
+    "description": "Operational metadata only. Connections use latest run; in-library materials use current version latest generation. Counts are mutually exclusive current states. Tenant filter precedes pagination; summary describes all objects of matched tenants. No filename, content, route, credentials, raw errors or content IDs. Read does not grant access to customer resources."
+  },
+  "security": [
+    {
+      "platformSessionCookie": []
+    }
+  ],
+  "paths": {
+    "/api/platform-admin/v1/data-operations": {
+      "get": {
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "schema": {
+              "enum": [
+                "CONNECTIONS",
+                "MATERIALS"
+              ],
+              "default": "CONNECTIONS"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "schema": {
+              "enum": [
+                "ALL",
+                "READY",
+                "PROCESSING",
+                "ATTENTION",
+                "NOT_STARTED",
+                "STOPPED"
+              ],
+              "default": "ALL"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 20000
+            }
+          },
+          {
+            "name": "query",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 180
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "No-store operational metadata",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Overview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid filter or paging"
+          },
+          "401": {
+            "description": "Independent platform session required"
+          },
+          "403": {
+            "description": "Current platform authority required"
+          },
+          "404": {
+            "description": "Tenant unavailable"
+          }
+        }
+      }
+    },
+    "/api/platform-admin/v1/tenants/{tenant}/data-operations": {
+      "get": {
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "schema": {
+              "enum": [
+                "CONNECTIONS",
+                "MATERIALS"
+              ],
+              "default": "CONNECTIONS"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "schema": {
+              "enum": [
+                "ALL",
+                "READY",
+                "PROCESSING",
+                "ATTENTION",
+                "NOT_STARTED",
+                "STOPPED"
+              ],
+              "default": "ALL"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 20000
+            }
+          },
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "No-store operational metadata",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid filter or paging"
+          },
+          "401": {
+            "description": "Independent platform session required"
+          },
+          "403": {
+            "description": "Current platform authority required"
+          },
+          "404": {
+            "description": "Tenant unavailable"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "platformSessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "DREAMCORE_PLATFORM",
+        "description": "独立总台会话；企业用户 Cookie 不授予平台权限。写入前从 /api/platform-admin/v1/auth/csrf 取得令牌。"
+      }
+    },
+    "schemas": {
+      "Counts": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "total",
+          "ready",
+          "processing",
+          "attention",
+          "notStarted",
+          "stopped"
+        ],
+        "properties": {
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "ready": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "processing": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "attention": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "notStarted": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "stopped": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        }
+      },
+      "Tenant": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "tenantId",
+          "tenantName",
+          "tenantStatus",
+          "counts",
+          "lastSuccessAt"
+        ],
+        "properties": {
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "tenantStatus": {
+            "enum": [
+              "ACTIVE",
+              "SUSPENDED"
+            ]
+          },
+          "counts": {
+            "$ref": "#/components/schemas/Counts"
+          },
+          "lastSuccessAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "Item": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "monitorKey",
+          "runId",
+          "stage",
+          "configuration",
+          "category",
+          "diagnostic",
+          "createdAt",
+          "finishedAt",
+          "lastSuccessAt"
+        ],
+        "properties": {
+          "monitorKey": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{32}$"
+          },
+          "runId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "stage": {
+            "enum": [
+              "NOT_STARTED",
+              "QUEUED",
+              "RUNNING",
+              "SUCCEEDED",
+              "READY",
+              "FAILED",
+              "INTERRUPTED",
+              "PARTIAL",
+              "UNSUPPORTED",
+              "CANCELLED"
+            ]
+          },
+          "configuration": {
+            "enum": [
+              "READY",
+              "UNAVAILABLE",
+              "UNCONFIGURED",
+              null
+            ]
+          },
+          "category": {
+            "enum": [
+              "READY",
+              "PROCESSING",
+              "ATTENTION",
+              "NOT_STARTED",
+              "STOPPED"
+            ]
+          },
+          "diagnostic": {
+            "enum": [
+              "CONNECTION_UNAVAILABLE",
+              "CONNECTION_UNCONFIGURED",
+              "COLLECTION_TIMEOUT",
+              "COLLECTION_INVALID_RESULT",
+              "COLLECTION_ADAPTER_FAILED",
+              "COLLECTION_INTERRUPTED",
+              "OTHER",
+              "PARSE_FAILED",
+              "UNSUPPORTED_FORMAT",
+              "PARTIAL_PARSE",
+              null
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "lastSuccessAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "Overview": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "state",
+          "offset",
+          "checkedAt",
+          "counts",
+          "hasMore",
+          "query",
+          "matchedTenants",
+          "items"
+        ],
+        "properties": {
+          "kind": {
+            "enum": [
+              "CONNECTIONS",
+              "MATERIALS"
+            ]
+          },
+          "state": {
+            "enum": [
+              "ALL",
+              "READY",
+              "PROCESSING",
+              "ATTENTION",
+              "NOT_STARTED",
+              "STOPPED"
+            ]
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/Counts"
+          },
+          "hasMore": {
+            "type": "boolean"
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 180
+          },
+          "matchedTenants": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "items": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "$ref": "#/components/schemas/Tenant"
+            }
+          }
+        }
+      },
+      "Detail": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "state",
+          "offset",
+          "checkedAt",
+          "counts",
+          "hasMore",
+          "tenantId",
+          "tenantName",
+          "tenantStatus",
+          "items"
+        ],
+        "properties": {
+          "kind": {
+            "enum": [
+              "CONNECTIONS",
+              "MATERIALS"
+            ]
+          },
+          "state": {
+            "enum": [
+              "ALL",
+              "READY",
+              "PROCESSING",
+              "ATTENTION",
+              "NOT_STARTED",
+              "STOPPED"
+            ]
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/Counts"
+          },
+          "hasMore": {
+            "type": "boolean"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "tenantStatus": {
+            "enum": [
+              "ACTIVE",
+              "SUSPENDED"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "$ref": "#/components/schemas/Item"
+            }
+          }
+        }
+      }
+    }
+  }
+}
