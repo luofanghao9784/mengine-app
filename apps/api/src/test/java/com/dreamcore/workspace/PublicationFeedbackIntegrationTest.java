@@ -30,6 +30,17 @@ class PublicationFeedbackIntegrationTest {
  FeedbackService.Feedback create(UUID who){return feedback.create(who,tenant,UUID.randomUUID(),target(who),negative());}
  UUID version(UUID feedback,int revision){return db.queryForObject("SELECT id FROM feedback_versions WHERE feedback_id=? AND revision=?",UUID.class,feedback,revision);}
  UUID record(UUID version){return db.queryForObject("SELECT id FROM object_lifecycle WHERE kind='FEEDBACK_VERSION' AND object_id=?",UUID.class,version);}
+ @Autowired ExperienceAnalysisQueue experienceQueue;
+ @Test void automaticIntakeReadsOnlyPublishedParsedCopyAndNeverAuthorsPrivateInput(){
+  db.update("UPDATE conversation_tasks SET execution_class='live' WHERE id=?",task);var opinion=create(reader);experienceQueue.discover();
+  assertNull(experienceQueue.claim(tenant)); // Parsing unavailable, never fall back to the author's document/task.
+  UUID run=UUID.randomUUID(),chunk=UUID.randomUUID();
+  db.update("INSERT INTO knowledge_runs(id,tenant_id,workspace_id,material_id,version_id,generation,requested_by,status) SELECT ?,?,?,?,?,coalesce(max(generation),0)+1,?,'READY' FROM knowledge_runs WHERE version_id=?",run,tenant,shared,publication.materialId(),publication.materialVersionId(),reader,publication.materialVersionId());
+  db.update("INSERT INTO knowledge_chunks(id,tenant_id,workspace_id,material_id,version_id,run_id,ordinal,locator,method,content) VALUES (?,?,?,?,?,?,0,'p1','TEXT','合成独立发布副本正文')",chunk,tenant,shared,publication.materialId(),publication.materialVersionId(),run);
+  db.update("UPDATE experience_analysis_items SET next_attempt_at=now() WHERE tenant_id=?",tenant);var job=experienceQueue.claim(tenant);assertNotNull(job);
+  String input=json.writeValueAsString(job.inputs());assertTrue(input.contains("合成独立发布副本正文"));assertTrue(input.contains("仅本人的纠错意见"));assertFalse(input.contains("作者私人"));assertFalse(input.contains("TASK_INPUT"));
+  db.queryForList("SELECT scrub_lifecycle_object('TASK',?)",task);assertTrue(experienceQueue.active(job.id(),job.lease()));
+ }
  @Test void readonlySharedReaderGetsOwnExactVersionWithoutAuthorsTaskOrOthersOpinions(){var t=target(reader);assertEquals("PUBLICATION",t.kind());assertNull(t.taskId());assertEquals(publication.id(),t.publicationId());assertEquals(publication.materialVersionId(),t.materialVersionId());var f=create(reader);assertEquals("PUBLISHED_COPY",f.snapshot().taskState());assertEquals("none",f.snapshot().executionClass());assertFalse(json.writeValueAsString(f).contains(task.toString()));assertFalse(json.writeValueAsString(f).contains("作者私人"));assertEquals(List.of(publication.materialVersionId()),db.queryForList("SELECT version_id FROM feedback_source_versions WHERE feedback_id=?",UUID.class,f.id()));
   for(UUID a:List.of(author,other,admin))assertThrows(IdentityException.class,()->feedback.get(a,tenant,f.id()));assertThrows(IdentityException.class,()->feedback.get(reader,UUID.randomUUID(),f.id()));assertEquals(false,db.queryForObject("SELECT can_maintain FROM workspace_members WHERE workspace_id=? AND account_id=?",Boolean.class,shared,reader));
   var their=create(other);assertNotEquals(f.id(),their.id());assertEquals(1,feedback.lookup(reader,tenant,t).feedback().revision());
