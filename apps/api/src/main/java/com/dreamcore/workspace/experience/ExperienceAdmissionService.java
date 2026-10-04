@@ -74,6 +74,7 @@ public class ExperienceAdmissionService {
   int number=entry==null?1:((Number)entry.get("latest_number")).intValue()+1,revision=entry==null?1:((Number)entry.get("revision")).intValue()+1;
   if(entry==null)db.update("INSERT INTO experience_entries(id,tenant_id,workspace_id,created_by) VALUES (?,?,?,?)",entryId,tenant,space,actor);
   UUID version=experiences.appendAutomatic(actor,entryId,number,content,List.copyOf(refs),fingerprint);
+  db.update("UPDATE experience_versions SET automatic_basis=?,automatic_steps=?::jsonb WHERE id=?",json.readTree(r.get("review").toString()).get("basis").asString(),c.get("steps").toString(),version);
   db.update("INSERT INTO experience_automatic_sources(version_id,source_id) VALUES (?,?)",version,source);
   for(UUID dep:dependencies)db.update("INSERT INTO experience_automatic_dependencies(version_id,dependency_version) VALUES (?,?)",version,dep);
   event(actor,tenant,entryId,version,revision,entry==null?"CREATED":"REVISED");

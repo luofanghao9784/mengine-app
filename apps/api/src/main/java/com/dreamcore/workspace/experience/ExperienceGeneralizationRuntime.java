@@ -38,7 +38,7 @@ public class ExperienceGeneralizationRuntime {
    while(System.nanoTime()<until){
     if(!active.getAsBoolean()){cancel(job.id(),job.lease());throw new Failure("GENERALIZATION_SOURCE_CHANGED",true);}
     try{var response=future.get(300,TimeUnit.MILLISECONDS);
-     if(response.statusCode()==200)return validate(response.body(),job,descriptor.engineVersion());
+     if(response.statusCode()==200)return validate(response.body(),job,descriptor.engineVersion(),mode);
      if(response.statusCode()==409 && "GENERALIZATION_ATTEMPT_CONFLICT".equals(json.readTree(response.body()).path("code").asString()))throw new Failure("GENERALIZATION_RESULT_UNKNOWN",true);
      if(Set.of(400,401,403,409,413,429,503).contains(response.statusCode()))throw new Failure(response.statusCode()==429?"ENGINE_BUSY":"GENERALIZATION_ENGINE_UNAVAILABLE",false);
      throw new Failure("GENERALIZATION_RESULT_UNKNOWN",true);
@@ -49,7 +49,7 @@ public class ExperienceGeneralizationRuntime {
   finally{if(future!=null&&!future.isDone())future.cancel(true);}
  }
  public Result recover(Job job,String version){
-  try{var response=send(request("/internal/v1/experience-generalization/results/"+job.id()+"/"+job.lease()).GET().build());if(response.statusCode()==202)return null;if(response.statusCode()!=200)throw new Failure("GENERALIZATION_RESULT_UNKNOWN",true);return validate(response.body(),job,version);}
+  try{var response=send(request("/internal/v1/experience-generalization/results/"+job.id()+"/"+job.lease()).GET().build());if(response.statusCode()==202)return null;if(response.statusCode()!=200)throw new Failure("GENERALIZATION_RESULT_UNKNOWN",true);return validate(response.body(),job,version,mode);}
   catch(Failure f){throw f;}catch(Exception e){if(e instanceof InterruptedException)Thread.currentThread().interrupt();throw new Failure("GENERALIZATION_RESULT_UNKNOWN",true);}
  }
  public void cancel(UUID run,UUID lease){try{send(request("/internal/v1/experience-generalization/results/"+run+"/"+lease).DELETE().build());}catch(Exception ignored){if(ignored instanceof InterruptedException)Thread.currentThread().interrupt();}}
@@ -67,7 +67,8 @@ public class ExperienceGeneralizationRuntime {
   return values.stream().anyMatch(v->body.contains(normalized(v)))||java.util.regex.Pattern.compile("[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,}|https?://|\\b(?:bearer\\s+|sk-)[a-z0-9_-]{12,}|\\b1[3-9]\\d{9}\\b|\\b\\d{17}[\\dx]\\b|[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}",java.util.regex.Pattern.CASE_INSENSITIVE).matcher(body).find();
  }
  private static boolean exact(tools.jackson.databind.JsonNode node,Set<String> names){return node!=null&&node.isObject()&&node.size()==names.size()&&names.stream().allMatch(node::has);}
- private Result validate(byte[] body,Job job,String version){
+ public Result validateReceipt(Result result,Job job,String version,String expectedMode){return validate(json.writeValueAsBytes(result),job,version,expectedMode);}
+ private Result validate(byte[] body,Job job,String version,String expectedMode){
   try{
    var tree=json.readTree(body);
    if(!exact(tree,Set.of("contractVersion","engineVersion","executionClass","runId","lease","source","admitted","outcome","code","method","privacy","quality","stages")))throw new Failure("GENERALIZATION_RESULT_UNKNOWN",true);
@@ -75,7 +76,7 @@ public class ExperienceGeneralizationRuntime {
    if(!tree.path("stages").isArray())throw new Failure("GENERALIZATION_RESULT_UNKNOWN",true);
    for(var stage:tree.get("stages"))if(!exact(stage,Set.of("stage","modelName","modelCalls","inputTokens","outputTokens")))throw new Failure("GENERALIZATION_RESULT_UNKNOWN",true);
    var r=json.readValue(body,Result.class);
-   if(!"1.0".equals(r.contractVersion())||!job.id().equals(r.runId())||!job.lease().equals(r.lease())||!job.source().equals(r.source())||!mode.equals(r.executionClass())||!Objects.equals(version,r.engineVersion())||!Boolean.FALSE.equals(r.admitted())||!Set.of("QUALIFIED","SKIPPED","REJECTED","FAILED","CANCELLED").contains(r.outcome())||r.stages()==null||r.stages().isEmpty()||r.stages().size()>3)throw new Failure("GENERALIZATION_RESULT_UNKNOWN",true);
+   if(!"1.0".equals(r.contractVersion())||!job.id().equals(r.runId())||!job.lease().equals(r.lease())||!job.source().equals(r.source())||!expectedMode.equals(r.executionClass())||!Objects.equals(version,r.engineVersion())||!Boolean.FALSE.equals(r.admitted())||!Set.of("QUALIFIED","SKIPPED","REJECTED","FAILED","CANCELLED").contains(r.outcome())||r.stages()==null||r.stages().isEmpty()||r.stages().size()>3)throw new Failure("GENERALIZATION_RESULT_UNKNOWN",true);
    for(int n=0;n<r.stages().size();n++){var s=r.stages().get(n);if(s==null||!Objects.equals(STAGES.get(n),s.stage())||!text(s.modelName(),200)||s.modelCalls()==null||s.modelCalls()<0||s.modelCalls()>6||(s.inputTokens()==null)!=(s.outputTokens()==null)||s.inputTokens()!=null&&(s.inputTokens()<0||s.outputTokens()<0))throw new Failure("GENERALIZATION_RESULT_UNKNOWN",true);}
    if(r.privacy()!=null&&(!checks(r.privacy(),PRIVACY)||r.stages().size()<2)||r.quality()!=null&&(!checks(r.quality(),QUALITY)||r.stages().size()!=3||!passed(r.privacy())))throw new Failure("GENERALIZATION_RESULT_UNKNOWN",true);
    if(r.outcome().equals("QUALIFIED")){
