@@ -694,3 +694,35 @@
 .admin-platform .platform-enterprise-catalog .platform-member-count { text-align: center; }
 .admin-platform .platform-enterprise-catalog .platform-service-label { justify-content: center; }
 .admin-platform .platform-enterprise-catalog .platform-tenant-arrow { color: var(--muted); }
+
+.admin-platform .platform-enterprise-page > .platform-detail-nav {
+  display: flex;
+  gap: 28px;
+  padding: 0;
+  margin: 0 0 20px;
+  border-bottom: 1px solid var(--line);
+}
+.admin-platform .platform-enterprise-page > .platform-detail-nav .button {
+  padding: 12px 0;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+  color: var(--muted);
+}
+.admin-platform .platform-enterprise-page > .platform-detail-nav .button:hover {
+  color: var(--text);
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+.admin-platform .platform-enterprise-page > .platform-detail-nav .button[aria-current='page'] {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.admin-platform .platform-enterprise-page > .platform-enterprise-detail { margin-top: 0; }
+.platform-invitation-record { padding-bottom: 20px; margin-bottom: 20px; border-bottom: 1px solid var(--line); }
+.platform-invitation-record > div { display: flex; align-items: center; gap: 12px; }
+.platform-invitation-record p { margin: 8px 0; }

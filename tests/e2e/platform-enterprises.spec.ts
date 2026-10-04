@@ -104,14 +104,14 @@ async function fixture(context: BrowserContext, uncertain = false) {
   });
   return writes;
 }
-test('enterprise catalog, full detail and creation keep navigation independent and filters intact', async ({
+test('enterprise catalog, full detail and creation keep navigation independent with simplified controls', async ({
   page,
   context,
 }) => {
   const writes = await fixture(context);
   await page.goto('/platform-admin/#admin=tenants');
-  await page.getByRole('textbox', { name: '搜索企业' }).fill('合成');
-  await page.getByRole('button', { name: '搜索企业名称', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: '搜索企业' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '刷新', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: '查看企业 合成企业甲' }).click();
   await expect(page.getByRole('region', { name: '企业详情' })).toBeVisible();
   await expect(page.getByRole('dialog')).toHaveCount(0);
@@ -121,7 +121,7 @@ test('enterprise catalog, full detail and creation keep navigation independent a
   await page.getByRole('button', { name: '管理记录', exact: true }).click();
   await expect(page).toHaveURL(/section=records/);
   await page.getByRole('button', { name: '返回企业列表' }).click();
-  await expect(page.getByRole('textbox', { name: '搜索企业' })).toHaveValue('合成');
+  await expect(page.getByRole('heading', { name: '企业管理', exact: true })).toBeVisible();
   await page.getByRole('button', { name: '开通企业', exact: true }).click();
   await page.getByLabel('企业名称', { exact: true }).fill('合成企业甲');
   await page.getByLabel('初始负责人手机号').fill('19900000001');
@@ -145,7 +145,7 @@ test('uncertain initial invitation revocation retains request and cannot leave o
   await expect(page.getByRole('button', { name: '重试本次操作' })).toBeVisible();
   await expect(page.getByRole('button', { name: '返回企业列表', includeHidden: true })).toBeDisabled();
   await expect(revoke.getByRole('button', { name: '取消', exact: true })).toBeDisabled();
-  await expect(page.getByRole('button', { name: '刷新详情', exact: true, includeHidden: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: '刷新详情', exact: true, includeHidden: true })).toHaveCount(0);
   await page.getByRole('button', { name: '重试本次操作' }).click();
   await expect(page.locator('.platform-invitation-line').getByText('已撤销', { exact: true })).toBeVisible();
   expect(writes[0].body).toEqual(writes[1].body);
