@@ -47,11 +47,77 @@ test('legacy check payload stays valid while only known context versions can adv
 });
 test('dataset reads require exact identities and bounded rows and columns, never a connection credential', () => {
   const id = '00000000-0000-4000-8000-000000000001';
-  const input = { action: 'dataset_read', referenceId: id, versionId: id, offset: 99999, columnOffset: 99, columnLimit: 1 };
+  const input = {
+    action: 'dataset_read',
+    referenceId: id,
+    versionId: id,
+    offset: 99999,
+    columnOffset: 99,
+    columnLimit: 1,
+  };
   assert.ok(request(input));
   assert.ok(!request({ ...input, versionId: 'latest' }));
   assert.ok(!request({ ...input, columnLimit: 11 }));
   assert.ok(!request({ ...input, connectionId: id }));
   assert.ok(!request({ ...input, sql: 'select * from customers' }));
   assert.ok(!request({ action: 'dataset_read', referenceId: id }));
+});
+
+test('general methods require a separate bridge, fixed versions and explicit adaptations without tenant authority', () => {
+  const id = '00000000-0000-4000-8000-000000000001';
+  const use = {
+    action: 'general_experience_use',
+    referenceId: id,
+    versionId: id,
+    requestId: id,
+    decision: 'ADAPTED',
+    conditions: '已检查前提',
+    adjustments: '仅调整当前任务格式',
+  };
+  assert.ok(request(use));
+  assert.ok(!request({ ...use, adjustments: '' }));
+  assert.ok(!request({ ...use, tenantId: id }));
+  assert.ok(!request({ ...use, scope: 'TENANT' }));
+  assert.ok(!request({ ...use, versionId: 'latest' }));
+  assert.ok(request({ action: 'general_experience_search', query: '核对' }));
+  assert.ok(!request({ action: 'general_experience_search' }));
+  assert.ok(request({ action: 'general_experience_read', referenceId: id, versionId: id, offset: 9 }));
+  assert.ok(!request({ action: 'general_experience_read', referenceId: id, versionId: id, offset: 10 }));
+  const base = {
+    allowed: true,
+    executionClass: 'verification',
+    publicQuery: '',
+    candidateTrialsAllowed: false,
+    contextVersion: '1.0',
+  };
+  assert.ok(check({ ...base, generalExperienceVersion: '1.0' }));
+  assert.ok(!check({ ...base, generalExperienceVersion: '2.0' }));
+});
+
+test('general result schemas exclude private contribution fields and fabricated outcomes', () => {
+  const response = ajv.compile({ $ref: schema.$id + '#/$defs/response' }),
+    id = '00000000-0000-4000-8000-000000000001';
+  const value = {
+    contractVersion: '1.0',
+    action: 'general_experience_use',
+    referenceOnly: true,
+    result: {
+      id,
+      versionId: id,
+      attempt: 1,
+      decision: 'DIRECT',
+      conditions: '满足必要条件',
+      adjustments: '',
+      selectionRecorded: true,
+      assessmentSource: 'MODEL_REPORTED',
+      applicationOutcome: 'UNKNOWN',
+      businessActionPerformed: false,
+    },
+  };
+  assert.ok(response(value));
+  for (const field of ['tenantId', 'sourceId', 'actorId', 'evidence'])
+    assert.ok(!response({ ...value, result: { ...value.result, [field]: id } }));
+  assert.ok(!response({ ...value, result: { ...value.result, applicationOutcome: 'SUCCEEDED' } }));
+  assert.ok(!response({ ...value, result: { ...value.result, selectionRecorded: false } }));
+  assert.ok(response({ ...value, result: { unavailable: true, reason: 'SELECTED_ONLY' } }));
 });

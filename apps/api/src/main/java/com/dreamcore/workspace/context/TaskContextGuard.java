@@ -15,6 +15,8 @@ public class TaskContextGuard {
   // Fence a simultaneous revision/publication through the caller's transaction, including final commit.
   db.queryForList("SELECT e.id FROM profile_entries e JOIN task_context_reads r ON r.reference_id=e.id AND r.kind='PROFILE' JOIN conversation_tasks t ON t.id=r.task_id WHERE t.id=? AND r.attempt_number=t.attempt ORDER BY e.id FOR SHARE OF e",task);
   db.queryForList("SELECT e.id FROM experience_entries e JOIN task_context_reads r ON r.reference_id=e.id AND r.kind='EXPERIENCE' JOIN conversation_tasks t ON t.id=r.task_id WHERE t.id=? AND r.attempt_number=t.attempt ORDER BY e.id FOR SHARE OF e",task);
+  db.queryForList("SELECT e.id FROM task_general_experience_dependencies(?) r JOIN general_experience_entries e ON e.id=r.entry_id JOIN general_experience_versions v ON v.id=r.version_id ORDER BY e.id FOR SHARE OF e,v",task);
+  if(Boolean.TRUE.equals(db.queryForObject("SELECT NOT task_general_experiences_current(?) OR EXISTS(SELECT 1 FROM task_general_experience_fences f JOIN conversation_tasks t ON t.id=f.task_id WHERE t.id=? AND f.attempt_number=t.attempt) OR NOT task_general_experiences_readable(?)",Boolean.class,task,task,task)))throw new IdentityException(409,"TASK_CONTEXT_CHANGED");
   boolean stale=Boolean.TRUE.equals(db.queryForObject("""
    SELECT EXISTS(SELECT 1 FROM task_context_reads r JOIN conversation_tasks t ON t.id=r.task_id
    WHERE t.id=? AND r.attempt_number=t.attempt AND (

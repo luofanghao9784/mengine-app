@@ -23,8 +23,8 @@ public class TaskContextService {
  private record Task(UUID id,UUID actor,UUID tenant,UUID space,UUID conversation,int attempt) {}
  private final JdbcTemplate db; private final AgentTaskService agents; private final ProfileService profiles;
  private final ExperienceService experiences; private final MaterialAccess materials; private final TaskContextGuard guard;
- private final JsonMapper json=new JsonMapper();private final BriefingContentService briefings;private final DatasetTaskContext datasets;
- public TaskContextService(JdbcTemplate db,AgentTaskService agents,ProfileService profiles,ExperienceService experiences,MaterialAccess materials,TaskContextGuard guard,BriefingContentService briefings,DatasetTaskContext datasets){this.datasets=datasets;this.briefings=briefings;this.db=db;this.agents=agents;this.profiles=profiles;this.experiences=experiences;this.materials=materials;this.guard=guard;}
+ private final JsonMapper json=new JsonMapper();private final BriefingContentService briefings;private final DatasetTaskContext datasets;private final GeneralExperienceTaskContext general;
+ public TaskContextService(JdbcTemplate db,AgentTaskService agents,ProfileService profiles,ExperienceService experiences,MaterialAccess materials,TaskContextGuard guard,BriefingContentService briefings,DatasetTaskContext datasets,GeneralExperienceTaskContext general){this.general=general;this.datasets=datasets;this.briefings=briefings;this.db=db;this.agents=agents;this.profiles=profiles;this.experiences=experiences;this.materials=materials;this.guard=guard;}
  private IdentityException missing(){return new IdentityException(404,"TASK_CONTEXT_NOT_FOUND");}
  private String text(String s,int max,boolean required){if(s==null)s="";if(s.length()>max||required&&s.isBlank()||s.codePoints().anyMatch(c->Character.isISOControl(c)&&c!=10&&c!=13&&c!=9))throw IdentityException.invalid();return s.strip();}
  private int offset(Request r){int n=r.offset()==null?0:r.offset();if(n<0||n>1000)throw IdentityException.invalid();return n;}
@@ -37,6 +37,7 @@ public class TaskContextService {
   Object result=switch(r.action()){
    case "bootstrap" -> bootstrap(t);
    case "dataset_search", "dataset_read" -> datasets.read(task,r);
+   case "general_experience_search", "general_experience_read", "general_experience_use" -> general.read(task,r);
    case "profiles" -> profilesSelectedOnly(t)?map("items",List.of(),"hasMore",false,"reason","SELECTED_ONLY"):profileList(t,r);
    case "profile_read" -> profilesSelectedOnly(t)?map("unavailable",true,"reason","SELECTED_ONLY"):profile(t,r);
    case "history" -> selectedOnly(t)?map("items",List.of(),"hasMore",false,"reason","SELECTED_ONLY"):history(t,r);
@@ -53,7 +54,7 @@ public class TaskContextService {
  private void record(Task t,String kind,UUID ref,String version,Object content){
   var old=db.queryForList("SELECT version_key FROM task_context_reads WHERE task_id=? AND attempt_number=? AND kind=? AND reference_id=?",String.class,t.id(),t.attempt(),kind,ref);
   if(!old.isEmpty()){if(!old.getFirst().equals(version))throw new IdentityException(409,"TASK_CONTEXT_CHANGED");return;}
-  if(db.queryForObject("SELECT count(*) FROM task_context_reads WHERE task_id=? AND attempt_number=?",Integer.class,t.id(),t.attempt())>=32)throw new IdentityException(413,"TASK_CONTEXT_LIMIT");
+  if(db.queryForObject("SELECT (SELECT count(*) FROM task_context_reads WHERE task_id=? AND attempt_number=?)+(SELECT count(*) FROM task_general_experience_reads WHERE task_id=? AND attempt_number=?)",Integer.class,t.id(),t.attempt(),t.id(),t.attempt())>=32)throw new IdentityException(413,"TASK_CONTEXT_LIMIT");
   db.update("INSERT INTO task_context_reads(task_id,attempt_number,kind,reference_id,version_key,content_hash) VALUES (?,?,?,?,?,?)",t.id(),t.attempt(),kind,ref,version,IdentityService.hash(json.writeValueAsString(content)));
  }
  private void dependencies(Task target,Collection<UUID> versions){
@@ -81,7 +82,7 @@ public class TaskContextService {
  private boolean selectedOnly(Task t){return "SELECTED".equals(db.queryForObject("SELECT source_scope FROM conversation_tasks WHERE id=?",String.class,t.id()));}
  private Object bootstrap(Task t){
   var previous=db.queryForList("SELECT * FROM conversation_attempts WHERE task_id=? AND attempt_number<? ORDER BY attempt_number DESC LIMIT 1",t.id(),t.attempt());
-  return map("taskId",t.id(),"attempt",t.attempt(),"historyScope","CURRENT_PRIVATE_CONVERSATION","profileScopes",List.of("TENANT","WORKSPACE","PERSONAL"),"experienceScope","CURRENT_WORKSPACE_PUBLISHED","previousAttempt",previous.isEmpty()?null:historyItem(previous.getFirst(),false),"latestBriefing",selectedOnly(t)?null:latestBriefing(t),"sourceScope",db.queryForObject("SELECT source_scope FROM conversation_tasks WHERE id=?",String.class,t.id()),"selectedMaterials",db.queryForList("SELECT v.filename,v.number AS version,v.id AS version_id FROM conversation_originals o JOIN material_versions v ON v.id=o.version_id WHERE o.task_id=? ORDER BY v.id",t.id()),"selectedDatasets",db.queryForList("SELECT d.id AS dataset_id,s.id AS snapshot_id,d.name,s.version FROM briefing_dataset_selections chosen JOIN business_datasets d ON d.id=chosen.dataset_id JOIN dataset_snapshots s ON s.id=chosen.snapshot_id WHERE chosen.task_id=? AND NOT chosen.invalidated ORDER BY d.id",t.id()),"backgroundIsAuthorization",false);
+  return map("taskId",t.id(),"attempt",t.attempt(),"historyScope","CURRENT_PRIVATE_CONVERSATION","profileScopes",List.of("TENANT","WORKSPACE","PERSONAL"),"experienceScope","CURRENT_WORKSPACE_PUBLISHED","generalExperienceScope","GENERAL_CLEANED","previousAttempt",previous.isEmpty()?null:historyItem(previous.getFirst(),false),"latestBriefing",selectedOnly(t)?null:latestBriefing(t),"sourceScope",db.queryForObject("SELECT source_scope FROM conversation_tasks WHERE id=?",String.class,t.id()),"selectedMaterials",db.queryForList("SELECT v.filename,v.number AS version,v.id AS version_id FROM conversation_originals o JOIN material_versions v ON v.id=o.version_id WHERE o.task_id=? ORDER BY v.id",t.id()),"selectedDatasets",db.queryForList("SELECT d.id AS dataset_id,s.id AS snapshot_id,d.name,s.version FROM briefing_dataset_selections chosen JOIN business_datasets d ON d.id=chosen.dataset_id JOIN dataset_snapshots s ON s.id=chosen.snapshot_id WHERE chosen.task_id=? AND NOT chosen.invalidated ORDER BY d.id",t.id()),"backgroundIsAuthorization",false);
  }
  private Object latestBriefing(Task current){
   var found=db.queryForList("SELECT t.id,t.attempt FROM conversation_tasks t JOIN readable_source_tasks readable ON readable.id=t.id WHERE t.conversation_id=? AND t.tenant_id=? AND t.status='SUCCEEDED' AND t.created_at<(SELECT created_at FROM conversation_tasks WHERE id=?) AND EXISTS ("+BriefingContentService.ELIGIBLE+") ORDER BY t.created_at DESC LIMIT 1",current.conversation(),current.tenant(),current.id());
@@ -168,7 +169,7 @@ public class TaskContextService {
   String hash=IdentityService.hash(json.writeValueAsString(List.of(e.id(),r.versionId(),r.decision(),conditions,adjustments)));
   var prior=db.queryForList("SELECT * FROM task_context_reviews WHERE task_id=? AND attempt_number=? AND request_id=?",t.id(),t.attempt(),r.requestId());
   if(!prior.isEmpty()){if(!hash.equals(prior.getFirst().get("request_hash")))throw new IdentityException(409,"IDEMPOTENCY_CONFLICT");return reviewResult(prior.getFirst());}
-  if(db.queryForObject("SELECT count(*) FROM task_context_reviews WHERE task_id=? AND attempt_number=?",Integer.class,t.id(),t.attempt())>=8)throw new IdentityException(413,"TASK_CONTEXT_LIMIT");
+  if(db.queryForObject("SELECT (SELECT count(*) FROM task_context_reviews WHERE task_id=? AND attempt_number=?)+(SELECT count(*) FROM task_general_experience_reviews WHERE task_id=? AND attempt_number=?)",Integer.class,t.id(),t.attempt(),t.id(),t.attempt())>=8)throw new IdentityException(413,"TASK_CONTEXT_LIMIT");
   UUID use=null;
   if(Set.of("DIRECT","ADAPTED").contains(r.decision())){
    var existing=db.queryForList("SELECT id,adopted FROM experience_uses WHERE actor_id=? AND task_id=? AND version_id=?",t.actor(),t.id(),r.versionId());
