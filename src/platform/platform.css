@@ -865,3 +865,18 @@
   background: transparent;
   box-shadow: none;
 }
+
+/* 邀请当前状态与管理历史各自成栏。 */
+.admin-platform .platform-enterprise-page .platform-record-catalog {
+  background: transparent;
+  border: 0;
+  overflow: visible;
+}
+.platform-record-directory { display: grid; gap: 16px; }
+.platform-record-directory .platform-invitation-record,
+.platform-record-directory .platform-management-table {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+}
+.platform-record-directory .platform-management-table { overflow: auto; }
