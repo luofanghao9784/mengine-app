@@ -333,6 +333,13 @@ def residual(sql,current_sql):
         update('business_sources',"name='"+removed+"',description='',status='PAUSED'",workspace('x')+" AND (x.name<>'"+removed+"' OR x.description<>'' OR x.status<>'PAUSED')")
         update('business_source_config_versions',"settings=settings||jsonb_build_object('name','"+removed+"','description','')",'EXISTS(SELECT 1 FROM business_sources b WHERE b.id=x.source_id AND '+workspace('b')+") AND (x.settings->>'name' IS DISTINCT FROM '"+removed+"' OR x.settings->>'description' IS DISTINCT FROM '')")
         update('business_source_submissions',"note=''",workspace('x')+" AND x.note<>''")
+        # Shared collected data belongs to the enterprise, not a departing member.
+        if owner is None and recovery.has_table(sql,'data_connections'):
+            update('dataset_snapshots',"data_rows='[]'::jsonb,scrubbed=true","x.tenant_id="+t+" AND NOT x.scrubbed")
+            update('business_datasets',"name='"+removed+"',description='',dataset_key='removed-'||id::text,column_names='[\"已清理\"]'::jsonb,status='WITHDRAWN',scrubbed=true",
+                   "x.tenant_id="+t+" AND NOT x.scrubbed AND NOT EXISTS(SELECT 1 FROM dataset_snapshots s WHERE s.dataset_id=x.id AND NOT s.scrubbed)")
+            update('data_connections',"name='"+removed+"',route_label='',access_summary='',status='UNCONFIGURED',auto_enabled=false,next_due=NULL,revision=revision+1",
+                   "x.tenant_id="+t+" AND (x.name<>'"+removed+"' OR x.route_label<>'' OR x.access_summary<>'' OR x.status<>'UNCONFIGURED' OR x.auto_enabled OR x.next_due IS NOT NULL) AND NOT EXISTS(SELECT 1 FROM business_datasets d WHERE d.connection_id=x.id AND NOT d.scrubbed)")
         update('conversations',"title='"+removed+"'",private('x','owner_id')+" AND x.title<>'"+removed+"'")
         update('conversation_tasks','public_query=NULL',private('x','requested_by')+' AND x.public_query IS NOT NULL')
         update('knowledge_runs',"warnings=''",workspace('x')+" AND x.warnings<>''")

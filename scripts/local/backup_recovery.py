@@ -29,6 +29,8 @@ CONTROL_TABLES = [
     'general_experience_adjustments', 'general_experience_adjustment_runs', 'general_experience_suggestions',
     'experience_general_dependencies', 'tenant_general_experience_usage', 'tenant_general_experience_usage_events',
     'general_experience_management_events', 'experience_events',
+    'data_connections', 'collection_runs', 'business_datasets', 'dataset_snapshots',
+    'task_dataset_reads', 'task_dataset_fences', 'dataset_task_inheritance', 'briefing_dataset_selections',
 ]
 
 
@@ -78,6 +80,8 @@ def quarantine(sql):
     import backup_experience
     sql = backup_experience.isolated_sql(sql)
     backup_experience.stop_pending(sql)
+    import backup_collection
+    backup_collection.stop_pending(sql)
     platform_reset = ''
     if has_table(sql, 'platform_accounts'):
         platform_reset = """
@@ -352,6 +356,8 @@ def reconcile(root, current_root, key_path):
                 sql = backup_experience.isolated_sql(sql)
                 applied = apply_current(sql, root, evidence)
                 import backup_lifecycle
+                import backup_collection
+                applied['collection']=backup_collection.synchronize(sql,current_sql)
                 applied['methodHeads']=backup_lifecycle.method_heads(sql,current_sql)
                 applied['objects']=backup_lifecycle.objects(sql,current_sql)
                 applied['versionBodies']=backup_lifecycle.version_bodies(sql,current_sql)
@@ -711,6 +717,8 @@ def activate(root, current_root, key_path):
                 sql = backup_experience.isolated_sql(sql)
                 applied=apply_current(sql,root,evidence)
                 import backup_lifecycle
+                import backup_collection
+                applied['collection']=backup_collection.synchronize(sql,current_sql)
                 applied['methodHeads']=backup_lifecycle.method_heads(sql,current_sql)
                 applied['objects']=backup_lifecycle.objects(sql,current_sql)
                 applied['versionBodies']=backup_lifecycle.version_bodies(sql,current_sql)
