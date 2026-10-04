@@ -25,7 +25,7 @@ RETENTION_DAYS = 30
 KEY_FILE = trial.WORKSPACE / '.local' / 'backup-private' / 'signing.json'
 MAX_BYTES = 2 * 1024**3
 MAX_FILES = 10001
-TRANSIENT = {'spring_session', 'spring_session_attributes', 'phone_challenges'}
+TRANSIENT = {'spring_session', 'spring_session_attributes', 'phone_challenges', 'platform_sessions'}
 
 
 def fail(message):
@@ -334,7 +334,7 @@ def create(root, output, key_path):
                     shutil.copyfile(root / name, destination / name)
                     (destination / name).chmod(0o600)
                 run([pg('pg_dump'), *args, '--format=custom', '--no-owner', '--no-acl',
-                     '--exclude-table-data=public.spring_session', '--exclude-table-data=public.spring_session_attributes', '--exclude-table-data=public.phone_challenges',
+                     *(f'--exclude-table-data=public.{table}' for table in sorted(TRANSIENT)),
                      '--file', str(destination / 'database.dump')])
                 (destination / 'database.dump').chmod(0o600)
                 manifest = {'format': FORMAT, 'snapshotId': str(uuid.uuid4()), 'sourceInstanceId': identity['instanceId'],
@@ -382,6 +382,8 @@ def restore(bundle, output, key_path):
                 fail('还原包含旧登录会话。')
             if sql("SELECT to_regclass('public.phone_challenges') IS NOT NULL") == 't' and sql('SELECT count(*) FROM phone_challenges') != '0':
                 fail('还原包含旧手机验证码。')
+            if backup_recovery.has_table(sql, 'platform_sessions') and sql('SELECT count(*) FROM platform_sessions') != '0':
+                fail('还原包含旧总台登录会话。')
             pending = int(sql("SELECT count(*) FROM invitations WHERE status='PENDING'"))
             backup_recovery.quarantine(sql)
         (destination / 'database.dump').unlink()

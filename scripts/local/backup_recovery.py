@@ -8,7 +8,7 @@ import trial
 
 COVERAGE = trial.WORKSPACE / 'contracts/local-backup/coverage.json'
 CONTROL_TABLES = [
-    'accounts', 'platform_roles', 'tenants', 'tenant_memberships', 'workspace_members', 'workspaces',
+    'accounts', 'platform_accounts', 'platform_roles', 'platform_staff_invitations', 'tenants', 'tenant_memberships', 'workspace_members', 'workspaces',
     'tenant_governance', 'governance_initial_designations', 'governance_capabilities', 'governance_handovers', 'governance_security_stops',
     'profile_entries', 'profile_versions', 'business_sources', 'business_source_config_versions',
     'experience_entries', 'experience_versions', 'ongoing_plans', 'ongoing_plan_versions', 'content_lifecycle',
@@ -68,8 +68,15 @@ def coverage(sql):
 
 def quarantine(sql):
     # This executes in the private, offline database before any application can start.
+    platform_reset = ''
+    if has_table(sql, 'platform_accounts'):
+        platform_reset = """
+        DELETE FROM platform_sessions;
+        UPDATE platform_accounts SET password_hash='!RECOVERY_DISABLED!',credential_version=credential_version+1;
+        UPDATE platform_staff_invitations SET status='REVOKED' WHERE status='PENDING';
+        """
     # A stopped worker is not evidence that an external side effect failed or succeeded.
-    sql("""BEGIN;
+    sql('BEGIN;\n' + platform_reset + """
     DELETE FROM spring_session_attributes; DELETE FROM spring_session; DELETE FROM phone_challenges;
     UPDATE invitations SET status='REVOKED' WHERE status='PENDING';
     UPDATE governance_handovers SET status='CANCELLED' WHERE status='PENDING';
@@ -388,6 +395,19 @@ def reopen_current(sql, current_sql, root):
     # Private ownership is itself a read grant. Do not leave an old private owner active after a changed/missing mapping.
     blocked_private_owners = {x['owner_id'] for x in local_spaces if x['kind'] == 'PERSONAL' and x['id'] not in valid_spaces}
     eligible -= blocked_private_owners
+    # Platform audit actors are never reopened through customer credentials or tenant membership.
+    # A role left by the pre-separation schema is insufficient to create a platform identity.
+    if not has_table(sql, 'platform_accounts') or not has_table(current_sql, 'platform_accounts'):
+        backup.fail('恢复身份结构不含独立总台账号；请使用对应版本的已核验适配器。')
+    local_platform = {x['account_id']: x for x in json_rows(sql, 'SELECT account_id::text,login_name FROM platform_accounts')}
+    all_current_platform = {x['account_id'] for x in json_rows(current_sql, 'SELECT account_id::text FROM platform_accounts')}
+    authorized_platform = {x['account_id']: x for x in json_rows(current_sql, """SELECT p.account_id::text,p.login_name,p.management_version
+        FROM platform_accounts p JOIN accounts a ON a.id=p.account_id AND a.status='ACTIVE'
+        JOIN platform_roles r ON r.account_id=p.account_id AND r.role='PLATFORM_ADMIN'
+        WHERE NOT EXISTS(SELECT 1 FROM tenant_memberships m WHERE m.account_id=p.account_id)""")}
+    platform = {identity for identity, row in authorized_platform.items()
+                if identity in eligible and local_platform.get(identity, {}).get('login_name') == row['login_name']}
+    eligible -= set(local_platform) | all_current_platform
     tenant_versions = {x['id']:x['management_version'] for x in json_rows(current_sql, "SELECT id::text,management_version FROM tenants WHERE status='ACTIVE'")}
     current_tenants = set(tenant_versions)
     local_tenants = {x['id'] for x in json_rows(sql, 'SELECT id::text FROM tenants')}
@@ -444,17 +464,22 @@ def reopen_current(sql, current_sql, root):
         if (row['tenant_id'],row['account_id']) in members and row['granted_by'] in known_accounts and (row['workspace_id'] is None or (row['tenant_id'],row['workspace_id'],row['account_id']) in grant_keys):
             fields = ['id','tenant_id','account_id','workspace_id','capability','granted_by']
             statements.append('INSERT INTO governance_capabilities('+','.join(fields)+') VALUES('+','.join(literal(row[k]) for k in fields)+')')
-    current_platform = {x['account_id'] for x in json_rows(current_sql, 'SELECT account_id::text FROM platform_roles')}
-    platform = current_platform & eligible
+    platform_credentials = []
     for identity in sorted(platform):
+        password = secrets.token_urlsafe(24)
+        current = authorized_platform[identity]
+        statements.append(f"UPDATE accounts SET status='ACTIVE',password_hash='!PLATFORM_ONLY!',credential_version=credential_version+1 WHERE id={quoted_id(identity)}")
+        statements.append(f"UPDATE platform_accounts SET password_hash={literal(password_hash(password))},credential_version=credential_version+1,management_version={int(current['management_version'])} WHERE account_id={quoted_id(identity)}")
         statements.append(f"INSERT INTO platform_roles VALUES({quoted_id(identity)},'PLATFORM_ADMIN')")
+        platform_credentials.append({'accountId': identity, 'loginName': current['login_name'], 'password': password, 'realm': 'platform'})
     if not platform:
-        # An explicitly activated local recovery may bootstrap operations, never tenant membership or content rights.
+        # Explicit local activation can create an operations-only identity, never a customer admin.
         identity, password = str(uuid.uuid4()), secrets.token_urlsafe(24)
-        email = 'recovery-' + identity + '@example.invalid'
-        statements.append(f"INSERT INTO accounts(id,email,display_name,password_hash) VALUES({quoted_id(identity)},{literal(email)},'本地恢复平台管理员',{literal(password_hash(password))})")
+        login = 'recovery-' + identity + '@example.invalid'
+        statements.append(f"INSERT INTO accounts(id,email,display_name,password_hash) VALUES({quoted_id(identity)},{literal(login)},'本地恢复平台管理员','!PLATFORM_ONLY!')")
+        statements.append(f"INSERT INTO platform_accounts(account_id,login_name,password_hash) VALUES({quoted_id(identity)},{literal(login)},{literal(password_hash(password))})")
         statements.append(f"INSERT INTO platform_roles VALUES({quoted_id(identity)},'PLATFORM_ADMIN')")
-        credentials.append({'accountId': identity, 'email': email, 'password': password, 'localRecoveryPlatformOnly': True})
+        platform_credentials.append({'accountId': identity, 'loginName': login, 'password': password, 'realm': 'platform', 'localRecoveryPlatformOnly': True})
         platform.add(identity)
     if departure_guards:
         statements += ['ALTER TABLE tenants ENABLE TRIGGER departure_tenant_activation',
@@ -462,10 +487,10 @@ def reopen_current(sql, current_sql, root):
         statements.append("DO $$ BEGIN IF (SELECT count(*) FROM pg_trigger WHERE (tgrelid='tenants'::regclass AND tgname='departure_tenant_activation' OR tgrelid='tenant_memberships'::regclass AND tgname='departure_member_activation') AND tgenabled='O')<>2 THEN RAISE EXCEPTION 'RESTORE_DEPARTURE_GUARDS_NOT_ENABLED'; END IF; END $$")
     statements.append('COMMIT')
     sql(';\n'.join(statements)+';')
-    platform_credential = next(x for x in credentials if x['accountId'] in platform)
-    trial.private_write(root/'accounts.json', {'restored': True, 'platform': platform_credential, 'recovered': credentials,
-        'note': '仅本地私有凭据。均为恢复时生成的新密码；旧会话失效，旧任务与计划未自动重启。'})
-    return {'accountsEnabled': len(eligible), 'membershipsEnabled': len(members), 'sharedGrantsEnabled': len(grants),
+    trial.private_write(root/'accounts.json', {'restored': True, 'platform': platform_credentials[0],
+        'platformRecovered': platform_credentials, 'recovered': credentials,
+        'note': '仅本地私有新凭据。总台使用独立登录入口和 loginName；recovered 仅为客户账号。旧会话失效，旧任务与计划未自动重启。'})
+    return {'accountsEnabled': len(eligible), 'platformAccountsEnabled': len(platform), 'membershipsEnabled': len(members), 'sharedGrantsEnabled': len(grants),
             'privateOwnersHeld': len(blocked_private_owners), 'heldTenantIds': sorted(held_tenants), 'oldCredentialsRestored': False}
 
 
