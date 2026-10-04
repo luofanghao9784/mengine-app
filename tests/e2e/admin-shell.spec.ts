@@ -1,4 +1,5 @@
 import { test, expect, type BrowserContext } from '@playwright/test';
+import { telemetryChannels } from '../../contracts/public-api/engine-telemetry';
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const tenant = id(1),
   person = id(2),
@@ -12,12 +13,12 @@ const account = {
   version: 0,
   tenantCount: 1,
 };
-async function fixture(context: BrowserContext) {
+async function fixture(context: BrowserContext, control: { mode?: string; paths?: string[] } = {}) {
   const changes: unknown[] = [];
   const current = { ...account };
   await context.route('**/api/**', async (route) => {
     const path = new URL(route.request().url()).pathname;
-    const now = Date.now();
+    control.paths?.push(path);
     const json = (value: unknown) => route.fulfill({ json: value });
     if (path.endsWith('/csrf')) return json({ token: 'synthetic', headerName: 'X-CSRF-TOKEN' });
     if (path === '/api/platform-admin/v1/auth/me')
@@ -65,22 +66,102 @@ async function fixture(context: BrowserContext) {
         sharedWorkspaceCount: 0,
         invitationDelivery: 'DISABLED',
       });
-    if (path.endsWith('/operations'))
+    if (path.endsWith('/engine-telemetry')) {
+      if (control.mode === 'revoked') return route.fulfill({ status: 403, json: { code: 'ACCESS_DENIED' } });
+      const scoped = path.includes('/tenants/');
       return json({
-        tenantId: path.includes('/tenants/') ? tenant : null,
-        days: 7,
-        from: new Date(now - 7 * 86400000).toISOString(),
-        checkedAt: new Date(now).toISOString(),
-        tasks: Object.fromEntries(
-          'total queued running succeeded failed cancelled interrupted paused waitingInput waitingCapability partial resultUnknown retryStarts'
-            .split(' ')
-            .map((k) => [k, 0]),
-        ),
-        storage: { materials: 0, versions: 0, originalBytes: 0 },
-        models: [],
-        errors: [],
-        attemptUsage: [],
+        tenantId: scoped ? tenant : null,
+        checkedAt: new Date().toISOString(),
+        recentSeconds: 300,
+        evolution: 'NOT_CONNECTED',
+        channels: telemetryChannels
+          .filter((c) => !scoped || c !== 'GENERAL_ADJUSTMENT')
+          .map((code) => ({
+            code,
+            running: code === 'TASK' ? 8 : code === 'RESPONSE' ? 3 : 0,
+            queued: code === 'KNOWLEDGE' ? 4 : 0,
+            waiting: code === 'COMPANY' ? 2 : 0,
+            unknown: code === 'EXPERIENCE' ? 1 : 0,
+            failed: 0,
+            completedRecent: 0,
+            lastCompletedAt: null,
+          })),
       });
+    }
+    if (path.endsWith('/usage')) {
+      if (control.mode === 'revoked') return route.fulfill({ status: 403, json: { code: 'ACCESS_DENIED' } });
+      const value = {
+        tenantId: path.includes('/tenants/') ? tenant : null,
+        period: new URL(route.request().url()).searchParams.get('period'),
+        timeZone: 'Asia/Shanghai',
+        from: '2026-09-30T16:00:00Z',
+        until: '2026-10-04T10:00:00Z',
+        checkedAt: '2026-10-04T10:00:00Z',
+        groups: [
+          {
+            purpose: 'WORK',
+            executionClass: 'live',
+            basis: 'REQUEST_STARTED',
+            units: 53,
+            reportedUnits: 52,
+            unknownCallUnits: 0,
+            pendingUnits: 1,
+            modelCalls: 53,
+            inputTokens: 100,
+            outputTokens: 50,
+          },
+          {
+            purpose: 'MAINTENANCE',
+            executionClass: 'live',
+            basis: 'RUN_STARTED',
+            units: 2,
+            reportedUnits: 0,
+            unknownCallUnits: 2,
+            pendingUnits: 2,
+            modelCalls: null,
+            inputTokens: null,
+            outputTokens: null,
+          },
+          {
+            purpose: 'WORK',
+            executionClass: 'verification',
+            basis: 'REQUEST_STARTED',
+            units: 700,
+            reportedUnits: 700,
+            unknownCallUnits: 0,
+            pendingUnits: 0,
+            modelCalls: 700,
+            inputTokens: 7000,
+            outputTokens: 700,
+          },
+        ],
+        days: [],
+        tools: [],
+        storage: { originals: 0, versions: 0, registeredBytes: 0 },
+        coverage: {
+          unmeteredWorkAttempts: 0,
+          legacyToolReceipts: 0,
+          evaluation: 'NOT_CONNECTED',
+          evolution: 'NOT_ENABLED',
+        },
+        quota: { state: 'NOT_CONFIGURED', unit: null, limit: null, remaining: null },
+      };
+      if (control.mode === 'wrong') value.tenantId = id(99);
+      return json(
+        path.startsWith('/api/platform-admin/')
+          ? {
+              usage: value,
+              cost: {
+                state: 'NOT_CONNECTED',
+                currency: null,
+                verifiedMinor: null,
+                estimatedMinor: null,
+                sharedAllocation: 'NOT_CONFIGURED',
+              },
+            }
+          : value,
+      );
+    }
     if (path === '/api/platform-admin/v1/accounts') return json([current]);
     if (path === `/api/platform-admin/v1/accounts/${customer}/status`) {
       const body = route.request().postDataJSON();
@@ -174,4 +255,51 @@ test('platform directory preserves query across pages and performs confirmed glo
   await expect(page.getByLabel('搜索账号')).toHaveValue('客户甲');
   await expect(page.locator('a[href*="/workspace/"],a[href*="/tenant-admin/"]')).toHaveCount(0);
   await page.screenshot({ path: 'test-results/platform-accounts.png', fullPage: true });
+});
+
+for (const realm of ['platform', 'tenant'] as const) {
+  test(`${realm} overview uses current telemetry and formal monthly usage with scoped detail`, async ({
+    context,
+    page,
+  }) => {
+    const control = { mode: 'ready', paths: [] as string[] };
+    await fixture(context, control);
+    const path = realm === 'platform' ? '/platform-admin/' : `/tenant-admin/#tenant=${tenant}`;
+    await page.goto(path);
+    const stats = page.locator('.admin-stat');
+    await expect(stats.filter({ hasText: '登记执行中' }).locator('strong')).toHaveText('11');
+    await expect(stats.filter({ hasText: '登记排队' }).locator('strong')).toHaveText('4');
+    await expect(page.getByText('1 项运行记录的结果尚未确认，可在运行页核对。')).toBeVisible();
+    const monthly = page.getByRole('region', { name: '本月用量摘要' });
+    await expect(
+      monthly.locator('.admin-stat').filter({ hasText: '日常模型登记请求' }).locator('strong'),
+    ).toHaveText('53');
+    await expect(monthly.getByText('回执调用数未知')).toBeVisible();
+    await expect(monthly.getByText(/2 次维护运行的调用数尚未知/)).toBeVisible();
+    expect(control.paths.some((p) => p.endsWith('/operations'))).toBe(false);
+    if (realm === 'tenant') await expect(page.getByText(/采购成本/)).toHaveCount(0);
+    await page.getByRole('link', { name: '查看本月用量', exact: true }).click();
+    await expect(page.getByLabel('用量统计期间')).toHaveValue('THIS_MONTH');
+    await page.getByLabel('用量统计期间').selectOption('LAST_MONTH');
+    await expect(page.getByLabel('用量统计期间')).toHaveValue('LAST_MONTH');
+    await page.getByRole('complementary').getByRole('link', { name: '概览', exact: true }).click();
+    await page.getByRole('link', { name: '查看本月用量', exact: true }).click();
+    await expect(page.getByLabel('用量统计期间')).toHaveValue('THIS_MONTH');
+    await page.getByRole('complementary').getByRole('link', { name: '概览', exact: true }).click();
+    control.mode = 'revoked';
+    await page.getByRole('button', { name: '刷新', exact: true }).click();
+    await expect(page.getByText('没有访问权限', { exact: true })).toHaveCount(2);
+    await expect(stats.filter({ hasText: '登记执行中' }).locator('strong')).toHaveText('—');
+    await expect(page.getByText('53', { exact: true })).toHaveCount(0);
+    await expect(page.getByText(/暂无结果待确认/)).toHaveCount(0);
+  });
+}
+test('overview rejects mismatched monthly scope and fits a narrow viewport', async ({ context, page }) => {
+  await fixture(context, { mode: 'wrong' });
+  await page.setViewportSize({ width: 360, height: 900 });
+  await page.goto(`/tenant-admin/#tenant=${tenant}`);
+  const monthly = page.getByRole('region', { name: '本月用量摘要' });
+  await expect(monthly.getByText('暂时无法读取', { exact: true })).toBeVisible();
+  await expect(page.getByText('53', { exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });

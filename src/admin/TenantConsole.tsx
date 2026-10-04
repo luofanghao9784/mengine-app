@@ -125,7 +125,7 @@ export function TenantConsole({ tenant, name }: { tenant: string; name: string }
             <a className="button ghost" href={adminHref('tenant', 'engine', hash)}>
               返回引擎运行
             </a>
-            <UsagePanel scope="tenant" tenant={tenant} />
+            <UsagePanel scope="tenant" tenant={tenant} hash={hash} />
           </>
         ) : (
           <>

@@ -48,7 +48,7 @@ export function PlatformUsagePage({ hash }: { hash: string }) {
           返回全平台用量
         </a>
       )}
-      <UsagePanel key={tenant || 'all'} scope="platform" tenant={tenant} />
+      <UsagePanel key={tenant || 'all'} scope="platform" tenant={tenant} hash={hash} />
       <TenantUsageDirectory hash={hash} />
     </div>
   );
@@ -120,28 +120,46 @@ export function UsagePanel({
   scope,
   tenant = null,
   revision = 0,
+  hash,
 }: {
   scope: 'platform' | 'tenant';
   tenant?: string | null;
   revision?: number;
+  hash?: string;
 }) {
-  return <ScopedUsage key={`${scope}:${tenant}`} scope={scope} tenant={tenant} revision={revision} />;
+  return (
+    <ScopedUsage key={`${scope}:${tenant}`} scope={scope} tenant={tenant} revision={revision} hash={hash} />
+  );
 }
 function ScopedUsage({
   scope,
   tenant,
   revision,
+  hash,
 }: {
   scope: 'platform' | 'tenant';
   tenant: string | null;
   revision: number;
+  hash?: string;
 }) {
-  const [period, setPeriod] = useViewState<UsagePeriod>(
+  const [savedPeriod, setPeriod] = useViewState<UsagePeriod>(
     scope === 'platform' ? 'platform' : tenant!,
     `usage-period`,
     'THIS_MONTH',
     (v): v is UsagePeriod => usagePeriods.includes(v as UsagePeriod),
   );
+  const requestedPeriod = new URLSearchParams(hash?.replace(/^#/, '')).get('period');
+  const period = usagePeriods.includes(requestedPeriod as UsagePeriod)
+    ? (requestedPeriod as UsagePeriod)
+    : savedPeriod;
+  const changePeriod = (next: UsagePeriod) => {
+    setPeriod(next);
+    if (hash !== undefined) {
+      const params = new URLSearchParams(hash.replace(/^#/, ''));
+      params.set('period', next);
+      window.location.hash = params.toString();
+    }
+  };
   const [attempt, setAttempt] = useState(0);
   const refresh = () => setAttempt((n) => n + 1);
   const data = useRemote(
@@ -170,7 +188,7 @@ function ScopedUsage({
           <select
             aria-label="用量统计期间"
             value={period}
-            onChange={(e) => setPeriod(e.target.value as UsagePeriod)}
+            onChange={(e) => changePeriod(e.target.value as UsagePeriod)}
           >
             {usagePeriods.map((p) => (
               <option value={p} key={p}>
