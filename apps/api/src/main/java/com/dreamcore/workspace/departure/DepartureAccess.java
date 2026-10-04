@@ -8,7 +8,7 @@ import org.springframework.jdbc.core.JdbcTemplate;import org.springframework.ste
  private final JdbcTemplate db;public DepartureAccess(JdbcTemplate db){this.db=db;}
  private boolean effective(UUID tenant,UUID account){return Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM departure_executions WHERE tenant_id=? AND state<>'CANCELLED' AND (kind='TENANT_EXIT' OR target_account_id=?))",Boolean.class,tenant,account));}
  public boolean exiting(UUID tenant){return Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM departure_executions WHERE tenant_id=? AND kind='TENANT_EXIT' AND state<>'CANCELLED')",Boolean.class,tenant));}
- public void requireActiveBusiness(UUID actor,UUID tenant){if(effective(tenant,actor))throw new IdentityException(409,"DEPARTURE_BUSINESS_STOPPED");}
+ public void requireActiveBusiness(UUID actor,UUID tenant){if(com.dreamcore.workspace.support.SupportContext.current()!=null&&!Boolean.TRUE.equals(db.queryForObject("SELECT status='ACTIVE' FROM tenants WHERE id=?",Boolean.class,tenant)))throw new IdentityException(409,"TENANT_SUSPENDED");if(effective(tenant,actor))throw new IdentityException(409,"DEPARTURE_BUSINESS_STOPPED");}
  /** A shared workspace does not turn its owner-private conversations, feedback or drafts into enterprise export assets. */
  public void requirePrivateRead(UUID actor,UUID tenant){if(effective(tenant,actor))throw new IdentityException(403,"DEPARTURE_PRIVATE_ACCESS_STOPPED");}
  public void requireContentRead(UUID actor,UUID tenant,UUID workspace){

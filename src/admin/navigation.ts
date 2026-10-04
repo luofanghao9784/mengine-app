@@ -66,7 +66,7 @@ export function adminHref(
   const old = new URLSearchParams(hash.replace(/^#/, ''));
   const next = new URLSearchParams({ admin: page });
   if (realm === 'tenant')
-    for (const key of ['tenant', 'back']) if (old.has(key)) next.set(key, old.get(key)!);
+    for (const key of ['tenant', 'back', 'support']) if (old.has(key)) next.set(key, old.get(key)!);
   for (const [key, value] of Object.entries(extra))
     if (!['tenant', 'back', 'admin'].includes(key)) next.set(key, value);
   return '#' + next;

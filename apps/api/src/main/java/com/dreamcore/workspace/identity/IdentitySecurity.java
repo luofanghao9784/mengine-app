@@ -68,7 +68,7 @@ public class IdentitySecurity {
             }, AuthorizationFilter.class);
         return http.build();
     }
-    static void writeError(HttpServletResponse response, int status, String code) throws IOException {
+    public static void writeError(HttpServletResponse response, int status, String code) throws IOException {
         response.setStatus(status); response.setContentType("application/json"); response.setCharacterEncoding("UTF-8");
         response.setHeader("Cache-Control","no-store");
         response.getWriter().write("{\"contractVersion\":\"1.0\",\"code\":\"" + code + "\",\"message\":\"请求未获授权。\",\"retryable\":false}");

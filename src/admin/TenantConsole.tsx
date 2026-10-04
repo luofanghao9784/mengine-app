@@ -1,3 +1,6 @@
+import { SupportRecords } from '../platform/SupportRecords';
+import type { SupportAccess } from '../platform/SupportConsole';
+import { supportClient } from '../platform/SupportConsole';
 import { EngineTelemetryWall } from '../operations/EngineTelemetryWall';
 import { useEffect, useRef, useState } from 'react';
 import { ExternalLink, ArrowLeft, ShieldX } from 'lucide-react';
@@ -19,7 +22,15 @@ import { TenantMaterials } from '../material/TenantMaterials';
 import { TenantExperiences } from '../experience/TenantExperiences';
 import { DeparturePanel } from '../departure/DeparturePanel';
 
-export function TenantConsole({ tenant, name }: { tenant: string; name: string }) {
+export function TenantConsole({
+  tenant,
+  name,
+  support,
+}: {
+  tenant: string;
+  name: string;
+  support?: SupportAccess;
+}) {
   const { session, logout } = useSession();
   const { page: requestedPage, hash } = useAdminRoute('tenant');
   const [attempt, setAttempt] = useState(0);
@@ -46,6 +57,14 @@ export function TenantConsole({ tenant, name }: { tenant: string; name: string }
     if (selectedAccount) select({ query: '', page: 0, target: selectedAccount });
   }, [selectedAccount]);
   const back = useRef(returnToWorkspaceHref(hash, tenant)).current;
+  const leaveSupport = async () => {
+    try {
+      await supportClient.leave(support!.id);
+      location.hash = `admin=tenants&enterprise=${tenant}&section=basic`;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '退出结果尚未确认。');
+    }
+  };
   const signOut = async () => {
     try {
       await logout();
@@ -63,18 +82,39 @@ export function TenantConsole({ tenant, name }: { tenant: string; name: string }
       hash={hash}
       logout={() => void signOut()}
       customerLinks={
-        <>
-          <a className="button ghost" href={back}>
+        support ? (
+          <Button onClick={() => void leaveSupport()}>
             <ArrowLeft size={16} />
-            返回客户端
-          </a>
-          <a className="button ghost" href={back} target="_blank" rel="noopener noreferrer">
-            <ExternalLink size={16} />
-            新标签页打开客户端
-          </a>
-        </>
+            返回总台企业概览
+          </Button>
+        ) : (
+          <>
+            <a className="button ghost" href={back}>
+              <ArrowLeft size={16} />
+              返回客户端
+            </a>
+            <a className="button ghost" href={back} target="_blank" rel="noopener noreferrer">
+              <ExternalLink size={16} />
+              新标签页打开客户端
+            </a>
+          </>
+        )
       }
     >
+      {support && (
+        <div className="support-mode-banner" role="status">
+          <strong>总部管理模式 · {support.mode === 'TEST' ? '测试' : '系统调整'}</strong>
+          <span>
+            {name} · 操作者：{session.identity?.account.displayName}
+          </span>
+          <small>
+            {support.mode === 'TEST'
+              ? '测试对象与执行留痕；真实模型调用正常计量。'
+              : '操作按企业负责人权限校验并留痕。'}
+          </small>
+          <SupportRecords id={support.id} test={support.mode === 'TEST'} />
+        </div>
+      )}
       {error && (
         <p className="access-alert" role="alert">
           {error}

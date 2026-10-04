@@ -1,3 +1,4 @@
+import { supportPath } from '../identity/support-request';
 import type {
   CreateExport,
   ExportBatch,
@@ -217,7 +218,7 @@ export function createExportClient(fetcher: typeof fetch = fetch) {
     },
     async download(t: string, b: string, signal?: AbortSignal) {
       try {
-        const response = await fetcher(root(t) + '/' + id(b) + '/archive', {
+        const response = await fetcher(supportPath(root(t) + '/' + id(b) + '/archive'), {
           credentials: 'same-origin',
           cache: 'no-store',
           redirect: 'error',

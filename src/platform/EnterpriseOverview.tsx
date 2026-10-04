@@ -1,3 +1,4 @@
+import { SupportEntry } from './SupportConsole';
 import type { TenantDetail } from '../../contracts/public-api/platform-admin';
 import { useRemote } from '../shared/admin';
 import { usageClient } from '../operations/usage-client';
@@ -36,7 +37,10 @@ export function EnterpriseOverview({
   return (
     <div className="enterprise-overview-cards">
       <section className="enterprise-info-card" aria-label="企业信息">
-        <h2>企业信息</h2>
+        <div className="enterprise-card-heading">
+          <h2>企业信息</h2>
+          <SupportEntry tenant={detail.tenant.id} enabled={detail.owner.state === 'ASSIGNED'} />
+        </div>
         <dl>
           <div>
             <dt>负责人</dt>

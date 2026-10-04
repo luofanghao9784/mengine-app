@@ -34,7 +34,7 @@ public class CollectionService {
     private static Timestamp stamp(Instant v){return v==null?null:Timestamp.from(v);}
     private static void bounds(int offset,int limit){if(offset<0||offset>100000||limit<1||limit>100)throw IdentityException.invalid();}
     private boolean controls(UUID actor,UUID tenant){return governance.allows(actor,tenant,GovernanceAccess.Capability.TENANT_CONFIG,null);}
-    private void member(UUID actor,UUID tenant){identities.member(actor,tenant,false);departure.requireActiveBusiness(actor,tenant);}
+    private void member(UUID actor,UUID tenant){identities.member(actor,tenant,false);if(!identities.supportAccess(actor,tenant))departure.requireActiveBusiness(actor,tenant);}
     private Map<String,Object> connection(UUID tenant,UUID connection,boolean lock) {
         var rows=db.queryForList("SELECT * FROM data_connections WHERE tenant_id=? AND id=?"+(lock?" FOR UPDATE":""),tenant,connection);
         if(rows.isEmpty())throw new IdentityException(404,"DATA_CONNECTION_NOT_FOUND");return rows.getFirst();
@@ -42,7 +42,7 @@ public class CollectionService {
     private boolean visible(UUID actor,UUID tenant,UUID connection){
         return controls(actor,tenant)||Boolean.TRUE.equals(db.queryForObject("""
             SELECT EXISTS(SELECT 1 FROM business_datasets d JOIN workspace_members g
-              ON g.tenant_id=d.tenant_id AND g.workspace_id=d.workspace_id AND g.account_id=?
+              ON g.tenant_id=d.tenant_id AND g.workspace_id=d.workspace_id AND g.account_id=headquarters_permission_actor(?,g.tenant_id)
               WHERE d.tenant_id=? AND d.connection_id=? AND d.status='ACTIVE')
             """,Boolean.class,actor,tenant,connection));
     }
@@ -52,7 +52,7 @@ public class CollectionService {
     private String effectiveStatus(Map<String,Object> c){return "READY".equals(c.get("status"))&&!adapter.available()?"UNCONFIGURED":(String)c.get("status");}
     private Connection project(UUID actor,UUID tenant,Map<String,Object> c){
         UUID id=(UUID)c.get("id");String state=effectiveStatus(c);boolean control=controls(actor,tenant);
-        String scope=control?(String)c.get("access_summary"):"当前获权空间："+String.join("、",db.queryForList("SELECT DISTINCT w.name FROM business_datasets d JOIN workspaces w ON w.id=d.workspace_id JOIN workspace_members g ON g.tenant_id=d.tenant_id AND g.workspace_id=d.workspace_id AND g.account_id=? WHERE d.tenant_id=? AND d.connection_id=? AND d.status='ACTIVE' AND departure_content_readable(?,d.tenant_id,d.workspace_id) ORDER BY w.name",String.class,actor,tenant,id,actor));
+        String scope=control?(String)c.get("access_summary"):"当前获权空间："+String.join("、",db.queryForList("SELECT DISTINCT w.name FROM business_datasets d JOIN workspaces w ON w.id=d.workspace_id JOIN workspace_members g ON g.tenant_id=d.tenant_id AND g.workspace_id=d.workspace_id AND g.account_id=headquarters_permission_actor(?,g.tenant_id) WHERE d.tenant_id=? AND d.connection_id=? AND d.status='ACTIVE' AND departure_content_readable(headquarters_permission_actor(?,d.tenant_id),d.tenant_id,d.workspace_id) ORDER BY w.name",String.class,actor,tenant,id,actor));
         Instant success=db.queryForObject("SELECT max(finished_at) FROM collection_runs WHERE connection_id=? AND status='SUCCEEDED'",(r,n)->instant(r.getTimestamp(1)),id);
         return new Connection(id,(String)c.get("name"),(String)c.get("route_label"),scope,state,((Number)c.get("revision")).longValue(),control,
             new Schedule((Boolean)c.get("auto_enabled"),(String)c.get("frequency"),(String)c.get("daily_time"),(String)c.get("time_zone")),"READY".equals(state)?instant(c.get("next_due")):null,success,latest(id,true),latest(id,false));
@@ -76,6 +76,7 @@ public class CollectionService {
         return project(actor,tenant,connection(tenant,id,false));
     }
     @Transactional public Run updateNow(UUID actor,UUID tenant,UUID id,UUID request,long revision){
+        departure.requireActiveBusiness(actor,tenant);
         member(actor,tenant);governance.require(actor,tenant,GovernanceAccess.Capability.TENANT_CONFIG,null);
         String fingerprint=IdentityService.hash(tenant+"\n"+id+"\n"+revision);
         UUID prior=identities.priorRequest(actor,request,"COLLECTION_NOW",fingerprint);var c=connection(tenant,id,true);
@@ -90,7 +91,11 @@ public class CollectionService {
     private boolean activeTenant(UUID tenant){var rows=db.queryForList("SELECT status FROM tenants WHERE id=? FOR SHARE",tenant);return !rows.isEmpty()&&"ACTIVE".equals(rows.getFirst().get("status"))&&!departure.exiting(tenant);}
     private String authority(Map<String,Object> r){
         UUID actor=(UUID)r.get("requested_by");if(actor==null)return null;
-        try{member(actor,(UUID)r.get("tenant_id"));return controls(actor,(UUID)r.get("tenant_id"))?null:"AUTHORIZATION_REVOKED";}catch(IdentityException e){return "AUTHORIZATION_REVOKED";}
+        var previous=com.dreamcore.workspace.support.SupportContext.current();
+        try{var support= new com.dreamcore.workspace.support.SupportAccess(db);var context=support.forObject(actor,(UUID)r.get("tenant_id"),"collection_runs",(UUID)r.get("id"));
+        com.dreamcore.workspace.support.SupportContext.set(context);
+        if(context!=null)db.queryForObject("SELECT set_config('dreamcore.support_access',?,true)",String.class,context.id().toString());
+        member(actor,(UUID)r.get("tenant_id"));return controls(actor,(UUID)r.get("tenant_id"))?null:"AUTHORIZATION_REVOKED";}catch(IdentityException e){return "AUTHORIZATION_REVOKED";}finally{com.dreamcore.workspace.support.SupportContext.set(previous);}
     }
     @Transactional public void schedule(UUID tenant,UUID id,Instant now){
         if(!activeTenant(tenant))return;var c=connection(tenant,id,true);
@@ -161,10 +166,10 @@ public class CollectionService {
     private static final String DATASETS="""
         SELECT d.*,w.name AS workspace_name,s.version,s.row_count,s.collected_at,s.coverage_through
         FROM business_datasets d JOIN workspaces w ON w.tenant_id=d.tenant_id AND w.id=d.workspace_id
-        JOIN workspace_members g ON g.tenant_id=w.tenant_id AND g.workspace_id=w.id AND g.account_id=?
+        JOIN workspace_members g ON g.tenant_id=w.tenant_id AND g.workspace_id=w.id AND g.account_id=headquarters_permission_actor(?,g.tenant_id)
         LEFT JOIN dataset_snapshots s ON s.dataset_id=d.id AND s.id=d.current_snapshot
         LEFT JOIN LATERAL (SELECT status FROM collection_runs r WHERE r.connection_id=d.connection_id ORDER BY created_at DESC,id DESC LIMIT 1) latest_run ON true
-        WHERE d.tenant_id=? AND d.status='ACTIVE' AND departure_content_readable(?,d.tenant_id,d.workspace_id)
+        WHERE d.tenant_id=? AND d.status='ACTIVE' AND departure_content_readable(headquarters_permission_actor(?,d.tenant_id),d.tenant_id,d.workspace_id)
         """;
     @Transactional public Summary summary(UUID actor,UUID tenant){
         member(actor,tenant);

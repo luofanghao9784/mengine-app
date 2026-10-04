@@ -15,11 +15,13 @@ public class GovernanceAccess {
     private final IdentityService identities;
     public GovernanceAccess(JdbcTemplate db, IdentityService identities) { this.db=db; this.identities=identities; }
 
+    public UUID permissionActor(UUID actor,UUID tenant){return identities.permissionActor(actor,tenant);}
     boolean isOwner(UUID actor, UUID tenant) {
         return Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM tenant_governance WHERE tenant_id=? AND owner_id=?)",Boolean.class,tenant,actor));
     }
     public boolean allows(UUID actor, UUID tenant, Capability capability, UUID workspace) {
         String role=identities.member(actor,tenant,false);
+        actor=identities.permissionActor(actor,tenant);
         if(capability==Capability.OWNER) return workspace==null && isOwner(actor,tenant);
         if(capability==Capability.TENANT_CONFIG) return workspace==null && (isOwner(actor,tenant) || role.equals("TENANT_ADMIN"));
         if(workspace==null) return (capability==Capability.PROFILE_MAINTAIN && (isOwner(actor,tenant) || role.equals("TENANT_ADMIN"))) || explicit(actor,tenant,capability,null);
@@ -43,6 +45,7 @@ public class GovernanceAccess {
     }
     public List<ScopeCapability> scopes(UUID actor,UUID tenant) {
         identities.member(actor,tenant,false);
+        actor=identities.permissionActor(actor,tenant);
         var result=new ArrayList<>(db.query("SELECT workspace_id,capability FROM governance_capabilities WHERE tenant_id=? AND account_id=? ORDER BY workspace_id,capability",(r,n)->new ScopeCapability(r.getObject(1,UUID.class),Capability.valueOf(r.getString(2))),tenant,actor));
         db.queryForList("SELECT workspace_id FROM workspace_members WHERE tenant_id=? AND account_id=? AND can_maintain",UUID.class,tenant,actor).forEach(w->result.add(new ScopeCapability(w,Capability.CONTENT_MAINTAIN)));
         return List.copyOf(result);
@@ -51,7 +54,7 @@ public class GovernanceAccess {
     public void contentGrant(UUID actor,UUID tenant,UUID target,boolean enabled) {
         identities.member(actor,tenant,true);
         if(!enabled)return;
-        if(isOwner(actor,tenant))return;
+        if(isOwner(identities.permissionActor(actor,tenant),tenant))return;
         if(actor.equals(target))throw new IdentityException(403,"SELF_GRANT_NOT_ENABLED");
         var roles=db.queryForList("SELECT role FROM tenant_memberships WHERE tenant_id=? AND account_id=?",String.class,tenant,target);
         if(isOwner(target,tenant) || roles.contains("TENANT_ADMIN"))throw new IdentityException(403,"OWNER_REQUIRED_FOR_ADMIN_GRANT");

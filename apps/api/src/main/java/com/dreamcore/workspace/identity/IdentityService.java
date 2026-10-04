@@ -35,6 +35,7 @@ public class IdentityService {
     private static final RowMapper<Invitation> INVITATION = (r, n) -> new Invitation(r.getObject("id", UUID.class), r.getObject("tenant_id", UUID.class),
             r.getString("email"), r.getString("role"), r.getString("effective_status"), r.getTimestamp("expires_at").toInstant(), r.getString("phone"));
     private static final String INVITATION_SELECT = "SELECT *, CASE WHEN status='PENDING' AND expires_at<=now() THEN 'EXPIRED' ELSE status END AS effective_status FROM invitations";
+    private final com.dreamcore.workspace.support.SupportAccess support;
     private final JdbcTemplate db;
     private final PasswordEncoder passwords;
     private final IdentityAudit audit;
@@ -46,7 +47,7 @@ public class IdentityService {
 
     private final com.dreamcore.workspace.departure.DepartureAccess departure;
     public IdentityService(JdbcTemplate db, PasswordEncoder passwords, IdentityAudit audit, LoginThrottle throttle,
-                           LocalInvitationDelivery delivery, @Value("${dreamcore.invitation.ttl-hours}") int ttlHours,com.dreamcore.workspace.departure.DepartureAccess departure) {this.departure=departure;
+                           LocalInvitationDelivery delivery, @Value("${dreamcore.invitation.ttl-hours}") int ttlHours,com.dreamcore.workspace.departure.DepartureAccess departure,com.dreamcore.workspace.support.SupportAccess support) {this.departure=departure;this.support=support;
         this.db = db; this.passwords = passwords; this.audit = audit; this.throttle = throttle;
         this.delivery = delivery; this.ttlHours = ttlHours;
         this.dummyHash = passwords.encode(UUID.randomUUID().toString());
@@ -121,6 +122,7 @@ public class IdentityService {
             // Account status can change while this request waits, just like tenant membership.
             account(actor);
         }
+        if(support.active(actor,tenant))return "TENANT_ADMIN";
         var roles = db.queryForList("""
             SELECT m.role FROM tenant_memberships m JOIN tenants t ON t.id=m.tenant_id
             WHERE m.tenant_id=? AND m.account_id=? AND m.status='ACTIVE' AND t.status='ACTIVE'
@@ -130,15 +132,18 @@ public class IdentityService {
         }
         return roles.getFirst();
     }
+    public UUID permissionActor(UUID actor,UUID tenant){return support.permissionActor(actor,tenant);}
+    public boolean supportAccess(UUID actor,UUID tenant){return support.active(actor,tenant);}
     @Transactional
     public TenantContext context(UUID actor, UUID tenant) {
         String role = member(actor, tenant, false);
+        UUID permission=permissionActor(actor,tenant);
         // Tenant admin and platform role do not confer access to another member's personal workspace.
         var spaces = db.query("""
             SELECT w.id,w.name,w.kind FROM workspaces w WHERE w.tenant_id=? AND
             ((w.kind='PERSONAL' AND w.owner_id=?) OR (w.kind='SHARED' AND EXISTS(SELECT 1 FROM workspace_members m
                 WHERE m.tenant_id=w.tenant_id AND m.workspace_id=w.id AND m.account_id=?))) AND departure_content_readable(?,w.tenant_id,w.id) ORDER BY w.id
-            """, (r,n) -> new Workspace(r.getObject("id", UUID.class),r.getString("name"),r.getString("kind")), tenant, actor, actor, actor);
+            """, (r,n) -> new Workspace(r.getObject("id", UUID.class),r.getString("name"),r.getString("kind")), tenant, permission, permission, permission);
         return new TenantContext(tenant(tenant), role, spaces);
     }
     public List<Tenant> tenants(UUID actor) { platform(actor); return db.query("SELECT * FROM tenants ORDER BY created_at,id", TENANT); }

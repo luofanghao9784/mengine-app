@@ -1,3 +1,4 @@
+import { supportPath } from '../identity/support-request';
 import type {
   MaterialEntry,
   MaterialPage,
@@ -201,7 +202,7 @@ export function createMaterialClient(fetcher: typeof fetch = fetch) {
       else signal?.addEventListener('abort', cancel, { once: true });
       try {
         const response = await fetcher(
-          root(tenant, space) + `/materials/${id(document)}/versions/${id(version)}/download`,
+          supportPath(root(tenant, space) + `/materials/${id(document)}/versions/${id(version)}/download`),
           { credentials: 'same-origin', cache: 'no-store', redirect: 'error', signal: controller.signal },
         );
         if (!response.ok) {

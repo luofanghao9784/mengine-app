@@ -32,7 +32,7 @@ public class ProfileService {
         if(subject==null)throw IdentityException.invalid();
         switch(scope){
             case TENANT -> {if(!tenant.equals(subject))throw new IdentityException(404,"PROFILE_NOT_FOUND");}
-            case PERSONAL -> {if(!actor.equals(subject))throw new IdentityException(404,"PROFILE_NOT_FOUND");}
+            case PERSONAL -> {if(!identities.permissionActor(actor,tenant).equals(subject))throw new IdentityException(404,"PROFILE_NOT_FOUND");}
             case WORKSPACE -> materials.require(actor,tenant,subject,false);
         }
     }

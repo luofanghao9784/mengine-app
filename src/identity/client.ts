@@ -1,3 +1,4 @@
+import { supportPath, supportRoute } from './support-request';
 import type {
   Identity,
   Membership,
@@ -11,6 +12,8 @@ export class IdentityError extends Error {
   readonly status: number;
   constructor(code: string, status = 0) {
     const messages: Record<string, string> = {
+      SUPPORT_ACCESS_EXPIRED: '总部访问已失效，请返回总台重新进入。',
+      SUPPORT_SCOPE_DENIED: '此操作不属于当前总部访问范围。负责人交接须通过专门流程。',
       CONVERSATION_BUSY: '会话正在执行，请选择停止并删除。',
       CONVERSATION_STATE_CHANGED: '会话状态已变化，请刷新后重试。',
       PHONE_INVALID: '请输入正确的手机号；海外号码请带国家区号。',
@@ -178,7 +181,7 @@ export function isTenantContext(v: unknown): v is TenantContext {
     record(v.tenant) &&
     uuid(v.tenant.id) &&
     text(v.tenant.name) &&
-    v.tenant.status === 'ACTIVE' &&
+    (v.tenant.status === 'ACTIVE' || (supportRoute() !== null && v.tenant.status === 'SUSPENDED')) &&
     role(v.role) &&
     Array.isArray(v.workspaces) &&
     v.workspaces.every(
@@ -197,6 +200,7 @@ export function createIdentityRequest(fetcher: typeof fetch = fetch, timeoutMs =
     body?: unknown,
     signal?: AbortSignal,
   ): Promise<T> {
+    path = supportPath(path);
     const controller = new AbortController();
     const cancel = () => controller.abort();
     if (signal?.aborted) cancel();

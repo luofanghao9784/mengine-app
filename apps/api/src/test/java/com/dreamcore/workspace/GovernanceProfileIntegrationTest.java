@@ -340,7 +340,7 @@ class GovernanceProfileIntegrationTest {
             db.update("INSERT INTO "+schema+".tenant_memberships(tenant_id,account_id,role) VALUES (?,?,'TENANT_ADMIN')",t,a);
             db.update("INSERT INTO "+schema+".workspaces(id,tenant_id,owner_id,name,kind) VALUES (?,?,?,'旧共享','SHARED')",w,t,a);
             db.update("INSERT INTO "+schema+".workspace_members(tenant_id,workspace_id,account_id,can_maintain) VALUES (?,?,?,true)",t,w,a);
-            org.flywaydb.core.Flyway.configure().dataSource(db.getDataSource()).schemas(schema).defaultSchema(schema).load().migrate();
+            org.flywaydb.core.Flyway.configure().dataSource(db.getDataSource()).schemas(schema).defaultSchema(schema).target("16").load().migrate();
             assertEquals(0,db.queryForObject("SELECT count(*) FROM "+schema+".tenant_governance",Integer.class));
             assertEquals(0,db.queryForObject("SELECT count(*) FROM "+schema+".governance_initial_designations",Integer.class));
             assertEquals(0,db.queryForObject("SELECT count(*) FROM "+schema+".governance_capabilities",Integer.class));

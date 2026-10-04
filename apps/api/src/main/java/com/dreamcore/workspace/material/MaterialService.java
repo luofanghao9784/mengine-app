@@ -87,8 +87,8 @@ public class MaterialService {
         )
         SELECT e.*,w.name AS workspace_name,((w.kind='PERSONAL' OR coalesce(g.can_maintain,false)) AND NOT EXISTS(SELECT 1 FROM departure_executions d WHERE d.tenant_id=w.tenant_id AND d.kind='TENANT_EXIT' AND d.state<>'CANCELLED')) AS can_maintain
         FROM entries e JOIN workspaces w ON w.tenant_id=e.tenant_id AND w.id=e.workspace_id
-        LEFT JOIN workspace_members g ON g.tenant_id=w.tenant_id AND g.workspace_id=w.id AND g.account_id=?
-        WHERE e.tenant_id=? AND ((w.kind='PERSONAL' AND w.owner_id=?) OR (w.kind='SHARED' AND g.account_id IS NOT NULL)) AND departure_content_readable(coalesce(g.account_id,w.owner_id),w.tenant_id,w.id)
+        LEFT JOIN workspace_members g ON g.tenant_id=w.tenant_id AND g.workspace_id=w.id AND g.account_id=headquarters_permission_actor(?,w.tenant_id)
+        WHERE e.tenant_id=? AND ((w.kind='PERSONAL' AND w.owner_id=headquarters_permission_actor(?,w.tenant_id)) OR (w.kind='SHARED' AND g.account_id IS NOT NULL)) AND departure_content_readable(coalesce(g.account_id,w.owner_id),w.tenant_id,w.id)
         """;
     @Transactional
     public Page list(UUID actor,UUID tenant,UUID workspace,UUID folder,String q,int offset,int limit) {

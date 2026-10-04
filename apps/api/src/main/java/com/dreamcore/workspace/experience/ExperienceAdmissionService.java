@@ -21,7 +21,7 @@ public class ExperienceAdmissionService {
  private List<String> strings(tools.jackson.databind.JsonNode value){return Arrays.asList(json.readValue(value.toString(),String[].class));}
  @Transactional public Receipt admit(UUID run){
   var scope=db.queryForList("SELECT r.tenant_id,r.source_id,i.owner_id,i.workspace_id,i.general_suggestion_id FROM experience_analysis_runs r JOIN experience_intake_sources i ON i.id=r.source_id WHERE r.id=?",run);
-  if(scope.isEmpty())throw new IdentityException(404,"EXPERIENCE_ANALYSIS_NOT_FOUND");var initial=scope.getFirst();
+  if(scope.isEmpty())throw new IdentityException(404,"EXPERIENCE_ANALYSIS_NOT_FOUND");var initial=scope.getFirst();new com.dreamcore.workspace.support.SupportAccess(db).bindObject((UUID)initial.get("owner_id"),(UUID)initial.get("tenant_id"),"experience_intake_sources",(UUID)initial.get("source_id"));
   db.queryForList("SELECT id FROM tenants WHERE id=? FOR SHARE",initial.get("tenant_id"));
   db.queryForList("SELECT pg_advisory_xact_lock(hashtextextended(?,0))","experience-admission:"+initial.get("tenant_id")+":"+initial.get("workspace_id")+":"+initial.get("owner_id"));
   db.queryForList("SELECT pg_advisory_xact_lock_shared(hashtextextended('general-use:'||?::text,0))",initial.get("tenant_id"));

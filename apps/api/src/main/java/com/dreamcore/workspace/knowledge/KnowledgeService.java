@@ -90,7 +90,7 @@ public class KnowledgeService {
         if(suppliedQuery==null)throw IdentityException.invalid();
         String query=suppliedQuery.strip();if((query.isEmpty() && (task==null || selectedVersions==null)) || query.length()>200) throw IdentityException.invalid();
         String[] terms=query.isEmpty()?new String[0]:query.split("\\s+");if(terms.length>8) throw IdentityException.invalid();
-        var args=new ArrayList<Object>();args.add(task);args.add(attempt);args.add(task);args.add(actor);args.add(tenant);args.add(actor);
+        var args=new ArrayList<Object>();args.add(task);args.add(attempt);args.add(task);args.add(identities.permissionActor(actor,tenant));args.add(tenant);args.add(identities.permissionActor(actor,tenant));
         String scope="""
             SELECT v.*,r.id AS run_id,coalesce(r.status,'NOT_STARTED') AS parse_status,
                    coalesce(r.generation,0) AS generation,coalesce(r.warnings,'') AS warnings,
@@ -165,12 +165,14 @@ public class KnowledgeService {
     private boolean owned(Job job) { return !db.queryForList("SELECT id FROM knowledge_runs WHERE id=? AND status='RUNNING' AND lease_token=? AND lease_until>now() FOR UPDATE",job.id(),job.token()).isEmpty(); }
     @Transactional
     public Input input(Job job) {
+        new com.dreamcore.workspace.support.SupportAccess(db).bindObject(job.actor(),job.tenant(),"knowledge_runs",job.id());
         access.require(job.actor(),job.tenant(),job.workspace(),true);if(!owned(job)) return null;
         var v=version(job.tenant(),job.workspace(),job.material(),job.version(),false);
         return new Input((String)v.get("filename"),store.read((UUID)v.get("object_id"),(Long)v.get("size_bytes"),(String)v.get("sha256")));
     }
     @Transactional
     public void finish(Job job,DocumentParser.Result result) {
+        new com.dreamcore.workspace.support.SupportAccess(db).bindObject(job.actor(),job.tenant(),"knowledge_runs",job.id());
         access.require(job.actor(),job.tenant(),job.workspace(),true);if(!owned(job)) return;
         access.requireVersionActive(job.tenant(),job.workspace(),job.version());
         int ordinal=0;

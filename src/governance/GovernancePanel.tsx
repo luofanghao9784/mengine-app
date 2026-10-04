@@ -1,3 +1,4 @@
+import { supportRoute } from '../identity/support-request';
 import { useContext, useState } from 'react';
 import type { Capability, CapabilityChange, GovernanceSnapshot } from '../../contracts/public-api/governance';
 import type { TenantMember } from '../../contracts/public-api/tenant-admin';
@@ -46,7 +47,7 @@ export function GovernancePanel({
           配置管理、范围维护和企业负责人是分别授予的职责。管理资格不会自动开放个人资料或私人会话。
         </p>
         <div className="governance-toolbar">
-          <Badge>{snapshot.owner ? '企业负责人' : snapshot.canConfigure ? '企业管理员' : '范围职责'}</Badge>
+          <Badge>{supportRoute() ? '总部支持' : snapshot.owner ? '企业负责人' : snapshot.canConfigure ? '企业管理员' : '范围职责'}</Badge>
           <Button onClick={changed} disabled={busy || locked}>
             刷新职责
           </Button>
@@ -106,7 +107,7 @@ export function GovernancePanel({
             <p className="muted">职责清单只说明已授予的资格；具体业务功能以当前可用入口为准。</p>
           </section>
         )}
-        {snapshot.owner && (
+        {(snapshot.owner || supportRoute()) && (
           <OwnerControls
             tenant={tenant}
             snapshot={snapshot}
@@ -115,10 +116,10 @@ export function GovernancePanel({
             select={select}
           />
         )}
-        <details className="governance-section">
+        {!supportRoute() && <details className="governance-section">
           <summary>负责人异常恢复</summary>
           <RecoveryForm tenant={tenant} />
-        </details>
+        </details>}
       </section>
     </MutationGate.Provider>
   );
@@ -424,7 +425,7 @@ function MemberDuties({
             保存管理职责
           </Button>
         </form>
-        {member.accountId !== snapshot.ownerId && !snapshot.pendingHandover && (
+        {!supportRoute() && member.accountId !== snapshot.ownerId && !snapshot.pendingHandover && (
           <form
             onSubmit={(e) => {
               e.preventDefault();

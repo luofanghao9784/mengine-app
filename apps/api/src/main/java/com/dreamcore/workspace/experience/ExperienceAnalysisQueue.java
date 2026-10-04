@@ -20,6 +20,7 @@ public class ExperienceAnalysisQueue {
  @Transactional(readOnly=true) public List<UUID> tenants(){return db.queryForList("SELECT q.tenant_id FROM experience_analysis_items q JOIN tenants t ON t.id=q.tenant_id AND t.status='ACTIVE' WHERE q.state IN ('QUEUED','RETRY_WAIT') AND q.next_attempt_at<=clock_timestamp() AND NOT EXISTS(SELECT 1 FROM experience_analysis_runs r WHERE r.tenant_id=q.tenant_id AND r.state IN ('CLAIMED','DISPATCHED')) GROUP BY q.tenant_id ORDER BY coalesce((SELECT max(previous.created_at) FROM experience_analysis_runs previous WHERE previous.tenant_id=q.tenant_id),to_timestamp(0)),min(q.next_attempt_at),q.tenant_id LIMIT 20",UUID.class);}
  private Map<String,Object> source(UUID id){var rows=db.queryForList("SELECT * FROM experience_intake_sources WHERE id=?",id);if(rows.isEmpty())throw changed();return rows.getFirst();}
  private void eligible(Map<String,Object> s){
+  new com.dreamcore.workspace.support.SupportAccess(db).bindObject((UUID)s.get("owner_id"),(UUID)s.get("tenant_id"),"experience_intake_sources",(UUID)s.get("id"));
   if(!intake.available((UUID)s.get("id"))||!Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM tenants WHERE id=? AND status='ACTIVE')",Boolean.class,s.get("tenant_id"))))throw changed();
  }
  private UUID inputId(UUID source,String key){return UUID.nameUUIDFromBytes((source+":"+key).getBytes(StandardCharsets.UTF_8));}

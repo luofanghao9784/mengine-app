@@ -18,12 +18,13 @@ public class MaterialAccess {
     public Space check(UUID actor,UUID tenant,UUID workspace,boolean write,boolean lock) {
         identities.member(actor,tenant,false,lock);
         if(write) departure.requireActiveBusiness(actor,tenant);
-        departure.requireContentRead(actor,tenant,workspace);
+        UUID permission=identities.permissionActor(actor,tenant);
+        departure.requireContentRead(permission,tenant,workspace);
         var rows=db.query("""
             SELECT w.id,w.name,w.kind,(w.kind='PERSONAL' OR coalesce(g.can_maintain,false)) AS can_maintain
             FROM workspaces w LEFT JOIN workspace_members g ON g.tenant_id=w.tenant_id AND g.workspace_id=w.id AND g.account_id=?
             WHERE w.tenant_id=? AND w.id=? AND ((w.kind='PERSONAL' AND w.owner_id=?) OR (w.kind='SHARED' AND g.account_id IS NOT NULL))
-            """,(r,n)->new Space(r.getObject("id",UUID.class),r.getString("name"),r.getString("kind"),r.getBoolean("can_maintain")),actor,tenant,workspace,actor);
+            """,(r,n)->new Space(r.getObject("id",UUID.class),r.getString("name"),r.getString("kind"),r.getBoolean("can_maintain")),permission,tenant,workspace,permission);
         if(rows.isEmpty()) throw new IdentityException(404,"MATERIAL_LOCATION_UNAVAILABLE");
         Space space=rows.getFirst();
         if(write && !space.canMaintain()) throw new IdentityException(403,"MATERIAL_READ_ONLY");

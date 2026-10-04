@@ -19,13 +19,13 @@ import tools.jackson.databind.json.JsonMapper;
   UUID space=(UUID)source.get("workspace_id"),owner=(UUID)source.get("owner_id");
   if(source.get("kind").equals("PROFILE_VERSION")){
    identities.member(actor,tenant,false);departure.requirePrivateRead(actor,tenant);
-   if(owner!=null&&!owner.equals(actor))throw missing();if(space!=null)materials.require(actor,tenant,space,false);
+   if(owner!=null&&!owner.equals(identities.permissionActor(actor,tenant)))throw missing();if(space!=null)materials.require(actor,tenant,space,false);
    if(owner==null)governance.require(actor,tenant,GovernanceAccess.Capability.PROFILE_MAINTAIN,space);
    if(purge&&owner==null&&!governance.allows(actor,tenant,GovernanceAccess.Capability.LIFECYCLE_PURGE,space)&&!governance.allows(actor,tenant,GovernanceAccess.Capability.LIFECYCLE_PURGE,null))throw new IdentityException(403,"LIFECYCLE_PURGE_REQUIRED");
    return;
   }
   var scope=materials.require(actor,tenant,space,false);
-  if(owner!=null&&!owner.equals(actor))throw missing();
+  if(owner!=null&&!owner.equals(identities.permissionActor(actor,tenant)))throw missing();
   if(owner!=null)departure.requirePrivateRead(actor,tenant);else departure.requireContentRead(actor,tenant,space);
   String kind=(String)source.get("kind");
   if(owner==null){GovernanceAccess.Capability cap=kind.equals("EXPERIENCE_VERSION")?GovernanceAccess.Capability.EXPERIENCE_MAINTAIN:GovernanceAccess.Capability.EVALUATION_MAINTAIN;governance.require(actor,tenant,cap,space);}
@@ -36,7 +36,7 @@ import tools.jackson.databind.json.JsonMapper;
  private void material(UUID actor,UUID tenant,UUID version){var rows=db.queryForList("SELECT workspace_id FROM material_versions WHERE id=? AND tenant_id=?",UUID.class,version,tenant);if(rows.isEmpty())throw missing();materials.require(actor,tenant,rows.getFirst(),false);materials.requireVersionActive(tenant,rows.getFirst(),version);}
  private void task(UUID actor,UUID tenant,UUID task){
   departure.requirePrivateRead(actor,tenant);
-  var rows=db.queryForList("SELECT t.workspace_id FROM conversation_tasks t JOIN conversations c ON c.id=t.conversation_id WHERE t.id=? AND t.tenant_id=? AND c.owner_id=?",UUID.class,task,tenant,actor);if(rows.isEmpty())throw missing();materials.require(actor,tenant,rows.getFirst(),false);
+  var rows=db.queryForList("SELECT t.workspace_id FROM conversation_tasks t JOIN conversations c ON c.id=t.conversation_id WHERE t.id=? AND t.tenant_id=? AND c.owner_id=?",UUID.class,task,tenant,identities.permissionActor(actor,tenant));if(rows.isEmpty())throw missing();materials.require(actor,tenant,rows.getFirst(),false);
   for(UUID v:db.queryForList("SELECT version_id FROM conversation_originals WHERE task_id=? UNION SELECT c.version_id FROM conversation_sources s JOIN knowledge_chunks c ON c.id=s.chunk_id WHERE s.task_id=? UNION SELECT c.version_id FROM conversation_agent_grants s JOIN knowledge_chunks c ON c.id=s.chunk_id WHERE s.task_id=? UNION SELECT version_id FROM feedback_task_sources WHERE task_id=? UNION SELECT version_id FROM task_context_materials WHERE task_id=?",UUID.class,task,task,task,task,task))material(actor,tenant,v);
  }
  private void feedback(UUID actor,UUID tenant,UUID id){

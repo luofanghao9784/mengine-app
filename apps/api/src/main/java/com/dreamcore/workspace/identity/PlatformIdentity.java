@@ -44,6 +44,10 @@ public class PlatformIdentity {
             .secure(request.isSecure()).sameSite("Strict").path(PATH).maxAge(seconds).build().toString());
         response.setHeader("Cache-Control","no-store");
     }
+    public String presentedSessionHash(HttpServletRequest request){
+        if(request.getCookies()!=null)for(var c:request.getCookies())if(cookieName.equals(c.getName())&&c.getValue().length()==43)return IdentityService.hash(c.getValue());
+        return null;
+    }
     public Session read(HttpServletRequest request) {
         if (request.getCookies()==null) return null;
         for (var cookie:request.getCookies()) {
