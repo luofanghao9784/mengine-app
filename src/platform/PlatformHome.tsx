@@ -293,13 +293,13 @@ function TenantView({
         ))}
       </nav>
       <section
-        className={`platform-enterprise-detail platform-enterprise-redesign ${['accounts', 'usage', 'records'].includes(tab) ? 'access-panel' : 'platform-overview-layout'} ${tab === 'accounts' ? 'platform-account-catalog' : ''}`}
+        className={`platform-enterprise-detail platform-enterprise-redesign ${['accounts', 'records'].includes(tab) ? 'access-panel' : 'platform-overview-layout'} ${tab === 'accounts' ? 'platform-account-catalog' : ''}`}
         aria-label="企业详情"
       >
         {tab === 'accounts' ? (
           <PlatformAccounts key={id} tenant={id} revision={attempt} />
         ) : tab === 'usage' ? (
-          <UsagePanel scope="platform" tenant={id} revision={attempt} />
+          <UsagePanel scope="platform" tenant={id} revision={attempt} compact />
         ) : tab === 'records' ? (
           <Records id={id} revision={attempt} invitation={invitation} />
         ) : (

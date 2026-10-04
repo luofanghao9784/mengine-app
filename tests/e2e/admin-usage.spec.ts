@@ -247,14 +247,22 @@ test('platform enterprise detail uses the same scoped usage facts and retains se
   const f = await fixture(context);
   await page.goto(`/platform-admin/#admin=tenants&enterprise=${tenant}&section=usage`);
   await expect(page.getByRole('region', { name: '企业详情' })).toBeVisible();
-  await expect(page.getByRole('region', { name: '用途与计量覆盖' })).toBeVisible();
+  const cards = page.locator('.enterprise-usage > .usage-metrics');
+  await expect(cards).toContainText('日常登记请求');
+  await expect(cards.locator('div').nth(0).locator('dd')).toHaveText('5');
+  await expect(cards.locator('div').nth(1).locator('dd')).toHaveText('150');
+  await expect(cards).toContainText('部分消耗未上报');
+  await expect(page.getByRole('region', { name: '用量构成' })).toContainText('未知');
+  await expect(page.getByRole('region', { name: '用途与计量覆盖' })).not.toBeVisible();
+  await page.getByText('计量明细与说明', { exact: true }).click();
+  await expect(page.getByRole('region', { name: '用途与计量覆盖' })).toContainText('合成验证');
   await page.getByRole('combobox', { name: '用量统计期间' }).click();
   await page
     .getByRole('listbox', { name: '用量统计期间' })
     .getByRole('option', { name: '近 30 天', exact: true })
     .click();
   await expect(page.getByText(/统计：2026\/9\/5/)).toBeVisible();
-  await page.getByRole('button', { name: '刷新详情', exact: true }).click();
+  await page.getByRole('button', { name: '更新用量', exact: true }).click();
   await expect(page.getByRole('combobox', { name: '用量统计期间' })).toHaveText('近 30 天');
   expect(
     f.paths.filter((p) => p.includes('/usage?')).every((p) => p.includes(`/tenants/${tenant}/usage?`)),

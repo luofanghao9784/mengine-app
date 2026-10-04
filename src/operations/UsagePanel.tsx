@@ -124,14 +124,23 @@ export function UsagePanel({
   tenant = null,
   revision = 0,
   hash,
+  compact = false,
 }: {
   scope: 'platform' | 'tenant';
   tenant?: string | null;
   revision?: number;
   hash?: string;
+  compact?: boolean;
 }) {
   return (
-    <ScopedUsage key={`${scope}:${tenant}`} scope={scope} tenant={tenant} revision={revision} hash={hash} />
+    <ScopedUsage
+      key={`${scope}:${tenant}`}
+      scope={scope}
+      tenant={tenant}
+      revision={revision}
+      hash={hash}
+      compact={compact}
+    />
   );
 }
 function ScopedUsage({
@@ -139,11 +148,13 @@ function ScopedUsage({
   tenant,
   revision,
   hash,
+  compact,
 }: {
   scope: 'platform' | 'tenant';
   tenant: string | null;
   revision: number;
   hash?: string;
+  compact: boolean;
 }) {
   const [savedPeriod, setPeriod] = useViewState<UsagePeriod>(
     scope === 'platform' ? 'platform' : tenant!,
@@ -190,80 +201,188 @@ function ScopedUsage({
     </div>
   );
   return (
-    <div className="usage-page">
+    <div className={`usage-page ${compact ? 'enterprise-usage' : ''}`}>
       {scope === 'platform' && <PageActions>{controls}</PageActions>}
-      <div className="usage-heading">
-        <div>
-          {scope === 'tenant' && <h2>本企业用量</h2>}
-          <p className="admin-note">
-            {scope === 'platform' ? (
-              tenant ? (
-                <TenantName tenant={tenant} />
+      {!compact && (
+        <div className="usage-heading">
+          <div>
+            {scope === 'tenant' && <h2>本企业用量</h2>}
+            <p className="admin-note">
+              {scope === 'platform' ? (
+                tenant ? (
+                  <TenantName tenant={tenant} />
+                ) : (
+                  '全平台 · 包含暂停服务企业和平台维护'
+                )
               ) : (
-                '全平台 · 包含暂停服务企业和平台维护'
-              )
-            ) : (
-              '当前企业范围'
-            )}
-          </p>
+                '当前企业范围'
+              )}
+            </p>
+          </div>
+          {scope === 'tenant' && controls}
         </div>
-        {scope === 'tenant' && controls}
-      </div>
+      )}
       {data.error ? (
         <Failure error={data.error} retry={refresh} />
       ) : !value ? (
         <Loading />
+      ) : compact ? (
+        <EnterpriseUsageFacts value={value} cost={cost} />
       ) : (
         <UsageFacts value={value} cost={cost} />
       )}
     </div>
   );
 }
-function UsageFacts({ value: v, cost }: { value: UsageOverview; cost?: UsageCost }) {
-  const platform = !!cost;
+function EnterpriseUsageFacts({ value: v, cost }: { value: UsageOverview; cost?: UsageCost }) {
   const work = v.groups.find((g) => g.purpose === 'WORK' && g.executionClass === 'live');
   const maintenance = v.groups.find((g) => g.purpose === 'MAINTENANCE' && g.executionClass === 'live');
+  const live = v.groups.filter((g) => g.executionClass === 'live');
+  const tokenSum = (field: 'inputTokens' | 'outputTokens') =>
+    live.length && live.every((g) => g[field] === null)
+      ? null
+      : live.reduce((sum, g) => sum + (g[field] ?? 0), 0);
+  const input = tokenSum('inputTokens'),
+    output = tokenSum('outputTokens');
+  const tokens = input === null || output === null ? null : input + output;
+  const incomplete = live.some(
+    (g) => g.reportedUnits < g.units || g.inputTokens === null || g.outputTokens === null,
+  );
   const tools = v.tools.find((t) => t.executionClass === 'live');
   return (
     <>
-      <p className="admin-note">
-        统计：{time(v.from, v.timeZone)} 至 {time(v.until, v.timeZone)} · {v.timeZone}。读取于{' '}
-        {time(v.checkedAt, v.timeZone)}。
-      </p>
-      {cost && <CostSummary cost={cost} />}
       <dl className="usage-metrics">
         <div>
-          <dt>日常模型登记请求</dt>
-          <dd>{numbers(work?.modelCalls ?? 0)}</dd>
-          <small>正式执行 · 包含失败与重试</small>
+          <dt>日常登记请求</dt>
+          <dd>{numbers(work?.units ?? 0)}</dd>
+          <small>包含失败、取消与重试</small>
         </div>
         <div>
-          <dt>维护模型回执调用</dt>
-          <dd>{maintenance ? numbers(maintenance.modelCalls) : '暂无记录'}</dd>
-          <small>正式执行 · 仅已收到的回执</small>
+          <dt>已上报 Token</dt>
+          <dd>{numbers(tokens)}</dd>
+          <small>{incomplete ? '部分消耗未上报，仅累计已知值' : '正式执行 · 输入与输出合计'}</small>
         </div>
         <div>
           <dt>工具执行登记</dt>
           <dd>{numbers(tools?.starts ?? 0)}</dd>
-          <small>正式执行 · 等待回执 {numbers(tools?.pending ?? 0)}</small>
+          <small>
+            成功 {numbers(tools?.succeeded ?? 0)} · 失败 {numbers(tools?.failed ?? 0)} · 等待{' '}
+            {numbers(tools?.pending ?? 0)}
+          </small>
         </div>
         <div>
-          <dt>当前原件登记量</dt>
+          <dt>当前资料原件</dt>
           <dd>{byte(v.storage.registeredBytes)}</dd>
           <small>
             {numbers(v.storage.originals)} 份资料 · {numbers(v.storage.versions)} 个版本
           </small>
         </div>
       </dl>
-      <section className="admin-section usage-section" aria-label="每日用量趋势">
-        <h2>每日用量</h2>
+      <div className="enterprise-usage-grid">
+        <section className="enterprise-usage-card" aria-label="每日用量趋势">
+          <h2>每日用量</h2>
+          <Trend days={v.days} platform />
+        </section>
+        <section className="enterprise-usage-card" aria-label="用量构成">
+          <h2>用量构成</h2>
+          <dl className="enterprise-usage-breakdown">
+            <div>
+              <dt>输入 Token</dt>
+              <dd>{numbers(input)}</dd>
+            </div>
+            <div>
+              <dt>输出 Token</dt>
+              <dd>{numbers(output)}</dd>
+            </div>
+            <div>
+              <dt>维护回执调用</dt>
+              <dd>{maintenance ? numbers(maintenance.modelCalls) : '暂无记录'}</dd>
+            </div>
+            <div>
+              <dt>使用成本</dt>
+              <dd>{cost?.state === 'NOT_CONNECTED' ? '未接入' : '未知'}</dd>
+            </div>
+            <div>
+              <dt>企业额度</dt>
+              <dd>未配置</dd>
+            </div>
+          </dl>
+          <p className="admin-note">Token 仅累计正式执行的已上报部分；剩余额度未知。</p>
+        </section>
+      </div>
+      <div className="enterprise-usage-footer">
         <p className="admin-note">
-          {platform
-            ? '仅正式执行；日常请求与维护回执分别计量，不合并为账单。'
-            : '仅正式执行。蓝色为日常请求开始登记，浅蓝为基础维护回执调用（归属运行开始日）；两种口径分别观察，不代表账单或业务效果。'}
+          统计：{time(v.from, v.timeZone)} 至 {time(v.until, v.timeZone)} · {v.timeZone}
+          <br />
+          读取于 {time(v.checkedAt, v.timeZone)}
         </p>
-        <Trend days={v.days} platform={platform} />
-      </section>
+        <details className="usage-explanation enterprise-usage-details">
+          <summary>计量明细与说明</summary>
+          <UsageFacts value={v} cost={cost} detailedOnly />
+        </details>
+      </div>
+    </>
+  );
+}
+function UsageFacts({
+  value: v,
+  cost,
+  detailedOnly = false,
+}: {
+  value: UsageOverview;
+  cost?: UsageCost;
+  detailedOnly?: boolean;
+}) {
+  const platform = !!cost;
+  const work = v.groups.find((g) => g.purpose === 'WORK' && g.executionClass === 'live');
+  const maintenance = v.groups.find((g) => g.purpose === 'MAINTENANCE' && g.executionClass === 'live');
+  const tools = v.tools.find((t) => t.executionClass === 'live');
+  return (
+    <>
+      {!detailedOnly && (
+        <p className="admin-note">
+          统计：{time(v.from, v.timeZone)} 至 {time(v.until, v.timeZone)} · {v.timeZone}。读取于{' '}
+          {time(v.checkedAt, v.timeZone)}。
+        </p>
+      )}
+      {cost && <CostSummary cost={cost} />}
+      {!detailedOnly && (
+        <>
+          <dl className="usage-metrics">
+            <div>
+              <dt>日常模型登记请求</dt>
+              <dd>{numbers(work?.modelCalls ?? 0)}</dd>
+              <small>正式执行 · 包含失败与重试</small>
+            </div>
+            <div>
+              <dt>维护模型回执调用</dt>
+              <dd>{maintenance ? numbers(maintenance.modelCalls) : '暂无记录'}</dd>
+              <small>正式执行 · 仅已收到的回执</small>
+            </div>
+            <div>
+              <dt>工具执行登记</dt>
+              <dd>{numbers(tools?.starts ?? 0)}</dd>
+              <small>正式执行 · 等待回执 {numbers(tools?.pending ?? 0)}</small>
+            </div>
+            <div>
+              <dt>当前原件登记量</dt>
+              <dd>{byte(v.storage.registeredBytes)}</dd>
+              <small>
+                {numbers(v.storage.originals)} 份资料 · {numbers(v.storage.versions)} 个版本
+              </small>
+            </div>
+          </dl>
+          <section className="admin-section usage-section" aria-label="每日用量趋势">
+            <h2>每日用量</h2>
+            <p className="admin-note">
+              {platform
+                ? '仅正式执行；日常请求与维护回执分别计量，不合并为账单。'
+                : '仅正式执行。蓝色为日常请求开始登记，浅蓝为基础维护回执调用（归属运行开始日）；两种口径分别观察，不代表账单或业务效果。'}
+            </p>
+            <Trend days={v.days} platform={platform} />
+          </section>
+        </>
+      )}
       <section className="admin-section usage-section" aria-label="用途与计量覆盖">
         <h2>用途与计量覆盖</h2>
         <p className="admin-note">Token 只累计已上报部分；未上报和未收到回执的消耗不能当作零。</p>

@@ -587,3 +587,66 @@
   flex: 1;
   width: auto;
 }
+
+/* Enterprise detail: compact cards share the console's surface and border tokens. */
+.admin-platform .platform-enterprise-redesign > .enterprise-usage {
+  margin: 0;
+  gap: 16px;
+}
+.admin-platform .enterprise-usage .usage-metrics > div {
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  background: var(--surface, #fff);
+}
+.enterprise-usage-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+  gap: 16px;
+}
+.enterprise-usage-card {
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  background: var(--surface, #fff);
+  min-width: 0;
+}
+.enterprise-usage-card h2 {
+  margin: 0;
+  font-size: var(--font-heading);
+}
+.enterprise-usage-breakdown {
+  margin: 16px 0 12px;
+}
+.enterprise-usage-breakdown > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+}
+.admin-platform .enterprise-usage-breakdown dd {
+  margin: 0;
+  font-weight: 550;
+}
+.admin-platform .enterprise-usage .usage-bars {
+  height: 162px;
+  margin: 20px 0 8px;
+}
+.admin-platform .enterprise-usage .usage-bars > div > div {
+  height: 140px;
+}
+.enterprise-usage-footer > p {
+  margin: 0;
+}
+.enterprise-usage-details {
+  margin-top: 4px;
+}
+.enterprise-usage-details[open] {
+  margin-top: 12px;
+  padding: 0 20px 20px;
+  background: var(--surface, #fff);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+}
