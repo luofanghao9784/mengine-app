@@ -99,7 +99,8 @@ export class IdentityError extends Error {
       OWNER_DESIGNATION_REQUIRED: '当前账号没有可接受的负责人指定。',
       CAPABILITY_REQUIRED: '当前没有执行此动作所需的范围能力。',
       HANDOVER_UNAVAILABLE: '交接状态或原负责人资格已变化，请重新核实。',
-      HANDOVER_NOT_FOUND: '没有可由你接受的交接请求。',
+      HANDOVER_NOT_FOUND: '没有可由你处理的交接请求。',
+      HANDOVER_ALREADY_PENDING: '已有交接等待处理，请先撤销当前交接再选择其他接任者。',
       PROFILE_READ_ONLY: '当前档案范围为只读。',
       PROFILE_NOT_FOUND: '档案不存在或你已没有访问权限。',
       PROFILE_KEY_EXISTS: '此范围已有同名档案，请修订已有记录。',
@@ -179,7 +180,13 @@ export function createIdentityRequest(fetcher: typeof fetch = fetch, timeoutMs =
     try {
       const headers: Record<string, string> = { Accept: 'application/json' };
       if (method !== 'GET') {
-        const token = await request(path.startsWith('/api/platform-admin/') ? '/api/platform-admin/v1/auth/csrf' : '/api/v1/auth/csrf', 'GET', isCsrf, undefined, controller.signal);
+        const token = await request(
+          path.startsWith('/api/platform-admin/') ? '/api/platform-admin/v1/auth/csrf' : '/api/v1/auth/csrf',
+          'GET',
+          isCsrf,
+          undefined,
+          controller.signal,
+        );
         headers[token.headerName] = token.token;
         if (body !== undefined && !(body instanceof FormData)) headers['Content-Type'] = 'application/json';
       }

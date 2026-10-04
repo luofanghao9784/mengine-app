@@ -76,12 +76,31 @@ export function TenantConsole({ tenant, name }: { tenant: string; name: string }
       ) : !governance.value ? (
         <Loading />
       ) : !governance.value.canEnterManagement ? (
-        <Empty icon={ShieldX} title="没有企业管理权限" text="管理权限已撤销或尚未授予。">
-          <a className="button" href={back}>
-            返回客户端
-          </a>
-          <Button onClick={refresh}>重新检查权限</Button>
-        </Empty>
+        <>
+          {governance.value.latestHandover && (
+            <p role="status">
+              交接
+              {
+                {
+                  ACCEPTED: '已接受',
+                  REJECTED: '已拒绝，原负责人继续负责',
+                  CANCELLED: '已撤销，原负责人继续负责',
+                }[governance.value.latestHandover.status]
+              }
+              。
+            </p>
+          )}
+          <Empty
+            icon={ShieldX}
+            title="没有企业管理权限"
+            text="当前账号没有其他企业管理职责，可以返回客户端继续工作。"
+          >
+            <a className="button" href={back}>
+              返回客户端
+            </a>
+            <Button onClick={refresh}>重新检查权限</Button>
+          </Empty>
+        </>
       ) : page === 'overview' ? (
         <AdminOverview
           realm="tenant"

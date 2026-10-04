@@ -4,6 +4,7 @@ import type {
   CapabilityChange,
   GovernanceChange,
   GovernanceSnapshot,
+  HandoverOffer,
   MemberRoleChange,
   MemberRoleResult,
   RecoveryReceipt,
@@ -29,6 +30,14 @@ const capability = (v: unknown): v is Capability =>
   typeof v === 'string' && Object.hasOwn(capabilityLabels, v);
 const scope = (v: unknown) =>
   record(v) && (v.workspaceId === null || uuid(v.workspaceId)) && capability(v.capability);
+const handover = (v: unknown) =>
+  record(v) &&
+  uuid(v.id) &&
+  uuid(v.fromAccount) &&
+  uuid(v.toAccount) &&
+  text(v.fromName) &&
+  text(v.toName) &&
+  ['TENANT_ADMIN', 'MEMBER'].includes(String(v.previousOwnerRole));
 export const isSnapshot = (v: unknown): v is GovernanceSnapshot =>
   record(v) &&
   uuid(v.tenantId) &&
@@ -39,12 +48,14 @@ export const isSnapshot = (v: unknown): v is GovernanceSnapshot =>
   ) &&
   Array.isArray(v.capabilities) &&
   v.capabilities.every(scope) &&
+  (v.ownerName === undefined || v.ownerName === null || text(v.ownerName)) &&
   (v.pendingHandover === null ||
-    (record(v.pendingHandover) &&
-      uuid(v.pendingHandover.id) &&
-      uuid(v.pendingHandover.fromAccount) &&
-      uuid(v.pendingHandover.toAccount) &&
-      v.pendingHandover.status === 'PENDING'));
+    (handover(v.pendingHandover) && record(v.pendingHandover) && v.pendingHandover.status === 'PENDING')) &&
+  (v.latestHandover === undefined ||
+    v.latestHandover === null ||
+    (handover(v.latestHandover) &&
+      record(v.latestHandover) &&
+      ['ACCEPTED', 'REJECTED', 'CANCELLED'].includes(String(v.latestHandover.status))));
 export const isRecovery = (v: unknown): v is RecoveryReceipt =>
   record(v) &&
   uuid(v.id) &&
@@ -75,10 +86,12 @@ export function createGovernanceClient(fetcher: typeof fetch = fetch) {
       request(path(tenant), 'GET', check(tenant), undefined, signal),
     acceptInitial: (tenant: string, body: GovernanceChange) =>
       request(path(tenant) + '/accept-initial-responsibility', 'POST', check(tenant), body),
-    offer: (tenant: string, body: GovernanceChange & { accountId: string }) =>
+    offer: (tenant: string, body: HandoverOffer) =>
       request(path(tenant) + '/handover', 'POST', check(tenant), body),
     acceptHandover: (tenant: string, handover: string, body: GovernanceChange) =>
       request(path(tenant) + `/handover/${id(handover)}/accept`, 'POST', check(tenant), body),
+    closeHandover: (tenant: string, handover: string, action: 'reject' | 'cancel', body: GovernanceChange) =>
+      request(path(tenant) + `/handover/${id(handover)}/${action}`, 'POST', check(tenant), body),
     appoint: (tenant: string, account: string, body: MemberRoleChange) =>
       request(
         path(tenant) + `/members/${id(account)}/role`,

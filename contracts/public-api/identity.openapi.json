@@ -5043,7 +5043,13 @@
               "WORKSPACE_MAINTAIN",
               "WORKSPACE_READONLY",
               "MEMBER_SECURITY_DISABLE",
-              "WORKSPACE_OWNER_CHANGE"
+              "WORKSPACE_OWNER_CHANGE",
+              "GOVERNANCE_ROLE",
+              "OWNER_ACCEPT",
+              "OWNER_HANDOVER_OFFER",
+              "OWNER_HANDOVER_ACCEPT",
+              "OWNER_HANDOVER_REJECT",
+              "OWNER_HANDOVER_CANCEL"
             ]
           },
           "targetId": {

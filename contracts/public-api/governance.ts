@@ -4,9 +4,14 @@ export type Capability = 'OWNER' | 'TENANT_CONFIG' | 'PROFILE_MAINTAIN' | 'CONTE
   | 'METHOD_ADOPT' | 'PLAN_CONFIGURE' | 'MEMBER_OFFBOARD' | 'TENANT_EXIT';
 export interface ScopeCapability { workspaceId: string | null; capability: Capability }
 export interface GovernanceSnapshot {
-  tenantId: string; ownerId: string | null; revision: number; owner: boolean; canConfigure: boolean;
+  tenantId: string; ownerId: string | null; ownerName?: string | null; revision: number; owner: boolean; canConfigure: boolean;
   canAcceptInitialResponsibility: boolean; canEnterManagement: boolean; capabilities: ScopeCapability[];
-  pendingHandover: { id: string; fromAccount: string; toAccount: string; status: 'PENDING' } | null;
+  pendingHandover: (Handover & { status: 'PENDING' }) | null;
+  latestHandover?: (Handover & { status: 'ACCEPTED' | 'REJECTED' | 'CANCELLED' }) | null;
+}
+export interface Handover {
+  id: string; fromAccount: string; toAccount: string; fromName: string; toName: string;
+  previousOwnerRole: 'TENANT_ADMIN' | 'MEMBER'; status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELLED';
 }
 export interface GovernanceChange { requestId: string; expectedVersion: number }
 export interface CapabilityChange extends GovernanceChange {
@@ -15,7 +20,7 @@ export interface CapabilityChange extends GovernanceChange {
 }
 export interface MemberRoleChange extends GovernanceChange { role: 'TENANT_ADMIN' | 'MEMBER' }
 export interface MemberRoleResult { accountId: string; role: 'TENANT_ADMIN' | 'MEMBER'; version: number }
-export interface HandoverOffer extends GovernanceChange { accountId: string }
+export interface HandoverOffer extends GovernanceChange { accountId: string; previousOwnerRole: 'TENANT_ADMIN' | 'MEMBER' }
 export interface RecoveryRequest { requestId: string; reason: 'OWNER_UNAVAILABLE' | 'LEGACY_OWNER_UNVERIFIED' }
 export interface RecoveryReceipt {
   id: string; tenantId: string; reason: RecoveryRequest['reason'];

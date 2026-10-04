@@ -145,7 +145,12 @@ test('governance writes retain request key, obtain fresh csrf and never automati
     if (String(path).endsWith('/csrf')) return reply(null)(path, init);
     throw new TypeError('offline');
   });
-  const body = { requestId: entry, expectedVersion: 7, accountId: account };
+  const body = {
+    requestId: entry,
+    expectedVersion: 7,
+    accountId: account,
+    previousOwnerRole: 'MEMBER' as const,
+  };
   await assert.rejects(
     client.offer(tenant, body),
     (e: unknown) => e instanceof IdentityError && e.code === 'UNCERTAIN_RESULT',
@@ -211,4 +216,45 @@ test('profile metadata preserves recovery entry while unavailable body is never 
     [{ ...info, provenance: 'private source' }],
   ])
     await assert.rejects(createProfileClient(reply({ ...history, items })).history(tenant, entry), mismatch);
+});
+
+test('handover choice and closing requests use the customer realm and validate outcomes', async () => {
+  const pending = {
+    id: entry,
+    fromAccount: account,
+    toAccount: tenant,
+    fromName: '原负责人',
+    toName: '接任者',
+    previousOwnerRole: 'MEMBER',
+    status: 'PENDING',
+  };
+  assert.deepEqual(
+    (await createGovernanceClient(reply({ ...snapshot, pendingHandover: pending })).snapshot(tenant))
+      .pendingHandover,
+    pending,
+  );
+  await assert.rejects(
+    createGovernanceClient(
+      reply({ ...snapshot, pendingHandover: { ...pending, previousOwnerRole: 'PLATFORM_ADMIN' } }),
+    ).snapshot(tenant),
+    mismatch,
+  );
+  const paths: string[] = [];
+  for (const action of ['reject', 'cancel'] as const) {
+    const result = {
+      ...snapshot,
+      latestHandover: { ...pending, status: action === 'reject' ? 'REJECTED' : 'CANCELLED' },
+    };
+    const api = createGovernanceClient(async (path, init) => {
+      paths.push(String(path));
+      return reply(result)(path, init);
+    });
+    assert.deepEqual(
+      await api.closeHandover(tenant, entry, action, { requestId: entry, expectedVersion: 3 }),
+      result,
+    );
+  }
+  assert(paths.every((path) => !path.includes('platform-admin')));
+  assert(paths.some((path) => path.endsWith('/reject')));
+  assert(paths.some((path) => path.endsWith('/cancel')));
 });

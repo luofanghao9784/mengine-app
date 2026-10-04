@@ -202,6 +202,86 @@ class GovernanceProfileIntegrationTest {
         owner.call("POST",governance()+"/members/"+memberId+"/role",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"role","MEMBER"),403);
         assertEquals(memberId,db.queryForObject("SELECT owner_id FROM workspaces WHERE id=?",UUID.class,privateSpace));
     }
+    @Test void handoverRoleChoiceIsAtomicAndDoesNotChangeContentOrSpaceResponsibility()throws Exception {
+        acceptOwner();
+        db.update("UPDATE workspaces SET responsibility_confirmed=true WHERE id=?",space);
+        db.update("INSERT INTO workspace_members(tenant_id,workspace_id,account_id,can_maintain) VALUES (?,?,?,true)",tenant,space,ownerId);
+        var offer=owner.call("POST",governance()+"/handover",Map.of("requestId",UUID.randomUUID(),"expectedVersion",revision(),"accountId",memberId,"previousOwnerRole","MEMBER"),200);
+        assertEquals("MEMBER",offer.get("pendingHandover").get("previousOwnerRole").asString());
+        assertEquals("TENANT_ADMIN",db.queryForObject("SELECT role FROM tenant_memberships WHERE tenant_id=? AND account_id=?",String.class,tenant,ownerId));
+        String id=offer.get("pendingHandover").get("id").asString();var body=change(offer.get("revision").asLong());
+        var accepted=member.call("POST",governance()+"/handover/"+id+"/accept",body,200);
+        assertEquals(accepted,member.call("POST",governance()+"/handover/"+id+"/accept",body,200));
+        assertEquals("MEMBER",db.queryForObject("SELECT role FROM tenant_memberships WHERE tenant_id=? AND account_id=?",String.class,tenant,ownerId));
+        assertEquals("TENANT_ADMIN",db.queryForObject("SELECT role FROM tenant_memberships WHERE tenant_id=? AND account_id=?",String.class,tenant,memberId));
+        assertEquals(ownerId,db.queryForObject("SELECT owner_id FROM workspaces WHERE id=?",UUID.class,space));
+        assertTrue(db.queryForObject("SELECT can_maintain FROM workspace_members WHERE workspace_id=? AND account_id=?",Boolean.class,space,ownerId));
+        assertEquals(0,db.queryForObject("SELECT count(*) FROM workspace_members WHERE workspace_id=? AND account_id=?",Integer.class,space,memberId));
+        assertEquals(memberId,db.queryForObject("SELECT owner_id FROM workspaces WHERE id=?",UUID.class,privateSpace));
+        assertEquals("ACCEPTED",owner.call("GET",governance(),null,200).get("latestHandover").get("status").asString());
+        String records=member.call("GET","/api/tenant-admin/v1/tenants/"+tenant+"/records",null,200).toString();
+        assertTrue(records.contains("OWNER_HANDOVER_ACCEPT"));assertTrue(records.contains("OWNER_HANDOVER_OFFER"));
+        assertEquals(1,db.queryForObject("SELECT count(*) FROM identity_audit WHERE tenant_id=? AND action='OWNER_HANDOVER_ACCEPT'",Integer.class,tenant));
+    }
+    @Test void rejectAndCancelAreScopedIdempotentAndNeverSilentlyReplacePending()throws Exception {
+        acceptOwner();UUID outsider=account();addMember(outsider,"TENANT_ADMIN");var admin=client(outsider);
+        var offerBody=Map.of("requestId",UUID.randomUUID(),"expectedVersion",revision(),"accountId",memberId);
+        var offer=owner.call("POST",governance()+"/handover",offerBody,200);
+        assertEquals(offer,owner.call("POST",governance()+"/handover",offerBody,200));
+        assertEquals("TENANT_ADMIN",offer.get("pendingHandover").get("previousOwnerRole").asString());
+        var pending=offer.get("pendingHandover");String path=governance()+"/handover/"+pending.get("id").asString();long rev=offer.get("revision").asLong();
+        var blocked=owner.call("POST",governance()+"/handover",Map.of("requestId",UUID.randomUUID(),"expectedVersion",rev,"accountId",outsider),409);
+        assertTrue(blocked.toString().contains("HANDOVER_ALREADY_PENDING"));
+        assertTrue(admin.call("GET",governance(),null,200).get("pendingHandover").isNull());
+        admin.call("POST",path+"/reject",change(rev),404);admin.call("POST",path+"/cancel",change(rev),404);
+        owner.call("POST",path+"/reject",change(rev),404);member.call("POST",path+"/cancel",change(rev),404);
+        assertEquals(403,member.send("POST",path+"/reject",change(rev),false).statusCode());
+        member.call("POST",path+"/reject",change(rev-1),409);
+        var reject=change(rev);var rejected=member.call("POST",path+"/reject",reject,200);
+        assertEquals(rejected,member.call("POST",path+"/reject",reject,200));
+        assertEquals("REJECTED",owner.call("GET",governance(),null,200).get("latestHandover").get("status").asString());
+        assertTrue(admin.call("GET",governance(),null,200).get("latestHandover").isNull());
+        member.call("POST",path+"/accept",change(rejected.get("revision").asLong()),409);
+        offer=owner.call("POST",governance()+"/handover",Map.of("requestId",UUID.randomUUID(),"expectedVersion",revision(),"accountId",memberId),200);
+        path=governance()+"/handover/"+offer.get("pendingHandover").get("id").asString();var cancel=change(offer.get("revision").asLong());
+        var cancelled=owner.call("POST",path+"/cancel",cancel,200);assertEquals(cancelled,owner.call("POST",path+"/cancel",cancel,200));
+        assertEquals("CANCELLED",cancelled.get("latestHandover").get("status").asString());
+        assertEquals(ownerId.toString(),cancelled.get("ownerId").asString());
+        assertEquals("MEMBER",db.queryForObject("SELECT role FROM tenant_memberships WHERE tenant_id=? AND account_id=?",String.class,tenant,memberId));
+    }
+    @Test void acceptAndCancelRaceHasOneWinnerAndConsistentRoles()throws Exception {
+        acceptOwner();var offer=owner.call("POST",governance()+"/handover",Map.of("requestId",UUID.randomUUID(),"expectedVersion",revision(),"accountId",memberId,"previousOwnerRole","MEMBER"),200);
+        String path=governance()+"/handover/"+offer.get("pendingHandover").get("id").asString();long rev=offer.get("revision").asLong();
+        HttpResponse<String> accept,cancel;
+        try(var pool=Executors.newFixedThreadPool(2)){var a=pool.submit(()->member.send("POST",path+"/accept",change(rev),true));var b=pool.submit(()->owner.send("POST",path+"/cancel",change(rev),true));accept=a.get(10,TimeUnit.SECONDS);cancel=b.get(10,TimeUnit.SECONDS);}
+        assertEquals(List.of(200,409),java.util.stream.Stream.of(accept.statusCode(),cancel.statusCode()).sorted().toList());
+        boolean accepted=accept.statusCode()==200;
+        assertEquals(accepted?memberId:ownerId,db.queryForObject("SELECT owner_id FROM tenant_governance WHERE tenant_id=?",UUID.class,tenant));
+        assertEquals(accepted?"MEMBER":"TENANT_ADMIN",db.queryForObject("SELECT role FROM tenant_memberships WHERE tenant_id=? AND account_id=?",String.class,tenant,ownerId));
+        assertEquals(accepted?"TENANT_ADMIN":"MEMBER",db.queryForObject("SELECT role FROM tenant_memberships WHERE tenant_id=? AND account_id=?",String.class,tenant,memberId));
+        assertEquals(1,db.queryForObject("SELECT count(*) FROM identity_audit WHERE tenant_id=? AND action IN ('OWNER_HANDOVER_ACCEPT','OWNER_HANDOVER_CANCEL')",Integer.class,tenant));
+    }
+    @Test void handoverRejectsForeignMembersInactiveSuccessorsAndInvalidPreviousRole()throws Exception {
+        acceptOwner();UUID other=account();
+        owner.call("POST",governance()+"/handover",Map.of("requestId",UUID.randomUUID(),"expectedVersion",revision(),"accountId",other),409);
+        owner.call("POST",governance()+"/handover",Map.of("requestId",UUID.randomUUID(),"expectedVersion",revision(),"accountId",memberId,"previousOwnerRole","PLATFORM_ADMIN"),400);
+        db.update("UPDATE tenant_memberships SET status='DISABLED' WHERE tenant_id=? AND account_id=?",tenant,memberId);
+        owner.call("POST",governance()+"/handover",Map.of("requestId",UUID.randomUUID(),"expectedVersion",revision(),"accountId",memberId),409);
+        assertEquals(0,db.queryForObject("SELECT count(*) FROM governance_handovers WHERE tenant_id=?",Integer.class,tenant));
+    }
+    @Test void administratorPromotionAndDemotionAreOwnerOnlyAndPreserveSpaceRights()throws Exception {
+        acceptOwner();db.update("INSERT INTO workspace_members(tenant_id,workspace_id,account_id,can_maintain) VALUES (?,?,?,true)",tenant,space,memberId);
+        db.update("UPDATE workspaces SET owner_id=?,responsibility_confirmed=true WHERE id=?",memberId,space);
+        var promote=Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"role","TENANT_ADMIN");String path=governance()+"/members/"+memberId+"/role";
+        owner.call("POST",path,promote,200);owner.call("POST",path,promote,200);
+        member.call("POST",governance()+"/members/"+ownerId+"/role",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"role","MEMBER"),403);
+        var demote=Map.of("requestId",UUID.randomUUID(),"expectedVersion",1,"role","MEMBER");owner.call("POST",path,demote,200);
+        owner.call("POST",path,Map.of("requestId",UUID.randomUUID(),"expectedVersion",1,"role","TENANT_ADMIN"),409);
+        assertEquals(memberId,db.queryForObject("SELECT owner_id FROM workspaces WHERE id=?",UUID.class,space));
+        assertTrue(db.queryForObject("SELECT can_maintain FROM workspace_members WHERE workspace_id=? AND account_id=?",Boolean.class,space,memberId));
+        assertTrue(member.call("GET",governance(),null,200).get("canEnterManagement").asBoolean());
+        assertTrue(owner.call("GET","/api/tenant-admin/v1/tenants/"+tenant+"/records",null,200).toString().contains("GOVERNANCE_ROLE"));
+    }
     Map<String,Object> profile(String key,String kind,String value,String status){return Map.of("requestId",UUID.randomUUID(),"key",key,"kind",kind,"value",value,"status",status,"provenance","合成用户明确记录");}
     @Test void profilesSeparateKindsScopesVersionsAndDoNotGrantAuthorities()throws Exception {
         acceptOwner();var fact=owner.call("POST",base()+"/profiles/TENANT/"+tenant,profile("行业","FACT","服务业","ACTIVE"),200);

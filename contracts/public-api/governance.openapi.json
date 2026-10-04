@@ -630,6 +630,150 @@
           }
         ]
       }
+    },
+    "/api/v1/tenants/{tenant}/governance/handover/{id}/reject": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "summary": "接任者拒绝交接",
+        "responses": {
+          "200": {
+            "description": "实际持久状态；不表示模型执行",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "401": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "403": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "404": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "409": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Change"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenant}/governance/handover/{id}/cancel": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "summary": "发起者撤销待接受交接",
+        "responses": {
+          "200": {
+            "description": "实际持久状态；不表示模型执行",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "401": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "403": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "404": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          },
+          "409": {
+            "description": "输入、当前身份/范围或版本不满足；不返回正文"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Change"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -761,13 +905,94 @@
                     "enum": [
                       "PENDING"
                     ]
+                  },
+                  "fromName": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "toName": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "previousOwnerRole": {
+                    "type": "string",
+                    "enum": [
+                      "TENANT_ADMIN",
+                      "MEMBER"
+                    ]
                   }
                 },
                 "required": [
                   "id",
                   "fromAccount",
                   "toAccount",
-                  "status"
+                  "status",
+                  "fromName",
+                  "toName",
+                  "previousOwnerRole"
+                ]
+              }
+            ]
+          },
+          "ownerName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "latestHandover": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "fromAccount": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "toAccount": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "ACCEPTED",
+                      "REJECTED",
+                      "CANCELLED"
+                    ]
+                  },
+                  "fromName": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "toName": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "previousOwnerRole": {
+                    "type": "string",
+                    "enum": [
+                      "TENANT_ADMIN",
+                      "MEMBER"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "fromAccount",
+                  "toAccount",
+                  "status",
+                  "fromName",
+                  "toName",
+                  "previousOwnerRole"
                 ]
               }
             ]
@@ -900,6 +1125,15 @@
           "accountId": {
             "type": "string",
             "format": "uuid"
+          },
+          "previousOwnerRole": {
+            "type": "string",
+            "enum": [
+              "TENANT_ADMIN",
+              "MEMBER"
+            ],
+            "default": "TENANT_ADMIN",
+            "description": "接受后原负责人身份。省略时兼容旧客户端保留企业管理员；不改空间职责或内容权限。"
           }
         },
         "required": [

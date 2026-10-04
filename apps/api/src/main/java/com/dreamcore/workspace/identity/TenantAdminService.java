@@ -290,14 +290,17 @@ public class TenantAdminService {
         identities.member(actor,tenant,true); page(offset,limit);
         return db.query("""
             SELECT e.id,e.actor_id,a.display_name AS actor_name,e.action,e.target_id,e.related_account_id,b.display_name AS related_name,e.created_at,
-              CASE WHEN e.action LIKE 'INVITATION_%' THEN coalesce(i.phone,i.email) WHEN e.action LIKE 'MEMBER_%' THEN c.display_name
+              CASE WHEN e.action LIKE 'INVITATION_%' THEN coalesce(i.phone,i.email) WHEN e.action LIKE 'MEMBER_%' OR e.action='GOVERNANCE_ROLE' OR e.action='OWNER_ACCEPT' THEN c.display_name
+                   WHEN e.action LIKE 'OWNER_HANDOVER_%' THEN successor.display_name
                    WHEN e.action LIKE 'WORKSPACE_%' THEN w.name WHEN e.action='TENANT_RENAME' THEN t.name END AS target_name
             FROM identity_audit e JOIN accounts a ON a.id=e.actor_id LEFT JOIN accounts b ON b.id=e.related_account_id
             LEFT JOIN accounts c ON c.id=e.target_id LEFT JOIN invitations i ON i.id=e.target_id AND i.tenant_id=e.tenant_id
             LEFT JOIN workspaces w ON w.id=e.target_id AND w.tenant_id=e.tenant_id AND w.kind='SHARED'
             LEFT JOIN tenants t ON t.id=e.target_id AND t.id=e.tenant_id
+            LEFT JOIN governance_handovers h ON h.id=e.target_id AND h.tenant_id=e.tenant_id
+            LEFT JOIN accounts successor ON successor.id=h.to_account
             WHERE e.tenant_id=? AND e.outcome='SUCCESS' AND e.action IN ('INVITATION_CREATE','INVITATION_REVOKE','INVITATION_ACCEPT',
-                'MEMBER_ENABLE','MEMBER_DISABLE','MEMBER_SECURITY_DISABLE','MEMBER_ROLE','WORKSPACE_CREATE','WORKSPACE_OWNER_CHANGE','WORKSPACE_RENAME','WORKSPACE_GRANT','WORKSPACE_REVOKE','WORKSPACE_MAINTAIN','WORKSPACE_READONLY','TENANT_RENAME')
+                'MEMBER_ENABLE','MEMBER_DISABLE','MEMBER_SECURITY_DISABLE','MEMBER_ROLE','GOVERNANCE_ROLE','OWNER_ACCEPT','OWNER_HANDOVER_OFFER','OWNER_HANDOVER_ACCEPT','OWNER_HANDOVER_REJECT','OWNER_HANDOVER_CANCEL','WORKSPACE_CREATE','WORKSPACE_OWNER_CHANGE','WORKSPACE_RENAME','WORKSPACE_GRANT','WORKSPACE_REVOKE','WORKSPACE_MAINTAIN','WORKSPACE_READONLY','TENANT_RENAME')
             ORDER BY e.created_at DESC,e.id DESC LIMIT ? OFFSET ?
             """,(r,n)->new AuditEntry(r.getLong("id"),r.getObject("actor_id",UUID.class),r.getString("actor_name"),r.getString("action"),
                 r.getObject("target_id",UUID.class),r.getString("target_name"),r.getObject("related_account_id",UUID.class),
