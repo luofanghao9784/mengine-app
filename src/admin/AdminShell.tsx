@@ -188,7 +188,7 @@ export function AdminShell({
               <div>
                 <strong>{realm === 'platform' ? '梦核引擎' : '梦擎'}</strong>
                 {realm === 'platform' && <span className="admin-brand-english">Mengine</span>}
-                <small>{realm === 'platform' ? '平台总台' : '企业管理'}</small>
+                {realm === 'tenant' && <small>企业管理</small>}
               </div>
               <Button
                 className="admin-close-menu"

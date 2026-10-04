@@ -1,7 +1,6 @@
-import { Select } from '../shared/Select';
 import { useEffect, useState } from 'react';
 import { uuid } from '../identity/client';
-import { ArrowLeft, Search, Users } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Users } from 'lucide-react';
 import { Button, Badge, Empty, Field, Modal } from '../shared/ui';
 import { Failure, Loading, Pager, SubmitError, useRemote, useSubmission } from '../shared/admin';
 import { useViewState, textState, pageState } from '../shared/useViewState';
@@ -11,16 +10,13 @@ import { directoryClient as api, type CustomerAccount } from './directory-client
 export function PlatformAccounts({ tenant, revision = 0 }: { tenant: string; revision?: number }) {
   const suppliedAccount = new URLSearchParams(location.hash.slice(1)).get('account');
   const routeAccount = uuid(suppliedAccount) ? suppliedAccount : null;
-  const [query, setQuery] = useViewState('platform', `accounts:${tenant}:query`, '', textState);
-  const [draft, setDraft] = useState(query);
-  const [status, setStatus] = useViewState('platform', `accounts:${tenant}:status`, '', textState);
   const [page, setPage] = useViewState('platform', `accounts:${tenant}:page`, 0, pageState);
   const [selected, setSelected] = useViewState('platform', `accounts:${tenant}:selected`, '', textState);
   const [attempt, setAttempt] = useState(0);
   const refresh = () => setAttempt((n) => n + 1);
   const data = useRemote(
-    (signal) => api.list(tenant, query, status, page * 20, signal),
-    [tenant, query, status, page, attempt, revision],
+    (signal) => api.list(tenant, '', '', page * 20, signal),
+    [tenant, page, attempt, revision],
   );
   if (routeAccount || selected)
     return (
@@ -35,90 +31,60 @@ export function PlatformAccounts({ tenant, revision = 0 }: { tenant: string; rev
       />
     );
   return (
-    <section className="admin-section">
-      <div className="platform-list-heading admin-directory-heading">
-        <form
-          className="platform-filters"
-          onSubmit={(e) => {
-            e.preventDefault();
-            setQuery(draft.trim());
-            setPage(0);
-          }}
-        >
-          <label className="platform-search">
-            <Search size={18} />
-            <input
-              aria-label="搜索账号"
-              placeholder="姓名、手机号或邮箱"
-              maxLength={180}
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-            />
-          </label>
-          <Button type="submit">搜索</Button>
-          <Select
-            aria-label="账号状态"
-            value={status}
-            onChange={(e) => {
-              setStatus(e.target.value);
-              setPage(0);
-            }}
-          >
-            <option value="">全部状态</option>
-            <option value="ACTIVE">已启用</option>
-            <option value="DISABLED">已停用</option>
-          </Select>
-          {(query || status) && (
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setDraft('');
-                setQuery('');
-                setStatus('');
-                setPage(0);
-              }}
-            >
-              清除筛选
-            </Button>
-          )}
-        </form>
-      </div>
+    <section className="platform-account-list" aria-label="企业账号列表">
       {data.error ? (
         <Failure error={data.error} retry={refresh} />
       ) : !data.value ? (
         <Loading />
       ) : !data.value.length ? (
-        <Empty
-          icon={Users}
-          title="没有匹配的账号"
-          text={query || status ? '调整搜索条件后重试。' : '客户接受企业邀请后会显示在这里。'}
-        />
+        <Empty icon={Users} title="暂无企业账号" text="客户接受企业邀请后会显示在这里。" />
       ) : (
         <>
-          <div className="admin-directory-list">
+          <div className="platform-account-columns" aria-hidden="true">
+            <span>姓名</span>
+            <span>手机号</span>
+            <span>邮箱</span>
+            <span>账号状态</span>
+            <span />
+          </div>
+          <div className="platform-account-rows">
             {data.value.slice(0, 20).map((account) => (
               <button
                 type="button"
-                className="admin-directory-row"
+                className="platform-account-row"
+                aria-label={`查看账号 ${account.displayName}`}
                 key={account.id}
                 onClick={() => setSelected(account.id)}
               >
-                <span>
-                  <strong>{account.displayName}</strong>
-                  <small>{account.phone || account.email}</small>
+                <strong>{account.displayName}</strong>
+                <span>{account.phone || '—'}</span>
+                <span>{account.email || '—'}</span>
+                <span className="platform-account-status">
+                  <Badge>{account.status === 'ACTIVE' ? '已启用' : '已停用'}</Badge>
                 </span>
-
-                <Badge>{account.status === 'ACTIVE' ? '已启用' : '已停用'}</Badge>
+                <ChevronRight size={16} aria-hidden="true" />
               </button>
             ))}
           </div>
-          <Pager page={page} next={data.value.length > 20} onPage={setPage} />
+          {(page > 0 || data.value.length > 20) && (
+            <Pager page={page} next={data.value.length > 20} onPage={setPage} />
+          )}
         </>
       )}
     </section>
   );
 }
-function AccountDetail({ id, tenant, close, changed }: { id: string; tenant: string; close: () => void; changed: () => void }) {
+function AccountDetail({
+  id,
+  tenant,
+  close,
+  changed,
+}: {
+  id: string;
+  tenant: string;
+  close: () => void;
+  changed: () => void;
+}) {
   const [attempt, setAttempt] = useState(0),
     [confirm, setConfirm] = useState(false);
   const refresh = () => setAttempt((n) => n + 1);
@@ -127,7 +93,8 @@ function AccountDetail({ id, tenant, close, changed }: { id: string; tenant: str
   if (!data.value) return <Loading />;
   const { account, records } = data.value;
   const memberships = data.value.memberships.filter((m) => m.tenantId === tenant);
-  if (!memberships.length) return <Empty icon={Users} title="该账号不属于当前企业" text="返回企业账号列表查看。" />;
+  if (!memberships.length)
+    return <Empty icon={Users} title="该账号不属于当前企业" text="返回企业账号列表查看。" />;
   return (
     <div className="admin-dashboard">
       <div>
@@ -267,7 +234,8 @@ export function AccountEnterpriseLink({ id }: { id: string }) {
   const data = useRemote((signal) => api.detail(id, signal), [id]);
   const membership = data.value?.memberships[0];
   useEffect(() => {
-    if (membership) location.hash = `#admin=tenants&enterprise=${membership.tenantId}&section=accounts&account=${id}`;
+    if (membership)
+      location.hash = `#admin=tenants&enterprise=${membership.tenantId}&section=accounts&account=${id}`;
   }, [membership, id]);
   if (data.error) return <Failure error={data.error} retry={() => location.reload()} />;
   if (!data.value || membership) return <Loading />;
