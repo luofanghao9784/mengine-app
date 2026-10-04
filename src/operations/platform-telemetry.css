@@ -1045,3 +1045,48 @@
     transition: none;
   }
 }
+
+/* Dashboard-specific navigation palette. */
+.admin-platform.admin-engine-fullscreen .admin-sidebar {
+  --text: #d7e8f5;
+  --text-secondary: #91a9bd;
+  --muted: #91a9bd;
+  --line: #739fc925;
+  --accent: #71dff5;
+  --selected: #163849;
+  --selected-text: #91ebf7;
+  --soft: #142b3e;
+  background: linear-gradient(180deg, #102335, #0b1b2b 70%);
+  border-right: 1px solid #739fc925;
+  box-shadow: inset -1px 0 #71dff508;
+}
+.admin-platform.admin-engine-fullscreen .admin-brand strong {
+  color: #e6f3ff;
+}
+.admin-platform.admin-engine-fullscreen .admin-brand-english {
+  color: #91a9bd;
+}
+.admin-platform.admin-engine-fullscreen .admin-nav-group-title {
+  color: #7e99ae;
+}
+.admin-platform.admin-engine-fullscreen .admin-nav-link {
+  color: #adc4d6;
+}
+.admin-platform.admin-engine-fullscreen .admin-nav-link.active {
+  color: #91ebf7;
+  background: linear-gradient(90deg, #1c4d5e, #163344);
+  box-shadow:
+    inset 3px 0 #71dff5,
+    inset 0 0 0 1px #71dff528;
+}
+.admin-platform.admin-engine-fullscreen .admin-nav-link:hover:not(.active) {
+  color: #e6f3ff;
+  background: #173247;
+}
+.admin-platform.admin-engine-fullscreen .admin-sidebar button {
+  color: #91a9bd;
+}
+.admin-platform.admin-engine-fullscreen .admin-sidebar button:hover {
+  color: #91ebf7;
+  background: #173247;
+}
