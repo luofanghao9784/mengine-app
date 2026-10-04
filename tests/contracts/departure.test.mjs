@@ -39,6 +39,13 @@ test('offboard never receives new private owner and restoration is bounded opera
     false,
   );
 });
+test('exit inventory recognizes exact data snapshots without accepting an external database dump', () => {
+  const item = { ordinal: 1, kind: 'DATASET_SNAPSHOT', objectId: id, versionId: id,
+    version: 2, state: 'PENDING', filename: null, sha256: null, errorCode: null };
+  assert.ok(check('Item')(item));
+  assert.equal(check('Item')({ ...item, kind: 'DATABASE_DUMP' }), false);
+  assert.equal(check('Item')({ ...item, version: 0 }), false);
+});
 test('all endpoints are scoped, no-store, CSRF-bound and support precise conflict', () => {
   assert.equal(spec.components.securitySchemes.sessionCookie.name, 'DREAMCORE_SESSION');
   for (const [path, verbs] of Object.entries(spec.paths))

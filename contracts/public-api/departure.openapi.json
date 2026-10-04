@@ -2428,7 +2428,8 @@
             "type": "string",
             "enum": [
               "MATERIAL_VERSION",
-              "EXPERIENCE_VERSION"
+              "EXPERIENCE_VERSION",
+              "DATASET_SNAPSHOT"
             ]
           },
           "objectId": {

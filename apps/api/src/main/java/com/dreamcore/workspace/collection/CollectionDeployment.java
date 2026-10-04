@@ -32,6 +32,7 @@ public class CollectionDeployment {
         }
         tx.executeWithoutResult(status->{
             if(db.queryForList("SELECT id FROM tenants WHERE id=? FOR UPDATE",m.tenantId()).isEmpty())throw new IllegalArgumentException("Unknown enterprise");
+            if(Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM departure_executions WHERE tenant_id=? AND kind='TENANT_EXIT' AND state<>'CANCELLED')",Boolean.class,m.tenantId())))throw new IllegalArgumentException("Enterprise exit blocks collection deployment");
             var existing=db.queryForList("SELECT tenant_id FROM data_connections WHERE id=? FOR UPDATE",m.connectionId());
             if(!existing.isEmpty()&&!m.tenantId().equals(existing.getFirst().get("tenant_id")))throw new IllegalArgumentException("Connection belongs to another enterprise");
             if(existing.isEmpty())db.update("INSERT INTO data_connections(id,tenant_id,name,route_label,access_summary,status,time_zone) VALUES (?,?,?,?,?,?,?)",m.connectionId(),m.tenantId(),m.name(),m.routeLabel(),m.accessSummary(),m.status(),m.timeZone());

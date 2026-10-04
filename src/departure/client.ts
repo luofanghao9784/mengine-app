@@ -158,7 +158,7 @@ export const isExitPart = (v: unknown): v is ExitPart =>
     (x) =>
       record(x) &&
       num(x.ordinal, 1) &&
-      one(x.kind, ['MATERIAL_VERSION', 'EXPERIENCE_VERSION']) &&
+      one(x.kind, ['MATERIAL_VERSION', 'EXPERIENCE_VERSION', 'DATASET_SNAPSHOT']) &&
       uuid(x.objectId) &&
       uuid(x.versionId) &&
       num(x.version, 1) &&

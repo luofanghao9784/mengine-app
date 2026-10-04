@@ -125,7 +125,7 @@ export interface ExitInventory {
 }
 export interface ExitItem {
   ordinal: number;
-  kind: 'MATERIAL_VERSION' | 'EXPERIENCE_VERSION';
+  kind: 'MATERIAL_VERSION' | 'EXPERIENCE_VERSION' | 'DATASET_SNAPSHOT';
   objectId: string;
   versionId: string;
   version: number;

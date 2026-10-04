@@ -35,6 +35,12 @@ public class DepartureResidualCleanup {
   changed+=update("business_sources","name='"+REMOVED+"',description='',status='PAUSED'",workspaceScope("x")+" AND (x.name<>'"+REMOVED+"' OR x.description<>'' OR x.status<>'PAUSED')",tenant,account);
   changed+=update("business_source_config_versions","settings=settings||jsonb_build_object('name','"+REMOVED+"','description','')","EXISTS(SELECT 1 FROM business_sources b WHERE b.id=x.source_id AND "+workspaceScope("b")+") AND (x.settings->>'name' IS DISTINCT FROM '"+REMOVED+"' OR x.settings->>'description' IS DISTINCT FROM '')",tenant,account);
   changed+=update("business_source_submissions","note=''",workspaceScope("x")+" AND x.note<>''",tenant,account);
+  // Collected datasets belong to shared enterprise spaces, never to an offboarding member.
+  if(account==null){
+   changed+=db.update("UPDATE dataset_snapshots SET data_rows='[]'::jsonb,scrubbed=true WHERE id IN (SELECT id FROM dataset_snapshots WHERE tenant_id=? AND NOT scrubbed ORDER BY id LIMIT 100)",tenant);
+   changed+=db.update("UPDATE business_datasets d SET name=?,description='',dataset_key='removed-'||d.id::text,column_names='[\"已清理\"]'::jsonb,status='WITHDRAWN',scrubbed=true WHERE d.id IN (SELECT x.id FROM business_datasets x WHERE x.tenant_id=? AND NOT x.scrubbed AND NOT EXISTS(SELECT 1 FROM dataset_snapshots s WHERE s.dataset_id=x.id AND NOT s.scrubbed) ORDER BY x.id LIMIT 100)",REMOVED,tenant);
+   changed+=db.update("UPDATE data_connections c SET name=?,route_label='',access_summary='',status='UNCONFIGURED',auto_enabled=false,next_due=NULL,revision=revision+1 WHERE c.id IN (SELECT x.id FROM data_connections x WHERE x.tenant_id=? AND (x.name<>? OR x.route_label<>'' OR x.access_summary<>'' OR x.status<>'UNCONFIGURED' OR x.auto_enabled OR x.next_due IS NOT NULL) AND NOT EXISTS(SELECT 1 FROM business_datasets d WHERE d.connection_id=x.id AND NOT d.scrubbed) ORDER BY x.id LIMIT 100)",REMOVED,tenant,REMOVED);
+  }
   changed+=update("conversations","title='"+REMOVED+"'",privateScope("x","owner_id")+" AND x.title<>'"+REMOVED+"'",tenant,account);
   changed+=update("conversation_tasks","public_query=NULL",privateScope("x","requested_by")+" AND x.public_query IS NOT NULL",tenant,account);
   changed+=update("knowledge_runs","warnings=''",workspaceScope("x")+" AND x.warnings<>''",tenant,account);

@@ -109,6 +109,8 @@ test('scoped inventory cannot claim complete empty or full-tenant migration', ()
 });
 test('download requires actual bounded nonempty archive and unexpired-state receipt', () => {
   assert.ok(isExitPart(part));
+  assert.ok(isExitPart({ ...part, items: [{ ...part.items[0], kind: 'DATASET_SNAPSHOT' }] }));
+  assert.equal(isExitPart({ ...part, items: [{ ...part.items[0], kind: 'DATABASE_DUMP' }] }), false);
   for (const patch of [
     { state: 'EXPIRED' },
     { cleanupState: 'PENDING' },

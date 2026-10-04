@@ -7,6 +7,67 @@ class DepartureIntegrationTest {
  @Autowired JdbcTemplate db;@Autowired DepartureService service;@Autowired DepartureAccess gate;@Autowired DepartureProcessor processor;@Autowired DepartureMaterialBridge bridge;@Autowired MaterialService materials;@Autowired MaterialCleanupService cleanup;@Autowired ObjectCleanupService objectCleanup;@Autowired PasswordEncoder passwords;@Autowired DepartureStatusService statuses;@Autowired DepartureArchiveService archives;@Autowired DepartureArchiveWorker archiveWorker;@Autowired com.dreamcore.workspace.experience.ExperienceService experiences;@MockitoBean RetentionClock clock;@LocalServerPort int port;
  UUID tenant,admin,member,successor,reader,personal,shared,task,conversation;Instant start;final String password="synthetic-departure-password";final JsonMapper json=new JsonMapper();
  @BeforeEach void fixture(){start=Instant.now();when(clock.now()).thenAnswer(x->start);tenant=UUID.randomUUID();admin=UUID.randomUUID();member=UUID.randomUUID();successor=UUID.randomUUID();reader=UUID.randomUUID();personal=UUID.randomUUID();shared=UUID.randomUUID();task=UUID.randomUUID();conversation=UUID.randomUUID();db.update("INSERT INTO tenants(id,name) VALUES (?,'合成正式离职与退出')",tenant);String hash=passwords.encode(password);for(UUID a:List.of(admin,member,successor,reader)){db.update("INSERT INTO accounts(id,email,display_name,password_hash) VALUES (?,?,?,?)",a,email(a),a.equals(member)?"合成员工":"合成维护者",hash);db.update("INSERT INTO tenant_memberships(tenant_id,account_id,role) VALUES (?,?,?)",tenant,a,a.equals(admin)?"TENANT_ADMIN":"MEMBER");}for(String cap:List.of("MEMBER_OFFBOARD","TENANT_EXIT","BULK_EXPORT"))grant(admin,cap,null);grant(reader,"BULK_EXPORT",shared);db.update("INSERT INTO workspaces(id,tenant_id,owner_id,name,kind) VALUES (?,?,?,'私人内容','PERSONAL'),(?,?,?,'独立企业共享资产','SHARED')",personal,tenant,member,shared,tenant,member);for(UUID a:List.of(admin,member,successor,reader))db.update("INSERT INTO workspace_members(tenant_id,workspace_id,account_id,can_maintain) VALUES (?,?,?,?)",tenant,shared,a,!a.equals(reader));db.update("INSERT INTO conversations(id,tenant_id,workspace_id,owner_id,title) VALUES (?,?,?,?,'私人会话绝不移交')",conversation,tenant,shared,member);db.update("INSERT INTO conversation_tasks(id,tenant_id,workspace_id,conversation_id,requested_by,prompt,mode,status,revision,attempt,reply) VALUES (?,?,?,?,?,'私人原始问题','SOURCE_LOOKUP','QUEUED',1,0,'')",task,tenant,shared,conversation,member);}
+
+ @Autowired com.dreamcore.workspace.collection.CollectionDeployment collectionDeployment;
+ private UUID[] collectedData(UUID workspace,int versions){
+  UUID connection=UUID.randomUUID(),dataset=UUID.randomUUID(),last=null;
+  db.update("INSERT INTO data_connections(id,tenant_id,name,route_label,access_summary,status,time_zone) VALUES (?,?,'合成外部业务','合成只读采集途径','合成范围说明','READY','Asia/Shanghai')",connection,tenant);
+  db.update("INSERT INTO business_datasets(id,tenant_id,connection_id,workspace_id,dataset_key,name,description,column_names) VALUES (?,?,?,?,'sales-secret-key','合成业务数据','合成业务说明','[\"日期\",\"金额\"]'::jsonb)",dataset,tenant,connection,workspace);
+  for(int n=1;n<=versions;n++){
+   UUID run=UUID.randomUUID();last=UUID.randomUUID();
+   db.update("INSERT INTO collection_runs(id,tenant_id,connection_id,execution_epoch,trigger_kind,status,finished_at) VALUES (?,?,?,1,'SCHEDULED','SUCCEEDED',now())",run,tenant,connection);
+   db.update("INSERT INTO dataset_snapshots(id,tenant_id,connection_id,dataset_id,run_id,version,data_rows,row_count,collected_at) VALUES (?,?,?,?,?,?,CAST(? AS jsonb),1,now())",last,tenant,connection,dataset,run,n,"[[\"2026-10-04\",\""+n+"00\"]]");
+  }
+  db.update("UPDATE business_datasets SET current_snapshot=? WHERE id=?",last,dataset);
+  return new UUID[]{connection,dataset,last};
+ }
+ @Test void exitExportsFixedDatasetVersionsWithinDesignatedScope()throws Exception{
+  var ids=collectedData(shared,2);
+  UUID other=UUID.randomUUID();db.update("INSERT INTO workspaces(id,tenant_id,owner_id,name,kind) VALUES (?,?,?,'未授权数据范围','SHARED')",other,tenant,successor);collectedData(other,1);
+  var e=exit();var current=archives.create(reader,tenant,e.execution().id(),shared,UUID.randomUUID(),false);
+  assertEquals(1,current.itemCount());assertEquals(2,archives.create(reader,tenant,e.execution().id(),shared,UUID.randomUUID(),true).itemCount());
+  assertThrows(IdentityException.class,()->archives.create(admin,tenant,e.execution().id(),shared,UUID.randomUUID(),false));
+  assertThrows(IdentityException.class,()->archives.create(reader,tenant,e.execution().id(),other,UUID.randomUUID(),false));
+  var part=archives.next(reader,tenant,current.id(),UUID.randomUUID());generateArchives();var done=archives.part(reader,tenant,part.id());
+  assertTrue(done.canDownload());assertEquals("DATASET_SNAPSHOT",done.items().getFirst().kind());assertEquals(ids[2],done.items().getFirst().versionId());
+  var out=new java.io.ByteArrayOutputStream();archives.download(reader,tenant,part.id(),info->{},out);
+  try(var zip=new java.util.zip.ZipInputStream(new java.io.ByteArrayInputStream(out.toByteArray()))){boolean found=false;for(var item=zip.getNextEntry();item!=null;item=zip.getNextEntry())if(item.getName().contains("dataset-")){
+   var data=json.readTree(zip.readAllBytes());assertEquals(2,data.get("version").asInt());assertEquals("200",data.get("rows").get(0).get(1).asString());assertTrue(data.get("coverageThrough").isNull());assertEquals(2,data.get("columns").size());assertFalse(data.has("routeLabel"));assertFalse(data.has("accessSummary"));found=true;
+  }assertTrue(found);}
+  db.update("DELETE FROM workspace_members WHERE tenant_id=? AND workspace_id=? AND account_id=?",tenant,shared,reader);
+  assertThrows(IdentityException.class,()->archives.download(reader,tenant,part.id(),info->{},new java.io.ByteArrayOutputStream()));
+ }
+ @Test void datasetWithdrawalAndSnapshotCleanupInvalidateExistingArchives(){
+  var ids=collectedData(shared,1);var e=exit();var inventory=archives.create(reader,tenant,e.execution().id(),shared,UUID.randomUUID(),false);
+  var part=archives.next(reader,tenant,inventory.id(),UUID.randomUUID());generateArchives();assertTrue(archives.part(reader,tenant,part.id()).canDownload());
+  db.update("UPDATE business_datasets SET status='WITHDRAWN' WHERE id=?",ids[1]);
+  assertEquals("REVOKED",archives.receipt(reader,tenant,part.id()).state());assertEquals(0,db.queryForObject("SELECT count(*) FROM departure_archive_chunks WHERE part_id=?",Integer.class,part.id()));
+  db.update("UPDATE business_datasets SET status='ACTIVE' WHERE id=?",ids[1]);assertFalse(archives.part(reader,tenant,part.id()).canDownload());
+  var next=archives.create(reader,tenant,e.execution().id(),shared,UUID.randomUUID(),false);var nextPart=archives.next(reader,tenant,next.id(),UUID.randomUUID());generateArchives();
+  db.update("UPDATE dataset_snapshots SET data_rows='[]'::jsonb,scrubbed=true WHERE id=?",ids[2]);
+  assertEquals("REVOKED",archives.receipt(reader,tenant,nextPart.id()).state());assertEquals(0,db.queryForObject("SELECT count(*) FROM departure_archive_chunks WHERE part_id=?",Integer.class,nextPart.id()));
+  assertThrows(org.springframework.dao.DataAccessException.class,()->db.update("UPDATE dataset_snapshots SET scrubbed=false WHERE id=?",ids[2]));
+ }
+ @Test void enterpriseDeadlineScrubsAllCollectedRowsAndMetadataBeforeCompletion(){
+  var ids=collectedData(shared,101);var e=exit();processor.process(e.execution().id());
+  assertEquals(101,db.queryForObject("SELECT count(*) FROM dataset_snapshots WHERE dataset_id=? AND NOT scrubbed",Integer.class,ids[1]));
+  assertThrows(IllegalArgumentException.class,()->collectionDeployment.apply(new com.dreamcore.workspace.collection.CollectionDeployment.Manifest("1.0",tenant,ids[0],"禁止重新部署","只读","范围","READY","UTC",List.of())));
+  start=e.execution().deadline().plusSeconds(1);db.update("UPDATE departure_executions SET deadline=clock_timestamp()-interval '1 second',effective_at=clock_timestamp()-interval '31 days' WHERE id=?",e.execution().id());
+  for(int i=0;i<20;i++){drain();processor.process(e.execution().id());if(service.get(admin,tenant,e.execution().id()).execution().state().equals("COMPLETE"))break;}
+  assertEquals("COMPLETE",service.get(admin,tenant,e.execution().id()).execution().state());
+  assertEquals(101,db.queryForObject("SELECT count(*) FROM dataset_snapshots WHERE dataset_id=? AND scrubbed AND data_rows='[]'::jsonb",Integer.class,ids[1]));
+  var dataset=db.queryForMap("SELECT * FROM business_datasets WHERE id=?",ids[1]);assertEquals(true,dataset.get("scrubbed"));assertEquals("WITHDRAWN",dataset.get("status"));assertEquals("removed-"+ids[1],dataset.get("dataset_key"));assertEquals("[\"已清理\"]",dataset.get("column_names").toString());
+  var connection=db.queryForMap("SELECT * FROM data_connections WHERE id=?",ids[0]);assertEquals("",connection.get("route_label"));assertEquals("",connection.get("access_summary"));assertEquals("UNCONFIGURED",connection.get("status"));assertFalse((Boolean)connection.get("auto_enabled"));
+  assertEquals("PENDING_VERIFICATION",service.get(admin,tenant,e.execution().id()).backupState());
+  assertThrows(org.springframework.dao.DataAccessException.class,()->db.update("UPDATE business_datasets SET status='ACTIVE',scrubbed=false WHERE id=?",ids[1]));
+ }
+ @Test void memberOffboardingNeverCleansSharedBusinessDataset(){
+  var ids=collectedData(shared,1);var e=offboard();start=e.execution().deadline().plusSeconds(1);
+  for(int i=0;i<20;i++){drain();processor.process(e.execution().id());if(service.get(admin,tenant,e.execution().id()).execution().state().equals("COMPLETE"))break;}
+  assertEquals("COMPLETE",service.get(admin,tenant,e.execution().id()).execution().state());
+  assertEquals(false,db.queryForObject("SELECT scrubbed FROM dataset_snapshots WHERE id=?",Boolean.class,ids[2]));
+  assertEquals("ACTIVE",db.queryForObject("SELECT status FROM business_datasets WHERE id=?",String.class,ids[1]));
+ }
  @AfterEach void releaseFixture(){
   db.update("UPDATE conversation_tasks SET status='CANCELLED',lease_token=NULL,lease_until=NULL WHERE tenant_id=? AND status IN('QUEUED','RUNNING')",tenant);
   db.update("UPDATE knowledge_runs SET status='CANCELLED' WHERE tenant_id=? AND status IN('QUEUED','RUNNING')",tenant);
