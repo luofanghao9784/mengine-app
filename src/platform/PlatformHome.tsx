@@ -368,7 +368,7 @@ function TenantView({
                   </p>
                 </div>
                 <Button
-                  variant={value.tenant.status === 'ACTIVE' ? 'ghost' : 'primary'}
+                  variant={value.tenant.status === 'ACTIVE' ? 'danger' : 'primary'}
                   onClick={() => setAction('status')}
                   disabled={pending}
                 >
