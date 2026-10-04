@@ -770,3 +770,22 @@
 .platform-account-row > svg { color: var(--muted); }
 .platform-account-catalog > .admin-dashboard { padding: 24px; }
 .platform-account-list > .pagination { padding: 16px 24px; }
+
+.admin-platform .admin-header .platform-enterprise-heading .button.platform-detail-back { border: 0; background: transparent; box-shadow: none; }
+.admin-platform .admin-header .platform-enterprise-heading .button.platform-detail-back:hover { background: transparent; box-shadow: none; color: var(--accent); }
+.platform-account-detail { padding: 24px; }
+.platform-account-detail-heading { display: flex; align-items: center; gap: 14px; padding-bottom: 24px; }
+.platform-account-detail-heading h2 { margin: 0; font-size: 20px; font-weight: 600; }
+.platform-account-detail-heading .badge { margin-left: 8px; }
+.admin-platform .platform-account-back { width: 40px; height: 40px; padding: 0; border: 0; background: transparent; box-shadow: none; }
+.admin-platform .platform-account-back svg { width: 22px; height: 22px; }
+.platform-account-info { padding: 24px 0; border-top: 1px solid var(--line); }
+.platform-account-detail h3 { margin: 0; font-size: 14px; font-weight: 600; }
+.platform-account-info dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; margin: 20px 0 0; }
+.platform-account-info dt { font-size: 12px; color: var(--muted); }
+.platform-account-info dd { margin: 8px 0 0; font-size: 14px; overflow-wrap: anywhere; }
+.platform-account-safety { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 24px 0; border-top: 1px solid var(--line); }
+.platform-account-safety p { margin: 8px 0 0; font-size: 13px; color: var(--muted); }
+.platform-account-history { border-top: 1px solid var(--line); padding-top: 20px; }
+.platform-account-history summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+.platform-account-history summary span { margin-left: 10px; font-size: 12px; }

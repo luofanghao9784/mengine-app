@@ -96,47 +96,63 @@ function AccountDetail({
   if (!memberships.length)
     return <Empty icon={Users} title="该账号不属于当前企业" text="返回企业账号列表查看。" />;
   return (
-    <div className="admin-dashboard">
-      <div>
-        <Button variant="ghost" icon={ArrowLeft} onClick={close}>
-          返回账号列表
-        </Button>
-      </div>
-      <section className="admin-section">
-        <div className="admin-section-heading">
-          <div>
-            <h2>{account.displayName}</h2>
-            <p className="admin-note">{account.phone || account.email}</p>
-          </div>
-          <Badge>{account.status === 'ACTIVE' ? '已启用' : '已停用'}</Badge>
-        </div>
-        <p className="admin-note">安全处置影响该账号的所有企业登录，不变更企业成员身份或空间授权。</p>
+    <div className="platform-account-detail">
+      <header className="platform-account-detail-heading">
         <Button
-          variant={account.status === 'ACTIVE' ? 'danger' : 'secondary'}
-          onClick={() => setConfirm(true)}
-        >
+          variant="ghost"
+          icon={ArrowLeft}
+          className="platform-account-back"
+          aria-label="返回账号列表"
+          onClick={close}
+        />
+        <h2>{account.displayName}</h2>
+        <Badge>{account.status === 'ACTIVE' ? '已启用' : '已停用'}</Badge>
+      </header>
+      <section className="platform-account-info" aria-label="账号信息">
+        <h3>账号信息</h3>
+        <dl>
+          <div>
+            <dt>手机号</dt>
+            <dd>{account.phone || '未绑定'}</dd>
+          </div>
+          <div>
+            <dt>邮箱</dt>
+            <dd>{account.email || '未绑定'}</dd>
+          </div>
+        </dl>
+      </section>
+      <section className="platform-account-info" aria-label="当前企业身份">
+        <h3>企业身份</h3>
+        {memberships.map((m) => (
+          <dl key={m.tenantId}>
+            <div>
+              <dt>企业角色</dt>
+              <dd>{m.role === 'TENANT_ADMIN' ? '企业管理员' : '成员'}</dd>
+            </div>
+            <div>
+              <dt>成员状态</dt>
+              <dd>{m.membershipStatus === 'ACTIVE' ? '已启用' : '已停用'}</dd>
+            </div>
+            <div>
+              <dt>企业服务</dt>
+              <dd>{m.serviceStatus === 'ACTIVE' ? '运行中' : '已暂停'}</dd>
+            </div>
+          </dl>
+        ))}
+      </section>
+      <section className="platform-account-safety" aria-label="账号安全操作">
+        <div>
+          <h3>账号安全</h3>
+          <p>停用影响该账号的所有企业登录，成员身份与空间授权保留。</p>
+        </div>
+        <Button variant={account.status === 'ACTIVE' ? 'danger' : 'primary'} onClick={() => setConfirm(true)}>
           {account.status === 'ACTIVE' ? '停用账号' : '恢复账号'}
         </Button>
       </section>
-      <section className="admin-section">
-        <h2>企业身份</h2>
-        {memberships.length ? (
-          memberships.map((m) => (
-            <div className="admin-directory-row" key={m.tenantId}>
-              <span>
-                {m.tenantName}
-                <small>{m.role === 'TENANT_ADMIN' ? '企业管理员' : '成员'}</small>
-              </span>
-              <Badge>{m.membershipStatus === 'ACTIVE' ? '成员已启用' : '成员已停用'}</Badge>
-              <span>{m.serviceStatus === 'ACTIVE' ? '服务正常' : '企业已暂停'}</span>
-            </div>
-          ))
-        ) : (
-          <p className="admin-note">尚无企业成员身份。</p>
-        )}
-      </section>
-      <section className="admin-section">
-        <h2>账号处理记录</h2>
+      <details className="platform-account-history">
+        <summary>
+          账号处理记录 <span>{records.length ? `最近 ${records.length} 条` : '暂无记录'}</span>
+        </summary>
         {records.length ? (
           records.map((r) => (
             <div className="admin-account-record" key={r.id}>
@@ -150,7 +166,7 @@ function AccountDetail({
         ) : (
           <p className="admin-note">暂无账号处理记录。</p>
         )}
-      </section>
+      </details>
       {confirm && (
         <AccountStatus
           account={account}
