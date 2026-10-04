@@ -12,6 +12,8 @@ public class TaskContextGuard {
  public TaskContextGuard(JdbcTemplate db){this.db=db;}
  @org.springframework.transaction.annotation.Transactional
  public void requireCurrent(UUID task){
+  // Serialize tenant future-use changes even while the default usage row does not exist.
+  db.queryForList("SELECT pg_advisory_xact_lock_shared(hashtextextended('general-use:'||tenant_id::text,0)) FROM conversation_tasks WHERE id=?",task);
   // Fence a simultaneous revision/publication through the caller's transaction, including final commit.
   db.queryForList("SELECT e.id FROM profile_entries e JOIN task_context_reads r ON r.reference_id=e.id AND r.kind='PROFILE' JOIN conversation_tasks t ON t.id=r.task_id WHERE t.id=? AND r.attempt_number=t.attempt ORDER BY e.id FOR SHARE OF e",task);
   db.queryForList("SELECT e.id FROM experience_entries e JOIN task_context_reads r ON r.reference_id=e.id AND r.kind='EXPERIENCE' JOIN conversation_tasks t ON t.id=r.task_id WHERE t.id=? AND r.attempt_number=t.attempt ORDER BY e.id FOR SHARE OF e",task);

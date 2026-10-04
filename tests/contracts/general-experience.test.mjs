@@ -36,9 +36,14 @@ test('cleaned method contract refuses source identities, raw evidence and invent
   }
   assert.equal(check({ ...row, method: { ...method, basis: 'PROVEN_SUCCESS' } }), false);
 });
-test('realm contracts are separate read-only routes and detail requires exact version', () => {
+test('realm contracts keep customer usage writes separate and require exact versions', () => {
   for (const [path, operations] of Object.entries(spec.paths)) {
-    assert.deepEqual(Object.keys(operations), ['get']);
+    assert.deepEqual(Object.keys(operations), path.endsWith('/usage') ? ['get', 'post'] : ['get']);
+    if (operations.post) {
+      assert.ok(path.startsWith('/api/v1/tenants/'));
+      assert.deepEqual(operations.post.security, [{ customerCookie: [] }]);
+      assert.ok(operations.post.parameters.some((p) => p.in === 'header' && p.required));
+    }
     const platform = path.includes('platform-admin');
     assert.deepEqual(operations.get.security, [{ [platform ? 'platformCookie' : 'customerCookie']: [] }]);
     assert.equal(operations.get.responses['200'].headers['Cache-Control'].schema.const, 'private, no-store');
@@ -48,4 +53,20 @@ test('realm contracts are separate read-only routes and detail requires exact ve
   assert.equal(spec.components.securitySchemes.platformCookie.name, 'DREAMCORE_PLATFORM');
   assert.equal(spec.components.securitySchemes.customerCookie.name, 'DREAMCORE_SESSION');
   assert.equal(Object.keys(spec.paths).filter((p) => p.endsWith('/processing')).length, 1);
+});
+
+test('usage control request and receipt carry exact version, revision and idempotency identity only', () => {
+  const check = ajv.compile(spec.components.schemas.UsageChange);
+  const request = { requestId: id, versionId: id, expectedRevision: 0, enabled: false };
+  assert.ok(check(request));
+  for (const key of ['actorId', 'tenantId', 'method', 'sourceId'])
+    assert.equal(check({ ...request, [key]: id }), false);
+  assert.equal(check({ ...request, expectedRevision: -1 }), false);
+  assert.equal(check({ ...request, enabled: 'false' }), false);
+  const state = ajv.compile(spec.components.schemas.Usage);
+  assert.ok(state({ entryId: id, versionId: id, revision: 0, enabled: true, canManage: false }));
+  assert.equal(
+    state({ entryId: id, versionId: id, revision: 0, enabled: true, canManage: false, reason: 'private' }),
+    false,
+  );
 });

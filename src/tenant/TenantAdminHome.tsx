@@ -74,6 +74,8 @@ const actions: Record<string, string> = {
   COMPANY_INFORMATION_EDIT: '调整企业信息',
   COMPANY_INFORMATION_REMOVE: '移除企业信息',
   COMPANY_INFORMATION_ADOPT: '采用企业信息建议',
+  GENERAL_EXPERIENCE_USE_STOP: '停止本企业使用通用经验',
+  GENERAL_EXPERIENCE_USE_RESTORE: '恢复本企业使用通用经验',
   COMPANY_INFORMATION_KEEP: '保留当前企业信息',
   COMPANY_INFORMATION_CLEAR: '清空企业信息分组',
   COLLECTION_CONFIGURE: '调整自动取数',

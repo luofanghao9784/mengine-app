@@ -47,3 +47,24 @@ export interface GeneralExperienceProcessing {
   withdrawn: number;
   checkedAt: string;
 }
+
+export interface GeneralExperienceUsage {
+  entryId: string;
+  versionId: string;
+  enabled: boolean;
+  revision: number;
+  canManage: boolean;
+}
+export interface GeneralExperienceUsageChange {
+  requestId: string;
+  versionId: string;
+  expectedRevision: number;
+  enabled: boolean;
+}
+export interface GeneralExperienceUsageReceipt {
+  requestId: string;
+  entryId: string;
+  versionId: string;
+  enabled: boolean;
+  revision: number;
+}

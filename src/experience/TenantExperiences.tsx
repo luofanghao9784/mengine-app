@@ -53,7 +53,7 @@ export function TenantExperiences({ tenant }: { tenant: string }) {
         </select>
       </Field>
       {source === 'general' ? (
-        <GeneralExperienceLibrary tenant={tenant} />
+        <GeneralExperienceLibrary tenant={tenant} onLocked={setLocked} />
       ) : (
         <EnterpriseExperiences tenant={tenant} onLocked={setLocked} />
       )}

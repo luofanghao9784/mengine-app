@@ -26,7 +26,10 @@
             "in": "query",
             "name": "state",
             "schema": {
-              "enum": ["AVAILABLE", "STOPPED"]
+              "enum": [
+                "AVAILABLE",
+                "STOPPED"
+              ]
             }
           },
           {
@@ -196,8 +199,14 @@
             "in": "query",
             "name": "state",
             "schema": {
-              "enum": ["AVAILABLE"]
-            }
+              "type": "string",
+              "enum": [
+                "AVAILABLE",
+                "STOPPED"
+              ],
+              "default": "AVAILABLE"
+            },
+            "description": "STOPPED means disabled only in this enterprise; global withdrawn bodies are never exposed."
           },
           {
             "in": "query",
@@ -305,6 +314,152 @@
           }
         }
       }
+    },
+    "/api/v1/tenants/{tenant}/general-experiences/{entry}/usage": {
+      "get": {
+        "description": "Only cleaned current general content; no tenant sources. Fixed version required for details.",
+        "security": [
+          {
+            "customerCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entry",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized projection",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Usage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Management scope required"
+          },
+          "404": {
+            "description": "Version no longer available"
+          }
+        },
+        "operationId": "getTenantGeneralExperienceUsage"
+      },
+      "post": {
+        "description": "Only cleaned current general content; no tenant sources. Fixed version required for details.",
+        "security": [
+          {
+            "customerCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entry",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-CSRF-TOKEN",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized projection",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageReceipt"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Management scope required"
+          },
+          "404": {
+            "description": "Version no longer available"
+          },
+          "409": {
+            "description": "Revision or request identity conflict"
+          }
+        },
+        "operationId": "changeTenantGeneralExperienceUsage",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UsageChange"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -324,7 +479,15 @@
       "Method": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["title", "summary", "steps", "applicable", "excluded", "tags", "basis"],
+        "required": [
+          "title",
+          "summary",
+          "steps",
+          "applicable",
+          "excluded",
+          "tags",
+          "basis"
+        ],
         "properties": {
           "title": {
             "type": "string",
@@ -377,14 +540,26 @@
             }
           },
           "basis": {
-            "enum": ["OBSERVED_EXECUTION", "FEEDBACK_CORRECTION"]
+            "enum": [
+              "OBSERVED_EXECUTION",
+              "FEEDBACK_CORRECTION"
+            ]
           }
         }
       },
       "Summary": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "versionId", "number", "status", "updatedAt", "title", "summary", "tags"],
+        "required": [
+          "id",
+          "versionId",
+          "number",
+          "status",
+          "updatedAt",
+          "title",
+          "summary",
+          "tags"
+        ],
         "properties": {
           "id": {
             "type": "string",
@@ -399,7 +574,10 @@
             "minimum": 1
           },
           "status": {
-            "enum": ["AVAILABLE", "STOPPED"]
+            "enum": [
+              "AVAILABLE",
+              "STOPPED"
+            ]
           },
           "updatedAt": {
             "type": "string",
@@ -430,7 +608,14 @@
       "Detail": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "versionId", "number", "status", "updatedAt", "method"],
+        "required": [
+          "id",
+          "versionId",
+          "number",
+          "status",
+          "updatedAt",
+          "method"
+        ],
         "properties": {
           "id": {
             "type": "string",
@@ -445,7 +630,10 @@
             "minimum": 1
           },
           "status": {
-            "enum": ["AVAILABLE", "STOPPED"]
+            "enum": [
+              "AVAILABLE",
+              "STOPPED"
+            ]
           },
           "updatedAt": {
             "type": "string",
@@ -459,7 +647,10 @@
       "Page": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["items", "hasMore"],
+        "required": [
+          "items",
+          "hasMore"
+        ],
         "properties": {
           "items": {
             "type": "array",
@@ -476,7 +667,14 @@
       "Processing": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["enabled", "counts", "available", "stopped", "withdrawn", "checkedAt"],
+        "required": [
+          "enabled",
+          "counts",
+          "available",
+          "stopped",
+          "withdrawn",
+          "checkedAt"
+        ],
         "properties": {
           "enabled": {
             "type": "boolean"
@@ -549,6 +747,96 @@
           "checkedAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "Usage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "entryId",
+          "versionId",
+          "enabled",
+          "revision",
+          "canManage"
+        ],
+        "properties": {
+          "entryId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "versionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "canManage": {
+            "type": "boolean"
+          }
+        }
+      },
+      "UsageChange": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requestId",
+          "versionId",
+          "expectedRevision",
+          "enabled"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "versionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        }
+      },
+      "UsageReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requestId",
+          "entryId",
+          "versionId",
+          "enabled",
+          "revision"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "entryId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "versionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
           }
         }
       }

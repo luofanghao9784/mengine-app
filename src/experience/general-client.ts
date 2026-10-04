@@ -1,5 +1,8 @@
 import type {
   GeneralExperiencePage,
+  GeneralExperienceUsage,
+  GeneralExperienceUsageChange,
+  GeneralExperienceUsageReceipt,
   GeneralExperienceDetail,
   GeneralExperienceProcessing,
   GeneralMethod,
@@ -65,6 +68,21 @@ export const isGeneralProcessing = (v: unknown): v is GeneralExperienceProcessin
   count(v.stopped) &&
   count(v.withdrawn) &&
   date(v.checkedAt);
+export const isGeneralUsage = (v: unknown): v is GeneralExperienceUsage =>
+  exact(v, ['entryId', 'versionId', 'enabled', 'revision', 'canManage']) &&
+  uuid(v.entryId) &&
+  uuid(v.versionId) &&
+  typeof v.enabled === 'boolean' &&
+  count(v.revision) &&
+  typeof v.canManage === 'boolean';
+export const isGeneralUsageReceipt = (v: unknown): v is GeneralExperienceUsageReceipt =>
+  exact(v, ['requestId', 'entryId', 'versionId', 'enabled', 'revision']) &&
+  uuid(v.requestId) &&
+  uuid(v.entryId) &&
+  uuid(v.versionId) &&
+  typeof v.enabled === 'boolean' &&
+  count(v.revision) &&
+  Number(v.revision) > 0;
 export function createGeneralExperienceClient(fetcher: typeof fetch = fetch) {
   const request = createIdentityRequest(fetcher);
   const path = (tenant?: string) => {
@@ -105,6 +123,39 @@ export function createGeneralExperienceClient(fetcher: typeof fetch = fetch) {
       )
         throw new IdentityError('CONTRACT_MISMATCH');
       return value;
+    },
+    usage: async (tenant: string, id: string, version: string, signal?: AbortSignal) => {
+      if (!uuid(tenant) || !uuid(id) || !uuid(version)) throw new IdentityError('INVALID_REQUEST', 400);
+      const v = await request(
+        path(tenant) + `/${id}/usage?version=${version}`,
+        'GET',
+        isGeneralUsage,
+        undefined,
+        signal,
+      );
+      if (v.entryId !== id || v.versionId !== version) throw new IdentityError('CONTRACT_MISMATCH');
+      return v;
+    },
+    changeUsage: async (tenant: string, id: string, body: GeneralExperienceUsageChange) => {
+      if (
+        !uuid(tenant) ||
+        !uuid(id) ||
+        !uuid(body.requestId) ||
+        !uuid(body.versionId) ||
+        !count(body.expectedRevision) ||
+        typeof body.enabled !== 'boolean'
+      )
+        throw new IdentityError('INVALID_REQUEST', 400);
+      const v = await request(path(tenant) + `/${id}/usage`, 'POST', isGeneralUsageReceipt, body);
+      if (
+        v.entryId !== id ||
+        v.versionId !== body.versionId ||
+        v.requestId !== body.requestId ||
+        v.enabled !== body.enabled ||
+        v.revision !== body.expectedRevision + 1
+      )
+        throw new IdentityError('CONTRACT_MISMATCH');
+      return v;
     },
     processing: (signal?: AbortSignal) =>
       request(path() + '/processing', 'GET', isGeneralProcessing, undefined, signal),

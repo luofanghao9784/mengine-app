@@ -13,7 +13,11 @@ const method = {
   tags: ['核对'],
   basis: 'OBSERVED_EXECUTION',
 };
-async function fixture(context: BrowserContext) {
+async function fixture(context: BrowserContext, options: { canManage?: boolean; dropFirst?: boolean } = {}) {
+  let enabled = true,
+    revision = 0;
+  const changes: Record<string, unknown>[] = [];
+  let receipt: unknown;
   let revoked = false;
   const calls: string[] = [];
   const mutations: string[] = [];
@@ -23,6 +27,7 @@ async function fixture(context: BrowserContext) {
     calls.push(path + url.search);
     const json = (value: unknown, status = 200) => route.fulfill({ json: value, status });
     if (route.request().method() !== 'GET') mutations.push(path);
+    if (path.endsWith('/csrf')) return json({ headerName: 'X-CSRF-TOKEN', token: 'synthetic' });
     if (path.endsWith('/phone/configuration')) return json({ delivery: 'DISABLED', localPreview: false });
     if (path.endsWith('/auth/me'))
       return json({
@@ -56,6 +61,28 @@ async function fixture(context: BrowserContext) {
       });
     if (path.endsWith('/experience-library') && path.startsWith('/api/v1/'))
       return json({ scopes: [], items: [], hasMore: false });
+    if (path.endsWith('/usage')) {
+      if (route.request().method() === 'POST') {
+        const body = route.request().postDataJSON();
+        changes.push(body);
+        if (changes.length === 1 || body.requestId !== changes[changes.length - 2].requestId) {
+          enabled = body.enabled;
+          revision++;
+          receipt = { requestId: body.requestId, entryId: entry, versionId: version, enabled, revision };
+        }
+        if (options.dropFirst && changes.length === 1) return route.abort('failed');
+        return json(receipt);
+      }
+      return revoked
+        ? json({ contractVersion: '1.0', code: 'EXPERIENCE_NOT_FOUND' }, 404)
+        : json({
+            entryId: entry,
+            versionId: version,
+            enabled,
+            revision,
+            canManage: options.canManage !== false,
+          });
+    }
     if (path.includes('experience-library') || path.includes('general-experiences')) {
       if (path.endsWith('/processing'))
         return json({
@@ -81,7 +108,7 @@ async function fixture(context: BrowserContext) {
         id: entry,
         versionId: version,
         number: 1,
-        status: state,
+        status: path.includes('general-experiences') ? 'AVAILABLE' : state,
         updatedAt: '2026-10-04T00:00:00Z',
       };
       if (path.endsWith('/' + entry))
@@ -89,7 +116,10 @@ async function fixture(context: BrowserContext) {
           ? json({ contractVersion: '1.0', code: 'EXPERIENCE_NOT_FOUND' }, 404)
           : json({ ...row, method });
       return json({
-        items: revoked ? [] : [{ ...row, title: method.title, summary: method.summary, tags: method.tags }],
+        items:
+          revoked || (path.includes('general-experiences') && (state === 'AVAILABLE') !== enabled)
+            ? []
+            : [{ ...row, title: method.title, summary: method.summary, tags: method.tags }],
         hasMore: url.searchParams.get('offset') !== '20',
       });
     }
@@ -98,6 +128,7 @@ async function fixture(context: BrowserContext) {
   return {
     calls,
     mutations,
+    changes,
     revoke: () => {
       revoked = true;
     },
@@ -182,4 +213,79 @@ test('an enterprise experience deep link overrides a remembered general-library 
   await page.goto(`/tenant-admin/#tenant=${tenant}&admin=experience&scope=${id(8)}&experience=${entry}`);
   await expect(page.getByLabel('经验来源')).toHaveValue('enterprise');
   await expect(page.getByRole('heading', { name: '经验详情', exact: true })).toBeVisible();
+});
+
+async function openTenantMethod(page: import('@playwright/test').Page) {
+  await page.goto(`/tenant-admin/#tenant=${tenant}&admin=experience`);
+  await page.getByLabel('经验来源').selectOption('general');
+  await page
+    .getByRole('button')
+    .filter({ has: page.getByRole('heading', { name: method.title }) })
+    .click();
+}
+test('enterprise stop and restore stay inside the fixed-version drawer and preserve scope', async ({
+  page,
+  context,
+}) => {
+  const f = await fixture(context);
+  await openTenantMethod(page);
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('button', { name: '停止本企业使用', exact: true }).click();
+  await expect(
+    dialog.getByText(
+      '停止本企业后续检索与采用，正在引用此经验的任务需重新执行。已完成结果保留，其他企业不受影响。',
+    ),
+  ).toBeVisible();
+  await dialog.getByRole('button', { name: '确认停用' }).click();
+  await expect(dialog.getByText('本企业：已停止使用')).toBeVisible();
+  await page.getByRole('button', { name: '关闭弹窗' }).click();
+  await page.getByLabel('通用经验状态').selectOption('STOPPED');
+  await page
+    .getByRole('button')
+    .filter({ has: page.getByRole('heading', { name: method.title }) })
+    .click();
+  await expect(dialog.getByRole('button', { name: '恢复本企业使用' })).toBeVisible();
+  await page.setViewportSize({ width: 360, height: 1000 });
+  expect(await dialog.evaluate((e) => e.scrollWidth <= e.clientWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/general-tenant-use-control.png', fullPage: true });
+  await dialog.getByRole('button', { name: '恢复本企业使用' }).click();
+  await dialog.getByRole('button', { name: '确认恢复' }).click();
+  await expect(dialog.getByText('本企业：可供引擎参考')).toBeVisible();
+  expect(f.changes.map((c) => [c.enabled, c.expectedRevision, c.versionId])).toEqual([
+    [false, 0, version],
+    [true, 1, version],
+  ]);
+  expect(f.calls.every((c) => !c.startsWith('/api/platform-admin/'))).toBe(true);
+});
+test('lost response retains the original request and locks source and drawer navigation', async ({
+  page,
+  context,
+}) => {
+  const f = await fixture(context, { dropFirst: true });
+  await openTenantMethod(page);
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('button', { name: '停止本企业使用', exact: true }).click();
+  await dialog.getByRole('button', { name: '确认停用' }).click();
+  await expect(dialog.getByRole('button', { name: '重试原请求' })).toBeVisible();
+  await expect(page.getByLabel('经验来源')).toBeDisabled();
+  await dialog.getByRole('button', { name: '关闭弹窗' }).click();
+  await expect(dialog).toBeVisible();
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect(dialog.getByRole('button', { name: '重试原请求' })).toBeVisible();
+  await dialog.getByRole('button', { name: '重试原请求' }).click();
+  await expect(dialog.getByText('本企业：已停止使用')).toBeVisible();
+  expect(f.changes).toHaveLength(2);
+  expect(f.changes[0]).toEqual(f.changes[1]);
+  await expect(page.getByLabel('经验来源')).toBeEnabled();
+});
+test('space maintainer sees enterprise use status without enterprise-wide mutation controls', async ({
+  page,
+  context,
+}) => {
+  const f = await fixture(context, { canManage: false });
+  await openTenantMethod(page);
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByText('企业负责人或管理员可调整本企业使用状态。')).toBeVisible();
+  await expect(dialog.getByRole('button', { name: /停止本企业使用|恢复本企业使用/ })).toHaveCount(0);
+  expect(f.mutations).toEqual([]);
 });

@@ -140,4 +140,33 @@ class GeneralExperienceTaskContextIntegrationTest {
   db.update("UPDATE general_experience_entries SET status='AVAILABLE' WHERE id=?",r.entryId());assertFalse(agents.active(inherited));
  }
 
+
+ @Autowired TenantGeneralExperienceUsage usage;
+ @Autowired org.springframework.transaction.PlatformTransactionManager transactionManager;
+ TenantGeneralExperienceUsage.Receipt localUse(GeneralExperienceAdmissionService.Receipt r,int revision,boolean enabled){
+  db.update("UPDATE tenant_memberships SET role='TENANT_ADMIN' WHERE tenant_id=? AND account_id=?",clientTenant,clientActor);
+  return usage.change(clientActor,clientTenant,r.entryId(),new TenantGeneralExperienceUsage.Change(UUID.randomUUID(),r.versionId(),revision,enabled));
+ }
+ @Test void localStopAffectsOnlyThisEnterpriseIncludingInheritedTaskHistory(){
+  seed();var r=publish(method());var done=working();read(done,r,0);finish(done,"历史合成结果");
+  var inherited=working(done.conversation());call(inherited,new TaskContextService.Request("history",null,null,null,null,null,null,null,null,null,null));
+  conversations.submit(owner,tenant,null,space,UUID.randomUUID(),"另一个企业的合成任务","AGENT");var other=conversations.claim();assertNotNull(other);assertEquals(tenant,other.tenant());read(other,r,0);
+  localUse(r,0,false);assertTrue(agents.active(other));assertNotNull(read(other,r,0));finish(other,"另一个企业仍可使用");assertFalse(agents.active(inherited));assertTrue(available(r.versionId()));assertTrue(db.queryForObject("SELECT EXISTS(SELECT 1 FROM readable_source_tasks WHERE id=?)",Boolean.class,done.id()));
+  assertFalse(db.queryForObject("SELECT tenant_general_experience_enabled(?,?)",Boolean.class,clientTenant,r.entryId()));assertTrue(db.queryForObject("SELECT tenant_general_experience_enabled(?,?)",Boolean.class,tenant,r.entryId()));
+  var fresh=working();assertEquals(0,search(fresh).get("items").size());denied(404,()->read(fresh,r,0));
+  localUse(r,1,true);assertFalse(agents.active(inherited));assertEquals(1,search(fresh).get("items").size());assertNotNull(read(fresh,r,0));
+ }
+ @Test void localStopUsesSharedTaskFenceEvenBeforeUsageRowExists()throws Exception{
+  seed();var r=publish(method());var job=working();read(job,r,0);
+  db.update("UPDATE tenant_memberships SET role='TENANT_ADMIN' WHERE tenant_id=? AND account_id=?",clientTenant,clientActor);
+  var locked=new CountDownLatch(1);var release=new CountDownLatch(1);var started=new CountDownLatch(1);
+  try(var pool=Executors.newFixedThreadPool(2)){
+   var reader=pool.submit(()->new org.springframework.transaction.support.TransactionTemplate(transactionManager).execute(status->{guard.requireCurrent(job.id());locked.countDown();try{assertTrue(release.await(10,TimeUnit.SECONDS));}catch(InterruptedException e){throw new RuntimeException(e);}return true;}));
+   assertTrue(locked.await(10,TimeUnit.SECONDS));
+   var writer=pool.submit(()->{started.countDown();return usage.change(clientActor,clientTenant,r.entryId(),new TenantGeneralExperienceUsage.Change(UUID.randomUUID(),r.versionId(),0,false));});
+   assertTrue(started.await(10,TimeUnit.SECONDS));try{assertThrows(TimeoutException.class,()->writer.get(200,TimeUnit.MILLISECONDS));}finally{release.countDown();}
+   assertTrue(reader.get(10,TimeUnit.SECONDS));assertFalse(writer.get(10,TimeUnit.SECONDS).enabled());
+  }finally{release.countDown();}
+  assertFalse(agents.active(job));localUse(r,1,true);assertFalse(agents.active(job));
+ }
 }

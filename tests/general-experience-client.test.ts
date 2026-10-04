@@ -86,3 +86,31 @@ test('search is encoded, paginated and never routed through the other realm', as
   assert.equal(url.searchParams.get('offset'), '20');
   assert.ok(url.pathname.includes('/general-experiences'));
 });
+
+test('usage mutations use customer CSRF, exact version, revision and unchanged request identity', async () => {
+  const calls: { url: string; body: unknown }[] = [];
+  let bad = false;
+  const api = createGeneralExperienceClient((async (url, init) => {
+    if (String(url).endsWith('/csrf'))
+      return Response.json({ headerName: 'X-CSRF-TOKEN', token: 'synthetic' });
+    assert.equal(init?.cache, 'no-store');
+    const body = JSON.parse(String(init?.body));
+    calls.push({ url: String(url), body });
+    assert.equal(new Headers(init?.headers).get('X-CSRF-TOKEN'), 'synthetic');
+    return Response.json({
+      requestId: id,
+      entryId: id,
+      versionId: version,
+      revision: bad ? 2 : 1,
+      enabled: false,
+    });
+  }) as typeof fetch);
+  const body = { requestId: id, versionId: version, expectedRevision: 0, enabled: false };
+  await api.changeUsage(id, id, body);
+  await api.changeUsage(id, id, body);
+  assert.deepEqual(calls[0], calls[1]);
+  assert.equal(calls[0].url, `/api/v1/tenants/${id}/general-experiences/${id}/usage`);
+  bad = true;
+  await assert.rejects(api.changeUsage(id, id, body));
+  await assert.rejects(api.changeUsage('', id, body));
+});

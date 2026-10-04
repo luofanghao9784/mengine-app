@@ -79,7 +79,7 @@ class GeneralExperienceLibraryIntegrationTest {
  @Test void stopRemainsPlatformReadableOnlyWhileSourceIsValid(){
   seed();var r=publish(method());grant();db.update("UPDATE general_experience_entries SET status='STOPPED' WHERE id=?",r.entryId());
   assertEquals("STOPPED",library.detail(platform,null,r.entryId(),r.versionId()).status());assertEquals(1,library.contents(platform,null,method().title(),"STOPPED",0).items().size());
-  assertThrows(IdentityException.class,()->library.detail(owner,tenant,r.entryId(),r.versionId()));assertThrows(IdentityException.class,()->library.contents(owner,tenant,"","STOPPED",0));
+  assertThrows(IdentityException.class,()->library.detail(owner,tenant,r.entryId(),r.versionId()));assertTrue(library.contents(owner,tenant,"","STOPPED",0).items().isEmpty());
   db.queryForList("SELECT scrub_lifecycle_object('TASK',?)",task);assertThrows(IdentityException.class,()->library.detail(platform,null,r.entryId(),r.versionId()));assertTrue(library.contents(platform,null,method().title(),"STOPPED",0).items().isEmpty());
  }
  @Test void exactVersionAndLiteralSearchNeverSubstituteOrTreatWildcardsAsAll(){
@@ -113,5 +113,49 @@ class GeneralExperienceLibraryIntegrationTest {
   for(var response:List.of(customer.get(publicPath),customer.get(publicPath+"/"+r.entryId()+"?version="+r.versionId()),admin.get(platformPath),admin.get(platformPath+"/processing"),admin.get(platformPath+"/"+r.entryId()+"?version="+r.versionId()))){assertEquals(200,response.statusCode(),response.body());assertTrue(response.headers().firstValue("cache-control").orElseThrow().contains("no-store"));}
   assertEquals(400,admin.get(platformPath+"/"+r.entryId()).statusCode());
   db.queryForList("SELECT scrub_lifecycle_object('TASK',?)",task);assertEquals(404,admin.get(platformPath+"/"+r.entryId()+"?version="+r.versionId()).statusCode());assertEquals(404,customer.get(publicPath+"/"+r.entryId()+"?version="+r.versionId()).statusCode());
+ }
+
+ @Autowired TenantGeneralExperienceUsage usage;
+ @Autowired com.dreamcore.workspace.identity.TenantAdminService adminRecords;
+ UUID manager;
+ void admin(){manager=UUID.randomUUID();db.update("INSERT INTO accounts(id,email,display_name,password_hash) VALUES (?,?,'合成管理人员','unused')",manager,manager+"@usage.test");db.update("INSERT INTO tenant_memberships(tenant_id,account_id,role) VALUES (?,?,'TENANT_ADMIN')",tenant,manager);}
+ @Test void tenantUsageIsLocalReversibleAndOptimisticallyIdempotent(){
+  seed();var r=publish(method());grant();
+  var initial=usage.state(owner,tenant,r.entryId(),r.versionId());assertTrue(initial.enabled());assertFalse(initial.canManage());assertEquals(0,initial.revision());
+  var stop=new TenantGeneralExperienceUsage.Change(UUID.randomUUID(),r.versionId(),0,false);
+  assertEquals(403,assertThrows(IdentityException.class,()->usage.change(owner,tenant,r.entryId(),stop)).status);
+  admin();var receipt=usage.change(manager,tenant,r.entryId(),stop);assertEquals(receipt,usage.change(manager,tenant,r.entryId(),stop));assertEquals(1,receipt.revision());
+  assertFalse(usage.state(owner,tenant,r.entryId(),r.versionId()).enabled());assertTrue(available(r.versionId()));
+  assertTrue(library.contents(owner,tenant,method().title(),"AVAILABLE",0).items().isEmpty());assertEquals(1,library.contents(owner,tenant,method().title(),"STOPPED",0).items().size());
+  assertNotNull(library.detail(owner,tenant,r.entryId(),r.versionId()));assertEquals(1,library.contents(platform,null,method().title(),"AVAILABLE",0).items().size());
+  assertEquals(409,assertThrows(IdentityException.class,()->usage.change(manager,tenant,r.entryId(),new TenantGeneralExperienceUsage.Change(stop.requestId(),r.versionId(),0,true))).status);
+  assertEquals(409,assertThrows(IdentityException.class,()->usage.change(manager,tenant,r.entryId(),new TenantGeneralExperienceUsage.Change(UUID.randomUUID(),r.versionId(),0,true))).status);
+  var restored=usage.change(manager,tenant,r.entryId(),new TenantGeneralExperienceUsage.Change(UUID.randomUUID(),r.versionId(),1,true));assertEquals(2,restored.revision());
+  assertEquals(receipt,usage.change(manager,tenant,r.entryId(),stop));assertTrue(usage.state(owner,tenant,r.entryId(),r.versionId()).enabled());
+  assertEquals(2,db.queryForObject("SELECT count(*) FROM identity_audit WHERE tenant_id=? AND action LIKE 'GENERAL_EXPERIENCE_USE_%'",Integer.class,tenant));
+  assertEquals(2,adminRecords.records(manager,tenant,0,20).stream().filter(x->x.action().startsWith("GENERAL_EXPERIENCE_USE_")).count());
+ }
+ @Test void withdrawnSourceAndStaleVersionCannotBeRestoredLocally(){
+  seed();var r=publish(method());admin();var stop=new TenantGeneralExperienceUsage.Change(UUID.randomUUID(),r.versionId(),0,false);usage.change(manager,tenant,r.entryId(),stop);
+  assertEquals(404,assertThrows(IdentityException.class,()->usage.change(manager,tenant,r.entryId(),new TenantGeneralExperienceUsage.Change(UUID.randomUUID(),UUID.randomUUID(),1,true))).status);
+  db.queryForList("SELECT scrub_lifecycle_object('TASK',?)",task);
+  assertEquals(404,assertThrows(IdentityException.class,()->usage.change(manager,tenant,r.entryId(),new TenantGeneralExperienceUsage.Change(UUID.randomUUID(),r.versionId(),1,true))).status);
+  assertEquals(1,usage.change(manager,tenant,r.entryId(),stop).revision()); // only original receipt, no body or restored state
+  assertEquals(404,assertThrows(IdentityException.class,()->usage.state(manager,tenant,r.entryId(),r.versionId())).status);
+  db.update("UPDATE tenant_memberships SET role='MEMBER' WHERE tenant_id=? AND account_id=?",tenant,manager);
+  assertEquals(403,assertThrows(IdentityException.class,()->usage.change(manager,tenant,r.entryId(),stop)).status);
+ }
+ @Test void customerMutationNeedsCustomerSessionAndCsrf()throws Exception{
+  seed();var r=publish(method());admin();db.update("UPDATE accounts SET password_hash=? WHERE id=?",passwords.encode("synthetic-customer-123"),manager);
+  String path="/api/v1/tenants/"+tenant+"/general-experiences/"+r.entryId()+"/usage";
+  var customer=new Browser();customer.login("customer",Map.of("email",manager+"@usage.test","password","synthetic-customer-123"));
+  var json=customer.json;var body=new TenantGeneralExperienceUsage.Change(UUID.randomUUID(),r.versionId(),0,false);
+  var builder=java.net.http.HttpRequest.newBuilder(java.net.URI.create("http://127.0.0.1:"+port+path)).header("Content-Type","application/json").POST(java.net.http.HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body)));
+  assertEquals(403,customer.http.send(builder.build(),java.net.http.HttpResponse.BodyHandlers.ofString()).statusCode());
+  var csrf=json.readTree(customer.get("/api/v1/auth/csrf").body());builder.header(csrf.get("headerName").asString(),csrf.get("token").asString());
+  var response=customer.http.send(builder.build(),java.net.http.HttpResponse.BodyHandlers.ofString());assertEquals(200,response.statusCode(),response.body());assertTrue(response.headers().firstValue("cache-control").orElseThrow().contains("no-store"));
+  assertEquals(response.body(),customer.http.send(builder.build(),java.net.http.HttpResponse.BodyHandlers.ofString()).body());
+  assertEquals(200,customer.get(path+"?version="+r.versionId()).statusCode());
+  var adminBrowser=new Browser();adminBrowser.login("platform",Map.of("username",platform+"@platform.test","password","synthetic-platform-456"));assertEquals(401,adminBrowser.get(path+"?version="+r.versionId()).statusCode());
  }
 }

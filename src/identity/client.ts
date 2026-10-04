@@ -42,6 +42,7 @@ export class IdentityError extends Error {
       LOGIN_THROTTLED: '尝试次数较多，请稍后再试。',
       CURRENT_PASSWORD_INCORRECT: '当前密码不正确。',
       PASSWORD_UNCHANGED: '新密码需要与当前密码不同。',
+      EXPERIENCE_USE_UNCHANGED: '使用状态已经变化，请取消操作并核对当前状态。',
       COLLECTION_STATE_CHANGED: '取数设置已变化，请刷新后重新核对。',
       DATA_CONNECTION_NOT_FOUND: '接入不存在或当前没有查看权限。',
       DATASET_NOT_FOUND: '数据集不存在或当前没有查看权限。',
