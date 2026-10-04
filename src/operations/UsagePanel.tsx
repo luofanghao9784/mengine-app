@@ -1,6 +1,6 @@
 import { Select } from '../shared/Select';
 import { useState, type ReactNode } from 'react';
-import { RefreshCw, Search, ArrowLeft, ChevronRight } from 'lucide-react';
+import { RefreshCw, ArrowLeft } from 'lucide-react';
 import type {
   UsageClass,
   UsageOverview,
@@ -10,8 +10,8 @@ import type {
 } from '../../contracts/public-api/usage';
 import { usagePeriods } from '../../contracts/public-api/usage';
 import { Button, Badge, PageActions } from '../shared/ui';
-import { useRemote, Failure, Loading, Pager } from '../shared/admin';
-import { useViewState, textState, pageState } from '../shared/useViewState';
+import { useRemote, Failure, Loading } from '../shared/admin';
+import { useViewState } from '../shared/useViewState';
 import { platformClient } from '../platform/client';
 import { adminHref } from '../admin/navigation';
 import { uuid } from '../identity/client';
@@ -52,69 +52,7 @@ export function PlatformUsagePage({ hash }: { hash: string }) {
         </a>
       )}
       <UsagePanel key={tenant || 'all'} scope="platform" tenant={tenant} hash={hash} compact />
-      <TenantUsageDirectory hash={hash} />
     </div>
-  );
-}
-function TenantUsageDirectory({ hash }: { hash: string }) {
-  const [query, setQuery] = useViewState('platform', 'usage-tenant-query', '', textState);
-  const [draft, setDraft] = useState(query);
-  const [page, setPage] = useViewState('platform', 'usage-tenant-page', 0, pageState);
-  const [attempt, setAttempt] = useState(0);
-  const data = useRemote(
-    (signal) => platformClient.tenants(query, '', page * 20, 21, signal),
-    [query, page, attempt],
-  );
-  return (
-    <section className="admin-section usage-section" aria-label="按企业查看用量">
-      <h2>按企业查看</h2>
-      <form
-        className="usage-filter"
-        onSubmit={(e) => {
-          e.preventDefault();
-          setPage(0);
-          setQuery(draft.trim());
-        }}
-      >
-        <input
-          aria-label="搜索企业"
-          placeholder="搜索企业名称"
-          value={draft}
-          maxLength={100}
-          onChange={(e) => setDraft(e.target.value)}
-        />
-        <Button type="submit" icon={Search}>
-          搜索
-        </Button>
-      </form>
-      {data.error ? (
-        <Failure error={data.error} retry={() => setAttempt((a) => a + 1)} />
-      ) : !data.value ? (
-        <Loading />
-      ) : data.value.length ? (
-        <>
-          <div className="usage-directory">
-            {data.value.slice(0, 20).map((t) => (
-              <a key={t.id} href={adminHref('platform', 'usage', hash, { enterprise: t.id })}>
-                <span>
-                  {t.name}
-                  <small>{t.status === 'ACTIVE' ? '运行中' : '已暂停'}</small>
-                </span>
-                <span>
-                  查看用量
-                  <ChevronRight size={15} />
-                </span>
-              </a>
-            ))}
-          </div>
-          {(page > 0 || data.value.length > 20) && (
-            <Pager page={page} next={data.value.length > 20} onPage={setPage} />
-          )}
-        </>
-      ) : (
-        <p className="admin-note">没有匹配的企业。</p>
-      )}
-    </section>
   );
 }
 function TenantName({ tenant }: { tenant: string }) {

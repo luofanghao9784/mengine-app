@@ -191,14 +191,13 @@ test('platform defaults to month, filters enterprise with same facts, preserves 
     .getByRole('option', { name: '上月', exact: true })
     .click();
   await expect(page.getByText(/统计：2026\/9\/1/)).toBeVisible();
-  await page.getByRole('link', { name: /合成企业 A.*查看用量/ }).click();
+  await expect(page.getByRole('region', { name: '按企业查看用量' })).toHaveCount(0);
+  await page.goto(`/platform-admin/#admin=usage&enterprise=${tenant}&period=LAST_MONTH`);
   await expect(page.getByRole('link', { name: '返回全平台用量' })).toBeVisible();
   await expect(page.getByRole('combobox', { name: '用量统计期间' })).toHaveText('上月');
   expect(f.paths.some((p) => p.includes(`/tenants/${tenant}/usage?period=LAST_MONTH`))).toBeTruthy();
   await page.getByRole('link', { name: '返回全平台用量' }).click();
-  await page.getByRole('textbox', { name: '搜索企业' }).fill('无结果');
-  await page.getByRole('button', { name: '搜索', exact: true }).click();
-  await expect(page.getByText('没有匹配的企业。')).toBeVisible();
+  await expect(page.getByRole('textbox', { name: '搜索企业' })).toHaveCount(0);
   expect(f.methods.every((m) => m === 'GET')).toBeTruthy();
   await page.screenshot({ path: '/tmp/usage-platform-details-1440.png' });
   await page.locator('.usage-scope-note').first().scrollIntoViewIfNeeded();
