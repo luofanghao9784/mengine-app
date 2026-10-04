@@ -13,6 +13,7 @@ public class ExperienceAdmissionService {
  private Receipt receipt(UUID run,UUID source,String outcome,UUID entry,UUID version){
   db.update("INSERT INTO experience_admissions(run_id,source_id,outcome,entry_id,version_id) VALUES (?,?,?,?,?)",run,source,outcome,entry,version);
   db.update("UPDATE experience_analysis_runs SET candidate=NULL,review=NULL,evidence=NULL WHERE id=?",run);
+  db.update("UPDATE experience_adjustments SET finished=true,content=NULL WHERE id=?",source);
   return new Receipt(run,outcome,entry,version);
  }
  private void event(UUID actor,UUID tenant,UUID entry,UUID version,int revision,String action){db.update("INSERT INTO experience_events(id,entry_id,version_id,revision,action,actor_id) VALUES (?,?,?,?,?,?)",UUID.randomUUID(),entry,version,revision,action,actor);audit.record(actor,tenant,"EXPERIENCE_AUTO_"+action,entry,"SUCCESS");}
@@ -23,7 +24,7 @@ public class ExperienceAdmissionService {
   db.queryForList("SELECT id FROM tenants WHERE id=? FOR SHARE",initial.get("tenant_id"));
   db.queryForList("SELECT pg_advisory_xact_lock(hashtextextended(?,0))","experience-admission:"+initial.get("tenant_id")+":"+initial.get("workspace_id")+":"+initial.get("owner_id"));
   db.queryForList("SELECT id FROM experience_intake_sources WHERE id=? FOR SHARE",initial.get("source_id"));
-  var rows=db.queryForList("SELECT r.*,i.owner_id,i.workspace_id,i.task_id,i.feedback_id FROM experience_analysis_runs r JOIN experience_intake_sources i ON i.id=r.source_id WHERE r.id=? FOR UPDATE OF r",run);if(rows.isEmpty())throw new IdentityException(404,"EXPERIENCE_ANALYSIS_NOT_FOUND");var r=rows.getFirst();UUID source=(UUID)r.get("source_id"),tenant=(UUID)r.get("tenant_id"),actor=(UUID)r.get("owner_id"),space=(UUID)r.get("workspace_id");
+  var rows=db.queryForList("SELECT r.*,i.owner_id,i.workspace_id,i.task_id,i.feedback_id,i.adjustment_id FROM experience_analysis_runs r JOIN experience_intake_sources i ON i.id=r.source_id WHERE r.id=? FOR UPDATE OF r",run);if(rows.isEmpty())throw new IdentityException(404,"EXPERIENCE_ANALYSIS_NOT_FOUND");var r=rows.getFirst();UUID source=(UUID)r.get("source_id"),tenant=(UUID)r.get("tenant_id"),actor=(UUID)r.get("owner_id"),space=(UUID)r.get("workspace_id");
   var prior=db.query("SELECT outcome,entry_id,version_id FROM experience_admissions WHERE run_id=?",(q,n)->new Receipt(run,q.getString(1),q.getObject(2,UUID.class),q.getObject(3,UUID.class)),run);if(!prior.isEmpty())return prior.getFirst();
   if(!"RETURNED".equals(r.get("state"))||!"QUALIFIED".equals(r.get("outcome"))||!"live".equals(r.get("execution_class")))throw new IdentityException(409,"EXPERIENCE_NOT_QUALIFIED");
   if((Boolean)r.get("invalidated")||r.get("candidate")==null)return receipt(run,source,"SOURCE_UNAVAILABLE",null,null);
@@ -42,11 +43,17 @@ public class ExperienceAdmissionService {
   if(tags.stream().anyMatch(t->t.length()>40)||content.applicable().length()>2000||content.excluded().length()>2000)return receipt(run,source,"CONFLICT",null,null);
   try{content=experiences.automaticContent(content);}catch(IdentityException invalid){return receipt(run,source,"CONFLICT",null,null);}
   String fingerprint=IdentityService.hash(json.writeValueAsString(content));UUID target=c.get("targetVersionId").isNull()?null:UUID.fromString(c.get("targetVersionId").asString());
+  boolean adjustment=r.get("adjustment_id")!=null;
+  if(adjustment){
+   var proposal=db.queryForMap("SELECT entry_id,version_id,expected_revision FROM experience_adjustments WHERE id=?",r.get("adjustment_id"));
+   if(!Objects.equals(target,proposal.get("version_id")))return receipt(run,source,"CONFLICT",null,null);
+   try{experiences.adjustmentTarget(actor,tenant,space,(UUID)proposal.get("entry_id"),target,((Number)proposal.get("expected_revision")).intValue());}catch(IdentityException changed){return receipt(run,source,"CONFLICT",null,null);}
+  }
   Map<String,Object> entry=null;UUID current=null;
   if(target!=null){
    if(job.existing().stream().noneMatch(e->e.versionId().equals(target)))return receipt(run,source,"CONFLICT",null,null);
-   var matches=db.queryForList("SELECT e.*,v.id version_id,v.origin FROM experience_entries e JOIN experience_versions v ON v.entry_id=e.id WHERE v.id=? AND e.tenant_id=? AND e.workspace_id=? AND e.created_by=? FOR UPDATE OF e",target,tenant,space,actor);
-   if(matches.isEmpty()||!"AUTOMATIC".equals(matches.getFirst().get("origin")))return receipt(run,source,"CONFLICT",null,null);entry=matches.getFirst();current=(UUID)entry.get("published_version");
+   var matches=db.queryForList("SELECT e.*,v.id version_id,v.origin FROM experience_entries e JOIN experience_versions v ON v.entry_id=e.id WHERE v.id=? AND e.tenant_id=? AND e.workspace_id=? AND (e.created_by=? OR ?) FOR UPDATE OF e",target,tenant,space,actor,adjustment);
+   if(matches.isEmpty()||!adjustment&&!"AUTOMATIC".equals(matches.getFirst().get("origin")))return receipt(run,source,"CONFLICT",null,null);entry=matches.getFirst();current=(UUID)entry.get("published_version");
    if(!target.equals(current)||Boolean.TRUE.equals(entry.get("automation_stopped")))return receipt(run,source,"CONFLICT",(UUID)entry.get("id"),null);
   }else{
    var matches=db.queryForList("SELECT e.*,v.id version_id,v.scrubbed FROM experience_versions v JOIN experience_entries e ON e.id=v.entry_id WHERE v.origin='AUTOMATIC' AND v.content_fingerprint=? AND e.tenant_id=? AND e.workspace_id=? AND e.created_by=? ORDER BY e.created_at,v.number DESC LIMIT 1 FOR UPDATE OF e",fingerprint,tenant,space,actor);
@@ -70,6 +77,7 @@ public class ExperienceAdmissionService {
   db.update("INSERT INTO experience_automatic_sources(version_id,source_id) VALUES (?,?)",version,source);
   for(UUID dep:dependencies)db.update("INSERT INTO experience_automatic_dependencies(version_id,dependency_version) VALUES (?,?)",version,dep);
   event(actor,tenant,entryId,version,revision,entry==null?"CREATED":"REVISED");
+  if(adjustment)db.update("UPDATE experience_adjustments SET finished=true WHERE id=?",source);
   db.update("UPDATE experience_entries SET status='PUBLISHED',published_version=?,latest_number=?,revision=?,updated_at=now() WHERE id=?",version,number,revision+1,entryId);event(actor,tenant,entryId,version,revision+1,"PUBLISHED");
   return receipt(run,source,entry==null?"CREATED":"UPDATED",entryId,version);
  }

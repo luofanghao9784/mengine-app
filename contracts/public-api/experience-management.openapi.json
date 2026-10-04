@@ -452,7 +452,8 @@
           "sourceKind": {
             "enum": [
               "TASK",
-              "FEEDBACK"
+              "FEEDBACK",
+              "ADJUSTMENT"
             ]
           },
           "state": {

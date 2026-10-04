@@ -131,6 +131,12 @@ public class ExperienceService {
   for(var r:refs)db.update("INSERT INTO experience_evidence(version_id,kind,reference_id,source_workspace_id,material_version_id,task_id) VALUES (?,?,?,?,?,?)",v,r.kind(),r.referenceId(),r.workspaceId(),r.kind().equals("MATERIAL_VERSION")?r.referenceId():null,r.kind().equals("TASK")?r.referenceId():null);
   return v;
  }
+ void adjustmentScope(UUID actor,UUID tenant,UUID space){scope(actor,tenant,space,true);}
+ Entry adjustmentTarget(UUID actor,UUID tenant,UUID space,UUID id,UUID version,int expected){
+  var row=row(actor,tenant,space,id,true);var e=get(actor,tenant,space,id,version);
+  if(!e.status().equals("PUBLISHED")||!version.equals(e.publishedVersion())||e.revision()!=expected||Boolean.TRUE.equals(row.get("automation_stopped")))throw new IdentityException(409,"EXPERIENCE_STATE_CHANGED");
+  if(!e.version().content().kind().equals("METHOD"))throw IdentityException.invalid();return e;
+ }
  Content automaticContent(Content c){return normalize(c);}
  List<Evidence> automaticEvidence(UUID actor,UUID tenant,Content c,List<Evidence> refs){return normalizeRefs(actor,tenant,normalize(c),refs);}
  UUID appendAutomatic(UUID actor,UUID entry,int number,Content c,List<Evidence> refs,String fingerprint){UUID version=append(actor,entry,number,normalize(c),refs);db.update("UPDATE experience_versions SET origin='AUTOMATIC',evaluation='AUTOMATIC_CHECKED',content_fingerprint=? WHERE id=?",fingerprint,version);return version;}

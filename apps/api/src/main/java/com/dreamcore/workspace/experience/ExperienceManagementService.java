@@ -44,7 +44,7 @@ public class ExperienceManagementService {
   if(db.queryForList(base+" LIMIT 1",actor,tenant,space,entry).isEmpty())throw new IdentityException(404,"EXPERIENCE_NOT_FOUND");
   var rows=db.query(base+" ORDER BY v.number DESC LIMIT 21 OFFSET ?",(r,n)->new Version(r.getObject(1,UUID.class),r.getInt(2),r.getString(3),r.getString(4),r.getTimestamp(5).toInstant(),r.getBoolean(6)),actor,tenant,space,entry,offset);return new History(rows.stream().limit(20).toList(),rows.size()>20);
  }
- private static final String PROCESSING="""
+ static final String PROCESSING="""
  SELECT i.id,i.kind source_kind,i.workspace_id,a.entry_id,a.version_id,
  greatest(a.created_at,q.updated_at,i.invalidated_at,i.created_at) updated_at,
  CASE WHEN i.state='SOURCE_UNAVAILABLE' OR q.state='SOURCE_UNAVAILABLE' THEN 'UNAVAILABLE'
@@ -65,6 +65,7 @@ public class ExperienceManagementService {
   var rows=db.queryForList("SELECT * FROM ("+PROCESSING+") p WHERE (?='ALL' OR state=?) ORDER BY updated_at DESC,id LIMIT 21 OFFSET ?",tenant,selected,state,state,offset);
   var items=new ArrayList<Processing>();for(var row:rows.stream().limit(20).toList()){
    UUID entry=(UUID)row.get("entry_id"),version=(UUID)row.get("version_id"),workspace=(UUID)row.get("workspace_id");
+   if(entry==null||version==null){entry=null;version=null;}
    if(entry!=null&&version!=null)try{experiences.analysisEntry(actor,tenant,workspace,entry,version);}catch(IdentityException unavailable){entry=null;version=null;}
    String code=(String)row.get("reason");if(code!=null&&!REASONS.contains(code)&&!code.equals("VERSION_CONFLICT"))code=Set.of("FAILED","RETRYING").contains(row.get("state"))?"TECHNICAL_FAILURE":row.get("state").equals("NOT_ADMITTED")?"QUALITY_NOT_ESTABLISHED":null;
    items.add(new Processing((UUID)row.get("id"),(String)row.get("source_kind"),(String)row.get("state"),code,((java.sql.Timestamp)row.get("updated_at")).toInstant(),entry,version,workspace));

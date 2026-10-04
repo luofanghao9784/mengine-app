@@ -9,6 +9,7 @@ import { requestNavigationLocked, useRequestLock } from '../shared/request-guard
 import { experienceClient } from './client';
 import { experienceManagementClient as api, processingLabels, reasonLabels } from './management-client';
 import './management.css';
+import { ExperienceAdjustmentPanel } from './ExperienceAdjustmentPanel';
 const stamp = (date: string) => new Date(date).toLocaleString('zh-CN', { hour12: false });
 type Selection = { id: string; version: string | null; space: string };
 const isSelection = (v: unknown): v is Selection | null =>
@@ -244,7 +245,13 @@ export function TenantExperiences({ tenant }: { tenant: string }) {
                 {processing.value.items.map((item) => (
                   <article key={item.id} className="admin-section">
                     <div>
-                      <strong>{item.sourceKind === 'FEEDBACK' ? '反馈关联内容' : '任务执行结果'}</strong>
+                      <strong>
+                        {item.sourceKind === 'ADJUSTMENT'
+                          ? '经验内容调整'
+                          : item.sourceKind === 'FEEDBACK'
+                            ? '反馈关联内容'
+                            : '任务执行结果'}
+                      </strong>
                       <Badge>{processingLabels[item.state]}</Badge>
                     </div>
                     <p>
@@ -353,8 +360,10 @@ function ExperienceDrawer({
   type Action = { intent: 'stop' | 'restore'; expectedRevision: number; versionId: string };
   const [action, setAction] = useState<Action | null>(null);
   const [notice, setNotice] = useState('');
+  const [adjusting, setAdjusting] = useState(false),
+    [adjustmentBlocked, setAdjustmentBlocked] = useState(false);
   const submission = useSubmission<Action>();
-  const blocked = submission.busy || submission.uncertain;
+  const blocked = submission.busy || submission.uncertain || adjustmentBlocked;
   useRequestLock(blocked);
   useEffect(() => {
     lock(blocked);
@@ -410,6 +419,7 @@ function ExperienceDrawer({
             </Badge>
           </div>
           {e.canMaintain &&
+            !adjusting &&
             ((e.status === 'PUBLISHED' && e.publishedVersion === e.version.id) || e.canRestore || action) && (
               <section className="experience-availability" aria-label="经验使用状态">
                 {action ? (
@@ -488,6 +498,20 @@ function ExperienceDrawer({
               <Badge key={tag}>{tag}</Badge>
             ))}
           </div>
+          {e.canMaintain && c.kind === 'METHOD' && !action && (
+            <ExperienceAdjustmentPanel
+              tenant={tenant}
+              space={selection.space}
+              entry={e}
+              editing={setAdjusting}
+              locked={setAdjustmentBlocked}
+              chooseVersion={chooseVersion}
+              changed={() => {
+                setAttempt((n) => n + 1);
+                changed();
+              }}
+            />
+          )}
           <details open>
             <summary>方法与适用条件</summary>
             <DocumentText text={c.body} />
@@ -521,7 +545,7 @@ function ExperienceDrawer({
                       <li key={v.id}>
                         <Button
                           variant="ghost"
-                          disabled={blocked || !!action || selection.version === v.id}
+                          disabled={blocked || adjusting || !!action || selection.version === v.id}
                           onClick={() => chooseVersion(v.id)}
                         >
                           v{v.number}

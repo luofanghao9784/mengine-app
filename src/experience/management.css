@@ -174,3 +174,23 @@
 .experience-availability button {
   margin: 0 8px 8px 0;
 }
+.experience-adjustment {
+  margin: 12px 0;
+}
+.experience-adjustment-form {
+  display: grid;
+  gap: 12px;
+}
+.experience-adjustment-form textarea {
+  width: 100%;
+  resize: vertical;
+}
+.experience-adjustment-form p,
+.experience-adjustment-status p {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.7;
+}
+.experience-adjustment-status {
+  margin-top: 12px;
+}

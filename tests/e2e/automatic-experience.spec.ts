@@ -15,6 +15,14 @@ async function fixture(context: BrowserContext) {
   const mutations: string[] = [];
   const queries: URLSearchParams[] = [];
   let waiting = 3;
+  let adjustment: {
+    id: string;
+    versionId: string;
+    state: string;
+    resultVersionId: string | null;
+    createdAt: string;
+  } | null = null;
+  let adjusted = false;
   const content = {
     kind: 'METHOD',
     title: '先核对来源口径',
@@ -78,6 +86,28 @@ async function fixture(context: BrowserContext) {
         role: 'TENANT_ADMIN',
         workspaces: [{ id: space, name: '合成共享空间', kind: 'SHARED', ownerId: person, canMaintain: true }],
       });
+    if (path.endsWith('/adjustments')) {
+      if (revoked) return json({ contractVersion: '1.0', code: 'EXPERIENCE_NOT_FOUND' }, 404);
+      if (route.request().method() === 'GET')
+        return json({ enabled: true, items: adjustment ? [adjustment] : [] });
+      const body = route.request().postDataJSON();
+      requests.push(body);
+      if (!completed.has(body.requestId)) {
+        adjustment = {
+          id: id(21),
+          versionId: body.versionId,
+          state: 'WAITING',
+          resultVersionId: null,
+          createdAt: '2026-10-04T00:00:00Z',
+        };
+        completed.add(body.requestId);
+      }
+      if (loseNextResponse) {
+        loseNextResponse = false;
+        return route.abort('failed');
+      }
+      return json(adjustment);
+    }
     if (path.endsWith('/experience-library')) {
       queries.push(new URL(route.request().url()).searchParams);
       return json({
@@ -172,7 +202,12 @@ async function fixture(context: BrowserContext) {
     const current = () => ({
       ...result,
       status: stopped ? 'WITHDRAWN' : 'PUBLISHED',
-      publishedVersion: stopped ? null : version,
+      publishedVersion: stopped ? null : adjusted ? id(22) : version,
+      latestNumber: adjusted ? 2 : 1,
+      version:
+        adjusted && new URL(route.request().url()).searchParams.get('version') === id(22)
+          ? { ...result.version, id: id(22), number: 2, content: { ...content, title: '核验后的新版本' } }
+          : result.version,
       canRestore: stopped,
     });
     if (path.endsWith('/stop') || path.endsWith('/restore')) {
@@ -198,6 +233,16 @@ async function fixture(context: BrowserContext) {
   });
   return {
     mutations,
+    finishAdjustment: (state: string) => {
+      if (adjustment) {
+        adjustment.state = state;
+        if (state === 'UPDATED') {
+          adjustment.resultVersionId = id(22);
+          adjusted = true;
+          result.revision++;
+        }
+      }
+    },
     eraseAfterStop: () => {
       eraseAfterStop = true;
     },
@@ -336,4 +381,65 @@ test('a confirmed stop remains successful when the related body becomes unavaila
   await expect(page.getByRole('button', { name: '重试原请求' })).toHaveCount(0);
   await page.getByRole('button', { name: '关闭弹窗' }).click();
   expect(state.mutations).toHaveLength(1);
+});
+
+test('adjustment keeps the original version, retries one request and links its automatic result', async ({
+  page,
+  context,
+}) => {
+  const state = await fixture(context);
+  await page.clock.install();
+  await page.goto(start);
+  await page.getByRole('button', { name: /先核对来源口径/ }).click();
+  await page.getByRole('button', { name: '调整内容', exact: true }).click();
+  await page.getByLabel('方法', { exact: true }).fill('核对覆盖范围，再解释执行回执。');
+  await page.getByLabel('调整原因与依据').fill('补充原方法未列出的覆盖范围限制。');
+  state.loseResponse();
+  await page.getByRole('button', { name: '提交调整', exact: true }).click();
+  await expect(page.getByRole('button', { name: '重试原调整' })).toBeVisible();
+  await page.getByRole('button', { name: '关闭弹窗' }).click();
+  await expect(page.getByLabel('调整原因与依据')).toHaveValue('补充原方法未列出的覆盖范围限制。');
+  await page.getByRole('button', { name: '重试原调整' }).click();
+  await expect(page.getByText('系统正在自动处理，原版本继续可用。', { exact: true })).toBeVisible();
+  expect(state.requests[0]).toEqual(state.requests[1]);
+  await expect(page.getByRole('button', { name: '调整内容', exact: true })).toBeDisabled();
+  state.finishAdjustment('UPDATED');
+  await page.clock.fastForward(31000);
+  await page.getByRole('button', { name: '查看处理后的版本' }).click();
+  await expect(page.locator('.experience-detail h3')).toHaveText('核验后的新版本');
+});
+test('mobile adjustment form preserves draft while focus refreshes and removes it on access loss', async ({
+  page,
+  context,
+}) => {
+  const state = await fixture(context);
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.goto(start);
+  await page.getByRole('button', { name: /先核对来源口径/ }).click();
+  await page.getByRole('button', { name: '调整内容', exact: true }).click();
+  await page.getByLabel('调整原因与依据').fill('保留未提交的调整说明');
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect(page.getByLabel('调整原因与依据')).toHaveValue('保留未提交的调整说明');
+  expect(await page.locator('dialog').evaluate((e) => e.scrollWidth <= e.clientWidth)).toBe(true);
+  await page.screenshot({ path: '/tmp/experience-adjustment-mobile.png', fullPage: true });
+  state.revoke();
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect(page.getByLabel('调整原因与依据')).toHaveCount(0);
+  expect(state.mutations).toEqual([]);
+});
+
+test('a submission-time access rejection clears the draft and stale method without waiting for focus', async ({
+  page,
+  context,
+}) => {
+  const state = await fixture(context);
+  await page.goto(start);
+  await page.getByRole('button', { name: '先核对来源口径' }).click();
+  await page.getByRole('button', { name: '调整内容', exact: true }).click();
+  await page.getByRole('textbox', { name: '调整原因与依据', exact: true }).fill('不应在失权后继续显示');
+  state.revoke();
+  await page.getByRole('button', { name: '提交调整', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: '调整原因与依据', exact: true })).toHaveCount(0);
+  await expect(page.getByText('核对来源范围，再检查实际执行回执。', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '关闭弹窗' })).toBeEnabled();
 });

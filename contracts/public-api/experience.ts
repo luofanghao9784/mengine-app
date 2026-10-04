@@ -99,3 +99,24 @@ export interface ExperienceAvailability {
   revision: number;
   status: 'WITHDRAWN';
 }
+
+export interface ExperienceProposal {
+  title: string;
+  summary: string;
+  body: string;
+  tags: string[];
+  applicable: string;
+  excluded: string;
+  reason: string;
+}
+export interface ExperienceAdjustment {
+  id: string;
+  versionId: string;
+  state: import('./experience-management').ExperienceProcessingState;
+  resultVersionId: string | null;
+  createdAt: string;
+}
+export interface ExperienceAdjustments {
+  enabled: boolean;
+  items: ExperienceAdjustment[];
+}

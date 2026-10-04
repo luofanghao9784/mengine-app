@@ -27,8 +27,18 @@ public class ExperienceAnalysisQueue {
   if(value==null||value.isBlank())return;boolean full=complete&&value.length()<=8000;int end=Math.min(8000,value.length());if(end<value.length()&&Character.isHighSurrogate(value.charAt(end-1)))end--;
   inputs.add(new Input(inputId(source,key),kind,value.substring(0,end),full));
  }
+ private void segmented(List<Input> inputs,UUID source,String key,String kind,String value){
+  int index=0;for(int start=0;start<value.length();){int end=Math.min(start+7900,value.length());if(end<value.length()&&Character.isHighSurrogate(value.charAt(end-1)))end--;add(inputs,source,key+":"+index++,kind,value.substring(start,end),value.length()<=7900);start=end;}
+ }
  private List<Input> inputs(Map<String,Object> s,List<UUID> fixedChunks){
   UUID id=(UUID)s.get("id"),task=(UUID)s.get("task_id");var inputs=new ArrayList<Input>();
+  if(s.get("kind").equals("ADJUSTMENT")){
+   var a=db.queryForMap("SELECT * FROM experience_adjustments WHERE id=?",s.get("adjustment_id"));if(a.get("content")==null)throw changed();
+   var original=experiences.analysisEntry((UUID)s.get("owner_id"),(UUID)s.get("tenant_id"),(UUID)s.get("workspace_id"),(UUID)a.get("entry_id"),(UUID)a.get("version_id"));
+   segmented(inputs,id,"original","SOURCE_EXCERPT","原经验的固定版本（仅供核对，不是新的执行证明）：\n"+json.writeValueAsString(original.version().content()));
+   segmented(inputs,id,"adjustment","FEEDBACK","用户提出的调整建议，不是已核验事实。只有依据充分才能形成更新，更新目标必须为原版本 "+a.get("version_id")+"：\n"+a.get("content"));
+   if(inputs.size()>8)throw IdentityException.invalid();return List.copyOf(inputs);
+  }
   Map<String,Object> feedback=null;
   if(s.get("kind").equals("FEEDBACK")){
    feedback=db.queryForMap("SELECT f.*,v.assessment FROM feedback_entries f JOIN feedback_versions v ON v.feedback_id=f.id AND v.revision=f.revision WHERE f.id=?",s.get("feedback_id"));
@@ -70,8 +80,8 @@ public class ExperienceAnalysisQueue {
   var ids=db.queryForList("SELECT source_id FROM experience_analysis_items WHERE tenant_id=? AND state IN ('QUEUED','RETRY_WAIT') AND next_attempt_at<=clock_timestamp() ORDER BY next_attempt_at,source_id LIMIT 1 FOR UPDATE SKIP LOCKED",UUID.class,tenant);if(ids.isEmpty())return null;
   UUID source=ids.getFirst();var s=source(source);
   try{
-   eligible(s);var chunks=s.get("task_id")==null?db.queryForList("SELECT c.id FROM knowledge_chunks c JOIN knowledge_runs r ON r.id=c.run_id JOIN feedback_entries f ON f.material_version_id=c.version_id WHERE f.id=? AND r.status IN ('READY','PARTIAL') AND r.generation=(SELECT max(x.generation) FROM knowledge_runs x WHERE x.version_id=c.version_id AND x.status IN ('READY','PARTIAL')) ORDER BY c.ordinal,c.id LIMIT 4",UUID.class,s.get("feedback_id")):List.<UUID>of();
-   var versions=experiences.list((UUID)s.get("owner_id"),tenant,(UUID)s.get("workspace_id"),"","",false,0,5).items().stream().map(ExperienceService.Summary::versionId).filter(v->{try{existing(s,v);return true;}catch(IdentityException unavailable){return false;}}).toList();
+   eligible(s);var chunks=s.get("kind").equals("FEEDBACK")&&s.get("task_id")==null?db.queryForList("SELECT c.id FROM knowledge_chunks c JOIN knowledge_runs r ON r.id=c.run_id JOIN feedback_entries f ON f.material_version_id=c.version_id WHERE f.id=? AND r.status IN ('READY','PARTIAL') AND r.generation=(SELECT max(x.generation) FROM knowledge_runs x WHERE x.version_id=c.version_id AND x.status IN ('READY','PARTIAL')) ORDER BY c.ordinal,c.id LIMIT 4",UUID.class,s.get("feedback_id")):List.<UUID>of();
+   var versions=s.get("kind").equals("ADJUSTMENT")?db.queryForList("SELECT version_id FROM experience_adjustments WHERE id=?",UUID.class,s.get("adjustment_id")):experiences.list((UUID)s.get("owner_id"),tenant,(UUID)s.get("workspace_id"),"","",false,0,5).items().stream().map(ExperienceService.Summary::versionId).filter(v->{try{existing(s,v);return true;}catch(IdentityException unavailable){return false;}}).toList();
    var run=new HashMap<String,Object>();run.put("id",UUID.randomUUID());run.put("lease",UUID.randomUUID());run.put("source_id",source);run.put("manifest",json.writeValueAsString(Map.of("chunks",chunks,"versions",versions)));
    var job=job(run);
    db.update("INSERT INTO experience_analysis_runs(id,source_id,tenant_id,lease,lease_until,state,job_hash,manifest) VALUES (?,?,?,?,now()+interval '10 minutes','CLAIMED',?,?::jsonb)",job.id(),source,tenant,job.lease(),hash(job),run.get("manifest"));
@@ -105,13 +115,16 @@ public class ExperienceAnalysisQueue {
   }else if(!Set.of("SKIPPED","REJECTED").contains(result.outcome()))throw new IdentityException(422,"EXPERIENCE_ANALYSIS_FAILED");
   db.update("UPDATE experience_analysis_runs SET state='RETURNED',outcome=?,code=?,stages=?::jsonb,candidate=?::jsonb,review=?::jsonb,evidence=?::jsonb,finished_at=now() WHERE id=?",result.outcome(),result.code(),json.writeValueAsString(result.stages()),candidate==null?null:json.writeValueAsString(candidate),review==null?null:json.writeValueAsString(review),evidence==null?null:json.writeValueAsString(evidence),result.runId());
   db.update("UPDATE experience_analysis_items SET state=?,error_code=?,updated_at=now() WHERE run_id=?",result.outcome(),result.code(),result.runId());
+  if(!result.outcome().equals("QUALIFIED"))finishAdjustment(result.source());
  }
+ private void finishAdjustment(UUID source){db.update("UPDATE experience_adjustments SET finished=true,content=NULL WHERE id=?",source);}
  @Transactional public void fail(UUID id,String code,boolean sent,Result result){
   var r=run(id,true);if(!Set.of("CLAIMED","DISPATCHED").contains(r.get("state")))return;
   boolean changed=code.equals("EXPERIENCE_SOURCE_CHANGED"),unknown=code.equals("EXPERIENCE_RESULT_UNKNOWN");
   if(!sent&&r.get("state").equals("DISPATCHED"))db.update("UPDATE experience_analysis_items SET attempts=greatest(0,attempts-1) WHERE run_id=?",id);
   db.update("UPDATE experience_analysis_runs SET state=?,code=?,stages=?::jsonb,finished_at=now() WHERE id=?",changed?"CANCELLED":unknown?"UNKNOWN":"FAILED",code,result==null?null:json.writeValueAsString(result.stages()),id);
   db.update("UPDATE experience_analysis_items SET state=CASE WHEN ? THEN 'SOURCE_UNAVAILABLE' WHEN ? THEN 'UNKNOWN' WHEN attempts>=3 OR ? THEN 'FAILED' ELSE 'RETRY_WAIT' END,error_code=?,next_attempt_at=now()+CASE WHEN ? THEN interval '60 seconds'*greatest(1,attempts) ELSE interval '5 minutes' END,updated_at=now() WHERE run_id=?",changed,unknown,code.equals("EXPERIENCE_VERIFICATION_ONLY"),code,sent,id);
+  if(Boolean.TRUE.equals(db.queryForObject("SELECT state IN ('FAILED','UNKNOWN','SOURCE_UNAVAILABLE') FROM experience_analysis_items WHERE run_id=?",Boolean.class,id)))finishAdjustment((UUID)r.get("source_id"));
  }
  @Transactional public void uncertain(UUID id){db.update("UPDATE experience_analysis_runs SET code='EXPERIENCE_RESULT_PENDING' WHERE id=? AND state='DISPATCHED'",id);}
  @Transactional(readOnly=true) public List<Recovery> recoveries(){return db.query("SELECT id,lease,state,engine_version,lease_until<clock_timestamp() AS expired,created_at<clock_timestamp()-interval '9 minutes' AS recovery_expired FROM experience_analysis_runs WHERE state='DISPATCHED' AND created_at<clock_timestamp()-interval '5 seconds' OR state='CLAIMED' AND lease_until<clock_timestamp() ORDER BY created_at LIMIT 30",(r,n)->new Recovery(r.getObject("id",UUID.class),r.getObject("lease",UUID.class),r.getString("state"),r.getString("engine_version"),r.getBoolean("expired"),r.getBoolean("recovery_expired")));}

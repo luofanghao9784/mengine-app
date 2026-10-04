@@ -2,7 +2,7 @@
 import { ExperienceAnalysis } from '../../dist/runtime/experience-analysis.js';
 import { createEngineServer } from '../../dist/server.js';
 const [token, mode] = process.argv.slice(2);
-if (!token?.startsWith('synthetic-') || !['skip', 'qualify'].includes(mode))
+if (!token?.startsWith('synthetic-') || !['skip', 'qualify', 'adjust'].includes(mode))
   throw Error('Local fixture only');
 const experience = new ExperienceAnalysis({
   executionClass: 'verification',
@@ -38,8 +38,13 @@ const experience = new ExperienceAnalysis({
         else if (verify && !outputs.some((o) => o.candidate)) yield send('experience_candidate', {}, 11);
         else {
           const record = outputs.find((o) => o.kind === 'EXECUTION_RECORD');
-          if (!record) throw Error('No execution record');
-          const evidence = [{ inputId: record.id, quote: record.text }];
+          if (!record && mode !== 'adjust') throw Error('No execution record');
+          const evidence =
+            mode === 'adjust'
+              ? outputs
+                  .filter((o) => ['FEEDBACK', 'SOURCE_EXCERPT'].includes(o.kind))
+                  .map((o) => ({ inputId: o.id, quote: o.text.slice(0, 700) }))
+              : [{ inputId: record.id, quote: record.text }];
           if (verify)
             yield send(
               'verify_experience',
@@ -47,7 +52,7 @@ const experience = new ExperienceAnalysis({
                 checks: Object.fromEntries(
                   ['grounded', 'reusable', 'bounded', 'privacySafe', 'novel'].map((k) => [k, 'PASS']),
                 ),
-                basis: 'OBSERVED_EXECUTION',
+                basis: mode === 'adjust' ? 'FEEDBACK_CORRECTION' : 'OBSERVED_EXECUTION',
                 evidence,
               },
               12,
@@ -57,7 +62,8 @@ const experience = new ExperienceAnalysis({
               'submit_experience',
               {
                 candidate: {
-                  targetVersionId: null,
+                  targetVersionId:
+                    mode === 'adjust' ? outputs.find((o) => Array.isArray(o.items)).items[0].versionId : null,
                   title: '区分工具执行与业务结果',
                   summary: '工具回执不直接证明业务正确性。',
                   steps: ['先读取实际工具状态，再核对业务结果依据。'],

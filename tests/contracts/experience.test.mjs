@@ -125,3 +125,44 @@ test('a stop receipt proves the fixed version action without requiring an access
   assert.equal(check('ExperienceAvailability')({ ...receipt, content }), false);
   assert.equal(check('ExperienceAvailability')({ ...receipt, status: 'PUBLISHED' }), false);
 });
+
+test('adjustments are revision-bound proposals without admission or authority controls', () => {
+  const proposal = {
+    title: '核对',
+    summary: '摘要',
+    body: '核对回执',
+    tags: ['核对'],
+    applicable: '有回执',
+    excluded: '',
+    reason: '明确依据',
+  };
+  const submission = { requestId: id, expectedRevision: 3, versionId: id, proposal };
+  const validate = check('ExperienceAdjustmentSubmit');
+  assert.ok(validate(submission));
+  for (const field of ['requestId', 'expectedRevision', 'versionId', 'proposal']) {
+    const missing = { ...submission };
+    delete missing[field];
+    assert.equal(validate(missing), false);
+  }
+  for (const extra of [
+    { reason: '' },
+    { approved: true },
+    { accessMode: 'INDEPENDENT_COPY' },
+    { evaluation: 'AUTOMATIC_CHECKED' },
+  ])
+    assert.equal(validate({ ...submission, proposal: { ...proposal, ...extra } }), false);
+});
+test('adjustment observations return bounded status metadata, never proposal or original text', () => {
+  const receipt = {
+    id,
+    versionId: id,
+    state: 'WAITING',
+    resultVersionId: null,
+    createdAt: '2026-10-04T00:00:00Z',
+  };
+  const validate = check('ExperienceAdjustments');
+  assert.ok(validate({ enabled: false, items: [receipt] }));
+  assert.equal(validate({ enabled: true, items: Array(11).fill(receipt) }), false);
+  for (const extra of [{ content }, { reason: 'private' }, { state: 'APPROVED' }])
+    assert.equal(validate({ enabled: true, items: [{ ...receipt, ...extra }] }), false);
+});

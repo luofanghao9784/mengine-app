@@ -139,4 +139,10 @@ class ExperienceManagementIntegrationTest {
   UUID admin=manager(true);assertThrows(IdentityException.class,()->experiences.stop(admin,tenant,space,e.id(),UUID.randomUUID(),e.revision(),second.versionId()));assertEquals("PUBLISHED",db.queryForObject("SELECT status FROM experience_entries WHERE id=?",String.class,e.id()));
  }
 
+ @Test void conflictedAdmissionNeverLeaksAnEntryWithoutAnAuthorizedVersion(){
+  grant();var job=returned("冲突回执",null);var receipt=admission.admit(job.id());
+  db.update("UPDATE experience_admissions SET outcome='CONFLICT',version_id=NULL WHERE run_id=?",job.id());
+  var result=management.processing(owner,tenant,space,"NOT_ADMITTED",0,true).items().getFirst();
+  assertEquals("VERSION_CONFLICT",result.reason());assertNull(result.entryId());assertNull(result.versionId());
+ }
 }

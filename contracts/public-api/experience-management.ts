@@ -27,7 +27,7 @@ export interface ExperienceContentPage {
 }
 export interface ExperienceProcessingRecord {
   id: string;
-  sourceKind: 'TASK' | 'FEEDBACK';
+  sourceKind: 'TASK' | 'FEEDBACK' | 'ADJUSTMENT';
   state: ExperienceProcessingState;
   reason: string | null;
   updatedAt: string;
