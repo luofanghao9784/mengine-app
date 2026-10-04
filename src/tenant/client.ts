@@ -78,6 +78,8 @@ const actions = [
   'WORKSPACE_MAINTAIN',
   'WORKSPACE_READONLY',
   'TENANT_RENAME',
+  'COLLECTION_CONFIGURE',
+  'COLLECTION_NOW',
 ];
 export const isRecord = (v: unknown): v is TenantRecord =>
   record(v) &&

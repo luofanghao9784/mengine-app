@@ -70,6 +70,8 @@ const actions: Record<string, string> = {
   MEMBER_ROLE: '调整管理员角色',
   GOVERNANCE_ROLE: '调整企业管理员',
   OWNER_ACCEPT: '接受初始负责人职责',
+  COLLECTION_CONFIGURE: '调整自动取数',
+  COLLECTION_NOW: '立即更新数据',
   OWNER_HANDOVER_OFFER: '发起企业负责人交接',
   OWNER_HANDOVER_ACCEPT: '接受企业负责人交接',
   OWNER_HANDOVER_REJECT: '拒绝企业负责人交接',

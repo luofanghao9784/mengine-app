@@ -20,6 +20,10 @@ public class TenantServiceRuntime {
         db.update("UPDATE briefing_generation_batches SET status='FAILED',reason='TENANT_SERVICE_SUSPENDED',finished_at=? WHERE tenant_id=? AND status IN ('QUEUED','RUNNING','WAITING_DATA','WAITING_RESOURCE','WAITING_CAPABILITY')",Timestamp.from(now),tenant);
     }
     public void resume(UUID tenant,Instant now){
+        for(var c:db.queryForList("SELECT id,frequency,daily_time,time_zone FROM data_connections WHERE tenant_id=? AND auto_enabled ORDER BY id FOR UPDATE",tenant)) {
+            Instant next=com.dreamcore.workspace.collection.CollectionSchedule.next(now,(String)c.get("frequency"),(String)c.get("daily_time"),(String)c.get("time_zone"));
+            db.update("UPDATE data_connections SET next_due=? WHERE id=?",Timestamp.from(next),c.get("id"));
+        }
         for(var p:db.queryForList("SELECT id,daily_time,time_zone FROM ongoing_plans WHERE tenant_id=? AND status='ACTIVE' ORDER BY id FOR UPDATE",tenant)){
             Instant next=p.get("daily_time")==null?null:PlanSchedule.next(now,LocalTime.parse((String)p.get("daily_time")),ZoneId.of((String)p.get("time_zone")));
             db.update("UPDATE ongoing_plans p SET next_due=?,observed_event=(SELECT coalesce(max(sequence),0) FROM ongoing_plan_material_events e WHERE e.tenant_id=p.tenant_id AND e.workspace_id=p.workspace_id),retry_requested=false,checked_at=NULL WHERE id=?",next==null?null:Timestamp.from(next),p.get("id"));

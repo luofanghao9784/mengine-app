@@ -54,6 +54,8 @@ export type TenantAction =
   | 'WORKSPACE_REVOKE'
   | 'WORKSPACE_MAINTAIN'
   | 'WORKSPACE_READONLY'
+  | 'COLLECTION_CONFIGURE'
+  | 'COLLECTION_NOW'
   | 'TENANT_RENAME';
 export interface TenantRecord {
   id: number;

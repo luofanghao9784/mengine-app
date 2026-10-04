@@ -12,7 +12,7 @@ import { Button, Empty } from '../shared/ui';
 import { TenantAdminHome, ManagedSpaces } from '../tenant/TenantAdminHome';
 import { TenantMemberDetail } from '../tenant/TenantMemberDetail';
 import { OperationsPanel } from '../operations/OperationsPanel';
-import { BusinessSources } from '../governance/BusinessSources';
+import { TenantDatabase } from '../database/TenantDatabase';
 import { Profiles } from '../profile/Profiles';
 import { LiveLibrary } from '../material/Library';
 import { WorkspaceExperiences } from '../experience/WorkspaceExperiences';
@@ -32,7 +32,9 @@ export function TenantConsole({ tenant, name }: { tenant: string; name: string }
   const refresh = () => setAttempt((n) => n + 1);
   const limited = governance.value && !governance.value.canConfigure;
   const page =
-    limited && !['members', 'materials', 'experience'].includes(requestedPage) ? 'members' : requestedPage;
+    limited && !['members', 'database', 'materials', 'experience'].includes(requestedPage)
+      ? 'members'
+      : requestedPage;
   const params = new URLSearchParams(hash.slice(1));
   const secondary =
     params.get('detail') ||
@@ -52,7 +54,7 @@ export function TenantConsole({ tenant, name }: { tenant: string; name: string }
   return (
     <AdminShell
       realm="tenant"
-      allowedPages={limited ? ['members', 'materials', 'experience'] : undefined}
+      allowedPages={limited ? ['members', 'database', 'materials', 'experience'] : undefined}
       name={name}
       account={session.identity?.account.displayName || ''}
       page={page}
@@ -156,7 +158,7 @@ export function TenantConsole({ tenant, name }: { tenant: string; name: string }
           </>
         )
       ) : page === 'database' ? (
-        <BusinessSources tenant={tenant} verification={attempt} />
+        <TenantDatabase key={tenant} tenant={tenant} hash={hash} />
       ) : page === 'materials' ? (
         secondary === 'content-lifecycle' ? (
           <>

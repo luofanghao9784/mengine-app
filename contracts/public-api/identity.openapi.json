@@ -5399,7 +5399,9 @@
               "OWNER_HANDOVER_OFFER",
               "OWNER_HANDOVER_ACCEPT",
               "OWNER_HANDOVER_REJECT",
-              "OWNER_HANDOVER_CANCEL"
+              "OWNER_HANDOVER_CANCEL",
+              "COLLECTION_CONFIGURE",
+              "COLLECTION_NOW"
             ]
           },
           "targetId": {
