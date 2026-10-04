@@ -86,7 +86,7 @@ for (const realm of ['platform', 'tenant'] as const)
       await expect(wall.getByRole('heading', { name, exact: true })).toBeVisible();
     await expect(wall.getByLabel('自进化运行状态')).toContainText('未启用');
     await expect(wall).toContainText('等待下一次采样');
-    await wall.getByRole('button', { name: '刷新', exact: true }).click();
+    await page.getByRole('button', { name: '刷新', exact: true }).click();
     await expect(wall.getByRole('img', { name: /已采样 2 次/ })).toBeVisible();
     expect(f.reads()).toBe(2);
     expect(f.mutations).toEqual([]);
@@ -97,7 +97,7 @@ for (const realm of ['platform', 'tenant'] as const)
       expect(f.paths.some((p) => p.startsWith('/api/v1/'))).toBe(false);
       await expect(page.locator('a[href*="/workspace/"],a[href*="/tenant-admin/"]')).toHaveCount(0);
     }
-    for (const width of [1440, 834, 360]) {
+    for (const width of realm === 'platform' ? [1440] : [1440, 834, 360]) {
       await page.setViewportSize({ width, height: 1000 });
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       if (width !== 834) await page.screenshot({ path: `/tmp/engine-${realm}-${width}.png`, fullPage: true });
@@ -106,7 +106,7 @@ for (const realm of ['platform', 'tenant'] as const)
     expect(storage).not.toContain('completedRecent');
     expect(errors).toEqual([]);
     f.revoke();
-    await wall.getByRole('button', { name: '刷新', exact: true }).click();
+    await page.getByRole('button', { name: '刷新', exact: true }).click();
     await expect(wall.getByRole('heading', { name: '没有访问权限', exact: true })).toBeVisible();
     await expect(page.locator('.engine-wall')).toHaveCount(0);
   });

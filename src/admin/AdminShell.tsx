@@ -37,7 +37,8 @@ const entries: Record<AdminRealm, { id: AdminPage; title: string; icon: LucideIc
     { id: 'overview', title: '概览', icon: LayoutDashboard },
     { id: 'tenants', title: '企业管理', icon: Building2 },
     { id: 'usage', title: '用量与成本', icon: Wallet },
-    { id: 'engine', title: '系统运行', icon: Activity },
+    { id: 'engine', title: '引擎仪表盘', icon: Activity },
+    { id: 'data', title: '数据处理', icon: Database },
     { id: 'experience', title: '经验库', icon: BookOpen },
     { id: 'capabilities', title: '引擎管理', icon: SlidersHorizontal },
   ],
@@ -213,7 +214,7 @@ export function AdminShell({
                   },
                   {
                     label: '梦核引擎',
-                    items: nav.filter((item) => ['engine', 'experience', 'capabilities'].includes(item.id)),
+                    items: nav.filter((item) => ['engine', 'data', 'experience', 'capabilities'].includes(item.id)),
                   },
                 ]
               : [{ label: '', items: nav }]

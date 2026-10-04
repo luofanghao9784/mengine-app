@@ -1,3 +1,4 @@
+import { PlatformStorage } from '../operations/PlatformStorage';
 import { useContext } from 'react';
 import { ArrowRight, SlidersHorizontal } from 'lucide-react';
 import { RequestPending } from '../shared/request-guard';
@@ -9,19 +10,31 @@ import './platform-engine-management.css';
 export function PlatformEngineManagement({ hash }: { hash: string }) {
   const pending = useContext(RequestPending);
   const params = new URLSearchParams(hash.replace(/^#/, ''));
+  const storage = params.get('tab') === 'storage' || params.get('detail') === 'storage';
   const versions = ['versions', 'methods'].includes(params.get('tab') || '');
   const versionHref = adminHref('platform', 'capabilities', hash, { tab: 'versions' });
   return (
     <div className="platform-engine-management">
       <nav className="platform-engine-tabs" aria-label="引擎管理板块" inert={pending || undefined}>
-        <a href={adminHref('platform', 'capabilities', hash)} aria-current={!versions ? 'page' : undefined}>
+        <a
+          href={adminHref('platform', 'capabilities', hash)}
+          aria-current={!versions && !storage ? 'page' : undefined}
+        >
           能力与规则
         </a>
         <a href={versionHref} aria-current={versions ? 'page' : undefined}>
           版本与更新
         </a>
+        <a
+          href={adminHref('platform', 'capabilities', hash, { tab: 'storage' })}
+          aria-current={storage ? 'page' : undefined}
+        >
+          存储与备份
+        </a>
       </nav>
-      {versions ? (
+      {storage ? (
+        <PlatformStorage hash={hash} embedded />
+      ) : versions ? (
         <MethodWorkbench embedded />
       ) : (
         <div className="platform-engine-capabilities">
@@ -75,9 +88,11 @@ export function PlatformEngineManagement({ hash }: { hash: string }) {
                 <dd>此页面尚未接入版本展示</dd>
               </div>
             </dl>
-            <p className="muted">现有运行记录可在系统运行中查看。未接入展示的能力不据此判断为正常或停用。</p>
+            <p className="muted">
+              现有运行记录可在引擎仪表盘中查看。未接入展示的能力不据此判断为正常或停用。
+            </p>
             <a className="platform-capability-link" href={adminHref('platform', 'engine', hash)}>
-              查看系统运行
+              查看引擎仪表盘
               <ArrowRight size={15} aria-hidden="true" />
             </a>
           </section>

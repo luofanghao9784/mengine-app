@@ -66,7 +66,7 @@ export function StorageAlert({ hash }: { hash: string }) {
   if (!attention) return null;
   return (
     <p className="storage-alert">
-      <a href={adminHref('platform', 'engine', hash, { detail: 'storage' })}>
+      <a href={adminHref('platform', 'capabilities', hash, { tab: 'storage' })}>
         存储与备份：
         {data.error ? '状态暂不可读' : b && b.state === 'NOT_CONFIGURED' ? '监测未接入' : '有状态需核对'} →
       </a>
@@ -297,16 +297,18 @@ function Facts({ value: v }: { value: StorageStatus }) {
     </>
   );
 }
-export function PlatformStorage({ hash }: { hash: string }) {
+export function PlatformStorage({ hash, embedded = false }: { hash: string; embedded?: boolean }) {
   const [attempt, setAttempt] = useState(0);
   const refresh = () => setAttempt((n) => n + 1);
   const data = useRemote((signal) => api.status(signal), [attempt]);
   return (
     <div className="storage-page">
-      <a className="button ghost" href={adminHref('platform', 'engine', hash)}>
-        <ArrowLeft size={16} />
-        返回系统运行
-      </a>
+      {!embedded && (
+        <a className="button ghost" href={adminHref('platform', 'capabilities', hash)}>
+          <ArrowLeft size={16} />
+          返回引擎管理
+        </a>
+      )}
       <div className="storage-heading">
         <div>
           <h2>存储与备份</h2>

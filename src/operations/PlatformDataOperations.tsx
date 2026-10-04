@@ -90,14 +90,16 @@ export function PlatformDataOperations({ hash }: { hash: string }) {
   const supplied = p.get('enterprise');
   const tenant = uuid(supplied) ? supplied : null;
   const href = (k: DataOperationKind, enterprise?: string) =>
-    adminHref('platform', 'engine', hash, { detail: 'data', kind: k, ...(enterprise ? { enterprise } : {}) });
+    adminHref('platform', 'data', hash, { kind: k, ...(enterprise ? { enterprise } : {}) });
   return (
     <div className="data-ops-page">
-      <a className="button ghost" href={tenant ? href(kind) : adminHref('platform', 'engine', hash)}>
-        <ArrowLeft size={16} />
-        {tenant ? '返回企业列表' : '返回系统运行'}
-      </a>
-      <nav className="data-ops-nav" aria-label="数据运行分类">
+      {tenant && (
+        <a className="button ghost" href={href(kind)}>
+          <ArrowLeft size={16} />
+          返回企业列表
+        </a>
+      )}
+      <nav className="data-ops-nav" aria-label="数据处理分类">
         {(['CONNECTIONS', 'MATERIALS'] as const).map((k) => (
           <a
             key={k}

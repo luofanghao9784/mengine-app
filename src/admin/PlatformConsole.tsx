@@ -1,6 +1,4 @@
-import { PlatformStorage, StorageAlert } from '../operations/PlatformStorage';
 import { PlatformDataOperations } from '../operations/PlatformDataOperations';
-import { adminHref } from './navigation';
 import { EngineTelemetryWall } from '../operations/EngineTelemetryWall';
 import { useSession } from '../identity/session';
 import { GeneralExperienceLibrary } from '../experience/GeneralExperienceLibrary';
@@ -16,7 +14,6 @@ export function PlatformConsole({ logout }: { logout: () => void }) {
   const { session } = useSession();
   const { page, hash } = useAdminRoute('platform');
   const params = new URLSearchParams(hash.slice(1));
-  const detail = params.get('detail');
   const enterprisePage = page === 'tenants' || page === 'accounts';
   return (
     <AdminShell
@@ -30,23 +27,15 @@ export function PlatformConsole({ logout }: { logout: () => void }) {
       {page === 'overview' ? (
         <AdminOverview realm="platform" hash={hash} />
       ) : enterprisePage ? (
-        params.has('account') && !params.has('enterprise')
-          ? <AccountEnterpriseLink id={params.get('account')!} />
-          : <PlatformHome embedded />
-      ) : page === 'engine' && detail === 'storage' ? (
-        <PlatformStorage hash={hash} />
-      ) : page === 'engine' && detail === 'data' ? (
+        params.has('account') && !params.has('enterprise') ? (
+          <AccountEnterpriseLink id={params.get('account')!} />
+        ) : (
+          <PlatformHome embedded />
+        )
+      ) : page === 'data' ? (
         <PlatformDataOperations hash={hash} />
       ) : page === 'engine' ? (
-        <>
-          <nav className="platform-runtime-links" aria-label="系统运行次级页面">
-            <a href={adminHref('platform', 'engine', hash, { detail: 'data' })}>数据运行</a>
-            <a href={adminHref('platform', 'engine', hash, { detail: 'storage' })}>存储与备份</a>
-            <a href={adminHref('platform', 'usage', hash)}>查看用量与成本</a>
-          </nav>
-          <StorageAlert hash={hash} />
-          <EngineTelemetryWall scope="platform" />
-        </>
+        <EngineTelemetryWall scope="platform" />
       ) : page === 'usage' ? (
         <PlatformUsagePage hash={hash} />
       ) : page === 'capabilities' ? (

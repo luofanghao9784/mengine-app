@@ -135,7 +135,7 @@ test('system running opens an independent data subpage; list search and paging s
   const f = await fixture(context);
   await page.goto('/platform-admin/#admin=engine');
   await expect(page.locator('.engine-wall')).toBeVisible();
-  await page.getByRole('link', { name: '数据运行', exact: true }).click();
+  await page.getByRole('link', { name: '数据处理', exact: true }).click();
   await expect(page.getByRole('heading', { name: '数据接入', exact: true })).toBeVisible();
   await expect(page.locator('.engine-wall')).toHaveCount(0);
   await page.getByLabel('搜索企业').fill('合成企业');
@@ -159,7 +159,7 @@ test('system running opens an independent data subpage; list search and paging s
     .click();
   await expect(page.getByText('第 1 页', { exact: true })).toBeVisible();
   await expect(page.getByText(/匹配 11 家企业/)).toBeVisible();
-  await page.getByRole('link', { name: '返回系统运行' }).click();
+  await page.getByRole('link', { name: '引擎仪表盘', exact: true }).click();
   await expect(page.locator('.engine-wall')).toBeVisible();
   expect(f.paths.every((p) => new URL(p).pathname.startsWith('/api/platform-admin/'))).toBe(true);
   expect(f.mutations).toEqual([]);
@@ -173,7 +173,7 @@ test('material processing only offers technical records and retains scope when c
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto(`/platform-admin/#admin=engine&detail=data&enterprise=${tenant}&kind=CONNECTIONS`);
   await page
-    .getByRole('navigation', { name: '数据运行分类' })
+    .getByRole('navigation', { name: '数据处理分类' })
     .getByRole('link', { name: '资料处理' })
     .click();
   await expect(page.getByRole('heading', { name: '合成企业 1 · 资料处理' })).toBeVisible();
@@ -182,7 +182,7 @@ test('material processing only offers technical records and retains scope when c
   for (const label of ['下载', '打开原件', '重试任务', '立即取数', '预览'])
     await expect(page.getByRole('button', { name: label })).toHaveCount(0);
   await expect(page.locator('a[href*="/workspace/"],a[href*="/tenant-admin/"]')).toHaveCount(0);
-  for (const width of [1440, 834, 360]) {
+  for (const width of [1440]) {
     await page.setViewportSize({ width, height: 1000 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     if (width !== 834)

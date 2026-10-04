@@ -103,6 +103,7 @@ test('system wall opens read-only storage page with separate restore and opening
 }) => {
   const f = await fixture(context);
   await page.goto('/platform-admin/#admin=engine');
+  await page.getByRole('link', { name: '引擎管理', exact: true }).click();
   await page.getByRole('link', { name: '存储与备份', exact: true }).click();
   await expect(page.getByRole('heading', { name: '存储与备份', exact: true })).toBeVisible();
   const facts = page.getByRole('region', { name: '备份与恢复验证' });
@@ -119,7 +120,7 @@ test('system wall opens read-only storage page with separate restore and opening
   await expect(page.getByRole('region', { name: '任务通知清理状态' })).toContainText(
     '此状态不代表备份已清理',
   );
-  await page.getByRole('link', { name: '返回系统运行' }).click();
+  await page.getByRole('link', { name: '能力与规则', exact: true }).click();
   await expect(page.getByRole('heading', { name: '存储与备份', exact: true })).toHaveCount(0);
   expect(f.methods.every((m) => m === 'GET')).toBeTruthy();
 });
