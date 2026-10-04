@@ -1,3 +1,4 @@
+import { SuspendedEnterprise } from './SuspendedEnterprise';
 import { TenantConsole } from '../admin/TenantConsole';
 import { UploadProvider } from '../material/UploadManager';
 import { phoneClient } from './phone-client';
@@ -201,13 +202,15 @@ function GuardedAccessShell({
     async (signal) => ({
       account: identity.account.id,
       items: await Promise.all(
-        identity.memberships.map(async (m) => {
-          try {
-            return await governanceClient.snapshot(m.tenantId, signal);
-          } catch {
-            return null;
-          }
-        }),
+        identity.memberships
+          .filter((m) => m.service?.status !== 'SUSPENDED')
+          .map(async (m) => {
+            try {
+              return await governanceClient.snapshot(m.tenantId, signal);
+            } catch {
+              return null;
+            }
+          }),
       ),
     }),
     [identity],
@@ -287,7 +290,14 @@ function GuardedAccessShell({
                     ? conversationHref(id)
                     : `tenant=${encodeURIComponent(id)}${new URLSearchParams(location.hash.slice(1)).get('view') === 'spaces' ? '&view=spaces' : ''}`;
   };
-  if (surface === 'tenant-admin' && selected) return <UploadProvider><TenantConsole key={tenant} tenant={tenant} name={selected.tenantName} /></UploadProvider>;
+  if (selected?.service?.status === 'SUSPENDED')
+    return <SuspendedEnterprise membership={selected} identity={identity} />;
+  if (surface === 'tenant-admin' && selected)
+    return (
+      <UploadProvider>
+        <TenantConsole key={tenant} tenant={tenant} name={selected.tenantName} />
+      </UploadProvider>
+    );
   return (
     <UploadShell key={`${identity.account.id}:${tenant}:${allowed}`} actionsTarget={actionsTarget}>
       <div

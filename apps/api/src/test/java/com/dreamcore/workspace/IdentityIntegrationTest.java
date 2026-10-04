@@ -244,7 +244,7 @@ class IdentityIntegrationTest {
         String id=created.get("tenant").get("id").asString();
         String path="/api/platform-admin/v1/tenants/"+id;
         var detail=platform.ok("GET",path,null,200);
-        assertEquals(7,detail.size());
+        assertEquals(8,detail.size());
         assertEquals(0,detail.get("version").asLong());
         assertEquals(0,detail.get("activeMemberCount").asLong());
         assertEquals("catalog-admin@example.test",detail.get("initialAdminInvitation").get("email").asString());
@@ -261,10 +261,10 @@ class IdentityIntegrationTest {
         for(Client forbidden:List.of(adminA,employee)) {
             for(String denied:List.of(path,path+"/records","/api/platform-admin/v1/overview"))
                 assertEquals(401,forbidden.send("GET",denied,null,false).statusCode());
-            assertEquals(401,forbidden.send("POST",path+"/status",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"status","SUSPENDED"),true).statusCode());
+            assertEquals(401,forbidden.send("POST",path+"/status",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"status","SUSPENDED","internalReason","内部核对-不可给客户","publicReason","合成公开服务说明"),true).statusCode());
             assertEquals(401,forbidden.send("POST",path+"/initial-admin-invitation",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"email","forbidden@example.test"),true).statusCode());
         }
-        assertEquals(403,platform.send("POST",path+"/status",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"status","SUSPENDED"),false).statusCode());
+        assertEquals(403,platform.send("POST",path+"/status",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"status","SUSPENDED","internalReason","内部核对-不可给客户","publicReason","合成公开服务说明"),false).statusCode());
         assertEquals(404,platform.send("GET","/api/platform-admin/v1/tenants/"+UUID.randomUUID(),null,false).statusCode());
         assertEquals(401,platform.send("GET","/api/v1/tenants/"+id+"/context",null,false).statusCode());
         for(String forbidden:List.of("content","conversations","impersonate")) assertEquals(404,platform.send("GET",path+"/"+forbidden,null,false).statusCode());
@@ -275,19 +275,39 @@ class IdentityIntegrationTest {
         Client user=acceptNew(created.get("invitation").get("id").asString(),"suspend-admin@example.test");
         user.ok("POST","/api/v1/auth/invitations/accept",Map.of("token",token(invitation(adminA,tenantA,"suspend-admin@example.test"))),200);
         String pending=invitation(user,id,"suspend-pending@example.test");
-        var suspend=Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"status","SUSPENDED");
+        Client disabled=acceptNew(invitation(user,id,"service-disabled@example.test"),"service-disabled@example.test");
+        UUID disabledId=UUID.fromString(disabled.ok("GET","/api/v1/me",null,200).get("account").get("id").asString());
+        db.update("UPDATE tenant_memberships SET status='DISABLED' WHERE tenant_id=? AND account_id=?",UUID.fromString(id),disabledId);
+        var membershipsBefore=db.queryForList("SELECT account_id,role,status,management_version FROM tenant_memberships WHERE tenant_id=? ORDER BY account_id",UUID.fromString(id));
+        var spacesBefore=db.queryForList("SELECT * FROM workspace_members WHERE tenant_id=? ORDER BY workspace_id,account_id",UUID.fromString(id));
+        assertEquals(400,platform.send("POST",path+"/status",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"status","SUSPENDED"),true).statusCode());
+        var suspend=Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"status","SUSPENDED","internalReason","内部核对-不可给客户","publicReason","合成公开服务说明");
         var stopped=platform.ok("POST",path+"/status",suspend,200);
         assertEquals(1,stopped.get("version").asLong());
+        assertEquals("内部核对-不可给客户",stopped.get("serviceChange").get("internalReason").asString());
+        var publicMe=user.ok("GET","/api/v1/me",null,200);
+        assertFalse(publicMe.toString().contains("内部核对-不可给客户"));
+        var pausedMembership=java.util.stream.StreamSupport.stream(publicMe.get("memberships").spliterator(),false).filter(m->m.get("tenantId").asString().equals(id)).findFirst().orElseThrow();
+        assertEquals("SUSPENDED",pausedMembership.get("service").get("status").asString());
+        assertEquals("合成公开服务说明",pausedMembership.get("service").get("explanation").asString());
+        assertTrue(pausedMembership.get("service").hasNonNull("changedAt"));
+        assertFalse(adminB.ok("GET","/api/v1/me",null,200).toString().contains(id));
         assertEquals(stopped,platform.ok("POST",path+"/status",suspend,200));
         assertEquals(403,user.send("GET","/api/v1/tenants/"+id+"/context",null,false).statusCode());
         user.ok("GET","/api/v1/tenants/"+tenantA+"/context",null,200);
         assertEquals(403,user.send("POST","/api/tenant-admin/v1/tenants/"+id+"/invitations",Map.of("requestId",UUID.randomUUID(),"email","stop-denied@example.test"),true).statusCode());
         var accept=Map.of("token",token(pending),"displayName","合成待加入","password",PASSWORD);
         assertEquals(403,new Client().send("POST","/api/v1/auth/invitations/accept",accept,true).statusCode());
-        assertEquals(409,platform.send("POST",path+"/status",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"status","ACTIVE"),true).statusCode());
-        assertEquals(400,platform.send("POST",path+"/status",Map.of("requestId",UUID.randomUUID(),"expectedVersion",1,"status","DELETED"),true).statusCode());
-        var resumed=platform.ok("POST",path+"/status",Map.of("requestId",UUID.randomUUID(),"expectedVersion",1,"status","ACTIVE"),200);
+        assertEquals(409,platform.send("POST",path+"/status",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"status","ACTIVE","internalReason","内部核对-不可给客户","publicReason","合成公开服务说明"),true).statusCode());
+        assertEquals(400,platform.send("POST",path+"/status",Map.of("requestId",UUID.randomUUID(),"expectedVersion",1,"status","DELETED","internalReason","内部核对-不可给客户","publicReason","合成公开服务说明"),true).statusCode());
+        var resumed=platform.ok("POST",path+"/status",Map.of("requestId",UUID.randomUUID(),"expectedVersion",1,"status","ACTIVE","internalReason","内部核对-不可给客户","publicReason","合成公开服务说明"),200);
         assertEquals(2,resumed.get("version").asLong());
+        assertEquals(membershipsBefore,db.queryForList("SELECT account_id,role,status,management_version FROM tenant_memberships WHERE tenant_id=? ORDER BY account_id",UUID.fromString(id)));
+        assertEquals(spacesBefore,db.queryForList("SELECT * FROM workspace_members WHERE tenant_id=? ORDER BY workspace_id,account_id",UUID.fromString(id)));
+        assertEquals(403,disabled.send("GET","/api/v1/tenants/"+id+"/context",null,false).statusCode());
+        var resumedMe=user.ok("GET","/api/v1/me",null,200);
+        assertFalse(resumedMe.toString().contains("合成公开服务说明"));
+        assertEquals(2,db.queryForObject("SELECT count(*) FROM tenant_service_changes WHERE tenant_id=?",Integer.class,UUID.fromString(id)));
         // An old retry must not suspend the tenant after another operation restored it.
         assertEquals("ACTIVE",platform.ok("POST",path+"/status",suspend,200).get("tenant").get("status").asString());
         user.ok("GET","/api/v1/tenants/"+id+"/context",null,200);
@@ -364,11 +384,11 @@ class IdentityIntegrationTest {
         String id=created.get("tenant").get("id").asString(),path="/api/platform-admin/v1/tenants/"+id;
         Client peer=new Client(true);peer.login("platform@example.test");
         try(var executor=Executors.newFixedThreadPool(2)) {
-            var one=executor.submit(()->platform.send("POST",path+"/status",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"status","SUSPENDED"),true).statusCode());
-            var two=executor.submit(()->peer.send("POST",path+"/status",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"status","SUSPENDED"),true).statusCode());
+            var one=executor.submit(()->platform.send("POST",path+"/status",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"status","SUSPENDED","internalReason","内部核对-不可给客户","publicReason","合成公开服务说明"),true).statusCode());
+            var two=executor.submit(()->peer.send("POST",path+"/status",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"status","SUSPENDED","internalReason","内部核对-不可给客户","publicReason","合成公开服务说明"),true).statusCode());
             assertEquals(List.of(200,409),java.util.stream.Stream.of(one.get(15,java.util.concurrent.TimeUnit.SECONDS),two.get(15,java.util.concurrent.TimeUnit.SECONDS)).sorted().toList());
         }
-        platform.ok("POST",path+"/status",Map.of("requestId",UUID.randomUUID(),"expectedVersion",1,"status","ACTIVE"),200);
+        platform.ok("POST",path+"/status",Map.of("requestId",UUID.randomUUID(),"expectedVersion",1,"status","ACTIVE","internalReason","内部核对-不可给客户","publicReason","合成公开服务说明"),200);
         String secret=token(created.get("invitation").get("id").asString());
         try(var executor=Executors.newFixedThreadPool(2)) {
             var accept=executor.submit(()->new Client().send("POST","/api/v1/auth/invitations/accept",Map.of("token",secret,"displayName","并发加入","password",PASSWORD),true).statusCode());
@@ -516,7 +536,7 @@ class IdentityIntegrationTest {
         assertEquals(1,f.admin.ok("POST",f.path+"/settings",rename,200).get("version").asLong());
         assertEquals("新企业名称",f.admin.ok("POST",f.path+"/settings",rename,200).get("name").asString());
         assertEquals(0,platform.ok("GET","/api/platform-admin/v1/tenants/"+f.tenant,null,200).get("version").asLong());
-        platform.ok("POST","/api/platform-admin/v1/tenants/"+f.tenant+"/status",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"status","SUSPENDED"),200);
+        platform.ok("POST","/api/platform-admin/v1/tenants/"+f.tenant+"/status",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"status","SUSPENDED","internalReason","内部核对-不可给客户","publicReason","合成公开服务说明"),200);
         assertEquals(403,f.admin.send("GET",f.path+"/overview",null,false).statusCode());
         assertEquals(403,f.admin.send("POST",f.path+"/settings",rename,true).statusCode());
     }

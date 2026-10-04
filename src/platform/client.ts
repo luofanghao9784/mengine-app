@@ -41,6 +41,12 @@ export const isDetail = (v: unknown): v is TenantDetail =>
   count(v.activeMemberCount) &&
   count(v.workspaceCount) &&
   isOwner(v.owner) &&
+  (v.serviceChange === null ||
+    (record(v.serviceChange) &&
+      ['ACTIVE', 'SUSPENDED'].includes(String(v.serviceChange.status)) &&
+      text(v.serviceChange.internalReason) &&
+      text(v.serviceChange.publicReason) &&
+      date(v.serviceChange.changedAt))) &&
   (v.initialAdminInvitation === null ||
     (isInvitation(v.initialAdminInvitation) && v.initialAdminInvitation.tenantId === v.tenant.id));
 const isOverview = (v: unknown): v is PlatformOverview =>
@@ -62,6 +68,8 @@ const isRecord = (v: unknown): v is ManagementRecord =>
   text(v.actorName) &&
   uuid(v.targetId) &&
   v.outcome === 'SUCCESS' &&
+  (v.internalReason === null || text(v.internalReason)) &&
+  (v.publicReason === null || text(v.publicReason)) &&
   date(v.createdAt) &&
   [
     'TENANT_CREATE',

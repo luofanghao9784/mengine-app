@@ -1,4 +1,5 @@
 const messages: Record<string, string> = {
+  TENANT_SERVICE_SUSPENDED: '企业服务暂停，原执行已停止后续动作。已发生的结果仍需核对，恢复服务不会自动重跑本任务。',
   TASK_TENANT_EXIT: '企业退出已生效，任务已中断；已经发生的业务动作仍需按实际记录核对。',
   TASK_MEMBER_OFFBOARDED: '成员离职已生效，原执行授权已停止，任务不会自动恢复。',
   TASK_PLAN_STOPPED: '关联计划已暂停、停止或授权已变化，本次执行已中断。',

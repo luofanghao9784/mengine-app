@@ -7,6 +7,12 @@ async function fixture(context: BrowserContext, uncertain = false) {
   const writes: { path: string; body: any }[] = [];
   const detail = {
     tenant: { id: tenant, name: '合成企业甲', status: 'ACTIVE' },
+    serviceChange: null as null | {
+      status: string;
+      internalReason: string;
+      publicReason: string;
+      changedAt: string;
+    },
     version: 0,
     createdAt: '2026-10-01T01:00:00Z',
     activeMemberCount: 0,
@@ -53,6 +59,19 @@ async function fixture(context: BrowserContext, uncertain = false) {
         { ...detail.tenant, createdAt: detail.createdAt, activeMemberCount: 0, owner: detail.owner },
       ]);
     if (path === `/api/platform-admin/v1/tenants/${tenant}`) return json(detail);
+    if (path === `/api/platform-admin/v1/tenants/${tenant}/status`) {
+      const body = route.request().postDataJSON();
+      writes.push({ path, body });
+      detail.tenant.status = body.status;
+      detail.version++;
+      detail.serviceChange = {
+        status: body.status,
+        internalReason: body.internalReason,
+        publicReason: body.publicReason,
+        changedAt: new Date().toISOString(),
+      };
+      return json(detail);
+    }
     if (path.endsWith('/initial-admin-invitation/revoke')) {
       writes.push({ path, body: route.request().postDataJSON() });
       detail.initialAdminInvitation.status = 'REVOKED';
@@ -136,4 +155,28 @@ test('uncertain initial invitation revocation retains request and cannot leave o
   await page.getByRole('button', { name: '确认重新邀请负责人' }).click();
   await expect(page.getByText('+8619900000002', { exact: true })).toBeVisible();
   expect(writes[2].body.expectedVersion).toBe(1);
+});
+
+test('service suspension and resume require separate internal and public reasons', async ({
+  page,
+  context,
+}) => {
+  const writes = await fixture(context);
+  await page.goto(`/platform-admin/#admin=tenants&enterprise=${tenant}`);
+  await page.getByText('更多管理操作', { exact: true }).click();
+  await page.getByRole('button', { name: '暂停服务', exact: true }).click();
+  await page.getByLabel('内部处理备注').fill('仅总台内部核对');
+  await page.getByLabel('企业可见说明').fill('企业服务维护中，请联系负责人。');
+  await page.getByRole('button', { name: '确认暂停服务' }).click();
+  await expect(page.getByText('已暂停', { exact: true })).toBeVisible();
+  expect(writes[0].body.internalReason).toBe('仅总台内部核对');
+  expect(writes[0].body.publicReason).toBe('企业服务维护中，请联系负责人。');
+  await expect(page.getByRole('region', { name: '最近服务变更' })).toContainText('企业服务维护中');
+  await page.getByRole('button', { name: '恢复服务', exact: true }).click();
+  await expect(page.getByText(/不补跑错过的执行/)).toBeVisible();
+  await page.getByLabel('内部处理备注').fill('核对完成');
+  await page.getByLabel('企业可见说明').fill('服务已恢复');
+  await page.getByRole('button', { name: '确认恢复服务' }).click();
+  await expect(page.getByText('正常', { exact: true })).toBeVisible();
+  expect(writes[1].body.expectedVersion).toBe(1);
 });

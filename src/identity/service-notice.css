@@ -1,0 +1,56 @@
+.service-notice-shell {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--surface);
+}
+.service-notice {
+  width: min(100%, 580px);
+  padding: 36px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+}
+.service-notice > svg:first-child {
+  width: 36px;
+  height: 36px;
+}
+.service-notice-icon {
+  color: var(--muted);
+  margin-top: 16px;
+}
+.service-notice h1 {
+  font-size: 24px;
+}
+.service-notice h2 {
+  font-size: 16px;
+}
+.service-notice p {
+  margin: 0;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.service-notice-explanation {
+  white-space: pre-wrap;
+}
+.service-notice-others {
+  border-top: 1px solid var(--line);
+  padding-top: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  width: 100%;
+}
+.service-notice-others h2 {
+  width: 100%;
+}
+@media (max-width: 600px) {
+  .service-notice-shell {
+    padding: 16px;
+  }
+  .service-notice {
+    padding: 24px;
+  }
+}

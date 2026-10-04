@@ -130,6 +130,7 @@ public class PlanService {
   UUID tenant=(UUID)preliminary.getFirst().get("tenant_id"),owner=(UUID)preliminary.getFirst().get("owner_id");
   db.queryForList("SELECT id FROM tenants WHERE id=? FOR SHARE",tenant);ownerLock(owner);
   var rows=db.queryForList("SELECT * FROM ongoing_plans WHERE id=? FOR UPDATE",id);if(rows.isEmpty())return;var p=rows.getFirst();Configuration c=configuration(p);Instant now=clock.now();
+  if("SUSPENDED".equals(db.queryForObject("SELECT status FROM tenants WHERE id=?",String.class,tenant))){runtime(id,"WAITING_TIME","TENANT_SERVICE_SUSPENDED");return;}
   if(!Set.of("STOPPED","EXPIRED").contains(p.get("status"))&&!c.expiresAt().isAfter(now)){db.update("UPDATE ongoing_plans SET status='EXPIRED',runtime_state='IDLE',reason='PLAN_EXPIRED',execution_epoch=execution_epoch+1,revision=revision+1,checked_at=? WHERE id=?",Timestamp.from(now),id);interrupt(p,"TASK_PLAN_EXPIRED");return;}
   if(!p.get("status").equals("ACTIVE")){interrupt(p,"TASK_PLAN_STOPPED");db.update("UPDATE ongoing_plans SET checked_at=? WHERE id=?",Timestamp.from(now),id);return;}
   try{departure.requireActiveBusiness(owner,tenant);access.require(owner,tenant,c.workspaceId(),false);}catch(IdentityException e){db.update("UPDATE ongoing_plans SET status='AUTHORIZATION_REQUIRED',runtime_state='NEEDS_ATTENTION',reason='AUTHORIZATION_REVOKED',execution_epoch=execution_epoch+1,revision=revision+1,checked_at=? WHERE id=?",Timestamp.from(now),id);interrupt(p,"TASK_PLAN_STOPPED");return;}
@@ -144,7 +145,7 @@ public class PlanService {
   var checks=db.queryForList("SELECT id,check_at FROM task_plan_checks WHERE plan_id=? AND execution_epoch=? AND state='PENDING' AND NOT scrubbed AND check_at<=? AND EXISTS(SELECT 1 FROM readable_source_tasks WHERE id=task_plan_checks.task_id) ORDER BY check_at,id LIMIT 1 FOR UPDATE",id,p.get("execution_epoch"),Timestamp.from(now));
   boolean check=!checks.isEmpty();
   long event=db.queryForObject("SELECT coalesce(max(sequence),0) FROM ongoing_plan_material_events WHERE tenant_id=? AND workspace_id=?",Long.class,tenant,c.workspaceId());
-  boolean changed=c.materialEvents()&&(event>(Long)p.get("observed_event")||p.get("last_source_key")==null);
+  boolean changed=c.materialEvents()&&(event>(Long)p.get("observed_event")||p.get("last_source_key")==null&&db.queryForObject("SELECT service_resumed_at IS NULL FROM tenants WHERE id=?",Boolean.class,tenant));
   if(!daily&&!changed&&!retry&&!check){runtime(id,"WAITING_TIME","NO_NEW_VERSION");return;}
   var versions=db.query("""
    SELECT m.id AS material_id,v.id AS version_id,coalesce(k.status,'NOT_REQUESTED') AS parse_status FROM active_materials m

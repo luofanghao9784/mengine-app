@@ -131,7 +131,18 @@ export const isContact = (v: Record<string, unknown>) =>
 export const contactLabel = (v: { phone?: string | null; email?: string | null }) =>
   v.phone || v.email || '未绑定手机号';
 export function isMembership(v: unknown): v is Membership {
-  return record(v) && uuid(v.tenantId) && text(v.tenantName) && role(v.role);
+  return (
+    record(v) &&
+    uuid(v.tenantId) &&
+    text(v.tenantName) &&
+    role(v.role) &&
+    (v.service === undefined ||
+      (record(v.service) &&
+        ['ACTIVE', 'SUSPENDED'].includes(String(v.service.status)) &&
+        (v.service.explanation === null || typeof v.service.explanation === 'string') &&
+        (v.service.changedAt === null ||
+          (typeof v.service.changedAt === 'string' && Number.isFinite(Date.parse(v.service.changedAt))))))
+  );
 }
 export function isIdentity(v: unknown): v is Identity {
   return (

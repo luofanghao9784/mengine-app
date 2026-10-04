@@ -37,12 +37,25 @@ test('all documented writes require CSRF including anonymous invitation acceptan
   for (const path of Object.keys(spec.paths)) assert.doesNotMatch(path, /impersonate|content|conversation/);
 });
 
-
 test('platform owner projection distinguishes accepted invitation from accepted responsibility without private content', () => {
-  const owner = ajv.compile({...spec.components.schemas.TenantOwner,components:spec.components});
-  assert.equal(owner({accountId:null,name:null,state:'AWAITING_RESPONSIBILITY'}),true);
-  assert.equal(owner({accountId:null,name:null,state:'ASSIGNED'}),false);
-  assert.equal(owner({accountId:'synthetic',name:'合成',state:'ASSIGNED',conversation:'private'}),false);
-  const endpoint=spec.paths['/api/platform-admin/v1/tenants/{tenant}/initial-admin-invitation/revoke'].post;
-  assert.deepEqual(endpoint.security,[{platformSessionCookie:[]}]);
+  const owner = ajv.compile({ ...spec.components.schemas.TenantOwner, components: spec.components });
+  assert.equal(owner({ accountId: null, name: null, state: 'AWAITING_RESPONSIBILITY' }), true);
+  assert.equal(owner({ accountId: null, name: null, state: 'ASSIGNED' }), false);
+  assert.equal(
+    owner({ accountId: 'synthetic', name: '合成', state: 'ASSIGNED', conversation: 'private' }),
+    false,
+  );
+  const endpoint = spec.paths['/api/platform-admin/v1/tenants/{tenant}/initial-admin-invitation/revoke'].post;
+  assert.deepEqual(endpoint.security, [{ platformSessionCookie: [] }]);
+});
+
+test('customer service notice cannot carry internal management reasons and status writes require both audiences', () => {
+  const notice = ajv.compile({ ...spec.components.schemas.ServiceNotice, components: spec.components });
+  const publicValue = { status: 'SUSPENDED', explanation: '公开说明', changedAt: '2026-10-04T01:00:00Z' };
+  assert.equal(notice(publicValue), true);
+  assert.equal(notice({ ...publicValue, internalReason: '内部备注' }), false);
+  const change = ajv.compile({ ...spec.components.schemas.ChangeTenantStatus, components: spec.components });
+  const base = { requestId: 'synthetic', expectedVersion: 0, status: 'SUSPENDED' };
+  assert.equal(change(base), false);
+  assert.equal(change({ ...base, internalReason: '内部核对', publicReason: '公开说明' }), true);
 });

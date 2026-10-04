@@ -7,6 +7,7 @@ const other = '00000000-0000-4000-8000-000000000002';
 const detail = {
   tenant: { id, name: '合成企业', status: 'ACTIVE' },
   owner: { accountId: null, name: null, state: 'UNDESIGNATED' },
+  serviceChange: null,
   version: 0,
   createdAt: '2026-09-22T01:00:00Z',
   initialAdminInvitation: null,
@@ -43,6 +44,8 @@ test('platform record projection rejects employee activity outside the managemen
     actorName: '合成平台管理员',
     targetId: id,
     outcome: 'SUCCESS',
+    internalReason: null,
+    publicReason: null,
     createdAt: '2026-09-22T01:00:00Z',
   };
   await assert.rejects(client([{ ...record, action: 'INVITATION_ACCEPT' }]).records(id), mismatch);
@@ -57,7 +60,13 @@ test('platform writes obtain platform CSRF and never borrow a customer session t
       String(path).endsWith('/csrf') ? { token: 'platform-csrf', headerName: 'X-CSRF-TOKEN' } : detail,
     );
   });
-  await api.status(id, { requestId: other, expectedVersion: 0, status: 'SUSPENDED' });
+  await api.status(id, {
+    requestId: other,
+    expectedVersion: 0,
+    status: 'SUSPENDED',
+    internalReason: '内部备注',
+    publicReason: '公开说明',
+  });
   assert.equal(calls[0].path, '/api/platform-admin/v1/auth/csrf');
   assert.equal((calls[1].init?.headers as Record<string, string>)['X-CSRF-TOKEN'], 'platform-csrf');
 });

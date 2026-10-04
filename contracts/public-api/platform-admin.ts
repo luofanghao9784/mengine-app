@@ -20,7 +20,14 @@ export interface TenantSummary extends Tenant {
   activeMemberCount: number;
   owner: TenantOwner;
 }
+export interface ServiceChange {
+  status: 'ACTIVE' | 'SUSPENDED';
+  internalReason: string;
+  publicReason: string;
+  changedAt: string;
+}
 export interface TenantDetail {
+  serviceChange: ServiceChange | null;
   owner: TenantOwner;
   tenant: Tenant;
   version: number;
@@ -42,12 +49,16 @@ export interface ManagementRecord {
   action: PlatformAction;
   targetId: string;
   outcome: 'SUCCESS';
+  internalReason: string | null;
+  publicReason: string | null;
   createdAt: string;
 }
 export interface ChangeTenantStatus {
   requestId: string;
   expectedVersion: number;
   status: Tenant['status'];
+  internalReason: string;
+  publicReason: string;
 }
 export interface ReplaceInitialInvitation {
   requestId: string;

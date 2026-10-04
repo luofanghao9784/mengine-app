@@ -230,6 +230,17 @@ public class ConversationService {
             """,UUID.class,tenant,ids,ids,ids,ids,ids,ids);
         interruptTasks(tenant,affected,"TASK_SOURCE_UNAVAILABLE");
     }
+    /** Tenant service suspension fences old leases without claiming running model work was cancelled. */
+    @Transactional public void suspendTenant(UUID tenant) {
+        var rows=db.queryForList("SELECT * FROM conversation_tasks WHERE tenant_id=? AND status IN ('QUEUED','RUNNING') ORDER BY id FOR UPDATE",tenant);
+        for(var row:rows){
+            UUID task=(UUID)row.get("id");boolean unknown="RUNNING".equals(row.get("status"))&&"AGENT".equals(row.get("mode"));
+            String next=unknown?"RESULT_UNKNOWN":"INTERRUPTED";
+            db.update("UPDATE conversation_tasks SET status=?,reconciliation_required=reconciliation_required OR ?,revision=revision+1,error_code='TENANT_SERVICE_SUSPENDED',lease_token=NULL,lease_until=NULL,finished_at=now() WHERE id=?",next,unknown,task);
+            usage.terminal(task,(UUID)row.get("lease_token"),next);archive(task);
+            event(tenant,(UUID)row.get("workspace_id"),(UUID)row.get("conversation_id"),task,next,(Integer)row.get("revision")+1);
+        }
+    }
     /** Internal atomic fence for lifecycle/plan owners. Caller acquires the tenant lock first. */
     @Transactional public void interruptTasks(UUID tenant,List<UUID> taskIds,String reason){
         if(reason==null || !Set.of("TASK_SOURCE_UNAVAILABLE","TASK_PLAN_STOPPED","TASK_PLAN_EXPIRED","TASK_MEMBER_OFFBOARDED","TASK_TENANT_EXIT","BRIEFING_CANCELLED","BRIEFING_AUTHORITY_REVOKED","BRIEFING_AUTHORITY_CHANGED","BRIEFING_TASK_UNFINISHED").contains(reason))throw IdentityException.invalid();

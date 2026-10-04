@@ -130,6 +130,7 @@ public class BriefingGenerationService {
         UUID tenant=(UUID)p.get("tenant_id"),actor=(UUID)p.get("owner_id"),space=(UUID)p.get("workspace_id");lock(actor,tenant);
         p=db.queryForMap("SELECT * FROM briefing_generation_policies WHERE id=? FOR UPDATE",id);Instant now=clock.now();
         db.update("UPDATE briefing_generation_policies SET checked_at=? WHERE id=?",time(now),id);
+        if("SUSPENDED".equals(db.queryForObject("SELECT status FROM tenants WHERE id=?",String.class,tenant))){db.update("UPDATE briefing_generation_policies SET reason='TENANT_SERVICE_SUSPENDED' WHERE id=?",id);return;}
         var active=db.queryForList("SELECT * FROM briefing_generation_batches WHERE policy_id=? AND status IN ('QUEUED','RUNNING','WAITING_DATA','WAITING_RESOURCE','WAITING_CAPABILITY') AND NOT (coalesce(business_type,'AUTO')='INFO' AND status='WAITING_DATA' AND reason='NEWS_SOURCE_UNAVAILABLE' AND ?) ORDER BY created_at LIMIT 1 FOR UPDATE",id,newsSource.isBlank()||!agents.publicWebEnabled());
         try{authority(actor,tenant,space);}catch(IdentityException e){
             for(var b:active){if(b.get("task_id")!=null)tasks.interruptTasks(tenant,List.of((UUID)b.get("task_id")),"BRIEFING_AUTHORITY_REVOKED");finish((UUID)b.get("id"),"AUTHORITY_REVOKED","AUTHORITY_REVOKED");}
@@ -141,7 +142,12 @@ public class BriefingGenerationService {
         List<Source> sources=sources(tenant,space);String contextKey=contextKey(actor,tenant,space);
         String key=IdentityService.hash(fingerprint(sources)+contextKey);
         Set<String> seen=new HashSet<>(db.queryForList("SELECT v->>'versionId' FROM briefing_generation_batches b CROSS JOIN LATERAL jsonb_array_elements(b.source_versions) v WHERE b.policy_id=? AND b.status IN ('SUCCEEDED','NO_NEW_CONTENT') AND coalesce(b.business_type,'AUTO')<>'INFO'",String.class,id));
-        var unseen=sources.stream().filter(source->!seen.contains(source.versionId().toString())).toList();
+        Instant resumed=db.queryForObject("SELECT service_resumed_at FROM tenants WHERE id=?",(r,n)->r.getTimestamp(1)==null?null:r.getTimestamp(1).toInstant(),tenant);
+        var unseen=sources.stream().filter(source->!seen.contains(source.versionId().toString()) && (resumed==null||source.changedAt().isAfter(resumed))).toList();
+        if(Boolean.TRUE.equals(p.get("service_resume_pending"))){
+            db.update("UPDATE briefing_generation_policies SET context_key=?,service_resume_pending=false WHERE id=?",contextKey,id);
+            p.put("context_key",contextKey);
+        }
         if(active.isEmpty()){
             if(!Boolean.TRUE.equals(p.get("enabled")))return;
             // Failed/cancelled automatic runs require an explicit retry; new source versions may proceed.
@@ -203,6 +209,11 @@ public class BriefingGenerationService {
     private String recent(UUID actor,UUID tenant,UUID space){
         String text=String.join("\n",db.queryForList("SELECT convert_from(b.content,'UTF8')::jsonb->>'summary' FROM conversation_tasks t JOIN conversations c ON c.id=t.conversation_id JOIN LATERAL ("+BriefingContentService.ELIGIBLE+") b ON true WHERE c.tenant_id=? AND c.owner_id=? AND c.workspace_id=? AND t.status='SUCCEEDED' AND EXISTS(SELECT 1 FROM readable_source_tasks r WHERE r.id=t.id) ORDER BY t.finished_at DESC LIMIT 5",String.class,tenant,actor,space));
         return text.substring(0,Math.min(1000,text.length()));
+    }
+    /** Settle already-finished work before the tenant status transition fences remaining attempts. */
+    public void settleBeforeSuspension(UUID tenant){
+        for(var b:db.queryForList("SELECT b.* FROM briefing_generation_batches b JOIN conversation_tasks t ON t.id=b.task_id WHERE b.tenant_id=? AND b.status IN ('QUEUED','RUNNING','WAITING_DATA','WAITING_RESOURCE','WAITING_CAPABILITY') AND t.status NOT IN ('QUEUED','RUNNING') ORDER BY b.id",tenant))
+            reconcile(db.queryForMap("SELECT * FROM briefing_generation_policies WHERE id=?",b.get("policy_id")),b);
     }
     private void reconcile(Map<String,Object> p,Map<String,Object> b){
         UUID batch=(UUID)b.get("id"),task=(UUID)b.get("task_id"),tenant=(UUID)p.get("tenant_id");

@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.*;
 @org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication(type = org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication.Type.SERVLET)
 @RequestMapping("/api/platform-admin/v1")
 public class PlatformAdminController {
-    public record Status(@NotNull UUID requestId, @NotNull @Min(0) Long expectedVersion, @NotNull String status) {}
+    public record Status(@NotNull UUID requestId, @NotNull @Min(0) Long expectedVersion, @NotNull String status, @NotNull @Size(min=1,max=1000) String internalReason, @NotNull @Size(min=1,max=1000) String publicReason) {}
     public record InitialAdmin(@NotNull UUID requestId, @NotNull @Min(0) Long expectedVersion, @Size(max=254) String email, @Size(max=40) String phone) {}
     private final PlatformAdminService service;
     private final IdentityService identities;
@@ -42,7 +42,7 @@ public class PlatformAdminController {
     public PlatformAdminService.Detail detail(Authentication auth, @PathVariable UUID tenant) { return service.detail(IdentityController.actor(auth),tenant); }
     @PostMapping("/tenants/{tenant}/status")
     public PlatformAdminService.Detail status(Authentication auth, @PathVariable UUID tenant, @Valid @RequestBody Status body) {
-        return service.status(IdentityController.actor(auth),tenant,body.requestId(),body.expectedVersion(),body.status());
+        return service.status(IdentityController.actor(auth),tenant,body.requestId(),body.expectedVersion(),body.status(),body.internalReason(),body.publicReason());
     }
     @PostMapping("/tenants/{tenant}/initial-admin-invitation")
     public PlatformAdminService.Detail initial(Authentication auth, @PathVariable UUID tenant, @Valid @RequestBody InitialAdmin body) {

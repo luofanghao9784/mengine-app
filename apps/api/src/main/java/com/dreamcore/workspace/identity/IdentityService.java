@@ -20,7 +20,10 @@ import org.springframework.transaction.annotation.Transactional;
 public class IdentityService {
     public record Account(UUID id, String email, String displayName, String phone,
                           @com.fasterxml.jackson.annotation.JsonIgnore long credentialVersion) {}
-    public record Membership(UUID tenantId, String tenantName, String role) {}
+    public record ServiceNotice(String status, String explanation, Instant changedAt) {}
+    public record Membership(UUID tenantId, String tenantName, String role, ServiceNotice service) {
+        public Membership(UUID tenantId,String tenantName,String role){this(tenantId,tenantName,role,new ServiceNotice("ACTIVE",null,null));}
+    }
     public record Me(Account account, boolean platformAdmin, List<Membership> memberships) {}
     public record Tenant(UUID id, String name, String status) {}
     public record Workspace(UUID id, String name, String kind) {}
@@ -95,9 +98,9 @@ public class IdentityService {
     }
     public Me me(UUID actor) {
         return new Me(account(actor), false, db.query("""
-            SELECT t.id,t.name,m.role FROM tenant_memberships m JOIN tenants t ON t.id=m.tenant_id
-            WHERE m.account_id=? AND m.status='ACTIVE' AND t.status='ACTIVE' ORDER BY t.created_at,t.id
-            """, (r,n) -> new Membership(r.getObject("id", UUID.class), r.getString("name"), r.getString("role")), actor));
+            SELECT t.id,t.name,m.role,t.status,t.service_public_reason,t.service_changed_at FROM tenant_memberships m JOIN tenants t ON t.id=m.tenant_id
+            WHERE m.account_id=? AND m.status='ACTIVE' ORDER BY t.created_at,t.id
+            """, (r,n) -> new Membership(r.getObject("id", UUID.class), r.getString("name"), r.getString("role"),new ServiceNotice(r.getString("status"),"SUSPENDED".equals(r.getString("status"))?r.getString("service_public_reason"):null,r.getTimestamp("service_changed_at")==null?null:r.getTimestamp("service_changed_at").toInstant())), actor));
     }
     private boolean isPlatformAdmin(UUID actor) {
         return Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM platform_roles WHERE account_id=? AND role='PLATFORM_ADMIN')", Boolean.class, actor));

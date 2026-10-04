@@ -349,6 +349,18 @@ function TenantView({
       ) : (
         <>
           <DepartureStatus tenant={id} platform verification={attempt} />
+          {value.serviceChange && (
+            <section className="platform-service-state" aria-label="最近服务变更">
+              <p>
+                <strong>
+                  {value.serviceChange.status === 'SUSPENDED' ? '暂停' : '恢复'}于{' '}
+                  {time(value.serviceChange.changedAt)}
+                </strong>
+              </p>
+              <p>企业可见说明：{value.serviceChange.publicReason}</p>
+              <p className="muted">内部处理备注：{value.serviceChange.internalReason}</p>
+            </section>
+          )}
           {value.tenant.status === 'SUSPENDED' && (
             <Button variant="primary" onClick={() => setAction('status')}>
               恢复服务
@@ -437,7 +449,9 @@ function TenantAction({
   onSuccess: (value: TenantDetail) => void;
 }) {
   const [email, setEmail] = useState(detail.initialAdminInvitation?.phone || '');
-  const task = useSubmission<{ email: string }>();
+  const [internalReason, setInternalReason] = useState('');
+  const [publicReason, setPublicReason] = useState('');
+  const task = useSubmission<{ email: string; internalReason: string; publicReason: string }>();
   useRequestLock(task.busy || task.uncertain);
   const suspend = detail.tenant.status === 'ACTIVE';
   const label =
@@ -453,26 +467,35 @@ function TenantAction({
       className="platform-form"
       onSubmit={(e) => {
         e.preventDefault();
-        void task.submit({ email: email.trim().toLowerCase() }, async (body, requestId) => {
-          const value =
-            action === 'revoke'
-              ? await platformClient.revokeInvitation(detail.tenant.id, {
-                  requestId,
-                  expectedVersion: detail.version,
-                })
-              : action === 'invite'
-                ? await platformClient.replaceInvitation(detail.tenant.id, {
+        void task.submit(
+          {
+            email: email.trim().toLowerCase(),
+            internalReason: internalReason.trim(),
+            publicReason: publicReason.trim(),
+          },
+          async (body, requestId) => {
+            const value =
+              action === 'revoke'
+                ? await platformClient.revokeInvitation(detail.tenant.id, {
                     requestId,
                     expectedVersion: detail.version,
-                    phone: body.email,
                   })
-                : await platformClient.status(detail.tenant.id, {
-                    requestId,
-                    expectedVersion: detail.version,
-                    status: suspend ? 'SUSPENDED' : 'ACTIVE',
-                  });
-          onSuccess(value);
-        });
+                : action === 'invite'
+                  ? await platformClient.replaceInvitation(detail.tenant.id, {
+                      requestId,
+                      expectedVersion: detail.version,
+                      phone: body.email,
+                    })
+                  : await platformClient.status(detail.tenant.id, {
+                      requestId,
+                      expectedVersion: detail.version,
+                      status: suspend ? 'SUSPENDED' : 'ACTIVE',
+                      internalReason: body.internalReason,
+                      publicReason: body.publicReason,
+                    });
+            onSuccess(value);
+          },
+        );
       }}
     >
       <h3>
@@ -498,6 +521,33 @@ function TenantAction({
               onChange={(e) => setEmail(e.target.value)}
             />
           </Field>
+        </fieldset>
+      )}
+      {action === 'status' && (
+        <fieldset disabled={task.busy || task.uncertain}>
+          <Field label="内部处理备注">
+            <textarea
+              required
+              maxLength={1000}
+              value={internalReason}
+              onChange={(e) => setInternalReason(e.target.value)}
+              placeholder="仅总台管理人员可见"
+            />
+          </Field>
+          <Field label="企业可见说明">
+            <textarea
+              required
+              maxLength={1000}
+              value={publicReason}
+              onChange={(e) => setPublicReason(e.target.value)}
+              placeholder="说明服务状态与联系指引，勿填写内部敏感信息"
+            />
+          </Field>
+          <p className="platform-help">
+            {suspend
+              ? '暂停后不再发起新任务；在途任务停止后续动作，已发生结果另行核对。暂停不会删除资料或启动企业退出。'
+              : '恢复有效访问及后续正常调度，不补跑错过的执行，不恢复单独停用的成员、授权或计划。未完成任务仍需单独处理。'}
+          </p>
         </fieldset>
       )}
       <SubmitError error={task.error} uncertain={task.uncertain} />
@@ -538,6 +588,8 @@ function Records({ id, revision }: { id: string; revision: number }) {
                 <span>
                   <strong>{actionLabel[item.action]}</strong>
                   <small>{item.actorName} · 成功</small>
+                  {item.internalReason && <small>内部：{item.internalReason}</small>}
+                  {item.publicReason && <small>企业可见：{item.publicReason}</small>}
                 </span>
                 <time dateTime={item.createdAt}>{time(item.createdAt)}</time>
               </li>

@@ -25,6 +25,7 @@ import static org.mockito.Mockito.*;
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={"dreamcore.tasks.enabled=true","dreamcore.tasks.agent-mode=off","dreamcore.tasks.initial-delay-ms=3600000","dreamcore.knowledge.enabled=true","dreamcore.knowledge.initial-delay-ms=3600000","dreamcore.plans.initial-delay-ms=3600000"})
 class PlanIntegrationTest {
  @Autowired PlanService plans;@Autowired PlanTaskGate gate;@Autowired PlanAttentionService attention;@Autowired ConversationService conversations;@Autowired AgentTaskService agentTasks;@Autowired MaterialService materials;@Autowired KnowledgeService knowledge;@Autowired JdbcTemplate db;@Autowired PasswordEncoder passwords;
+ @Autowired PlatformAdminService platform; @Autowired IdentityService identities;
  @MockitoBean PlanClock clock;@MockitoBean AgentSettings agents;@LocalServerPort int port;
  UUID tenant,owner,other,space,personal;Instant now;static String passwordHash;JsonMapper json=new JsonMapper();
  @BeforeEach void fixture(){
@@ -35,7 +36,7 @@ class PlanIntegrationTest {
   db.update("INSERT INTO workspaces(id,tenant_id,owner_id,name,kind) VALUES (?,?,?,'计划资料','SHARED'),(?,?,?,'私人资料','PERSONAL')",space,tenant,owner,personal,tenant,owner);
   db.update("INSERT INTO workspace_members(tenant_id,workspace_id,account_id,can_maintain) VALUES (?,?,?,true),(?,?,?,false)",tenant,space,owner,tenant,space,other);
  }
- @AfterEach void cleanup(){db.update("UPDATE ongoing_plans SET status='STOPPED' WHERE tenant_id=?",tenant);db.update("UPDATE ongoing_plan_runs SET status='CANCELLED' WHERE tenant_id=?",tenant);db.update("UPDATE conversation_tasks SET status='CANCELLED' WHERE tenant_id=? AND status IN ('RUNNING','QUEUED','WAITING_CAPABILITY')",tenant);db.update("UPDATE knowledge_runs SET status='CANCELLED' WHERE tenant_id=? AND status IN ('RUNNING','QUEUED')",tenant);db.update("DELETE FROM login_attempts WHERE bucket=?",IdentityService.hash("ip:127.0.0.1"));}
+ @AfterEach void cleanup(){db.update("DELETE FROM platform_roles WHERE account_id IN (SELECT account_id FROM platform_accounts WHERE login_name LIKE '%@service-platform.test')");db.update("DELETE FROM tenant_service_changes WHERE actor_id IN (SELECT account_id FROM platform_accounts WHERE login_name LIKE '%@service-platform.test')");db.update("DELETE FROM platform_accounts WHERE login_name LIKE '%@service-platform.test'");db.update("UPDATE ongoing_plans SET status='STOPPED' WHERE tenant_id=?",tenant);db.update("UPDATE ongoing_plan_runs SET status='CANCELLED' WHERE tenant_id=?",tenant);db.update("UPDATE conversation_tasks SET status='CANCELLED' WHERE tenant_id=? AND status IN ('RUNNING','QUEUED','WAITING_CAPABILITY')",tenant);db.update("UPDATE knowledge_runs SET status='CANCELLED' WHERE tenant_id=? AND status IN ('RUNNING','QUEUED')",tenant);db.update("DELETE FROM login_attempts WHERE bucket=?",IdentityService.hash("ip:127.0.0.1"));}
  void time(Instant value){now=value;when(clock.now()).thenReturn(value);}
  PlanService.Configuration config(String behavior){return new PlanService.Configuration(space,"持续核查进度","仅本人查看获权资料中的进度依据","进度",behavior,true,null,"Asia/Shanghai",60,4,10,now.plus(Duration.ofDays(10)),true);}
  PlanService.Configuration withDaily(PlanService.Configuration c,boolean event,String local){return new PlanService.Configuration(c.workspaceId(),c.goal(),c.purpose(),c.query(),c.behavior(),event,local,c.timeZone(),c.minIntervalSeconds(),c.maxRunsPerDay(),c.maxTotalRuns(),c.expiresAt(),c.notificationsEnabled());}
@@ -49,6 +50,34 @@ class PlanIntegrationTest {
  PlanService.Run run(UUID id){return plans.runs(owner,tenant,id,0,20).items().getFirst();}
  void succeed(UUID plan){var j=conversations.claim();assertNotNull(j);assertEquals(run(plan).taskId(),j.id());var ids=conversations.sources(j);conversations.finish(j,new TaskRuntime.Result("1.0","0.12.0",j.id(),j.token(),"SOURCE_LOOKUP",ids.isEmpty()?"NO_SOURCES":"SOURCES_FOUND",ids));plans.tick(plan);}
  void denied(int status,Runnable work){assertEquals(status,assertThrows(IdentityException.class,work::run).status);}
+ UUID serviceOperator(){
+  UUID id=UUID.randomUUID();db.update("INSERT INTO accounts(id,email,display_name,password_hash) VALUES (?,?,'合成平台','unused')",id,id+"@service-platform.test");
+  db.update("INSERT INTO platform_accounts(account_id,login_name,password_hash) VALUES (?,?,'unused')",id,id+"@service-platform.test");
+  db.update("INSERT INTO platform_roles(account_id,role) VALUES (?,'PLATFORM_ADMIN')",id);return id;
+ }
+ @Test void servicePausePreservesPlanChoicesAndResumeSkipsMissedScheduleAndEvents(){
+  UUID operator=serviceOperator();
+  time(now.atZone(ZoneId.of("Asia/Shanghai")).toLocalDate().atTime(12,0).atZone(ZoneId.of("Asia/Shanghai")).toInstant());
+  UUID briefingPolicy=UUID.randomUUID();db.update("INSERT INTO briefing_generation_policies(id,tenant_id,owner_id,workspace_id) VALUES(?,?,?,?)",briefingPolicy,tenant,owner,space);
+  upload(null);var daily=enable(plans.create(owner,tenant,UUID.randomUUID(),withDaily(config("SOURCE_LOOKUP"),false,"09:00")));
+  var paused=enable(create("SOURCE_LOOKUP"));action(paused.id(),"PAUSE");
+  var eventOnly=enable(create("SOURCE_LOOKUP"));
+  platform.status(operator,tenant,UUID.randomUUID(),0,"SUSPENDED","内部计划测试","维护期间暂停服务");
+  time(now.plus(Duration.ofDays(3)));plans.tick(daily.id());plans.tick(eventOnly.id());
+  assertEquals("ACTIVE",db.queryForObject("SELECT status FROM ongoing_plans WHERE id=?",String.class,daily.id()));
+  assertEquals("TENANT_SERVICE_SUSPENDED",db.queryForObject("SELECT reason FROM ongoing_plans WHERE id=?",String.class,daily.id()));
+  assertEquals(0,db.queryForObject("SELECT count(*) FROM ongoing_plan_runs WHERE tenant_id=?",Integer.class,tenant));
+  assertEquals(403,assertThrows(IdentityException.class,()->conversations.submit(owner,tenant,null,space,UUID.randomUUID(),"合成禁止发起","SOURCE_LOOKUP")).status);
+  platform.status(operator,tenant,UUID.randomUUID(),1,"ACTIVE","已完成核对","服务已恢复");
+  assertEquals("PAUSED",plans.get(owner,tenant,paused.id()).status());
+  assertEquals(java.sql.Date.valueOf(now.atZone(ZoneId.of("Asia/Shanghai")).toLocalDate()),db.queryForObject("SELECT info_day FROM briefing_generation_policies WHERE id=?",java.sql.Date.class,briefingPolicy));
+  var resumed=plans.get(owner,tenant,daily.id());assertTrue(resumed.nextDue().isAfter(now));
+  plans.tick(daily.id());plans.tick(eventOnly.id());assertEquals(0,resumed.runs());
+  assertEquals(0,plans.get(owner,tenant,eventOnly.id()).runs());
+  time(resumed.nextDue());plans.tick(daily.id());assertEquals(1,plans.get(owner,tenant,daily.id()).runs());assertEquals(0,run(daily.id()).missedSlots());
+  assertEquals("PAUSED",plans.get(owner,tenant,paused.id()).status());
+  upload(null);plans.tick(eventOnly.id());assertEquals(1,plans.get(owner,tenant,eventOnly.id()).runs());
+ }
  @Test void explicitDelegationAndOwnershipAreEnforced(){
   upload(null);var draft=create("SOURCE_LOOKUP");plans.tick(draft.id());assertEquals(0,plans.get(owner,tenant,draft.id()).runs());
   denied(400,()->plans.action(owner,tenant,draft.id(),UUID.randomUUID(),draft.revision(),"ENABLE",false));denied(404,()->plans.get(other,tenant,draft.id()));
@@ -92,7 +121,7 @@ class PlanIntegrationTest {
  @Test void transientAccountMemberAndTenantDisableFencePlansWithoutGrantingRights(){
   for(String target:List.of("account","member","tenant")){
    var p=enable(create("SOURCE_LOOKUP"));switch(target){case "account"->{db.update("UPDATE accounts SET status='DISABLED' WHERE id=?",owner);db.update("UPDATE accounts SET status='ACTIVE' WHERE id=?",owner);}case "member"->{db.update("UPDATE tenant_memberships SET status='DISABLED' WHERE tenant_id=? AND account_id=?",tenant,owner);db.update("UPDATE tenant_memberships SET status='ACTIVE' WHERE tenant_id=? AND account_id=?",tenant,owner);}default->{db.update("UPDATE tenants SET status='SUSPENDED' WHERE id=?",tenant);db.update("UPDATE tenants SET status='ACTIVE' WHERE id=?",tenant);}}
-   assertEquals("AUTHORIZATION_REQUIRED",plans.get(owner,tenant,p.id()).status());assertEquals(p.executionEpoch()+1,plans.get(owner,tenant,p.id()).executionEpoch());action(p.id(),"STOP");
+   assertEquals(target.equals("tenant")?"ACTIVE":"AUTHORIZATION_REQUIRED",plans.get(owner,tenant,p.id()).status());assertEquals(p.executionEpoch()+1,plans.get(owner,tenant,p.id()).executionEpoch());action(p.id(),"STOP");
   }
  }
  @Test void rateDailyAndLifetimeBudgetsRemainAfterEdits(){

@@ -303,3 +303,15 @@
     padding: 18px;
   }
 }
+
+.platform-service-state {
+  background: var(--surface);
+  padding: 16px;
+  border-radius: var(--radius);
+  margin: 20px 0;
+}
+.platform-service-state p,
+.platform-records small {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

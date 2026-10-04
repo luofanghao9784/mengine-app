@@ -19,19 +19,33 @@ const SessionContext = createContext<{
 } | null>(null);
 const platformRequest = createIdentityRequest();
 const platformIdentityClient = {
-  me: (signal?: AbortSignal) => platformRequest('/api/platform-admin/v1/auth/me', 'GET', isIdentity, undefined, signal),
-  login: (username: string, password: string) => platformRequest('/api/platform-admin/v1/auth/login', 'POST', isIdentity, {username, password}),
+  me: (signal?: AbortSignal) =>
+    platformRequest('/api/platform-admin/v1/auth/me', 'GET', isIdentity, undefined, signal),
+  login: (username: string, password: string) =>
+    platformRequest('/api/platform-admin/v1/auth/login', 'POST', isIdentity, { username, password }),
   logout: () => platformRequest('/api/platform-admin/v1/auth/logout', 'POST', (v): v is null => v === null),
 };
 
-export function SessionProvider({ children, realm = 'customer' }: { children: ReactNode; realm?: 'customer' | 'platform' }) {
+export function SessionProvider({
+  children,
+  realm = 'customer',
+}: {
+  children: ReactNode;
+  realm?: 'customer' | 'platform';
+}) {
   const client = realm === 'platform' ? platformIdentityClient : identityClient;
   const CHANGE_KEY = realm === 'platform' ? 'dreamcore-platform-session-change' : 'dreamcore-session-change';
-  const reconcile = useCallback((identity: Identity | null) => {
-    if (realm === 'platform') return;
-    reconcileDocumentDrafts(identity);
-    reconcileViewStates(identity?.account.id ?? null, identity?.memberships.map((m) => m.tenantId));
-  }, [realm]);
+  const reconcile = useCallback(
+    (identity: Identity | null) => {
+      if (realm === 'platform') return;
+      reconcileDocumentDrafts(identity);
+      reconcileViewStates(
+        identity?.account.id ?? null,
+        identity?.memberships.map((m) => m.tenantId),
+      );
+    },
+    [realm],
+  );
   const [session, setSession] = useState<Session>({ phase: 'loading', identity: null });
   const generation = useRef(0);
   const pending = useRef<AbortController | null>(null);
@@ -100,12 +114,21 @@ export function SessionProvider({ children, realm = 'customer' }: { children: Re
     const focus = () => {
       if (current.current.phase === 'authenticated') void refresh(true);
     };
+    // Revalidate service state while an already-open customer page remains visible.
+    const serviceCheck =
+      realm === 'customer'
+        ? window.setInterval(() => {
+            if (document.visibilityState === 'visible' && current.current.phase === 'authenticated')
+              void refresh(true);
+          }, 30000)
+        : undefined;
     window.addEventListener('storage', storage);
     window.addEventListener('focus', focus);
     return () => {
       invalidate();
       channel.current?.close();
       channel.current = null;
+      if (serviceCheck !== undefined) window.clearInterval(serviceCheck);
       window.removeEventListener('storage', storage);
       window.removeEventListener('focus', focus);
     };

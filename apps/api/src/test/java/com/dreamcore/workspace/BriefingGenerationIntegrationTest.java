@@ -22,6 +22,7 @@ class BriefingGenerationIntegrationTest {
  @Autowired ConversationService conversations;@Autowired AgentTaskService agents;@Autowired BriefingContentService contents;
  @Autowired BriefingGenerationService generation;@Autowired BriefingCardService cards;@Autowired BriefingService feed;@Autowired RecommendationService recommendations;
  @Autowired AgentUsageLedger usage;
+ @Autowired com.dreamcore.workspace.identity.PlatformAdminService platform;
  UUID tenant,actor,reader,space;
  @BeforeEach void setup(){tenant=UUID.randomUUID();actor=UUID.randomUUID();reader=UUID.randomUUID();space=UUID.randomUUID();
   db.update("INSERT INTO tenants(id,name) VALUES (?,'合成画报生成验收')",tenant);
@@ -29,7 +30,7 @@ class BriefingGenerationIntegrationTest {
   db.update("INSERT INTO workspaces(id,tenant_id,owner_id,name,kind) VALUES (?,?,?,'合成共享空间','SHARED')",space,tenant,actor);
   for(UUID id:List.of(actor,reader))db.update("INSERT INTO workspace_members(tenant_id,workspace_id,account_id,can_maintain) VALUES (?,?,?,true)",tenant,space,id);
  }
- @AfterEach void cleanup(){db.update("UPDATE conversation_tasks SET status='CANCELLED' WHERE tenant_id=? AND status IN ('QUEUED','RUNNING')",tenant);db.update("UPDATE knowledge_runs SET status='CANCELLED' WHERE tenant_id=? AND status IN ('QUEUED','RUNNING')",tenant);}
+ @AfterEach void cleanup(){db.update("DELETE FROM platform_roles WHERE account_id IN (SELECT account_id FROM platform_accounts WHERE login_name LIKE '%@service-platform.test')");db.update("DELETE FROM tenant_service_changes WHERE actor_id IN (SELECT account_id FROM platform_accounts WHERE login_name LIKE '%@service-platform.test')");db.update("DELETE FROM platform_accounts WHERE login_name LIKE '%@service-platform.test'");db.update("UPDATE conversation_tasks SET status='CANCELLED' WHERE tenant_id=? AND status IN ('QUEUED','RUNNING')",tenant);db.update("UPDATE knowledge_runs SET status='CANCELLED' WHERE tenant_id=? AND status IN ('QUEUED','RUNNING')",tenant);}
  MaterialService.UploadReceipt upload(String text,boolean ready){
   var f=materials.uploadReceipt(actor,tenant,space,null,null,null,UUID.randomUUID(),new MockMultipartFile("file","evidence.txt","text/plain",text.getBytes(StandardCharsets.UTF_8)));
   if(ready){var j=knowledge.claim();assertEquals(f.acceptedVersion().id(),j.version());knowledge.finish(j,new DocumentParser.Result("synthetic","READY",List.of(),List.of(new DocumentParser.Fragment("L1",text,"TEXT"))));}return f;
@@ -44,6 +45,41 @@ class BriefingGenerationIntegrationTest {
   agents.toolReceipt(j.id(),j.token(),new AgentTaskService.ToolReceipt(1,"deliver_briefing","succeeded"));
   agents.openUsage(j.id(),j.token());agents.startUsage(j.id(),j.token(),new AgentUsageLedger.Start(1,2048));usage.finish(j.id(),j.token(),new AgentUsageLedger.Receipt(1,"RETURNED",100L,50L));
   agents.finish(j,new AgentResult("1.5","0.15.4",j.id(),j.token(),"AGENT","verification","synthetic","合成系统交付确认。",sources.stream().map(AgentTaskService.Input::id).toList(),List.of(new AgentResult.Tool("delivery","deliver_briefing","succeeded")),List.of(),1,new AgentResult.Usage(100,50),List.of(),List.of(),List.of(),"COMPLETE",null));return receipt;
+ }
+ UUID serviceOperator(){
+  UUID id=UUID.randomUUID();db.update("INSERT INTO accounts(id,email,display_name,password_hash) VALUES (?,?,'合成平台','unused')",id,id+"@service-platform.test");
+  db.update("INSERT INTO platform_accounts(account_id,login_name,password_hash) VALUES (?,?,'unused')",id,id+"@service-platform.test");
+  db.update("INSERT INTO platform_roles(account_id,role) VALUES (?,'PLATFORM_ADMIN')",id);return id;
+ }
+ @Test void servicePauseFencesRunningAttemptAndResumeOnlyUsesNewSourceEvents(){
+  UUID operator=serviceOperator();
+  upload("marker 暂停前资料。",true);UUID policy=policy();generation.tick(policy);var before=generation.state(actor,tenant).batches().getFirst();
+  var job=conversations.claim();assertEquals(before.taskId(),job.id());
+  platform.status(operator,tenant,UUID.randomUUID(),0,"SUSPENDED","内部运行核对","企业维护暂停");
+  assertEquals("RESULT_UNKNOWN",db.queryForObject("SELECT status FROM conversation_tasks WHERE id=?",String.class,job.id()));
+  assertTrue(db.queryForObject("SELECT reconciliation_required FROM conversation_tasks WHERE id=?",Boolean.class,job.id()));
+  assertEquals("RESULT_UNKNOWN",db.queryForObject("SELECT status FROM conversation_attempts WHERE task_id=?",String.class,job.id()));
+  assertThrows(IdentityException.class,()->agents.check(job.id(),job.token()));
+  generation.tick(policy);assertEquals(1,db.queryForObject("SELECT count(*) FROM briefing_generation_batches WHERE policy_id=?",Integer.class,policy));
+  assertTrue(db.queryForObject("SELECT enabled FROM briefing_generation_policies WHERE id=?",Boolean.class,policy));
+  platform.status(operator,tenant,UUID.randomUUID(),1,"ACTIVE","完成运行核对","服务已恢复");
+  assertThrows(IdentityException.class,()->agents.check(job.id(),job.token()));
+  generation.tick(policy);assertEquals(1,generation.state(actor,tenant).batches().size());
+  upload("marker 恢复后的新资料。",true);generation.tick(policy);
+  assertEquals(2,generation.state(actor,tenant).batches().size());
+  assertEquals("RESULT_UNKNOWN",db.queryForObject("SELECT status FROM conversation_tasks WHERE id=?",String.class,job.id()));
+ }
+ @Test void servicePausePreservesCompletedDeliveryAndIndependentlyDisabledPolicies(){
+  UUID operator=serviceOperator();
+  upload("marker 已完成交付资料。",true);UUID policy=policy();generation.tick(policy);var batch=generation.state(actor,tenant).batches().getFirst();
+  var job=conversations.claim();deliver(job,"暂停前已经完成的合成来源分析。");
+  var readerPolicy=db.queryForObject("SELECT id FROM briefing_generation_policies WHERE tenant_id=? AND owner_id=?",UUID.class,tenant,reader);
+  db.update("UPDATE briefing_generation_policies SET enabled=false WHERE id=?",readerPolicy);
+  platform.status(operator,tenant,UUID.randomUUID(),0,"SUSPENDED","内部核对已交付结果","服务暂停");
+  assertEquals("SUCCEEDED",db.queryForObject("SELECT status FROM briefing_generation_batches WHERE id=?",String.class,batch.id()));
+  platform.status(operator,tenant,UUID.randomUUID(),1,"ACTIVE","完成核对","服务恢复");
+  assertFalse(db.queryForObject("SELECT enabled FROM briefing_generation_policies WHERE id=?",Boolean.class,readerPolicy));
+  assertEquals("SUCCEEDED",generation.get(actor,tenant,batch.id()).status());
  }
  @Test void initializationNeedsNoConversationOrPersonalPlanAndIsDurable(){
   upload("marker 经营事实仅用于合成验收。",true);UUID policy=policy();generation.tick(policy);

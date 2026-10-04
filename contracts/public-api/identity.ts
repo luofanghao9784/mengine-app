@@ -6,7 +6,13 @@ export interface Account {
   phone?: string | null;
   displayName: string;
 }
+export interface ServiceNotice {
+  status: 'ACTIVE' | 'SUSPENDED';
+  explanation: string | null;
+  changedAt: string | null;
+}
 export interface Membership {
+  service?: ServiceNotice;
   tenantId: string;
   tenantName: string;
   role: TenantRole;

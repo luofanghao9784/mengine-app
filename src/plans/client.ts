@@ -27,6 +27,7 @@ export const runtimeLabels = {
   NEEDS_ATTENTION: '需要处理',
 } as const;
 export const reasonLabels: Record<string, string> = {
+  TENANT_SERVICE_SUSPENDED: '企业服务暂停，后续调度暂缓。',
   NO_NEW_VERSION: '当前没有新增资料版本。',
   NO_MATERIALS: '当前范围还没有资料，补交后会继续检查。',
   MATERIALS_NOT_READY: '资料尚未形成可检索内容。',

@@ -20,6 +20,7 @@ const label: Record<string, string> = {
   AUTHORITY_REVOKED: '资料权限已变化',
 };
 const reasons: Record<string, string> = {
+  TENANT_SERVICE_SUSPENDED: '企业服务暂停时，本次生成未完成；已发生的任务结果保留，恢复后可按需重新生成。',
   NEWS_SOURCE_UNAVAILABLE: '资讯来源尚未接入，接入后会自动筛选相关资讯。',
   NEWS_CONTEXT_UNAVAILABLE: '请先在资料库准备企业或项目资料。',
   RESULT_NOT_READY: '尚无已完成并保存到资料库的成果。',

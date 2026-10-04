@@ -1197,7 +1197,7 @@
       "post": {
         "operationId": "changeTenantStatus",
         "summary": "停用或恢复企业",
-        "description": "expectedVersion 乐观校验；停用阻止新企业访问与接受邀请，保留其他企业身份。相同 requestId/body 重试不重复执行，返回企业当前状态；不重放旧状态转换。",
+        "description": "独立平台身份、CSRF、版本与请求幂等。内部备注与企业可见说明分别必填并记录；客户 me 仅暴露有效成员所属企业的公开服务说明。暂停保留数据和成员授权，阻断新执行并使在途租约失效；运行中模型结果待核对，不伪称取消。恢复只安排未来正常触发，不补跑积压、不恢复单独停用计划或成员。",
         "responses": {
           "200": {
             "description": "成功",
@@ -4316,6 +4316,9 @@
               "TENANT_ADMIN",
               "MEMBER"
             ]
+          },
+          "service": {
+            "$ref": "#/components/schemas/ServiceNotice"
           }
         },
         "required": [
@@ -4836,6 +4839,16 @@
           },
           "owner": {
             "$ref": "#/components/schemas/TenantOwner"
+          },
+          "serviceChange": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ServiceChange"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -4845,7 +4858,8 @@
           "initialAdminInvitation",
           "activeMemberCount",
           "workspaceCount",
-          "owner"
+          "owner",
+          "serviceChange"
         ],
         "additionalProperties": false
       },
@@ -4883,6 +4897,30 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "internalReason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "publicReason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -4892,7 +4930,9 @@
           "action",
           "targetId",
           "outcome",
-          "createdAt"
+          "createdAt",
+          "internalReason",
+          "publicReason"
         ],
         "additionalProperties": false
       },
@@ -4913,12 +4953,24 @@
               "ACTIVE",
               "SUSPENDED"
             ]
+          },
+          "internalReason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "publicReason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
           }
         },
         "required": [
           "requestId",
           "expectedVersion",
-          "status"
+          "status",
+          "internalReason",
+          "publicReason"
         ],
         "additionalProperties": false
       },
@@ -6049,6 +6101,77 @@
           "owner"
         ],
         "additionalProperties": false
+      },
+      "ServiceNotice": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "explanation",
+          "changedAt"
+        ],
+        "properties": {
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "SUSPENDED"
+            ]
+          },
+          "explanation": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "changedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "ServiceChange": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "internalReason",
+          "publicReason",
+          "changedAt"
+        ],
+        "properties": {
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "SUSPENDED"
+            ]
+          },
+          "internalReason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "publicReason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "changedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
       }
     }
   }
