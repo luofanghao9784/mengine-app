@@ -16,6 +16,7 @@ const method = {
 async function fixture(
   context: BrowserContext,
   options: {
+    history?: boolean;
     canManage?: boolean;
     dropFirst?: boolean;
     dropPlatformFirst?: boolean;
@@ -40,7 +41,7 @@ async function fixture(
   const suggestionChanges: Record<string, unknown>[] = [];
   const adjustmentChanges: Record<string, unknown>[] = [],
     adjustments: Record<string, unknown>[] = [];
-  let currentVersion = version;
+  let currentVersion = options.history ? id(61) : version;
   const suggestions: Record<string, unknown>[] = [];
   let suggestionScope = !options.noSuggestionScope;
   const calls: string[] = [];
@@ -277,6 +278,47 @@ async function fixture(
             canManage: options.canManage !== false,
           });
     }
+    if (path.endsWith('/activity')) {
+      if (revoked) return json({ code: 'EXPERIENCE_NOT_FOUND' }, 404);
+      return json({
+        entryId: entry,
+        currentVersionId: currentVersion,
+        versionId: url.searchParams.get('version'),
+        scope: path.includes('platform-admin') ? 'PLATFORM_AGGREGATE' : 'AUTHORIZED_SHARED_SPACES',
+        referencedAttempts: 5,
+        fullyReadAttempts: 3,
+        assessedAttempts: 3,
+        adoptedAttempts: 2,
+        applicationOutcome: 'UNKNOWN',
+        checkedAt: '2026-10-04T00:00:00Z',
+      });
+    }
+    if (path.endsWith('/versions') || path.endsWith('/history')) {
+      if (revoked || (path.includes('general-experiences') && globalStatus === 'STOPPED'))
+        return json({ code: 'EXPERIENCE_NOT_FOUND' }, 404);
+      if (path.endsWith('/versions')) {
+        const all = Array.from({ length: 22 }, (_, i) => ({
+          versionId: i === 0 ? currentVersion : i === 21 ? version : id(100 + i),
+          number: 22 - i,
+          createdAt: '2026-10-04T00:00:00Z',
+        }));
+        const offset = Number(url.searchParams.get('offset') || '0');
+        return json({
+          entryId: entry,
+          currentVersionId: currentVersion,
+          items: all.slice(offset, offset + 20),
+          hasMore: offset + 20 < all.length,
+        });
+      }
+      return json({
+        entryId: entry,
+        currentVersionId: currentVersion,
+        versionId: url.searchParams.get('version'),
+        number: 1,
+        method: { ...method, title: '历史核对方法', steps: ['保留的旧版本步骤'] },
+        createdAt: '2026-10-03T00:00:00Z',
+      });
+    }
     if (path.includes('experience-library') || path.includes('general-experiences')) {
       if (path.endsWith('/processing'))
         return json({
@@ -301,7 +343,7 @@ async function fixture(
       const row = {
         id: entry,
         versionId: currentVersion,
-        number: currentVersion === version ? 1 : 2,
+        number: options.history ? 22 : currentVersion === version ? 1 : 2,
         status: globalStatus,
         updatedAt: '2026-10-04T00:00:00Z',
       };
@@ -703,6 +745,7 @@ test('platform correction lost response retains original key and locks sibling c
   await expect(dialog.getByRole('button', { name: '重试原请求' })).toBeVisible();
   await expect(dialog.getByLabel('调整建议与依据')).toBeDisabled();
   await expect(dialog.getByRole('button', { name: '刷新调整状态' })).toBeDisabled();
+  await expect(dialog.getByRole('button', { name: '查看版本历史' })).toBeDisabled();
   await expect(dialog.getByRole('region', { name: '总库使用状态' }).getByRole('button')).toBeDisabled();
   await page.evaluate(() => window.dispatchEvent(new Event('focus')));
   await dialog.getByRole('button', { name: '关闭弹窗' }).click();
@@ -725,3 +768,61 @@ test('loss of platform rights clears adjustment form and cleaned method content'
   await expect(dialog.getByLabel('调整建议与依据')).toHaveCount(0);
   await expect(dialog.getByRole('heading', { name: method.title })).toHaveCount(0);
 });
+
+for (const realm of ['platform', 'tenant'] as const)
+  test(`${realm} history is lazy, read-only and paginated without changing the current method`, async ({
+    page,
+    context,
+  }) => {
+    const f = await fixture(context, { history: true });
+    await page.goto(
+      realm === 'platform'
+        ? '/platform-admin/#admin=experience'
+        : `/tenant-admin/#tenant=${tenant}&admin=experience`,
+    );
+    if (realm === 'tenant') await page.getByLabel('经验来源').selectOption('general');
+    await page
+      .getByRole('button')
+      .filter({ has: page.getByRole('heading', { name: method.title }) })
+      .click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByText('v22', { exact: true })).toBeVisible();
+    expect(f.calls.some((c) => c.includes('/versions?') || c.includes('/activity?'))).toBe(false);
+    await dialog.getByRole('button', { name: '查看使用情况' }).click();
+    const usage = dialog.getByRole('region', { name: '本版本使用情况' });
+    await expect(usage.getByText('记录采用', { exact: true })).toBeVisible();
+    await expect(usage).toContainText('业务效果：尚未确认');
+    await expect(usage).toContainText(realm === 'platform' ? '全平台匿名汇总' : '当前有权管理的共享空间');
+    expect(f.calls.some((c) => c.endsWith(`/activity?current=${id(61)}&version=${id(61)}`))).toBe(true);
+    await dialog.getByRole('button', { name: '收起使用情况' }).click();
+    await dialog.getByRole('button', { name: '查看版本历史' }).click();
+    const history = dialog.getByRole('region', { name: '通用经验版本历史' });
+    await history.getByRole('button', { name: '下一页', exact: true }).click();
+    await history.getByRole('button', { name: /^v1 · 历史版本/ }).click();
+    await expect(history.getByText('保留的旧版本步骤')).toBeVisible();
+    await history.getByRole('button', { name: '查看使用情况' }).click();
+    await expect(history.getByText('记录采用', { exact: true })).toBeVisible();
+    expect(f.calls.some((c) => c.endsWith(`/activity?current=${id(61)}&version=${version}`))).toBe(true);
+    await expect(dialog.getByText('v22', { exact: true })).toBeVisible();
+    expect(f.calls.some((c) => c.endsWith(`/history?current=${id(61)}&version=${version}`))).toBe(true);
+    await expect(history.getByRole('button', { name: /恢复|停用|提交|调整/ })).toHaveCount(0);
+    expect(f.mutations).toEqual([]);
+    expect(await page.evaluate(() => JSON.stringify({ ...sessionStorage, ...localStorage }))).not.toContain(
+      '保留的旧版本步骤',
+    );
+    await page.setViewportSize({ width: 360, height: 1000 });
+    expect(await dialog.evaluate((e) => e.scrollWidth <= e.clientWidth)).toBe(true);
+    if (realm === 'platform') {
+      await history.getByText('历史核对方法').scrollIntoViewIfNeeded();
+      await page.screenshot({ path: 'test-results/general-history-mobile.png', fullPage: true });
+      await dialog.getByRole('button', { name: '提出内容调整' }).click();
+      await dialog.getByLabel('调整建议与依据').fill('核验中的私有建议');
+      await history.getByRole('button', { name: '上一页' }).click();
+      await history.getByRole('button', { name: '收起版本历史' }).click();
+      await expect(dialog.getByLabel('调整建议与依据')).toHaveValue('核验中的私有建议');
+    }
+    f.revoke();
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await expect(dialog.getByText('保留的旧版本步骤')).toHaveCount(0);
+    await expect(dialog.getByText(method.steps[0])).toHaveCount(0);
+  });

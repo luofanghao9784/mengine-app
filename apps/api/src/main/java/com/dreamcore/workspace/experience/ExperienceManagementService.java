@@ -31,6 +31,7 @@ public class ExperienceManagementService {
   if(!admin&&scopes.isEmpty())throw new IdentityException(403,"CAPABILITY_REQUIRED");return scopes;
  }
  void requireLibraryAccess(UUID actor,UUID tenant){scopes(actor,tenant);}
+ UUID[] managedSharedSpaces(UUID actor,UUID tenant){return scopes(actor,tenant).stream().map(Scope::id).toArray(UUID[]::new);}
  private UUID[] selected(List<Scope> scopes,UUID space){if(space!=null&&scopes.stream().noneMatch(s->s.id().equals(space)))throw new IdentityException(403,"WORKSPACE_ACCESS_DENIED");return scopes.stream().map(Scope::id).filter(id->space==null||id.equals(space)).toArray(UUID[]::new);}
  private void paging(int offset){if(offset<0||offset>100000)throw IdentityException.invalid();}
  @Transactional public ContentPage contents(UUID actor,UUID tenant,UUID space,String query,String state,int offset){

@@ -2,6 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createGeneralExperienceClient,
+  isGeneralActivity,
+  isGeneralVersions,
+  isGeneralHistorical,
   isGeneralDetail,
   isGeneralPage,
   isGeneralProcessing,
@@ -249,4 +252,79 @@ test('platform adjustment metadata rejects private inputs, other realms and unfi
   );
   assert.ok(calls.every((c) => c.url.startsWith('/api/platform-admin/')));
   assert.equal((calls[1].body as { content: string }).content, '合成调整建议');
+});
+
+test('history reads bind realm, entry, current anchor and selected version without permitting extra provenance', async () => {
+  const item = { versionId: version, number: 1, createdAt: detail.updatedAt };
+  const page = { entryId: id, currentVersionId: id, items: [item], hasMore: false };
+  const history = {
+    entryId: id,
+    currentVersionId: id,
+    versionId: version,
+    number: 1,
+    method,
+    createdAt: detail.updatedAt,
+  };
+  assert.ok(isGeneralVersions(page));
+  assert.ok(isGeneralHistorical(history));
+  assert.equal(isGeneralVersions({ ...page, items: [item, item] }), false);
+  assert.equal(isGeneralVersions({ ...page, items: [{ ...item, number: 0 }] }), false);
+  for (const field of ['tenantId', 'sourceId', 'actorId', 'content', 'receipt']) {
+    assert.equal(isGeneralVersions({ ...page, items: [{ ...item, [field]: id }] }), false);
+    assert.equal(isGeneralHistorical({ ...history, [field]: id }), false);
+  }
+  let response: unknown = page;
+  const calls: string[] = [];
+  const api = createGeneralExperienceClient(async (url, options) => {
+    calls.push(String(url));
+    assert.equal(options?.method, 'GET');
+    assert.equal(options?.cache, 'no-store');
+    return Response.json(response);
+  });
+  await api.versions(undefined, id, id, 20);
+  assert.match(calls[0], /platform-admin.*versions\?current=.*&offset=20$/);
+  await api.versions(id, id, id, 0);
+  assert.match(calls[1], /api\/v1\/tenants/);
+  response = history;
+  await api.historical(id, id, id, version);
+  assert.ok(calls[2].endsWith(`history?current=${id}&version=${version}`));
+  response = { ...history, currentVersionId: version };
+  await assert.rejects(api.historical(id, id, id, version));
+  response = { ...history, versionId: id };
+  await assert.rejects(api.historical(undefined, id, id, version));
+  response = { ...page, entryId: version };
+  await assert.rejects(api.versions(undefined, id, id, 0));
+  await assert.rejects(api.versions(undefined, id, id, -1));
+});
+
+test('usage aggregates cannot imply business success, include private rows or cross realm scope', async () => {
+  const value = {
+    entryId: id,
+    currentVersionId: id,
+    versionId: version,
+    scope: 'PLATFORM_AGGREGATE',
+    referencedAttempts: 5,
+    fullyReadAttempts: 3,
+    assessedAttempts: 3,
+    adoptedAttempts: 2,
+    applicationOutcome: 'UNKNOWN',
+    checkedAt: detail.updatedAt,
+  };
+  assert.ok(isGeneralActivity(value));
+  for (const extra of [
+    { taskId: id },
+    { items: [] },
+    { applicationOutcome: 'SUCCESS' },
+    { adoptedAttempts: 4 },
+    { referencedAttempts: -1 },
+  ])
+    assert.equal(isGeneralActivity({ ...value, ...extra }), false);
+  let response = value;
+  const api = createGeneralExperienceClient(async () => Response.json(response));
+  await api.activity(undefined, id, id, version);
+  await assert.rejects(api.activity(id, id, id, version));
+  response = { ...value, scope: 'AUTHORIZED_SHARED_SPACES' };
+  await api.activity(id, id, id, version);
+  response = { ...response, versionId: id };
+  await assert.rejects(api.activity(id, id, id, version));
 });

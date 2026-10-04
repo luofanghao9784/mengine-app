@@ -14,6 +14,12 @@ public class GeneralExperienceController {
  public GeneralExperienceLibrary.Page contents(Authentication a,@PathVariable(required=false) UUID tenant,@RequestParam(defaultValue="") String query,@RequestParam(defaultValue="AVAILABLE") String state,@RequestParam(defaultValue="0") int offset){return library.contents(UUID.fromString(a.getName()),tenant,query,state,offset);}
  @GetMapping({"/api/platform-admin/v1/experience-library/{entry}","/api/v1/tenants/{tenant}/general-experiences/{entry}"})
  public GeneralExperienceLibrary.Detail detail(Authentication a,@PathVariable(required=false) UUID tenant,@PathVariable UUID entry,@RequestParam UUID version){return library.detail(UUID.fromString(a.getName()),tenant,entry,version);}
+ @GetMapping({"/api/platform-admin/v1/experience-library/{entry}/versions","/api/v1/tenants/{tenant}/general-experiences/{entry}/versions"})
+ public GeneralExperienceLibrary.Versions versions(Authentication a,@PathVariable(required=false) UUID tenant,@PathVariable UUID entry,@RequestParam UUID current,@RequestParam(defaultValue="0") int offset){return library.versions(UUID.fromString(a.getName()),tenant,entry,current,offset);}
+ @GetMapping({"/api/platform-admin/v1/experience-library/{entry}/history","/api/v1/tenants/{tenant}/general-experiences/{entry}/history"})
+ public GeneralExperienceLibrary.Historical historical(Authentication a,@PathVariable(required=false) UUID tenant,@PathVariable UUID entry,@RequestParam UUID current,@RequestParam UUID version){return library.historical(UUID.fromString(a.getName()),tenant,entry,current,version);}
+ @GetMapping({"/api/platform-admin/v1/experience-library/{entry}/activity","/api/v1/tenants/{tenant}/general-experiences/{entry}/activity"})
+ public GeneralExperienceLibrary.Activity activity(Authentication a,@PathVariable(required=false) UUID tenant,@PathVariable UUID entry,@RequestParam UUID current,@RequestParam UUID version){return library.activity(UUID.fromString(a.getName()),tenant,entry,current,version);}
  @GetMapping("/api/platform-admin/v1/experience-library/processing")
  public GeneralExperienceLibrary.Processing processing(Authentication a){return library.processing(UUID.fromString(a.getName()),enabled&&runtime.configured());}
  @GetMapping("/api/v1/tenants/{tenant}/general-experiences/{entry}/usage")

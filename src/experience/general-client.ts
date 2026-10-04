@@ -1,4 +1,7 @@
 import type {
+  GeneralExperienceActivity,
+  GeneralExperienceVersions,
+  GeneralExperienceHistorical,
   GeneralExperienceAdjustmentChange,
   GeneralExperienceAdjustment,
   GeneralExperienceAdjustments,
@@ -169,6 +172,56 @@ export const isGeneralAdjustments = (v: unknown): v is GeneralExperienceAdjustme
   Array.isArray(v.items) &&
   v.items.length <= 10 &&
   v.items.every(isGeneralAdjustment);
+export const isGeneralVersions = (v: unknown): v is GeneralExperienceVersions =>
+  exact(v, ['entryId', 'currentVersionId', 'items', 'hasMore']) &&
+  uuid(v.entryId) &&
+  uuid(v.currentVersionId) &&
+  typeof v.hasMore === 'boolean' &&
+  Array.isArray(v.items) &&
+  v.items.length <= 20 &&
+  v.items.every(
+    (item, i, items) =>
+      exact(item, ['versionId', 'number', 'createdAt']) &&
+      uuid(item.versionId) &&
+      count(item.number) &&
+      Number(item.number) > 0 &&
+      date(item.createdAt) &&
+      (i === 0 || Number(items[i - 1].number) > Number(item.number)),
+  ) &&
+  new Set(v.items.map((item) => item.versionId)).size === v.items.length;
+export const isGeneralHistorical = (v: unknown): v is GeneralExperienceHistorical =>
+  exact(v, ['entryId', 'currentVersionId', 'versionId', 'number', 'method', 'createdAt']) &&
+  uuid(v.entryId) &&
+  uuid(v.currentVersionId) &&
+  uuid(v.versionId) &&
+  count(v.number) &&
+  Number(v.number) > 0 &&
+  method(v.method) &&
+  date(v.createdAt);
+export const isGeneralActivity = (v: unknown): v is GeneralExperienceActivity =>
+  exact(v, [
+    'entryId',
+    'currentVersionId',
+    'versionId',
+    'scope',
+    'referencedAttempts',
+    'fullyReadAttempts',
+    'assessedAttempts',
+    'adoptedAttempts',
+    'applicationOutcome',
+    'checkedAt',
+  ]) &&
+  uuid(v.entryId) &&
+  uuid(v.currentVersionId) &&
+  uuid(v.versionId) &&
+  ['PLATFORM_AGGREGATE', 'AUTHORIZED_SHARED_SPACES'].includes(String(v.scope)) &&
+  [v.referencedAttempts, v.fullyReadAttempts, v.assessedAttempts, v.adoptedAttempts].every(count) &&
+  Number(v.fullyReadAttempts) <= Number(v.referencedAttempts) &&
+  Number(v.assessedAttempts) <= Number(v.referencedAttempts) &&
+  Number(v.adoptedAttempts) <= Number(v.fullyReadAttempts) &&
+  Number(v.adoptedAttempts) <= Number(v.assessedAttempts) &&
+  v.applicationOutcome === 'UNKNOWN' &&
+  date(v.checkedAt);
 export function createGeneralExperienceClient(fetcher: typeof fetch = fetch) {
   const request = createIdentityRequest(fetcher);
   const path = (tenant?: string) => {
@@ -209,6 +262,65 @@ export function createGeneralExperienceClient(fetcher: typeof fetch = fetch) {
       )
         throw new IdentityError('CONTRACT_MISMATCH');
       return value;
+    },
+    versions: async (
+      tenant: string | undefined,
+      id: string,
+      current: string,
+      offset: number,
+      signal?: AbortSignal,
+    ) => {
+      if (![id, current].every(uuid) || !count(offset) || offset > 100000)
+        throw new IdentityError('INVALID_REQUEST', 400);
+      return request(
+        path(tenant) + `/${id}/versions?` + new URLSearchParams({ current, offset: String(offset) }),
+        'GET',
+        (v): v is GeneralExperienceVersions =>
+          isGeneralVersions(v) && v.entryId === id && v.currentVersionId === current,
+        undefined,
+        signal,
+      );
+    },
+    historical: async (
+      tenant: string | undefined,
+      id: string,
+      current: string,
+      version: string,
+      signal?: AbortSignal,
+    ) => {
+      if (![id, current, version].every(uuid)) throw new IdentityError('INVALID_REQUEST', 400);
+      return request(
+        path(tenant) + `/${id}/history?` + new URLSearchParams({ current, version }),
+        'GET',
+        (v): v is GeneralExperienceHistorical =>
+          isGeneralHistorical(v) &&
+          v.entryId === id &&
+          v.currentVersionId === current &&
+          v.versionId === version,
+        undefined,
+        signal,
+      );
+    },
+    activity: async (
+      tenant: string | undefined,
+      id: string,
+      current: string,
+      version: string,
+      signal?: AbortSignal,
+    ) => {
+      if (![id, current, version].every(uuid)) throw new IdentityError('INVALID_REQUEST', 400);
+      return request(
+        path(tenant) + `/${id}/activity?` + new URLSearchParams({ current, version }),
+        'GET',
+        (v): v is GeneralExperienceActivity =>
+          isGeneralActivity(v) &&
+          v.entryId === id &&
+          v.currentVersionId === current &&
+          v.versionId === version &&
+          v.scope === (tenant === undefined ? 'PLATFORM_AGGREGATE' : 'AUTHORIZED_SHARED_SPACES'),
+        undefined,
+        signal,
+      );
     },
     usage: async (tenant: string, id: string, version: string, signal?: AbortSignal) => {
       if (!uuid(tenant) || !uuid(id) || !uuid(version)) throw new IdentityError('INVALID_REQUEST', 400);

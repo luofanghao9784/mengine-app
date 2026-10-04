@@ -149,3 +149,31 @@ export interface GeneralExperienceAdjustments {
   currentVersionId: string;
   items: GeneralExperienceAdjustment[];
 }
+
+export interface GeneralExperienceVersions {
+  entryId: string;
+  currentVersionId: string;
+  items: { versionId: string; number: number; createdAt: string }[];
+  hasMore: boolean;
+}
+export interface GeneralExperienceHistorical {
+  entryId: string;
+  currentVersionId: string;
+  versionId: string;
+  number: number;
+  method: GeneralMethod;
+  createdAt: string;
+}
+
+export interface GeneralExperienceActivity {
+  entryId: string;
+  currentVersionId: string;
+  versionId: string;
+  scope: 'PLATFORM_AGGREGATE' | 'AUTHORIZED_SHARED_SPACES';
+  referencedAttempts: number;
+  fullyReadAttempts: number;
+  assessedAttempts: number;
+  adoptedAttempts: number;
+  applicationOutcome: 'UNKNOWN';
+  checkedAt: string;
+}

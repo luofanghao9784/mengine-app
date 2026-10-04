@@ -163,3 +163,60 @@ test('platform adjustments expose own metadata only, have no customer endpoint o
     false,
   );
 });
+
+test('history is fixed-version read-only across both realms and excludes unpublished inputs', () => {
+  const check = ajv.compile({ ...spec.components.schemas.Historical, components: spec.components });
+  const history = {
+    entryId: id,
+    currentVersionId: id,
+    versionId: id,
+    number: 1,
+    method: {
+      title: '核对',
+      summary: '核对回执',
+      steps: ['核对'],
+      applicable: ['有依据'],
+      excluded: ['无依据'],
+      tags: ['核对'],
+      basis: 'OBSERVED_EXECUTION',
+    },
+    createdAt: '2026-10-04T00:00:00Z',
+  };
+  assert.ok(check(history), JSON.stringify(check.errors));
+  for (const field of ['sourceId', 'tenantId', 'actorId', 'suggestion', 'receipt'])
+    assert.equal(check({ ...history, [field]: id }), false);
+  for (const [path, operation] of Object.entries(spec.paths).filter(([path]) =>
+    /\/(history|versions)$/.test(path),
+  )) {
+    assert.deepEqual(Object.keys(operation), ['get']);
+    assert.ok(operation.get.parameters.some((p) => p.name === 'current' && p.required));
+    if (path.endsWith('/history'))
+      assert.ok(operation.get.parameters.some((p) => p.name === 'version' && p.required));
+  }
+});
+
+test('usage aggregates contain bounded counts and an explicitly unknown application outcome only', () => {
+  const check = ajv.compile(spec.components.schemas.Activity);
+  const value = {
+    entryId: id,
+    currentVersionId: id,
+    versionId: id,
+    scope: 'PLATFORM_AGGREGATE',
+    referencedAttempts: 5,
+    fullyReadAttempts: 3,
+    assessedAttempts: 3,
+    adoptedAttempts: 2,
+    applicationOutcome: 'UNKNOWN',
+    checkedAt: '2026-10-04T00:00:00Z',
+  };
+  assert.ok(check(value));
+  for (const extra of [
+    { taskId: id },
+    { tenantId: id },
+    { conditions: 'private' },
+    { items: [] },
+    { applicationOutcome: 'SUCCESS' },
+    { adoptedAttempts: -1 },
+  ])
+    assert.equal(check({ ...value, ...extra }), false);
+});

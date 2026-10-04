@@ -7,6 +7,11 @@ import { Failure, Loading, Pager, SubmitError, useRemote, useSubmission } from '
 import { pageState, textState, useViewState } from '../shared/useViewState';
 import { generalExperienceClient as api, generalProcessingLabels } from './general-client';
 import './management.css';
+import {
+  GeneralExperienceActivity,
+  GeneralExperienceHistory,
+  GeneralMethodBody,
+} from './GeneralExperienceHistory';
 import { PlatformExperienceAdjustmentPanel } from './PlatformExperienceAdjustmentPanel';
 import { GeneralSuggestionPanel, type LocalExperienceSelection } from './GeneralSuggestionPanel';
 import { requestNavigationLocked, useRequestLock } from '../shared/request-guard';
@@ -351,31 +356,7 @@ function GeneralDetail({
             </fieldset>
           )}
 
-          <h2>{d.method.title}</h2>
-          <p>{d.method.summary}</p>
-          <div className="experience-management-tags">
-            {d.method.tags.map((tag) => (
-              <Badge key={tag}>{tag}</Badge>
-            ))}
-          </div>
-          <h3>方法步骤</h3>
-          <ol>
-            {d.method.steps.map((s, i) => (
-              <li key={i}>{s}</li>
-            ))}
-          </ol>
-          <h3>适用条件</h3>
-          <ul>
-            {d.method.applicable.map((s, i) => (
-              <li key={i}>{s}</li>
-            ))}
-          </ul>
-          <h3>限制</h3>
-          <ul>
-            {d.method.excluded.map((s, i) => (
-              <li key={i}>{s}</li>
-            ))}
-          </ul>
+          <GeneralMethodBody method={d.method} />
           {tenant && (
             <fieldset className="general-experience-control-group" disabled={usageBlocked}>
               <GeneralSuggestionPanel
@@ -399,6 +380,21 @@ function GeneralDetail({
               />
             </fieldset>
           )}
+          <GeneralExperienceActivity
+            tenant={tenant}
+            entry={selection.id}
+            current={selection.version}
+            version={selection.version}
+            disabled={usageBlocked || suggestionBlocked}
+            denied={setDenied}
+          />
+          <GeneralExperienceHistory
+            tenant={tenant}
+            entry={selection.id}
+            current={selection.version}
+            disabled={usageBlocked || suggestionBlocked}
+            denied={setDenied}
+          />
           <details>
             <summary>依据说明</summary>
             <p>

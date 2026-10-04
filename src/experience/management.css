@@ -228,3 +228,39 @@
 .experience-reference-row .badge {
   margin-left: 8px;
 }
+
+.general-experience-history {
+  border-top: 1px solid var(--border-color, #e2e8f0);
+  padding-top: 16px;
+}
+.general-experience-history-list {
+  display: grid;
+  gap: 8px;
+}
+.general-experience-history-list button {
+  white-space: normal;
+  text-align: left;
+  height: auto;
+}
+.general-experience-history-content {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 12px;
+}
+
+.general-experience-activity {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.general-experience-activity dd {
+  margin: 8px 0 0;
+  font-size: 22px;
+  font-weight: 600;
+}
+@media (max-width: 600px) {
+  .general-experience-activity {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

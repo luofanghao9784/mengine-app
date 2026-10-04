@@ -14,6 +14,10 @@ public class GeneralExperienceLibrary {
  public record Summary(UUID id,UUID versionId,int number,String status,String title,String summary,List<String> tags,Instant updatedAt) {}
  public record Page(List<Summary> items,boolean hasMore) {}
  public record Detail(UUID id,UUID versionId,int number,String status,ExperienceGeneralizationRuntime.Method method,Instant updatedAt) {}
+ public record Version(UUID versionId,int number,Instant createdAt) {}
+ public record Versions(UUID entryId,UUID currentVersionId,List<Version> items,boolean hasMore) {}
+ public record Historical(UUID entryId,UUID currentVersionId,UUID versionId,int number,ExperienceGeneralizationRuntime.Method method,Instant createdAt) {}
+ public record Activity(UUID entryId,UUID currentVersionId,UUID versionId,String scope,long referencedAttempts,long fullyReadAttempts,long assessedAttempts,long adoptedAttempts,String applicationOutcome,Instant checkedAt) {}
  public record Processing(boolean enabled,Map<String,Long> counts,long available,long stopped,long withdrawn,Instant checkedAt) {}
  private final JdbcTemplate db;private final IdentityService identities;private final ExperienceManagementService management;
  private final JsonMapper json=new JsonMapper();
@@ -41,6 +45,54 @@ public class GeneralExperienceLibrary {
   var rows=db.queryForList(BASE+" AND e.id=? AND v.id=?",tenant==null,entry,version);
   if(rows.isEmpty())throw new IdentityException(404,"EXPERIENCE_NOT_FOUND");
   var r=rows.getFirst();return new Detail(entry,version,((Number)r.get("number")).intValue(),(String)r.get("status"),method(r),updated(r));
+ }
+ // Anchor pagination to the version the user actually opened. Do not replace it with the latest.
+ private Detail historyAnchor(UUID actor,UUID tenant,UUID entry,UUID current){
+  access(actor,tenant);
+  db.queryForList("SELECT id FROM general_experience_entries WHERE id=? FOR SHARE",entry);
+  return detail(actor,tenant,entry,current);
+ }
+ @Transactional public Versions versions(UUID actor,UUID tenant,UUID entry,UUID current,int offset){
+  if(offset<0||offset>100000)throw IdentityException.invalid();
+  var anchor=historyAnchor(actor,tenant,entry,current);
+  var rows=db.queryForList("""
+   SELECT id,number,created_at FROM general_experience_versions
+   WHERE entry_id=? AND number<=? AND method IS NOT NULL AND general_experience_history_readable(id)
+   ORDER BY number DESC LIMIT 21 OFFSET ?
+   """,entry,anchor.number(),offset);
+  var items=rows.stream().limit(20).map(r->new Version((UUID)r.get("id"),((Number)r.get("number")).intValue(),((java.sql.Timestamp)r.get("created_at")).toInstant())).toList();
+  return new Versions(entry,current,items,rows.size()>20);
+ }
+ @Transactional public Historical historical(UUID actor,UUID tenant,UUID entry,UUID current,UUID version){
+  var anchor=historyAnchor(actor,tenant,entry,current);
+  var rows=db.queryForList("""
+   SELECT number,method,created_at FROM general_experience_versions
+   WHERE entry_id=? AND id=? AND number<=? AND method IS NOT NULL AND general_experience_history_readable(id)
+   """,entry,version,anchor.number());
+  if(rows.isEmpty())throw new IdentityException(404,"EXPERIENCE_NOT_FOUND");
+  var r=rows.getFirst();return new Historical(entry,current,version,((Number)r.get("number")).intValue(),method(r),((java.sql.Timestamp)r.get("created_at")).toInstant());
+ }
+ @Transactional public Activity activity(UUID actor,UUID tenant,UUID entry,UUID current,UUID version){
+  var content=historical(actor,tenant,entry,current,version);
+  UUID[] spaces=tenant==null?new UUID[0]:management.managedSharedSpaces(actor,tenant);
+  int mask=(1<<content.method().steps().size())-1;
+  var row=db.queryForMap("""
+   WITH records AS (
+    SELECT r.read_bits,
+     EXISTS(SELECT 1 FROM task_general_experience_reviews x WHERE x.task_id=r.task_id AND x.attempt_number=r.attempt_number
+      AND x.entry_id=r.entry_id AND x.version_id=r.version_id AND NOT x.scrubbed) assessed,
+     EXISTS(SELECT 1 FROM task_general_experience_reviews x WHERE x.task_id=r.task_id AND x.attempt_number=r.attempt_number
+      AND x.entry_id=r.entry_id AND x.version_id=r.version_id AND NOT x.scrubbed AND x.decision IN ('DIRECT','ADAPTED')) adopted
+    FROM task_general_experience_reads r JOIN conversation_tasks t ON t.id=r.task_id
+    JOIN conversation_attempts a ON a.task_id=r.task_id AND a.attempt_number=r.attempt_number
+    WHERE r.entry_id=? AND r.version_id=? AND NOT r.invalidated AND object_is_active('TASK',t.id)
+     AND coalesce(a.snapshot->>'execution_class',CASE WHEN t.attempt=a.attempt_number THEN t.execution_class END)='live'
+     AND (?::uuid IS NULL OR (t.tenant_id=? AND t.workspace_id=ANY(?::uuid[])))
+   ) SELECT count(*) referenced,count(*) FILTER(WHERE read_bits=?) fully_read,
+     count(*) FILTER(WHERE assessed) assessed,count(*) FILTER(WHERE adopted AND read_bits=?) adopted FROM records
+   """,entry,version,tenant,tenant,spaces,mask,mask);
+  return new Activity(entry,current,version,tenant==null?"PLATFORM_AGGREGATE":"AUTHORIZED_SHARED_SPACES",
+   ((Number)row.get("referenced")).longValue(),((Number)row.get("fully_read")).longValue(),((Number)row.get("assessed")).longValue(),((Number)row.get("adopted")).longValue(),"UNKNOWN",Instant.now());
  }
  static final Set<String> STATES=Set.of("WAITING","PROCESSING","RETRYING","ADMITTED","DUPLICATE","NOT_ADMITTED","UNAVAILABLE","FAILED","UNKNOWN");
  @Transactional public Processing processing(UUID actor,boolean enabled){

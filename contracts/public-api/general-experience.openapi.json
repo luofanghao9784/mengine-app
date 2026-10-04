@@ -862,6 +862,435 @@
           }
         }
       }
+    },
+    "/api/platform-admin/v1/experience-library/{entry}/versions": {
+      "get": {
+        "description": "Read-only source-valid published history, anchored to the exact current version. No source identities, private suggestions, restore or publish action.",
+        "security": [
+          {
+            "platformCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entry",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "current",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized projection",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Versions"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Management scope required"
+          },
+          "404": {
+            "description": "Version no longer available"
+          }
+        }
+      }
+    },
+    "/api/platform-admin/v1/experience-library/{entry}/history": {
+      "get": {
+        "description": "Read-only source-valid published history, anchored to the exact current version. No source identities, private suggestions, restore or publish action.",
+        "security": [
+          {
+            "platformCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entry",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "current",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized projection",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Historical"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Management scope required"
+          },
+          "404": {
+            "description": "Version no longer available"
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/general-experiences/{entry}/versions": {
+      "get": {
+        "description": "Read-only source-valid published history, anchored to the exact current version. No source identities, private suggestions, restore or publish action.",
+        "security": [
+          {
+            "customerCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entry",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "current",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized projection",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Versions"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Management scope required"
+          },
+          "404": {
+            "description": "Version no longer available"
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/general-experiences/{entry}/history": {
+      "get": {
+        "description": "Read-only source-valid published history, anchored to the exact current version. No source identities, private suggestions, restore or publish action.",
+        "security": [
+          {
+            "customerCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entry",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "current",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized projection",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Historical"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Management scope required"
+          },
+          "404": {
+            "description": "Version no longer available"
+          }
+        }
+      }
+    },
+    "/api/platform-admin/v1/experience-library/{entry}/activity": {
+      "get": {
+        "description": "Fixed-version aggregate retained live task-attempt references, full reads and model-recorded applicability/adoption. No business success inference; no task, actor, contributor or tenant rows. Customer scope is authorized managed shared spaces only.",
+        "security": [
+          {
+            "platformCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entry",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "current",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized projection",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Activity"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Management scope required"
+          },
+          "404": {
+            "description": "Version no longer available"
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/general-experiences/{entry}/activity": {
+      "get": {
+        "description": "Fixed-version aggregate retained live task-attempt references, full reads and model-recorded applicability/adoption. No business success inference; no task, actor, contributor or tenant rows. Customer scope is authorized managed shared spaces only.",
+        "security": [
+          {
+            "customerCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entry",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "current",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized projection",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Activity"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Management scope required"
+          },
+          "404": {
+            "description": "Version no longer available"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1673,6 +2102,152 @@
           "items"
         ],
         "additionalProperties": false
+      },
+      "Versions": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "entryId",
+          "currentVersionId",
+          "items",
+          "hasMore"
+        ],
+        "properties": {
+          "entryId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "currentVersionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "items": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "versionId",
+                "number",
+                "createdAt"
+              ],
+              "properties": {
+                "versionId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "number": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              }
+            }
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Historical": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "entryId",
+          "currentVersionId",
+          "versionId",
+          "number",
+          "method",
+          "createdAt"
+        ],
+        "properties": {
+          "entryId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "currentVersionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "versionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "method": {
+            "$ref": "#/components/schemas/Method"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Activity": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "entryId",
+          "currentVersionId",
+          "versionId",
+          "scope",
+          "referencedAttempts",
+          "fullyReadAttempts",
+          "assessedAttempts",
+          "adoptedAttempts",
+          "applicationOutcome",
+          "checkedAt"
+        ],
+        "properties": {
+          "entryId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "currentVersionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "versionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "scope": {
+            "enum": [
+              "PLATFORM_AGGREGATE",
+              "AUTHORIZED_SHARED_SPACES"
+            ]
+          },
+          "referencedAttempts": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "fullyReadAttempts": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "assessedAttempts": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "adoptedAttempts": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "applicationOutcome": {
+            "const": "UNKNOWN"
+          },
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
       }
     }
   }

@@ -99,6 +99,84 @@ class GeneralExperienceLibraryIntegrationTest {
   db.update("UPDATE experience_generalization_sources SET error_code='private-provider-message' WHERE version_id=?",j.source());
   String observation=new tools.jackson.databind.json.JsonMapper().writeValueAsString(library.processing(platform,false));for(String secret:List.of("private",method().title(),tenant.toString(),j.id().toString(),j.source().toString(),"method","error_code"))assertFalse(observation.contains(secret));
  }
+ UUID historicalClone(GeneralExperienceAdmissionService.Receipt r,int number){
+  UUID v=UUID.randomUUID();db.update("INSERT INTO general_experience_versions(id,entry_id,number,method,content_fingerprint) SELECT ?,entry_id,?,method,content_fingerprint FROM general_experience_versions WHERE id=?",v,number,r.versionId());
+  db.update("INSERT INTO general_experience_origins(version_id,source_version) SELECT ?,source_version FROM general_experience_origins WHERE version_id=?",v,r.versionId());return v;
+ }
+ @Test void historyIsReadOnlyAnchoredAndNeverSubstitutesOrRevealsProvenance(){
+  seed();var r=publish(method());grant();UUID current=historicalClone(r,2),future=historicalClone(r,3);
+  db.update("UPDATE general_experience_entries SET published_version=?,revision=revision+1 WHERE id=?",current,r.entryId());
+  var page=library.versions(platform,null,r.entryId(),current,0);assertEquals(List.of(current,r.versionId()),page.items().stream().map(GeneralExperienceLibrary.Version::versionId).toList());
+  assertEquals(page,library.versions(owner,tenant,r.entryId(),current,0));
+  var old=library.historical(platform,null,r.entryId(),current,r.versionId());assertEquals(1,old.number());assertEquals(r.versionId(),old.versionId());assertEquals(current,old.currentVersionId());
+  assertEquals(old,library.historical(owner,tenant,r.entryId(),current,r.versionId()));
+  String serialized=new tools.jackson.databind.json.JsonMapper().writeValueAsString(old);
+  for(String secret:List.of(owner.toString(),tenant.toString(),task.toString(),space.toString(),"sourceId","runId","private-prompt","private-reply"))assertFalse(serialized.contains(secret),secret);
+  assertEquals(404,assertThrows(IdentityException.class,()->library.historical(platform,null,r.entryId(),current,future)).status);
+  assertEquals(404,assertThrows(IdentityException.class,()->library.historical(platform,null,UUID.randomUUID(),current,r.versionId())).status);
+  assertEquals(404,assertThrows(IdentityException.class,()->library.versions(platform,null,r.entryId(),r.versionId(),0)).status);
+  assertEquals(current,db.queryForObject("SELECT published_version FROM general_experience_entries WHERE id=?",UUID.class,r.entryId()));
+  assertThrows(IdentityException.class,()->library.versions(owner,null,r.entryId(),current,0));
+  db.update("DELETE FROM governance_capabilities WHERE tenant_id=? AND account_id=?",tenant,owner);
+  assertThrows(IdentityException.class,()->library.historical(owner,tenant,r.entryId(),current,r.versionId()));
+ }
+ @Test void historyFiltersUnavailableVersionsBeforePagingAndHonorsGlobalStop(){
+  seed();var r=publish(method());grant();UUID current=null,unreadable=null;
+  for(int n=2;n<=23;n++){var v=historicalClone(r,n);if(n==12)unreadable=v;current=v;}
+  db.update("UPDATE general_experience_entries SET published_version=? WHERE id=?",current,r.entryId());
+  db.update("UPDATE general_experience_versions SET method=NULL WHERE id=?",unreadable);
+  var first=library.versions(platform,null,r.entryId(),current,0);var second=library.versions(platform,null,r.entryId(),current,20);
+  assertEquals(20,first.items().size());assertTrue(first.hasMore());assertEquals(2,second.items().size());assertFalse(second.hasMore());
+  assertTrue(Collections.disjoint(first.items().stream().map(GeneralExperienceLibrary.Version::versionId).toList(),second.items().stream().map(GeneralExperienceLibrary.Version::versionId).toList()));
+  UUID fixed=current,missing=unreadable;
+  assertThrows(IdentityException.class,()->library.historical(platform,null,r.entryId(),fixed,missing));
+  assertEquals(400,assertThrows(IdentityException.class,()->library.versions(platform,null,r.entryId(),fixed,-1)).status);
+  db.update("UPDATE general_experience_entries SET status='STOPPED' WHERE id=?",r.entryId());
+  assertNotNull(library.historical(platform,null,r.entryId(),fixed,r.versionId()));
+  assertThrows(IdentityException.class,()->library.versions(owner,tenant,r.entryId(),fixed,0));
+  db.queryForList("SELECT scrub_lifecycle_object('TASK',?)",task);
+  assertThrows(IdentityException.class,()->library.versions(platform,null,r.entryId(),fixed,0));
+  assertThrows(IdentityException.class,()->library.historical(platform,null,r.entryId(),fixed,r.versionId()));
+ }
+ void reference(UUID consumer,GeneralExperienceAdmissionService.Receipt r,int bits,boolean invalid){
+  db.update("INSERT INTO task_general_experience_reads(task_id,attempt_number,entry_id,version_id,read_bits,invalidated) VALUES (?,1,?,?,?,?)",consumer,r.entryId(),r.versionId(),bits,invalid);
+ }
+ void assessment(UUID consumer,GeneralExperienceAdmissionService.Receipt r){
+  db.update("INSERT INTO task_general_experience_reviews(id,task_id,attempt_number,entry_id,version_id,request_id,request_hash,decision,conditions,adjustments) VALUES (?,?,1,?,?,?,'synthetic-hash','DIRECT','private-business-condition','private-business-adjustment')",UUID.randomUUID(),consumer,r.entryId(),r.versionId(),UUID.randomUUID());
+ }
+ @Test void activityCountsFixedRetainedLiveAttemptsWithoutPrivateRowsOrDuplicateAdoptions(){
+  seed();var r=publish(method());grant();UUID root=task;
+  UUID consumer=nextTask();reference(consumer,r,1,false);assessment(consumer,r);assessment(consumer,r);
+  UUID partial=nextTask();reference(partial,r,0,false);
+  UUID verification=nextTask();reference(verification,r,1,false);db.update("UPDATE conversation_attempts SET snapshot=jsonb_set(snapshot,'{execution_class}','\"verification\"') WHERE task_id=?",verification);
+  UUID invalid=nextTask();reference(invalid,r,1,true);
+  // The saved attempt class wins even if the mutable task's later execution class changes.
+  db.update("UPDATE conversation_tasks SET execution_class='verification' WHERE id=?",consumer);
+  var a=library.activity(platform,null,r.entryId(),r.versionId(),r.versionId());
+  assertEquals(2,a.referencedAttempts());assertEquals(1,a.fullyReadAttempts());assertEquals(1,a.assessedAttempts());assertEquals(1,a.adoptedAttempts());assertEquals("UNKNOWN",a.applicationOutcome());
+  assertEquals("PLATFORM_AGGREGATE",a.scope());assertEquals(2,library.activity(owner,tenant,r.entryId(),r.versionId(),r.versionId()).referencedAttempts());
+  var text=new tools.jackson.databind.json.JsonMapper().writeValueAsString(a);
+  for(String secret:List.of(tenant.toString(),space.toString(),owner.toString(),consumer.toString(),"private-business","private-prompt","private-reply","items","taskId"))assertFalse(text.contains(secret),secret);
+  UUID current=historicalClone(r,2);db.update("UPDATE general_experience_entries SET published_version=? WHERE id=?",current,r.entryId());
+  assertEquals(2,library.activity(platform,null,r.entryId(),current,r.versionId()).referencedAttempts());
+  assertEquals(0,library.activity(platform,null,r.entryId(),current,current).referencedAttempts());
+  db.update("UPDATE general_experience_entries SET status='STOPPED' WHERE id=?",r.entryId());
+  assertEquals(2,library.activity(platform,null,r.entryId(),current,r.versionId()).referencedAttempts());
+  assertThrows(IdentityException.class,()->library.activity(owner,tenant,r.entryId(),current,r.versionId()));
+  db.queryForList("SELECT scrub_lifecycle_object('TASK',?)",root);
+  assertThrows(IdentityException.class,()->library.activity(platform,null,r.entryId(),current,r.versionId()));
+ }
+ @Test void customerActivityIsLimitedToCurrentlyManagedSharedSpaces(){
+  seed();var r=publish(method());UUID consumer=nextTask();reference(consumer,r,1,false);assessment(consumer,r);admin();
+  assertEquals(0,library.activity(manager,tenant,r.entryId(),r.versionId(),r.versionId()).referencedAttempts());
+  db.update("INSERT INTO workspace_members(tenant_id,workspace_id,account_id) VALUES (?,?,?)",tenant,space,manager);
+  assertEquals("AUTHORIZED_SHARED_SPACES",library.activity(manager,tenant,r.entryId(),r.versionId(),r.versionId()).scope());
+  assertEquals(1,library.activity(manager,tenant,r.entryId(),r.versionId(),r.versionId()).referencedAttempts());
+  db.update("DELETE FROM workspace_members WHERE workspace_id=? AND account_id=?",space,manager);
+  assertEquals(0,library.activity(manager,tenant,r.entryId(),r.versionId(),r.versionId()).referencedAttempts());
+  assertThrows(IdentityException.class,()->library.activity(manager,UUID.randomUUID(),r.entryId(),r.versionId(),r.versionId()));
+  assertThrows(IdentityException.class,()->library.activity(manager,null,r.entryId(),r.versionId(),r.versionId()));
+ }
  final class Browser {
   final java.net.http.HttpClient http=java.net.http.HttpClient.newBuilder().cookieHandler(new java.net.CookieManager(null,java.net.CookiePolicy.ACCEPT_ALL)).build();
   final tools.jackson.databind.json.JsonMapper json=new tools.jackson.databind.json.JsonMapper();
@@ -112,6 +190,11 @@ class GeneralExperienceLibraryIntegrationTest {
   var admin=new Browser();admin.login("platform",Map.of("username",platform+"@platform.test","password","synthetic-platform-456"));assertEquals(401,admin.get(publicPath).statusCode());
   for(var response:List.of(customer.get(publicPath),customer.get(publicPath+"/"+r.entryId()+"?version="+r.versionId()),admin.get(platformPath),admin.get(platformPath+"/processing"),admin.get(platformPath+"/"+r.entryId()+"?version="+r.versionId()))){assertEquals(200,response.statusCode(),response.body());assertTrue(response.headers().firstValue("cache-control").orElseThrow().contains("no-store"));}
   assertEquals(400,admin.get(platformPath+"/"+r.entryId()).statusCode());
+  for(String suffix:List.of("/versions?current="+r.versionId(),"/history?current="+r.versionId()+"&version="+r.versionId(),"/activity?current="+r.versionId()+"&version="+r.versionId())){
+   for(var response:List.of(customer.get(publicPath+"/"+r.entryId()+suffix),admin.get(platformPath+"/"+r.entryId()+suffix))){assertEquals(200,response.statusCode(),response.body());assertTrue(response.headers().firstValue("cache-control").orElseThrow().contains("no-store"));}
+   assertEquals(401,customer.get(platformPath+"/"+r.entryId()+suffix).statusCode());assertEquals(401,admin.get(publicPath+"/"+r.entryId()+suffix).statusCode());
+  }
+  assertEquals(400,admin.get(platformPath+"/"+r.entryId()+"/history?version="+r.versionId()).statusCode());
   db.queryForList("SELECT scrub_lifecycle_object('TASK',?)",task);assertEquals(404,admin.get(platformPath+"/"+r.entryId()+"?version="+r.versionId()).statusCode());assertEquals(404,customer.get(publicPath+"/"+r.entryId()+"?version="+r.versionId()).statusCode());
  }
 

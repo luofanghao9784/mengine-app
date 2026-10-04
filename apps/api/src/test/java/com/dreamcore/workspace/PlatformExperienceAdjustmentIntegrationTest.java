@@ -80,6 +80,8 @@ class PlatformExperienceAdjustmentIntegrationTest {
   adjustments.complete(correction(x));assertEquals("QUEUED",proposalState(a.id()));assertEquals(base.versionId(),db.queryForObject("SELECT published_version FROM general_experience_entries WHERE id=?",UUID.class,base.entryId()));
   var g=cleaning();adjustments.complete(cleaned(g));assertEquals("PUBLISHING",proposalState(a.id()));assertTrue(available(base.versionId()));
   var accepted=adjustments.publish(a.id());assertEquals("ADMITTED",accepted.state());assertNotNull(accepted.resultVersionId());assertEquals(accepted,adjustments.publish(a.id()));cleared(a.id());
+  assertEquals(List.of(accepted.resultVersionId(),base.versionId()),library.versions(platform,null,base.entryId(),accepted.resultVersionId(),0).items().stream().map(GeneralExperienceLibrary.Version::versionId).toList());
+  assertEquals(1,library.historical(platform,null,base.entryId(),accepted.resultVersionId(),base.versionId()).number());
   assertEquals(2,library.detail(platform,null,base.entryId(),accepted.resultVersionId()).number());assertFalse(available(base.versionId()));assertTrue(db.queryForObject("SELECT general_experience_history_readable(?)",Boolean.class,base.versionId()));assertTrue(available(accepted.resultVersionId()));
   assertEquals(0,db.queryForObject("SELECT count(*) FROM general_experience_origins WHERE version_id=?",Integer.class,accepted.resultVersionId()));
   assertEquals(base.versionId(),db.queryForObject("SELECT base_version FROM general_experience_version_dependencies WHERE version_id=?",UUID.class,accepted.resultVersionId()));
