@@ -673,3 +673,24 @@
 }
 
 .platform-enterprise-detail .admin-section { box-shadow: none; }
+
+/* 首期企业目录：表头与数据共用六列，末列仅承载详情箭头。 */
+.admin-platform .platform-enterprise-catalog .platform-list-columns,
+.admin-platform .platform-enterprise-catalog .platform-tenant-row {
+  grid-template-columns: minmax(240px, 1.5fr) minmax(220px, 1.1fr) 100px 140px 100px 16px;
+  gap: 24px;
+  align-items: center;
+}
+.admin-platform .platform-enterprise-catalog .platform-list-columns {
+  padding-block: 16px;
+  border-top: 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-muted, #f3f6fa);
+  font-size: 13px;
+  font-weight: 600;
+}
+.admin-platform .platform-enterprise-catalog .platform-list-columns > span:nth-child(3),
+.admin-platform .platform-enterprise-catalog .platform-list-columns > span:nth-child(5),
+.admin-platform .platform-enterprise-catalog .platform-member-count { text-align: center; }
+.admin-platform .platform-enterprise-catalog .platform-service-label { justify-content: center; }
+.admin-platform .platform-enterprise-catalog .platform-tenant-arrow { color: var(--muted); }

@@ -1,8 +1,7 @@
 import { PlatformAccounts } from './PlatformAccounts';
-import { Select } from '../shared/Select';
 import { useContext, useEffect, useState } from 'react';
-import { ArrowLeft, Building2, ChevronRight, Plus, RefreshCw, Search, Send } from 'lucide-react';
-import { useViewState, textState, pageState } from '../shared/useViewState';
+import { ArrowLeft, Building2, ChevronRight, Plus, RefreshCw, Send } from 'lucide-react';
+import { useViewState, pageState } from '../shared/useViewState';
 import { useAdminRoute } from '../admin/AdminShell';
 import { adminHref } from '../admin/navigation';
 import { RequestPending, useRequestLock } from '../shared/request-guard';
@@ -54,9 +53,6 @@ export function PlatformHome({ embedded: _embedded = false }: { embedded?: boole
   const params = new URLSearchParams(hash.slice(1));
   const tenant = params.get('enterprise');
   const [attempt, setAttempt] = useState(0);
-  const [draft, setDraft] = useViewState('platform', 'tenants:draft', '', textState);
-  const [query, setQuery] = useViewState('platform', 'tenants:query', '', textState);
-  const [status, setStatus] = useViewState('platform', 'tenants:status', '', textState);
   const [page, setPage] = useViewState('platform', 'tenants:page', 0, pageState);
   const [createOpen, setCreateOpen] = useState(false);
   const [createdTenant, setCreatedTenant] = useState<string>();
@@ -67,8 +63,8 @@ export function PlatformHome({ embedded: _embedded = false }: { embedded?: boole
     }
   }, [createdTenant, pending, hash]);
   const list = useRemote(
-    (signal) => platformClient.tenants(query, status, page * 20, 21, signal),
-    [query, status, page, attempt],
+    (signal) => platformClient.tenants('', '', page * 20, 21, signal),
+    [page, attempt],
   );
   const overview = useRemote((signal) => platformClient.overview(signal), [attempt]);
   const refresh = () => setAttempt((v) => v + 1);
@@ -79,9 +75,6 @@ export function PlatformHome({ embedded: _embedded = false }: { embedded?: boole
   return (
     <>
       <PageActions>
-        <Button variant="ghost" icon={RefreshCw} onClick={refresh} disabled={pending}>
-          刷新
-        </Button>
         <Button
           variant="primary"
           icon={Plus}
@@ -96,53 +89,6 @@ export function PlatformHome({ embedded: _embedded = false }: { embedded?: boole
         <p className="platform-help">邀请投递尚未启用，暂不能开通企业。</p>
       )}
       <section className="access-panel platform-catalog platform-enterprise-catalog" aria-label="企业列表">
-        <div className="platform-list-heading">
-          <form
-            className="platform-filters"
-            onSubmit={(e) => {
-              e.preventDefault();
-              setQuery(draft.trim());
-              setPage(0);
-            }}
-          >
-            <div className="platform-search">
-              <input
-                aria-label="搜索企业"
-                placeholder="搜索企业名称"
-                value={draft}
-                maxLength={100}
-                onChange={(e) => setDraft(e.target.value)}
-              />
-              <Button type="submit" variant="ghost" icon={Search} aria-label="搜索企业名称" />
-            </div>
-            <Select
-              aria-label="企业状态"
-              value={status}
-              onChange={(e) => {
-                setStatus(e.target.value);
-                setPage(0);
-              }}
-            >
-              <option value="">全部状态</option>
-              <option value="ACTIVE">正常</option>
-              <option value="SUSPENDED">已暂停</option>
-            </Select>
-            {(query || status) && (
-              <Button
-                variant="ghost"
-                disabled={pending}
-                onClick={() => {
-                  setDraft('');
-                  setQuery('');
-                  setStatus('');
-                  setPage(0);
-                }}
-              >
-                清除筛选
-              </Button>
-            )}
-          </form>
-        </div>
         {list.error ? (
           <Failure error={list.error} retry={refresh} />
         ) : !list.value ? (
@@ -152,11 +98,12 @@ export function PlatformHome({ embedded: _embedded = false }: { embedded?: boole
             {list.value.length ? (
               <>
                 <div className="platform-list-columns" aria-hidden="true">
-                  <span>企业</span>
+                  <span>企业名称</span>
                   <span>负责人</span>
-                  <span>有效成员</span>
-                  <span>开通时间</span>
+                  <span>有效成员数</span>
+                  <span>开通日期</span>
                   <span>服务状态</span>
+                  <span />
                 </div>
                 <ul className="platform-tenant-list">
                   {list.value.slice(0, 20).map((item) => (
@@ -194,8 +141,8 @@ export function PlatformHome({ embedded: _embedded = false }: { embedded?: boole
                         </time>
                         <span className="platform-service-label">
                           <Badge blue={item.status === 'ACTIVE'}>{statusLabel(item.status)}</Badge>
-                          <ChevronRight size={16} aria-hidden="true" />
                         </span>
+                        <ChevronRight className="platform-tenant-arrow" size={16} aria-hidden="true" />
                       </button>
                     </li>
                   ))}
@@ -204,8 +151,8 @@ export function PlatformHome({ embedded: _embedded = false }: { embedded?: boole
             ) : (
               <Empty
                 icon={Building2}
-                title={query || status ? '没有符合条件的企业' : '还没有企业'}
-                text={query || status ? '调整搜索内容或清除筛选后再试。' : '开通企业并邀请负责人，开始使用。'}
+                title="还没有企业"
+                text="开通企业并邀请负责人，开始使用。"
               />
             )}
             {(page > 0 || list.value.length > 20) && (
