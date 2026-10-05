@@ -1,4 +1,3 @@
-import { ExpressionPreferencesPanel } from '../preferences/ExpressionPreferencesPanel';
 import { useContext, useRef, useEffect, useState } from 'react';
 import { Plus, RefreshCw } from 'lucide-react';
 import { useSession } from '../identity/session';
@@ -41,7 +40,6 @@ export function CompanyInformation({ tenant }: { tenant: string }) {
   const data = useRemote((signal) => companyClient.get(tenant, signal), [tenant, attempt, session.identity]);
   return (
     <div className="admin-dashboard company-information">
-      <ExpressionPreferencesPanel scope="TENANT" tenant={tenant} />
       <section className="admin-section">
         <header className="company-header">
           <div>

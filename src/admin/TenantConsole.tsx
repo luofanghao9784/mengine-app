@@ -1,3 +1,4 @@
+import { ExpressionPreferencesPanel } from '../preferences/ExpressionPreferencesPanel';
 import './tenant-redesign.css';
 import { SupportRecords } from '../platform/SupportRecords';
 import type { SupportAccess } from '../platform/SupportConsole';
@@ -208,30 +209,53 @@ export function TenantConsole({
         <TenantMaterials key={tenant} tenant={tenant} hash={hash} />
       ) : page === 'experience' ? (
         <TenantExperiences key={tenant} tenant={tenant} />
-      ) : secondary === 'records' && governance.value.canConfigure ? (
-        <>
-          <a className="button ghost" href={adminHref('tenant', 'company', hash)}>
-            返回企业信息
-          </a>
-          <TenantAdminHome tenant={tenant} compact initialTab="records" />
-        </>
-      ) : secondary === 'retention' && governance.value.canConfigure ? (
-        <>
-          <a className="button ghost" href={adminHref('tenant', 'company', hash)}>
-            返回企业信息
-          </a>
-          <DeparturePanel tenant={tenant} only="exit" />
-        </>
       ) : (
-        <>
-          {governance.value.canConfigure && (
-            <div className="admin-secondary-link">
-              <a href={adminHref('tenant', 'company', hash, { detail: 'records' })}>管理记录</a>
-              <a href={adminHref('tenant', 'company', hash, { detail: 'retention' })}>保留与退出</a>
-            </div>
+        <div className="admin-dashboard tenant-company-page">
+          <nav className="platform-detail-nav" aria-label="企业信息栏目">
+            {[
+              ['background', '企业背景'],
+              ['preferences', 'AI内容偏好'],
+              ...(governance.value.canConfigure
+                ? [
+                    ['records', '管理记录'],
+                    ['retention', '保留与退出'],
+                  ]
+                : []),
+            ].map(([key, label]) => (
+              <a
+                key={key}
+                className="button ghost"
+                href={adminHref('tenant', 'company', hash, key === 'background' ? {} : { detail: key })}
+                aria-current={
+                  key === secondary ||
+                  (key === 'background' && !['preferences', 'records', 'retention'].includes(secondary || ''))
+                    ? 'page'
+                    : undefined
+                }
+                onClick={(event) => {
+                  if (requestNavigationLocked()) event.preventDefault();
+                }}
+              >
+                {label}
+              </a>
+            ))}
+          </nav>
+          {secondary === 'preferences' ? (
+            <ExpressionPreferencesPanel key={tenant} scope="TENANT" tenant={tenant} />
+          ) : secondary === 'records' && governance.value.canConfigure ? (
+            <TenantAdminHome
+              key={tenant + ':records'}
+              tenant={tenant}
+              compact
+              initialTab="records"
+              hideNavigation
+            />
+          ) : secondary === 'retention' && governance.value.canConfigure ? (
+            <DeparturePanel key={tenant} tenant={tenant} only="exit" />
+          ) : (
+            <CompanyInformation key={tenant} tenant={tenant} />
           )}
-          <CompanyInformation tenant={tenant} />
-        </>
+        </div>
       )}
     </AdminShell>
   );
