@@ -1,177 +1,81 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Failure, Loading, SubmitError, useRemote, useSubmission } from '../shared/admin';
-import { useRequestLock } from '../shared/request-guard';
-import { Button } from '../shared/ui';
-import {
-  preferenceClient,
-  preferenceKeys,
-  type PreferencePage,
-  type PreferenceKey,
-  type PreferenceScope,
-} from './client';
+import { useContext, useMemo, useState } from 'react';
+import { RefreshCw } from 'lucide-react';
+import { Failure, Loading, Pager, useRemote } from '../shared/admin';
+import { RequestPending } from '../shared/request-guard';
+import { Badge, Button } from '../shared/ui';
+import { preferenceClient, type PreferenceScope } from './client';
 import './preferences.css';
-const names: Record<PreferenceKey, string> = {
-  RESPONSE_LENGTH: '内容长短',
-  RESPONSE_FORMAT: '正文形式',
-  TONE: '表达语气',
-  BRIEFING_ORDER: '画报顺序',
+const states: Record<string, string> = {
+  EFFECTIVE: '当前采用',
+  SUPERSEDED: '已被更新',
+  WITHDRAWN: '已撤回',
+  EXPIRED: '已到期',
+  UNAVAILABLE: '内容不可用',
+  RECORDED: '已记录',
 };
-const labels: Record<string, string> = {
-  CONCISE: '简洁',
-  DETAILED: '详细',
-  PARAGRAPHS: '自然段',
-  BULLETS: '要点列表',
-  DIRECT: '直接清楚',
-  FRIENDLY: '友好自然',
-  CONCLUSION_FIRST: '结论在前',
-  EVIDENCE_FIRST: '依据在前',
-};
-const sources: Record<string, string> = {
-  SYSTEM: '系统默认',
-  GLOBAL: '总部设置',
-  TENANT: '企业设置',
-  PERSONAL: '个人设置',
-};
+const when = (v: string) => new Date(v).toLocaleString('zh-CN', { hour12: false });
 export function ExpressionPreferencesPanel({ scope, tenant }: { scope: PreferenceScope; tenant?: string }) {
   const client = useMemo(() => preferenceClient(scope, tenant), [scope, tenant]);
-  const [refresh, setRefresh] = useState(0),
-    [saved, setSaved] = useState<PreferencePage>();
-  const data = useRemote((signal) => client.read(signal), [client, refresh]);
-  useEffect(() => setSaved(undefined), [data.value]);
+  const [page, setPage] = useState(0),
+    [refresh, setRefresh] = useState(0);
+  const pending = useContext(RequestPending);
+  const data = useRemote((signal) => client.records(page * 20, signal), [client, page, refresh]);
   return (
-    <section className="admin-section expression-preferences" aria-label="AI内容偏好">
-      <header>
+    <section className="admin-section expression-preferences" aria-label="AI内容偏好规则">
+      <header className="expression-rules-heading">
         <div>
           <h2>AI内容偏好</h2>
           <p className="muted">
             {scope === 'GLOBAL'
-              ? '作为所有企业及用户的AI内容默认表达。'
+              ? '总部录入的全局表达规则'
               : scope === 'TENANT'
-                ? '只影响本企业；未单独设置时继承总部偏好。'
-                : '只影响本人在当前企业的AI内容；未单独设置时继承企业与总部偏好。'}
+                ? '本企业录入与收录的表达规则'
+                : '本人在当前企业录入与收录的表达规则'}
+            ，按时间查看每次记录。
           </p>
         </div>
+        <Button variant="ghost" icon={RefreshCw} disabled={pending} onClick={() => setRefresh((n) => n + 1)}>
+          刷新
+        </Button>
       </header>
       {data.error ? (
-        <Failure
-          error={data.error}
-          retry={() => {
-            setSaved(undefined);
-            setRefresh((n) => n + 1);
-          }}
-        />
+        <Failure error={data.error} retry={() => setRefresh((n) => n + 1)} />
       ) : !data.value ? (
         <Loading />
       ) : (
-        <PreferenceForm
-          key={scope + tenant + refresh}
-          page={saved ?? data.value}
-          client={client}
-          saved={setSaved}
-        />
+        <>
+          {!data.value.items.length ? (
+            <div className="expression-rules-empty">
+              <strong>暂无偏好规则记录</strong>
+              <p className="muted">后续录入或明确收录的偏好将在这里显示，历史更新与撤回记录一并保留。</p>
+            </div>
+          ) : (
+            <ol className="expression-rule-list">
+              {data.value.items.map((item) => (
+                <li key={item.id}>
+                  <div className="expression-rule-meta">
+                    <span>
+                      {item.origin === 'CONVERSATION' ? '会话收录' : '手动录入'} · 版本 {item.revision}
+                    </span>
+                    <time dateTime={item.recordedAt}>{when(item.recordedAt)}</time>
+                    <Badge>{states[item.state]}</Badge>
+                  </div>
+                  <p className="expression-rule-body">
+                    {item.rule ?? '该版本内容已不可用，仅保留记录信息。'}
+                  </p>
+                  {item.provenance && <p className="expression-rule-source">来源：{item.provenance}</p>}
+                </li>
+              ))}
+            </ol>
+          )}
+          {(page > 0 || data.value.hasMore) && (
+            <Pager page={page} next={data.value.hasMore} onPage={setPage} />
+          )}
+          <p className="expression-rule-note muted">
+            “当前采用”表示已接入生成默认表达；“已记录”仅表示保存了规则。个人、企业与总部按各自范围生效，当前明确要求优先。
+          </p>
+        </>
       )}
     </section>
-  );
-}
-function PreferenceForm({
-  page,
-  client,
-  saved,
-}: {
-  page: PreferencePage;
-  client: ReturnType<typeof preferenceClient>;
-  saved: (p: PreferencePage) => void;
-}) {
-  const [values, setValues] = useState(
-    () =>
-      Object.fromEntries(preferenceKeys.map((k) => [k, page.settings[k].choice])) as Record<
-        PreferenceKey,
-        string
-      >,
-  );
-  const [notice, setNotice] = useState('');
-  const submission = useSubmission<{
-    choices: Record<PreferenceKey, string>;
-    expectedRevisions: Record<PreferenceKey, number>;
-  }>();
-  useRequestLock(submission.busy || submission.uncertain);
-  const changed = preferenceKeys.some((k) => values[k] !== page.settings[k].choice);
-  return (
-    <form
-      onSubmit={(event) => {
-        event.preventDefault();
-        void submission.submit(
-          {
-            choices: values,
-            expectedRevisions: Object.fromEntries(
-              preferenceKeys.map((k) => [k, page.settings[k].revision]),
-            ) as Record<PreferenceKey, number>,
-          },
-          async (body, id) => {
-            const next = await client.save(body.choices, body.expectedRevisions, id);
-            saved(next);
-            setNotice('已保存。后续AI生成按有效偏好采用，已有内容保留。');
-          },
-        );
-      }}
-    >
-      <div className="expression-preference-grid">
-        {preferenceKeys.map((k) => (
-          <label key={k}>
-            <span>{names[k]}</span>
-            <select
-              aria-label={names[k]}
-              disabled={!page.canMaintain || submission.busy || submission.uncertain}
-              value={values[k]}
-              onChange={(e) => {
-                setNotice('');
-                setValues((v) => ({ ...v, [k]: e.target.value }));
-              }}
-            >
-              <option value="">{page.scope === 'GLOBAL' ? '使用系统默认' : '继承上层设置'}</option>
-              {page.choices
-                .filter((c) => c.category === k)
-                .map((c) => (
-                  <option key={c.choice} value={c.choice}>
-                    {labels[c.choice]}
-                  </option>
-                ))}
-            </select>
-            <small>
-              当前生效：{labels[page.effective[k].choice]} · {sources[page.effective[k].source]}
-              {page.effective[k].revision > 0 ? ` v${page.effective[k].revision}` : ''}
-            </small>
-          </label>
-        ))}
-      </div>
-      <p className="muted expression-preference-boundary">
-        当前明确要求优先于默认偏好。偏好只调整表达，不改变事实、权限或业务数据；画报顺序只作用于画报。
-      </p>
-      <SubmitError error={submission.error} uncertain={submission.uncertain} />
-      {notice && <p role="status">{notice}</p>}
-      {page.canMaintain && (
-        <div className="expression-preference-actions">
-          <Button
-            type="button"
-            disabled={submission.busy || submission.uncertain}
-            onClick={() => {
-              setNotice('');
-              setValues(
-                Object.fromEntries(preferenceKeys.map((k) => [k, ''])) as Record<PreferenceKey, string>,
-              );
-            }}
-          >
-            全部恢复继承
-          </Button>
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={submission.busy || (!changed && !submission.uncertain)}
-          >
-            {submission.busy ? '保存中…' : submission.uncertain ? '核对并重试' : '保存偏好'}
-          </Button>
-        </div>
-      )}
-    </form>
   );
 }
