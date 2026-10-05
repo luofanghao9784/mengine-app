@@ -75,11 +75,11 @@ test('historical result requires the exact successful task in the original conve
       createConversationClient(async () => response({ ...detail, tasks })).historical(tenant, id, id),
     );
 });
-test('conversation reads reject foreign tenant, conversation and source scope', async () => {
+test('conversation reads allow granted cross-space sources but reject foreign tenants and conversations', async () => {
   for (const v of [
     { ...detail, conversation: { ...conversation, tenantId: id } },
     { ...detail, conversation: { ...conversation, id: space } },
-    { ...detail, tasks: [{ ...task, sources: [{ ...chunk, workspaceId: id }] }] },
+    { ...detail, tasks: [{ ...task, sources: [{ ...chunk, tenantId: id }] }] },
     { ...detail, tasks: [{ ...task, status: 'IMAGINED_SUCCESS' }] },
   ])
     await assert.rejects(
@@ -87,6 +87,8 @@ test('conversation reads reject foreign tenant, conversation and source scope', 
       (e) => e instanceof IdentityError && e.code === 'CONTRACT_MISMATCH',
     );
   assert.deepEqual(await createConversationClient(async () => response(detail)).detail(tenant, id), detail);
+  const crossSpace = { ...detail, tasks: [{ ...task, sources: [{ ...chunk, workspaceId: id }] }] };
+  assert.deepEqual(await createConversationClient(async () => response(crossSpace)).detail(tenant, id), crossSpace);
 });
 test('events reject cursor rollback and unsorted sequences', async () => {
   const event = { seq: 4, taskId: id, kind: 'SUCCEEDED', revision: 2 };

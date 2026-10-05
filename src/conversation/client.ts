@@ -166,8 +166,7 @@ export const isDetail = (v: unknown): v is ConversationDetail =>
       task(t) &&
       t.sources.every(
         (s) =>
-          s.tenantId === (v.conversation as Conversation).tenantId &&
-          s.workspaceId === (v.conversation as Conversation).workspaceId,
+          s.tenantId === (v.conversation as Conversation).tenantId,
       ),
   );
 const id = (v: string) => {
