@@ -30,6 +30,8 @@ export interface TaskTool {
   execute(args: unknown, signal: AbortSignal): Promise<Json>;
   /** Optional model-facing projection; complete output remains in the execution receipt. */
   modelOutput?(value: Json): Json;
+  /** Lossless protocol formatting only, before schema validation. */
+  normalizeArguments?(value: unknown): unknown;
 }
 export interface RuntimeResult {
   status: 'completed' | 'failed' | 'cancelled' | 'limit';

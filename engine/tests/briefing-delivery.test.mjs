@@ -255,3 +255,17 @@ test('editorial rejections provide actionable corrections instead of inviting re
  assert.ok(BRIEFING_EDITORIAL_HINTS.BRIEFING_UNVERIFIED_QUANTITY.includes('Sample observations'));
  assert.ok(BRIEFING_EDITORIAL_HINTS.BRIEFING_NO_BUSINESS_INSIGHT.includes('暂无新内容'));
 });
+
+test('lossless paragraph compatibility reaches the real checked delivery without a retry',async()=>{
+ const {normalizeBriefingArguments}=await import('../dist/runtime/briefing-delivery.js');
+ const paragraphs=['第一段保留公开原文支持的完整事实。','第二段保留对企业的关联判断，不改变业务内容。'];
+ for(const analysis of [paragraphs,JSON.stringify(paragraphs),paragraphs.join('\n\n')]){
+  let received,calls=0;const artifactId=randomUUID();
+  const tool=briefingDeliveryTool({authorize:async()=>{},invoke:async body=>{received=body;return{contractVersion:'1.0',status:'PREPARED',artifactId,title:body.title,visibility:'PRIVATE_AFTER_TASK_SUCCEEDS'};}});
+  const result=await runHarness({prompt:'合成段落格式验收',tools:[tool],finishOnDeliverable:true,hasCompletedDeliverable:hasPreparedBriefing,model:{async *generate(){calls++;yield{type:'tool_call',id:'lossless',name:'deliver_briefing',arguments:JSON.stringify({businessType:'INFO',title:'合成公开新闻主题',summary:'合成公开新闻的完整关联摘要。',analysis})};yield{type:'finish',reason:'tool_calls'};}}});
+  assert.equal(result.status,'completed');assert.equal(calls,1);assert.deepEqual(received.analysis,paragraphs);
+ }
+ for(const analysis of ['只有一个段落，不能凭空补充另一个段落。',JSON.stringify([7,8]),JSON.stringify(Array(5).fill(paragraphs[0])),'x'.repeat(2201)]){
+  const original={analysis};assert.equal(normalizeBriefingArguments(original),original);
+ }
+});

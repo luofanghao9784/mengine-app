@@ -336,6 +336,7 @@ export class AgentTasks {
       let newsSkill: { id: string; version: string } | undefined;
       let newsSearched = false,
         newsRead = false;
+      let newsNoResults = false;
       let answerStep = 0;
       let briefingDatasetReads = 0;
       let briefingDatasetLookups = 0;
@@ -488,6 +489,10 @@ export class AgentTasks {
                   : retrievalClosed && phaseTools.length
                     ? { requireToolCall: true }
                     : {}),
+            ...(newsBriefing && !blockingQuestion
+              ? { requiredTool: newsNoResults ? 'task_control' : !newsSearched ? 'public_search' : !newsRead ? 'read_public_page' :
+                  topicAvailable && !topicSelected ? 'select_briefing_topic' : 'deliver_briefing' }
+              : {}),
             ...(webMode === 'REQUIRED' && !briefingGeneration && !publicRead
               ? {
                   requiredTool: !activated.has('public-research')
@@ -789,7 +794,7 @@ export class AgentTasks {
               }
               const items = await web.find(toolSignal, automaticQuery ?? topic);
               publicSearched = true;
-              if (newsBriefing) newsSearched = true;
+              if (newsBriefing) { newsSearched = true; newsNoResults = items.length === 0; }
               return { items: items.map(({ image: _image, ...item }) => item), untrusted: true };
             },
           },

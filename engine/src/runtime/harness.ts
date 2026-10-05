@@ -416,6 +416,7 @@ export async function runHarness(options: {
               let executionStarted = false;
               let validationIssues: string[] | undefined;
               try {
+                if (tool.normalizeArguments) args = tool.normalizeArguments(args);
                 const violations = validateJsonSchemaValue(parameters, args);
                 if (violations.length) {
                   // Unknown property names come from model arguments and may contain private data.
