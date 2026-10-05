@@ -143,8 +143,8 @@ test('system running opens an independent data subpage; list search and paging s
   await page.getByRole('link', { name: '数据库', exact: true }).click();
   await expect(page.getByRole('heading', { name: '数据接入监测', exact: true })).toBeVisible();
   await expect(page.locator('.engine-wall')).toHaveCount(0);
-  await page.getByLabel('搜索企业').fill('合成企业');
-  await page.getByRole('button', { name: '搜索', exact: true }).click();
+  await expect(page.getByLabel('搜索企业')).toHaveCount(0);
+  await expect(page.getByRole('combobox', { name: '运行状态' })).toHaveCount(0);
   await page.getByRole('button', { name: '下一页' }).click();
   await expect(page.getByRole('heading', { name: '合成企业 21', exact: true })).toBeVisible();
   await page
@@ -154,16 +154,8 @@ test('system running opens an independent data subpage; list search and paging s
   await expect(page.getByRole('heading', { name: '合成企业 21 · 数据接入' })).toBeVisible();
   await expect(page.getByText('处理未完成，详细技术原因尚未确认。', { exact: true })).toBeVisible();
   await page.getByRole('link', { name: '返回企业列表' }).click();
-  await expect(page.getByLabel('搜索企业')).toHaveValue('合成企业');
   await expect(page.getByText('第 2 页', { exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: '合成企业 21', exact: true })).toBeVisible();
-  await page.getByRole('combobox', { name: '运行状态' }).click();
-  await page
-    .getByRole('listbox', { name: '运行状态' })
-    .getByRole('option', { name: '需留意', exact: true })
-    .click();
-  await expect(page.getByText('第 1 页', { exact: true })).toBeVisible();
-  await expect(page.getByText(/匹配 11 家企业/)).toBeVisible();
   await page.getByRole('link', { name: '引擎仪表盘', exact: true }).click();
   await expect(page.locator('.engine-wall')).toBeVisible();
   expect(f.paths.every((p) => new URL(p).pathname.startsWith('/api/platform-admin/'))).toBe(true);
@@ -218,10 +210,9 @@ for (const problem of ['leak', 'wrong'] as const)
   });
 test('empty search remains explicit and does not report a healthy enterprise', async ({ page, context }) => {
   await fixture(context);
-  await page.goto('/platform-admin/#admin=engine&detail=data');
+  await page.goto('/platform-admin/#admin=materials');
   await page.getByLabel('搜索企业').fill('不存在');
   await page.getByRole('button', { name: '搜索', exact: true }).click();
   await expect(page.getByText('没有符合条件的企业。', { exact: true })).toBeVisible();
-  await expect(page.getByText(/匹配 0 家企业/)).toBeVisible();
   await expect(page.locator('.data-ops-tenants a')).toHaveCount(0);
 });

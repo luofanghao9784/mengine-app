@@ -123,7 +123,14 @@ function Directory({ kind, href }: { kind: DataOperationKind; href: (id: string)
   const [attempt, setAttempt] = useState(0);
   const refresh = () => setAttempt((v) => v + 1);
   const data = useRemote(
-    (signal) => api.list(kind, query, state, page * 20, signal),
+    (signal) =>
+      api.list(
+        kind,
+        kind === 'CONNECTIONS' ? '' : query,
+        kind === 'CONNECTIONS' ? 'ALL' : state,
+        page * 20,
+        signal,
+      ),
     [kind, query, state, page, attempt],
   );
   return (
@@ -131,52 +138,46 @@ function Directory({ kind, href }: { kind: DataOperationKind; href: (id: string)
       <div className="data-ops-heading">
         <div>
           <h2>{kindName(kind)}监测</h2>
-          {kind === 'CONNECTIONS' && (
-            <p className="admin-note">汇总企业现场接入与最近取数状态 · 仅运行信息</p>
-          )}
         </div>
         <Button variant="ghost" icon={RefreshCw} onClick={refresh}>
           刷新
         </Button>
       </div>
-      <form
-        className="data-ops-filters"
-        onSubmit={(e) => {
-          e.preventDefault();
-          setQuery(draft.trim());
-          setPage(0);
-        }}
-      >
-        <label>
-          <Search size={18} />
-          <input
-            aria-label="搜索企业"
-            placeholder="搜索企业"
-            value={draft}
-            maxLength={180}
-            onChange={(e) => setDraft(e.target.value)}
-          />
-        </label>
-        <Button type="submit">搜索</Button>
-        <Filter
-          value={state}
-          change={(v) => {
-            setState(v);
+      {kind === 'MATERIALS' && (
+        <form
+          className="data-ops-filters"
+          onSubmit={(e) => {
+            e.preventDefault();
+            setQuery(draft.trim());
             setPage(0);
           }}
-        />
-      </form>
+        >
+          <label>
+            <Search size={18} />
+            <input
+              aria-label="搜索企业"
+              placeholder="搜索企业"
+              value={draft}
+              maxLength={180}
+              onChange={(e) => setDraft(e.target.value)}
+            />
+          </label>
+          <Button type="submit">搜索</Button>
+          <Filter
+            value={state}
+            change={(v) => {
+              setState(v);
+              setPage(0);
+            }}
+          />
+        </form>
+      )}
       {data.error ? (
         <Failure error={data.error} retry={refresh} />
       ) : !data.value ? (
         <Loading />
       ) : (
         <>
-          {kind === 'CONNECTIONS' && (
-            <p className="admin-note">
-              匹配 {n(data.value.matchedTenants)} 家企业 · 下方汇总为这些企业的全部{kindName(kind)}对象
-            </p>
-          )}
           <Metrics value={data.value.counts} />
           <section className="data-ops-list-card" aria-label="企业监测目录">
             <div className="data-ops-list-heading">
