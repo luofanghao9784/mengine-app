@@ -278,7 +278,17 @@ export function AdminShell({
                   <div className="admin-customer-links">{customerLinks}</div>
                 )}
                 <div className="admin-account">
-                  <span title={account}>{account}</span>
+                  <span className="admin-account-avatar" aria-hidden="true">
+                    {Array.from(account.trim())[0] || '账'}
+                  </span>
+                  <div className="admin-account-label">
+                    <strong title={account}>{account}</strong>
+                    <small>
+                      {realm === 'platform' || new URLSearchParams(hash.replace(/^#/, '')).has('support')
+                        ? '总部账号'
+                        : '企业账号'}
+                    </small>
+                  </div>
                   <Button
                     variant="ghost"
                     icon={LogOut}
