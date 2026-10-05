@@ -24,7 +24,7 @@ public class SupportSecurity {
   if(tail.startsWith("governance/"))return tail.equals("governance/capabilities")||tail.matches("governance/members/[0-9a-f-]{36}/role");
   if(Set.of("context","governance","library","knowledge/processing").contains(tail))return method.equals("GET");
   if(tail.startsWith("workspaces/"))return tail.matches("workspaces/[0-9a-f-]{36}/(library|folders|materials|knowledge|sources|lifecycle|experiences)(/.*)?");
-  return tail.matches("(database|company-information|experience-library|general-experiences|profiles|retention|departures|departure-exports|export-batches|object-lifecycle|evaluation|methods)(/.*)?");
+  return tail.matches("(news-sources|database|company-information|experience-library|general-experiences|profiles|retention|departures|departure-exports|export-batches|object-lifecycle|evaluation|methods)(/.*)?");
  }
  @Bean @Order(0) SecurityFilterChain supportSecurityChain(HttpSecurity http,PlatformIdentity identities,SupportAccess access)throws Exception{
   http.securityMatcher("/api/platform-admin/v1/support-access/*/api/**")

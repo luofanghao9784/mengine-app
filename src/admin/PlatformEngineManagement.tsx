@@ -1,3 +1,4 @@
+import { NewsSources } from '../news/NewsSources';
 import { ExpressionPreferencesPanel } from '../preferences/ExpressionPreferencesPanel';
 import { PlatformStorage } from '../operations/PlatformStorage';
 import { useContext } from 'react';
@@ -13,6 +14,7 @@ export function PlatformEngineManagement({ hash }: { hash: string }) {
   const params = new URLSearchParams(hash.replace(/^#/, ''));
   const storage = params.get('tab') === 'storage' || params.get('detail') === 'storage';
   const preferences = params.get('tab') === 'preferences';
+  const news = params.get('tab') === 'news';
   const versions = ['versions', 'methods'].includes(params.get('tab') || '');
   const versionHref = adminHref('platform', 'capabilities', hash, { tab: 'versions' });
   return (
@@ -20,7 +22,7 @@ export function PlatformEngineManagement({ hash }: { hash: string }) {
       <nav className="platform-engine-tabs" aria-label="引擎管理板块" inert={pending || undefined}>
         <a
           href={adminHref('platform', 'capabilities', hash)}
-          aria-current={!versions && !storage && !preferences ? 'page' : undefined}
+          aria-current={!versions && !storage && !preferences && !news ? 'page' : undefined}
         >
           能力与规则
         </a>
@@ -39,8 +41,16 @@ export function PlatformEngineManagement({ hash }: { hash: string }) {
         >
           内容偏好
         </a>
+        <a
+          href={adminHref('platform', 'capabilities', hash, { tab: 'news' })}
+          aria-current={news ? 'page' : undefined}
+        >
+          资讯来源
+        </a>
       </nav>
-      {preferences ? (
+      {news ? (
+        <NewsSources />
+      ) : preferences ? (
         <ExpressionPreferencesPanel scope="GLOBAL" />
       ) : storage ? (
         <PlatformStorage hash={hash} embedded />

@@ -96,6 +96,7 @@ export class AgentTasks {
     let denied = false;
     let realtimeAvailable = false;
     let publicQuery: string | undefined;
+    let newsSeen: { url: string; sha256: string }[] = [];
     let candidatesAllowed: boolean | undefined;
     let contextAvailable: boolean | undefined;
     let answerStream = false;
@@ -151,6 +152,11 @@ export class AgentTasks {
           }
         }
         realtimeAvailable = response.realtimeVersion === '1.0';
+        if (Array.isArray(response.newsSeen) && response.newsSeen.length <= 200)
+          newsSeen = response.newsSeen.filter(
+            (s): s is { url: string; sha256: string } =>
+              isRecord(s) && typeof s.url === 'string' && typeof s.sha256 === 'string',
+          );
         const query = response.publicQuery ?? '';
         if (
           typeof query !== 'string' ||
@@ -258,7 +264,13 @@ export class AgentTasks {
       if (publicQuery && !this.config.publicWeb) throw new RuntimeError('PUBLIC_WEB_NOT_CONFIGURED');
       const web =
         publicQuery && this.config.publicWeb
-          ? new PublicWebTask(publicQuery, this.config.publicWeb.reader, this.config.publicWeb.search)
+          ? new PublicWebTask(
+              publicQuery,
+              this.config.publicWeb.reader,
+              this.config.publicWeb.search,
+              briefingGeneration,
+              newsSeen,
+            )
           : undefined;
       const catalog = this.config.catalog ?? (await TrustedCatalog.load());
       if (candidatesAllowed && publicQuery && this.config.candidates)

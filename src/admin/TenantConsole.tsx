@@ -1,3 +1,4 @@
+import { NewsSources } from '../news/NewsSources';
 import { ExpressionPreferencesPanel } from '../preferences/ExpressionPreferencesPanel';
 import './tenant-redesign.css';
 import { SupportRecords } from '../platform/SupportRecords';
@@ -215,6 +216,7 @@ export function TenantConsole({
             {[
               ['background', '企业背景'],
               ['preferences', 'AI内容偏好'],
+              ...(governance.value.canConfigure ? [['news', '资讯来源']] : []),
               ...(governance.value.canConfigure
                 ? [
                     ['records', '管理记录'],
@@ -240,7 +242,9 @@ export function TenantConsole({
               </a>
             ))}
           </nav>
-          {secondary === 'preferences' ? (
+          {secondary === 'news' && governance.value.canConfigure ? (
+            <NewsSources key={tenant} tenant={tenant} />
+          ) : secondary === 'preferences' ? (
             <ExpressionPreferencesPanel key={tenant} scope="TENANT" tenant={tenant} />
           ) : secondary === 'records' && governance.value.canConfigure ? (
             <TenantAdminHome

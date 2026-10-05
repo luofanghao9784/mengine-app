@@ -251,6 +251,16 @@
   height: 16px;
   flex: none;
 }
+.generation-type-tags .generation-type:has(.generation-type-unavailable) {
+  flex-wrap: wrap;
+  gap: 2px 5px;
+  padding-block: 5px;
+}
+.generation-type-unavailable {
+  flex-basis: 100%;
+  font-size: 10px;
+  line-height: 12px;
+}
 .generation-type input {
   position: absolute;
   opacity: 0;

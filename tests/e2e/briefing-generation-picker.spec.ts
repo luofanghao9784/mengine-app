@@ -240,3 +240,15 @@ test('生成首页保留原入口，数量页只有一个数字，类型复用�
   await expect(picker(page).getByRole('button', { name: '生成 3 张' })).toHaveClass(/generation-icon-button/);
   expect(posts).toHaveLength(0);
 });
+
+test('资讯未接入时禁选，默认与其他类型仍可操作', async ({ page }) => {
+  const { posts } = await pickerFixture(page);
+  await page.goto(home);
+  await choose(page, 3);
+  await expect(picker(page).getByRole('checkbox', { name: '资讯', exact: true })).toBeDisabled();
+  await expect(picker(page).getByText('未接入', { exact: true })).toBeVisible();
+  await picker(page).getByRole('checkbox', { name: '洞察', exact: true }).check();
+  await picker(page).getByRole('button', { name: '生成 3 张' }).click();
+  await expect.poll(() => posts.length).toBe(1);
+  expect(posts[0].types).toEqual(['INSIGHT']);
+});

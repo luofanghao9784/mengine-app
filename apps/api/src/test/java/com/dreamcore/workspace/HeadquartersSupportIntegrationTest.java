@@ -36,6 +36,16 @@ class HeadquartersSupportIntegrationTest {
  @AfterEach void cleanup(){db.update("DELETE FROM platform_sessions WHERE account_id=?",hq);db.update("DELETE FROM platform_roles WHERE account_id=?",hq);db.update("DELETE FROM platform_accounts WHERE account_id=?",hq);SupportContext.set(null);}
  Browser login()throws Exception{var b=new Browser();var r=b.call("POST","/api/platform-admin/v1/auth/login",Map.of("username",login,"password","synthetic-hq-123"),b.csrf("/api/platform-admin/v1/auth"));assertEquals(200,r.statusCode(),r.body());b.token=b.csrf("/api/platform-admin/v1/auth");return b;}
  String proxy(String id,String suffix){return "/api/platform-admin/v1/support-access/"+id+suffix;}
+ @Test void newsSelectionThroughSupportRetainsHeadquartersActorAndScope()throws Exception{
+  UUID source=UUID.randomUUID();db.update("INSERT INTO news_sources(id,name,url,format,enabled,changed_by) VALUES (?,'合成资讯',?,'RSS',true,?)",source,"https://news.example.org/"+source,hq);
+  var b=login();String id=b.enter("ADJUSTMENT"),root=proxy(id,"/api/v1/tenants/"+tenant+"/news-sources");
+  assertEquals(200,b.call("GET",root,null,null).statusCode());
+  assertEquals(403,b.call("POST",root,Map.of("sourceId",source,"revision",1,"enabled",true),null).statusCode());
+  var selected=b.call("POST",root,Map.of("sourceId",source,"revision",1,"enabled",true),b.token);assertEquals(200,selected.statusCode(),selected.body());
+  assertEquals(hq,db.queryForObject("SELECT changed_by FROM tenant_news_sources WHERE tenant_id=? AND source_id=?",UUID.class,tenant,source));
+  assertEquals(1,db.queryForObject("SELECT count(*) FROM headquarters_support_changes WHERE access_id=?::uuid AND table_name='tenant_news_sources'",Integer.class,id));
+  assertEquals(403,b.call("GET",proxy(id,"/api/v1/tenants/"+other+"/news-sources"),null,null).statusCode());
+ }
  @Test void scopedAccessKeepsActorPrivatePermissionsCsrfAuditAndCustomerSession()throws Exception{
   var b=login();String customerToken=b.csrf("/api/v1/auth");assertEquals(200,b.call("POST","/api/v1/auth/login",Map.of("email",employee+"@example.test","password","synthetic-123"),customerToken).statusCode());
   String id=b.enter("TEST"),root=proxy(id,"/api/v1/tenants/"+tenant);

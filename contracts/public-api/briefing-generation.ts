@@ -37,6 +37,7 @@ export interface GenerationQuota {
 }
 export interface GenerationState {
   quota?: GenerationQuota;
+  capabilities?: Record<string, { available: boolean; reason: string | null }>;
   policies: GenerationPolicy[];
   batches: GenerationBatch[];
 }

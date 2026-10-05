@@ -340,12 +340,11 @@ class BriefingGenerationIntegrationTest {
   var manual=manual();generation.tick(p);assertEquals("RUNNING",generation.get(actor,tenant,manual.id()).status());generation.cancel(actor,tenant,manual.id());assertEquals("CANCELLED",generation.get(actor,tenant,manual.id()).status());
   assertThrows(IdentityException.class,()->generation.get(reader,tenant,manual.id()));
  }
- @Test void infoWaitsForARealConfiguredSource(){var b=generation.generate(actor,tenant,UUID.randomUUID(),space,"INFO");generation.tick(policy());assertEquals("NEWS_SOURCE_UNAVAILABLE",generation.get(actor,tenant,b.id()).reason());assertNull(generation.get(actor,tenant,b.id()).taskId());}
+ @Test void infoRejectsWithoutAConfiguredEnterpriseSource(){assertEquals("BRIEFING_INFO_UNAVAILABLE",assertThrows(IdentityException.class,()->generation.generate(actor,tenant,UUID.randomUUID(),space,"INFO")).code);assertEquals(0,generation.state(actor,tenant).quota().reserved());assertEquals(0,db.queryForObject("SELECT count(*) FROM conversation_tasks WHERE tenant_id=?",Integer.class,tenant));}
  @Test void readAndRefreshNeverSubmitTasks(){generation.state(actor,tenant);recommendations.list(actor,tenant,space,0,20,null,true);assertEquals(0,db.queryForObject("SELECT count(*) FROM conversation_tasks WHERE tenant_id=?",Integer.class,tenant));}
  @Test void unavailableInfoDoesNotBlockDataInitialization(){
-  var info=generation.generate(actor,tenant,UUID.randomUUID(),space,"INFO");UUID p=policy();generation.tick(p);
-  upload("marker 与资讯独立的经营资料。",true);generation.tick(p);
-  assertEquals("WAITING_DATA",generation.get(actor,tenant,info.id()).status());
+  assertThrows(IdentityException.class,()->generation.generate(actor,tenant,UUID.randomUUID(),space,"INFO"));
+  upload("marker 与资讯独立的经营资料。",true);UUID p=policy();generation.tick(p);
   assertTrue(generation.state(actor,tenant).batches().stream().anyMatch(b->b.taskId()!=null&&b.businessType()==null));
  }
  @Test void readingSnapshotSurvivesNewCardsAndStillChecksAuthority(){
@@ -372,6 +371,8 @@ class BriefingGenerationIntegrationTest {
  @Autowired com.dreamcore.workspace.context.TaskContextService context;
  @Test @org.springframework.transaction.annotation.Transactional
  void contextualInfoUsesFixedPublicSourceAndAuthorizedPrivateEvidence(){
+  UUID newsSource=UUID.randomUUID();db.update("INSERT INTO news_sources(id,name,url,format,enabled,changed_by) VALUES(?,'合成固定资讯源','https://news.example.org/updates','PAGE',true,?) ON CONFLICT(url) DO NOTHING",newsSource,actor);
+  newsSource=db.queryForObject("SELECT id FROM news_sources WHERE url='https://news.example.org/updates'",UUID.class);db.update("INSERT INTO tenant_news_sources(tenant_id,source_id,enabled,changed_by) VALUES(?,?,true,?)",tenant,newsSource,actor);
   var f=upload("marker 本企业经营青少年舞蹈教育，本项目关注课程安全。",true);
   var clock=new com.dreamcore.workspace.plans.PlanClock();
   var news=new BriefingGenerationService(db,conversations,contents,identities,access,departure,new AgentSettings("verification",true,false),clock,true,"https://news.example.org/updates",0,6);

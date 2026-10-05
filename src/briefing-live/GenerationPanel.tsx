@@ -23,7 +23,7 @@ const label: Record<string, string> = {
 };
 const reasons: Record<string, string> = {
   TENANT_SERVICE_SUSPENDED: '企业服务暂停时，本次生成未完成；已发生的任务结果保留，恢复后可按需重新生成。',
-  NEWS_SOURCE_UNAVAILABLE: '资讯来源尚未接入，接入后会自动筛选相关资讯。',
+  NEWS_SOURCE_UNAVAILABLE: '资讯来源尚未接入，请选择其他类型。',
   NEWS_CONTEXT_UNAVAILABLE: '请先在资料库准备企业或项目资料。',
   RESULT_NOT_READY: '尚无已完成并保存到资料库的成果。',
   NO_MATERIALS: '先将资料加入资料库，资料就绪后会自动继续。',
@@ -218,22 +218,39 @@ export function GenerationPanel({ generation }: { generation: BriefingGeneration
                     <legend>画报类型</legend>
                     {generationChoices.map((choice) => {
                       const Icon = choice.value ? briefingTypeIcons[choice.value] : Sparkles;
+                      const unavailable = choice.value === 'INFO' && !generation.capabilities.INFO?.available;
                       return (
                         <label
                           key={choice.value}
                           className="magazine-type generation-type"
                           data-briefing-type={choice.value ? choice.label : '全部'}
+                          title={
+                            unavailable
+                              ? generation.capabilities.INFO?.reason === 'PUBLIC_WEB_UNAVAILABLE'
+                                ? '资讯联网能力未启用'
+                                : '资讯来源未接入'
+                              : undefined
+                          }
                         >
                           <input
                             type="checkbox"
+                            aria-label={choice.label}
                             checked={choice.value ? types.includes(choice.value) : types.length === 0}
                             disabled={
-                              !!choice.value && !types.includes(choice.value) && types.length >= quantity
+                              unavailable ||
+                              (!!choice.value && !types.includes(choice.value) && types.length >= quantity)
                             }
                             onChange={() => (choice.value ? toggleType(choice.value) : setTypes([]))}
                           />
                           <Icon size={16} strokeWidth={1.5} />
                           <span>{choice.label}</span>
+                          {unavailable && (
+                            <small className="generation-type-unavailable">
+                              {generation.capabilities.INFO?.reason === 'PUBLIC_WEB_UNAVAILABLE'
+                                ? '未启用'
+                                : '未接入'}
+                            </small>
+                          )}
                         </label>
                       );
                     })}
@@ -243,7 +260,13 @@ export function GenerationPanel({ generation }: { generation: BriefingGeneration
                     icon={Sparkles}
                     aria-label={`生成 ${quantity} 张`}
                     title={`生成 ${quantity} 张`}
-                    disabled={remaining < count || types.length > quantity || submission.busy || !!active}
+                    disabled={
+                      remaining < count ||
+                      types.length > quantity ||
+                      (types.includes('INFO') && !generation.capabilities.INFO?.available) ||
+                      submission.busy ||
+                      !!active
+                    }
                     onClick={() => {
                       generation.generate(quantity, types);
                       setStep('start');

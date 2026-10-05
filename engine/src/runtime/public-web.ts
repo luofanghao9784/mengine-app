@@ -1,3 +1,4 @@
+import { discoverNews, pagePublication } from './news-discovery.js';
 import { request } from 'node:https';
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
@@ -17,6 +18,7 @@ export type WebSource = {
   retrievedAt: string;
   kind: 'SEARCH' | 'PAGE';
   truncated: boolean;
+  publishedAt?: string;
 };
 export type WebResponse = { status: number; headers: Record<string, string | undefined>; bytes: Buffer };
 export type PinnedRequest = (url: URL, address: Address, signal: AbortSignal) => Promise<WebResponse>;
@@ -168,6 +170,14 @@ export class PublicReader {
       throw new RuntimeError(signal.aborted ? 'CANCELLED' : 'PUBLIC_READ_FAILED');
     }
   }
+  async discover(url: string, signal: AbortSignal) {
+    const fetched = await this.fetch(url, signal);
+    const type = fetched.response.headers['content-type'] ?? '';
+    if (!/^(text\/(html|plain|xml)|application\/(rss\+xml|atom\+xml|xml))(;|$)/i.test(type))
+      throw new RuntimeError('PUBLIC_FORMAT_UNSUPPORTED');
+    const body = new TextDecoder('utf-8', { fatal: true }).decode(fetched.response.bytes);
+    return discoverNews(body, fetched.url);
+  }
   async read(url: string, signal: AbortSignal) {
     const fetched = await this.fetch(url, signal),
       type = fetched.response.headers['content-type'] || '';
@@ -183,7 +193,9 @@ export class PublicReader {
     const extracted = type.toLowerCase().startsWith('text/html')
       ? extractHtml(text)
       : { title: new URL(fetched.url).hostname, text, truncated: false };
-    return source(fetched.url, extracted.title, extracted.text, 'PAGE', extracted.truncated);
+    const result = source(fetched.url, extracted.title, extracted.text, 'PAGE', extracted.truncated);
+    const publishedAt = pagePublication(text);
+    return publishedAt ? { ...result, publishedAt } : result;
   }
 }
 async function abortable<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
@@ -316,6 +328,8 @@ export class PublicWebTask {
     readonly query: string,
     private readonly reader: PublicReader,
     private readonly search?: PublicSearch,
+    private readonly news = false,
+    private readonly seen: { url: string; sha256: string }[] = [],
   ) {}
   async find(signal: AbortSignal) {
     this.searchPromise ??= this.findOnce(signal);
@@ -325,6 +339,16 @@ export class PublicWebTask {
   private async findOnce(signal: AbortSignal) {
     if (/^https:\/\//i.test(this.query)) {
       const url = publicUrl(this.query);
+      if (this.news) {
+        for (const candidate of (await this.reader.discover(url.href, signal)).slice(0, 2)) {
+          const item = await this.reader.read(publicUrl(candidate.url).href, signal);
+          if (candidate.publishedAt && !item.publishedAt) item.publishedAt = candidate.publishedAt;
+          if (item.publishedAt && Date.parse(item.publishedAt) < Date.now() - 30 * 86400000) continue;
+          if (this.seen.some((old) => old.url === item.url && old.sha256 === item.sha256)) continue;
+          this.sources.set(item.id, item);
+        }
+        return;
+      }
       const item = source(url.href, url.hostname, '用户指定公开网址，尚未读取页面', 'SEARCH');
       this.sources.set(item.id, item);
     } else {
@@ -343,6 +367,7 @@ export class PublicWebTask {
       this.reads++;
       promise = this.reader.read(item.url, signal).then((read) => {
         const updated = { ...read, id };
+        if (!updated.publishedAt && item.publishedAt) updated.publishedAt = item.publishedAt;
         this.sources.set(id, updated);
         return updated;
       });

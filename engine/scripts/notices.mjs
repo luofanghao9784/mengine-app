@@ -14,7 +14,12 @@ for (const [path, entry] of Object.entries(lock.packages).sort(([a], [b]) => a.l
   if (!path || entry.dev) continue;
   const metadata = JSON.parse(await readFile(join(root, path, 'package.json'), 'utf8'));
   if (metadata.version !== entry.version) throw new Error(`Install differs from lock: ${path}`);
-  const license = (await readFile(join(root, path, 'LICENSE'), 'utf8')).trim();
+  let license;
+  try { license = (await readFile(join(root, path, 'LICENSE'), 'utf8')).trim(); }
+  catch (error) {
+    if(error.code !== 'ENOENT') throw error;
+    license = (await readFile(join(root, 'vendor-licenses', metadata.name, metadata.version, 'LICENSE'), 'utf8')).trim();
+  }
   text += `| ${metadata.name} | ${metadata.version} | ${metadata.license} |\n`;
   if (!groups.has(license)) groups.set(license, []);
   groups.get(license).push(`${metadata.name}@${metadata.version}`);

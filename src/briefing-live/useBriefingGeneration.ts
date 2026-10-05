@@ -16,6 +16,9 @@ export type GenerationSlot = { batch: GenerationBatch; item?: RecommendationItem
 /** One owner per briefing page: filtering and refreshing the feed must not resubmit or lose a batch. */
 export function useBriefingGeneration(tenant: string, workspace?: string, businessType?: string) {
   const { expire } = useSession();
+  const [capabilities, setCapabilities] = useState<
+    Record<string, { available: boolean; reason: string | null }>
+  >({});
   const [quota, setQuota] = useState({ limit: 6, used: 0, reserved: 0, remaining: 6 });
   const [requested, setRequested] = useViewState<string | undefined>(
     tenant,
@@ -83,6 +86,7 @@ export function useBriefingGeneration(tenant: string, workspace?: string, busine
         });
         setBatches(state.batches);
         if (state.quota) setQuota(state.quota);
+        setCapabilities(state.capabilities ?? {});
         setReady(true);
         setError(undefined);
         setSlots((old) =>
@@ -163,6 +167,7 @@ export function useBriefingGeneration(tenant: string, workspace?: string, busine
     }
   };
   return {
+    capabilities,
     quota,
     progress: {
       total: selectionIds.length,

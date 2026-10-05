@@ -1547,6 +1547,13 @@
                 },
                 "truncated": {
                   "type": "boolean"
+                },
+                "publishedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
                 }
               },
               "required": [

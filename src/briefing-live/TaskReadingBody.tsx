@@ -54,10 +54,10 @@ export function TaskReadingBody({
     [tenant, task.conversationId, task.taskId, task.taskRevision, task.attempt, hasBriefing, attempt],
   );
   const state = readableTask(data.value, task);
-  const headerReady = state === 'ready' && !data.error && !generated.error &&
-    (!hasBriefing || !!generated.value);
-  const title = headerReady ? generated.value?.content.title ?? data.value?.conversation.title : undefined;
-  const date = headerReady ? generated.value?.content.generatedAt ?? result?.createdAt : undefined;
+  const headerReady =
+    state === 'ready' && !data.error && !generated.error && (!hasBriefing || !!generated.value);
+  const title = headerReady ? (generated.value?.content.title ?? data.value?.conversation.title) : undefined;
+  const date = headerReady ? (generated.value?.content.generatedAt ?? result?.createdAt) : undefined;
   const contentLabel = generated.value?.content.schemaVersion === 'briefing-data-v1' ? '数据分析' : undefined;
   useEffect(() => {
     onHeader?.(title && date ? { title, date, contentLabel } : undefined);
@@ -179,6 +179,14 @@ export function TaskReadingBody({
               <a href={s.url} target="_blank" rel="noopener noreferrer">
                 {s.title}
               </a>
+              <span className="muted">
+                {' '}
+                ·{' '}
+                {s.publishedAt
+                  ? `发布于 ${new Date(s.publishedAt).toLocaleDateString('zh-CN')}`
+                  : '发布日期未核实'}{' '}
+                · 检索于 {new Date(s.retrievedAt).toLocaleDateString('zh-CN')}
+              </span>
             </p>
           ))}
           {result.originals.map((s) => (

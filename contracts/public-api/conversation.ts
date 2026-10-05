@@ -31,6 +31,7 @@ export interface WebSource {
   excerpt: string;
   sha256: string;
   retrievedAt: string;
+  publishedAt?: string | null;
   kind: 'SEARCH' | 'PAGE';
   truncated: boolean;
 }
