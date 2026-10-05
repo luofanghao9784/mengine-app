@@ -195,7 +195,9 @@ public class BriefingGenerationService {
         }
         if(!tasksEnabled||!agents.enabled()){waiting(batch,"WAITING_CAPABILITY","MODEL_NOT_CONFIGURED");return;}
         Instant day=now.atZone(ZoneOffset.UTC).toLocalDate().atStartOfDay(ZoneOffset.UTC).toInstant();
-        int used=db.queryForObject("SELECT count(*) FROM briefing_generation_batches WHERE tenant_id=? AND owner_id=? AND task_id IS NOT NULL AND started_at>=?",Integer.class,tenant,actor,time(day));
+        // The latest reset within this UTC day starts a new owner budget without rewriting history.
+        Instant ownerSince=db.queryForObject("SELECT coalesce(max(reset_at),?) FROM briefing_quota_resets WHERE tenant_id=? AND owner_id=? AND reset_at>=? AND reset_at<=?",Timestamp.class,time(day),tenant,actor,time(day),time(now)).toInstant();
+        int used=db.queryForObject("SELECT count(*) FROM briefing_generation_batches WHERE tenant_id=? AND owner_id=? AND task_id IS NOT NULL AND started_at>=?",Integer.class,tenant,actor,time(ownerSince));
         int concurrent=db.queryForObject("SELECT count(*) FROM briefing_generation_batches b JOIN conversation_tasks t ON t.id=b.task_id WHERE b.tenant_id=? AND b.owner_id=? AND t.status IN ('QUEUED','RUNNING')",Integer.class,tenant,actor);
         int tenantUsed=db.queryForObject("SELECT count(*) FROM briefing_generation_batches WHERE tenant_id=? AND started_at>=?",Integer.class,tenant,time(day));
         int tenantConcurrent=db.queryForObject("SELECT count(*) FROM briefing_generation_batches b JOIN conversation_tasks t ON t.id=b.task_id WHERE b.tenant_id=? AND t.status IN ('QUEUED','RUNNING')",Integer.class,tenant);

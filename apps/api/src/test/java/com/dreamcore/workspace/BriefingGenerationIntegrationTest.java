@@ -432,6 +432,29 @@ class BriefingGenerationIntegrationTest {
   time.set(time.get().plusSeconds(86400));limited.tick(p);assertEquals("RUNNING",limited.get(actor,tenant,more.id()).status());
  }
 
+ @Test @org.springframework.transaction.annotation.Transactional
+ void administrativeResetRestoresOnlyThisOwnersCurrentDayBudgetAndPreservesHistory(){
+  upload("marker 重置额度。",true);
+  var time=new java.util.concurrent.atomic.AtomicReference<>(java.time.Instant.now().plusSeconds(86400));
+  var clock=new com.dreamcore.workspace.plans.PlanClock(){@Override public java.time.Instant now(){return time.get();}};
+  var limited=new BriefingGenerationService(db,conversations,contents,identities,access,departure,new AgentSettings("verification",true,false),clock,true,"",0,1);
+  UUID p=policy();limited.tick(p);complete(conversations.claim());limited.tick(p);
+  var more=limited.generate(actor,tenant,UUID.randomUUID(),space,"INSIGHT");limited.tick(p);
+  assertEquals("DAILY_RUN_LIMIT",limited.get(actor,tenant,more.id()).reason());
+  db.update("INSERT INTO briefing_quota_resets(id,tenant_id,owner_id,reset_at,reason) VALUES (?,?,?,?,?)",UUID.randomUUID(),tenant,reader,java.sql.Timestamp.from(time.get().plusSeconds(1)),"合成其他账号重置");
+  db.update("INSERT INTO briefing_quota_resets(id,tenant_id,owner_id,reset_at,reason) VALUES (?,?,?,?,?)",UUID.randomUUID(),tenant,actor,java.sql.Timestamp.from(time.get().minusSeconds(86400)),"合成昨日重置");
+  time.set(time.get().plusSeconds(2));limited.tick(p);
+  assertEquals("DAILY_RUN_LIMIT",limited.get(actor,tenant,more.id()).reason());
+  assertNull(limited.get(actor,tenant,more.id()).taskId());
+  db.update("INSERT INTO briefing_quota_resets(id,tenant_id,owner_id,reset_at,reason) VALUES (?,?,?,?,?)",UUID.randomUUID(),tenant,actor,java.sql.Timestamp.from(time.get()),"合成当前账号重置");
+  time.set(time.get().plusSeconds(1));limited.tick(p);
+  assertEquals("RUNNING",limited.get(actor,tenant,more.id()).status());
+  assertEquals(2,db.queryForObject("SELECT count(*) FROM briefing_generation_batches WHERE tenant_id=? AND owner_id=? AND task_id IS NOT NULL",Integer.class,tenant,actor));
+  complete(conversations.claim());limited.tick(p);
+  var again=limited.generate(actor,tenant,UUID.randomUUID(),space,"INSIGHT");limited.tick(p);
+  assertEquals("DAILY_RUN_LIMIT",limited.get(actor,tenant,again.id()).reason(),"reset restores the configured budget rather than disabling the limit");
+ }
+
  @Test void backgroundMigrationPreservesMixedUserHistoryCardsAndMisleadingTitles() throws Exception {
   String schema="background_migration_"+UUID.randomUUID().toString().replace("-","");
   UUID system=UUID.randomUUID(),mixed=UUID.randomUUID(),user=UUID.randomUUID(),systemTask=UUID.randomUUID(),mixedSystem=UUID.randomUUID(),mixedUser=UUID.randomUUID(),userTask=UUID.randomUUID(),policy=UUID.randomUUID(),artifact=UUID.randomUUID();

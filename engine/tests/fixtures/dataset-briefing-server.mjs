@@ -13,7 +13,8 @@ const agent = new AgentTasks({
     lastUsage: null,
     usage: { inputTokens: 0, outputTokens: 0 },
     async *generate(request) {
-      assert.ok(request.tools.some((t) => t.name === 'compare_dataset'));
+      assert.ok(request.tools.some((t) => t.name === (request.requiredTool ?? 'compare_dataset')));
+      if (request.requiredTool) assert.deepEqual(request.tools.map(t => t.name), ['deliver_briefing']);
       const results = request.messages
         .flatMap((m) => m.content)
         .filter((c) => c.type === 'tool_result')
