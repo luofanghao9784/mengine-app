@@ -25,7 +25,7 @@ public class DatasetTaskContext {
             (SELECT pick.snapshot_id FROM briefing_dataset_selections pick WHERE pick.task_id=? AND pick.dataset_id=d.id AND NOT pick.invalidated),d.current_snapshot)
           WHERE d.tenant_id=? AND d.status='ACTIVE' AND NOT d.scrubbed AND NOT s.scrubbed
            AND (?<>'SELECTED' OR EXISTS(SELECT 1 FROM briefing_dataset_selections pick WHERE pick.task_id=? AND pick.dataset_id=d.id AND pick.snapshot_id=s.id AND NOT pick.invalidated))
-           AND (?='AUTHORIZED_LIBRARY' OR d.workspace_id=?::uuid) AND departure_content_readable(?,d.tenant_id,d.workspace_id)
+           AND (? IN ('AUTHORIZED_LIBRARY','SELECTED') OR d.workspace_id=?::uuid) AND departure_content_readable(?,d.tenant_id,d.workspace_id)
            AND (?::uuid IS NULL OR d.id=?::uuid) AND (?::uuid IS NULL OR s.id=?::uuid)
            AND (?='' OR strpos(lower(d.name||' '||d.description),lower(?))>0)
           ORDER BY d.name,d.id LIMIT ? OFFSET ?
