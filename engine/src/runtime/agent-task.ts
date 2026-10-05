@@ -755,7 +755,7 @@ export class AgentTasks {
             parameters: webMode
               ? {
                   type: 'object',
-                  properties: { query: { type: 'string', maxLength: 120 } },
+                  properties: { query: { type: 'string', description: 'Public keywords only; at most 120 characters. Validated before transport.' } },
                   required: ['query'],
                   additionalProperties: false,
                 }

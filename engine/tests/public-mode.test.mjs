@@ -28,3 +28,39 @@ test('required mode cannot finish without both a successful search and an actual
  assert.throws(()=>requirePublicEvidence('REQUIRED',true,false),/PUBLIC_SEARCH_REQUIRED/);
  requirePublicEvidence('REQUIRED',true,true);
 });
+
+for (const mode of ['web:optional:v1', 'web:required:v1']) {
+ test(`actual AgentTasks Harness registers ${mode} and completes its authorized flow`, async t => {
+  let calls=0, searches=0, reads=0;
+  const platform=createServer((req,res)=> {
+   if(usageFixture(req,res)) return;
+   if(req.url.endsWith('/check')) return json(res,{allowed:true,executionClass:'verification',publicQuery:mode});
+   if(req.url.endsWith('/execution/open')) return json(res,{accepted:true,policy:'READ_ONLY_PRIVATE_V1'});
+   if(req.url.endsWith('/execution/tool')) return json(res,{accepted:true});
+   return json(res,{code:'unexpected'},404);
+  });
+  const url=await listen(platform); t.after(()=>close(platform));
+  const required=mode==='web:required:v1';
+  const agent=new AgentTasks({platformBaseUrl:url,executionClass:'verification',modelName:'synthetic-web-mode',
+   publicWeb:{reader:{read:async()=>{reads++;return {...source,kind:'PAGE'}}},search:{search:async()=>{searches++;return [source]}}},
+   createModel:()=>({async *generate(request) {
+    calls++;
+    const steps=[['activate_skill',{id:'public-research',version:'1.0.0'}],['public_search',{query:'健身 会员服务'}],['read_public_page',{id:source.id}]];
+    if(required && calls<=steps.length) {
+     const [name,args]=steps[calls-1];assert.ok(request.tools.some(t=>t.name===name));
+     yield {type:'tool_call',id:'web-'+calls,name,arguments:JSON.stringify(args)};
+     yield {type:'finish',reason:'tool_calls'};return;
+    }
+    yield {type:'text',text:required?'已核验合成公开来源。':'已有背景足够，本次无需联网。'};
+    yield {type:'finish',reason:'stop'};
+   }})});
+  t.after(()=>agent.stop());
+  const result=await agent.run({contractVersion:'1.5',taskId:randomUUID(),attemptId:randomUUID(),prompt:'合成业务背景分析'},new AbortController().signal);
+  assert.equal(result.modelCalls,required?4:1);
+  assert.equal(searches,required?1:0);assert.equal(reads,required?1:0);
+  assert.ok(result.text.includes(required?'已核验':'无需联网'));
+ });
+}
+test('keyword length remains enforced before transport with the compatible schema',()=>{
+ assert.throws(()=>publicKeywords('x'.repeat(121)),/PUBLIC_QUERY_DENIED/);
+});
