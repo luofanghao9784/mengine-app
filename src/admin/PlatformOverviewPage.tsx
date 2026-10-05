@@ -145,9 +145,9 @@ export function PlatformOverviewPage({ hash }: { hash: string }) {
             <details className="platform-overview-notes">
               <summary>监测范围与状态口径</summary>
               <p>
-                仅汇总已接入的运行记录，不代表全部服务正常。数据接入与资料处理的必要排查信息在数据处理查看；监测未接入时，当前情况未知。
+                仅汇总已接入的运行记录，不代表全部服务正常。数据库查看接入与取数，资料库查看资料解析；监测未接入时，当前情况未知。
               </p>
-              <a href={adminHref('platform', 'engine', hash, { detail: 'data' })}>查看数据运行</a>
+              <a href={adminHref('platform', 'database', hash)}>查看数据库运行</a>
             </details>
           </div>
         </section>

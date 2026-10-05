@@ -35,8 +35,8 @@ export function PlatformConsole({ logout }: { logout: () => void }) {
         ) : (
           <PlatformHome embedded />
         )
-      ) : page === 'data' ? (
-        <PlatformDataOperations hash={hash} />
+      ) : page === 'database' || page === 'materials' ? (
+        <PlatformDataOperations hash={hash} kind={page === 'materials' ? 'MATERIALS' : 'CONNECTIONS'} />
       ) : page === 'engine' ? (
         <EngineTelemetryWall scope="platform" />
       ) : page === 'usage' ? (

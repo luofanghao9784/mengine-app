@@ -84,13 +84,14 @@ function Filter({ value, change }: { value: DataOperationState; change: (v: Data
     </Select>
   );
 }
-export function PlatformDataOperations({ hash }: { hash: string }) {
+export function PlatformDataOperations({ hash, kind }: { hash: string; kind: DataOperationKind }) {
   const p = new URLSearchParams(hash.slice(1));
-  const kind: DataOperationKind = p.get('kind') === 'MATERIALS' ? 'MATERIALS' : 'CONNECTIONS';
   const supplied = p.get('enterprise');
   const tenant = uuid(supplied) ? supplied : null;
   const href = (k: DataOperationKind, enterprise?: string) =>
-    adminHref('platform', 'data', hash, { kind: k, ...(enterprise ? { enterprise } : {}) });
+    adminHref('platform', k === 'MATERIALS' ? 'materials' : 'database', hash, {
+      ...(enterprise ? { enterprise } : {}),
+    });
   return (
     <div className="data-ops-page">
       {tenant && (
@@ -99,18 +100,6 @@ export function PlatformDataOperations({ hash }: { hash: string }) {
           返回企业列表
         </a>
       )}
-      <nav className="data-ops-nav" aria-label="数据处理分类">
-        {(['CONNECTIONS', 'MATERIALS'] as const).map((k) => (
-          <a
-            key={k}
-            className={k === kind ? 'active' : ''}
-            href={href(k, tenant || undefined)}
-            aria-current={k === kind ? 'page' : undefined}
-          >
-            {kindName(k)}
-          </a>
-        ))}
-      </nav>
       {tenant ? (
         <Detail key={`${kind}:${tenant}`} tenant={tenant} kind={kind} />
       ) : (
@@ -136,11 +125,14 @@ function Directory({ kind, href }: { kind: DataOperationKind; href: (id: string)
     [kind, query, state, page, attempt],
   );
   return (
-    <section className="admin-section" aria-label="数据运行企业列表">
+    <div className="data-ops-directory" aria-label="数据运行企业列表">
       <div className="data-ops-heading">
         <div>
-          <h2>{kindName(kind)}</h2>
-          <p className="admin-note">按企业查看运行情况，不开放原始资料或业务数据。</p>
+          <h2>{kindName(kind)}监测</h2>
+          <p className="admin-note">
+            {kind === 'CONNECTIONS' ? '汇总企业现场接入与最近取数状态' : '汇总企业在库资料当前版本的解析状态'}{' '}
+            · 仅运行信息
+          </p>
         </div>
         <Button variant="ghost" icon={RefreshCw} onClick={refresh}>
           刷新
@@ -183,16 +175,31 @@ function Directory({ kind, href }: { kind: DataOperationKind; href: (id: string)
             匹配 {n(data.value.matchedTenants)} 家企业 · 下方汇总为这些企业的全部{kindName(kind)}对象
           </p>
           <Metrics value={data.value.counts} />
-          <div className="data-ops-tenants">
-            {data.value.items.map((t) => (
-              <a key={t.tenantId} href={href(t.tenantId)}>
-                <div>
+          <section className="data-ops-list-card" aria-label="企业监测目录">
+            <div className="data-ops-list-heading">
+              <h3>企业列表</h3>
+              <span className="admin-note">
+                {kind === 'CONNECTIONS' ? '接入部署与取数' : '资料解析'} · 点击查看详情
+              </span>
+            </div>
+            <div className="data-ops-list-columns" aria-hidden="true">
+              <span>企业名称</span>
+              <span>{kind === 'CONNECTIONS' ? '接入对象' : '资料对象'}</span>
+              <span>处理中</span>
+              <span>需留意</span>
+              <span>最近成功</span>
+              <span>状态</span>
+            </div>
+            <div className="data-ops-tenants">
+              {data.value.items.map((t) => (
+                <a key={t.tenantId} href={href(t.tenantId)}>
                   <h3>{t.tenantName}</h3>
-                  <span className="admin-note">
-                    {n(t.counts.total)} 项 · 处理中 {n(t.counts.processing)} · 需留意 {n(t.counts.attention)}
+                  <span>{n(t.counts.total)}</span>
+                  <span>{n(t.counts.processing)}</span>
+                  <span className={t.counts.attention ? 'data-ops-attention' : ''}>
+                    {n(t.counts.attention)}
                   </span>
-                </div>
-                <div>
+                  <small>{time(t.lastSuccessAt)}</small>
                   <Badge>
                     {t.tenantStatus === 'SUSPENDED'
                       ? '企业已暂停'
@@ -208,17 +215,18 @@ function Directory({ kind, href }: { kind: DataOperationKind; href: (id: string)
                                 ? '有停止项'
                                 : '已完成'}
                   </Badge>
-                  <small>最近成功 {time(t.lastSuccessAt)}</small>
-                </div>
-              </a>
-            ))}
-          </div>
-          {!data.value.items.length && <p className="admin-note">没有符合条件的企业。</p>}
-          <Pager page={page} next={data.value.hasMore} onPage={setPage} />
-          <p className="admin-note">更新于 {time(data.value.checkedAt)} · 手动刷新</p>
+                </a>
+              ))}
+            </div>
+            {!data.value.items.length && <p className="admin-note">没有符合条件的企业。</p>}
+            <Pager page={page} next={data.value.hasMore} onPage={setPage} />
+          </section>
+          <p className="data-ops-footnote">
+            更新于 {time(data.value.checkedAt)} · 手动刷新 · 不提供原件、业务数据或重新执行操作
+          </p>
         </>
       )}
-    </section>
+    </div>
   );
 }
 function Detail({ tenant, kind }: { tenant: string; kind: DataOperationKind }) {

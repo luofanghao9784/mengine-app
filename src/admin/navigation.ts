@@ -13,6 +13,8 @@ export const platformPages = [
   'tenants',
   'accounts',
   'data',
+  'database',
+  'materials',
   'engine',
   'experience',
   'capabilities',
@@ -37,7 +39,11 @@ export function adminPage(realm: AdminRealm, hash: string): AdminPage {
   const params = new URLSearchParams(hash.replace(/^#/, ''));
   const pages: readonly string[] = realm === 'tenant' ? tenantPages : [...platformPages, 'settings'];
   const selected = params.get('admin');
-  if (realm === 'platform' && selected === 'engine' && params.get('detail') === 'data') return 'data';
+  if (
+    realm === 'platform' &&
+    (selected === 'data' || (selected === 'engine' && params.get('detail') === 'data'))
+  )
+    return params.get('kind') === 'MATERIALS' ? 'materials' : 'database';
   if (realm === 'platform' && selected === 'engine' && params.get('detail') === 'storage')
     return 'capabilities';
   if (selected && pages.includes(selected)) return selected as AdminPage;

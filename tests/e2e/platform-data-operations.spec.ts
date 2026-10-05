@@ -135,8 +135,8 @@ test('system running opens an independent data subpage; list search and paging s
   const f = await fixture(context);
   await page.goto('/platform-admin/#admin=engine');
   await expect(page.locator('.engine-wall')).toBeVisible();
-  await page.getByRole('link', { name: '数据处理', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '数据接入', exact: true })).toBeVisible();
+  await page.getByRole('link', { name: '数据库', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '数据接入监测', exact: true })).toBeVisible();
   await expect(page.locator('.engine-wall')).toHaveCount(0);
   await page.getByLabel('搜索企业').fill('合成企业');
   await page.getByRole('button', { name: '搜索', exact: true }).click();
@@ -164,18 +164,14 @@ test('system running opens an independent data subpage; list search and paging s
   expect(f.paths.every((p) => new URL(p).pathname.startsWith('/api/platform-admin/'))).toBe(true);
   expect(f.mutations).toEqual([]);
 });
-test('material processing only offers technical records and retains scope when changing category', async ({
-  page,
-  context,
-}) => {
+test('independent material library only offers technical records', async ({ page, context }) => {
   const f = await fixture(context);
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto(`/platform-admin/#admin=engine&detail=data&enterprise=${tenant}&kind=CONNECTIONS`);
-  await page
-    .getByRole('navigation', { name: '数据处理分类' })
-    .getByRole('link', { name: '资料处理' })
-    .click();
+  await page.getByRole('link', { name: '资料库', exact: true }).click();
+  await expect(page).toHaveURL(/admin=materials/);
+  await page.getByRole('heading', { name: '合成企业 1', exact: true }).click();
   await expect(page.getByRole('heading', { name: '合成企业 1 · 资料处理' })).toBeVisible();
   await expect(page.getByText('解析未完成，需在原处理系统核对。', { exact: true })).toBeVisible();
   await expect(page.getByText(id(500), { exact: true })).toBeVisible();
