@@ -131,10 +131,9 @@ function Directory({ kind, href }: { kind: DataOperationKind; href: (id: string)
       <div className="data-ops-heading">
         <div>
           <h2>{kindName(kind)}监测</h2>
-          <p className="admin-note">
-            {kind === 'CONNECTIONS' ? '汇总企业现场接入与最近取数状态' : '汇总企业在库资料当前版本的解析状态'}{' '}
-            · 仅运行信息
-          </p>
+          {kind === 'CONNECTIONS' && (
+            <p className="admin-note">汇总企业现场接入与最近取数状态 · 仅运行信息</p>
+          )}
         </div>
         <Button variant="ghost" icon={RefreshCw} onClick={refresh}>
           刷新
@@ -173,9 +172,11 @@ function Directory({ kind, href }: { kind: DataOperationKind; href: (id: string)
         <Loading />
       ) : (
         <>
-          <p className="admin-note">
-            匹配 {n(data.value.matchedTenants)} 家企业 · 下方汇总为这些企业的全部{kindName(kind)}对象
-          </p>
+          {kind === 'CONNECTIONS' && (
+            <p className="admin-note">
+              匹配 {n(data.value.matchedTenants)} 家企业 · 下方汇总为这些企业的全部{kindName(kind)}对象
+            </p>
+          )}
           <Metrics value={data.value.counts} />
           <section className="data-ops-list-card" aria-label="企业监测目录">
             <div className="data-ops-list-heading">
