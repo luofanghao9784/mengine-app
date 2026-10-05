@@ -77,8 +77,9 @@ function start(origin, args = [], patch = {}) {
   });
   return { child, done };
 }
-function safe(result) {
-  assert.equal(result.stderr, '');
+function safe(result, expectedDiagnostics = []) {
+  assert.deepEqual(result.stderr.trim() ? result.stderr.trim().split('\n').map(line => JSON.parse(line)) : [], expectedDiagnostics);
+  for (const value of [key, workspace, privateText, script]) assert.ok(!result.stderr.includes(value));
   assert.equal(result.stdout.trim().split('\n').length, 1);
   assert.deepEqual(Object.keys(result.report).sort(), ['status', 'provider', 'model', 'durationMs', 'usage', 'requestCount', 'liveVerified'].sort());
   for (const value of [key, workspace, privateText, script]) assert.ok(!result.stdout.includes(value));
@@ -165,7 +166,7 @@ test('provider failures are classified without body reflection, automatic retrie
   for (responseStatus of [401, 403, 404, 429, 500]) {
     const before = f.requests.length;
     const result = await start(f.url).done;
-    safe(result);
+    safe(result, [{ event: 'MODEL_HTTP_REJECTED', status: responseStatus }]);
     assert.equal(result.code, 3);
     assert.equal(result.report.status, responseStatus < 429 ? 'remote_access_denied' : 'remote_unavailable');
     assert.equal(result.report.requestCount, 1);
@@ -259,7 +260,7 @@ test('SIGINT cancels the real in-flight HTTP body and emits one safe terminal re
   running.child.kill('SIGINT');
   const result = await running.done;
   await closed;
-  safe(result);
+  safe(result, [{ event: 'MODEL_TRANSPORT_FAILED', timedOut: false, cancelled: true, code: 'TRANSPORT_ERROR' }]);
   assert.equal(result.code, 130);
   assert.equal(result.report.status, 'cancelled');
   assert.equal(result.report.requestCount, 1);

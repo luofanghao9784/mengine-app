@@ -68,13 +68,20 @@ export async function* chatFrames(
       'ENOTFOUND',
       'EAI_AGAIN',
       'ETIMEDOUT',
+      'ERR_TLS_CERT_ALTNAME_INVALID',
+      'CERT_HAS_EXPIRED',
+      'DEPTH_ZERO_SELF_SIGNED_CERT',
+      'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+      'ERR_SSL_SSLV3_ALERT_HANDSHAKE_FAILURE',
     ]);
+    const directCode = error instanceof Error ? (error as Error & { code?: string }).code : undefined;
+    const networkCode = cause?.code ?? directCode;
     console.warn(
       JSON.stringify({
         event: 'MODEL_TRANSPORT_FAILED',
         timedOut: timeout.signal.aborted,
         cancelled: signal.aborted,
-        code: cause?.code && codes.has(cause.code) ? cause.code : 'TRANSPORT_ERROR',
+        code: networkCode && codes.has(networkCode) ? networkCode : 'TRANSPORT_ERROR',
       }),
     );
     throw new RuntimeError(signal.aborted ? 'CANCELLED' : 'REMOTE_UNAVAILABLE');
