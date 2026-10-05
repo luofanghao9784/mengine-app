@@ -186,7 +186,44 @@ def verify_engine(engine_port, engine_token, mode):
         raise TrialError('引擎身份、版本或运行模式核验失败；API 尚未启动，未发送模型请求。')
 
 
-def model_environments(model, engine_port, engine_token, api_port, manual_acceptance=False):
+def public_search_environments(value):
+    """Explicit instance routing only; inherited proxy/search settings never enable product access."""
+    if value is None:
+        return {}, {}
+    from urllib.parse import urlparse
+    if not isinstance(value, dict) or set(value) - {'provider', 'proxy', 'dns', 'endpoint'}:
+        raise TrialError('资讯搜索配置格式无效。')
+    provider = value.get('provider', 'off')
+    if provider not in ('off', 'bing-rss', 'searx') or value.get('dns', 'system') not in ('system', 'google'):
+        raise TrialError('资讯搜索服务或 DNS 配置无效。')
+    if provider == 'off':
+        return {}, {}
+    engine = {'AGENT_PUBLIC_WEB_ENABLED': 'true', 'AGENT_NEWS_SEARCH_PROVIDER': provider,
+              'AGENT_PUBLIC_WEB_DNS': value.get('dns', 'system')}
+    proxy = value.get('proxy')
+    if proxy:
+        try:
+            u = urlparse(proxy)
+            valid = u.scheme == 'http' and u.hostname in ('127.0.0.1', '::1') and u.port and not u.username and not u.password and u.path in ('', '/') and not u.query and not u.fragment
+        except (TypeError, ValueError):
+            valid = False
+        if not valid:
+            raise TrialError('仅允许显式配置本机回环代理，目标网站仍通过 HTTPS 和公网地址校验。')
+        engine['AGENT_PUBLIC_WEB_PROXY'] = proxy
+    if provider == 'searx':
+        endpoint = value.get('endpoint', '')
+        try:
+            u = urlparse(endpoint)
+            valid = u.scheme == 'https' and u.hostname and '.' in u.hostname and u.path == '/search' and not u.query and not u.fragment and not u.username and not u.password
+        except (TypeError, ValueError):
+            valid = False
+        if not valid:
+            raise TrialError('SearXNG 需要公开 HTTPS 搜索接口。')
+        engine['AGENT_SEARCH_ENDPOINT'] = endpoint
+    return {'AGENT_PUBLIC_WEB_ENABLED': 'true', 'AGENT_NEWS_SEARCH_PROVIDER': provider}, engine
+
+
+def model_environments(model, engine_port, engine_token, api_port, manual_acceptance=False, public_search=None):
     engine_env = {'PATH': os.environ.get('PATH', '/usr/bin:/bin'), 'ENGINE_HOST': '127.0.0.1',
                   'ENGINE_PORT': str(engine_port), 'TASK_ENGINE_TOKEN': engine_token}
     api_env = {'AGENT_TASK_MODE': 'off'}
@@ -199,6 +236,9 @@ def model_environments(model, engine_port, engine_token, api_port, manual_accept
         api_env.update({'COMPANY_INFORMATION_ENABLED': 'false', 'EXPERIENCE_INTAKE_ENABLED': 'false',
                         'EXPERIENCE_ANALYSIS_ENABLED': 'false', 'EXPERIENCE_GENERALIZATION_ENABLED': 'false',
                         'BRIEFING_AUTOMATIC_ENABLED': 'false', 'ONGOING_PLANS_ENABLED': 'false'})
+    search_api, search_engine = public_search_environments(public_search)
+    api_env.update(search_api)
+    engine_env.update(search_engine)
     return api_env, engine_env
 
 
@@ -309,7 +349,7 @@ def start(root, model_config=None, reconnect_live=False, phone_local=False, coll
             raise TrialError('数据库目录不能是符号链接。')
         engine_port=free_port()
         engine_token=secrets.token_urlsafe(48)
-        model_api_env, engine_env = model_environments(model, engine_port, engine_token, settings['ports']['api'], settings.get('manualModelAcceptance', False))
+        model_api_env, engine_env = model_environments(model, engine_port, engine_token, settings['ports']['api'], settings.get('manualModelAcceptance', False), settings.get('publicSearch'))
         env = {**clean_environment(), 'TASK_ENABLED':'true', 'TASK_ENGINE_TOKEN':engine_token, 'ENGINE_BASE_URL':f'http://127.0.0.1:{engine_port}', 'DATABASE_URL': f"jdbc:postgresql://127.0.0.1:{settings['ports']['database']}/dreamcore_trial", 'DATABASE_USER': 'dreamcore_trial', 'DATABASE_PASSWORD': secret,
                'KNOWLEDGE_ENABLED': str((WORKSPACE / 'workers/parser/.venv/bin/python').exists()).lower(), 'KNOWLEDGE_PARSER_ROOT': str(WORKSPACE / 'workers/parser'), 'MATERIAL_STORAGE_ROOT': str(root / 'objects'), 'SPRING_PROFILES_ACTIVE': 'local', 'INVITATION_DELIVERY': 'local', 'INVITATION_OUTBOX': str(root / 'invitations'), 'API_HOST': '127.0.0.1', 'API_PORT': str(settings['ports']['api']), 'SERVER_SERVLET_SESSION_COOKIE_NAME': 'DREAMCORE_TRIAL_' + hashlib.sha256(str(root).encode()).hexdigest()[:12]}
         env.update({'PHONE_DELIVERY': 'local' if phone_local else 'disabled', 'PHONE_LOCAL_PREVIEW': str(phone_local).lower(), 'PHONE_OUTBOX': str(root / 'phone-sms')})

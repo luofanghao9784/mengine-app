@@ -23,7 +23,8 @@ const label: Record<string, string> = {
 };
 const reasons: Record<string, string> = {
   TENANT_SERVICE_SUSPENDED: '企业服务暂停时，本次生成未完成；已发生的任务结果保留，恢复后可按需重新生成。',
-  NEWS_SOURCE_UNAVAILABLE: '资讯来源尚未接入，请选择其他类型。',
+  NEWS_SOURCE_UNAVAILABLE: '资讯联网搜索暂不可用，请选择其他类型。',
+  PUBLIC_SEARCH_NOT_CONFIGURED: '资讯联网搜索尚未配置，请选择其他类型。',
   NEWS_CONTEXT_UNAVAILABLE: '请先在资料库准备企业或项目资料。',
   RESULT_NOT_READY: '尚无已完成并保存到资料库的成果。',
   NO_MATERIALS: '先将资料加入资料库，资料就绪后会自动继续。',
@@ -228,7 +229,7 @@ export function GenerationPanel({ generation }: { generation: BriefingGeneration
                             unavailable
                               ? generation.capabilities.INFO?.reason === 'PUBLIC_WEB_UNAVAILABLE'
                                 ? '资讯联网能力未启用'
-                                : '资讯来源未接入'
+                                : '资讯联网搜索未配置'
                               : undefined
                           }
                         >
@@ -248,7 +249,7 @@ export function GenerationPanel({ generation }: { generation: BriefingGeneration
                             <small className="generation-type-unavailable">
                               {generation.capabilities.INFO?.reason === 'PUBLIC_WEB_UNAVAILABLE'
                                 ? '未启用'
-                                : '未接入'}
+                                : '未配置'}
                             </small>
                           )}
                         </label>

@@ -22,7 +22,7 @@ class NewsSourcesIntegrationTest {
   db.update("INSERT INTO workspaces(id,tenant_id,owner_id,name,kind) VALUES(?,?,?,'合成资讯空间','PERSONAL')",space,tenant,actor);
  }
  NewsSourceCatalog.Source create(){return catalog.save(platform,new NewsSourceCatalog.Change(UUID.randomUUID(),0,"合成官方来源","https://publisher.example.org/"+UUID.randomUUID(),"PAGE","健身","中国",true));}
- @Test void enterpriseSourceScopeAndDisableFence(){var s=create();assertFalse(generation.state(actor,tenant).capabilities().get("INFO").available());catalog.select(actor,tenant,s.id(),s.revision(),true);assertTrue(generation.state(actor,tenant).capabilities().get("INFO").available());assertTrue(catalog.selected(other).isEmpty());
+ @Test void enterpriseSourceScopeAndDisableFence(){var s=create();assertFalse(generation.state(actor,tenant).capabilities().get("INFO").available());catalog.select(actor,tenant,s.id(),s.revision(),true);assertFalse(generation.state(actor,tenant).capabilities().get("INFO").available());assertEquals(1,catalog.selectedSources(tenant).size());assertTrue(catalog.selected(other).isEmpty());
   assertEquals(403,assertThrows(IdentityException.class,()->catalog.select(reader,tenant,s.id(),1,true)).status);
   assertThrows(IdentityException.class,()->catalog.list(actor,other));assertThrows(IdentityException.class,()->catalog.save(actor,new NewsSourceCatalog.Change(null,0,"拒绝","https://x.example.org/","PAGE","","",true)));
   catalog.save(platform,new NewsSourceCatalog.Change(s.id(),1,s.name(),s.url(),s.format(),s.industry(),s.region(),false));assertFalse(generation.state(actor,tenant).capabilities().get("INFO").available());
@@ -38,7 +38,7 @@ class NewsSourcesIntegrationTest {
   var source=create();catalog.select(actor,tenant,source.id(),1,true);
   var upload=materials.uploadReceipt(actor,tenant,space,null,null,null,UUID.randomUUID(),new org.springframework.mock.web.MockMultipartFile("file","context.txt","text/plain","合成健身业务背景 marker".getBytes(java.nio.charset.StandardCharsets.UTF_8)));
   var parse=knowledge.claim();assertNotNull(parse);knowledge.finish(parse,new com.dreamcore.workspace.knowledge.DocumentParser.Result("synthetic","READY",List.of(),List.of(new com.dreamcore.workspace.knowledge.DocumentParser.Fragment("L1","合成健身业务背景 marker","TEXT"))));
-  var batch=generation.generate(actor,tenant,UUID.randomUUID(),space,"INFO");UUID policy=generation.state(actor,tenant).policies().getFirst().id();generation.tick(policy);var job=conversations.claim();assertNotNull(job);assertTrue(agents.check(job.id(),job.token()).containsKey("newsSeen"));
+  var detail=conversations.submitBriefing(actor,tenant,space,UUID.randomUUID(),"合成资讯",source.url(),List.of());UUID policy=UUID.randomUUID();db.update("INSERT INTO briefing_generation_policies(id,tenant_id,owner_id,workspace_id) VALUES(?,?,?,?)",policy,tenant,actor,space);db.update("INSERT INTO briefing_generation_batches(id,tenant_id,owner_id,workspace_id,policy_id,policy_epoch,trigger_kind,business_type,status,task_id) VALUES(?,?,?,?,?,1,'GENERATE_MORE','INFO','RUNNING',?)",UUID.randomUUID(),tenant,actor,space,policy,detail.tasks().getLast().id());var job=conversations.claim();assertNotNull(job);assertTrue(agents.check(job.id(),job.token()).containsKey("newsSeen"));
   catalog.select(actor,tenant,source.id(),1,false);assertEquals("TASK_ACCESS_DENIED",assertThrows(IdentityException.class,()->agents.check(job.id(),job.token())).code);
   db.update("UPDATE conversation_tasks SET status='CANCELLED' WHERE id=?",job.id());
  }

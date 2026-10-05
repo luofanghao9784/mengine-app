@@ -1,0 +1,23 @@
+package com.dreamcore.workspace;
+import com.dreamcore.workspace.news.*;
+import com.dreamcore.workspace.briefing.*;
+import com.dreamcore.workspace.conversation.*;
+import com.dreamcore.workspace.identity.*;
+import java.util.*;
+import org.junit.jupiter.api.*;
+import static org.junit.jupiter.api.Assertions.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
+@SpringBootTest(properties={"dreamcore.tasks.public-web-enabled=true","dreamcore.tasks.news-search-provider=bing-rss","dreamcore.tasks.enabled=true","dreamcore.tasks.agent-mode=verification","dreamcore.knowledge.enabled=true","dreamcore.briefing.merge-seconds=0"})
+class NewsSearchIntegrationTest {
+ @Autowired JdbcTemplate db;@Autowired NewsSourceCatalog catalog;@Autowired NewsSearchPolicy search;@Autowired BriefingGenerationService generation;@Autowired ConversationService conversations;@Autowired AgentTaskService agents;
+ UUID actor,tenant,space;
+ @BeforeEach void setup(){actor=UUID.randomUUID();tenant=UUID.randomUUID();space=UUID.randomUUID();db.update("INSERT INTO accounts(id,email,display_name,password_hash) VALUES(?,?,'不可外传内部人员','unused')",actor,actor+"@private.test");db.update("INSERT INTO tenants(id,name) VALUES(?,'不可外传企业名称')",tenant);db.update("INSERT INTO tenant_memberships(tenant_id,account_id,role) VALUES(?,?,'TENANT_ADMIN')",tenant,actor);db.update("INSERT INTO workspaces(id,tenant_id,owner_id,name,kind) VALUES(?,?,?,'私有经营数值123456789','PERSONAL')",space,tenant,actor);}
+ ConversationService.Job job(){var batch=generation.generate(actor,tenant,UUID.randomUUID(),space,"INFO");generation.tick(generation.state(actor,tenant).policies().getFirst().id());assertEquals("RUNNING",generation.get(actor,tenant,batch.id()).status());var job=conversations.claim();assertNotNull(job);return job;}
+ @Test void noSelectedSitesOrMaterialsRequiredAndOutgoingTermsArePublic(){assertTrue(generation.state(actor,tenant).capabilities().get("INFO").available());var job=job();var scope=(NewsSearchPolicy.Scope)agents.check(job.id(),job.token()).get("newsSearch");assertEquals("1.0",scope.version());assertTrue(scope.sources().isEmpty());assertEquals(NewsSearchPolicy.QUERY,db.queryForObject("SELECT public_query FROM conversation_tasks WHERE id=?",String.class,job.id()));var topic=(NewsSearchPolicy.Topic)agents.selectNewsQuery(job.id(),job.token(),"FITNESS");assertEquals("健身 体育 政策",topic.query());assertFalse(scope.toString().contains("123456789"));assertFalse(scope.toString().contains("不可外传"));}
+ @Test void infoBypassesOlderMaterialWaitingRequestWithoutConsumingIt(){var old=generation.generate(actor,tenant,UUID.randomUUID(),space,null);UUID policy=generation.state(actor,tenant).policies().getFirst().id();generation.tick(policy);assertEquals("WAITING_DATA",generation.get(actor,tenant,old.id()).status());var info=generation.generate(actor,tenant,UUID.randomUUID(),space,"INFO");generation.tick(policy);assertEquals("RUNNING",generation.get(actor,tenant,info.id()).status());assertNull(generation.get(actor,tenant,old.id()).taskId());}
+ @Test void rawPrivateQueriesAreDeniedAndTwoTopicLimitSurvivesReplay(){var job=job();assertEquals("NEWS_TOPIC_NOT_GRANTED",assertThrows(IdentityException.class,()->agents.selectNewsQuery(job.id(),job.token(),"企业内部营收123456789")).code);agents.selectNewsQuery(job.id(),job.token(),"FITNESS");agents.selectNewsQuery(job.id(),job.token(),"SPORTS_SAFETY");agents.selectNewsQuery(job.id(),job.token(),"FITNESS");assertEquals(2,db.queryForObject("SELECT count(*) FROM briefing_news_search_queries WHERE task_id=?",Integer.class,job.id()));assertEquals("NEWS_SEARCH_LIMIT",assertThrows(IdentityException.class,()->agents.selectNewsQuery(job.id(),job.token(),"RETAIL")).code);}
+ @Test void optionalSourceWithdrawalRevokesPinnedScopeAndMembershipStillRequired(){db.update("INSERT INTO platform_roles(account_id,role) VALUES(?,'PLATFORM_ADMIN')",actor);var s=catalog.save(actor,new NewsSourceCatalog.Change(UUID.randomUUID(),0,"补充来源","https://publisher.example.org/"+UUID.randomUUID(),"RSS","健身","中国",true));catalog.select(actor,tenant,s.id(),1,true);var job=job();assertEquals(List.of(s.url()),search.scope(job.id()).sources());catalog.select(actor,tenant,s.id(),1,false);assertThrows(IdentityException.class,()->agents.check(job.id(),job.token()));}
+ @AfterEach void release(){db.update("UPDATE conversation_tasks SET status='CANCELLED' WHERE tenant_id=? AND status IN ('RUNNING','QUEUED')",tenant);}
+}

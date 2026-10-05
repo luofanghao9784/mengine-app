@@ -9,6 +9,8 @@ import org.springframework.web.bind.annotation.*;
 @ConditionalOnWebApplication(type=ConditionalOnWebApplication.Type.SERVLET)
 public class AgentAccessController {
     public record Query(String query) {}
+    public record NewsQuery(String topic) {}
+    @PostMapping("/select-news-query") public ResponseEntity<?> newsQuery(@PathVariable UUID task,@RequestHeader(value="Authorization",required=false) String auth,@RequestBody NewsQuery body){return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(service.selectNewsQuery(task,attempt(auth),body.topic()));}
     public record Original(UUID versionId) {}
     private final AgentTaskService service;private final AgentUsageLedger usage;public AgentAccessController(AgentTaskService service,AgentUsageLedger usage){this.service=service;this.usage=usage;}
     private UUID attempt(String header){try{if(header==null || !header.startsWith("Bearer "))throw new IllegalArgumentException();return UUID.fromString(header.substring(7));}catch(Exception error){throw new IdentityException(403,"TASK_ACCESS_DENIED");}}

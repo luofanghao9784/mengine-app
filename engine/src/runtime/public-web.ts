@@ -1,5 +1,8 @@
+import type { NewsSearchScope } from './news-search.js';
 import { discoverNews, pagePublication } from './news-discovery.js';
-import { request } from 'node:https';
+import { request, Agent } from 'node:https';
+import { request as connectRequest } from 'node:http';
+import { connect as tlsConnect } from 'node:tls';
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
 import { createHash, randomUUID } from 'node:crypto';
@@ -76,13 +79,18 @@ const source = (
   };
 };
 /** DNS is resolved/checked once, then the actual TLS connection is pinned to the checked address. */
-export const pinnedRequest: PinnedRequest = (url, address, signal) =>
+const requestPinned = (
+  url: URL,
+  address: Address,
+  signal: AbortSignal,
+  agent: false | Agent = false,
+): Promise<WebResponse> =>
   new Promise((resolve, reject) => {
     const req = request(
       url,
       {
         method: 'GET',
-        agent: false,
+        agent,
         signal,
         family: address.family,
         lookup: (_host, options, callback) => {
@@ -124,9 +132,71 @@ export const pinnedRequest: PinnedRequest = (url, address, signal) =>
     req.on('error', reject);
     req.end();
   });
+export const pinnedRequest: PinnedRequest = (url, address, signal) => requestPinned(url, address, signal);
+/** An explicitly configured local proxy changes routing only: CONNECT uses the checked public IP and TLS still verifies the original hostname. */
+export function loopbackProxyRequest(endpoint: string): PinnedRequest {
+  let proxy: URL;
+  try {
+    proxy = new URL(endpoint);
+  } catch {
+    throw new RuntimeError('INVALID_PUBLIC_PROXY');
+  }
+  if (
+    proxy.protocol !== 'http:' ||
+    !['127.0.0.1', '[::1]'].includes(proxy.hostname) ||
+    !proxy.port ||
+    proxy.username ||
+    proxy.password ||
+    proxy.pathname !== '/' ||
+    proxy.search ||
+    proxy.hash
+  )
+    throw new RuntimeError('INVALID_PUBLIC_PROXY');
+  return (url, address, signal) =>
+    new Promise((resolve, reject) => {
+      if (!publicAddress(address.address)) return reject(new RuntimeError('PUBLIC_ADDRESS_DENIED'));
+      const destination = address.family === 6 ? `[${address.address}]:443` : `${address.address}:443`;
+      const tunnel = connectRequest({
+        hostname: proxy.hostname.replace(/^\[|\]$/g, ''),
+        port: proxy.port,
+        method: 'CONNECT',
+        path: destination,
+        headers: { Host: destination },
+        signal,
+        agent: false,
+      });
+      tunnel.on('error', reject);
+      tunnel.on('connect', (response, socket, head) => {
+        if (response.statusCode !== 200 || head.length) {
+          socket.destroy();
+          return reject(new RuntimeError('PUBLIC_PROXY_FAILED'));
+        }
+        const abort = () => socket.destroy();
+        signal.addEventListener('abort', abort, { once: true });
+        const tls = tlsConnect({
+          socket,
+          servername: url.hostname.replace(/^\[|\]$/g, ''),
+          rejectUnauthorized: true,
+        });
+        tls.on('error', reject);
+        const agent = new Agent({ keepAlive: false });
+        agent.createConnection = () => tls;
+        requestPinned(url, address, signal, agent)
+          .then(resolve, reject)
+          .finally(() => {
+            signal.removeEventListener('abort', abort);
+            tls.destroy();
+            agent.destroy();
+          });
+      });
+      tunnel.end();
+    });
+}
 export class PublicReader {
   constructor(
-    private readonly resolveHost = (host: string) => lookup(host, { all: true }),
+    private readonly resolveHost: (host: string, signal?: AbortSignal) => Promise<Address[]> = (
+      host: string,
+    ) => lookup(host, { all: true }),
     private readonly transport: PinnedRequest = pinnedRequest,
   ) {}
   async fetch(
@@ -142,7 +212,7 @@ export class PublicReader {
         const host = url.hostname.replace(/^\[|\]$/g, '');
         const addresses = isIP(host)
           ? [{ address: host, family: isIP(host) }]
-          : await abortable(this.resolveHost(host), bounded);
+          : await abortable(this.resolveHost(host, bounded), bounded);
         if (
           !addresses.length ||
           addresses.length > 32 ||
@@ -324,17 +394,71 @@ export class PublicWebTask {
   private searchPromise?: Promise<void>;
   private readPromises = new Map<string, Promise<WebSource>>();
   private reads = 0;
+  private newsPromises = new Map<string, Promise<void>>();
   constructor(
     readonly query: string,
     private readonly reader: PublicReader,
     private readonly search?: PublicSearch,
     private readonly news = false,
     private readonly seen: { url: string; sha256: string }[] = [],
+    private readonly newsScope?: NewsSearchScope,
   ) {}
-  async find(signal: AbortSignal) {
+  async find(signal: AbortSignal, topic?: string) {
+    if (this.newsScope) {
+      const selected = this.newsScope.topics.find((t) => t.id === topic);
+      if (!selected) throw new RuntimeError('NEWS_TOPIC_NOT_GRANTED');
+      if (!this.newsPromises.has(selected.id)) {
+        if (this.newsPromises.size >= 2) throw new RuntimeError('NEWS_SEARCH_LIMIT');
+        this.newsPromises.set(selected.id, this.findNews(selected.query, signal));
+      }
+      await this.newsPromises.get(selected.id);
+      return this.snapshot();
+    }
     this.searchPromise ??= this.findOnce(signal);
     await this.searchPromise;
     return this.snapshot();
+  }
+  private async findNews(query: string, signal: AbortSignal) {
+    if (!this.search) throw new RuntimeError('PUBLIC_SEARCH_NOT_CONFIGURED');
+    const candidates = (await this.search.search(query, signal)).slice(0, 3);
+    // Search is primary; configured sites may fill a gap, never block broad topic search.
+    if (candidates.length < 2)
+      for (const url of this.newsScope!.sources) {
+        try {
+          for (const c of await this.reader.discover(url, signal))
+            if (!candidates.some((x) => x.url === c.url))
+              candidates.push({
+                ...source(c.url, c.title, c.excerpt, 'SEARCH'),
+                ...(c.publishedAt ? { publishedAt: c.publishedAt } : {}),
+              });
+        } catch {
+          if (signal.aborted) throw signal.reason;
+        }
+        if (candidates.length >= 3) break;
+      }
+    let failures = 0;
+    for (const candidate of candidates.slice(0, 3)) {
+      if (this.reads >= 2) break;
+      if (candidate.publishedAt && Date.parse(candidate.publishedAt) < Date.now() - 30 * 86400000) continue;
+      if ([...this.sources.values()].some((s) => s.url === candidate.url)) continue;
+      this.reads++;
+      try {
+        const page = await this.reader.read(candidate.url, signal);
+        const item = {
+          ...page,
+          id: candidate.id,
+          ...(!page.publishedAt && candidate.publishedAt ? { publishedAt: candidate.publishedAt } : {}),
+        };
+        if (item.publishedAt && Date.parse(item.publishedAt) < Date.now() - 30 * 86400000) continue;
+        if (this.seen.some((s) => s.url === item.url && s.sha256 === item.sha256)) continue;
+        if (item.excerpt.length < 40) continue;
+        this.sources.set(item.id, item);
+      } catch {
+        failures++;
+        if (signal.aborted) throw signal.reason;
+      }
+    }
+    if (failures && this.sources.size === 0) throw new RuntimeError('PUBLIC_NEWS_READ_FAILED');
   }
   private async findOnce(signal: AbortSignal) {
     if (/^https:\/\//i.test(this.query)) {

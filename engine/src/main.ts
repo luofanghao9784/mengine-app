@@ -1,6 +1,8 @@
 import { createEngineServer } from './server.js';
 import { AgentTasks } from './runtime/agent-task.js';
-import { PublicReader, SearxSearch } from './runtime/public-web.js';
+import { BingNewsSearch } from './runtime/news-search.js';
+import { configuredPublicReader } from './runtime/public-routing.js';
+import { SearxSearch } from './runtime/public-web.js';
 import { configuredModel } from './runtime/model-config.js';
 import { CompanyAnalysis } from './runtime/company-analysis.js';
 import { ExperienceGeneralization } from './runtime/experience-generalization.js';
@@ -17,9 +19,20 @@ const host = process.env.ENGINE_HOST ?? '127.0.0.1';
 const model = configuredModel(process.env);
 const webEnabled = process.env.AGENT_PUBLIC_WEB_ENABLED === 'true';
 const searchEndpoint = process.env.AGENT_SEARCH_ENDPOINT;
-const reader = new PublicReader();
+const proxyEndpoint = process.env.AGENT_PUBLIC_WEB_PROXY;
+const reader = configuredPublicReader(proxyEndpoint, process.env.AGENT_PUBLIC_WEB_DNS ?? 'system');
+const newsProvider = process.env.AGENT_NEWS_SEARCH_PROVIDER ?? 'off';
+if (!['off', 'bing-rss', 'searx'].includes(newsProvider)) throw new Error('INVALID_NEWS_SEARCH_PROVIDER');
+if (newsProvider === 'searx' && !searchEndpoint) throw new Error('PUBLIC_SEARCH_NOT_CONFIGURED');
 const publicWeb = webEnabled
-  ? { reader, ...(searchEndpoint ? { search: new SearxSearch(searchEndpoint, reader) } : {}) }
+  ? {
+      reader,
+      ...(searchEndpoint
+        ? { search: new SearxSearch(searchEndpoint, reader) }
+        : newsProvider === 'bing-rss'
+          ? { search: new BingNewsSearch(reader) }
+          : {}),
+    }
   : undefined;
 const agent = model
   ? new AgentTasks({

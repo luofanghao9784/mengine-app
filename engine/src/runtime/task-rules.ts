@@ -15,7 +15,7 @@ export const TASK_RULES = [
 /** Generated from actual registered tools; descriptions never imply unavailable business actions. */
 export function capabilityDirectory(names: readonly string[]): string {
   const prerequisites: Record<string, string> = {
-    public_search: 'activate_skill(public-research) first; immutable user public query only',
+    public_search: 'activate_skill(public-research) first; immutable user public query or platform-granted public news topic ID only; no private query text',
     read_public_page: 'activate_skill(public-research) first; granted public source IDs only',
     candidate_tool: 'activate_skill(candidate-trials) first; local verification only',
     process_original: 'activate_skill(file-processing) first; local verification only',

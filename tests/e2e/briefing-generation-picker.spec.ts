@@ -246,7 +246,7 @@ test('资讯未接入时禁选，默认与其他类型仍可操作', async ({ pa
   await page.goto(home);
   await choose(page, 3);
   await expect(picker(page).getByRole('checkbox', { name: '资讯', exact: true })).toBeDisabled();
-  await expect(picker(page).getByText('未接入', { exact: true })).toBeVisible();
+  await expect(picker(page).getByText('未配置', { exact: true })).toBeVisible();
   await picker(page).getByRole('checkbox', { name: '洞察', exact: true }).check();
   await picker(page).getByRole('button', { name: '生成 3 张' }).click();
   await expect.poll(() => posts.length).toBe(1);

@@ -183,6 +183,17 @@ class LiveModelBoundaryTest(unittest.TestCase):
         self.assertNotIn('synthetic-service-secret', json.dumps(args))
         self.assertEqual(kwargs['env']['TASK_ENGINE_TOKEN'], 'synthetic-service-secret')
 
+    def test_public_search_routing_is_explicit_and_manual_mode_stays_manual(self):
+        search = {'provider': 'bing-rss', 'dns': 'google', 'proxy': 'http://127.0.0.1:7897'}
+        api, engine = trial.model_environments(self.value, 23001, 'synthetic-service-token', 23002, True, search)
+        self.assertEqual(api['AGENT_NEWS_SEARCH_PROVIDER'], 'bing-rss')
+        self.assertEqual(api['BRIEFING_AUTOMATIC_ENABLED'], 'false')
+        self.assertEqual(engine['AGENT_PUBLIC_WEB_PROXY'], search['proxy'])
+        self.assertEqual(engine['AGENT_PUBLIC_WEB_DNS'], 'google')
+        for value in [{'provider': 'unknown'}, {'provider': 'searx'}, {'provider': 'bing-rss', 'proxy': 'http://remote.example.org:8080'}]:
+            with self.assertRaises(trial.TrialError):
+                trial.public_search_environments(value)
+
     def test_configure_refuses_noninteractive_key_input(self):
         with patch.object(sys.stdin, 'isatty', return_value=False):
             with self.assertRaisesRegex(trial.TrialError, '交互终端'):

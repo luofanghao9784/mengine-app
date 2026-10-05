@@ -16,7 +16,7 @@
       "version": "1.0.0",
       "title": "公开资料查找与阅读",
       "file": "public-research.md",
-      "sha256": "ece85e60e12e361e2b202694f42698cf3a7060eed568c388ed2f98d3b9fcfb98",
+      "sha256": "1b78e2654ba3a04b3f3bbadeebb6d5de3c6df87da26e7b27b64226c2dd422a61",
       "tools": ["public_search", "read_public_page"],
       "source": "dreamcore-bundled",
       "license": "project-internal"

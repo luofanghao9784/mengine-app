@@ -20,10 +20,10 @@ export function NewsSources({ tenant }: { tenant?: string }) {
     <section className="admin-section news-source-directory">
       <header className="admin-section-heading">
         <div>
-          <h2>{tenant ? '企业资讯来源' : '资讯来源目录'}</h2>
+          <h2>{tenant ? '补充资讯来源' : '资讯来源目录'}</h2>
           <p className="muted">
             {tenant
-              ? '从可信来源中选择与本企业业务相关的内容，个人偏好继续在此范围内筛选。'
+              ? '资讯默认按关注主题联网查询。可选用这些网站补充内容，不选也不影响主题搜索。'
               : '维护公开来源及适用范围。启用来源不代表已完成真实采集验收。'}
           </p>
         </div>
@@ -44,7 +44,7 @@ export function NewsSources({ tenant }: { tenant?: string }) {
       ) : !remote.value ? (
         <Loading />
       ) : remote.value.length === 0 ? (
-        <p className="muted">暂无资讯来源，总台添加可信来源后，企业可以在这里选用。</p>
+        <p className="muted">暂无补充来源，资讯仍可按关注主题联网查询。</p>
       ) : (
         <ul className="tenant-rows">
           {remote.value.map((s) => (

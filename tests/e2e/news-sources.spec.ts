@@ -34,7 +34,7 @@ test('总台维护来源目录，来源创建使用稳定请求编号', async ({
     return route.fulfill({ status: 404, json: { code: 'NOT_FOUND' } });
   });
   await page.goto('/platform-admin/#admin=capabilities&tab=news');
-  await expect(page.getByText('暂无资讯来源，总台添加可信来源后，企业可以在这里选用。')).toBeVisible();
+  await expect(page.getByText('暂无补充来源，资讯仍可按关注主题联网查询。')).toBeVisible();
   await page.getByRole('button', { name: '添加来源' }).click();
   await page.getByLabel('来源名称').fill('合成官方资讯');
   await page.getByLabel('公开网址').fill('https://publisher.example.org/rss');
