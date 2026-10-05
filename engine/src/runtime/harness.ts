@@ -41,10 +41,12 @@ export async function runHarness(options: {
   limits?: { modelCalls?: number; toolCalls?: number; timeoutMs?: number };
   reserveFinalResponse?: boolean;
   /** Safe diagnostic metadata only; never arguments, outputs or arbitrary error messages. */
-  onToolFailure?: (failure: { tool: string; callId: string; code: string; executionStarted: boolean }) => void | Promise<void>;
+  onToolFailure?: (failure: { tool: string; callId: string; code: string; executionStarted: boolean; validationIssues?: string[] }) => void | Promise<void>;
   /** Structured card batches need their time for delivery; their final reply is only a confirmation. */
   finalResponseReserveMs?: number;
   finishOnDeliverable?: boolean;
+  /** Stop a briefing delivery loop after this many identical schema failures. */
+  invalidDeliveryAttempts?: number;
   hasCompletedDeliverable?: (tools: RuntimeResult['tools']) => boolean;
 }): Promise<RuntimeResult> {
   if (!options.model) throw new RuntimeError('MODEL_NOT_CONFIGURED');
@@ -81,6 +83,9 @@ export async function runHarness(options: {
   const receipts = new Map<string, RuntimeResult['tools'][number]>();
   const toolOutputs = new Map<string, Json>();
   const modelCallIds = new Set<string>();
+  const invalidDeliveries = new Map<string, number>();
+  const invalidDeliveryLimit = options.invalidDeliveryAttempts === undefined
+    ? undefined : bound(options.invalidDeliveryAttempts, 8);
   const abort = (code: string) => {
     if (controller.signal.aborted) return;
     result.status = code === 'CANCELLED' ? 'cancelled' : 'limit';
@@ -408,9 +413,19 @@ export async function runHarness(options: {
               // Calls denied by the Harness registry never enter this implementation.
               const signal = AbortSignal.any([controller.signal, execution.signal]);
               let executionStarted = false;
+              let validationIssues: string[] | undefined;
               try {
-                if (validateJsonSchemaValue(parameters, args).length)
+                const violations = validateJsonSchemaValue(parameters, args);
+                if (violations.length) {
+                  // Unknown property names come from model arguments and may contain private data.
+                  // Other diagnostics contain only trusted schema paths, types and enum values.
+                  validationIssues = [...new Set(violations.map(issue =>
+                    issue.includes('is not a declared property')
+                      ? 'Remove undeclared properties; use only fields listed in the tool schema.'
+                      : issue.slice(0, 256)))].slice(0, 8);
                   throw new RuntimeError('INVALID_TOOL_ARGUMENTS');
+                }
+                if (tool.name === 'deliver_briefing') invalidDeliveries.clear();
                 executionStarted = true;
                 const value = await tool.execute(args, signal);
                 signal.throwIfAborted();
@@ -439,7 +454,21 @@ export async function runHarness(options: {
                   error instanceof RuntimeError && /^[A-Z_]{1,64}$/.test(error.code)
                     ? error.code
                     : 'TOOL_FAILED';
-                await options.onToolFailure?.({ tool: tool.name, callId: execution.callId, code, executionStarted });
+                await options.onToolFailure?.({ tool: tool.name, callId: execution.callId, code, executionStarted,
+                  ...(validationIssues ? { validationIssues } : {}) });
+                if (tool.name === 'deliver_briefing' && validationIssues && invalidDeliveryLimit) {
+                  const signature = JSON.stringify(validationIssues);
+                  const repeats = (invalidDeliveries.get(signature) ?? 0) + 1;
+                  invalidDeliveries.set(signature, repeats);
+                  if (repeats >= invalidDeliveryLimit) {
+                    result.status = 'failed';
+                    result.code = 'TASK_TOOL_FAILED';
+                    controller.abort();
+                    handle?.agent.cancel({ kind: 'hook', reason: 'TASK_TOOL_FAILED' });
+                  }
+                }
+                if (validationIssues)
+                  throw new Error(`${code}: ${validationIssues.join('; ')} Correct these fields before retrying; do not repeat the same invalid submission.`);
                 throw new Error(error instanceof ContextRequestError ? `${code}: ${error.hint}` : code);
               }
             },

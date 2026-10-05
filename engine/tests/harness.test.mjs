@@ -60,6 +60,7 @@ test('tool diagnostics cover invalid arguments and execution failures without pr
         tool: 'search_sources',
         callId: 'call-1',
         executionStarted: scenario !== 'schema',
+        ...(scenario === 'schema' ? { validationIssues: ['missing required property \"value.query\"'] } : {}),
         code:
           scenario === 'schema'
             ? 'INVALID_TOOL_ARGUMENTS'
@@ -578,4 +579,56 @@ test('context validation gives a safe correction and the model can retry without
     assert.deepEqual(warnings, [{ event: 'CONTEXT_REQUEST_REJECTED', action: 'profiles', field: 'scope' }]);
     assert.ok(!JSON.stringify(warnings).includes('private account text'));
   } finally { console.warn = previous; }
+});
+
+test('briefing schema feedback identifies fields, hides unknown keys and allows corrected delivery', async () => {
+  const diagnostics = [];
+  let deliveries = 0;
+  const delivery = {
+    name: 'deliver_briefing', description: 'synthetic delivery',
+    parameters: { type: 'object', properties: {
+      title: { type: 'string' }, analysis: { type: 'array', items: { type: 'string' } },
+      businessType: { type: 'string', enum: ['INSIGHT', 'DATA'] },
+    }, required: ['title', 'analysis'], additionalProperties: false },
+    async execute() { deliveries++; return { status: 'PREPARED' }; },
+  };
+  const result = await runHarness({
+    prompt: 'synthetic briefing', tools: [delivery], invalidDeliveryAttempts: 3,
+    finishOnDeliverable: true,
+    hasCompletedDeliverable: receipts => receipts.at(-1)?.output?.status === 'PREPARED',
+    onToolFailure: failure => diagnostics.push(failure),
+    model: fixture([
+      call('deliver_briefing', { title: 9, analysis: 'private-body', businessType: 'private-value', 'private-key': 'secret' }),
+      request => {
+        const feedback = request.messages.flatMap(m => m.content).filter(b => b.type === 'tool_result').at(-1).content;
+        assert.match(feedback, /value.title.*string/);
+        assert.match(feedback, /value.analysis.*array/);
+        assert.match(feedback, /value.businessType.*INSIGHT/);
+        assert.match(feedback, /Remove undeclared properties/);
+        assert.doesNotMatch(feedback, /private-key|private-body|private-value|secret/);
+        return call('deliver_briefing', { title: 'A valid title', analysis: ['A grounded paragraph.'], businessType: 'INSIGHT' }, 'corrected');
+      },
+    ]),
+  });
+  assert.equal(result.status, 'completed');
+  assert.equal(result.modelCalls, 2);
+  assert.equal(deliveries, 1);
+  assert.doesNotMatch(JSON.stringify(diagnostics), /private-key|private-body|private-value|secret/);
+});
+
+test('three repeated invalid briefing deliveries stop before the model call budget is exhausted', async () => {
+  let executed = 0;
+  const result = await runHarness({
+    prompt: 'synthetic briefing', invalidDeliveryAttempts: 3,
+    limits: { modelCalls: 8, toolCalls: 8 },
+    tools: [{ name: 'deliver_briefing', description: 'synthetic',
+      parameters: { type: 'object', properties: { title: { type: 'string' } }, required: ['title'] },
+      async execute() { executed++; return {}; },
+    }],
+    model: fixture([1, 2, 3].map(i => call('deliver_briefing', { title: i }, `invalid-${i}`))),
+  });
+  assert.equal(result.status, 'failed');
+  assert.equal(result.code, 'TASK_TOOL_FAILED');
+  assert.equal(result.modelCalls, 3);
+  assert.equal(executed, 0);
 });

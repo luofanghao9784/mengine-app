@@ -814,11 +814,13 @@ export class AgentTasks {
               tool: failure.tool,
               callId: failure.callId,
               code: failure.code,
+              ...(failure.validationIssues ? { validationIssues: failure.validationIssues } : {}),
             }),
           );
         },
         finalResponseReserveMs: briefingGeneration ? 10000 : undefined,
         finishOnDeliverable: briefingGeneration,
+        invalidDeliveryAttempts: briefingGeneration ? 3 : undefined,
         hasCompletedDeliverable: briefingGeneration ? hasTerminalBriefing : hasPreparedBriefing,
       });
       if (realtime && (result.status === 'cancelled' || (await realtime.control()).stop)) {
@@ -850,6 +852,7 @@ export class AgentTasks {
               : '本次没有新增画报：相同内容已存在。'
             : '画报已生成，可在智能画报查看。';
       }
+      if (result.code === 'TASK_TOOL_FAILED') throw new RuntimeError('TASK_TOOL_FAILED');
       if (result.code === 'CONTROL_UNAVAILABLE') throw new RuntimeError('TASK_RESULT_UNKNOWN');
       if (result.status !== 'completed' || !result.text.trim() || result.text.length > 16000)
         throw new RuntimeError(result.status === 'limit' ? 'TASK_LIMIT' : 'TASK_MODEL_FAILED');
