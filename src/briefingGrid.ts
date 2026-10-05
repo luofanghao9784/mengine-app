@@ -53,13 +53,16 @@ export function packMagazineTiles(tiles: MagazineTile[], columns: number): Magaz
     for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) occupied.add(cursor + y * columns + x);
     cursor++;
   }
-  // Controls at the end never fill earlier gaps, even below tall content cards.
-  let endRow = Math.max(0, ...placed.map((tile) => tile.row + tile.height));
+  // Append after the rightmost occupied cell of the final row, never in earlier gaps.
+  cursor = placed.reduce((end, tile) => Math.max(end, (tile.row + tile.height - 1) * columns + tile.col + tile.width), 0);
   for (const tile of tiles.filter((tile) => tile.atEnd)) {
     const width = Math.min(columns, Number(tile.size[0]));
+    const size = `${width}×${tile.size[2]}` as CardSize;
     const height = Math.max(Number(tile.size[2]), tile.rows || 0);
-    placed.push({ ...tile, size: `${width}×${tile.size[2]}` as CardSize, row: endRow, col: 0, width, height });
-    endRow += height;
+    while (!fits(tile, size)) cursor++;
+    placed.push({ ...tile, size, row: Math.floor(cursor / columns), col: cursor % columns, width, height });
+    for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) occupied.add(cursor + y * columns + x);
+    cursor += (height - 1) * columns + width;
   }
   return placed;
 }

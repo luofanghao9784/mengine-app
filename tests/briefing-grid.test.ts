@@ -94,7 +94,7 @@ test('one-column display adapts saved wide cards and keeps measured full-title c
   assert.equal(tiles[0].size, '2×1');
 });
 
-test('generation control stays below every content card as cards append and columns change', () => {
+test('generation control appends after the final row as cards append and columns change', () => {
   const control: MagazineTile = { id: 'generation:more', size: '1×1', fixed: true, atEnd: true };
   const content: MagazineTile[] = [
     { id: 'tall', size: '1×2', fixed: true, rows: 3 },
@@ -106,8 +106,16 @@ test('generation control stays below every content card as cards append and colu
     const placed = packMagazineTiles(tiles,columns);
     const tail = placed.find(tile=>tile.id===control.id)!;
     assert.equal(placed.at(-1)?.id, control.id);
-    assert.equal(tail.row, Math.max(...placed.filter(tile=>tile.id!==control.id).map(tile=>tile.row+tile.height)));
-    assert.equal(tail.col,0);
+    const end = Math.max(...placed.filter(tile=>tile.id!==control.id).map(tile=>(tile.row+tile.height-1)*columns+tile.col+tile.width));
+    assert.equal(tail.row * columns + tail.col, end);
   }
   assert.equal(packMagazineTiles([control],3)[0].row,0);
+});
+
+test('generation control shares the last row and wraps only when its remaining width is insufficient', () => {
+ const more: MagazineTile = {id:'more',size:'1×1',fixed:true,atEnd:true};
+ assert.deepEqual(packMagazineTiles([{id:'wide',size:'2×1',fixed:true},more],3).map(p=>[p.row,p.col]),[[0,0],[0,2]]);
+ assert.deepEqual(packMagazineTiles([{id:'wide',size:'2×1',fixed:true},{id:'small',size:'1×1'},more],3).at(-1)?.row,1);
+ const tall=packMagazineTiles([{id:'tall',size:'1×2',fixed:true},more],3).at(-1)!;
+ assert.deepEqual([tall.row,tall.col],[1,1]);
 });

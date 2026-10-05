@@ -1028,7 +1028,7 @@ test('生成请求等待时不出现全页状态气泡，已有卡片与入口�
   expect(await more.boundingBox()).toEqual(moreBox);
 });
 
-test('生成入口在新增卡片和响应式重排后始终位于所有画报下方', async ({ page }) => {
+test('生成入口在新增卡片和响应式重排后位于末排末尾', async ({ page }) => {
   const f = await generationFixture(page, true);
   await page.setViewportSize({ width: 944, height: 841 });
   await page.goto(home);
@@ -1038,7 +1038,10 @@ test('生成入口在新增卡片和响应式重排后始终位于所有画报�
   const belowAll = () => page.locator('.live-magazine-grid').first().evaluate(el => {
     const control = el.querySelector<HTMLElement>('[data-card-id="generation:more"]')!;
     const cards = [...el.querySelectorAll<HTMLElement>('.live-briefing-tile')].filter(card => card !== control);
-    return control.offsetTop >= Math.max(0,...cards.map(card => card.offsetTop + card.offsetHeight)) - 1;
+    const bottom = Math.max(0,...cards.map(card => card.offsetTop + card.offsetHeight));
+    const last = cards.filter(card => Math.abs(card.offsetTop + card.offsetHeight - bottom) < 1);
+    const right = Math.max(0,...last.map(card=>card.offsetLeft+card.offsetWidth));
+    return control.offsetTop >= bottom - 1 || (control.offsetTop + control.offsetHeight >= bottom - 1 && control.offsetLeft >= right - 1);
   });
   await expect.poll(belowAll).toBe(true);
   f.set('SUCCEEDED');
