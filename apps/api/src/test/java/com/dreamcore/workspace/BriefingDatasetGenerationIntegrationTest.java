@@ -64,6 +64,19 @@ class BriefingDatasetGenerationIntegrationTest extends DatasetCalculationFixture
   assertEquals(snapshot.toString(),content.at("/datasetSource/snapshotId").asString());assertTrue(content.path("source").isNull());assertTrue(content.path("chart").isNull());
  }
 
+ @Test void datasetEvidenceCanReportNoUsefulBusinessInsightWithoutPublishingInventory(){
+  UUID p=policy();var b=first(p);var j=conversations.claim();
+  agents.openExecution(j.id(),j.token(),new AgentTaskService.ExecutionOpen("1.6",List.of("deliver_briefing")));
+  agents.toolReceipt(j.id(),j.token(),new AgentTaskService.ToolReceipt(1,"deliver_briefing","STARTED"));
+  var request=new BriefingContentService.Request(null,"暂无新内容","现有记录尚不足以形成有依据的新业务发现。",List.of("目前只能确认资料结构，不据此推断经营变化。","需要明确分析期间和业务问题后，再判断是否值得关注。"),"INSIGHT");
+  assertEquals("BRIEFING_SOURCES_REQUIRED",assertThrows(com.dreamcore.workspace.identity.IdentityException.class,()->agents.deliverBriefing(j.id(),j.token(),request)).code);
+  call(j,request("dataset_read",dataset,snapshot,0));
+  var receipt=agents.deliverBriefing(j.id(),j.token(),request);
+  assertEquals("NO_NEW_CONTENT",receipt.get("status"));assertEquals("NO_USEFUL_CONTENT",receipt.get("reason"));
+  assertEquals(0,db.queryForObject("SELECT count(*) FROM conversation_artifacts WHERE task_id=?",Integer.class,j.id()));
+  assertEquals(1,db.queryForObject("SELECT count(*) FROM identity_audit WHERE target_id=? AND action='TASK_BRIEFING_SKIPPED' AND outcome='SUCCESS'",Integer.class,j.token()));
+ }
+
  @Autowired com.dreamcore.workspace.identity.PlatformAdminService platform;
  @Test void serviceResumeDoesNotCatchUpOldDatasetEventsButAcceptsFreshCollection(){
   UUID operator=UUID.randomUUID();db.update("INSERT INTO accounts(id,email,display_name,password_hash) VALUES (?,?,'合成平台','unused')",operator,operator+"@auto-dataset-platform.test");

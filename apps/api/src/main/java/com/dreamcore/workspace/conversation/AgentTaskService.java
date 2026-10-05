@@ -127,7 +127,7 @@ public class AgentTaskService {
         var job=authorized(task,attempt);
         if(db.queryForObject("SELECT count(*) FROM conversation_attempts WHERE task_id=? AND attempt_id=? AND allowed_tools @> '[\"deliver_briefing\"]'::jsonb",Integer.class,task,attempt)!=1||db.queryForObject("SELECT count(*) FROM conversation_tool_receipts WHERE task_id=? AND attempt_number=(SELECT attempt FROM conversation_tasks WHERE id=?) AND name='deliver_briefing' AND status='STARTED'",Integer.class,task,task)==0)throw denied();
         if(briefings.statusOnly(request)&&Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM briefing_generation_batches WHERE task_id=?)",Boolean.class,task))){
-            if(grants(job).isEmpty())throw new IdentityException(422,"BRIEFING_SOURCES_REQUIRED");
+            if(grants(job).isEmpty()&&!Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM task_dataset_reads WHERE task_id=? AND attempt_number=(SELECT attempt FROM conversation_tasks WHERE id=?))",Boolean.class,job.id(),job.id())))throw new IdentityException(422,"BRIEFING_SOURCES_REQUIRED");
             audit.record(job.actor(),job.tenant(),"TASK_BRIEFING_SKIPPED",job.token(),"SUCCESS");
             return Map.of("contractVersion","1.0","status","NO_NEW_CONTENT","reason","NO_USEFUL_CONTENT");
         }

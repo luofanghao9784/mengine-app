@@ -1,3 +1,4 @@
+import { BRIEFING_WRITING_RULES } from './briefing-writing-rules.js';
 import type { RealtimePort } from './realtime.js';
 import { sourceQueries } from './source-query.js';
 import { planManagementTool } from './plan-management.js';
@@ -285,13 +286,13 @@ export class AgentTasks {
           ].join(' ') : '';
           const messages = briefingGeneration
             ? [{ role: 'system' as const, content: [{ type: 'text' as const,
-                text: deliveryReady
+                text: BRIEFING_WRITING_RULES + '\n' + (deliveryReady
                   ? 'The platform has verified one complete table calculation for this briefing. Retrieval and calculation are now closed. Call deliver_briefing with its existing calculation artifact, preserving its periods, scope and gaps. Write one complete theme; do not compute another range or repeat searches. A duplicate receipt means no new card, never fabricate novelty.'
                   : sampleDeliveryReady
-                  ? 'Dataset retrieval is closed after three successful lookups. Successful dataset_read calls so far: ' + briefingDatasetReads + '. Call deliver_briefing for ONE grounded INSIGHT or SUGGESTION using the already observed evidence. Explicitly state the observed sample scope and coverage limits. Do not invent totals, trends, causes or full coverage. DATA requires a verified calculation and is not available in this sample-only phase. compare_dataset computes ALL rows when a calculation was completed in the earlier phase.'
+                  ? 'Dataset retrieval is closed after three successful lookups. Successful dataset_read calls so far: ' + briefingDatasetReads + '. Call deliver_briefing for ONE useful business INSIGHT or SUGGESTION supported by already observed evidence, or report no useful new content through its status-only receipt. A dataset inventory is not a business insight. Explicitly state the observed sample scope and coverage limits. Do not invent totals, trends, causes or full coverage. DATA requires a verified calculation and is not available in this sample-only phase. compare_dataset computes ALL rows when a calculation was completed in the earlier phase.'
                   : `System briefing retrieval: ${briefingSearches}/${briefingSearchLimit} internal searches used. The first lookup reads the selected versions; at most two targeted lookups follow. Do not repeat searches to fill the budget. ${briefingSearches >= briefingSearchLimit
                   ? 'Internal search is now closed. Use the existing granted evidence to calculate and deliver one grounded theme. If evidence is insufficient, explain the concrete gap without claiming a card was generated.'
-                  : 'Once evidence supports a useful theme, for DATA use compare_table for files or compare_dataset for collected datasets, then deliver_briefing for the card. A text reply is not card delivery.'}${datasetGuide}` } ] }, ...request.messages]
+                  : 'Once evidence supports a useful theme, for DATA use compare_table for files or compare_dataset for collected datasets, then deliver_briefing for the card. A text reply is not card delivery.'}${datasetGuide}`) } ] }, ...request.messages]
             : request.messages;
           const phaseTools = request.tools.filter(
             tool => !retrievalClosed || ['compare_dataset', 'deliver_briefing', 'task_control'].includes(tool.name),
