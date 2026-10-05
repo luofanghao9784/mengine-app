@@ -102,7 +102,7 @@ export function Recommendations({
     return null;
   return (
     <section className="recommendations" aria-busy={data.loading} aria-label={focused ? '关注的企业成果' : '工作推荐'}>
-      {data.loading && data.value && <span className="briefing-local-loading" role="status">正在更新画报…</span>}
+      {data.loading && data.value && <span className="sr-only" role="status">正在更新画报…</span>}
       <SubmitError error={submission.error} uncertain={submission.uncertain} />
       {data.error ? (
         <Failure error={data.error} retry={refresh} />

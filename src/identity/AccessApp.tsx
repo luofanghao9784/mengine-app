@@ -420,7 +420,7 @@ function GuardedAccessShell({
                 </a>
               </div>
             )}
-            {pendingRequest && (
+            {pendingRequest && !(surface === 'workspace' && view === 'briefing') && (
               <p className="access-alert" role="status">
                 正在核对本次提交，请在原处完成或重试后再切换页面。
               </p>
