@@ -5,7 +5,13 @@ export default defineConfig({
   plugins: [react(), privateNinepopDemo(process.env.NINEPOP_PRIVATE_DATA)],
   build: {
     rollupOptions: {
-      input: ['index.html', 'workspace/index.html', 'tenant-admin/index.html', 'platform-admin/index.html'],
+      input: [
+        'index.html',
+        'workspace/index.html',
+        'tenant-admin/index.html',
+        'tenant-admin/support/index.html',
+        'platform-admin/index.html',
+      ],
     },
   },
   preview: {

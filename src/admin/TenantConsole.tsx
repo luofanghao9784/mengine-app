@@ -60,7 +60,7 @@ export function TenantConsole({
   const leaveSupport = async () => {
     try {
       await supportClient.leave(support!.id);
-      location.hash = `admin=tenants&enterprise=${tenant}&section=basic`;
+      location.assign(`/platform-admin/#admin=tenants&enterprise=${tenant}&section=basic`);
     } catch (e) {
       setError(e instanceof Error ? e.message : '退出结果尚未确认。');
     }

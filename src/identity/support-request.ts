@@ -1,6 +1,10 @@
 /** Platform support uses its own cookie/CSRF and a tenant-bound server context. */
 export function supportRoute() {
-  if (typeof location === 'undefined' || !location.pathname.startsWith('/platform-admin/')) return null;
+  if (
+    typeof location === 'undefined' ||
+    !(location.pathname.startsWith('/platform-admin/') || location.pathname === '/tenant-admin/support/')
+  )
+    return null;
   const params = new URLSearchParams(location.hash.slice(1));
   const id = params.get('support'),
     tenant = params.get('tenant');

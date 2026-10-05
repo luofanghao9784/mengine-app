@@ -81,7 +81,8 @@ test('headquarters enters scoped management, keeps context in navigation, shows 
   await page.goto(`/platform-admin/#admin=tenants&enterprise=${tenant}&section=basic`);
   await expect(page.getByRole('combobox', { name: '总部访问模式' })).toHaveCount(0);
   await page.getByRole('button', { name: '进入企业管理端' }).click();
-  await expect(page).toHaveURL(/support=/);
+  await expect(page).toHaveURL(/\/tenant-admin\/support\/#.*support=/);
+  await page.reload();
   await expect(page.getByRole('status').getByText('总部管理模式', { exact: true })).toBeVisible();
   await expect(page.getByText('操作者：合成总部操作者', { exact: false })).toBeVisible();
   await page.getByRole('link', { name: '成员与空间', exact: true }).click();
@@ -94,7 +95,7 @@ test('headquarters enters scoped management, keeps context in navigation, shows 
   await expect(page.getByRole('dialog').getByText('成功', { exact: true })).toBeVisible();
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: '返回总台企业概览' }).click();
-  await expect(page).toHaveURL(/admin=tenants&enterprise=/);
+  await expect(page).toHaveURL(/\/platform-admin\/#admin=tenants&enterprise=/);
   expect(writes[0]).toEqual({
     path: '/api/platform-admin/v1/support-access',
     body: { tenant, mode: 'ADJUSTMENT' },
@@ -104,4 +105,5 @@ test('headquarters enters scoped management, keeps context in navigation, shows 
     true,
   );
   expect(paths.some((path) => /^\/api\/(v1|tenant-admin\/v1)\/tenants\//.test(path))).toBe(false);
+  expect(paths.includes('/api/v1/auth/me')).toBe(false);
 });

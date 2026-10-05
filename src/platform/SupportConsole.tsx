@@ -31,7 +31,7 @@ export const supportClient = {
 export function SupportConsole({ id, tenant }: { id: string; tenant: string }) {
   const [attempt, retry] = useState(0);
   const access = useRemote((signal) => supportClient.read(id, signal), [id, tenant, attempt]);
-  const back = `#admin=tenants&enterprise=${encodeURIComponent(tenant)}&section=basic`;
+  const back = `/platform-admin/#admin=tenants&enterprise=${encodeURIComponent(tenant)}&section=basic`;
   if (access.error)
     return (
       <main className="admin-content">
@@ -58,7 +58,7 @@ export function SupportEntry({ tenant, enabled }: { tenant: string; enabled: boo
     setError('');
     try {
       const access = await supportClient.enter(tenant);
-      location.hash = `admin=overview&tenant=${access.tenant}&support=${access.id}`;
+      location.assign(`/tenant-admin/support/#admin=overview&tenant=${access.tenant}&support=${access.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : '总部访问暂不可用。');
     } finally {

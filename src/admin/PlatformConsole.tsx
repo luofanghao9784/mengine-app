@@ -1,4 +1,4 @@
-import { SupportConsole } from '../platform/SupportConsole';
+import { SupportPageRedirect } from '../platform/SupportApp';
 import { PlatformDataOperations } from '../operations/PlatformDataOperations';
 import { EngineTelemetryWall } from '../operations/EngineTelemetryWall';
 import { useSession } from '../identity/session';
@@ -16,7 +16,7 @@ export function PlatformConsole({ logout }: { logout: () => void }) {
   const { page, hash } = useAdminRoute('platform');
   const params = new URLSearchParams(hash.slice(1));
   if (params.get('support') && params.get('tenant'))
-    return <SupportConsole id={params.get('support')!} tenant={params.get('tenant')!} />;
+    return <SupportPageRedirect />;
   const enterprisePage = page === 'tenants' || page === 'accounts';
   return (
     <AdminShell
