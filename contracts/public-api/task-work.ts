@@ -17,8 +17,8 @@ export interface TaskPreferenceReceipt {
   id: string;
   taskId: string;
   requestId: string;
-  category: 'RESPONSE_LENGTH' | 'RESPONSE_FORMAT' | 'TONE';
-  choice: 'CONCISE' | 'DETAILED' | 'PARAGRAPHS' | 'BULLETS' | 'DIRECT' | 'FRIENDLY';
+  category: 'RESPONSE_LENGTH' | 'RESPONSE_FORMAT' | 'TONE' | 'BRIEFING_ORDER';
+  choice: 'CONCISE' | 'DETAILED' | 'PARAGRAPHS' | 'BULLETS' | 'DIRECT' | 'FRIENDLY' | 'CONCLUSION_FIRST' | 'EVIDENCE_FIRST';
   label: string;
   profileId: string;
   acceptedRevision: number;

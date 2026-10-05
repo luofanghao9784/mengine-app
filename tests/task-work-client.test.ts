@@ -105,3 +105,14 @@ test('unavailable preference keeps an exact historical receipt without effect or
     }),
   );
 });
+test('briefing order memory receipts use the same finite preference contract', () => {
+  assert.ok(
+    isPreferenceReceipt({
+      ...receipt,
+      category: 'BRIEFING_ORDER',
+      choice: 'EVIDENCE_FIRST',
+      label: '画报先列依据',
+    }),
+  );
+  assert.equal(isPreferenceReceipt({ ...receipt, category: 'BRIEFING_ORDER', choice: 'FRIENDLY' }), false);
+});

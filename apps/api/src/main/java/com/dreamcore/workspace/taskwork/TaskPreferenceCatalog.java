@@ -4,6 +4,8 @@ import java.util.*;
 public final class TaskPreferenceCatalog {
  public record Choice(String category,String choice,String label,List<String> explicitPhrases) {}
  public static final List<Choice> CHOICES=List.of(
+  new Choice("BRIEFING_ORDER","CONCLUSION_FIRST","画报先给结论",List.of("请记住，以后我的画报先给结论")),
+  new Choice("BRIEFING_ORDER","EVIDENCE_FIRST","画报先列依据",List.of("请记住，以后我的画报先列依据")),
   new Choice("RESPONSE_LENGTH","CONCISE","回答默认简洁",List.of("请记住，以后回答简洁一些","以后请默认简洁回答","Remember that I prefer concise responses")),
   new Choice("RESPONSE_LENGTH","DETAILED","回答默认详细",List.of("请记住，以后回答详细一些","以后请默认详细回答","Remember that I prefer detailed responses")),
   new Choice("RESPONSE_FORMAT","PARAGRAPHS","回答默认使用自然段",List.of("请记住，以后回答默认使用自然段","以后请默认用自然段回答","Remember that I prefer paragraph responses")),

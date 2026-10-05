@@ -1,3 +1,4 @@
+import { ExpressionPreferencesPanel } from '../preferences/ExpressionPreferencesPanel';
 import { useContext, useState, useRef } from 'react';
 import { ArrowLeft, Building2, ChevronRight, ExternalLink, LogOut, Settings, UserRound } from 'lucide-react';
 import type { Identity, Membership } from '../../contracts/public-api/identity';
@@ -207,6 +208,7 @@ export function AccountPanel({
               {page === 'profiles' && current && (
                 <>
                   <p className="muted">适用于：{current.tenantName} · 其他企业独立保存</p>
+                  <ExpressionPreferencesPanel scope="PERSONAL" tenant={tenant} />
                   <Profiles tenant={tenant} personalOnly />
                 </>
               )}

@@ -30,14 +30,16 @@ export const isPreferenceReceipt = (v: unknown): v is TaskPreferenceReceipt =>
   uuid(v.id) &&
   uuid(v.taskId) &&
   uuid(v.requestId) &&
-  one(v.category, ['RESPONSE_LENGTH', 'RESPONSE_FORMAT', 'TONE']) &&
+  one(v.category, ['RESPONSE_LENGTH', 'RESPONSE_FORMAT', 'TONE', 'BRIEFING_ORDER']) &&
   one(
     v.choice,
     v.category === 'RESPONSE_LENGTH'
       ? ['CONCISE', 'DETAILED']
       : v.category === 'RESPONSE_FORMAT'
         ? ['PARAGRAPHS', 'BULLETS']
-        : ['DIRECT', 'FRIENDLY'],
+        : v.category === 'BRIEFING_ORDER'
+          ? ['CONCLUSION_FIRST', 'EVIDENCE_FIRST']
+          : ['DIRECT', 'FRIENDLY'],
   ) &&
   typeof v.label === 'string' &&
   v.label.length > 0 &&

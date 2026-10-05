@@ -52,9 +52,9 @@ export function workResponse(value: unknown, action: string): Json {
         r.pending.length <= 1 &&
         r.pending.every(check)) ||
       (Array.isArray(r.choices) &&
-        r.choices.length === 6 &&
+        r.choices.length === 8 &&
         Array.isArray(r.current) &&
-        r.current.length <= 3 &&
+        r.current.length <= 4 &&
         r.scope === 'CURRENT_USER_PERSONAL')
     )
   )
@@ -73,10 +73,22 @@ export function workTools(invoke: Invoke, authorize: () => Promise<void>, planAl
           action: { type: 'string', enum: ['read', 'save'] },
           requestId: { type: 'string' },
           expectedRevision: { type: 'integer' },
-          category: { type: 'string', enum: ['RESPONSE_LENGTH', 'RESPONSE_FORMAT', 'TONE'] },
+          category: {
+            type: 'string',
+            enum: ['RESPONSE_LENGTH', 'RESPONSE_FORMAT', 'TONE', 'BRIEFING_ORDER'],
+          },
           choice: {
             type: 'string',
-            enum: ['CONCISE', 'DETAILED', 'PARAGRAPHS', 'BULLETS', 'DIRECT', 'FRIENDLY'],
+            enum: [
+              'CONCISE',
+              'DETAILED',
+              'PARAGRAPHS',
+              'BULLETS',
+              'DIRECT',
+              'FRIENDLY',
+              'CONCLUSION_FIRST',
+              'EVIDENCE_FIRST',
+            ],
           },
           evidenceSource: { type: 'string', enum: ['PROMPT', 'SUPPLEMENT'] },
           evidenceOffset: { type: 'integer' },

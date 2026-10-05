@@ -1,3 +1,4 @@
+import { expressionInstructions } from './expression-preferences.js';
 import { BRIEFING_WRITING_RULES } from './briefing-writing-rules.js';
 import type { RealtimePort } from './realtime.js';
 import { sourceQueries } from './source-query.js';
@@ -80,6 +81,7 @@ export class AgentTasks {
     const sources = new Map<string, Source>();
     const tableHandles = new Map<string, string>();
     let briefingGeneration: boolean | undefined;
+    let expressionPreferences: unknown;
     let briefingSearches = 0;
     const briefingSearchLimit = 3;
     let briefingCalculationReady = false;
@@ -118,6 +120,8 @@ export class AgentTasks {
           response.executionClass !== this.config.executionClass
         )
           throw new RuntimeError('TASK_ACCESS_DENIED');
+        expressionInstructions(response.expressionPreferences, false);
+        expressionPreferences = response.expressionPreferences;
         realtimeAvailable = response.realtimeVersion === '1.0';
         const query = response.publicQuery ?? '';
         if (
@@ -147,8 +151,11 @@ export class AgentTasks {
           throw new RuntimeError('TASK_ACCESS_DENIED');
         datasetContextAvailable = datasets;
         const general = response.generalExperienceVersion === '1.0';
-        if ((response.generalExperienceVersion !== undefined && !general) || (general && !context) ||
-            (generalExperienceAvailable !== undefined && generalExperienceAvailable !== general))
+        if (
+          (response.generalExperienceVersion !== undefined && !general) ||
+          (general && !context) ||
+          (generalExperienceAvailable !== undefined && generalExperienceAvailable !== general)
+        )
           throw new RuntimeError('TASK_ACCESS_DENIED');
         generalExperienceAvailable = general;
         const work = response.taskWorkVersion === '1.0';
@@ -275,42 +282,75 @@ export class AgentTasks {
           const deliveryReady = briefingGeneration && briefingCalculationReady;
           const retrievalClosed = briefingGeneration && briefingDatasetLookups >= 3;
           const sampleDeliveryReady = retrievalClosed && briefingDatasetReads > 0;
-          const datasetGuide = !deliveryReady && datasetComparisonAvailable ? [
-            briefingDatasetLookups >= 3
-              ? ' Dataset retrieval is now closed after three successful lookups. Select compare_dataset for a supported DATA calculation, deliver_briefing for a grounded INSIGHT or SUGGESTION with explicit sample limits, or task_control to report a concrete evidence gap. Do not request task_context or further source reads. Never invent totals or claims of full coverage.'
-              : ` Dataset retrieval: ${briefingDatasetLookups}/3 lookups used. Choose ONE selected dataset and ONE useful theme, not an inventory of all datasets.`,
-            'Use dataset_search for exact IDs and columns, then dataset_read with columnLimit 10 to inspect required columns and actual period values.',
-            `Successful dataset_read calls so far: ${briefingDatasetReads}. Read only the pages needed to establish the calculation parameters.`,
-            'compare_dataset computes ALL rows in the pinned snapshot; do not page through every row to calculate totals. Reserve calls for calculation and delivery.',
-            'If the data does not support an exact two-period grouped calculation, choose a grounded INSIGHT or SUGGESTION without invented totals, explicitly limiting claims to observed evidence, or report insufficient evidence.',
-          ].join(' ') : '';
-          const messages = briefingGeneration
-            ? [{ role: 'system' as const, content: [{ type: 'text' as const,
-                text: BRIEFING_WRITING_RULES + '\n' + (deliveryReady
-                  ? 'The platform has verified one complete table calculation for this briefing. Retrieval and calculation are now closed. Call deliver_briefing with its existing calculation artifact, preserving its periods, scope and gaps. Write one complete theme; do not compute another range or repeat searches. A duplicate receipt means no new card, never fabricate novelty.'
-                  : sampleDeliveryReady
-                  ? 'Dataset retrieval is closed after three successful lookups. Successful dataset_read calls so far: ' + briefingDatasetReads + '. Call deliver_briefing for ONE useful business INSIGHT or SUGGESTION supported by already observed evidence, or report no useful new content through its status-only receipt. A dataset inventory is not a business insight. Explicitly state the observed sample scope and coverage limits. Do not invent totals, trends, causes or full coverage. DATA requires a verified calculation and is not available in this sample-only phase. compare_dataset computes ALL rows when a calculation was completed in the earlier phase.'
-                  : `System briefing retrieval: ${briefingSearches}/${briefingSearchLimit} internal searches used. The first lookup reads the selected versions; at most two targeted lookups follow. Do not repeat searches to fill the budget. ${briefingSearches >= briefingSearchLimit
-                  ? 'Internal search is now closed. Use the existing granted evidence to calculate and deliver one grounded theme. If evidence is insufficient, explain the concrete gap without claiming a card was generated.'
-                  : 'Once evidence supports a useful theme, for DATA use compare_table for files or compare_dataset for collected datasets, then deliver_briefing for the card. A text reply is not card delivery.'}${datasetGuide}`) } ] }, ...request.messages]
+          const datasetGuide =
+            !deliveryReady && datasetComparisonAvailable
+              ? [
+                  briefingDatasetLookups >= 3
+                    ? ' Dataset retrieval is now closed after three successful lookups. Select compare_dataset for a supported DATA calculation, deliver_briefing for a grounded INSIGHT or SUGGESTION with explicit sample limits, or task_control to report a concrete evidence gap. Do not request task_context or further source reads. Never invent totals or claims of full coverage.'
+                    : ` Dataset retrieval: ${briefingDatasetLookups}/3 lookups used. Choose ONE selected dataset and ONE useful theme, not an inventory of all datasets.`,
+                  'Use dataset_search for exact IDs and columns, then dataset_read with columnLimit 10 to inspect required columns and actual period values.',
+                  `Successful dataset_read calls so far: ${briefingDatasetReads}. Read only the pages needed to establish the calculation parameters.`,
+                  'compare_dataset computes ALL rows in the pinned snapshot; do not page through every row to calculate totals. Reserve calls for calculation and delivery.',
+                  'If the data does not support an exact two-period grouped calculation, choose a grounded INSIGHT or SUGGESTION without invented totals, explicitly limiting claims to observed evidence, or report insufficient evidence.',
+                ].join(' ')
+              : '';
+          const phaseMessages = briefingGeneration
+            ? [
+                {
+                  role: 'system' as const,
+                  content: [
+                    {
+                      type: 'text' as const,
+                      text:
+                        BRIEFING_WRITING_RULES +
+                        '\n' +
+                        (deliveryReady
+                          ? 'The platform has verified one complete table calculation for this briefing. Retrieval and calculation are now closed. Call deliver_briefing with its existing calculation artifact, preserving its periods, scope and gaps. Write one complete theme; do not compute another range or repeat searches. A duplicate receipt means no new card, never fabricate novelty.'
+                          : sampleDeliveryReady
+                            ? 'Dataset retrieval is closed after three successful lookups. Successful dataset_read calls so far: ' +
+                              briefingDatasetReads +
+                              '. Call deliver_briefing for ONE useful business INSIGHT or SUGGESTION supported by already observed evidence, or report no useful new content through its status-only receipt. A dataset inventory is not a business insight. Explicitly state the observed sample scope and coverage limits. Do not invent totals, trends, causes or full coverage. DATA requires a verified calculation and is not available in this sample-only phase. compare_dataset computes ALL rows when a calculation was completed in the earlier phase.'
+                            : `System briefing retrieval: ${briefingSearches}/${briefingSearchLimit} internal searches used. The first lookup reads the selected versions; at most two targeted lookups follow. Do not repeat searches to fill the budget. ${
+                                briefingSearches >= briefingSearchLimit
+                                  ? 'Internal search is now closed. Use the existing granted evidence to calculate and deliver one grounded theme. If evidence is insufficient, explain the concrete gap without claiming a card was generated.'
+                                  : 'Once evidence supports a useful theme, for DATA use compare_table for files or compare_dataset for collected datasets, then deliver_briefing for the card. A text reply is not card delivery.'
+                              }${datasetGuide}`),
+                    },
+                  ],
+                },
+                ...request.messages,
+              ]
             : request.messages;
+          const preferenceText = expressionInstructions(expressionPreferences, !!briefingGeneration);
+          const messages = preferenceText
+            ? [
+                { role: 'system' as const, content: [{ type: 'text' as const, text: preferenceText }] },
+                ...phaseMessages,
+              ]
+            : phaseMessages;
           const phaseTools = request.tools.filter(
-            tool => !retrievalClosed || ['compare_dataset', 'deliver_briefing', 'task_control'].includes(tool.name),
+            (tool) =>
+              !retrievalClosed || ['compare_dataset', 'deliver_briefing', 'task_control'].includes(tool.name),
           );
           for await (const part of metered.generate({
             ...request,
             messages,
             tools: phaseTools.filter(
               (t) =>
-                (t.name !== 'search_sources' || !briefingGeneration || briefingSearches < briefingSearchLimit) &&
+                (t.name !== 'search_sources' ||
+                  !briefingGeneration ||
+                  briefingSearches < briefingSearchLimit) &&
                 (t.name !== 'task_context' || !briefingGeneration || briefingDatasetLookups < 3) &&
                 (!publicTools.has(t.name) || activated.has('public-research')) &&
                 (!(deliveryReady || sampleDeliveryReady) || t.name === 'deliver_briefing') &&
                 (t.name !== 'candidate_tool' || activated.has('candidate-trials')) &&
                 (t.name !== 'process_original' || activated.has('file-processing')),
             ),
-            ...(deliveryReady || sampleDeliveryReady ? { requiredTool: 'deliver_briefing' } :
-              retrievalClosed && phaseTools.length ? { requireToolCall: true } : {}),
+            ...(deliveryReady || sampleDeliveryReady
+              ? { requiredTool: 'deliver_briefing' }
+              : retrievalClosed && phaseTools.length
+                ? { requireToolCall: true }
+                : {}),
             signal: AbortSignal.any([signal, request.signal]),
           })) {
             if (part.type === 'text') {
@@ -341,16 +381,25 @@ export class AgentTasks {
             throw new RuntimeError('INVALID_QUERY');
           if (briefingGeneration && briefingSearches >= briefingSearchLimit)
             return {
-              items: [], scope: 'previously-authorized-excerpts', searchPerformed: false,
+              items: [],
+              scope: 'previously-authorized-excerpts',
+              searchPerformed: false,
               reuseExistingEvidence: true,
-              notice: 'Retrieval is closed. No search was dispatched. Use the existing granted evidence for one calculation if DATA needs it, then deliver; do not request another search.',
+              notice:
+                'Retrieval is closed. No search was dispatched. Use the existing granted evidence for one calculation if DATA needs it, then deliver; do not request another search.',
               retrievalBudget: { used: briefingSearches, max: briefingSearchLimit, searchClosed: true },
             };
-          const selectedBriefing = briefingGeneration && isRecord(continuity) &&
-            isRecord(continuity.result) && Array.isArray(continuity.result.selectedMaterials) &&
+          const selectedBriefing =
+            briefingGeneration &&
+            isRecord(continuity) &&
+            isRecord(continuity.result) &&
+            Array.isArray(continuity.result.selectedMaterials) &&
             continuity.result.selectedMaterials.length > 0;
-          const queries = sourceQueries(task.prompt,
-            selectedBriefing && briefingSearches === 0 ? '' : query, continuity);
+          const queries = sourceQueries(
+            task.prompt,
+            selectedBriefing && briefingSearches === 0 ? '' : query,
+            continuity,
+          );
           if (briefingGeneration) briefingSearches++;
           let effectiveQuery = queries[0];
           let response = await invoke('search', { query: effectiveQuery });
@@ -399,10 +448,15 @@ export class AgentTasks {
             scope: 'authorized-excerpts',
             requestedQuery: query,
             effectiveQuery,
-            ...(briefingGeneration ? { retrievalBudget: {
-              used: briefingSearches, max: briefingSearchLimit,
-              searchClosed: briefingSearches >= briefingSearchLimit,
-            } } : {}),
+            ...(briefingGeneration
+              ? {
+                  retrievalBudget: {
+                    used: briefingSearches,
+                    max: briefingSearchLimit,
+                    searchClosed: briefingSearches >= briefingSearchLimit,
+                  },
+                }
+              : {}),
             ...inputCoverage(response),
           };
         },
@@ -503,7 +557,8 @@ export class AgentTasks {
       ];
       const contextEnabled = task.contractVersion === '1.5' && contextAvailable;
       const continuity = contextEnabled ? await taskBootstrap(invoke) : undefined;
-      if (contextEnabled) tools.push(contextTool(invoke, authorize, datasetContextAvailable, generalExperienceAvailable));
+      if (contextEnabled)
+        tools.push(contextTool(invoke, authorize, datasetContextAvailable, generalExperienceAvailable));
       if (task.contractVersion === '1.5' && workAvailable)
         tools.push(...workTools(invoke, authorize, !!planAllowed));
       if (web) {
@@ -753,7 +808,11 @@ export class AgentTasks {
             await invoke('execution/tool', { sequence: number, name: tool.name, status: 'STARTED' });
             let output: Json;
             try {
-              if (briefingGeneration && briefingCalculationReady && ['compare_table', 'compare_dataset'].includes(tool.name))
+              if (
+                briefingGeneration &&
+                briefingCalculationReady &&
+                ['compare_table', 'compare_dataset'].includes(tool.name)
+              )
                 throw new RuntimeError('BRIEFING_DELIVERY_REQUIRED');
               if (briefingGeneration && tool.name === 'task_context' && briefingDatasetLookups >= 3)
                 throw new RuntimeError('BRIEFING_RETRIEVAL_LIMIT');
@@ -783,7 +842,8 @@ export class AgentTasks {
               if (['dataset_search', 'dataset_read'].includes(String(args.action))) briefingDatasetLookups++;
               if (args.action === 'dataset_read') briefingDatasetReads++;
             }
-            if (briefingGeneration && ['compare_table', 'compare_dataset'].includes(tool.name)) briefingCalculationReady = true;
+            if (briefingGeneration && ['compare_table', 'compare_dataset'].includes(tool.name))
+              briefingCalculationReady = true;
             return output;
           };
         }
@@ -800,8 +860,11 @@ export class AgentTasks {
         reserveFinalResponse: task.contractVersion === '1.5',
         onToolFailure: async (failure) => {
           // Record local schema rejection too. No business action is dispatched for invalid arguments.
-          if (task.contractVersion === '1.5' && !failure.executionStarted &&
-              failure.code === 'INVALID_TOOL_ARGUMENTS') {
+          if (
+            task.contractVersion === '1.5' &&
+            !failure.executionStarted &&
+            failure.code === 'INVALID_TOOL_ARGUMENTS'
+          ) {
             const number = ++sequence;
             await invoke('execution/tool', { sequence: number, name: failure.tool, status: 'STARTED' });
             await invoke('execution/tool', { sequence: number, name: failure.tool, status: 'failed' });
@@ -856,7 +919,12 @@ export class AgentTasks {
       if (result.code === 'CONTROL_UNAVAILABLE') throw new RuntimeError('TASK_RESULT_UNKNOWN');
       if (result.status !== 'completed' || !result.text.trim() || result.text.length > 16000)
         throw new RuntimeError(result.status === 'limit' ? 'TASK_LIMIT' : 'TASK_MODEL_FAILED');
-      if (result.finalResponseReserved && outcome === 'COMPLETE' && !terminalBriefing && !hasPreparedBriefing(result.tools)) {
+      if (
+        result.finalResponseReserved &&
+        outcome === 'COMPLETE' &&
+        !terminalBriefing &&
+        !hasPreparedBriefing(result.tools)
+      ) {
         outcome = 'PARTIAL';
         requiredInput =
           '本次执行预算已用于资料处理，已保留有依据的阶段结果；请核对回复中的缺口与未完成事项。';

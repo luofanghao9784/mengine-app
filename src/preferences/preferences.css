@@ -1,0 +1,47 @@
+.expression-preferences h2 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+.expression-preference-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px 24px;
+  margin-top: 24px;
+}
+.expression-preference-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.expression-preference-grid select {
+  width: 100%;
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid #dae4f0;
+  border-radius: 8px;
+  color: #243447;
+  font: inherit;
+  font-weight: 400;
+}
+.expression-preference-grid small {
+  font-weight: 400;
+  color: #64748b;
+  font-size: 12px;
+}
+.expression-preference-boundary {
+  margin: 24px 0 16px;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.expression-preference-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+@media (max-width: 600px) {
+  .expression-preference-grid {
+    grid-template-columns: 1fr;
+  }
+}

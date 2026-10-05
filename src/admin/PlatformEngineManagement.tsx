@@ -1,3 +1,4 @@
+import { ExpressionPreferencesPanel } from '../preferences/ExpressionPreferencesPanel';
 import { PlatformStorage } from '../operations/PlatformStorage';
 import { useContext } from 'react';
 import { ArrowRight, SlidersHorizontal } from 'lucide-react';
@@ -11,6 +12,7 @@ export function PlatformEngineManagement({ hash }: { hash: string }) {
   const pending = useContext(RequestPending);
   const params = new URLSearchParams(hash.replace(/^#/, ''));
   const storage = params.get('tab') === 'storage' || params.get('detail') === 'storage';
+  const preferences = params.get('tab') === 'preferences';
   const versions = ['versions', 'methods'].includes(params.get('tab') || '');
   const versionHref = adminHref('platform', 'capabilities', hash, { tab: 'versions' });
   return (
@@ -18,7 +20,7 @@ export function PlatformEngineManagement({ hash }: { hash: string }) {
       <nav className="platform-engine-tabs" aria-label="引擎管理板块" inert={pending || undefined}>
         <a
           href={adminHref('platform', 'capabilities', hash)}
-          aria-current={!versions && !storage ? 'page' : undefined}
+          aria-current={!versions && !storage && !preferences ? 'page' : undefined}
         >
           能力与规则
         </a>
@@ -31,8 +33,16 @@ export function PlatformEngineManagement({ hash }: { hash: string }) {
         >
           存储与备份
         </a>
+        <a
+          href={adminHref('platform', 'capabilities', hash, { tab: 'preferences' })}
+          aria-current={preferences ? 'page' : undefined}
+        >
+          内容偏好
+        </a>
       </nav>
-      {storage ? (
+      {preferences ? (
+        <ExpressionPreferencesPanel scope="GLOBAL" />
+      ) : storage ? (
         <PlatformStorage hash={hash} embedded />
       ) : versions ? (
         <MethodWorkbench embedded />

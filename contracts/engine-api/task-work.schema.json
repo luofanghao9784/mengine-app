@@ -71,10 +71,10 @@
               "minimum": 0
             },
             "category": {
-              "enum": ["RESPONSE_LENGTH", "RESPONSE_FORMAT", "TONE"]
+              "enum": ["RESPONSE_LENGTH", "RESPONSE_FORMAT", "TONE", "BRIEFING_ORDER"]
             },
             "choice": {
-              "enum": ["CONCISE", "DETAILED", "PARAGRAPHS", "BULLETS", "DIRECT", "FRIENDLY"]
+              "enum": ["CONCISE", "DETAILED", "PARAGRAPHS", "BULLETS", "DIRECT", "FRIENDLY", "CONCLUSION_FIRST", "EVIDENCE_FIRST"]
             },
             "evidenceSource": {
               "enum": ["PROMPT", "SUPPLEMENT"]
@@ -191,10 +191,10 @@
           "format": "uuid"
         },
         "category": {
-          "enum": ["RESPONSE_LENGTH", "RESPONSE_FORMAT", "TONE"]
+          "enum": ["RESPONSE_LENGTH", "RESPONSE_FORMAT", "TONE", "BRIEFING_ORDER"]
         },
         "choice": {
-          "enum": ["CONCISE", "DETAILED", "PARAGRAPHS", "BULLETS", "DIRECT", "FRIENDLY"]
+          "enum": ["CONCISE", "DETAILED", "PARAGRAPHS", "BULLETS", "DIRECT", "FRIENDLY", "CONCLUSION_FIRST", "EVIDENCE_FIRST"]
         },
         "label": {
           "type": "string",
