@@ -20,6 +20,11 @@ test('data operations only expose independent platform reads with bounded paging
 test('operational item schema excludes names, credentials and raw diagnostic payloads', () => {
   const row = {
     monitorKey: 'a'.repeat(32),
+    format: null,
+    sizeBytes: null,
+    version: null,
+    datasetCount: 2,
+    rowCount: 24,
     runId: null,
     stage: 'NOT_STARTED',
     configuration: 'UNCONFIGURED',

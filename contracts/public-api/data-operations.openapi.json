@@ -277,7 +277,12 @@
           "diagnostic",
           "createdAt",
           "finishedAt",
-          "lastSuccessAt"
+          "lastSuccessAt",
+          "format",
+          "sizeBytes",
+          "version",
+          "datasetCount",
+          "rowCount"
         ],
         "properties": {
           "monitorKey": {
@@ -354,6 +359,53 @@
               "null"
             ],
             "format": "date-time"
+          },
+          "format": {
+            "enum": [
+              "PDF",
+              "DOCX",
+              "XLSX",
+              "CSV",
+              "TXT",
+              "MD",
+              "JSON",
+              "PPTX",
+              "HTML",
+              "OTHER",
+              null
+            ]
+          },
+          "sizeBytes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "version": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "datasetCount": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "rowCount": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 9007199254740991
           }
         }
       },

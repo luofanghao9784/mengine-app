@@ -16,6 +16,11 @@ const detail = {
   items: [
     {
       monitorKey: 'a'.repeat(32),
+      format: null,
+      sizeBytes: null,
+      version: null,
+      datasetCount: 2,
+      rowCount: 24,
       runId: null,
       stage: 'NOT_STARTED',
       configuration: 'UNAVAILABLE',
@@ -72,4 +77,12 @@ test('platform data operations bind tenant, category, filters and pagination to 
   await assert.rejects(api.list('MATERIALS', '', 'ALL', 0), { code: 'CONTRACT_MISMATCH' });
   await assert.rejects(api.list('CONNECTIONS', '', 'ALL', 20), { code: 'CONTRACT_MISMATCH' });
   assert.throws(() => api.detail('invalid', 'MATERIALS', 'ALL', 0), { code: 'INVALID_REQUEST' });
+});
+
+test('safe object metadata enforces category, format whitelist and integer bounds', () => {
+  for (const patch of [{ format: 'secret-filename' }, { rowCount: -1 }, { datasetCount: 1.5 }, { sizeBytes: 2 }])
+    assert.equal(isDataDetail({ ...detail, items: [{ ...detail.items[0], ...patch }] }), false);
+  const material = { ...detail.items[0], configuration: null, format: 'PDF', sizeBytes: 2048, version: 3, datasetCount: null, rowCount: null };
+  assert.ok(isDataDetail({ ...detail, kind: 'MATERIALS', items: [material] }));
+  assert.equal(isDataDetail({ ...detail, kind: 'MATERIALS', items: [{ ...material, version: 0 }] }), false);
 });

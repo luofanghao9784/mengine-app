@@ -91,6 +91,7 @@ export function GeneralExperienceLibrary({
   }, [error, select, locked]);
   return (
     <div className="admin-dashboard experience-management">
+      {!tenant && <p className="admin-note">总台展示平台通用经验与自动积累状态；企业私有经验及来源正文不在此汇总。排查企业内容请从企业管理中的支持入口进入，按现有权限访问并记录审计。</p>}
       {!tenant && <PageActions>{refreshControl}</PageActions>}
       <div
         className="experience-management-tabs"

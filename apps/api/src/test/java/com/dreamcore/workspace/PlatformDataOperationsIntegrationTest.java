@@ -38,7 +38,19 @@ class PlatformDataOperationsIntegrationTest {
   db.update("UPDATE knowledge_runs SET status='FAILED',warnings=?,finished_at=now() WHERE id=?",SECRET,run);assertEquals("PARSE_FAILED",detail("MATERIALS").items().getFirst().diagnostic());
   db.update("INSERT INTO knowledge_runs(id,tenant_id,workspace_id,material_id,version_id,generation,requested_by,status,finished_at) SELECT ?,tenant_id,workspace_id,material_id,version_id,2,requested_by,'READY',now() FROM knowledge_runs WHERE id=?",UUID.randomUUID(),run);var ready=detail("MATERIALS");assertEquals(1,ready.counts().ready());assertEquals(0,ready.counts().attention());assertNotEquals(run,ready.items().getFirst().runId());
   materials.upload(member,tenant,space,null,m.id(),1,UUID.randomUUID(),new MockMultipartFile("file",SECRET+".txt","text/plain","new-version".getBytes()));var newer=detail("MATERIALS");assertEquals(1,newer.counts().total());assertEquals(1,newer.counts().processing());assertNull(newer.items().getFirst().lastSuccessAt());
+  var metadata=newer.items().getFirst();assertEquals("TXT",metadata.format());assertEquals(11L,metadata.sizeBytes());assertEquals(2,metadata.version());assertNull(metadata.datasetCount());assertNull(metadata.rowCount());
   String json=new JsonMapper().writeValueAsString(newer);for(String secret:List.of(SECRET,m.id().toString(),member.toString(),space.toString(),"filename","warnings","workspaceId"))assertFalse(json.contains(secret));
+ }
+ @Test void safeDatasetMetadataCountsOnlyActiveObjectsWithoutBusinessRows(){
+  UUID c=connection(tenant,"READY"),r=run(tenant,c,"SUCCEEDED",1),d=UUID.randomUUID(),snap=UUID.randomUUID();
+  db.update("UPDATE workspaces SET kind='SHARED' WHERE id=?",space);
+  db.update("INSERT INTO business_datasets(id,tenant_id,connection_id,workspace_id,dataset_key,name,column_names) VALUES (?,?,?,?,?,?,?::jsonb)",d,tenant,c,space,SECRET,SECRET,"[\"private_column\"]");
+  db.update("INSERT INTO dataset_snapshots(id,tenant_id,connection_id,dataset_id,run_id,version,data_rows,row_count,collected_at) VALUES (?,?,?,?,?,1,?::jsonb,1,now())",snap,tenant,c,d,r,"[{\"private_column\":\""+SECRET+"\"}]");
+  db.update("UPDATE business_datasets SET current_snapshot=? WHERE id=?",snap,d);
+  var item=detail("CONNECTIONS").items().getFirst();assertEquals(1L,item.datasetCount());assertEquals(1L,item.rowCount());assertNull(item.format());assertNull(item.sizeBytes());assertNull(item.version());
+  String projection=new JsonMapper().writeValueAsString(detail("CONNECTIONS"));assertFalse(projection.contains(SECRET));assertFalse(projection.contains("private_column"));assertFalse(projection.contains(snap.toString()));
+  db.update("UPDATE business_datasets SET status='WITHDRAWN' WHERE id=?",d);
+  var withdrawn=detail("CONNECTIONS").items().getFirst();assertEquals(0L,withdrawn.datasetCount());assertEquals(0L,withdrawn.rowCount());
  }
  @Test void scopeChecksBoundsSuspensionAndRevocation(){denied(403,()->service.list(member,"CONNECTIONS","","ALL",0));denied(404,()->service.detail(operator,UUID.randomUUID(),"MATERIALS","ALL",0));for(String k:List.of("FILES","connection",""))denied(400,()->service.list(operator,k,"","ALL",0));denied(400,()->service.list(operator,"CONNECTIONS","","BROKEN",0));denied(400,()->service.list(operator,"CONNECTIONS","x".repeat(181),"ALL",0));denied(400,()->service.detail(operator,tenant,"MATERIALS","ALL",20001));
   db.update("UPDATE tenants SET status='SUSPENDED' WHERE id=?",tenant);assertEquals("SUSPENDED",detail("MATERIALS").tenantStatus());db.update("DELETE FROM platform_roles WHERE account_id=?",operator);denied(403,()->detail("MATERIALS"));

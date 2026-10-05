@@ -1,6 +1,7 @@
 import { createIdentityRequest, IdentityError, record, uuid } from '../identity/client.ts';
 import {
   dataOperationDiagnostics,
+  dataOperationFormats,
   type DataOperationCounts,
   type DataOperationKind,
   type DataOperationState,
@@ -76,7 +77,7 @@ export function isDataDetail(v: unknown): v is DataOperationDetail {
     (i) =>
       exact(
         i,
-        'monitorKey runId stage configuration category diagnostic createdAt finishedAt lastSuccessAt',
+        'monitorKey runId stage configuration category diagnostic createdAt finishedAt lastSuccessAt format sizeBytes version datasetCount rowCount',
       ) &&
       typeof i.monitorKey === 'string' &&
       /^[a-f0-9]{32}$/.test(i.monitorKey) &&
@@ -96,8 +97,19 @@ export function isDataDetail(v: unknown): v is DataOperationDetail {
         'CANCELLED',
       ].includes(String(i.stage)) &&
       (v.kind === 'MATERIALS'
-        ? i.configuration === null
-        : ['READY', 'UNAVAILABLE', 'UNCONFIGURED'].includes(String(i.configuration))) &&
+        ? i.configuration === null &&
+          dataOperationFormats.includes(i.format as (typeof dataOperationFormats)[number]) &&
+          num(i.sizeBytes) &&
+          num(i.version) &&
+          i.version > 0 &&
+          i.datasetCount === null &&
+          i.rowCount === null
+        : ['READY', 'UNAVAILABLE', 'UNCONFIGURED'].includes(String(i.configuration)) &&
+          i.format === null &&
+          i.sizeBytes === null &&
+          i.version === null &&
+          num(i.datasetCount) &&
+          num(i.rowCount)) &&
       i.category !== 'ALL' &&
       state(i.category) &&
       (v.state === 'ALL' || i.category === v.state) &&

@@ -1,4 +1,4 @@
-import { supportPath, supportRoute } from './support-request';
+import { supportPath, supportRoute } from './support-request.ts';
 import type {
   Identity,
   Membership,

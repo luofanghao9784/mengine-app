@@ -70,6 +70,11 @@ async function fixture(context: BrowserContext) {
               : [
                   {
                     monitorKey: 'a'.repeat(32),
+                    format: kind === 'MATERIALS' ? 'PDF' : null,
+                    sizeBytes: kind === 'MATERIALS' ? 2048 : null,
+                    version: kind === 'MATERIALS' ? 3 : null,
+                    datasetCount: kind === 'CONNECTIONS' ? 2 : null,
+                    rowCount: kind === 'CONNECTIONS' ? 24 : null,
                     runId: id(500),
                     stage: 'FAILED',
                     configuration: kind === 'CONNECTIONS' ? 'READY' : null,
@@ -175,6 +180,13 @@ test('independent material library only offers technical records', async ({ page
   await expect(page.getByRole('heading', { name: '合成企业 1 · 资料处理' })).toBeVisible();
   await expect(page.getByText('解析未完成，需在原处理系统核对。', { exact: true })).toBeVisible();
   await expect(page.getByText(id(500), { exact: true })).toBeVisible();
+  await expect(page.getByText('PDF', { exact: true })).toBeVisible();
+  await expect(page.getByText('2.0 KB', { exact: true })).toBeVisible();
+  await expect(page.getByText('V3', { exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: '企业支持入口' })).toHaveAttribute(
+    'href',
+    `#admin=tenants&enterprise=${tenant}&section=basic`,
+  );
   for (const label of ['下载', '打开原件', '重试任务', '立即取数', '预览'])
     await expect(page.getByRole('button', { name: label })).toHaveCount(0);
   await expect(page.locator('a[href*="/workspace/"],a[href*="/tenant-admin/"]')).toHaveCount(0);

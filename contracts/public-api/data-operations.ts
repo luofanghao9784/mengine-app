@@ -39,7 +39,24 @@ export const dataOperationDiagnostics = [
   'PARTIAL_PARSE',
 ] as const;
 export type DataOperationDiagnostic = (typeof dataOperationDiagnostics)[number];
+export const dataOperationFormats = [
+  'PDF',
+  'DOCX',
+  'XLSX',
+  'CSV',
+  'TXT',
+  'MD',
+  'JSON',
+  'PPTX',
+  'HTML',
+  'OTHER',
+] as const;
 export interface DataOperationItem {
+  format: (typeof dataOperationFormats)[number] | null;
+  sizeBytes: number | null;
+  version: number | null;
+  datasetCount: number | null;
+  rowCount: number | null;
   monitorKey: string;
   runId: string | null;
   stage:

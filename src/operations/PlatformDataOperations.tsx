@@ -49,6 +49,8 @@ const diagnostics: Record<DataOperationDiagnostic, string> = {
 const chosen = (v: unknown): v is DataOperationState => typeof v === 'string' && Object.hasOwn(states, v);
 const time = (v: string | null) => (v ? new Date(v).toLocaleString('zh-CN', { hour12: false }) : '暂无记录');
 const n = (v: number) => v.toLocaleString('zh-CN');
+const size = (v: number) =>
+  v < 1024 ? `${n(v)} B` : v < 1048576 ? `${(v / 1024).toFixed(1)} KB` : `${(v / 1048576).toFixed(1)} MB`;
 const kindName = (k: DataOperationKind) => (k === 'CONNECTIONS' ? '数据接入' : '资料处理');
 function Metrics({ value }: { value: DataOperationCounts }) {
   return (
@@ -267,13 +269,21 @@ function Detail({ tenant, kind }: { tenant: string; kind: DataOperationKind }) {
             <h2>
               {data.value.tenantName} · {kindName(kind)}
             </h2>
-            <Badge>{data.value.tenantStatus === 'SUSPENDED' ? '企业已暂停' : '服务中'}</Badge>
+            <div className="data-ops-detail-actions">
+              <Badge>{data.value.tenantStatus === 'SUSPENDED' ? '企业已暂停' : '服务中'}</Badge>
+              <a
+                className="button ghost"
+                href={adminHref('platform', 'tenants', '', { enterprise: tenant, section: 'basic' })}
+              >
+                企业支持入口
+              </a>
+            </div>
           </div>
           <p className="admin-note">
             {kind === 'CONNECTIONS'
               ? '每个现场接入显示最近一次运行，未成功时不代表历史数据被清除。'
               : '仅显示在库资料当前版本的最近解析；包含企业与个人范围的运行元信息。'}{' '}
-            页面不提供原件、业务记录、原始日志或重新执行操作。
+            目录使用脱敏编号，名称与内容不在总台监测页开放。需进一步排查时，可前往企业支持入口，按现有权限访问并记录审计。
           </p>
           <Metrics value={data.value.counts} />
           <div className="data-ops-records">
@@ -281,11 +291,38 @@ function Detail({ tenant, kind }: { tenant: string; kind: DataOperationKind }) {
               <article key={i.monitorKey}>
                 <div className="data-ops-heading">
                   <h3>
-                    {kind === 'CONNECTIONS' ? '接入' : '解析'}监测 · {i.monitorKey.slice(0, 8)}
+                    {kind === 'CONNECTIONS' ? '接入对象' : '资料对象'} · {i.monitorKey.slice(0, 8)}
                   </h3>
                   <Badge>{states[i.category]}</Badge>
                 </div>
                 <dl>
+                  {kind === 'MATERIALS' ? (
+                    <>
+                      <div>
+                        <dt>文件扩展类型</dt>
+                        <dd>{i.format === 'OTHER' ? '其他 / 未识别' : i.format}</dd>
+                      </div>
+                      <div>
+                        <dt>原件大小</dt>
+                        <dd>{size(i.sizeBytes!)}</dd>
+                      </div>
+                      <div>
+                        <dt>当前版本</dt>
+                        <dd>V{i.version}</dd>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div>
+                        <dt>有效数据集</dt>
+                        <dd>{n(i.datasetCount!)} 个</dd>
+                      </div>
+                      <div>
+                        <dt>当前快照登记行数</dt>
+                        <dd>{n(i.rowCount!)} 行</dd>
+                      </div>
+                    </>
+                  )}
                   <div>
                     <dt>当前阶段</dt>
                     <dd>{stages[i.stage]}</dd>
