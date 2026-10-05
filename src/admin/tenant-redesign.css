@@ -242,3 +242,44 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.admin-tenant.admin-control .tenant-experience-page {
+  gap: 18px;
+}
+.admin-tenant.admin-control .tenant-experience-content {
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+  min-width: 0;
+}
+.admin-tenant.admin-control .tenant-experience-content .experience-management {
+  gap: 16px;
+}
+.admin-tenant.admin-control .tenant-experience-section-heading h2 {
+  margin: 0;
+  font-size: 16px;
+}
+.admin-tenant.admin-control .tenant-experience-section-heading p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.admin-tenant.admin-control .tenant-experience-content .experience-processing-metrics {
+  gap: 10px;
+}
+.admin-tenant.admin-control .tenant-experience-content .experience-processing-metrics .admin-section {
+  padding: 14px;
+  background: var(--canvas);
+}
+.admin-tenant.admin-control .tenant-experience-content .empty-state {
+  padding: 36px 20px;
+}
+@media (max-width: 600px) {
+  .admin-tenant.admin-control .tenant-experience-content {
+    padding: 16px;
+  }
+  .admin-tenant.admin-control .tenant-experience-page > .platform-detail-nav {
+    gap: 20px;
+  }
+}

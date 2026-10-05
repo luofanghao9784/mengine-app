@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { BookOpen, RefreshCw } from 'lucide-react';
 import { IdentityError, uuid } from '../identity/client';
 import { useSession } from '../identity/session';
-import { Badge, Button, DocumentText, Empty, Field, Modal } from '../shared/ui';
+import { Badge, Button, DocumentText, Empty, Field, Modal, PageActions } from '../shared/ui';
 import { Failure, Loading, Pager, SubmitError, useRemote, useSubmission } from '../shared/admin';
 import { pageState, textState, useViewState } from '../shared/useViewState';
 import { requestNavigationLocked, useRequestLock } from '../shared/request-guard';
@@ -31,32 +31,53 @@ export function TenantExperiences({ tenant }: { tenant: string }) {
     'enterprise',
     (v): v is string => v === 'enterprise' || v === 'general',
   );
+  const [tab, setTab] = useViewState(
+    tenant,
+    'experience:tab',
+    'content',
+    (v): v is string => v === 'content' || v === 'processing',
+  );
   const [locked, setLocked] = useState(false);
   const [localSelection, setLocalSelection] = useState<LocalExperienceSelection | null>(null);
   const params = new URLSearchParams(location.hash.slice(1));
   const linkedEntry =
     uuid(params.get('experience')) && uuid(params.get('scope')) ? params.get('experience') : null;
   useEffect(() => {
-    if (linkedEntry) setSource('enterprise');
-  }, [tenant, linkedEntry, setSource]);
+    if (linkedEntry) {
+      setSource('enterprise');
+      setTab('content');
+    }
+  }, [tenant, linkedEntry, setSource, setTab]);
   return (
     <div className="admin-dashboard tenant-experience-page">
-      <nav className="platform-detail-nav" aria-label="经验来源">
+      <nav className="platform-detail-nav" aria-label="经验库栏目">
         {(
           [
             ['enterprise', '企业经验'],
             ['general', '通用经验'],
+            ['processing', '积累与改进'],
           ] as const
         ).map(([key, label]) => (
           <Button
             key={key}
             variant="ghost"
-            aria-current={source === key ? 'page' : undefined}
+            aria-current={
+              (
+                source === 'general'
+                  ? key === 'general'
+                  : tab === 'processing'
+                    ? key === 'processing'
+                    : key === 'enterprise'
+              )
+                ? 'page'
+                : undefined
+            }
             disabled={locked}
             onClick={() => {
               if (!requestNavigationLocked()) {
                 setLocalSelection(null);
-                setSource(key);
+                setSource(key === 'general' ? 'general' : 'enterprise');
+                setTab(key === 'processing' ? 'processing' : 'content');
               }
             }}
           >
@@ -64,27 +85,37 @@ export function TenantExperiences({ tenant }: { tenant: string }) {
           </Button>
         ))}
       </nav>
-      {source === 'general' ? (
-        <GeneralExperienceLibrary
-          tenant={tenant}
-          onLocked={setLocked}
-          chooseLocal={(selection) => {
-            setLocalSelection(selection);
-            setSource('enterprise');
-          }}
-        />
-      ) : (
-        <EnterpriseExperiences tenant={tenant} onLocked={setLocked} initialSelection={localSelection} />
-      )}
+      <section className="tenant-experience-content">
+        {source === 'general' ? (
+          <GeneralExperienceLibrary
+            tenant={tenant}
+            onLocked={setLocked}
+            chooseLocal={(selection) => {
+              setLocalSelection(selection);
+              setSource('enterprise');
+              setTab('content');
+            }}
+          />
+        ) : (
+          <EnterpriseExperiences
+            tenant={tenant}
+            tab={tab}
+            onLocked={setLocked}
+            initialSelection={localSelection}
+          />
+        )}
+      </section>
     </div>
   );
 }
 function EnterpriseExperiences({
   tenant,
+  tab,
   onLocked,
   initialSelection,
 }: {
   tenant: string;
+  tab: string;
   onLocked: (value: boolean) => void;
   initialSelection?: LocalExperienceSelection | null;
 }) {
@@ -95,12 +126,6 @@ function EnterpriseExperiences({
     uuid(params.get('experience')) && legacySpace
       ? { id: params.get('experience')!, version: null, space: legacySpace }
       : null;
-  const [tab, setTab] = useViewState(
-    tenant,
-    'experience:tab',
-    'content',
-    (v): v is string => v === 'content' || v === 'processing',
-  );
   const [space, setSpace] = useViewState(
     tenant,
     'experience:scope',
@@ -170,28 +195,18 @@ function EnterpriseExperiences({
   }, [error, select]);
   return (
     <div className="admin-dashboard experience-management">
-      <div className="experience-management-tabs platform-detail-nav" role="tablist" aria-label="经验库板块">
-        <Button
-          role="tab"
-          aria-selected={tab !== 'processing'}
-          variant={tab !== 'processing' ? 'primary' : 'ghost'}
-          disabled={locked}
-          onClick={() => setTab('content')}
-        >
-          经验内容
-        </Button>
-        <Button
-          role="tab"
-          aria-selected={tab === 'processing'}
-          variant={tab === 'processing' ? 'primary' : 'ghost'}
-          disabled={locked}
-          onClick={() => setTab('processing')}
-        >
-          积累与改进
-        </Button>
+      <PageActions>
         <Button icon={RefreshCw} variant="ghost" disabled={locked} onClick={refresh}>
           刷新
         </Button>
+      </PageActions>
+      <div className="tenant-experience-section-heading">
+        <h2>{tab === 'processing' ? '企业积累与改进' : '企业经验'}</h2>
+        <p>
+          {tab === 'processing'
+            ? '查看本企业来源处理、自动核验与入库更新记录。'
+            : '查看当前获权空间中可供引擎参考的经验。'}
+        </p>
       </div>
       <form
         className="experience-management-filters"

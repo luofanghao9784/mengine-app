@@ -294,6 +294,10 @@ test('automatic experience is readable in tenant admin without manual approval o
 }) => {
   const state = await fixture(context);
   await page.goto(start);
+  await expect(page.getByRole('navigation', { name: '经验库栏目' }).getByRole('button')).toHaveCount(3);
+  await expect(page.getByRole('tablist')).toHaveCount(0);
+  await expect(page.locator('header').getByRole('button', { name: '刷新', exact: true })).toBeVisible();
+  await page.screenshot({ path: '.local/experience-layout-enterprise-fixture.png', fullPage: true });
   await expect(page.locator('.experience-management-card')).toContainText('自动核验通过');
   await page.getByRole('button', { name: /先核对来源口径/ }).click();
   await expect(page.locator('.experience-detail')).toContainText('系统积累 · 自动核验通过');
@@ -338,7 +342,7 @@ test('accumulation dashboard separates quality and execution outcomes without hu
   const state = await fixture(context);
   await page.clock.install();
   await page.goto(start);
-  await page.getByRole('tab', { name: '积累与改进' }).click();
+  await page.getByRole('navigation', { name: '经验库栏目' }).getByRole('button', { name: '积累与改进' }).click();
   await expect(page.getByText('缺少充分依据', { exact: true })).toBeVisible();
   await expect(page.getByText('技术执行未完成', { exact: true })).toBeVisible();
   await expect(page.getByText(/自动积累尚未启用/)).toBeVisible();
@@ -356,7 +360,7 @@ test('mobile processing and drawer fit the viewport', async ({ page, context }) 
   await fixture(context);
   await page.setViewportSize({ width: 360, height: 800 });
   await page.goto(start);
-  await page.getByRole('tab', { name: '积累与改进' }).click();
+  await page.getByRole('navigation', { name: '经验库栏目' }).getByRole('button', { name: '积累与改进' }).click();
   await expect(page.locator('.experience-processing-metrics')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: '/tmp/experience-processing-mobile.png', fullPage: true });

@@ -330,3 +330,31 @@
   margin: 6px;
   color: var(--muted);
 }
+
+.experience-archive-table td:first-child {
+  min-width: 230px;
+  max-width: 400px;
+  white-space: normal;
+}
+.experience-archive-table td:first-child small {
+  line-height: 1.6;
+}
+.experience-archive-table td:first-child .button {
+  padding: 0;
+  min-height: 0;
+  text-align: left;
+}
+.experience-archive-table td:first-child h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.experience-archive-table td:nth-child(2) {
+  max-width: 200px;
+  white-space: normal;
+}
+.experience-archive-table td:last-child .button {
+  padding: 0;
+  min-height: 0;
+  color: #1765dc;
+}

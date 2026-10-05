@@ -8,6 +8,7 @@ import { Failure, Loading, Pager, SubmitError, useRemote, useSubmission } from '
 import { pageState, textState, useViewState } from '../shared/useViewState';
 import { generalExperienceClient as api, generalProcessingLabels } from './general-client';
 import './management.css';
+import '../operations/data-operations.css';
 import {
   GeneralExperienceActivity,
   GeneralExperienceHistory,
@@ -91,38 +92,39 @@ export function GeneralExperienceLibrary({
   }, [error, select, locked]);
   return (
     <div className="admin-dashboard experience-management">
-      {!tenant && <PageActions>{refreshControl}</PageActions>}
-      <div
-        className={`experience-management-tabs${tenant ? '' : ' experience-library-tabs'}`}
-        role={tenant ? undefined : 'tablist'}
-        aria-label="通用经验库板块"
-      >
-        {tenant ? (
-          <strong>通用经验</strong>
-        ) : (
-          <>
-            <Button
-              role="tab"
-              disabled={locked}
-              aria-selected={!processing}
-              variant={!processing ? 'primary' : 'ghost'}
-              onClick={() => setTab('content')}
-            >
-              经验内容
-            </Button>
-            <Button
-              role="tab"
-              disabled={locked}
-              aria-selected={processing}
-              variant={processing ? 'primary' : 'ghost'}
-              onClick={() => setTab('processing')}
-            >
-              积累与改进
-            </Button>
-          </>
-        )}
-        {tenant && refreshControl}
-      </div>
+      <PageActions>{refreshControl}</PageActions>
+      {!tenant && (
+        <div
+          className="experience-management-tabs experience-library-tabs"
+          role="tablist"
+          aria-label="通用经验库板块"
+        >
+          <Button
+            role="tab"
+            disabled={locked}
+            aria-selected={!processing}
+            variant={!processing ? 'primary' : 'ghost'}
+            onClick={() => setTab('content')}
+          >
+            经验内容
+          </Button>
+          <Button
+            role="tab"
+            disabled={locked}
+            aria-selected={processing}
+            variant={processing ? 'primary' : 'ghost'}
+            onClick={() => setTab('processing')}
+          >
+            积累与改进
+          </Button>
+        </div>
+      )}
+      {tenant && (
+        <div className="tenant-experience-section-heading">
+          <h2>通用经验</h2>
+          <p>查看平台提供的经验，以及本企业的使用状态。</p>
+        </div>
+      )}
       {processing ? (
         <p className="muted">自动脱敏、提炼和核验后的积累概况。每 30 秒更新，无需人工审核。</p>
       ) : (
@@ -211,53 +213,119 @@ export function GeneralExperienceLibrary({
         <Loading />
       ) : (
         <>
-          {data.value.items.length ? (
-            <div className="experience-management-list">
-              {data.value.items.map((item) => (
-                <button
-                  className="experience-management-card"
-                  key={item.id}
-                  disabled={locked}
-                  onClick={() => select({ id: item.id, version: item.versionId })}
-                >
-                  <div>
-                    <Badge>通用经验</Badge>
-                    <span>
-                      {tenant && state === 'STOPPED'
-                        ? '本企业已停用'
-                        : item.status === 'STOPPED'
-                          ? '已停用'
-                          : '当前可用'}{' '}
-                      · v{item.number}
-                    </span>
-                  </div>
-                  <h2>{item.title}</h2>
-                  <p>{item.summary}</p>
-                  <footer>
-                    <span className="experience-management-tags">
-                      {item.tags.map((tag) => (
-                        <Badge key={tag}>{tag}</Badge>
-                      ))}
-                    </span>
-                    <time>{stamp(item.updatedAt)}</time>
-                  </footer>
-                </button>
-              ))}
-            </div>
+          {!tenant ? (
+            <section className="data-ops-list-card" aria-label="通用经验列表">
+              <div className="data-archive-scroll">
+                <table className="data-archive-table experience-archive-table">
+                  <thead>
+                    <tr>
+                      <th>经验名称</th>
+                      <th>标签</th>
+                      <th>版本</th>
+                      <th>状态</th>
+                      <th>最近更新</th>
+                      <th>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.value.items.map((item) => (
+                      <tr key={item.id}>
+                        <td>
+                          <Button
+                            variant="ghost"
+                            disabled={locked}
+                            onClick={() => select({ id: item.id, version: item.versionId })}
+                          >
+                            <h2>{item.title}</h2>
+                          </Button>
+                          <small>{item.summary}</small>
+                        </td>
+                        <td>
+                          <span className="experience-management-tags">
+                            {item.tags.length ? item.tags.map((tag) => <Badge key={tag}>{tag}</Badge>) : '—'}
+                          </span>
+                        </td>
+                        <td>V{item.number}</td>
+                        <td>
+                          <Badge>{item.status === 'STOPPED' ? '已停用' : '当前可用'}</Badge>
+                        </td>
+                        <td>{stamp(item.updatedAt)}</td>
+                        <td>
+                          <Button
+                            variant="ghost"
+                            disabled={locked}
+                            onClick={() => select({ id: item.id, version: item.versionId })}
+                          >
+                            查看详情
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {!data.value.items.length && (
+                <p className="data-archive-empty">{query ? '没有匹配的通用经验' : '暂无通用经验'}</p>
+              )}
+              <Pager
+                page={page}
+                next={data.value.hasMore}
+                onPage={(p) => {
+                  if (!locked) setPage(p);
+                }}
+              />
+            </section>
           ) : (
-            <Empty
-              icon={BookOpen}
-              title={query ? '没有匹配的通用经验' : '暂无通用经验'}
-              text="满足清洗和自动核验要求的方法入库后，会显示在这里。"
-            />
+            <>
+              {data.value.items.length ? (
+                <div className="experience-management-list">
+                  {data.value.items.map((item) => (
+                    <button
+                      className="experience-management-card"
+                      key={item.id}
+                      disabled={locked}
+                      onClick={() => select({ id: item.id, version: item.versionId })}
+                    >
+                      <div>
+                        <Badge>通用经验</Badge>
+                        <span>
+                          {tenant && state === 'STOPPED'
+                            ? '本企业已停用'
+                            : item.status === 'STOPPED'
+                              ? '已停用'
+                              : '当前可用'}{' '}
+                          · v{item.number}
+                        </span>
+                      </div>
+                      <h2>{item.title}</h2>
+                      <p>{item.summary}</p>
+                      <footer>
+                        <span className="experience-management-tags">
+                          {item.tags.map((tag) => (
+                            <Badge key={tag}>{tag}</Badge>
+                          ))}
+                        </span>
+                        <time>{stamp(item.updatedAt)}</time>
+                      </footer>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <Empty
+                  icon={BookOpen}
+                  title={query ? '没有匹配的通用经验' : '暂无通用经验'}
+                  text="满足清洗和自动核验要求的方法入库后，会显示在这里。"
+                />
+              )}
+              <Pager
+                page={page}
+                next={data.value.hasMore}
+                onPage={(p) => {
+                  if (!locked) setPage(p);
+                }}
+              />
+            </>
           )}
-          <Pager
-            page={page}
-            next={data.value.hasMore}
-            onPage={(p) => {
-              if (!locked) setPage(p);
-            }}
-          />
         </>
       )}
       {selection && !error && (
