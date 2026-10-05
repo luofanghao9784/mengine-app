@@ -739,7 +739,7 @@ export class AgentTasks {
               }
               const items = await web.find(toolSignal, topic);
               if (newsBriefing) newsSearched = true;
-              return { items, untrusted: true };
+              return { items: items.map(({ image: _image, ...item }) => item), untrusted: true };
             },
           },
           {
@@ -756,7 +756,8 @@ export class AgentTasks {
               await verify();
               const source = await web.read((args as { id: string }).id, toolSignal);
               if (newsBriefing) newsRead = true;
-              return { source, untrusted: true };
+              const { image: _image, ...reference } = source;
+              return { source: reference, untrusted: true };
             },
           },
         );

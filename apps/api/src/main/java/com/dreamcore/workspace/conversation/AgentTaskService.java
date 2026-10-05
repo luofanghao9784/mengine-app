@@ -281,6 +281,7 @@ public class AgentTaskService {
         if(result.tools().stream().anyMatch(t->Set.of("public_search","read_public_page").contains(t.name())) && !skills.contains("public-research"))incompatible();
         var ids=new HashSet<UUID>();
         for(var source:result.webSources()){
+            if(source!=null && source.image()!=null && !NewsImage.valid(source.image()))incompatible();
             if(source!=null&&source.publishedAt()!=null&&source.publishedAt().isAfter(java.time.Instant.now().plusSeconds(86400)))incompatible();
             if(source==null || source.id()==null || !ids.add(source.id()) || source.url()==null || source.url().length()>2048 || source.title()==null || source.title().length()>160 || source.excerpt()==null || source.excerpt().length()>4000 || source.sha256()==null || !source.sha256().equals(IdentityService.hash(source.excerpt())) || source.retrievedAt()==null || source.retrievedAt().isAfter(java.time.Instant.now().plusSeconds(60)) || source.kind()==null || !Set.of("SEARCH","PAGE").contains(source.kind()))incompatible();
             try{var uri=java.net.URI.create(source.url());if(!"https".equals(uri.getScheme()) || uri.getHost()==null || uri.getUserInfo()!=null || uri.getFragment()!=null || uri.getPort()!=-1 && uri.getPort()!=443)incompatible();}catch(IllegalArgumentException error){incompatible();}

@@ -17,6 +17,7 @@ const row = (v: unknown): v is BriefingRow =>
     ['MISSING_PERIOD', 'NON_POSITIVE_BASELINE', 'UNEQUAL_GROUP_COVERAGE'].includes(String(v.issue)));
 export function isBriefingDocument(v: unknown): v is BriefingDocument {
   if (!record(v) || !uuid(v.artifactId) || !hash(v.sha256) || !record(v.content)) return false;
+  if (v.cover != null && (!record(v.cover) || typeof v.cover.dataUrl !== 'string' || !/^data:image\/(jpeg|png);base64,[A-Za-z0-9+/]+=*$/.test(v.cover.dataUrl) || v.cover.dataUrl.length > 175000 || typeof v.cover.sourceUrl !== 'string' || !v.cover.sourceUrl.startsWith('https://') || typeof v.cover.sourceTitle !== 'string')) return false;
   if (
     v.ruleTrace !== undefined &&
     v.ruleTrace !== null &&

@@ -1,3 +1,4 @@
+import { NewsCover } from './NewsCover';
 import { FeedbackMark } from './FeedbackMark';
 import type { FeedbackTarget } from '../../contracts/public-api/feedback';
 import { briefingTypeLabels } from './content';
@@ -121,6 +122,7 @@ export function MagazineBody({
         <div className="magazine-main">
           <div className="magazine-copy" ref={copyRef}>
             <h3>{content?.title ?? title}</h3>
+            {content?.businessType === 'INFO' && <NewsCover cover={briefing?.cover} compact />}
             {chart && <BriefingChart document={briefing!} compact />}
             <p className="magazine-summary live-briefing-excerpt" title={summary}>
               {summary}

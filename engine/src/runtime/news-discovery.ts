@@ -107,3 +107,22 @@ export function pagePublication(body: string): string | undefined {
   }
   return;
 }
+
+/** Only editorial body images; generic sharing logos and author avatars are excluded. */
+export function articleImage(body: string, base: string): string | undefined {
+  const root = parse(body);let found: string | undefined;
+  const walk = (node: DefaultTreeAdapterMap['node'], editorial = false, excluded = false) => {
+    if (found) return;
+    if ('tagName' in node) {
+      const attrs = Object.fromEntries(node.attrs.map(a => [a.name, a.value]));
+      const label = (attrs.class || '') + ' ' + (attrs.id || '');
+      excluded ||= ['header','footer','nav'].includes(node.tagName) || /avatar|logo|qrcode|advert|promotion|recommend/i.test(label);
+      editorial ||= node.tagName === 'article' || /media-wrap|article-content|article-body|rich_media_content/i.test(label);
+      if (!excluded && editorial && node.tagName === 'img' && !/头像|二维码|公众号|推广|广告|logo|^图片$|^image$|\.(jpe?g|png)$/i.test(attrs.alt || '')) {
+        try { const u = new URL(attrs['data-src'] || attrs.src, base); if (u.protocol === 'https:' && !u.username && !u.password && u.href.length <= 2048) { u.hash='';found=u.href; } } catch { /* Missing image never blocks article text. */ }
+      }
+    }
+    if ('childNodes' in node) for (const child of node.childNodes) walk(child, editorial, excluded);
+  };
+  walk(root);return found;
+}

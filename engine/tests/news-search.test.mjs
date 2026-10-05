@@ -58,3 +58,17 @@ test('news summaries use fixed scopes, reject malformed grants and retain narrow
  for(const stage of [[false,false],[true,false],[true,true]])for(const tool of ['task_context','find_skills','activate_skill','dataset_read','compare_dataset'])assert.equal(newsBriefingToolAllowed(tool,...stage),false);
  assert.equal(newsBriefingToolAllowed('deliver_briefing',false,false),false);assert.equal(newsBriefingToolAllowed('deliver_briefing',true,false),true);assert.equal(newsBriefingToolAllowed('task_control',false,false),true);
 });
+
+test('article image is bounded, privately pinned, optional and excluded from ordinary reads',async()=>{
+ const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aD1sAAAAASUVORK5CYII=','base64');let images=0;
+ const reader=new PublicReader(async host=>[{address:host==='private.example.org'?'127.0.0.1':'8.8.8.8',family:4}],async u=>{if(u.pathname.endsWith('.png')){images++;return{status:200,headers:{'content-type':'image/png'},bytes:png};}return{status:200,headers:{'content-type':'text/html'},bytes:Buffer.from(`<title>政策原文</title><article><img alt="运动场" src="https://${u.pathname==='/private'?'private':'publisher'}.example.org/photo.png"></article><p>足够长的公开文章原文，仅为测试图片来源安全与文本读取独立性。</p>`)}});
+ assert.equal((await reader.read('https://publisher.example.org/article',signal())).image,undefined);assert.equal(images,0);
+ const page=await reader.read('https://publisher.example.org/article',signal(),true);assert.equal(page.image.base64,png.toString('base64'));
+ assert.equal((await reader.read('https://publisher.example.org/private',signal(),true)).image,undefined);assert.equal(images,1);
+});
+
+test('cover extraction ignores share logos, avatars and filename-only promotion images',async()=>{
+ const {articleImage}=await import('../dist/runtime/news-discovery.js');
+ assert.equal(articleImage('<meta property="og:image" content="https://cdn.example.org/logo.png"><div class="author-avatar"><img src="https://cdn.example.org/avatar.png"></div>','https://publisher.example.org'),undefined);
+ assert.equal(articleImage('<article><img alt="1.jpg" src="https://cdn.example.org/promo.png"></article><div class="media-wrap"><img alt="运动赛事现场" src="https://cdn.example.org/event.png"></div>','https://publisher.example.org'),'https://cdn.example.org/event.png');
+});

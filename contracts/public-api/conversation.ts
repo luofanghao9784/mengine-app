@@ -25,6 +25,7 @@ export interface TaskArtifact {
   bytes: number;
 }
 export interface WebSource {
+  image?: { url: string; contentType: 'image/jpeg' | 'image/png'; base64: string } | null;
   id: string;
   url: string;
   title: string;

@@ -1,3 +1,4 @@
+import { NewsCover } from './NewsCover';
 import { ReadingEvidence } from './ReadingEvidence';
 import { displayAmount } from './money-display';
 import type { BriefingDocument } from '../../contracts/public-api/briefing-content';
@@ -44,6 +45,7 @@ export function DataBriefing({
   if (!ch)
     return (
       <article className="data-briefing">
+        {c.businessType === 'INFO' && <NewsCover cover={document.cover} />}
         <p className="data-briefing-summary">{c.summary}</p>
         {!compact && (
           <>

@@ -23,7 +23,7 @@ public class BriefingContentService {
     }
     public record RuleVersion(String source,String target,int revision) {}
     public record RuleTrace(String status,List<RuleVersion> versions) {}
-    public record Document(UUID artifactId,String sha256,Content content,RuleTrace ruleTrace) {public Document(UUID artifactId,String sha256,Content content){this(artifactId,sha256,content,null);}}
+    public record Document(UUID artifactId,String sha256,Content content,RuleTrace ruleTrace,NewsImage.Cover cover) {public Document(UUID artifactId,String sha256,Content content,RuleTrace ruleTrace){this(artifactId,sha256,content,ruleTrace,null);}public Document(UUID artifactId,String sha256,Content content){this(artifactId,sha256,content,null);}}
     private final JdbcTemplate db;private final IdentityAudit audit;private final JsonMapper json=new JsonMapper();
     public BriefingContentService(JdbcTemplate db,IdentityAudit audit){this.db=db;this.audit=audit;}
     public boolean statusOnly(Request request){return request!=null&&request.title()!=null&&request.title().strip().matches("(?i)^(暂无|没有|无)(新的?|新增)?(内容|画报|卡片|结果)[。.!！]*$|^no new (content|briefing|cards?)[.!]*$");}
@@ -143,7 +143,13 @@ public class BriefingContentService {
     private Document read(Map<String,Object> row){
         byte[] bytes=(byte[])row.get("content");String sha=(String)row.get("sha256");if(!hash(bytes).equals(sha))throw new IdentityException(502,"BRIEFING_CONTENT_INVALID");
         Content content=json.readValue(bytes,Content.class);if(!Set.of("briefing-data-v1","briefing-text-v1","briefing-dataset-v1").contains(content.schemaVersion()))throw new IdentityException(502,"BRIEFING_CONTENT_INVALID");
-        return new Document((UUID)row.get("id"),sha,content,ruleTrace((UUID)row.get("id")));
+        return new Document((UUID)row.get("id"),sha,content,ruleTrace((UUID)row.get("id")),content.businessType().equals("INFO")?cover((UUID)row.get("id")):null);
+    }
+    private NewsImage.Cover cover(UUID artifact){
+        var rows=db.queryForList("SELECT t.web_sources FROM conversation_tasks t JOIN conversation_artifacts a ON a.task_id=t.id WHERE a.id=?",artifact);
+        if(rows.isEmpty()||rows.getFirst().get("web_sources")==null)return null;
+        try{for(var source:json.readTree(rows.getFirst().get("web_sources").toString()))if(source.path("kind").asString().equals("PAGE")&&source.hasNonNull("image")){var image=json.treeToValue(source.get("image"),NewsImage.Image.class);if(NewsImage.valid(image))return new NewsImage.Cover("data:"+image.contentType()+";base64,"+image.base64(),source.path("url").asString(),source.path("title").asString());}}catch(Exception ignored){}
+        return null;
     }
     private String hash(byte[] body){try{return HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(body));}catch(Exception e){throw new IllegalStateException(e);}}
 }

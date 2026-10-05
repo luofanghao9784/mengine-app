@@ -1,5 +1,5 @@
 import type { NewsSearchScope } from './news-search.js';
-import { discoverNews, pagePublication } from './news-discovery.js';
+import { discoverNews, pagePublication, articleImage } from './news-discovery.js';
 import { request, Agent } from 'node:https';
 import { request as connectRequest } from 'node:http';
 import { connect as tlsConnect } from 'node:tls';
@@ -22,6 +22,7 @@ export type WebSource = {
   kind: 'SEARCH' | 'PAGE';
   truncated: boolean;
   publishedAt?: string;
+  image?: { url: string; contentType: string; base64: string };
 };
 export type WebResponse = { status: number; headers: Record<string, string | undefined>; bytes: Buffer };
 export type PinnedRequest = (url: URL, address: Address, signal: AbortSignal) => Promise<WebResponse>;
@@ -248,7 +249,7 @@ export class PublicReader {
     const body = new TextDecoder('utf-8', { fatal: true }).decode(fetched.response.bytes);
     return discoverNews(body, fetched.url);
   }
-  async read(url: string, signal: AbortSignal) {
+  async read(url: string, signal: AbortSignal, withImage = false) {
     const fetched = await this.fetch(url, signal),
       type = fetched.response.headers['content-type'] || '';
     const charset = /charset\s*=\s*"?([^;"\s]+)/i.exec(type)?.[1]?.toLowerCase();
@@ -264,6 +265,15 @@ export class PublicReader {
       ? extractHtml(text)
       : { title: new URL(fetched.url).hostname, text, truncated: false };
     const result = source(fetched.url, extracted.title, extracted.text, 'PAGE', extracted.truncated);
+    const imageUrl = type.toLowerCase().startsWith('text/html') ? articleImage(text, fetched.url) : undefined;
+    if (withImage && imageUrl) {
+      try {
+        const image = await this.fetch(imageUrl, AbortSignal.any([signal, AbortSignal.timeout(2500)]));
+        const mime = (image.response.headers['content-type'] || '').split(';')[0].toLowerCase();
+        if (['image/jpeg', 'image/png'].includes(mime) && image.response.bytes.length <= 131072)
+          result.image = { url: image.url, contentType: mime, base64: image.response.bytes.toString('base64') };
+      } catch { signal.throwIfAborted(); }
+    }
     const publishedAt = pagePublication(text);
     return publishedAt ? { ...result, publishedAt } : result;
   }
@@ -443,7 +453,7 @@ export class PublicWebTask {
       if ([...this.sources.values()].some((s) => s.url === candidate.url)) continue;
       this.reads++;
       try {
-        const page = await this.reader.read(candidate.url, signal);
+        const page = await this.reader.read(candidate.url, signal, this.news);
         const item = {
           ...page,
           id: candidate.id,
@@ -465,7 +475,7 @@ export class PublicWebTask {
       const url = publicUrl(this.query);
       if (this.news) {
         for (const candidate of (await this.reader.discover(url.href, signal)).slice(0, 2)) {
-          const item = await this.reader.read(publicUrl(candidate.url).href, signal);
+          const item = await this.reader.read(publicUrl(candidate.url).href, signal, this.news);
           if (candidate.publishedAt && !item.publishedAt) item.publishedAt = candidate.publishedAt;
           if (item.publishedAt && Date.parse(item.publishedAt) < Date.now() - 30 * 86400000) continue;
           if (this.seen.some((old) => old.url === item.url && old.sha256 === item.sha256)) continue;
@@ -489,7 +499,7 @@ export class PublicWebTask {
     if (!promise) {
       if (this.reads >= 2) throw new RuntimeError('PUBLIC_READ_LIMIT');
       this.reads++;
-      promise = this.reader.read(item.url, signal).then((read) => {
+      promise = this.reader.read(item.url, signal, this.news).then((read) => {
         const updated = { ...read, id };
         if (!updated.publishedAt && item.publishedAt) updated.publishedAt = item.publishedAt;
         this.sources.set(id, updated);
@@ -500,6 +510,7 @@ export class PublicWebTask {
     return structuredClone(await promise);
   }
   snapshot() {
-    return [...this.sources.values()].map((s) => structuredClone(s));
+    let imageIncluded = false;
+    return [...this.sources.values()].map((s) => { const copy = structuredClone(s); if (copy.image) { if (imageIncluded) delete copy.image; else imageIncluded = true; } return copy; });
   }
 }

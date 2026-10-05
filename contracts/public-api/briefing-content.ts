@@ -10,6 +10,7 @@ export interface BriefingRow {
   issue: string | null;
 }
 export interface BriefingDocument {
+  cover?: { dataUrl: string; sourceUrl: string; sourceTitle: string } | null;
   artifactId: string;
   sha256: string;
   ruleTrace?: {
