@@ -1,3 +1,4 @@
+import { publicSearchMode, publicKeywords } from './public-search-mode.js';
 import type { NewsSearchScope } from './news-search.js';
 import { discoverNews, pagePublication, articleImage } from './news-discovery.js';
 import { request, Agent } from 'node:https';
@@ -271,8 +272,14 @@ export class PublicReader {
         const image = await this.fetch(imageUrl, AbortSignal.any([signal, AbortSignal.timeout(2500)]));
         const mime = (image.response.headers['content-type'] || '').split(';')[0].toLowerCase();
         if (['image/jpeg', 'image/png'].includes(mime) && image.response.bytes.length <= 131072)
-          result.image = { url: image.url, contentType: mime, base64: image.response.bytes.toString('base64') };
-      } catch { signal.throwIfAborted(); }
+          result.image = {
+            url: image.url,
+            contentType: mime,
+            base64: image.response.bytes.toString('base64'),
+          };
+      } catch {
+        signal.throwIfAborted();
+      }
     }
     const publishedAt = pagePublication(text);
     return publishedAt ? { ...result, publishedAt } : result;
@@ -402,6 +409,7 @@ export class SearxSearch implements PublicSearch {
 export class PublicWebTask {
   private sources = new Map<string, WebSource>();
   private searchPromise?: Promise<void>;
+  private keywordPromises = new Map<string, Promise<void>>();
   private readPromises = new Map<string, Promise<WebSource>>();
   private reads = 0;
   private newsPromises = new Map<string, Promise<void>>();
@@ -414,6 +422,21 @@ export class PublicWebTask {
     private readonly newsScope?: NewsSearchScope,
   ) {}
   async find(signal: AbortSignal, topic?: string) {
+    if (publicSearchMode(this.query)) {
+      const query = publicKeywords(topic);
+      if (!this.search) throw new RuntimeError('PUBLIC_SEARCH_NOT_CONFIGURED');
+      if (!this.keywordPromises.has(query)) {
+        if (this.keywordPromises.size >= 2) throw new RuntimeError('PUBLIC_SEARCH_LIMIT');
+        this.keywordPromises.set(
+          query,
+          this.search.search(query, signal).then((items) => {
+            for (const item of items.slice(0, 3)) this.sources.set(item.id, item);
+          }),
+        );
+      }
+      await this.keywordPromises.get(query);
+      return this.snapshot();
+    }
     if (this.newsScope) {
       const selected = this.newsScope.topics.find((t) => t.id === topic);
       if (!selected) throw new RuntimeError('NEWS_TOPIC_NOT_GRANTED');
@@ -511,6 +534,13 @@ export class PublicWebTask {
   }
   snapshot() {
     let imageIncluded = false;
-    return [...this.sources.values()].map((s) => { const copy = structuredClone(s); if (copy.image) { if (imageIncluded) delete copy.image; else imageIncluded = true; } return copy; });
+    return [...this.sources.values()].map((s) => {
+      const copy = structuredClone(s);
+      if (copy.image) {
+        if (imageIncluded) delete copy.image;
+        else imageIncluded = true;
+      }
+      return copy;
+    });
   }
 }

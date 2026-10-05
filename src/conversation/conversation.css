@@ -918,21 +918,17 @@
 .live-demo-deck .live-reader-fullscreen .live-source-reader {
   padding-inline: max(24px, calc((100% - 880px) / 2));
 }
-.live-demo-deck .live-web-options {
-  padding: 0 16px 12px;
+.live-composer-tools .live-web-toggle {
+  border-radius: 8px;
+  white-space: nowrap;
+}
+.live-composer-tools .live-web-toggle[aria-pressed='true'] {
+  background: #e7efff;
+  color: #1469ef;
+}
+.live-composer-tools .live-web-toggle[aria-pressed='true']::after {
+  content: '✓';
   font-size: 11px;
-  color: #66788e;
-}
-.live-web-options summary {
-  cursor: pointer;
-  width: fit-content;
-}
-.live-web-options .field {
-  padding: 10px 0 32px;
-}
-.live-web-options input {
-  width: 100%;
-  min-width: 0;
 }
 .live-demo-deck .conversation-result > .document-text {
   font-size: 14px;

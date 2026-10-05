@@ -23,6 +23,7 @@ import { SaveAsDocument } from '../documents/Documents';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Info,
+  Globe,
   Copy,
   Check,
   History,
@@ -787,7 +788,15 @@ function TaskCard({
                 ))}
               </div>
             )}
-            {task.publicQuery && <p className="muted">公开检索内容：{task.publicQuery}</p>}
+            {task.publicQuery && (
+              <p className="muted">
+                {task.publicQuery === 'web:required:v1'
+                  ? '本次要求联网查证'
+                  : task.publicQuery === 'web:optional:v1'
+                    ? 'AI 可按需联网'
+                    : '公开检索内容：' + task.publicQuery}
+              </p>
+            )}
             {task.webSources.length > 0 && (
               <div className="conversation-web-sources" aria-label="公开网页来源">
                 {task.webSources.map((source) => (
@@ -1353,8 +1362,8 @@ export function ConversationComposer({
           ...(mode === 'AGENT' && originals.length
             ? { originals: originals.map(({ materialId, versionId }) => ({ materialId, versionId })) }
             : {}),
-          ...(mode === 'AGENT' && !selectedOnly && publicWebEnabled && publicQuery.trim()
-            ? { publicQuery: publicQuery.trim() }
+          ...(mode === 'AGENT' && !selectedOnly && publicWebEnabled
+            ? { publicQuery: publicQuery.trim() || 'web:optional:v1' }
             : {}),
         };
         setStored(
@@ -1526,6 +1535,30 @@ export function ConversationComposer({
                   dropped={dropped}
                   verification={agentMode === 'verification'}
                 />
+                {!selectedOnly && publicWebEnabled && (
+                  <Button
+                    icon={Globe}
+                    variant="ghost"
+                    className="live-web-toggle"
+                    aria-label="联网"
+                    aria-pressed={
+                      controlTask || responseTask
+                        ? (controlTask || responseTask)?.publicQuery === 'web:required:v1'
+                        : !!publicQuery
+                    }
+                    disabled={!!controlTask || !!responseTask}
+                    title={
+                      controlTask || responseTask
+                        ? '当前任务沿用原联网设置'
+                        : publicQuery
+                          ? '本次优先联网查证'
+                          : '由 AI 按需联网'
+                    }
+                    onClick={() => setPublicQuery(publicQuery ? '' : 'web:required:v1')}
+                  >
+                    联网
+                  </Button>
+                )}
               </div>
               {originals.length > 0 && (
                 <label className="attachment-scope">
@@ -1536,23 +1569,6 @@ export function ConversationComposer({
                   />
                   只用所选资料
                 </label>
-              )}
-              {mode === 'AGENT' && !selectedOnly && publicWebEnabled && (
-                <details className="live-web-options">
-                  <summary>查找公开资料（可选）</summary>
-                  <Field label="公开检索内容（可选）">
-                    <input
-                      aria-label="公开检索内容（可选）"
-                      value={publicQuery}
-                      maxLength={2048}
-                      pattern="([hH][tT][tT][pP][sS]://.*|.{0,200})"
-                      title="公开关键词最多 200 字，HTTPS 网址最多 2048 字"
-                      onChange={(e) => setPublicQuery(e.target.value)}
-                      placeholder="公开关键词，或一个 https 网页地址"
-                    />
-                    <small>仅将这里填写的内容用于外部检索或访问；请勿填写企业机密。留空则不联网查找。</small>
-                  </Field>
-                </details>
               )}
             </div>
           </div>

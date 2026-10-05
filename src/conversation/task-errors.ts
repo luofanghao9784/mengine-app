@@ -1,5 +1,6 @@
 const messages: Record<string, string> = {
-  TENANT_SERVICE_SUSPENDED: '企业服务暂停，原执行已停止后续动作。已发生的结果仍需核对，恢复服务不会自动重跑本任务。',
+  TENANT_SERVICE_SUSPENDED:
+    '企业服务暂停，原执行已停止后续动作。已发生的结果仍需核对，恢复服务不会自动重跑本任务。',
   TASK_TENANT_EXIT: '企业退出已生效，任务已中断；已经发生的业务动作仍需按实际记录核对。',
   TASK_MEMBER_OFFBOARDED: '成员离职已生效，原执行授权已停止，任务不会自动恢复。',
   TASK_PLAN_STOPPED: '关联计划已暂停、停止或授权已变化，本次执行已中断。',
@@ -27,6 +28,9 @@ const messages: Record<string, string> = {
   TASK_FILE_DATA:
     '文件内容无法按要求完整处理。请检查表格结构、空值和数字格式；公式、金额符号、千分位等不会自动作为数字计算。',
   TASK_TOOL_FAILED: '工具未能完成任务，本次没有交付成功结果。可以调整要求后重新发起。',
+  PUBLIC_SEARCH_REQUIRED: '本次要求联网查证，但尚未完成搜索与原文阅读。请重试或取消联网要求。',
+  PUBLIC_QUERY_DENIED: '检索词包含不适合公开发送的信息，未执行外部检索。',
+  PUBLIC_QUERY_PRIVATE_CONTENT: '检索词涉及内部资料或个人信息，未执行外部检索。',
   TASK_LIMIT: '本次处理达到系统执行上限，未能完成回答。你可以再次尝试。',
 };
 export const taskErrorMessage = (code: string) => messages[code] ?? '执行服务暂不可用，请稍后重试。';

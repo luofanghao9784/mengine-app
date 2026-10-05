@@ -1082,3 +1082,23 @@ test('画报阅读隐藏内部说明与计算文件，资料引用复用会话�
   await dialog.getByText('成果附件', { exact: true }).click();
   await expect(dialog.locator('.reading-evidence[open]')).toContainText('report.csv');
 });
+
+test('会话联网按钮替代关键词表单，默认按需与勾选要求使用不同任务模式', async ({ page }) => {
+  for (const required of [false, true]) {
+    let body: any;
+    await fixture(page, async (route, value) => { body=value; return accepted(route,value); });
+    await page.route('**/api/**/conversations?*', route => route.request().method()==='GET'
+      ? route.fulfill({json:{tenantId:tenant,enabled:true,agentMode:'live',publicWebEnabled:true,items:[],hasMore:false}})
+      : route.fallback());
+    await page.goto(`/workspace/#tenant=${tenant}&view=conversations`);
+    const web = page.getByRole('button',{name:'联网',exact:true});
+    await expect(web).toHaveAttribute('aria-pressed','false');
+    await expect(page.getByText('查找公开资料（可选）')).toHaveCount(0);
+    if(required)await web.click();
+    await expect(web).toHaveAttribute('aria-pressed',String(required));
+    await page.getByPlaceholder('告诉我你想处理的工作').fill('合成联网请求');
+    await page.locator('.live-composer-submit').click();
+    await expect.poll(()=>body?.publicQuery).toBe(required?'web:required:v1':'web:optional:v1');
+    await page.screenshot({path:`test-results/web-shortcut-${required}.png`});
+  }
+});
