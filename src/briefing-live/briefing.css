@@ -868,3 +868,18 @@
 .live-reading-rail .live-feedback-actions .nav-link.active {
   background: var(--selected);
 }
+
+/* Loading occupies an overlay, so retained cards keep their geometry. */
+.recommendations { position: relative; }
+.briefing-local-loading {
+  position: absolute;
+  right: 12px;
+  top: 8px;
+  z-index: 2;
+  padding: 5px 10px;
+  border-radius: 12px;
+  background: #f5f7fa;
+  color: #52647a;
+  font-size: 12px;
+  pointer-events: none;
+}

@@ -61,6 +61,7 @@ function BriefingPage({ tenant, onMonthChange }: BriefingProps) {
   const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const refresh = () => setAttempt((n) => n + 1);
   const pageRef = useRef<HTMLElement>(null);
+  const [transitionHeight, setTransitionHeight] = useState(0);
   const reloadState = useRef<{
     attempt: number;
     pending: Set<string>;
@@ -78,10 +79,16 @@ function BriefingPage({ tenant, onMonthChange }: BriefingProps) {
   const trackRead = async <T,>(part: string, request: Promise<T>, signal: AbortSignal) => {
     try {
       const value = await request;
-      if (!signal.aborted) settled(part, attempt, true);
+      if (!signal.aborted) {
+        settled(part, attempt, true);
+        if (part === 'feed') setTransitionHeight(0);
+      }
       return value;
     } catch (error) {
-      if (!signal.aborted) settled(part, attempt, false);
+      if (!signal.aborted) {
+        settled(part, attempt, false);
+        setTransitionHeight(0);
+      }
       throw error;
     }
   };
@@ -131,6 +138,7 @@ function BriefingPage({ tenant, onMonthChange }: BriefingProps) {
       ),
     [tenant, view, tab, selectedType, zone, selectedSpace, session.identity, attempt],
     (card) => card.cardId || card.taskId,
+    true,
   );
   const timeline = useInfiniteBriefing<import('../../contracts/public-api/briefing').BriefingTimelinePage>(
     (offset, _previous, signal) =>
@@ -152,6 +160,7 @@ function BriefingPage({ tenant, onMonthChange }: BriefingProps) {
   const [recommendationReady, setRecommendationReady] = useState<string>();
   const recommendationsSettled = (success: boolean) => {
     setRecommendationReady(success ? recommendationKey : undefined);
+    setTransitionHeight(0);
     settled('recommendations', attempt, success);
   };
   const pullRefresh = useBriefingRefresh({
@@ -187,6 +196,7 @@ function BriefingPage({ tenant, onMonthChange }: BriefingProps) {
     blocked: pendingRequest || pullRefresh.active || arranging,
     onSelect: (index) => {
       const label = tabs[index];
+      setTransitionHeight(pageRef.current?.getBoundingClientRect().height || 0);
       pageRef.current?.closest('main')?.scrollTo({ top: 0, behavior: 'instant' });
       setTab(label);
 
@@ -235,6 +245,7 @@ function BriefingPage({ tenant, onMonthChange }: BriefingProps) {
         id="live-briefing-panel"
         role="tabpanel"
         ref={pageRef}
+        style={{ minHeight: transitionHeight || undefined }}
         data-refresh-phase={pullRefresh.phase}
         data-briefing-arriving={pullRefresh.arriving || undefined}
       >
@@ -315,6 +326,19 @@ function BriefingPage({ tenant, onMonthChange }: BriefingProps) {
           </div>
         )}
         {!!context.error && <Failure error={context.error} retry={refresh} />}
+        {tab !== '日期' && ['RECOMMENDED', 'FOCUSED'].includes(view) && (
+          <Recommendations
+            key={tenant}
+            tenant={tenant}
+            generation={tab === '推荐' ? generation : undefined}
+            onSettled={recommendationsSettled}
+            workspace={selectedSpace || null}
+            businessType={selectedType || undefined}
+            publicationsOnly={view === 'FOCUSED'}
+            focused={view === 'FOCUSED'}
+            onArranging={setArranging}
+          />
+        )}
         {tab === '日期' ? (
           <DateTimeline
             tenant={tenant}
@@ -326,33 +350,12 @@ function BriefingPage({ tenant, onMonthChange }: BriefingProps) {
               <Card key={card.cardId || card.taskId} tenant={tenant} card={card} changed={refresh} />
             )}
           />
-        ) : view === 'RECOMMENDED' ? (
-          <Recommendations
-            key={tenant + ':' + selectedSpace + ':' + selectedType + ':' + attempt}
-            tenant={tenant}
-            generation={tab === '推荐' ? generation : undefined}
-            onSettled={recommendationsSettled}
-            workspace={selectedSpace || null}
-            businessType={selectedType || undefined}
-          />
-        ) : feed.error || context.error ? (
+        ) : view === 'RECOMMENDED' ? null : feed.error || context.error ? (
           <Failure error={feed.error || context.error} retry={refresh} />
         ) : !feed.value || !context.value ? (
           <Loading />
         ) : (
           <>
-            {view === 'FOCUSED' && (
-              <Recommendations
-                key={'publication-focus:' + selectedSpace + ':' + selectedType + ':' + attempt}
-                tenant={tenant}
-                onSettled={recommendationsSettled}
-                workspace={selectedSpace || null}
-                businessType={selectedType || undefined}
-                publicationsOnly
-                onArranging={setArranging}
-                focused
-              />
-            )}
             {!feed.value.items.length && (
               <Empty
                 icon={Newspaper}

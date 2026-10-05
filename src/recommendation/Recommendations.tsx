@@ -57,6 +57,7 @@ export function Recommendations({
       }),
     [tenant, workspace, businessType, publicationsOnly, focused, attempt, session.identity],
     (item) => item.content.id,
+    true,
   );
   // Notify the page after the cards have committed, so arrival/refresh animation
   // cannot finish on the loading placeholder before asynchronous data arrives.
@@ -100,7 +101,8 @@ export function Recommendations({
   if (focused && data.value && !data.error && !visibleItems.length && !data.value.hasMore && !generation)
     return null;
   return (
-    <section className="recommendations" aria-label={focused ? '关注的企业成果' : '工作推荐'}>
+    <section className="recommendations" aria-busy={data.loading} aria-label={focused ? '关注的企业成果' : '工作推荐'}>
+      {data.loading && data.value && <span className="briefing-local-loading" role="status">正在更新画报…</span>}
       <SubmitError error={submission.error} uncertain={submission.uncertain} />
       {data.error ? (
         <Failure error={data.error} retry={refresh} />
