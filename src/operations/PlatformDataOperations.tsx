@@ -145,14 +145,11 @@ function Directory({
   const data = useRemote((signal) => api.list(kind, '', 'ALL', page * 20, signal), [kind, page, attempt]);
   return (
     <div className="data-ops-directory" aria-label="数据运行企业列表">
-      <div className="data-ops-heading">
-        <div>
-          <h2>{enterpriseList ? '企业列表' : `${kindName(kind)}监测`}</h2>
-        </div>
+      <PageActions>
         <Button variant="ghost" icon={RefreshCw} onClick={refresh}>
           刷新
         </Button>
-      </div>
+      </PageActions>
       {data.error ? (
         <Failure error={data.error} retry={refresh} />
       ) : !data.value ? (
