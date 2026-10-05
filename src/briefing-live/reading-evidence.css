@@ -1,0 +1,24 @@
+.live-reading-article .reply-reference-library {
+  border-top: 0;
+  padding-top: 0;
+  font-family: system-ui;
+}
+.live-reading-article .reply-reference-library details {
+  margin-top: 0;
+  padding-top: 0;
+}
+.reading-evidence-content {
+  padding: 4px 12px 12px;
+  overflow-wrap: anywhere;
+}
+.reading-evidence-content > p {
+  margin: 8px 0;
+}
+.reading-evidence-content > pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+}
+.reading-evidence-content > a {
+  font-size: 12px;
+}

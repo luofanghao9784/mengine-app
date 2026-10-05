@@ -429,22 +429,6 @@ function RecommendationCard({ tenant, item }: { tenant: string; item: Recommenda
               {errorAction === 'download' ? '重试下载副本' : '重试记录本次打开'}
             </Button>
           )}
-          <details className="recommendation-reason">
-            <summary>推荐与呈现依据</summary>
-            <p>{item.reason}</p>
-            <p>
-              方法：{item.method.scope === 'BUILTIN' ? '内建基础排序' : `已采用版本 ${item.method.versionId}`}
-              。已读内容留在原位。
-            </p>
-            <p>
-              呈现：
-              {item.presentation.profileId
-                ? `本人已确认偏好，修订 ${item.presentation.profileRevision}`
-                : '默认原文视图'}
-              。正文保持原结果。
-            </p>
-            <p>{opened ? '你已打开过此版本' : '尚无此版本的打开记录'} · 业务效果未评估</p>
-          </details>
         </ReadingDialog>
       )}
       {featureEntries.forwarding && shareInfo && (

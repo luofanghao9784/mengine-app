@@ -1053,3 +1053,32 @@ test('生成入口在新增卡片和响应式重排后位于末排末尾', async
     expect(await more.evaluate(el => el.getAnimations().filter(a => a.playState === 'running').length)).toBe(0);
   }
 });
+
+test('画报阅读隐藏内部说明与计算文件，资料引用复用会话文件卡片', async ({ page }) => {
+  await generationFixture(page);
+  await page.route('**/api/**/feedback?*', route => route.fulfill({ json: { feedback: null } }));
+  await page.route('**/tasks/' + uid(21), route => route.fulfill({ json: {
+    conversation: info,
+    tasks: [{ ...task('合成阅读'), id: uid(21), status: 'SUCCEEDED', revision: 1, attempt: 1,
+      reply: '根据收款明细形成的业务分析。', executionClass: 'verification',
+      sources: [{ id: uid(70), tenantId: tenant, workspaceId: space, materialId: uid(71), versionId: uid(72), runId: uid(73),
+        version: 2, filename: '收款明细.csv', locator: '第 1–20 行', method: 'TABLE', content: '合成来源摘要' }],
+      artifacts: [{ id: uid(74), filename: 'dataset-comparison-test.json', sha256: 'a'.repeat(64), bytes: 12 },
+        { id: uid(75), filename: 'report.csv', sha256: 'b'.repeat(64), bytes: 12 }],
+    }], hasMore: false, cursor: 1,
+  } }));
+  await page.goto(home);
+  await page.getByRole('button', { name: '阅读：已有经营发现', exact: true }).click();
+  const dialog = page.locator('.live-reading-dialog');
+  await expect(dialog).toContainText('根据收款明细形成的业务分析。');
+  await expect(dialog.getByText('推荐与呈现依据')).toHaveCount(0);
+  await expect(dialog.getByText('生成规则版本')).toHaveCount(0);
+  await expect(dialog.getByText('dataset-comparison-test.json')).toHaveCount(0);
+  await dialog.getByLabel('资料引用（1）').click();
+  await expect(dialog.locator('.reply-reference-library:not(.reading-evidence) .reply-reference-file header')).toContainText('收款明细.csv');
+  await dialog.getByText('第 1–20 行', { exact: true }).click();
+  await expect(dialog.getByText('合成来源摘要')).toBeVisible();
+  await expect(dialog.getByRole('link', { name: '在会话中查看来源' })).toBeVisible();
+  await dialog.getByText('成果附件', { exact: true }).click();
+  await expect(dialog.locator('.reading-evidence[open]')).toContainText('report.csv');
+});

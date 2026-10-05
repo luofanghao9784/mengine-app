@@ -1,3 +1,5 @@
+import { ReplyReferences } from '../conversation/ReplyReferences';
+import { ReadingEvidence } from './ReadingEvidence';
 import { MagazineBody } from './Magazine';
 import { MagazineGrid } from './MagazineGrid';
 import { DataBriefing } from './DataBriefing';
@@ -148,63 +150,59 @@ export function TaskReadingBody({
       ) : (
         <DocumentText text={result.reply || ''} />
       )}
-      {(result.sources.length > 0 ||
-        result.webSources.length > 0 ||
-        result.originals.length > 0 ||
-        result.artifacts.length > 0) && (
-        <details className="live-reading-sources">
-          <summary>
-            资料来源与附件（
-            {result.sources.length +
-              result.webSources.length +
-              result.originals.length +
-              result.artifacts.length}
-            ）
-          </summary>
-          {result.sources.map((s) => (
-            <p key={s.id}>
-              {onSource ? (
-                <Button variant="ghost" onClick={() => onSource(s.id, s.filename + ' · v' + s.version)}>
-                  {s.filename} · v{s.version} · {s.locator}
-                </Button>
-              ) : (
-                <>
-                  {s.filename} · v{s.version} · {s.locator}
-                </>
-              )}
-            </p>
-          ))}
-          {result.webSources.map((s) => (
-            <p key={s.id}>
-              <a href={s.url} target="_blank" rel="noopener noreferrer">
-                {s.title}
-              </a>
-              <span className="muted">
-                {' '}
-                ·{' '}
-                {s.publishedAt
-                  ? `发布于 ${new Date(s.publishedAt).toLocaleDateString('zh-CN')}`
-                  : '发布日期未核实'}{' '}
-                · 检索于 {new Date(s.retrievedAt).toLocaleDateString('zh-CN')}
-              </span>
-            </p>
-          ))}
-          {result.originals.map((s) => (
-            <p key={s.versionId}>
-              {s.filename} · v{s.version}
-              {s.read ? ' · 已读取' : ''}
-            </p>
-          ))}
-          {result.artifacts.map((s) => (
-            <p key={s.id}>{s.filename}</p>
-          ))}
-          <a
-            href={conversationHref(tenant, task.conversationId) + '&task=' + encodeURIComponent(task.taskId)}
-          >
-            在原会话查看引用和下载附件
-          </a>
-        </details>
+      <ReplyReferences
+        sources={result.sources}
+        citation={
+          onSource
+            ? (id) => {
+                const source = result.sources.find((s) => s.id === id)!;
+                onSource(id, source.filename + ' · v' + source.version);
+              }
+            : undefined
+        }
+      />
+      {result.sources.length > 0 && !onSource && (
+        <p className="reading-source-link"><a href={conversationHref(tenant, task.conversationId) + '&task=' + encodeURIComponent(task.taskId)}>在会话中查看来源</a></p>
       )}
+      {result.webSources.map((s) => (
+        <ReadingEvidence key={s.id} title="网络来源" filename={s.title}>
+          <a href={s.url} target="_blank" rel="noopener noreferrer">
+            查看原文
+          </a>
+          <p>
+            {s.publishedAt
+              ? `发布于 ${new Date(s.publishedAt).toLocaleDateString('zh-CN')}`
+              : '发布日期未核实'}{' '}
+            · 检索于 {new Date(s.retrievedAt).toLocaleDateString('zh-CN')}
+          </p>
+        </ReadingEvidence>
+      ))}
+      {result.originals
+        .filter((s) => !result.sources.some((source) => source.versionId === s.versionId))
+        .map((s) => (
+          <ReadingEvidence key={s.versionId} title="原始资料" filename={s.filename} version={s.version}>
+            <a
+              href={
+                conversationHref(tenant, task.conversationId) + '&task=' + encodeURIComponent(task.taskId)
+              }
+            >
+              在会话中查看原件
+            </a>
+          </ReadingEvidence>
+        ))}
+      {result.artifacts
+        .filter((s) => !/^(briefing-(data|text|dataset)-|dataset-comparison-)/.test(s.filename))
+        .map((s) => (
+          <ReadingEvidence key={s.id} title="成果附件" filename={s.filename}>
+            <a
+              href={
+                conversationHref(tenant, task.conversationId) + '&task=' + encodeURIComponent(task.taskId)
+              }
+            >
+              在会话中查看与下载
+            </a>
+          </ReadingEvidence>
+        ))}
     </>
   );
 }

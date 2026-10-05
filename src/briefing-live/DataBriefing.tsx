@@ -1,3 +1,4 @@
+import { ReadingEvidence } from './ReadingEvidence';
 import { displayAmount } from './money-display';
 import type { BriefingDocument } from '../../contracts/public-api/briefing-content';
 import { formatBriefingNumber as value } from './content';
@@ -52,20 +53,17 @@ export function DataBriefing({
               ))}
             </div>
             {c.source && (
-              <details>
-                <summary>资料依据</summary>
-                <p>
-                  {c.source?.filename} · v{c.source?.version}
-                </p>
+              <ReadingEvidence title="资料依据" filename={c.source.filename} version={c.source.version}>
                 <pre>{c.source?.scopeExcerpt}</pre>
-              </details>
+              </ReadingEvidence>
             )}
             {c.datasetSource && (
-              <details>
-                <summary>数据依据</summary>
-                <p>
-                  {c.datasetSource.name} · v{c.datasetSource.version} · 快照共 {c.datasetSource.rowCount} 行
-                </p>
+              <ReadingEvidence
+                title="数据依据"
+                filename={c.datasetSource.name}
+                version={c.datasetSource.version}
+              >
+                <p>数据版本包含 {c.datasetSource.rowCount} 条记录</p>
                 <p>
                   采集于 {new Date(c.datasetSource.collectedAt).toLocaleString('zh-CN')}；
                   {c.datasetSource.coverageThrough
@@ -74,10 +72,8 @@ export function DataBriefing({
                   。
                 </p>
                 <p>这是任务所读的固定数据版本；快照行数不代表逐行阅读或完整业务覆盖。</p>
-              </details>
+              </ReadingEvidence>
             )}
-            <RuleTrace document={document} />
-            <small>生成于 {new Date(c.generatedAt).toLocaleString('zh-CN')}；完整引用见来源卡片。</small>
           </>
         )}
       </article>
@@ -93,7 +89,6 @@ export function DataBriefing({
               <p key={i}>{p}</p>
             ))}
           </div>
-          <RuleTrace document={document} />
           <details className="data-briefing-table">
             <summary>查看完整对比数据</summary>
             <div className="data-table-scroll">
@@ -126,12 +121,12 @@ export function DataBriefing({
             </div>
             <p>缺失期间不记为零；非正基期不计算变化率；并列采用相同名次。</p>
           </details>
-          <details className="data-briefing-basis">
-            <summary>资料、统计口径与计算依据</summary>
-            <p>
-              {c.datasetSource?.name ?? c.source?.filename} · v{c.datasetSource?.version ?? c.source?.version}{' '}
-              · {ch.range}
-            </p>
+          <ReadingEvidence
+            title="统计口径与计算依据"
+            filename={c.datasetSource?.name ?? c.source?.filename}
+            version={c.datasetSource?.version ?? c.source?.version}
+          >
+            <p>统计范围：{ch.range}</p>
             {c.datasetSource ? (
               <>
                 <p>数据采集于 {new Date(c.datasetSource.collectedAt).toLocaleString('zh-CN')}。</p>
@@ -146,8 +141,7 @@ export function DataBriefing({
                       按日期归月，业务时区：{c.datasetBasis.timeZone}。<br />
                     </>
                   )}
-                  分组字段：{c.datasetBasis?.groupColumn}；期间字段：{c.datasetBasis?.periodColumn}
-                  ；数值字段：{ch.metric}。
+                  统计指标：{ch.metric}。
                 </p>
                 <p>
                   纳入比较 {c.datasetBasis?.matchedRows} 行，其他期间 {c.datasetBasis?.ignoredRows}{' '}
@@ -157,38 +151,10 @@ export function DataBriefing({
             ) : (
               <pre>{c.source?.scopeExcerpt}</pre>
             )}
-            <p>
-              图表与数据表使用同一份计算回执。生成时间：{new Date(c.generatedAt).toLocaleString('zh-CN')}
-              。这是固定来源版本的分析，不代表实时经营数据。
-            </p>
-          </details>
+            <p>本分析基于上述数据版本，不代表实时经营数据。</p>
+          </ReadingEvidence>
         </>
       )}
     </div>
-  );
-}
-
-function RuleTrace({ document }: { document: BriefingDocument }) {
-  const trace = document.ruleTrace;
-  return (
-    <details className="data-briefing-rule-trace">
-      <summary>生成规则版本</summary>
-      {trace?.status === 'RECORDED' ? (
-        trace.versions.length ? (
-          <ul>
-            {trace.versions.map((r) => (
-              <li key={r.source + ':' + r.target}>
-                {{ GLOBAL: '总部', TENANT: '企业', PERSONAL: '个人' }[r.source]} ·{' '}
-                {r.target === 'ALL' ? '通用表达' : '画报表达'} · 第 {r.revision} 版
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p>本次任务未配置额外文字规则，采用基础表达规范。</p>
-        )
-      ) : (
-        <p>这张历史卡片未记录文字规则版本；后续修改不会自动重写它。</p>
-      )}
-    </details>
   );
 }

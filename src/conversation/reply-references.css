@@ -1,15 +1,17 @@
-.live-conversations .reply-reference-library {
+:is(.live-conversations, .live-reading-article) .reply-reference-library {
   margin-block: 16px 8px;
   color: #52647c;
   font-size: 12px;
   line-height: 1.6;
 }
-.live-conversations .reply-reference-library summary {
+:is(.live-conversations, .live-reading-article) .reply-reference-library summary {
   list-style: none;
   cursor: pointer;
 }
-.live-conversations .reply-reference-library summary::-webkit-details-marker { display: none; }
-.live-conversations .reply-reference-library > summary {
+:is(.live-conversations, .live-reading-article) .reply-reference-library summary::-webkit-details-marker {
+  display: none;
+}
+:is(.live-conversations, .live-reading-article) .reply-reference-library > summary {
   display: flex;
   align-items: center;
   gap: 7px;
@@ -17,12 +19,14 @@
   min-height: 32px;
   border-radius: 6px;
 }
-.live-conversations .reply-reference-library > summary > svg {
+:is(.live-conversations, .live-reading-article) .reply-reference-library > summary > svg {
   transform: rotate(-90deg);
   transition: transform 150ms ease;
 }
-.live-conversations .reply-reference-library[open] > summary > svg { transform: none; }
-.live-conversations .reply-reference-count {
+:is(.live-conversations, .live-reading-article) .reply-reference-library[open] > summary > svg {
+  transform: none;
+}
+:is(.live-conversations, .live-reading-article) .reply-reference-count {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -35,23 +39,31 @@
   font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
-.live-conversations .reply-reference-files { display: grid; gap: 10px; margin-top: 6px; }
-.live-conversations .reply-reference-file {
+:is(.live-conversations, .live-reading-article) .reply-reference-files {
+  display: grid;
+  gap: 10px;
+  margin-top: 6px;
+}
+:is(.live-conversations, .live-reading-article) .reply-reference-file {
   min-width: 0;
   overflow: hidden;
   border: 1px solid #e8edf4;
   border-radius: 10px;
   background: #fff;
 }
-.live-conversations .reply-reference-file > header {
+:is(.live-conversations, .live-reading-article) .reply-reference-file > header {
   display: flex;
   align-items: flex-start;
   gap: 8px;
   padding: 12px;
   background: #f8fafc;
 }
-.live-conversations .reply-reference-file > header > svg { flex-shrink: 0; margin-top: 2px; color: #8193ab; }
-.live-conversations .reply-reference-file > header > strong {
+:is(.live-conversations, .live-reading-article) .reply-reference-file > header > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: #8193ab;
+}
+:is(.live-conversations, .live-reading-article) .reply-reference-file > header > strong {
   flex: 1;
   min-width: 0;
   color: #40516a;
@@ -59,25 +71,53 @@
   font-weight: 500;
   overflow-wrap: anywhere;
 }
-.live-conversations .reply-reference-version { flex-shrink: 0; color: #8c99ac; font-size: 11px; }
-.live-conversations .reply-reference-locations { padding-inline: 12px; }
-.live-conversations .reply-reference-fragment + .reply-reference-fragment { border-top: 1px solid #edf1f6; }
-.live-conversations .reply-reference-fragment > summary {
+:is(.live-conversations, .live-reading-article) .reply-reference-version {
+  flex-shrink: 0;
+  color: #8c99ac;
+  font-size: 11px;
+}
+:is(.live-conversations, .live-reading-article) .reply-reference-locations {
+  padding-inline: 12px;
+}
+:is(.live-conversations, .live-reading-article) .reply-reference-fragment + .reply-reference-fragment {
+  border-top: 1px solid #edf1f6;
+}
+:is(.live-conversations, .live-reading-article) .reply-reference-fragment > summary {
   display: flex;
   align-items: center;
   gap: 8px;
   min-height: 40px;
   padding-block: 9px;
 }
-.live-conversations .reply-reference-fragment > summary > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.live-conversations .reply-reference-fragment > summary > svg { flex-shrink: 0; color: #93a0b2; transition: transform 150ms ease; }
-.live-conversations .reply-reference-fragment[open] > summary > svg { transform: rotate(180deg); }
-.live-conversations .reply-reference-library summary:hover { color: #2f6bc5; }
-.live-conversations .reply-reference-library summary:focus-visible,
-.live-conversations .reply-reference-excerpt > button:focus-visible { outline: 2px solid #4587ed; outline-offset: 2px; }
-.live-conversations .reply-reference-ocr { color: #9a6a26; font-size: 10px; }
-.live-conversations .reply-reference-excerpt { padding-bottom: 12px; }
-.live-conversations .reply-reference-excerpt > pre {
+:is(.live-conversations, .live-reading-article) .reply-reference-fragment > summary > span {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+:is(.live-conversations, .live-reading-article) .reply-reference-fragment > summary > svg {
+  flex-shrink: 0;
+  color: #93a0b2;
+  transition: transform 150ms ease;
+}
+:is(.live-conversations, .live-reading-article) .reply-reference-fragment[open] > summary > svg {
+  transform: rotate(180deg);
+}
+:is(.live-conversations, .live-reading-article) .reply-reference-library summary:hover {
+  color: #2f6bc5;
+}
+:is(.live-conversations, .live-reading-article) .reply-reference-library summary:focus-visible,
+:is(.live-conversations, .live-reading-article) .reply-reference-excerpt > button:focus-visible {
+  outline: 2px solid #4587ed;
+  outline-offset: 2px;
+}
+:is(.live-conversations, .live-reading-article) .reply-reference-ocr {
+  color: #9a6a26;
+  font-size: 10px;
+}
+:is(.live-conversations, .live-reading-article) .reply-reference-excerpt {
+  padding-bottom: 12px;
+}
+:is(.live-conversations, .live-reading-article) .reply-reference-excerpt > pre {
   margin: 0 0 8px;
   padding: 10px 12px;
   border-radius: 7px;
@@ -89,7 +129,7 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.live-conversations .reply-reference-excerpt > button {
+:is(.live-conversations, .live-reading-article) .reply-reference-excerpt > button {
   display: inline-flex;
   align-items: center;
   gap: 3px;
@@ -102,7 +142,11 @@
   font-size: 11px;
   cursor: pointer;
 }
-.live-conversations .reply-reference-excerpt > button:hover { color: #2466bf; }
+:is(.live-conversations, .live-reading-article) .reply-reference-excerpt > button:hover {
+  color: #2466bf;
+}
 @media (prefers-reduced-motion: reduce) {
-  .live-conversations .reply-reference-library summary > svg { transition: none; }
+  :is(.live-conversations, .live-reading-article) .reply-reference-library summary > svg {
+    transition: none;
+  }
 }
