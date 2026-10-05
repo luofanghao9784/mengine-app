@@ -225,11 +225,6 @@ function Directory({ kind, href }: { kind: DataOperationKind; href: (id: string)
             {!data.value.items.length && <p className="admin-note">没有符合条件的企业。</p>}
             <Pager page={page} next={data.value.hasMore} onPage={setPage} />
           </section>
-          {kind === 'MATERIALS' && (
-            <p className="data-ops-footnote">
-              更新于 {time(data.value.checkedAt)} · 手动刷新 · 不提供原件、业务数据或重新执行操作
-            </p>
-          )}
         </>
       )}
     </div>
