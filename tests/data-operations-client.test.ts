@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createDataOperationsClient, isDataOverview, isDataDetail } from '../src/operations/data-client.ts';
+import { createDataOperationsClient, isDataOverview, isDataDetail, isDataArchives } from '../src/operations/data-client.ts';
 const tenant = '00000000-0000-4000-8000-000000000001';
 const counts = { total: 1, ready: 0, processing: 0, attention: 1, notStarted: 0, stopped: 0 };
 const detail = {
@@ -85,4 +85,17 @@ test('safe object metadata enforces category, format whitelist and integer bound
   const material = { ...detail.items[0], configuration: null, format: 'PDF', sizeBytes: 2048, version: 3, datasetCount: null, rowCount: null };
   assert.ok(isDataDetail({ ...detail, kind: 'MATERIALS', items: [material] }));
   assert.equal(isDataDetail({ ...detail, kind: 'MATERIALS', items: [{ ...material, version: 0 }] }), false);
+});
+
+test('global archive projection validates metadata and binds response kind and page', async () => {
+  const {tenantId,tenantName,tenantStatus,...base} = detail;
+  const archives = {...base,items:[{tenantId,tenantName,tenantStatus,archive:detail.items[0]}]};
+  assert.ok(isDataArchives(archives));
+  assert.equal(isDataArchives({...archives,items:[{...archives.items[0],filename:'private'}]}),false);
+  assert.equal(isDataArchives({...archives,items:[{...archives.items[0],archive:{...detail.items[0],content:'private'}}]}),false);
+  assert.equal(isDataArchives({...archives,items:[...archives.items,...archives.items]}),false);
+  const api=createDataOperationsClient((async()=>Response.json(archives)) as typeof fetch);
+  assert.ok(await api.archives('CONNECTIONS',0));
+  await assert.rejects(api.archives('MATERIALS',0),{code:'CONTRACT_MISMATCH'});
+  await assert.rejects(api.archives('CONNECTIONS',20),{code:'CONTRACT_MISMATCH'});
 });

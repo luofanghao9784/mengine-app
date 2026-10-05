@@ -124,8 +124,100 @@ export function PlatformDataOperations({ hash, kind }: { hash: string; kind: Dat
       )}
       {tenant ? (
         <Detail key={`${kind}:${tenant}`} tenant={tenant} kind={kind} />
+      ) : !enterpriseList ? (
+        <Archives key={kind} kind={kind} href={(id) => href(kind, id)} />
       ) : (
         <Directory key={kind} kind={kind} enterpriseList={enterpriseList} href={(id) => href(kind, id)} />
+      )}
+    </div>
+  );
+}
+function Archives({ kind, href }: { kind: DataOperationKind; href: (id: string) => string }) {
+  const [page, setPage] = useViewState('platform', `data-archives:${kind}:page`, 0, pageState);
+  const [attempt, setAttempt] = useState(0);
+  const refresh = () => setAttempt((v) => v + 1);
+  const data = useRemote((signal) => api.archives(kind, page * 20, signal), [kind, page, attempt]);
+  return (
+    <div className="data-ops-directory">
+      <PageActions>
+        <Button variant="ghost" icon={RefreshCw} onClick={refresh}>
+          刷新
+        </Button>
+      </PageActions>
+      {data.error ? (
+        <Failure error={data.error} retry={refresh} />
+      ) : !data.value ? (
+        <Loading />
+      ) : (
+        <>
+          <Metrics value={data.value.counts} />
+          <section
+            className="data-ops-list-card"
+            aria-label={kind === 'CONNECTIONS' ? '数据档案' : '资料档案'}
+          >
+            <div className="data-archive-scroll">
+              <table className="data-archive-table">
+                <thead>
+                  <tr>
+                    <th>档案编号</th>
+                    <th>所属企业</th>
+                    {kind === 'CONNECTIONS' ? (
+                      <>
+                        <th>有效数据集</th>
+                        <th>登记行数</th>
+                      </>
+                    ) : (
+                      <>
+                        <th>格式 / 大小</th>
+                        <th>版本</th>
+                      </>
+                    )}
+                    <th>处理状态</th>
+                    <th>最近成功</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.value.items.map(({ tenantId, tenantName, archive: i }) => (
+                    <tr key={i.monitorKey}>
+                      <td>
+                        <strong>{i.monitorKey.slice(0, 8)}</strong>
+                      </td>
+                      <td>{tenantName}</td>
+                      {kind === 'CONNECTIONS' ? (
+                        <>
+                          <td>{n(i.datasetCount!)} 个</td>
+                          <td>{n(i.rowCount!)} 行</td>
+                        </>
+                      ) : (
+                        <>
+                          <td>
+                            {i.format} · {size(i.sizeBytes!)}
+                          </td>
+                          <td>V{i.version}</td>
+                        </>
+                      )}
+                      <td>
+                        <Badge>{states[i.category]}</Badge>
+                        <small>{stages[i.stage]}</small>
+                      </td>
+                      <td>{time(i.lastSuccessAt)}</td>
+                      <td>
+                        <a href={href(tenantId)}>查看详情</a>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {!data.value.items.length && (
+              <p className="data-archive-empty">
+                {kind === 'CONNECTIONS' ? '暂无数据档案' : '暂无在库资料档案'}
+              </p>
+            )}
+            <Pager page={page} next={data.value.hasMore} onPage={setPage} />
+          </section>
+        </>
       )}
     </div>
   );

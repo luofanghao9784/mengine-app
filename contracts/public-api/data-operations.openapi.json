@@ -171,6 +171,78 @@
           }
         }
       }
+    },
+    "/api/platform-admin/v1/data-operations/archives": {
+      "get": {
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "schema": {
+              "enum": [
+                "CONNECTIONS",
+                "MATERIALS"
+              ],
+              "default": "CONNECTIONS"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "schema": {
+              "enum": [
+                "ALL",
+                "READY",
+                "PROCESSING",
+                "ATTENTION",
+                "NOT_STARTED",
+                "STOPPED"
+              ],
+              "default": "ALL"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 20000
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "No-store operational metadata",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Archives"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid filter or paging"
+          },
+          "401": {
+            "description": "Independent platform session required"
+          },
+          "403": {
+            "description": "Current platform authority required"
+          },
+          "404": {
+            "description": "Tenant unavailable"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -540,6 +612,89 @@
             "maxItems": 20,
             "items": {
               "$ref": "#/components/schemas/Item"
+            }
+          }
+        }
+      },
+      "ArchiveRow": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "tenantId",
+          "tenantName",
+          "tenantStatus",
+          "archive"
+        ],
+        "properties": {
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "tenantStatus": {
+            "enum": [
+              "ACTIVE",
+              "SUSPENDED"
+            ]
+          },
+          "archive": {
+            "$ref": "#/components/schemas/Item"
+          }
+        }
+      },
+      "Archives": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "state",
+          "offset",
+          "checkedAt",
+          "counts",
+          "hasMore",
+          "items"
+        ],
+        "properties": {
+          "kind": {
+            "enum": [
+              "CONNECTIONS",
+              "MATERIALS"
+            ]
+          },
+          "state": {
+            "enum": [
+              "ALL",
+              "READY",
+              "PROCESSING",
+              "ATTENTION",
+              "NOT_STARTED",
+              "STOPPED"
+            ]
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/Counts"
+          },
+          "hasMore": {
+            "type": "boolean"
+          },
+          "items": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "$ref": "#/components/schemas/ArchiveRow"
             }
           }
         }

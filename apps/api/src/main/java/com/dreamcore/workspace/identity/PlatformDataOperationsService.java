@@ -15,6 +15,8 @@ public class PlatformDataOperationsService {
  public record Overview(String kind,String query,String state,int offset,Instant checkedAt,long matchedTenants,Counts counts,List<TenantRow> items,boolean hasMore) {}
  public record Item(String monitorKey,UUID runId,String stage,String configuration,String category,String diagnostic,Instant createdAt,Instant finishedAt,Instant lastSuccessAt,String format,Long sizeBytes,Integer version,Long datasetCount,Long rowCount) {}
  public record Detail(String kind,String state,int offset,Instant checkedAt,UUID tenantId,String tenantName,String tenantStatus,Counts counts,List<Item> items,boolean hasMore) {}
+ public record ArchiveRow(UUID tenantId,String tenantName,String tenantStatus,Item archive) {}
+ public record Archives(String kind,String state,int offset,Instant checkedAt,Counts counts,List<ArchiveRow> items,boolean hasMore) {}
  private final JdbcTemplate db;private final IdentityService identities;private final JsonMapper json=new JsonMapper();
  public PlatformDataOperationsService(JdbcTemplate db,IdentityService identities){this.db=db;this.identities=identities;}
  private static final String COUNTS="""
@@ -65,6 +67,18 @@ public class PlatformDataOperationsService {
      'counts',coalesce(counts,'{"total":0,"ready":0,"processing":0,"attention":0,"notStarted":0,"stopped":0}'::jsonb),'lastSuccessAt',last_success_at) ORDER BY lower(name),id) FROM paged),'[]') items
    """.formatted(COUNTS,COUNTS),(r,n)->new Overview(kind,q,state,offset,r.getTimestamp("checked_at").toInstant(),r.getLong("matched"),json.readValue(r.getString("counts"),Counts.class),Arrays.asList(json.readValue(r.getString("items"),TenantRow[].class)),false),q,state,state,offset);
   identities.platform(actor);return new Overview(kind,q,state,offset,data.checkedAt(),data.matchedTenants(),data.counts(),data.items().stream().limit(20).toList(),data.items().size()>20);
+ }
+ @Transactional public Archives archives(UUID actor,String kind,String state,int offset){
+  validate(kind,state,offset);begin(actor);
+  var data=db.queryForObject(source(kind)+"""
+   , paged AS (SELECT u.*,t.name tenant_name,t.status tenant_status FROM units u JOIN tenants t ON t.id=u.tenant_id
+    WHERE ?='ALL' OR category=? ORDER BY created_at DESC,monitor_key LIMIT 21 OFFSET ?)
+   SELECT statement_timestamp() checked_at,(SELECT %s FROM units) counts,
+    coalesce((SELECT jsonb_agg(jsonb_build_object('tenantId',tenant_id,'tenantName',tenant_name,'tenantStatus',tenant_status,
+     'archive',jsonb_build_object('monitorKey',monitor_key,'runId',run_id,'stage',stage,'configuration',configuration,'category',category,'diagnostic',diagnostic,
+      'createdAt',created_at,'finishedAt',finished_at,'lastSuccessAt',last_success_at,'format',format,'sizeBytes',size_bytes,'version',version,'datasetCount',dataset_count,'rowCount',row_count)) ORDER BY created_at DESC,monitor_key) FROM paged),'[]') items
+   """.formatted(COUNTS),(r,n)->new Archives(kind,state,offset,r.getTimestamp("checked_at").toInstant(),json.readValue(r.getString("counts"),Counts.class),Arrays.asList(json.readValue(r.getString("items"),ArchiveRow[].class)),false),state,state,offset);
+  identities.platform(actor);return new Archives(kind,state,offset,data.checkedAt(),data.counts(),data.items().stream().limit(20).toList(),data.items().size()>20);
  }
  @Transactional public Detail detail(UUID actor,UUID tenant,String kind,String state,int offset){
   validate(kind,state,offset);begin(actor);

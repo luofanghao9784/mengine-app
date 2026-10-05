@@ -9,7 +9,7 @@ const ajv = new Ajv2020({ strict: false, formats: { uuid: true, 'date-time': tru
 const check = ajv.compile({ ...spec.components.schemas.Item, components: spec.components });
 test('data operations only expose independent platform reads with bounded paging', () => {
   assert.deepEqual(spec.security, [{ platformSessionCookie: [] }]);
-  assert.equal(Object.keys(spec.paths).length, 2);
+  assert.equal(Object.keys(spec.paths).length, 3);
   for (const [path, route] of Object.entries(spec.paths)) {
     assert.ok(path.startsWith('/api/platform-admin/v1/'));
     assert.deepEqual(Object.keys(route), ['get']);

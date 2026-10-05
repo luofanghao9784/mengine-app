@@ -89,3 +89,18 @@ export interface DataOperationDetail {
   items: DataOperationItem[];
   hasMore: boolean;
 }
+
+export interface DataOperationArchives {
+  kind: DataOperationKind;
+  state: DataOperationState;
+  offset: number;
+  checkedAt: string;
+  counts: DataOperationCounts;
+  items: {
+    tenantId: string;
+    tenantName: string;
+    tenantStatus: 'ACTIVE' | 'SUSPENDED';
+    archive: DataOperationItem;
+  }[];
+  hasMore: boolean;
+}

@@ -47,6 +47,41 @@ async function fixture(context: BrowserContext) {
           lastCompletedAt: null,
         })),
       });
+    if (p.endsWith('/data-operations/archives')) {
+      if (revoked) return json({ code: 'ACCESS_DENIED' }, 403);
+      const kind = url.searchParams.get('kind') || 'CONNECTIONS';
+      return json({
+        kind,
+        state: 'ALL',
+        offset: Number(url.searchParams.get('offset') || 0),
+        checkedAt,
+        counts: counts(1, 0),
+        hasMore: false,
+        items: [
+          {
+            tenantId: id(21),
+            tenantName: '合成企业 1',
+            tenantStatus: 'ACTIVE',
+            archive: {
+              monitorKey: 'b'.repeat(32),
+              runId: id(501),
+              stage: kind === 'MATERIALS' ? 'READY' : 'SUCCEEDED',
+              configuration: kind === 'CONNECTIONS' ? 'READY' : null,
+              category: 'READY',
+              diagnostic: null,
+              createdAt: checkedAt,
+              finishedAt: checkedAt,
+              lastSuccessAt: checkedAt,
+              format: kind === 'MATERIALS' ? 'PDF' : null,
+              sizeBytes: kind === 'MATERIALS' ? 2048 : null,
+              version: kind === 'MATERIALS' ? 3 : null,
+              datasetCount: kind === 'CONNECTIONS' ? 2 : null,
+              rowCount: kind === 'CONNECTIONS' ? 24 : null,
+            },
+          },
+        ],
+      });
+    }
     if (p.endsWith('/data-operations')) {
       const kind = url.searchParams.get('kind') || 'CONNECTIONS',
         state = url.searchParams.get('state') || 'ALL',
@@ -143,7 +178,9 @@ test('system running opens an independent data subpage; list search and paging s
   await page.getByRole('link', { name: '数据库', exact: true }).click();
   await expect(page.getByRole('link', { name: '数据接入监测', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: '数据接入监测', exact: true })).toHaveCount(0);
-  await expect(page.locator('.admin-page-actions').getByRole('button', { name: '刷新', exact: true })).toBeVisible();
+  await expect(
+    page.locator('.admin-page-actions').getByRole('button', { name: '刷新', exact: true }),
+  ).toBeVisible();
   await expect(page.locator('.engine-wall')).toHaveCount(0);
   await expect(page.getByLabel('搜索企业')).toHaveCount(0);
   await expect(page.getByRole('combobox', { name: '运行状态' })).toHaveCount(0);
@@ -224,6 +261,7 @@ test('material monitoring and enterprise directory are separate and preserve ret
   await expect(page.getByLabel('搜索企业')).toHaveCount(0);
   await expect(page.getByRole('combobox', { name: '运行状态' })).toHaveCount(0);
   await expect(page.locator('.data-ops-metrics')).toBeVisible();
+  await expect(page.getByRole('cell', { name: /PDF · 2/  })).toBeVisible();
   await expect(page.locator('.data-ops-tenants')).toHaveCount(0);
   await page.getByRole('link', { name: '企业列表', exact: true }).click();
   await expect(page.locator('.data-ops-metrics')).toHaveCount(0);

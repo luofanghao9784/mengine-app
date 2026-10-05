@@ -7,6 +7,7 @@ import {
   type DataOperationState,
   type DataOperationOverview,
   type DataOperationDetail,
+  type DataOperationArchives,
 } from '../../contracts/public-api/data-operations.ts';
 const exact = (v: unknown, fields: string): v is Record<string, unknown> =>
   record(v) && Object.keys(v).sort().join(' ') === fields.split(' ').sort().join(' ');
@@ -120,6 +121,25 @@ export function isDataDetail(v: unknown): v is DataOperationDetail {
       nullableDate(i.lastSuccessAt),
   );
 }
+export function isDataArchives(v: unknown): v is DataOperationArchives {
+  if (!exact(v, 'kind state offset checkedAt counts items hasMore') || !base(v) || !Array.isArray(v.items))
+    return false;
+  const ids = new Set<string>();
+  return v.items.every((row) => {
+    if (!exact(row, 'tenantId tenantName tenantStatus archive') || !record(row.archive)) return false;
+    const key = String(row.archive.monitorKey);
+    if (ids.has(key)) return false;
+    ids.add(key);
+    return isDataDetail({
+      ...v,
+      tenantId: row.tenantId,
+      tenantName: row.tenantName,
+      tenantStatus: row.tenantStatus,
+      items: [row.archive],
+      hasMore: false,
+    });
+  });
+}
 export function createDataOperationsClient(fetcher: typeof fetch = fetch) {
   const request = createIdentityRequest(fetcher);
   const params = (k: DataOperationKind, s: DataOperationState, offset: number) => {
@@ -128,6 +148,16 @@ export function createDataOperationsClient(fetcher: typeof fetch = fetch) {
     return new URLSearchParams({ kind: k, state: s, offset: String(offset) });
   };
   return {
+    archives(k: DataOperationKind, offset: number, signal?: AbortSignal) {
+      return request(
+        '/api/platform-admin/v1/data-operations/archives?' + params(k, 'ALL', offset),
+        'GET',
+        (v): v is DataOperationArchives =>
+          isDataArchives(v) && v.kind === k && v.state === 'ALL' && v.offset === offset,
+        undefined,
+        signal,
+      );
+    },
     list(k: DataOperationKind, query: string, s: DataOperationState, offset: number, signal?: AbortSignal) {
       if (typeof query !== 'string' || query.length > 180) throw new IdentityError('INVALID_REQUEST', 400);
       const p = params(k, s, offset);

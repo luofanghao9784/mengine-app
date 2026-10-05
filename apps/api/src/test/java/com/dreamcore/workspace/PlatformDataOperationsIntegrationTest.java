@@ -52,6 +52,17 @@ class PlatformDataOperationsIntegrationTest {
   db.update("UPDATE business_datasets SET status='WITHDRAWN' WHERE id=?",d);
   var withdrawn=detail("CONNECTIONS").items().getFirst();assertEquals(0L,withdrawn.datasetCount());assertEquals(0L,withdrawn.rowCount());
  }
+ @Test void archivesPageAcrossEnterprisesWithoutPrivatePayloads(){
+  connection(tenant,"UNCONFIGURED");connection(other,"UNCONFIGURED");
+  var page=service.archives(operator,"CONNECTIONS","ALL",0);
+  assertTrue(page.items().stream().anyMatch(r->r.tenantId().equals(tenant)));
+  assertTrue(page.items().stream().anyMatch(r->r.tenantId().equals(other)));
+  assertTrue(page.items().size()<=20);
+  var payload=new JsonMapper().writeValueAsString(page);assertFalse(payload.contains(SECRET));assertFalse(payload.contains("routeLabel"));
+  denied(403,()->service.archives(member,"CONNECTIONS","ALL",0));
+  denied(400,()->service.archives(operator,"CONNECTIONS","ALL",20001));
+  db.update("DELETE FROM platform_roles WHERE account_id=?",operator);denied(403,()->service.archives(operator,"MATERIALS","ALL",0));
+ }
  @Test void scopeChecksBoundsSuspensionAndRevocation(){denied(403,()->service.list(member,"CONNECTIONS","","ALL",0));denied(404,()->service.detail(operator,UUID.randomUUID(),"MATERIALS","ALL",0));for(String k:List.of("FILES","connection",""))denied(400,()->service.list(operator,k,"","ALL",0));denied(400,()->service.list(operator,"CONNECTIONS","","BROKEN",0));denied(400,()->service.list(operator,"CONNECTIONS","x".repeat(181),"ALL",0));denied(400,()->service.detail(operator,tenant,"MATERIALS","ALL",20001));
   db.update("UPDATE tenants SET status='SUSPENDED' WHERE id=?",tenant);assertEquals("SUSPENDED",detail("MATERIALS").tenantStatus());db.update("DELETE FROM platform_roles WHERE account_id=?",operator);denied(403,()->detail("MATERIALS"));
  }
@@ -59,7 +70,7 @@ class PlatformDataOperationsIntegrationTest {
   db.update("DELETE FROM login_attempts");String base="http://127.0.0.1:"+port;var http=HttpClient.newBuilder().cookieHandler(new CookieManager(null,CookiePolicy.ACCEPT_ALL)).build();var json=new JsonMapper();
   var csrf=json.readTree(http.send(HttpRequest.newBuilder(URI.create(base+"/api/v1/auth/csrf")).GET().build(),HttpResponse.BodyHandlers.ofString()).body());
   var login=HttpRequest.newBuilder(URI.create(base+"/api/v1/auth/login")).header(csrf.get("headerName").asString(),csrf.get("token").asString()).header("Content-Type","application/json").POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(Map.of("email",member+"@example.test","password",PASSWORD)))).build();assertEquals(200,http.send(login,HttpResponse.BodyHandlers.ofString()).statusCode());
-  for(String path:List.of("/api/platform-admin/v1/data-operations","/api/platform-admin/v1/tenants/"+tenant+"/data-operations"))assertEquals(401,http.send(HttpRequest.newBuilder(URI.create(base+path)).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
+  for(String path:List.of("/api/platform-admin/v1/data-operations","/api/platform-admin/v1/data-operations/archives","/api/platform-admin/v1/tenants/"+tenant+"/data-operations"))assertEquals(401,http.send(HttpRequest.newBuilder(URI.create(base+path)).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
  }
  @Test void independentPlatformHttpReturnsOnlyReadOnlyNoStoreProjection()throws Exception{db.update("DELETE FROM login_attempts");connection(tenant,"UNAVAILABLE");String base="http://127.0.0.1:"+port,path="/api/platform-admin/v1/tenants/"+tenant+"/data-operations";var http=HttpClient.newBuilder().cookieHandler(new CookieManager(null,CookiePolicy.ACCEPT_ALL)).build();var json=new JsonMapper();
   assertEquals(401,http.send(HttpRequest.newBuilder(URI.create(base+path)).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
