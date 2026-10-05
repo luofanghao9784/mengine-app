@@ -16,11 +16,18 @@ export type GenerationSlot = { batch: GenerationBatch; item?: RecommendationItem
 /** One owner per briefing page: filtering and refreshing the feed must not resubmit or lose a batch. */
 export function useBriefingGeneration(tenant: string, workspace?: string, businessType?: string) {
   const { expire } = useSession();
+  const [quota, setQuota] = useState({ limit: 6, used: 0, reserved: 0, remaining: 6 });
   const [requested, setRequested] = useViewState<string | undefined>(
     tenant,
     'briefing:generation-request',
     undefined,
     (v): v is string | undefined => v === undefined || typeof v === 'string',
+  );
+  const [selectionIds, setSelectionIds] = useViewState<string[]>(
+    tenant,
+    'briefing:selection-ids',
+    [],
+    (v): v is string[] => Array.isArray(v) && v.every((id) => typeof id === 'string'),
   );
   const requestRef = useRef(requested);
   requestRef.current = requested;
@@ -32,8 +39,8 @@ export function useBriefingGeneration(tenant: string, workspace?: string, busine
   const [cancelBusy, setCancelBusy] = useState<string>();
   const refresh = useCallback(() => setRevision((n) => n + 1), []);
   const seen = useRef<Set<string> | undefined>(undefined);
-  const tracked = useRef<string[]>([]);
-  const submission = useSubmission<{ workspaceId?: string; businessType?: string }>();
+  const tracked = useRef<string[]>(selectionIds);
+  const submission = useSubmission<{ workspaceId?: string; count: number; types: string[] }>();
   useRequestLock(submission.busy || submission.uncertain || !!cancelBusy);
 
   useEffect(() => {
@@ -75,6 +82,7 @@ export function useBriefingGeneration(tenant: string, workspace?: string, busine
           return generationOpen(batch) || batch.status === 'SUCCEEDED' ? [{ batch }] : [];
         });
         setBatches(state.batches);
+        if (state.quota) setQuota(state.quota);
         setReady(true);
         setError(undefined);
         setSlots((old) =>
@@ -120,37 +128,47 @@ export function useBriefingGeneration(tenant: string, workspace?: string, busine
     (!workspace || b.workspaceId === workspace) &&
     (!businessType || !b.businessType || b.businessType === businessType);
   const visible = batches.filter(matches);
-  const active = batches.find(generationOpen);
-  const current = active || visible.find((b) => b.id === requested) || visible[0];
-  const generate = () => {
+  const active = batches.find((b) => b.status === 'RUNNING') || batches.find(generationOpen);
+  const current = active || batches.find((b) => b.id === requested) || visible[0];
+  const generate = (count = 1, types: string[] = []) => {
     if (!ready || active || submission.busy || slots.some((slot) => !slot.item)) return;
-    void submission.submit({ workspaceId: workspace, businessType }, async (body, requestId) => {
-      const batch = await api.generate(tenant, { ...body, requestId });
-      requestRef.current = batch.id;
-      setRequested(batch.id);
-      if (!tracked.current.includes(batch.id)) tracked.current.push(batch.id);
-      setBatches((old) => [batch, ...old.filter((b) => b.id !== batch.id)]);
-      setSlots((old) => [...old.filter((s) => s.batch.id !== batch.id), { batch }]);
+    void submission.submit({ workspaceId: workspace, count, types }, async (body, requestId) => {
+      const next = await api.generateSelection(tenant, { ...body, requestId });
+      const first = next[0];
+      setSelectionIds(next.map((batch) => batch.id));
+      requestRef.current = first.id;
+      setRequested(first.id);
+      for (const batch of next) if (!tracked.current.includes(batch.id)) tracked.current.push(batch.id);
+      const ids = new Set(next.map((batch) => batch.id));
+      setBatches((old) => [...next, ...old.filter((b) => !ids.has(b.id))]);
+      setSlots((old) => [...old.filter((s) => !ids.has(s.batch.id)), ...next.map((batch) => ({ batch }))]);
       refresh();
     });
   };
   const cancel = async (id: string) => {
     if (cancelBusy) return;
     setCancelBusy(id);
+    setError(undefined);
     try {
       const batch = await api.cancel(tenant, id);
       setBatches((old) => old.map((b) => (b.id === id ? batch : b)));
-      setSlots((old) => old.filter((s) => s.batch.id !== id));
-      setError(undefined);
+      setSlots((old) => old.filter((slot) => slot.batch.id !== id));
       refresh();
     } catch (e) {
-      setError(e);
       if (e instanceof IdentityError && e.status === 401) expire();
+      setError(e);
+      refresh();
     } finally {
       setCancelBusy(undefined);
     }
   };
   return {
+    quota,
+    progress: {
+      total: selectionIds.length,
+      done: batches.filter((b) => selectionIds.includes(b.id) && b.status === 'SUCCEEDED').length,
+    },
+    filterType: businessType,
     slots: slots.filter(
       (s) =>
         matches(s.batch) &&

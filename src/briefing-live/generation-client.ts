@@ -40,6 +40,9 @@ const policy = (v: unknown): v is GenerationPolicy =>
   Number.isSafeInteger(v.revision) &&
   Number(v.revision) > 0 &&
   nullableText(v.reason);
+const quota = (v: unknown) =>
+  record(v) &&
+  ['limit', 'used', 'reserved', 'remaining'].every((k) => Number.isSafeInteger(v[k]) && Number(v[k]) >= 0);
 const request = createIdentityRequest();
 const root = (tenant: string) => `/api/v1/tenants/${tenant}/briefing/generation`;
 export const generationClient = {
@@ -52,7 +55,8 @@ export const generationClient = {
         Array.isArray(v.policies) &&
         v.policies.every(policy) &&
         Array.isArray(v.batches) &&
-        v.batches.every(batch),
+        v.batches.every(batch) &&
+        (v.quota === undefined || quota(v.quota)),
       undefined,
       signal,
     ),
@@ -60,6 +64,16 @@ export const generationClient = {
     request(root(tenant) + `/${id}`, 'GET', batch, undefined, signal),
   generate: (tenant: string, body: { requestId: string; workspaceId?: string; businessType?: string }) =>
     request(root(tenant), 'POST', batch, body),
+  generateSelection: (
+    tenant: string,
+    body: { requestId: string; workspaceId?: string; count: number; types: string[] },
+  ) =>
+    request(
+      root(tenant) + '/selection',
+      'POST',
+      (v): v is GenerationBatch[] => Array.isArray(v) && v.every(batch),
+      body,
+    ),
   cancel: (tenant: string, id: string) => request(root(tenant) + `/${id}/cancel`, 'POST', batch, {}),
   configure: (tenant: string, p: GenerationPolicy) =>
     request(root(tenant) + '/policy', 'POST', policy, {

@@ -72,6 +72,8 @@ export class IdentityError extends Error {
       RECOMMENDATION_SNAPSHOT_CHANGED: '推荐内容、权限或方法已变化，请刷新后继续查看。',
       DELIVERY_NOT_FOUND: '此成果已不可访问，请刷新。',
       DELIVERY_VERSION_CHANGED: '成果版本已变化，请刷新并核对最新内容。',
+      BRIEFING_DAILY_QUOTA_EXCEEDED: '今日可用生成次数不足，请减少数量或等待额度恢复。',
+      BRIEFING_REQUEST_CONFLICT: '本次生成请求已确认，请刷新后重新选择。',
       BRIEFING_NOT_FOUND: '画报来源已不可访问，请刷新。',
       BRIEFING_REVISION_CONFLICT: '画报设置已有更新，请刷新后重试。',
       BRIEFING_LAYOUT_CHANGED: '关注布局已被修改，请刷新后重新选择移动位置。',

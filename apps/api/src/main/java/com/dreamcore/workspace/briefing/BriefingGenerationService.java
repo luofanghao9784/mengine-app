@@ -24,7 +24,8 @@ public class BriefingGenerationService {
     }
     public record Batch(UUID id,UUID workspaceId,String trigger,String businessType,String status,String reason,UUID taskId,List<UUID> cardIds,Instant createdAt,Instant finishedAt) {}
     public record Policy(UUID id,UUID workspaceId,String workspaceName,boolean enabled,int revision,String reason) {}
-    public record State(List<Policy> policies,List<Batch> batches) {}
+    public record Quota(int limit,int used,int reserved,int remaining) {}
+    public record State(List<Policy> policies,List<Batch> batches,Quota quota) {}
     private static final Set<String> TYPES=Set.of("INFO","DATA","INSIGHT","SUGGESTION","RESULT");
     private static final Set<String> OPEN=Set.of("QUEUED","RUNNING","WAITING_DATA","WAITING_RESOURCE","WAITING_CAPABILITY");
     private final JdbcTemplate db;private final ConversationService tasks;private final BriefingContentService contents;
@@ -72,6 +73,35 @@ public class BriefingGenerationService {
         db.update("INSERT INTO briefing_generation_requests VALUES(?,?,?,?,?)",tenant,actor,request,fingerprint,id);
         return get(actor,tenant,id);
     }
+    private UUID selectionRequest(UUID request,int index){return UUID.nameUUIDFromBytes(("briefing-selection:"+request+":"+index).getBytes(java.nio.charset.StandardCharsets.UTF_8));}
+    /** Reserve all requested runs atomically. A repeated confirmation replays the same batches. */
+    @Transactional public List<Batch> generateSelection(UUID actor,UUID tenant,UUID request,UUID space,int count,List<String> types){
+        authority(actor,tenant,null);
+        if(request==null||count<1||count>6||types==null||types.size()>count||types.stream().anyMatch(t->t==null||!TYPES.contains(t))||new HashSet<>(types).size()!=types.size())throw IdentityException.invalid();
+        lock(actor,tenant);
+        String fingerprint=IdentityService.hash("selection:"+tenant+":"+space+":"+count+":"+types);
+        var prior=db.queryForList("SELECT batch_id,fingerprint FROM briefing_generation_requests WHERE tenant_id=? AND owner_id=? AND request_id=?",tenant,actor,request);
+        if(!prior.isEmpty()){
+            if(!fingerprint.equals(prior.getFirst().get("fingerprint")))throw new IdentityException(409,"BRIEFING_REQUEST_CONFLICT");
+            var result=new ArrayList<Batch>();for(int i=0;i<count;i++)result.add(get(actor,tenant,db.queryForObject("SELECT batch_id FROM briefing_generation_requests WHERE tenant_id=? AND owner_id=? AND request_id=?",UUID.class,tenant,actor,selectionRequest(request,i))));return result;
+        }
+        UUID chosen=chooseSpace(actor,tenant,space);
+        if(count>quota(actor,tenant).remaining())throw new IdentityException(409,"BRIEFING_DAILY_QUOTA_EXCEEDED");
+        UUID p=policy(actor,tenant,chosen);var result=new ArrayList<Batch>();
+        for(int i=0;i<count;i++){
+            String type=types.isEmpty()?null:types.get(i%types.size());UUID id=UUID.randomUUID();
+            db.update("INSERT INTO briefing_generation_batches(id,tenant_id,owner_id,workspace_id,policy_id,policy_epoch,trigger_kind,business_type,status,selection_id,selection_index,created_at) SELECT ?,tenant_id,owner_id,workspace_id,id,epoch,'GENERATE_MORE',?,'QUEUED',?,?,? FROM briefing_generation_policies WHERE id=?",id,type,request,i,time(clock.now().plusMillis(i)),p);
+            db.update("INSERT INTO briefing_generation_requests VALUES(?,?,?,?,?)",tenant,actor,selectionRequest(request,i),fingerprint,id);result.add(get(actor,tenant,id));
+        }
+        db.update("INSERT INTO briefing_generation_requests VALUES(?,?,?,?,?)",tenant,actor,request,fingerprint,result.getFirst().id());return result;
+    }
+    private Quota quota(UUID actor,UUID tenant){
+        Instant now=clock.now(),day=now.atZone(ZoneOffset.UTC).toLocalDate().atStartOfDay(ZoneOffset.UTC).toInstant();
+        Instant since=db.queryForObject("SELECT coalesce(max(reset_at),?) FROM briefing_quota_resets WHERE tenant_id=? AND owner_id=? AND reset_at>=? AND reset_at<=?",Timestamp.class,time(day),tenant,actor,time(day),time(now)).toInstant();
+        int used=db.queryForObject("SELECT count(*) FROM briefing_generation_batches WHERE tenant_id=? AND owner_id=? AND task_id IS NOT NULL AND started_at>=?",Integer.class,tenant,actor,time(since));
+        int reserved=db.queryForObject("SELECT count(*) FROM briefing_generation_batches WHERE tenant_id=? AND owner_id=? AND task_id IS NULL AND status IN ('QUEUED','WAITING_DATA','WAITING_RESOURCE','WAITING_CAPABILITY')",Integer.class,tenant,actor);
+        return new Quota(dailyLimit,used,reserved,Math.max(0,dailyLimit-used-reserved));
+    }
     private UUID enqueue(UUID policy,String trigger,String type,Instant scheduled){
         UUID id=UUID.randomUUID();db.update("INSERT INTO briefing_generation_batches(id,tenant_id,owner_id,workspace_id,policy_id,policy_epoch,trigger_kind,business_type,scheduled_for,status) SELECT ?,tenant_id,owner_id,workspace_id,id,epoch,?,?,?,'QUEUED' FROM briefing_generation_policies WHERE id=?",id,trigger,type,time(scheduled),policy);return id;
     }
@@ -92,7 +122,7 @@ public class BriefingGenerationService {
             policies.add(new Policy((UUID)p.get("id"),(UUID)p.get("workspace_id"),db.queryForObject("SELECT name FROM workspaces WHERE id=?",String.class,p.get("workspace_id")),(Boolean)p.get("enabled"),(Integer)p.get("revision"),(String)p.get("reason")));
             for(var b:db.queryForList("SELECT * FROM briefing_generation_batches WHERE policy_id=? ORDER BY created_at DESC,id DESC LIMIT 5",p.get("id")))batches.add(map(b));
         }
-        batches.sort(Comparator.comparing(Batch::createdAt).reversed());return new State(policies,batches.stream().limit(20).toList());
+        batches.sort(Comparator.comparing(Batch::createdAt).reversed());return new State(policies,batches.stream().limit(20).toList(),quota(actor,tenant));
     }
     @Transactional public Policy configure(UUID actor,UUID tenant,UUID space,int revision,boolean enabled){
         authority(actor,tenant,space);lock(actor,tenant);UUID id=policy(actor,tenant,space);
@@ -103,10 +133,13 @@ public class BriefingGenerationService {
         return new Policy(id,space,db.queryForObject("SELECT name FROM workspaces WHERE id=?",String.class,space),enabled,revision+1,(String)p.get("reason"));
     }
     @Transactional public Batch cancel(UUID actor,UUID tenant,UUID id){
-        var b=get(actor,tenant,id);lock(actor,tenant);if(OPEN.contains(b.status())){
+        get(actor,tenant,id);lock(actor,tenant);
+        UUID selection=db.queryForObject("SELECT selection_id FROM briefing_generation_batches WHERE id=?",UUID.class,id);
+        List<UUID> ids=selection==null?List.of(id):db.queryForList("SELECT id FROM briefing_generation_batches WHERE tenant_id=? AND owner_id=? AND selection_id=? ORDER BY selection_index",UUID.class,tenant,actor,selection);
+        for(UUID member:ids){var b=get(actor,tenant,member);if(OPEN.contains(b.status())){
             if(b.taskId()!=null)tasks.interruptTasks(tenant,List.of(b.taskId()),"BRIEFING_CANCELLED");
-            finish(id,"CANCELLED","USER_CANCELLED");
-        }return get(actor,tenant,id);
+            finish(member,"CANCELLED","USER_CANCELLED");
+        }}return get(actor,tenant,id);
     }
     /** Bounded discovery also covers existing users after an upgrade. No page read creates work. */
     @Transactional public void discover(){

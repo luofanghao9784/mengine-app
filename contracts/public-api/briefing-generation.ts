@@ -29,7 +29,14 @@ export interface GenerationPolicy {
   revision: number;
   reason: string | null;
 }
+export interface GenerationQuota {
+  limit: number;
+  used: number;
+  reserved: number;
+  remaining: number;
+}
 export interface GenerationState {
+  quota?: GenerationQuota;
   policies: GenerationPolicy[];
   batches: GenerationBatch[];
 }

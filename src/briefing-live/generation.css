@@ -134,3 +134,105 @@
   background: #dce9ff;
   border-color: #a8c2ef;
 }
+
+.generation-card-copy.generation-chooser {
+  align-items: stretch;
+  text-align: left;
+  gap: 9px;
+  padding: clamp(14px, 6cqi, 22px);
+}
+.generation-chooser-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #356fe5;
+}
+.generation-chooser-heading h3 {
+  color: #26364d;
+  font-size: 18px;
+}
+.generation-types {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.generation-types legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.generation-type {
+  position: relative;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 29px;
+  padding: 4px 8px;
+  border: 1px solid #e4eaf3;
+  border-radius: 8px;
+  background: #fff;
+  color: #63738a;
+  font-size: 12px;
+  cursor: pointer;
+}
+.generation-type input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+.generation-type:has(input:checked) {
+  color: #2162d6;
+  background: #edf3ff;
+  border-color: #bfd3fc;
+  font-weight: 600;
+}
+.generation-type:has(input:focus-visible) {
+  outline: 2px solid #356fe5;
+  outline-offset: 2px;
+}
+.generation-type:has(input:disabled) {
+  opacity: 0.55;
+  cursor: default;
+}
+.generation-chooser .generation-choice-description {
+  min-height: 32px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.generation-chooser .generation-start-button {
+  justify-content: center;
+  min-height: 34px;
+  width: 100%;
+  margin-top: 0;
+  border-radius: 9px;
+  font-size: 12px;
+}
+.generation-chooser .generation-result,
+.generation-chooser .generation-filter-note {
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.generation-counts {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.generation-chooser .generation-back {
+  border: 0;
+  padding: 0 3px;
+  background: transparent;
+  color: #63738a;
+  font-size: 25px;
+  line-height: 1;
+  cursor: pointer;
+}
+.generation-chooser .generation-start-button {
+  margin-top: 0;
+}

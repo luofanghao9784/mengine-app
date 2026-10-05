@@ -1,5 +1,6 @@
 import { Sparkles, Square, RotateCw } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
+import { generationChoices } from './generation-types';
 import type { RecommendationItem } from '../../contracts/public-api/recommendation';
 import { SubmitError } from '../shared/admin';
 import { Button } from '../shared/ui';
@@ -41,62 +42,80 @@ function GenerationPlaceholder({
   const batch = slot?.batch;
   const completed = batch?.status === 'SUCCEEDED';
   return (
-      <div className="generation-card-copy" role="status">
-        <span className="generation-symbol">
-          <Sparkles size={26} strokeWidth={1.5} />
-        </span>
-        <h3>
-          {batch
-            ? completed
-              ? slot?.reading
-                ? '正在读取新画报'
-                : '新画报暂不可读取'
-              : label[batch.status]
-            : generation.submission.uncertain
-              ? '正在确认生成请求'
-              : '正在准备新画报'}
-        </h3>
-        <p>{(batch?.reason && reasons[batch.reason]) || (completed ? '读取后自动显示' : '完成后自动显示')}</p>
-        <SubmitError
-          error={generation.submission.error || generation.error}
-          uncertain={generation.submission.uncertain}
+    <div className="generation-card-copy" role="status">
+      <span className="generation-symbol">
+        <Sparkles size={26} strokeWidth={1.5} />
+      </span>
+      <h3>
+        {batch
+          ? completed
+            ? slot?.reading
+              ? '正在读取新画报'
+              : '新画报暂不可读取'
+            : label[batch.status]
+          : generation.submission.uncertain
+            ? '正在确认生成请求'
+            : '正在准备新画报'}
+      </h3>
+      <p>
+        {(batch?.reason && reasons[batch.reason]) ||
+          (completed
+            ? '读取后自动显示'
+            : generation.progress.total > 1
+              ? `已生成 ${generation.progress.done} / ${generation.progress.total} 张`
+              : '完成后自动显示')}
+      </p>
+      <SubmitError
+        error={generation.submission.error || generation.error}
+        uncertain={generation.submission.uncertain}
+      />
+      {!batch && generation.submission.uncertain && (
+        <Button
+          className="generation-icon-button"
+          icon={RotateCw}
+          aria-label="重试本次请求"
+          title="重试本次请求"
+          disabled={generation.submission.busy}
+          onClick={() => generation.generate()}
         />
-        {!batch && generation.submission.uncertain && (
-          <Button
-            className="generation-icon-button"
-            icon={RotateCw}
-            aria-label="重试本次请求"
-            title="重试本次请求"
-            disabled={generation.submission.busy}
-            onClick={generation.generate}
-          />
-        )}
-        {batch && generationOpen(batch) && (
-          <Button
-            variant="secondary"
-            className="generation-icon-button generation-stop-button"
-            icon={Square}
-            aria-label="取消本次"
-            title="取消生成"
-            disabled={!!generation.cancelBusy}
-            onClick={() => void generation.cancel(batch.id)}
-          />
-        )}
-        {completed && !slot?.reading && (
-          <Button
-            variant="ghost"
-            className="generation-icon-button"
-            icon={RotateCw}
-            aria-label="重新读取"
-            title="重新读取"
-            onClick={generation.refresh}
-          />
-        )}
-      </div>
+      )}
+      {batch && generationOpen(batch) && (
+        <Button
+          variant="secondary"
+          className="generation-icon-button generation-stop-button"
+          icon={Square}
+          aria-label="取消本次"
+          title="取消生成"
+          disabled={!!generation.cancelBusy}
+          onClick={() => void generation.cancel(batch.id)}
+        />
+      )}
+      {completed && !slot?.reading && (
+        <Button
+          variant="ghost"
+          className="generation-icon-button"
+          icon={RotateCw}
+          aria-label="重新读取"
+          title="重新读取"
+          onClick={generation.refresh}
+        />
+      )}
+    </div>
   );
 }
 export function GenerationPanel({ generation }: { generation: BriefingGeneration }) {
   const { submission, current, active } = generation;
+  const choiceName = useId();
+  const [step, setStep] = useState<'start' | 'count' | 'types'>('start');
+  const [count, setCount] = useState(1);
+  const [types, setTypes] = useState<string[]>([]);
+  const remaining = Math.min(6, generation.quota.remaining);
+  const quantity = Math.min(count, Math.max(1, remaining));
+  const toggleType = (type: string) =>
+    setTypes((old) =>
+      old.includes(type) ? old.filter((t) => t !== type) : old.length < quantity ? [...old, type] : old,
+    );
+
   const pendingSlot = generation.active ? { batch: generation.active } : generation.pendingSlot;
   const pending = !!pendingSlot || submission.busy || submission.uncertain;
   const batch = pendingSlot?.batch;
@@ -104,34 +123,119 @@ export function GenerationPanel({ generation }: { generation: BriefingGeneration
   const terminal = current && !generationOpen(current) && current.status !== 'SUCCEEDED';
   return (
     <article
-      className={'live-briefing-card briefing-generation' + (pending ? ' generation-placeholder' : '') + (pending && loading ? ' is-generating' : '')}
+      className={
+        'live-briefing-card briefing-generation' +
+        (pending ? ' generation-placeholder' : '') +
+        (pending && loading ? ' is-generating' : '')
+      }
       aria-label="生成新画报"
       aria-busy={pending && (loading || !!pendingSlot?.reading)}
       data-batch-id={batch?.id}
     >
-      {pending ? <GenerationPlaceholder generation={generation} slot={pendingSlot} /> : <div className="generation-card-copy">
-        <h3>发现新内容</h3>
-        <p
-          className="generation-result"
-          role={terminal ? 'status' : undefined}
-          title={terminal && current.reason ? reasons[current.reason] : undefined}
-        >
-          {terminal
-            ? current.reason === 'TASK_LIMIT'
-              ? '本次未完成，可稍后重试'
-              : (current.reason && reasons[current.reason]) || label[current.status]
-            : '基于已有资料，生成新的画报'}
-        </p>
-        <SubmitError error={submission.error || generation.error} uncertain={submission.uncertain} />
-        <Button
-          className="generation-icon-button"
-          icon={Sparkles}
-          aria-label="生成更多"
-          title="生成更多"
-          disabled={!generation.ready || submission.busy || !!active}
-          onClick={generation.generate}
-        />
-      </div>}
+      {pending ? (
+        <GenerationPlaceholder generation={generation} slot={pendingSlot} />
+      ) : (
+        <div className="generation-card-copy generation-chooser">
+          <div className="generation-chooser-heading">
+            {step !== 'start' && (
+              <button
+                type="button"
+                className="generation-back"
+                aria-label="上一步"
+                onClick={() => setStep(step === 'types' ? 'count' : 'start')}
+              >
+                ‹
+              </button>
+            )}
+            <h3>{step === 'start' ? '生成画报' : step === 'count' ? '生成数量' : '画报类型'}</h3>
+          </div>
+          {step === 'start' ? (
+            <Button
+              variant="primary"
+              className="generation-start-button"
+              icon={Sparkles}
+              aria-label="生成更多"
+              disabled={!generation.ready}
+              onClick={() => setStep('count')}
+            >
+              生成
+            </Button>
+          ) : step === 'count' ? (
+            <>
+              <fieldset className="generation-types generation-counts">
+                <legend>生成数量</legend>
+                {[1, 2, 3, 4, 5, 6].map((n) => (
+                  <label key={n} className="generation-type">
+                    <input
+                      type="radio"
+                      name={choiceName}
+                      checked={quantity === n}
+                      disabled={n > remaining}
+                      onChange={() => {
+                        setCount(n);
+                        setTypes((old) => old.slice(0, n));
+                      }}
+                    />
+                    <span>{n}</span>
+                  </label>
+                ))}
+              </fieldset>
+              <p>
+                今日可用 {remaining} / {generation.quota.limit} 次
+              </p>
+              <Button
+                variant="primary"
+                className="generation-start-button"
+                disabled={remaining === 0}
+                onClick={() => setStep('types')}
+              >
+                下一步
+              </Button>
+            </>
+          ) : (
+            <>
+              <fieldset className="generation-types">
+                <legend>画报类型</legend>
+                {generationChoices.map((choice) => (
+                  <label key={choice.value} className="generation-type">
+                    <input
+                      type="checkbox"
+                      checked={choice.value ? types.includes(choice.value) : types.length === 0}
+                      disabled={!!choice.value && !types.includes(choice.value) && types.length >= quantity}
+                      onChange={() => (choice.value ? toggleType(choice.value) : setTypes([]))}
+                    />
+                    <span>{choice.label}</span>
+                  </label>
+                ))}
+              </fieldset>
+              <p>{types.length === 0 ? '由系统判断类型' : `已选 ${types.length} 种 · 共 ${quantity} 张`}</p>
+              <Button
+                variant="primary"
+                className="generation-start-button"
+                disabled={remaining < count || types.length > quantity || submission.busy || !!active}
+                onClick={() => {
+                  generation.generate(quantity, types);
+                  setStep('start');
+                }}
+              >
+                生成 {quantity} 张
+              </Button>
+            </>
+          )}
+          <SubmitError error={submission.error || generation.error} uncertain={submission.uncertain} />
+          {step === 'start' && (
+            <p className="generation-result" role="status">
+              {remaining === 0
+                ? '今日额度已用完'
+                : terminal
+                  ? current.status === 'NO_NEW_CONTENT'
+                    ? '暂无新内容'
+                    : label[current.status]
+                  : `每日最多 ${generation.quota.limit} 次`}
+            </p>
+          )}
+        </div>
+      )}
     </article>
   );
 }
