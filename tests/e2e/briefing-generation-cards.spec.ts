@@ -1009,18 +1009,21 @@ test('生成请求等待时不出现全页状态气泡，已有卡片与入口�
   await expect(page.getByRole('button', { name: '生成更多', exact: true })).toBeEnabled();
   const oldBox = await old.boundingBox(), moreBox = await more.boundingBox();
   const oldNode = await old.elementHandle();
+  const generationNode = await more.locator('article').elementHandle();
   await page.getByRole('button', { name: '生成更多', exact: true }).click();
   await expect.poll(() => waiting).toBe(true);
   await expect(more).toContainText('正在准备新画报');
   await expect(page.getByText('正在核对本次提交，请在原处完成或重试后再切换页面。', { exact: true })).toHaveCount(0);
   await expect(page.locator('.briefing-local-loading')).toHaveCount(0);
   expect(await oldNode!.evaluate(el => el.isConnected)).toBe(true);
+  expect(await generationNode!.evaluate(el => el.isConnected)).toBe(true);
   expect(await old.boundingBox()).toEqual(oldBox);
   expect(await more.boundingBox()).toEqual(moreBox);
   // The existing write guard remains in force while only its redundant banner is hidden.
   await expect(page.getByRole('navigation', { name: '主导航' })).toHaveAttribute('inert', '');
   release();
   await expect(more).toContainText('正在分析资料');
+  expect(await generationNode!.evaluate(el => el.isConnected)).toBe(true);
   expect(await old.boundingBox()).toEqual(oldBox);
   expect(await more.boundingBox()).toEqual(moreBox);
 });

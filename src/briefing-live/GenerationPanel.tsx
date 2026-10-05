@@ -39,17 +39,8 @@ function GenerationPlaceholder({
   slot?: GenerationSlot;
 }) {
   const batch = slot?.batch;
-  const loading = batch ? ['QUEUED', 'RUNNING'].includes(batch.status) : generation.submission.busy;
   const completed = batch?.status === 'SUCCEEDED';
   return (
-    <article
-      className={
-        'live-briefing-card briefing-generation generation-placeholder' + (loading ? ' is-generating' : '')
-      }
-      aria-label="生成新画报"
-      aria-busy={loading || !!slot?.reading}
-      data-batch-id={batch?.id}
-    >
       <div className="generation-card-copy" role="status">
         <span className="generation-symbol">
           <Sparkles size={26} strokeWidth={1.5} />
@@ -102,18 +93,23 @@ function GenerationPlaceholder({
           />
         )}
       </div>
-    </article>
   );
 }
 export function GenerationPanel({ generation }: { generation: BriefingGeneration }) {
   const { submission, current, active } = generation;
   const pendingSlot = generation.active ? { batch: generation.active } : generation.pendingSlot;
-  if (pendingSlot || submission.busy || submission.uncertain)
-    return <GenerationPlaceholder generation={generation} slot={pendingSlot} />;
+  const pending = !!pendingSlot || submission.busy || submission.uncertain;
+  const batch = pendingSlot?.batch;
+  const loading = batch ? ['QUEUED', 'RUNNING'].includes(batch.status) : submission.busy;
   const terminal = current && !generationOpen(current) && current.status !== 'SUCCEEDED';
   return (
-    <article className="live-briefing-card briefing-generation" aria-label="生成新画报">
-      <div className="generation-card-copy">
+    <article
+      className={'live-briefing-card briefing-generation' + (pending ? ' generation-placeholder' : '') + (pending && loading ? ' is-generating' : '')}
+      aria-label="生成新画报"
+      aria-busy={pending && (loading || !!pendingSlot?.reading)}
+      data-batch-id={batch?.id}
+    >
+      {pending ? <GenerationPlaceholder generation={generation} slot={pendingSlot} /> : <div className="generation-card-copy">
         <h3>发现新内容</h3>
         <p
           className="generation-result"
@@ -135,7 +131,7 @@ export function GenerationPanel({ generation }: { generation: BriefingGeneration
           disabled={!generation.ready || submission.busy || !!active}
           onClick={generation.generate}
         />
-      </div>
+      </div>}
     </article>
   );
 }
