@@ -24,7 +24,7 @@ test('headquarters enters scoped management, keeps context in navigation, shows 
         platformAdmin: true,
         memberships: [],
       });
-    if (path.endsWith('/phone/configuration')) return json({ delivery: 'DISABLED', localPreview: false });
+    if (path.endsWith('/phone/configuration')) return json({ delivery: 'LOCAL', localPreview: true });
     if (path === '/api/platform-admin/v1/support-access') return json(access);
     if (path === `/api/platform-admin/v1/support-access/${visit}`)
       return method === 'DELETE' ? route.fulfill({ status: 204 }) : json(access);
@@ -85,8 +85,24 @@ test('headquarters enters scoped management, keeps context in navigation, shows 
         sharedWorkspaceCount: 1,
         invitationDelivery: 'LOCAL',
       });
-    if (path.endsWith('/members') || path.endsWith('/workspaces') || path.endsWith('/invitations'))
-      return json([]);
+    if (path.endsWith('/invitations'))
+      return json([
+        {
+          id: owner,
+          tenantId: tenant,
+          phone: '+8619900012345',
+          email: null,
+          role: 'MEMBER',
+          status: 'PENDING',
+          expiresAt: '2027-10-08T01:00:00Z',
+        },
+      ]);
+    if (
+      path ===
+      `/api/platform-admin/v1/support-access/${visit}/api/tenant-admin/v1/tenants/${tenant}/invitations/${owner}/local-link`
+    )
+      return json({ mode: 'LOCAL', path: '/workspace/#invite=' + 's'.repeat(43) });
+    if (path.endsWith('/members') || path.endsWith('/workspaces')) return json([]);
     return route.fulfill({ status: 404, json: { contractVersion: '1.0', code: 'SYNTHETIC_UNAVAILABLE' } });
   });
   await page.goto(`/platform-admin/#admin=tenants&enterprise=${tenant}&section=basic`);
@@ -109,15 +125,24 @@ test('headquarters enters scoped management, keeps context in navigation, shows 
   expect(await supportPage.evaluate(() => window.opener)).toBeNull();
   await supportPage.reload();
   await expect(supportPage.locator('.support-mode-banner')).toHaveCount(0);
-  await expect(supportPage.getByRole('complementary').getByText('合成总部操作者', { exact: true })).toBeVisible();
+  await expect(
+    supportPage.getByRole('complementary').getByText('合成总部操作者', { exact: true }),
+  ).toBeVisible();
   const pageErrors: string[] = [];
   supportPage.on('pageerror', (error) => pageErrors.push(error.message));
-  await supportPage.getByRole('complementary', { name: '企业管理导航' }).getByRole('link', { name: '资料库', exact: true }).click();
+  await supportPage
+    .getByRole('complementary', { name: '企业管理导航' })
+    .getByRole('link', { name: '资料库', exact: true })
+    .click();
   await supportPage.getByRole('link', { name: '文件与目录', exact: true }).click();
   await expect(supportPage.getByRole('heading', { name: '还没有资料', exact: true })).toBeVisible();
   expect(pageErrors).toEqual([]);
   await supportPage.getByRole('link', { name: '成员与空间', exact: true }).click();
   await expect(supportPage).toHaveURL(new RegExp(`admin=members.*support=${visit}`));
+  await supportPage.getByRole('link', { name: '成员邀请', exact: true }).click();
+  await supportPage.getByRole('button', { name: '查看本地邀请链接' }).click();
+  await expect(supportPage.getByLabel('本地邀请链接')).toHaveValue(/\/workspace\/#invite=s{43}$/);
+  await expect(supportPage.getByText('登录已失效，请重新登录。')).toHaveCount(0);
   await supportPage.getByRole('link', { name: '职责与交接' }).click();
   await expect(supportPage.getByText('负责人异常恢复', { exact: true })).toHaveCount(0);
   await expect(supportPage.getByRole('button', { name: '发起交接' })).toHaveCount(0);

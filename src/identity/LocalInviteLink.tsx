@@ -1,15 +1,29 @@
 import { useEffect, useState } from 'react';
 import { createIdentityRequest, IdentityError, record, text } from './client';
 import { Button } from '../shared/ui';
+import { supportRoute } from './support-request';
 const request = createIdentityRequest();
-export function LocalInviteLink({ invitation, platform = false }: { invitation: string; platform?: boolean }) {
+export function LocalInviteLink({
+  invitation,
+  platform = false,
+}: {
+  invitation: string;
+  platform?: boolean;
+}) {
+  const support = supportRoute();
+  const linkPath = support
+    ? `/api/tenant-admin/v1/tenants/${support.tenant}/invitations/${invitation}/local-link`
+    : (platform ? '/api/platform-admin/v1/local-invitations/' : '/api/v1/auth/phone/local-invitation/') +
+      invitation;
   const [enabled, setEnabled] = useState(false),
     [path, setPath] = useState(''),
     [error, setError] = useState('');
   useEffect(() => {
     let active = true;
     request(
-      platform ? '/api/platform-admin/v1/local-invitations/configuration' : '/api/v1/auth/phone/configuration',
+      platform
+        ? '/api/platform-admin/v1/local-invitations/configuration'
+        : '/api/v1/auth/phone/configuration',
       'GET',
       (v): v is { localPreview: boolean } => record(v) && typeof v.localPreview === 'boolean',
     )
@@ -29,7 +43,7 @@ export function LocalInviteLink({ invitation, platform = false }: { invitation: 
         onClick={async () => {
           try {
             const result = await request(
-              (platform ? '/api/platform-admin/v1/local-invitations/' : '/api/v1/auth/phone/local-invitation/') + invitation,
+              linkPath,
               'GET',
               (v): v is { path: string } =>
                 record(v) &&

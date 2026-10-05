@@ -9,9 +9,9 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import tools.jackson.databind.json.JsonMapper;
-@SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={"dreamcore.auth.ip-attempts=1000","dreamcore.auth.email-attempts=1000","dreamcore.knowledge.enabled=true"})
+@SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={"dreamcore.auth.ip-attempts=1000","dreamcore.auth.email-attempts=1000","dreamcore.knowledge.enabled=true","dreamcore.phone.delivery=local","dreamcore.phone.local-preview=true"})
 class HeadquartersSupportIntegrationTest {
- @LocalServerPort int port;@Autowired JdbcTemplate db;@Autowired PasswordEncoder passwords;@Autowired SupportAccess access;@Autowired com.dreamcore.workspace.knowledge.KnowledgeService knowledge;
+ @LocalServerPort int port;@Autowired JdbcTemplate db;@Autowired PasswordEncoder passwords;@Autowired SupportAccess access;@Autowired com.dreamcore.workspace.knowledge.KnowledgeService knowledge;@Autowired IdentityService identities;
  static final JsonMapper JSON=new JsonMapper();UUID hq,owner,employee,tenant,other,shared,privateSpace,ownerPrivate;String login;
  final class Browser {
   final HttpClient http=HttpClient.newBuilder().cookieHandler(new CookieManager(null,CookiePolicy.ACCEPT_ALL)).build();
@@ -89,6 +89,25 @@ class HeadquartersSupportIntegrationTest {
   assertThrows(IdentityException.class,()->access.forObject(job.actor(),job.tenant(),"knowledge_runs",job.id()));
   assertEquals(401,b.call("GET",root+"/governance",null,null).statusCode());
   assertEquals(1,db.queryForObject("SELECT count(*) FROM headquarters_support_events WHERE access_id=? AND action='INVALIDATED'",Integer.class,UUID.fromString(id)));
+ }
+
+ @Test void localInvitationLinkUsesSupportScopeAndAuditsActualActor()throws Exception{
+  var b=login();String id=b.enter("ADJUSTMENT"),root=proxy(id,"/api/tenant-admin/v1/tenants/"+tenant);
+  var invite=identities.invite(owner,tenant,UUID.randomUUID(),"+8619900012345");
+  String path=root+"/invitations/"+invite.id()+"/local-link";
+  assertEquals(401,b.call("GET","/api/v1/auth/phone/local-invitation/"+invite.id(),null,null).statusCode());
+  var result=b.call("GET",path,null,null);assertEquals(200,result.statusCode());
+  assertEquals("no-store",result.headers().firstValue("Cache-Control").orElse(""));
+  assertTrue(JSON.readTree(result.body()).get("path").asString().matches("/workspace/#invite=[A-Za-z0-9_-]{43}"));
+  var foreign=identities.invite(owner,other,UUID.randomUUID(),"+8619900012346");
+  assertEquals(403,b.call("GET",root+"/invitations/"+foreign.id()+"/local-link",null,null).statusCode());
+  assertEquals(403,b.call("GET",proxy(id,"/api/tenant-admin/v1/tenants/"+other+"/invitations/"+foreign.id()+"/local-link"),null,null).statusCode());
+  db.update("UPDATE invitations SET expires_at=now()-interval '1 second' WHERE id=?",invite.id());
+  assertEquals(409,b.call("GET",path,null,null).statusCode());
+  assertEquals(0,db.queryForObject("SELECT count(*) FROM tenant_memberships WHERE account_id=?",Integer.class,hq));
+  assertEquals(1,db.queryForObject("SELECT count(*) FROM headquarters_support_events WHERE access_id=? AND action=? AND outcome='SUCCESS'",Integer.class,UUID.fromString(id),"GET /api/tenant-admin/v1/tenants/"+tenant+"/invitations/"+invite.id()+"/local-link"));
+  assertEquals(204,b.call("DELETE","/api/platform-admin/v1/support-access/"+id,null,b.token).statusCode());
+  assertEquals(403,b.call("GET",path,null,null).statusCode());
  }
 
 }
