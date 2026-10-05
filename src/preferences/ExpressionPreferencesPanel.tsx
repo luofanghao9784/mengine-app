@@ -1,9 +1,9 @@
 import { useContext, useMemo, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
-import { Failure, Loading, Pager, useRemote } from '../shared/admin';
-import { RequestPending } from '../shared/request-guard';
-import { Badge, Button } from '../shared/ui';
-import { preferenceClient, type PreferenceScope } from './client';
+import { Failure, Loading, Pager, useRemote, useSubmission, SubmitError, FormActions } from '../shared/admin';
+import { useRequestLock, RequestPending } from '../shared/request-guard';
+import { Badge, Button, Modal, Field } from '../shared/ui';
+import { preferenceClient, ruleBookClient, type RuleBook, type PreferenceScope } from './client';
 import './preferences.css';
 const states: Record<string, string> = {
   EFFECTIVE: '当前采用',
@@ -19,6 +19,14 @@ export function ExpressionPreferencesPanel({ scope, tenant }: { scope: Preferenc
   const [page, setPage] = useState(0),
     [refresh, setRefresh] = useState(0);
   const pending = useContext(RequestPending);
+  const writer = useMemo(() => ruleBookClient(scope, tenant), [scope, tenant]);
+  const books = useRemote((signal) => writer.read(signal), [writer, refresh]);
+  const [editing, setEditing] = useState<RuleBook | null>(null);
+  const changed = () => {
+    setEditing(null);
+    setPage(0);
+    setRefresh((n) => n + 1);
+  };
   const data = useRemote((signal) => client.records(page * 20, signal), [client, page, refresh]);
   return (
     <section className="admin-section expression-preferences" aria-label="AI内容偏好规则">
@@ -38,6 +46,22 @@ export function ExpressionPreferencesPanel({ scope, tenant }: { scope: Preferenc
           刷新
         </Button>
       </header>
+      {books.error ? (
+        <Failure error={books.error} retry={() => setRefresh((n) => n + 1)} />
+      ) : (
+        books.value?.canMaintain && (
+          <div className="expression-book-actions">
+            {books.value.books.map((book) => (
+              <Button key={book.target} disabled={pending} onClick={() => setEditing(book)}>
+                {book.target === 'BRIEFING' ? '录入或修订画报规则' : '录入或修订通用表达规则'}
+              </Button>
+            ))}
+          </div>
+        )
+      )}
+      {editing && (
+        <RuleEditor book={editing} writer={writer} close={() => setEditing(null)} changed={changed} />
+      )}
       {data.error ? (
         <Failure error={data.error} retry={() => setRefresh((n) => n + 1)} />
       ) : !data.value ? (
@@ -72,10 +96,78 @@ export function ExpressionPreferencesPanel({ scope, tenant }: { scope: Preferenc
             <Pager page={page} next={data.value.hasMore} onPage={setPage} />
           )}
           <p className="expression-rule-note muted">
-            “当前采用”表示已接入生成默认表达；“已记录”仅表示保存了规则。个人、企业与总部按各自范围生效，当前明确要求优先。
+            “当前采用”表示已接入生成默认表达；“已记录”仅表示保存了规则。文字规则只调整后续内容；同一表达问题按个人、企业、总部依次优先，当前明确要求最高。事实、权限和证据要求始终保留。
           </p>
         </>
       )}
     </section>
+  );
+}
+
+function RuleEditor({
+  book,
+  writer,
+  close,
+  changed,
+}: {
+  book: RuleBook;
+  writer: ReturnType<typeof ruleBookClient>;
+  close: () => void;
+  changed: () => void;
+}) {
+  const [body, setBody] = useState(book.body);
+  const submission = useSubmission<{ target: RuleBook['target']; body: string; expectedRevision: number }>();
+  const locked = submission.busy || submission.uncertain;
+  useRequestLock(locked);
+  return (
+    <Modal
+      title={book.target === 'BRIEFING' ? '画报表达规则' : '通用表达规则'}
+      onClose={() => {
+        if (!locked) close();
+      }}
+    >
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          void submission.submit(
+            { target: book.target, body, expectedRevision: book.revision },
+            async (payload, id) => {
+              await writer.save(payload, id);
+              changed();
+            },
+          );
+        }}
+      >
+        <p className="muted">
+          直接写希望采用的表达规则，每行一条。修订会保留历史；清空并保存表示撤回本层规则，继续采用其他层的规则。已有画报不会重写。
+        </p>
+        <Field label="规则正文">
+          <textarea
+            aria-label="规则正文"
+            rows={12}
+            maxLength={4000}
+            value={body}
+            disabled={locked}
+            onChange={(event) => setBody(event.target.value)}
+          />
+        </Field>
+        <p className="muted">
+          {body.length} / 4000 字 · 当前版本 {book.revision}
+        </p>
+        <SubmitError error={submission.error} uncertain={submission.uncertain} />
+        <FormActions>
+          <Button type="button" disabled={locked} onClick={close}>
+            取消
+          </Button>
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={submission.busy || (!submission.uncertain && body === book.body)}
+          >
+            {submission.busy ? '保存中…' : submission.uncertain ? '核对并重试' : '保存规则'}
+          </Button>
+        </FormActions>
+      </form>
+    </Modal>
   );
 }

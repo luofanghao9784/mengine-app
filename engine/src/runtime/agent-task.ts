@@ -1,4 +1,4 @@
-import { expressionInstructions } from './expression-preferences.js';
+import { expressionInstructions, ruleBookInstructions } from './expression-preferences.js';
 import { BRIEFING_WRITING_RULES } from './briefing-writing-rules.js';
 import type { RealtimePort } from './realtime.js';
 import { sourceQueries } from './source-query.js';
@@ -82,6 +82,7 @@ export class AgentTasks {
     const tableHandles = new Map<string, string>();
     let briefingGeneration: boolean | undefined;
     let expressionPreferences: unknown;
+    let expressionRuleBooks: unknown;
     let briefingSearches = 0;
     const briefingSearchLimit = 3;
     let briefingCalculationReady = false;
@@ -122,6 +123,8 @@ export class AgentTasks {
           throw new RuntimeError('TASK_ACCESS_DENIED');
         expressionInstructions(response.expressionPreferences, false);
         expressionPreferences = response.expressionPreferences;
+        ruleBookInstructions(response.expressionRuleBooks, false);
+        expressionRuleBooks = response.expressionRuleBooks;
         realtimeAvailable = response.realtimeVersion === '1.0';
         const query = response.publicQuery ?? '';
         if (
@@ -321,7 +324,9 @@ export class AgentTasks {
                 ...request.messages,
               ]
             : request.messages;
-          const preferenceText = expressionInstructions(expressionPreferences, !!briefingGeneration);
+          const preferenceText =
+            expressionInstructions(expressionPreferences, !!briefingGeneration) +
+            ruleBookInstructions(expressionRuleBooks, !!briefingGeneration);
           const messages = preferenceText
             ? [
                 { role: 'system' as const, content: [{ type: 'text' as const, text: preferenceText }] },

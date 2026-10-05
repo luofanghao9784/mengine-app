@@ -53,3 +53,12 @@
     margin-left: 0;
   }
 }
+.expression-book-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 16px 0;
+}
+.expression-preferences textarea {
+  width: 100%;
+}

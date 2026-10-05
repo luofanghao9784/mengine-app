@@ -25,6 +25,8 @@ async function fixture(page: import('@playwright/test').Page, empty = false) {
   await page.route('**/api/**', async (route) => {
     const path = new URL(route.request().url()).pathname;
     if (route.request().method() === 'POST') posts++;
+    if (path.endsWith('/csrf'))
+      return route.fulfill({ json: { headerName: 'X-CSRF-TOKEN', token: 'synthetic-only' } });
     if (path.endsWith('/me'))
       return route.fulfill({
         json: {
@@ -37,6 +39,17 @@ async function fixture(page: import('@playwright/test').Page, empty = false) {
           },
           platformAdmin: true,
           memberships: [],
+        },
+      });
+    if (path.endsWith('/expression-preferences/books'))
+      return route.fulfill({
+        json: {
+          scope: 'GLOBAL',
+          canMaintain: true,
+          books: [
+            { target: 'ALL', body: '', revision: 0, id: null },
+            { target: 'BRIEFING', body: '', revision: 0, id: null },
+          ],
         },
       });
     if (path.endsWith('/expression-preferences/records'))
@@ -66,4 +79,33 @@ test('没有实际记录时显示空状态，不虚构默认规则为收录记�
   await page.goto('/platform-admin/#admin=capabilities&tab=preferences');
   await expect(page.getByText('暂无偏好规则记录', { exact: true })).toBeVisible();
   await expect(page.locator('.expression-rule-list li')).toHaveCount(0);
+});
+
+test('文字录入保留版本号与请求幂等标识，不使用下拉选项', async ({ page }) => {
+  await fixture(page, true);
+  let saved: Record<string, unknown> | undefined;
+  await page.route('**/expression-preferences/books', async (route) => {
+    const request = route.request();
+    if (request.method() === 'POST') saved = request.postDataJSON();
+    return route.fulfill({
+      json: {
+        scope: 'GLOBAL',
+        canMaintain: true,
+        books: [
+          { target: 'ALL', body: '', revision: 0, id: null },
+          { target: 'BRIEFING', body: saved ? '标题写业务发现' : '', revision: saved ? 1 : 0, id: null },
+        ],
+      },
+    });
+  });
+  await page.goto('/platform-admin/#admin=capabilities&tab=preferences');
+  await page.getByRole('button', { name: '录入或修订画报规则' }).click();
+  await page.getByRole('textbox', { name: '规则正文' }).fill('标题写业务发现');
+  await expect(page.getByRole('combobox')).toHaveCount(0);
+  await page.getByRole('button', { name: '保存规则' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  expect(saved?.target).toBe('BRIEFING');
+  expect(saved?.body).toBe('标题写业务发现');
+  expect(saved?.expectedRevision).toBe(0);
+  expect(saved?.requestId).toMatch(/^[0-9a-f-]{36}$/);
 });

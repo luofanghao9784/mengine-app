@@ -60,3 +60,46 @@ export function preferenceClient(scope: PreferenceScope, tenant?: string) {
       ),
   };
 }
+
+export interface RuleBook {
+  target: 'ALL' | 'BRIEFING';
+  body: string;
+  revision: number;
+  id: string | null;
+}
+export interface RuleBooks {
+  scope: PreferenceScope;
+  canMaintain: boolean;
+  books: RuleBook[];
+}
+const isRuleBooks = (v: unknown): v is RuleBooks =>
+  record(v) &&
+  ['GLOBAL', 'TENANT', 'PERSONAL'].includes(String(v.scope)) &&
+  typeof v.canMaintain === 'boolean' &&
+  Array.isArray(v.books) &&
+  v.books.length === 2 &&
+  new Set(v.books.map((b: unknown) => (record(b) ? b.target : ''))).size === 2 &&
+  v.books.every(
+    (b: unknown) =>
+      record(b) &&
+      ['ALL', 'BRIEFING'].includes(String(b.target)) &&
+      typeof b.body === 'string' &&
+      b.body.length <= 4000 &&
+      Number.isSafeInteger(b.revision) &&
+      Number(b.revision) >= 0 &&
+      (b.id === null || typeof b.id === 'string'),
+  );
+export function ruleBookClient(scope: PreferenceScope, tenant?: string) {
+  if (scope !== 'GLOBAL' && !tenant) throw new IdentityError('CONTRACT_MISMATCH');
+  const valid = (value: unknown): value is RuleBooks => isRuleBooks(value) && value.scope === scope;
+  const request = createIdentityRequest();
+  const path =
+    scope === 'GLOBAL'
+      ? '/api/platform-admin/v1/expression-preferences/books'
+      : `/api/v1/tenants/${tenant}/profiles/expression-preferences/books?scope=${scope}`;
+  return {
+    read: (signal?: AbortSignal) => request(path, 'GET', valid, undefined, signal),
+    save: (body: { target: RuleBook['target']; body: string; expectedRevision: number }, requestId: string) =>
+      request(path, 'POST', valid, { ...body, requestId }),
+  };
+}
