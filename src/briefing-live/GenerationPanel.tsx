@@ -82,8 +82,8 @@ function GenerationPlaceholder({
         )}
         {batch && generationOpen(batch) && (
           <Button
-            variant="ghost"
-            className="generation-icon-button"
+            variant="secondary"
+            className="generation-icon-button generation-stop-button"
             icon={Square}
             aria-label="取消本次"
             title="取消生成"
