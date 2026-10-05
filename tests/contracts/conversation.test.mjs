@@ -10,6 +10,13 @@ const engine = JSON.parse(
 );
 const ajv = new Ajv2020({ strict: false, formats: { uuid: true, 'date-time': true } }),
   id = '00000000-0000-4000-8000-000000000001';
+test('conversation events include persisted live updates without accepting unknown kinds', () => {
+  const check = ajv.compile(spec.components.schemas.Event);
+  const event = { seq: 2, taskId: id, kind: 'LIVE', revision: 1 };
+  assert.ok(check(event));
+  assert.ok(check({ ...event, kind: 'SUCCEEDED', revision: 2 }));
+  assert.equal(check({ ...event, kind: 'UNKNOWN' }), false);
+});
 test('conversation writes require CSRF, caller idempotency key and explicit local mode', () => {
   for (const path of Object.values(spec.paths))
     if (path.post)

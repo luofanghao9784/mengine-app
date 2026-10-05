@@ -2150,3 +2150,34 @@ test.describe('会话列表触屏长按', () => {
     expect(state.actions).toEqual([]);
   });
 });
+
+test('排队任务包含 LIVE 事件时自动显示完成回复并恢复发送', async ({ page }) => {
+  await fixture(page, accepted);
+  const current = { ...task('等待完成的合成问题'), status: 'QUEUED', attempt: 1, revision: 0, executionClass: 'live', waitReason: null, reply: null as string | null };
+  let cursor = 1;
+  const events: { seq: number; taskId: string; kind: string; revision: number }[] = [];
+  await page.route('**/conversations/' + conversation + '?*', route => route.fulfill({ json: {
+    conversation: info, tasks: [current], hasMore: false, cursor,
+  } }));
+  await page.route('**/conversations/' + conversation + '/events?*', route => {
+    const after = Number(new URL(route.request().url()).searchParams.get('after'));
+    return route.fulfill({ json: { conversationId: conversation, items: events.filter(e => e.seq > after), cursor, hasMore: false } });
+  });
+  await page.route('**/answer-stream', route => route.fulfill({ status: 503 }));
+  await page.route('**/answer-snapshot', route => route.fulfill({ json: { items: [] } }));
+  await page.goto(`/workspace/#tenant=${tenant}&view=conversations&conversation=${conversation}`);
+  await expect(page.getByText('等待处理', { exact: true })).toBeVisible();
+  const input = page.getByRole('textbox', { name: '工作要求', exact: true });
+  await input.fill('保留下一条尚未发送的要求');
+  const append = (kind: string, revision: number) => events.push({ seq: ++cursor, taskId, kind, revision });
+  current.status = 'RUNNING'; current.revision = 1;
+  append('RUNNING', 1); append('LIVE', 1);
+  await expect(page.getByText('正在思考', { exact: true })).toBeVisible();
+  current.status = 'SUCCEEDED'; current.revision = 2; current.reply = '后台完成的正式回复';
+  append('LIVE', 1); append('SUCCEEDED', 2);
+  await expect(page.locator('.conversation-reply')).toHaveText('后台完成的正式回复');
+  await expect(page.locator('.reply-progress')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '停止执行', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '开始任务', exact: true })).toBeEnabled();
+  await expect(input).toHaveValue('保留下一条尚未发送的要求');
+});

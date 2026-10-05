@@ -1797,7 +1797,8 @@
               "WAITING_CAPABILITY",
               "PARTIAL",
               "RESULT_UNKNOWN",
-              "TITLE_UPDATED"
+              "TITLE_UPDATED",
+              "LIVE"
             ]
           },
           "revision": {

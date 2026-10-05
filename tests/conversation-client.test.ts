@@ -97,6 +97,24 @@ test('events reject cursor rollback and unsorted sequences', async () => {
   ])
     await assert.rejects(createConversationClient(async () => response(v)).events(tenant, id, 3));
 });
+test('events accept live updates followed by the durable completion event', async () => {
+  const events = {
+    conversationId: id,
+    items: [
+      { seq: 4, taskId: id, kind: 'RUNNING', revision: 1 },
+      { seq: 5, taskId: id, kind: 'LIVE', revision: 1 },
+      { seq: 6, taskId: id, kind: 'LIVE', revision: 1 },
+      { seq: 7, taskId: id, kind: 'SUCCEEDED', revision: 2 },
+    ],
+    cursor: 7,
+    hasMore: false,
+  };
+  assert.deepEqual(await createConversationClient(async () => response(events)).events(tenant, id, 3), events);
+  await assert.rejects(
+    createConversationClient(async () => response({ ...events, items: [{ ...events.items[0], kind: 'UNKNOWN' }] })).events(tenant, id, 3),
+    (e) => e instanceof IdentityError && e.code === 'CONTRACT_MISMATCH',
+  );
+});
 test('card discussion sends only version references while retaining display geometry and draft identity', async () => {
   const reference = { conversationId: id, taskId: id, workspaceId: space, taskRevision: 2, attempt: 1 };
   const displayed = { ...reference, presentation: { size: '2×2' as const, unit: 294.75 } };

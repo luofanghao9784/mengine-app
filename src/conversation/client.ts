@@ -436,7 +436,7 @@ export function createConversationClient(fetcher: typeof fetch = fetch) {
               e.seq > (i === 0 ? after : (a[i - 1] as { seq: number }).seq) &&
               e.seq <= (v.cursor as number) &&
               uuid(e.taskId) &&
-              (states.includes(String(e.kind)) || e.kind === 'TITLE_UPDATED') &&
+              (states.includes(String(e.kind)) || e.kind === 'TITLE_UPDATED' || e.kind === 'LIVE') &&
               count(e.revision),
           ),
         undefined,
