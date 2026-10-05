@@ -256,15 +256,6 @@
 .admin-tenant.admin-control .tenant-experience-content .experience-management {
   gap: 16px;
 }
-.admin-tenant.admin-control .tenant-experience-section-heading h2 {
-  margin: 0;
-  font-size: 16px;
-}
-.admin-tenant.admin-control .tenant-experience-section-heading p {
-  margin: 6px 0 0;
-  color: var(--muted);
-  font-size: 13px;
-}
 .admin-tenant.admin-control .tenant-experience-content .experience-processing-metrics {
   gap: 10px;
 }

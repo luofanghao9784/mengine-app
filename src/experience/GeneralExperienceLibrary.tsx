@@ -119,12 +119,6 @@ export function GeneralExperienceLibrary({
           </Button>
         </div>
       )}
-      {tenant && (
-        <div className="tenant-experience-section-heading">
-          <h2>通用经验</h2>
-          <p>查看平台提供的经验，以及本企业的使用状态。</p>
-        </div>
-      )}
       {processing ? (
         <p className="muted">自动脱敏、提炼和核验后的积累概况。每 30 秒更新，无需人工审核。</p>
       ) : (

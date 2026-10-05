@@ -200,14 +200,6 @@ function EnterpriseExperiences({
           刷新
         </Button>
       </PageActions>
-      <div className="tenant-experience-section-heading">
-        <h2>{tab === 'processing' ? '企业积累与改进' : '企业经验'}</h2>
-        <p>
-          {tab === 'processing'
-            ? '查看本企业来源处理、自动核验与入库更新记录。'
-            : '查看当前获权空间中可供引擎参考的经验。'}
-        </p>
-      </div>
       <form
         className="experience-management-filters"
         onSubmit={(e) => {
