@@ -93,7 +93,7 @@ export function GeneralExperienceLibrary({
     <div className="admin-dashboard experience-management">
       {!tenant && <PageActions>{refreshControl}</PageActions>}
       <div
-        className="experience-management-tabs"
+        className={`experience-management-tabs${tenant ? '' : ' experience-library-tabs'}`}
         role={tenant ? undefined : 'tablist'}
         aria-label="通用经验库板块"
       >
