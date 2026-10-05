@@ -764,12 +764,9 @@ function TaskCard({
             close={() => setReadingOriginal(undefined)}
           />
         )}
-        {(task.originals.length > 0 ||
-          task.webSources.length > 0 ||
-          task.skills.length > 0 ||
-          task.publicQuery) && (
+        {(task.originals.length > 0 || task.webSources.length > 0) && (
           <details className="reply-references">
-            <summary>参考资料与使用能力</summary>
+            <summary>参考来源</summary>
             {task.originals.length > 0 && (
               <div className="conversation-originals" aria-label="本次指定的原件">
                 {task.originals.map((file) => (
