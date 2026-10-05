@@ -21,8 +21,8 @@ const valid = (v: unknown): v is SupportAccess =>
   text(v.name) &&
   ['ADJUSTMENT', 'TEST'].includes(String(v.mode));
 export const supportClient = {
-  enter: (tenant: string, mode: string) =>
-    request('/api/platform-admin/v1/support-access', 'POST', valid, { tenant, mode }),
+  enter: (tenant: string) =>
+    request('/api/platform-admin/v1/support-access', 'POST', valid, { tenant, mode: 'ADJUSTMENT' }),
   read: (id: string, signal?: AbortSignal) =>
     request(`/api/platform-admin/v1/support-access/${id}`, 'GET', valid, undefined, signal),
   leave: (id: string) =>
@@ -51,14 +51,13 @@ export function SupportConsole({ id, tenant }: { id: string; tenant: string }) {
   return <TenantConsole key={id} tenant={tenant} name={access.value.name} support={access.value} />;
 }
 export function SupportEntry({ tenant, enabled }: { tenant: string; enabled: boolean }) {
-  const [mode, setMode] = useState('ADJUSTMENT');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const enter = async () => {
     setBusy(true);
     setError('');
     try {
-      const access = await supportClient.enter(tenant, mode);
+      const access = await supportClient.enter(tenant);
       location.hash = `admin=overview&tenant=${access.tenant}&support=${access.id}`;
     } catch (e) {
       setError(e instanceof Error ? e.message : '总部访问暂不可用。');
@@ -68,15 +67,6 @@ export function SupportEntry({ tenant, enabled }: { tenant: string; enabled: boo
   };
   return (
     <div className="support-entry">
-      <select
-        aria-label="总部访问模式"
-        value={mode}
-        onChange={(e) => setMode(e.target.value)}
-        disabled={busy || !enabled}
-      >
-        <option value="ADJUSTMENT">系统调整</option>
-        <option value="TEST">测试模式</option>
-      </select>
       <Button disabled={busy || !enabled} onClick={() => void enter()}>
         {busy ? '正在进入…' : '进入企业管理端'}
       </Button>

@@ -103,15 +103,11 @@ export function TenantConsole({
     >
       {support && (
         <div className="support-mode-banner" role="status">
-          <strong>总部管理模式 · {support.mode === 'TEST' ? '测试' : '系统调整'}</strong>
+          <strong>总部管理模式</strong>
           <span>
             {name} · 操作者：{session.identity?.account.displayName}
           </span>
-          <small>
-            {support.mode === 'TEST'
-              ? '测试对象与执行留痕；真实模型调用正常计量。'
-              : '操作按企业负责人权限校验并留痕。'}
-          </small>
+          <small>操作按企业负责人权限校验并留痕。</small>
           <SupportRecords id={support.id} test={support.mode === 'TEST'} />
         </div>
       )}

@@ -87,7 +87,7 @@ function RecordsModal({ id, test, close }: { id: string; test: boolean; close: (
     [id, page, attempt],
   );
   return (
-    <Modal title={test ? '总部测试记录' : '总部调整记录'} onClose={close} wide>
+    <Modal title="总部操作记录" onClose={close} wide>
       {data.error ? (
         <Failure error={data.error} retry={() => retry((n) => n + 1)} />
       ) : !data.value ? (
@@ -95,7 +95,7 @@ function RecordsModal({ id, test, close }: { id: string; test: boolean; close: (
       ) : (
         <>
           <p className="muted">
-            记录保留总部真实操作者、企业范围、结果及变更状态；测试对象可按以下编号追溯。
+            记录保留总部真实操作者、企业范围、结果及变更状态；变更对象可按以下编号追溯。
           </p>
           <table className="support-record-table">
             <thead>

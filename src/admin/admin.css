@@ -766,7 +766,6 @@ button.admin-directory-row:hover {
 .support-mode-banner { display:flex; align-items:center; flex-wrap:wrap; gap:10px 20px; margin-bottom:16px; padding:12px 16px; border:1px solid #d5dfef; border-radius:10px; background:#f0f5fc; color:#334b6d; font-size:13px; }
 .support-mode-banner small { margin-left:auto; color:var(--muted); }
 .support-entry {display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
-.support-entry select {width:auto; min-width:104px;}
 .support-entry p {margin:0; color:var(--danger);}
 
 .support-record-table {width:100%; border-collapse:collapse; font-size:12px; table-layout:fixed;}
