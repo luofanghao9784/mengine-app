@@ -253,6 +253,8 @@ export class AgentTasks {
           : invoke(action, body, 4096),
       );
       let answerStep = 0;
+      let briefingDatasetReads = 0;
+      let briefingDatasetLookups = 0;
       const model: ModelPort = {
         async *generate(request) {
           await authorize();
@@ -270,13 +272,22 @@ export class AgentTasks {
             last = performance.now();
           };
           const deliveryReady = briefingGeneration && briefingCalculationReady;
+          const datasetGuide = !deliveryReady && datasetComparisonAvailable ? [
+            briefingDatasetLookups >= 3
+              ? ' Dataset retrieval is now closed after three successful lookups. Use existing evidence for calculation and delivery; do not request more profiles or datasets. If evidence is insufficient, explain the specific gap without claiming a card.'
+              : ` Dataset retrieval: ${briefingDatasetLookups}/3 lookups used. Choose ONE selected dataset and ONE useful theme, not an inventory of all datasets.`,
+            'Use dataset_search for exact IDs and columns, then dataset_read with columnLimit 10 to inspect required columns and actual period values.',
+            `Successful dataset_read calls so far: ${briefingDatasetReads}. Read only the pages needed to establish the calculation parameters.`,
+            'compare_dataset computes ALL rows in the pinned snapshot; do not page through every row to calculate totals. Reserve calls for calculation and delivery.',
+            'If the data does not support an exact two-period grouped calculation, choose a grounded INSIGHT or SUGGESTION without invented totals, explicitly limiting claims to observed evidence, or report insufficient evidence.',
+          ].join(' ') : '';
           const messages = briefingGeneration
             ? [{ role: 'system' as const, content: [{ type: 'text' as const,
                 text: deliveryReady
                   ? 'The platform has verified one complete table calculation for this briefing. Retrieval and calculation are now closed. Call deliver_briefing with its existing calculation artifact, preserving its periods, scope and gaps. Write one complete theme; do not compute another range or repeat searches. A duplicate receipt means no new card, never fabricate novelty.'
                   : `System briefing retrieval: ${briefingSearches}/${briefingSearchLimit} internal searches used. The first lookup reads the selected versions; at most two targeted lookups follow. Do not repeat searches to fill the budget. ${briefingSearches >= briefingSearchLimit
                   ? 'Internal search is now closed. Use the existing granted evidence to calculate and deliver one grounded theme. If evidence is insufficient, explain the concrete gap without claiming a card was generated.'
-                  : 'Once evidence supports a useful theme, use compare_table only for DATA and deliver_briefing for the card. A text reply is not card delivery.'}` } ] }, ...request.messages]
+                  : 'Once evidence supports a useful theme, for DATA use compare_table for files or compare_dataset for collected datasets, then deliver_briefing for the card. A text reply is not card delivery.'}${datasetGuide}` } ] }, ...request.messages]
             : request.messages;
           for await (const part of metered.generate({
             ...request,
@@ -284,6 +295,7 @@ export class AgentTasks {
             tools: request.tools.filter(
               (t) =>
                 (t.name !== 'search_sources' || !briefingGeneration || briefingSearches < briefingSearchLimit) &&
+                (t.name !== 'task_context' || !briefingGeneration || briefingDatasetLookups < 3) &&
                 (!publicTools.has(t.name) || activated.has('public-research')) &&
                 (!deliveryReady || t.name === 'deliver_briefing') &&
                 (t.name !== 'candidate_tool' || activated.has('candidate-trials')) &&
@@ -734,6 +746,8 @@ export class AgentTasks {
             try {
               if (briefingGeneration && briefingCalculationReady && ['compare_table', 'compare_dataset'].includes(tool.name))
                 throw new RuntimeError('BRIEFING_DELIVERY_REQUIRED');
+              if (briefingGeneration && tool.name === 'task_context' && briefingDatasetLookups >= 3)
+                throw new RuntimeError('BRIEFING_RETRIEVAL_LIMIT');
               output = await execute(args, executionSignal);
             } catch (error) {
               if (
@@ -756,6 +770,10 @@ export class AgentTasks {
               throw error;
             }
             await invoke('execution/tool', { sequence: number, name: tool.name, status: 'succeeded' });
+            if (briefingGeneration && tool.name === 'task_context' && isRecord(args)) {
+              if (['dataset_search', 'dataset_read'].includes(String(args.action))) briefingDatasetLookups++;
+              if (args.action === 'dataset_read') briefingDatasetReads++;
+            }
             if (briefingGeneration && ['compare_table', 'compare_dataset'].includes(tool.name)) briefingCalculationReady = true;
             return output;
           };

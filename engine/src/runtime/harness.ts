@@ -1,3 +1,4 @@
+import { ContextRequestError } from './task-context.js';
 import type { RealtimePort } from './realtime.js';
 import { randomUUID } from 'node:crypto';
 import { Context } from '@deepseek-ai/cordis';
@@ -439,7 +440,7 @@ export async function runHarness(options: {
                     ? error.code
                     : 'TOOL_FAILED';
                 await options.onToolFailure?.({ tool: tool.name, callId: execution.callId, code, executionStarted });
-                throw new Error(code);
+                throw new Error(error instanceof ContextRequestError ? `${code}: ${error.hint}` : code);
               }
             },
           });

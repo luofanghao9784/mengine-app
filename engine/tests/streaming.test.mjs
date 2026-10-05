@@ -191,3 +191,48 @@ test('agent publishes visible snapshots before model completion without per-toke
   assert.ok(snapshots.length < 11);
   assert.equal(new Set(snapshots.map((s) => s.step)).size, 1);
 });
+
+test('completed SSE responses drain a short tail and reuse the connection for the next model round', async (t) => {
+  const sockets = new Set();
+  const server = createServer(async (req, res) => {
+    sockets.add(req.socket);
+    await body(req);
+    res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+    send(res, frame({ content: '合成完成' }));
+    send(res, frame({}, 'stop'));
+    res.write('data: [DONE]\n\n');
+    await delay(30);
+    res.end();
+  });
+  const url = await listen(server); t.after(() => close(server));
+  const adapter = model(url);
+  for (let i = 0; i < 2; i++) {
+    const output = [];
+    for await (const part of adapter.generate(request(new AbortController().signal))) output.push(part);
+    assert.equal(output.at(-1).reason, 'stop');
+    await delay(10);
+  }
+  assert.equal(sockets.size, 1, 'finished HTTP body should keep the existing connection reusable');
+});
+
+test('SSE tail cleanup is bounded and cancellation during cleanup cannot produce a final answer', async (t) => {
+  const server = createServer(async (req, res) => {
+    await body(req);
+    res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+    send(res, frame({ content: '合成' })); send(res, frame({}, 'stop'));
+    res.write('data: [DONE]\n\n'); // Intentionally never closes: must not wait for the model timeout.
+  });
+  const url = await listen(server); t.after(() => close(server));
+  const adapter = model(url), start = performance.now(), output = [];
+  for await (const part of adapter.generate(request(new AbortController().signal))) output.push(part);
+  assert.equal(output.at(-1).reason, 'stop');
+  assert.ok(performance.now() - start < 1000);
+  const controller = new AbortController(), cancelled = [];
+  const timer = setTimeout(() => controller.abort(), 50);
+  try {
+    await assert.rejects(async () => {
+      for await (const part of adapter.generate(request(controller.signal))) cancelled.push(part);
+    }, { code: 'CANCELLED' });
+    assert.ok(!cancelled.some(p => p.type === 'finish'));
+  } finally { clearTimeout(timer); }
+});

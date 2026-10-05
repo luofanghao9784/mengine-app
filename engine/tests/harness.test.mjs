@@ -548,3 +548,34 @@ test('structured delivery keeps tools after 15 seconds while preserving a short 
   assert.equal(calls, 3);
   assert.equal(r.finalResponseReserved, true);
 });
+
+test('context validation gives a safe correction and the model can retry without widening access', async () => {
+  const { contextTool } = await import('../dist/runtime/task-context.js');
+  let invoked = 0;
+  const warnings = [], previous = console.warn;
+  console.warn = (line) => warnings.push(JSON.parse(line));
+  try {
+    const result = await runHarness({
+      prompt: 'Read authorized profiles.',
+      tools: [contextTool(async (_action, input) => {
+        invoked++;
+        assert.deepEqual(input, { action: 'profiles', scope: 'WORKSPACE' });
+        return { contractVersion: '1.0', action: 'profiles', referenceOnly: true,
+          result: { items: [], hasMore: false } };
+      }, async () => {})],
+      model: fixture([
+        call('task_context', { action: 'profiles', query: 'private account text' }),
+        (request) => {
+          const evidence = JSON.stringify(request.messages);
+          assert.match(evidence, /profiles requires scope TENANT, WORKSPACE or PERSONAL/);
+          return call('task_context', { action: 'profiles', scope: 'WORKSPACE' }, 'corrected');
+        },
+        reply('No authorized profiles found.'),
+      ]),
+    });
+    assert.equal(invoked, 1);
+    assert.deepEqual(result.tools.map(t => t.status), ['failed', 'succeeded']);
+    assert.deepEqual(warnings, [{ event: 'CONTEXT_REQUEST_REJECTED', action: 'profiles', field: 'scope' }]);
+    assert.ok(!JSON.stringify(warnings).includes('private account text'));
+  } finally { console.warn = previous; }
+});

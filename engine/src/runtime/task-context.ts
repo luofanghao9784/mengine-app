@@ -1,6 +1,18 @@
 import { isRecord } from './http-json.js';
 import { RuntimeError, type Json, type TaskTool } from './ports.js';
 
+// Only fixed, developer-authored hints are exposed to the model. Never echo arguments.
+export class ContextRequestError extends RuntimeError {
+  constructor(readonly hint: string) {
+    super('INVALID_CONTEXT_REQUEST');
+  }
+}
+function invalidContext(action: unknown, field: string, hint: string): never {
+  console.warn(JSON.stringify({ event: 'CONTEXT_REQUEST_REJECTED',
+    action: typeof action === 'string' && [...actions, ...generalActions, 'dataset_search', 'dataset_read'].includes(action) ? action : 'UNKNOWN', field }));
+  throw new ContextRequestError(hint);
+}
+
 const actions = [
   'profiles',
   'profile_read',
@@ -106,13 +118,13 @@ export function contextTool(invoke: Invoke, authorize: () => Promise<void>, data
       type: 'object',
       properties: {
         action: { type: 'string', enum: enabledActions },
-        scope: { type: 'string', enum: ['TENANT', 'WORKSPACE', 'PERSONAL'] },
-        query: { type: 'string' },
-        offset: { type: 'integer' },
-        ...(datasets ? { columnOffset: { type: 'integer' }, columnLimit: { type: 'integer' } } : {}),
-        referenceId: { type: 'string' },
-        versionId: { type: 'string' },
-        revision: { type: 'integer' },
+        scope: { type: 'string', enum: ['TENANT', 'WORKSPACE', 'PERSONAL'], description: 'Required for profiles only.' },
+        query: { type: 'string', description: 'Search text, at most 200 characters. Required and nonempty for experience searches.' },
+        offset: { type: 'integer', description: 'Omit for first page. Use returned nextOffset. Maximum: dataset 100000, experience_read 8001, general_experience_read 9, otherwise 1000.' },
+        ...(datasets ? { columnOffset: { type: 'integer', description: 'Dataset column index 0..99. Omit for first column.' }, columnLimit: { type: 'integer', description: 'Column count 1..10, default 5.' } } : {}),
+        referenceId: { type: 'string', description: 'Exact UUID from a preceding result. dataset_read uses datasetId, not name, workspaceId or snapshotId.' },
+        versionId: { type: 'string', description: 'Exact version UUID from result; dataset_read uses snapshotId, not the numeric version.' },
+        revision: { type: 'integer', description: 'Required for profile_read: exact revision from profiles.' },
         requestId: { type: 'string' },
         decision: { type: 'string', enum: ['DIRECT', 'ADAPTED', 'UNKNOWN', 'NOT_APPLICABLE'] },
         conditions: { type: 'string' },
@@ -132,26 +144,26 @@ export function contextTool(invoke: Invoke, authorize: () => Promise<void>, data
             Number(args.offset) < 0 ||
             Number(args.offset) > (String(args.action).startsWith('dataset_') ? 100000 : args.action === 'experience_read' ? 8001 : 1000)))
       )
-        throw new RuntimeError('INVALID_CONTEXT_REQUEST');
+        invalidContext(isRecord(args) ? args.action : undefined, 'action/query/offset', 'Use a supported action; query is at most 200 characters; offset is a nonnegative integer within the action paging range.');
       for (const key of ['referenceId', 'versionId', 'requestId'])
-        if (args[key] !== undefined && !uuid(args[key])) throw new RuntimeError('INVALID_CONTEXT_REQUEST');
+        if (args[key] !== undefined && !uuid(args[key])) invalidContext(args.action, key, 'referenceId, versionId and requestId must be exact UUID strings, not names or numeric versions. Omit unused fields.');
       if ((args.columnOffset !== undefined && (!datasets || !integer(args.columnOffset, 0, 99))) ||
           (args.columnLimit !== undefined && (!datasets || !integer(args.columnLimit, 1, 10))))
-        throw new RuntimeError('INVALID_CONTEXT_REQUEST');
+        invalidContext(args.action, 'columnOffset/columnLimit', 'Dataset columnOffset is 0..99 and columnLimit is 1..10; omit these fields for non-dataset tasks.');
       if (args.action === 'profiles' && !['TENANT', 'WORKSPACE', 'PERSONAL'].includes(String(args.scope)))
-        throw new RuntimeError('INVALID_CONTEXT_REQUEST');
+        invalidContext(args.action, 'scope', 'profiles requires scope TENANT, WORKSPACE or PERSONAL.');
       if (
         args.action === 'profile_read' &&
         (!uuid(args.referenceId) || !Number.isInteger(args.revision) || Number(args.revision) < 1)
       )
-        throw new RuntimeError('INVALID_CONTEXT_REQUEST');
+        invalidContext(args.action, 'referenceId/revision', 'profile_read requires the exact referenceId UUID and positive integer revision returned by profiles.');
       if (['experience_search','general_experience_search'].includes(String(args.action)) && (typeof args.query !== 'string' || !args.query.trim()))
-        throw new RuntimeError('INVALID_CONTEXT_REQUEST');
+        invalidContext(args.action, 'query', 'Experience search requires a nonempty query of at most 200 characters.');
       if (
         ['experience_read', 'experience_use', 'general_experience_read', 'general_experience_use', 'dataset_read'].includes(String(args.action)) &&
         (!uuid(args.referenceId) || !uuid(args.versionId))
       )
-        throw new RuntimeError('INVALID_CONTEXT_REQUEST');
+        invalidContext(args.action, 'referenceId/versionId', 'Read/use requires exact referenceId and versionId UUIDs from the preceding search. For dataset_read use datasetId and snapshotId, not the numeric version.');
       if (
         ['experience_use','general_experience_use'].includes(String(args.action)) &&
         (!uuid(args.requestId) ||
@@ -162,16 +174,16 @@ export function contextTool(invoke: Invoke, authorize: () => Promise<void>, data
           (args.adjustments !== undefined &&
             (typeof args.adjustments !== 'string' || args.adjustments.length > 1000)))
       )
-        throw new RuntimeError('INVALID_CONTEXT_REQUEST');
+        invalidContext(args.action, 'applicability', 'Experience use requires requestId UUID, supported decision and nonempty conditions up to 1000 characters; adjustments is at most 1000 characters.');
       if(generalActions.includes(String(args.action))) {
         const keys = args.action === 'general_experience_search' ? ['action','query','offset'] :
           args.action === 'general_experience_read' ? ['action','referenceId','versionId','offset'] :
           ['action','referenceId','versionId','requestId','decision','conditions','adjustments'];
-        if(Object.keys(args).some(k=>!keys.includes(k)))throw new RuntimeError('INVALID_CONTEXT_REQUEST');
+        if(Object.keys(args).some(k=>!keys.includes(k)))invalidContext(args.action, 'extraFields', 'General experience actions accept only their documented fields; omit unrelated properties.');
       }
       if (args.action === 'general_experience_use' && args.decision === 'ADAPTED' &&
-          (typeof args.adjustments !== 'string' || !args.adjustments.trim()))throw new RuntimeError('INVALID_CONTEXT_REQUEST');
-      if (args.action === 'general_experience_read' && args.offset !== undefined && !integer(args.offset,0,9))throw new RuntimeError('INVALID_CONTEXT_REQUEST');
+          (typeof args.adjustments !== 'string' || !args.adjustments.trim()))invalidContext(args.action, 'adjustments', 'ADAPTED general experience requires nonempty adjustments up to 1000 characters.');
+      if (args.action === 'general_experience_read' && args.offset !== undefined && !integer(args.offset,0,9))invalidContext(args.action, 'offset', 'general_experience_read offset is a step index in 0..9; use the returned nextOffset.');
       const result = contextResponse(await invoke('context', args, 57344), String(args.action));
       if (args.action === 'dataset_read' && isRecord(result) && isRecord(result.result) && isRecord(result.result.source)) {
         const source = result.result.source;

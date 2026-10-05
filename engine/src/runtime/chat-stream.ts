@@ -12,6 +12,7 @@ export async function* chatFrames(
   const combined = AbortSignal.any([signal, timeout.signal]);
   const timer = setTimeout(() => timeout.abort(), timeoutMs);
   let response: Response | undefined;
+  let terminalFrame = false;
   try {
     response = await fetch(url, {
       method: 'POST',
@@ -34,7 +35,7 @@ export async function* chatFrames(
     let buffer = '',
       data: string[] = [],
       bytes = 0;
-    for await (const chunk of response.body as unknown as AsyncIterable<Uint8Array>) {
+    for await (const chunk of response.body.values({ preventCancel: true })) {
       bytes += chunk.length;
       if (bytes > (streaming ? 2097152 : 131072)) throw new RuntimeError('REMOTE_OUTPUT_LIMIT');
       buffer += decoder.decode(chunk, { stream: true });
@@ -48,7 +49,7 @@ export async function* chatFrames(
         if (!line && data.length) {
           const payload = data.join('\n');
           data = [];
-          if (payload === '[DONE]') return;
+          if (payload === '[DONE]') { terminalFrame = true; return; }
           yield { streaming: true, data: JSON.parse(payload) };
         }
       }
@@ -78,8 +79,26 @@ export async function* chatFrames(
     );
     throw new RuntimeError(signal.aborted ? 'CANCELLED' : 'REMOTE_UNAVAILABLE');
   } finally {
+    // A normal DONE often precedes the HTTP body's EOF by one small tail.
+    // Cancelling it immediately destroys keep-alive and reconnects every model round.
+    // Drain only a bounded tail; an endpoint that stays open is still cancelled.
+    if (terminalFrame && response?.body && !response.body.locked && !combined.aborted) {
+      const reader = response.body.getReader();
+      const drainTimer = setTimeout(() => { void reader.cancel().catch(() => {}); }, 250);
+      try {
+        let tailBytes = 0;
+        while (true) {
+          const next = await reader.read();
+          if (next.done) break;
+          tailBytes += next.value.byteLength;
+          if (tailBytes > 8192) { await reader.cancel(); break; }
+        }
+      } catch { /* Completed frame is authoritative; cleanup cannot replay a request. */ }
+      finally { clearTimeout(drainTimer); reader.releaseLock(); }
+    }
     clearTimeout(timer);
     timeout.abort();
     if (response?.body && !response.body.locked) await response.body.cancel().catch(() => {});
+    if (signal.aborted) throw new RuntimeError('CANCELLED');
   }
 }

@@ -179,3 +179,67 @@ test('receipt-based completion respects duplicates, cancellation, failed tools a
     assert.equal(hasPreparedBriefing(result.tools), ['duplicate', 'conversation'].includes(mode), mode);
   }
 });
+
+test('dataset briefing closes retrieval after three lookups and delivers an honest bounded insight without scanning all rows', async (t) => {
+  const datasetId = randomUUID(), snapshotId = randomUUID(), artifactId = randomUUID();
+  const source = { datasetId, snapshotId, version: 1, name: '合成收款', description: '',
+    columns: ['门店', '收款状态'], columnOffset: 0, nextColumnOffset: null, totalColumns: 2,
+    rowCount: 100, coverageThrough: null, collectedAt: '2026-10-05T00:00:00Z', authority: false };
+  const actions = [];
+  const platform = createServer(async (req, res) => {
+    if (usageFixture(req, res)) return;
+    const input = await body(req);
+    if (req.url.endsWith('/check')) return json(res, { allowed: true, executionClass: 'live',
+      contextVersion: '1.0', datasetContextVersion: '1.0', datasetComparisonVersion: '1.0',
+      briefingContentVersion: '1.0', briefingGeneration: true });
+    if (req.url.endsWith('/context')) {
+      actions.push(input.action);
+      const result = input.action === 'bootstrap' ? {} : input.action === 'dataset_search'
+        ? { items: [source], hasMore: false }
+        : { source, rows: [['合成门店', '待确认']], offset: input.offset ?? 0, nextOffset: (input.offset ?? 0) + 1,
+          hasMore: true, completeDataset: false, referenceOnly: true };
+      return json(res, { contractVersion: '1.0', action: input.action, referenceOnly: true, result });
+    }
+    if (req.url.endsWith('/execution/open')) return json(res, { accepted: true, policy: 'READ_ONLY_PRIVATE_V1' });
+    if (req.url.endsWith('/execution/tool')) return json(res, { accepted: true });
+    if (req.url.endsWith('/deliver-briefing')) {
+      assert.equal(input.businessType, 'INSIGHT');
+      assert.equal(input.calculationArtifactId, undefined);
+      assert.match(input.summary, /样本/);
+      return json(res, { contractVersion: '1.0', status: 'PREPARED', artifactId,
+        title: input.title, visibility: 'PRIVATE_AFTER_TASK_SUCCEEDS' });
+    }
+    json(res, {}, 404);
+  });
+  const url = await listen(platform); t.after(() => close(platform));
+  let calls = 0;
+  const agent = new AgentTasks({ platformBaseUrl: url, executionClass: 'live', modelName: 'synthetic-dataset-insight',
+    createModel: () => ({ usage: null, async *generate(request) {
+      calls++;
+      const instructions = request.messages[0].content[0].text;
+      assert.match(instructions, /compare_dataset computes ALL rows/);
+      let name = 'task_context', args;
+      if (calls === 1) args = { action: 'dataset_search' };
+      else if (calls === 2) args = { action: 'dataset_read', referenceId: datasetId, versionId: snapshotId, columnLimit: 10 };
+      else if (calls === 3) args = { action: 'dataset_read', referenceId: datasetId, versionId: snapshotId, columnLimit: 10, offset: 1 };
+      else {
+        assert.equal(calls, 4);
+        assert.ok(!request.tools.some(tool => tool.name === 'task_context'));
+        assert.match(instructions, /retrieval is now closed after three successful lookups/);
+        assert.match(instructions, /Successful dataset_read calls so far: 2/);
+        name = 'deliver_briefing';
+        args = { businessType: 'INSIGHT', title: '收款确认状态值得进一步核对',
+          summary: '已读取样本中存在待确认收款，仍需核对其业务依据。',
+          analysis: ['本次仅观察到固定版本中的一条样本，不代表完整数据集的分布。',
+            '建议结合业务回执核对确认状态，当前证据不足以推断经营原因。'] };
+      }
+      yield { type: 'tool_call', id: `dataset-insight-${calls}`, name, arguments: JSON.stringify(args) };
+      yield { type: 'finish', reason: 'tool_calls' };
+    } }) });
+  const result = await agent.run({ contractVersion: '1.5', taskId: randomUUID(), attemptId: randomUUID(),
+    prompt: 'Generate one useful briefing from selected synthetic sources.' }, new AbortController().signal);
+  assert.equal(result.outcome, 'COMPLETE');
+  assert.equal(calls, 4);
+  assert.deepEqual(actions, ['bootstrap', 'dataset_search', 'dataset_read', 'dataset_read']);
+  assert.deepEqual(result.tools.map(r => r.name), ['task_context', 'task_context', 'task_context', 'deliver_briefing']);
+});
