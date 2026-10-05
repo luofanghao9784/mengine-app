@@ -1115,6 +1115,8 @@ export class AgentTasks {
         );
       const terminalBriefing = briefingGeneration && hasTerminalBriefing(result.tools);
       if (terminalBriefing && result.status === 'completed') {
+        outcome = 'COMPLETE';
+        requiredInput = null;
         // This is a system delivery acknowledgement, not model-authored analysis.
         // The immutable card content already came from the model's checked tool call.
         const receipt = result.tools.at(-1)?.output;

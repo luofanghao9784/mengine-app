@@ -24,7 +24,7 @@ test('explicit proxy pins CONNECT to the checked IP and never accepts a remote p
  await assert.rejects(publicDnsResolver(bootstrap)('publisher.example.org',signal()),/PUBLIC_ADDRESS_DENIED/);
 });
 
-test('INFO prepares scoped background and trusted research, then delivers in four model rounds',async t=>{
+for (const earlyWait of [false, true]) test(`INFO verified delivery clears earlier wait=${earlyWait}`,async t=>{
  const {createServer}=await import('node:http');const {randomUUID}=await import('node:crypto');const {AgentTasks}=await import('../dist/runtime/agent-task.js');const {listen,close,json,body}=await import('./fixtures/agent.mjs');const {usageFixture}=await import('./fixtures/usage.mjs');
  const contexts=[],receipts=[];let selected=false,step=0;const artifactId=randomUUID();
  const server=createServer(async(req,res)=>{
@@ -41,13 +41,15 @@ test('INFO prepares scoped background and trusted research, then delivers in fou
  const agent=new AgentTasks({platformBaseUrl:endpoint,executionClass:'verification',modelName:'synthetic-info',publicWeb:{reader,search:new BingNewsSearch(reader)},createModel:()=>({usage:null,async *generate(req){
   step++;assert.ok(!req.tools.some(x=>['task_context','find_skills','activate_skill','search_sources','compare_dataset'].includes(x.name)));
   let name,args;
-  if(step===1){assert.deepEqual(contexts.filter(x=>x.action==='profiles').map(x=>x.scope),['TENANT','WORKSPACE','PERSONAL']);assert.match(JSON.stringify(req.messages),/PRIVATE_COMPANY/);assert.ok(req.tools.some(x=>x.name==='public_search'));name='public_search';args={topic:'FITNESS'};}
-  else if(step===2){const last=req.messages.flatMap(m=>m.content).filter(b=>b.type==='tool_result').at(-1);source=JSON.parse(JSON.parse(last.content)[0].text).items[0].id;assert.ok(!req.tools.some(x=>x.name==='public_search'));name='read_public_page';args={id:source};}
-  else if(step===3){name='select_briefing_topic';args={candidates:[{question:'新政策影响哪些健身安排',evidenceNeeded:'已读取的政策原文',requiresCalculation:false,difference:'新增政策',businessType:'INFO'}],selectedIndex:0};}
-  else {assert.equal(step,4);name='deliver_briefing';args={businessType:'INFO',title:'健身行业新政策',summary:'合成资讯验收摘要',analysis:['合成原文支持相关经营安排。']};}
+  if(earlyWait && step===1){yield{type:'tool_call',id:'early-wait',name:'task_control',arguments:JSON.stringify({outcome:'WAITING_CAPABILITY',message:'合成早期能力判断，后续实际执行已成功。'})};yield{type:'finish',reason:'tool_calls'};return;}
+  const phase=step-(earlyWait?1:0);
+  if(phase===1){assert.deepEqual(contexts.filter(x=>x.action==='profiles').map(x=>x.scope),['TENANT','WORKSPACE','PERSONAL']);assert.match(JSON.stringify(req.messages),/PRIVATE_COMPANY/);assert.ok(req.tools.some(x=>x.name==='public_search'));name='public_search';args={topic:'FITNESS'};}
+  else if(phase===2){const last=req.messages.flatMap(m=>m.content).filter(b=>b.type==='tool_result').at(-1);source=JSON.parse(JSON.parse(last.content)[0].text).items[0].id;assert.ok(!req.tools.some(x=>x.name==='public_search'));name='read_public_page';args={id:source};}
+  else if(phase===3){name='select_briefing_topic';args={candidates:[{question:'新政策影响哪些健身安排',evidenceNeeded:'已读取的政策原文',requiresCalculation:false,difference:'新增政策',businessType:'INFO'}],selectedIndex:0};}
+  else {assert.equal(phase,4);name='deliver_briefing';args={businessType:'INFO',title:'健身行业新政策',summary:'合成资讯验收摘要',analysis:['合成原文支持相关经营安排。']};}
   yield{type:'tool_call',id:'info'+step,name,arguments:JSON.stringify(args)};yield{type:'finish',reason:'tool_calls'};
  }})});t.after(()=>agent.stop());const result=await agent.run({contractVersion:'1.5',taskId:randomUUID(),attemptId:randomUUID(),prompt:'合成资讯生成'},signal());
- assert.equal(step,4);assert.equal(result.outcome,'COMPLETE');assert.deepEqual(receipts.filter(x=>x.status==='succeeded').map(x=>x.name),['activate_skill','public_search','read_public_page','select_briefing_topic','deliver_briefing']);assert.equal(result.webSources.length,1);assert.ok(!calls.join('').includes('123456789'));
+ assert.equal(step,earlyWait?5:4);assert.equal(result.outcome,'COMPLETE');assert.equal(result.requiredInput,null);assert.deepEqual(receipts.filter(x=>x.status==='succeeded').map(x=>x.name),['activate_skill',...(earlyWait?['task_control']:[]),'public_search','read_public_page','select_briefing_topic','deliver_briefing']);assert.equal(result.webSources.length,1);assert.ok(!calls.join('').includes('123456789'));
 });
 
 test('news summaries use fixed scopes, reject malformed grants and retain narrow tool phases',async()=>{
