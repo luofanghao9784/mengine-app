@@ -1,6 +1,10 @@
 import { BRIEFING_WRITING_RULES } from './briefing-writing-rules.js';
 import { isRecord } from './http-json.js';
 import { RuntimeError, type Json, type TaskTool } from './ports.js';
+/** Protocol guidance only. Placeholder text is never business evidence. */
+export const BRIEFING_ANALYSIS_ARRAY_HINT =
+  'analysis must be a JSON array of paragraph strings, for example {"analysis":["First complete evidence-grounded paragraph.","Second complete evidence-grounded paragraph."]}. Replace placeholders with supported business content. Do not send analysis as one string, a Markdown block, or a string containing serialized JSON. Preserve the title and summary fields; correct the analysis type before calling deliver_briefing again.';
+
 export function briefingDeliveryTool(options: {
   authorize(): Promise<void>;
   invoke(body: unknown, signal: AbortSignal): Promise<unknown>;
@@ -8,7 +12,7 @@ export function briefingDeliveryTool(options: {
   return {
     name: 'deliver_briefing',
     description:
-      'Create a real private briefing card on 智能画报. Set businessType to INFO (资讯), DATA (数据), INSIGHT (洞察), SUGGESTION (建议), or RESULT (成果). For text categories omit calculationArtifactId and use actual granted evidence; only DATA requires the calculation below. Do not create cards for greetings or routine status replies; create for a complete useful theme or an explicit user request. Only DATA requires compare_table (XLSX) or compare_dataset (collected database snapshot) and its artifact.id; INFO, INSIGHT, SUGGESTION and RESULT use granted evidence without a calculation. Write a short editorial title, summary and 2–4 analysis paragraphs grounded in that calculation and source scope. Summary and each paragraph must be complete sentences ending in punctuation. Distinguish observed changes from unverified causes. Chart values, periods, units and provenance are taken by the platform from the verified calculation, never from model-supplied numbers. One immutable card per task attempt, private to the current user, visible only after successful task delivery. After PREPARED, finish with a short confirmation; NO_NEW_CONTENT means a duplicate was suppressed, so report no new card; do not repeat raw IDs, hashes or the entire report. This is not enterprise publication or a scheduled plan.' + '\n' + BRIEFING_WRITING_RULES,
+      'Create a real private briefing card on 智能画报. Set businessType to INFO (资讯), DATA (数据), INSIGHT (洞察), SUGGESTION (建议), or RESULT (成果). For text categories omit calculationArtifactId and use actual granted evidence; only DATA requires the calculation below. Do not create cards for greetings or routine status replies; create for a complete useful theme or an explicit user request. Only DATA requires compare_table (XLSX) or compare_dataset (collected database snapshot) and its artifact.id; INFO, INSIGHT, SUGGESTION and RESULT use granted evidence without a calculation. Write a short editorial title, summary and 2–4 analysis paragraphs grounded in that calculation and source scope. Summary and each paragraph must be complete sentences ending in punctuation. Distinguish observed changes from unverified causes. Chart values, periods, units and provenance are taken by the platform from the verified calculation, never from model-supplied numbers. One immutable card per task attempt, private to the current user, visible only after successful task delivery. After PREPARED, finish with a short confirmation; NO_NEW_CONTENT means a duplicate was suppressed, so report no new card; do not repeat raw IDs, hashes or the entire report. This is not enterprise publication or a scheduled plan.' + '\n' + BRIEFING_WRITING_RULES + '\n' + BRIEFING_ANALYSIS_ARRAY_HINT,
     parameters: {
       type: 'object',
       properties: {
@@ -29,7 +33,7 @@ export function briefingDeliveryTool(options: {
           type: 'array',
           items: { type: 'string' },
           description:
-            '2–4 complete evidence-grounded paragraphs, 12–500 characters each, each ending in sentence punctuation',
+            'JSON array of strings, NOT a single string. Each array item is one complete evidence-grounded paragraph, 12–500 characters, ending in sentence punctuation. Use 2–4 items, e.g. ["First grounded paragraph.","Second grounded paragraph."]. Never JSON-stringify the array.',
         },
       },
       required: ['title', 'summary', 'analysis'],

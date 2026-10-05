@@ -1,3 +1,4 @@
+import { BRIEFING_ANALYSIS_ARRAY_HINT } from './briefing-delivery.js';
 import { ContextRequestError } from './task-context.js';
 import type { RealtimePort } from './realtime.js';
 import { randomUUID } from 'node:crypto';
@@ -467,8 +468,12 @@ export async function runHarness(options: {
                     handle?.agent.cancel({ kind: 'hook', reason: 'TASK_TOOL_FAILED' });
                   }
                 }
-                if (validationIssues)
-                  throw new Error(`${code}: ${validationIssues.join('; ')} Correct these fields before retrying; do not repeat the same invalid submission.`);
+                if (validationIssues) {
+                  const correction = tool.name === 'deliver_briefing' &&
+                    validationIssues.includes('"value.analysis" must be an array')
+                    ? ` ${BRIEFING_ANALYSIS_ARRAY_HINT}` : '';
+                  throw new Error(`${code}: ${validationIssues.join('; ')}${correction} Correct these fields before retrying; do not repeat the same invalid submission.`);
+                }
                 throw new Error(error instanceof ContextRequestError ? `${code}: ${error.hint}` : code);
               }
             },

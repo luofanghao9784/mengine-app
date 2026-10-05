@@ -603,6 +603,8 @@ test('briefing schema feedback identifies fields, hides unknown keys and allows 
         const feedback = request.messages.flatMap(m => m.content).filter(b => b.type === 'tool_result').at(-1).content;
         assert.match(feedback, /value.title.*string/);
         assert.match(feedback, /value.analysis.*array/);
+        assert.match(feedback, /analysis.*First complete evidence-grounded paragraph/);
+        assert.match(feedback, /string containing serialized JSON/);
         assert.match(feedback, /value.businessType.*INSIGHT/);
         assert.match(feedback, /Remove undeclared properties/);
         assert.doesNotMatch(feedback, /private-key|private-body|private-value|secret/);
