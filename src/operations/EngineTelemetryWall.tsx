@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
-import { Activity, ArrowDownToLine, ArrowUpFromLine, Cpu, BrainCircuit, RefreshCw } from 'lucide-react';
+import { Activity, ArrowDownToLine, ArrowUpFromLine, Cpu, Dna, RefreshCw } from 'lucide-react';
 import type {
   EngineTelemetry,
   TelemetryChannel,
@@ -395,7 +395,7 @@ function Snapshot({
             <div>
               <small>EVOLUTION</small>
               <h3>
-                <BrainCircuit size={19} />
+                <Dna size={19} />
                 自进化
               </h3>
             </div>
@@ -452,7 +452,7 @@ function Snapshot({
                   <text textAnchor="middle" y="-19" fill="#baa0d5" fontSize="10" letterSpacing="2">
                     EVOLVE
                   </text>
-                  <BrainCircuit x="-14" y="-8" size={28} color="#d4b8f4" strokeWidth={1.3} aria-hidden="true" />
+                  <Dna x="-14" y="-8" size={28} color="#d4b8f4" strokeWidth={1.3} aria-hidden="true" />
                   <text textAnchor="middle" y="35" fill="#d4b8f4" fontSize="11">
                     进化核心
                   </text>
