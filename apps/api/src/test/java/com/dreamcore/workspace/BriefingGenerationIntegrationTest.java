@@ -23,6 +23,28 @@ class BriefingGenerationIntegrationTest {
  @Autowired BriefingGenerationService generation;@Autowired BriefingCardService cards;@Autowired BriefingService feed;@Autowired RecommendationService recommendations;
  @Autowired AgentUsageLedger usage;
  @Autowired com.dreamcore.workspace.identity.PlatformAdminService platform;
+ @Test void defaultGenerationRotatesReadyAuthorizedSpacesAndReplaysTheSameSelection(){
+  upload("marker 财务合成资料",true);UUID finance=space,operations=UUID.randomUUID();
+  db.update("INSERT INTO workspaces(id,tenant_id,owner_id,name,kind) VALUES (?,?,?,'运营','SHARED')",operations,tenant,actor);
+  db.update("INSERT INTO workspace_members(tenant_id,workspace_id,account_id,can_maintain) VALUES (?,?,?,true)",tenant,operations,actor);
+  space=operations;upload("marker 运营合成资料",true);space=finance;
+  UUID request=UUID.randomUUID();var selected=generation.generateSelection(actor,tenant,request,null,2,List.of("INSIGHT"));
+  assertEquals(Set.of(finance,operations),new HashSet<>(selected.stream().map(BriefingGenerationService.Batch::workspaceId).toList()));
+  assertEquals(selected,generation.generateSelection(actor,tenant,request,null,2,List.of("INSIGHT")));
+  var explicit=generation.generateSelection(actor,tenant,UUID.randomUUID(),finance,2,List.of("INSIGHT"));
+  assertTrue(explicit.stream().allMatch(b->finance.equals(b.workspaceId())));
+  db.update("DELETE FROM workspace_members WHERE workspace_id=? AND account_id=?",operations,actor);
+  assertEquals(finance,generation.generate(actor,tenant,UUID.randomUUID(),null,"INSIGHT").workspaceId());
+  assertThrows(IdentityException.class,()->generation.generate(actor,tenant,UUID.randomUUID(),operations,"INSIGHT"));
+ }
+ @Test void defaultGenerationSkipsUnreadySpacesEvenWhenTheyHaveNeverGenerated(){
+  upload("marker 已就绪财务资料",true);UUID ready=space,pending=UUID.randomUUID();
+  db.update("INSERT INTO workspaces(id,tenant_id,owner_id,name,kind) VALUES (?,?,?,'待解析空间','SHARED')",pending,tenant,actor);
+  db.update("INSERT INTO workspace_members(tenant_id,workspace_id,account_id,can_maintain) VALUES (?,?,?,true)",tenant,pending,actor);
+  space=pending;upload("marker 待解析资料",false);space=ready;
+  generation.generateSelection(actor,tenant,UUID.randomUUID(),ready,1,List.of("INSIGHT"));
+  assertEquals(ready,generation.generate(actor,tenant,UUID.randomUUID(),null,"INSIGHT").workspaceId());
+ }
  UUID tenant,actor,reader,space;
  @BeforeEach void setup(){tenant=UUID.randomUUID();actor=UUID.randomUUID();reader=UUID.randomUUID();space=UUID.randomUUID();
   db.update("INSERT INTO tenants(id,name) VALUES (?,'合成画报生成验收')",tenant);

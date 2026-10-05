@@ -63,10 +63,20 @@ public class BriefingGenerationService {
         var spaces=db.queryForList("""
           SELECT w.id FROM workspaces w WHERE w.tenant_id=? AND ((w.kind='PERSONAL' AND w.owner_id=?) OR EXISTS(
           SELECT 1 FROM workspace_members g WHERE g.workspace_id=w.id AND g.tenant_id=w.tenant_id AND g.account_id=?))
-          ORDER BY (EXISTS(SELECT 1 FROM active_materials m WHERE m.workspace_id=w.id AND m.in_library) OR EXISTS(SELECT 1 FROM business_datasets d JOIN dataset_snapshots s ON s.id=d.current_snapshot WHERE d.workspace_id=w.id AND d.status='ACTIVE' AND NOT d.scrubbed AND NOT s.scrubbed)) DESC,w.kind='PERSONAL' DESC,w.id LIMIT 1
-          """,UUID.class,tenant,actor,actor);
+          ORDER BY (SELECT max(b.created_at) FROM briefing_generation_batches b WHERE b.tenant_id=w.tenant_id AND b.workspace_id=w.id AND b.owner_id=?) ASC NULLS FIRST,w.kind='PERSONAL' DESC,w.id
+          """,UUID.class,tenant,actor,actor,actor);
         if(spaces.isEmpty())throw new IdentityException(409,"BRIEFING_WORKSPACE_REQUIRED");
-        authority(actor,tenant,spaces.getFirst());return spaces.getFirst();
+        // A scope is never widened: rotate independent tasks among authorized spaces.
+        // Reservations count immediately, so a multi-card request also covers different spaces.
+        UUID chosen=spaces.getFirst(),pending=null;
+        for(UUID candidate:spaces){
+            var available=sources(tenant,candidate);
+            if(available.isEmpty())continue;
+            if(pending==null)pending=candidate;
+            if(available.stream().allMatch(s->Set.of("READY","PARTIAL").contains(s.parseStatus()))){chosen=candidate;authority(actor,tenant,chosen);return chosen;}
+        }
+        if(pending!=null)chosen=pending;
+        authority(actor,tenant,chosen);return chosen;
     }
     @Transactional public Batch generate(UUID actor,UUID tenant,UUID request,UUID space,String type){
         authority(actor,tenant,null);if(request==null||type!=null&&!TYPES.contains(type))throw IdentityException.invalid();lock(actor,tenant);
@@ -93,10 +103,11 @@ public class BriefingGenerationService {
             var result=new ArrayList<Batch>();for(int i=0;i<count;i++)result.add(get(actor,tenant,db.queryForObject("SELECT batch_id FROM briefing_generation_requests WHERE tenant_id=? AND owner_id=? AND request_id=?",UUID.class,tenant,actor,selectionRequest(request,i))));return result;
         }
         for(String type:types)requireNews(tenant,type);
-        UUID chosen=chooseSpace(actor,tenant,space);
+        if(space!=null)authority(actor,tenant,space);
         if(count>quota(actor,tenant).remaining())throw new IdentityException(409,"BRIEFING_DAILY_QUOTA_EXCEEDED");
-        UUID p=policy(actor,tenant,chosen);var result=new ArrayList<Batch>();
+        var result=new ArrayList<Batch>();
         for(int i=0;i<count;i++){
+            UUID chosen=chooseSpace(actor,tenant,space),p=policy(actor,tenant,chosen);
             String type=types.isEmpty()?null:types.get(i%types.size());UUID id=UUID.randomUUID();
             db.update("INSERT INTO briefing_generation_batches(id,tenant_id,owner_id,workspace_id,policy_id,policy_epoch,trigger_kind,business_type,status,selection_id,selection_index,created_at) SELECT ?,tenant_id,owner_id,workspace_id,id,epoch,'GENERATE_MORE',?,'QUEUED',?,?,? FROM briefing_generation_policies WHERE id=?",id,type,request,i,time(clock.now().plusMillis(i)),p);
             db.update("INSERT INTO briefing_generation_requests VALUES(?,?,?,?,?)",tenant,actor,selectionRequest(request,i),fingerprint,id);result.add(get(actor,tenant,id));
