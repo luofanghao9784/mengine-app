@@ -84,10 +84,13 @@ export function TenantConsole({
       logout={() => void signOut()}
       customerLinks={
         support ? (
-          <Button onClick={() => void leaveSupport()}>
-            <ArrowLeft size={16} />
-            返回总台企业概览
-          </Button>
+          <>
+            <SupportRecords id={support.id} test={support.mode === 'TEST'} />
+            <Button onClick={() => void leaveSupport()}>
+              <ArrowLeft size={16} />
+              返回总台企业概览
+            </Button>
+          </>
         ) : (
           <>
             <a className="button ghost" href={back}>
@@ -102,16 +105,6 @@ export function TenantConsole({
         )
       }
     >
-      {support && (
-        <div className="support-mode-banner" role="status">
-          <strong>总部管理模式</strong>
-          <span>
-            {name} · 操作者：{session.identity?.account.displayName}
-          </span>
-          <small>操作按企业负责人权限校验并留痕。</small>
-          <SupportRecords id={support.id} test={support.mode === 'TEST'} />
-        </div>
-      )}
       {error && (
         <p className="access-alert" role="alert">
           {error}

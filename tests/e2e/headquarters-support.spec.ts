@@ -108,8 +108,8 @@ test('headquarters enters scoped management, keeps context in navigation, shows 
   await expect(page.getByRole('button', { name: '进入企业管理端' })).toBeVisible();
   expect(await supportPage.evaluate(() => window.opener)).toBeNull();
   await supportPage.reload();
-  await expect(supportPage.getByRole('status').getByText('总部管理模式', { exact: true })).toBeVisible();
-  await expect(supportPage.getByText('操作者：合成总部操作者', { exact: false })).toBeVisible();
+  await expect(supportPage.locator('.support-mode-banner')).toHaveCount(0);
+  await expect(supportPage.getByRole('complementary').getByText('合成总部操作者', { exact: true })).toBeVisible();
   const pageErrors: string[] = [];
   supportPage.on('pageerror', (error) => pageErrors.push(error.message));
   await supportPage.getByRole('complementary', { name: '企业管理导航' }).getByRole('link', { name: '资料库', exact: true }).click();
