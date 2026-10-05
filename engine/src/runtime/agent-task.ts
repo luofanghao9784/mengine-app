@@ -416,7 +416,7 @@ export class AgentTasks {
                             : `System briefing retrieval: ${briefingSearches}/${briefingSearchLimit} internal searches used. The first lookup reads the selected versions; at most two targeted lookups follow. Do not repeat searches to fill the budget. ${
                                 briefingSearches >= briefingSearchLimit
                                   ? 'Internal search is now closed. Use the existing granted evidence to calculate and deliver one grounded theme. If evidence is insufficient, explain the concrete gap without claiming a card was generated.'
-                                  : 'Once evidence supports a useful theme, for DATA use compare_table for files or compare_dataset for collected datasets, then deliver_briefing for the card. A text reply is not card delivery.'
+                                  : 'Once evidence supports a useful theme, for DATA use compare_table for files or compare_dataset for collected datasets (aggregation COUNT for lesson/member record counts with no numeric measure, SUM only for verified numeric columns; count rows is not distinct members), then deliver_briefing for the card. A text reply is not card delivery.'
                               }${datasetGuide}`),
                     },
                   ],

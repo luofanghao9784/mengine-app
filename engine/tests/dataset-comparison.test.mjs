@@ -101,3 +101,12 @@ test('authorization loss after a calculation prevents returning the result to th
   });
   await assert.rejects(tool.execute(request, new AbortController().signal), /revoked/);
 });
+
+test('COUNT accepts omitted value column and verifies echoed aggregation',async()=>{
+ const args={...request,aggregation:'COUNT'};delete args.valueColumn;
+ const r=result();r.calculation.request={...args};
+ const tool=datasetComparisonTool({authorize:async()=>{},invoke:async(body)=>{assert.deepEqual(body,args);return r;}});
+ assertObjectJsonSchema(tool.parameters);
+ assert.deepEqual(await tool.execute(args,new AbortController().signal),r);
+ await assert.rejects(tool.execute({...args,aggregation:'AVERAGE'},new AbortController().signal),{code:'INVALID_TOOL_ARGUMENTS'});
+});

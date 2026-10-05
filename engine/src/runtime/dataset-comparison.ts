@@ -20,10 +20,11 @@ export function datasetComparisonTool(options: {
   return {
     name: 'compare_dataset',
     description:
-      'Compute a deterministic two-period grouped sum, difference, change percent and descending competition rank over ALL rows in one pinned collected dataset snapshot. First use task_context dataset_search to obtain authorized datasetId, snapshotId and exact column names; use dataset_read for period values and follow column pages if needed. Parameters use exact header names (not Excel letters) and exact period text. For date columns use periodMode=MONTH and baseline/current YYYY-MM, with an explicit IANA business timeZone (defaults Asia/Shanghai). Dates are grouped into months over ALL rows; missing/ambiguous dates fail closed. Do not invent a month column. A sample page is never a total. Missing or ambiguous numeric values fail rather than become zero; missing periods and non-positive baselines are explicit gaps. All rows outside the selected two periods are counted as ignored. Result artifact.id can be used with deliver_briefing for a DATA card. Null coverageThrough means unknown business coverage, collectedAt is only collection time. No raw SQL, model-supplied rows, arbitrary formulas, permissions, writes or publishing.',
+      'Compute a deterministic two-period grouped sum (aggregation SUM, default) or row count (aggregation COUNT, omit valueColumn), difference, change percent and descending competition rank over ALL rows in one pinned collected dataset snapshot. First use task_context dataset_search to obtain authorized datasetId, snapshotId and exact column names; use dataset_read for period values and follow column pages if needed. Parameters use exact header names (not Excel letters) and exact period text. For date columns use periodMode=MONTH and baseline/current YYYY-MM, with an explicit IANA business timeZone (defaults Asia/Shanghai). Dates are grouped into months over ALL rows; missing/ambiguous dates fail closed. Do not invent a month column. A sample page is never a total. For member lists or lesson records without a numeric measure, use COUNT to count actual rows; this is not distinct people or monetary sum. Missing or ambiguous numeric values in SUM fail rather than become zero; missing periods and non-positive baselines are explicit gaps. All rows outside the selected two periods are counted as ignored. Result artifact.id can be used with deliver_briefing for a DATA card. Null coverageThrough means unknown business coverage, collectedAt is only collection time. No raw SQL, model-supplied rows, arbitrary formulas, permissions, writes or publishing.',
     parameters: {
       type: 'object',
       properties: {
+        aggregation: { type: 'string', enum: ['SUM', 'COUNT'] },
         periodMode: { type: 'string', enum: ['EXACT', 'MONTH'] },
         timeZone: { type: 'string', description: 'IANA business timezone; defaults to Asia/Shanghai' },
         ...Object.fromEntries(
@@ -43,7 +44,6 @@ export function datasetComparisonTool(options: {
         'snapshotId',
         'groupColumn',
         'periodColumn',
-        'valueColumn',
         'baseline',
         'current',
       ],
@@ -54,13 +54,14 @@ export function datasetComparisonTool(options: {
         !isRecord(args) ||
         !uuid(args.datasetId) ||
         !uuid(args.snapshotId) ||
-        ['groupColumn', 'periodColumn', 'valueColumn'].some(
+        (args.aggregation === 'COUNT' ? ['groupColumn','periodColumn'] : ['groupColumn', 'periodColumn', 'valueColumn']).some(
           (k) => typeof args[k] !== 'string' || !args[k] || (args[k] as string).length > 160,
         ) ||
         ['baseline', 'current'].some(
           (k) =>
             typeof args[k] !== 'string' || !(args[k] as string).trim() || (args[k] as string).length > 100,
         ) ||
+        (args.aggregation !== undefined && !['SUM','COUNT'].includes(String(args.aggregation))) ||
         (args.periodMode !== undefined && !['EXACT', 'MONTH'].includes(String(args.periodMode))) ||
         (args.timeZone !== undefined && (typeof args.timeZone !== 'string' || args.timeZone.length > 80)) ||
         args.baseline === args.current

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:dreamcore:dataset-comparison:1.0",
-  "$comment": "Optional datasetComparisonVersion=1.0. POST /internal/v1/agent-access/{task}/compare-dataset, current attempt bearer, no-store. Requires pinned snapshot and registered STARTED compare_dataset receipt. Whole snapshot grouped sum, period exact match, decimal arithmetic, half-up 2 decimals for percent. No partial-page totals, raw SQL or caller-provided rows.",
+  "$comment": "Optional datasetComparisonVersion=1.0. POST /internal/v1/agent-access/{task}/compare-dataset, current attempt bearer, no-store. Requires pinned snapshot and registered STARTED compare_dataset receipt. Whole snapshot grouped sum, period exact match, decimal arithmetic, half-up 2 decimals for percent. No partial-page totals, raw SQL or caller-provided rows. COUNT counts every matching row exactly once over the full snapshot, not distinct members; SUM is the default and requires a numeric valueColumn.",
   "$defs": {
     "request": {
       "type": "object",
@@ -53,6 +53,13 @@
           ],
           "minLength": 1,
           "maxLength": 80
+        },
+        "aggregation": {
+          "enum": [
+            "SUM",
+            "COUNT",
+            null
+          ]
         }
       },
       "required": [
@@ -60,11 +67,30 @@
         "snapshotId",
         "groupColumn",
         "periodColumn",
-        "valueColumn",
         "baseline",
         "current"
       ],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "aggregation": {
+                "const": "COUNT"
+              }
+            },
+            "required": [
+              "aggregation"
+            ]
+          },
+          "then": {},
+          "else": {
+            "required": [
+              "valueColumn"
+            ]
+          }
+        }
+      ]
     },
     "source": {
       "type": "object",

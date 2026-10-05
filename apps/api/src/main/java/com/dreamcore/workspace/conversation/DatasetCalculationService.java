@@ -14,8 +14,9 @@ import tools.jackson.databind.json.JsonMapper;
 @Service
 public class DatasetCalculationService {
     public record Request(UUID datasetId, UUID snapshotId, String groupColumn, String periodColumn,
-                          String valueColumn, String baseline, String current, String periodMode, String timeZone) {
-        public Request(UUID datasetId,UUID snapshotId,String groupColumn,String periodColumn,String valueColumn,String baseline,String current){this(datasetId,snapshotId,groupColumn,periodColumn,valueColumn,baseline,current,null,null);}
+                          String valueColumn, String baseline, String current, String periodMode, String timeZone, String aggregation) {
+        public Request(UUID datasetId,UUID snapshotId,String groupColumn,String periodColumn,String valueColumn,String baseline,String current){this(datasetId,snapshotId,groupColumn,periodColumn,valueColumn,baseline,current,null,null,null);}
+        public Request(UUID datasetId,UUID snapshotId,String groupColumn,String periodColumn,String valueColumn,String baseline,String current,String periodMode,String timeZone){this(datasetId,snapshotId,groupColumn,periodColumn,valueColumn,baseline,current,periodMode,timeZone,null);}
     }
     public record Source(UUID datasetId, UUID snapshotId, int version, String name, String sha256,
                          int rowCount, String collectedAt, String coverageThrough) {}
@@ -54,7 +55,7 @@ public class DatasetCalculationService {
         try{
             java.time.LocalDate day;
             if(raw.matches("\\d{4}-\\d{2}-\\d{2}"))day=java.time.LocalDate.parse(raw);
-            else {try{day=java.time.OffsetDateTime.parse(raw).atZoneSameInstant(zone).toLocalDate();}catch(java.time.format.DateTimeParseException ex){day=java.time.LocalDateTime.parse(raw).toLocalDate();}}
+            else {try{day=java.time.OffsetDateTime.parse(raw).atZoneSameInstant(zone).toLocalDate();}catch(java.time.format.DateTimeParseException ex){day=java.time.LocalDateTime.parse(raw.matches("\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,9})?")?raw.replace(' ','T'):raw).toLocalDate();}}
             return java.time.YearMonth.from(day).toString();
         }catch(java.time.DateTimeException ex){invalid("DATASET_DATE_INVALID");return null;}
     }
@@ -77,8 +78,10 @@ public class DatasetCalculationService {
         var source = sources.getFirst(); access.require(job.actor(),job.tenant(),(UUID)source.get("workspace_id"),false);
         String columnsText=source.get("column_names").toString(),rowsText=source.get("data_rows").toString();
         List<String> columns=json.readValue(columnsText,json.getTypeFactory().constructCollectionType(List.class,String.class));
-        var requested=Arrays.asList(request.groupColumn(),request.periodColumn(),request.valueColumn());
-        if (requested.stream().anyMatch(c -> c == null || !columns.contains(c)) || new HashSet<>(requested).size()!=3) invalid("DATASET_COLUMNS_INVALID");
+        boolean countRows="COUNT".equals(request.aggregation());
+        if(request.aggregation()!=null&&!Set.of("SUM","COUNT").contains(request.aggregation()))invalid("INVALID_REQUEST");
+        var requested=countRows?Arrays.asList(request.groupColumn(),request.periodColumn()):Arrays.asList(request.groupColumn(),request.periodColumn(),request.valueColumn());
+        if (requested.stream().anyMatch(c -> c == null || !columns.contains(c)) || new HashSet<>(requested).size()!=requested.size()) invalid("DATASET_COLUMNS_INVALID");
         int groupIndex=columns.indexOf(request.groupColumn()),periodIndex=columns.indexOf(request.periodColumn()),valueIndex=columns.indexOf(request.valueColumn());
         var data=json.readTree(rowsText); int count=((Number)source.get("row_count")).intValue();
         if (!data.isArray() || data.size()!=count || count>100000) invalid("DATASET_SHAPE_INVALID");
@@ -88,8 +91,8 @@ public class DatasetCalculationService {
             var periodCell=record.get(periodIndex);if(!periodCell.isString())invalid("DATASET_LABEL_INVALID");String period=period(periodCell.asString(),mode,zone);
             if (!period.equals(request.baseline()) && !period.equals(request.current())) { ignored++; continue; }
             var groupCell=record.get(groupIndex);if(!groupCell.isString())invalid("DATASET_LABEL_INVALID");String group=label(groupCell.asString());
-            var cell=record.get(valueIndex);if(!cell.isString() || !cell.asString().matches("-?[0-9]{1,30}(?:\\.[0-9]{1,12})?(?:[Ee][+-]?[0-9]{1,2})?"))invalid("DATASET_NUMBER_INVALID");
-            var number=new BigDecimal(cell.asString());if(number.abs().compareTo(BigDecimal.TEN.pow(30))>=0 || number.scale()>12)invalid("DATASET_NUMBER_LIMIT");
+            var cell=countRows?null:record.get(valueIndex);if(!countRows && (!cell.isString() || !cell.asString().matches("-?[0-9]{1,30}(?:\\.[0-9]{1,12})?(?:[Ee][+-]?[0-9]{1,2})?")))invalid("DATASET_NUMBER_INVALID");
+            var number=countRows?BigDecimal.ONE:new BigDecimal(cell.asString());if(number.abs().compareTo(BigDecimal.TEN.pow(30))>=0 || number.scale()>12)invalid("DATASET_NUMBER_LIMIT");
             int p=period.equals(request.baseline())?0:1;var values=groups.computeIfAbsent(group,k->new BigDecimal[2]);values[p]=values[p]==null?number:values[p].add(number);matched++;
             if(groups.size()>50)invalid("DATASET_GROUP_LIMIT");
         }

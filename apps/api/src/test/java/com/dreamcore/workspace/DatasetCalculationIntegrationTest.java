@@ -44,4 +44,17 @@ class DatasetCalculationIntegrationTest extends DatasetCalculationFixture {
  @Test void monthGroupingUsesBusinessTimezoneAndComputesAllRows(){rows(List.of(List.of("甲","2026-09-10","10"),List.of("甲","2026-09-30T18:00:00Z","20"),List.of("甲","2026-10-02T10:00:00","5"),List.of("甲","2026-08-01","100")));var j=start();var p=new DatasetCalculationService.Request(dataset,snapshot,"门店","期间","收款（元）","2026-09","2026-10","MONTH","Asia/Shanghai");var r=json.valueToTree(agents.compareDataset(j.id(),j.token(),p));assertEquals("dataset-compare-month-1",r.at("/calculation/recipeVersion").asString());assertEquals("10",r.at("/calculation/totals/baseline").asString());assertEquals("25",r.at("/calculation/totals/current").asString());assertEquals(3,r.at("/calculation/matchedRows").asInt());assertEquals(1,r.at("/calculation/ignoredRows").asInt());receipt(j,2,"compare_dataset","succeeded");receipt(j,3,"deliver_briefing","STARTED");assertNotNull(agents.deliverBriefing(j.id(),j.token(),card(UUID.fromString(r.at("/artifact/id").asString()))));}
  @Test void ambiguousDatesAndInvalidTimezonesFailWithoutArtifact(){rows(List.of(List.of("甲","09/10/2026","10"),List.of("甲","2026-10-02","20")));var j=start();assertEquals("DATASET_DATE_INVALID",assertThrows(IdentityException.class,()->agents.compareDataset(j.id(),j.token(),new DatasetCalculationService.Request(dataset,snapshot,"门店","期间","收款（元）","2026-09","2026-10","MONTH","Asia/Shanghai"))).code);assertEquals("DATASET_TIMEZONE_INVALID",assertThrows(IdentityException.class,()->agents.compareDataset(j.id(),j.token(),new DatasetCalculationService.Request(dataset,snapshot,"门店","期间","收款（元）","2026-09","2026-10","MONTH","Not/AZone"))).code);assertEquals(0,db.queryForObject("SELECT count(*) FROM conversation_artifacts WHERE task_id=?",Integer.class,j.id()));}
 
+ @Test void countRowsAcceptsTextMeasuresAndProducesVerifiedCard(){
+  rows(List.of(List.of("甲","前期","姓名甲"),List.of("甲","前期","姓名乙"),List.of("甲","本期","姓名丙"),List.of("甲","其他","姓名丁")));
+  var j=start();var p=new DatasetCalculationService.Request(dataset,snapshot,"门店","期间",null,"前期","本期","EXACT",null,"COUNT");
+  var r=json.valueToTree(agents.compareDataset(j.id(),j.token(),p));
+  assertEquals("2",r.at("/calculation/totals/baseline").asString());assertEquals("1",r.at("/calculation/totals/current").asString());assertEquals(1,r.at("/calculation/ignoredRows").asInt());
+  receipt(j,2,"compare_dataset","succeeded");receipt(j,3,"deliver_briefing","STARTED");
+  assertNotNull(agents.deliverBriefing(j.id(),j.token(),card(UUID.fromString(r.at("/artifact/id").asString()))));
+ }
+ @Test void sqlDatetimeCountsUseExplicitMonths(){
+ rows(List.of(List.of("甲","2026-09-10 12:00:00","姓名甲"),List.of("甲","2026-10-02 09:00:00","姓名乙")));
+ var j=start();var p=new DatasetCalculationService.Request(dataset,snapshot,"门店","期间",null,"2026-09","2026-10","MONTH","Asia/Shanghai","COUNT");
+ var r=json.valueToTree(agents.compareDataset(j.id(),j.token(),p));assertEquals("1",r.at("/calculation/totals/current").asString());assertEquals(2,r.at("/calculation/matchedRows").asInt());
+ }
 }

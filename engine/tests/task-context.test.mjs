@@ -223,3 +223,9 @@ test('partial columns remain exact and cannot be labelled a complete dataset', (
   assert.throws(() => contextResponse(envelope({ ...partial, completeDataset: true }), 'dataset_read'), /INVALID_CONTEXT_RESPONSE/);
   assert.throws(() => contextResponse({ contractVersion: '1.0', action: 'dataset_search', referenceOnly: true, result: { items: [{ ...dataset, version: 0 }], hasMore: false } }, 'dataset_search'), /INVALID_CONTEXT_RESPONSE/);
 });
+
+test('optional paging encoding is normalized without accepting fractional or negative strings',()=>{
+ const tool=contextTool(async()=>({}),async()=>{},true);
+ assert.deepEqual(tool.normalizeArguments({action:'dataset_read',columnOffset:'0',columnLimit:'5',offset:null}),{action:'dataset_read',columnOffset:0,columnLimit:5});
+ assert.deepEqual(tool.normalizeArguments({columnLimit:'1.5',columnOffset:'-1'}),{columnLimit:'1.5',columnOffset:'-1'});
+});
