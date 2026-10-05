@@ -1,6 +1,7 @@
 export type AdminRealm = 'tenant' | 'platform';
 export const tenantPages = [
   'overview',
+  'usage',
   'engine',
   'members',
   'database',
@@ -46,6 +47,7 @@ export function adminPage(realm: AdminRealm, hash: string): AdminPage {
     return params.get('kind') === 'MATERIALS' ? 'materials' : 'database';
   if (realm === 'platform' && selected === 'engine' && params.get('detail') === 'storage')
     return 'capabilities';
+  if (realm === 'tenant' && selected === 'engine' && params.get('detail') === 'usage') return 'usage';
   if (selected && pages.includes(selected)) return selected as AdminPage;
   if (realm === 'tenant' && ['records', 'settings'].includes(params.get('tab') || '')) return 'company';
   if (realm === 'tenant' && params.get('tab') === 'operations') return 'engine';

@@ -56,13 +56,12 @@ function ScopedOverview({
     }),
     { running: 0, queued: 0, waiting: 0, unknown: 0 },
   );
-  const usageHref = adminHref(realm, realm === 'tenant' ? 'engine' : 'usage', hash, {
-    ...(realm === 'tenant' ? { detail: 'usage' } : {}),
+  const usageHref = adminHref(realm, 'usage', hash, {
     period: 'THIS_MONTH',
   });
   const refresh = () => setAttempt((n) => n + 1);
   return (
-    <div className="admin-dashboard">
+    <div className="admin-dashboard tenant-overview">
       <PageActions>
         <Button variant="ghost" icon={RefreshCw} onClick={refresh}>
           刷新
@@ -177,7 +176,7 @@ function ScopedOverview({
               <a className="button" href={adminHref(realm, 'members', hash, { tab: 'invitations' })}>
                 成员邀请
               </a>
-              <a className="button" href={adminHref(realm, 'engine', hash, { detail: 'usage' })}>
+              <a className="button" href={adminHref(realm, 'usage', hash)}>
                 本企业用量
               </a>
               <a className="button" href={adminHref(realm, 'members', hash, { tab: 'spaces' })}>

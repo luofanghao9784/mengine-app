@@ -142,7 +142,7 @@ function ScopedUsage({
   );
   return (
     <div className={`usage-page ${compact ? 'enterprise-usage' : ''}`}>
-      {scope === 'platform' && <PageActions>{controls}</PageActions>}
+      {(scope === 'platform' || compact) && <PageActions>{controls}</PageActions>}
       {!compact && (
         <div className="usage-heading">
           <div>
@@ -165,9 +165,7 @@ function ScopedUsage({
       {compact && hash !== undefined && (
         <p className="admin-note usage-scope-note">
           {tenant ? (
-            <>
-              <TenantName tenant={tenant} /> · 企业用量
-            </>
+            <>{scope === 'tenant' ? '本企业' : <TenantName tenant={tenant} />} · 运行与用量</>
           ) : (
             '全平台汇总 · 包含暂停服务企业与平台维护 · 仅正式执行'
           )}

@@ -65,7 +65,7 @@ export function TenantDatabase({ tenant, hash }: { tenant: string; hash: string 
     dataset = params.get('dataset');
   const href = (extra: Record<string, string>) => adminHref('tenant', 'database', hash, extra);
   return (
-    <div className="admin-dashboard">
+    <div className="admin-dashboard tenant-database-page">
       <nav className="platform-detail-nav" aria-label="数据库栏目">
         {(
           [
@@ -143,7 +143,7 @@ function DataList({ tenant, hash }: { tenant: string; hash: string }) {
           ))}
         </div>
       )}
-      <section className="admin-section">
+      <section className="admin-section tenant-directory-card">
         <div className="platform-list-heading admin-directory-heading">
           <h2>数据集</h2>
           <form
@@ -193,24 +193,34 @@ function DataList({ tenant, hash }: { tenant: string; hash: string }) {
           />
         ) : (
           <>
-            <div className="admin-directory-list">
-              {data.value.list.items.map((d) => (
-                <a
-                  className="admin-directory-row"
-                  key={d.id}
-                  href={adminHref('tenant', 'database', hash, { section: 'data', dataset: d.id })}
-                >
-                  <span>
-                    <strong>{d.name}</strong>
-                    <small>
-                      {d.workspaceName} ·{' '}
-                      {d.version === null ? '暂无可用数据' : `版本 ${d.version} · ${d.rowCount} 条记录`}
-                    </small>
-                    <small>最近成功：{date(d.collectedAt)}</small>
-                  </span>
-                  <Badge>{runStatus(d.latestRun)}</Badge>
-                </a>
-              ))}
+            <div className="tenant-directory-scroll">
+              <div className="tenant-list-columns tenant-dataset-grid">
+                <span>数据集</span>
+                <span>所属空间</span>
+                <span>记录数</span>
+                <span>更新状态</span>
+                <span>最近成功</span>
+              </div>
+              <div className="admin-directory-list">
+                {data.value.list.items.map((d) => (
+                  <a
+                    className="admin-directory-row tenant-dataset-grid"
+                    key={d.id}
+                    href={adminHref('tenant', 'database', hash, { section: 'data', dataset: d.id })}
+                  >
+                    <span>
+                      <strong>{d.name}</strong>
+                      <small>{d.version === null ? '暂无可用数据' : `版本 ${d.version}`}</small>
+                    </span>
+                    <span>{d.workspaceName}</span>
+                    <span>{d.version === null ? '—' : d.rowCount?.toLocaleString('zh-CN')}</span>
+                    <span>
+                      <Badge>{runStatus(d.latestRun)}</Badge>
+                    </span>
+                    <time>{date(d.collectedAt)}</time>
+                  </a>
+                ))}
+              </div>
             </div>
             <Pager page={page} next={data.value.list.hasMore} onPage={setPage} />
           </>
@@ -344,24 +354,32 @@ function Connections({ tenant, hash }: { tenant: string; hash: string }) {
           text="外部系统的连接途径和权限由项目部署维护，部署后可在这里查看状态和调整取数频率。"
         />
       ) : (
-        <div className="admin-directory-list">
-          {data.value.map((c) => (
-            <a
-              className="admin-directory-row"
-              key={c.id}
-              href={adminHref('tenant', 'database', hash, { section: 'access', connection: c.id })}
-            >
-              <span>
-                <strong>{c.name}</strong>
-                <small>{c.routeLabel}</small>
-                <small>
-                  {c.schedule.enabled ? `自动取数 · ${frequency(c.schedule)}` : '自动取数已关闭'} ·{' '}
-                  {runStatus(c.currentRun || c.lastRun)}
-                </small>
-              </span>
-              <Badge>{status(c.status)}</Badge>
-            </a>
-          ))}
+        <div className="tenant-directory-scroll">
+          <div className="tenant-list-columns tenant-connection-grid">
+            <span>数据接入</span>
+            <span>连接状态</span>
+            <span>取数频率</span>
+            <span>最近运行</span>
+          </div>
+          <div className="admin-directory-list">
+            {data.value.map((c) => (
+              <a
+                className="admin-directory-row tenant-connection-grid"
+                key={c.id}
+                href={adminHref('tenant', 'database', hash, { section: 'access', connection: c.id })}
+              >
+                <span>
+                  <strong>{c.name}</strong>
+                  <small>{c.routeLabel}</small>
+                </span>
+                <span>
+                  <Badge>{status(c.status)}</Badge>
+                </span>
+                <span>{c.schedule.enabled ? frequency(c.schedule) : '已关闭'}</span>
+                <span>{runStatus(c.currentRun || c.lastRun)}</span>
+              </a>
+            ))}
+          </div>
         </div>
       )}
     </section>

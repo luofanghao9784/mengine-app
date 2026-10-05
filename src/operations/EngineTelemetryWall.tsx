@@ -59,7 +59,7 @@ export function EngineTelemetryWall({
 }
 function Wall({ scope, tenant }: { scope: 'platform' | 'tenant'; tenant: string | null }) {
   const { expire } = useSession();
-  const pollMs = scope === 'platform' ? 3000 : 15000;
+  const pollMs = 3000;
   const [value, setValue] = useState<EngineTelemetry>();
   const [error, setError] = useState<unknown>();
   const [samples, setSamples] = useState<Sample[]>([]);
@@ -88,7 +88,7 @@ function Wall({ scope, tenant }: { scope: 'platform' | 'tenant'; tenant: string 
                 Date.parse(s.at) >= Date.parse(next.checkedAt) - 300000,
             ),
             { at: next.checkedAt, running: sum(next.channels, 'running') },
-          ].slice(scope === 'platform' ? -101 : -21),
+          ].slice(-101),
         );
       } catch (e) {
         if (disposed) return;
@@ -125,14 +125,14 @@ function Wall({ scope, tenant }: { scope: 'platform' | 'tenant'; tenant: string 
   );
   return (
     <section className="engine-page" aria-label="引擎运行监控">
-      <div className={`engine-heading ${scope === 'platform' ? 'engine-heading--embedded' : ''}`}>
+      <div className={`engine-heading engine-heading--embedded`}>
         <div>
-          {scope === 'tenant' ? <h2>企业引擎运行</h2> : <h1>引擎仪表盘</h1>}
+          <h1>引擎仪表盘</h1>
           {scope === 'tenant' && <p className="muted">本企业的运行记录 · 只读监控</p>}
         </div>
         <div className="engine-refresh">
           {scope === 'tenant' && refreshAction}
-          {scope === 'platform' && value && <small>快照 {time(value.checkedAt)} · 可见时每 3 秒更新</small>}
+          {value && <small>快照 {time(value.checkedAt)} · 可见时每 3 秒更新</small>}
         </div>
       </div>
       {error ? (
@@ -140,7 +140,7 @@ function Wall({ scope, tenant }: { scope: 'platform' | 'tenant'; tenant: string 
       ) : !value ? (
         <Loading />
       ) : (
-        <Snapshot value={value} samples={samples} loading={loading} compact={scope === 'platform'} />
+        <Snapshot value={value} samples={samples} loading={loading} compact />
       )}
     </section>
   );

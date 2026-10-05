@@ -209,8 +209,8 @@ test('enterprise sidebar, three member tabs and customer return stay separate fr
   const back = '#' + new URLSearchParams({ tenant, view: 'conversations', conversation: id(9) });
   await page.goto('/tenant-admin/#' + new URLSearchParams({ tenant, back }));
   const nav = page.getByRole('complementary', { name: '企业管理导航' });
-  await expect(nav.locator('nav a')).toHaveCount(7);
-  await expect(page.getByRole('heading', { level: 1, name: '概览', exact: true })).toBeVisible();
+  await expect(nav.locator('nav a')).toHaveCount(8);
+  await expect(page.getByRole('heading', { level: 1, name: '企业概览', exact: true })).toBeVisible();
   await nav.getByRole('link', { name: '成员与空间', exact: true }).click();
   await expect(page.getByRole('navigation', { name: '成员与空间' }).getByRole('button')).toHaveCount(3);
   await expect(page.getByRole('navigation', { name: '管理工作区' })).toHaveCount(0);
@@ -219,8 +219,8 @@ test('enterprise sidebar, three member tabs and customer return stay separate fr
     '/workspace/' + back,
   );
   await expect(page.locator('a[href*="/platform-admin/"]')).toHaveCount(0);
-  await nav.getByRole('link', { name: '概览', exact: true }).click();
-  await expect(page.getByRole('heading', { level: 1, name: '概览', exact: true })).toBeVisible();
+  await nav.getByRole('link', { name: '企业概览', exact: true }).click();
+  await expect(page.getByRole('heading', { level: 1, name: '企业概览', exact: true })).toBeVisible();
   await expect(page.getByText('启用成员', { exact: true })).toBeVisible();
   await page.screenshot({ path: 'test-results/tenant-admin-overview.png', fullPage: true });
   for (const width of [834, 360]) {
@@ -228,8 +228,9 @@ test('enterprise sidebar, three member tabs and customer return stay separate fr
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   }
   await page.getByRole('button', { name: '展开导航' }).click();
-  await expect(nav).toBeVisible();
-  await nav.getByRole('link', { name: '成员与空间', exact: true }).click();
+  const mobileNav = page.getByRole('dialog', { name: '企业管理导航' });
+  await expect(mobileNav).toBeVisible();
+  await mobileNav.getByRole('link', { name: '成员与空间', exact: true }).click();
   await expect(page.getByRole('heading', { level: 1, name: '成员与空间' })).toBeVisible();
 });
 test('platform directory preserves query across pages and performs confirmed global account action', async ({
@@ -293,12 +294,18 @@ for (const realm of ['platform', 'tenant'] as const) {
       await page.getByLabel('用量统计期间').selectOption('LAST_MONTH');
       await expect(page.getByLabel('用量统计期间')).toHaveValue('LAST_MONTH');
     }
-    await page.getByRole('complementary').getByRole('link', { name: '概览', exact: true }).click();
+    await page
+      .getByRole('complementary')
+      .getByRole('link', { name: realm === 'tenant' ? '企业概览' : '概览', exact: true })
+      .click();
     await page.getByRole('link', { name: monthlyLinkName, exact: true }).click();
     if (realm === 'platform')
       await expect(page.getByRole('combobox', { name: '用量统计期间' })).toHaveText('本月');
     else await expect(page.getByLabel('用量统计期间')).toHaveValue('THIS_MONTH');
-    await page.getByRole('complementary').getByRole('link', { name: '概览', exact: true }).click();
+    await page
+      .getByRole('complementary')
+      .getByRole('link', { name: realm === 'tenant' ? '企业概览' : '概览', exact: true })
+      .click();
     control.mode = 'revoked';
     await page.getByRole('button', { name: '刷新', exact: true }).click();
     await expect(page.getByText('没有访问权限', { exact: true })).toHaveCount(2);

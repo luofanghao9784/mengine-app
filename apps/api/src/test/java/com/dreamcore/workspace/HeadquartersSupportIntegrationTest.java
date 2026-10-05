@@ -41,6 +41,10 @@ class HeadquartersSupportIntegrationTest {
   String id=b.enter("TEST"),root=proxy(id,"/api/v1/tenants/"+tenant);
   var governance=b.call("GET",root+"/governance",null,null);assertEquals(200,governance.statusCode(),governance.body());assertFalse(JSON.readTree(governance.body()).get("owner").asBoolean());assertTrue(JSON.readTree(governance.body()).get("canConfigure").asBoolean());
   var context=b.call("GET",root+"/context",null,null);assertEquals(200,context.statusCode(),context.body());assertTrue(context.body().contains(shared.toString()));assertTrue(context.body().contains(ownerPrivate.toString()));assertFalse(context.body().contains(privateSpace.toString()));
+  var processing=b.call("GET",root+"/knowledge/processing",null,null);assertEquals(200,processing.statusCode(),processing.body());
+  assertFalse(SupportSecurity.allowed("/api/v1/tenants/"+other+"/knowledge/processing",tenant,"GET"));
+  assertFalse(SupportSecurity.allowed("/api/v1/tenants/"+tenant+"/knowledge/processing",tenant,"POST"));
+  assertFalse(SupportSecurity.allowed("/api/v1/tenants/"+tenant+"/knowledge/processing/other",tenant,"GET"));
   assertEquals(403,b.call("GET",proxy(id,"/api/v1/tenants/"+other+"/governance"),null,null).statusCode());
   assertEquals(404,b.call("GET",root+"/workspaces/"+privateSpace+"/library",null,null).statusCode());
   assertEquals(404,b.call("GET",root+"/profiles/PERSONAL/"+employee,null,null).statusCode());

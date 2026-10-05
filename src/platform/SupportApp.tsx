@@ -4,6 +4,7 @@ import { supportRoute } from '../identity/support-request';
 import { useAdminRoute } from '../admin/AdminShell';
 import { RequestGuard } from '../shared/request-guard';
 import { Loading } from '../shared/admin';
+import { UploadProvider } from '../material/UploadManager';
 import { SupportConsole } from './SupportConsole';
 
 /** An independent management entry authenticated only by the platform realm. */
@@ -35,7 +36,9 @@ export function SupportApp() {
     );
   return (
     <RequestGuard>
-      <SupportConsole key={access.id} id={access.id} tenant={access.tenant} />
+      <UploadProvider key={access.id}>
+        <SupportConsole id={access.id} tenant={access.tenant} />
+      </UploadProvider>
     </RequestGuard>
   );
 }

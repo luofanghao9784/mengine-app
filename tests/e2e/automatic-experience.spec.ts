@@ -489,7 +489,7 @@ test('enterprise detail keeps its exact general reference and distinguishes glob
   await page.goto(`/tenant-admin/#tenant=${tenant}&admin=experience`);
   await page
     .getByRole('button')
-    .filter({ has: page.getByRole('heading', { name: '先核对来源口径' }) })
+    .filter({ has: page.getByText('先核对来源口径', { exact: true }) })
     .click();
   const dialog = page.getByRole('dialog');
   await expect(dialog.getByRole('heading', { name: '引用的通用经验' })).toBeVisible();
@@ -527,7 +527,7 @@ test('reference pagination retains exact versions and local stop is scoped separ
   await page.goto(`/tenant-admin/#tenant=${tenant}&admin=experience`);
   await page
     .getByRole('button')
-    .filter({ has: page.getByRole('heading', { name: '先核对来源口径' }) })
+    .filter({ has: page.getByText('先核对来源口径', { exact: true }) })
     .click();
   const refs = page.getByRole('region', { name: '引用的通用经验' });
   await expect(refs.getByText('引用的通用经验已停用，当前企业版本暂停供引擎参考。')).toBeVisible();
@@ -576,7 +576,7 @@ test('legacy management link keeps manual records read-only with no editor, dire
   await page.goto(`/tenant-admin/#tenant=${tenant}&manage=experiences&scope=${space}`);
   await page
     .getByRole('button')
-    .filter({ has: page.getByRole('heading', { name: '先核对来源口径' }) })
+    .filter({ has: page.getByText('先核对来源口径', { exact: true }) })
     .click();
   const dialog = page.getByRole('dialog');
   await expect(dialog).toContainText('历史人工经验 · 未自动核验，仅供查看');

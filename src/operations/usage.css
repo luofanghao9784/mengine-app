@@ -221,33 +221,33 @@
 }
 
 /* Platform refinements: retain the shared enterprise baseline above. */
-.admin-platform .usage-page {
+.admin-control .usage-page {
   --usage-maintenance: #657fa8;
   display: grid;
   gap: 24px;
   min-width: 0;
   font-variant-numeric: tabular-nums;
 }
-.admin-platform .usage-heading {
+.admin-control .usage-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
 }
-.admin-platform .usage-heading h2,
-.admin-platform .usage-section h2,
-.admin-platform .usage-heading h3 {
+.admin-control .usage-heading h2,
+.admin-control .usage-section h2,
+.admin-control .usage-heading h3 {
   margin: 0;
 }
-.admin-platform .usage-filter {
+.admin-control .usage-filter {
   display: flex;
   gap: 8px;
   align-items: center;
   flex-wrap: wrap;
 }
-.admin-platform .usage-filter input,
-.admin-platform .usage-filter select {
+.admin-control .usage-filter input,
+.admin-control .usage-filter select {
   padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -255,22 +255,22 @@
   max-width: 100%;
   min-width: 0;
 }
-.admin-platform .usage-section {
+.admin-control .usage-section {
   padding: 22px;
   min-width: 0;
   display: grid;
   gap: 14px;
 }
-.admin-platform .usage-section > .badge {
+.admin-control .usage-section > .badge {
   justify-self: start;
 }
-.admin-platform .usage-metrics {
+.admin-control .usage-metrics {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
   margin: 0;
 }
-.admin-platform .usage-metrics > div {
+.admin-control .usage-metrics > div {
   padding: 6px 18px 6px 0;
   border: 0;
   border-radius: 0;
@@ -278,61 +278,61 @@
   min-width: 0;
   border-right: 1px solid var(--line);
 }
-.admin-platform .usage-metrics > div:last-child {
+.admin-control .usage-metrics > div:last-child {
   border-right: 0;
 }
-.admin-platform .usage-page dt,
-.admin-platform .usage-page small,
-.admin-platform .usage-page .admin-note {
+.admin-control .usage-page dt,
+.admin-control .usage-page small,
+.admin-control .usage-page .admin-note {
   color: var(--muted);
   font-size: var(--font-caption);
   line-height: 1.65;
 }
-.admin-platform .usage-page dd {
+.admin-control .usage-page dd {
   margin: 6px 0;
   overflow-wrap: anywhere;
 }
-.admin-platform .usage-metrics dd {
+.admin-control .usage-metrics dd {
   font-size: var(--font-display);
   font-weight: 600;
 }
-.admin-platform .usage-groups {
+.admin-control .usage-groups {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
 }
-.admin-platform .usage-groups article {
+.admin-control .usage-groups article {
   border-top: 1px solid var(--line);
   background: transparent;
   border-radius: 0;
   padding: 18px 0 0;
   min-width: 0;
 }
-.admin-platform .usage-groups dl {
+.admin-control .usage-groups dl {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
-.admin-platform .usage-groups dd {
+.admin-control .usage-groups dd {
   font-weight: 600;
   font-size: var(--font-heading);
 }
-.admin-platform .usage-limits {
+.admin-control .usage-limits {
   font-size: var(--font-caption);
   color: var(--muted);
   line-height: 1.7;
 }
-.admin-platform .usage-tool {
+.admin-control .usage-tool {
   padding: 12px 0;
   border-bottom: 1px solid var(--line);
   font-size: var(--font-body);
 }
-.admin-platform .usage-directory {
+.admin-control .usage-directory {
   display: grid;
   gap: 4px;
   margin-top: 14px;
 }
-.admin-platform .usage-directory a {
+.admin-control .usage-directory a {
   padding: 12px;
   display: flex;
   align-items: center;
@@ -342,113 +342,113 @@
   color: inherit;
   text-decoration: none;
 }
-.admin-platform .usage-directory a:hover {
+.admin-control .usage-directory a:hover {
   background: var(--soft);
 }
-.admin-platform .usage-directory small {
+.admin-control .usage-directory small {
   display: block;
 }
-.admin-platform .usage-directory a > span:last-child {
+.admin-control .usage-directory a > span:last-child {
   display: flex;
   align-items: center;
   font-size: var(--font-caption);
   color: var(--blue-ink);
   flex-shrink: 0;
 }
-.admin-platform .usage-bars {
+.admin-control .usage-bars {
   height: 170px;
   display: flex;
   gap: 4px;
   align-items: stretch;
   margin: 25px 0 15px;
 }
-.admin-platform .usage-bars > div {
+.admin-control .usage-bars > div {
   flex: 1;
   min-width: 0;
   text-align: center;
   display: flex;
   flex-direction: column;
 }
-.admin-platform .usage-bars > div > div {
+.admin-control .usage-bars > div > div {
   display: flex;
   gap: 2px;
   align-items: flex-end;
   border-bottom: 1px solid var(--line);
   height: 145px;
 }
-.admin-platform .usage-bars i {
+.admin-control .usage-bars i {
   display: block;
   flex: 1;
   min-height: 0;
   background: var(--accent);
   border-radius: 3px 3px 0 0;
 }
-.admin-platform .usage-bars i + i {
+.admin-control .usage-bars i + i {
   background: var(--usage-maintenance, #9ebdfa);
 }
-.admin-platform .usage-bars i.incomplete {
+.admin-control .usage-bars i.incomplete {
   border-top: 3px dotted #9c6200;
   min-height: 4px;
 }
-.admin-platform .usage-bars small {
+.admin-control .usage-bars small {
   font-size: 10px;
 }
-.admin-platform .usage-trend summary {
+.admin-control .usage-trend summary {
   cursor: pointer;
   font-size: 13px;
   color: var(--blue-ink);
 }
-.admin-platform .usage-table {
+.admin-control .usage-table {
   overflow: auto;
   margin-top: 12px;
 }
-.admin-platform .usage-table table {
+.admin-control .usage-table table {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
   white-space: nowrap;
 }
-.admin-platform .usage-table td,
-.admin-platform .usage-table th {
+.admin-control .usage-table td,
+.admin-control .usage-table th {
   padding: 10px;
   border-bottom: 1px solid var(--line);
   text-align: left;
 }
 @media (max-width: 1100px) {
-  .admin-platform .usage-metrics {
+  .admin-control .usage-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 @media (max-width: 620px) {
-  .admin-platform .usage-section {
+  .admin-control .usage-section {
     padding: 16px;
   }
-  .admin-platform .usage-groups {
+  .admin-control .usage-groups {
     grid-template-columns: 1fr;
   }
-  .admin-platform .usage-metrics {
+  .admin-control .usage-metrics {
     gap: 8px;
   }
-  .admin-platform .usage-metrics > div {
+  .admin-control .usage-metrics > div {
     padding: 6px 12px 6px 0;
   }
-  .admin-platform .usage-metrics dd {
+  .admin-control .usage-metrics dd {
     font-size: 21px;
   }
-  .admin-platform .usage-bars {
+  .admin-control .usage-bars {
     gap: 2px;
   }
-  .admin-platform .usage-bars small {
+  .admin-control .usage-bars small {
     font-size: 9px;
   }
-  .admin-platform .usage-filter input {
+  .admin-control .usage-filter input {
     width: 190px;
   }
-  .admin-platform .usage-directory a {
+  .admin-control .usage-directory a {
     padding: 12px 0;
   }
 }
-.admin-platform .usage-cost-summary {
+.admin-control .usage-cost-summary {
   padding: 18px 22px;
   border: 1px solid var(--line);
   border-radius: var(--radius-panel);
@@ -458,31 +458,31 @@
   gap: 12px 32px;
   align-items: start;
 }
-.admin-platform .usage-cost-summary h2 {
+.admin-control .usage-cost-summary h2 {
   margin: 0;
   font-size: var(--font-heading);
 }
-.admin-platform .usage-cost-summary dl {
+.admin-control .usage-cost-summary dl {
   display: flex;
   gap: 16px 32px;
   flex-wrap: wrap;
   margin: 0;
 }
-.admin-platform .usage-cost-summary dl > div {
+.admin-control .usage-cost-summary dl > div {
   display: flex;
   gap: 10px;
   align-items: baseline;
 }
-.admin-platform .usage-cost-summary dd {
+.admin-control .usage-cost-summary dd {
   margin: 0;
   font-weight: 550;
 }
-.admin-platform .usage-cost-summary > p,
-.admin-platform .usage-cost-summary > details {
+.admin-control .usage-cost-summary > p,
+.admin-control .usage-cost-summary > details {
   grid-column: 1 / -1;
 }
-.admin-platform .usage-explanation summary,
-.admin-platform .usage-trend summary {
+.admin-control .usage-explanation summary,
+.admin-control .usage-trend summary {
   width: fit-content;
   min-height: 44px;
   display: flex;
@@ -492,8 +492,8 @@
   color: var(--blue-ink);
   font-size: var(--font-caption);
 }
-.admin-platform .usage-explanation summary::before,
-.admin-platform .usage-trend summary::before {
+.admin-control .usage-explanation summary::before,
+.admin-control .usage-trend summary::before {
   content: '';
   width: 6px;
   height: 6px;
@@ -501,33 +501,33 @@
   border-bottom: 1.5px solid currentColor;
   transform: rotate(-45deg);
 }
-.admin-platform .usage-explanation[open] > summary::before,
-.admin-platform .usage-trend details[open] > summary::before {
+.admin-control .usage-explanation[open] > summary::before,
+.admin-control .usage-trend details[open] > summary::before {
   transform: rotate(45deg);
 }
-.admin-platform .usage-explanation summary:focus-visible,
-.admin-platform .usage-trend summary:focus-visible {
+.admin-control .usage-explanation summary:focus-visible,
+.admin-control .usage-trend summary:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
   border-radius: 4px;
 }
-.admin-platform .usage-explanation p + p {
+.admin-control .usage-explanation p + p {
   margin-top: 12px;
 }
-.admin-platform .usage-explanation p,
-.admin-platform .usage-section > .admin-note {
+.admin-control .usage-explanation p,
+.admin-control .usage-section > .admin-note {
   max-width: 75ch;
 }
-.admin-platform .usage-trend-empty {
+.admin-control .usage-trend-empty {
   padding-block: 18px;
 }
-.admin-platform .usage-trend-empty strong {
+.admin-control .usage-trend-empty strong {
   font-size: var(--font-body);
 }
-.admin-platform .usage-trend-empty p {
+.admin-control .usage-trend-empty p {
   margin-top: 8px;
 }
-.admin-platform .usage-chart-key {
+.admin-control .usage-chart-key {
   display: flex;
   flex-wrap: wrap;
   gap: 16px;
@@ -535,65 +535,65 @@
   color: var(--muted);
   font-size: var(--font-caption);
 }
-.admin-platform .usage-chart-key span {
+.admin-control .usage-chart-key span {
   display: inline-flex;
   align-items: center;
   gap: 8px;
 }
-.admin-platform .usage-chart-key i {
+.admin-control .usage-chart-key i {
   width: 10px;
   height: 10px;
   border-radius: 2px;
   background: var(--accent);
 }
-.admin-platform .usage-chart-key span + span i {
+.admin-control .usage-chart-key span + span i {
   background: var(--usage-maintenance, #9ebdfa);
 }
-.admin-platform .usage-unknown-note {
+.admin-control .usage-unknown-note {
   color: var(--muted);
   font-size: var(--font-caption);
   margin-block: 12px;
 }
 @media (max-width: 620px) {
-  .admin-platform .usage-cost-summary {
+  .admin-control .usage-cost-summary {
     grid-template-columns: 1fr;
     padding: 16px;
     gap: 12px;
   }
-  .admin-platform .usage-cost-summary dl {
+  .admin-control .usage-cost-summary dl {
     display: grid;
     gap: 8px;
   }
-  .admin-platform .usage-cost-summary dl > div {
+  .admin-control .usage-cost-summary dl > div {
     justify-content: space-between;
   }
-  .admin-platform .usage-filter .button,
-  .admin-platform .usage-filter select,
-  .admin-platform .usage-filter input {
+  .admin-control .usage-filter .button,
+  .admin-control .usage-filter select,
+  .admin-control .usage-filter input {
     min-height: 44px;
   }
-  .admin-platform .usage-section .usage-filter input {
+  .admin-control .usage-section .usage-filter input {
     flex-basis: 100%;
   }
-  .admin-platform .usage-metrics > div:nth-child(even) {
+  .admin-control .usage-metrics > div:nth-child(even) {
     border-right: 0;
   }
 }
-.admin-platform .usage-section form.usage-filter {
+.admin-control .usage-section form.usage-filter {
   display: flex;
   margin: 14px 0;
 }
-.admin-platform .usage-section .usage-filter input {
+.admin-control .usage-section .usage-filter input {
   flex: 1;
   width: auto;
 }
 
 /* Enterprise detail: compact cards share the console's surface and border tokens. */
-.admin-platform .platform-enterprise-redesign > .enterprise-usage {
+.admin-control .platform-enterprise-redesign > .enterprise-usage {
   margin: 0;
   gap: 16px;
 }
-.admin-platform .enterprise-usage .usage-metrics > div {
+.admin-control .enterprise-usage .usage-metrics > div {
   padding: 18px 20px;
   border: 1px solid var(--line);
   border-radius: var(--radius-panel);
@@ -626,15 +626,15 @@
   padding: 9px 0;
   border-bottom: 1px solid var(--line);
 }
-.admin-platform .enterprise-usage-breakdown dd {
+.admin-control .enterprise-usage-breakdown dd {
   margin: 0;
   font-weight: 550;
 }
-.admin-platform .enterprise-usage .usage-bars {
+.admin-control .enterprise-usage .usage-bars {
   height: 162px;
   margin: 20px 0 8px;
 }
-.admin-platform .enterprise-usage .usage-bars > div > div {
+.admin-control .enterprise-usage .usage-bars > div > div {
   height: 140px;
 }
 .enterprise-usage-footer > p {
@@ -650,7 +650,7 @@
   border: 1px solid var(--line);
   border-radius: var(--radius-panel);
 }
-.admin-platform .enterprise-daily-card .usage-table {
+.admin-control .enterprise-daily-card .usage-table {
   max-height: 240px;
   margin-top: 16px;
 }
@@ -659,9 +659,9 @@
   top: 0;
 }
 
-.admin-platform .platform-usage-summary,
-.admin-platform .platform-usage-summary > .enterprise-usage { gap: 16px; }
-.admin-platform .platform-usage-summary .usage-scope-note { margin: 0; }
-.admin-platform .platform-usage-summary .usage-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.admin-platform .platform-usage-summary > .usage-section { padding: 20px; }
-.admin-platform .platform-usage-summary .usage-directory a:last-child { border-bottom: 0; }
+.admin-control .platform-usage-summary,
+.admin-control .platform-usage-summary > .enterprise-usage { gap: 16px; }
+.admin-control .platform-usage-summary .usage-scope-note { margin: 0; }
+.admin-control .platform-usage-summary .usage-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.admin-control .platform-usage-summary > .usage-section { padding: 20px; }
+.admin-control .platform-usage-summary .usage-directory a:last-child { border-bottom: 0; }

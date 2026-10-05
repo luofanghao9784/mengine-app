@@ -209,12 +209,13 @@ test('enterprise page omits procurement cost, shows incomplete usage and quota w
 }) => {
   const f = await fixture(context);
   await page.goto(`/tenant-admin/#tenant=${tenant}&admin=engine&detail=usage`);
-  await expect(page.getByRole('heading', { name: '本企业用量', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '运行与用量', exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: '每日数值' })).toBeVisible();
+  await page.getByText('计量明细与说明', { exact: true }).click();
   await expect(page.getByRole('region', { name: '企业额度' })).toContainText('剩余额度未知');
   await expect(page.getByRole('region', { name: '运行成本' })).toHaveCount(0);
   await expect(page.getByRole('region', { name: '用途与计量覆盖' })).toContainText('Token 完整回执 3 / 5');
-  await page.getByText('查看每日数值', { exact: true }).click();
-  await expect(page.getByRole('table')).toContainText('2026-10-04');
+  await expect(page.getByRole('region', { name: '每日数值' }).getByRole('table')).toContainText('2026-10-04');
   await page.setViewportSize({ width: 360, height: 820 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
   await page.screenshot({ path: '/tmp/usage-tenant-360.png' });
@@ -252,7 +253,9 @@ test('platform enterprise detail uses the same scoped usage facts and retains se
   await page.goto(`/platform-admin/#admin=tenants&enterprise=${tenant}&section=usage`);
   await expect(page.getByRole('region', { name: '企业详情' })).toBeVisible();
   await expect(page.getByRole('region', { name: '每日数值', exact: true })).toBeVisible();
-  await expect(page.getByRole('region', { name: '每日数值', exact: true }).getByRole('table')).toContainText('未知');
+  await expect(page.getByRole('region', { name: '每日数值', exact: true }).getByRole('table')).toContainText(
+    '未知',
+  );
   await expect(page.getByRole('region', { name: '每日用量趋势' }).getByRole('table')).toHaveCount(0);
   const cards = page.locator('.enterprise-usage > .usage-metrics');
   await expect(cards).toContainText('日常登记请求');

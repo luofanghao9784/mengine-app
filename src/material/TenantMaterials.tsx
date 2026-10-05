@@ -48,23 +48,24 @@ export function TenantMaterials({ tenant, hash }: { tenant: string; hash: string
   );
   const href = (extra: Record<string, string> = {}) => adminHref('tenant', 'materials', hash, extra);
   return (
-    <div className="admin-dashboard material-processing">
+    <div className="admin-dashboard material-processing tenant-material-page">
       <PageActions>
-        {files ? (
-          <a className="button ghost" href={href()}>
-            <ArrowLeft size={16} />
-            返回处理概览
-          </a>
-        ) : (
-          <a className="button ghost" href={href({ section: 'files', scope: 'enterprise' })}>
-            <FolderOpen size={16} />
-            文件与目录
-          </a>
-        )}
         <Button variant="ghost" icon={Recycle} onClick={() => setRecycle(true)}>
           回收站
         </Button>
       </PageActions>
+      <nav className="platform-detail-nav" aria-label="资料库栏目">
+        <a className="button ghost" aria-current={!files ? 'page' : undefined} href={href()}>
+          处理概览
+        </a>
+        <a
+          className="button ghost"
+          aria-current={files ? 'page' : undefined}
+          href={href({ section: 'files', scope: 'enterprise' })}
+        >
+          文件与目录
+        </a>
+      </nav>
       {context.error ? (
         <Failure error={context.error} retry={() => setAttempt((n) => n + 1)} />
       ) : !context.value ? (
@@ -215,31 +216,40 @@ function ProcessingList({ tenant, context }: { tenant: string; context: TenantCo
           <Loading />
         ) : (
           <>
-            <div className="processing-list">
-              {data.value.items.map((item) => (
-                <button
-                  key={item.materialId}
-                  className="processing-row"
-                  onClick={() =>
-                    setSelected({
-                      id: item.materialId,
-                      workspaceId: item.workspaceId,
-                      versionId: item.versionId,
-                    })
-                  }
-                >
-                  <FileText size={22} />
-                  <div>
-                    <strong>{item.name}</strong>
-                    <small>
-                      {item.workspaceName} · v{item.version}
-                    </small>
-                  </div>
-                  <Badge>{processingStatusLabel[item.status]}</Badge>
-                  <small>更新于 {date(item.updatedAt)}</small>
-                  <span>查看详情</span>
-                </button>
-              ))}
+            <div className="tenant-directory-scroll">
+              <div className="tenant-list-columns tenant-material-grid">
+                <span></span>
+                <span>资料 / 所属空间</span>
+                <span>处理状态</span>
+                <span>更新时间</span>
+                <span></span>
+              </div>
+              <div className="processing-list">
+                {data.value.items.map((item) => (
+                  <button
+                    key={item.materialId}
+                    className="processing-row tenant-material-grid"
+                    onClick={() =>
+                      setSelected({
+                        id: item.materialId,
+                        workspaceId: item.workspaceId,
+                        versionId: item.versionId,
+                      })
+                    }
+                  >
+                    <FileText size={22} />
+                    <div>
+                      <strong>{item.name}</strong>
+                      <small>
+                        {item.workspaceName} · v{item.version}
+                      </small>
+                    </div>
+                    <Badge>{processingStatusLabel[item.status]}</Badge>
+                    <small>更新于 {date(item.updatedAt)}</small>
+                    <span>查看详情</span>
+                  </button>
+                ))}
+              </div>
             </div>
             {!data.value.items.length && (
               <Empty

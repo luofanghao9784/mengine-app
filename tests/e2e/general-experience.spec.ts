@@ -401,7 +401,11 @@ for (const realm of ['platform', 'tenant'] as const)
         ? '/platform-admin/#admin=experience'
         : `/tenant-admin/#tenant=${tenant}&admin=experience`,
     );
-    if (realm === 'tenant') await page.getByLabel('经验来源').selectOption('general');
+    if (realm === 'tenant')
+      await page
+        .getByRole('navigation', { name: '经验来源' })
+        .getByRole('button', { name: '通用经验', exact: true })
+        .click();
     await page.getByLabel('搜索通用经验').fill('核验');
     await page.getByRole('button', { name: '搜索', exact: true }).click();
     await page.getByRole('button', { name: '下一页', exact: true }).click();
@@ -464,16 +468,24 @@ test('an enterprise experience deep link overrides a remembered general-library 
 }) => {
   await fixture(context);
   await page.goto(`/tenant-admin/#tenant=${tenant}&admin=experience`);
-  await page.getByLabel('经验来源').selectOption('general');
+  await page
+    .getByRole('navigation', { name: '经验来源' })
+    .getByRole('button', { name: '通用经验', exact: true })
+    .click();
   await expect(page.getByLabel('搜索通用经验')).toBeVisible();
   await page.goto(`/tenant-admin/#tenant=${tenant}&admin=experience&scope=${id(8)}&experience=${entry}`);
-  await expect(page.getByLabel('经验来源')).toHaveValue('enterprise');
+  await expect(
+    page.getByRole('navigation', { name: '经验来源' }).getByRole('button', { name: '企业经验', exact: true }),
+  ).toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('heading', { name: '经验详情', exact: true })).toBeVisible();
 });
 
 async function openTenantMethod(page: import('@playwright/test').Page) {
   await page.goto(`/tenant-admin/#tenant=${tenant}&admin=experience`);
-  await page.getByLabel('经验来源').selectOption('general');
+  await page
+    .getByRole('navigation', { name: '经验来源' })
+    .getByRole('button', { name: '通用经验', exact: true })
+    .click();
   await page
     .getByRole('button')
     .filter({ has: page.getByRole('heading', { name: method.title }) })
@@ -523,7 +535,9 @@ test('lost response retains the original request and locks source and drawer nav
   await dialog.getByRole('button', { name: '停止本企业使用', exact: true }).click();
   await dialog.getByRole('button', { name: '确认停用' }).click();
   await expect(dialog.getByRole('button', { name: '重试原请求' })).toBeVisible();
-  await expect(page.getByLabel('经验来源')).toBeDisabled();
+  await expect(
+    page.getByRole('navigation', { name: '经验来源' }).getByRole('button', { name: '通用经验', exact: true }),
+  ).toBeDisabled();
   await dialog.getByRole('button', { name: '关闭弹窗' }).click();
   await expect(dialog).toBeVisible();
   await page.evaluate(() => window.dispatchEvent(new Event('focus')));
@@ -532,7 +546,9 @@ test('lost response retains the original request and locks source and drawer nav
   await expect(dialog.getByText('本企业：已停止使用')).toBeVisible();
   expect(f.changes).toHaveLength(2);
   expect(f.changes[0]).toEqual(f.changes[1]);
-  await expect(page.getByLabel('经验来源')).toBeEnabled();
+  await expect(
+    page.getByRole('navigation', { name: '经验来源' }).getByRole('button', { name: '通用经验', exact: true }),
+  ).toBeEnabled();
 });
 test('space maintainer sees enterprise use status without enterprise-wide mutation controls', async ({
   page,
@@ -650,7 +666,10 @@ test('enterprise supplement submits a fixed private input, locks an uncertain re
 }) => {
   const f = await fixture(context, { dropSuggestionFirst: true });
   await page.goto(`/tenant-admin/#tenant=${tenant}&admin=experience`);
-  await page.getByLabel('经验来源').selectOption('general');
+  await page
+    .getByRole('navigation', { name: '经验来源' })
+    .getByRole('button', { name: '通用经验', exact: true })
+    .click();
   await page
     .getByRole('button')
     .filter({ has: page.getByRole('heading', { name: method.title }) })
@@ -666,7 +685,9 @@ test('enterprise supplement submits a fixed private input, locks an uncertain re
   await page.getByRole('button', { name: '提交自动处理', exact: true }).click();
   await expect(page.getByRole('button', { name: '重试原请求', exact: true })).toBeVisible();
   await expect(page.getByLabel('内容与依据')).toBeDisabled();
-  await expect(page.getByLabel('经验来源')).toBeDisabled();
+  await expect(
+    page.getByRole('navigation', { name: '经验来源' }).getByRole('button', { name: '通用经验', exact: true }),
+  ).toBeDisabled();
   await expect(page.getByRole('button', { name: '停止本企业使用', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: '关闭弹窗' }).click();
   await expect(dialog).toBeVisible();
@@ -683,7 +704,9 @@ test('enterprise supplement submits a fixed private input, locks an uncertain re
   f.admitSuggestion();
   await page.evaluate(() => window.dispatchEvent(new Event('focus')));
   await page.getByRole('button', { name: '查看企业经验', exact: true }).click();
-  await expect(page.getByLabel('经验来源')).toHaveValue('enterprise');
+  await expect(
+    page.getByRole('navigation', { name: '经验来源' }).getByRole('button', { name: '企业经验', exact: true }),
+  ).toHaveAttribute('aria-current', 'page');
   await expect(page.getByText('合成企业专用方法', { exact: true })).toBeVisible();
   expect(f.calls.some((c) => c.includes(`/experiences/${id(31)}?version=${id(32)}`))).toBe(true);
 });
@@ -693,7 +716,10 @@ test('workspace permission removal clears the unsent proposal and platform never
 }) => {
   const f = await fixture(context);
   await page.goto(`/tenant-admin/#tenant=${tenant}&admin=experience`);
-  await page.getByLabel('经验来源').selectOption('general');
+  await page
+    .getByRole('navigation', { name: '经验来源' })
+    .getByRole('button', { name: '通用经验', exact: true })
+    .click();
   await page
     .getByRole('button')
     .filter({ has: page.getByRole('heading', { name: method.title }) })
@@ -790,7 +816,11 @@ for (const realm of ['platform', 'tenant'] as const)
         ? '/platform-admin/#admin=experience'
         : `/tenant-admin/#tenant=${tenant}&admin=experience`,
     );
-    if (realm === 'tenant') await page.getByLabel('经验来源').selectOption('general');
+    if (realm === 'tenant')
+      await page
+        .getByRole('navigation', { name: '经验来源' })
+        .getByRole('button', { name: '通用经验', exact: true })
+        .click();
     await page
       .getByRole('button')
       .filter({ has: page.getByRole('heading', { name: method.title }) })

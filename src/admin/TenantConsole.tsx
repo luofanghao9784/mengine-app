@@ -1,3 +1,4 @@
+import './tenant-redesign.css';
 import { SupportRecords } from '../platform/SupportRecords';
 import type { SupportAccess } from '../platform/SupportConsole';
 import { supportClient } from '../platform/SupportConsole';
@@ -155,22 +156,10 @@ export function TenantConsole({
             governance.value.canAcceptInitialResponsibility || !!governance.value.pendingHandover
           }
         />
+      ) : page === 'usage' ? (
+        <UsagePanel scope="tenant" tenant={tenant} hash={hash} compact />
       ) : page === 'engine' ? (
-        secondary === 'usage' ? (
-          <>
-            <a className="button ghost" href={adminHref('tenant', 'engine', hash)}>
-              返回引擎运行
-            </a>
-            <UsagePanel scope="tenant" tenant={tenant} hash={hash} />
-          </>
-        ) : (
-          <>
-            <div className="admin-secondary-link">
-              <a href={adminHref('tenant', 'engine', hash, { detail: 'usage' })}>查看本企业用量</a>
-            </div>
-            <EngineTelemetryWall scope="tenant" tenant={tenant} />
-          </>
-        )
+        <EngineTelemetryWall scope="tenant" tenant={tenant} />
       ) : page === 'members' ? (
         secondary === 'member' && params.get('member') ? (
           <TenantMemberDetail

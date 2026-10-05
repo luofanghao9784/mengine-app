@@ -204,7 +204,7 @@ test('file navigation preserves admin realm and client return; recycle uses same
   expect(new URLSearchParams(new URL(page.url()).hash.slice(1)).get('back')).toBe(
     '#tenant=' + tenant + '&view=briefing',
   );
-  await page.getByRole('link', { name: '返回处理概览' }).click();
+  await page.getByRole('link', { name: '处理概览', exact: true }).click();
   await page.getByRole('button', { name: '回收站', exact: true }).click();
   await expect(page.getByRole('button', { name: '个人空间', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: '合成销售空间', exact: true }).click();
@@ -212,8 +212,10 @@ test('file navigation preserves admin realm and client return; recycle uses same
   await expect(page.getByText('当前目录没有资料。可返回资料库选择其他目录。')).toHaveCount(0);
 });
 
-
-test('inline recycle and deletion records retain the enterprise realm, shared scope and client return', async ({ page, context }) => {
+test('inline recycle and deletion records retain the enterprise realm, shared scope and client return', async ({
+  page,
+  context,
+}) => {
   await fixture(context);
   await page.goto(start + '&section=files&scope=' + space);
   await page.locator('.library-page').getByRole('button', { name: '回收站', exact: true }).click();
@@ -231,7 +233,10 @@ test('inline recycle and deletion records retain the enterprise realm, shared sc
   await page.getByRole('button', { name: '删除记录', exact: true }).click();
   await expect(page.getByLabel('资料删除记录', { exact: true })).toBeVisible();
   await assertLocation('records');
-  await page.getByLabel('文件夹路径', { exact: true }).getByRole('button', { name: '合成销售空间', exact: true }).click();
+  await page
+    .getByLabel('文件夹路径', { exact: true })
+    .getByRole('button', { name: '合成销售空间', exact: true })
+    .click();
   await assertLocation(null);
   await expect(page.locator('button.material-entry').filter({ hasText: '合成月度数据说明' })).toBeVisible();
 });

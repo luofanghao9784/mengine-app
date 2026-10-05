@@ -1,24 +1,24 @@
-:where(.admin-platform) .engine-page {
+:where(.admin-control) .engine-page {
   min-width: 0;
 }
-:where(.admin-platform) .engine-heading {
+:where(.admin-control) .engine-heading {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 16px;
   margin-bottom: 16px;
 }
-:where(.admin-platform) .engine-heading h2 {
+:where(.admin-control) .engine-heading h2 {
   margin: 0 0 5px;
 }
-:where(.admin-platform) .engine-heading p {
+:where(.admin-control) .engine-heading p {
   margin: 0;
 }
-:where(.admin-platform) .engine-heading--embedded {
+:where(.admin-control) .engine-heading--embedded {
   margin-bottom: 12px;
   font-size: 13px;
 }
-:where(.admin-platform) .platform-runtime-links {
+:where(.admin-control) .platform-runtime-links {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -26,13 +26,13 @@
   margin-bottom: 14px;
   font-size: 13px;
 }
-:where(.admin-platform) .platform-runtime-links a {
+:where(.admin-control) .platform-runtime-links a {
   padding-block: 5px;
 }
-:where(.admin-platform) .platform-runtime-links a:hover {
+:where(.admin-control) .platform-runtime-links a:hover {
   color: var(--accent);
 }
-:where(.admin-platform) .engine-wall {
+:where(.admin-control) .engine-wall {
   --engine-input: #71dff5;
   --engine-process: #8db9ff;
   --engine-output: #76e3bb;
@@ -46,19 +46,19 @@
   padding: 18px;
   font-variant-numeric: tabular-nums;
 }
-:where(.admin-platform) .engine-wall h3,
-:where(.admin-platform) .engine-wall p {
+:where(.admin-control) .engine-wall h3,
+:where(.admin-control) .engine-wall p {
   margin: 0;
 }
-:where(.admin-platform) .engine-wall ::selection {
+:where(.admin-control) .engine-wall ::selection {
   background: #345878;
   color: #fff;
 }
-:where(.admin-platform) .engine-wall summary:focus-visible {
+:where(.admin-control) .engine-wall summary:focus-visible {
   outline: 2px solid var(--engine-process);
   outline-offset: 4px;
 }
-:where(.admin-platform) .engine-status {
+:where(.admin-control) .engine-status {
   display: flex;
   justify-content: space-between;
   gap: 10px;
@@ -68,46 +68,46 @@
   padding-bottom: 12px;
   border-bottom: 1px solid var(--engine-line);
 }
-:where(.admin-platform) .engine-status span:first-child {
+:where(.admin-control) .engine-status span:first-child {
   display: flex;
   align-items: center;
   gap: 8px;
   color: #bcddf8;
 }
-:where(.admin-platform) .engine-totals {
+:where(.admin-control) .engine-totals {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   margin: 0;
   padding: 14px 0 12px;
   gap: 12px;
 }
-:where(.admin-platform) .engine-totals > div {
+:where(.admin-control) .engine-totals > div {
   padding-right: 12px;
   border-right: 1px solid var(--engine-line);
   min-width: 0;
 }
-:where(.admin-platform) .engine-totals > div:last-child {
+:where(.admin-control) .engine-totals > div:last-child {
   border: 0;
 }
-:where(.admin-platform) .engine-totals dt {
+:where(.admin-control) .engine-totals dt {
   color: var(--engine-muted);
   font-size: 12px;
   line-height: 1.5;
 }
-:where(.admin-platform) .engine-totals dd {
+:where(.admin-control) .engine-totals dd {
   font-size: 26px;
   line-height: 1.4;
   margin: 4px 0 0;
 }
-:where(.admin-platform) .engine-totals [data-alert] dd {
+:where(.admin-control) .engine-totals [data-alert] dd {
   color: #f2cf92;
 }
-:where(.admin-platform) .engine-scope-note {
+:where(.admin-control) .engine-scope-note {
   color: var(--engine-muted);
   font-size: 12px;
   line-height: 1.6;
 }
-:where(.admin-platform) .engine-reactor {
+:where(.admin-control) .engine-reactor {
   position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 104px minmax(0, 1fr);
@@ -116,7 +116,7 @@
   padding: 16px 0;
   isolation: isolate;
 }
-:where(.admin-platform) .engine-wires {
+:where(.admin-control) .engine-wires {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -124,7 +124,7 @@
   color: #35516b;
   z-index: -1;
 }
-:where(.admin-platform) .engine-bank {
+:where(.admin-control) .engine-bank {
   --tone: var(--engine-input);
   background: #132a40;
   border: 1px solid var(--engine-line);
@@ -133,64 +133,64 @@
   padding: 14px;
   min-width: 0;
 }
-:where(.admin-platform) .engine-input {
+:where(.admin-control) .engine-input {
   grid-column: 1;
   grid-row: 1;
 }
-:where(.admin-platform) .engine-process {
+:where(.admin-control) .engine-process {
   --tone: var(--engine-process);
   grid-column: 3;
   grid-row: 1;
 }
-:where(.admin-platform) .engine-output {
+:where(.admin-control) .engine-output {
   --tone: var(--engine-output);
   grid-column: 3;
   grid-row: 2;
 }
-:where(.admin-platform) .engine-evolution {
+:where(.admin-control) .engine-evolution {
   --tone: var(--engine-evolution);
   grid-column: 1;
   grid-row: 2;
   background: #152638;
 }
-:where(.admin-platform) .engine-bank-heading {
+:where(.admin-control) .engine-bank-heading {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 8px;
   margin-bottom: 12px;
 }
-:where(.admin-platform) .engine-bank-heading small {
+:where(.admin-control) .engine-bank-heading small {
   display: block;
   color: var(--engine-muted);
   font-size: 12px;
   font-weight: 400;
 }
-:where(.admin-platform) .engine-bank-heading h3 {
+:where(.admin-control) .engine-bank-heading h3 {
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 18px;
   font-weight: 550;
 }
-:where(.admin-platform) .engine-bank-heading svg {
+:where(.admin-control) .engine-bank-heading svg {
   color: var(--tone);
 }
-:where(.admin-platform) .engine-bank-heading > strong {
+:where(.admin-control) .engine-bank-heading > strong {
   color: var(--tone);
   font-size: 24px;
   text-align: right;
   font-weight: 550;
   line-height: 1.2;
 }
-:where(.admin-platform) .engine-bank-heading > strong small {
+:where(.admin-control) .engine-bank-heading > strong small {
   margin-top: 3px;
 }
-:where(.admin-platform) .engine-channels {
+:where(.admin-control) .engine-channels {
   display: grid;
   gap: 9px;
 }
-:where(.admin-platform) .engine-channel {
+:where(.admin-control) .engine-channel {
   display: grid;
   grid-template-columns: minmax(120px, auto) minmax(12px, 1fr) auto;
   align-items: center;
@@ -199,30 +199,30 @@
   line-height: 1.5;
   color: var(--engine-muted);
 }
-:where(.admin-platform) .engine-channel i {
+:where(.admin-control) .engine-channel i {
   height: 4px;
   background: #29445b;
   border-radius: 2px;
   overflow: hidden;
 }
-:where(.admin-platform) .engine-channel i b {
+:where(.admin-control) .engine-channel i b {
   display: block;
   background: var(--tone);
   height: 100%;
 }
-:where(.admin-platform) .engine-channel strong {
+:where(.admin-control) .engine-channel strong {
   color: #e6f3ff;
   min-width: 20px;
   text-align: right;
   font-weight: 550;
 }
-:where(.admin-platform) .engine-bank .engine-bank-state {
+:where(.admin-control) .engine-bank .engine-bank-state {
   margin-top: 12px;
   font-size: 12px;
   color: var(--engine-muted);
   line-height: 1.6;
 }
-:where(.admin-platform) .engine-bank-foot {
+:where(.admin-control) .engine-bank-foot {
   border-top: 1px solid var(--engine-line);
   margin-top: 8px;
   padding-top: 8px;
@@ -233,15 +233,15 @@
   font-size: 12px;
   color: var(--engine-muted);
 }
-:where(.admin-platform) .engine-bank-foot b {
+:where(.admin-control) .engine-bank-foot b {
   color: #e6f3ff;
   font-weight: 550;
 }
-:where(.admin-platform) .engine-bank-foot .engine-bank-alert,
-:where(.admin-platform) .engine-bank-alert b {
+:where(.admin-control) .engine-bank-foot .engine-bank-alert,
+:where(.admin-control) .engine-bank-alert b {
   color: #f2cf92;
 }
-:where(.admin-platform) .engine-core {
+:where(.admin-control) .engine-core {
   grid-column: 2;
   grid-row: 1 / 3;
   align-self: center;
@@ -252,15 +252,15 @@
   color: var(--engine-muted);
   font-size: 13px;
 }
-:where(.admin-platform) .engine-core > svg {
+:where(.admin-control) .engine-core > svg {
   color: #8eacc6;
 }
-:where(.admin-platform) .engine-core > small {
+:where(.admin-control) .engine-core > small {
   font-size: 12px;
   line-height: 1.5;
   max-width: 7em;
 }
-:where(.admin-platform) .engine-unavailable {
+:where(.admin-control) .engine-unavailable {
   border: 1px solid #6a5986;
   border-radius: 5px;
   padding: 4px 8px;
@@ -268,24 +268,24 @@
   font-size: 12px;
   white-space: nowrap;
 }
-:where(.admin-platform) .engine-evolution p {
+:where(.admin-control) .engine-evolution p {
   color: var(--engine-muted);
   font-size: 12px;
   line-height: 1.7;
 }
-:where(.admin-platform) .engine-secondary {
+:where(.admin-control) .engine-secondary {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 14px;
 }
-:where(.admin-platform) .engine-panel {
+:where(.admin-control) .engine-panel {
   padding: 14px;
   border: 1px solid var(--engine-line);
   background: #0f2337;
   border-radius: 12px;
   min-width: 0;
 }
-:where(.admin-platform) .engine-panel h3 {
+:where(.admin-control) .engine-panel h3 {
   font-size: 14px;
   font-weight: 550;
   margin-bottom: 12px;
@@ -294,73 +294,73 @@
   flex-wrap: wrap;
   gap: 8px;
 }
-:where(.admin-platform) .engine-panel h3 small {
+:where(.admin-control) .engine-panel h3 small {
   font-size: 12px;
   font-weight: 400;
   color: var(--engine-muted);
 }
-:where(.admin-platform) .engine-panel p,
-:where(.admin-platform) .engine-caption {
+:where(.admin-control) .engine-panel p,
+:where(.admin-control) .engine-caption {
   color: var(--engine-muted);
   font-size: 12px;
   line-height: 1.7;
 }
-:where(.admin-platform) .engine-panel p {
+:where(.admin-control) .engine-panel p {
   max-width: 72ch;
 }
-:where(.admin-platform) .engine-resource {
+:where(.admin-control) .engine-resource {
   margin: 0 0 12px;
   display: grid;
   gap: 8px;
   font-size: 12px;
 }
-:where(.admin-platform) .engine-resource > div {
+:where(.admin-control) .engine-resource > div {
   display: flex;
   justify-content: space-between;
   gap: 12px;
 }
-:where(.admin-platform) .engine-resource dt {
+:where(.admin-control) .engine-resource dt {
   color: var(--engine-muted);
 }
-:where(.admin-platform) .engine-resource dd {
+:where(.admin-control) .engine-resource dd {
   margin: 0;
 }
-:where(.admin-platform) .engine-details {
+:where(.admin-control) .engine-details {
   font-size: 12px;
   line-height: 1.7;
 }
-:where(.admin-platform) .engine-details summary {
+:where(.admin-control) .engine-details summary {
   cursor: pointer;
   color: #bcddf8;
 }
-:where(.admin-platform) .engine-details[open] > summary {
+:where(.admin-control) .engine-details[open] > summary {
   margin-bottom: 10px;
 }
-:where(.admin-platform) .engine-details summary:hover {
+:where(.admin-control) .engine-details summary:hover {
   color: #fff;
 }
-:where(.admin-platform) .engine-trend svg {
+:where(.admin-control) .engine-trend svg {
   width: 100%;
   height: 110px;
   overflow: visible;
 }
-:where(.admin-platform) .engine-trend polyline {
+:where(.admin-control) .engine-trend polyline {
   fill: none;
   stroke: var(--engine-process);
   stroke-width: 2;
 }
-:where(.admin-platform) .engine-trend circle {
+:where(.admin-control) .engine-trend circle {
   fill: var(--engine-process);
 }
-:where(.admin-platform) .engine-trend-grid {
+:where(.admin-control) .engine-trend-grid {
   fill: none;
   stroke: var(--engine-line);
 }
-:where(.admin-platform) .engine-trend text {
+:where(.admin-control) .engine-trend text {
   fill: var(--engine-muted);
   font-size: 12px;
 }
-:where(.admin-platform) .engine-trend-empty {
+:where(.admin-control) .engine-trend-empty {
   min-height: 88px;
   display: flex;
   align-items: center;
@@ -368,16 +368,16 @@
   font-size: 12px;
   color: var(--engine-muted);
 }
-:where(.admin-platform) .engine-recent {
+:where(.admin-control) .engine-recent {
   margin-top: 14px;
 }
-:where(.admin-platform) .engine-recent ul {
+:where(.admin-control) .engine-recent ul {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
 }
-:where(.admin-platform) .engine-recent li {
+:where(.admin-control) .engine-recent li {
   display: grid;
   grid-template-columns: 180px 1fr auto;
   gap: 12px;
@@ -385,95 +385,95 @@
   border-top: 1px solid var(--engine-line);
   font-size: 12px;
 }
-:where(.admin-platform) .engine-recent time,
-:where(.admin-platform) .engine-recent li > span:last-child {
+:where(.admin-control) .engine-recent time,
+:where(.admin-control) .engine-recent li > span:last-child {
   color: var(--engine-muted);
 }
-:where(.admin-platform) .engine-wall > .engine-caption {
+:where(.admin-control) .engine-wall > .engine-caption {
   margin-top: 14px;
 }
 @media (max-width: 1100px) {
-  :where(.admin-platform) .engine-reactor {
+  :where(.admin-control) .engine-reactor {
     grid-template-columns: minmax(0, 1fr) 72px minmax(0, 1fr);
     gap: 12px 10px;
   }
-  :where(.admin-platform) .engine-channel {
+  :where(.admin-control) .engine-channel {
     grid-template-columns: minmax(0, 1fr) 30px 22px;
   }
-  :where(.admin-platform) .engine-bank {
+  :where(.admin-control) .engine-bank {
     padding: 12px;
   }
 }
 @media (max-width: 760px) {
-  :where(.admin-platform) .engine-wall {
+  :where(.admin-control) .engine-wall {
     padding: 14px;
   }
-  :where(.admin-platform) .engine-totals {
+  :where(.admin-control) .engine-totals {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
-  :where(.admin-platform) .engine-totals > div {
+  :where(.admin-control) .engine-totals > div {
     border: 0;
   }
-  :where(.admin-platform) .engine-reactor {
+  :where(.admin-control) .engine-reactor {
     grid-template-columns: 1fr 1fr;
   }
-  :where(.admin-platform) .engine-input {
+  :where(.admin-control) .engine-input {
     grid-column: 1;
     grid-row: 1;
   }
-  :where(.admin-platform) .engine-process {
+  :where(.admin-control) .engine-process {
     grid-column: 2;
     grid-row: 1;
   }
-  :where(.admin-platform) .engine-output {
+  :where(.admin-control) .engine-output {
     grid-column: 2;
     grid-row: 2;
   }
-  :where(.admin-platform) .engine-evolution {
+  :where(.admin-control) .engine-evolution {
     grid-column: 1;
     grid-row: 2;
   }
-  :where(.admin-platform) .engine-core,
-  :where(.admin-platform) .engine-wires {
+  :where(.admin-control) .engine-core,
+  :where(.admin-control) .engine-wires {
     display: none;
   }
-  :where(.admin-platform) .engine-secondary {
+  :where(.admin-control) .engine-secondary {
     grid-template-columns: 1fr;
   }
-  :where(.admin-platform) .engine-recent li {
+  :where(.admin-control) .engine-recent li {
     grid-template-columns: 1fr 1fr;
   }
-  :where(.admin-platform) .engine-recent time {
+  :where(.admin-control) .engine-recent time {
     grid-column: 1 / 3;
   }
 }
 @media (max-width: 480px) {
-  :where(.admin-platform) .engine-heading {
+  :where(.admin-control) .engine-heading {
     align-items: flex-start;
   }
-  :where(.admin-platform) .engine-heading p {
+  :where(.admin-control) .engine-heading p {
     font-size: 12px;
   }
-  :where(.admin-platform) .engine-reactor {
+  :where(.admin-control) .engine-reactor {
     display: flex;
     flex-direction: column;
   }
-  :where(.admin-platform) .engine-channel {
+  :where(.admin-control) .engine-channel {
     grid-template-columns: minmax(0, 1fr) 56px 22px;
   }
-  :where(.admin-platform) .engine-totals {
+  :where(.admin-control) .engine-totals {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  :where(.admin-platform) .engine-bank-heading > strong {
+  :where(.admin-control) .engine-bank-heading > strong {
     font-size: 22px;
   }
 }
 
 /* Four operational sectors around a live snapshot core. */
-.admin-platform .engine-heading--embedded {
+.admin-control .engine-heading--embedded {
   display: none;
 }
-.admin-platform .engine-observatory {
+.admin-control .engine-observatory {
   padding: 24px;
   border-color: #253e58;
   background:
@@ -490,33 +490,33 @@
     0 12px 32px #17304e16;
   border-radius: 20px;
 }
-.admin-platform .engine-observatory .engine-status {
+.admin-control .engine-observatory .engine-status {
   border: 0;
   padding-bottom: 4px;
 }
-.admin-platform .engine-observatory .engine-status span:first-child {
+.admin-control .engine-observatory .engine-status span:first-child {
   color: #75dce9;
 }
-.admin-platform .engine-observatory .engine-totals {
+.admin-control .engine-observatory .engine-totals {
   padding: 18px 0;
   gap: 14px;
 }
-.admin-platform .engine-observatory .engine-totals > div {
+.admin-control .engine-observatory .engine-totals > div {
   border: 1px solid #92caff18;
   border-radius: 10px;
   padding: 12px 16px;
   background: #17344c55;
 }
-.admin-platform .engine-observatory .engine-totals dd {
+.admin-control .engine-observatory .engine-totals dd {
   font-size: 30px;
   font-weight: 550;
 }
-.admin-platform .engine-observatory .engine-reactor {
+.admin-control .engine-observatory .engine-reactor {
   grid-template-columns: minmax(0, 1fr) 220px minmax(0, 1fr);
   gap: 18px 20px;
   padding: 20px 0;
 }
-.admin-platform .engine-observatory .engine-bank {
+.admin-control .engine-observatory .engine-bank {
   padding: 20px;
   border: 1px solid #90cfff25;
   border-top: 2px solid var(--tone);
@@ -524,33 +524,33 @@
   border-radius: 16px;
   box-shadow: inset 0 1px #d0f0ff0a;
 }
-.admin-platform .engine-observatory .engine-bank-heading > div > small {
+.admin-control .engine-observatory .engine-bank-heading > div > small {
   color: var(--tone);
   letter-spacing: 0.18em;
   font-size: 10px;
   margin-bottom: 7px;
 }
-.admin-platform .engine-observatory .engine-bank-heading > strong {
+.admin-control .engine-observatory .engine-bank-heading > strong {
   font-size: 32px;
 }
-.admin-platform .engine-observatory .engine-channels {
+.admin-control .engine-observatory .engine-channels {
   gap: 10px;
 }
-.admin-platform .engine-observatory .engine-channel {
+.admin-control .engine-observatory .engine-channel {
   grid-template-columns: minmax(110px, auto) minmax(16px, 1fr) 24px;
 }
-.admin-platform .engine-observatory .engine-channel i {
+.admin-control .engine-observatory .engine-channel i {
   background: #99ccff13;
   height: 3px;
 }
-.admin-platform .engine-observatory .engine-channel i b {
+.admin-control .engine-observatory .engine-channel i b {
   transition: width 0.5s ease;
   box-shadow: 0 0 8px var(--tone);
 }
-.admin-platform .engine-observatory .engine-core {
+.admin-control .engine-observatory .engine-core {
   gap: 12px;
 }
-.admin-platform .engine-observatory .engine-orb {
+.admin-control .engine-observatory .engine-orb {
   width: 170px;
   height: 170px;
   padding: 3px;
@@ -561,7 +561,7 @@
     0 0 0 26px #72b9f305,
     0 0 60px #58beff20;
 }
-.admin-platform .engine-observatory .engine-orb > div {
+.admin-control .engine-observatory .engine-orb > div {
   width: 100%;
   height: 100%;
   border-radius: 50%;
@@ -572,46 +572,46 @@
   align-items: center;
   gap: 4px;
 }
-.admin-platform .engine-observatory .engine-orb small {
+.admin-control .engine-observatory .engine-orb small {
   font-size: 10px;
   letter-spacing: 0.2em;
   color: #7daec7;
 }
-.admin-platform .engine-observatory .engine-orb strong {
+.admin-control .engine-observatory .engine-orb strong {
   font-size: 44px;
   color: #e9f8ff;
   font-weight: 550;
 }
-.admin-platform .engine-observatory .engine-orb span {
+.admin-control .engine-observatory .engine-orb span {
   font-size: 12px;
   color: #9fc5db;
 }
-.admin-platform .engine-observatory .engine-core > small {
+.admin-control .engine-observatory .engine-core > small {
   max-width: none;
   font-size: 10px;
 }
-.admin-platform .engine-observatory .engine-wires {
+.admin-control .engine-observatory .engine-wires {
   color: #528fbb60;
 }
-.admin-platform .engine-observatory .engine-wires path[data-active] {
+.admin-control .engine-observatory .engine-wires path[data-active] {
   stroke: #71dff5;
   stroke-dasharray: 8 12;
   animation: engine-snapshot-flow 3s linear infinite;
 }
-.admin-platform .engine-observatory .engine-evolution-flow {
+.admin-control .engine-observatory .engine-evolution-flow {
   display: flex;
   gap: 8px;
   align-items: center;
   margin-top: 18px;
   color: #9d86c3;
 }
-.admin-platform .engine-observatory .engine-evolution-flow span {
+.admin-control .engine-observatory .engine-evolution-flow span {
   padding: 7px 9px;
   border: 1px solid #b298e52a;
   border-radius: 6px;
   font-size: 11px;
 }
-.admin-platform .engine-observatory .engine-panel {
+.admin-control .engine-observatory .engine-panel {
   background: #11283bbd;
   border-color: #91c5f323;
   border-radius: 12px;
@@ -622,51 +622,51 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .admin-platform .engine-observatory .engine-wires path[data-active] {
+  .admin-control .engine-observatory .engine-wires path[data-active] {
     animation: none;
   }
-  .admin-platform .engine-observatory .engine-channel i b {
+  .admin-control .engine-observatory .engine-channel i b {
     transition: none;
   }
 }
 
 /* Standalone engine core, execution pipeline and independent improvement layer. */
-.admin-platform .engine-observatory .engine-reactor {
+.admin-control .engine-observatory .engine-reactor {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   grid-template-rows: auto auto auto;
   gap: 28px 30px;
 }
-.admin-platform .engine-observatory .engine-input {
+.admin-control .engine-observatory .engine-input {
   grid-column: 1;
   grid-row: 1;
 }
-.admin-platform .engine-observatory .engine-process {
+.admin-control .engine-observatory .engine-process {
   grid-column: 2;
   grid-row: 1;
 }
-.admin-platform .engine-observatory .engine-output {
+.admin-control .engine-observatory .engine-output {
   grid-column: 3;
   grid-row: 1;
 }
-.admin-platform .engine-observatory .engine-wires {
+.admin-control .engine-observatory .engine-wires {
   height: 100%;
 }
-.admin-platform .engine-observatory .engine-bank:not(.engine-evolution) {
+.admin-control .engine-observatory .engine-bank:not(.engine-evolution) {
   display: flex;
   flex-direction: column;
 }
-.admin-platform .engine-observatory .engine-bank:not(.engine-evolution) > .engine-bank-state {
+.admin-control .engine-observatory .engine-bank:not(.engine-evolution) > .engine-bank-state {
   margin-top: auto;
   padding-top: 18px;
 }
-.admin-platform .engine-observatory .engine-core {
+.admin-control .engine-observatory .engine-core {
   position: static;
   grid-column: 2;
   grid-row: 2;
   gap: 12px;
   padding: 8px 0;
 }
-.admin-platform .engine-observatory .engine-orb {
+.admin-control .engine-observatory .engine-orb {
   width: 144px;
   height: 144px;
   margin: 0 auto;
@@ -675,62 +675,62 @@
     0 0 0 10px #72b9f305,
     0 0 30px #58beff20;
 }
-.admin-platform .engine-observatory .engine-orb strong {
+.admin-control .engine-observatory .engine-orb strong {
   font-size: 40px;
 }
-.admin-platform .engine-observatory .engine-orb span {
+.admin-control .engine-observatory .engine-orb span {
   font-size: 10px;
 }
-.admin-platform .engine-observatory .engine-core > small {
+.admin-control .engine-observatory .engine-core > small {
   text-align: center;
   font-size: 9px;
 }
-.admin-platform .engine-observatory .engine-evolution {
+.admin-control .engine-observatory .engine-evolution {
   grid-column: 1 / -1;
   grid-row: 3;
   background: linear-gradient(110deg, #25253c, #191e31 65%);
   border-color: #b298e530;
   border-top-color: #ad91dc;
 }
-.admin-platform .engine-observatory .engine-evolution-body {
+.admin-control .engine-observatory .engine-evolution-body {
   display: grid;
   grid-template-columns: 1fr 1.3fr 1fr;
   gap: 30px;
   align-items: center;
 }
-.admin-platform .engine-observatory .engine-evolution-body > p {
+.admin-control .engine-observatory .engine-evolution-body > p {
   margin: 0;
 }
-.admin-platform .engine-observatory .engine-evolution-flow {
+.admin-control .engine-observatory .engine-evolution-flow {
   margin-top: 0;
   justify-content: center;
 }
-.admin-platform .engine-observatory .engine-evolution-results {
+.admin-control .engine-observatory .engine-evolution-results {
   display: flex;
   gap: 30px;
   margin: 0;
   padding-left: 24px;
   border-left: 1px solid #b298e525;
 }
-.admin-platform .engine-observatory .engine-evolution-results dt {
+.admin-control .engine-observatory .engine-evolution-results dt {
   color: #b6a5cb;
   font-size: 11px;
   margin-bottom: 6px;
 }
-.admin-platform .engine-observatory .engine-evolution-results dd {
+.admin-control .engine-observatory .engine-evolution-results dd {
   margin: 0;
   color: #9d91ac;
   font-size: 13px;
 }
-.admin-platform .engine-observatory .engine-evolution > .engine-bank-state {
+.admin-control .engine-observatory .engine-evolution > .engine-bank-state {
   margin-bottom: 0;
 }
 
-.admin-platform .engine-observatory .engine-evolution-flow {
+.admin-control .engine-observatory .engine-evolution-flow {
   position: relative;
   padding-bottom: 18px;
 }
-.admin-platform .engine-observatory .engine-evolution-flow::after {
+.admin-control .engine-observatory .engine-evolution-flow::after {
   content: '↶ 持续改进 · 流程预留';
   position: absolute;
   bottom: -5px;
@@ -744,12 +744,12 @@
 }
 
 /* Full canvas dashboard, with the sidebar retained. */
-.admin-platform.admin-engine-fullscreen .admin-content {
+.admin-control.admin-engine-fullscreen .admin-content {
   padding: 0;
   flex: 1;
   background: #091827;
 }
-.admin-platform.admin-engine-fullscreen .engine-page {
+.admin-control.admin-engine-fullscreen .engine-page {
   min-height: 100%;
   padding: 28px 32px;
   color: #e6f3ff;
@@ -763,30 +763,30 @@
     32px 32px,
     auto;
 }
-.admin-platform.admin-engine-fullscreen .engine-heading--embedded {
+.admin-control.admin-engine-fullscreen .engine-heading--embedded {
   display: flex;
   margin-bottom: 20px;
   padding-bottom: 20px;
   border-bottom: 1px solid #92caff18;
 }
-.admin-platform.admin-engine-fullscreen .engine-heading h1 {
+.admin-control.admin-engine-fullscreen .engine-heading h1 {
   margin: 0 0 6px;
   font-size: 24px;
   line-height: 1.4;
   color: #e6f3ff;
 }
-.admin-platform.admin-engine-fullscreen .engine-heading p {
+.admin-control.admin-engine-fullscreen .engine-heading p {
   color: #aec5da;
 }
-.admin-platform.admin-engine-fullscreen .engine-heading .button {
+.admin-control.admin-engine-fullscreen .engine-heading .button {
   color: #aec5da;
   border-color: #92caff25;
 }
-.admin-platform.admin-engine-fullscreen .engine-heading .button:hover {
+.admin-control.admin-engine-fullscreen .engine-heading .button:hover {
   color: #e6f3ff;
   background: #17344c;
 }
-.admin-platform.admin-engine-fullscreen .engine-observatory {
+.admin-control.admin-engine-fullscreen .engine-observatory {
   padding: 0;
   border: 0;
   border-radius: 0;
@@ -794,23 +794,23 @@
   background: transparent;
 }
 @media (min-width: 761px) {
-  .admin-platform.admin-engine-fullscreen .admin-header {
+  .admin-control.admin-engine-fullscreen .admin-header {
     display: none;
   }
 }
 
 /* Ambient mechanical motion does not imply an executing task. */
-.admin-platform .engine-observatory .engine-process {
+.admin-control .engine-observatory .engine-process {
   padding: 14px 20px;
 }
-.admin-platform .engine-observatory .engine-process .engine-channels {
+.admin-control .engine-observatory .engine-process .engine-channels {
   gap: 6px;
 }
-.admin-platform .engine-observatory .engine-orb::before {
+.admin-control .engine-observatory .engine-orb::before {
   border-color: #71dff55c;
   animation: engine-orbit-turn 24s linear infinite;
 }
-.admin-platform .engine-observatory .engine-orb::after {
+.admin-control .engine-observatory .engine-orb::after {
   content: '';
   position: absolute;
   inset: -20px;
@@ -821,7 +821,7 @@
   animation: engine-orbit-turn 14s linear infinite reverse;
   pointer-events: none;
 }
-.admin-platform .engine-observatory .engine-orb > div {
+.admin-control .engine-observatory .engine-orb > div {
   animation: engine-core-breathe 4s ease-in-out infinite;
 }
 @keyframes engine-orbit-turn {
@@ -839,69 +839,69 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .admin-platform .engine-observatory .engine-orb::before,
-  .admin-platform .engine-observatory .engine-orb::after,
-  .admin-platform .engine-observatory .engine-orb > div {
+  .admin-control .engine-observatory .engine-orb::before,
+  .admin-control .engine-observatory .engine-orb::after,
+  .admin-control .engine-observatory .engine-orb > div {
     animation: none;
   }
 }
 
-.admin-platform .engine-observatory .engine-transfer-packet {
+.admin-control .engine-observatory .engine-transfer-packet {
   filter: drop-shadow(0 0 5px #71dff5);
 }
-.admin-platform .engine-observatory .engine-transfer-note {
+.admin-control .engine-observatory .engine-transfer-note {
   color: #88a6bc;
 }
 @media (prefers-reduced-motion: reduce) {
-  .admin-platform .engine-observatory .engine-transfer-packet {
+  .admin-control .engine-observatory .engine-transfer-packet {
     display: none;
   }
 }
 
-.admin-platform .engine-refresh {
+.admin-control .engine-refresh {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   gap: 8px;
 }
-.admin-platform .engine-refresh > small {
+.admin-control .engine-refresh > small {
   color: #aec5da;
   font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
 
 /* Each sector visualizes its own type of work. */
-.admin-platform .engine-observatory .engine-input {
+.admin-control .engine-observatory .engine-input {
   background: radial-gradient(ellipse at 50% 90%, #17526a44, transparent 70%), #112638;
 }
-.admin-platform .engine-observatory .engine-process {
+.admin-control .engine-observatory .engine-process {
   background: linear-gradient(135deg, #1c2b49, #112638);
 }
-.admin-platform .engine-observatory .engine-output {
+.admin-control .engine-observatory .engine-output {
   background: radial-gradient(ellipse at 50% 50%, #144e4644, transparent 75%), #112638;
 }
-.admin-platform .engine-input-chart {
+.admin-control .engine-input-chart {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
   padding: 8px 0;
 }
-.admin-platform .engine-input-chart > div {
+.admin-control .engine-input-chart > div {
   text-align: center;
   min-width: 0;
 }
-.admin-platform .engine-input-column {
+.admin-control .engine-input-column {
   height: 112px;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
-.admin-platform .engine-input-column > strong {
+.admin-control .engine-input-column > strong {
   font-size: 18px;
   color: #71dff5;
   font-weight: 500;
 }
-.admin-platform .engine-input-track {
+.admin-control .engine-input-track {
   flex: 1;
   position: relative;
   border-bottom: 1px solid #71dff555;
@@ -913,7 +913,7 @@
     transparent 23px
   );
 }
-.admin-platform .engine-input-track i {
+.admin-control .engine-input-track i {
   display: block;
   position: absolute;
   bottom: 0;
@@ -923,19 +923,19 @@
   border-radius: 4px 4px 0 0;
   transition: height 0.5s ease;
 }
-.admin-platform .engine-input-chart span {
+.admin-control .engine-input-chart span {
   display: block;
   margin-top: 10px;
   font-size: 11px;
   color: #aec5da;
 }
-.admin-platform .engine-process-map {
+.admin-control .engine-process-map {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   padding: 5px 0;
 }
-.admin-platform .engine-process-map > div {
+.admin-control .engine-process-map > div {
   display: grid;
   grid-template-columns: 6px minmax(0, 1fr) auto;
   gap: 7px;
@@ -945,44 +945,44 @@
   background: #8db9ff08;
   padding: 10px;
 }
-.admin-platform .engine-process-map > div:last-child {
+.admin-control .engine-process-map > div:last-child {
   grid-column: 1 / -1;
 }
-.admin-platform .engine-process-map i {
+.admin-control .engine-process-map i {
   width: 5px;
   height: 5px;
   border-radius: 50%;
   background: #58738e;
 }
-.admin-platform .engine-process-map [data-running] i {
+.admin-control .engine-process-map [data-running] i {
   background: #8db9ff;
   box-shadow: 0 0 8px #8db9ff;
 }
-.admin-platform .engine-process-map span {
+.admin-control .engine-process-map span {
   font-size: 11px;
   color: #aec5da;
 }
-.admin-platform .engine-process-map strong {
+.admin-control .engine-process-map strong {
   font-size: 16px;
   color: #8db9ff;
 }
-.admin-platform .engine-output-chart {
+.admin-control .engine-output-chart {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 20px;
   padding: 4px 0;
 }
-.admin-platform .engine-output-chart > div {
+.admin-control .engine-output-chart > div {
   position: relative;
   text-align: center;
 }
-.admin-platform .engine-output-chart svg {
+.admin-control .engine-output-chart svg {
   display: block;
   width: 108px;
   max-width: 100%;
   margin: 0 auto;
 }
-.admin-platform .engine-output-chart strong {
+.admin-control .engine-output-chart strong {
   position: absolute;
   top: 40px;
   left: 0;
@@ -991,24 +991,24 @@
   font-size: 22px;
   line-height: 28px;
 }
-.admin-platform .engine-output-chart span {
+.admin-control .engine-output-chart span {
   display: block;
   margin-top: 5px;
   color: #aec5da;
   font-size: 11px;
 }
-.admin-platform .engine-observatory .engine-evolution {
+.admin-control .engine-observatory .engine-evolution {
   background:
     radial-gradient(ellipse at 50% 50%, #7953ab20, transparent 65%), linear-gradient(110deg, #25253c, #191e31);
 }
 @media (prefers-reduced-motion: reduce) {
-  .admin-platform .engine-input-track i {
+  .admin-control .engine-input-track i {
     transition: none;
   }
 }
 
 /* Dashboard-specific navigation palette. */
-.admin-platform.admin-engine-fullscreen .admin-sidebar {
+.admin-control.admin-engine-fullscreen .admin-sidebar {
   --text: #d7e8f5;
   --text-secondary: #91a9bd;
   --muted: #91a9bd;
@@ -1021,53 +1021,53 @@
   border-right: 1px solid #739fc925;
   box-shadow: inset -1px 0 #71dff508;
 }
-.admin-platform.admin-engine-fullscreen .admin-brand strong {
+.admin-control.admin-engine-fullscreen .admin-brand strong {
   color: #e6f3ff;
 }
-.admin-platform.admin-engine-fullscreen .admin-brand-english {
+.admin-control.admin-engine-fullscreen .admin-brand-english {
   color: #91a9bd;
 }
-.admin-platform.admin-engine-fullscreen .admin-nav-group-title {
+.admin-control.admin-engine-fullscreen .admin-nav-group-title {
   color: #7e99ae;
 }
-.admin-platform.admin-engine-fullscreen .admin-nav-link {
+.admin-control.admin-engine-fullscreen .admin-nav-link {
   color: #adc4d6;
 }
-.admin-platform.admin-engine-fullscreen .admin-nav-link.active {
+.admin-control.admin-engine-fullscreen .admin-nav-link.active {
   color: #91ebf7;
   background: linear-gradient(90deg, #1c4d5e, #163344);
   box-shadow:
     inset 3px 0 #71dff5,
     inset 0 0 0 1px #71dff528;
 }
-.admin-platform.admin-engine-fullscreen .admin-nav-link:hover:not(.active) {
+.admin-control.admin-engine-fullscreen .admin-nav-link:hover:not(.active) {
   color: #e6f3ff;
   background: #173247;
 }
-.admin-platform.admin-engine-fullscreen .admin-sidebar button {
+.admin-control.admin-engine-fullscreen .admin-sidebar button {
   color: #91a9bd;
 }
-.admin-platform.admin-engine-fullscreen .admin-sidebar button:hover {
+.admin-control.admin-engine-fullscreen .admin-sidebar button:hover {
   color: #91ebf7;
   background: #173247;
 }
 
-.admin-platform.admin-engine-fullscreen .engine-page {
+.admin-control.admin-engine-fullscreen .engine-page {
   padding-top: 18px;
 }
-.admin-platform.admin-engine-fullscreen .engine-heading--embedded {
+.admin-control.admin-engine-fullscreen .engine-heading--embedded {
   margin-bottom: 6px;
   padding-bottom: 10px;
 }
-.admin-platform.admin-engine-fullscreen .engine-heading h1 {
+.admin-control.admin-engine-fullscreen .engine-heading h1 {
   margin: 0;
 }
-.admin-platform.admin-engine-fullscreen .engine-reactor {
+.admin-control.admin-engine-fullscreen .engine-reactor {
   padding-top: 12px;
 }
 
 /* Independent animated evolution circuit; illustrative while disconnected. */
-.admin-platform .engine-coupling-wire {
+.admin-control .engine-coupling-wire {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -1076,30 +1076,30 @@
   pointer-events: none;
   overflow: visible;
 }
-.admin-platform .engine-learning-demo {
+.admin-control .engine-learning-demo {
   position: relative;
 }
-.admin-platform .engine-learning-diagram {
+.admin-control .engine-learning-diagram {
   display: block;
   width: 100%;
   max-height: 205px;
 }
-.admin-platform .engine-learning-demo-label {
+.admin-control .engine-learning-demo-label {
   display: block;
   text-align: right;
   color: #a990c6;
   font-size: 10px;
   margin-top: 2px;
 }
-.admin-platform .engine-learning-orbit {
+.admin-control .engine-learning-orbit {
   transform-box: fill-box;
   transform-origin: center;
   animation: engine-orbit-turn 20s linear infinite reverse;
 }
-.admin-platform .engine-learning-halo {
+.admin-control .engine-learning-halo {
   animation: engine-learning-halo 4s ease-in-out infinite;
 }
-.admin-platform .engine-learning-stage rect {
+.admin-control .engine-learning-stage rect {
   animation: engine-learning-stage 8s ease-in-out infinite;
   animation-delay: var(--stage-delay);
 }
@@ -1125,9 +1125,9 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .admin-platform .engine-learning-orbit,
-  .admin-platform .engine-learning-halo,
-  .admin-platform .engine-learning-stage rect {
+  .admin-control .engine-learning-orbit,
+  .admin-control .engine-learning-halo,
+  .admin-control .engine-learning-stage rect {
     animation: none;
   }
 }

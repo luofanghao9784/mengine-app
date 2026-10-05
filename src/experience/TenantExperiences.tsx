@@ -40,23 +40,30 @@ export function TenantExperiences({ tenant }: { tenant: string }) {
     if (linkedEntry) setSource('enterprise');
   }, [tenant, linkedEntry, setSource]);
   return (
-    <div className="admin-dashboard">
-      <Field label="经验来源">
-        <select
-          aria-label="经验来源"
-          value={source}
-          disabled={locked}
-          onChange={(e) => {
-            if (!requestNavigationLocked()) {
-              setLocalSelection(null);
-              setSource(e.target.value);
-            }
-          }}
-        >
-          <option value="enterprise">企业经验</option>
-          <option value="general">通用经验</option>
-        </select>
-      </Field>
+    <div className="admin-dashboard tenant-experience-page">
+      <nav className="platform-detail-nav" aria-label="经验来源">
+        {(
+          [
+            ['enterprise', '企业经验'],
+            ['general', '通用经验'],
+          ] as const
+        ).map(([key, label]) => (
+          <Button
+            key={key}
+            variant="ghost"
+            aria-current={source === key ? 'page' : undefined}
+            disabled={locked}
+            onClick={() => {
+              if (!requestNavigationLocked()) {
+                setLocalSelection(null);
+                setSource(key);
+              }
+            }}
+          >
+            {label}
+          </Button>
+        ))}
+      </nav>
       {source === 'general' ? (
         <GeneralExperienceLibrary
           tenant={tenant}
@@ -163,7 +170,7 @@ function EnterpriseExperiences({
   }, [error, select]);
   return (
     <div className="admin-dashboard experience-management">
-      <div className="experience-management-tabs" role="tablist" aria-label="经验库板块">
+      <div className="experience-management-tabs platform-detail-nav" role="tablist" aria-label="经验库板块">
         <Button
           role="tab"
           aria-selected={tab !== 'processing'}
@@ -360,29 +367,38 @@ function EnterpriseExperiences({
         <>
           <p className="muted">本企业当前获权经验。方法供引擎按需参考，自动核验通过不代表所有场景都适用。</p>
           {data.value.items.length ? (
-            <div className="experience-management-list">
-              {data.value.items.map(({ experience: e, workspaceId, workspaceName, updatedAt }) => (
-                <button
-                  className="experience-management-card"
-                  key={e.id}
-                  onClick={() => select({ id: e.id, version: e.versionId, space: workspaceId })}
-                >
-                  <div>
-                    <Badge>{e.status === 'PUBLISHED' ? '可用' : '已停用'}</Badge>
-                    <small>
-                      {workspaceName} · v{e.number}
-                    </small>
-                  </div>
-                  <h2>{e.title}</h2>
-                  <p>{e.summary}</p>
-                  <footer>
+            <div className="tenant-directory-scroll tenant-experience-directory">
+              <div className="tenant-list-columns tenant-experience-grid">
+                <span>经验名称</span>
+                <span>所属空间 / 版本</span>
+                <span>状态</span>
+                <span>更新于</span>
+              </div>
+              <div className="experience-management-list">
+                {data.value.items.map(({ experience: e, workspaceId, workspaceName, updatedAt }) => (
+                  <button
+                    className="experience-management-card tenant-experience-grid"
+                    key={e.id}
+                    onClick={() => select({ id: e.id, version: e.versionId, space: workspaceId })}
+                  >
+                    <span className="tenant-experience-name">
+                      <strong>{e.title}</strong>
+                      <small>{e.summary}</small>
+                    </span>
                     <span>
-                      {e.origin === 'AUTOMATIC' ? '系统积累 · 自动核验通过' : '历史人工经验 · 未评测'}
+                      {workspaceName}
+                      <small>
+                        v{e.number} ·{' '}
+                        {e.origin === 'AUTOMATIC' ? '系统积累 · 自动核验通过' : '历史人工经验 · 未评测'}
+                      </small>
+                    </span>
+                    <span>
+                      <Badge>{e.status === 'PUBLISHED' ? '可用' : '已停用'}</Badge>
                     </span>
                     <time>{stamp(updatedAt)}</time>
-                  </footer>
-                </button>
-              ))}
+                  </button>
+                ))}
+              </div>
             </div>
           ) : (
             <Empty

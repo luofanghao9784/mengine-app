@@ -363,8 +363,8 @@ button.admin-directory-row:hover {
   }
 }
 
-/* Platform control surface. These tokens do not change the customer surfaces. */
-.admin-platform {
+/* Shared platform and tenant management surface; client workspace is unaffected. */
+.admin-control {
   --surface: #ffffff;
   --surface-muted: #f3f6fa;
   --canvas: #f8fbff;
@@ -393,26 +393,26 @@ button.admin-directory-row:hover {
   line-height: 1.5;
   caret-color: var(--accent);
 }
-.admin-platform ::selection {
+.admin-control ::selection {
   color: var(--text);
   background: var(--selected);
 }
-.admin-platform .admin-sidebar {
+.admin-control .admin-sidebar {
   padding-top: 24px;
   background: var(--canvas);
 }
-.admin-platform .admin-brand {
+.admin-control .admin-brand {
   padding-bottom: 24px;
 }
-.admin-platform .admin-brand strong {
+.admin-control .admin-brand strong {
   color: var(--text);
   font-size: 21px;
   font-weight: 650;
 }
-.admin-platform .admin-scope {
+.admin-control .admin-scope {
   margin-bottom: 16px;
 }
-.admin-platform .admin-nav-link {
+.admin-control .admin-nav-link {
   min-height: 46px;
   padding: 12px 14px;
   gap: 12px;
@@ -420,45 +420,45 @@ button.admin-directory-row:hover {
   font-size: 14px;
   font-weight: 550;
 }
-.admin-platform .admin-nav-link.active {
+.admin-control .admin-nav-link.active {
   color: var(--selected-text);
   background: var(--selected);
 }
-.admin-platform .admin-nav-link:hover:not(.active) {
+.admin-control .admin-nav-link:hover:not(.active) {
   color: var(--text);
   background: var(--soft);
 }
-.admin-platform .admin-account {
+.admin-control .admin-account {
   padding-top: 16px;
   margin-top: 12px;
   border-top: 1px solid var(--line);
 }
-.admin-platform .admin-account > span {
+.admin-control .admin-account > span {
   color: var(--text-secondary);
 }
-.admin-platform .admin-header {
+.admin-control .admin-header {
   min-height: 76px;
   padding: 18px 32px;
   gap: 16px;
   flex-shrink: 0;
 }
-.admin-platform .admin-header h1 {
+.admin-control .admin-header h1 {
   margin: 0;
   font-size: 24px;
   font-weight: 600;
   line-height: 1.4;
   letter-spacing: -0.02em;
 }
-.admin-platform .admin-content {
+.admin-control .admin-content {
   padding: 24px 32px 40px;
 }
-.admin-platform .admin-page-actions {
+.admin-control .admin-page-actions {
   gap: 8px;
 }
-.admin-platform .admin-page-actions:empty {
+.admin-control .admin-page-actions:empty {
   display: none;
 }
-.admin-platform .button {
+.admin-control .button {
   min-height: 36px;
   padding: 8px 12px;
   border: 1px solid var(--border);
@@ -470,50 +470,50 @@ button.admin-directory-row:hover {
   font-weight: 500;
   box-shadow: none;
 }
-.admin-platform .button:hover:not(:disabled) {
+.admin-control .button:hover:not(:disabled) {
   background: var(--surface-muted);
   border-color: #b4c5d7;
 }
-.admin-platform .button:active:not(:disabled) {
+.admin-control .button:active:not(:disabled) {
   background: var(--soft);
 }
-.admin-platform .button.primary {
+.admin-control .button.primary {
   color: #fff;
   background: var(--accent);
   border-color: var(--accent);
   font-weight: 550;
 }
-.admin-platform .button.primary:hover:not(:disabled),
-.admin-platform .button.primary:active:not(:disabled) {
+.admin-control .button.primary:hover:not(:disabled),
+.admin-control .button.primary:active:not(:disabled) {
   background: var(--accent-hover);
   border-color: var(--accent-hover);
 }
-.admin-platform .button.ghost {
+.admin-control .button.ghost {
   color: var(--text-secondary);
   background: transparent;
   border-color: transparent;
 }
-.admin-platform .button.ghost:hover:not(:disabled) {
+.admin-control .button.ghost:hover:not(:disabled) {
   color: var(--text);
   background: var(--soft);
   border-color: transparent;
 }
-.admin-platform .button.danger {
+.admin-control .button.danger {
   color: #a33c3c;
   border-color: #e6c6c6;
 }
-.admin-platform .button.danger:hover:not(:disabled) {
+.admin-control .button.danger:hover:not(:disabled) {
   background: #fff3f3;
   border-color: #c99a9a;
 }
-.admin-platform .button:disabled {
+.admin-control .button:disabled {
   opacity: 0.55;
 }
-.admin-platform :is(button, a, summary):focus-visible {
+.admin-control :is(button, a, summary):focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
-.admin-platform :is(input:not([type='checkbox']):not([type='file']), textarea, select) {
+.admin-control :is(input:not([type='checkbox']):not([type='file']), textarea, select) {
   min-height: 40px;
   padding: 9px 12px;
   border: 1px solid #cbd7e3;
@@ -524,101 +524,101 @@ button.admin-directory-row:hover {
   line-height: 1.5;
   box-shadow: none;
 }
-.admin-platform select {
+.admin-control select {
   padding-right: 28px;
 }
-.admin-platform :is(input, textarea)::placeholder {
+.admin-control :is(input, textarea)::placeholder {
   color: var(--text-secondary);
   opacity: 1;
 }
-.admin-platform :is(input, textarea, select):focus {
+.admin-control :is(input, textarea, select):focus {
   border-color: var(--accent);
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
-.admin-platform :is(input, textarea, select):disabled {
+.admin-control :is(input, textarea, select):disabled {
   color: var(--text-secondary);
   background: var(--surface-muted);
   cursor: default;
 }
-.admin-platform .platform-search input:not([type='checkbox']):not([type='file']) {
+.admin-control .platform-search input:not([type='checkbox']):not([type='file']) {
   border: 0;
   background: transparent;
   outline: none;
 }
-.admin-platform .platform-search:focus-within {
+.admin-control .platform-search:focus-within {
   border-color: var(--accent);
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
-.admin-platform .field {
+.admin-control .field {
   gap: 7px;
   margin-block: 20px;
 }
-.admin-platform .field:first-child {
+.admin-control .field:first-child {
   margin-top: 0;
 }
-.admin-platform .experience-management-filters .field {
+.admin-control .experience-management-filters .field {
   margin: 0;
 }
-.admin-platform .experience-management-tabs > button:last-child {
+.admin-control .experience-management-tabs > button:last-child {
   margin-left: 0;
 }
-.admin-platform .experience-management-tabs .button[aria-selected='true'] {
+.admin-control .experience-management-tabs .button[aria-selected='true'] {
   color: var(--selected-text);
   background: var(--selected);
   border-color: transparent;
 }
-.admin-platform .experience-management-tabs .button[aria-selected='true']:hover:not(:disabled) {
+.admin-control .experience-management-tabs .button[aria-selected='true']:hover:not(:disabled) {
   color: var(--selected-text);
   background: #d8e6fb;
   border-color: transparent;
 }
-.admin-platform .field > span {
+.admin-control .field > span {
   color: var(--text);
   font-weight: 500;
 }
-.admin-platform .field > small {
+.admin-control .field > small {
   color: var(--text-secondary);
   font-size: 12px;
   line-height: 1.6;
 }
-.admin-platform .admin-credentials fieldset {
+.admin-control .admin-credentials fieldset {
   min-width: 0;
   margin: 20px 0 0;
   padding: 0;
   border: 0;
 }
-.admin-platform :is(.admin-section, .admin-stat, .access-panel, .experience-management-card) {
+.admin-control :is(.admin-section, .admin-stat, .access-panel, .experience-management-card) {
   border: 1px solid var(--border);
   border-radius: var(--radius-panel);
   background: var(--surface);
   box-shadow: none;
 }
-.admin-platform .experience-management-card:hover {
+.admin-control .experience-management-card:hover {
   border-color: #b4c5d7;
   background: var(--surface-muted);
   box-shadow: none;
 }
-.admin-platform .admin-section h2 {
+.admin-control .admin-section h2 {
   font-size: 17px;
   margin-bottom: 16px;
 }
-.admin-platform .admin-section-heading h2 {
+.admin-control .admin-section-heading h2 {
   margin-bottom: 0;
 }
-.admin-platform .admin-section-heading {
+.admin-control .admin-section-heading {
   margin-bottom: 16px;
 }
-.admin-platform .admin-directory-heading {
+.admin-control .admin-directory-heading {
   margin-bottom: 0;
 }
-.admin-platform .empty-state {
+.admin-control .empty-state {
   min-height: 220px;
   padding: 36px 24px;
   gap: 10px;
 }
-.admin-platform .empty-icon {
+.admin-control .empty-icon {
   width: 44px;
   height: 44px;
   margin-bottom: 4px;
@@ -626,18 +626,18 @@ button.admin-directory-row:hover {
   background: var(--surface-muted);
   color: var(--text-secondary);
 }
-.admin-platform .empty-state h2 {
+.admin-control .empty-state h2 {
   color: var(--text);
   font-size: 17px;
   font-weight: 550;
   margin: 0;
 }
-.admin-platform .empty-state p {
+.admin-control .empty-state p {
   max-width: 52ch;
   color: var(--text-secondary);
   font-size: 14px;
 }
-.admin-platform .admin-secondary-link {
+.admin-control .admin-secondary-link {
   justify-content: flex-start;
   flex-wrap: wrap;
   align-items: center;
@@ -645,78 +645,78 @@ button.admin-directory-row:hover {
   margin-bottom: 20px;
   font-size: 14px;
 }
-.admin-platform :is(.admin-secondary-link, .admin-shortcuts) a,
-.admin-platform .admin-account-record > a {
+.admin-control :is(.admin-secondary-link, .admin-shortcuts) a,
+.admin-control .admin-account-record > a {
   color: var(--selected-text);
   text-underline-offset: 3px;
 }
-.admin-platform .admin-secondary-link a {
+.admin-control .admin-secondary-link a {
   display: inline-flex;
   align-items: center;
   min-height: 36px;
 }
-.admin-platform :is(.admin-secondary-link, .admin-shortcuts) a:hover,
-.admin-platform .admin-account-record > a:hover {
+.admin-control :is(.admin-secondary-link, .admin-shortcuts) a:hover,
+.admin-control .admin-account-record > a:hover {
   text-decoration: underline;
 }
-.admin-platform nav .button[aria-current='page'] {
+.admin-control nav .button[aria-current='page'] {
   color: var(--selected-text);
   background: var(--selected);
   border-color: transparent;
 }
-.admin-platform nav .button[aria-current='page']:hover:not(:disabled) {
+.admin-control nav .button[aria-current='page']:hover:not(:disabled) {
   color: var(--selected-text);
   background: #d8e6fb;
   border-color: transparent;
 }
-.admin-platform .mono,
-.admin-platform time {
+.admin-control .mono,
+.admin-control time {
   font-variant-numeric: tabular-nums;
 }
 @media (max-width: 1100px) {
-  .admin-platform .admin-header,
-  .admin-platform .admin-content {
+  .admin-control .admin-header,
+  .admin-control .admin-content {
     padding-inline: 24px;
   }
 }
 @media (max-width: 760px) {
-  .admin-platform .admin-header {
+  .admin-control .admin-header {
     min-height: 76px;
     padding: 14px 16px;
     align-items: center;
     gap: 12px;
   }
-  .admin-platform .admin-header h1 {
+  .admin-control .admin-header h1 {
     font-size: 22px;
   }
-  .admin-platform .admin-content {
+  .admin-control .admin-content {
     padding: 20px 16px 32px;
   }
-  .admin-platform .admin-page-actions {
+  .admin-control .admin-page-actions {
     margin-left: auto;
     justify-content: flex-end;
   }
-  .admin-platform :is(.button, .icon-button, .admin-secondary-link a) {
+  .admin-control :is(.button, .icon-button, .admin-secondary-link a) {
     min-height: 44px;
     min-width: 44px;
   }
-  .admin-platform :is(input:not([type='checkbox']):not([type='file']), select) {
+  .admin-control :is(input:not([type='checkbox']):not([type='file']), select) {
     min-height: 44px;
   }
-  .admin-platform .admin-brand {
+  .admin-control .admin-brand {
     padding-inline: 8px;
   }
-  .admin-platform.admin-menu-open .admin-sidebar {
+  .admin-control.admin-menu-open .admin-sidebar {
     border-right: 0;
     box-shadow: 8px 0 32px #1e355b26;
   }
-  .admin-platform .admin-scrim {
+  .admin-control .admin-scrim {
     background: #20324766;
   }
-  .admin-platform .admin-section {
+  .admin-control .admin-section {
     padding: 18px;
   }
-  .admin-platform .admin-section-heading {
+  .admin-control .admin-section-heading {
     flex-wrap: wrap;
     align-items: flex-start;
   }
@@ -730,14 +730,14 @@ button.admin-directory-row:hover {
   line-height: 1.5;
   letter-spacing: 0.04em;
 }
-.admin-platform .admin-brand strong {
+.admin-control .admin-brand strong {
   font-size: 19px;
   white-space: nowrap;
 }
 .admin-nav-group {
   min-width: 0;
 }
-.admin-platform .admin-nav-group + .admin-nav-group {
+.admin-control .admin-nav-group + .admin-nav-group {
   margin-top: 24px;
 }
 .admin-nav-group-title {
@@ -747,16 +747,16 @@ button.admin-directory-row:hover {
 }
 
 .admin-default-title:not(:only-child) { display: none; }
-.admin-platform .admin-title-slot { min-width: 0; }
-.admin-platform .admin-heading:has(.platform-enterprise-heading) { flex: 1; min-width: 0; }
-.admin-platform .admin-header .platform-enterprise-heading { padding: 0; gap: 14px; }
-.admin-platform .admin-header .platform-enterprise-heading h1 { margin: 0; font-size: 20px; }
-.admin-platform .admin-header .platform-enterprise-heading-text { flex: initial; }
-.admin-platform .admin-header .platform-enterprise-heading-text p { margin-top: 4px; }
-.admin-platform .admin-header .platform-enterprise-heading .badge { margin-left: 10px; }
+.admin-control .admin-title-slot { min-width: 0; }
+.admin-control .admin-heading:has(.platform-enterprise-heading) { flex: 1; min-width: 0; }
+.admin-control .admin-header .platform-enterprise-heading { padding: 0; gap: 14px; }
+.admin-control .admin-header .platform-enterprise-heading h1 { margin: 0; font-size: 20px; }
+.admin-control .admin-header .platform-enterprise-heading-text { flex: initial; }
+.admin-control .admin-header .platform-enterprise-heading-text p { margin-top: 4px; }
+.admin-control .admin-header .platform-enterprise-heading .badge { margin-left: 10px; }
 
 /* 总台表头使用白底、次级文字和细分隔线。 */
-.admin-platform table thead th {
+.admin-control table thead th {
   background: var(--table-header);
   color: var(--muted);
   font-weight: 600;

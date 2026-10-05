@@ -64,6 +64,17 @@ test('headquarters enters scoped management, keeps context in navigation, shows 
         role: 'TENANT_ADMIN',
         workspaces: [],
       });
+    if (path.endsWith('/library'))
+      return json({
+        tenantId: tenant,
+        workspaceId: null,
+        folderId: null,
+        trail: [],
+        canMaintain: false,
+        maxUploadBytes: 20971520,
+        items: [],
+        hasMore: false,
+      });
     if (path.endsWith('/overview'))
       return json({
         tenantId: tenant,
@@ -99,6 +110,12 @@ test('headquarters enters scoped management, keeps context in navigation, shows 
   await supportPage.reload();
   await expect(supportPage.getByRole('status').getByText('总部管理模式', { exact: true })).toBeVisible();
   await expect(supportPage.getByText('操作者：合成总部操作者', { exact: false })).toBeVisible();
+  const pageErrors: string[] = [];
+  supportPage.on('pageerror', (error) => pageErrors.push(error.message));
+  await supportPage.getByRole('complementary', { name: '企业管理导航' }).getByRole('link', { name: '资料库', exact: true }).click();
+  await supportPage.getByRole('link', { name: '文件与目录', exact: true }).click();
+  await expect(supportPage.getByRole('heading', { name: '还没有资料', exact: true })).toBeVisible();
+  expect(pageErrors).toEqual([]);
   await supportPage.getByRole('link', { name: '成员与空间', exact: true }).click();
   await expect(supportPage).toHaveURL(new RegExp(`admin=members.*support=${visit}`));
   await supportPage.getByRole('link', { name: '职责与交接' }).click();
