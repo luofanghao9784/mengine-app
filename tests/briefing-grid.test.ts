@@ -93,3 +93,21 @@ test('one-column display adapts saved wide cards and keeps measured full-title c
   );
   assert.equal(tiles[0].size, '2×1');
 });
+
+test('generation control stays below every content card as cards append and columns change', () => {
+  const control: MagazineTile = { id: 'generation:more', size: '1×1', fixed: true, atEnd: true };
+  const content: MagazineTile[] = [
+    { id: 'tall', size: '1×2', fixed: true, rows: 3 },
+    { id: 'wide', size: '2×1', fixed: true },
+    { id: 'chart', size: '2×2', fixed: true },
+  ];
+  for (const columns of [1,2,3,4,5]) for (const appended of [false,true]) {
+    const tiles = [content[0], control, ...content.slice(1), ...(appended ? [{id:'new',size:'2×1' as const}] : [])];
+    const placed = packMagazineTiles(tiles,columns);
+    const tail = placed.find(tile=>tile.id===control.id)!;
+    assert.equal(placed.at(-1)?.id, control.id);
+    assert.equal(tail.row, Math.max(...placed.filter(tile=>tile.id!==control.id).map(tile=>tile.row+tile.height)));
+    assert.equal(tail.col,0);
+  }
+  assert.equal(packMagazineTiles([control],3)[0].row,0);
+});

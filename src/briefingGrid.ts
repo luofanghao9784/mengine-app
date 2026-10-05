@@ -5,12 +5,12 @@ export function magazineGridMetrics(width: number) {
   const columns = width >= 1210 ? 5 : width >= 966 ? 4 : width >= 722 ? 3 : width >= 478 ? 2 : 1;
   return { columns, unit: (width - (columns - 1) * magazineGap) / columns };
 }
-export type MagazineTile = { id: string; size: CardSize; fixed?: boolean; rows?: number };
+export type MagazineTile = { id: string; size: CardSize; fixed?: boolean; rows?: number; atEnd?: boolean };
 export type MagazinePlacement = MagazineTile & { row: number; col: number; width: number; height: number };
 
 /** Same first-free-cell packing as the Demo: later cards may fill a gap, never mutate preferences. */
 export function packMagazineTiles(tiles: MagazineTile[], columns: number): MagazinePlacement[] {
-  const pending = tiles.map((tile) => ({
+  const pending = tiles.filter((tile) => !tile.atEnd).map((tile) => ({
     ...tile,
     size: (columns === 1 ? `1×${tile.size[2]}` : tile.size) as CardSize,
   }));
@@ -52,6 +52,14 @@ export function packMagazineTiles(tiles: MagazineTile[], columns: number): Magaz
     placed.push({ ...tile, size, row: Math.floor(cursor / columns), col: cursor % columns, width, height });
     for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) occupied.add(cursor + y * columns + x);
     cursor++;
+  }
+  // Controls at the end never fill earlier gaps, even below tall content cards.
+  let endRow = Math.max(0, ...placed.map((tile) => tile.row + tile.height));
+  for (const tile of tiles.filter((tile) => tile.atEnd)) {
+    const width = Math.min(columns, Number(tile.size[0]));
+    const height = Math.max(Number(tile.size[2]), tile.rows || 0);
+    placed.push({ ...tile, size: `${width}×${tile.size[2]}` as CardSize, row: endRow, col: 0, width, height });
+    endRow += height;
   }
   return placed;
 }

@@ -1027,3 +1027,26 @@ test('生成请求等待时不出现全页状态气泡，已有卡片与入口�
   expect(await old.boundingBox()).toEqual(oldBox);
   expect(await more.boundingBox()).toEqual(moreBox);
 });
+
+test('生成入口在新增卡片和响应式重排后始终位于所有画报下方', async ({ page }) => {
+  const f = await generationFixture(page, true);
+  await page.setViewportSize({ width: 944, height: 841 });
+  await page.goto(home);
+  const more = page.locator('[data-card-id="generation:more"]');
+  await expect(more).toHaveAttribute('data-at-end', 'true');
+  const node = await more.locator('article').elementHandle();
+  const belowAll = () => page.locator('.live-magazine-grid').first().evaluate(el => {
+    const control = el.querySelector<HTMLElement>('[data-card-id="generation:more"]')!;
+    const cards = [...el.querySelectorAll<HTMLElement>('.live-briefing-tile')].filter(card => card !== control);
+    return control.offsetTop >= Math.max(0,...cards.map(card => card.offsetTop + card.offsetHeight)) - 1;
+  });
+  await expect.poll(belowAll).toBe(true);
+  f.set('SUCCEEDED');
+  await expect(page.getByText('新增经营发现', {exact:true})).toBeVisible({timeout:10000});
+  expect(await node!.evaluate(el => el.isConnected)).toBe(true);
+  for (const width of [390, 944, 1440]) {
+    await page.setViewportSize({width,height:841});
+    await expect.poll(belowAll).toBe(true);
+    expect(await more.evaluate(el => el.getAnimations().filter(a => a.playState === 'running').length)).toBe(0);
+  }
+});

@@ -297,6 +297,7 @@ export function generationTiles(
     }));
   items.push({
     id: 'generation:more',
+    atEnd: true,
     title: '',
     summary: '',
     fixedSize: '1×1',

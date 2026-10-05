@@ -12,6 +12,7 @@ export type MagazineGridItem = {
   chart?: boolean;
   wide?: boolean;
   fixedSize?: CardSize;
+  atEnd?: boolean;
   render: ReactNode;
 };
 const selectors = { cards: '.live-briefing-tile', button: '.live-briefing-body', growVertically: true };
@@ -133,6 +134,7 @@ export function MagazineGrid({
       const minimum = item.fixedSize ? undefined : fit[item.id];
       return {
         id: item.id,
+        atEnd: item.atEnd,
         size: (minimum
           ? `${Math.max(Number(preferred[0]), Number(minimum.size[0]))}×${Math.max(Number(preferred[2]), Number(minimum.size[2]))}`
           : preferred) as CardSize,
@@ -162,6 +164,7 @@ export function MagazineGrid({
       const old = previous.current.get(id);
       if (
         old &&
+        !element.dataset.atEnd &&
         contentChanged &&
         !matchMedia('(prefers-reduced-motion: reduce)').matches &&
         (old.x !== position.x || old.y !== position.y)
@@ -207,6 +210,7 @@ export function MagazineGrid({
           className="live-briefing-tile"
           data-card-id={p.id}
           data-size={p.size}
+          data-at-end={p.atEnd || undefined}
           data-stacked={p.id === stackedId || undefined}
           style={{ gridColumn: `${p.col + 1} / span ${p.width}`, gridRow: `${p.row + 1} / span ${p.height}` }}
         >
