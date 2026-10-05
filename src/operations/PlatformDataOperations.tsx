@@ -1,6 +1,6 @@
 import { Select } from '../shared/Select';
 import { useState } from 'react';
-import { ArrowLeft, RefreshCw, Search } from 'lucide-react';
+import { ArrowLeft, RefreshCw } from 'lucide-react';
 import type {
   DataOperationCounts,
   DataOperationKind,
@@ -9,7 +9,7 @@ import type {
 } from '../../contracts/public-api/data-operations';
 import { adminHref } from '../admin/navigation';
 import { uuid } from '../identity/client';
-import { useViewState, textState, pageState } from '../shared/useViewState';
+import { useViewState, pageState } from '../shared/useViewState';
 import { Button, Badge, PageActions } from '../shared/ui';
 import { Failure, Loading, Pager, useRemote } from '../shared/admin';
 import { dataOperationsClient as api } from './data-client';
@@ -94,7 +94,7 @@ export function PlatformDataOperations({ hash, kind }: { hash: string; kind: Dat
   const href = (k: DataOperationKind, enterprise?: string) =>
     adminHref('platform', k === 'MATERIALS' ? 'materials' : 'database', hash, {
       ...(enterprise ? { enterprise } : {}),
-      ...(k === 'CONNECTIONS' ? { view: 'enterprises' } : {}),
+      view: 'enterprises',
     });
   return (
     <div className="data-ops-page">
@@ -104,16 +104,18 @@ export function PlatformDataOperations({ hash, kind }: { hash: string; kind: Dat
           返回企业列表
         </a>
       )}
-      {!tenant && kind === 'CONNECTIONS' && (
-        <nav className="data-ops-sections" aria-label="数据库栏目">
+      {!tenant && (
+        <nav className="data-ops-sections" aria-label={kind === 'CONNECTIONS' ? '数据库栏目' : '资料库栏目'}>
           <a
-            href={adminHref('platform', 'database', hash)}
+            href={adminHref('platform', kind === 'CONNECTIONS' ? 'database' : 'materials', hash)}
             aria-current={!enterpriseList ? 'page' : undefined}
           >
-            数据接入监测
+            {kindName(kind)}监测
           </a>
           <a
-            href={adminHref('platform', 'database', hash, { view: 'enterprises' })}
+            href={adminHref('platform', kind === 'CONNECTIONS' ? 'database' : 'materials', hash, {
+              view: 'enterprises',
+            })}
             aria-current={enterpriseList ? 'page' : undefined}
           >
             企业列表
@@ -137,82 +139,29 @@ function Directory({
   href: (id: string) => string;
   enterpriseList: boolean;
 }) {
-  const [query, setQuery] = useViewState('platform', `data-ops:${kind}:query`, '', textState);
-  const [draft, setDraft] = useState(query);
-  const [state, setState] = useViewState<DataOperationState>(
-    'platform',
-    `data-ops:${kind}:state`,
-    'ALL',
-    chosen,
-  );
   const [page, setPage] = useViewState('platform', `data-ops:${kind}:page`, 0, pageState);
   const [attempt, setAttempt] = useState(0);
   const refresh = () => setAttempt((v) => v + 1);
-  const data = useRemote(
-    (signal) =>
-      api.list(
-        kind,
-        kind === 'CONNECTIONS' ? '' : query,
-        kind === 'CONNECTIONS' ? 'ALL' : state,
-        page * 20,
-        signal,
-      ),
-    [kind, query, state, page, attempt],
-  );
+  const data = useRemote((signal) => api.list(kind, '', 'ALL', page * 20, signal), [kind, page, attempt]);
   return (
     <div className="data-ops-directory" aria-label="数据运行企业列表">
       <div className="data-ops-heading">
         <div>
-          <h2>{kind === 'CONNECTIONS' && enterpriseList ? '企业列表' : `${kindName(kind)}监测`}</h2>
+          <h2>{enterpriseList ? '企业列表' : `${kindName(kind)}监测`}</h2>
         </div>
         <Button variant="ghost" icon={RefreshCw} onClick={refresh}>
           刷新
         </Button>
       </div>
-      {kind === 'MATERIALS' && (
-        <form
-          className="data-ops-filters"
-          onSubmit={(e) => {
-            e.preventDefault();
-            setQuery(draft.trim());
-            setPage(0);
-          }}
-        >
-          <label>
-            <Search size={18} />
-            <input
-              aria-label="搜索企业"
-              placeholder="搜索企业"
-              value={draft}
-              maxLength={180}
-              onChange={(e) => setDraft(e.target.value)}
-            />
-          </label>
-          <Button type="submit">搜索</Button>
-          <Filter
-            value={state}
-            change={(v) => {
-              setState(v);
-              setPage(0);
-            }}
-          />
-        </form>
-      )}
       {data.error ? (
         <Failure error={data.error} retry={refresh} />
       ) : !data.value ? (
         <Loading />
       ) : (
         <>
-          {(kind === 'MATERIALS' || !enterpriseList) && <Metrics value={data.value.counts} />}
-          {(kind === 'MATERIALS' || enterpriseList) && (
+          {!enterpriseList && <Metrics value={data.value.counts} />}
+          {enterpriseList && (
             <section className="data-ops-list-card" aria-label="企业监测目录">
-              {kind === 'MATERIALS' && (
-                <div className="data-ops-list-heading">
-                  <h3>企业列表</h3>
-                  <span className="admin-note">资料解析 · 点击查看详情</span>
-                </div>
-              )}
               <div className="data-ops-list-columns" aria-hidden="true">
                 <span>企业名称</span>
                 <span>{kind === 'CONNECTIONS' ? '接入对象' : '资料对象'}</span>

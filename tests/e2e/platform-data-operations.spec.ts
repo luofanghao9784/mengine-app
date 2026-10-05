@@ -172,6 +172,7 @@ test('independent material library only offers technical records', async ({ page
   await page.goto(`/platform-admin/#admin=engine&detail=data&enterprise=${tenant}&kind=CONNECTIONS`);
   await page.getByRole('link', { name: '资料库', exact: true }).click();
   await expect(page).toHaveURL(/admin=materials/);
+  await page.getByRole('link', { name: '企业列表', exact: true }).click();
   await page.getByRole('heading', { name: '合成企业 1', exact: true }).click();
   await expect(page.getByRole('heading', { name: '合成企业 1 · 资料处理' })).toBeVisible();
   await expect(page.getByText('解析未完成，需在原处理系统核对。', { exact: true })).toBeVisible();
@@ -212,11 +213,20 @@ for (const problem of ['leak', 'wrong'] as const)
     await expect(page.getByText('不应泄露的文件名.txt')).toHaveCount(0);
     await expect(page.locator('.data-ops-records')).toHaveCount(0);
   });
-test('empty search remains explicit and does not report a healthy enterprise', async ({ page, context }) => {
+test('material monitoring and enterprise directory are separate and preserve return context', async ({
+  page,
+  context,
+}) => {
   await fixture(context);
   await page.goto('/platform-admin/#admin=materials');
-  await page.getByLabel('搜索企业').fill('不存在');
-  await page.getByRole('button', { name: '搜索', exact: true }).click();
-  await expect(page.getByText('没有符合条件的企业。', { exact: true })).toBeVisible();
-  await expect(page.locator('.data-ops-tenants a')).toHaveCount(0);
+  await expect(page.getByLabel('搜索企业')).toHaveCount(0);
+  await expect(page.getByRole('combobox', { name: '运行状态' })).toHaveCount(0);
+  await expect(page.locator('.data-ops-metrics')).toBeVisible();
+  await expect(page.locator('.data-ops-tenants')).toHaveCount(0);
+  await page.getByRole('link', { name: '企业列表', exact: true }).click();
+  await expect(page.locator('.data-ops-metrics')).toHaveCount(0);
+  await page.getByRole('heading', { name: '合成企业 1', exact: true }).click();
+  await page.getByRole('link', { name: '返回企业列表' }).click();
+  await expect(page).toHaveURL(/admin=materials&view=enterprises/);
+  await expect(page.getByRole('heading', { name: '合成企业 1', exact: true })).toBeVisible();
 });
