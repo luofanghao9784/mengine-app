@@ -6,7 +6,6 @@ import { DocumentCard } from '../documents/Documents';
 import { useViewState, textState, pageState } from '../shared/useViewState';
 import { LiveConversationDeck } from '../conversation/LiveConversationDeck';
 import { useBriefingRefresh } from '../components/useBriefingRefresh';
-import { ExportBatchPanel } from '../export/ExportBatchPanel';
 import { requestNavigationLocked, RequestPending } from '../shared/request-guard';
 import { useContext, useEffect, useRef, useState } from 'react';
 import {
@@ -323,14 +322,6 @@ function LibraryListing({
       <span className="sr-only" role="status">
         {pullRefresh.announcement}
       </span>
-      {current?.kind === 'SHARED' && (
-        <ExportBatchPanel
-          tenant={tenant}
-          workspace={current.id}
-          workspaceName={current.name}
-          scope="ENTERPRISE"
-        />
-      )}
       <PageActions placement="meta">
         {(enterprise || all || current?.kind === 'SHARED') && (
           <IconButton icon={Activity} label="资料动态" onClick={() => setActivityOpen(true)} />

@@ -1,10 +1,9 @@
 import { DocumentCard } from './DocumentCard';
 export { DocumentCard } from './DocumentCard';
-import { ExportBatchPanel } from '../export/ExportBatchPanel';
 import { RequestPending, requestNavigationLocked, useRequestLock } from '../shared/request-guard';
 import { useContext, useEffect, useRef, useState } from 'react';
 import { FileText, RefreshCw } from 'lucide-react';
-import { identityClient, useSession } from '../identity/session';
+import { useSession } from '../identity/session';
 import { Button, PageActions, Empty } from '../shared/ui';
 import { Failure, Loading, Pager, SubmitError, useRemote, useSubmission } from '../shared/admin';
 import { documentClient as api } from './client';
@@ -68,8 +67,6 @@ export function Documents({ tenant }: { tenant: string }) {
     [page, setPage] = useState(0);
   const { session } = useSession();
   const pendingRequest = useContext(RequestPending);
-  const context = useRemote((signal) => identityClient.context(tenant, signal), [tenant, session.identity]);
-  const personal = context.value?.workspaces.find((w) => w.kind === 'PERSONAL');
   const refresh = () => {
     if (!pendingRequest) setAttempt((n) => n + 1);
   };
@@ -110,14 +107,6 @@ export function Documents({ tenant }: { tenant: string }) {
         <a href={documentsHref(tenant)}>个人文稿</a>
       </div>
       <p className="muted">仅自己可见。来源空间撤权后，文稿仍保留，但不能查看、编辑或导出。</p>
-      {personal && (
-        <ExportBatchPanel
-          tenant={tenant}
-          workspace={personal.id}
-          workspaceName={personal.name}
-          scope="PRIVATE"
-        />
-      )}
       {selected ? (
         <DocumentReader
           key={selected + ':' + (version || 'latest')}
