@@ -17,6 +17,8 @@ export interface ModelPort {
     tools: { name: string; description: string; parameters: Record<string, unknown> }[];
     /** Trusted workflow selection, only after a verified prerequisite receipt. */
     requiredTool?: string;
+    /** Bounded workflow phase: choose one or more of the currently advertised tools. */
+    requireToolCall?: boolean;
     signal: AbortSignal;
     maxTokens: number;
   }): AsyncIterable<ModelPart>;

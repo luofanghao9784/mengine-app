@@ -306,3 +306,39 @@ test('configuration preflight is offline, defaults off and never falls back to a
   assert.ok(!(invalid.stdout + invalid.stderr).includes(config.apiKey));
   assert.equal(run({ AGENT_MODEL_PROVIDER: 'off' }).status, 1);
 });
+
+test('a closed retrieval phase selects only advertised calculation, delivery or blocker tools', async (t) => {
+  const diagnostics = [];
+  t.mock.method(console, 'warn', value => diagnostics.push(value));
+  let responseMode = 'delivery', calls = 0;
+  const server = createServer(async (req, res) => {
+    calls++;
+    const input = await body(req);
+    assert.equal(input.tool_choice, 'required');
+    assert.deepEqual(input.tools.map(tool => tool.function.name), ['compare_dataset', 'deliver_briefing', 'task_control']);
+    if (responseMode === 'empty') return json(res, completion('No tool was called.'));
+    const name = responseMode === 'obsolete' ? 'task_context' : responseMode === 'blocker' ? 'task_control' : 'deliver_briefing';
+    const value = completion(null, [call('phase-call', name, {})]);
+    if (responseMode === 'stop') value.choices[0].finish_reason = 'stop';
+    if (responseMode === 'length') value.choices[0].finish_reason = 'length';
+    if (responseMode === 'missing-name') delete value.choices[0].message.tool_calls[0].function.name;
+    json(res, value);
+  });
+  const url = await listen(server); t.after(() => close(server));
+  const backend = local(url, 2000), input = { ...request(), requireToolCall: true,
+    tools: ['compare_dataset', 'deliver_briefing', 'task_control'].map(name => ({ name, description: 'synthetic', parameters: { type: 'object' } })) };
+  for (const mode of ['delivery', 'blocker', 'stop']) {
+    responseMode = mode;
+    const output = await collect(backend.generate(input));
+    assert.equal(output[0].name, mode === 'blocker' ? 'task_control' : 'deliver_briefing');
+    assert.equal(output.at(-1).reason, 'tool_calls');
+  }
+  for (const mode of ['empty', 'obsolete', 'length', 'missing-name']) {
+    responseMode = mode;
+    await assert.rejects(collect(backend.generate(input)), { code: 'INVALID_MODEL_RESPONSE' });
+  }
+  await assert.rejects(collect(backend.generate({ ...input, tools: [] })), { code: 'INVALID_MODEL_INPUT' });
+  assert.equal(calls, 7, 'an empty phase cannot dispatch a model request');
+  assert.ok(diagnostics.some(value => JSON.parse(value).calls.some(call => call.advertisedName === false)));
+  assert.ok(diagnostics.every(value => !/task_context|deliver_briefing|phase-call/.test(value)), 'diagnostics expose only fixed shape metadata');
+});

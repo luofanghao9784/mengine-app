@@ -224,8 +224,9 @@ test('dataset briefing closes retrieval after three lookups and delivers an hone
       else if (calls === 3) args = { action: 'dataset_read', referenceId: datasetId, versionId: snapshotId, columnLimit: 10, offset: 1 };
       else {
         assert.equal(calls, 4);
-        assert.ok(!request.tools.some(tool => tool.name === 'task_context'));
-        assert.match(instructions, /retrieval is now closed after three successful lookups/);
+        assert.deepEqual(request.tools.map(tool => tool.name), ['deliver_briefing']);
+        assert.equal(request.requiredTool, 'deliver_briefing');
+        assert.match(instructions, /retrieval is closed after three successful lookups/);
         assert.match(instructions, /Successful dataset_read calls so far: 2/);
         name = 'deliver_briefing';
         args = { businessType: 'INSIGHT', title: '收款确认状态值得进一步核对',

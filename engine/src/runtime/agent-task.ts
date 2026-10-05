@@ -272,9 +272,11 @@ export class AgentTasks {
             last = performance.now();
           };
           const deliveryReady = briefingGeneration && briefingCalculationReady;
+          const retrievalClosed = briefingGeneration && briefingDatasetLookups >= 3;
+          const sampleDeliveryReady = retrievalClosed && briefingDatasetReads > 0;
           const datasetGuide = !deliveryReady && datasetComparisonAvailable ? [
             briefingDatasetLookups >= 3
-              ? ' Dataset retrieval is now closed after three successful lookups. Use existing evidence for calculation and delivery; do not request more profiles or datasets. If evidence is insufficient, explain the specific gap without claiming a card.'
+              ? ' Dataset retrieval is now closed after three successful lookups. Select compare_dataset for a supported DATA calculation, deliver_briefing for a grounded INSIGHT or SUGGESTION with explicit sample limits, or task_control to report a concrete evidence gap. Do not request task_context or further source reads. Never invent totals or claims of full coverage.'
               : ` Dataset retrieval: ${briefingDatasetLookups}/3 lookups used. Choose ONE selected dataset and ONE useful theme, not an inventory of all datasets.`,
             'Use dataset_search for exact IDs and columns, then dataset_read with columnLimit 10 to inspect required columns and actual period values.',
             `Successful dataset_read calls so far: ${briefingDatasetReads}. Read only the pages needed to establish the calculation parameters.`,
@@ -285,23 +287,29 @@ export class AgentTasks {
             ? [{ role: 'system' as const, content: [{ type: 'text' as const,
                 text: deliveryReady
                   ? 'The platform has verified one complete table calculation for this briefing. Retrieval and calculation are now closed. Call deliver_briefing with its existing calculation artifact, preserving its periods, scope and gaps. Write one complete theme; do not compute another range or repeat searches. A duplicate receipt means no new card, never fabricate novelty.'
+                  : sampleDeliveryReady
+                  ? 'Dataset retrieval is closed after three successful lookups. Successful dataset_read calls so far: ' + briefingDatasetReads + '. Call deliver_briefing for ONE grounded INSIGHT or SUGGESTION using the already observed evidence. Explicitly state the observed sample scope and coverage limits. Do not invent totals, trends, causes or full coverage. DATA requires a verified calculation and is not available in this sample-only phase. compare_dataset computes ALL rows when a calculation was completed in the earlier phase.'
                   : `System briefing retrieval: ${briefingSearches}/${briefingSearchLimit} internal searches used. The first lookup reads the selected versions; at most two targeted lookups follow. Do not repeat searches to fill the budget. ${briefingSearches >= briefingSearchLimit
                   ? 'Internal search is now closed. Use the existing granted evidence to calculate and deliver one grounded theme. If evidence is insufficient, explain the concrete gap without claiming a card was generated.'
                   : 'Once evidence supports a useful theme, for DATA use compare_table for files or compare_dataset for collected datasets, then deliver_briefing for the card. A text reply is not card delivery.'}${datasetGuide}` } ] }, ...request.messages]
             : request.messages;
+          const phaseTools = request.tools.filter(
+            tool => !retrievalClosed || ['compare_dataset', 'deliver_briefing', 'task_control'].includes(tool.name),
+          );
           for await (const part of metered.generate({
             ...request,
             messages,
-            tools: request.tools.filter(
+            tools: phaseTools.filter(
               (t) =>
                 (t.name !== 'search_sources' || !briefingGeneration || briefingSearches < briefingSearchLimit) &&
                 (t.name !== 'task_context' || !briefingGeneration || briefingDatasetLookups < 3) &&
                 (!publicTools.has(t.name) || activated.has('public-research')) &&
-                (!deliveryReady || t.name === 'deliver_briefing') &&
+                (!(deliveryReady || sampleDeliveryReady) || t.name === 'deliver_briefing') &&
                 (t.name !== 'candidate_tool' || activated.has('candidate-trials')) &&
                 (t.name !== 'process_original' || activated.has('file-processing')),
             ),
-            ...(deliveryReady ? { requiredTool: 'deliver_briefing' } : {}),
+            ...(deliveryReady || sampleDeliveryReady ? { requiredTool: 'deliver_briefing' } :
+              retrievalClosed && phaseTools.length ? { requireToolCall: true } : {}),
             signal: AbortSignal.any([signal, request.signal]),
           })) {
             if (part.type === 'text') {

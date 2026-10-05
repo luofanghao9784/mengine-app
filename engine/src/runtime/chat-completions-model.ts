@@ -30,6 +30,7 @@ export class ChatCompletionsModel implements ModelPort {
   }
   async *generate(request: Parameters<ModelPort['generate']>[0]): AsyncIterable<ModelPart> {
     this.lastUsage = null;
+    if (request.requireToolCall && !request.tools.length) throw new RuntimeError('INVALID_MODEL_INPUT');
     if (request.requiredTool !== undefined &&
         !request.tools.some((tool) => tool.name === request.requiredTool))
       throw new RuntimeError('INVALID_MODEL_INPUT');
@@ -74,7 +75,7 @@ export class ChatCompletionsModel implements ModelPort {
         ? { tools: request.tools.map((t) => ({ type: 'function', function: t })),
             ...(request.requiredTool ? { tool_choice: {
               type: 'function', function: { name: request.requiredTool },
-            } } : {}),
+            } } : request.requireToolCall ? { tool_choice: 'required' } : {}),
           }
         : { tool_choice: 'none' }),
     };
@@ -220,13 +221,24 @@ export class ChatCompletionsModel implements ModelPort {
     )
       throw new RuntimeError('INVALID_MODEL_RESPONSE');
     const calls = message.tool_calls ?? [];
+    if (request.requireToolCall) console.warn(JSON.stringify({ event: 'MODEL_PHASE_RESPONSE_SHAPE',
+      finish: ['stop', 'tool_calls', 'length'].includes(String(choice.finish_reason)) ? choice.finish_reason : 'unknown',
+      calls: Array.isArray(calls) ? calls.slice(0, 4).map(call => ({
+        hasId: isRecord(call) && typeof call.id === 'string' && call.id.length > 0,
+        functionType: isRecord(call) && call.type === 'function',
+        advertisedName: isRecord(call) && isRecord(call.function) && request.tools.some(tool => tool.name === (call.function as Record<string, unknown>).name),
+        stringArguments: isRecord(call) && isRecord(call.function) && typeof call.function.arguments === 'string',
+      })) : null }));
+    const phaseCalls = request.requireToolCall === true && Array.isArray(calls) && calls.length > 0 &&
+      ['stop', 'tool_calls'].includes(String(choice.finish_reason));
     const forcedCall = request.requiredTool !== undefined && Array.isArray(calls) && calls.length === 1 &&
       ['stop', 'tool_calls'].includes(String(choice.finish_reason));
     if (
       !Array.isArray(calls) ||
       calls.length > 4 ||
       (request.requiredTool !== undefined && !forcedCall) ||
-      ((choice.finish_reason === 'tool_calls') !== calls.length > 0 && !forcedCall)
+      (request.requireToolCall === true && !phaseCalls) ||
+      ((choice.finish_reason === 'tool_calls') !== calls.length > 0 && !forcedCall && !phaseCalls)
     )
       throw new RuntimeError('INVALID_MODEL_RESPONSE');
     const parts: ModelPart[] = [];
@@ -249,6 +261,7 @@ export class ChatCompletionsModel implements ModelPort {
         !isRecord(call.function) ||
         typeof name !== 'string' ||
         (request.requiredTool !== undefined && name !== request.requiredTool) ||
+        (request.requireToolCall === true && !request.tools.some(tool => tool.name === name)) ||
         typeof call.function.arguments !== 'string'
       )
         throw new RuntimeError('INVALID_MODEL_RESPONSE');
@@ -265,6 +278,6 @@ export class ChatCompletionsModel implements ModelPort {
       });
     }
     yield* parts;
-    yield { type: 'finish', reason: forcedCall ? 'tool_calls' : choice.finish_reason as 'stop' | 'tool_calls' | 'length' };
+    yield { type: 'finish', reason: forcedCall || phaseCalls ? 'tool_calls' : choice.finish_reason as 'stop' | 'tool_calls' | 'length' };
   }
 }
