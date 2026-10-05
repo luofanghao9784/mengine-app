@@ -12,7 +12,12 @@ import { sourceQueries } from './source-query.js';
 import { planManagementTool } from './plan-management.js';
 import { meteredModel } from './metered-model.js';
 import { inputCoverage } from './input-coverage.js';
-import { briefingDeliveryTool, hasPreparedBriefing, hasTerminalBriefing } from './briefing-delivery.js';
+import {
+  BRIEFING_EDITORIAL_HINTS,
+  briefingDeliveryTool,
+  hasPreparedBriefing,
+  hasTerminalBriefing,
+} from './briefing-delivery.js';
 import { datasetComparisonTool } from './dataset-comparison.js';
 import { tableComparisonTool } from './table-comparison.js';
 import { workTools } from './task-work.js';
@@ -111,6 +116,7 @@ export class AgentTasks {
     let topicAvailable = false;
     let topicSelected = false;
     let topicNeedsCalculation = false;
+    let briefingRequestedType: string | undefined;
     let briefingCalculationAttempts = 0;
     let selectedTopic: unknown;
     let candidateSession: CandidateSession | undefined;
@@ -138,6 +144,14 @@ export class AgentTasks {
         expressionPreferences = response.expressionPreferences;
         ruleBookInstructions(response.expressionRuleBooks, false);
         expressionRuleBooks = response.expressionRuleBooks;
+        const requested = response.briefingRequestedType ?? '';
+        if (
+          typeof requested !== 'string' ||
+          !['', 'DATA', 'INSIGHT', 'SUGGESTION', 'INFO', 'RESULT'].includes(requested) ||
+          (briefingRequestedType !== undefined && briefingRequestedType !== requested)
+        )
+          throw new RuntimeError('TASK_ACCESS_DENIED');
+        briefingRequestedType = requested;
         topicAvailable = response.topicStrategyVersion === '1.0';
         topicSelected ||= response.topicSelectionRecorded === true;
         if (response.topicSelection !== undefined) {
@@ -348,6 +362,9 @@ export class AgentTasks {
                     {
                       type: 'text' as const,
                       text:
+                        (briefingRequestedType
+                          ? `本批服务端指定的画报类型是 ${briefingRequestedType}。候选选题和最终 businessType 必须保持该类型；偏好和计算结果不能改换类型。非 DATA 内容不要附 calculationArtifactId。资料不足时报告缺口或暂无新内容，不以其他类型替代。\n`
+                          : '') +
                         BRIEFING_WRITING_RULES +
                         '\n' +
                         BRIEFING_TOPIC_STRATEGY +
@@ -358,7 +375,9 @@ export class AgentTasks {
                             '\n继续核验并执行所选问题，不另换主题。\n'
                           : '') +
                         (deliveryReady
-                          ? 'The platform has verified one complete table calculation for this briefing. Retrieval and calculation are now closed. Call deliver_briefing with its existing calculation artifact, preserving its periods, scope and gaps. Write one complete theme; do not compute another range or repeat searches. A duplicate receipt means no new card, never fabricate novelty.'
+                          ? briefingRequestedType && briefingRequestedType !== 'DATA'
+                            ? `A calculation has completed, but the requested type remains ${briefingRequestedType}. Retrieval and calculation are now closed. Deliver the requested text category using authorized evidence; omit calculationArtifactId and do not invent quantitative claims. If no useful requested-type content is supported, use status-only delivery. Never substitute DATA.`
+                            : 'The platform has verified one complete table calculation for this briefing. Retrieval and calculation are now closed. Call deliver_briefing with its existing calculation artifact, preserving its periods, scope and gaps. Write one complete theme; do not compute another range or repeat searches. A duplicate receipt means no new card, never fabricate novelty.'
                           : retrievalClosed
                             ? 'Dataset retrieval is closed after three successful lookups. Choose compare_dataset or compare_table using already granted evidence to complete ONE supported calculation, or deliver_briefing for a useful grounded INSIGHT or SUGGESTION with explicit sample limits. If evidence is insufficient, use task_control to state the concrete gap, or a status-only delivery for no useful new content. DATA still requires a successful verified calculation. Do not repeat reads or invent totals, trends or full coverage.'
                             : `System briefing retrieval: ${briefingSearches}/${briefingSearchLimit} internal searches used. The first lookup reads the selected versions; at most two targeted lookups follow. Do not repeat searches to fill the budget. ${
@@ -539,6 +558,7 @@ export class AgentTasks {
         ...(briefingAvailable && task.contractVersion === '1.5'
           ? [
               briefingDeliveryTool({
+                requestedType: briefingRequestedType,
                 authorize,
                 invoke: (body, executionSignal) =>
                   postJson(
@@ -548,6 +568,7 @@ export class AgentTasks {
                     AbortSignal.any([signal, executionSignal]),
                     65536,
                     12000,
+                    ['BRIEFING_TYPE_MISMATCH', ...Object.keys(BRIEFING_EDITORIAL_HINTS)],
                   ),
               }),
             ]
@@ -886,12 +907,15 @@ export class AgentTasks {
                   body,
                   toolSignal,
                   8192,
+                  5000,
+                  ['BRIEFING_TYPE_MISMATCH'],
                 );
               },
               (candidate) => {
                 topicSelected = true;
                 topicNeedsCalculation = isRecord(candidate) && candidate.requiresCalculation === true;
               },
+              briefingRequestedType,
             ),
           );
         const registered = await invoke('execution/open', {

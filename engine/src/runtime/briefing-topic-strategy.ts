@@ -17,6 +17,7 @@ import { RuntimeError, type TaskTool } from './ports.js';
 export function topicSelectionTool(
   invoke: (body: unknown, signal: AbortSignal) => Promise<unknown>,
   selected: (candidate: import('./ports.js').Json) => void,
+  requestedType = '',
 ): TaskTool {
   const text = { type: 'string', description: 'Nonempty text, at most 500 characters' };
   return {
@@ -36,7 +37,10 @@ export function topicSelectionTool(
               evidenceNeeded: text,
               requiresCalculation: { type: 'boolean' },
               difference: text,
-              businessType: { type: 'string', enum: ['DATA', 'INSIGHT', 'SUGGESTION', 'INFO', 'RESULT'] },
+              businessType: {
+                type: 'string',
+                enum: requestedType ? [requestedType] : ['DATA', 'INSIGHT', 'SUGGESTION', 'INFO', 'RESULT'],
+              },
             },
             required: ['question', 'evidenceNeeded', 'requiresCalculation', 'difference', 'businessType'],
             additionalProperties: false,
@@ -69,6 +73,8 @@ export function topicSelectionTool(
           (c.businessType === 'DATA' && !c.requiresCalculation)
         )
           throw new RuntimeError('INVALID_TOOL_ARGUMENTS');
+      if (requestedType && args.candidates.some((c) => isRecord(c) && c.businessType !== requestedType))
+        throw new RuntimeError('BRIEFING_TYPE_MISMATCH');
       const result = await invoke(args, signal);
       if (
         !isRecord(result) ||

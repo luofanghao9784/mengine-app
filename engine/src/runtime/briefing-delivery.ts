@@ -3,6 +3,8 @@ import { isRecord } from './http-json.js';
 import { RuntimeError, type Json, type TaskTool } from './ports.js';
 /** Protocol guidance only. Placeholder text is never business evidence. */
 export const BRIEFING_EDITORIAL_HINTS: Record<string, string> = {
+  BRIEFING_TYPE_MISMATCH:
+    'Keep businessType equal to the platform requested briefing type. A completed calculation does not change the requested type. For SUGGESTION deliver evidence-grounded actions, omit calculationArtifactId and avoid unsupported quantitative claims. If no useful content of the requested type is supported, use the status-only receipt; do not substitute DATA.',
   BRIEFING_INTERNAL_LANGUAGE:
     'Rewrite user-visible title, summary and paragraphs in business Chinese. Remove tool names, raw IDs and raw status codes; e.g. deposit means 定金, canceled means 已取消, finance_confirmed means 财务已确认, never proof of refund or cash receipt.',
   BRIEFING_NO_BUSINESS_INSIGHT:
@@ -16,6 +18,7 @@ export const BRIEFING_ANALYSIS_ARRAY_HINT =
   'analysis must be a JSON array of paragraph strings, for example {"analysis":["First complete evidence-grounded paragraph.","Second complete evidence-grounded paragraph."]}. Replace placeholders with supported business content. Do not send analysis as one string, a Markdown block, or a string containing serialized JSON. Preserve the title and summary fields; correct the analysis type before calling deliver_briefing again.';
 
 export function briefingDeliveryTool(options: {
+  requestedType?: string;
   authorize(): Promise<void>;
   invoke(body: unknown, signal: AbortSignal): Promise<unknown>;
 }): TaskTool {
@@ -30,7 +33,12 @@ export function briefingDeliveryTool(options: {
     parameters: {
       type: 'object',
       properties: {
-        businessType: { type: 'string', enum: ['INFO', 'DATA', 'INSIGHT', 'SUGGESTION', 'RESULT'] },
+        businessType: {
+          type: 'string',
+          enum: options.requestedType
+            ? [options.requestedType]
+            : ['INFO', 'DATA', 'INSIGHT', 'SUGGESTION', 'RESULT'],
+        },
         calculationArtifactId: {
           type: 'string',
           description: 'artifact.id from this attempt’s successful compare_table or compare_dataset',
@@ -50,10 +58,12 @@ export function briefingDeliveryTool(options: {
             'JSON array of strings, NOT a single string. Each array item is one complete evidence-grounded paragraph, 12–500 characters, ending in sentence punctuation. Use 2–4 items, e.g. ["First grounded paragraph.","Second grounded paragraph."]. Never JSON-stringify the array.',
         },
       },
-      required: ['title', 'summary', 'analysis'],
+      required: ['title', 'summary', 'analysis', ...(options.requestedType ? ['businessType'] : [])],
       additionalProperties: false,
     },
     async execute(args, signal) {
+      if (options.requestedType && (!isRecord(args) || args.businessType !== options.requestedType))
+        throw new RuntimeError('BRIEFING_TYPE_MISMATCH');
       await options.authorize();
       const r = await options.invoke(args, signal);
       await options.authorize();

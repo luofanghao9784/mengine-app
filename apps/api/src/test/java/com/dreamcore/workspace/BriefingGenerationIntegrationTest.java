@@ -530,4 +530,13 @@ class BriefingGenerationIntegrationTest {
   assertEquals(403,assertThrows(IdentityException.class,()->agents.selectTopic(j.id(),UUID.randomUUID(),request)).status);
   assertEquals(true,agents.check(j.id(),j.token()).get("topicSelectionRecorded"));
  }
+ @Test void requestedSuggestionRejectsDataTopicBeforeRecordingAndAcceptsSuggestion(){
+  upload("marker 合成建议依据。",true);generation.generate(actor,tenant,UUID.randomUUID(),space,"SUGGESTION");generation.tick(policy());var j=conversations.claim();assertNotNull(j);
+  assertEquals("SUGGESTION",agents.check(j.id(),j.token()).get("briefingRequestedType"));
+  var wrong=new AgentTaskService.TopicSelection(List.of(new AgentTaskService.TopicCandidate("合成数据问题","需要计算",true,"新问题","DATA")),0);
+  assertEquals(422,assertThrows(IdentityException.class,()->agents.selectTopic(j.id(),j.token(),wrong)).status);
+  assertEquals(0,db.queryForObject("SELECT count(*) FROM briefing_topic_selections WHERE task_id=?",Integer.class,j.id()));
+  var valid=new AgentTaskService.TopicSelection(List.of(new AgentTaskService.TopicCandidate("合成建议问题","已有获权依据",false,"可执行措施","SUGGESTION")),0);
+  assertEquals(true,agents.selectTopic(j.id(),j.token(),valid).get("recorded"));
+ }
 }
