@@ -54,12 +54,29 @@ export function SupportEntry({ tenant, enabled }: { tenant: string; enabled: boo
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const enter = async () => {
+    if (busy || !enabled) return;
+    setError('');
+    // Open during the click gesture; awaiting authorization first can trigger popup blocking.
+    const target = window.open('about:blank', '_blank');
+    if (!target) {
+      setError('新标签页未能打开，请允许此站点打开弹出窗口后重试。');
+      return;
+    }
+    target.opener = null;
+    target.document.title = '正在进入企业管理端…';
     setBusy(true);
     setError('');
     try {
       const access = await supportClient.enter(tenant);
-      location.assign(`/tenant-admin/support/#admin=overview&tenant=${access.tenant}&support=${access.id}`);
+      if (target.closed) {
+        await supportClient.leave(access.id);
+        throw new Error('新标签页已关闭，请重新进入。');
+      }
+      target.location.replace(
+        `/tenant-admin/support/#admin=overview&tenant=${access.tenant}&support=${access.id}`,
+      );
     } catch (e) {
+      target.close();
       setError(e instanceof Error ? e.message : '总部访问暂不可用。');
     } finally {
       setBusy(false);

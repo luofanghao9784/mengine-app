@@ -80,22 +80,39 @@ test('headquarters enters scoped management, keeps context in navigation, shows 
   });
   await page.goto(`/platform-admin/#admin=tenants&enterprise=${tenant}&section=basic`);
   await expect(page.getByRole('combobox', { name: '总部访问模式' })).toHaveCount(0);
+  await page.evaluate(() => {
+    window.open = () => null;
+  });
   await page.getByRole('button', { name: '进入企业管理端' }).click();
-  await expect(page).toHaveURL(/\/tenant-admin\/support\/#.*support=/);
+  await expect(page.getByRole('alert')).toContainText('新标签页未能打开');
+  expect(writes).toHaveLength(0);
   await page.reload();
-  await expect(page.getByRole('status').getByText('总部管理模式', { exact: true })).toBeVisible();
-  await expect(page.getByText('操作者：合成总部操作者', { exact: false })).toBeVisible();
-  await page.getByRole('link', { name: '成员与空间', exact: true }).click();
-  await expect(page).toHaveURL(new RegExp(`admin=members.*support=${visit}`));
-  await page.getByRole('link', { name: '职责与交接' }).click();
-  await expect(page.getByText('负责人异常恢复', { exact: true })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: '发起交接' })).toHaveCount(0);
-  await page.getByRole('button', { name: '本次操作记录' }).click();
-  await expect(page.getByRole('dialog', { name: '总部操作记录' })).toBeVisible();
-  await expect(page.getByRole('dialog').getByText('成功', { exact: true })).toBeVisible();
-  await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: '返回总台企业概览' }).click();
-  await expect(page).toHaveURL(/\/platform-admin\/#admin=tenants&enterprise=/);
+  const popup = page.waitForEvent('popup');
+  await page.getByRole('button', { name: '进入企业管理端' }).click();
+  const supportPage = await popup;
+  await expect(supportPage).toHaveURL(/\/tenant-admin\/support\/#.*support=/);
+  await expect(page).toHaveURL(
+    new RegExp(`/platform-admin/#admin=tenants&enterprise=${tenant}&section=basic`),
+  );
+  await expect(page.getByRole('button', { name: '进入企业管理端' })).toBeVisible();
+  expect(await supportPage.evaluate(() => window.opener)).toBeNull();
+  await supportPage.reload();
+  await expect(supportPage.getByRole('status').getByText('总部管理模式', { exact: true })).toBeVisible();
+  await expect(supportPage.getByText('操作者：合成总部操作者', { exact: false })).toBeVisible();
+  await supportPage.getByRole('link', { name: '成员与空间', exact: true }).click();
+  await expect(supportPage).toHaveURL(new RegExp(`admin=members.*support=${visit}`));
+  await supportPage.getByRole('link', { name: '职责与交接' }).click();
+  await expect(supportPage.getByText('负责人异常恢复', { exact: true })).toHaveCount(0);
+  await expect(supportPage.getByRole('button', { name: '发起交接' })).toHaveCount(0);
+  await supportPage.getByRole('button', { name: '本次操作记录' }).click();
+  await expect(supportPage.getByRole('dialog', { name: '总部操作记录' })).toBeVisible();
+  await expect(supportPage.getByRole('dialog').getByText('成功', { exact: true })).toBeVisible();
+  await supportPage.keyboard.press('Escape');
+  await supportPage.getByRole('button', { name: '返回总台企业概览' }).click();
+  await expect(supportPage).toHaveURL(/\/platform-admin\/#admin=tenants&enterprise=/);
+  await expect(page).toHaveURL(
+    new RegExp(`/platform-admin/#admin=tenants&enterprise=${tenant}&section=basic`),
+  );
   expect(writes[0]).toEqual({
     path: '/api/platform-admin/v1/support-access',
     body: { tenant, mode: 'ADJUSTMENT' },
