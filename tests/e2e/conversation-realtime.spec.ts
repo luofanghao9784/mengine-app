@@ -111,7 +111,7 @@ async function fixture(page: Page) {
     return route.fulfill({ json });
   });
   await page.goto(`/workspace/#tenant=${tenant}&view=conversations&conversation=${conversation}`);
-  await expect(page.getByLabel('补充要求', { exact: true })).toBeVisible();
+  await expect(page.getByText(task.prompt, { exact: true })).toBeVisible();
   return {
     task,
     live,
@@ -127,6 +127,28 @@ async function fixture(page: Page) {
     },
   };
 }
+test('more reply actions appear only after the task finishes, including after a retry', async ({ page }) => {
+  const f = await fixture(page);
+  const more = page.getByRole('button', { name: '更多回复操作', exact: true });
+  await expect(page.getByRole('button', { name: '停止执行', exact: true })).toBeVisible();
+  await expect(more).toHaveCount(0);
+  await page.screenshot({ path: '.local/reply-more-20261005/生成中.png' });
+  f.task.status = f.live.status = 'WAITING_INPUT';
+  f.change();
+  await expect(page.getByRole('button', { name: '停止执行', exact: true })).toHaveCount(0);
+  await expect(more).toHaveCount(0);
+  f.task.status = f.live.status = 'SUCCEEDED';
+  f.task.reply = '已完成的回答';
+  f.change();
+  await expect(more).toBeVisible();
+  f.task.status = f.live.status = 'RUNNING';
+  f.task.attempt = f.live.attempt = 2;
+  f.change();
+  await expect(more).toHaveCount(0);
+  f.task.status = f.live.status = 'FAILED';
+  f.change();
+  await expect(more).toBeVisible();
+});
 test('incremental answer, supplement receipt/adoption, and confirmed stop', async ({ page }) => {
   const f = await fixture(page);
   await expect(page.getByText('正在核对合成资料。', { exact: true })).toBeVisible();

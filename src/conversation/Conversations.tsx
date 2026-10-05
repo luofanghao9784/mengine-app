@@ -930,46 +930,50 @@ function TaskCard({
                 }}
               />
             )}
-          {!task.sourcesUnavailable && (task.attempt > 0 || (task.status === 'SUCCEEDED' && task.reply)) && (
-            <div ref={moreAnchor} className="reply-more">
-              <Button
-                icon={MoreHorizontal}
-                variant="ghost"
-                aria-label="更多回复操作"
-                aria-expanded={moreOpen}
-                disabled={pendingRequest}
-                onClick={() => {
-                  if (!requestNavigationLocked()) setMoreOpen(!moreOpen);
-                }}
-              />
-              {moreOpen && (
-                <ActionPopover
-                  anchor={moreAnchor}
-                  label="更多回复操作"
-                  onClose={() => {
-                    if (!requestNavigationLocked()) setMoreOpen(false);
+          {!task.sourcesUnavailable &&
+            ['SUCCEEDED', 'PARTIAL', 'FAILED', 'CANCELLED', 'INTERRUPTED', 'RESULT_UNKNOWN'].includes(
+              task.status,
+            ) &&
+            (task.attempt > 0 || (task.status === 'SUCCEEDED' && task.reply)) && (
+              <div ref={moreAnchor} className="reply-more">
+                <Button
+                  icon={MoreHorizontal}
+                  variant="ghost"
+                  aria-label="更多回复操作"
+                  aria-expanded={moreOpen}
+                  disabled={pendingRequest}
+                  onClick={() => {
+                    if (!requestNavigationLocked()) setMoreOpen(!moreOpen);
                   }}
-                >
-                  {task.mode === 'AGENT' && task.status === 'SUCCEEDED' && task.reply && (
-                    <SaveAsDocument tenant={tenant} conversation={conversation} task={task.id} />
-                  )}
-                  {task.attempt > 0 && (
-                    <Button
-                      icon={History}
-                      variant="ghost"
-                      onClick={() => {
-                        if (requestNavigationLocked()) return;
-                        setHistoryOpen(!historyOpen);
-                        setMoreOpen(false);
-                      }}
-                    >
-                      {historyOpen ? '收起过程' : '查看过程'}
-                    </Button>
-                  )}
-                </ActionPopover>
-              )}
-            </div>
-          )}
+                />
+                {moreOpen && (
+                  <ActionPopover
+                    anchor={moreAnchor}
+                    label="更多回复操作"
+                    onClose={() => {
+                      if (!requestNavigationLocked()) setMoreOpen(false);
+                    }}
+                  >
+                    {task.mode === 'AGENT' && task.status === 'SUCCEEDED' && task.reply && (
+                      <SaveAsDocument tenant={tenant} conversation={conversation} task={task.id} />
+                    )}
+                    {task.attempt > 0 && (
+                      <Button
+                        icon={History}
+                        variant="ghost"
+                        onClick={() => {
+                          if (requestNavigationLocked()) return;
+                          setHistoryOpen(!historyOpen);
+                          setMoreOpen(false);
+                        }}
+                      >
+                        {historyOpen ? '收起过程' : '查看过程'}
+                      </Button>
+                    )}
+                  </ActionPopover>
+                )}
+              </div>
+            )}
           {copyNotice && copyNotice !== '已复制' && (
             <span role="status" className="reply-action-notice">
               {copyNotice}
