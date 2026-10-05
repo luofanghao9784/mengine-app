@@ -1,7 +1,6 @@
 import './tenant-redesign.css';
 import { SupportRecords } from '../platform/SupportRecords';
 import type { SupportAccess } from '../platform/SupportConsole';
-import { supportClient } from '../platform/SupportConsole';
 import { EngineTelemetryWall } from '../operations/EngineTelemetryWall';
 import { useEffect, useRef, useState } from 'react';
 import { ExternalLink, ArrowLeft, ShieldX } from 'lucide-react';
@@ -58,14 +57,6 @@ export function TenantConsole({
     if (selectedAccount) select({ query: '', page: 0, target: selectedAccount });
   }, [selectedAccount]);
   const back = useRef(returnToWorkspaceHref(hash, tenant)).current;
-  const leaveSupport = async () => {
-    try {
-      await supportClient.leave(support!.id);
-      location.assign(`/platform-admin/#admin=tenants&enterprise=${tenant}&section=basic`);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : '退出结果尚未确认。');
-    }
-  };
   const signOut = async () => {
     try {
       await logout();
@@ -84,13 +75,7 @@ export function TenantConsole({
       logout={() => void signOut()}
       customerLinks={
         support ? (
-          <>
-            <SupportRecords id={support.id} test={support.mode === 'TEST'} />
-            <Button onClick={() => void leaveSupport()}>
-              <ArrowLeft size={16} />
-              返回总台企业概览
-            </Button>
-          </>
+          <SupportRecords id={support.id} test={support.mode === 'TEST'} />
         ) : (
           <>
             <a className="button ghost" href={back}>

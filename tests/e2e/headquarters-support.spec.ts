@@ -3,7 +3,7 @@ const tenant = '00000000-0000-4000-8000-000000000001';
 const actor = '00000000-0000-4000-8000-000000000002';
 const owner = '00000000-0000-4000-8000-000000000003';
 const visit = '00000000-0000-4000-8000-000000000004';
-test('headquarters enters scoped management, keeps context in navigation, shows records and returns', async ({
+test('headquarters enters scoped management, keeps context in navigation, shows records and retains the original tab', async ({
   page,
   context,
 }) => {
@@ -125,8 +125,8 @@ test('headquarters enters scoped management, keeps context in navigation, shows 
   await expect(supportPage.getByRole('dialog', { name: '总部操作记录' })).toBeVisible();
   await expect(supportPage.getByRole('dialog').getByText('成功', { exact: true })).toBeVisible();
   await supportPage.keyboard.press('Escape');
-  await supportPage.getByRole('button', { name: '返回总台企业概览' }).click();
-  await expect(supportPage).toHaveURL(/\/platform-admin\/#admin=tenants&enterprise=/);
+  await expect(supportPage.getByRole('button', { name: '返回总台企业概览' })).toHaveCount(0);
+  await supportPage.close();
   await expect(page).toHaveURL(
     new RegExp(`/platform-admin/#admin=tenants&enterprise=${tenant}&section=basic`),
   );
@@ -134,7 +134,7 @@ test('headquarters enters scoped management, keeps context in navigation, shows 
     path: '/api/platform-admin/v1/support-access',
     body: { tenant, mode: 'ADJUSTMENT' },
   });
-  expect(writes.at(-1)?.path).toBe(`/api/platform-admin/v1/support-access/${visit}`);
+  expect(writes).toHaveLength(1);
   expect(paths.some((path) => path.startsWith(`/api/platform-admin/v1/support-access/${visit}/api/`))).toBe(
     true,
   );
