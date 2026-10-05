@@ -172,9 +172,7 @@ async function pickerFixture(page: Page, remaining = 6, dropFirst = false) {
 const picker = (page: Page) => page.getByRole('article', { name: '生成新画报' });
 async function choose(page: Page, quantity: number) {
   await picker(page).getByRole('button', { name: '生成更多' }).click();
-  await picker(page)
-    .getByRole('radio', { name: String(quantity), exact: true })
-    .check();
+  await picker(page).getByRole('spinbutton', { name: '生成数量' }).fill(String(quantity));
   await picker(page).getByRole('button', { name: '下一步' }).click();
 }
 test('卡片内数量与多选类型确认后只提交一次，取消整次生成', async ({ page }) => {
@@ -197,7 +195,7 @@ test('默认由系统决定类型，上一步不提交请求', async ({ page }) 
   await choose(page, 2);
   await expect(picker(page).getByRole('checkbox', { name: '默认', exact: true })).toBeChecked();
   await picker(page).getByRole('button', { name: '上一步' }).click();
-  await expect(picker(page).getByRole('radio', { name: '2', exact: true })).toBeChecked();
+  await expect(picker(page).getByRole('spinbutton', { name: '生成数量' })).toHaveValue('2');
   await picker(page).getByRole('button', { name: '下一步' }).click();
   await picker(page).getByRole('button', { name: '生成 2 张' }).click();
   await expect.poll(() => posts.length).toBe(1);
@@ -207,14 +205,16 @@ test('剩余额度限制数量，数量缩小后移除超出的类型', async ({
   await pickerFixture(page, 2);
   await page.goto(home);
   await picker(page).getByRole('button', { name: '生成更多' }).click();
-  await expect(picker(page).getByRole('radio', { name: '3', exact: true })).toBeDisabled();
-  await picker(page).getByRole('radio', { name: '2', exact: true }).check();
+  await expect(picker(page).getByRole('spinbutton', { name: '生成数量' })).toHaveAttribute('max', '2');
+  await picker(page).getByRole('button', { name: '增加数量' }).click();
+  await expect(picker(page).getByRole('button', { name: '增加数量' })).toBeDisabled();
   await picker(page).getByRole('button', { name: '下一步' }).click();
   await picker(page).getByRole('checkbox', { name: '数据', exact: true }).check();
   await picker(page).getByRole('checkbox', { name: '建议', exact: true }).check();
   await expect(picker(page).getByRole('checkbox', { name: '洞察', exact: true })).toBeDisabled();
   await picker(page).getByRole('button', { name: '上一步' }).click();
-  await picker(page).getByRole('radio', { name: '1', exact: true }).check();
+  await picker(page).getByRole('button', { name: '减少数量' }).click();
+  await expect(picker(page).getByRole('button', { name: '减少数量' })).toBeDisabled();
   await picker(page).getByRole('button', { name: '下一步' }).click();
   await expect(picker(page).getByRole('checkbox', { name: '数据', exact: true })).toBeChecked();
   await expect(picker(page).getByRole('checkbox', { name: '建议', exact: true })).not.toBeChecked();
@@ -228,4 +228,15 @@ test('请求结果不确定时重试沿用数量类型及请求编号', async ({
   await picker(page).getByRole('button', { name: '重试本次请求' }).click();
   await expect.poll(() => posts.length).toBe(2);
   expect(posts[1]).toEqual(posts[0]);
+});
+
+test('生成首页保留原入口，数量页只有一个数字，类型复用画报标签', async ({ page }) => {
+  const { posts } = await pickerFixture(page);
+  await page.goto(home);
+  await expect(picker(page).getByRole('heading', { name: '发现新内容' })).toBeVisible();
+  await expect(picker(page).getByRole('button', { name: '生成更多' })).toHaveClass(/generation-icon-button/);
+  await choose(page, 3);
+  await expect(picker(page).locator('.magazine-type[data-briefing-type]')).toHaveCount(6);
+  await expect(picker(page).getByRole('button', { name: '生成 3 张' })).toHaveClass(/generation-icon-button/);
+  expect(posts).toHaveLength(0);
 });

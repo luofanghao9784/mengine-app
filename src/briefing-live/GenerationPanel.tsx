@@ -1,5 +1,6 @@
-import { Sparkles, Square, RotateCw } from 'lucide-react';
-import { useId, useState, type ReactNode } from 'react';
+import { Sparkles, Square, RotateCw, ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
+import { briefingTypeIcons } from './Magazine';
 import { generationChoices } from './generation-types';
 import type { RecommendationItem } from '../../contracts/public-api/recommendation';
 import { SubmitError } from '../shared/admin';
@@ -105,12 +106,16 @@ function GenerationPlaceholder({
 }
 export function GenerationPanel({ generation }: { generation: BriefingGeneration }) {
   const { submission, current, active } = generation;
-  const choiceName = useId();
   const [step, setStep] = useState<'start' | 'count' | 'types'>('start');
   const [count, setCount] = useState(1);
   const [types, setTypes] = useState<string[]>([]);
   const remaining = Math.min(6, generation.quota.remaining);
   const quantity = Math.min(count, Math.max(1, remaining));
+  const changeQuantity = (n: number) => {
+    const next = Math.max(1, Math.min(Math.max(1, remaining), Math.trunc(n) || 1));
+    setCount(next);
+    setTypes((old) => old.slice(0, next));
+  };
   const toggleType = (type: string) =>
     setTypes((old) =>
       old.includes(type) ? old.filter((t) => t !== type) : old.length < quantity ? [...old, type] : old,
@@ -135,105 +140,118 @@ export function GenerationPanel({ generation }: { generation: BriefingGeneration
       {pending ? (
         <GenerationPlaceholder generation={generation} slot={pendingSlot} />
       ) : (
-        <div className="generation-card-copy generation-chooser">
-          <div className="generation-chooser-heading">
-            {step !== 'start' && (
+        <div className={'generation-card-copy generation-minimal generation-' + step}>
+          {step === 'start' ? (
+            <>
+              <h3>发现新内容</h3>
+              <p className="generation-result" role="status">
+                {remaining === 0
+                  ? '今日额度已用完'
+                  : terminal
+                    ? (current.reason && reasons[current.reason]) || label[current.status]
+                    : '基于已有资料，生成新的画报'}
+              </p>
+              <Button
+                className="generation-icon-button"
+                icon={Sparkles}
+                aria-label="生成更多"
+                title="生成更多"
+                disabled={!generation.ready}
+                onClick={() => setStep('count')}
+              />
+            </>
+          ) : (
+            <>
               <button
                 type="button"
                 className="generation-back"
                 aria-label="上一步"
+                title="上一步"
                 onClick={() => setStep(step === 'types' ? 'count' : 'start')}
               >
-                ‹
+                <ChevronLeft size={16} />
               </button>
-            )}
-            <h3>{step === 'start' ? '生成画报' : step === 'count' ? '生成数量' : '画报类型'}</h3>
-          </div>
-          {step === 'start' ? (
-            <Button
-              variant="primary"
-              className="generation-start-button"
-              icon={Sparkles}
-              aria-label="生成更多"
-              disabled={!generation.ready}
-              onClick={() => setStep('count')}
-            >
-              生成
-            </Button>
-          ) : step === 'count' ? (
-            <>
-              <fieldset className="generation-types generation-counts">
-                <legend>生成数量</legend>
-                {[1, 2, 3, 4, 5, 6].map((n) => (
-                  <label key={n} className="generation-type">
-                    <input
-                      type="radio"
-                      name={choiceName}
-                      checked={quantity === n}
-                      disabled={n > remaining}
-                      onChange={() => {
-                        setCount(n);
-                        setTypes((old) => old.slice(0, n));
-                      }}
+              {step === 'count' ? (
+                <>
+                  <div className="generation-quantity">
+                    <Button
+                      variant="ghost"
+                      icon={ChevronLeft}
+                      aria-label="减少数量"
+                      disabled={remaining === 0 || quantity <= 1}
+                      onClick={() => changeQuantity(quantity - 1)}
                     />
-                    <span>{n}</span>
-                  </label>
-                ))}
-              </fieldset>
-              <p>
-                今日可用 {remaining} / {generation.quota.limit} 次
-              </p>
-              <Button
-                variant="primary"
-                className="generation-start-button"
-                disabled={remaining === 0}
-                onClick={() => setStep('types')}
-              >
-                下一步
-              </Button>
-            </>
-          ) : (
-            <>
-              <fieldset className="generation-types">
-                <legend>画报类型</legend>
-                {generationChoices.map((choice) => (
-                  <label key={choice.value} className="generation-type">
                     <input
-                      type="checkbox"
-                      checked={choice.value ? types.includes(choice.value) : types.length === 0}
-                      disabled={!!choice.value && !types.includes(choice.value) && types.length >= quantity}
-                      onChange={() => (choice.value ? toggleType(choice.value) : setTypes([]))}
+                      type="number"
+                      aria-label="生成数量"
+                      min={1}
+                      max={Math.max(1, remaining)}
+                      value={remaining === 0 ? 0 : quantity}
+                      disabled={remaining === 0}
+                      onChange={(e) => changeQuantity(Number(e.target.value))}
                     />
-                    <span>{choice.label}</span>
-                  </label>
-                ))}
-              </fieldset>
-              <p>{types.length === 0 ? '由系统判断类型' : `已选 ${types.length} 种 · 共 ${quantity} 张`}</p>
-              <Button
-                variant="primary"
-                className="generation-start-button"
-                disabled={remaining < count || types.length > quantity || submission.busy || !!active}
-                onClick={() => {
-                  generation.generate(quantity, types);
-                  setStep('start');
-                }}
-              >
-                生成 {quantity} 张
-              </Button>
+                    <Button
+                      variant="ghost"
+                      icon={ChevronRight}
+                      aria-label="增加数量"
+                      disabled={quantity >= remaining}
+                      onClick={() => changeQuantity(quantity + 1)}
+                    />
+                  </div>
+                  <p>
+                    今日可用 {remaining} / {generation.quota.limit} 次
+                  </p>
+                  <Button
+                    className="generation-icon-button"
+                    icon={ArrowRight}
+                    aria-label="下一步"
+                    title="下一步"
+                    disabled={remaining === 0}
+                    onClick={() => setStep('types')}
+                  />
+                </>
+              ) : (
+                <>
+                  <fieldset className="generation-type-tags">
+                    <legend>画报类型</legend>
+                    {generationChoices.map((choice) => {
+                      const Icon = choice.value ? briefingTypeIcons[choice.value] : Sparkles;
+                      return (
+                        <label
+                          key={choice.value}
+                          className="magazine-type generation-type"
+                          data-briefing-type={choice.value ? choice.label : '全部'}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={choice.value ? types.includes(choice.value) : types.length === 0}
+                            disabled={
+                              !!choice.value && !types.includes(choice.value) && types.length >= quantity
+                            }
+                            onChange={() => (choice.value ? toggleType(choice.value) : setTypes([]))}
+                          />
+                          <Icon size={13} strokeWidth={1.5} />
+                          <span>{choice.label}</span>
+                        </label>
+                      );
+                    })}
+                  </fieldset>
+                  <Button
+                    className="generation-icon-button"
+                    icon={Sparkles}
+                    aria-label={`生成 ${quantity} 张`}
+                    title={`生成 ${quantity} 张`}
+                    disabled={remaining < count || types.length > quantity || submission.busy || !!active}
+                    onClick={() => {
+                      generation.generate(quantity, types);
+                      setStep('start');
+                    }}
+                  />
+                </>
+              )}
             </>
           )}
           <SubmitError error={submission.error || generation.error} uncertain={submission.uncertain} />
-          {step === 'start' && (
-            <p className="generation-result" role="status">
-              {remaining === 0
-                ? '今日额度已用完'
-                : terminal
-                  ? current.status === 'NO_NEW_CONTENT'
-                    ? '暂无新内容'
-                    : label[current.status]
-                  : `每日最多 ${generation.quota.limit} 次`}
-            </p>
-          )}
         </div>
       )}
     </article>
