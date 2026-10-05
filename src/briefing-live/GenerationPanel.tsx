@@ -31,7 +31,7 @@ const reasons: Record<string, string> = {
   MATERIALS_NOT_READY: '资料仍在解析，或需要处理解析问题。',
   MERGING_DATA_EVENTS: '正在等待本批资料完成更新。',
   DAILY_RUN_LIMIT: '今天的生成额度已用完，额度恢复后会继续。',
-  TASK_LIMIT: '主模型达到本次执行上限，可稍后重试。',
+  TASK_LIMIT: '本次生成达到处理上限，尚未完成画报。',
   NO_NEW_CONTENT: '现有资料暂未支持新的分析，不重复生成旧卡。',
 };
 function GenerationPlaceholder({

@@ -23,3 +23,36 @@ test('explicit proxy pins CONNECT to the checked IP and never accepts a remote p
  const bootstrap={fetch:async()=>({response:{headers:{'content-type':'application/json'},bytes:Buffer.from(JSON.stringify({Status:0,Question:[{name:'publisher.example.org.'}],Answer:[{type:1,data:'127.0.0.1'}]}))}})};
  await assert.rejects(publicDnsResolver(bootstrap)('publisher.example.org',signal()),/PUBLIC_ADDRESS_DENIED/);
 });
+
+test('INFO prepares scoped background and trusted research, then delivers in four model rounds',async t=>{
+ const {createServer}=await import('node:http');const {randomUUID}=await import('node:crypto');const {AgentTasks}=await import('../dist/runtime/agent-task.js');const {listen,close,json,body}=await import('./fixtures/agent.mjs');const {usageFixture}=await import('./fixtures/usage.mjs');
+ const contexts=[],receipts=[];let selected=false,step=0;const artifactId=randomUUID();
+ const server=createServer(async(req,res)=>{
+  if(usageFixture(req,res))return;const input=await body(req);
+  if(req.url.endsWith('/check'))return json(res,{allowed:true,executionClass:'verification',publicQuery:'news:topic-search:v1',briefingGeneration:true,briefingRequestedType:'INFO',briefingContentVersion:'1.0',contextVersion:'1.0',topicStrategyVersion:'1.0',topicSelectionRecorded:selected,newsSearch:scope});
+  if(req.url.endsWith('/context')){contexts.push(input);return json(res,{contractVersion:'1.0',action:input.action,referenceOnly:true,result:input.action==='bootstrap'?{}:{items:[{value:input.scope==='TENANT'?'PRIVATE_COMPANY 健身经营 123456789':'关注运动安全',authority:false}],hasMore:false}});}
+  if(req.url.endsWith('/execution/open'))return json(res,{accepted:true,policy:'READ_ONLY_PRIVATE_V1'});
+  if(req.url.endsWith('/execution/tool')){receipts.push(input);return json(res,{accepted:true});}
+  if(req.url.endsWith('/select-news-query'))return json(res,scope.topics[0]);
+  if(req.url.endsWith('/select-briefing-topic')){selected=true;return json(res,{recorded:true,proposalOnly:true,selectedIndex:0,strategyVersion:'1.0.0'});}
+  if(req.url.endsWith('/deliver-briefing')){assert.equal(input.businessType,'INFO');return json(res,{contractVersion:'1.0',status:'PREPARED',artifactId,title:input.title,visibility:'PRIVATE_AFTER_TASK_SUCCEEDS'});}
+  json(res,{},404);
+ });const endpoint=await listen(server);t.after(()=>close(server));const {reader,calls}=fixture();let source;
+ const agent=new AgentTasks({platformBaseUrl:endpoint,executionClass:'verification',modelName:'synthetic-info',publicWeb:{reader,search:new BingNewsSearch(reader)},createModel:()=>({usage:null,async *generate(req){
+  step++;assert.ok(!req.tools.some(x=>['task_context','find_skills','activate_skill','search_sources','compare_dataset'].includes(x.name)));
+  let name,args;
+  if(step===1){assert.deepEqual(contexts.filter(x=>x.action==='profiles').map(x=>x.scope),['TENANT','WORKSPACE','PERSONAL']);assert.match(JSON.stringify(req.messages),/PRIVATE_COMPANY/);assert.ok(req.tools.some(x=>x.name==='public_search'));name='public_search';args={topic:'FITNESS'};}
+  else if(step===2){const last=req.messages.flatMap(m=>m.content).filter(b=>b.type==='tool_result').at(-1);source=JSON.parse(JSON.parse(last.content)[0].text).items[0].id;assert.ok(!req.tools.some(x=>x.name==='public_search'));name='read_public_page';args={id:source};}
+  else if(step===3){name='select_briefing_topic';args={candidates:[{question:'新政策影响哪些健身安排',evidenceNeeded:'已读取的政策原文',requiresCalculation:false,difference:'新增政策',businessType:'INFO'}],selectedIndex:0};}
+  else {assert.equal(step,4);name='deliver_briefing';args={businessType:'INFO',title:'健身行业新政策',summary:'合成资讯验收摘要',analysis:['合成原文支持相关经营安排。']};}
+  yield{type:'tool_call',id:'info'+step,name,arguments:JSON.stringify(args)};yield{type:'finish',reason:'tool_calls'};
+ }})});t.after(()=>agent.stop());const result=await agent.run({contractVersion:'1.5',taskId:randomUUID(),attemptId:randomUUID(),prompt:'合成资讯生成'},signal());
+ assert.equal(step,4);assert.equal(result.outcome,'COMPLETE');assert.deepEqual(receipts.filter(x=>x.status==='succeeded').map(x=>x.name),['public_search','read_public_page','select_briefing_topic','deliver_briefing']);assert.equal(result.webSources.length,1);assert.ok(!calls.join('').includes('123456789'));
+});
+
+test('news summaries use fixed scopes, reject malformed grants and retain narrow tool phases',async()=>{
+ const {newsBriefingBackground,newsBriefingToolAllowed}=await import('../dist/runtime/news-briefing-flow.js');let calls=0;
+ await assert.rejects(newsBriefingBackground(async()=>{calls++;return {contractVersion:'1.0',action:'profiles',referenceOnly:false,result:{items:[]}};}),/INVALID_CONTEXT_RESPONSE/);assert.equal(calls,1);
+ for(const stage of [[false,false],[true,false],[true,true]])for(const tool of ['task_context','find_skills','activate_skill','dataset_read','compare_dataset'])assert.equal(newsBriefingToolAllowed(tool,...stage),false);
+ assert.equal(newsBriefingToolAllowed('deliver_briefing',false,false),false);assert.equal(newsBriefingToolAllowed('deliver_briefing',true,false),true);assert.equal(newsBriefingToolAllowed('task_control',false,false),true);
+});
