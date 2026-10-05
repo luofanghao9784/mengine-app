@@ -283,3 +283,81 @@
     gap: 20px;
   }
 }
+
+/* Members, invitations and spaces share one directory layout. */
+.admin-tenant.admin-control .tenant-members-page .tenant-section {
+  padding: 0;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.admin-tenant.admin-control .tenant-members-page .platform-list-heading {
+  gap: 16px;
+  padding: 18px 20px;
+}
+.admin-tenant.admin-control .tenant-members-page .platform-list-heading h2 {
+  font-size: 15px;
+}
+.admin-tenant.admin-control .tenant-members-page .platform-filters {
+  gap: 8px;
+}
+.admin-tenant.admin-control .tenant-members-page .platform-help {
+  margin: 8px 0 0;
+  font-size: 12px;
+}
+.admin-tenant.admin-control .tenant-member-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 2fr) 140px 110px 100px;
+  min-width: 650px;
+}
+.admin-tenant.admin-control .tenant-invitation-grid {
+  display: grid;
+  grid-template-columns: minmax(210px, 2fr) 125px 170px 100px 110px;
+  min-width: 750px;
+}
+.admin-tenant.admin-control .tenant-space-grid {
+  display: grid;
+  grid-template-columns: minmax(210px, 2fr) minmax(130px, 1fr) 110px 85px;
+  min-width: 600px;
+}
+.admin-tenant.admin-control
+  .tenant-members-page
+  :is(.tenant-list-columns, .tenant-rows > li, .tenant-space-grid) {
+  gap: 16px;
+  align-items: center;
+  padding: 14px 20px;
+}
+.admin-tenant.admin-control .tenant-members-page .tenant-rows > li {
+  border-top: 0;
+  border-bottom: 1px solid var(--line);
+}
+.admin-tenant.admin-control .tenant-members-page .tenant-person {
+  min-width: 0;
+  gap: 5px;
+}
+.admin-tenant.admin-control .tenant-members-page .badge {
+  justify-self: start;
+}
+.admin-tenant.admin-control .tenant-members-page .tenant-space-grid.platform-tenant-row {
+  width: 100%;
+}
+.admin-tenant.admin-control .tenant-members-page .tenant-space-grid .platform-tenant-name {
+  grid-column: auto;
+}
+.admin-tenant.admin-control .tenant-members-page .tenant-rows .button {
+  justify-self: end;
+}
+@media (max-width: 700px) {
+  .admin-tenant.admin-control .tenant-members-page .platform-list-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .admin-tenant.admin-control .tenant-members-page .platform-filters {
+    width: 100%;
+  }
+  .admin-tenant.admin-control .tenant-members-page .platform-detail-nav {
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+}

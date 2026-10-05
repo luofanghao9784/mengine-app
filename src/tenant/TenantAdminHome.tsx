@@ -99,10 +99,12 @@ export function TenantAdminHome({
   tenant,
   compact = false,
   initialTab,
+  hideNavigation = false,
 }: {
   tenant: string;
   compact?: boolean;
   initialTab?: Tab;
+  hideNavigation?: boolean;
 }) {
   const { session, refresh: refreshIdentity } = useSession();
   const [tab, setTab] = useState<Tab>(
@@ -196,7 +198,7 @@ export function TenantAdminHome({
               ))}
             </nav>
           )}
-          {compact && !initialTab && (
+          {compact && !initialTab && !hideNavigation && (
             <nav className="tenant-tabs" aria-label="成员与空间">
               {tabs
                 .filter(([key]) => ['members', 'invitations', 'spaces'].includes(key))
@@ -446,34 +448,42 @@ function Members({ tenant, attempt, refresh }: { tenant: string; attempt: number
         <Loading />
       ) : (
         <>
-          <ul className="tenant-rows">
-            {data.value.slice(0, 20).map((m) => (
-              <li key={m.accountId}>
-                <span className="tenant-person">
-                  <strong>{m.displayName}</strong>
-                  <small>{m.phone || m.email}</small>
-                </span>
-                <Badge>{role(m.role)}</Badge>
-                <Badge blue={m.status === 'ACTIVE' && m.accountStatus === 'ACTIVE'}>
-                  {m.accountStatus === 'DISABLED'
-                    ? '账号已停用'
-                    : m.status === 'ACTIVE'
-                      ? '已启用'
-                      : '已停用'}
-                </Badge>
-                <a
-                  className="button ghost"
-                  href={adminHref('tenant', 'members', location.hash, {
-                    detail: 'member',
-                    member: m.accountId,
-                  })}
-                  aria-label={`查看成员 ${m.displayName}`}
-                >
-                  查看详情
-                </a>
-              </li>
-            ))}
-          </ul>
+          <div className="tenant-directory-scroll">
+            <div className="tenant-list-columns tenant-member-grid">
+              <span>成员</span>
+              <span>企业角色</span>
+              <span>状态</span>
+              <span>操作</span>
+            </div>
+            <ul className="tenant-rows tenant-member-directory">
+              {data.value.slice(0, 20).map((m) => (
+                <li className="tenant-member-grid" key={m.accountId}>
+                  <span className="tenant-person">
+                    <strong>{m.displayName}</strong>
+                    <small>{m.phone || m.email}</small>
+                  </span>
+                  <Badge>{role(m.role)}</Badge>
+                  <Badge blue={m.status === 'ACTIVE' && m.accountStatus === 'ACTIVE'}>
+                    {m.accountStatus === 'DISABLED'
+                      ? '账号已停用'
+                      : m.status === 'ACTIVE'
+                        ? '已启用'
+                        : '已停用'}
+                  </Badge>
+                  <a
+                    className="button ghost"
+                    href={adminHref('tenant', 'members', location.hash, {
+                      detail: 'member',
+                      member: m.accountId,
+                    })}
+                    aria-label={`查看成员 ${m.displayName}`}
+                  >
+                    查看详情
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
           {!data.value.length && (
             <Empty icon={Users} title="没有找到成员" text="调整搜索条件，或邀请同事加入企业。" />
           )}
@@ -516,25 +526,35 @@ function Invitations({
         <Loading />
       ) : (
         <>
-          <ul className="tenant-rows">
-            {data.value.slice(0, 20).map((i) => (
-              <li key={i.id}>
-                <span className="tenant-person">
-                  <strong>{i.phone || i.email}</strong>
-                  {i.phone && i.status === 'PENDING' && <LocalInviteLink invitation={i.id} />}
-                  <small>
-                    {role(i.role)} · 到期 {time(i.expiresAt)}
-                  </small>
-                </span>
-                <Badge blue={i.status === 'PENDING'}>{inviteLabels[i.status]}</Badge>
-                {['PENDING', 'EXPIRED'].includes(i.status) && (
-                  <Button variant="ghost" onClick={() => revoke(i)}>
-                    撤销邀请
-                  </Button>
-                )}
-              </li>
-            ))}
-          </ul>
+          <div className="tenant-directory-scroll">
+            <div className="tenant-list-columns tenant-invitation-grid">
+              <span>受邀账号</span>
+              <span>企业角色</span>
+              <span>有效期至</span>
+              <span>状态</span>
+              <span>操作</span>
+            </div>
+            <ul className="tenant-rows tenant-invitation-directory">
+              {data.value.slice(0, 20).map((i) => (
+                <li className="tenant-invitation-grid" key={i.id}>
+                  <span className="tenant-person">
+                    <strong>{i.phone || i.email}</strong>
+                    {i.phone && i.status === 'PENDING' && <LocalInviteLink invitation={i.id} />}
+                  </span>
+                  <span>{role(i.role)}</span>
+                  <time>{time(i.expiresAt)}</time>
+                  <Badge blue={i.status === 'PENDING'}>{inviteLabels[i.status]}</Badge>
+                  <span>
+                    {['PENDING', 'EXPIRED'].includes(i.status) && (
+                      <Button variant="ghost" onClick={() => revoke(i)}>
+                        撤销邀请
+                      </Button>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
           {!data.value.length && (
             <Empty icon={Mail} title="还没有邀请" text="邀请同事，共同开始使用工作空间。" />
           )}
@@ -585,29 +605,32 @@ function Spaces({
         <Loading />
       ) : (
         <>
-          <ul className="platform-tenant-list">
-            {data.value.slice(0, 20).map((s) => (
-              <li key={s.id}>
-                <button
-                  className="platform-tenant-row"
-                  onClick={() => open(s.id)}
-                  aria-label={`管理空间 ${s.name}`}
-                >
-                  <span className="platform-tenant-icon">
-                    <FolderOpen size={22} />
-                  </span>
-                  <span className="platform-tenant-name">
-                    <strong>{s.name}</strong>
-                    <small>
-                      {s.ownerName ? `负责人：${s.ownerName}` : '负责人待指定'} · {s.memberCount}{' '}
-                      位已授权成员（含停用成员）
-                    </small>
-                  </span>
-                  <span>管理</span>
-                </button>
-              </li>
-            ))}
-          </ul>
+          <div className="tenant-directory-scroll">
+            <div className="tenant-list-columns tenant-space-grid">
+              <span>空间名称</span>
+              <span>负责人</span>
+              <span>授权成员</span>
+              <span>操作</span>
+            </div>
+            <ul className="platform-tenant-list">
+              {data.value.slice(0, 20).map((s) => (
+                <li key={s.id}>
+                  <button
+                    className="platform-tenant-row tenant-space-grid"
+                    onClick={() => open(s.id)}
+                    aria-label={`管理空间 ${s.name}`}
+                  >
+                    <span className="platform-tenant-name">
+                      <strong>{s.name}</strong>
+                    </span>
+                    <span>{s.ownerName || '负责人待指定'}</span>
+                    <span>{s.memberCount} 人</span>
+                    <span>管理</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
           {!data.value.length && (
             <Empty
               icon={FolderOpen}

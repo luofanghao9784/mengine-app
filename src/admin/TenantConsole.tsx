@@ -20,6 +20,7 @@ import { TenantDatabase } from '../database/TenantDatabase';
 import { CompanyInformation } from '../profile/CompanyInformation';
 import { TenantMaterials } from '../material/TenantMaterials';
 import { TenantExperiences } from '../experience/TenantExperiences';
+import { requestNavigationLocked } from '../shared/request-guard';
 import { DeparturePanel } from '../departure/DeparturePanel';
 
 export function TenantConsole({
@@ -139,18 +140,50 @@ export function TenantConsole({
       ) : page === 'engine' ? (
         <EngineTelemetryWall scope="tenant" tenant={tenant} />
       ) : page === 'members' ? (
-        secondary === 'member' && params.get('member') ? (
-          <TenantMemberDetail
-            key={params.get('member')}
-            tenant={tenant}
-            account={params.get('member')!}
-            hash={hash}
-          />
-        ) : secondary === 'duties' ? (
-          <>
-            <a className="button ghost" href={adminHref('tenant', 'members', hash)}>
-              返回成员与空间
-            </a>
+        <div className="admin-dashboard tenant-members-page">
+          <nav className="platform-detail-nav" aria-label="成员与空间">
+            {[
+              ['members', '企业成员'],
+              ['invitations', '成员邀请'],
+              ['spaces', '共享空间'],
+              ['duties', '职责与交接'],
+            ]
+              .filter(([key]) => !limited || ['spaces', 'duties'].includes(key))
+              .map(([key, label]) => (
+                <a
+                  key={key}
+                  className="button ghost"
+                  aria-current={
+                    (
+                      secondary === 'duties'
+                        ? key === 'duties'
+                        : key === (params.get('tab') || (limited ? 'spaces' : 'members'))
+                    )
+                      ? 'page'
+                      : undefined
+                  }
+                  onClick={(event) => {
+                    if (requestNavigationLocked()) event.preventDefault();
+                  }}
+                  href={adminHref(
+                    'tenant',
+                    'members',
+                    hash,
+                    key === 'duties' ? { detail: 'duties' } : { tab: key },
+                  )}
+                >
+                  {label}
+                </a>
+              ))}
+          </nav>
+          {secondary === 'member' && params.get('member') ? (
+            <TenantMemberDetail
+              key={tenant + params.get('member')}
+              tenant={tenant}
+              account={params.get('member')!}
+              hash={hash}
+            />
+          ) : secondary === 'duties' ? (
             <GovernancePanel
               tenant={tenant}
               snapshot={governance.value}
@@ -158,24 +191,17 @@ export function TenantConsole({
               selection={selection}
               select={select}
             />
-          </>
-        ) : (
-          <>
-            <div className="admin-secondary-link">
-              <a href={adminHref('tenant', 'members', hash, { detail: 'duties' })}>职责与交接</a>
-            </div>
-            {limited ? (
-              <>
-                {governance.value.capabilities.some(
-                  (c) => c.capability === 'MEMBER_OFFBOARD' && c.workspaceId === null,
-                ) && <DeparturePanel tenant={tenant} only="member" />}
-                <ManagedSpaces tenant={tenant} />
-              </>
-            ) : (
-              <TenantAdminHome tenant={tenant} compact />
-            )}
-          </>
-        )
+          ) : limited ? (
+            <>
+              {governance.value.capabilities.some(
+                (c) => c.capability === 'MEMBER_OFFBOARD' && c.workspaceId === null,
+              ) && <DeparturePanel tenant={tenant} only="member" />}
+              <ManagedSpaces tenant={tenant} />
+            </>
+          ) : (
+            <TenantAdminHome tenant={tenant} compact hideNavigation />
+          )}
+        </div>
       ) : page === 'database' ? (
         <TenantDatabase key={tenant} tenant={tenant} hash={hash} />
       ) : page === 'materials' ? (

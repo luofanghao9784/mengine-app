@@ -184,7 +184,45 @@ async function fixture(context: BrowserContext, control: { mode?: string; paths?
         ],
         records: [],
       });
-    if (path.endsWith('/members')) return json([]);
+    if (path.endsWith('/members'))
+      return json([
+        {
+          accountId: customer,
+          displayName: '合成客户甲',
+          phone: '+8619900000001',
+          email: null,
+          role: 'TENANT_ADMIN',
+          status: 'ACTIVE',
+          accountStatus: 'ACTIVE',
+          version: 0,
+        },
+      ]);
+    if (path.endsWith('/invitations'))
+      return json([
+        {
+          id: id(15),
+          tenantId: tenant,
+          phone: '+8619900000015',
+          email: null,
+          role: 'MEMBER',
+          status: 'ACCEPTED',
+          expiresAt: '2026-10-07T12:00:00Z',
+        },
+      ]);
+    if (path.endsWith('/workspaces'))
+      return json([
+        {
+          id: id(16),
+          tenantId: tenant,
+          name: '合成业务空间',
+          kind: 'SHARED',
+          version: 0,
+          memberCount: 1,
+          ownerId: customer,
+          ownerName: '合成客户甲',
+          description: '',
+        },
+      ]);
     if (path.endsWith('/tenants')) return json([]);
     if (path.endsWith('/staff'))
       return json([
@@ -201,7 +239,7 @@ async function fixture(context: BrowserContext, control: { mode?: string; paths?
   });
   return changes;
 }
-test('enterprise sidebar, three member tabs and customer return stay separate from platform', async ({
+test('enterprise sidebar, unified member navigation and customer return stay separate from platform', async ({
   context,
   page,
 }) => {
@@ -212,8 +250,21 @@ test('enterprise sidebar, three member tabs and customer return stay separate fr
   await expect(nav.locator('nav a')).toHaveCount(8);
   await expect(page.getByRole('heading', { level: 1, name: '企业概览', exact: true })).toBeVisible();
   await nav.getByRole('link', { name: '成员与空间', exact: true }).click();
-  await expect(page.getByRole('navigation', { name: '成员与空间' }).getByRole('button')).toHaveCount(3);
+  await expect(page.getByRole('navigation', { name: '成员与空间' }).getByRole('link')).toHaveCount(4);
   await expect(page.getByRole('navigation', { name: '管理工作区' })).toHaveCount(0);
+  await expect(page.locator('.tenant-list-columns')).toContainText('企业角色');
+  await expect(page.getByRole('link', { name: '查看成员 合成客户甲' })).toBeVisible();
+  await page.screenshot({ path: '.local/member-layout-members.png', fullPage: true });
+  const memberNav = page.getByRole('navigation', { name: '成员与空间' });
+  await memberNav.getByRole('link', { name: '成员邀请', exact: true }).click();
+  await expect(page.locator('.tenant-list-columns')).toContainText('有效期至');
+  await memberNav.getByRole('link', { name: '共享空间', exact: true }).click();
+  await expect(page.locator('.tenant-list-columns')).toContainText('授权成员');
+  for (const width of [834, 360]) {
+    await page.setViewportSize({ width, height: 900 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  }
+  await page.setViewportSize({ width: 1440, height: 1000 });
   await expect(page.getByRole('link', { name: '返回客户端', exact: true })).toHaveAttribute(
     'href',
     '/workspace/' + back,
