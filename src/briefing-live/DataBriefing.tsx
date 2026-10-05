@@ -1,3 +1,4 @@
+import { displayAmount } from './money-display';
 import type { BriefingDocument } from '../../contracts/public-api/briefing-content';
 import { formatBriefingNumber as value } from './content';
 import { BriefingChart as MagazineChart } from '../components/BriefingChart';
@@ -22,7 +23,10 @@ export function BriefingChart({
           <MagazineChart chart={chart} spacious={false} />
         </div>
       </div>
-      <figcaption>按原表同口径比较，具体日期与统计范围见下方依据。</figcaption>
+      <figcaption>
+        {document.content.chart?.unit === '分' ? '金额以元显示，计算依据保留原始单位。' : '按同口径比较。'}
+        具体日期与统计范围见下方依据。
+      </figcaption>
     </figure>
   );
 }
@@ -35,6 +39,7 @@ export function DataBriefing({
 }) {
   const c = document.content,
     ch = c.chart;
+  const amount = (raw: string | null) => value(displayAmount(raw, ch?.unit ?? ''));
   if (!ch)
     return (
       <article className="data-briefing">
@@ -71,6 +76,7 @@ export function DataBriefing({
                 <p>这是任务所读的固定数据版本；快照行数不代表逐行阅读或完整业务覆盖。</p>
               </details>
             )}
+            <RuleTrace document={document} />
             <small>生成于 {new Date(c.generatedAt).toLocaleString('zh-CN')}；完整引用见来源卡片。</small>
           </>
         )}
@@ -87,13 +93,14 @@ export function DataBriefing({
               <p key={i}>{p}</p>
             ))}
           </div>
+          <RuleTrace document={document} />
           <details className="data-briefing-table">
             <summary>查看完整对比数据</summary>
             <div className="data-table-scroll">
               <table>
                 <thead>
                   <tr>
-                    <th>门店 / 分组</th>
+                    <th>门店 / 分组{ch.unit === '分' ? '（金额：元）' : ''}</th>
                     <th>{ch.baseline}</th>
                     <th>{ch.current}</th>
                     <th>差额</th>
@@ -105,9 +112,9 @@ export function DataBriefing({
                   {[...ch.rows, { ...ch.totals, group: '总计' }].map((r) => (
                     <tr key={r.group}>
                       <th>{r.group}</th>
-                      <td>{value(r.baseline)}</td>
-                      <td>{value(r.current)}</td>
-                      <td>{value(r.difference)}</td>
+                      <td>{amount(r.baseline)}</td>
+                      <td>{amount(r.current)}</td>
+                      <td>{amount(r.difference)}</td>
                       <td>{r.changePercent === null ? '不可计算' : value(r.changePercent) + '%'}</td>
                       <td>
                         {r.baselineRank === null ? '—' : `${r.baselineRank} → ${r.currentRank ?? '缺数据'}`}
@@ -134,6 +141,11 @@ export function DataBriefing({
                     : '业务覆盖时间未提供，采集时间不代表数据统计期间。'}
                 </p>
                 <p>
+                  {c.datasetBasis?.periodMode === 'MONTH' && (
+                    <>
+                      按日期归月，业务时区：{c.datasetBasis.timeZone}。<br />
+                    </>
+                  )}
                   分组字段：{c.datasetBasis?.groupColumn}；期间字段：{c.datasetBasis?.periodColumn}
                   ；数值字段：{ch.metric}。
                 </p>
@@ -153,5 +165,30 @@ export function DataBriefing({
         </>
       )}
     </div>
+  );
+}
+
+function RuleTrace({ document }: { document: BriefingDocument }) {
+  const trace = document.ruleTrace;
+  return (
+    <details className="data-briefing-rule-trace">
+      <summary>生成规则版本</summary>
+      {trace?.status === 'RECORDED' ? (
+        trace.versions.length ? (
+          <ul>
+            {trace.versions.map((r) => (
+              <li key={r.source + ':' + r.target}>
+                {{ GLOBAL: '总部', TENANT: '企业', PERSONAL: '个人' }[r.source]} ·{' '}
+                {r.target === 'ALL' ? '通用表达' : '画报表达'} · 第 {r.revision} 版
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p>本次任务未配置额外文字规则，采用基础表达规范。</p>
+        )
+      ) : (
+        <p>这张历史卡片未记录文字规则版本；后续修改不会自动重写它。</p>
+      )}
+    </details>
   );
 }

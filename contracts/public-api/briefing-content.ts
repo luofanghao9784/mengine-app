@@ -12,6 +12,10 @@ export interface BriefingRow {
 export interface BriefingDocument {
   artifactId: string;
   sha256: string;
+  ruleTrace?: {
+    status: 'RECORDED' | 'NOT_RECORDED';
+    versions: { source: 'GLOBAL' | 'TENANT' | 'PERSONAL'; target: 'ALL' | 'BRIEFING'; revision: number }[];
+  } | null;
   content: {
     schemaVersion: 'briefing-data-v1' | 'briefing-text-v1' | 'briefing-dataset-v1';
     businessType: 'INFO' | 'DATA' | 'INSIGHT' | 'SUGGESTION' | 'RESULT';
@@ -52,6 +56,8 @@ export interface BriefingDocument {
       periodColumn: string;
       matchedRows: number;
       ignoredRows: number;
+      periodMode?: 'EXACT' | 'MONTH' | null;
+      timeZone?: string | null;
     } | null;
     calculationArtifactId: string | null;
     calculationSha256: string | null;

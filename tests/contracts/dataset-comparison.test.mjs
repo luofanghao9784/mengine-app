@@ -58,3 +58,7 @@ test('text dataset insight retains source identity but cannot claim a chart calc
   doc.content.datasetBasis = { groupColumn: '门店', periodColumn: '期间', matchedRows: 5, ignoredRows: 1 };
   assert.equal(valid(doc), false);
 });
+
+test('date-month grouping is bounded and cannot accept arbitrary transformations',()=>{
+ const valid=ajv.compile({$ref:schema.$id+'#/$defs/request'}),id='00000000-0000-4000-8000-000000000001';const request={datasetId:id,snapshotId:id,groupColumn:'门店',periodColumn:'确认时间',valueColumn:'实收金额（分）',baseline:'2026-09',current:'2026-10',periodMode:'MONTH',timeZone:'Asia/Shanghai'};assert.ok(valid(request));assert.equal(valid({...request,periodMode:'JAVASCRIPT'}),false);assert.equal(valid({...request,transform:'return row'}),false);
+});

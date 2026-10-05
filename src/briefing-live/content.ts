@@ -17,6 +17,23 @@ const row = (v: unknown): v is BriefingRow =>
     ['MISSING_PERIOD', 'NON_POSITIVE_BASELINE', 'UNEQUAL_GROUP_COVERAGE'].includes(String(v.issue)));
 export function isBriefingDocument(v: unknown): v is BriefingDocument {
   if (!record(v) || !uuid(v.artifactId) || !hash(v.sha256) || !record(v.content)) return false;
+  if (
+    v.ruleTrace !== undefined &&
+    v.ruleTrace !== null &&
+    (!record(v.ruleTrace) ||
+      !['RECORDED', 'NOT_RECORDED'].includes(String(v.ruleTrace.status)) ||
+      !Array.isArray(v.ruleTrace.versions) ||
+      v.ruleTrace.versions.length > 6 ||
+      !v.ruleTrace.versions.every(
+        (r: unknown) =>
+          record(r) &&
+          ['GLOBAL', 'TENANT', 'PERSONAL'].includes(String(r.source)) &&
+          ['ALL', 'BRIEFING'].includes(String(r.target)) &&
+          Number.isSafeInteger(r.revision) &&
+          Number(r.revision) > 0,
+      ))
+  )
+    return false;
   const c = v.content,
     ch = c.chart,
     s = c.source,

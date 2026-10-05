@@ -2,6 +2,16 @@ import { BRIEFING_WRITING_RULES } from './briefing-writing-rules.js';
 import { isRecord } from './http-json.js';
 import { RuntimeError, type Json, type TaskTool } from './ports.js';
 /** Protocol guidance only. Placeholder text is never business evidence. */
+export const BRIEFING_EDITORIAL_HINTS: Record<string, string> = {
+  BRIEFING_INTERNAL_LANGUAGE:
+    'Rewrite user-visible title, summary and paragraphs in business Chinese. Remove tool names, raw IDs and raw status codes; e.g. deposit means 定金, canceled means 已取消, finance_confirmed means 财务已确认, never proof of refund or cash receipt.',
+  BRIEFING_NO_BUSINESS_INSIGHT:
+    'A schema inventory is not a business insight. Deliver one supported business finding or use the status-only 暂无新内容 receipt; do not pad content with columns or tool limitations.',
+  BRIEFING_UNVERIFIED_QUANTITY:
+    'Sample observations do not prove majority, share, growth or rank. Remove quantitative claims unless a verified full-snapshot comparison supports them. A fixed date-to-month comparison is available; never fabricate a statistical result.',
+  BRIEFING_RATIO_NOT_VERIFIED:
+    'Grouped sum comparisons do not verify category counts or ratios. Remove majority/share claims and use supported individual observations; do not invent a denominator.',
+};
 export const BRIEFING_ANALYSIS_ARRAY_HINT =
   'analysis must be a JSON array of paragraph strings, for example {"analysis":["First complete evidence-grounded paragraph.","Second complete evidence-grounded paragraph."]}. Replace placeholders with supported business content. Do not send analysis as one string, a Markdown block, or a string containing serialized JSON. Preserve the title and summary fields; correct the analysis type before calling deliver_briefing again.';
 
@@ -12,7 +22,11 @@ export function briefingDeliveryTool(options: {
   return {
     name: 'deliver_briefing',
     description:
-      'Create a real private briefing card on 智能画报. Set businessType to INFO (资讯), DATA (数据), INSIGHT (洞察), SUGGESTION (建议), or RESULT (成果). For text categories omit calculationArtifactId and use actual granted evidence; only DATA requires the calculation below. Do not create cards for greetings or routine status replies; create for a complete useful theme or an explicit user request. Only DATA requires compare_table (XLSX) or compare_dataset (collected database snapshot) and its artifact.id; INFO, INSIGHT, SUGGESTION and RESULT use granted evidence without a calculation. Write a short editorial title, summary and 2–4 analysis paragraphs grounded in that calculation and source scope. Summary and each paragraph must be complete sentences ending in punctuation. Distinguish observed changes from unverified causes. Chart values, periods, units and provenance are taken by the platform from the verified calculation, never from model-supplied numbers. One immutable card per task attempt, private to the current user, visible only after successful task delivery. After PREPARED, finish with a short confirmation; NO_NEW_CONTENT means a duplicate was suppressed, so report no new card; do not repeat raw IDs, hashes or the entire report. This is not enterprise publication or a scheduled plan.' + '\n' + BRIEFING_WRITING_RULES + '\n' + BRIEFING_ANALYSIS_ARRAY_HINT,
+      'Create a real private briefing card on 智能画报. Set businessType to INFO (资讯), DATA (数据), INSIGHT (洞察), SUGGESTION (建议), or RESULT (成果). For text categories omit calculationArtifactId and use actual granted evidence; only DATA requires the calculation below. Do not create cards for greetings or routine status replies; create for a complete useful theme or an explicit user request. Only DATA requires compare_table (XLSX) or compare_dataset (collected database snapshot) and its artifact.id; INFO, INSIGHT, SUGGESTION and RESULT use granted evidence without a calculation. Write a short editorial title, summary and 2–4 analysis paragraphs grounded in that calculation and source scope. Summary and each paragraph must be complete sentences ending in punctuation. Distinguish observed changes from unverified causes. Chart values, periods, units and provenance are taken by the platform from the verified calculation, never from model-supplied numbers. One immutable card per task attempt, private to the current user, visible only after successful task delivery. After PREPARED, finish with a short confirmation; NO_NEW_CONTENT means a duplicate was suppressed, so report no new card; do not repeat raw IDs, hashes or the entire report. This is not enterprise publication or a scheduled plan.' +
+      '\n' +
+      BRIEFING_WRITING_RULES +
+      '\n' +
+      BRIEFING_ANALYSIS_ARRAY_HINT,
     parameters: {
       type: 'object',
       properties: {
@@ -46,7 +60,10 @@ export function briefingDeliveryTool(options: {
       if (
         !isRecord(r) ||
         r.contractVersion !== '1.0' ||
-        (!(r.status === 'NO_NEW_CONTENT' && ['DUPLICATE_CONTENT', 'NO_USEFUL_CONTENT'].includes(String(r.reason))) &&
+        (!(
+          r.status === 'NO_NEW_CONTENT' &&
+          ['DUPLICATE_CONTENT', 'NO_USEFUL_CONTENT'].includes(String(r.reason))
+        ) &&
           (r.status !== 'PREPARED' ||
             typeof r.artifactId !== 'string' ||
             typeof r.title !== 'string' ||
@@ -69,7 +86,8 @@ export function hasPreparedBriefing(
     last?.name === 'deliver_briefing' &&
     isRecord(r) &&
     r.contractVersion === '1.0' &&
-    ((r.status === 'NO_NEW_CONTENT' && ['DUPLICATE_CONTENT', 'NO_USEFUL_CONTENT'].includes(String(r.reason))) ||
+    ((r.status === 'NO_NEW_CONTENT' &&
+      ['DUPLICATE_CONTENT', 'NO_USEFUL_CONTENT'].includes(String(r.reason))) ||
       (r.status === 'PREPARED' &&
         typeof r.artifactId === 'string' &&
         /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(r.artifactId) &&
@@ -80,6 +98,14 @@ export function hasPreparedBriefing(
 /** Native card delivery can recover earlier rejected delivery arguments; other failed work remains partial. */
 export function hasTerminalBriefing(tools: Parameters<typeof hasPreparedBriefing>[0]): boolean {
   const last = tools.at(-1);
-  return !!last && hasPreparedBriefing([last]) && tools.slice(0, -1).every((tool) =>
-    tool.status === 'succeeded' || (tool.name === 'deliver_briefing' && tool.status === 'failed'));
+  return (
+    !!last &&
+    hasPreparedBriefing([last]) &&
+    tools
+      .slice(0, -1)
+      .every(
+        (tool) =>
+          tool.status === 'succeeded' || (tool.name === 'deliver_briefing' && tool.status === 'failed'),
+      )
+  );
 }

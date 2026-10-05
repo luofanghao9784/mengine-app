@@ -1126,6 +1126,75 @@
                       "type": "integer",
                       "minimum": 0,
                       "maximum": 100000
+                    },
+                    "periodMode": {
+                      "enum": [
+                        "EXACT",
+                        "MONTH",
+                        null
+                      ]
+                    },
+                    "timeZone": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "maxLength": 80
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "ruleTrace": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "required": [
+                "status",
+                "versions"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "status": {
+                  "enum": [
+                    "RECORDED",
+                    "NOT_RECORDED"
+                  ]
+                },
+                "versions": {
+                  "type": "array",
+                  "maxItems": 6,
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "source",
+                      "target",
+                      "revision"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "source": {
+                        "enum": [
+                          "GLOBAL",
+                          "TENANT",
+                          "PERSONAL"
+                        ]
+                      },
+                      "target": {
+                        "enum": [
+                          "ALL",
+                          "BRIEFING"
+                        ]
+                      },
+                      "revision": {
+                        "type": "integer",
+                        "minimum": 1
+                      }
                     }
                   }
                 }

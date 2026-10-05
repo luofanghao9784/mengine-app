@@ -1,3 +1,4 @@
+import { displayAmount } from './money-display.ts';
 import type { BriefingDocument } from '../../contracts/public-api/briefing-content';
 import type { BriefingChart } from '../briefingPresentation';
 import { formatBriefingNumber } from './content.ts';
@@ -12,7 +13,7 @@ export function toMagazineChart(document: BriefingDocument, compact = false): Br
   );
   return {
     kind: 'columns',
-    unit: chart.unit,
+    unit: chart.unit === '分' ? '元' : chart.unit,
     period:
       (cellRange ? '两期对比' : chart.range) +
       (rows.length < chart.rows.length
@@ -21,12 +22,12 @@ export function toMagazineChart(document: BriefingDocument, compact = false): Br
     columns: [chart.baseline, chart.current],
     rows: rows.map((row) => ({
       label: row.group!,
-      previous: Number(row.baseline ?? 0),
-      value: Number(row.current ?? 0),
+      previous: Number(displayAmount(row.baseline, chart.unit) ?? 0),
+      value: Number(displayAmount(row.current, chart.unit) ?? 0),
       previousMissing: row.baseline === null,
       valueMissing: row.current === null,
-      previousText: formatBriefingNumber(row.baseline),
-      valueText: formatBriefingNumber(row.current),
+      previousText: formatBriefingNumber(displayAmount(row.baseline, chart.unit)),
+      valueText: formatBriefingNumber(displayAmount(row.current, chart.unit)),
     })),
   };
 }

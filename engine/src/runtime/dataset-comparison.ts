@@ -20,14 +20,24 @@ export function datasetComparisonTool(options: {
   return {
     name: 'compare_dataset',
     description:
-      'Compute a deterministic two-period grouped sum, difference, change percent and descending competition rank over ALL rows in one pinned collected dataset snapshot. First use task_context dataset_search to obtain authorized datasetId, snapshotId and exact column names; use dataset_read for period values and follow column pages if needed. Parameters use exact header names (not Excel letters) and exact period text. A sample page is never a total. Missing or ambiguous numeric values fail rather than become zero; missing periods and non-positive baselines are explicit gaps. All rows outside the selected two periods are counted as ignored. Result artifact.id can be used with deliver_briefing for a DATA card. Null coverageThrough means unknown business coverage, collectedAt is only collection time. No raw SQL, model-supplied rows, arbitrary formulas, permissions, writes or publishing.',
+      'Compute a deterministic two-period grouped sum, difference, change percent and descending competition rank over ALL rows in one pinned collected dataset snapshot. First use task_context dataset_search to obtain authorized datasetId, snapshotId and exact column names; use dataset_read for period values and follow column pages if needed. Parameters use exact header names (not Excel letters) and exact period text. For date columns use periodMode=MONTH and baseline/current YYYY-MM, with an explicit IANA business timeZone (defaults Asia/Shanghai). Dates are grouped into months over ALL rows; missing/ambiguous dates fail closed. Do not invent a month column. A sample page is never a total. Missing or ambiguous numeric values fail rather than become zero; missing periods and non-positive baselines are explicit gaps. All rows outside the selected two periods are counted as ignored. Result artifact.id can be used with deliver_briefing for a DATA card. Null coverageThrough means unknown business coverage, collectedAt is only collection time. No raw SQL, model-supplied rows, arbitrary formulas, permissions, writes or publishing.',
     parameters: {
       type: 'object',
-      properties: Object.fromEntries(
-        ['datasetId', 'snapshotId', 'groupColumn', 'periodColumn', 'valueColumn', 'baseline', 'current'].map(
-          (k) => [k, { type: 'string' }],
+      properties: {
+        periodMode: { type: 'string', enum: ['EXACT', 'MONTH'] },
+        timeZone: { type: 'string', description: 'IANA business timezone; defaults to Asia/Shanghai' },
+        ...Object.fromEntries(
+          [
+            'datasetId',
+            'snapshotId',
+            'groupColumn',
+            'periodColumn',
+            'valueColumn',
+            'baseline',
+            'current',
+          ].map((k) => [k, { type: 'string' }]),
         ),
-      ),
+      },
       required: [
         'datasetId',
         'snapshotId',
@@ -51,6 +61,8 @@ export function datasetComparisonTool(options: {
           (k) =>
             typeof args[k] !== 'string' || !(args[k] as string).trim() || (args[k] as string).length > 100,
         ) ||
+        (args.periodMode !== undefined && !['EXACT', 'MONTH'].includes(String(args.periodMode))) ||
+        (args.timeZone !== undefined && (typeof args.timeZone !== 'string' || args.timeZone.length > 80)) ||
         args.baseline === args.current
       )
         throw new RuntimeError('INVALID_TOOL_ARGUMENTS');
@@ -88,7 +100,7 @@ export function datasetComparisonTool(options: {
           s.coverageThrough === null ||
           (typeof s.coverageThrough === 'string' && Number.isFinite(Date.parse(s.coverageThrough)))
         ) ||
-        c.recipeVersion !== 'dataset-compare-1' ||
+        !['dataset-compare-1', 'dataset-compare-month-1'].includes(String(c.recipeVersion)) ||
         c.status !== 'COMPUTED' ||
         c.inputSha256 !== s.sha256 ||
         !isRecord(c.request) ||

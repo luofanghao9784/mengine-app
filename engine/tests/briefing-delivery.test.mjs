@@ -247,3 +247,10 @@ test('dataset briefing closes retrieval after three lookups and delivers an hone
   assert.deepEqual(actions, ['bootstrap', 'dataset_search', 'dataset_read', 'dataset_read']);
   assert.deepEqual(result.tools.map(r => r.name), ['task_context', 'task_context', 'task_context', 'deliver_briefing']);
 });
+
+test('editorial rejections provide actionable corrections instead of inviting repeated bad delivery',async()=>{
+ const {BRIEFING_EDITORIAL_HINTS}=await import('../dist/runtime/briefing-delivery.js');
+ assert.ok(BRIEFING_EDITORIAL_HINTS.BRIEFING_INTERNAL_LANGUAGE.includes('business Chinese'));
+ assert.ok(BRIEFING_EDITORIAL_HINTS.BRIEFING_UNVERIFIED_QUANTITY.includes('Sample observations'));
+ assert.ok(BRIEFING_EDITORIAL_HINTS.BRIEFING_NO_BUSINESS_INSIGHT.includes('暂无新内容'));
+});

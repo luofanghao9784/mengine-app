@@ -14,7 +14,9 @@ import tools.jackson.databind.json.JsonMapper;
 @Service
 public class DatasetCalculationService {
     public record Request(UUID datasetId, UUID snapshotId, String groupColumn, String periodColumn,
-                          String valueColumn, String baseline, String current) {}
+                          String valueColumn, String baseline, String current, String periodMode, String timeZone) {
+        public Request(UUID datasetId,UUID snapshotId,String groupColumn,String periodColumn,String valueColumn,String baseline,String current){this(datasetId,snapshotId,groupColumn,periodColumn,valueColumn,baseline,current,null,null);}
+    }
     public record Source(UUID datasetId, UUID snapshotId, int version, String name, String sha256,
                          int rowCount, String collectedAt, String coverageThrough) {}
     public record Calculation(String recipeVersion, String status, Request request, String inputSha256,
@@ -46,9 +48,22 @@ public class DatasetCalculationService {
         for (int i = 0; i < sorted.size(); i++) { var e = sorted.get(i); if (previous == null || previous.compareTo(e.getValue()[period]) != 0) rank = i + 1; ranks.put(e.getKey(),rank); previous = e.getValue()[period]; }
         return ranks;
     }
+    private String period(String raw,String mode,java.time.ZoneId zone){
+        if(mode.equals("EXACT"))return label(raw);
+        if(raw==null||raw.isBlank())invalid("DATASET_DATE_REQUIRED");
+        try{
+            java.time.LocalDate day;
+            if(raw.matches("\\d{4}-\\d{2}-\\d{2}"))day=java.time.LocalDate.parse(raw);
+            else {try{day=java.time.OffsetDateTime.parse(raw).atZoneSameInstant(zone).toLocalDate();}catch(java.time.format.DateTimeParseException ex){day=java.time.LocalDateTime.parse(raw).toLocalDate();}}
+            return java.time.YearMonth.from(day).toString();
+        }catch(java.time.DateTimeException ex){invalid("DATASET_DATE_INVALID");return null;}
+    }
     public Map<String,Object> calculate(ConversationService.Job job, Request request) {
         if (request == null || request.datasetId() == null || request.snapshotId() == null) throw IdentityException.invalid();
         label(request.baseline()); label(request.current());
+        String mode=request.periodMode()==null?"EXACT":request.periodMode();if(!Set.of("EXACT","MONTH").contains(mode))invalid("DATASET_PERIOD_MODE_INVALID");
+        java.time.ZoneId zone;try{zone=java.time.ZoneId.of(request.timeZone()==null?"Asia/Shanghai":request.timeZone());}catch(java.time.DateTimeException ex){invalid("DATASET_TIMEZONE_INVALID");return null;}
+        if(mode.equals("MONTH")){try{if(!java.time.YearMonth.parse(request.baseline()).toString().equals(request.baseline())||!java.time.YearMonth.parse(request.current()).toString().equals(request.current()))invalid("DATASET_MONTH_INVALID");}catch(java.time.DateTimeException ex){invalid("DATASET_MONTH_INVALID");}}
         if (request.baseline().equals(request.current())) throw IdentityException.invalid();
         var sources = db.queryForList("""
             SELECT d.workspace_id,d.name,d.column_names,s.*,t.attempt FROM conversation_tasks t
@@ -70,7 +85,7 @@ public class DatasetCalculationService {
         var groups=new TreeMap<String,BigDecimal[]>();int matched=0,ignored=0;
         for (var record:data) {
             if (!record.isArray() || record.size()!=columns.size()) invalid("DATASET_SHAPE_INVALID");
-            var periodCell=record.get(periodIndex);if(!periodCell.isString())invalid("DATASET_LABEL_INVALID");String period=label(periodCell.asString());
+            var periodCell=record.get(periodIndex);if(!periodCell.isString())invalid("DATASET_LABEL_INVALID");String period=period(periodCell.asString(),mode,zone);
             if (!period.equals(request.baseline()) && !period.equals(request.current())) { ignored++; continue; }
             var groupCell=record.get(groupIndex);if(!groupCell.isString())invalid("DATASET_LABEL_INVALID");String group=label(groupCell.asString());
             var cell=record.get(valueIndex);if(!cell.isString() || !cell.asString().matches("-?[0-9]{1,30}(?:\\.[0-9]{1,12})?(?:[Ee][+-]?[0-9]{1,2})?"))invalid("DATASET_NUMBER_INVALID");
@@ -86,7 +101,7 @@ public class DatasetCalculationService {
         String inputHash=IdentityService.hash(columnsText+"\n"+rowsText);
         var metadata=new Source(request.datasetId(),request.snapshotId(),((Number)source.get("version")).intValue(),(String)source.get("name"),inputHash,count,
             ((Timestamp)source.get("collected_at")).toInstant().toString(),source.get("coverage_through")==null?null:((Timestamp)source.get("coverage_through")).toInstant().toString());
-        var calculation=new Calculation("dataset-compare-1","COMPUTED",request,inputHash,matched,ignored,List.copyOf(output),total);
+        var calculation=new Calculation(mode.equals("MONTH")?"dataset-compare-month-1":"dataset-compare-1","COMPUTED",request,inputHash,matched,ignored,List.copyOf(output),total);
         byte[] body=json.writeValueAsBytes(Map.of("datasetSource",metadata,"calculation",calculation));String sha=hash(body),filename="dataset-comparison-"+sha.substring(0,20)+".json";
         var existing=db.queryForList("SELECT id FROM conversation_artifacts WHERE task_id=? AND attempt_number=? AND filename=? AND sha256=? AND object_is_active('ARTIFACT',id)",UUID.class,job.id(),source.get("attempt"),filename,sha);UUID artifact;
         if(existing.isEmpty()) {

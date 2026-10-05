@@ -127,3 +127,7 @@ test('text insight may cite a dataset snapshot without claiming a calculation', 
   doc.content.datasetSource.snapshotId = 'latest';
   assert.equal(isBriefingDocument(doc), false);
 });
+
+test('rule version provenance validates metadata and keeps legacy cards readable',()=>{
+ const doc=JSON.parse(readFileSync(new URL('../contracts/fixtures/dataset-briefing.json',import.meta.url),'utf8'));assert.ok(isBriefingDocument(doc));doc.ruleTrace={status:'RECORDED',versions:[{source:'GLOBAL',target:'BRIEFING',revision:1}]};assert.ok(isBriefingDocument(doc));doc.ruleTrace.versions[0].revision=0;assert.equal(isBriefingDocument(doc),false);doc.ruleTrace={status:'NOT_RECORDED',versions:[]};assert.ok(isBriefingDocument(doc));
+});
