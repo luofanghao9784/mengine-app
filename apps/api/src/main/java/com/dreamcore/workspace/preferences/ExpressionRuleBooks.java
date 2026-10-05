@@ -11,14 +11,14 @@ import org.springframework.transaction.annotation.Transactional;
 public class ExpressionRuleBooks {
  public record Book(String target,String body,int revision,UUID id) {}
  public record Rule(String target,String body,String source,int revision) {}
- public record Page(String scope,boolean canMaintain,List<Book> books) {}
+ public record Page(String scope,boolean canMaintain,List<Book> books,List<Rule> effectiveRules) {}
  public record Change(UUID requestId,String target,String body,int expectedRevision) {}
  private final JdbcTemplate db;private final ExpressionPreferences permissions;private final ProfileService profiles;private final IdentityService identities;private final IdentityAudit audit;
  public ExpressionRuleBooks(JdbcTemplate db,ExpressionPreferences permissions,ProfileService profiles,IdentityService identities,IdentityAudit audit){this.db=db;this.permissions=permissions;this.profiles=profiles;this.identities=identities;this.audit=audit;}
- private void target(String value){if(value==null||!Set.of("ALL","BRIEFING").contains(value))throw IdentityException.invalid();}
+ private void target(String value){if(value==null||!Set.of("ALL","BRIEFING","TOPICS").contains(value))throw IdentityException.invalid();}
  private List<Book> layer(UUID actor,UUID tenant,String scope){
   var books=new ArrayList<Book>();
-  for(String target:List.of("ALL","BRIEFING")){
+  for(String target:List.of("ALL","BRIEFING","TOPICS")){
    if(scope.equals("GLOBAL")){
     var rows=db.queryForList("SELECT body,revision FROM expression_rule_books WHERE target=? ORDER BY revision DESC LIMIT 1",target);
     books.add(rows.isEmpty()?new Book(target,"",0,null):new Book(target,(String)rows.getFirst().get("body"),(Integer)rows.getFirst().get("revision"),null));
@@ -34,7 +34,9 @@ public class ExpressionRuleBooks {
   }
   return books;
  }
- @Transactional public Page read(UUID actor,UUID tenant,String scope){var p=permissions.read(actor,tenant,scope);return new Page(scope,p.canMaintain(),layer(actor,tenant,scope));}
+ @Transactional public Page read(UUID actor,UUID tenant,String scope){var p=permissions.read(actor,tenant,scope);var effective=new ArrayList<Rule>();
+  for(String source:List.of("GLOBAL","TENANT","PERSONAL")){if(scope.equals("GLOBAL")&&!source.equals("GLOBAL"))continue;if(scope.equals("TENANT")&&source.equals("PERSONAL"))continue;if(source.equals("PERSONAL")&&!identities.permissionActor(actor,tenant).equals(actor))continue;for(var b:layer(actor,tenant,source))if(!b.body().isBlank())effective.add(new Rule(b.target(),b.body(),source,b.revision()));}
+  return new Page(scope,p.canMaintain(),layer(actor,tenant,scope),effective);}
  @Transactional public List<Rule> effective(UUID actor,UUID tenant){
   permissions.read(actor,tenant,"TENANT");var out=new ArrayList<Rule>();
   for(String scope:List.of("GLOBAL","TENANT","PERSONAL")){
@@ -71,7 +73,7 @@ public class ExpressionRuleBooks {
    db.update("INSERT INTO expression_rule_books(target,revision,body,changed_by,request_id) VALUES (?,?,?,?,?)",c.target(),old.revision()+1,body,actor,c.requestId());audit.record(actor,null,"EXPRESSION_RULE_BOOK_CHANGED",c.requestId(),"SUCCESS");
   }else if(body.isEmpty())profiles.withdraw(actor,tenant,old.id(),old.revision(),profileRequest);
   else{
-   var content=new ProfileService.Content(body,"用户在AI内容偏好中明确录入"+(c.target().equals("BRIEFING")?"画报规则":"通用表达规则"),ProfileService.Status.ACTIVE,null);
+   var content=new ProfileService.Content(body,"用户在AI内容偏好中明确录入"+(c.target().equals("TOPICS")?"画报选题规则":c.target().equals("BRIEFING")?"画报表达规则":"通用表达规则"),ProfileService.Status.ACTIVE,null);
    if(old.id()==null)profiles.create(actor,tenant,ProfileService.Scope.valueOf(scope),scope.equals("PERSONAL")?actor:tenant,"ai.rules."+c.target(),ProfileService.Kind.PREFERENCE,content,profileRequest);
    else{if(!"PREFERENCE".equals(db.queryForObject("SELECT kind FROM profile_entries WHERE id=?",String.class,old.id())))throw new IdentityException(409,"PROFILE_KIND_CONFLICT");profiles.save(actor,tenant,old.id(),old.revision(),content,profileRequest);}
   }

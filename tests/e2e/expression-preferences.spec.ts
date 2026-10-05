@@ -46,9 +46,11 @@ async function fixture(page: import('@playwright/test').Page, empty = false) {
         json: {
           scope: 'GLOBAL',
           canMaintain: true,
+          effectiveRules: [],
           books: [
             { target: 'ALL', body: '', revision: 0, id: null },
             { target: 'BRIEFING', body: '', revision: 0, id: null },
+            { target: 'TOPICS', body: '', revision: 0, id: null },
           ],
         },
       });
@@ -61,6 +63,7 @@ async function fixture(page: import('@playwright/test').Page, empty = false) {
 test('偏好页展示每次规则及来源状态，不提供选项调整', async ({ page }) => {
   const posts = await fixture(page);
   await page.goto('/platform-admin/#admin=capabilities&tab=preferences');
+  await page.getByRole('tab', { name: '规则记录' }).click();
   await expect(page.getByText('以后回答语气直接一些', { exact: true })).toBeVisible();
   await expect(page.getByText('以后回答语气友好一些', { exact: true })).toBeVisible();
   await expect(page.getByText('当前采用', { exact: true })).toBeVisible();
@@ -77,6 +80,7 @@ test('偏好页展示每次规则及来源状态，不提供选项调整', async
 test('没有实际记录时显示空状态，不虚构默认规则为收录记录', async ({ page }) => {
   await fixture(page, true);
   await page.goto('/platform-admin/#admin=capabilities&tab=preferences');
+  await page.getByRole('tab', { name: '规则记录' }).click();
   await expect(page.getByText('暂无偏好规则记录', { exact: true })).toBeVisible();
   await expect(page.locator('.expression-rule-list li')).toHaveCount(0);
 });
@@ -91,15 +95,17 @@ test('文字录入保留版本号与请求幂等标识，不使用下拉选项',
       json: {
         scope: 'GLOBAL',
         canMaintain: true,
+        effectiveRules: [],
         books: [
           { target: 'ALL', body: '', revision: 0, id: null },
           { target: 'BRIEFING', body: saved ? '标题写业务发现' : '', revision: saved ? 1 : 0, id: null },
+          { target: 'TOPICS', body: '', revision: 0, id: null },
         ],
       },
     });
   });
   await page.goto('/platform-admin/#admin=capabilities&tab=preferences');
-  await page.getByRole('button', { name: '录入或修订画报规则' }).click();
+  await page.getByRole('button', { name: '录入或修订画报表达规则' }).click();
   await page.getByRole('textbox', { name: '规则正文' }).fill('标题写业务发现');
   await expect(page.getByRole('combobox')).toHaveCount(0);
   await page.getByRole('button', { name: '保存规则' }).click();
@@ -108,4 +114,28 @@ test('文字录入保留版本号与请求幂等标识，不使用下拉选项',
   expect(saved?.body).toBe('标题写业务发现');
   expect(saved?.expectedRevision).toBe(0);
   expect(saved?.requestId).toMatch(/^[0-9a-f-]{36}$/);
+});
+
+test('选题标签独立录入并保留继承来源', async ({ page }) => {
+  await fixture(page, true);
+  let saved: Record<string, unknown> | undefined;
+  await page.route('**/expression-preferences/books', async (route) => {
+    if (route.request().method() === 'POST') saved = route.request().postDataJSON();
+    await route.fulfill({
+      json: {
+        scope: 'GLOBAL',
+        canMaintain: true,
+        books: ['ALL', 'BRIEFING', 'TOPICS'].map((target) => ({ target, body: '', revision: 0, id: null })),
+        effectiveRules: [{ target: 'TOPICS', body: '关注合成收款异常', source: 'GLOBAL', revision: 1 }],
+      },
+    });
+  });
+  await page.goto('/platform-admin/#admin=capabilities&tab=preferences');
+  await page.getByRole('tab', { name: '画报选题' }).click();
+  await expect(page.getByText('关注合成收款异常', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '录入或修订画报选题规则' }).click();
+  await page.getByRole('textbox', { name: '规则正文' }).fill('优先比较门店变化');
+  await page.getByRole('button', { name: '保存规则' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  expect(saved?.target).toBe('TOPICS');
 });

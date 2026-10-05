@@ -41,7 +41,7 @@ export function expressionInstructions(value: unknown, briefing: boolean): strin
 /** These are expression preferences, never instructions to tools or claims about source data. */
 export function ruleBookInstructions(value: unknown, briefing: boolean): string {
   if (value === undefined) return '';
-  if (!Array.isArray(value) || value.length > 6) throw new RuntimeError('TASK_ACCESS_DENIED');
+  if (!Array.isArray(value) || value.length > 9) throw new RuntimeError('TASK_ACCESS_DENIED');
   const keys = new Set<string>();
   const ranks: Record<string, number> = { GLOBAL: 0, TENANT: 1, PERSONAL: 2 };
   const rules = value
@@ -49,7 +49,7 @@ export function ruleBookInstructions(value: unknown, briefing: boolean): string 
       if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new RuntimeError('TASK_ACCESS_DENIED');
       const r = raw as { target: string; body: string; source: string; revision: number };
       if (
-        !['ALL', 'BRIEFING'].includes(r.target) ||
+        !['ALL', 'BRIEFING', 'TOPICS'].includes(r.target) ||
         !Object.hasOwn(ranks, r.source) ||
         typeof r.body !== 'string' ||
         !r.body.trim() ||
@@ -63,7 +63,11 @@ export function ruleBookInstructions(value: unknown, briefing: boolean): string 
       keys.add(r.source + ':' + r.target);
       return r;
     })
-    .sort((a, b) => ranks[a.source] - ranks[b.source] || (a.target === 'ALL' ? -1 : 1));
+    .sort(
+      (a, b) =>
+        ranks[a.source] - ranks[b.source] ||
+        ['ALL', 'BRIEFING', 'TOPICS'].indexOf(a.target) - ['ALL', 'BRIEFING', 'TOPICS'].indexOf(b.target),
+    );
   const selected = rules.filter((r) => r.target === 'ALL' || briefing);
   if (!selected.length) return '';
   return (

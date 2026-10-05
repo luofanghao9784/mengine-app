@@ -519,4 +519,14 @@ class BriefingGenerationIntegrationTest {
   }finally{db.execute("DROP SCHEMA IF EXISTS "+schema+" CASCADE");}
  }
 
+ @Test void topicSelectionIsAnImmutableProposalBoundToTheAuthorizedBriefingTask(){
+  upload("marker 合成选题依据。",true);manual();generation.tick(policy());var j=conversations.claim();assertNotNull(j);
+  var request=new AgentTaskService.TopicSelection(List.of(new AgentTaskService.TopicCandidate("合成业务问题","获权资料及必要计算",false,"区别于近期主题","INSIGHT")),0);
+  assertEquals(true,agents.selectTopic(j.id(),j.token(),request).get("proposalOnly"));agents.selectTopic(j.id(),j.token(),request);
+  assertEquals(1,db.queryForObject("SELECT count(*) FROM briefing_topic_selections WHERE task_id=?",Integer.class,j.id()));
+  var changed=new AgentTaskService.TopicSelection(List.of(new AgentTaskService.TopicCandidate("另一问题","依据",false,"区别","INSIGHT")),0);
+  assertEquals(409,assertThrows(IdentityException.class,()->agents.selectTopic(j.id(),j.token(),changed)).status);
+  assertEquals(403,assertThrows(IdentityException.class,()->agents.selectTopic(j.id(),UUID.randomUUID(),request)).status);
+  assertEquals(true,agents.check(j.id(),j.token()).get("topicSelectionRecorded"));
+ }
 }

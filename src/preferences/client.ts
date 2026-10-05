@@ -62,7 +62,7 @@ export function preferenceClient(scope: PreferenceScope, tenant?: string) {
 }
 
 export interface RuleBook {
-  target: 'ALL' | 'BRIEFING';
+  target: 'ALL' | 'BRIEFING' | 'TOPICS';
   body: string;
   revision: number;
   id: string | null;
@@ -71,18 +71,31 @@ export interface RuleBooks {
   scope: PreferenceScope;
   canMaintain: boolean;
   books: RuleBook[];
+  effectiveRules: (Omit<RuleBook, 'id'> & { source: PreferenceScope })[];
 }
 const isRuleBooks = (v: unknown): v is RuleBooks =>
   record(v) &&
   ['GLOBAL', 'TENANT', 'PERSONAL'].includes(String(v.scope)) &&
   typeof v.canMaintain === 'boolean' &&
+  Array.isArray(v.effectiveRules) &&
+  v.effectiveRules.length <= 9 &&
+  v.effectiveRules.every(
+    (r: unknown) =>
+      record(r) &&
+      ['ALL', 'BRIEFING', 'TOPICS'].includes(String(r.target)) &&
+      ['GLOBAL', 'TENANT', 'PERSONAL'].includes(String(r.source)) &&
+      typeof r.body === 'string' &&
+      r.body.length <= 4000 &&
+      Number.isSafeInteger(r.revision) &&
+      Number(r.revision) > 0,
+  ) &&
   Array.isArray(v.books) &&
-  v.books.length === 2 &&
-  new Set(v.books.map((b: unknown) => (record(b) ? b.target : ''))).size === 2 &&
+  v.books.length === 3 &&
+  new Set(v.books.map((b: unknown) => (record(b) ? b.target : ''))).size === 3 &&
   v.books.every(
     (b: unknown) =>
       record(b) &&
-      ['ALL', 'BRIEFING'].includes(String(b.target)) &&
+      ['ALL', 'BRIEFING', 'TOPICS'].includes(String(b.target)) &&
       typeof b.body === 'string' &&
       b.body.length <= 4000 &&
       Number.isSafeInteger(b.revision) &&

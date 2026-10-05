@@ -8,6 +8,7 @@ export async function postJson(
   signal: AbortSignal,
   limit = 131072,
   timeoutMs = 5000,
+  safeErrorCodes: readonly string[] = [],
 ): Promise<unknown> {
   const controller = new AbortController();
   const combined = AbortSignal.any([signal, controller.signal]);
@@ -21,7 +22,30 @@ export async function postJson(
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
-    if (!response.ok)
+    if (!response.ok) {
+      if (
+        [400, 422].includes(response.status) &&
+        safeErrorCodes.length &&
+        response.headers.get('content-type')?.includes('application/json') &&
+        response.body
+      ) {
+        const parts: Uint8Array[] = [];
+        let size = 0;
+        for await (const part of response.body as unknown as AsyncIterable<Uint8Array>) {
+          size += part.byteLength;
+          if (size > 4096) break;
+          parts.push(part);
+        }
+        if (size <= 4096) {
+          try {
+            const value = JSON.parse(Buffer.concat(parts).toString('utf8'));
+            if (typeof value.code === 'string' && safeErrorCodes.includes(value.code))
+              throw new RuntimeError(value.code);
+          } catch (error) {
+            if (error instanceof RuntimeError) throw error;
+          }
+        }
+      }
       throw new RuntimeError(
         response.status === 401 || response.status === 403 || response.status === 404
           ? 'REMOTE_ACCESS_DENIED'
@@ -29,6 +53,7 @@ export async function postJson(
             ? 'REMOTE_BAD_REQUEST'
             : 'REMOTE_UNAVAILABLE',
       );
+    }
     if (!response.headers.get('content-type')?.includes('application/json') || !response.body)
       throw new RuntimeError('INVALID_REMOTE_RESPONSE');
     const chunks: Uint8Array[] = [];

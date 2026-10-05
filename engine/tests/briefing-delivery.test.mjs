@@ -217,7 +217,7 @@ test('dataset briefing closes retrieval after three lookups and delivers an hone
     createModel: () => ({ usage: null, async *generate(request) {
       calls++;
       const instructions = request.messages[0].content[0].text;
-      assert.match(instructions, /compare_dataset computes ALL rows/);
+      assert.match(instructions, /compare_dataset/);
       assert.match(instructions, /每张卡回答：发现了什么/);
       assert.match(instructions, /只有来源介绍而没有新业务发现时不凑卡/);
       assert.ok(request.tools.find(t => t.name === 'deliver_briefing').description.includes('智能画报表达规范 1.0.1'));
@@ -227,10 +227,11 @@ test('dataset briefing closes retrieval after three lookups and delivers an hone
       else if (calls === 3) args = { action: 'dataset_read', referenceId: datasetId, versionId: snapshotId, columnLimit: 10, offset: 1 };
       else {
         assert.equal(calls, 4);
-        assert.deepEqual(request.tools.map(tool => tool.name), ['deliver_briefing']);
-        assert.equal(request.requiredTool, 'deliver_briefing');
+        assert.ok(request.tools.some(tool => tool.name === 'compare_dataset'));
+        assert.ok(!request.tools.some(tool => tool.name === 'task_context'));
+        assert.equal(request.requiredTool, undefined);
+        assert.equal(request.requireToolCall, true);
         assert.match(instructions, /retrieval is closed after three successful lookups/);
-        assert.match(instructions, /Successful dataset_read calls so far: 2/);
         name = 'deliver_briefing';
         args = { businessType: 'INSIGHT', title: '收款确认状态值得进一步核对',
           summary: '已读取样本中存在待确认收款，仍需核对其业务依据。',

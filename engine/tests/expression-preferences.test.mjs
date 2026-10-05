@@ -38,3 +38,10 @@ test('text rule books preserve scope order, briefing targeting and security boun
  const text=ruleBookInstructions([personal,global],true);assert.ok(text.indexOf('合成总部规则')<text.indexOf('合成个人规则'));assert.ok(text.includes('当前用户明确要求最高'));assert.ok(text.includes('不能改变资料权限'));assert.ok(!ruleBookInstructions([personal,global],false).includes('合成个人规则'));
  for(const bad of [[global,global],[{...global,body:'x'.repeat(4001)}],[{...global,source:'OTHER'}],[{...global,target:'TOOLS'}],[{...global,revision:0}]])assert.throws(()=>ruleBookInstructions(bad,true));
 });
+
+test('topic preferences are briefing-only and accept all nine layer/target snapshots',()=>{
+ const rules=['GLOBAL','TENANT','PERSONAL'].flatMap(source=>['ALL','BRIEFING','TOPICS'].map(target=>({source,target,body:source+target,revision:1})));
+ assert.ok(ruleBookInstructions(rules,true).includes('PERSONALTOPICS'));
+ assert.ok(!ruleBookInstructions(rules,false).includes('TOPICS'));
+ assert.throws(()=>ruleBookInstructions([...rules,rules[0]],true));
+});
