@@ -1,4 +1,4 @@
-import { Sparkles, Square, RotateCw, ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Sparkles, Square, RotateCw, ArrowRight, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { briefingTypeIcons } from './Magazine';
 import { generationChoices } from './generation-types';
@@ -166,11 +166,11 @@ export function GenerationPanel({ generation }: { generation: BriefingGeneration
               <button
                 type="button"
                 className="generation-back"
-                aria-label="上一步"
-                title="上一步"
-                onClick={() => setStep(step === 'types' ? 'count' : 'start')}
+                aria-label="返回生成首页"
+                title="返回生成首页"
+                onClick={() => setStep('start')}
               >
-                <ChevronLeft size={16} />
+                <X size={16} />
               </button>
               {step === 'count' ? (
                 <>
