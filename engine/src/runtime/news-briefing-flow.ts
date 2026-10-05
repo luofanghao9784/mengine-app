@@ -15,6 +15,6 @@ export async function newsBriefingBackground(
 export function newsBriefingToolAllowed(name: string, searched: boolean, read: boolean): boolean {
   if (name === 'task_control') return true;
   if (!searched) return name === 'public_search';
-  if (!read) return ['read_public_page', 'select_briefing_topic', 'deliver_briefing'].includes(name);
+  if (!read) return name === 'read_public_page';
   return ['read_public_page', 'select_briefing_topic', 'deliver_briefing'].includes(name);
 }
