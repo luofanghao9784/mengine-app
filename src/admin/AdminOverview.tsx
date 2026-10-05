@@ -168,42 +168,6 @@ function ScopedOverview({
           </>
         )}
       </section>
-      <section className="admin-section">
-        <h2>常用入口</h2>
-        <div className="admin-shortcuts">
-          {realm === 'tenant' ? (
-            <>
-              <a className="button" href={adminHref(realm, 'members', hash, { tab: 'invitations' })}>
-                成员邀请
-              </a>
-              <a className="button" href={adminHref(realm, 'usage', hash)}>
-                本企业用量
-              </a>
-              <a className="button" href={adminHref(realm, 'members', hash, { tab: 'spaces' })}>
-                共享空间
-              </a>
-              <a className="button" href={adminHref(realm, 'database', hash)}>
-                数据库
-              </a>
-              <a className="button" href={adminHref(realm, 'materials', hash, { scope: 'enterprise' })}>
-                资料库
-              </a>
-            </>
-          ) : (
-            <>
-              <a className="button" href={adminHref(realm, 'tenants', hash)}>
-                企业管理
-              </a>
-              <a className="button" href={adminHref(realm, 'engine', hash)}>
-                运行监控
-              </a>
-              <a className="button" href={adminHref(realm, 'capabilities', hash)}>
-                引擎管理
-              </a>
-            </>
-          )}
-        </div>
-      </section>
     </div>
   );
 }
