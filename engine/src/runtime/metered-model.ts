@@ -34,6 +34,27 @@ export function meteredModel(
           if (part.type === 'finish') outcome = 'RETURNED';
           yield part;
         }
+      } catch (error) {
+        const codes = new Set([
+          'REMOTE_ACCESS_DENIED',
+          'REMOTE_UNAVAILABLE',
+          'INVALID_REMOTE_RESPONSE',
+          'REMOTE_OUTPUT_LIMIT',
+          'INVALID_MODEL_INPUT',
+          'INVALID_MODEL_RESPONSE',
+          'MODEL_INPUT_LIMIT',
+          'MODEL_OUTPUT_LIMIT',
+          'MODEL_INCOMPLETE',
+          'CANCELLED',
+        ]);
+        console.warn(
+          JSON.stringify({
+            event: 'TASK_MODEL_REQUEST_FAILED',
+            sequence: current,
+            code: error instanceof RuntimeError && codes.has(error.code) ? error.code : 'MODEL_ERROR',
+          }),
+        );
+        throw error;
       } finally {
         if (request.signal.aborted) outcome = 'CANCELLED';
         // A fresh bounded signal permits metadata delivery after cancellation. No task/data actions.

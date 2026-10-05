@@ -178,3 +178,17 @@ test('Harness may close the stream at finish without turning a returned response
   }
   assert.equal(events[1].body.outcome, 'RETURNED');
 });
+
+test('model failure diagnostics exclude arbitrary provider errors and request data', async (t) => {
+  const warnings = [];
+  t.mock.method(console, 'warn', (value) => warnings.push(JSON.parse(value)));
+  const events = [];
+  const backend = {
+    async *generate() {
+      throw new Error('synthetic secret must never reach diagnostic logs');
+    },
+  };
+  await assert.rejects(collect(meteredModel(backend, callback(events)).generate(request())));
+  assert.deepEqual(warnings, [{ event: 'TASK_MODEL_REQUEST_FAILED', sequence: 1, code: 'MODEL_ERROR' }]);
+  assert.equal(events[1].body.outcome, 'FAILED');
+});

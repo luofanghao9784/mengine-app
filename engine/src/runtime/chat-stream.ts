@@ -20,10 +20,12 @@ export async function* chatFrames(
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
     });
-    if (!response.ok)
+    if (!response.ok) {
+      console.warn(JSON.stringify({ event: 'MODEL_HTTP_REJECTED', status: response.status }));
       throw new RuntimeError(
         [401, 403, 404].includes(response.status) ? 'REMOTE_ACCESS_DENIED' : 'REMOTE_UNAVAILABLE',
       );
+    }
     if (!response.body) throw new RuntimeError('INVALID_REMOTE_RESPONSE');
     const streaming = response.headers.get('content-type')?.includes('text/event-stream');
     if (!streaming && !response.headers.get('content-type')?.includes('application/json'))
@@ -57,6 +59,23 @@ export async function* chatFrames(
     yield { streaming: false, data: JSON.parse(buffer) };
   } catch (error) {
     if (error instanceof RuntimeError) throw error;
+    const cause = error instanceof Error ? (error as Error & { cause?: { code?: string } }).cause : undefined;
+    const codes = new Set([
+      'UND_ERR_CONNECT_TIMEOUT',
+      'ECONNRESET',
+      'ECONNREFUSED',
+      'ENOTFOUND',
+      'EAI_AGAIN',
+      'ETIMEDOUT',
+    ]);
+    console.warn(
+      JSON.stringify({
+        event: 'MODEL_TRANSPORT_FAILED',
+        timedOut: timeout.signal.aborted,
+        cancelled: signal.aborted,
+        code: cause?.code && codes.has(cause.code) ? cause.code : 'TRANSPORT_ERROR',
+      }),
+    );
     throw new RuntimeError(signal.aborted ? 'CANCELLED' : 'REMOTE_UNAVAILABLE');
   } finally {
     clearTimeout(timer);
