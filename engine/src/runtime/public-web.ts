@@ -471,7 +471,7 @@ export class PublicWebTask {
       }
     let failures = 0;
     for (const candidate of candidates.slice(0, 3)) {
-      if (this.reads >= 2) break;
+      if (this.reads >= 4) break;
       if (candidate.publishedAt && Date.parse(candidate.publishedAt) < Date.now() - 30 * 86400000) continue;
       if ([...this.sources.values()].some((s) => s.url === candidate.url)) continue;
       this.reads++;
