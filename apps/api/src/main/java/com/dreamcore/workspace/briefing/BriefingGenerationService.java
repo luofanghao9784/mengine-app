@@ -117,9 +117,20 @@ public class BriefingGenerationService {
     private Quota quota(UUID actor,UUID tenant){
         Instant now=clock.now(),day=now.atZone(ZoneOffset.UTC).toLocalDate().atStartOfDay(ZoneOffset.UTC).toInstant();
         Instant since=db.queryForObject("SELECT coalesce(max(reset_at),?) FROM briefing_quota_resets WHERE tenant_id=? AND owner_id=? AND reset_at>=? AND reset_at<=?",Timestamp.class,time(day),tenant,actor,time(day),time(now)).toInstant();
-        int used=db.queryForObject("SELECT count(*) FROM briefing_generation_batches WHERE tenant_id=? AND owner_id=? AND task_id IS NOT NULL AND started_at>=?",Integer.class,tenant,actor,time(since));
-        int reserved=db.queryForObject("SELECT count(*) FROM briefing_generation_batches WHERE tenant_id=? AND owner_id=? AND task_id IS NULL AND status IN ('QUEUED','WAITING_DATA','WAITING_RESOURCE','WAITING_CAPABILITY')",Integer.class,tenant,actor);
+        int used=successfulCards(actor,tenant,since);
+        int reserved=db.queryForObject("SELECT count(*) FROM briefing_generation_batches b LEFT JOIN conversation_tasks t ON t.id=b.task_id WHERE b.tenant_id=? AND b.owner_id=? AND ((b.task_id IS NULL AND b.status IN ('QUEUED','WAITING_DATA','WAITING_RESOURCE','WAITING_CAPABILITY')) OR t.status IN ('QUEUED','RUNNING'))",Integer.class,tenant,actor);
         return new Quota(dailyLimit,used,reserved,Math.max(0,dailyLimit-used-reserved));
+    }
+    // Charge only a successful, audited card delivery. Failed prepared artifacts are not cards.
+    // Historical delivery remains charged after a later source withdrawal or user deletion.
+    private int successfulCards(UUID actor,UUID tenant,Instant since){
+        return db.queryForObject("""
+            SELECT count(*) FROM briefing_generation_batches b JOIN conversation_tasks t ON t.id=b.task_id
+            WHERE b.tenant_id=? AND b.owner_id=? AND b.started_at>=? AND t.status='SUCCEEDED'
+            AND EXISTS(SELECT 1 FROM conversation_artifacts a WHERE a.task_id=t.id AND a.attempt_number=t.attempt
+                AND EXISTS(SELECT 1 FROM identity_audit p WHERE p.target_id=a.id AND p.tenant_id=a.tenant_id AND p.action='TASK_BRIEFING_CREATED' AND p.outcome='SUCCESS'))
+            AND EXISTS(SELECT 1 FROM conversation_tool_receipts r WHERE r.task_id=t.id AND r.attempt_number=t.attempt AND r.name='deliver_briefing' AND r.status='succeeded')
+            """,Integer.class,tenant,actor,time(since));
     }
     private UUID enqueue(UUID policy,String trigger,String type,Instant scheduled){
         UUID id=UUID.randomUUID();db.update("INSERT INTO briefing_generation_batches(id,tenant_id,owner_id,workspace_id,policy_id,policy_epoch,trigger_kind,business_type,scheduled_for,status) SELECT ?,tenant_id,owner_id,workspace_id,id,epoch,?,?,?,'QUEUED' FROM briefing_generation_policies WHERE id=?",id,trigger,type,time(scheduled),policy);return id;
@@ -252,7 +263,7 @@ public class BriefingGenerationService {
         Instant day=now.atZone(ZoneOffset.UTC).toLocalDate().atStartOfDay(ZoneOffset.UTC).toInstant();
         // The latest reset within this UTC day starts a new owner budget without rewriting history.
         Instant ownerSince=db.queryForObject("SELECT coalesce(max(reset_at),?) FROM briefing_quota_resets WHERE tenant_id=? AND owner_id=? AND reset_at>=? AND reset_at<=?",Timestamp.class,time(day),tenant,actor,time(day),time(now)).toInstant();
-        int used=db.queryForObject("SELECT count(*) FROM briefing_generation_batches WHERE tenant_id=? AND owner_id=? AND task_id IS NOT NULL AND started_at>=?",Integer.class,tenant,actor,time(ownerSince));
+        int used=successfulCards(actor,tenant,ownerSince);
         int concurrent=db.queryForObject("SELECT count(*) FROM briefing_generation_batches b JOIN conversation_tasks t ON t.id=b.task_id WHERE b.tenant_id=? AND b.owner_id=? AND t.status IN ('QUEUED','RUNNING')",Integer.class,tenant,actor);
         int tenantUsed=db.queryForObject("SELECT count(*) FROM briefing_generation_batches WHERE tenant_id=? AND started_at>=?",Integer.class,tenant,time(day));
         int tenantConcurrent=db.queryForObject("SELECT count(*) FROM briefing_generation_batches b JOIN conversation_tasks t ON t.id=b.task_id WHERE b.tenant_id=? AND t.status IN ('QUEUED','RUNNING')",Integer.class,tenant);

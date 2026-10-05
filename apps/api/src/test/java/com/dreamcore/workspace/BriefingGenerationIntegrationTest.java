@@ -400,7 +400,7 @@ class BriefingGenerationIntegrationTest {
   var news=new BriefingGenerationService(db,conversations,contents,identities,access,departure,new AgentSettings("verification",true,false),clock,true,"https://news.example.org/updates",0,6);
    var b=news.generate(actor,tenant,UUID.randomUUID(),space,"INFO");news.tick(policy());b=news.get(actor,tenant,b.id());assertEquals("RUNNING",b.status());
    var t=db.queryForMap("SELECT prompt,public_query FROM conversation_tasks WHERE id=?",b.taskId());
-   assertEquals("https://news.example.org/updates",t.get("public_query"));assertTrue(t.get("prompt").toString().contains("企业主营业务"));assertTrue(t.get("prompt").toString().contains("没有相关资讯"));
+   assertEquals("https://news.example.org/updates",t.get("public_query"));assertTrue(t.get("prompt").toString().contains("引擎已预取获权企业"));assertTrue(t.get("prompt").toString().contains("没有相关资讯"));
    assertEquals(f.acceptedVersion().id(),db.queryForObject("SELECT version_id FROM conversation_originals WHERE task_id=?",UUID.class,b.taskId()));
    var j=conversations.claim();agents.search(j.id(),j.token(),"marker");
    assertThrows(IdentityException.class,()->contents.create(j,new BriefingContentService.Request(null,"资讯缺少公开来源","仅有内部资料不得冒充外部资讯已经核实。",List.of("这段合成说明用于检查资讯的真实来源要求。","缺少公开网页读取回执就不能成功创建资讯。"),"INFO")));
@@ -444,13 +444,29 @@ class BriefingGenerationIntegrationTest {
   time.set(time.get().plusSeconds(3*86400));news.tick(p);assertTrue(news.state(actor,tenant).batches().stream().anyMatch(b->"SCHEDULE".equals(b.trigger())&&"INFO".equals(b.businessType())));
   assertEquals(3,news.state(actor,tenant).batches().size());assertEquals(0,db.queryForObject("SELECT count(*) FROM ongoing_plans WHERE tenant_id=?",Integer.class,tenant));
  }
+ @Test void onlySuccessfulCardsConsumeQuotaAndInFlightWorkReservesIt(){
+  upload("marker 额度按成功画报计次。",true);
+  var batch=manual();generation.tick(policy());var job=conversations.claim();
+  assertEquals(0,generation.state(actor,tenant).quota().used());
+  assertEquals(1,generation.state(actor,tenant).quota().reserved());
+  db.update("UPDATE conversation_tasks SET status='FAILED',error_code='TASK_LIMIT',lease_token=NULL,lease_until=NULL WHERE id=?",job.id());
+  assertEquals(0,generation.state(actor,tenant).quota().used());assertEquals(0,generation.state(actor,tenant).quota().reserved());generation.tick(policy());
+  var next=manual();generation.tick(policy());complete(conversations.claim());generation.tick(policy());
+  assertEquals("NO_NEW_CONTENT",generation.get(actor,tenant,next.id()).status());assertEquals(0,generation.state(actor,tenant).quota().used());
+  var cancel=manual();generation.tick(policy());var cancelled=conversations.claim();db.update("UPDATE conversation_tasks SET status='CANCELLED',lease_token=NULL,lease_until=NULL WHERE id=?",cancelled.id());generation.tick(policy());
+  assertEquals(0,generation.state(actor,tenant).quota().used());
+  var success=manual();generation.tick(policy());deliver(conversations.claim(),"有实际内容的合成画报成功交付后，才应计入额度。");
+  assertEquals(1,generation.state(actor,tenant).quota().used(),"count before batch reconciliation prevents oversubscription");assertEquals(0,generation.state(actor,tenant).quota().reserved());
+  generation.tick(policy());assertEquals("SUCCEEDED",generation.get(actor,tenant,success.id()).status());assertEquals(1,generation.state(actor,tenant).quota().used());
+ }
+
  @Test @org.springframework.transaction.annotation.Transactional
  void dailyBudgetWaitsAndResumesNextDayWithoutCreatingAnotherTask(){
   upload("marker 额度验证。",true);
   var time=new java.util.concurrent.atomic.AtomicReference<>(java.time.Instant.now().plusSeconds(86400));
   var clock=new com.dreamcore.workspace.plans.PlanClock(){@Override public java.time.Instant now(){return time.get();}};
   var limited=new BriefingGenerationService(db,conversations,contents,identities,access,departure,new AgentSettings("verification",true,false),clock,true,"",0,1);
-  UUID p=policy();limited.tick(p);complete(conversations.claim());limited.tick(p);
+  UUID p=policy();limited.tick(p);deliver(conversations.claim(),"合成成功出卡后应占用每日额度。");limited.tick(p);
   var more=limited.generate(actor,tenant,UUID.randomUUID(),space,"INSIGHT");limited.tick(p);assertEquals("DAILY_RUN_LIMIT",limited.get(actor,tenant,more.id()).reason());assertNull(limited.get(actor,tenant,more.id()).taskId());
   time.set(time.get().plusSeconds(86400));limited.tick(p);assertEquals("RUNNING",limited.get(actor,tenant,more.id()).status());
  }
@@ -461,7 +477,7 @@ class BriefingGenerationIntegrationTest {
   var time=new java.util.concurrent.atomic.AtomicReference<>(java.time.Instant.now().plusSeconds(86400));
   var clock=new com.dreamcore.workspace.plans.PlanClock(){@Override public java.time.Instant now(){return time.get();}};
   var limited=new BriefingGenerationService(db,conversations,contents,identities,access,departure,new AgentSettings("verification",true,false),clock,true,"",0,1);
-  UUID p=policy();limited.tick(p);complete(conversations.claim());limited.tick(p);
+  UUID p=policy();limited.tick(p);deliver(conversations.claim(),"合成重置后成功出卡，保留真实历史计次。");limited.tick(p);
   var more=limited.generate(actor,tenant,UUID.randomUUID(),space,"INSIGHT");limited.tick(p);
   assertEquals("DAILY_RUN_LIMIT",limited.get(actor,tenant,more.id()).reason());
   db.update("INSERT INTO briefing_quota_resets(id,tenant_id,owner_id,reset_at,reason) VALUES (?,?,?,?,?)",UUID.randomUUID(),tenant,reader,java.sql.Timestamp.from(time.get().plusSeconds(1)),"合成其他账号重置");
@@ -473,7 +489,7 @@ class BriefingGenerationIntegrationTest {
   time.set(time.get().plusSeconds(1));limited.tick(p);
   assertEquals("RUNNING",limited.get(actor,tenant,more.id()).status());
   assertEquals(2,db.queryForObject("SELECT count(*) FROM briefing_generation_batches WHERE tenant_id=? AND owner_id=? AND task_id IS NOT NULL",Integer.class,tenant,actor));
-  complete(conversations.claim());limited.tick(p);
+  deliver(conversations.claim(),"合成重置后的另一张不同卡片应重新计次。");limited.tick(p);
   var again=limited.generate(actor,tenant,UUID.randomUUID(),space,"INSIGHT");limited.tick(p);
   assertEquals("DAILY_RUN_LIMIT",limited.get(actor,tenant,again.id()).reason(),"reset restores the configured budget rather than disabling the limit");
  }

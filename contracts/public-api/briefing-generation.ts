@@ -31,7 +31,9 @@ export interface GenerationPolicy {
 }
 export interface GenerationQuota {
   limit: number;
+  /** Successful audited card deliveries in the current daily/reset window. */
   used: number;
+  /** Pending batches and queued/running attempts temporarily hold slots. */
   reserved: number;
   remaining: number;
 }
