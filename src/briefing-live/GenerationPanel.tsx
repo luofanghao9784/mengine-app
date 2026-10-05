@@ -173,6 +173,7 @@ export function GenerationPanel({ generation }: { generation: BriefingGeneration
               </button>
               {step === 'count' ? (
                 <>
+                  <h3>选择生成数量</h3>
                   <div className="generation-quantity">
                     <Button
                       variant="ghost"
@@ -212,6 +213,7 @@ export function GenerationPanel({ generation }: { generation: BriefingGeneration
                 </>
               ) : (
                 <>
+                  <h3>选择画报类型</h3>
                   <fieldset className="generation-type-tags">
                     <legend>画报类型</legend>
                     {generationChoices.map((choice) => {
@@ -230,7 +232,7 @@ export function GenerationPanel({ generation }: { generation: BriefingGeneration
                             }
                             onChange={() => (choice.value ? toggleType(choice.value) : setTypes([]))}
                           />
-                          <Icon size={13} strokeWidth={1.5} />
+                          <Icon size={16} strokeWidth={1.5} />
                           <span>{choice.label}</span>
                         </label>
                       );

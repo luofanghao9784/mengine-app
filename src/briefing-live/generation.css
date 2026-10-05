@@ -147,8 +147,8 @@
   left: 14px;
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border: 0;
   border-radius: 50%;
   padding: 0;
@@ -169,7 +169,7 @@
   appearance: textfield;
   -moz-appearance: textfield;
   width: 76px;
-  height: 78px;
+  height: 68px;
   min-height: 0;
   padding: 0;
   border: 0;
@@ -190,20 +190,34 @@
   margin: 0;
 }
 .generation-quantity .button {
-  width: 28px;
-  height: 28px;
+  width: 36px;
+  height: 36px;
   padding: 0;
   border: 0;
 }
 .generation-quantity .button svg {
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
+}
+.generation-card-copy.generation-count,
+.generation-card-copy.generation-types {
+  gap: 12px;
+  padding-top: 32px;
+  padding-bottom: 20px;
+}
+.generation-card-copy.generation-types {
+  gap: 14px;
+}
+.generation-card-copy.generation-count h3,
+.generation-card-copy.generation-types h3 {
+  font-size: 18px;
+  line-height: 1.4;
 }
 .generation-type-tags {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
+  gap: 12px 10px;
+  width: 100%;
   max-width: 230px;
   border: 0;
   padding: 0;
@@ -220,6 +234,22 @@
 .generation-type {
   position: relative;
   cursor: pointer;
+}
+.generation-type-tags .magazine-type.generation-type {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 40px;
+  padding: 8px;
+  gap: 5px;
+  font-size: 14px;
+  line-height: 20px;
+  border-radius: 7px;
+}
+.generation-type-tags .generation-type svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
 }
 .generation-type input {
   position: absolute;
