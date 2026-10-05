@@ -145,6 +145,9 @@ test('system running opens an independent data subpage; list search and paging s
   await expect(page.locator('.engine-wall')).toHaveCount(0);
   await expect(page.getByLabel('搜索企业')).toHaveCount(0);
   await expect(page.getByRole('combobox', { name: '运行状态' })).toHaveCount(0);
+  await expect(page.locator('.data-ops-tenants')).toHaveCount(0);
+  await page.getByRole('link', { name: '企业列表', exact: true }).click();
+  await expect(page.locator('.data-ops-metrics')).toHaveCount(0);
   await page.getByRole('button', { name: '下一页' }).click();
   await expect(page.getByRole('heading', { name: '合成企业 21', exact: true })).toBeVisible();
   await page
@@ -154,6 +157,7 @@ test('system running opens an independent data subpage; list search and paging s
   await expect(page.getByRole('heading', { name: '合成企业 21 · 数据接入' })).toBeVisible();
   await expect(page.getByText('处理未完成，详细技术原因尚未确认。', { exact: true })).toBeVisible();
   await page.getByRole('link', { name: '返回企业列表' }).click();
+  await expect(page).toHaveURL(/view=enterprises/);
   await expect(page.getByText('第 2 页', { exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: '合成企业 21', exact: true })).toBeVisible();
   await page.getByRole('link', { name: '引擎仪表盘', exact: true }).click();

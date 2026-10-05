@@ -90,9 +90,11 @@ export function PlatformDataOperations({ hash, kind }: { hash: string; kind: Dat
   const p = new URLSearchParams(hash.slice(1));
   const supplied = p.get('enterprise');
   const tenant = uuid(supplied) ? supplied : null;
+  const enterpriseList = p.get('view') === 'enterprises';
   const href = (k: DataOperationKind, enterprise?: string) =>
     adminHref('platform', k === 'MATERIALS' ? 'materials' : 'database', hash, {
       ...(enterprise ? { enterprise } : {}),
+      ...(k === 'CONNECTIONS' ? { view: 'enterprises' } : {}),
     });
   return (
     <div className="data-ops-page">
@@ -102,15 +104,39 @@ export function PlatformDataOperations({ hash, kind }: { hash: string; kind: Dat
           返回企业列表
         </a>
       )}
+      {!tenant && kind === 'CONNECTIONS' && (
+        <nav className="data-ops-sections" aria-label="数据库栏目">
+          <a
+            href={adminHref('platform', 'database', hash)}
+            aria-current={!enterpriseList ? 'page' : undefined}
+          >
+            数据接入监测
+          </a>
+          <a
+            href={adminHref('platform', 'database', hash, { view: 'enterprises' })}
+            aria-current={enterpriseList ? 'page' : undefined}
+          >
+            企业列表
+          </a>
+        </nav>
+      )}
       {tenant ? (
         <Detail key={`${kind}:${tenant}`} tenant={tenant} kind={kind} />
       ) : (
-        <Directory key={kind} kind={kind} href={(id) => href(kind, id)} />
+        <Directory key={kind} kind={kind} enterpriseList={enterpriseList} href={(id) => href(kind, id)} />
       )}
     </div>
   );
 }
-function Directory({ kind, href }: { kind: DataOperationKind; href: (id: string) => string }) {
+function Directory({
+  kind,
+  href,
+  enterpriseList,
+}: {
+  kind: DataOperationKind;
+  href: (id: string) => string;
+  enterpriseList: boolean;
+}) {
   const [query, setQuery] = useViewState('platform', `data-ops:${kind}:query`, '', textState);
   const [draft, setDraft] = useState(query);
   const [state, setState] = useViewState<DataOperationState>(
@@ -137,7 +163,7 @@ function Directory({ kind, href }: { kind: DataOperationKind; href: (id: string)
     <div className="data-ops-directory" aria-label="数据运行企业列表">
       <div className="data-ops-heading">
         <div>
-          <h2>{kindName(kind)}监测</h2>
+          <h2>{kind === 'CONNECTIONS' && enterpriseList ? '企业列表' : `${kindName(kind)}监测`}</h2>
         </div>
         <Button variant="ghost" icon={RefreshCw} onClick={refresh}>
           刷新
@@ -178,53 +204,55 @@ function Directory({ kind, href }: { kind: DataOperationKind; href: (id: string)
         <Loading />
       ) : (
         <>
-          <Metrics value={data.value.counts} />
-          <section className="data-ops-list-card" aria-label="企业监测目录">
-            <div className="data-ops-list-heading">
-              <h3>企业列表</h3>
-              <span className="admin-note">
-                {kind === 'CONNECTIONS' ? '接入部署与取数' : '资料解析'} · 点击查看详情
-              </span>
-            </div>
-            <div className="data-ops-list-columns" aria-hidden="true">
-              <span>企业名称</span>
-              <span>{kind === 'CONNECTIONS' ? '接入对象' : '资料对象'}</span>
-              <span>处理中</span>
-              <span>需留意</span>
-              <span>最近成功</span>
-              <span>状态</span>
-            </div>
-            <div className="data-ops-tenants">
-              {data.value.items.map((t) => (
-                <a key={t.tenantId} href={href(t.tenantId)}>
-                  <h3>{t.tenantName}</h3>
-                  <span>{n(t.counts.total)}</span>
-                  <span>{n(t.counts.processing)}</span>
-                  <span className={t.counts.attention ? 'data-ops-attention' : ''}>
-                    {n(t.counts.attention)}
-                  </span>
-                  <small>{time(t.lastSuccessAt)}</small>
-                  <Badge>
-                    {t.tenantStatus === 'SUSPENDED'
-                      ? '企业已暂停'
-                      : t.counts.attention
-                        ? '需留意'
-                        : t.counts.processing
-                          ? '处理中'
-                          : t.counts.total === 0
-                            ? '尚无对象'
-                            : t.counts.notStarted
-                              ? '尚未开始'
-                              : t.counts.stopped
-                                ? '有停止项'
-                                : '已完成'}
-                  </Badge>
-                </a>
-              ))}
-            </div>
-            {!data.value.items.length && <p className="admin-note">没有符合条件的企业。</p>}
-            <Pager page={page} next={data.value.hasMore} onPage={setPage} />
-          </section>
+          {(kind === 'MATERIALS' || !enterpriseList) && <Metrics value={data.value.counts} />}
+          {(kind === 'MATERIALS' || enterpriseList) && (
+            <section className="data-ops-list-card" aria-label="企业监测目录">
+              {kind === 'MATERIALS' && (
+                <div className="data-ops-list-heading">
+                  <h3>企业列表</h3>
+                  <span className="admin-note">资料解析 · 点击查看详情</span>
+                </div>
+              )}
+              <div className="data-ops-list-columns" aria-hidden="true">
+                <span>企业名称</span>
+                <span>{kind === 'CONNECTIONS' ? '接入对象' : '资料对象'}</span>
+                <span>处理中</span>
+                <span>需留意</span>
+                <span>最近成功</span>
+                <span>状态</span>
+              </div>
+              <div className="data-ops-tenants">
+                {data.value.items.map((t) => (
+                  <a key={t.tenantId} href={href(t.tenantId)}>
+                    <h3>{t.tenantName}</h3>
+                    <span>{n(t.counts.total)}</span>
+                    <span>{n(t.counts.processing)}</span>
+                    <span className={t.counts.attention ? 'data-ops-attention' : ''}>
+                      {n(t.counts.attention)}
+                    </span>
+                    <small>{time(t.lastSuccessAt)}</small>
+                    <Badge>
+                      {t.tenantStatus === 'SUSPENDED'
+                        ? '企业已暂停'
+                        : t.counts.attention
+                          ? '需留意'
+                          : t.counts.processing
+                            ? '处理中'
+                            : t.counts.total === 0
+                              ? '尚无对象'
+                              : t.counts.notStarted
+                                ? '尚未开始'
+                                : t.counts.stopped
+                                  ? '有停止项'
+                                  : '已完成'}
+                    </Badge>
+                  </a>
+                ))}
+              </div>
+              {!data.value.items.length && <p className="admin-note">没有符合条件的企业。</p>}
+              <Pager page={page} next={data.value.hasMore} onPage={setPage} />
+            </section>
+          )}
         </>
       )}
     </div>

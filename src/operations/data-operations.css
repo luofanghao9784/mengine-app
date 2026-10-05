@@ -217,3 +217,27 @@
   align-items: center;
   gap: 12px;
 }
+
+.data-ops-sections {
+  display: flex;
+  gap: 28px;
+  border-bottom: 1px solid var(--line);
+}
+.data-ops-sections a {
+  position: relative;
+  padding: 10px 0 12px;
+  font-size: 13px;
+  color: var(--muted);
+  text-decoration: none;
+}
+.data-ops-sections a[aria-current='page'] {
+  color: #1765dc;
+}
+.data-ops-sections a[aria-current='page']::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  inset-inline: 0;
+  height: 2px;
+  background: #1765dc;
+}
