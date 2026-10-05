@@ -44,7 +44,8 @@ function GenerationPlaceholder({
   const batch = slot?.batch;
   const completed = batch?.status === 'SUCCEEDED';
   return (
-    <div className="generation-card-copy" role="status">
+    <div className="generation-card-copy generation-minimal" role="status">
+      {completed && <button type="button" className="generation-back" aria-label="返回生成首页" title="返回生成首页" onClick={generation.dismissUnavailable}><X size={16} /></button>}
       <span className="generation-symbol">
         <Sparkles size={26} strokeWidth={1.5} />
       </span>
@@ -62,7 +63,7 @@ function GenerationPlaceholder({
       <p>
         {(batch?.reason && reasons[batch.reason]) ||
           (completed
-            ? '读取后自动显示'
+            ? '资料或权限变化可能导致无法读取，可返回重新选择。'
             : generation.progress.total > 1
               ? `已生成 ${generation.progress.done} / ${generation.progress.total} 张`
               : '完成后自动显示')}

@@ -43,6 +43,7 @@ export function useBriefingGeneration(tenant: string, workspace?: string, busine
   const refresh = useCallback(() => setRevision((n) => n + 1), []);
   const seen = useRef<Set<string> | undefined>(undefined);
   const tracked = useRef<string[]>(selectionIds);
+  const dismissed = useRef(new Set<string>());
   const submission = useSubmission<{ workspaceId?: string; count: number; types: string[] }>();
   useRequestLock(submission.busy || submission.uncertain || !!cancelBusy);
 
@@ -73,13 +74,14 @@ export function useBriefingGeneration(tenant: string, workspace?: string, busine
           const newlyFinished = previous && !previous.has(b.id) && b.status === 'SUCCEEDED';
           if (
             (generationOpen(b) || b.id === requestRef.current || newlyFinished) &&
+            !dismissed.current.has(b.id) &&
             !tracked.current.includes(b.id)
           )
             tracked.current.push(b.id);
         }
         seen.current = new Set(state.batches.map((b) => b.id));
         // The server removes inaccessible batches; never retain their former content.
-        tracked.current = tracked.current.filter((id) => state.batches.some((b) => b.id === id));
+        tracked.current = tracked.current.filter((id) => state.batches.some((b) => b.id === id) && !dismissed.current.has(id));
         const next = tracked.current.flatMap((id) => {
           const batch = state.batches.find((b) => b.id === id)!;
           return generationOpen(batch) || batch.status === 'SUCCEEDED' ? [{ batch }] : [];
@@ -90,7 +92,7 @@ export function useBriefingGeneration(tenant: string, workspace?: string, busine
         setReady(true);
         setError(undefined);
         setSlots((old) =>
-          next.map(({ batch }) => ({
+          next.filter(({ batch }) => !dismissed.current.has(batch.id)).map(({ batch }) => ({
             batch,
             item: old.find((s) => s.batch.id === batch.id)?.item,
             reading: batch.status === 'SUCCEEDED',
@@ -104,7 +106,7 @@ export function useBriefingGeneration(tenant: string, workspace?: string, busine
           );
         if (!controller.signal.aborted)
           setSlots(
-            next.map(({ batch }) => ({
+            next.filter(({ batch }) => !dismissed.current.has(batch.id)).map(({ batch }) => ({
               batch,
               item: items.find((i) => batch.cardIds.includes(i.content.id)),
             })),
@@ -149,6 +151,18 @@ export function useBriefingGeneration(tenant: string, workspace?: string, busine
       refresh();
     });
   };
+  const dismissUnavailable = () => {
+    const ids = slots.filter((s) => s.batch.status === 'SUCCEEDED' && !s.item).map((s) => s.batch.id);
+    for (const id of ids) dismissed.current.add(id);
+    tracked.current = tracked.current.filter((id) => !dismissed.current.has(id));
+    setSelectionIds((old) => old.filter((id) => !dismissed.current.has(id)));
+    if (requestRef.current && dismissed.current.has(requestRef.current)) {
+      requestRef.current = undefined;
+      setRequested(undefined);
+    }
+    setSlots((old) => old.filter((s) => !dismissed.current.has(s.batch.id)));
+    setError(undefined);
+  };
   const cancel = async (id: string) => {
     if (cancelBusy) return;
     setCancelBusy(id);
@@ -189,6 +203,7 @@ export function useBriefingGeneration(tenant: string, workspace?: string, busine
     refresh,
     cancel,
     cancelBusy,
+    dismissUnavailable,
   };
 }
 export type BriefingGeneration = ReturnType<typeof useBriefingGeneration>;

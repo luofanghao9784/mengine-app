@@ -1102,3 +1102,23 @@ test('会话联网按钮替代关键词表单，默认按需与勾选要求使�
     await page.screenshot({path:`test-results/web-shortcut-${required}.png`});
   }
 });
+
+test('已完成画报读取失败可关闭并回到生成首页，轮询与刷新不会重新卡住', async ({ page }) => {
+  const f = await generationFixture(page, true);
+  f.readFailure(true);
+  await page.goto(home);
+  await expect(page.locator('.generation-placeholder')).toBeVisible();
+  f.set('SUCCEEDED');
+  await expect(page.getByRole('button', { name: '重新读取', exact: true })).toBeVisible({ timeout: 10000 });
+  await page.getByRole('button', { name: '返回生成首页', exact: true }).click();
+  await expect(page.locator('.generation-placeholder')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '生成更多', exact: true })).toBeEnabled();
+  const reads = f.reads;
+  await expect.poll(() => f.reads).toBeGreaterThan(reads);
+  await expect(page.locator('.generation-placeholder')).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByRole('button', { name: '生成更多', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: '生成更多', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '选择生成数量', exact: true })).toBeVisible();
+  expect(f.posts).toHaveLength(0);
+});
