@@ -109,20 +109,22 @@ export function pagePublication(body: string): string | undefined {
 }
 
 /** Only editorial body images; generic sharing logos and author avatars are excluded. */
-export function articleImage(body: string, base: string): string | undefined {
-  const root = parse(body);let found: string | undefined;
+export function articleImages(body: string, base: string): string[] {
+  const root = parse(body);const found: string[] = [];
   const walk = (node: DefaultTreeAdapterMap['node'], editorial = false, excluded = false) => {
-    if (found) return;
+    if (found.length >= 3) return;
     if ('tagName' in node) {
       const attrs = Object.fromEntries(node.attrs.map(a => [a.name, a.value]));
       const label = (attrs.class || '') + ' ' + (attrs.id || '');
       excluded ||= ['header','footer','nav'].includes(node.tagName) || /avatar|logo|qrcode|advert|promotion|recommend/i.test(label);
       editorial ||= node.tagName === 'article' || /media-wrap|article-content|article-body|rich_media_content/i.test(label);
-      if (!excluded && editorial && node.tagName === 'img' && !/头像|二维码|公众号|推广|广告|logo|^图片$|^image$|\.(jpe?g|png)$/i.test(attrs.alt || '')) {
-        try { const u = new URL(attrs['data-src'] || attrs.src, base); if (u.protocol === 'https:' && !u.username && !u.password && u.href.length <= 2048) { u.hash='';found=u.href; } } catch { /* Missing image never blocks article text. */ }
+      if (!excluded && editorial && node.tagName === 'img' && !/头像|二维码|公众号|推广|广告|logo|\.(jpe?g|png)$/i.test(attrs.alt || '')) {
+        try { const u = new URL(attrs['data-src'] || attrs.src, base); if (u.protocol === 'https:' && !u.username && !u.password && u.href.length <= 2048) { u.hash='';if(!found.includes(u.href))found.push(u.href); } } catch { /* Missing image never blocks article text. */ }
       }
     }
     if ('childNodes' in node) for (const child of node.childNodes) walk(child, editorial, excluded);
   };
   walk(root);return found;
 }
+
+export function articleImage(body: string, base: string): string | undefined { return articleImages(body,base)[0]; }

@@ -1,6 +1,6 @@
 import { publicSearchMode, publicKeywords } from './public-search-mode.js';
 import type { NewsSearchScope } from './news-search.js';
-import { discoverNews, pagePublication, articleImage } from './news-discovery.js';
+import { discoverNews, pagePublication, articleImages } from './news-discovery.js';
 import { request, Agent } from 'node:https';
 import { request as connectRequest } from 'node:http';
 import { connect as tlsConnect } from 'node:tls';
@@ -194,6 +194,22 @@ export function loopbackProxyRequest(endpoint: string): PinnedRequest {
       tunnel.end();
     });
 }
+function rasterDimensions(bytes: Buffer): [number, number] | undefined {
+  if(bytes.length>=24 && bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]))) return [bytes.readUInt32BE(16),bytes.readUInt32BE(20)];
+  if(bytes.length<4 || bytes[0]!==255 || bytes[1]!==216) return;
+  let offset=2;
+  while(offset+4<=bytes.length) {
+    if(bytes[offset]!==255) return;
+    const marker=bytes[offset+1]; offset+=2;
+    if(marker===0xd9||marker===0xda) return;
+    if(marker===0xff) {offset--;continue;}
+    if(marker===0x01||(marker>=0xd0&&marker<=0xd7)) continue;
+    const length=bytes.readUInt16BE(offset);
+    if(length<2||offset+length>bytes.length) return;
+    if([0xc0,0xc1,0xc2].includes(marker)&&length>=7) return [bytes.readUInt16BE(offset+5),bytes.readUInt16BE(offset+3)];
+    offset+=length;
+  }
+}
 export class PublicReader {
   constructor(
     private readonly resolveHost: (host: string, signal?: AbortSignal) => Promise<Address[]> = (
@@ -266,20 +282,20 @@ export class PublicReader {
       ? extractHtml(text)
       : { title: new URL(fetched.url).hostname, text, truncated: false };
     const result = source(fetched.url, extracted.title, extracted.text, 'PAGE', extracted.truncated);
-    const imageUrl = type.toLowerCase().startsWith('text/html') ? articleImage(text, fetched.url) : undefined;
-    if (withImage && imageUrl) {
+    const imageUrls = type.toLowerCase().startsWith('text/html') ? articleImages(text, fetched.url) : [];
+    const imageSignal = AbortSignal.any([signal, AbortSignal.timeout(5000)]);
+    if (withImage) for (const imageUrl of imageUrls) {
       try {
-        const image = await this.fetch(imageUrl, AbortSignal.any([signal, AbortSignal.timeout(2500)]));
+        const image = await this.fetch(imageUrl, imageSignal);
         const mime = (image.response.headers['content-type'] || '').split(';')[0].toLowerCase();
-        if (['image/jpeg', 'image/png'].includes(mime) && image.response.bytes.length <= 131072)
-          result.image = {
-            url: image.url,
-            contentType: mime,
-            base64: image.response.bytes.toString('base64'),
-          };
-      } catch {
-        signal.throwIfAborted();
-      }
+        const dimensions = rasterDimensions(image.response.bytes);
+        // Prefer an editorial photo over very wide publisher branding banners.
+        if (dimensions && dimensions[0] / dimensions[1] > 2.2) continue;
+        if (['image/jpeg', 'image/png'].includes(mime) && image.response.bytes.length <= 131072) {
+          result.image = { url: image.url, contentType: mime, base64: image.response.bytes.toString('base64') };
+          break;
+        }
+      } catch { signal.throwIfAborted(); }
     }
     const publishedAt = pagePublication(text);
     return publishedAt ? { ...result, publishedAt } : result;

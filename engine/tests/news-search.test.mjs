@@ -73,3 +73,21 @@ test('cover extraction ignores share logos, avatars and filename-only promotion 
  assert.equal(articleImage('<meta property="og:image" content="https://cdn.example.org/logo.png"><div class="author-avatar"><img src="https://cdn.example.org/avatar.png"></div>','https://publisher.example.org'),undefined);
  assert.equal(articleImage('<article><img alt="1.jpg" src="https://cdn.example.org/promo.png"></article><div class="media-wrap"><img alt="运动赛事现场" src="https://cdn.example.org/event.png"></div>','https://publisher.example.org'),'https://cdn.example.org/event.png');
 });
+
+test('generic alt text on a publisher body photo is accepted while avatars remain excluded',async()=>{
+ const {articleImage}=await import('../dist/runtime/news-discovery.js');
+ assert.equal(articleImage('<div class="author-avatar"><img alt="图片" src="https://cdn.example.org/avatar.jpg"></div><div class="rich_media_content"><img alt="图片" data-src="https://cdn.example.org/event.jpg"></div>','https://news.example.org/a'),'https://cdn.example.org/event.jpg');
+});
+
+test('body cover skips a wide publisher banner and reads the next editorial image',async()=>{
+ const {PublicReader}=await import('../dist/runtime/public-web.js');
+ const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l9sAAAAASUVORK5CYII=','base64');
+ const wide=Buffer.from(png);wide.writeUInt32BE(5,16);
+ const images=[];
+ const reader=new PublicReader(async()=>[{address:'8.8.8.8',family:4}],async u=>{
+  if(u.pathname.endsWith('.png')){images.push(u.pathname);return {status:200,headers:{'content-type':'image/png'},bytes:u.pathname==='/banner.png'?wide:png};}
+  return {status:200,headers:{'content-type':'text/html'},bytes:Buffer.from('<article><img alt="图片" src="https://cdn.example.org/banner.png"><img alt="图片" src="https://cdn.example.org/event.png"></article><p>真实正文仅为合成图片候选测试。</p>')};
+ });
+ const result=await reader.read('https://publisher.example.org/a',new AbortController().signal,true);
+ assert.equal(result.image.url,'https://cdn.example.org/event.png');assert.deepEqual(images,['/banner.png','/event.png']);
+});
