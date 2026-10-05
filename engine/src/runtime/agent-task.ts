@@ -325,9 +325,10 @@ export class AgentTasks {
             )
           : invoke(action, body, 4096),
       );
-      const newsBriefing = !!briefingGeneration && !!newsScope;
+      const newsBriefing = task.contractVersion === '1.5' && !!briefingGeneration && !!newsScope;
       let newsBackground: Json[] = [];
       let newsInstructions = '';
+      let newsSkill: { id: string; version: string } | undefined;
       let newsSearched = false, newsRead = false;
       let answerStep = 0;
       let briefingDatasetReads = 0;
@@ -686,9 +687,7 @@ export class AgentTasks {
         await authorize();
         const skill = catalog.available(allowed).find((item) => item.id === 'public-research');
         if (!skill) throw new RuntimeError('SKILL_NOT_ACTIVE');
-        const loaded = await catalog.activate(skill.id, skill.version, allowed);
-        activated.set(skill.id, { id: skill.id, version: skill.version, sha256: loaded.item.sha256 });
-        newsInstructions = loaded.instructions;
+        newsSkill = skill;
         if (contextEnabled) newsBackground = await newsBriefingBackground(invoke);
         await authorize();
       }
@@ -991,6 +990,15 @@ export class AgentTasks {
           registered.policy !== (workAvailable ? 'SCOPED_PRIVATE_V2' : 'READ_ONLY_PRIVATE_V1')
         )
           throw new RuntimeError('TASK_RUNTIME_INCOMPATIBLE');
+        if (newsSkill) {
+          const number = ++sequence;
+          await invoke('execution/tool', { sequence: number, name: 'activate_skill', status: 'STARTED' });
+          await authorize();
+          const loaded = await catalog.activate(newsSkill.id, newsSkill.version, allowed);
+          activated.set(newsSkill.id, { id: newsSkill.id, version: newsSkill.version, sha256: loaded.item.sha256 });
+          newsInstructions = loaded.instructions;
+          await invoke('execution/tool', { sequence: number, name: 'activate_skill', status: 'succeeded' });
+        }
         for (const tool of tools) {
           const execute = tool.execute.bind(tool);
           tool.execute = async (args, executionSignal) => {
@@ -1057,7 +1065,7 @@ export class AgentTasks {
         model,
         tools,
         signal,
-        limits: { timeoutMs: 55000, modelCalls: 8, toolCalls: 8 },
+        limits: { timeoutMs: 55000, modelCalls: 8, toolCalls: newsSkill ? 7 : 8 },
         reserveFinalResponse: task.contractVersion === '1.5',
         onToolFailure: async (failure) => {
           // Record local schema rejection too. No business action is dispatched for invalid arguments.
@@ -1087,6 +1095,7 @@ export class AgentTasks {
         invalidDeliveryAttempts: briefingGeneration ? 3 : undefined,
         hasCompletedDeliverable: briefingGeneration ? hasTerminalBriefing : hasPreparedBriefing,
       });
+      if (newsSkill) result.tools.unshift({ callId: 'runtime-public-research', name: 'activate_skill', status: 'succeeded' });
       if (realtime && (result.status === 'cancelled' || (await realtime.control()).stop)) {
         await invoke('live/stopped', {});
         throw new RuntimeError('TASK_STOPPED');

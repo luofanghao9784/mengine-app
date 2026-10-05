@@ -11,7 +11,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 @SpringBootTest(properties={"dreamcore.tasks.public-web-enabled=true","dreamcore.tasks.news-search-provider=bing-rss","dreamcore.tasks.enabled=true","dreamcore.tasks.agent-mode=verification","dreamcore.knowledge.enabled=true","dreamcore.briefing.merge-seconds=0"})
 class NewsSearchIntegrationTest {
- @Autowired JdbcTemplate db;@Autowired NewsSourceCatalog catalog;@Autowired NewsSearchPolicy search;@Autowired BriefingGenerationService generation;@Autowired ConversationService conversations;@Autowired AgentTaskService agents;@Autowired BriefingContentService contents;
+ @Autowired JdbcTemplate db;@Autowired NewsSourceCatalog catalog;@Autowired NewsSearchPolicy search;@Autowired BriefingGenerationService generation;@Autowired ConversationService conversations;@Autowired AgentTaskService agents;@Autowired BriefingContentService contents;@Autowired AgentUsageLedger usage;
  UUID actor,tenant,space;
  @BeforeEach void setup(){actor=UUID.randomUUID();tenant=UUID.randomUUID();space=UUID.randomUUID();db.update("INSERT INTO accounts(id,email,display_name,password_hash) VALUES(?,?,'不可外传内部人员','unused')",actor,actor+"@private.test");db.update("INSERT INTO tenants(id,name) VALUES(?,'不可外传企业名称')",tenant);db.update("INSERT INTO tenant_memberships(tenant_id,account_id,role) VALUES(?,?,'TENANT_ADMIN')",tenant,actor);db.update("INSERT INTO workspaces(id,tenant_id,owner_id,name,kind) VALUES(?,?,?,'私有经营数值123456789','PERSONAL')",space,tenant,actor);}
  ConversationService.Job job(){var batch=generation.generate(actor,tenant,UUID.randomUUID(),space,"INFO");generation.tick(generation.state(actor,tenant).policies().getFirst().id());assertEquals("RUNNING",generation.get(actor,tenant,batch.id()).status());var job=conversations.claim();assertNotNull(job);return job;}
@@ -24,6 +24,19 @@ class NewsSearchIntegrationTest {
   assertEquals("BRIEFING_NEWS_EVIDENCE_REQUIRED",assertThrows(IdentityException.class,()->contents.create(job,request)).code);
   db.update("INSERT INTO conversation_tool_receipts(task_id,attempt_number,sequence,name,status) VALUES(?,?,2,'read_public_page','succeeded')",job.id(),attempt);
   var doc=contents.create(job,request);assertNotNull(doc);assertEquals("INFO",doc.content().businessType());assertNull(doc.content().source());assertNull(doc.content().datasetSource());
+ }
+ @Test void runtimeActivationOriginalDeliveryAndFinalReceiptSucceedWithoutInternalSources(){
+  var j=job();agents.selectNewsQuery(j.id(),j.token(),"FITNESS");
+  var names=List.of("activate_skill","public_search","read_public_page","select_briefing_topic","deliver_briefing");agents.openExecution(j.id(),j.token(),new AgentTaskService.ExecutionOpen("1.5",names));
+  for(int i=0;i<4;i++){agents.toolReceipt(j.id(),j.token(),new AgentTaskService.ToolReceipt(i+1,names.get(i),"STARTED"));agents.toolReceipt(j.id(),j.token(),new AgentTaskService.ToolReceipt(i+1,names.get(i),"succeeded"));}
+  agents.selectTopic(j.id(),j.token(),new AgentTaskService.TopicSelection(List.of(new AgentTaskService.TopicCandidate("运动安全政策如何影响服务","已读取的公开原文",false,"新发布政策","INFO")),0));
+  agents.toolReceipt(j.id(),j.token(),new AgentTaskService.ToolReceipt(5,"deliver_briefing","STARTED"));
+  var delivered=agents.deliverBriefing(j.id(),j.token(),new BriefingContentService.Request(null,"运动安全政策更新","新发布的运动安全要求值得企业关注并核对适用范围。",List.of("该资讯依据已读取的公开原文，具体执行安排应核对政策适用范围。","企业可以结合现有运营安排评估影响，不能把政策介绍直接当作经营成效。"),"INFO"));assertEquals("PREPARED",delivered.get("status"));
+  agents.toolReceipt(j.id(),j.token(),new AgentTaskService.ToolReceipt(5,"deliver_briefing","succeeded"));
+  agents.openUsage(j.id(),j.token());for(int i=1;i<=4;i++){agents.startUsage(j.id(),j.token(),new AgentUsageLedger.Start(i,2048));usage.finish(j.id(),j.token(),new AgentUsageLedger.Receipt(i,"RETURNED",100L,50L));}
+  String excerpt="合成公开政策原文，关于运动安全要求及适用范围。";var web=new AgentResult.WebSource(UUID.randomUUID(),"https://publisher.example.org/policy","合成政策",excerpt,IdentityService.hash(excerpt),java.time.Instant.now(),"PAGE",false);
+  agents.finish(j,new AgentResult("1.5","0.19.0",j.id(),j.token(),"AGENT","verification","synthetic-news","已生成合成资讯卡片。",List.of(),names.stream().map(n->new AgentResult.Tool("receipt-"+n,n,"succeeded")).toList(),List.of(),4,new AgentResult.Usage(400,200),List.of(web),List.of(new AgentResult.Skill("public-research","1.0.0","0".repeat(64))),List.of(),"COMPLETE",null));
+  assertEquals("SUCCEEDED",db.queryForObject("SELECT status FROM conversation_tasks WHERE id=?",String.class,j.id()));assertEquals(1,db.queryForObject("SELECT count(*) FROM news_article_deliveries WHERE task_id=?",Integer.class,j.id()));assertNotNull(contents.find(j.id(),db.queryForObject("SELECT attempt FROM conversation_tasks WHERE id=?",Integer.class,j.id())));
  }
  @AfterEach void release(){db.update("UPDATE conversation_tasks SET status='CANCELLED' WHERE tenant_id=? AND status IN ('RUNNING','QUEUED')",tenant);}
 }
