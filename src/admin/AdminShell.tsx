@@ -306,7 +306,6 @@ export function AdminShell({
                   </button>
                   <div className="admin-title-slot" ref={setTitleTarget}>
                     <div className="admin-default-title">
-                      {realm === 'tenant' && <span className="admin-breadcrumb">{name}</span>}
                       <h1>{title}</h1>
                     </div>
                   </div>
