@@ -78,6 +78,7 @@
     "test:client-all": "python3 scripts/with-test-postgres.py node --experimental-strip-types scripts/verify-phone-flow.ts --client-all"
   },
   "dependencies": {
+    "@fontsource/cormorant-garamond": "^5.3.0",
     "lucide-react": "^1.47.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"

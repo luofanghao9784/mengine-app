@@ -4,6 +4,11 @@ import { SessionProvider } from './session';
 import { SupportApp } from '../platform/SupportApp';
 import { PlatformApp } from '../platform/PlatformApp';
 import AccessApp, { readInvitation, type Surface } from './AccessApp';
+// Self-hosted numerals for the D′ admin surfaces and engine dashboard (SIL OFL); browsers fetch only used faces.
+import '@fontsource/cormorant-garamond/latin-300.css';
+import '@fontsource/cormorant-garamond/latin-400.css';
+import '@fontsource/cormorant-garamond/latin-500.css';
+import '@fontsource/cormorant-garamond/latin-400-italic.css';
 import '../shared/theme.css';
 import './access.css';
 import './workspace.css';
