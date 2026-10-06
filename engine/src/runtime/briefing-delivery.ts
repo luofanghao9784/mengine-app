@@ -3,6 +3,8 @@ import { isRecord } from './http-json.js';
 import { RuntimeError, type Json, type TaskTool } from './ports.js';
 /** Protocol guidance only. Placeholder text is never business evidence. */
 export const BRIEFING_EDITORIAL_HINTS: Record<string, string> = {
+  BRIEFING_PRESENTATION_INVALID:
+    'Choose a supported presentation layout/chartStyle; sections must reference distinct existing analysis paragraph indices (0-based). STEPS only for SUGGESTION with ACTION/CAUTION; COMPARISON only INSIGHT/SUGGESTION with at least two OPTION sections. DATA only EDITORIAL/KEY_METRIC, chartStyle required. focusGroup must exactly match a verified calculation group and is only allowed for KEY_METRIC. Do not submit numbers, URLs, HTML, CSS or code.',
   BRIEFING_TYPE_MISMATCH:
     'Keep businessType equal to the platform requested or selected-topic briefing type. A completed calculation does not change the requested type. For SUGGESTION deliver evidence-grounded actions, omit calculationArtifactId and avoid unsupported quantitative claims. If no useful content of the requested type is supported, use the status-only receipt; do not substitute DATA.',
   BRIEFING_INTERNAL_LANGUAGE:
@@ -21,16 +23,25 @@ export const BRIEFING_ANALYSIS_ARRAY_HINT =
 export function normalizeBriefingArguments(value: unknown): unknown {
   if (!isRecord(value) || typeof value.analysis !== 'string' || value.analysis.length > 2200) return value;
   let paragraphs: unknown;
-  try { paragraphs = JSON.parse(value.analysis); } catch {
+  try {
+    paragraphs = JSON.parse(value.analysis);
+  } catch {
     paragraphs = value.analysis.split(/\r?\n\s*\r?\n/).map((p) => p.trim());
-    if (Array.isArray(paragraphs) && paragraphs.length === 1) paragraphs = value.analysis.split(/\r?\n/).map((p) => p.trim());
+    if (Array.isArray(paragraphs) && paragraphs.length === 1)
+      paragraphs = value.analysis.split(/\r?\n/).map((p) => p.trim());
   }
-  if (!Array.isArray(paragraphs) || paragraphs.length < 2 || paragraphs.length > 4 ||
-      paragraphs.some((p) => typeof p !== 'string' || p.length < 12 || p.length > 500)) return value;
+  if (
+    !Array.isArray(paragraphs) ||
+    paragraphs.length < 2 ||
+    paragraphs.length > 4 ||
+    paragraphs.some((p) => typeof p !== 'string' || p.length < 12 || p.length > 500)
+  )
+    return value;
   return { ...value, analysis: paragraphs };
 }
 
 export function briefingDeliveryTool(options: {
+  presentationAvailable?: boolean;
   requestedType?: string;
   selectedType?(): string | undefined;
   authorize(): Promise<void>;
@@ -44,10 +55,64 @@ export function briefingDeliveryTool(options: {
       '\n' +
       BRIEFING_WRITING_RULES +
       '\n' +
-      BRIEFING_ANALYSIS_ARRAY_HINT,
+      BRIEFING_ANALYSIS_ARRAY_HINT +
+      (options.presentationAvailable
+        ? '\nChoose presentation according to the business question, not random decoration. version=briefing-presentation-v1. DATA: GROUPED_BAR for a few two-period groups; DUMBBELL for paired comparisons across many groups; DELTA_BAR for verified increases/decreases; CURRENT_BAR for current-period ranking; TABLE for exact values and gaps. KEY_METRIC highlights CURRENT, DIFFERENCE or CHANGE_PERCENT from the verified totals (focusGroup=null) or an exact group. No long-term trend, share, funnel or progress claims from a two-period sum. Non-DATA: EDITORIAL for prose or labeled analysis sections, STEPS for actual recommended actions, COMPARISON for actual supported options, SOURCE for a source filename cover (not proof of a generated file). sections selects 0-based analysis paragraphIndex with OBSERVATION/INTERPRETATION/ACTION/OPTION/CAUTION roles. At least two ACTION/CAUTION sections for STEPS, two OPTION sections for COMPARISON. Do not relabel observations as actions/options. Keep the full analysis; composition never adds facts, executable code, media URLs or chart numbers.'
+        : ''),
     parameters: {
       type: 'object',
       properties: {
+        ...(options.presentationAvailable
+          ? {
+              presentation: {
+                type: 'object',
+                properties: {
+                  version: { type: 'string', enum: ['briefing-presentation-v1'] },
+                  layout: {
+                    type: 'string',
+                    enum: ['EDITORIAL', 'KEY_METRIC', 'STEPS', 'COMPARISON', 'SOURCE'],
+                  },
+                  chartStyle: {
+                    oneOf: [
+                      {
+                        type: 'string',
+                        enum: ['GROUPED_BAR', 'DUMBBELL', 'DELTA_BAR', 'CURRENT_BAR', 'TABLE'],
+                      },
+                      { type: 'null' },
+                    ],
+                  },
+                  focusGroup: {
+                    oneOf: [{ type: 'string' }, { type: 'null' }],
+                    description: 'Exact verified group, max 100 characters; null means totals',
+                  },
+                  focusValue: {
+                    oneOf: [
+                      { type: 'string', enum: ['CURRENT', 'DIFFERENCE', 'CHANGE_PERCENT'] },
+                      { type: 'null' },
+                    ],
+                  },
+                  sections: {
+                    type: 'array',
+                    description: 'At most 4 distinct existing paragraphs',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        role: {
+                          type: 'string',
+                          enum: ['OBSERVATION', 'INTERPRETATION', 'ACTION', 'OPTION', 'CAUTION'],
+                        },
+                        paragraphIndex: { type: 'integer', enum: [0, 1, 2, 3] },
+                      },
+                      required: ['role', 'paragraphIndex'],
+                      additionalProperties: false,
+                    },
+                  },
+                },
+                required: ['version', 'layout', 'chartStyle', 'focusGroup', 'focusValue', 'sections'],
+                additionalProperties: false,
+              },
+            }
+          : {}),
         businessType: {
           type: 'string',
           enum: options.requestedType
@@ -73,7 +138,13 @@ export function briefingDeliveryTool(options: {
             'JSON array of strings, NOT a single string. Each array item is one complete evidence-grounded paragraph, 12–500 characters, ending in sentence punctuation. Use 2–4 items, e.g. ["First grounded paragraph.","Second grounded paragraph."]. Never JSON-stringify the array.',
         },
       },
-      required: ['title', 'summary', 'analysis', ...(options.requestedType ? ['businessType'] : [])],
+      required: [
+        'title',
+        'summary',
+        'analysis',
+        ...(options.presentationAvailable ? ['presentation'] : []),
+        ...(options.requestedType ? ['businessType'] : []),
+      ],
       additionalProperties: false,
     },
     async execute(args, signal) {

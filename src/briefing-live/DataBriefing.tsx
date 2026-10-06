@@ -1,3 +1,6 @@
+import { KeyMetric, AnalysisComposition, SourceCover } from './Composition';
+import { ComparisonVisual } from './ComparisonVisual';
+import { presentationOf } from './presentation';
 import { NewsCover } from './NewsCover';
 import { ReadingEvidence } from './ReadingEvidence';
 import { displayAmount } from './money-display';
@@ -15,6 +18,8 @@ export function BriefingChart({
   document: BriefingDocument;
   compact?: boolean;
 }) {
+  if (presentationOf(document)?.chartStyle && presentationOf(document)?.chartStyle !== 'GROUPED_BAR')
+    return <ComparisonVisual document={document} compact={compact} />;
   const chart = toMagazineChart(document, compact);
   if (!chart) return null;
   if (compact) return <MagazineChart chart={chart} spacious />;
@@ -47,13 +52,10 @@ export function DataBriefing({
       <article className="data-briefing">
         {c.businessType === 'INFO' && <NewsCover cover={document.cover} />}
         <p className="data-briefing-summary">{c.summary}</p>
+        <SourceCover document={document} />
         {!compact && (
           <>
-            <div className="data-briefing-analysis">
-              {c.analysis.map((p, i) => (
-                <p key={i}>{p}</p>
-              ))}
-            </div>
+            <AnalysisComposition document={document} />
             {c.source && (
               <ReadingEvidence title="资料依据" filename={c.source.filename} version={c.source.version}>
                 <pre>{c.source?.scopeExcerpt}</pre>
@@ -83,14 +85,11 @@ export function DataBriefing({
   return (
     <div className={'data-briefing ' + (compact ? 'is-compact' : '')}>
       <p className="data-briefing-summary">{c.summary}</p>
+      <KeyMetric document={document} />
       <BriefingChart document={document} compact={compact} />
       {!compact && (
         <>
-          <div className="data-briefing-analysis">
-            {c.analysis.map((p, i) => (
-              <p key={i}>{p}</p>
-            ))}
-          </div>
+          <AnalysisComposition document={document} />
           <details className="data-briefing-table">
             <summary>查看完整对比数据</summary>
             <div className="data-table-scroll">

@@ -1,3 +1,4 @@
+import { isPresentation } from './presentation.ts';
 import type { BriefingDocument, BriefingRow } from '../../contracts/public-api/briefing-content';
 import { createIdentityRequest, record, uuid } from '../identity/client.ts';
 const text = (v: unknown, min: number, max: number): v is string =>
@@ -17,7 +18,17 @@ const row = (v: unknown): v is BriefingRow =>
     ['MISSING_PERIOD', 'NON_POSITIVE_BASELINE', 'UNEQUAL_GROUP_COVERAGE'].includes(String(v.issue)));
 export function isBriefingDocument(v: unknown): v is BriefingDocument {
   if (!record(v) || !uuid(v.artifactId) || !hash(v.sha256) || !record(v.content)) return false;
-  if (v.cover != null && (!record(v.cover) || typeof v.cover.dataUrl !== 'string' || !/^data:image\/(jpeg|png);base64,[A-Za-z0-9+/]+=*$/.test(v.cover.dataUrl) || v.cover.dataUrl.length > 175000 || typeof v.cover.sourceUrl !== 'string' || !v.cover.sourceUrl.startsWith('https://') || typeof v.cover.sourceTitle !== 'string')) return false;
+  if (
+    v.cover != null &&
+    (!record(v.cover) ||
+      typeof v.cover.dataUrl !== 'string' ||
+      !/^data:image\/(jpeg|png);base64,[A-Za-z0-9+/]+=*$/.test(v.cover.dataUrl) ||
+      v.cover.dataUrl.length > 175000 ||
+      typeof v.cover.sourceUrl !== 'string' ||
+      !v.cover.sourceUrl.startsWith('https://') ||
+      typeof v.cover.sourceTitle !== 'string')
+  )
+    return false;
   if (
     v.ruleTrace !== undefined &&
     v.ruleTrace !== null &&
@@ -40,6 +51,8 @@ export function isBriefingDocument(v: unknown): v is BriefingDocument {
     s = c.source,
     ds = c.datasetSource,
     basis = c.datasetBasis;
+  if (c.presentation != null && !isPresentation(c.presentation, c as unknown as BriefingDocument['content']))
+    return false;
   const dataset = c.schemaVersion === 'briefing-dataset-v1';
   const datasetSourceValid =
     record(ds) &&

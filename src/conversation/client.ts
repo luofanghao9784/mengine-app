@@ -1,3 +1,4 @@
+import { invalidateWorkspaceNotifications } from '../identity/workspace-notification-events.ts';
 import type {
   Conversation,
   ConversationManagementReceipt,
@@ -208,7 +209,7 @@ export function createConversationClient(fetcher: typeof fetch = fetch) {
     read(tenant: string, conversationId: string, replyRevision: number, signal?: AbortSignal) {
       return request(root(tenant) + `/${id(conversationId)}/read`, 'POST',
         (v): v is {id:string;readReplyRevision:number} => record(v) && v.id === conversationId && count(v.readReplyRevision) && v.readReplyRevision >= replyRevision,
-        {replyRevision}, signal);
+        {replyRevision}, signal).then(receipt => { invalidateWorkspaceNotifications(tenant); return receipt; });
     },
     discussion(
       tenant: string,

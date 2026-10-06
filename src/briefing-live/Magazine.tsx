@@ -1,3 +1,5 @@
+import { KeyMetric, AnalysisComposition, SourceCover } from './Composition';
+import { presentationOf } from './presentation';
 import { NewsCover } from './NewsCover';
 import { FeedbackMark } from './FeedbackMark';
 import type { FeedbackTarget } from '../../contracts/public-api/feedback';
@@ -83,6 +85,9 @@ export function MagazineBody({
   feedback?: { tenant: string; target: FeedbackTarget };
 }) {
   const content = briefing?.content;
+  const presentation = briefing ? presentationOf(briefing) : null;
+  const composed =
+    !compact && !!presentation && (presentation.layout !== 'EDITORIAL' || presentation.sections.length > 0);
   const chart = compact ? undefined : content?.chart;
   const type = content ? briefingTypeLabels[content.businessType] : publication ? '成果' : '会话';
   const Icon = content ? briefingTypeIcons[content.businessType] : publication ? FileCheck2 : MessagesSquare;
@@ -91,7 +96,7 @@ export function MagazineBody({
   useLayoutEffect(() => {
     const copy = copyRef.current;
     const paragraph = copy?.querySelector<HTMLElement>('.magazine-summary');
-    if (!copy || !paragraph || chart || compact) return;
+    if (!copy || !paragraph || chart || compact || composed) return;
     const measure = () => {
       const lineHeight = parseFloat(getComputedStyle(paragraph).lineHeight);
       const available = copy.getBoundingClientRect().bottom - paragraph.getBoundingClientRect().top;
@@ -103,11 +108,12 @@ export function MagazineBody({
     for (const child of copy.children) if (child !== paragraph) observer.observe(child);
     measure();
     return () => observer.disconnect();
-  }, [summary, title, content?.title, chart, compact]);
+  }, [summary, title, content?.title, chart, compact, composed]);
   return (
     <>
       <div
-        className={`briefing-magazine live-magazine magazine-${type}${chart ? ' magazine-with-chart' : ''}`}
+        className={`briefing-magazine live-magazine magazine-${type}${chart ? ' magazine-with-chart' : ''}${composed ? ' magazine-with-composition' : ''}`}
+        data-presentation={presentation?.layout ?? 'EDITORIAL'}
         data-magazine-type={type}
       >
         <div className="magazine-eyebrow live-magazine-eyebrow">
@@ -123,11 +129,14 @@ export function MagazineBody({
           <div className="magazine-copy" ref={copyRef}>
             <h3>{content?.title ?? title}</h3>
             {content?.businessType === 'INFO' && <NewsCover cover={briefing?.cover} compact />}
+            {!compact && briefing && <KeyMetric document={briefing} />}
             {chart && <BriefingChart document={briefing!} compact />}
             <p className="magazine-summary live-briefing-excerpt" title={summary}>
               {summary}
               {!content && truncated ? '…' : ''}
             </p>
+            {!compact && briefing && <SourceCover document={briefing} />}
+            {!compact && briefing && <AnalysisComposition document={briefing} compact />}
           </div>
         </div>
         <div className="magazine-footer live-magazine-footer">

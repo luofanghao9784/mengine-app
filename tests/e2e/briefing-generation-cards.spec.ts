@@ -498,6 +498,87 @@ test('阅读弹窗仅保留有用、没用、关注，桌面和窄屏图标均�
   }
 });
 
+test('工作导航蓝点独立显示，阅读更新后清除且撤权不保留提示', async ({ page }) => {
+  await generationFixture(page);
+  let state = { tenantId: tenant, conversations: true, briefing: false };
+  let status = 200;
+  await page.route('**/workspace/notifications', route => route.fulfill({ status,
+    json: status === 200 ? state : { code: 'FORBIDDEN' } }));
+  await page.goto(home);
+  const nav = page.getByRole('navigation', { name: '主导航' });
+  const conversationsDot = nav.getByRole('img', { name: '会话有待处理内容' });
+  const briefingDot = nav.getByRole('img', { name: '智能画报有未读卡片' });
+  await expect(conversationsDot).toBeVisible();
+  await expect(briefingDot).toHaveCount(0);
+  state = { ...state, briefing: true };
+  await page.evaluate(tenant => window.dispatchEvent(new CustomEvent('workspace:notifications-changed', { detail: tenant })), tenant);
+  await expect(briefingDot).toBeVisible();
+  await expect(briefingDot).toHaveCSS('background-color', 'rgb(20, 105, 239)');
+  await expect(page.locator('.recommendation-card').first()).toHaveCSS('opacity', '1');
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect(conversationsDot).toBeVisible();
+    await expect(briefingDot).toBeVisible();
+    await page.screenshot({ path: `test-results/workspace-navigation-notifications-${width}.png` });
+  }
+  state = { ...state, conversations: false, briefing: false };
+  await page.evaluate(tenant => window.dispatchEvent(new CustomEvent('workspace:notifications-changed', { detail: tenant })), tenant);
+  await expect(conversationsDot).toHaveCount(0);
+  await expect(briefingDot).toHaveCount(0);
+  state = { ...state, conversations: true, briefing: true };
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect(briefingDot).toBeVisible();
+  status = 403;
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect(conversationsDot).toHaveCount(0);
+  await expect(briefingDot).toHaveCount(0);
+});
+
+for (const receiptFails of [false, true])
+test(`已读回执不锁住背景且在途去重，${receiptFails ? '失败后可重试' : '成功后不重复提交'}`, async ({ page }) => {
+  await generationFixture(page);
+  await page.route('**/api/**/feedback?*', route => route.fulfill({ json: { feedback: null } }));
+  await page.route('**/tasks/' + uid(21), route => route.fulfill({ json: {
+    conversation: info,
+    tasks: [{ ...task('合成成果'), executionClass: 'verification', id: uid(21), status: 'SUCCEEDED', revision: 1, attempt: 1, reply: '可阅读成果' }],
+    hasMore: false, cursor: 1,
+  } }));
+  let posts = 0;
+  let release: (() => void) | undefined;
+  await page.route('**/recommendations/opened', async route => {
+    posts++;
+    if (posts === 1) await new Promise<void>(resolve => { release = resolve; });
+    await route.fulfill(receiptFails && posts === 1
+      ? { status: 503, json: { code: 'UNAVAILABLE' } }
+      : { json: { target: route.request().postDataJSON(), openedAt: now, evidence: 'USER_OPEN_ACTION', businessOutcome: 'NOT_ASSESSED' } });
+  });
+  await page.goto(home);
+  const card = page.locator('.recommendation-card').first();
+  const body = card.locator('.live-briefing-body');
+  await body.click();
+  await expect.poll(() => posts).toBe(1);
+  await expect(body).toBeEnabled();
+  await expect(body).toHaveCSS('opacity', '1');
+  await expect(card).toHaveAttribute('data-read', 'false');
+  await page.getByRole('button', { name: '关闭卡片详情' }).click();
+  await body.click();
+  await expect(page.getByText('可阅读成果', { exact: true })).toBeVisible();
+  expect(posts).toBe(1);
+  release!();
+  if (receiptFails) {
+    await page.getByRole('button', { name: '关闭卡片详情' }).click();
+    await expect(card.locator('.access-alert')).toBeVisible();
+    await expect(card).toHaveAttribute('data-read', 'false');
+    await body.click();
+    await expect.poll(() => posts).toBe(2);
+  }
+  await expect(card).toHaveAttribute('data-read', 'true');
+  await page.getByRole('button', { name: '关闭卡片详情' }).click();
+  await body.click();
+  await expect(page.getByText('可阅读成果', { exact: true })).toBeVisible();
+  expect(posts).toBe(receiptFails ? 2 : 1);
+});
+
 test('阅读弹窗复用 Demo 的淡入轻移缩放关键帧，减少动态效果时停用', async ({ page }) => {
   await page.addInitScript(() => {
     (window as any).readingAnimations = [];

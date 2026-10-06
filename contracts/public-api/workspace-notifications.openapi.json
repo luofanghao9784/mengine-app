@@ -1,0 +1,75 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "工作导航通知摘要",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/v1/tenants/{tenant}/workspace/notifications": {
+      "get": {
+        "summary": "读取本人当前获权范围的工作导航蓝点",
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "未读回复或待处理会话，以及未读的生成画报。private, no-store。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "tenantId",
+                    "conversations",
+                    "briefing"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "tenantId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "conversations": {
+                      "type": "boolean"
+                    },
+                    "briefing": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "403": {
+            "description": "企业或私人内容读取资格不可用"
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "sessionCookie": []
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "DREAMCORE_SESSION"
+      }
+    }
+  }
+}

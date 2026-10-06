@@ -6,6 +6,7 @@ import { PhoneAuth } from './PhoneAuth';
 import { uuid } from './client';
 import { entryTenant, rememberedTenant, rememberTenant } from './entry';
 import { WorkspaceNavigation } from './WorkspaceNavigation';
+import { useWorkspaceNotifications } from './workspace-notifications';
 import { WorkspaceComposer } from './WorkspaceComposer';
 import { DepartureStatus } from '../departure/DepartureStatus';
 import { DeparturePanel } from '../departure/DeparturePanel';
@@ -264,6 +265,8 @@ function GuardedAccessShell({
     if (selected) rememberTenant(identity.account.id, selected.tenantId, surface);
   }, [identity.account.id, selected?.tenantId, surface]);
   const allowed = surface === 'platform-admin' ? identity.platformAdmin : !!selected;
+  const notifications = useWorkspaceNotifications(tenant, surface === 'workspace' && allowed,
+    routeHash, identity.account.id);
   const links: Surface[] = [
     'workspace',
     ...(management.includes(tenant) || surface === 'tenant-admin' ? ['tenant-admin' as const] : []),
@@ -319,8 +322,10 @@ function GuardedAccessShell({
                     icon: MessageSquare,
                     active: conversations,
                     href: conversationHref(tenant),
+                    notification: notifications?.conversations ? '会话有待处理内容' : undefined,
                   },
-                  { label: '智能画报', icon: LayoutPanelTop, active: briefing, href: briefingHref(tenant) },
+                  { label: '智能画报', icon: LayoutPanelTop, active: briefing, href: briefingHref(tenant),
+                    notification: notifications?.briefing ? '智能画报有未读卡片' : undefined },
                   {
                     label: '资料库',
                     icon: LibraryBig,

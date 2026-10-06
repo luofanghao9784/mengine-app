@@ -9,6 +9,18 @@ export interface BriefingRow {
   currentRank: number | null;
   issue: string | null;
 }
+/** Bounded composition; paragraph references reuse verified editorial content, never executable code. */
+export interface BriefingPresentation {
+  version: 'briefing-presentation-v1';
+  layout: 'EDITORIAL' | 'KEY_METRIC' | 'STEPS' | 'COMPARISON' | 'SOURCE';
+  chartStyle: 'GROUPED_BAR' | 'DUMBBELL' | 'DELTA_BAR' | 'CURRENT_BAR' | 'TABLE' | null;
+  focusGroup: string | null;
+  focusValue: 'CURRENT' | 'DIFFERENCE' | 'CHANGE_PERCENT' | null;
+  sections: {
+    role: 'OBSERVATION' | 'INTERPRETATION' | 'ACTION' | 'OPTION' | 'CAUTION';
+    paragraphIndex: number;
+  }[];
+}
 export interface BriefingDocument {
   cover?: { dataUrl: string; sourceUrl: string; sourceTitle: string } | null;
   artifactId: string;
@@ -23,6 +35,7 @@ export interface BriefingDocument {
     title: string;
     summary: string;
     analysis: string[];
+    presentation?: BriefingPresentation | null;
     chart: {
       type: 'GROUPED_BAR';
       metric: string;

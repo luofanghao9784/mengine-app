@@ -3,7 +3,7 @@ import { useRef } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { NavigationButton } from '../shared/layout';
 
-export type WorkspaceLink = { label: string; icon: LucideIcon; href: string; active?: boolean };
+export type WorkspaceLink = { label: string; icon: LucideIcon; href: string; active?: boolean; notification?: string };
 
 /** Daily work stays in three direct entries; enterprise tools live with the tenant. */
 export function WorkspaceNavigation({ primary, routeKey }: { primary: WorkspaceLink[]; routeKey?: string }) {
@@ -19,6 +19,7 @@ export function WorkspaceNavigation({ primary, routeKey }: { primary: WorkspaceL
           {...interaction(link.label)}
         >
           <NavigationButton {...link} onClick={dismiss} />
+          {link.notification && <span className="workspace-notification-dot" role="img" aria-label={link.notification} />}
         </div>
       ))}
     </div>

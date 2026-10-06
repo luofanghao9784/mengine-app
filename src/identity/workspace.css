@@ -463,3 +463,16 @@
     padding-left: 28px;
   }
 }
+
+.workspace-shell .workspace-nav-items .nav-item { position: relative; }
+.workspace-shell .workspace-notification-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #1469ef;
+  box-shadow: 0 0 0 2px #f7faff;
+  pointer-events: none;
+}

@@ -44,6 +44,13 @@ public class RecommendationService {
  }
  private record Pool(List<Candidate> items,long total) {}
  private Pool pool(UUID actor,UUID tenant,UUID workspace,boolean generatedOnly,String businessType,boolean publicationsOnly,boolean focused){
+  return pool(actor,tenant,workspace,generatedOnly,businessType,publicationsOnly,focused,false);
+ }
+ @Transactional public boolean hasUnreadBriefing(UUID actor,UUID tenant){
+  identities.member(actor,tenant,false);departure.requirePrivateRead(actor,tenant);
+  return !pool(actor,tenant,null,true,null,false,false,true).items().isEmpty();
+ }
+ private Pool pool(UUID actor,UUID tenant,UUID workspace,boolean generatedOnly,String businessType,boolean publicationsOnly,boolean focused,boolean unreadOnly){
   if(workspace!=null)access.require(actor,tenant,workspace,false);
   var sql="""
    WITH spaces AS MATERIALIZED (
@@ -72,10 +79,11 @@ public class RecommendationService {
    )
    SELECT c.*,o.opened_at,count(*) OVER() eligible_total FROM candidates c LEFT JOIN delivery_observations o
     ON o.tenant_id=? AND o.actor_id=? AND o.target_kind=c.kind AND o.target_id=c.id AND o.version_key=c.version_key
+   WHERE (NOT ? OR (c.kind='TASK' AND o.opened_at IS NULL))
    ORDER BY c.created_at DESC,c.id LIMIT 1000
    """.formatted(BriefingContentService.ELIGIBLE,BriefingContentService.ELIGIBLE,generatedOnly?"":"LIMIT 1",BriefingContentService.ELIGIBLE,generatedOnly?"briefing_card_preferences p ON p.task_id=t.id":"briefing_preferences p ON p.conversation_id=c.id");
   final long[] total={0};db.execute("SET LOCAL statement_timeout='3s'");
-  var items=db.query(sql,(r,n)->{total[0]=r.getLong("eligible_total");return new Candidate(r.getObject("id",UUID.class),r.getString("kind"),r.getString("version_key"),r.getObject("workspace_id",UUID.class),r.getString("workspace_name"),r.getString("title"),r.getString("excerpt"),r.getBoolean("truncated"),r.getTimestamp("created_at").toInstant(),r.getString("execution_class"),r.getObject("conversation_id",UUID.class),r.getInt("task_revision"),r.getInt("attempt"),r.getInt("preference_revision"),r.getObject("material_id",UUID.class),r.getInt("material_version"),r.getString("filename"),r.getBoolean("pinned"),r.getTimestamp("opened_at")==null?null:r.getTimestamp("opened_at").toInstant());},actor,tenant,workspace,workspace,actor,generatedOnly,generatedOnly,businessType,businessType,tenant,actor,publicationsOnly,focused,actor,businessType,businessType,focused,tenant,actor);
+  var items=db.query(sql,(r,n)->{total[0]=r.getLong("eligible_total");return new Candidate(r.getObject("id",UUID.class),r.getString("kind"),r.getString("version_key"),r.getObject("workspace_id",UUID.class),r.getString("workspace_name"),r.getString("title"),r.getString("excerpt"),r.getBoolean("truncated"),r.getTimestamp("created_at").toInstant(),r.getString("execution_class"),r.getObject("conversation_id",UUID.class),r.getInt("task_revision"),r.getInt("attempt"),r.getInt("preference_revision"),r.getObject("material_id",UUID.class),r.getInt("material_version"),r.getString("filename"),r.getBoolean("pinned"),r.getTimestamp("opened_at")==null?null:r.getTimestamp("opened_at").toInstant());},actor,tenant,workspace,workspace,actor,generatedOnly,generatedOnly,businessType,businessType,tenant,actor,publicationsOnly,focused,actor,businessType,businessType,focused,tenant,actor,unreadOnly);
   return new Pool(items,total[0]);
  }
  private Presentation presentation(UUID actor,UUID tenant){

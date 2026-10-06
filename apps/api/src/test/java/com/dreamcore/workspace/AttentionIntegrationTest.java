@@ -15,6 +15,26 @@ import static org.junit.jupiter.api.Assertions.*;
 class AttentionIntegrationTest {
  @Autowired com.dreamcore.workspace.plans.PlanService plans;
  @Autowired AttentionService attention;@Autowired JdbcTemplate db;@Autowired SourceService sources;@Autowired MaterialService materials;
+ @Autowired com.dreamcore.workspace.conversation.ConversationService conversations;
+ @Test void navigationConversationSignalIsPersonalAndClearsAfterHandlingOrTrash(){
+  assertFalse(conversations.hasUnreadOrAttention(owner,tenant));
+  UUID t=task(owner,personal,"WAITING_INPUT");
+  assertTrue(conversations.hasUnreadOrAttention(owner,tenant));
+  assertFalse(conversations.hasUnreadOrAttention(reader,tenant));
+  assertFalse(conversations.hasUnreadOrAttention(admin,tenant));
+  db.update("UPDATE conversation_tasks SET status='RUNNING' WHERE id=?",t);
+  assertFalse(conversations.hasUnreadOrAttention(owner,tenant));
+  db.update("UPDATE conversation_tasks SET status='SUCCEEDED',reply='合成回复' WHERE id=?",t);
+  db.update("UPDATE conversations SET reply_revision=1,latest_reply_task_id=? WHERE id=(SELECT conversation_id FROM conversation_tasks WHERE id=?)",t,t);
+  assertTrue(conversations.hasUnreadOrAttention(owner,tenant));
+  db.update("UPDATE conversations SET read_reply_revision=1 WHERE latest_reply_task_id=?",t);
+  assertFalse(conversations.hasUnreadOrAttention(owner,tenant));
+  db.update("UPDATE conversation_tasks SET status='RESULT_UNKNOWN' WHERE id=?",t);
+  assertTrue(conversations.hasUnreadOrAttention(owner,tenant));
+  db.update("UPDATE conversations SET trashed_at=now() WHERE latest_reply_task_id=?",t);
+  assertFalse(conversations.hasUnreadOrAttention(owner,tenant));
+  assertThrows(IdentityException.class,()->conversations.hasUnreadOrAttention(owner,UUID.randomUUID()));
+ }
  UUID tenant,owner,reader,admin,personal,shared;
  @BeforeEach void setup(){tenant=UUID.randomUUID();owner=UUID.randomUUID();reader=UUID.randomUUID();admin=UUID.randomUUID();personal=UUID.randomUUID();shared=UUID.randomUUID();db.update("INSERT INTO tenants(id,name) VALUES (?,'合成待办企业')",tenant);for(UUID u:List.of(owner,reader,admin)){db.update("INSERT INTO accounts(id,email,display_name,password_hash) VALUES (?,?,?,'unused')",u,u+"@attention.test","合成成员");db.update("INSERT INTO tenant_memberships(tenant_id,account_id,role) VALUES (?,?,?)",tenant,u,u.equals(admin)?"TENANT_ADMIN":"MEMBER");}db.update("INSERT INTO workspaces(id,tenant_id,owner_id,name,kind) VALUES (?,?,?,'个人','PERSONAL'),(?,?,?,'共享','SHARED')",personal,tenant,owner,shared,tenant,admin);db.update("INSERT INTO workspace_members(tenant_id,workspace_id,account_id,can_maintain) VALUES (?,?,?,true),(?,?,?,false)",tenant,shared,owner,tenant,shared,reader);}
  @AfterEach void cleanup(){db.update("UPDATE conversation_tasks SET status='CANCELLED' WHERE tenant_id=? AND status IN ('QUEUED','RUNNING')",tenant);db.update("UPDATE ongoing_plans SET status='STOPPED' WHERE tenant_id=?",tenant);}

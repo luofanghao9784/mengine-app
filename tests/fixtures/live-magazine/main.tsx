@@ -99,6 +99,80 @@ longTitle.content.title =
 documents.push(longTitle);
 documents.push(edge);
 
+if (location.search.includes('expressive')) {
+  documents.splice(0);
+  for (const chartStyle of ['GROUPED_BAR', 'DUMBBELL', 'DELTA_BAR', 'CURRENT_BAR', 'TABLE'] as const) {
+    const doc = structuredClone(edge);
+    doc.content.title = '合成核验对比 · ' + chartStyle;
+    doc.content.chart!.rows[1].current = '1000';
+    doc.content.chart!.rows[1].difference = '0';
+    doc.content.presentation = {
+      version: 'briefing-presentation-v1',
+      layout: 'EDITORIAL',
+      chartStyle,
+      focusGroup: null,
+      focusValue: null,
+      sections: [],
+    };
+    documents.push(doc);
+  }
+  const metric = structuredClone(documents[1]);
+  metric.content.title = '合成重点数字 · 精确单位换算';
+  metric.content.chart!.unit = '分';
+  metric.content.chart!.rows[2].current = '309100';
+  metric.content.presentation = {
+    version: 'briefing-presentation-v1',
+    layout: 'KEY_METRIC',
+    chartStyle: 'DUMBBELL',
+    focusGroup: metric.content.chart!.rows[2].group,
+    focusValue: 'CURRENT',
+    sections: [],
+  };
+  documents.push(metric);
+  for (const layout of ['EDITORIAL', 'STEPS', 'COMPARISON', 'SOURCE'] as const) {
+    const doc: BriefingDocument = {
+      ...structuredClone(metric),
+      content: {
+        ...structuredClone(metric.content),
+        businessType: layout === 'STEPS' ? 'SUGGESTION' : layout === 'SOURCE' ? 'RESULT' : 'INSIGHT',
+        chart: null,
+        title: '合成内容组合 · ' + layout,
+        source: {
+          id: 'fixture',
+          materialId: 'fixture',
+          versionId: 'fixture',
+          version: 2,
+          filename: '合成分析依据.pdf',
+          sha256: 'a'.repeat(64),
+          scopeExcerpt: '合成资料，仅用于检查视觉。',
+        },
+        presentation: {
+          version: 'briefing-presentation-v1',
+          layout,
+          chartStyle: null,
+          focusGroup: null,
+          focusValue: null,
+          sections:
+            layout === 'SOURCE'
+              ? []
+              : [
+                  {
+                    role: layout === 'STEPS' ? 'ACTION' : layout === 'COMPARISON' ? 'OPTION' : 'OBSERVATION',
+                    paragraphIndex: 0,
+                  },
+                  {
+                    role:
+                      layout === 'STEPS' ? 'CAUTION' : layout === 'COMPARISON' ? 'OPTION' : 'INTERPRETATION',
+                    paragraphIndex: 1,
+                  },
+                ],
+        },
+      },
+    };
+    documents.push(doc);
+  }
+}
+
 function FixtureGrid({ items }: ComponentProps<typeof MagazineGrid>) {
   const [saved, setSaved] = useState<FollowPreference | undefined>(
     () => JSON.parse(sessionStorage.getItem('fixture-follow') || 'null') || undefined,
@@ -167,16 +241,16 @@ function Fixture() {
       />
       {reading && (
         <SessionProvider>
-        <ReadingDialog
-          title={reading.content.title}
-          workspace="合成工作空间"
-          date={reading.content.generatedAt}
-          tenant="fixture"
-          onClose={() => setReading(undefined)}
-          contentLabel="数据"
-        >
-          <DataBriefing document={reading} />
-        </ReadingDialog>
+          <ReadingDialog
+            title={reading.content.title}
+            workspace="合成工作空间"
+            date={reading.content.generatedAt}
+            tenant="fixture"
+            onClose={() => setReading(undefined)}
+            contentLabel="数据"
+          >
+            <DataBriefing document={reading} />
+          </ReadingDialog>
         </SessionProvider>
       )}
     </main>

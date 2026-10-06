@@ -118,6 +118,7 @@ export class AgentTasks {
     let planAllowed: boolean | undefined;
     let tablesAvailable: boolean | undefined;
     let planManagementAvailable = false;
+    let briefingPresentationAvailable = false;
     let briefingAvailable: boolean | undefined;
     let topicAvailable = false;
     let topicSelected = false;
@@ -257,6 +258,7 @@ export class AgentTasks {
         )
           throw new RuntimeError('TASK_ACCESS_DENIED');
         briefingAvailable = briefing;
+        briefingPresentationAvailable = response.briefingPresentationVersion === '1.0';
         const generation = response.briefingGeneration ?? false;
         if (
           typeof generation !== 'boolean' ||
@@ -628,6 +630,7 @@ export class AgentTasks {
         ...(briefingAvailable && task.contractVersion === '1.5'
           ? [
               briefingDeliveryTool({
+                presentationAvailable: briefingPresentationAvailable,
                 requestedType: briefingRequestedType,
                 selectedType: () => selectedBriefingType,
                 authorize,

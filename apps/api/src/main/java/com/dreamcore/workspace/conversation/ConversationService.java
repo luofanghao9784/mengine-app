@@ -44,6 +44,20 @@ public class ConversationService {
         return first.isEmpty() || sourcesReadable(first.getFirst())?title:"会话内容暂不可用";
     }
     private void paging(int offset,int limit){if(offset<0 || offset>100000 || limit<1 || limit>50)throw IdentityException.invalid();}
+    @Transactional public boolean hasUnreadOrAttention(UUID actor,UUID tenant) {
+        identities.member(actor,tenant,false);departure.requirePrivateRead(actor,tenant);
+        var ids=db.queryForList("""
+          SELECT c.id FROM conversations c JOIN workspaces w ON w.id=c.workspace_id AND w.tenant_id=c.tenant_id
+          LEFT JOIN workspace_members g ON g.workspace_id=w.id AND g.tenant_id=w.tenant_id AND g.account_id=?
+          WHERE c.tenant_id=? AND c.owner_id=? AND c.purpose='BUSINESS' AND c.trashed_at IS NULL
+          AND ((w.kind='PERSONAL' AND w.owner_id=?) OR (w.kind='SHARED' AND g.account_id IS NOT NULL))
+          AND ((c.reply_revision>c.read_reply_revision AND EXISTS(SELECT 1 FROM readable_source_tasks r WHERE r.id=c.latest_reply_task_id))
+            OR EXISTS(SELECT 1 FROM conversation_tasks t WHERE t.conversation_id=c.id AND t.origin='USER'
+              AND t.status IN ('WAITING_INPUT','RESULT_UNKNOWN')
+              AND EXISTS(SELECT 1 FROM readable_source_tasks r WHERE r.id=t.id)))
+          """,UUID.class,actor,tenant,actor,actor);
+        return ids.stream().anyMatch(this::discussionReadable);
+    }
     Conversation require(UUID actor,UUID tenant,UUID id,boolean lock) {
         identities.member(actor,tenant,false);departure.requirePrivateRead(actor,tenant);
         var rows=db.query("SELECT c.*,"+RUNNING_SQL+","+BRIEFING_DISCUSSION_SQL+" FROM conversations c WHERE tenant_id=? AND owner_id=? AND id=? AND trashed_at IS NULL"+(lock?" FOR NO KEY UPDATE":""),mapper,tenant,actor,id);

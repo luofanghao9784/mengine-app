@@ -22,7 +22,6 @@ class BriefingGenerationIntegrationTest {
  @Autowired ConversationService conversations;@Autowired AgentTaskService agents;@Autowired BriefingContentService contents;
  @Autowired BriefingGenerationService generation;@Autowired BriefingCardService cards;@Autowired BriefingService feed;@Autowired RecommendationService recommendations;
  @Autowired AgentUsageLedger usage;
- @Autowired com.dreamcore.workspace.identity.PlatformAdminService platform;
  @Test void defaultGenerationRotatesReadyAuthorizedSpacesAndReplaysTheSameSelection(){
   upload("marker 财务合成资料",true);UUID finance=space,operations=UUID.randomUUID();
   db.update("INSERT INTO workspaces(id,tenant_id,owner_id,name,kind) VALUES (?,?,?,'运营','SHARED')",operations,tenant,actor);
@@ -45,6 +44,24 @@ class BriefingGenerationIntegrationTest {
   generation.generateSelection(actor,tenant,UUID.randomUUID(),ready,1,List.of("INSIGHT"));
   assertEquals(ready,generation.generate(actor,tenant,UUID.randomUUID(),null,"INSIGHT").workspaceId());
  }
+ @Test void navigationBriefingSignalUsesUnreadAuthorizedCardVersions(){
+  upload("marker 合成画报导航资料。",true);
+  assertFalse(recommendations.hasUnreadBriefing(actor,tenant));
+  var b=manual();generation.tick(policy());var j=conversations.claim();assertNotNull(j);
+  deliver(j,"合成资料支持这份新画报，仅用于通知状态验证。");generation.tick(policy());
+  assertTrue(recommendations.hasUnreadBriefing(actor,tenant));
+  assertFalse(recommendations.hasUnreadBriefing(reader,tenant));
+  assertFalse(conversations.hasUnreadOrAttention(actor,tenant));
+  var card=recommendations.list(actor,tenant,null,0,20,null,true).items().getFirst().content();
+  recommendations.opened(actor,tenant,new RecommendationService.Target(card.kind(),card.id(),card.versionKey()));
+  assertFalse(recommendations.hasUnreadBriefing(actor,tenant));
+  db.update("UPDATE conversation_tasks SET revision=revision+1 WHERE id=?",j.id());
+  assertTrue(recommendations.hasUnreadBriefing(actor,tenant));
+  db.update("DELETE FROM workspace_members WHERE workspace_id=? AND account_id=?",space,actor);
+  assertFalse(recommendations.hasUnreadBriefing(actor,tenant));
+  assertThrows(IdentityException.class,()->recommendations.hasUnreadBriefing(actor,UUID.randomUUID()));
+ }
+ @Autowired com.dreamcore.workspace.identity.PlatformAdminService platform;
  UUID tenant,actor,reader,space;
  @BeforeEach void setup(){tenant=UUID.randomUUID();actor=UUID.randomUUID();reader=UUID.randomUUID();space=UUID.randomUUID();
   db.update("INSERT INTO tenants(id,name) VALUES (?,'合成画报生成验收')",tenant);
@@ -637,7 +654,6 @@ class BriefingGenerationIntegrationTest {
    assertEquals(0,generation.state(actor,tenant).quota().used());
   }
  }
-
 
  @Test void samePolicyDispatchesFiveAndSixthWaitsWithoutOverspending(){
   upload("marker 合成并行资料。",true);UUID p=policy();

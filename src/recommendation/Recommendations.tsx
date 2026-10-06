@@ -13,6 +13,7 @@ import { Download, Newspaper, Share2, Star } from 'lucide-react';
 import type { RecommendationItem } from '../../contracts/public-api/recommendation';
 import { Failure, Loading, SubmitError, useRemote, useSubmission } from '../shared/admin';
 import { RequestPending, useRequestLock } from '../shared/request-guard';
+import { invalidateWorkspaceNotifications } from '../identity/workspace-notification-events.ts';
 import { Button, Empty } from '../shared/ui';
 import { useSession } from '../identity/session';
 import { materialClient } from '../material/client';
@@ -196,7 +197,8 @@ function RecommendationCard({ tenant, item }: { tenant: string; item: Recommenda
     [pinned, setPinned] = useState(c.pinned),
     [shareInfo, setShareInfo] = useState(false);
   const download = useRef<AbortController | null>(null),
-    current = useRef(true);
+    current = useRef(true),
+    openReceipt = useRef<Promise<boolean> | undefined>(undefined);
   useEffect(() => {
     current.current = true;
     return () => {
@@ -213,20 +215,28 @@ function RecommendationCard({ tenant, item }: { tenant: string; item: Recommenda
     setError(e);
     if (e && typeof e === 'object' && 'status' in e && e.status === 401) expire();
   };
-  const recordOpen = async () => {
+  const recordOpen = (): Promise<boolean> => {
+    if (opened) return Promise.resolve(true);
+    if (openReceipt.current) return openReceipt.current;
     setErrorAction('open');
-    setBusy(true);
     setError(undefined);
-    try {
-      const receipt = await api.opened(tenant, { kind: c.kind, id: c.id, versionKey: c.versionKey });
-      if (current.current) setOpened(receipt.openedAt);
-      return true;
-    } catch (e) {
-      failed(e);
-      return false;
-    } finally {
-      if (current.current) setBusy(false);
-    }
+    // Reading receipts are background bookkeeping, not a navigation-blocking action.
+    // Share an in-flight receipt; only the server response marks this version as read.
+    const request = api.opened(tenant, { kind: c.kind, id: c.id, versionKey: c.versionKey })
+      .then((receipt) => {
+        if (current.current) setOpened(receipt.openedAt);
+        invalidateWorkspaceNotifications(tenant);
+        return true;
+      })
+      .catch((e) => {
+        failed(e);
+        return false;
+      })
+      .finally(() => {
+        if (openReceipt.current === request) openReceipt.current = undefined;
+      });
+    openReceipt.current = request;
+    return request;
   };
   const open = async () => {
     if (c.kind === 'TASK') setReading(true);

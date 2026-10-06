@@ -515,3 +515,6 @@ npm run test:contracts
 
 
 2026-10-01 独立数据画报续接：真实接入模型可通过 `compare_table → deliver_briefing` 生成带来源版本的经营分析与分组条形图；推荐、关注、详情及继续会话已在原本机实例运行验证。刷新仅读取，不自动生成。执行记录、兼容部署和未关闭的分析质量问题见[本机验收续接记录](docs/交接/真实模型本机验收-2026-10-01.md#独立数据画报验收续接)。
+
+
+2026-10-06 真实画报接入模型表达与受控版式组合：两期对比、哑铃、增减、本期排名、表格和重点数字，配合分析分区、建议步骤、方案对照及引用封面。数字来自原核验计算，段落由索引复用完整分析，旧卡兼容且不重生成。检查：`npm run build`、`npm run build:engine`、`node --experimental-strip-types --test tests/briefing-presentation.test.ts tests/briefing-chart-presentation.test.ts`、`node --test engine/tests/briefing-presentation.test.mjs engine/tests/briefing-delivery.test.mjs engine/tests/briefing-topic-strategy.test.mjs`、`npx playwright test tests/e2e/briefing-expressive.spec.ts tests/e2e/briefing-live-layout.spec.ts`。后台检查及能力边界见[实施交接](docs/交接/画报表达与模型版式选择-2026-10-06.md)。
