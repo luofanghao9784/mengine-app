@@ -10,5 +10,5 @@ public class BriefingGenerationWorker {
     private final BriefingGenerationService service;
     public BriefingGenerationWorker(BriefingGenerationService service){this.service=service;}
     @Scheduled(fixedDelayString="${dreamcore.briefing.poll-ms:5000}",initialDelayString="${dreamcore.briefing.initial-delay-ms:10000}")
-    public void tick(){service.discover();for(var id:service.candidates())try{service.tick(id);}catch(Exception e){log.warn("Briefing generation deferred policy={} cause={}",id,e.getClass().getSimpleName());}}
+    public void tick(){service.discover();for(var id:service.candidates())try{for(int slot=0;slot<5;slot++)service.tick(id);}catch(Exception e){log.warn("Briefing generation deferred policy={} cause={}",id,e.getClass().getSimpleName());}}
 }

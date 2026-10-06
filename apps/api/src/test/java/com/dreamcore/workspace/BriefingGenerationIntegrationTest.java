@@ -638,4 +638,15 @@ class BriefingGenerationIntegrationTest {
   }
  }
 
+
+ @Test void samePolicyDispatchesFiveAndSixthWaitsWithoutOverspending(){
+  upload("marker 合成并行资料。",true);UUID p=policy();
+  var batches=generation.generateSelection(actor,tenant,UUID.randomUUID(),space,6,List.of("INSIGHT"));
+  for(int i=0;i<6;i++)generation.tick(p);
+  assertEquals(5,db.queryForObject("SELECT count(*) FROM briefing_generation_batches WHERE policy_id=? AND task_id IS NOT NULL",Integer.class,p));
+  assertEquals(1,db.queryForObject("SELECT count(*) FROM briefing_generation_batches WHERE policy_id=? AND task_id IS NULL AND status='WAITING_RESOURCE'",Integer.class,p));
+  var first=conversations.claim();assertNotNull(first);deliver(first,"并行第一张合成画报保存成功后才计入次数。");generation.tick(p);
+  assertEquals(6,db.queryForObject("SELECT count(*) FROM briefing_generation_batches WHERE policy_id=? AND task_id IS NOT NULL",Integer.class,p));
+  assertEquals(1,generation.state(actor,tenant).quota().used());
+ }
 }

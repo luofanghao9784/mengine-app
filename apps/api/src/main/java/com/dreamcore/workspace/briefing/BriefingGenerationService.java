@@ -247,7 +247,9 @@ public class BriefingGenerationService {
         if("SUSPENDED".equals(db.queryForObject("SELECT status FROM tenants WHERE id=?",String.class,tenant))){db.update("UPDATE briefing_generation_policies SET reason='TENANT_SERVICE_SUSPENDED' WHERE id=?",id);return;}
         // A missing installation prerequisite is terminal for a manual request, not an endless reservation.
         if(!newsCapability(tenant).available())db.update("UPDATE briefing_generation_batches SET status='FAILED',reason='NEWS_SOURCE_UNAVAILABLE',finished_at=? WHERE policy_id=? AND business_type='INFO' AND task_id IS NULL AND status IN ('QUEUED','WAITING_DATA','WAITING_CAPABILITY')",time(now),id);
-        var active=db.queryForList("SELECT * FROM briefing_generation_batches WHERE policy_id=? AND status IN ('QUEUED','RUNNING','WAITING_DATA','WAITING_RESOURCE','WAITING_CAPABILITY') AND (? OR trigger_kind='GENERATE_MORE' OR EXISTS(SELECT 1 FROM briefing_generation_requests request WHERE request.batch_id=briefing_generation_batches.id)) AND NOT (coalesce(business_type,'AUTO')='INFO' AND status='WAITING_DATA' AND reason='NEWS_SOURCE_UNAVAILABLE' AND ?) ORDER BY CASE WHEN task_id IS NOT NULL THEN 0 ELSE 1 END,CASE WHEN trigger_kind='GENERATE_MORE' OR EXISTS(SELECT 1 FROM briefing_generation_requests manual WHERE manual.batch_id=briefing_generation_batches.id) THEN 0 ELSE 1 END,CASE WHEN business_type='INFO' THEN 0 ELSE 1 END,created_at LIMIT 1 FOR UPDATE",id,automaticAllowed,newsSource.isBlank()||!agents.publicWebEnabled());
+        var dispatched=db.queryForList("SELECT * FROM briefing_generation_batches WHERE policy_id=? AND task_id IS NOT NULL AND status IN ('QUEUED','RUNNING','WAITING_DATA','WAITING_RESOURCE','WAITING_CAPABILITY')",id);
+        for(var prior:dispatched)reconcile(p,prior);
+        var active=db.queryForList("SELECT * FROM briefing_generation_batches WHERE policy_id=? AND task_id IS NULL AND status IN ('QUEUED','RUNNING','WAITING_DATA','WAITING_RESOURCE','WAITING_CAPABILITY') AND (? OR trigger_kind='GENERATE_MORE' OR EXISTS(SELECT 1 FROM briefing_generation_requests request WHERE request.batch_id=briefing_generation_batches.id)) AND NOT (coalesce(business_type,'AUTO')='INFO' AND status='WAITING_DATA' AND reason='NEWS_SOURCE_UNAVAILABLE' AND ?) ORDER BY CASE WHEN task_id IS NOT NULL THEN 0 ELSE 1 END,CASE WHEN trigger_kind='GENERATE_MORE' OR EXISTS(SELECT 1 FROM briefing_generation_requests manual WHERE manual.batch_id=briefing_generation_batches.id) THEN 0 ELSE 1 END,CASE WHEN business_type='INFO' THEN 0 ELSE 1 END,created_at LIMIT 1 FOR UPDATE",id,automaticAllowed,newsSource.isBlank()||!agents.publicWebEnabled());
         try{authority(actor,tenant,space);}catch(IdentityException e){
             for(var b:active){if(b.get("task_id")!=null)tasks.interruptTasks(tenant,List.of((UUID)b.get("task_id")),"BRIEFING_AUTHORITY_REVOKED");finish((UUID)b.get("id"),"AUTHORITY_REVOKED","AUTHORITY_REVOKED");}
             db.update("UPDATE briefing_generation_policies SET reason='AUTHORITY_REVOKED' WHERE id=?",id);return;
@@ -265,7 +267,9 @@ public class BriefingGenerationService {
             p.put("context_key",contextKey);
         }
         if(active.isEmpty()){
+            if(!dispatched.isEmpty())return;
             if(!automaticAllowed||!Boolean.TRUE.equals(p.get("enabled")))return;
+            if(Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM briefing_generation_batches WHERE policy_id=? AND task_id IS NOT NULL AND status IN ('QUEUED','RUNNING'))",Boolean.class,id)))return;
             // Failed/cancelled automatic runs require an explicit retry; new source versions may proceed.
             boolean goalChanged=unseen.isEmpty()&&p.get("context_key")!=null&&!p.get("context_key").equals(contextKey);
             boolean changed=!unseen.isEmpty()||goalChanged;
@@ -303,12 +307,13 @@ public class BriefingGenerationService {
         // The latest reset within this UTC day starts a new owner budget without rewriting history.
         Instant ownerSince=db.queryForObject("SELECT coalesce(max(reset_at),?) FROM briefing_quota_resets WHERE tenant_id=? AND owner_id=? AND reset_at>=? AND reset_at<=?",Timestamp.class,time(day),tenant,actor,time(day),time(now)).toInstant();
         boolean manualBatch="GENERATE_MORE".equals(b.get("trigger_kind"))||Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM briefing_generation_requests WHERE batch_id=?)",Boolean.class,batch));
+        int categoryExecuting=db.queryForObject("SELECT count(*) FROM briefing_generation_batches b JOIN conversation_tasks t ON t.id=b.task_id WHERE b.tenant_id=? AND b.owner_id=? AND "+MANUAL_BATCH+"=? AND t.status IN ('QUEUED','RUNNING')",Integer.class,tenant,actor,manualBatch);
         int executionLimit=manualBatch?dailyLimit:Math.max(1,Math.min(24,automaticDailyLimit));
         int used=successfulCards(actor,tenant,manualBatch?ownerSince:day,manualBatch);
         int concurrent=db.queryForObject("SELECT count(*) FROM briefing_generation_batches b JOIN conversation_tasks t ON t.id=b.task_id WHERE b.tenant_id=? AND b.owner_id=? AND t.status IN ('QUEUED','RUNNING')",Integer.class,tenant,actor);
         int tenantUsed=db.queryForObject("SELECT count(*) FROM briefing_generation_batches WHERE tenant_id=? AND started_at>=?",Integer.class,tenant,time(day));
         int tenantConcurrent=db.queryForObject("SELECT count(*) FROM briefing_generation_batches b JOIN conversation_tasks t ON t.id=b.task_id WHERE b.tenant_id=? AND t.status IN ('QUEUED','RUNNING')",Integer.class,tenant);
-        if(used>=executionLimit||concurrent>=1||tenantUsed>=48||tenantConcurrent>=2){waiting(batch,"WAITING_RESOURCE",used>=executionLimit?(manualBatch?"DAILY_RUN_LIMIT":"AUTOMATIC_DAILY_LIMIT"):tenantUsed>=48?"TENANT_DAILY_LIMIT":tenantConcurrent>=2?"TENANT_CONCURRENCY_LIMIT":"OWNER_CONCURRENCY_LIMIT");return;}
+        if(used+categoryExecuting>=executionLimit||concurrent>=5||tenantUsed>=48||tenantConcurrent>=20){waiting(batch,"WAITING_RESOURCE",used+categoryExecuting>=executionLimit?(manualBatch?"DAILY_RUN_LIMIT":"AUTOMATIC_DAILY_LIMIT"):tenantUsed>=48?"TENANT_DAILY_LIMIT":tenantConcurrent>=20?"TENANT_CONCURRENCY_LIMIT":"OWNER_CONCURRENCY_LIMIT");return;}
         // One complete topic per batch. Explicit bounded source selection is visible to the model and reader.
         var order=Comparator.comparing(Source::changedAt,Comparator.reverseOrder()).thenComparing(Source::filename);
         List<Source> selected=selectSources((info||unseen.isEmpty()?sources:unseen).stream().filter(s->Set.of("READY","PARTIAL").contains(s.parseStatus())).filter(s->!"RESULT".equals(type)||!s.dataset()&&completedPublication(s.versionId())).sorted(order).toList(),space);

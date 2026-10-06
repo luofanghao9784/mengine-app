@@ -169,4 +169,18 @@ class ConversationIntegrationTest {
         denied(404,()->management.action(owner,tenant,id,UUID.randomUUID(),1,"RESTORE",false));
     }
 
+
+    @Test void fivePerAccountClaimsDoNotBlockAnotherAccountAndReleaseAfterCompletion() throws Exception {
+        source(personal);for(int i=0;i<6;i++)send(owner,personal);
+        var jobs=new java.util.ArrayList<ConversationService.Job>();
+        try(var pool=Executors.newFixedThreadPool(8)){
+            var futures=new java.util.ArrayList<Future<ConversationService.Job>>();
+            for(int i=0;i<8;i++)futures.add(pool.submit(()->conversations.claim()));
+            for(var f:futures){var job=f.get(10,TimeUnit.SECONDS);if(job!=null)jobs.add(job);}
+        }
+        assertEquals(5,jobs.size());assertEquals(5,new java.util.HashSet<>(jobs.stream().map(ConversationService.Job::id).toList()).size());assertNull(conversations.claim());
+        var other=send(reader,space);var colleague=conversations.claim();assertNotNull(colleague);assertEquals(reader,colleague.actor());
+        var first=jobs.getFirst();conversations.finish(first,result(first,conversations.sources(first)));
+        assertNotNull(conversations.claim());
+    }
 }

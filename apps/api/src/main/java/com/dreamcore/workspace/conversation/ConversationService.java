@@ -304,6 +304,8 @@ public class ConversationService {
         var visible=items.stream().limit(100).toList();return new Events(conversation,visible,visible.isEmpty()?after:visible.getLast().seq(),items.size()>100);
     }
     @Transactional public Job claim() {
+        // Serialize only short dispatch transactions, never model execution. Shared across API instances.
+        db.queryForList("SELECT pg_advisory_xact_lock(hashtextextended('conversation-task-dispatch',0))");
         // Match lifecycle/plan lock ordering: tenant before task, including expired attempts.
         var stale=db.queryForList("SELECT id,tenant_id FROM conversation_tasks WHERE status='RUNNING' AND lease_until<now() ORDER BY lease_until,id LIMIT 1");
         if(!stale.isEmpty()){
@@ -313,7 +315,15 @@ public class ConversationService {
             for(var row:expired){archive((UUID)row.get("id"));usage.expired((UUID)row.get("id"));event((UUID)row.get("tenant_id"),(UUID)row.get("workspace_id"),(UUID)row.get("conversation_id"),(UUID)row.get("id"),(String)row.get("status"),(Integer)row.get("revision"));}
             return null;
         }
-        var candidate=db.queryForList("SELECT id,tenant_id FROM conversation_tasks WHERE status='QUEUED' AND EXISTS(SELECT 1 FROM conversations c WHERE c.id=conversation_tasks.conversation_id AND c.trashed_at IS NULL) ORDER BY created_at,id LIMIT 1");if(candidate.isEmpty())return null;
+        var candidate=db.queryForList("""
+            SELECT q.id,q.tenant_id FROM conversation_tasks q WHERE q.status='QUEUED'
+            AND EXISTS(SELECT 1 FROM conversations c WHERE c.id=q.conversation_id AND c.trashed_at IS NULL)
+            AND (SELECT count(*) FROM conversation_tasks r WHERE r.status='RUNNING')<20
+            AND (SELECT count(*) FROM conversation_tasks r WHERE r.status='RUNNING' AND r.tenant_id=q.tenant_id)<20
+            AND (SELECT count(*) FROM conversation_tasks r WHERE r.status='RUNNING' AND r.tenant_id=q.tenant_id AND r.requested_by=q.requested_by
+              AND EXISTS(SELECT 1 FROM briefing_generation_batches b WHERE b.task_id=r.id)=EXISTS(SELECT 1 FROM briefing_generation_batches b WHERE b.task_id=q.id))<5
+            ORDER BY q.created_at,q.id LIMIT 1
+            """);if(candidate.isEmpty())return null;
         db.queryForList("SELECT id FROM tenants WHERE id=? FOR SHARE",candidate.getFirst().get("tenant_id"));
         var rows=db.queryForList("SELECT * FROM conversation_tasks WHERE id=? AND status='QUEUED' FOR UPDATE SKIP LOCKED",candidate.getFirst().get("id"));if(rows.isEmpty())return null;
         var row=rows.getFirst();UUID id=(UUID)row.get("id"),token=UUID.randomUUID();

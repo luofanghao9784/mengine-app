@@ -89,7 +89,7 @@ export class AgentTasks {
       key = `${task.taskId}/${task.attemptId}`;
     for (const [old, time] of this.attempts) if (Date.now() - time > 120000) this.attempts.delete(old);
     if (this.attempts.has(key)) throw new RuntimeError('ATTEMPT_ALREADY_SEEN');
-    if (this.active.size >= 2 || this.attempts.size >= 256) throw new RuntimeError('ENGINE_BUSY');
+    if (this.active.size >= 20 || this.attempts.size >= 256) throw new RuntimeError('ENGINE_BUSY');
     const controller = new AbortController(),
       signal = AbortSignal.any([controller.signal, disconnected]);
     this.attempts.set(key, Date.now());
