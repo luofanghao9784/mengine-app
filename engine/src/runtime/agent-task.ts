@@ -21,6 +21,7 @@ import {
   hasTerminalBriefing,
 } from './briefing-delivery.js';
 import { datasetComparisonTool } from './dataset-comparison.js';
+import { DATASET_ANALYSIS_GUIDANCE } from './dataset-analysis-guidance.js';
 import { tableComparisonTool } from './table-comparison.js';
 import { workTools } from './task-work.js';
 import { contextTool, taskBootstrap } from './task-context.js';
@@ -113,6 +114,7 @@ export class AgentTasks {
     let datasetContextAvailable: boolean | undefined;
     let generalExperienceAvailable: boolean | undefined;
     let datasetComparisonAvailable: boolean | undefined;
+    let datasetAnalysisAvailable = false;
     let planAllowed: boolean | undefined;
     let tablesAvailable: boolean | undefined;
     let planManagementAvailable = false;
@@ -247,6 +249,7 @@ export class AgentTasks {
         )
           throw new RuntimeError('TASK_ACCESS_DENIED');
         datasetComparisonAvailable = datasetComparison;
+        datasetAnalysisAvailable = datasetComparison && response.datasetAnalysisVersion === '1.0';
         const briefing = response.briefingContentVersion === '1.0';
         if (
           (response.briefingContentVersion !== undefined && !briefing) ||
@@ -424,7 +427,9 @@ export class AgentTasks {
                 },
                 ...request.messages,
               ]
-            : request.messages;
+            : datasetAnalysisAvailable
+              ? [{ role: 'system' as const, content: [{ type: 'text' as const, text: DATASET_ANALYSIS_GUIDANCE }] }, ...request.messages]
+              : request.messages;
           const preferenceText =
             expressionInstructions(expressionPreferences, !!briefingGeneration) +
             ruleBookInstructions(expressionRuleBooks, !!briefingGeneration);
@@ -642,6 +647,8 @@ export class AgentTasks {
         ...(datasetComparisonAvailable && task.contractVersion === '1.5'
           ? [
               datasetComparisonTool({
+                allowSummary: datasetAnalysisAvailable && !briefingGeneration,
+                allowDateRange: datasetAnalysisAvailable,
                 authorize,
                 invoke: (body, executionSignal) =>
                   postJson(
@@ -655,6 +662,8 @@ export class AgentTasks {
                       'INVALID_REQUEST',
                       'DATASET_LABEL_INVALID',
                       'DATASET_DATE_REQUIRED',
+                      'DATASET_DATE_RANGE_INVALID',
+                      'DATASET_NO_MATCHING_DATA',
                       'DATASET_DATE_INVALID',
                       'DATASET_PERIOD_MODE_INVALID',
                       'DATASET_TIMEZONE_INVALID',

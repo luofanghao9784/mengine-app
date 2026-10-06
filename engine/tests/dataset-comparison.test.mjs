@@ -110,3 +110,20 @@ test('COUNT accepts omitted value column and verifies echoed aggregation',async(
  assert.deepEqual(await tool.execute(args,new AbortController().signal),r);
  await assert.rejects(tool.execute({...args,aggregation:'AVERAGE'},new AbortController().signal),{code:'INVALID_TOOL_ARGUMENTS'});
 });
+
+test('cumulative summary uses separate date filtering and verifies grouped receipts', async () => {
+ const args={datasetId:request.datasetId,snapshotId:request.snapshotId,operation:'SUMMARY',groupColumns:['门店','状态'],valueColumn:'金额',dateColumn:'确认时间',dateFrom:'2026-08-01',missingDates:'EXCLUDE'};
+ const response=result();response.calculation={recipeVersion:'dataset-summary-1',status:'COMPUTED',request:{...args},inputSha256:sha,matchedRows:5,ignoredRows:1,missingDateRows:1,rows:[{group:['甲','已确认'],value:'1.20',records:5}],total:'1.20'};
+ const tool=datasetComparisonTool({authorize:async()=>{},invoke:async(body)=>{assert.deepEqual(body,args);return response;}});
+ assertObjectJsonSchema(tool.parameters);
+ assert.deepEqual(await tool.execute(args,new AbortController().signal),response);
+ for(const change of [{dateTo:'2026-07-01'},{dateColumn:undefined},{groupColumns:[]},{groupColumns:['门店','门店']},{baseline:'2026-07'}])await assert.rejects(tool.execute({...args,...change},new AbortController().signal),{code:'INVALID_TOOL_ARGUMENTS'});
+ response.calculation.missingDateRows=2;
+ await assert.rejects(tool.execute(args,new AbortController().signal),{code:'DATASET_RESULT_INVALID'});
+});
+
+test('DATA briefing calculator cannot mistake a summary receipt for a two-period chart', async()=>{
+ const tool=datasetComparisonTool({allowSummary:false,authorize:async()=>{},invoke:async()=>{throw Error('must not invoke');}});
+ assert.deepEqual(tool.parameters.properties.operation.enum,['COMPARE']);
+ await assert.rejects(tool.execute({operation:'SUMMARY'},new AbortController().signal),{code:'INVALID_TOOL_ARGUMENTS'});
+});

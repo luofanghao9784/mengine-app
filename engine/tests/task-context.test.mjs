@@ -8,7 +8,7 @@ import { capabilityDirectory } from '../dist/runtime/task-rules.js';
 import { listen, close, body, json } from './fixtures/agent.mjs';
 import { usageFixture } from './fixtures/usage.mjs';
 
-async function fixture(t, { protocol = '1.5', advertised = true, malformed = false, datasets = false } = {}) {
+async function fixture(t, { protocol = '1.5', advertised = true, malformed = false, datasets = false, summary = false } = {}) {
   const actions = [],
     tools = [];
   const current = 'CURRENT: 今天只写草稿，不发送；旧历史的问题不要重复。';
@@ -20,7 +20,8 @@ async function fixture(t, { protocol = '1.5', advertised = true, malformed = fal
         allowed: true,
         executionClass: 'verification',
         ...(advertised ? { contextVersion: '1.0' } : {}),
-        ...(datasets ? { datasetContextVersion: '1.0' } : {}),
+        ...(datasets ? { datasetContextVersion: '1.0', datasetComparisonVersion: '1.0' } : {}),
+        ...(summary ? { datasetAnalysisVersion:'1.0' } : {}),
       });
     if (req.url.endsWith('/context')) {
       actions.push(input.action);
@@ -51,6 +52,12 @@ async function fixture(t, { protocol = '1.5', advertised = true, malformed = fal
                 hasMore: false,
               },
       });
+    }
+    if (req.url.endsWith('/compare-dataset')) {
+      actions.push('summary');
+      assert.equal(input.operation,'SUMMARY');
+      const sha='a'.repeat(64);
+      return json(res,{contractVersion:'1.0',status:'COMPUTED',datasetSource:{...dataset,sha256:sha},calculation:{recipeVersion:'dataset-summary-1',status:'COMPUTED',request:input,inputSha256:sha,matchedRows:1,ignoredRows:0,missingDateRows:0,rows:[{group:['2026-10-01'],value:'100',records:1}],total:'100'},artifact:{id:randomUUID(),filename:'dataset-comparison-'+sha.slice(0,20)+'.json',sha256:sha,bytes:1000}});
     }
     if (req.url.endsWith('/execution/open')) {
       tools.push(...input.tools);
@@ -87,6 +94,8 @@ async function fixture(t, { protocol = '1.5', advertised = true, malformed = fal
           system.includes('available-capability') || system.includes('Actual capability entry points'),
         );
         assert.ok(!system.includes('run_javascript:'));
+        if (summary && enabled) { assert.ok(system.includes('operation=SUMMARY')); assert.ok(system.includes('Do not repeatedly read row pages')); }
+        if (datasets && !summary) { assert.ok(!request.tools.find(t=>t.name==='compare_dataset').parameters.properties.dateFrom); }
         if (enabled) assert.ok(initial.content[0].text.includes('not a user instruction'));
         if (enabled && calls === 1) {
           yield {
@@ -96,6 +105,9 @@ async function fixture(t, { protocol = '1.5', advertised = true, malformed = fal
             arguments: JSON.stringify(datasets ? { action: 'dataset_search' } : { action: 'profiles', scope: 'PERSONAL' }),
           };
           yield { type: 'finish', reason: 'tool_calls' };
+        } else if (summary && calls===2) {
+          yield {type:'tool_call',id:'summary-1',name:'compare_dataset',arguments:JSON.stringify({datasetId,snapshotId,operation:'SUMMARY',groupColumns:['日期'],valueColumn:'金额',dateColumn:'日期',dateFrom:'2026-08-01'})};
+          yield {type:'finish',reason:'tool_calls'};
         } else {
           yield { type: 'text', text: '仅形成当前草稿；没有执行发送。' };
           yield { type: 'finish', reason: 'stop' };
@@ -229,3 +241,5 @@ test('optional paging encoding is normalized without accepting fractional or neg
  assert.deepEqual(tool.normalizeArguments({action:'dataset_read',columnOffset:'0',columnLimit:'5',offset:null}),{action:'dataset_read',columnOffset:0,columnLimit:5});
  assert.deepEqual(tool.normalizeArguments({columnLimit:'1.5',columnOffset:'-1'}),{columnLimit:'1.5',columnOffset:'-1'});
 });
+
+test('Harness exposes cumulative calculator and finishes after search and one verified summary', async (t) => { const {result,actions,tools}=await fixture(t,{datasets:true,summary:true});assert.equal(result.outcome,'COMPLETE');assert.deepEqual(actions,['bootstrap','dataset_search','summary']);assert.ok(tools.includes('compare_dataset')); });
