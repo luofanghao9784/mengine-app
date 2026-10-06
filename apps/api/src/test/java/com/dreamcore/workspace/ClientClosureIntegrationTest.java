@@ -68,7 +68,11 @@ class ClientClosureIntegrationTest {
 
  ConversationPlanCommands.Receipt command(String prompt,String action,com.dreamcore.workspace.plans.PlanService.Plan plan,String time){
   var j=taskWith(prompt);agents.openExecution(j.id(),j.token(),new AgentTaskService.ExecutionOpen("1.6",List.of("manage_plan")));agents.toolReceipt(j.id(),j.token(),new AgentTaskService.ToolReceipt(1,"manage_plan","STARTED"));
-  var result=(Map<?,?>)commands.invoke(j.id(),j.token(),new ConversationPlanCommands.Request(action,plan==null?null:plan.id(),plan==null?null:plan.revision(),personal,"销售简报","整理销售简报。",time,false,prompt));assertEquals(true,result.get("saved"),result.toString());return (ConversationPlanCommands.Receipt)result.get("receipt");
+  var result=(Map<?,?>)commands.invoke(j.id(),j.token(),new ConversationPlanCommands.Request(action,plan==null?null:plan.id(),plan==null?null:plan.revision(),personal,"销售简报","整理销售简报。",time,false,prompt));assertEquals(true,result.get("saved"),result.toString());
+  // Commands are sequential; release the synthetic execution before the next one (five active tasks per account).
+  int revision=db.queryForObject("SELECT revision FROM conversation_tasks WHERE id=?",Integer.class,j.id());
+  conversations.action(actor,tenant,j.conversation(),j.id(),UUID.randomUUID(),revision,"CANCEL");
+  return (ConversationPlanCommands.Receipt)result.get("receipt");
  }
  @Test void planTimeUpdateMutePauseAndResumePersistDistinctStates(){
   var p=command("未来3天每天晚上九点根据个人资料整理销售简报。","create",null,"21:00").plan();

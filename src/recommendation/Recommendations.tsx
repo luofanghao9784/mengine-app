@@ -33,6 +33,7 @@ export function Recommendations({
   businessType,
   publicationsOnly = false,
   focused = false,
+  refreshToken = 0,
   onSettled,
   generation,
   onArranging,
@@ -44,6 +45,7 @@ export function Recommendations({
   businessType?: string;
   publicationsOnly?: boolean;
   focused?: boolean;
+  refreshToken?: number;
   onSettled?: (success: boolean) => void;
 }) {
   const { session } = useSession(),
@@ -56,7 +58,7 @@ export function Recommendations({
         publicationsOnly,
         focused,
       }),
-    [tenant, workspace, businessType, publicationsOnly, focused, attempt, session.identity],
+    [tenant, workspace, businessType, publicationsOnly, focused, attempt, refreshToken, session.identity],
     (item) => item.content.id,
     true,
   );
@@ -65,12 +67,12 @@ export function Recommendations({
   const settled = useRef(onSettled);
   settled.current = onSettled;
   useEffect(() => {
-    if (data.value || data.error) settled.current?.(!data.error);
-  }, [data.value, data.error]);
+    if (!data.loading && (data.value || data.error)) settled.current?.(!data.error);
+  }, [data.value, data.error, data.loading]);
   // Background ranking changes update content/authority, but keep the reading
   // order until the user explicitly refreshes or changes the filter/page.
   const readingOrder = useRef<{ key: string; ids: string[] }>({ key: '', ids: [] });
-  const orderKey = JSON.stringify([tenant, workspace, businessType, publicationsOnly, focused, attempt]);
+  const orderKey = JSON.stringify([tenant, workspace, businessType, publicationsOnly, focused, attempt, refreshToken]);
   if (readingOrder.current.key !== orderKey) readingOrder.current = { key: orderKey, ids: [] };
   const incoming = data.value?.items || [];
   const present = new Set(incoming.map((item) => item.content.id));

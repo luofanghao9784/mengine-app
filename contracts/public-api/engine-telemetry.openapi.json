@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Engine operational telemetry",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "Read-only database-state snapshot; no physical utilization or autonomous evolution is inferred. Active records have no creation-time cutoff. Completed means processing completion, not quality, delivery or business success. No business identifiers or text. Historic failures retained. Streaming task counted only in output."
   },
   "paths": {
@@ -37,6 +37,42 @@
           },
           "403": {
             "description": "Current management authority required"
+          }
+        }
+      }
+    },
+    "/api/platform-admin/v1/engine-telemetry/tenants": {
+      "get": {
+        "security": [
+          {
+            "platformSessionCookie": []
+          }
+        ],
+        "parameters": [],
+        "description": "Platform only. Running records per tenant using the snapshot classification. General adjustment has no tenant and is not attributed. Counts only: no channel, task, person, file or business content.",
+        "responses": {
+          "200": {
+            "description": "Tenants with running records, most first, at most 10; the rest are folded into otherTenants/otherRunning.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantDistribution"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Platform authentication required"
+          },
+          "403": {
+            "description": "Current platform authority required"
           }
         }
       }
@@ -205,6 +241,64 @@
               "null"
             ],
             "format": "date-time"
+          }
+        }
+      },
+      "TenantDistribution": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "checkedAt",
+          "tenants",
+          "otherTenants",
+          "otherRunning"
+        ],
+        "properties": {
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "tenants": {
+            "type": "array",
+            "maxItems": 10,
+            "items": {
+              "$ref": "#/components/schemas/TenantRunning"
+            }
+          },
+          "otherTenants": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "otherRunning": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        }
+      },
+      "TenantRunning": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "tenantId",
+          "tenantName",
+          "running"
+        ],
+        "properties": {
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "running": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
           }
         }
       }

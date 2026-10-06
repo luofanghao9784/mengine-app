@@ -81,6 +81,7 @@ class BriefingDatasetGenerationIntegrationTest extends DatasetCalculationFixture
  @Test void serviceResumeDoesNotCatchUpOldDatasetEventsButAcceptsFreshCollection(){
   UUID operator=UUID.randomUUID();db.update("INSERT INTO accounts(id,email,display_name,password_hash) VALUES (?,?,'合成平台','unused')",operator,operator+"@auto-dataset-platform.test");
   db.update("INSERT INTO platform_accounts(account_id,login_name,password_hash) VALUES (?,?,'unused')",operator,operator+"@auto-dataset-platform.test");db.update("INSERT INTO platform_roles(account_id,role) VALUES (?,'PLATFORM_ADMIN')",operator);
+  try {
   UUID p=policy();var b=first(p);var j=conversations.claim();
   platform.status(operator,tenant,UUID.randomUUID(),0,"SUSPENDED","合成维护检查","服务暂停");
   generation.tick(p);assertEquals(1,db.queryForObject("SELECT count(*) FROM briefing_generation_batches WHERE policy_id=?",Integer.class,p));
@@ -88,6 +89,7 @@ class BriefingDatasetGenerationIntegrationTest extends DatasetCalculationFixture
   generation.tick(p);assertEquals(1,generation.state(owner,tenant).batches().size());denied(()->agents.check(j.id(),j.token()));
   UUID next=version(2,"new");generation.tick(p);var after=generation.state(owner,tenant).batches().stream().filter(x->!x.id().equals(b.id())).findFirst().orElseThrow();
   assertEquals(next,db.queryForObject("SELECT snapshot_id FROM briefing_dataset_selections WHERE task_id=?",UUID.class,after.taskId()));
+  } finally { db.update("DELETE FROM tenant_service_changes WHERE actor_id=?",operator);db.update("DELETE FROM platform_accounts WHERE account_id=?",operator);db.update("DELETE FROM platform_roles WHERE account_id=?",operator); }
  }
  @Test void automaticSourcesRemainBoundedAndUnselectedVersionsContinueLater(){
   for(int n=0;n<3;n++){

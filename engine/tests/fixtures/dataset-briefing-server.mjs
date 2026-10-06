@@ -14,12 +14,6 @@ const agent = new AgentTasks({
     usage: { inputTokens: 0, outputTokens: 0 },
     async *generate(request) {
       try {
-        assert.ok(request.tools.some((t) => t.name === (request.requiredTool ?? 'compare_dataset')));
-        if (request.requiredTool)
-          assert.deepEqual(
-            request.tools.map((t) => t.name),
-            ['deliver_briefing'],
-          );
         const results = request.messages
           .flatMap((m) => m.content)
           .filter((c) => c.type === 'tool_result')
@@ -35,6 +29,18 @@ const agent = new AgentTasks({
             args = { action: 'dataset_read', referenceId: source.datasetId, versionId: source.snapshotId };
           } else if (results.length === 2) {
             assert.equal(results[1].result.completeDataset, false);
+            name = 'select_briefing_topic';
+            args = {
+              candidates: [{
+                question: '两家门店本期收款相较前期有何变化',
+                evidenceNeeded: '已获权固定快照中的门店、期间与收款列，按完整记录计算',
+                requiresCalculation: true,
+                difference: '首次比较当前固定快照的两期收款',
+                businessType: 'DATA',
+              }],
+              selectedIndex: 0,
+            };
+          } else if (results.length === 3) {
             name = 'compare_dataset';
             args = {
               datasetId: source.datasetId,
@@ -45,9 +51,9 @@ const agent = new AgentTasks({
               baseline: '前期',
               current: '本期',
             };
-          } else if (results.length === 3) {
-            assert.equal(results[2].calculation.totals.current, '1.20');
-            assert.equal(results[2].calculation.ignoredRows, 1);
+          } else if (results.length === 4) {
+            assert.equal(results[3].calculation.totals.current, '1.20');
+            assert.equal(results[3].calculation.ignoredRows, 1);
             name = 'deliver_briefing';
             args = {
               businessType: 'DATA',
@@ -59,7 +65,7 @@ const agent = new AgentTasks({
                 focusValue: 'CURRENT',
                 sections: [],
               },
-              calculationArtifactId: results[2].artifact.id,
+              calculationArtifactId: results[3].artifact.id,
               title: '门店两期收款比较',
               summary: '两家门店的同口径收款合计由零点六元增长到一点二元。',
               analysis: [
@@ -68,7 +74,7 @@ const agent = new AgentTasks({
               ],
             };
           } else {
-            assert.equal(results[3].status, 'PREPARED');
+            assert.equal(results[4].status, 'PREPARED');
             this.lastUsage = { inputTokens: 10, outputTokens: 2 };
             this.usage.inputTokens += 10;
             this.usage.outputTokens += 2;
@@ -77,6 +83,8 @@ const agent = new AgentTasks({
             return;
           }
         }
+        assert.ok(request.tools.some((t) => t.name === name), `Tool ${name} must be available in the current phase`);
+        if (request.requiredTool) assert.equal(name, request.requiredTool);
         this.lastUsage = { inputTokens: 10, outputTokens: 2 };
         this.usage.inputTokens += 10;
         this.usage.outputTokens += 2;

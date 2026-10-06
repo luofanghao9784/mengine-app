@@ -330,6 +330,7 @@ function BriefingPage({ tenant, onMonthChange }: BriefingProps) {
           <Recommendations
             key={tenant}
             tenant={tenant}
+            refreshToken={attempt}
             generation={tab === '推荐' ? generation : undefined}
             onSettled={recommendationsSettled}
             workspace={selectedSpace || null}

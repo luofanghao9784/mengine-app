@@ -10,6 +10,8 @@ public class EngineTelemetryController {
  public EngineTelemetryController(EngineTelemetryService service){this.service=service;}
  @GetMapping("/api/platform-admin/v1/engine-telemetry")
  public EngineTelemetryService.Snapshot platform(Authentication auth,HttpServletResponse response){response.setHeader("Cache-Control","private, no-store");return service.read(IdentityController.actor(auth),null,true);}
+ @GetMapping("/api/platform-admin/v1/engine-telemetry/tenants")
+ public EngineTelemetryService.TenantDistribution tenants(Authentication auth,HttpServletResponse response){response.setHeader("Cache-Control","private, no-store");return service.tenants(IdentityController.actor(auth));}
  @GetMapping("/api/tenant-admin/v1/tenants/{tenant}/engine-telemetry")
  public EngineTelemetryService.Snapshot tenant(Authentication auth,HttpServletResponse response,@PathVariable UUID tenant){response.setHeader("Cache-Control","private, no-store");return service.read(IdentityController.actor(auth),tenant,false);}
 }

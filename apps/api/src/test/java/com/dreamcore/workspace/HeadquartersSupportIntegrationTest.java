@@ -33,7 +33,7 @@ class HeadquartersSupportIntegrationTest {
   db.update("INSERT INTO workspace_members(tenant_id,workspace_id,account_id,can_maintain) VALUES (?,?,?,true)",tenant,shared,owner);
   for(var pair:List.of(new UUID[]{privateSpace,employee},new UUID[]{ownerPrivate,owner}))db.update("INSERT INTO workspaces(id,tenant_id,owner_id,name,kind) VALUES (?,?,?,'合成个人空间','PERSONAL')",pair[0],tenant,pair[1]);
  }
- @AfterEach void cleanup(){db.update("DELETE FROM platform_sessions WHERE account_id=?",hq);db.update("DELETE FROM platform_roles WHERE account_id=?",hq);db.update("DELETE FROM platform_accounts WHERE account_id=?",hq);SupportContext.set(null);}
+ @AfterEach void cleanup(){db.update("UPDATE knowledge_runs SET status='CANCELLED' WHERE tenant_id IN (?,?) AND status IN ('QUEUED','RUNNING')",tenant,other);db.update("UPDATE conversation_tasks SET status='CANCELLED' WHERE tenant_id IN (?,?) AND status IN ('QUEUED','RUNNING')",tenant,other);db.update("DELETE FROM platform_sessions WHERE account_id=?",hq);db.update("DELETE FROM platform_roles WHERE account_id=?",hq);db.update("DELETE FROM platform_accounts WHERE account_id=?",hq);SupportContext.set(null);}
  Browser login()throws Exception{var b=new Browser();var r=b.call("POST","/api/platform-admin/v1/auth/login",Map.of("username",login,"password","synthetic-hq-123"),b.csrf("/api/platform-admin/v1/auth"));assertEquals(200,r.statusCode(),r.body());b.token=b.csrf("/api/platform-admin/v1/auth");return b;}
  String proxy(String id,String suffix){return "/api/platform-admin/v1/support-access/"+id+suffix;}
  @Test void newsSelectionThroughSupportRetainsHeadquartersActorAndScope()throws Exception{

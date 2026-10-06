@@ -1,0 +1,668 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>引擎仪表盘</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400&amp;family=Noto+Sans+SC:wght@400;500;700&amp;family=Noto+Serif+SC:wght@600&amp;family=Saira:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0D0F22}
+a{color:#B9BEF0}a:hover{color:#EEEDF8}
+.eng{font-family:"Noto Sans SC",system-ui,sans-serif;color:#EEEDF8;-webkit-font-smoothing:antialiased}
+.num{font-family:"Saira","Noto Sans SC",sans-serif;font-variant-numeric:tabular-nums;letter-spacing:.01em}
+.nav-item{display:flex;align-items:center;gap:12px;height:44px;padding:0 14px;border-radius:10px;color:#A3A8D0;text-decoration:none;font-size:14.5px}
+.nav-item:hover{background:rgba(179,157,255,.07);color:#EEEDF8}
+.nav-item:focus-visible,.seg button:focus-visible,.hit:focus-visible,.link:focus-visible,.close:focus-visible{outline:2px solid #B39DFF;outline-offset:2px}
+.seg{display:inline-flex;padding:3px;border-radius:999px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07)}
+.seg button{appearance:none;border:0;background:transparent;color:#A3A8D0;font:inherit;font-size:13px;height:32px;padding:0 14px;border-radius:999px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:#272A52;color:#EEEDF8}
+.hit{appearance:none;border:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer;padding:8px 10px;border-radius:12px}
+.hit:hover{background:rgba(255,255,255,.035)}
+.pt{position:absolute;left:0;top:0;width:5px;height:5px;border-radius:50%;offset-rotate:0deg;animation-name:flow;animation-timing-function:linear;animation-iteration-count:infinite;box-shadow:0 0 10px 2px currentColor;pointer-events:none}
+@keyframes flow{0%{offset-distance:0%;opacity:0}10%{opacity:1}90%{opacity:1}100%{offset-distance:100%;opacity:0}}
+.spin{transform-origin:560px 240px;animation:spin 90s linear infinite}
+.spin-r{transform-origin:560px 240px;animation:spin 140s linear infinite reverse}
+@keyframes spin{to{transform:rotate(360deg)}}
+.breath{animation-name:breath;animation-timing-function:ease-in-out;animation-iteration-count:infinite}
+@keyframes breath{0%,100%{transform:translate(-50%,-50%) scale(.92);opacity:.55}50%{transform:translate(-50%,-50%) scale(1.06);opacity:1}}
+.beat{animation:beat 3s ease-out infinite}
+@keyframes beat{0%{stroke-dashoffset:120}60%,100%{stroke-dashoffset:-120}}
+.live-dot{animation:livedot 3s ease-out infinite}
+@keyframes livedot{0%{box-shadow:0 0 0 0 rgba(124,196,255,.55)}70%,100%{box-shadow:0 0 0 9px rgba(124,196,255,0)}}
+.node-dot-on{animation:nodeglow 2.4s ease-in-out infinite}
+@keyframes nodeglow{0%,100%{box-shadow:0 0 0 0 rgba(179,157,255,.45),0 0 14px 2px rgba(179,157,255,.55)}50%{box-shadow:0 0 0 6px rgba(179,157,255,0),0 0 20px 4px rgba(179,157,255,.7)}}
+.evo-loop{animation:evo 6s ease-in-out infinite}
+@keyframes evo{0%,100%{stroke-opacity:.35}50%{stroke-opacity:.7}}
+.drawer-in{animation:drawer .28s cubic-bezier(.2,.8,.2,1)}
+@keyframes drawer{from{transform:translateX(24px);opacity:0}to{transform:none;opacity:1}}
+.link{color:#B9BEF0;text-decoration:none;font-size:13px;border-bottom:1px solid rgba(185,190,240,.3);padding-bottom:1px}
+.link:hover{color:#EEEDF8;border-color:#EEEDF8}
+.close{appearance:none;border:1px solid rgba(255,255,255,.12);background:transparent;color:#EEEDF8;width:44px;height:44px;border-radius:12px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.hatch{background-image:repeating-linear-gradient(135deg,rgba(163,168,208,.28) 0 2px,transparent 2px 7px)}
+.lower{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:56px 56px}
+.c7{grid-column:span 7}.c5{grid-column:span 5}.c12{grid-column:span 12}
+.readings{display:grid;grid-template-columns:repeat(6,minmax(0,1fr))}
+@media (max-width:1100px){.lower{grid-template-columns:1fr}.c7,.c5,.c12{grid-column:auto}.readings{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:640px){.readings{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (prefers-reduced-motion:reduce){.pt{display:none}.spin,.spin-r,.breath,.beat,.live-dot,.node-dot-on,.evo-loop,.drawer-in{animation:none}}
+</style>
+</helmet>
+
+<div class="eng" style="position: relative; display: flex; flex-wrap: wrap; min-height: 100vh; background-color: #0D0F22; background-image: radial-gradient(900px 520px at 58% 260px, rgba(110,92,230,.16), transparent 70%), radial-gradient(600px 380px at 20% 0px, rgba(80,140,255,.07), transparent 70%)">
+
+  <!-- 侧边导航 -->
+  <nav aria-label="主导航" style="flex: 1 0 232px; max-width: 232px; box-sizing: border-box; padding: 28px 16px 24px; display: flex; flex-direction: column; gap: 6px; border-right: 1px solid rgba(255,255,255,.06); background: rgba(9,10,26,.55)">
+    <div style="display: flex; align-items: center; gap: 12px; padding: 0 10px 22px">
+      <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><circle cx="17" cy="17" r="6" fill="#B39DFF"></circle><ellipse cx="17" cy="17" rx="15" ry="6" fill="none" stroke="#7CC4FF" stroke-width="1.3" transform="rotate(-25 17 17)"></ellipse><ellipse cx="17" cy="17" rx="15" ry="6" fill="none" stroke="#FFC47A" stroke-width="1.3" stroke-opacity=".8" transform="rotate(35 17 17)"></ellipse></svg>
+      <div>
+        <div style="font-family: 'Noto Serif SC', serif; font-size: 18px; font-weight: 600; letter-spacing: .04em">梦核引擎</div>
+        <div style="font-family: Fraunces, serif; font-size: 13px; color: #8A8FB8; font-style: italic">Mengine</div>
+      </div>
+    </div>
+    <div style="font-size: 12.5px; color: #8A8FB8; padding: 10px 14px 6px">平台管理</div>
+    <a class="nav-item" href="#overview"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"></rect><rect x="14" y="3" width="7" height="7" rx="1.5"></rect><rect x="3" y="14" width="7" height="7" rx="1.5"></rect><rect x="14" y="14" width="7" height="7" rx="1.5"></rect></svg>概览</a>
+    <a class="nav-item" href="#tenants"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 21V6l8-3 8 3v15"></path><path d="M9 21v-5h6v5M8 9h2M14 9h2M8 13h2M14 13h2"></path></svg>企业管理</a>
+    <a class="nav-item" href="#usage"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 20h16M7 16V9M12 16V5M17 16v-4"></path></svg>用量与成本</a>
+    <div style="font-size: 12.5px; color: #8A8FB8; padding: 18px 14px 6px">梦核引擎</div>
+    <a class="nav-item" href="#engine" aria-current="page" style="background: linear-gradient(90deg, rgba(179,157,255,.16), rgba(179,157,255,.04)); color: #EEEDF8"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#B39DFF" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><circle cx="12" cy="12" r="8" stroke-dasharray="3 3"></circle></svg>引擎仪表盘<span style="margin-left: auto; width: 6px; height: 6px; border-radius: 50%; background: #B39DFF; box-shadow: 0 0 8px #B39DFF"></span></a>
+    <a class="nav-item" href="#data"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><ellipse cx="12" cy="6" rx="7" ry="3"></ellipse><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"></path></svg>数据处理</a>
+    <a class="nav-item" href="#experience"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 5a2 2 0 0 1 2-2h5v18H6a2 2 0 0 1-2-2zM13 3h5a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-5z"></path></svg>经验库</a>
+    <a class="nav-item" href="#manage"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"></path><circle cx="16" cy="7" r="2"></circle><circle cx="10" cy="17" r="2"></circle></svg>引擎管理</a>
+    <div style="flex: 1"></div>
+    <a class="nav-item" href="#settings"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"></path></svg>设置</a>
+    <div style="border-top: 1px solid rgba(255,255,255,.06); margin-top: 8px; padding: 14px 14px 0; font-size: 13px; color: #A3A8D0">本地试用平台管理员</div>
+  </nav>
+
+  <!-- 主内容 -->
+  <main style="flex: 999 1 560px; min-width: 0; box-sizing: border-box; padding: 28px 40px 64px; display: flex; flex-direction: column; gap: 28px">
+
+    <!-- 标题行 -->
+    <header style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 20px">
+      <div style="display: flex; flex-direction: column; gap: 10px">
+        <h1 style="margin: 0; font-family: 'Noto Serif SC', serif; font-weight: 600; font-size: 30px; letter-spacing: .06em">引擎仪表盘</h1>
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 18px; font-size: 14px; color: #A3A8D0">
+          <span style="display: inline-flex; align-items: center; gap: 10px">
+            <span class="{{status.dotClass}}" style="width: 8px; height: 8px; border-radius: 50%; background: {{status.dotColor}}"></span>
+            <span style="color: #EEEDF8">{{status.text}}</span>
+          </span>
+          <sc-if value="{{status.hasAttention}}" hint-placeholder-val="{{ true }}">
+            <a class="link" href="#attention" style="color: #FF8A96; border-color: rgba(255,138,150,.35)">{{status.attentionText}}</a>
+          </sc-if>
+        </div>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px">
+        <div style="display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 14px; border: 1px dashed rgba(255,196,122,.45); border-radius: 999px">
+          <span style="font-size: 12.5px; color: #FFC47A">演示场景</span>
+          <div class="seg" role="group" aria-label="演示场景">
+            <sc-for list="{{scenarios}}" as="b" hint-placeholder-count="3">
+              <button type="button" aria-pressed="{{b.pressed}}" onClick="{{b.pick}}">{{b.label}}</button>
+            </sc-for>
+          </div>
+        </div>
+        <div class="seg" role="group" aria-label="查看范围">
+          <sc-for list="{{scopes}}" as="b" hint-placeholder-count="2">
+            <button type="button" aria-pressed="{{b.pressed}}" onClick="{{b.pick}}">{{b.label}}</button>
+          </sc-for>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; font-size: 13px; color: #A3A8D0">
+          <svg width="44" height="18" viewBox="0 0 44 18" aria-hidden="true"><path class="beat" d="M0 9h12l3-6 4 12 3-9 2 3h20" fill="none" stroke="#7CC4FF" stroke-width="1.4" stroke-dasharray="120" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+          <span>快照 <span class="num" style="color: #EEEDF8">{{snapshot}}</span>，可见时每 3 秒更新</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 星图 -->
+    <section aria-label="引擎实时流向" style="overflow-x: auto; margin: 0 -8px">
+      <div style="position: relative; width: 1120px; height: 480px; margin: 0 auto">
+        <div class="breath" style="position: absolute; left: 560px; top: 240px; width: 300px; height: 300px; border-radius: 50%; background: radial-gradient(circle, rgba(179,157,255,.38) 0%, rgba(124,120,255,.14) 38%, transparent 68%); animation-duration: {{core.breath}}; pointer-events: none"></div>
+
+        <svg width="1120" height="480" viewBox="0 0 1120 480" style="position: absolute; inset: 0" aria-hidden="true">
+          <defs>
+            <filter id="glow" x="-20%" y="-50%" width="140%" height="200%"><feGaussianBlur stdDeviation="4"></feGaussianBlur></filter>
+            <radialGradient id="coreFill" cx="50%" cy="45%" r="60%"><stop offset="0%" stop-color="#2B2A5E"></stop><stop offset="100%" stop-color="#141633"></stop></radialGradient>
+          </defs>
+          <!-- 外层轨道 -->
+          <g class="spin-r"><circle cx="560" cy="240" r="208" fill="none" stroke="#8A8FB8" stroke-opacity=".14" stroke-dasharray="1 9"></circle></g>
+          <g class="spin"><circle cx="560" cy="240" r="150" fill="none" stroke="#B39DFF" stroke-opacity=".28" stroke-dasharray="40 10 2 10"></circle></g>
+          <circle cx="560" cy="240" r="150" fill="none" stroke="#B39DFF" stroke-opacity="{{core.orbitOp}}" stroke-width="1"></circle>
+          <!-- 通道：发光底 + 线 -->
+          <path d="{{lanes.in0.d}}" fill="none" stroke="#7CC4FF" stroke-width="6" stroke-opacity="{{lanes.in0.glow}}" filter="url(#glow)"></path>
+          <path d="{{lanes.in1.d}}" fill="none" stroke="#7CC4FF" stroke-width="6" stroke-opacity="{{lanes.in1.glow}}" filter="url(#glow)"></path>
+          <path d="{{lanes.in2.d}}" fill="none" stroke="#7CC4FF" stroke-width="6" stroke-opacity="{{lanes.in2.glow}}" filter="url(#glow)"></path>
+          <path d="{{lanes.out0.d}}" fill="none" stroke="#FFC47A" stroke-width="6" stroke-opacity="{{lanes.out0.glow}}" filter="url(#glow)"></path>
+          <path d="{{lanes.out1.d}}" fill="none" stroke="#FFC47A" stroke-width="6" stroke-opacity="{{lanes.out1.glow}}" filter="url(#glow)"></path>
+          <path d="{{lanes.in0.d}}" fill="none" stroke="#7CC4FF" stroke-width="1.4" stroke-opacity="{{lanes.in0.op}}" stroke-dasharray="{{lanes.in0.dash}}"></path>
+          <path d="{{lanes.in1.d}}" fill="none" stroke="#7CC4FF" stroke-width="1.4" stroke-opacity="{{lanes.in1.op}}" stroke-dasharray="{{lanes.in1.dash}}"></path>
+          <path d="{{lanes.in2.d}}" fill="none" stroke="#7CC4FF" stroke-width="1.4" stroke-opacity="{{lanes.in2.op}}" stroke-dasharray="{{lanes.in2.dash}}"></path>
+          <path d="{{lanes.out0.d}}" fill="none" stroke="#FFC47A" stroke-width="1.4" stroke-opacity="{{lanes.out0.op}}" stroke-dasharray="{{lanes.out0.dash}}"></path>
+          <path d="{{lanes.out1.d}}" fill="none" stroke="#FFC47A" stroke-width="1.4" stroke-opacity="{{lanes.out1.op}}" stroke-dasharray="{{lanes.out1.dash}}"></path>
+          <!-- 核心 -->
+          <circle cx="560" cy="240" r="96" fill="url(#coreFill)" stroke="#B39DFF" stroke-opacity=".25"></circle>
+          <circle cx="560" cy="240" r="104" fill="none" stroke="#ffffff" stroke-opacity=".06" stroke-width="5"></circle>
+          <circle cx="560" cy="240" r="104" fill="none" stroke="#7CC4FF" stroke-width="5" stroke-linecap="round" stroke-dasharray="{{core.inDash}}" stroke-dashoffset="{{core.inOff}}" transform="rotate(-90 560 240)"></circle>
+          <circle cx="560" cy="240" r="104" fill="none" stroke="#B39DFF" stroke-width="5" stroke-linecap="round" stroke-dasharray="{{core.prDash}}" stroke-dashoffset="{{core.prOff}}" transform="rotate(-90 560 240)"></circle>
+          <circle cx="560" cy="240" r="104" fill="none" stroke="#FFC47A" stroke-width="5" stroke-linecap="round" stroke-dasharray="{{core.outDash}}" stroke-dashoffset="{{core.outOff}}" transform="rotate(-90 560 240)"></circle>
+        </svg>
+
+        <!-- 光点：数量来自实际执行中记录 -->
+        <sc-if value="{{motionOn}}" hint-placeholder-val="{{ true }}">
+          <sc-for list="{{particles}}" as="p" hint-placeholder-count="12">
+            <i class="pt" style="{{p.style}}"></i>
+          </sc-for>
+        </sc-if>
+
+        <!-- 核心读数 -->
+        <div style="position: absolute; left: 560px; top: 240px; transform: translate(-50%, -50%); text-align: center; pointer-events: none">
+          <div style="font-family: Fraunces, serif; font-weight: 300; font-size: 68px; line-height: 1; font-variant-numeric: lining-nums tabular-nums">{{totals.r}}</div>
+          <div style="margin-top: 8px; font-size: 13px; color: #A3A8D0">执行中</div>
+          <div style="margin-top: 4px; font-size: 12.5px; color: #8A8FB8">排队 <span class="num">{{totals.q}}</span></div>
+        </div>
+
+        <!-- 输入列 -->
+        <div style="position: absolute; left: 26px; top: 14px; font-size: 13px; color: #7CC4FF">输入</div>
+        <sc-for list="{{inputs}}" as="c" hint-placeholder-count="3">
+          <button type="button" class="hit" onClick="{{c.open}}" aria-label="{{c.aria}}" style="position: absolute; left: 16px; top: {{c.top}}px; width: 204px; display: flex; flex-direction: column; gap: 4px">
+            <span style="display: flex; align-items: center; justify-content: space-between; font-size: 14px; color: #D9DAF0">{{c.name}}
+              <sc-if value="{{c.f}}" hint-placeholder-val="{{ false }}"><span style="font-size: 12px; color: #FF8A96">异常 {{c.f}}</span></sc-if>
+            </span>
+            <span class="num" style="font-size: 30px; line-height: 1.05; color: {{c.numColor}}">{{c.r}}</span>
+            <span style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #8A8FB8">
+              <span>排队 <span class="num">{{c.q}}</span></span>
+              <span style="display: inline-flex; gap: 3px; align-items: center">
+                <sc-for list="{{c.beads}}" as="d" hint-placeholder-count="3"><i style="width: 5px; height: 5px; border-radius: 50%; background: #7CC4FF; opacity: .55"></i></sc-for>
+                <span>{{c.beadMore}}</span>
+              </span>
+            </span>
+          </button>
+        </sc-for>
+
+        <!-- 输出列 -->
+        <div style="position: absolute; left: 914px; top: 84px; font-size: 13px; color: #FFC47A">输出</div>
+        <sc-for list="{{outputs}}" as="c" hint-placeholder-count="2">
+          <button type="button" class="hit" onClick="{{c.open}}" aria-label="{{c.aria}}" style="position: absolute; left: 904px; top: {{c.top}}px; width: 200px; display: flex; flex-direction: column; gap: 4px">
+            <span style="display: flex; align-items: center; justify-content: space-between; font-size: 14px; color: #D9DAF0">{{c.name}}
+              <sc-if value="{{c.f}}" hint-placeholder-val="{{ false }}"><span style="font-size: 12px; color: #FF8A96">异常 {{c.f}}</span></sc-if>
+            </span>
+            <span class="num" style="font-size: 30px; line-height: 1.05; color: {{c.numColor}}">{{c.r}}</span>
+            <span style="font-size: 12.5px; color: #8A8FB8">近 5 分钟完成 <span class="num">{{c.d}}</span></span>
+          </button>
+        </sc-for>
+
+        <!-- 处理节点（轨道上） -->
+        <sc-for list="{{nodes}}" as="n" hint-placeholder-count="5">
+          <button type="button" class="hit" onClick="{{n.open}}" aria-label="{{n.aria}}" style="position: absolute; left: {{n.x}}px; top: {{n.y}}px; transform: {{n.tf}}; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 6px 10px; text-align: center">
+            <sc-if value="{{n.below}}" hint-placeholder-val="{{ false }}">
+              <span class="{{n.dotClass}}" style="width: 14px; height: 14px; border-radius: 50%; box-sizing: border-box; border: 1.5px solid #B39DFF; background: {{n.dotFill}}"></span>
+            </sc-if>
+            <span style="font-size: 13px; color: #D9DAF0; white-space: nowrap">{{n.name}} <span class="num" style="color: {{n.numColor}}; font-size: 15px; margin-left: 4px">{{n.r}}</span></span>
+            <sc-if value="{{n.above}}" hint-placeholder-val="{{ true }}">
+              <span class="{{n.dotClass}}" style="width: 14px; height: 14px; border-radius: 50%; box-sizing: border-box; border: 1.5px solid #B39DFF; background: {{n.dotFill}}"></span>
+            </sc-if>
+          </button>
+        </sc-for>
+
+        <!-- 图例 -->
+        <div style="position: absolute; left: 0; right: 0; top: 446px; display: flex; justify-content: center; gap: 28px; font-size: 13px; color: #A3A8D0">
+          <span style="display: inline-flex; align-items: center; gap: 8px"><i style="width: 18px; height: 3px; border-radius: 2px; background: #7CC4FF"></i>输入 <span class="num" style="color: #EEEDF8">{{totals.in}}</span></span>
+          <span style="display: inline-flex; align-items: center; gap: 8px"><i style="width: 18px; height: 3px; border-radius: 2px; background: #B39DFF"></i>处理 <span class="num" style="color: #EEEDF8">{{totals.pr}}</span></span>
+          <span style="display: inline-flex; align-items: center; gap: 8px"><i style="width: 18px; height: 3px; border-radius: 2px; background: #FFC47A"></i>输出 <span class="num" style="color: #EEEDF8">{{totals.out}}</span></span>
+          <span style="color: #8A8FB8">环上弧长为各段执行中占比，不是完成率</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 读数带 -->
+    <section aria-label="运行读数" class="readings" style="border-top: 1px solid rgba(255,255,255,.08); border-bottom: 1px solid rgba(255,255,255,.08)">
+      <sc-for list="{{readings}}" as="m" hint-placeholder-count="6">
+        <div style="padding: 18px 20px 16px; display: flex; flex-direction: column; gap: 6px; border-left: 1px solid rgba(255,255,255,.06)">
+          <span style="font-size: 13px; color: #A3A8D0">{{m.label}}</span>
+          <span style="display: flex; align-items: flex-end; justify-content: space-between; gap: 10px">
+            <span class="num" style="font-size: 32px; line-height: 1; color: {{m.color}}">{{m.v}}</span>
+            <svg width="96" height="28" viewBox="0 0 96 28" aria-hidden="true"><polyline points="{{m.spark}}" fill="none" stroke="{{m.color}}" stroke-opacity=".7" stroke-width="1.3" stroke-linejoin="round"></polyline></svg>
+          </span>
+        </div>
+      </sc-for>
+    </section>
+
+    <div class="lower">
+
+      <!-- 近 5 分钟脉搏 -->
+      <section class="c7" aria-label="近 5 分钟脉搏" style="display: flex; flex-direction: column; gap: 16px">
+        <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap">
+          <h2 style="margin: 0; font-size: 16px; font-weight: 500">近 5 分钟脉搏</h2>
+          <span style="font-size: 12.5px; color: #8A8FB8">只连接本页实际读到的快照，离开页面不保留</span>
+        </div>
+        <svg viewBox="0 0 640 200" style="width: 100%; height: auto" role="img" aria-label="近 5 分钟执行中数量，按输入、处理、输出堆叠">
+          <path d="M40 20H632M40 100H632M40 180H632" stroke="#ffffff" stroke-opacity=".06"></path>
+          <path d="{{pulse.out}}" fill="#FFC47A" fill-opacity=".22" stroke="#FFC47A" stroke-opacity=".8" stroke-width="1.2"></path>
+          <path d="{{pulse.pr}}" fill="#B39DFF" fill-opacity=".26" stroke="#B39DFF" stroke-opacity=".8" stroke-width="1.2"></path>
+          <path d="{{pulse.in}}" fill="#7CC4FF" fill-opacity=".26" stroke="#7CC4FF" stroke-opacity=".8" stroke-width="1.2"></path>
+          <line x1="{{pulse.lastX}}" x2="{{pulse.lastX}}" y1="14" y2="180" stroke="#EEEDF8" stroke-opacity=".25" stroke-dasharray="2 4"></line>
+          <text x="32" y="24" fill="#8A8FB8" font-size="11" text-anchor="end" font-family="Saira">{{pulse.max}}</text>
+          <text x="32" y="184" fill="#8A8FB8" font-size="11" text-anchor="end" font-family="Saira">0</text>
+          <text x="40" y="198" fill="#8A8FB8" font-size="11">5 分钟前</text>
+          <text x="632" y="198" fill="#8A8FB8" font-size="11" text-anchor="end">现在</text>
+        </svg>
+      </section>
+
+      <!-- 需要留意 -->
+      <section id="attention" class="c5" aria-label="需要留意" style="display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px">
+          <h2 style="margin: 0; font-size: 16px; font-weight: 500">需要留意</h2>
+          <a class="link" href="#operations">查看全部任务</a>
+        </div>
+        <sc-if value="{{attention.empty}}" hint-placeholder-val="{{ false }}">
+          <p style="margin: 0; padding: 22px 0; font-size: 14px; color: #A3A8D0; border-top: 1px solid rgba(255,255,255,.07)">目前没有失败、中断或待核对的记录。</p>
+        </sc-if>
+        <div style="display: flex; flex-direction: column">
+          <sc-for list="{{attention.items}}" as="a" hint-placeholder-count="3">
+            <div style="display: grid; grid-template-columns: 10px minmax(0,1fr) auto; gap: 14px; align-items: start; padding: 14px 0; border-top: 1px solid rgba(255,255,255,.07)">
+              <i style="margin-top: 7px; width: 8px; height: 8px; border-radius: {{a.shape}}; box-sizing: border-box; background: {{a.fill}}; border: 1.5px solid {{a.color}}"></i>
+              <div style="display: flex; flex-direction: column; gap: 3px; min-width: 0">
+                <span style="font-size: 14px; color: #EEEDF8">{{a.title}}</span>
+                <span style="font-size: 12.5px; color: #8A8FB8">{{a.detail}}</span>
+              </div>
+              <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 3px">
+                <span class="num" style="font-size: 18px; color: {{a.color}}">{{a.n}}</span>
+                <span style="font-size: 12px; color: #8A8FB8">{{a.at}}</span>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+
+      <!-- 近 7 天节律 -->
+      <section class="c7" aria-label="近 7 天节律" style="display: flex; flex-direction: column; gap: 16px">
+        <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap">
+          <h2 style="margin: 0; font-size: 16px; font-weight: 500">近 7 天节律</h2>
+          <span style="display: inline-flex; gap: 18px; font-size: 12.5px; color: #8A8FB8">
+            <span style="display: inline-flex; align-items: center; gap: 6px"><i style="width: 10px; height: 10px; border-radius: 2px; background: rgba(179,157,255,.55)"></i>工作请求</span>
+            <span style="display: inline-flex; align-items: center; gap: 6px"><i style="width: 8px; height: 8px; transform: rotate(45deg); background: #FFC47A"></i>Token（万）</span>
+          </span>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 14px; align-items: end; height: 200px">
+          <sc-for list="{{week}}" as="d" hint-placeholder-count="7">
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; height: 100%; justify-content: flex-end">
+              <div style="position: relative; width: 100%; flex: 1; display: flex; align-items: flex-end; justify-content: center">
+                <div style="width: 60%; max-width: 46px; height: {{d.h}}%; border-radius: 6px 6px 2px 2px; background: linear-gradient(180deg, rgba(179,157,255,.7), rgba(179,157,255,.18))"></div>
+                <sc-if value="{{d.hasTok}}" hint-placeholder-val="{{ true }}">
+                  <div style="position: absolute; left: 50%; bottom: {{d.t}}%; transform: translate(-50%, 50%) rotate(45deg); width: 9px; height: 9px; background: #FFC47A; box-shadow: 0 0 10px rgba(255,196,122,.6)"></div>
+                </sc-if>
+                <sc-if value="{{d.noTok}}" hint-placeholder-val="{{ false }}">
+                  <div class="hatch" style="position: absolute; left: 50%; bottom: 72%; transform: translateX(-50%); padding: 2px 6px; border-radius: 4px; font-size: 11px; color: #D9DAF0; white-space: nowrap">未回报</div>
+                </sc-if>
+              </div>
+              <span class="num" style="font-size: 13px; color: #EEEDF8">{{d.req}}</span>
+              <span style="font-size: 12px; color: {{d.labelColor}}">{{d.label}}</span>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+
+      <!-- 资料与接入 -->
+      <section class="c5" aria-label="资料与接入" style="display: flex; flex-direction: column; gap: 18px">
+        <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px">
+          <h2 style="margin: 0; font-size: 16px; font-weight: 500">资料与接入</h2>
+          <a class="link" href="#data">打开数据处理</a>
+        </div>
+        <sc-for list="{{intake}}" as="row" hint-placeholder-count="2">
+          <div style="display: flex; flex-direction: column; gap: 10px">
+            <div style="display: flex; justify-content: space-between; font-size: 14px"><span>{{row.label}}</span><span class="num" style="color: #A3A8D0">共 {{row.total}}</span></div>
+            <div style="display: flex; height: 10px; border-radius: 6px; overflow: hidden; gap: 2px; background: rgba(255,255,255,.04)">
+              <sc-for list="{{row.segs}}" as="s" hint-placeholder-count="4"><i class="{{s.cls}}" style="flex: {{s.flex}} 0 0; background-color: {{s.color}}"></i></sc-for>
+            </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12.5px; color: #A3A8D0">
+              <sc-for list="{{row.segs}}" as="s" hint-placeholder-count="4"><span style="display: inline-flex; align-items: center; gap: 6px"><i class="{{s.cls}}" style="width: 8px; height: 8px; border-radius: 2px; background-color: {{s.color}}"></i>{{s.label}} <span class="num" style="color: {{s.numColor}}">{{s.n}}</span></span></sc-for>
+            </div>
+          </div>
+        </sc-for>
+      </section>
+
+      <!-- 企业活跃（仅总台） -->
+      <sc-if value="{{isPlatform}}" hint-placeholder-val="{{ true }}">
+        <section class="c5" aria-label="企业执行分布" style="display: flex; flex-direction: column; gap: 14px">
+          <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px">
+            <h2 style="margin: 0; font-size: 16px; font-weight: 500">企业执行分布</h2>
+            <span style="font-size: 12.5px; color: #8A8FB8">按执行中数量，只含计数</span>
+          </div>
+          <sc-if value="{{tenants.empty}}" hint-placeholder-val="{{ false }}">
+            <p style="margin: 0; padding: 18px 0; font-size: 14px; color: #A3A8D0; border-top: 1px solid rgba(255,255,255,.07)">当前没有企业有执行中的记录。</p>
+          </sc-if>
+          <sc-for list="{{tenants.items}}" as="t" hint-placeholder-count="5">
+            <div style="display: grid; grid-template-columns: 112px minmax(0,1fr) 36px; gap: 14px; align-items: center; font-size: 13.5px">
+              <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #D9DAF0">{{t.name}}</span>
+              <span style="height: 6px; border-radius: 3px; background: rgba(255,255,255,.05); overflow: hidden"><i style="display: block; height: 100%; width: {{t.w}}%; border-radius: 3px; background: linear-gradient(90deg, #7CC4FF, #B39DFF)"></i></span>
+              <span class="num" style="text-align: right">{{t.r}}</span>
+            </div>
+          </sc-for>
+        </section>
+      </sc-if>
+
+      <!-- 自进化（休眠） -->
+      <section class="{{evoClass}}" aria-label="自进化" style="position: relative; display: flex; flex-direction: column; gap: 12px; padding: 22px 26px; border-radius: 18px; border: 1px solid rgba(179,157,255,.18); background: linear-gradient(160deg, rgba(43,36,92,.5), rgba(20,22,51,.3))">
+        <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px">
+          <h2 style="margin: 0; font-size: 16px; font-weight: 500">自进化</h2>
+          <span style="font-size: 12.5px; color: #CDBEFF; border: 1px solid rgba(179,157,255,.35); border-radius: 999px; padding: 3px 10px">未启用</span>
+        </div>
+        <svg viewBox="0 0 640 120" style="width: 100%; height: auto" role="img" aria-label="自进化循环预留：发现、候选、验证、采用，执行器尚未接入">
+          <path class="evo-loop" d="M110 60 C110 18, 250 18, 320 60 S530 102, 530 60 S390 18, 320 60 S110 102, 110 60 Z" fill="none" stroke="#B39DFF" stroke-width="1.2" stroke-dasharray="3 6"></path>
+          <circle cx="160" cy="34" r="4" fill="#0D0F22" stroke="#B39DFF"></circle>
+          <circle cx="250" cy="34" r="4" fill="#0D0F22" stroke="#B39DFF"></circle>
+          <circle cx="400" cy="86" r="4" fill="#0D0F22" stroke="#B39DFF"></circle>
+          <circle cx="490" cy="86" r="4" fill="#0D0F22" stroke="#B39DFF"></circle>
+          <text x="160" y="20" fill="#CDBEFF" font-size="12" text-anchor="middle">发现</text>
+          <text x="250" y="20" fill="#CDBEFF" font-size="12" text-anchor="middle">候选</text>
+          <text x="400" y="110" fill="#CDBEFF" font-size="12" text-anchor="middle">验证</text>
+          <text x="490" y="110" fill="#CDBEFF" font-size="12" text-anchor="middle">采用</text>
+        </svg>
+        <p style="margin: 0; font-size: 13px; line-height: 1.7; color: #A3A8D0; max-width: 46em">独立执行器尚未接入，这里只保留循环结构，不显示任何执行数量。经验提炼与通用清洗属于基础处理，已计入上方处理环。</p>
+      </section>
+
+      <!-- 尚未接入的观测 -->
+      <section class="c12" aria-label="尚未接入的观测" style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.07); font-size: 13px; color: #A3A8D0">
+        <span style="margin-right: 6px">尚未接入的观测</span>
+        <span class="hatch" style="padding: 5px 12px; border-radius: 999px; color: #D9DAF0">执行容量</span>
+        <span class="hatch" style="padding: 5px 12px; border-radius: 999px; color: #D9DAF0">节点 CPU 与内存</span>
+        <span class="hatch" style="padding: 5px 12px; border-radius: 999px; color: #D9DAF0">费用核算</span>
+        <span class="hatch" style="padding: 5px 12px; border-radius: 999px; color: #D9DAF0">质量评估</span>
+        <span style="margin-left: auto; color: #8A8FB8">接入前显示为未知，不按 0 计算</span>
+      </section>
+    </div>
+  </main>
+
+  <!-- 通道详情抽屉 -->
+  <sc-if value="{{sel.open}}" hint-placeholder-val="{{ false }}">
+    <div style="position: absolute; inset: 0; background: rgba(6,7,18,.55); z-index: 5" onClick="{{close}}"></div>
+    <aside class="drawer-in" aria-label="{{sel.name}}详情" style="position: absolute; top: 0; right: 0; bottom: 0; width: 420px; max-width: 100%; z-index: 6; box-sizing: border-box; padding: 28px 28px 32px; background: #15173A; border-left: 1px solid rgba(179,157,255,.2); box-shadow: -30px 0 80px rgba(0,0,0,.45); display: flex; flex-direction: column; gap: 22px">
+      <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 16px">
+        <div style="display: flex; flex-direction: column; gap: 6px">
+          <span style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: {{sel.color}}"><i style="width: 8px; height: 8px; border-radius: 50%; background: {{sel.color}}"></i>{{sel.stage}}</span>
+          <h2 style="margin: 0; font-family: 'Noto Serif SC', serif; font-weight: 600; font-size: 24px">{{sel.name}}</h2>
+        </div>
+        <button type="button" class="close" onClick="{{close}}" aria-label="关闭详情"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3l10 10M13 3 3 13" stroke="currentColor" stroke-width="1.6"></path></svg></button>
+      </div>
+      <p style="margin: 0; font-size: 14px; line-height: 1.7; color: #A3A8D0">{{sel.desc}}</p>
+      <div style="display: flex; align-items: baseline; gap: 10px">
+        <span style="font-family: Fraunces, serif; font-weight: 300; font-size: 56px; line-height: 1; color: {{sel.color}}">{{sel.r}}</span>
+        <span style="font-size: 14px; color: #A3A8D0">执行中</span>
+      </div>
+      <dl style="margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: rgba(255,255,255,.07); border-radius: 12px; overflow: hidden">
+        <sc-for list="{{sel.metrics}}" as="m" hint-placeholder-count="6">
+          <div style="background: #15173A; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px">
+            <dt style="font-size: 12.5px; color: #8A8FB8">{{m.label}}</dt>
+            <dd class="num" style="margin: 0; font-size: 22px; color: {{m.color}}">{{m.v}}</dd>
+          </div>
+        </sc-for>
+      </dl>
+      <div style="font-size: 13px; color: #A3A8D0">最近一次完成 <span class="num" style="color: #EEEDF8">{{sel.last}}</span></div>
+      <div style="margin-top: auto; display: flex; flex-wrap: wrap; gap: 18px">
+        <a class="link" href="#operations">查看该类任务</a>
+        <a class="link" href="#usage">查看用量</a>
+      </div>
+      <p style="margin: 0; font-size: 12px; line-height: 1.6; color: #8A8FB8">处理完成不等于业务成功或内容合格；保留异常可能包含已重试的历史尝试。</p>
+    </aside>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":2080}}'>
+var CH = [
+  { code: 'COLLECTION', name: '外部取数', stage: 'in', desc: '按已配置的频率，从企业接入的数据源读取数据并生成固定版本。' },
+  { code: 'KNOWLEDGE', name: '资料解析', stage: 'in', desc: '把上传或同步的资料解析为可检索的内容，保留原件与版本。' },
+  { code: 'RETRIEVAL', name: '资料检索', stage: 'in', desc: '为会话与画报任务查找当前账号有权读取的资料。' },
+  { code: 'TASK', name: '会话与画报', stage: 'pr', desc: '执行员工发起的会话，以及系统主动生成的画报任务。' },
+  { code: 'COMPANY', name: '企业信息分析', stage: 'pr', desc: '从企业资料中提炼企业信息，并记录推断依据。' },
+  { code: 'EXPERIENCE', name: '经验提炼与核验', stage: 'pr', desc: '从任务与反馈中提炼经验，并由独立会话核验。' },
+  { code: 'GENERALIZATION', name: '通用经验清洗', stage: 'pr', desc: '去除企业信息与隐私后，形成可在总库共享的通用经验。' },
+  { code: 'GENERAL_ADJUSTMENT', name: '总库调整核验', stage: 'pr', platformOnly: true, desc: '核验总台对通用经验库提出的内容调整。' },
+  { code: 'RESPONSE', name: '会话流式输出', stage: 'out', desc: '向员工逐段返回会话结果。流式输出期间只计入输出，避免与处理重复。' },
+  { code: 'EXPORT', name: '成果导出', stage: 'out', desc: '把会话成果导出为文件，供下载或共享。' }
+];
+// [执行中, 排队, 等待, 待核对, 保留异常, 近5分钟完成]
+var SCN = {
+  idle: { COLLECTION: [0,0,0,0,0,2], KNOWLEDGE: [0,0,0,0,1,0], RETRIEVAL: [0,0,0,0,0,0], TASK: [0,0,0,0,0,1], COMPANY: [0,0,0,0,0,0], EXPERIENCE: [0,0,0,0,0,0], GENERALIZATION: [0,0,0,0,0,0], GENERAL_ADJUSTMENT: [0,0,0,0,0,0], RESPONSE: [0,0,0,0,0,1], EXPORT: [0,0,0,0,0,0] },
+  busy: { COLLECTION: [3,5,0,0,0,14], KNOWLEDGE: [2,7,1,0,1,9], RETRIEVAL: [4,1,0,0,0,21], TASK: [6,3,2,0,0,17], COMPANY: [1,0,0,0,0,2], EXPERIENCE: [2,1,0,0,0,4], GENERALIZATION: [1,0,0,0,0,1], GENERAL_ADJUSTMENT: [0,1,0,0,0,0], RESPONSE: [5,0,0,0,0,26], EXPORT: [1,0,0,0,0,3] },
+  alert: { COLLECTION: [1,13,0,0,3,4], KNOWLEDGE: [2,4,2,0,2,6], RETRIEVAL: [2,0,0,0,0,8], TASK: [3,6,4,2,1,7], COMPANY: [0,0,1,0,0,0], EXPERIENCE: [1,2,0,1,0,1], GENERALIZATION: [0,0,0,0,0,0], GENERAL_ADJUSTMENT: [0,0,0,0,0,0], RESPONSE: [2,0,0,0,0,9], EXPORT: [0,1,0,1,1,0] }
+};
+var ERR = {
+  idle: [{ title: '执行中断', detail: '资料解析：进程重启时中断，保留待重试', n: 1, at: '昨天 22:41' }],
+  busy: [{ title: '执行中断', detail: '资料解析：进程重启时中断，保留待重试', n: 1, at: '昨天 22:41' }],
+  alert: [
+    { title: '模型调用失败', detail: '会话与画报、外部取数：供应商返回错误', n: 4, at: '12:03' },
+    { title: '外部数据源不可用', detail: '外部取数：2 个连接超时', n: 3, at: '12:01' },
+    { title: '文件格式不支持', detail: '资料解析：已跳过，不影响其他资料', n: 2, at: '11:52' }
+  ]
+};
+var TEN = [['九号泡泡健身', .38], ['青禾设计', .26], ['远帆物流', .18], ['拾光教育', .12], ['合成测试企业', .06]];
+var WEEK = [['周三', 182, 41], ['周四', 240, 58], ['周五', 210, 49], ['周六', 96, null], ['周日', 74, 17], ['周一', 265, 63], ['今天', 131, 30]];
+var INTAKE = {
+  normal: [{ label: '数据接入', v: [6, 1, 1, 2, 0] }, { label: '资料', v: [1284, 23, 4, 0, 2] }],
+  alert: [{ label: '数据接入', v: [4, 1, 3, 2, 0] }, { label: '资料', v: [1279, 18, 11, 0, 2] }]
+};
+var COLOR = { in: '#7CC4FF', pr: '#B39DFF', out: '#FFC47A' };
+var STAGE = { in: '输入', pr: '处理', out: '输出' };
+var IN_Y = [116, 240, 364], OUT_Y = [186, 306];
+var CX = 560, CY = 240;
+
+function ri(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
+function pad(n) { return String(n).padStart(2, '0'); }
+function hms(t) { var d = new Date(t); return pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds()); }
+function inPath(y) { var e = CY + (y - CY) * 0.1; return 'M232 ' + y + ' C 344 ' + y + ' 384 ' + e + ' 462 ' + e; }
+function outPath(y) { var e = CY + (y - CY) * 0.1; return 'M658 ' + e + ' C 736 ' + e + ' 776 ' + y + ' 900 ' + y; }
+var ORBIT = 'M560 90 A150 150 0 1 1 559.9 90';
+
+class Component extends DCLogic {
+  chans(scope) { return CH.filter(function (c) { return scope === 'platform' || !c.platformOnly; }); }
+  totals(live, scope) {
+    var t = { in: 0, pr: 0, out: 0, r: 0, q: 0, w: 0, u: 0, f: 0, d: 0 };
+    this.chans(scope).forEach(function (c) {
+      var v = live[c.code];
+      t[c.stage] += v[0]; t.r += v[0]; t.q += v[1]; t.w += v[2]; t.u += v[3]; t.f += v[4]; t.d += v[5];
+    });
+    return t;
+  }
+  sample(t, i) {
+    function j(v, k) { return v > 0 ? Math.max(0, Math.round(v + Math.sin(i / k) * Math.max(1, v * 0.35) + (Math.random() - .5) * 1.6)) : 0; }
+    return { in: j(t.in, 5), pr: j(t.pr, 7), out: j(t.out, 4), r: 0, q: j(t.q, 9), w: t.w, u: t.u, f: t.f, d: j(t.d, 11) };
+  }
+  seed(scn, scope) {
+    var live = JSON.parse(JSON.stringify(SCN[scn]));
+    var t = this.totals(live, scope);
+    var samples = [];
+    for (var i = 0; i < 72; i++) { var s = this.sample(t, i); s.r = s.in + s.pr + s.out; samples.push(s); }
+    return { scn: scn, scope: scope, live: live, samples: samples, now: Date.now(), sel: null };
+  }
+  tick() {
+    var s = this.state; if (!s.live) return;
+    var base = SCN[s.scn], live = {};
+    Object.keys(base).forEach(function (k) {
+      var b = base[k];
+      live[k] = [b[0] > 0 ? Math.max(0, b[0] + ri(-1, 1)) : 0, b[1] > 0 ? Math.max(0, b[1] + ri(-1, 1)) : 0, b[2], b[3], b[4], b[5] > 0 ? Math.max(0, b[5] + ri(-1, 1)) : 0];
+    });
+    var t = this.totals(live, s.scope);
+    var smp = { in: t.in, pr: t.pr, out: t.out, r: t.r, q: t.q, w: t.w, u: t.u, f: t.f, d: t.d };
+    this.setState({ live: live, samples: s.samples.concat([smp]).slice(-100), now: Date.now() });
+  }
+  componentDidMount() {
+    var rm = false;
+    try { rm = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+    this.setState(Object.assign(this.seed('busy', 'platform'), { rm: rm }));
+    var self = this;
+    this.timer = setInterval(function () { self.tick(); }, 3000);
+  }
+  componentWillUnmount() { clearInterval(this.timer); }
+  spark(samples, key) {
+    var xs = samples.slice(-40), max = 1;
+    xs.forEach(function (s) { if (s[key] > max) max = s[key]; });
+    return xs.map(function (s, i) { return (i * 96 / 39).toFixed(1) + ',' + (25 - (s[key] / max) * 21).toFixed(1); }).join(' ');
+  }
+  renderVals() {
+    var self = this;
+    var s = this.state && this.state.live ? this.state : (this._seed || (this._seed = this.seed('busy', 'platform')));
+    var scope = s.scope || 'platform';
+    var chans = this.chans(scope).map(function (c) {
+      var v = s.live[c.code];
+      return Object.assign({}, c, { r: v[0], q: v[1], w: v[2], u: v[3], f: v[4], d: v[5] });
+    });
+    var t = this.totals(s.live, scope);
+    var open = function (code) { return function () { self.setState({ sel: code }); }; };
+
+    // 星图：输入、输出通道
+    var lanes = {}, particles = [];
+    function lane(key, c, d, dur) {
+      var on = c.r > 0;
+      lanes[key] = { d: d, op: on ? .75 : .22, glow: on ? .35 : 0, dash: on ? 'none' : '2 6' };
+      var n = Math.min(c.r, 6);
+      for (var k = 0; k < n; k++) {
+        particles.push({ style: "offset-path: path('" + d + "'); animation-duration: " + dur + 's; animation-delay: -' + (k * dur / n).toFixed(2) + 's; background: ' + COLOR[c.stage] + '; color: ' + COLOR[c.stage] });
+      }
+    }
+    var ins = chans.filter(function (c) { return c.stage === 'in'; });
+    var outs = chans.filter(function (c) { return c.stage === 'out'; });
+    var prs = chans.filter(function (c) { return c.stage === 'pr'; });
+    ins.forEach(function (c, i) { lane('in' + i, c, inPath(IN_Y[i]), 3.4); });
+    outs.forEach(function (c, i) { lane('out' + i, c, outPath(OUT_Y[i]), 2.8); });
+    var orbitN = Math.min(t.pr, 10);
+    for (var k = 0; k < orbitN; k++) {
+      particles.push({ style: "offset-path: path('" + ORBIT + "'); animation-duration: 12s; animation-delay: -" + (k * 12 / orbitN).toFixed(2) + 's; background: #CDBEFF; color: #B39DFF' });
+    }
+    function numColor(c) { return c.r > 0 ? COLOR[c.stage] : '#6E7299'; }
+    var inputs = ins.map(function (c, i) {
+      var beads = []; for (var b = 0; b < Math.min(c.q, 10); b++) beads.push({ i: b });
+      return Object.assign({}, c, { top: IN_Y[i] - 50, numColor: numColor(c), beads: beads, beadMore: c.q > 10 ? '+' + (c.q - 10) : '', open: open(c.code), aria: c.name + '，执行中 ' + c.r + '，排队 ' + c.q + '，查看详情', f: c.f || 0 });
+    });
+    var outputs = outs.map(function (c, i) {
+      return Object.assign({}, c, { top: OUT_Y[i] - 50, numColor: numColor(c), open: open(c.code), aria: c.name + '，执行中 ' + c.r + '，查看详情', f: c.f || 0 });
+    });
+    var angles = prs.length === 5 ? [-135, -90, -45, 45, 135] : [-120, -60, 60, 120];
+    var nodes = prs.map(function (c, i) {
+      var a = angles[i] * Math.PI / 180, x = CX + 150 * Math.cos(a), y = CY + 150 * Math.sin(a), above = y < CY;
+      return Object.assign({}, c, {
+        x: x.toFixed(1), y: y.toFixed(1), above: above, below: !above,
+        tf: above ? 'translate(-50%, calc(-100% + 13px))' : 'translate(-50%, -13px)',
+        dotFill: c.r > 0 ? '#B39DFF' : '#14163A', dotClass: c.r > 0 ? 'node-dot-on' : '',
+        numColor: numColor(c), open: open(c.code), aria: c.name + '，执行中 ' + c.r + '，查看详情'
+      });
+    });
+
+    // 核心环：各段执行中占比
+    var C = 2 * Math.PI * 104, gap = 6, segs = [['in', t.in], ['pr', t.pr], ['out', t.out]].filter(function (x) { return x[1] > 0; });
+    var core = { breath: (t.r > 0 ? 3 : 7) + 's', orbitOp: t.pr > 0 ? .4 : .14 };
+    ['in', 'pr', 'out'].forEach(function (k) { core[k + 'Dash'] = '0 ' + C; core[k + 'Off'] = 0; });
+    var acc = 0;
+    segs.forEach(function (x) {
+      var len = Math.max(2, x[1] / t.r * C - (segs.length > 1 ? gap : 0));
+      core[x[0] + 'Dash'] = len.toFixed(1) + ' ' + C.toFixed(1);
+      core[x[0] + 'Off'] = (-acc).toFixed(1);
+      acc += x[1] / t.r * C;
+    });
+
+    // 读数带
+    var readings = [
+      { label: '执行中', v: t.r, key: 'r', color: '#EEEDF8' },
+      { label: '排队', v: t.q, key: 'q', color: '#EEEDF8' },
+      { label: '等待或部分完成', v: t.w, key: 'w', color: '#EEEDF8' },
+      { label: '结果待核对', v: t.u, key: 'u', color: t.u > 0 ? '#E3C2FF' : '#EEEDF8' },
+      { label: '近 5 分钟完成', v: t.d, key: 'd', color: '#EEEDF8' },
+      { label: '保留的失败与中断', v: t.f, key: 'f', color: t.f > 0 ? '#FF8A96' : '#EEEDF8' }
+    ].map(function (m) { return Object.assign(m, { spark: self.spark(s.samples, m.key) }); });
+
+    // 脉搏（堆叠面积）
+    var sm = s.samples.slice(-100), maxv = 4;
+    sm.forEach(function (p) { var v = p.in + p.pr + p.out; if (v > maxv) maxv = v; });
+    maxv = Math.ceil(maxv * 1.15);
+    var X0 = 40, W = 592, step = W / 99, off = 100 - sm.length;
+    function xAt(i) { return X0 + (i + off) * step; }
+    function yAt(v) { return 180 - v / maxv * 160; }
+    function area(lo, hi) {
+      var top = sm.map(function (p, i) { return xAt(i).toFixed(1) + ' ' + yAt(hi(p)).toFixed(1); });
+      var bot = sm.map(function (p, i) { return xAt(i).toFixed(1) + ' ' + yAt(lo(p)).toFixed(1); }).reverse();
+      return 'M' + top.join(' L') + ' L' + bot.join(' L') + ' Z';
+    }
+    var pulse = {
+      in: area(function () { return 0; }, function (p) { return p.in; }),
+      pr: area(function (p) { return p.in; }, function (p) { return p.in + p.pr; }),
+      out: area(function (p) { return p.in + p.pr; }, function (p) { return p.in + p.pr + p.out; }),
+      max: maxv, lastX: xAt(sm.length - 1).toFixed(1)
+    };
+
+    // 需要留意
+    var items = ERR[s.scn].map(function (e) { return Object.assign({}, e, { color: '#FF8A96', fill: '#FF8A96', shape: '50%' }); });
+    chans.forEach(function (c) {
+      if (c.u > 0) items.push({ title: c.name + '有结果待核对', detail: '超时或断连后无法确认动作是否已发生，需核对原回执', n: c.u, at: '进行中', color: '#E3C2FF', fill: 'transparent', shape: '50%' });
+    });
+    chans.forEach(function (c) {
+      if (c.q >= 10) items.push({ title: c.name + '排队较长', detail: '排队超过 10 条，可在数据处理中查看接入频率', n: c.q, at: '当前', color: '#FFC47A', fill: 'transparent', shape: '2px' });
+    });
+
+    // 近 7 天
+    var maxReq = Math.max.apply(null, WEEK.map(function (d) { return d[1]; })), maxTok = 70;
+    var week = WEEK.map(function (d, i) {
+      return { label: d[0], req: d[1], h: (d[1] / maxReq * 82).toFixed(1), hasTok: d[2] !== null, noTok: d[2] === null, t: d[2] === null ? 0 : (d[2] / maxTok * 92).toFixed(1), labelColor: i === 6 ? '#EEEDF8' : '#8A8FB8' };
+    });
+
+    // 资料与接入
+    var segDef = [['就绪', '#7CC4FF', ''], ['处理中', '#B39DFF', ''], ['需处理', '#FF8A96', ''], ['未开始', 'rgba(163,168,208,.35)', ''], ['已停止', 'transparent', 'hatch']];
+    var intake = INTAKE[s.scn === 'alert' ? 'alert' : 'normal'].map(function (row) {
+      var total = row.v.reduce(function (a, b) { return a + b; }, 0);
+      return {
+        label: row.label, total: total.toLocaleString('zh-CN'),
+        segs: row.v.map(function (n, i) { return { label: segDef[i][0], color: segDef[i][1], cls: segDef[i][2], n: n.toLocaleString('zh-CN'), flex: Math.max(n, n > 0 ? total * 0.012 : 0).toFixed(2), numColor: i === 2 && n > 0 ? '#FF8A96' : '#EEEDF8' }; })
+      };
+    });
+
+    // 企业执行分布
+    var tItems = t.r > 0 ? TEN.map(function (x) { return { name: x[0], r: Math.max(0, Math.round(x[1] * t.r)) }; }).filter(function (x) { return x.r > 0; }) : [];
+    var tMax = Math.max.apply(null, [1].concat(tItems.map(function (x) { return x.r; })));
+    tItems.forEach(function (x) { x.w = (x.r / tMax * 100).toFixed(1); });
+
+    // 状态
+    var attnCount = items.length;
+    var status = {
+      text: t.r > 0 ? '引擎运转中，' + t.r + ' 项执行中' : '引擎空闲，当前没有执行中的记录',
+      dotColor: t.r > 0 ? '#7CC4FF' : '#6E7299', dotClass: t.r > 0 ? 'live-dot' : '',
+      hasAttention: s.scn === 'alert', attentionText: attnCount + ' 项需要留意'
+    };
+
+    // 抽屉
+    var selC = s.sel ? chans.filter(function (c) { return c.code === s.sel; })[0] : null;
+    var sel = { open: !!selC };
+    if (selC) {
+      var ago = selC.d > 0 ? hms(s.now - ri(4, 40) * 1000) : '5 分钟内没有';
+      sel = Object.assign({ open: true }, selC, {
+        color: COLOR[selC.stage], stage: STAGE[selC.stage], last: ago,
+        metrics: [
+          { label: '排队', v: selC.q, color: '#EEEDF8' },
+          { label: '等待或部分完成', v: selC.w, color: '#EEEDF8' },
+          { label: '结果待核对', v: selC.u, color: selC.u > 0 ? '#E3C2FF' : '#EEEDF8' },
+          { label: '保留的失败与中断', v: selC.f, color: selC.f > 0 ? '#FF8A96' : '#EEEDF8' },
+          { label: '近 5 分钟完成', v: selC.d, color: '#EEEDF8' },
+          { label: '所属阶段', v: STAGE[selC.stage], color: COLOR[selC.stage] }
+        ]
+      });
+    }
+
+    var mk = function (list, cur, field) {
+      return list.map(function (x) { return { label: x[1], pressed: cur === x[0] ? 'true' : 'false', pick: function () { var n = {}; n[field] = x[0]; var next = field === 'scn' ? self.seed(x[0], s.scope || 'platform') : self.seed(s.scn, x[0]); next.rm = self.state.rm; self.setState(next); } }; });
+    };
+
+    return {
+      scenarios: mk([['idle', '空闲'], ['busy', '繁忙'], ['alert', '有异常']], s.scn, 'scn'),
+      scopes: mk([['platform', '全平台'], ['tenant', '九号泡泡健身']], scope, 'scope'),
+      snapshot: hms(s.now), status: status, motionOn: !s.rm,
+      lanes: lanes, particles: particles, core: core, totals: t,
+      inputs: inputs, outputs: outputs, nodes: nodes, readings: readings, pulse: pulse,
+      attention: { items: items, empty: items.length === 0 },
+      week: week, intake: intake, isPlatform: scope === 'platform',
+      tenants: { items: tItems, empty: tItems.length === 0 },
+      evoClass: scope === 'platform' ? 'c7' : 'c12',
+      sel: sel, close: function () { self.setState({ sel: null }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

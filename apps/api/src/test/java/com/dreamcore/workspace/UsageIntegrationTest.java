@@ -12,7 +12,7 @@ class UsageIntegrationTest {
   db.update("INSERT INTO platform_roles(account_id,role) VALUES (?,'PLATFORM_ADMIN')",operator);db.update("INSERT INTO platform_accounts(account_id,login_name,password_hash) VALUES (?,?,?)",operator,operator+"@example.test",passwords.encode(PASSWORD));
   db.update("INSERT INTO tenants(id,name) VALUES (?,?)",tenant,PRIVATE);db.update("INSERT INTO tenant_memberships(tenant_id,account_id,role) VALUES (?,?,'TENANT_ADMIN')",tenant,actor);db.update("INSERT INTO workspaces(id,tenant_id,owner_id,name,kind) VALUES (?,?,?,?,'PERSONAL')",space,tenant,actor,PRIVATE);
  }
- @AfterEach void cleanup(){db.update("UPDATE conversation_tasks SET status='CANCELLED' WHERE tenant_id=? AND status IN ('RUNNING','QUEUED')",tenant);db.update("DELETE FROM platform_roles WHERE account_id=?",operator);}
+ @AfterEach void cleanup(){db.update("UPDATE conversation_tasks SET status='CANCELLED' WHERE tenant_id=? AND status IN ('RUNNING','QUEUED')",tenant);db.update("DELETE FROM platform_sessions WHERE account_id=?",operator);db.update("DELETE FROM platform_accounts WHERE account_id=?",operator);db.update("DELETE FROM platform_roles WHERE account_id=?",operator);}
  ConversationService.Job start(){tasks.submit(actor,tenant,null,space,UUID.randomUUID(),PRIVATE,"AGENT");return tasks.claim();}
  UsageService.Overview read(){return usage.tenant(actor,tenant,"THIS_MONTH");}
  void model(ConversationService.Job j,int n,String outcome,Long in,Long out){agents.startUsage(j.id(),j.token(),new AgentUsageLedger.Start(n,2048));ledger.finish(j.id(),j.token(),new AgentUsageLedger.Receipt(n,outcome,in,out));}

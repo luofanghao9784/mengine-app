@@ -364,10 +364,20 @@ button {
   flex-shrink: 0;
 }
 .dreamcore-symbol {
+  /* Light surfaces: deepened champagne so the work loop keeps contrast on white. */
+  --mark-work: #b8892e;
+  --mark-evolve: #2864e8;
   display: block;
   width: 32px;
   height: 32px;
   flex-shrink: 0;
+  overflow: visible;
+}
+/* Dark surfaces use the original engine-dashboard colors. */
+:is(.admin-engine-fullscreen .admin-sidebar, .admin-engine-fullscreen .admin-header, .eng3d)
+  .dreamcore-symbol {
+  --mark-work: #f1d6a0;
+  --mark-evolve: #5e86e8;
 }
 .dreamcore-logo.with-wordmark .dreamcore-symbol {
   width: 42px;

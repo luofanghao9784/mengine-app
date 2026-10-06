@@ -42,7 +42,11 @@ class ObjectLifecycleIntegrationTest {
 
  @Test void realExperienceContextRecordsEntryAndExactVersionAndStopsDerivedTask(){
   var body=new com.dreamcore.workspace.experience.ExperienceService.Content("METHOD","确切经验","合成方法","先确认口径再计算",List.of("test"),"合成输入","不代表业务收益","只用获权工具","合成依据","INDEPENDENT_COPY");var e=experiences.create(owner,tenant,space,UUID.randomUUID(),body,List.of());var published=experiences.publish(owner,tenant,space,e.id(),UUID.randomUUID(),e.revision(),e.version().id(),true);UUID t=task(),token=UUID.randomUUID();db.update("UPDATE conversation_tasks SET status='RUNNING',attempt=1,execution_class='verification',lease_token=?,lease_until=now()+interval '120 seconds' WHERE id=?",token,t);db.update("INSERT INTO conversation_attempts(task_id,attempt_number,attempt_id,input,status,provenance) VALUES (?,1,?,'context','RUNNING','RECORDED')",t,token);
-  contexts.context(t,token,new com.dreamcore.workspace.context.TaskContextService.Request("experience_read",null,null,0,published.id(),published.version().id(),null,null,null,null,null));
+  var read=new com.dreamcore.workspace.context.TaskContextService.Request("experience_read",null,null,0,published.id(),published.version().id(),null,null,null,null,null);
+  denied(409,()->contexts.context(t,token,read));
+  // Synthetic checked version: admission itself is covered by ExperienceAdmissionIntegrationTest.
+  db.update("UPDATE experience_versions SET origin='AUTOMATIC',evaluation='AUTOMATIC_CHECKED' WHERE id=?",published.version().id());
+  contexts.context(t,token,read);
   assertEquals(published.id(),db.queryForObject("SELECT reference_id FROM task_context_reads WHERE task_id=?",UUID.class,t));assertEquals(published.version().id().toString(),db.queryForObject("SELECT version_key FROM task_context_reads WHERE task_id=?",String.class,t));
   act("EXPERIENCE_VERSION",published.version().id(),"DISABLE");assertFalse(gate.active("TASK",t));act("EXPERIENCE_VERSION",published.version().id(),"PURGE");cleanAll();assertEquals("PURGED",service.get(owner,tenant,"TASK",t).state());
  }

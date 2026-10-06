@@ -40,6 +40,11 @@ class DepartureResidualCleanupIntegrationTest {
     record Publication(UUID id,UUID run,UUID materialVersion) {}
 
     @BeforeEach void fixture(){now=Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS);when(clock.now()).thenReturn(now);s=scope();}
+    @org.junit.jupiter.api.AfterEach void retireFixtureQueues(){
+        db.update("UPDATE export_batches SET state='REMOVED',cleanup_state='COMPLETE',lease_token=NULL,lease_until=NULL WHERE tenant_id=?",s.tenant());
+        db.update("UPDATE conversation_tasks SET status='CANCELLED' WHERE tenant_id=? AND status IN ('QUEUED','RUNNING')",s.tenant());
+        db.update("UPDATE knowledge_runs SET status='CANCELLED' WHERE tenant_id=? AND status IN ('QUEUED','RUNNING')",s.tenant());
+    }
     Timestamp at(Instant value){return Timestamp.from(value);}
     Scope scope(){
         var v=new Scope(UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID());

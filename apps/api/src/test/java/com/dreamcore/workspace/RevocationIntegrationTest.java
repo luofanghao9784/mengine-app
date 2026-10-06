@@ -38,7 +38,7 @@ class RevocationIntegrationTest {
         final HttpClient http=HttpClient.newBuilder().cookieHandler(new CookieManager(null,CookiePolicy.ACCEPT_ALL)).build();
         HttpRequest.Builder request(String path) { return HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+path)).timeout(java.time.Duration.ofSeconds(15)); }
         HttpRequest.Builder csrf(String path) throws Exception {
-            var req=request(path); var response=get("/api/v1/auth/csrf");
+            var req=request(path); var response=get(path.startsWith("/api/platform-admin/")?"/api/platform-admin/v1/auth/csrf":"/api/v1/auth/csrf");
             if(response.statusCode()==200) { var token=json(response);req.header(token.get("headerName").asString(),token.get("token").asString()); }
             return req;
         }
@@ -79,6 +79,8 @@ class RevocationIntegrationTest {
         a=UUID.randomUUID();b=UUID.randomUUID();actor=UUID.randomUUID();admin=UUID.randomUUID();platform=UUID.randomUUID();
         member=account(actor);peer=new Client();peer.login(actor);manager=account(admin);operator=account(platform);
         db.update("INSERT INTO platform_roles(account_id,role) VALUES (?,'PLATFORM_ADMIN')",platform);
+        db.update("INSERT INTO platform_accounts(account_id,login_name,password_hash) VALUES (?,?,?)",platform,platform+"@revoke.example.test",passwords.encode(PASSWORD));
+        operator.ok("/api/platform-admin/v1/auth/login",Map.of("username",platform+"@revoke.example.test","password",PASSWORD),200);
         db.update("INSERT INTO tenants(id,name) VALUES (?,'撤权 A'),(?,'撤权 B')",a,b);
         db.update("INSERT INTO tenant_memberships(tenant_id,account_id,role) VALUES (?,?,'MEMBER'),(?,?,'MEMBER'),(?,?,'TENANT_ADMIN')",a,actor,b,actor,a,admin);
         shared=space(a,true);personalA=space(a,false);personalB=space(b,false);
@@ -95,7 +97,12 @@ class RevocationIntegrationTest {
     }
     @AfterEach void removeFixturePlatformRole() {
         // The bootstrap integration test deliberately starts without a platform role.
-        if(platform!=null) db.update("DELETE FROM platform_roles WHERE account_id=?",platform);
+        if(platform!=null) {
+            db.update("DELETE FROM platform_sessions WHERE account_id=?",platform);
+            db.update("DELETE FROM tenant_service_changes WHERE actor_id=?",platform);
+            db.update("DELETE FROM platform_accounts WHERE account_id=?",platform);
+            db.update("DELETE FROM platform_roles WHERE account_id=?",platform);
+        }
     }
     long version() throws Exception { return manager.ok(management()+"/workspaces/"+shared,null,200).get("version").asLong(); }
     void grant(boolean enabled) throws Exception { manager.ok(control(),Map.of("requestId",UUID.randomUUID(),"expectedVersion",version(),"enabled",enabled),200); }
@@ -107,7 +114,7 @@ class RevocationIntegrationTest {
     void statusTenant(String status) throws Exception {
         String path="/api/platform-admin/v1/tenants/"+a;
         long version=operator.ok(path,null,200).get("version").asLong();
-        operator.ok(path+"/status",Map.of("requestId",UUID.randomUUID(),"expectedVersion",version,"status",status),200);
+        operator.ok(path+"/status",Map.of("requestId",UUID.randomUUID(),"expectedVersion",version,"status",status,"internalReason","合成撤权检查","publicReason","合成服务状态"),200);
     }
     void revoke(Change change) throws Exception {
         switch(change) {
@@ -230,7 +237,7 @@ class RevocationIntegrationTest {
         if(action==PlatformAction.CREATE) {
             path="/api/platform-admin/v1/tenants";body=Map.of("requestId",key,"name","Forbidden tenant","adminEmail",UUID.randomUUID()+"@revoke.example.test");
         } else if(action==PlatformAction.STATUS) {
-            path="/api/platform-admin/v1/tenants/"+a+"/status";body=Map.of("requestId",key,"expectedVersion",0,"status","SUSPENDED");
+            path="/api/platform-admin/v1/tenants/"+a+"/status";body=Map.of("requestId",key,"expectedVersion",0,"status","SUSPENDED","internalReason","合成撤权检查","publicReason","合成服务状态");
         } else {
             path="/api/platform-admin/v1/tenants/"+pending+"/initial-admin-invitation";
             body=Map.of("requestId",key,"expectedVersion",0,"email",UUID.randomUUID()+"@revoke.example.test");
@@ -261,6 +268,6 @@ class RevocationIntegrationTest {
         for(String response:List.of(operator.ok("/api/platform-admin/v1/tenants/"+a+"/records",null,200).toString(),manager.ok(management()+"/records",null,200).toString())) {
             assertFalse(response.contains(document));assertFalse(response.contains(folder.toString()));assertFalse(response.contains("MATERIAL_"));assertFalse(response.contains("private-name"));assertFalse(response.contains("synthetic-private-original"));
         }
-        rejected(operator.get(downloads.get(0)),403);rejected(manager.get(downloads.get(0)),404);
+        rejected(operator.get(downloads.get(0)),401);rejected(manager.get(downloads.get(0)),404);
     }
 }

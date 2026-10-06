@@ -35,10 +35,11 @@ class OperationsIntegrationTest {
         db.update("INSERT INTO workspaces(id,tenant_id,owner_id,name,kind) VALUES (?,?,?,?,'PERSONAL'),(?,?,?,?,'PERSONAL')",space,tenant,member,SECRET,foreign,other,member,SECRET);
     }
     @AfterEach void clean(){
-        db.update("DELETE FROM platform_roles WHERE account_id=?",operator);
+        db.update("DELETE FROM platform_sessions WHERE account_id=?",operator);db.update("DELETE FROM platform_accounts WHERE account_id=?",operator);db.update("DELETE FROM platform_roles WHERE account_id=?",operator);
         db.update("UPDATE conversation_tasks SET status='CANCELLED' WHERE tenant_id IN (?,?) AND status IN ('QUEUED','RUNNING')",tenant,other);
         db.update("UPDATE knowledge_runs SET status='CANCELLED' WHERE tenant_id IN (?,?) AND status IN ('QUEUED','RUNNING')",tenant,other);
     }
+    ConversationService.Job claimQueued(){for(int tick=0;tick<20;tick++){var job=conversations.claim();if(job!=null)return job;}throw new AssertionError("Queued fixture was not claimed after lease reconciliation");}
     UUID row(UUID t,UUID s,String status,String mode,String execution,String error,int attempt,int age,String usage){
         UUID c=UUID.randomUUID(),id=UUID.randomUUID();
         db.update("INSERT INTO conversations(id,tenant_id,workspace_id,owner_id,title) VALUES (?,?,?,?,?)",c,t,s,member,SECRET);
@@ -63,6 +64,30 @@ class OperationsIntegrationTest {
         db.update("UPDATE conversation_tasks SET status='SUCCEEDED',finished_at=now() WHERE id=?",task);
         var done=telemetry.read(admin,tenant,false);assertEquals(0,channel(done,"RESPONSE").running());assertEquals(1,channel(done,"TASK").completedRecent());
         assertFalse(new JsonMapper().writeValueAsString(done).contains(SECRET));assertEquals("NOT_CONNECTED",done.evolution());
+    }
+    long running(EngineTelemetryService.TenantDistribution d){return d.tenants().stream().mapToLong(EngineTelemetryService.TenantRunning::running).sum()+d.otherRunning();}
+    @Test void tenantDistributionCountsOnlyRunningPerTenantForPlatformAuthority(){
+        db.update("UPDATE tenants SET name=? WHERE id=?","合成企业甲-"+tenant,tenant);db.update("UPDATE tenants SET name=? WHERE id=?","合成企业乙-"+other,other);
+        var before=telemetry.tenants(operator);
+        for(int i=0;i<3;i++)row(tenant,space,"RUNNING","AGENT","live",null,1,40,null);
+        row(other,foreign,"RUNNING","SOURCE_LOOKUP",null,null,1,0,null);
+        task("QUEUED");task("FAILED");task("RESULT_UNKNOWN");task("SUCCEEDED");
+        UUID connection=UUID.randomUUID();db.update("INSERT INTO data_connections(id,tenant_id,name,route_label,access_summary,status,time_zone) VALUES (?,?,?,?,?,'READY','UTC')",connection,other,SECRET,SECRET,SECRET);
+        db.update("INSERT INTO collection_runs(id,tenant_id,connection_id,execution_epoch,trigger_kind,status) VALUES (?,?,?,0,'SCHEDULED','RUNNING')",UUID.randomUUID(),other,connection);
+        var after=telemetry.tenants(operator);
+        assertEquals(running(before)+5,running(after));assertTrue(after.tenants().size()<=EngineTelemetryService.TENANT_LIMIT);
+        assertEquals(after.otherTenants()==0,after.otherRunning()==0);
+        var mine=after.tenants().stream().filter(t->t.tenantId().equals(tenant)).findFirst().orElseThrow();assertEquals(3,mine.running());assertEquals("合成企业甲-"+tenant,mine.tenantName());
+        assertEquals(2,after.tenants().stream().filter(t->t.tenantId().equals(other)).findFirst().orElseThrow().running());
+        assertTrue(after.tenants().stream().allMatch(t->t.running()>0));
+        for(int i=1;i<after.tenants().size();i++)assertTrue(after.tenants().get(i-1).running()>=after.tenants().get(i).running());
+        // Per-tenant counts equal the tenant snapshot; general adjustment has no tenant and is not attributed.
+        assertEquals(telemetry.read(admin,tenant,false).channels().stream().mapToLong(EngineTelemetryService.Channel::running).sum(),mine.running());
+        var serialized=new JsonMapper().writeValueAsString(after);
+        for(String forbidden:List.of(SECRET,member.toString(),space.toString(),connection.toString(),"prompt","code","channels","workspaceId"))assertFalse(serialized.contains(forbidden));
+        denied(403,()->telemetry.tenants(admin));denied(403,()->telemetry.tenants(member));
+        db.update("DELETE FROM platform_roles WHERE account_id=?",operator);denied(403,()->telemetry.tenants(operator));
+        db.update("UPDATE collection_runs SET status='SUCCEEDED',finished_at=now() WHERE connection_id=?",connection);
     }
     @Test void telemetryKeepsScopeUnknownAndPartialStatesAndBoundsCompletionWindow(){
         task("QUEUED");task("WAITING_INPUT");task("RESULT_UNKNOWN");task("PARTIAL");task("FAILED");task("SUCCEEDED");
@@ -127,11 +152,11 @@ class OperationsIntegrationTest {
     }
     @Test void actualRetryAndDuplicateSubmissionKeepOneTaskAndRemoveResolvedError(){
         UUID key=UUID.randomUUID();var first=conversations.submit(member,tenant,null,space,key,SECRET,"SOURCE_LOOKUP");conversations.submit(member,tenant,null,space,key,SECRET,"SOURCE_LOOKUP");
-        var j=conversations.claim();assertEquals(tenant,j.tenant());conversations.fail(j,"TASK_RUNTIME_UNAVAILABLE");assertEquals(1,operations.tenant(admin,tenant,7).tasks().failed());
+        var j=claimQueued();assertEquals(tenant,j.tenant());conversations.fail(j,"TASK_RUNTIME_UNAVAILABLE");assertEquals(1,operations.tenant(admin,tenant,7).tasks().failed());
         var failed=conversations.detail(member,tenant,first.conversation().id(),0,20).tasks().getFirst();UUID retry=UUID.randomUUID();
         conversations.action(member,tenant,first.conversation().id(),j.id(),retry,failed.revision(),"RETRY");conversations.action(member,tenant,first.conversation().id(),j.id(),retry,failed.revision(),"RETRY");
         assertEquals(1,operations.tenant(admin,tenant,7).tasks().total());assertTrue(operations.tenant(admin,tenant,7).errors().isEmpty());
-        var next=conversations.claim();conversations.finish(next,new TaskRuntime.Result("1.0","test",next.id(),next.token(),"SOURCE_LOOKUP","NO_SOURCES",List.of()));
+        var next=claimQueued();conversations.finish(next,new TaskRuntime.Result("1.0","test",next.id(),next.token(),"SOURCE_LOOKUP","NO_SOURCES",List.of()));
         conversations.action(member,tenant,first.conversation().id(),j.id(),retry,failed.revision(),"RETRY");
         var done=operations.tenant(admin,tenant,7);assertEquals(1,done.tasks().total());assertEquals(1,done.tasks().succeeded());assertEquals(1,done.tasks().retryStarts());assertTrue(done.models().isEmpty());
     }
@@ -172,13 +197,19 @@ class OperationsIntegrationTest {
         for(String secret:List.of(SECRET,member.toString(),space.toString(),"prompt","filename","conversationId","modelName","@example.test"))assertFalse(r.body().contains(secret));
         var monitor=http.send(HttpRequest.newBuilder(URI.create(base+"/api/tenant-admin/v1/tenants/"+tenant+"/engine-telemetry")).GET().build(),HttpResponse.BodyHandlers.ofString());assertEquals(200,monitor.statusCode());assertEquals("private, no-store",monitor.headers().firstValue("Cache-Control").orElseThrow());assertFalse(monitor.body().contains(SECRET));
         assertEquals(401,http.send(HttpRequest.newBuilder(URI.create(base+"/api/platform-admin/v1/engine-telemetry")).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
+        assertEquals(401,http.send(HttpRequest.newBuilder(URI.create(base+"/api/platform-admin/v1/engine-telemetry/tenants")).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
+        assertEquals(404,http.send(HttpRequest.newBuilder(URI.create(base+"/api/tenant-admin/v1/tenants/"+tenant+"/engine-telemetry/tenants")).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
         db.update("INSERT INTO platform_accounts(account_id,login_name,password_hash) VALUES (?,?,?)",operator,operator+"@example.test",passwords.encode(PASSWORD));
         var platformCsrf=json.readTree(http.send(HttpRequest.newBuilder(URI.create(base+"/api/platform-admin/v1/auth/csrf")).GET().build(),HttpResponse.BodyHandlers.ofString()).body());
         var platformLogin=HttpRequest.newBuilder(URI.create(base+"/api/platform-admin/v1/auth/login")).header(platformCsrf.get("headerName").asString(),platformCsrf.get("token").asString()).header("Content-Type","application/json").POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(Map.of("username",operator+"@example.test","password",PASSWORD)))).build();
         assertEquals(200,http.send(platformLogin,HttpResponse.BodyHandlers.ofString()).statusCode());
         var platformMonitor=http.send(HttpRequest.newBuilder(URI.create(base+"/api/platform-admin/v1/engine-telemetry")).GET().build(),HttpResponse.BodyHandlers.ofString());assertEquals(200,platformMonitor.statusCode());assertEquals("private, no-store",platformMonitor.headers().firstValue("Cache-Control").orElseThrow());assertFalse(platformMonitor.body().contains(SECRET));
+        var distribution=http.send(HttpRequest.newBuilder(URI.create(base+"/api/platform-admin/v1/engine-telemetry/tenants")).GET().build(),HttpResponse.BodyHandlers.ofString());assertEquals(200,distribution.statusCode());assertEquals("private, no-store",distribution.headers().firstValue("Cache-Control").orElseThrow());
+        assertEquals(Set.of("checkedAt","tenants","otherTenants","otherRunning"),new HashSet<>(json.readTree(distribution.body()).propertyNames()));
+        for(String secret:List.of(member.toString(),space.toString(),"prompt","filename","@example.test"))assertFalse(distribution.body().contains(secret));
         db.update("DELETE FROM platform_roles WHERE account_id=?",operator);
         assertEquals(401,http.send(HttpRequest.newBuilder(URI.create(base+"/api/platform-admin/v1/engine-telemetry")).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
+        assertEquals(401,http.send(HttpRequest.newBuilder(URI.create(base+"/api/platform-admin/v1/engine-telemetry/tenants")).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
         assertEquals(400,http.send(HttpRequest.newBuilder(URI.create(base+path+"?days=8")).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
         assertEquals(401,http.send(HttpRequest.newBuilder(URI.create(base+"/api/platform-admin/v1/operations")).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
     }

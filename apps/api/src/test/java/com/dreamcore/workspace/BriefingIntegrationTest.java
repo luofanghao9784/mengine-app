@@ -36,7 +36,10 @@ class BriefingIntegrationTest {
     BriefingService.Page list(){return briefing.list(owner,tenant,null,"LATEST",null,"Asia/Shanghai",0,20);}
     ConversationService.Detail success(UUID actor,UUID location,UUID conversation,String reply,String finishedAt){
         var submitted=conversations.submit(actor,tenant,conversation,location,UUID.randomUUID(),"合成画报任务","AGENT");
-        var job=conversations.claim();assertNotNull(job);assertEquals(submitted.tasks().getLast().id(),job.id());
+        var job=conversations.claim();
+        // A dispatch tick may reconcile an expired synthetic lease before claiming queued work.
+        for(int tick=0;job==null && tick<20;tick++) job=conversations.claim();
+        assertNotNull(job);assertEquals(submitted.tasks().getLast().id(),job.id());
         agents.finish(job,new AgentResult("1.4","0.8.0",job.id(),job.token(),"AGENT","verification","local-verification",reply,List.of(),List.of(),List.of(),1,null,List.of(),List.of(),List.of()));
         if(finishedAt!=null)db.update("UPDATE conversation_tasks SET finished_at=? WHERE id=?",Timestamp.from(Instant.parse(finishedAt)),job.id());
         return conversations.detail(actor,tenant,submitted.conversation().id(),0,20);

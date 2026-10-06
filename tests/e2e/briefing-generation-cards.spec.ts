@@ -215,7 +215,7 @@ async function generationFixture(page: Page, initial = false) {
       });
     return route.fulfill(readFailure ? { status: 503, json: { code: 'UNAVAILABLE' } } : { json: [newCard] });
   });
-  await page.route('**/api/**/briefing/generation*', async (route) => {
+  await page.route(/\/briefing\/generation(?:\/[^?]*)?(?:\?.*)?$/, async (route) => {
     if (route.request().method() === 'POST') {
       posts.push(route.request().postDataJSON());
       if (failPost) {
@@ -223,7 +223,7 @@ async function generationFixture(page: Page, initial = false) {
         return route.abort('failed');
       }
       batches = [batch()];
-      return route.fulfill({ json: batches[0] });
+      return route.fulfill({ json: route.request().url().endsWith('/selection') ? batches : batches[0] });
     }
     reads++;
     return route.fulfill(
@@ -271,6 +271,12 @@ async function generationFixture(page: Page, initial = false) {
   };
 }
 
+async function submitGeneration(page: Page) {
+  await page.getByRole('button', { name: '生成更多', exact: true }).click();
+  await page.getByRole('button', { name: '下一步', exact: true }).click();
+  await page.getByRole('button', { name: '生成 1 张', exact: true }).click();
+}
+
 test('生成入口原位显示进度且不新增占位，完成后展示结果与入口', async ({ page }) => {
   test.setTimeout(40000);
   const f = await generationFixture(page);
@@ -286,7 +292,7 @@ test('生成入口原位显示进度且不新增占位，完成后展示结果�
     .poll(() => old.evaluate((el) => el.getAnimations().filter((a) => a.playState === 'running').length))
     .toBe(0);
   const originalBox = await old.boundingBox();
-  await page.getByRole('button', { name: '生成更多', exact: true }).click();
+  await submitGeneration(page);
   let slot = more;
   await expect(slot.locator('.is-generating')).toBeVisible();
   await expect(page.getByRole('tab', { name: '推荐', exact: true })).toBeEnabled();
@@ -347,11 +353,11 @@ test('等待和失败有真实状态，取消去掉占位，刷新只读取不�
   await page.getByRole('button', { name: '取消本次', exact: true }).click();
   await expect(page.locator('.generation-placeholder')).toHaveCount(0);
   await expect(page.locator('.briefing-generation')).toContainText('已取消本次生成');
-  await page.getByRole('button', { name: '生成更多', exact: true }).click();
+  await submitGeneration(page);
   await expect(page.locator('.generation-placeholder')).toHaveAttribute('data-batch-id', uid(30));
   await expect(page.getByRole('tab', { name: '推荐', exact: true })).toBeEnabled();
   f.set('FAILED', 'TASK_LIMIT');
-  await expect(page.locator('.briefing-generation')).toContainText('本次未完成，可稍后重试', {
+  await expect(page.locator('.briefing-generation')).toContainText('本次生成达到处理上限，尚未完成画报。', {
     timeout: 10000,
   });
   await expect(page.locator('.generation-placeholder')).toHaveCount(0);
@@ -363,7 +369,7 @@ test('结果未知重试使用同一请求，完成后读卡失败可重读且�
   const f = await generationFixture(page);
   await page.goto(home);
   f.failNext();
-  await page.getByRole('button', { name: '生成更多', exact: true }).click();
+  await submitGeneration(page);
   await expect(page.getByRole('button', { name: '重试本次请求' })).toBeEnabled();
   await page.getByRole('button', { name: '重试本次请求' }).click();
   await expect(page.locator('.is-generating')).toBeVisible();
@@ -454,6 +460,7 @@ test('异步推荐卡片提交后才按 Demo 参数入场，下拉完成后重�
   await expect(page.locator('.live-card-action-rail')).toHaveCount(0);
   await expect(page.getByRole('button', { name: '刷新智能画报', exact: true })).toHaveCount(0);
   hold = false;
+  await page.locator('#live-briefing-panel').hover({ position: { x: 10, y: 6 } });
   await page.mouse.wheel(0, -220);
   await expect.poll(async () => (await arrivals()).length).toBe(2);
   expect(f.posts).toHaveLength(0);
@@ -1077,7 +1084,7 @@ test('生成请求等待时不出现全页状态气泡，已有卡片与入口�
   await generationFixture(page);
   let release!: () => void;
   let waiting = false;
-  await page.route('**/api/**/briefing/generation*', async route => {
+  await page.route(/\/briefing\/generation(?:\/[^?]*)?(?:\?.*)?$/, async route => {
     if (route.request().method() === 'POST') {
       waiting = true;
       await new Promise<void>(resolve => { release = resolve; });
@@ -1091,7 +1098,7 @@ test('生成请求等待时不出现全页状态气泡，已有卡片与入口�
   const oldBox = await old.boundingBox(), moreBox = await more.boundingBox();
   const oldNode = await old.elementHandle();
   const generationNode = await more.locator('article').elementHandle();
-  await page.getByRole('button', { name: '生成更多', exact: true }).click();
+  await submitGeneration(page);
   await expect.poll(() => waiting).toBe(true);
   await expect(more).toContainText('正在准备新画报');
   await expect(page.getByText('正在核对本次提交，请在原处完成或重试后再切换页面。', { exact: true })).toHaveCount(0);

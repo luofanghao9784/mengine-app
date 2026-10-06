@@ -29,3 +29,16 @@ export interface EngineTelemetry {
   evolution: 'NOT_CONNECTED';
   channels: TelemetryChannel[];
 }
+/** Platform only: running records per tenant. Counts and tenant identity only, no channel or content. */
+export interface TenantRunning {
+  tenantId: string;
+  tenantName: string;
+  running: number;
+}
+export interface TenantDistribution {
+  checkedAt: string;
+  /** Most running first, at most 10; the rest are folded into otherTenants / otherRunning. */
+  tenants: TenantRunning[];
+  otherTenants: number;
+  otherRunning: number;
+}

@@ -30,7 +30,8 @@ const tenants = ['合成健身', '合成餐饮', '合成零售', '合成教育']
   name,
   status: i === 3 ? 'SUSPENDED' : 'ACTIVE',
   createdAt: '2026-09-2' + i + 'T02:00:00Z',
-  memberCount: [12, 34, 8, 21][i],
+  activeMemberCount: [12, 34, 8, 21][i],
+  owner: { state: 'ASSIGNED', accountId: id(30 + i), name: names[i] },
   version: 0,
 }));
 
@@ -130,7 +131,7 @@ const shots: [string, string][] = [
   ['tenant-overview', `/tenant-admin/#tenant=${tenant}`],
   ['tenant-members', `/tenant-admin/#tenant=${tenant}&admin=members`],
   ['platform-overview', `/platform-admin/`],
-  ['platform-enterprises', `/platform-admin/#admin=enterprises`],
+  ['platform-enterprises', `/platform-admin/#admin=tenants`],
   ['platform-engine', `/platform-admin/#admin=engine`],
   ['tenant-engine', `/tenant-admin/#tenant=${tenant}&admin=engine`],
 ];

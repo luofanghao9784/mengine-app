@@ -397,7 +397,7 @@ class IdentityIntegrationTest {
         }
         assertEquals(1,db.queryForObject("SELECT count(*) FROM identity_audit WHERE tenant_id=? AND action='TENANT_SUSPEND'",Integer.class,UUID.fromString(id)));
     }
-    @Test void populatedV2DatabaseMigratesInitialInvitationAndEnforcesTenantForeignKey() {
+    @Test void populatedV2DatabaseMigratesThroughV5AndEnforcesTenantForeignKey() {
         String schema="b2_migration_"+UUID.randomUUID().toString().replace("-","");
         UUID account=UUID.randomUUID(),tenant=UUID.randomUUID(),other=UUID.randomUUID(),first=UUID.randomUUID(),later=UUID.randomUUID();
         try {
@@ -408,7 +408,9 @@ class IdentityIntegrationTest {
             UUID shared=UUID.randomUUID(),personal=UUID.randomUUID();
             db.update("INSERT INTO "+schema+".tenant_memberships(tenant_id,account_id,role) VALUES (?,?,'TENANT_ADMIN')",tenant,account);
             db.update("INSERT INTO "+schema+".workspaces(id,tenant_id,owner_id,name,kind) VALUES (?,?,?,'旧共享空间','SHARED'),(?,?,?,'旧个人空间','PERSONAL')",shared,tenant,account,personal,tenant,account);
-            org.flywaydb.core.Flyway.configure().dataSource(db.getDataSource()).schemas(schema).defaultSchema(schema).load().migrate();
+            // This isolated-schema fixture verifies the V3-V5 identity/material backfill.
+            // Later production migrations intentionally target public and are covered by suite startup.
+            org.flywaydb.core.Flyway.configure().dataSource(db.getDataSource()).schemas(schema).defaultSchema(schema).target("5").load().migrate();
             assertEquals(0,db.queryForObject("SELECT settings_version FROM "+schema+".tenants WHERE id=?",Long.class,tenant));
             assertEquals(0,db.queryForObject("SELECT management_version FROM "+schema+".tenant_memberships WHERE tenant_id=?",Long.class,tenant));
             assertEquals(0,db.queryForObject("SELECT management_version FROM "+schema+".workspaces WHERE id=?",Long.class,shared));

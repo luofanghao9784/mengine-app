@@ -1,4 +1,4 @@
-import { supportPath } from '../identity/support-request';
+import { supportPath } from '../identity/support-request.ts';
 import type {
   CreateExport,
   ExportBatch,

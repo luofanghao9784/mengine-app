@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>梦擎 · 引擎观测台 — 独立风格原型</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body data-scenario="busy">
+    <svg class="symbols" aria-hidden="true">
+      <defs>
+        <symbol id="i-grid" viewBox="0 0 24 24">
+          <rect x="4" y="4" width="6" height="6" rx="1.5" />
+          <rect x="14" y="4" width="6" height="6" rx="1.5" />
+          <rect x="4" y="14" width="6" height="6" rx="1.5" />
+          <rect x="14" y="14" width="6" height="6" rx="1.5" />
+        </symbol>
+        <symbol id="i-engine" viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4" /></symbol>
+        <symbol id="i-input" viewBox="0 0 24 24"><path d="M12 3v11m-4-4 4 4 4-4M4 15v5h16v-5" /></symbol>
+        <symbol id="i-process" viewBox="0 0 24 24">
+          <rect x="6" y="6" width="12" height="12" rx="3" />
+          <path d="M9 2v4m6-4v4M9 18v4m6-4v4M2 9h4m-4 6h4m12-6h4m-4 6h4" />
+          <rect x="10" y="10" width="4" height="4" rx="1" />
+        </symbol>
+        <symbol id="i-output" viewBox="0 0 24 24"><path d="M12 16V3m-4 4 4-4 4 4M4 15v5h16v-5" /></symbol>
+        <symbol id="i-memory" viewBox="0 0 24 24">
+          <path
+            d="M8 3C3 3 3 9 6 10c-5 3-2 10 3 9l3 2V4L8 3Zm8 0c5 0 5 6 2 7 5 3 2 10-3 9l-3 2V4l4-1ZM6 10l3 2m9-2-3 2M5 16l4-1m10 1-4-1"
+          />
+        </symbol>
+        <symbol id="i-data" viewBox="0 0 24 24">
+          <ellipse cx="12" cy="5" rx="8" ry="3" />
+          <path d="M4 5v14c0 4 16 4 16 0V5M4 12c0 4 16 4 16 0" />
+        </symbol>
+        <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 3v17h17M8 15v-4m5 4V7m5 8V4" /></symbol>
+        <symbol id="i-settings" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="7" />
+          <circle cx="12" cy="12" r="2" />
+          <path d="M12 2v3m0 14v3M2 12h3m14 0h3M5 5l2 2m10 10 2 2M5 19l2-2M17 7l2-2" />
+        </symbol>
+        <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-5-5 5 5-5 5" /></symbol>
+        <symbol id="i-pause" viewBox="0 0 24 24"><path d="M9 5v14M15 5v14" /></symbol>
+      </defs>
+    </svg>
+    <aside class="rail" aria-label="总台环境示意">
+      <div class="brand" title="梦擎 DREAMCORE">m<span>·</span></div>
+      <div class="rail-icons" aria-hidden="true">
+        <span
+          ><svg><use href="#i-grid" /></svg
+        ></span>
+        <span class="active"
+          ><svg><use href="#i-engine" /></svg
+        ></span>
+        <span
+          ><svg><use href="#i-data" /></svg
+        ></span>
+        <span
+          ><svg><use href="#i-memory" /></svg
+        ></span>
+        <span
+          ><svg><use href="#i-chart" /></svg
+        ></span>
+      </div>
+      <div class="rail-bottom">
+        <svg aria-hidden="true"><use href="#i-settings" /></svg>
+        <div class="avatar">D</div>
+      </div>
+    </aside>
+    <main>
+      <header class="header">
+        <div>
+          <div class="eyebrow">DREAMCORE <span>/</span> ENGINE OBSERVATORY</div>
+          <h1>引擎仪表盘 <span class="scope">总台 · 全局概览</span></h1>
+        </div>
+        <div class="prototype-controls">
+          <span class="prototype-label"><i></i> 风格原型 · 模拟数据</span>
+          <div class="scenario-switch" role="group" aria-label="预览运行状态">
+            <button data-mode="busy" aria-pressed="true">运行中</button
+            ><button data-mode="idle" aria-pressed="false">空闲</button
+            ><button data-mode="fault" aria-pressed="false">异常</button
+            ><button data-mode="offline" aria-pressed="false">断开</button>
+          </div>
+        </div>
+      </header>
+      <section class="status-strip" aria-label="运行概况">
+        <div class="system-status">
+          <span class="status-light"></span>
+          <div>
+            <strong id="status-title">正在协同运行</strong
+            ><small id="status-caption">四组能力，围绕每一次工作交付</small>
+          </div>
+        </div>
+        <div class="metric"><span>登记执行中</span><strong id="metric-running">18</strong></div>
+        <div class="metric"><span>排队</span><strong id="metric-queued">4</strong></div>
+        <div class="metric"><span>等待 / 部分完成</span><strong id="metric-waiting">2</strong></div>
+        <div class="metric"><span>结果待核对</span><strong id="metric-unknown">0</strong></div>
+        <button class="metric alert-metric" id="open-errors">
+          <span>保留异常 <span aria-hidden="true">↗</span></span
+          ><strong id="metric-failed">0</strong>
+        </button>
+      </section>
+      <div class="workspace">
+        <section class="observatory" aria-label="引擎能力关系图">
+          <div class="scene-heading">
+            <div>
+              <span class="eyebrow">THE ENGINE AT WORK</span>
+              <h2>让工作流动，让经验沉淀。</h2>
+            </div>
+            <span class="scene-hint">选择节点，查看运行类别 <span>↗</span></span>
+          </div>
+          <div class="scene" id="scene">
+            <svg class="network" viewBox="0 0 1000 570" preserveAspectRatio="none" aria-hidden="true">
+              <defs>
+                <radialGradient id="halo">
+                  <stop stop-color="#adc6eb" stop-opacity=".12" />
+                  <stop offset="1" stop-color="#adc6eb" stop-opacity="0" />
+                </radialGradient>
+                <linearGradient id="wire">
+                  <stop stop-color="#80abb6" stop-opacity=".18" />
+                  <stop offset=".5" stop-color="#d2dbe7" stop-opacity=".55" />
+                  <stop offset="1" stop-color="#bdb0dd" stop-opacity=".18" />
+                </linearGradient>
+              </defs>
+              <ellipse cx="500" cy="268" rx="330" ry="245" fill="url(#halo)" />
+              <g class="orbit-grid">
+                <ellipse cx="500" cy="280" rx="325" ry="194" />
+                <ellipse cx="500" cy="280" rx="245" ry="154" />
+                <ellipse cx="500" cy="280" rx="153" ry="115" />
+                <path d="M100 280h800M500 40v480" />
+                <ellipse cx="500" cy="280" rx="325" ry="64" transform="rotate(-24 500 280)" />
+              </g>
+              <g class="wires">
+                <path d="M220 192C345 192 350 240 432 263" />
+                <path d="M571 263C655 240 654 192 780 192" />
+                <path d="M571 300C659 330 652 393 780 393" />
+                <path d="M432 300C351 330 349 393 220 393" />
+                <path class="feedback-line" d="M220 426C382 535 670 523 780 426" />
+              </g>
+              <g class="link-markers">
+                <circle cx="356" cy="222" r="3" />
+                <circle cx="643" cy="222" r="3" />
+                <circle cx="648" cy="340" r="3" />
+                <circle cx="352" cy="340" r="3" />
+              </g>
+              <g class="diagram-labels">
+                <text x="340" y="195">理解</text>
+                <text x="640" y="195">执行</text>
+                <text x="644" y="365">交付</text>
+                <text x="338" y="365">积累</text>
+              </g>
+            </svg>
+            <div class="core" aria-label="引擎核心">
+              <div class="core-aura"></div>
+              <svg id="core-art" viewBox="0 0 300 300" aria-hidden="true">
+                <defs>
+                  <radialGradient id="sphere">
+                    <stop stop-color="#d0e0ed" stop-opacity=".04" />
+                    <stop offset=".73" stop-color="#b9ccdf" stop-opacity=".07" />
+                    <stop offset=".94" stop-color="#e1e7ee" stop-opacity=".23" />
+                    <stop offset="1" stop-color="#ecf3ff" stop-opacity=".03" />
+                  </radialGradient>
+                  <linearGradient id="filament" x1="0" y1="0" x2="1" y2="1">
+                    <stop stop-color="#e8edff" stop-opacity=".65" />
+                    <stop offset=".5" stop-color="#718899" stop-opacity=".1" />
+                    <stop offset="1" stop-color="#ced9e6" stop-opacity=".85" />
+                  </linearGradient>
+                </defs>
+                <circle cx="150" cy="150" r="109" fill="url(#sphere)" />
+                <g id="filaments"></g>
+                <circle
+                  cx="150"
+                  cy="150"
+                  r="112"
+                  fill="none"
+                  stroke="#cbd7e7"
+                  stroke-opacity=".22"
+                  stroke-width=".5"
+                />
+                <circle
+                  cx="150"
+                  cy="150"
+                  r="128"
+                  fill="none"
+                  stroke="#cbd7e7"
+                  stroke-opacity=".14"
+                  stroke-dasharray="1 7"
+                />
+              </svg>
+              <div class="core-copy">
+                <span>DREAMCORE</span><strong id="core-number">18</strong
+                ><small id="core-state">登记执行中</small>
+              </div>
+              <div class="core-caption">
+                <span class="status-light"></span> <span id="core-caption">能力协同 · 有序运行</span>
+              </div>
+            </div>
+            <button class="node node-input" data-group="input" aria-pressed="false">
+              <span class="node-glyph"
+                ><svg><use href="#i-input" /></svg></span
+              ><span class="node-heading"
+                ><span>输入 <small>INPUT</small></span
+                ><b data-count="input">5</b></span
+              ><span class="node-subtitle">外部取数 · 解析 · 检索</span
+              ><span class="node-foot"
+                ><i></i><span data-state="input">5 项执行中</span><span class="node-arrow">↗</span></span
+              >
+            </button>
+            <button class="node node-process selected" data-group="process" aria-pressed="true">
+              <span class="node-glyph"
+                ><svg><use href="#i-process" /></svg></span
+              ><span class="node-heading"
+                ><span>处理 <small>PROCESS</small></span
+                ><b data-count="process">8</b></span
+              ><span class="node-subtitle">会话与画报 · 企业信息分析</span
+              ><span class="node-foot"
+                ><i></i><span data-state="process">8 项执行中</span><span class="node-arrow">↗</span></span
+              >
+            </button>
+            <button class="node node-memory" data-group="memory" aria-pressed="false">
+              <span class="node-glyph"
+                ><svg><use href="#i-memory" /></svg></span
+              ><span class="node-heading"
+                ><span>经验积累 <small>LEARNING</small></span
+                ><b data-count="memory">2</b></span
+              ><span class="node-subtitle">提炼 · 清洗 · 调整核验</span
+              ><span class="node-foot"
+                ><i></i><span data-state="memory">2 项执行中</span><span class="node-arrow">↗</span></span
+              >
+            </button>
+            <button class="node node-output" data-group="output" aria-pressed="false">
+              <span class="node-glyph"
+                ><svg><use href="#i-output" /></svg></span
+              ><span class="node-heading"
+                ><span>输出 <small>OUTPUT</small></span
+                ><b data-count="output">3</b></span
+              ><span class="node-subtitle">会话流式输出 · 成果导出</span
+              ><span class="node-foot"
+                ><i></i><span data-state="output">3 项执行中</span><span class="node-arrow">↗</span></span
+              >
+            </button>
+            <div class="evolution">
+              <span class="evolution-mark">✧</span><span>独立自进化</span
+              ><span class="inactive-tag">未启用</span><span class="evolution-note">与日常经验积累分开</span>
+            </div>
+          </div>
+          <footer class="scene-footer">
+            <span><i class="legend-dot"></i> 节点表示能力分组 · 连线表示关系</span
+            ><button id="motion-toggle" aria-pressed="false">
+              <svg><use href="#i-pause" /></svg><span>暂停动效</span>
+            </button>
+          </footer>
+        </section>
+        <aside class="inspector" aria-label="能力运行详情">
+          <div class="inspector-heading">
+            <span class="eyebrow">CAPABILITY DETAIL</span
+            ><span class="detail-index" id="detail-index">02 / 04</span>
+          </div>
+          <div class="detail-title">
+            <span class="detail-icon"
+              ><svg><use id="detail-icon" href="#i-process" /></svg
+            ></span>
+            <div>
+              <h2 id="detail-title">处理</h2>
+              <p id="detail-subtitle">把上下文转化为工作成果</p>
+            </div>
+          </div>
+          <div class="detail-summary">
+            <div><strong id="detail-running">8</strong><span>登记执行中</span></div>
+            <div><strong id="detail-completed">32</strong><span>近 5 分钟完成</span></div>
+          </div>
+          <div class="detail-section-title">运行类别 <span>执行中 / 排队</span></div>
+          <div id="channel-list" class="channel-list"></div>
+          <div class="detail-notice" id="detail-notice"></div>
+          <div class="detail-description">
+            <span class="eyebrow">HOW IT WORKS</span>
+            <p id="detail-description"></p>
+          </div>
+          <div class="snapshot-note">
+            <span class="snapshot-dot"></span
+            ><span
+              >模拟快照 <time id="snapshot-time">14:32:08</time
+              ><small>分类汇总，不代表模型并发数</small></span
+            >
+          </div>
+        </aside>
+      </div>
+      <section class="bottom-grid">
+        <div class="recent-panel">
+          <div class="panel-heading">
+            <h2>近期完成 <span>RECENT ACTIVITY</span></h2>
+            <span class="period">近 5 分钟 · 模拟汇总</span>
+          </div>
+          <div class="recent-items" id="recent-items"></div>
+        </div>
+        <div class="reading-panel">
+          <span class="eyebrow">OBSERVATION NOTE</span>
+          <p id="observation-note">运行中的工作可被看见，<br />积累下来的经验同样可被追踪。</p>
+          <span>原型仅展示分类计数，不展示员工会话正文。</span>
+        </div>
+      </section>
+      <footer class="page-footer">
+        <span>梦擎工作空间 <b>·</b> ENGINE OBSERVATORY</span
+        ><span>独立交互原型 <b>/</b> 尚未接入真实引擎 <b>/</b> 设计待确认</span>
+      </footer>
+      <p class="sr-only" role="status" id="announcement"></p>
+    </main>
+    <script src="./app.js"></script>
+  </body>
+</html>

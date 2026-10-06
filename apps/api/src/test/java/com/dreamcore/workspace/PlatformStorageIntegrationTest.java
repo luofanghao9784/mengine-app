@@ -12,7 +12,7 @@ class PlatformStorageIntegrationTest {
   db.update("INSERT INTO platform_roles(account_id,role) VALUES (?,'PLATFORM_ADMIN')",operator);db.update("INSERT INTO platform_accounts(account_id,login_name,password_hash) VALUES (?,?,?)",operator,operator+"@example.test",passwords.encode(PASSWORD));
   db.update("INSERT INTO tenants(id,name) VALUES (?,?)",tenant,SECRET);db.update("INSERT INTO tenant_memberships(tenant_id,account_id,role) VALUES (?,?,'TENANT_ADMIN')",tenant,member);db.update("INSERT INTO workspaces(id,tenant_id,owner_id,name,kind) VALUES (?,?,?,?,'PERSONAL')",space,tenant,member,SECRET);
  }
- @AfterEach void cleanup(){db.update("DELETE FROM platform_roles WHERE account_id=?",operator);}
+ @AfterEach void cleanup(){db.update("DELETE FROM platform_sessions WHERE account_id=?",operator);db.update("DELETE FROM platform_accounts WHERE account_id=?",operator);db.update("DELETE FROM platform_roles WHERE account_id=?",operator);}
  @Test void projectsStorageFactsAndRecordedPhysicalCleanupWithoutContent(){
   var before=service.status(operator);assertTrue(before.storage().databaseBytes()>0);assertTrue(before.storage().knowledgeBytes()>=0);assertEquals("NOT_CONFIGURED",before.backup().state());assertTrue(before.backup().events().isEmpty());
   byte[] payload=SECRET.getBytes();var m=materials.upload(member,tenant,space,null,null,null,UUID.randomUUID(),new MockMultipartFile("file",SECRET+".txt","text/plain",payload));

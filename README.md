@@ -1,6 +1,12 @@
 # 梦擎工作空间
 
+> **2026-10-06 主线版本整合：** Claude Code 三端视觉主题、自托管字体、双轨道标志与总台 3D 仪表盘统一纳入本目录 `main`；同步保留此前画报、会话及管理业务。范围、190 个既有提交清单、整合修复与实测结果见[整合记录](docs/交接/前端改版与主线整合-2026-10-06.md)。企业端 3D 复用（DEC-131）仍待实施。
+
 > **2026-10-06 客户端视觉改为 D 克制版（DEC-130）：** 客户端按端切换样式变量（`src/shared/theme.css` 中的 `:root[data-surface='workspace']`），组件层在 `src/identity/workspace-theme.css`；企业管理端与总台采用 D′ 梦核日光（收敛版），组件层在 `src/admin/admin-theme.css`，总台引擎仪表盘保持深色舞台。页面结构与交互不变。用合成数据预览真实客户端：`node --experimental-strip-types scripts/design/preview-workspace.ts`，脚本会自启独立端口（默认 5199）并把画报、会话、资料库、手机宽度截图写到 `.local/design-preview/`；管理端用 `node --experimental-strip-types scripts/design/preview-admin.ts`（默认端口 5195）。两者都不连接后端或模型。
+
+> **2026-10-06 总台引擎仪表盘（3D）：** 总台 `#admin=engine` 已按确认的 3D 原型改为 WebGL 舞台，动效只由真实运行快照驱动，新增总台专用企业执行分布接口；企业管理端仍为原运行墙。合成数据下的检查：`npx playwright test tests/e2e/platform-engine-dashboard.spec.ts tests/e2e/engine-telemetry.spec.ts`。口径与验证范围见[开发决策记录](docs/技术/开发决策记录.md)。
+
+> **历史原型（2026-10-06，正式总台已采用上方 3D 版本）：** 独立一屏交互预览，使用合成数据，未接入正式引擎、未替换管理端页面。根目录运行 `python3 -m http.server 5188 --bind 127.0.0.1 --directory docs/产品/原型/engine-observatory`，访问 `http://127.0.0.1:5188/`。设计选择与验证见[原型说明](docs/产品/原型/engine-observatory/README.md)，该原型保留用于设计追溯，不作为当前正式页面。
 
 > **2026-10-04 总部支持访问：** 总台企业概览已增加进入企业管理端入口，按企业负责人实际权限执行，保留总部身份、独立会话、审计及撤权围栏。权限与浏览器检查通过；本地运行安装与验收边界见[实施记录](docs/交接/总部支持访问实施记录-2026-10-04.md)。
 

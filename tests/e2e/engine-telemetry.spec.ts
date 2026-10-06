@@ -70,7 +70,8 @@ async function fixture(context: BrowserContext) {
     reads: () => reads,
   };
 }
-for (const realm of ['platform', 'tenant'] as const)
+// The platform realm now renders the redesigned dashboard (platform-engine-dashboard.spec.ts).
+for (const realm of ['tenant'] as const)
   test(`${realm} engine is a read-only four-part wall with honest sampling and responsive layout`, async ({
     page,
     context,
@@ -131,18 +132,18 @@ test('automatic polling produces real samples and stops after leaving the engine
   const f = await fixture(context);
   await page.clock.install();
   await page.goto('/platform-admin/#admin=engine');
-  await expect(page.locator('.engine-wall')).toBeVisible();
+  await expect(page.locator('.engine-dash')).toBeVisible();
   await page.clock.runFor(3010);
   await expect.poll(() => f.reads()).toBe(2);
   await expect(page.getByRole('img', { name: /已采样 2 次/ })).toBeVisible();
   await page.clock.runFor(3000);
   await expect.poll(() => f.reads()).toBe(3);
   await expect(page.getByRole('img', { name: /已采样 3 次/ })).toBeVisible();
-  await expect(page.locator('.engine-refresh')).toContainText('每 3 秒更新');
+  await expect(page.locator('.eng3d-snap')).toContainText('可见时每 3 秒');
   await page.evaluate(() => {
     location.hash = '#admin=overview';
   });
-  await expect(page.locator('.engine-wall')).toHaveCount(0);
+  await expect(page.locator('.engine-dash')).toHaveCount(0);
   const count = f.reads();
   await page.clock.runFor(45000);
   expect(f.reads()).toBe(count);
@@ -152,7 +153,7 @@ test('hidden pages stop sampling until they become visible', async ({ page, cont
   const f = await fixture(context);
   await page.clock.install();
   await page.goto('/platform-admin/#admin=engine');
-  await expect(page.locator('.engine-wall')).toBeVisible();
+  await expect(page.locator('.engine-dash')).toBeVisible();
   await page.evaluate(() =>
     Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' }),
   );

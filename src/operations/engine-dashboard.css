@@ -1,0 +1,509 @@
+/* Platform engine dashboard: 3D stage (engine-stage/) on top, observed sections below in the stage palette. */
+.engine-dash {
+  --ed-bg: #0b0a09;
+  --ed-text: #eceae4;
+  --ed-soft: #d6d2c8;
+  --ed-muted: #ada89e;
+  --ed-faint: #8c877d;
+  --ed-off: #5f5c56;
+  --ed-line: rgba(236, 234, 228, 0.09);
+  --ed-in: #d6e2ee;
+  --ed-pr: #f1d6a0;
+  --ed-out: #f0be72;
+  --ed-alert: #ff6f61;
+  --ed-unknown: #d8c4f0;
+  --ed-link: #d6d2c8;
+  box-sizing: border-box;
+  min-height: 100%;
+  color: var(--ed-text);
+  background: var(--ed-bg);
+  font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+.admin-control.admin-engine-fullscreen .admin-content:has(.engine-dash) {
+  background: #0b0a09;
+}
+.engine-dash > .platform-loading,
+.engine-dash-failure {
+  padding: 28px 32px;
+}
+.engine-dash-failure h1 {
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: 0.32em;
+  margin-bottom: 16px !important;
+}
+.engine-dash h1,
+.engine-dash h2,
+.engine-dash p {
+  margin: 0;
+}
+.engine-dash :focus-visible {
+  outline: 2px solid var(--ed-pr);
+  outline-offset: 2px;
+}
+.engine-dash-link {
+  color: var(--ed-link);
+  text-decoration: none;
+  font-size: 13px;
+  border-bottom: 1px solid rgba(185, 190, 240, 0.3);
+  padding-bottom: 1px;
+}
+.engine-dash-link:hover {
+  color: var(--ed-text);
+  border-color: var(--ed-text);
+}
+.engine-dash-link--alert {
+  color: var(--ed-alert);
+  border-color: rgba(255, 138, 150, 0.35);
+}
+
+/* Lower grid */
+.engine-dash-lower {
+  padding: 48px 40px 64px;
+  border-top: 1px solid var(--ed-line);
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 56px;
+}
+.engine-dash-lower > section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.engine-dash-c7 {
+  grid-column: span 7;
+}
+.engine-dash-c5 {
+  grid-column: span 5;
+}
+.engine-dash-c12 {
+  grid-column: span 12;
+}
+.engine-dash-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.engine-dash-title h2 {
+  font-size: 16px;
+  font-weight: 500;
+}
+.engine-dash-title small,
+.engine-dash-note {
+  font-size: 12.5px;
+  color: var(--ed-faint);
+}
+.engine-dash-empty {
+  padding: 22px 0;
+  font-size: 14px;
+  color: var(--ed-muted);
+  border-top: 1px solid var(--ed-line);
+}
+.engine-dash-hatch {
+  background-image: repeating-linear-gradient(135deg, rgba(163, 168, 208, 0.28) 0 2px, transparent 2px 7px);
+  color: var(--ed-soft);
+}
+
+.engine-dash-pulse {
+  width: 100%;
+  height: auto;
+}
+.engine-dash-pulse text {
+  fill: var(--ed-faint);
+  font-size: 11px;
+}
+.engine-dash-grid {
+  stroke: #fff;
+  stroke-opacity: 0.06;
+}
+.engine-dash-now {
+  stroke: var(--ed-text);
+  stroke-opacity: 0.25;
+  stroke-dasharray: 2 4;
+}
+.engine-dash-pulse path[data-stage] {
+  stroke-width: 1.2;
+  stroke-opacity: 0.8;
+  fill-opacity: 0.26;
+}
+.engine-dash-pulse path[data-stage='in'] {
+  fill: var(--ed-in);
+  stroke: var(--ed-in);
+}
+.engine-dash-pulse path[data-stage='pr'] {
+  fill: var(--ed-pr);
+  stroke: var(--ed-pr);
+}
+.engine-dash-pulse path[data-stage='out'] {
+  fill: var(--ed-out);
+  stroke: var(--ed-out);
+  fill-opacity: 0.22;
+}
+
+.engine-dash-attention {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.engine-dash-attention li {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: start;
+  padding: 14px 0;
+  border-top: 1px solid var(--ed-line);
+  --tone: var(--ed-alert);
+}
+.engine-dash-attention li[data-kind='unknown'] {
+  --tone: var(--ed-unknown);
+}
+.engine-dash-attention li[data-kind='queue'] {
+  --tone: var(--ed-out);
+}
+.engine-dash-attention li > i {
+  margin-top: 7px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-sizing: border-box;
+  border: 1.5px solid var(--tone);
+}
+.engine-dash-attention li[data-kind='error'] > i {
+  background: var(--tone);
+}
+.engine-dash-attention li[data-kind='queue'] > i {
+  border-radius: 2px;
+}
+.engine-dash-attention li > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.engine-dash-attention li > div:last-child {
+  align-items: flex-end;
+}
+.engine-dash-attention strong {
+  font-size: 14px;
+  font-weight: 400;
+}
+.engine-dash-attention span {
+  font-size: 12.5px;
+  color: var(--ed-faint);
+}
+.engine-dash-attention b {
+  font-size: 18px;
+  font-weight: 400;
+  color: var(--tone);
+}
+
+.engine-dash-keys {
+  display: inline-flex;
+  gap: 18px;
+  font-size: 12.5px;
+  color: var(--ed-faint);
+}
+.engine-dash-keys span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.engine-dash-key-bar {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: rgba(214, 226, 238, 0.5);
+}
+.engine-dash-key-tok,
+.engine-dash-tok {
+  width: 8px;
+  height: 8px;
+  transform: rotate(45deg);
+  background: var(--ed-out);
+}
+.engine-dash-week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 14px;
+  align-items: end;
+  height: 200px;
+}
+.engine-dash-week > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  height: 100%;
+}
+.engine-dash-week-plot {
+  position: relative;
+  width: 100%;
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.engine-dash-week-plot > i {
+  width: 60%;
+  max-width: 46px;
+  border-radius: 6px 6px 2px 2px;
+  background: linear-gradient(180deg, rgba(214, 226, 238, 0.55), rgba(214, 226, 238, 0.12));
+}
+.engine-dash-tok {
+  position: absolute;
+  left: 50%;
+  width: 9px;
+  height: 9px;
+  transform: translate(-50%, 50%) rotate(45deg);
+  box-shadow: 0 0 10px rgba(255, 196, 122, 0.6);
+}
+.engine-dash-week-plot > .engine-dash-hatch {
+  position: absolute;
+  left: 50%;
+  bottom: 72%;
+  transform: translateX(-50%);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.engine-dash-week b {
+  font-size: 13px;
+  font-weight: 400;
+}
+.engine-dash-week > div > span {
+  font-size: 12px;
+  color: var(--ed-faint);
+}
+.engine-dash-week > div[data-today] > span {
+  color: var(--ed-text);
+}
+
+.engine-dash-intake {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.engine-dash-intake > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+}
+.engine-dash-intake > div:first-child b {
+  font-weight: 400;
+  color: var(--ed-muted);
+}
+.engine-dash-intake-bar {
+  display: flex;
+  height: 10px;
+  gap: 2px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.04);
+}
+.engine-dash-intake ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  font-size: 12.5px;
+  color: var(--ed-muted);
+}
+.engine-dash-intake li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.engine-dash-intake li i {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+.engine-dash-intake li b {
+  font-weight: 400;
+  color: var(--ed-text);
+}
+.engine-dash-intake li[data-alert] b {
+  color: var(--ed-alert);
+}
+.engine-dash-intake [data-seg='ready'],
+.engine-dash-intake li[data-seg='ready'] i {
+  background-color: var(--ed-in);
+}
+.engine-dash-intake [data-seg='processing'],
+.engine-dash-intake li[data-seg='processing'] i {
+  background-color: var(--ed-pr);
+}
+.engine-dash-intake [data-seg='attention'],
+.engine-dash-intake li[data-seg='attention'] i {
+  background-color: var(--ed-alert);
+}
+.engine-dash-intake [data-seg='not-started'],
+.engine-dash-intake li[data-seg='not-started'] i {
+  background-color: rgba(163, 168, 208, 0.35);
+}
+.engine-dash-intake li[data-seg] {
+  background: none;
+}
+.engine-dash-intake [data-seg='stopped'],
+.engine-dash-intake li[data-seg='stopped'] i {
+  background-image: repeating-linear-gradient(135deg, rgba(163, 168, 208, 0.28) 0 2px, transparent 2px 7px);
+}
+
+.engine-dash-tenants {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.engine-dash-tenants li {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr) 36px;
+  gap: 14px;
+  align-items: center;
+  font-size: 13.5px;
+}
+.engine-dash-tenants li > span:first-child {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--ed-soft);
+}
+.engine-dash-tenants li > span:nth-child(2) {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+}
+.engine-dash-tenants li i {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--ed-in), var(--ed-pr));
+}
+.engine-dash-tenants b {
+  text-align: right;
+  font-weight: 400;
+}
+
+.engine-dash-pending {
+  flex-direction: row !important;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px !important;
+  padding-top: 18px;
+  border-top: 1px solid var(--ed-line);
+  font-size: 13px;
+  color: var(--ed-muted);
+}
+.engine-dash-pending .engine-dash-hatch {
+  padding: 5px 12px;
+  border-radius: 999px;
+}
+.engine-dash-pending small {
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--ed-faint);
+}
+
+@media (max-width: 1100px) {
+  .engine-dash-lower {
+    padding: 36px 20px 48px;
+  }
+  .engine-dash-lower {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .engine-dash-lower > section {
+    grid-column: auto;
+  }
+}
+@media (max-width: 640px) {
+  .engine-dash-lower {
+    padding: 28px 16px 40px;
+  }
+}
+
+/* Shell around the platform 3D dashboard follows the stage palette; the tenant wall keeps its own. */
+.admin-control.admin-platform.admin-engine-fullscreen {
+  background: #0b0a09;
+}
+.admin-control.admin-platform.admin-engine-fullscreen .admin-sidebar {
+  --text: #eceae4;
+  --text-secondary: #ada89e;
+  --muted: #ada89e;
+  --line: rgba(236, 234, 228, 0.09);
+  --accent: #f1d6a0;
+  --selected: rgba(241, 214, 160, 0.12);
+  --selected-text: #f1d6a0;
+  --soft: rgba(236, 234, 228, 0.05);
+  background: linear-gradient(180deg, #141210, #0b0a09 70%);
+  border-right: 1px solid rgba(236, 234, 228, 0.08);
+  box-shadow: none;
+}
+.admin-control.admin-platform.admin-engine-fullscreen .admin-brand strong {
+  color: #eceae4;
+  font-family: 'Noto Serif SC', 'Songti SC', serif;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+}
+.admin-control.admin-platform.admin-engine-fullscreen .admin-brand-english {
+  color: #ada89e;
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-style: italic;
+  letter-spacing: 0.04em;
+}
+.admin-control.admin-platform.admin-engine-fullscreen .admin-nav-group-title {
+  color: #8c877d;
+  letter-spacing: 0.2em;
+}
+.admin-control.admin-platform.admin-engine-fullscreen .admin-nav-link {
+  color: #ada89e;
+}
+.admin-control.admin-platform.admin-engine-fullscreen .admin-nav-link.active {
+  color: #f1d6a0;
+  background: linear-gradient(90deg, rgba(241, 214, 160, 0.12), rgba(241, 214, 160, 0.03));
+  box-shadow:
+    inset 2px 0 #f1d6a0,
+    inset 0 0 0 1px rgba(241, 214, 160, 0.14);
+}
+.admin-control.admin-platform.admin-engine-fullscreen .admin-nav-link:hover:not(.active) {
+  color: #eceae4;
+  background: rgba(236, 234, 228, 0.05);
+}
+.admin-control.admin-platform.admin-engine-fullscreen .admin-sidebar button {
+  color: #ada89e;
+}
+.admin-control.admin-platform.admin-engine-fullscreen .admin-sidebar button:hover {
+  color: #f1d6a0;
+  background: rgba(236, 234, 228, 0.05);
+}
+.admin-control.admin-platform.admin-engine-fullscreen .admin-account > .admin-account-avatar {
+  background: rgba(241, 214, 160, 0.12);
+  color: #f1d6a0;
+  box-shadow: inset 0 0 0 1px rgba(241, 214, 160, 0.22);
+}
+.admin-control.admin-platform.admin-engine-fullscreen .admin-account-label small {
+  color: #8c877d;
+}
+/* Narrow screens show the shell header above the stage. */
+.admin-control.admin-platform.admin-engine-fullscreen .admin-header {
+  --text: #eceae4;
+  --muted: #ada89e;
+  --line: rgba(236, 234, 228, 0.09);
+  color: #eceae4;
+  background: #0b0a09;
+  border-bottom-color: rgba(236, 234, 228, 0.09);
+}
+.admin-control.admin-platform.admin-engine-fullscreen .admin-header :is(h1, button) {
+  color: #eceae4;
+}

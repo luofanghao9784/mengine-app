@@ -107,7 +107,11 @@ class ExperienceAnalysisQueueIntegrationTest {
   db.update("INSERT INTO conversation_attempts(task_id,attempt_number,attempt_id,input,status,provenance,snapshot) SELECT id,1,gen_random_uuid(),'synthetic input','SUCCEEDED','RECORDED',to_jsonb(t) FROM conversation_tasks t WHERE tenant_id=? AND id<>?",tenant,task);
   for(int n=0;n<4;n++)queue.discover();assertEquals(211,db.queryForObject("SELECT count(*) FROM experience_analysis_items WHERE tenant_id=?",Integer.class,tenant));
  }
- @Test void aNewTenantIsNotStarvedByAnOlderTenantsBacklog(){
+ @Test @org.springframework.transaction.annotation.Transactional
+ void aNewTenantIsNotStarvedByAnOlderTenantsBacklog(){
+  // Isolate this two-tenant ordering case from unrelated fixtures in the bounded global queue.
+  // The enclosing test transaction restores their scheduling times afterwards.
+  db.update("UPDATE experience_analysis_items SET next_attempt_at=now()+interval '1 day'");
   UUID earlier=tenant;var j=claim();queue.fail(j.id(),"MODEL_NOT_CONFIGURED",false,null);db.update("UPDATE experience_analysis_items SET next_attempt_at=now() WHERE source_id=?",j.source());
   fixture();queue.discover();var order=queue.tenants();assertTrue(order.contains(tenant));assertTrue(order.contains(earlier));assertTrue(order.indexOf(tenant)<order.indexOf(earlier));
  }

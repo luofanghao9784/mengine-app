@@ -1,6 +1,6 @@
 import { SupportPageRedirect } from '../platform/SupportApp';
 import { PlatformDataOperations } from '../operations/PlatformDataOperations';
-import { EngineTelemetryWall } from '../operations/EngineTelemetryWall';
+import { PlatformEngineDashboard } from '../operations/PlatformEngineDashboard';
 import { useSession } from '../identity/session';
 import { GeneralExperienceLibrary } from '../experience/GeneralExperienceLibrary';
 import { AdminShell, useAdminRoute } from './AdminShell';
@@ -15,8 +15,7 @@ export function PlatformConsole({ logout }: { logout: () => void }) {
   const { session } = useSession();
   const { page, hash } = useAdminRoute('platform');
   const params = new URLSearchParams(hash.slice(1));
-  if (params.get('support') && params.get('tenant'))
-    return <SupportPageRedirect />;
+  if (params.get('support') && params.get('tenant')) return <SupportPageRedirect />;
   const enterprisePage = page === 'tenants' || page === 'accounts';
   return (
     <AdminShell
@@ -38,7 +37,7 @@ export function PlatformConsole({ logout }: { logout: () => void }) {
       ) : page === 'database' || page === 'materials' ? (
         <PlatformDataOperations hash={hash} kind={page === 'materials' ? 'MATERIALS' : 'CONNECTIONS'} />
       ) : page === 'engine' ? (
-        <EngineTelemetryWall scope="platform" />
+        <PlatformEngineDashboard hash={hash} />
       ) : page === 'usage' ? (
         <PlatformUsagePage hash={hash} />
       ) : page === 'capabilities' ? (
