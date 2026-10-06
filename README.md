@@ -1,6 +1,6 @@
 # 梦擎工作空间
 
-> **2026-10-06 主线版本整合：** Claude Code 三端视觉主题、自托管字体、双轨道标志与总台 3D 仪表盘统一纳入本目录 `main`；同步保留此前画报、会话及管理业务。范围、190 个既有提交清单、整合修复与实测结果见[整合记录](docs/交接/前端改版与主线整合-2026-10-06.md)。企业端 3D 复用（DEC-131）仍待实施。
+> **2026-10-06 主线版本整合：** Claude Code 三端视觉主题、自托管字体、双轨道标志与总台 3D 仪表盘统一纳入本目录 `main`；同步保留此前画报、会话及管理业务。范围、190 个既有提交清单、整合修复与实测结果见[整合记录](docs/交接/前端改版与主线整合-2026-10-06.md)。企业端 3D 复用（DEC-131）仍待实施。2026-10-07 已将 `cbc8441` 更新至原 `54803` 验收实例，部署证据及回退位置见同一整合记录。
 
 > **2026-10-06 客户端视觉改为 D 克制版（DEC-130）：** 客户端按端切换样式变量（`src/shared/theme.css` 中的 `:root[data-surface='workspace']`），组件层在 `src/identity/workspace-theme.css`；企业管理端与总台采用 D′ 梦核日光（收敛版），组件层在 `src/admin/admin-theme.css`，总台引擎仪表盘保持深色舞台。页面结构与交互不变。用合成数据预览真实客户端：`node --experimental-strip-types scripts/design/preview-workspace.ts`，脚本会自启独立端口（默认 5199）并把画报、会话、资料库、手机宽度截图写到 `.local/design-preview/`；管理端用 `node --experimental-strip-types scripts/design/preview-admin.ts`（默认端口 5195）。两者都不连接后端或模型。
 
