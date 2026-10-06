@@ -2,10 +2,10 @@ import test from 'node:test';import assert from 'node:assert/strict';
 import {BingNewsSearch,newsSearchScope} from '../dist/runtime/news-search.js';
 import {PublicReader,PublicWebTask} from '../dist/runtime/public-web.js';
 const signal=()=>new AbortController().signal;const date=new Date(Date.now()-86400000).toISOString();
-const scope={version:'1.0',topics:[{id:'FITNESS',label:'健身',query:'健身 体育 政策'},{id:'BUSINESS',label:'经营',query:'企业 政策'},{id:'RETAIL',label:'零售',query:'零售 消费'}],sources:[]};
+const scope={version:'1.0',topics:[{id:'FITNESS',label:'健身',query:'健身 体育 政策'},{id:'BUSINESS',label:'经营',query:'企业 政策'},{id:'RETAIL',label:'零售',query:'零售 消费'},{id:'FOOD',label:'食品',query:'食品安全'}],sources:[]};
 function fixture(){const calls=[];const reader=new PublicReader(async()=>[{address:'8.8.8.8',family:4}],async u=>{calls.push(u.href);return {status:200,headers:{'content-type':u.hostname==='www.bing.com'?'application/xml':'text/html'},bytes:Buffer.from(u.hostname==='www.bing.com'?`<rss><channel><item><title>近期行业资讯</title><link>http://www.bing.com/news/apiclick.aspx?ref=RSS&amp;url=https%3A%2F%2Fpublisher.example.org%2Fa</link><pubDate>${date}</pubDate><description>只读搜索摘要</description></item><item><title>不可读取私网</title><link>http://www.bing.com/news/apiclick.aspx?url=https%3A%2F%2F127.0.0.1%2F</link></item></channel></rss>`:`<title>近期行业资讯</title><meta property="article:published_time" content="${date}"><p>这是足够长的合成原文，行业政策发布后会影响相关经营安排。这里的正文仅为隔离测试，不是真实新闻，不产生客户画报。</p>`)}});return{reader,calls};}
 test('RSS topic search unwraps original URLs and excludes private addresses',async()=>{const {reader,calls}=fixture();const found=await new BingNewsSearch(reader).search(scope.topics[0].query,signal());assert.equal(found.length,1);assert.equal(found[0].url,'https://publisher.example.org/a');assert.equal(found[0].publishedAt,date);assert.equal(new URL(calls[0]).searchParams.get('q'),scope.topics[0].query);});
-test('topic selection sends only granted fixed phrase, reads original and caches repeated search',async()=>{const {reader,calls}=fixture();const task=new PublicWebTask('news:topic-search:v1',reader,new BingNewsSearch(reader),true,[],scope);await assert.rejects(task.find(signal(),'私有营收'),/NEWS_TOPIC_NOT_GRANTED/);const rows=await task.find(signal(),'FITNESS');assert.equal(rows[0].kind,'PAGE');await task.find(signal(),'FITNESS');assert.equal(calls.length,2);assert.equal((await task.read(rows[0].id,signal())).publishedAt,date);await task.find(signal(),'BUSINESS');await assert.rejects(task.find(signal(),'RETAIL'),/NEWS_SEARCH_LIMIT/);assert.ok(!calls.join('').includes('私有营收'));});
+test('topic selection sends only granted fixed phrase, reads original and caches repeated search',async()=>{const {reader,calls}=fixture();const task=new PublicWebTask('news:topic-search:v1',reader,new BingNewsSearch(reader),true,[],scope);await assert.rejects(task.find(signal(),'私有营收'),/NEWS_TOPIC_NOT_GRANTED/);const rows=await task.find(signal(),'FITNESS');assert.equal(rows[0].kind,'PAGE');await task.find(signal(),'FITNESS');assert.equal(calls.length,2);assert.equal((await task.read(rows[0].id,signal())).publishedAt,date);await task.find(signal(),'BUSINESS');await task.find(signal(),'RETAIL');await assert.rejects(task.find(signal(),'FOOD'),/NEWS_SEARCH_LIMIT/);assert.ok(!calls.join('').includes('私有营收'));});
 test('delivered articles dedupe after body reads, not search snippets',async()=>{const {reader}=fixture();const first=await new PublicWebTask('news:topic-search:v1',reader,new BingNewsSearch(reader),true,[],scope).find(signal(),'FITNESS');const seen=first.map(({url,sha256})=>({url,sha256}));assert.equal((await new PublicWebTask('news:topic-search:v1',reader,new BingNewsSearch(reader),true,seen,scope).find(signal(),'FITNESS')).length,0);});
 test('search prerequisite remains explicit even when a supplemental site exists',async()=>{const {reader}=fixture();const task=new PublicWebTask('news:topic-search:v1',reader,undefined,true,[],{...scope,sources:['https://publisher.example.org/list']});await assert.rejects(task.find(signal(),'FITNESS'),/PUBLIC_SEARCH_NOT_CONFIGURED/);assert.equal(newsSearchScope({...scope,topics:[{id:'PRIVATE',label:'隐私',query:'abc\ncredential'}]}),undefined);});
 test('actual Harness records granted topic before any outbound query and reads source handles',async t=>{
@@ -90,4 +90,33 @@ test('body cover skips a wide publisher banner and reads the next editorial imag
  });
  const result=await reader.read('https://publisher.example.org/a',new AbortController().signal,true);
  assert.equal(result.image.url,'https://cdn.example.org/event.png');assert.deepEqual(images,['/banner.png','/event.png']);
+});
+
+test('old article rechecks cannot consume the new-original budget or starve the second topic',async()=>{
+ const old=['a','b','c','d'].map(x=>({url:'https://publisher.example.org/'+x,sha256:'old'}));const calls=[];
+ const reader={read:async url=>{calls.push(url);return {url,title:'合成新闻',excerpt:'足够长的合成原文内容。'.repeat(8),sha256:old.some(s=>s.url===url)?'old':'new',kind:'PAGE',retrievedAt:date,publishedAt:date};},discover:async()=>[]};
+ const search={search:async q=>(q===scope.topics[0].query?old.slice(0,3):[old[3],{url:'https://publisher.example.org/new'}]).map((s,i)=>({...s,id:q+i,title:'合成新闻',excerpt:'摘要',publishedAt:date}))};
+ const task=new PublicWebTask('news:topic-search:v1',reader,search,true,old,scope);
+ assert.equal((await task.find(signal(),'FITNESS')).length,0);assert.equal(task.newsDiagnostics().status,'ALREADY_REPORTED');
+ const fresh=await task.find(signal(),'BUSINESS');assert.equal(fresh.length,1);assert.equal(fresh[0].url,'https://publisher.example.org/new');
+ assert.deepEqual(calls,['https://publisher.example.org/a','https://publisher.example.org/new']);
+});
+test('expanded RSS pool keeps candidate beyond the former first-three cutoff',async()=>{
+ const reader={fetch:async()=>({response:{headers:{'content-type':'application/xml'},bytes:Buffer.from('<rss><channel>'+Array.from({length:25},(_,i)=>`<item><title>合成新闻${i}</title><link>https://publisher.example.org/${i}</link><pubDate>${date}</pubDate></item>`).join('')+'</channel></rss>')}})};
+ const rows=await new BingNewsSearch(reader).search('合成公开主题',signal());assert.equal(rows.length,20);assert.equal(rows[19].url,'https://publisher.example.org/19');
+});
+test('failed originals remain distinguishable from already reported candidates',async()=>{
+ const task=new PublicWebTask('news:topic-search:v1',{read:async()=>{throw Error('read failed');},discover:async()=>[]},{search:async()=>[{id:'a',url:'https://publisher.example.org/new',title:'合成',publishedAt:date}]},true,[],scope);
+ assert.deepEqual(await task.find(signal(),'FITNESS'),[]);assert.equal(task.newsDiagnostics().status,'READ_FAILED');
+});
+
+test('obvious download promotion does not spend the news budget and newer originals read first',async()=>{
+ const calls=[];const candidates=[{id:'old',url:'https://publisher.example.org/old',title:'合成旧新闻',publishedAt:new Date(Date.now()-86400000*10).toISOString()},{id:'promo',url:'https://publisher.example.org/promo',title:'体育官方app下载最新版',publishedAt:date},{id:'fresh',url:'https://publisher.example.org/fresh',title:'合成近期新闻',publishedAt:date}];
+ const task=new PublicWebTask('news:topic-search:v1',{discover:async()=>[],read:async url=>{calls.push(url);return {url,title:'合成新闻',excerpt:'足够长的合成业务正文。'.repeat(8),sha256:'fresh',kind:'PAGE',retrievedAt:date};}},{search:async()=>candidates},true,[],scope);
+ await task.find(signal(),'FITNESS');assert.deepEqual(calls,[candidates[2].url,candidates[0].url]);assert.equal(task.newsDiagnostics().unsuitable,1);
+});
+test('an updated reported original remains eligible through its independent recheck',async()=>{
+ const url='https://publisher.example.org/updated';
+ const task=new PublicWebTask('news:topic-search:v1',{discover:async()=>[],read:async()=>({url,title:'合成更新新闻',excerpt:'已有原文发生真实更新的合成正文。'.repeat(5),sha256:'updated',kind:'PAGE',retrievedAt:date,publishedAt:date})},{search:async()=>[{id:'updated',url,title:'合成更新新闻',publishedAt:date}]},true,[{url,sha256:'old'}],scope);
+ assert.equal((await task.find(signal(),'FITNESS')).length,1);assert.equal(task.newsDiagnostics().status,'AVAILABLE');
 });

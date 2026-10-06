@@ -429,6 +429,15 @@ export class PublicWebTask {
   private readPromises = new Map<string, Promise<WebSource>>();
   private reads = 0;
   private newsPromises = new Map<string, Promise<void>>();
+  private newsChecked = new Set<string>();
+  private newsRechecks = 0;
+  private newsStats = { candidates: 0, alreadyReported: 0, readFailures: 0, stale: 0, insufficientText: 0, unsuitable: 0, budgetExhausted: false };
+  newsDiagnostics() {
+    const s = this.newsStats;
+    const status = this.sources.size ? 'AVAILABLE' : s.budgetExhausted ? 'CANDIDATE_LIMIT' : s.readFailures ? 'READ_FAILED' :
+      s.alreadyReported && !s.stale && !s.insufficientText && !s.unsuitable ? 'ALREADY_REPORTED' : 'SEARCH_INSUFFICIENT';
+    return { status, ...s, available: this.sources.size };
+  }
   constructor(
     readonly query: string,
     private readonly reader: PublicReader,
@@ -457,7 +466,7 @@ export class PublicWebTask {
       const selected = this.newsScope.topics.find((t) => t.id === topic);
       if (!selected) throw new RuntimeError('NEWS_TOPIC_NOT_GRANTED');
       if (!this.newsPromises.has(selected.id)) {
-        if (this.newsPromises.size >= 2) throw new RuntimeError('NEWS_SEARCH_LIMIT');
+        if (this.newsPromises.size >= 3) throw new RuntimeError('NEWS_SEARCH_LIMIT');
         this.newsPromises.set(selected.id, this.findNews(selected.query, signal));
       }
       await this.newsPromises.get(selected.id);
@@ -469,45 +478,45 @@ export class PublicWebTask {
   }
   private async findNews(query: string, signal: AbortSignal) {
     if (!this.search) throw new RuntimeError('PUBLIC_SEARCH_NOT_CONFIGURED');
-    const candidates = (await this.search.search(query, signal)).slice(0, 3);
-    // Search is primary; configured sites may fill a gap, never block broad topic search.
-    if (candidates.length < 2)
+    const candidates = (await this.search.search(query, signal)).slice(0, 20);
+    const reported = (url: string) => this.seen.some(s => s.url === url);
+    // Supplemental sites fill a shortage of unreported candidates, even when top results are old articles.
+    if (candidates.filter(c => !reported(c.url)).length < 2)
       for (const url of this.newsScope!.sources) {
         try {
           for (const c of await this.reader.discover(url, signal))
-            if (!candidates.some((x) => x.url === c.url))
-              candidates.push({
-                ...source(c.url, c.title, c.excerpt, 'SEARCH'),
-                ...(c.publishedAt ? { publishedAt: c.publishedAt } : {}),
-              });
-        } catch {
-          if (signal.aborted) throw signal.reason;
-        }
-        if (candidates.length >= 3) break;
+            if (candidates.length < 20 && !candidates.some(x => x.url === c.url))
+              candidates.push({ ...source(c.url, c.title, c.excerpt, 'SEARCH'), ...(c.publishedAt ? { publishedAt: c.publishedAt } : {}) });
+        } catch { signal.throwIfAborted(); }
+        if (candidates.filter(c => !reported(c.url)).length >= 3) break;
       }
-    let failures = 0;
-    for (const candidate of candidates.slice(0, 3)) {
-      if (this.reads >= 4) break;
-      if (candidate.publishedAt && Date.parse(candidate.publishedAt) < Date.now() - 30 * 86400000) continue;
-      if ([...this.sources.values()].some((s) => s.url === candidate.url)) continue;
-      this.reads++;
+    // New originals get their own budget; one old-original recheck can discover an actual body update.
+    const promotion = (title: string) => /官方app下载|下载最新版|备用网址|开户注册|真人博彩|体育投注|下注入口/.test(title);
+    const byDate = (a: WebSource, b: WebSource) => (b.publishedAt ?? '').localeCompare(a.publishedAt ?? '');
+    const ordered = [...candidates.filter(c => !reported(c.url)).sort(byDate), ...candidates.filter(c => reported(c.url)).sort(byDate)];
+    for (const candidate of ordered) {
+      if (this.newsChecked.has(candidate.url)) continue;
+      this.newsStats.candidates++;
+      if (promotion(candidate.title)) { this.newsStats.unsuitable++; continue; }
+      const old = reported(candidate.url);
+      if (old) this.newsStats.alreadyReported++;
+      if (candidate.publishedAt && Date.parse(candidate.publishedAt) < Date.now() - 30 * 86400000) { this.newsStats.stale++; continue; }
+      if (old ? this.newsRechecks >= 1 : this.reads >= 4) {
+        if (!old) this.newsStats.budgetExhausted = true;
+        continue;
+      }
+      this.newsChecked.add(candidate.url);
+      if (old) this.newsRechecks++; else this.reads++;
       try {
         const page = await this.reader.read(candidate.url, signal, this.news);
-        const item = {
-          ...page,
-          id: candidate.id,
-          ...(!page.publishedAt && candidate.publishedAt ? { publishedAt: candidate.publishedAt } : {}),
-        };
-        if (item.publishedAt && Date.parse(item.publishedAt) < Date.now() - 30 * 86400000) continue;
-        if (this.seen.some((s) => s.url === item.url && s.sha256 === item.sha256)) continue;
-        if (item.excerpt.length < 40) continue;
+        const item = { ...page, id: candidate.id, ...(!page.publishedAt && candidate.publishedAt ? { publishedAt: candidate.publishedAt } : {}) };
+        if (item.publishedAt && Date.parse(item.publishedAt) < Date.now() - 30 * 86400000) { this.newsStats.stale++; continue; }
+        if (this.seen.some(s => s.url === item.url && s.sha256 === item.sha256)) continue;
+        if (promotion(item.title)) { this.newsStats.unsuitable++; continue; }
+        if (item.excerpt.length < 40) { this.newsStats.insufficientText++; continue; }
         this.sources.set(item.id, item);
-      } catch {
-        failures++;
-        if (signal.aborted) throw signal.reason;
-      }
+      } catch { this.newsStats.readFailures++; signal.throwIfAborted(); }
     }
-    if (failures && this.sources.size === 0) throw new RuntimeError('PUBLIC_NEWS_READ_FAILED');
   }
   private async findOnce(signal: AbortSignal) {
     if (/^https:\/\//i.test(this.query)) {

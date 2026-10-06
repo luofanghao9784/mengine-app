@@ -104,7 +104,7 @@ export class BingNewsSearch implements PublicSearch {
         truncated: false,
         ...(date ? { publishedAt: date } : {}),
       });
-      if (found.length >= 3) break;
+      if (found.length >= 20) break;
     }
     return found;
   }

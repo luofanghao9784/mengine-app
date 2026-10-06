@@ -623,17 +623,17 @@ class BriefingGenerationIntegrationTest {
  }
 
  @Test void boundedEmptyNewsSearchFinishesWithoutChargingOrHidingOtherPartialFailures(){
-  for(boolean twoSearches:List.of(false,true)){
+  for(int searchCount:List.of(1,2,3)){
    upload("marker 合成资讯空搜索证明。",true);var b=manual();UUID p=policy();generation.tick(p);var j=conversations.claim();
    db.update("UPDATE briefing_generation_batches SET business_type='INFO' WHERE id=?",b.id());
    db.update("INSERT INTO briefing_news_search_scope(task_id,tenant_id,provider,scope) VALUES(?,?,'bing-rss','{}')",j.id(),tenant);
-   for(int i=1;i<=(twoSearches?2:1);i++){
+   for(int i=1;i<=searchCount;i++){
     db.update("INSERT INTO briefing_news_search_queries(task_id,topic_id,query) VALUES(?,?,?)",j.id(),"TOPIC"+i,"synthetic topic "+i);
     db.update("INSERT INTO conversation_tool_receipts(task_id,attempt_number,sequence,name,status) VALUES(?,1,?,'public_search','succeeded')",j.id(),i);
    }
-   db.update("INSERT INTO conversation_tool_receipts(task_id,attempt_number,sequence,name,status) VALUES(?,1,3,'task_control','succeeded')",j.id());
+   db.update("INSERT INTO conversation_tool_receipts(task_id,attempt_number,sequence,name,status) VALUES(?,1,4,'task_control','succeeded')",j.id());
    db.update("UPDATE conversation_tasks SET status='PARTIAL',web_sources='[]',lease_token=NULL,lease_until=NULL WHERE id=?",j.id());generation.tick(p);
-   assertEquals(twoSearches?"NO_NEW_CONTENT":"FAILED",generation.get(actor,tenant,b.id()).status());
+   assertEquals(searchCount>=2?"NO_NEW_CONTENT":"FAILED",generation.get(actor,tenant,b.id()).status());
    assertEquals(0,generation.state(actor,tenant).quota().used());
   }
  }

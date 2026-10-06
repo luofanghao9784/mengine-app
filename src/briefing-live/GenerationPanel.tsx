@@ -24,6 +24,9 @@ const label: Record<string, string> = {
 const reasons: Record<string, string> = {
   TENANT_SERVICE_SUSPENDED: '企业服务暂停时，本次生成未完成；已发生的任务结果保留，恢复后可按需重新生成。',
   NEWS_SOURCE_UNAVAILABLE: '资讯联网搜索暂不可用，请选择其他类型。',
+  PUBLIC_NEWS_READ_FAILED: '候选资讯的原文读取失败，请稍后重试。',
+  PUBLIC_NEWS_CANDIDATE_LIMIT: '候选资讯核验达到本次上限，请换一个相关主题重试。',
+  NEWS_NO_NEW_CONTENT: '本轮候选已报道或未满足核验要求，可重新选择生成。',
   PUBLIC_SEARCH_NOT_CONFIGURED: '资讯联网搜索尚未配置，请选择其他类型。',
   NEWS_CONTEXT_UNAVAILABLE: '请先在资料库准备企业或项目资料。',
   RESULT_NOT_READY: '尚无已完成并保存到资料库的成果。',

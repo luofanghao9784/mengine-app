@@ -350,8 +350,8 @@ public class BriefingGenerationService {
     private boolean emptyNewsSearch(UUID task,int attempt){
         return Boolean.TRUE.equals(db.queryForObject("""
             SELECT coalesce(web_sources,'[]'::jsonb)='[]'::jsonb
-            AND (SELECT count(*) FROM briefing_news_search_queries q WHERE q.task_id=t.id)=2
-            AND (SELECT count(*) FROM conversation_tool_receipts r WHERE r.task_id=t.id AND r.attempt_number=? AND r.name='public_search' AND r.status='succeeded')=2
+            AND (SELECT count(*) FROM briefing_news_search_queries q WHERE q.task_id=t.id) BETWEEN 2 AND 3
+            AND (SELECT count(*) FROM conversation_tool_receipts r WHERE r.task_id=t.id AND r.attempt_number=? AND r.name='public_search' AND r.status='succeeded')=(SELECT count(*) FROM briefing_news_search_queries q WHERE q.task_id=t.id)
             AND EXISTS(SELECT 1 FROM conversation_tool_receipts r WHERE r.task_id=t.id AND r.attempt_number=? AND r.name='task_control' AND r.status='succeeded')
             AND NOT EXISTS(SELECT 1 FROM conversation_tool_receipts r WHERE r.task_id=t.id AND r.attempt_number=? AND (r.status<>'succeeded' OR r.name NOT IN ('activate_skill','public_search','task_control')))
             FROM conversation_tasks t WHERE t.id=?

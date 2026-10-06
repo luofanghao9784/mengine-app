@@ -407,7 +407,7 @@ export class AgentTasks {
                             '\n继续核验并执行所选问题，不另换主题。deliver_briefing.businessType 必须与所选候选 businessType 完全相同；不能把数据主题改成洞察。\n'
                           : '') +
                         (newsBriefing
-                          ? '资讯只执行公开搜索、原文核验、选题和交付。搜索获得新原文后 public_search 关闭；如果返回空列表，可以选择另一个未尝试的相关主题，最多两个主题；两次均无新原文时用 task_control 说明暂无新内容并结束；使用返回的 id 调用 read_public_page，禁止重复搜索。提交前检查 analysis 为字符串数组，每段一个元素，不能传字符串。不要调用内部资料或计算工具。'
+                          ? '资讯只执行公开搜索、原文核验、选题和交付。搜索获得新原文后 public_search 关闭；如果返回空列表，可以选择另一个未尝试的相关主题，最多三个相关主题；候选不足时选择另一个相关主题，不重复已有主题；全部尝试后仍无新原文时用 task_control 说明暂无新内容并结束；使用返回的 id 调用 read_public_page，禁止重复搜索。提交前检查 analysis 为字符串数组，每段一个元素，不能传字符串。不要调用内部资料或计算工具。'
                           : deliveryReady
                           ? briefingRequestedType && briefingRequestedType !== 'DATA'
                             ? `A calculation has completed, but the requested type remains ${briefingRequestedType}. Retrieval and calculation are now closed. Deliver the requested text category using authorized evidence; omit calculationArtifactId and do not invent quantitative claims. If no useful requested-type content is supported, use status-only delivery. Never substitute DATA.`
@@ -799,10 +799,12 @@ export class AgentTasks {
               publicSearched = true;
               if (newsBriefing) {
                 newsTopicsTried.add(topic!);
-                newsNoResults = items.length === 0 && newsTopicsTried.size >= Math.min(2, newsScope!.topics.length);
+                newsNoResults = items.length === 0 && newsTopicsTried.size >= Math.min(3, newsScope!.topics.length);
                 newsSearched = items.length > 0 || newsNoResults;
+                if (newsNoResults && web.newsDiagnostics().status === 'READ_FAILED') throw new RuntimeError('PUBLIC_NEWS_READ_FAILED');
+                if (newsNoResults && web.newsDiagnostics().status === 'CANDIDATE_LIMIT') throw new RuntimeError('PUBLIC_NEWS_CANDIDATE_LIMIT');
               }
-              return { items: items.map(({ image: _image, ...item }) => item), untrusted: true };
+              return { items: items.map(({ image: _image, ...item }) => item), ...(newsBriefing ? { diagnostics: web.newsDiagnostics() } : {}), untrusted: true };
             },
           },
           {
@@ -1020,7 +1022,12 @@ export class AgentTasks {
               throw new RuntimeError('INVALID_TASK_CONTROL');
             outcome = args.outcome as typeof outcome;
             requiredInput = args.message.trim();
-            if (newsBriefing && newsNoResults) blockingQuestion = true;
+            if (newsBriefing && newsNoResults) {
+              blockingQuestion = true;
+              requiredInput = web!.newsDiagnostics().status === 'ALREADY_REPORTED'
+                ? '本轮候选资讯均已报道，未找到可核验的新原文；这不代表当天没有相关新闻。'
+                : '本轮相关主题的搜索候选不足或原文不满足核验要求，暂未生成资讯；这不代表当天没有相关新闻。';
+            }
             return { recorded: true, outcome, message: requiredInput, businessActionPerformed: false };
           },
         });

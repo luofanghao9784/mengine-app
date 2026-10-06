@@ -29,7 +29,7 @@ public class NewsSearchPolicy {
  public Topic select(UUID task,String id){
   var scope=scope(task);if(scope==null)throw new IdentityException(403,"TASK_ACCESS_DENIED");var topic=scope.topics().stream().filter(t->t.id().equals(id)).findFirst().orElseThrow(()->new IdentityException(422,"NEWS_TOPIC_NOT_GRANTED"));
   db.queryForList("SELECT task_id FROM briefing_news_search_scope WHERE task_id=? FOR UPDATE",task);
-  if(!Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM briefing_news_search_queries WHERE task_id=? AND topic_id=?)",Boolean.class,task,id))&&db.queryForObject("SELECT count(*) FROM briefing_news_search_queries WHERE task_id=?",Integer.class,task)>=2)throw new IdentityException(409,"NEWS_SEARCH_LIMIT");
+  if(!Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM briefing_news_search_queries WHERE task_id=? AND topic_id=?)",Boolean.class,task,id))&&db.queryForObject("SELECT count(*) FROM briefing_news_search_queries WHERE task_id=?",Integer.class,task)>=3)throw new IdentityException(409,"NEWS_SEARCH_LIMIT");
   db.update("INSERT INTO briefing_news_search_queries(task_id,topic_id,query) VALUES(?,?,?) ON CONFLICT DO NOTHING",task,id,topic.query());return topic;
  }
 }
