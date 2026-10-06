@@ -37,7 +37,7 @@ export function useConversationList(tenant: string, revision: number, trash = fa
     const retained = latest.current.scope === scope ? latest.current.value : undefined;
     const count = retained ? Math.max(1, offset.current / 20) : 1;
     busy.current = true;
-    publish({ scope, value: retained, loading: true });
+    publish({ scope, value: retained, loading: !retained });
     void (async () => {
       try {
         let result: ConversationPage | undefined;

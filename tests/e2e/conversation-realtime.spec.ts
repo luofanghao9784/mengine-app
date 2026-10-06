@@ -240,3 +240,30 @@ test('narrow screen keeps supplement and question actions reachable', async ({ p
   expect(f.sends).toHaveLength(1);
   await page.screenshot({ path: '.local/realtime-conversation-mobile.png' });
 });
+
+
+test('task updates refresh the list without showing initial loading text', async ({ page }) => {
+  const f = await fixture(page);
+  const row = page.getByRole('link', { name: '实时会话合成验收', exact: true });
+  await expect(row).toBeVisible();
+  let waiting = false;
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  await page.route('**/api/**', async (route) => {
+    if (!new URL(route.request().url()).pathname.endsWith('/conversations')) return route.fallback();
+    waiting = true;
+    await gate;
+    await route.fallback();
+  });
+  try {
+    f.task.revision++;
+    f.change();
+    await expect.poll(() => waiting).toBe(true);
+    await expect(row).toBeVisible();
+    await expect(page.getByText('正在加载会话…', { exact: true })).toHaveCount(0);
+    await page.screenshot({ path: '.local/conversation-list-stable-20261006/更新中.png' });
+  } finally {
+    release();
+  }
+  await expect(row).toBeVisible();
+});
