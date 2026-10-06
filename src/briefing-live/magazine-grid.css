@@ -51,7 +51,7 @@
   }
   .live-magazine-grid:not([data-static]) .live-briefing-card:is(:hover, :has(:focus-visible)) {
     translate: 0 -4px;
-    border-color: #cedaed;
+    border-color: var(--line);
     box-shadow:
       0 16px 32px -8px #294c7b29,
       0 5px 12px -4px #294c7b1a;

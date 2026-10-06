@@ -32,7 +32,7 @@
   flex-direction: column;
   gap: 12px;
   padding: 18px;
-  border: 1px solid #dce5de;
+  border: 1px solid var(--line);
   border-radius: 14px;
   background: var(--surface, #fff);
   min-width: 0;
@@ -42,7 +42,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  color: var(--text-secondary, #687970);
+  color: var(--text-secondary, var(--ink-2));
   font-size: 12px;
 }
 .attention-card h3 {
@@ -57,7 +57,7 @@
 }
 .attention-card small {
   font-size: 12px;
-  color: var(--text-secondary, #687970);
+  color: var(--text-secondary, var(--ink-2));
 }
 .attention-card > a {
   margin-top: auto;
@@ -66,7 +66,7 @@
 }
 .attention-empty {
   font-size: 13px;
-  color: var(--text-secondary, #687970);
+  color: var(--text-secondary, var(--ink-2));
 }
 @container attention (max-width:803px) {
   .attention-grid {

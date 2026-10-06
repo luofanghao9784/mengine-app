@@ -1,6 +1,6 @@
 /* Reading and feedback are separate from the business conversation. */
 .briefing-grid .briefing-card.is-read h3 {
-  color: #8b929d;
+  color: var(--ink-3);
 }
 .briefing-grid .briefing-card.is-read:has(.briefing-news-photo) h3 {
   color: #d3d8e1;
@@ -10,7 +10,7 @@
   bottom: 15px;
   left: 22px;
   font: 11px system-ui;
-  color: #7b8593;
+  color: var(--ink-3);
   background: #ffffffed;
   border-radius: 6px;
   padding: 2px 5px;
@@ -25,7 +25,7 @@
   padding: 0;
   border: 0;
   background: transparent;
-  color: #28313d;
+  color: var(--ink);
   overflow: visible;
 }
 .briefing-detail[open] {
@@ -38,7 +38,7 @@
   width: calc(100% - var(--feedback-gutter));
   height: 100%;
   overflow: hidden;
-  border: 1px solid #e4e8ee;
+  border: 1px solid var(--line);
   border-radius: 26px;
   background: #fff;
   box-shadow: 0 24px 90px #1d365529;
@@ -52,7 +52,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 17px 22px 12px 32px;
-  color: #35465e;
+  color: var(--ink);
   font-size: 16px;
   font-weight: 600;
   gap: 16px;
@@ -64,7 +64,7 @@
 }
 .briefing-detail-top > span > span {
   margin: 0 6px;
-  color: #8290a0;
+  color: var(--ink-3);
 }
 .briefing-detail-top > button {
   flex-shrink: 0;
@@ -92,7 +92,7 @@
 }
 .briefing-detail-article > time {
   font: 12px system-ui;
-  color: #8290a0;
+  color: var(--ink-3);
 }
 .briefing-detail-article h2 {
   font-size: 32px;
@@ -112,12 +112,12 @@
 .briefing-detail-value {
   font-family: system-ui;
   margin: 22px 0;
-  color: #657388;
+  color: var(--ink-2);
 }
 .briefing-detail-value strong {
   font-size: 38px;
   font-weight: 500;
-  color: #253a53;
+  color: var(--ink);
 }
 .briefing-detail-chart {
   margin: 28px 0;
@@ -134,7 +134,7 @@
   margin: 26px 0;
 }
 .briefing-detail-points > div {
-  border-top: 1px solid #eef0f3;
+  border-top: 1px solid var(--line);
   padding-top: 16px;
 }
 .briefing-detail-points dt {
@@ -149,12 +149,12 @@
 .briefing-detail-advice {
   padding: 18px 22px;
   border-radius: 14px;
-  background: #f5f8fc;
+  background: var(--soft);
   margin: 26px 0;
 }
 .briefing-detail-advice > span {
   font: 12px system-ui;
-  color: #647c9b;
+  color: var(--ink-3);
 }
 .briefing-detail-advice p {
   margin: 8px 0 0;
@@ -162,7 +162,7 @@
 .briefing-detail-sources {
   margin-top: 30px;
   font-family: system-ui;
-  color: #778493;
+  color: var(--ink-3);
   font-size: 12px;
 }
 .briefing-detail-sources > p {
@@ -176,9 +176,9 @@
   gap: 9px;
   padding: 12px 0;
   border: 0;
-  border-top: 1px solid #eef1f5;
+  border-top: 1px solid var(--line);
   background: transparent;
-  color: #4c6380;
+  color: var(--ink-2);
 }
 .briefing-detail-sources > button span {
   flex: 1;
@@ -189,7 +189,7 @@
   flex-shrink: 0;
 }
 .briefing-detail-status {
-  border-bottom: 1px solid #edf0f4;
+  border-bottom: 1px solid var(--line);
   background: #fff;
   flex-shrink: 0;
   max-height: 48%;
@@ -237,7 +237,7 @@
   padding: 14px;
   background: #fff;
   color: var(--text);
-  border: 1px solid #e4e8ee;
+  border: 1px solid var(--line);
   border-radius: 22px;
   box-shadow: 0 12px 48px #1e355b24;
   transform-origin: bottom right;
@@ -296,7 +296,7 @@
   max-height: calc(100dvh - 48px);
   box-sizing: border-box;
   padding: 24px;
-  border: 1px solid #e4e8ee;
+  border: 1px solid var(--line);
   border-radius: 24px;
   background: #fff;
   color: var(--text);
@@ -316,7 +316,7 @@
   margin: 6px 0 18px;
   padding: 12px 14px;
   border-radius: 12px;
-  background: #f5f8fc;
+  background: var(--soft);
   font-size: 14px;
   line-height: 1.6;
 }
@@ -342,7 +342,7 @@
   align-items: center;
   justify-content: space-between;
   text-align: left;
-  background: #f6f8fb;
+  background: var(--soft);
   border: 1px solid transparent;
   padding: 11px 12px;
   font-size: 13px;
@@ -350,8 +350,8 @@
 }
 .briefing-reasons > button:hover,
 .briefing-reasons > button[aria-pressed='true'] {
-  background: #edf4ff;
-  color: #2469c9;
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 .briefing-custom-reason {
   display: flex;
@@ -361,7 +361,7 @@
   padding: 13px 2px 5px;
   border: 0;
   background: transparent;
-  color: #2469c9;
+  color: var(--accent);
   gap: 8px;
 }
 .briefing-custom-reason > span {
@@ -375,7 +375,7 @@
   align-items: center;
   gap: 12px;
   padding: 0 32px 10px;
-  color: #738197;
+  color: var(--ink-3);
   font-size: 12px;
 }
 .briefing-feedback-receipt > span {
@@ -388,18 +388,18 @@
 .briefing-feedback-undo {
   border: 0;
   background: transparent;
-  color: #52749b;
+  color: var(--ink-2);
   font-size: 12px;
   white-space: nowrap;
   padding: 5px 0;
 }
 .briefing-detail-notice {
   margin: 10px 26px;
-  color: #5a7594;
+  color: var(--ink-2);
   font-size: 12px;
 }
 .briefing-share-note {
-  color: #8591a1;
+  color: var(--ink-3);
   font-size: 12px;
   margin: 0 0 12px;
 }
@@ -414,7 +414,7 @@
   justify-content: space-between;
   align-items: center;
   text-align: left;
-  background: #f6f8fb;
+  background: var(--soft);
   border: 0;
   border-radius: 8px;
   padding: 10px 12px;
@@ -423,8 +423,8 @@
   font-size: 11px;
 }
 .briefing-recipients > button[aria-pressed='true'] {
-  background: #eaf2ff;
-  color: #2469c9;
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 .briefing-recipients > button:disabled {
   opacity: 0.5;
@@ -434,7 +434,7 @@
   width: 100%;
   min-height: 70px;
   margin: 12px 0;
-  border: 1px solid #e3e9f0;
+  border: 1px solid var(--line);
   border-radius: 10px;
   padding: 12px;
   resize: vertical;
@@ -449,16 +449,16 @@
   gap: 12px;
   align-items: center;
   padding: 16px 0;
-  color: #3e6693;
+  color: var(--ink-2);
 }
 .briefing-share-done button {
   background: transparent;
   border: 0;
-  color: #2469c9;
+  color: var(--accent);
 }
 .briefing-feedback-context {
   padding: 16px 20px;
-  background: #f4f8ff;
+  background: var(--accent-soft);
   border-radius: 14px;
 }
 .briefing-feedback-context p {
@@ -512,7 +512,7 @@
   background:
     radial-gradient(ellipse at 22% 30%, #60d3f299, transparent 55%),
     radial-gradient(ellipse at 80% 70%, #9177ffbb, transparent 58%),
-    linear-gradient(120deg, var(--accent-hover), var(--accent), #5874d7);
+    linear-gradient(120deg, var(--accent-hover), var(--accent), var(--accent));
   background-size:
     170% 170%,
     170% 170%,
@@ -594,14 +594,14 @@
 .briefing-article-eyebrow {
   font: 11px system-ui;
   letter-spacing: 0.1em;
-  color: #7a8797;
+  color: var(--ink-3);
 }
 .briefing-article-extension h3 {
   font-size: 19px;
   line-height: 1.5;
   font-weight: 600;
   margin: 24px 0 10px;
-  color: #283e58;
+  color: var(--ink);
 }
 .briefing-article-extension p {
   margin: 0 0 24px;

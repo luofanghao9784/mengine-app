@@ -44,7 +44,7 @@
   right: 28px;
   top: 16px;
   z-index: 50;
-  background: var(--canvas, #f7f8fa);
+  background: var(--canvas, var(--soft));
   border-radius: 12px;
 }
 
@@ -59,7 +59,7 @@
   border: 0;
   background: transparent;
   border-radius: 0 0 24px 0;
-  color: #8798ae;
+  color: var(--ink-3);
   opacity: 0;
   pointer-events: none;
   transition: opacity 140ms ease;

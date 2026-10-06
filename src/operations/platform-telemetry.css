@@ -121,7 +121,7 @@
   inset: 0;
   width: 100%;
   height: 100%;
-  color: #35516b;
+  color: var(--ink-2);
   z-index: -1;
 }
 :where(.admin-control) .engine-bank {
@@ -575,7 +575,7 @@
 .admin-control .engine-observatory .engine-orb small {
   font-size: 10px;
   letter-spacing: 0.2em;
-  color: #7daec7;
+  color: var(--ink-3);
 }
 .admin-control .engine-observatory .engine-orb strong {
   font-size: 44px;
@@ -719,7 +719,7 @@
 }
 .admin-control .engine-observatory .engine-evolution-results dd {
   margin: 0;
-  color: #9d91ac;
+  color: var(--ink-3);
   font-size: 13px;
 }
 .admin-control .engine-observatory .engine-evolution > .engine-bank-state {
@@ -850,7 +850,7 @@
   filter: drop-shadow(0 0 5px #71dff5);
 }
 .admin-control .engine-observatory .engine-transfer-note {
-  color: #88a6bc;
+  color: var(--ink-3);
 }
 @media (prefers-reduced-motion: reduce) {
   .admin-control .engine-observatory .engine-transfer-packet {
@@ -1025,10 +1025,10 @@
   color: #e6f3ff;
 }
 .admin-control.admin-engine-fullscreen .admin-brand-english {
-  color: #91a9bd;
+  color: var(--ink-3);
 }
 .admin-control.admin-engine-fullscreen .admin-nav-group-title {
-  color: #7e99ae;
+  color: var(--ink-3);
 }
 .admin-control.admin-engine-fullscreen .admin-nav-link {
   color: #adc4d6;
@@ -1045,7 +1045,7 @@
   background: #173247;
 }
 .admin-control.admin-engine-fullscreen .admin-sidebar button {
-  color: #91a9bd;
+  color: var(--ink-3);
 }
 .admin-control.admin-engine-fullscreen .admin-sidebar button:hover {
   color: #91ebf7;
@@ -1108,7 +1108,7 @@
   20%,
   100% {
     stroke: #ad91dc55;
-    fill: #24283e;
+    fill: var(--ink);
   }
   8% {
     stroke: #d3b4ff;

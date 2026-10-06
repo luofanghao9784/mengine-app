@@ -16,7 +16,7 @@
   margin-bottom: 8px;
 }
 .taskwork-heading span {
-  color: #74836b;
+  color: var(--ink-2);
   font-size: 12px;
 }
 .taskwork-item {
@@ -39,7 +39,7 @@
 }
 .taskwork-item summary {
   cursor: pointer;
-  color: #647558;
+  color: var(--ink-2);
 }
 .taskwork-item details {
   margin: 7px 0;

@@ -11,7 +11,7 @@
   overflow-wrap: anywhere;
 }
 .forwarding-source span {
-  color: #68765f;
+  color: var(--ink-2);
   font-size: 13px;
 }
 .forwarding-people {
@@ -34,7 +34,7 @@
   width: auto;
 }
 .forwarding-people small {
-  color: #899280;
+  color: var(--ink-3);
   margin-left: auto;
 }
 .forwarding-pagination {
@@ -89,7 +89,7 @@
   margin: 0;
 }
 .forwarding-inbox header p {
-  color: #718066;
+  color: var(--ink-2);
   font-size: 13px;
 }
 .forwarding-cards {
@@ -111,7 +111,7 @@
 .forwarding-cards p {
   line-height: 1.7;
   font-size: 13px;
-  color: #66735f;
+  color: var(--ink-2);
 }
 .forwarding-state {
   font-size: 12px;

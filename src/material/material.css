@@ -84,7 +84,7 @@
   border: 1px solid var(--line);
 }
 .material-space-card strong {
-  color: #2d3744;
+  color: var(--ink);
   flex: 1;
   overflow-wrap: anywhere;
 }
@@ -106,7 +106,7 @@
   outline-offset: 3px;
 }
 .material-cover {
-  background: linear-gradient(135deg, #f1f6ff, #fcfdff);
+  background: linear-gradient(135deg, var(--accent-soft), #fcfdff);
   height: 144px;
   margin: 14px 14px 0;
   border-radius: 14px;
@@ -341,7 +341,7 @@
   color: inherit;
 }
 .knowledge-result:hover {
-  background: #f6f8fc;
+  background: var(--soft);
 }
 .knowledge-result small {
   color: var(--text-secondary);
@@ -402,7 +402,7 @@
   margin: 0;
   padding: 19px 20px;
   border-radius: 16px;
-  background: #f7f9fc;
+  background: var(--soft);
 }
 .material-cover > svg {
   width: 16px;
@@ -423,7 +423,7 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
   margin-top: 14px;
-  color: #334052;
+  color: var(--ink);
   overflow-wrap: anywhere;
 }
 .material-entry-body {
@@ -438,7 +438,7 @@
 .material-entries.list .material-entry {
   border-radius: 0;
   padding: 6px 14px;
-  border-bottom: 1px solid #f1f3f7;
+  border-bottom: 1px solid var(--line);
 }
 .material-entries.list .material-cover {
   width: 54px;
@@ -610,7 +610,7 @@
 }
 .material-entries.cards .material-entry:hover {
   translate: 0 -4px;
-  border-color: #cedaed;
+  border-color: var(--line);
   box-shadow:
     0 16px 32px -8px #294c7b29,
     0 5px 12px -4px #294c7b1a;
@@ -620,7 +620,7 @@
   inset: 46px 16px 16px;
   display: grid;
   place-items: center;
-  color: #7899c5;
+  color: var(--ink-3);
 }
 .material-cover-art > svg {
   width: 72px;

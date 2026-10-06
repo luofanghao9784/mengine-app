@@ -1,6 +1,6 @@
 :is(.live-conversations, .live-reading-article) .reply-reference-library {
   margin-block: 16px 8px;
-  color: #52647c;
+  color: var(--ink-2);
   font-size: 12px;
   line-height: 1.6;
 }
@@ -34,8 +34,8 @@
   height: 20px;
   padding-inline: 5px;
   border-radius: 6px;
-  background: #f0f3f8;
-  color: #7b8a9f;
+  background: var(--soft);
+  color: var(--ink-3);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
@@ -47,7 +47,7 @@
 :is(.live-conversations, .live-reading-article) .reply-reference-file {
   min-width: 0;
   overflow: hidden;
-  border: 1px solid #e8edf4;
+  border: 1px solid var(--line);
   border-radius: 10px;
   background: #fff;
 }
@@ -56,31 +56,31 @@
   align-items: flex-start;
   gap: 8px;
   padding: 12px;
-  background: #f8fafc;
+  background: var(--soft);
 }
 :is(.live-conversations, .live-reading-article) .reply-reference-file > header > svg {
   flex-shrink: 0;
   margin-top: 2px;
-  color: #8193ab;
+  color: var(--ink-3);
 }
 :is(.live-conversations, .live-reading-article) .reply-reference-file > header > strong {
   flex: 1;
   min-width: 0;
-  color: #40516a;
+  color: var(--ink-2);
   font-size: 12px;
   font-weight: 500;
   overflow-wrap: anywhere;
 }
 :is(.live-conversations, .live-reading-article) .reply-reference-version {
   flex-shrink: 0;
-  color: #8c99ac;
+  color: var(--ink-3);
   font-size: 11px;
 }
 :is(.live-conversations, .live-reading-article) .reply-reference-locations {
   padding-inline: 12px;
 }
 :is(.live-conversations, .live-reading-article) .reply-reference-fragment + .reply-reference-fragment {
-  border-top: 1px solid #edf1f6;
+  border-top: 1px solid var(--line);
 }
 :is(.live-conversations, .live-reading-article) .reply-reference-fragment > summary {
   display: flex;
@@ -96,18 +96,18 @@
 }
 :is(.live-conversations, .live-reading-article) .reply-reference-fragment > summary > svg {
   flex-shrink: 0;
-  color: #93a0b2;
+  color: var(--ink-3);
   transition: transform 150ms ease;
 }
 :is(.live-conversations, .live-reading-article) .reply-reference-fragment[open] > summary > svg {
   transform: rotate(180deg);
 }
 :is(.live-conversations, .live-reading-article) .reply-reference-library summary:hover {
-  color: #2f6bc5;
+  color: var(--accent);
 }
 :is(.live-conversations, .live-reading-article) .reply-reference-library summary:focus-visible,
 :is(.live-conversations, .live-reading-article) .reply-reference-excerpt > button:focus-visible {
-  outline: 2px solid #4587ed;
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 :is(.live-conversations, .live-reading-article) .reply-reference-ocr {
@@ -121,8 +121,8 @@
   margin: 0 0 8px;
   padding: 10px 12px;
   border-radius: 7px;
-  background: #f8fafc;
-  color: #76849a;
+  background: var(--soft);
+  color: var(--ink-3);
   font: inherit;
   font-size: 11px;
   line-height: 1.8;
@@ -137,13 +137,13 @@
   border: 0;
   border-radius: 3px;
   background: transparent;
-  color: #4678bb;
+  color: var(--accent);
   font: inherit;
   font-size: 11px;
   cursor: pointer;
 }
 :is(.live-conversations, .live-reading-article) .reply-reference-excerpt > button:hover {
-  color: #2466bf;
+  color: var(--accent);
 }
 @media (prefers-reduced-motion: reduce) {
   :is(.live-conversations, .live-reading-article) .reply-reference-library summary > svg {

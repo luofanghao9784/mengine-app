@@ -8,12 +8,12 @@
 }
 .briefing-key-metric {
   padding: 12px 0;
-  color: #356cd4;
+  color: var(--accent);
 }
 .briefing-key-metric > span,
 .briefing-key-metric small {
   font-size: 12px;
-  color: #657184;
+  color: var(--ink-2);
 }
 .briefing-key-metric > div {
   display: flex;
@@ -39,14 +39,14 @@
   list-style: none;
 }
 .briefing-section {
-  border-left: 2px solid var(--magazine-color, #356cd4);
+  border-left: 2px solid var(--magazine-color, var(--accent));
   padding: 0 0 0 10px;
   min-width: 0;
 }
 .briefing-section-label {
   font-size: 12px;
   font-weight: 600;
-  color: var(--magazine-color, #356cd4);
+  color: var(--magazine-color, var(--accent));
 }
 .briefing-section p {
   margin: 4px 0 0;
@@ -62,7 +62,7 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 .briefing-sections.layout-comparison .briefing-section {
-  background: #f6f8fb;
+  background: var(--soft);
   border: 0;
   border-radius: 12px;
   padding: 12px;
@@ -73,13 +73,13 @@
   gap: 14px;
   margin: 8px 0;
   padding: 16px;
-  background: #f4f7fa;
-  border: 1px solid #e2e8f0;
+  background: var(--soft);
+  border: 1px solid var(--line);
   border-radius: 12px;
 }
 .briefing-source-cover svg {
   flex: none;
-  color: #617d9a;
+  color: var(--ink-2);
 }
 .briefing-source-cover > div {
   display: grid;
@@ -93,7 +93,7 @@
 .briefing-source-cover span,
 .briefing-composition-note {
   font-size: 12px;
-  color: #657184;
+  color: var(--ink-2);
 }
 .briefing-comparison-visual {
   padding: 8px 0;
@@ -103,7 +103,7 @@
   display: flex;
   justify-content: space-between;
   gap: 8px;
-  color: #657184;
+  color: var(--ink-2);
   margin-bottom: 10px;
 }
 .briefing-comparison-rows {
@@ -131,7 +131,7 @@
 }
 .briefing-comparison-visual small {
   display: block;
-  color: #657184;
+  color: var(--ink-2);
   margin-top: 8px;
   font-size: 11px;
 }
@@ -144,7 +144,7 @@
 .briefing-mini-table th,
 .briefing-mini-table td {
   padding: 8px 4px;
-  border-bottom: 1px solid #e6ebf3;
+  border-bottom: 1px solid var(--line);
   text-align: right;
   overflow-wrap: anywhere;
   font-variant-numeric: tabular-nums;

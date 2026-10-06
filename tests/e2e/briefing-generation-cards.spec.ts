@@ -513,7 +513,7 @@ test('工作导航蓝点独立显示，阅读更新后清除且撤权不保留�
   state = { ...state, briefing: true };
   await page.evaluate(tenant => window.dispatchEvent(new CustomEvent('workspace:notifications-changed', { detail: tenant })), tenant);
   await expect(briefingDot).toBeVisible();
-  await expect(briefingDot).toHaveCSS('background-color', 'rgb(20, 105, 239)');
+  await expect(briefingDot).toHaveCSS('background-color', 'rgb(91, 87, 217)'); // DEC-130 客户端靛蓝强调色
   await expect(page.locator('.recommendation-card').first()).toHaveCSS('opacity', '1');
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 900 });

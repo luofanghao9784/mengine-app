@@ -30,13 +30,13 @@
   gap: 6px;
 }
 .timeline-date strong {
-  color: #33475f;
+  color: var(--ink);
   font-size: 25px;
   font-weight: 550;
   line-height: 1.15;
 }
 .timeline-date time > span {
-  color: #8793a4;
+  color: var(--ink-3);
   font-size: 12px;
 }
 .timeline-dot {
@@ -45,7 +45,7 @@
   right: -4px;
   width: 9px;
   height: 9px;
-  border: 2px solid #f8faff;
+  border: 2px solid var(--line);
   border-radius: 50%;
   background: #7aa5ef;
   box-shadow: 0 0 0 3px #eaf1ff;
@@ -57,7 +57,7 @@
   gap: 12px;
   align-items: center;
   margin: 3px 0 12px;
-  color: #8490a2;
+  color: var(--ink-3);
   font-size: 12px;
 }
 .timeline-day-content {
@@ -89,9 +89,9 @@
   content: '';
   position: absolute;
   inset: 0;
-  border: 1px solid #dce6f4;
+  border: 1px solid var(--line);
   border-radius: 24px;
-  background: #edf3fc;
+  background: var(--accent-soft);
   z-index: -1;
   pointer-events: none;
 }
@@ -99,7 +99,7 @@
   transform: translate(12px, 12px) rotate(1.2deg);
 }
 .timeline-card-scroll .live-briefing-tile[data-stacked]::after {
-  background: #f6f9ff;
+  background: var(--accent-soft);
   transform: translate(6px, 6px) rotate(0.6deg);
 }
 .timeline-stack-open {
@@ -111,7 +111,7 @@
   padding: 16px;
   border: 0;
   border-radius: 24px;
-  color: #3568b8;
+  color: var(--accent);
   background: linear-gradient(transparent 70%, #f5f9fff5);
   cursor: pointer;
 }
@@ -120,7 +120,7 @@
   align-items: center;
   gap: 6px;
   padding: 7px 10px;
-  border: 1px solid #d9e5f8;
+  border: 1px solid var(--line);
   border-radius: 12px;
   background: #f8fbff;
   box-shadow: 0 2px 7px #356fe50d;
@@ -132,8 +132,8 @@
   font-weight: 500;
 }
 .timeline-stack-open:hover > span {
-  background: #eaf2ff;
-  border-color: #bcd3f6;
+  background: var(--accent-soft);
+  border-color: var(--line);
 }
 .timeline-stack-open:focus-visible {
   outline: 2px solid #6099f3;
@@ -151,12 +151,12 @@
   padding: 4px 8px;
   border: 0;
   background: transparent;
-  color: #6385b6;
+  color: var(--ink-3);
   cursor: pointer;
   font-size: 12px;
 }
 .timeline-expand:hover {
-  color: var(--accent, #356fe5);
+  color: var(--accent, var(--accent));
 }
 .timeline-expand[aria-expanded='true'] svg {
   transform: rotate(180deg);

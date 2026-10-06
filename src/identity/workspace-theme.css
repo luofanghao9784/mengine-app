@@ -1,0 +1,227 @@
+/*
+ * DEC-130 客户端 D 克制版：组件层。
+ * 只在 :root[data-surface='workspace'] 生效，企业管理端与总台不受影响。
+ * 颜色与材质全部来自 theme.css 的样式变量；渐变只用于输入框的“AI 在场”流光。
+ */
+@property --workspace-glow-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+:root[data-surface='workspace'] {
+  --workspace-glow: conic-gradient(
+    from var(--workspace-glow-angle),
+    #8f8bff,
+    #7cc2ff,
+    #c9c6ff,
+    #8f8bff
+  );
+  --chart-baseline: #dfe0ea;
+  --chart-current: var(--accent);
+  --glass-shadow-hover: 0 1px 0 rgb(255 255 255 / 90%) inset, 0 16px 44px rgb(40 40 90 / 10%);
+}
+
+/* 外壳：去掉整块底色，让柔光背景透出来。 */
+:root[data-surface='workspace'] :is(.topbar, .workspace-conversations, .workspace-conversation-page) {
+  background: transparent;
+}
+:root[data-surface='workspace'] .access-sidebar {
+  /* 18 + 64 + 26 = 原侧栏宽度 108px，主区域与会话页的定位保持不变。 */
+  margin: 16px 26px 16px 18px;
+  flex-basis: 64px;
+  padding: 18px 0;
+  border: 1px solid var(--glass-edge);
+  border-radius: 26px;
+  background: rgb(255 255 255 / 45%);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+}
+:root[data-surface='workspace'] .access-brand {
+  margin-bottom: 24px;
+}
+:root[data-surface='workspace'] .access-sidebar .nav-link {
+  background: transparent;
+  box-shadow: none;
+  border-radius: 14px;
+  width: 44px;
+  height: 44px;
+}
+:root[data-surface='workspace'] .access-sidebar .nav-item {
+  width: 44px;
+  height: 44px;
+}
+:root[data-surface='workspace'] .access-sidebar .nav-symbol {
+  width: 42px;
+  height: 42px;
+  flex-basis: 42px;
+}
+:root[data-surface='workspace'] .access-sidebar .nav-link:hover {
+  background: rgb(255 255 255 / 60%);
+}
+:root[data-surface='workspace'] .access-sidebar .nav-link.active {
+  background: var(--surface-raised);
+  color: var(--accent-hover);
+  box-shadow: 0 4px 14px rgb(60 55 160 / 12%);
+}
+@media (max-width: 800px) {
+  :root[data-surface='workspace'] .access-sidebar {
+    margin: 0;
+    border-radius: 22px 22px 0 0;
+    border-width: 1px 0 0;
+    background: rgb(255 255 255 / 72%);
+  }
+}
+
+/* 顶部分类：玻璃胶囊分段。 */
+:root[data-surface='workspace'] .live-briefing-tabs {
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--glass-edge);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 50%);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+}
+:root[data-surface='workspace'] .live-briefing-tabs button {
+  padding: 6px 16px;
+  border: 0;
+  border-radius: 999px;
+  font-size: 13.5px;
+}
+:root[data-surface='workspace'] .live-briefing-tabs button[aria-selected='true'] {
+  background: var(--surface-raised);
+  color: var(--ink);
+  box-shadow: 0 1px 6px rgb(40 40 90 / 10%);
+}
+@media (max-width: 800px) {
+  :root[data-surface='workspace'] .live-briefing-tabs {
+    padding: 3px;
+  }
+  :root[data-surface='workspace'] .live-briefing-tabs button {
+    padding: 5px 9px;
+    font-size: 13px;
+  }
+}
+
+/* 画报卡片：毛玻璃面板、无衬线标题、中性类型标签。 */
+:root[data-surface='workspace'] .live-briefing-card {
+  background: var(--surface);
+  border-color: var(--glass-edge);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  transition:
+    box-shadow 200ms,
+    transform 200ms,
+    border-color 200ms;
+}
+:root[data-surface='workspace'] .live-briefing-card:not(.conversation-briefing-preview):is(:hover, :focus-within) {
+  border-color: var(--glass-edge);
+  box-shadow: var(--glass-shadow-hover);
+  transform: translateY(-2px);
+}
+:root[data-surface='workspace'] :is(.live-briefing-card h3, .briefing-magazine h3, .generation-card-copy h3) {
+  font-family: inherit;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+:root[data-surface='workspace'] :is(.briefing-card, .live-briefing-card):has(.briefing-magazine),
+:root[data-surface='workspace'] .magazine-type[data-briefing-type] {
+  --magazine-color: var(--ink-2);
+  --magazine-tint: var(--soft);
+  --briefing-ink: var(--ink);
+  --briefing-muted: var(--ink-2);
+}
+:root[data-surface='workspace'] :is(.briefing-card, .live-briefing-card):has(.magazine-数据),
+:root[data-surface='workspace'] .magazine-type[data-briefing-type='数据'] {
+  --magazine-color: var(--accent-hover);
+  --magazine-tint: var(--accent-soft);
+}
+:root[data-surface='workspace'] .magazine-type {
+  border-radius: 999px;
+  padding-inline: 9px;
+}
+:root[data-surface='workspace'] .live-magazine-type.publication {
+  background: var(--soft);
+  color: var(--ink-2);
+}
+
+/* 图表：基期中性灰、当期靛蓝；覆盖组件内的固定配色。 */
+:root[data-surface='workspace'] svg :is([fill='#356cd4'], [fill='#356CD4']) {
+  fill: var(--chart-current);
+}
+:root[data-surface='workspace'] svg :is([fill='#bed0ee'], [fill='#adc4e9']) {
+  fill: var(--chart-baseline);
+}
+:root[data-surface='workspace'] svg [stroke='#356cd4'] {
+  stroke: var(--chart-current);
+}
+
+/* 输入框：AI 在场的流光边框是全页唯一的渐变。 */
+:root[data-surface='workspace'] :is(.workspace-composer, .live-conversations) .live-composer-surface {
+  border-color: transparent;
+  background: rgb(255 255 255 / 78%);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: 0 14px 44px rgb(60 55 160 / 12%);
+}
+:root[data-surface='workspace'] :is(.workspace-composer, .live-conversations) .live-composer-surface::before {
+  content: '';
+  position: absolute;
+  inset: -1.5px;
+  z-index: -1;
+  padding: 1.5px;
+  border-radius: inherit;
+  background: var(--workspace-glow);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0.85;
+  animation: workspace-glow 10s linear infinite;
+  pointer-events: none;
+}
+:root[data-surface='workspace'] :is(.workspace-composer, .live-conversations) .live-composer-surface:focus-within {
+  border-color: transparent;
+  box-shadow:
+    0 14px 44px rgb(60 55 160 / 16%),
+    0 0 0 4px rgb(91 87 217 / 8%);
+}
+:root[data-surface='workspace'] :is(.workspace-composer, .live-conversations) .live-composer-submit:not(:disabled) {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 4px 12px rgb(91 87 217 / 28%);
+}
+:root[data-surface='workspace'] :is(.workspace-composer, .live-conversations) .live-composer-submit:disabled {
+  background: var(--accent-soft);
+  color: var(--ink-3);
+  opacity: 1;
+}
+@keyframes workspace-glow {
+  to {
+    --workspace-glow-angle: 360deg;
+  }
+}
+
+/* 会话卡片带：叠放的卡片保持不透明，只换边缘和阴影。 */
+:root[data-surface='workspace'] .deck-card {
+  background: var(--surface-raised);
+  border-color: var(--glass-edge);
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 90%) inset,
+    -2px 0 10px rgb(40 40 90 / 5%),
+    0 10px 32px rgb(40 40 90 / 7%);
+}
+:root[data-surface='workspace'] .live-conversations .conversation-user {
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-surface='workspace'] .live-composer-surface::before {
+    animation: none;
+  }
+  :root[data-surface='workspace'] .live-briefing-card:not(.conversation-briefing-preview):is(:hover, :focus-within) {
+    transform: none;
+  }
+}

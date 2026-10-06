@@ -1,7 +1,7 @@
 .data-briefing-summary {
   font-size: 1.05rem;
   line-height: 1.8;
-  color: #203047;
+  color: var(--ink);
   margin: 16px 0 20px;
 }
 .data-briefing-chart {
@@ -12,7 +12,7 @@
 }
 .data-briefing-chart figcaption {
   font: 12px/1.65 system-ui;
-  color: #7d8795;
+  color: var(--ink-3);
   margin-top: 8px;
 }
 .data-briefing-chart .briefing-visual-chart {
@@ -24,27 +24,27 @@
   margin: 18px 0;
 }
 .data-briefing details {
-  border-top: 1px solid #e7ecf1;
+  border-top: 1px solid var(--line);
   margin-top: 22px;
   padding-top: 16px;
 }
 .data-briefing summary {
   cursor: pointer;
-  color: #647387;
+  color: var(--ink-2);
   font-size: 13px;
 }
 .data-briefing-basis pre {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   font: 12px/1.8 inherit;
-  background: #f6f8fa;
+  background: var(--soft);
   padding: 14px;
   border-radius: 10px;
 }
 .data-briefing-basis p,
 .data-briefing-table p {
   font-size: 12px;
-  color: #65748a;
+  color: var(--ink-2);
   line-height: 1.8;
 }
 .data-table-scroll {
@@ -60,7 +60,7 @@
 .data-briefing th,
 .data-briefing td {
   padding: 10px 8px;
-  border-bottom: 1px solid #e9edf2;
+  border-bottom: 1px solid var(--line);
   text-align: right;
   white-space: nowrap;
 }

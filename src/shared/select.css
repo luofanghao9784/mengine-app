@@ -20,10 +20,10 @@
   min-height: 36px;
   width: 100%;
   padding: 8px 12px;
-  border: 1px solid var(--border, #e4e9f0);
+  border: 1px solid var(--border, var(--line));
   border-radius: var(--radius, 8px);
   background: var(--surface, #fff);
-  color: var(--text, #2d3744);
+  color: var(--text, var(--ink));
   font: inherit;
   font-size: 13px;
   text-align: left;
@@ -36,16 +36,16 @@
 }
 .app-select-trigger > svg {
   flex-shrink: 0;
-  color: #64748b;
+  color: var(--ink-2);
 }
 .app-select-trigger:hover {
   border-color: #a9bbd4;
 }
 .app-select-trigger:focus-visible,
 .app-select-trigger[aria-expanded='true'] {
-  outline: 2px solid #c5d9fc;
+  outline: 2px solid var(--line);
   outline-offset: 1px;
-  border-color: #3373df;
+  border-color: var(--accent);
 }
 .app-select-trigger:disabled {
   opacity: 0.5;
@@ -58,10 +58,10 @@
   padding: 5px;
   max-height: min(320px, calc(100vh - 24px));
   overflow-y: auto;
-  border: 1px solid #e1e7f0;
+  border: 1px solid var(--line);
   border-radius: 10px;
   background: #fff;
-  color: #2d3744;
+  color: var(--ink);
   box-shadow: 0 8px 28px #1e355b20;
   font:
     13px/1.5 -apple-system,
@@ -80,11 +80,11 @@
   cursor: pointer;
 }
 .app-select-option.highlighted {
-  background: #f1f5fc;
+  background: var(--accent-soft);
 }
 .app-select-option[aria-selected='true'] {
-  color: #175bb7;
-  background: #e8f0ff;
+  color: var(--accent);
+  background: var(--accent-soft);
 }
 .app-select-option[aria-disabled='true'] {
   opacity: 0.45;

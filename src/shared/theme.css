@@ -36,6 +36,44 @@
   --card-shadow: 0 5px 20px #1e355b0b;
   --sidebar-width: 108px;
   --preview-width: 370px;
+  /* Semantic roles shared by all surfaces; each surface theme below re-points them. */
+  --ink: #2d3744;
+  --ink-2: #5f7283;
+  --ink-3: #8290a2;
+  --accent-soft: #edf3ff;
+  --surface: #fff;
+  --surface-raised: #fff;
+  --glass-blur: none;
+  --glass-edge: var(--card-edge);
+}
+/* DEC-130 客户端 D 克制版：冷色柔光、毛玻璃、单一靛蓝强调色。 */
+:root[data-surface='workspace'] {
+  color: var(--ink);
+  --canvas: #f3f4f8;
+  --ink: #191b2e;
+  --ink-2: #4f5368;
+  --ink-3: #8b8fa3;
+  --text-secondary: var(--ink-2);
+  --muted: var(--ink-2);
+  --line: rgb(25 27 46 / 8%);
+  --soft: rgb(25 27 46 / 4%);
+  --accent: #5b57d9;
+  --accent-hover: #4a46c4;
+  --accent-soft: rgb(91 87 217 / 8%);
+  --selected: rgb(91 87 217 / 10%);
+  --blue-ink: #4a46c4;
+  --surface: rgb(255 255 255 / 70%);
+  --surface-raised: #fff;
+  --glass-blur: blur(28px) saturate(1.5);
+  --glass-edge: rgb(255 255 255 / 75%);
+  --card-edge: var(--glass-edge);
+  --card-shadow: 0 1px 0 rgb(255 255 255 / 90%) inset, 0 8px 30px rgb(40 40 90 / 6%);
+  --conversation-card-radius: 22px;
+  background:
+    radial-gradient(1000px 640px at 4% -6%, rgb(196 190 255 / 45%), transparent 60%),
+    radial-gradient(900px 600px at 100% 0%, rgb(198 226 255 / 50%), transparent 58%),
+    radial-gradient(900px 700px at 80% 110%, rgb(206 200 255 / 28%), transparent 55%), var(--canvas);
+  background-attachment: fixed;
 }
 * {
   box-sizing: border-box;
@@ -122,9 +160,9 @@ svg {
 input:not([type='checkbox']):not([type='file']),
 textarea,
 select {
-  border: 1px solid #dde6ed;
+  border: 1px solid var(--line);
   background: #fff;
-  color: #344454;
+  color: var(--ink);
   border-radius: 8px;
   padding: 10px 12px;
   width: 100%;
@@ -159,7 +197,7 @@ button {
     box-shadow 0.16s;
 }
 ::selection {
-  background: #d6eafa;
+  background: var(--accent-soft);
 }
 /* Keep the scrollbar gutter stable; only the active surface shows its thumb. */
 * {
@@ -193,7 +231,7 @@ button {
   gap: 7px;
   min-height: 34px;
   padding: 7px 12px;
-  border: 1px solid #dfe7ee;
+  border: 1px solid var(--line);
   border-radius: var(--radius);
   font-size: var(--font-body);
   font-weight: 450;
@@ -203,7 +241,7 @@ button {
   flex-shrink: 0;
 }
 .button:hover:not(:disabled) {
-  background: #f5f9fc;
+  background: var(--soft);
   border-color: #bed8eb;
 }
 .button.primary {
@@ -221,7 +259,7 @@ button {
   color: var(--text-secondary);
 }
 .button.ghost:hover:not(:disabled) {
-  background: #edf5fb;
+  background: var(--accent-soft);
 }
 .button.danger {
   color: #a14e4e;
@@ -238,8 +276,8 @@ button {
   color: var(--text-secondary);
 }
 .icon-button:hover {
-  background: #e9eff4;
-  color: #3b627f;
+  background: var(--soft);
+  color: var(--ink-2);
 }
 .row {
   display: flex;
@@ -284,14 +322,14 @@ button {
   min-height: 22px;
   padding: 2px 7px;
   border-radius: 5px;
-  background: #f0f3f6;
+  background: var(--soft);
   color: var(--text-secondary);
   font-size: var(--font-caption);
   line-height: 1.5;
   white-space: nowrap;
 }
 .badge.blue {
-  background: #edf5fc;
+  background: var(--accent-soft);
   color: var(--text-secondary);
 }
 .eyebrow {
@@ -349,7 +387,7 @@ button {
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 2.5px;
-  color: #64748b;
+  color: var(--ink-2);
 }
 
 .nav-item {
@@ -395,7 +433,7 @@ button {
   transform: translateY(-50%) translateX(-4px);
   width: max-content;
   padding: 10px 8px;
-  color: #2d3744;
+  color: var(--ink);
   z-index: 4;
   isolation: isolate;
   pointer-events: none;
@@ -507,7 +545,7 @@ button {
   gap: 13px;
 }
 .empty-icon {
-  background: #f0f6fb;
+  background: var(--soft);
   border-radius: 14px;
   width: 57px;
   height: 57px;
@@ -532,13 +570,13 @@ button {
   padding: 25px 0;
 }
 .modal {
-  border: 1px solid #e0e8ef;
+  border: 1px solid var(--line);
   padding: 0;
   border-radius: 16px;
   box-shadow: 0 24px 100px #20394b24;
   width: min(560px, calc(100vw - 32px));
   max-height: calc(100dvh - 64px);
-  color: #41576a;
+  color: var(--ink-2);
   overflow: auto;
   background: #fff;
 }
@@ -577,7 +615,7 @@ button {
   justify-content: flex-end;
   gap: 9px;
   margin-top: 24px;
-  border-top: 1px solid #eef3f7;
+  border-top: 1px solid var(--line);
   padding-top: 18px;
 }
 .field {

@@ -20,7 +20,7 @@
 .adjustment-reply {
   margin-top: 12px;
   padding: 12px;
-  background: var(--surface-muted, #f5f7fa);
+  background: var(--surface-muted, var(--soft));
   border-radius: 10px;
 }
 .adjustment-panel details {

@@ -2,7 +2,7 @@
   max-width: 1600px;
   width: 100%;
   margin: 0 auto;
-  color: #202c3c;
+  color: var(--ink);
 }
 .live-briefing-tabs {
   display: flex;
@@ -14,12 +14,12 @@
   border: 0;
   border-bottom: 2px solid transparent;
   background: transparent;
-  color: #62666e;
+  color: var(--ink-2);
   white-space: nowrap;
   cursor: pointer;
 }
 .live-briefing-tabs button[aria-selected='true'] {
-  color: var(--accent, #356fe5);
+  color: var(--accent, var(--accent));
   border-bottom-color: currentColor;
   font-weight: 550;
 }
@@ -42,7 +42,7 @@
 }
 .live-briefing-filters .field > span {
   font-size: 11px;
-  color: #7c8693;
+  color: var(--ink-3);
 }
 .live-briefing-filters select,
 .live-briefing-filters input {
@@ -53,7 +53,7 @@
 }
 .live-briefing-view-options {
   font-size: 12px;
-  color: #657184;
+  color: var(--ink-2);
   min-width: 110px;
 }
 .live-briefing-view-options summary {
@@ -66,7 +66,7 @@
 .live-briefing-day h2 {
   font-size: 14px;
   font-weight: 500;
-  color: #657184;
+  color: var(--ink-2);
   margin: 22px 0 14px;
 }
 .live-briefing-grid {
@@ -89,7 +89,7 @@
     border-color 160ms;
 }
 .live-briefing-card:not(.conversation-briefing-preview):is(:hover, :focus-within) {
-  border-color: #d5dce6;
+  border-color: var(--line);
   box-shadow: 0 9px 28px #26374a0d;
   z-index: 4;
 }
@@ -117,7 +117,7 @@
   cursor: default;
 }
 .live-briefing-body:focus-visible {
-  outline: 2px solid var(--accent, #356fe5);
+  outline: 2px solid var(--accent, var(--accent));
   outline-offset: 3px;
 }
 .live-magazine-eyebrow {
@@ -126,7 +126,7 @@
   gap: 12px;
   align-items: center;
   font-size: 12px;
-  color: #7d8795;
+  color: var(--ink-3);
 }
 .live-magazine-type {
   display: inline-flex;
@@ -136,8 +136,8 @@
   border-radius: 5px;
   font-size: 12px;
   font-weight: 600;
-  background: #eff3fc;
-  color: #4d659b;
+  background: var(--accent-soft);
+  color: var(--ink-2);
 }
 .live-magazine-type.publication {
   background: #edf5f2;
@@ -152,7 +152,7 @@
   margin: 0;
 }
 .live-briefing-excerpt {
-  color: #657184;
+  color: var(--ink-2);
   line-height: 1.65;
   font-size: 14px;
   white-space: pre-wrap;
@@ -169,7 +169,7 @@
   flex-wrap: wrap;
   margin-top: auto;
   padding-right: 50px;
-  color: #7e8794;
+  color: var(--ink-3);
   font-size: 12px;
   line-height: 1.5;
   overflow-wrap: anywhere;
@@ -182,7 +182,7 @@
   overflow-wrap: anywhere;
 }
 .live-briefing-card.is-read .briefing-magazine h3 {
-  color: #8b929d;
+  color: var(--ink-3);
 }
 .live-briefing-card .live-magazine:not(.magazine-with-chart) .magazine-summary {
   -webkit-line-clamp: 3;
@@ -194,7 +194,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  color: #657184;
+  color: var(--ink-2);
 }
 .live-briefing-body > .live-briefing-marks {
   position: absolute;
@@ -211,7 +211,7 @@
   padding-right: 38px;
 }
 .live-briefing-card.is-read h3 {
-  color: #8b929d;
+  color: var(--ink-3);
 }
 .live-briefing-controls {
   display: flex;
@@ -245,7 +245,7 @@
 }
 .focus-layout-tools {
   font-size: 12px;
-  color: #657184;
+  color: var(--ink-2);
   margin: 12px 0;
 }
 .focus-layout-tools summary {
@@ -273,7 +273,7 @@
   padding: 10px 0;
   margin: 10px 0;
   border: 0;
-  border-bottom: 1px solid #e4e8ee;
+  border-bottom: 1px solid var(--line);
   border-radius: 0;
   background: transparent;
 }
@@ -283,7 +283,7 @@
 .live-briefing .forwarding-inbox h3 {
   font-size: 13px;
   font-weight: 500;
-  color: #657184;
+  color: var(--ink-2);
 }
 .live-briefing .forwarding-inbox header p {
   display: none;
@@ -304,7 +304,7 @@
   border: 0;
   background: transparent;
   overflow: visible;
-  color: #28313d;
+  color: var(--ink);
   box-sizing: border-box;
 }
 .live-reading-dialog::backdrop {
@@ -317,7 +317,7 @@
   flex-direction: column;
   height: 100%;
   background: #fff;
-  border: 1px solid #e4e8ee;
+  border: 1px solid var(--line);
   border-radius: 26px;
   box-shadow: 0 24px 90px #1d365529;
   overflow: hidden;
@@ -330,7 +330,7 @@
   height: var(--card-header-height);
   min-height: var(--card-header-height);
   flex-shrink: 0;
-  color: #35465e;
+  color: var(--ink);
   font-size: 14px;
   font-weight: 600;
 }
@@ -349,12 +349,12 @@
   border: 0;
   border-radius: 50%;
   background: transparent;
-  color: #617084;
+  color: var(--ink-2);
   cursor: pointer;
   flex-shrink: 0;
 }
 .live-reading-close:hover {
-  background: #f1f4f8;
+  background: var(--soft);
 }
 .live-reading-scroll {
   overflow: auto;
@@ -370,7 +370,7 @@
 }
 .live-reading-article > time {
   font: 12px system-ui;
-  color: #8290a0;
+  color: var(--ink-3);
 }
 .live-reading-article h2 {
   margin: 12px 0 24px;
@@ -396,7 +396,7 @@
 .live-reading-article th,
 .live-reading-article td {
   padding: 8px;
-  border: 1px solid #e4e8ee;
+  border: 1px solid var(--line);
   overflow-wrap: anywhere;
 }
 .live-reading-article pre {
@@ -407,7 +407,7 @@
 .live-publication-download {
   font-family: system-ui;
   font-size: 12px;
-  color: #657184;
+  color: var(--ink-2);
   margin-top: 24px;
 }
 .live-reading-article details p,
@@ -446,14 +446,14 @@
   border: 1px solid #ffffff66;
   border-radius: 999px;
   color: white;
-  background: linear-gradient(120deg, #367dd8, #526dd2 65%, #8276ce);
+  background: linear-gradient(120deg, var(--accent), var(--accent) 65%, #8276ce);
   box-shadow: 0 6px 20px #225fb82e;
   font: 500 14px system-ui;
   text-decoration: none;
   white-space: nowrap;
 }
 .live-conversation-cta:focus-visible {
-  outline: 2px solid #356fe5;
+  outline: 2px solid var(--accent);
   outline-offset: 4px;
 }
 .live-conversation-cta[aria-disabled='true'] {
@@ -468,7 +468,7 @@
   border-radius: 50%;
   font-size: 0;
   background: #fffffff0;
-  color: #526376;
+  color: var(--ink-2);
   box-shadow: 0 4px 18px #28374e15;
 }
 .live-reading-forward > .button svg {
@@ -806,14 +806,14 @@
   display: flex;
   align-items: center;
   gap: 9px;
-  color: #64778f;
+  color: var(--ink-2);
   font-size: 13px;
   white-space: nowrap;
   user-select: none;
 }
 .live-briefing-refresh-indicator svg {
   flex-shrink: 0;
-  color: #6891ce;
+  color: var(--accent);
 }
 .live-briefing-refresh-spinner {
   animation: live-briefing-refresh-spin 800ms linear infinite;
@@ -878,8 +878,8 @@
   z-index: 2;
   padding: 5px 10px;
   border-radius: 12px;
-  background: #f5f7fa;
-  color: #52647a;
+  background: var(--soft);
+  color: var(--ink-2);
   font-size: 12px;
   pointer-events: none;
 }

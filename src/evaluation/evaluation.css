@@ -20,7 +20,7 @@
 }
 .evaluation-toolbar {
   padding-bottom: 18px;
-  border-bottom: 1px solid var(--line, #e4e7ec);
+  border-bottom: 1px solid var(--line, var(--line));
 }
 .evaluation-toolbar nav,
 .evaluation-actions {
@@ -38,7 +38,7 @@
 }
 .evaluation-card {
   padding: 18px;
-  border: 1px solid var(--line, #e4e7ec);
+  border: 1px solid var(--line, var(--line));
   border-radius: 12px;
   margin: 14px 0;
   overflow-wrap: anywhere;
@@ -63,20 +63,20 @@
 }
 .evaluation-metrics > div {
   padding: 12px;
-  background: var(--bg, #f6f8fa);
+  background: var(--bg, var(--soft));
   border-radius: 8px;
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 .evaluation-metrics small {
-  color: var(--text-muted, #687280);
+  color: var(--text-muted, var(--ink-2));
 }
 .evaluation-criterion,
 .evaluation-evidence {
   margin: 14px 0;
   padding: 14px;
-  border: 1px solid var(--line, #e4e7ec);
+  border: 1px solid var(--line, var(--line));
   border-radius: 10px;
 }
 .evaluation-evidence-row {

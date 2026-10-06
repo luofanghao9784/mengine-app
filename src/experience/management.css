@@ -230,7 +230,7 @@
 }
 
 .general-experience-history {
-  border-top: 1px solid var(--border-color, #e2e8f0);
+  border-top: 1px solid var(--border-color, var(--line));
   padding-top: 16px;
 }
 .general-experience-history-list {
@@ -245,7 +245,7 @@
 .general-experience-history-content {
   margin-top: 16px;
   padding: 16px;
-  border: 1px solid var(--border-color, #e2e8f0);
+  border: 1px solid var(--border-color, var(--line));
   border-radius: 12px;
 }
 
@@ -356,5 +356,5 @@
 .experience-archive-table td:last-child .button {
   padding: 0;
   min-height: 0;
-  color: #1765dc;
+  color: var(--accent);
 }

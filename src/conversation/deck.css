@@ -93,7 +93,7 @@
   width: max-content;
   max-width: min(560px, calc(100vw - 32px));
   padding: 6px 8px;
-  color: #2d3744;
+  color: var(--ink);
   font-size: 13px;
   font-weight: 500;
   line-height: 1.5;
@@ -140,7 +140,7 @@
   bottom: 12px;
   width: 3px;
   border-radius: 3px;
-  background: #4e8ee8;
+  background: var(--accent);
   pointer-events: none;
 }
 .deck-card[data-drop-side='before']::after {
@@ -165,12 +165,12 @@
   left: 50%;
   bottom: 22px;
   transform: translateX(-50%);
-  border: 1px solid #dce6f2;
+  border: 1px solid var(--line);
   border-radius: 999px;
   padding: 8px 16px;
   background: #fff;
   box-shadow: 0 4px 16px #17335312;
-  color: #46617f;
+  color: var(--ink-2);
   font-size: 12px;
   white-space: nowrap;
   pointer-events: none;
@@ -273,7 +273,7 @@
     background: #fff9;
   }
   .deck-mobile-tabs button[aria-pressed='true'] {
-    background: #e4edff;
+    background: var(--accent-soft);
     color: var(--blue-ink);
   }
   .deck-controls .icon-button:not(:last-child) {

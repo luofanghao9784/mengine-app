@@ -1,5 +1,7 @@
 # 梦擎工作空间
 
+> **2026-10-06 客户端视觉改为 D 克制版（DEC-130）：** 客户端按端切换样式变量（`src/shared/theme.css` 中的 `:root[data-surface='workspace']`），组件层在 `src/identity/workspace-theme.css`；企业管理端与总台采用 D′ 梦核日光（收敛版），组件层在 `src/admin/admin-theme.css`，总台引擎仪表盘保持深色舞台。页面结构与交互不变。用合成数据预览真实客户端：`node --experimental-strip-types scripts/design/preview-workspace.ts`，脚本会自启独立端口（默认 5199）并把画报、会话、资料库、手机宽度截图写到 `.local/design-preview/`；管理端用 `node --experimental-strip-types scripts/design/preview-admin.ts`（默认端口 5195）。两者都不连接后端或模型。
+
 > **2026-10-04 总部支持访问：** 总台企业概览已增加进入企业管理端入口，按企业负责人实际权限执行，保留总部身份、独立会话、审计及撤权围栏。权限与浏览器检查通过；本地运行安装与验收边界见[实施记录](docs/交接/总部支持访问实施记录-2026-10-04.md)。
 
 > **2026-10-04 单主线开发：** 当前源码统一到本目录 `main`，不再跨会话并行及发送同步消息；总台仅按桌面验收。来源、快照、验证与运行边界见[收敛记录](docs/交接/单主线开发收敛-2026-10-04.md)。本条优先于下方历史目录与分支描述。

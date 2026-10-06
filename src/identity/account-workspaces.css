@@ -51,7 +51,7 @@
   background: var(--selected);
 }
 .account-workspace-option:hover:not(:disabled) {
-  border-color: #cbdcf4;
+  border-color: var(--line);
   background: var(--soft);
 }
 .account-management-links {

@@ -741,7 +741,13 @@ test('正式导航悬浮复用 Demo 视觉参数，图标与正文不移位，�
     await expect(nav.locator('.is-expanded')).toHaveCount(1);
     expect(await link.boundingBox()).toEqual(bounds);
     expect(await page.locator('.access-main').boundingBox()).toEqual(mainBounds);
-    expect(await link.evaluate(visual)).toEqual(expected);
+    // DEC-130：客户端导航按钮改为 D 克制版的圆角方块；悬浮标签的虚化层与动效仍沿用 Demo。
+    const actual = await link.evaluate(visual);
+    expect(actual.layers.map(({ blur, mask, inset }) => ({ blur, mask, inset }))).toEqual(
+      expected.layers.map(({ blur, mask, inset }) => ({ blur, mask, inset })),
+    );
+    expect(actual.transition).toBe(expected.transition);
+    expect([actual.width, actual.height, actual.radius]).toEqual(['44px', '44px', '14px']);
   }
   const label = nav.getByRole('link', { name: '资料库', exact: true }).locator('.nav-label');
   await page.mouse.move(650, 30);

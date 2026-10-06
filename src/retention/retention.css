@@ -2,7 +2,7 @@
   max-width: 1280px;
   margin: 0 auto;
   padding: 24px;
-  color: var(--text, #223247);
+  color: var(--text, var(--ink));
 }
 .retention-panel * {
   box-sizing: border-box;
@@ -31,7 +31,7 @@
 }
 .retention-panel small {
   line-height: 1.6;
-  color: #64748b;
+  color: var(--ink-2);
 }
 .retention-panel fieldset {
   border: 0;
@@ -51,7 +51,7 @@
   width: 100%;
   max-width: 100%;
   background: #fff;
-  color: #243247;
+  color: var(--ink);
   border: 1px solid #cbd5e1;
   border-radius: 8px;
   padding: 10px;
@@ -90,16 +90,16 @@
 }
 .retention-heading p,
 .retention-section-heading p {
-  color: #65748b;
+  color: var(--ink-2);
   margin-top: 6px;
 }
 .retention-notice {
   padding: 15px 17px;
-  background: #f1f6fc;
-  border: 1px solid #dce7f5;
+  background: var(--accent-soft);
+  border: 1px solid var(--line);
   border-radius: 12px;
   margin: 16px 0 !important;
-  color: #3b536f;
+  color: var(--ink-2);
 }
 .retention-tabs {
   display: flex;
@@ -113,7 +113,7 @@
   gap: 14px;
 }
 .retention-policy {
-  border: 1px solid #e0e6ee;
+  border: 1px solid var(--line);
   border-radius: 12px;
   background: #fff;
   padding: 18px;
@@ -136,11 +136,11 @@
 .retention-policy-title > span {
   font-weight: 650;
   white-space: nowrap;
-  color: #3069a8;
+  color: var(--accent);
   font-size: 14px;
 }
 .retention-policy > p {
-  color: #5d6b7e;
+  color: var(--ink-2);
 }
 .retention-policy details {
   width: 100%;
@@ -151,7 +151,7 @@
 }
 .retention-editor {
   margin-top: 20px;
-  border: 1px solid #cddbea;
+  border: 1px solid var(--line);
   border-radius: 14px;
   padding: 22px;
   background: #fff;
@@ -176,7 +176,7 @@
 }
 .retention-history article {
   padding: 12px 14px;
-  background: #f6f8fb;
+  background: var(--soft);
   border-radius: 8px;
   display: flex;
   flex-direction: column;
@@ -189,7 +189,7 @@
 }
 .retention-history span {
   font-size: 12px;
-  color: #64748b;
+  color: var(--ink-2);
 }
 .retention-section-heading {
   margin-bottom: 16px;
@@ -207,7 +207,7 @@
   text-align: left;
   min-width: 0;
   padding: 18px;
-  border: 1px solid #e1e7ef;
+  border: 1px solid var(--line);
   border-radius: 12px;
   background: white;
   cursor: pointer;
@@ -215,11 +215,11 @@
 }
 .retention-case.selected {
   border-color: #88aeda;
-  background: #f2f7fd;
+  background: var(--accent-soft);
 }
 .retention-case > span {
   font-size: 12px;
-  color: #607086;
+  color: var(--ink-2);
 }
 .retention-case > strong {
   overflow-wrap: anywhere;
@@ -229,7 +229,7 @@
   font-size: 12px;
 }
 .retention-muted {
-  color: #6d7b8e;
+  color: var(--ink-2);
 }
 .retention-fields {
   display: grid;
@@ -244,7 +244,7 @@
   margin: 14px 0;
 }
 .retention-scope-choices > label {
-  border: 1px solid #e0e7ef;
+  border: 1px solid var(--line);
   border-radius: 9px;
   padding: 13px;
   display: flex;
@@ -293,13 +293,13 @@
   margin: 15px 0;
 }
 .retention-assessment {
-  border-top: 1px solid #e3e9f0;
+  border-top: 1px solid var(--line);
   margin-top: 22px;
   padding-top: 22px;
 }
 .retention-assessment > header p {
   margin-top: 5px;
-  color: #68788a;
+  color: var(--ink-2);
 }
 .retention-status {
   border: 1px solid #ead3a7;
@@ -322,13 +322,13 @@
 }
 .retention-assessed-scope {
   margin: 17px 0;
-  border: 1px solid #dfe6ee;
+  border: 1px solid var(--line);
   border-radius: 12px;
   padding: 18px;
 }
 .retention-assessed-scope > p {
   margin: 9px 0;
-  color: #627188;
+  color: var(--ink-2);
 }
 .retention-group-grid {
   display: grid;
@@ -339,7 +339,7 @@
 .retention-group-grid > div {
   padding: 14px;
   border-radius: 9px;
-  background: #f6f8fb;
+  background: var(--soft);
   display: flex;
   flex-direction: column;
   gap: 7px;
@@ -351,11 +351,11 @@
   font-size: 13px;
 }
 .retention-group-grid strong > span {
-  color: #346495;
+  color: var(--accent);
   white-space: nowrap;
 }
 .retention-group-grid p {
-  color: #66778c;
+  color: var(--ink-2);
   font-size: 12px;
 }
 .retention-group-grid button {
@@ -366,7 +366,7 @@
   flex-direction: column;
   align-items: flex-start;
   gap: 6px;
-  background: #f6f8fb;
+  background: var(--soft);
   padding: 12px;
   margin: 8px 0;
   border-radius: 8px;
@@ -374,7 +374,7 @@
 }
 .retention-assessment > details,
 .retention-history-disclosure {
-  border-top: 1px solid #e5eaf0;
+  border-top: 1px solid var(--line);
   padding-top: 16px;
   margin-top: 16px;
 }
@@ -386,7 +386,7 @@
 .retention-policy-stamps span {
   padding: 5px 8px;
   font-size: 11px;
-  background: #f1f5f9;
+  background: var(--soft);
   border-radius: 5px;
   overflow-wrap: anywhere;
 }

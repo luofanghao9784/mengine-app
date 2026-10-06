@@ -28,7 +28,7 @@
 }
 .briefing-evidence {
   margin: 0;
-  color: #617087;
+  color: var(--ink-2);
   font-size: 14px;
   line-height: 1.6;
 }
@@ -37,13 +37,13 @@
   font-size: 18px;
   line-height: 1.6;
   font-weight: 500;
-  color: #294d80;
+  color: var(--accent);
 }
 .briefing-takeaway {
   margin: 12px 0 0;
   font-size: 14px;
   line-height: 1.65;
-  color: #3d5270;
+  color: var(--ink-2);
 }
 .briefing-designed-footer {
   display: flex;
@@ -65,7 +65,7 @@
 .briefing-file-summary {
   flex-shrink: 0;
   font-size: 11px;
-  color: #5c7494;
+  color: var(--ink-2);
 }
 .briefing-designed-files {
   flex-shrink: 0;
@@ -101,7 +101,7 @@
 }
 .briefing-designed-number span {
   font-size: 13px;
-  color: #617087;
+  color: var(--ink-2);
 }
 .briefing-reasoning {
   display: grid;
@@ -109,7 +109,7 @@
   margin-top: 18px;
 }
 .briefing-reasoning strong {
-  color: #617087;
+  color: var(--ink-2);
   font-size: 12px;
   font-weight: 500;
 }
@@ -123,12 +123,12 @@
   gap: 20px;
 }
 .design-comparison .briefing-reasoning > div + div {
-  border-left: 1px solid #e2e8f0;
+  border-left: 1px solid var(--line);
   padding-left: 20px;
 }
 .design-comparison .briefing-reasoning strong {
   font-size: 15px;
-  color: #35547b;
+  color: var(--ink-2);
 }
 .design-digest .briefing-reasoning {
   grid-template-columns: repeat(3, 1fr);
@@ -146,14 +146,14 @@
   display: none;
 }
 .design-brief .briefing-reasoning p {
-  color: #617087;
+  color: var(--ink-2);
 }
 .briefing-person-role {
   display: block;
   margin-top: 3px;
   font-size: 11px;
   font-weight: 400;
-  color: #617087;
+  color: var(--ink-2);
 }
 .briefing-visual-chart {
   margin: 6px 0 0;
@@ -166,7 +166,7 @@
   margin-bottom: 5px;
   font-size: 11px;
   line-height: 1.4;
-  color: #617087;
+  color: var(--ink-2);
 }
 .briefing-chart-period span {
   flex-shrink: 0;

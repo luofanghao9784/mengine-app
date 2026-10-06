@@ -4,7 +4,7 @@
   max-width: 1120px;
   margin: 0 auto;
   padding: 28px;
-  color: var(--text-primary, #2d3744);
+  color: var(--text-primary, var(--ink));
 }
 .departure-header {
   display: flex;
@@ -294,7 +294,7 @@
   font-size: 12px;
   line-height: 1.65;
   background: #f6f8f2;
-  color: #66705c;
+  color: var(--ink-2);
 }
 .departure-status.stopped {
   background: #fff7e8;

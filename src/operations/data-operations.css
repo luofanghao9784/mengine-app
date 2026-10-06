@@ -81,7 +81,7 @@
   font-variant-numeric: tabular-nums;
 }
 .data-ops-metrics > div:first-child dd {
-  color: #1765dc;
+  color: var(--accent);
 }
 .data-ops-list-card {
   background: #fff;
@@ -125,7 +125,7 @@
   min-height: 60px;
 }
 .data-ops-tenants > a:hover {
-  background: #f7faff;
+  background: var(--accent-soft);
 }
 .data-ops-tenants h3 {
   margin: 0;
@@ -231,7 +231,7 @@
   text-decoration: none;
 }
 .data-ops-sections a[aria-current='page'] {
-  color: #1765dc;
+  color: var(--accent);
 }
 .data-ops-sections a[aria-current='page']::after {
   content: '';
@@ -239,7 +239,7 @@
   bottom: -1px;
   inset-inline: 0;
   height: 2px;
-  background: #1765dc;
+  background: var(--accent);
 }
 
 .data-archive-scroll {
@@ -253,28 +253,28 @@
 }
 .data-archive-table th {
   padding: 16px;
-  background: var(--surface-subtle, #f7f9fc);
-  color: var(--muted, #64748b);
+  background: var(--surface-subtle, var(--soft));
+  color: var(--muted, var(--ink-2));
   font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
 }
 .data-archive-table td {
   padding: 18px 16px;
-  border-top: 1px solid var(--border, #e3eaf4);
+  border-top: 1px solid var(--border, var(--line));
   white-space: nowrap;
 }
 .data-archive-table td small {
   display: block;
   margin-top: 5px;
-  color: var(--muted, #64748b);
+  color: var(--muted, var(--ink-2));
 }
 .data-archive-table td a {
-  color: var(--primary, #1760dd);
+  color: var(--primary, var(--accent));
   text-decoration: none;
 }
 .data-archive-empty {
   padding: 36px 16px;
   text-align: center;
-  color: var(--muted, #64748b);
+  color: var(--muted, var(--ink-2));
 }

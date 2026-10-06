@@ -23,8 +23,8 @@
   width: 20px;
   height: 20px;
   border-radius: 6px;
-  color: #3767b6;
-  background: #edf3ff;
+  color: var(--accent);
+  background: var(--accent-soft);
   overflow: visible;
 }
 .live-conversation-group .live-conversation-row .conversation-list-indicators {

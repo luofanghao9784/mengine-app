@@ -19,7 +19,7 @@
   flex: 1;
 }
 .object-lifecycle-item {
-  border: 1px solid var(--border, #dce2e9);
+  border: 1px solid var(--border, var(--line));
   border-radius: 12px;
   padding: 16px;
   display: flex;
@@ -55,7 +55,7 @@
 .object-lifecycle-inline,
 .object-lifecycle-blockers,
 .profile-version-row {
-  border: 1px solid var(--border, #dce2e9);
+  border: 1px solid var(--border, var(--line));
   border-radius: 12px;
   padding: 16px;
 }

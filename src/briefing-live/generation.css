@@ -28,7 +28,7 @@
   margin: 0;
   font-size: 12px;
   line-height: 1.7;
-  color: var(--muted, #64748b);
+  color: var(--muted, var(--ink-2));
 }
 .generation-card-copy .button {
   flex: none;
@@ -39,23 +39,23 @@
 .generation-eyebrow {
   font-size: 10px;
   letter-spacing: 0.15em;
-  color: #6b86ab;
+  color: var(--ink-3);
 }
 .generation-symbol {
   display: flex;
-  color: #7899c5;
+  color: var(--ink-3);
   margin-bottom: 2px;
 }
 .generation-card-copy .generation-result {
   font-size: 11px;
-  color: #60718a;
+  color: var(--ink-2);
 }
 .generation-card-copy .access-alert {
   font-size: 11px;
   padding: 6px;
 }
 .generation-placeholder {
-  background: #f2f6fc;
+  background: var(--accent-soft);
 }
 .generation-placeholder.is-generating::before {
   content: '';
@@ -108,9 +108,9 @@
   padding: 0;
   margin-top: 4px;
   border-radius: 50%;
-  color: #356fe5;
-  background: #edf3ff;
-  border: 1px solid #dce7fa;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid var(--line);
 }
 .generation-card-copy .generation-icon-button svg {
   width: 23px;
@@ -119,19 +119,19 @@
   stroke-width: 1.65;
 }
 .generation-card-copy .generation-icon-button:hover:not(:disabled) {
-  background: #e2ecff;
+  background: var(--accent-soft);
 }
 
 /* Keep the stop action visibly framed, including over the animated card wash. */
 .generation-card-copy .generation-icon-button.generation-stop-button {
-  border: 1px solid #c6d7f4;
+  border: 1px solid var(--line);
   border-radius: 50%;
-  background: #e9f1ff;
-  color: #356fe5;
+  background: var(--accent-soft);
+  color: var(--accent);
   box-shadow: 0 2px 6px #356fe50a;
 }
 .generation-card-copy .generation-icon-button.generation-stop-button:hover:not(:disabled) {
-  background: #dce9ff;
+  background: var(--accent-soft);
   border-color: #a8c2ef;
 }
 
@@ -153,11 +153,11 @@
   border-radius: 50%;
   padding: 0;
   background: transparent;
-  color: #748297;
+  color: var(--ink-3);
   cursor: pointer;
 }
 .generation-minimal .generation-back:hover {
-  background: #edf3ff;
+  background: var(--accent-soft);
 }
 .generation-quantity {
   display: flex;
@@ -176,7 +176,7 @@
   border-radius: 6px;
   background: transparent;
   box-shadow: none;
-  color: #26364d;
+  color: var(--ink);
   text-align: center;
   font-family: inherit;
   font-size: 58px;

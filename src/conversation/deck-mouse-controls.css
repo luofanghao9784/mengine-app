@@ -70,9 +70,9 @@
   width: 38.4px;
   height: 38.4px;
   padding: 0;
-  border: 1px solid #dce5f2;
+  border: 1px solid var(--line);
   border-radius: 50%;
-  color: #5e7cac;
+  color: var(--ink-3);
   background: #fff;
   box-shadow: 0 2px 8px #213d6714;
 }
@@ -109,8 +109,8 @@
   .live-mouse-deck
   .live-deck-arrows
   .icon-button:not(:disabled):is(:hover, :focus-visible) {
-  color: #2d67ba;
-  background: #edf3ff;
+  color: var(--accent);
+  background: var(--accent-soft);
 }
 .deck-fold-bubble-entry:is(:hover, :focus-visible, [data-card-hover]) .deck-fold-bubble {
   --deck-bubble-fill: #edf3ff;
@@ -256,7 +256,7 @@
   cursor: grabbing;
 }
 .deck-bubble-drag-ghost .deck-fold-bubble {
-  color: #2d67ba;
+  color: var(--accent);
   --deck-bubble-fill: #edf3ff;
 }
 

@@ -1,0 +1,114 @@
+/*
+ * DEC-130 企业管理端与总台：D′ 梦核日光（收敛版）。
+ * 与引擎仪表盘共用颜色语义：品牌蓝 = 操作，香槟金 = 梦核与处理，琥珀金 = 输出，珊瑚红 = 异常。
+ * 界面主体保持中性暖白；语义色只在少量位置出现，不做大面积铺色。
+ * 只在管理端入口生效；客户端与深色仪表盘舞台不受影响。
+ */
+:root:is([data-surface='tenant-admin'], [data-surface='platform-admin'], [data-surface='headquarters-support']) {
+  --canvas: #f5f3ee;
+  background:
+    radial-gradient(900px 600px at 6% -6%, rgb(241 214 160 / 30%), transparent 60%),
+    radial-gradient(820px 560px at 100% 0%, rgb(214 226 238 / 65%), transparent 58%),
+    radial-gradient(900px 700px at 88% 110%, rgb(94 134 232 / 8%), transparent 55%),
+    var(--canvas);
+  background-attachment: fixed;
+}
+:root:is([data-surface='tenant-admin'], [data-surface='platform-admin'], [data-surface='headquarters-support']) .admin-control:not(.admin-engine-fullscreen) {
+  --canvas: transparent;
+  --surface: #fffdf9;
+  --surface-muted: rgb(29 27 23 / 4%);
+  --text: #1d1b17;
+  --ink: #1d1b17;
+  --ink-2: #5b564d;
+  --ink-3: #958f84;
+  --text-primary: var(--text);
+  --text-secondary: var(--ink-2);
+  --muted: var(--ink-2);
+  --border: rgb(29 27 23 / 9%);
+  --line: var(--border);
+  --card-edge: var(--border);
+  --selected: rgb(94 134 232 / 11%);
+  --selected-text: #3352ad;
+  --blue-ink: #3352ad;
+  --blue: #3f63c9;
+  --accent: var(--blue);
+  --accent-hover: #3352ad;
+  --accent-soft: rgb(94 134 232 / 10%);
+  --soft: rgb(29 27 23 / 4%);
+  --table-header: transparent;
+  --champagne: #c99a45;
+  --gold: #b8752a;
+  --coral: #e0594b;
+  --panel: rgb(255 253 248 / 68%);
+  --panel-edge: rgb(255 255 255 / 80%);
+  --panel-shadow: 0 1px 0 rgb(255 255 255 / 90%) inset, 0 10px 36px rgb(60 48 20 / 6%);
+  --title-serif: 'Noto Serif SC', 'Songti SC', STSong, serif;
+  --num-serif: 'Cormorant Garamond', 'Noto Serif SC', Georgia, 'Songti SC', serif;
+  background: transparent;
+}
+
+/* 外壳：玻璃侧栏、细线页头、宽字距衬线标题。 */
+:root[data-surface] .admin-control:not(.admin-engine-fullscreen) .admin-sidebar {
+  margin: 14px 0 14px 14px;
+  border: 1px solid var(--panel-edge);
+  border-radius: 22px;
+  background: rgb(255 253 248 / 52%);
+  -webkit-backdrop-filter: blur(22px) saturate(1.3);
+  backdrop-filter: blur(22px) saturate(1.3);
+}
+:root[data-surface] .admin-control:not(.admin-engine-fullscreen) .admin-nav-link.active {
+  color: var(--text);
+  background: #fffdf9;
+  box-shadow: 0 4px 14px rgb(60 48 20 / 9%);
+}
+:root[data-surface] .admin-control:not(.admin-engine-fullscreen) .admin-nav-link.active svg {
+  color: var(--accent);
+}
+:root[data-surface] .admin-control:not(.admin-engine-fullscreen) .admin-nav-link:hover:not(.active) {
+  background: rgb(255 253 248 / 60%);
+}
+:root[data-surface] .admin-control:not(.admin-engine-fullscreen) .admin-brand strong {
+  font-family: var(--title-serif);
+  font-weight: 500;
+  letter-spacing: 0.12em;
+}
+:root[data-surface] .admin-control:not(.admin-engine-fullscreen) .admin-header {
+  border-bottom-color: transparent;
+}
+:root[data-surface] .admin-control:not(.admin-engine-fullscreen) .admin-header h1 {
+  font-family: var(--title-serif);
+  font-weight: 500;
+  letter-spacing: 0.18em;
+}
+
+/* 面板：暖白毛玻璃，代替纯白卡片与粗边框。 */
+:root[data-surface] .admin-control:not(.admin-engine-fullscreen) :is(.admin-stat, .admin-section, .admin-panel, .platform-panel, .tenant-panel) {
+  background: var(--panel);
+  border-color: var(--panel-edge);
+  box-shadow: var(--panel-shadow);
+  -webkit-backdrop-filter: blur(24px) saturate(1.3);
+  backdrop-filter: blur(24px) saturate(1.3);
+}
+:root[data-surface] .admin-control:not(.admin-engine-fullscreen) :is(.platform-status-strip dd, .platform-monthly-values dd) {
+  font-family: var(--num-serif);
+  font-weight: 400;
+  font-size: 36px;
+  line-height: 1.1;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+:root[data-surface] .admin-control:not(.admin-engine-fullscreen) :is(.admin-stat strong, .platform-stat strong, .admin-metric strong) {
+  font-family: var(--num-serif);
+  font-weight: 400;
+  font-size: 40px;
+  line-height: 1;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+/* 主要按钮：品牌蓝实底；其余按钮保持中性。 */
+:root[data-surface] .admin-control:not(.admin-engine-fullscreen) .button.primary {
+  background: var(--accent);
+  box-shadow: 0 4px 12px rgb(63 99 201 / 22%);
+}
+:root[data-surface] .admin-control:not(.admin-engine-fullscreen) .button:not(.primary, .ghost) {
+  background: rgb(255 253 249 / 80%);
+}

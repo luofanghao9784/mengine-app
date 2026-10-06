@@ -8,11 +8,11 @@
   max-height: calc(100dvh - 24px);
   overflow: auto;
   padding: 14px;
-  border: 1px solid #e4e8ee;
+  border: 1px solid var(--line);
   border-radius: 22px;
   background: #fff;
   box-shadow: 0 12px 48px #1e355b24;
-  color: #35465e;
+  color: var(--ink);
   font: 13px/1.6 system-ui;
 }
 .workspace-action-popover > header {
@@ -44,7 +44,7 @@
 }
 .workspace-action-popover > button:hover,
 .workspace-action-list > :is(button, a):hover {
-  background: #f2f6fd;
+  background: var(--accent-soft);
 }
 .workspace-action-popover > button[aria-pressed='true'] {
   color: var(--accent);

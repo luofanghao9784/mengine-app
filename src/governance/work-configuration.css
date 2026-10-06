@@ -25,7 +25,7 @@
   align-items: center;
   font-size: 12px;
   letter-spacing: 0.6px;
-  color: #788270;
+  color: var(--ink-2);
 }
 .configuration-scope {
   display: flex;
@@ -74,7 +74,7 @@
   padding: 18px;
   border-radius: 11px;
   background: #f5f7f1;
-  color: #5b6851;
+  color: var(--ink-2);
   font-size: 14px;
   line-height: 1.8;
 }
@@ -93,14 +93,14 @@
   gap: 12px;
 }
 .configuration-facts dt {
-  color: #7a8274;
+  color: var(--ink-2);
 }
 .configuration-facts dd {
   margin: 0;
   overflow-wrap: anywhere;
 }
 .configuration-source {
-  color: #7d8476;
+  color: var(--ink-2);
   font-size: 12px !important;
 }
 .configuration-section {
@@ -136,7 +136,7 @@
 }
 .configuration-weights span {
   font-size: 12px;
-  color: #6d7c61;
+  color: var(--ink-2);
 }
 .configuration-weights strong {
   font-size: 22px;

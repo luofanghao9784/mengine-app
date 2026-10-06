@@ -19,7 +19,7 @@
   justify-content: space-between;
   gap: 12px;
   padding: 12px;
-  border: 1px solid var(--border, #dedfe4);
+  border: 1px solid var(--border, var(--line));
   border-radius: 12px;
 }
 .lifecycle-list li > div,
@@ -42,13 +42,13 @@
 }
 .lifecycle-confirm,
 .lifecycle-cleanup {
-  border: 1px solid var(--border, #dedfe4);
+  border: 1px solid var(--border, var(--line));
   padding: 16px;
   border-radius: 12px;
   margin-top: 18px;
 }
 .lifecycle-object dt {
-  color: var(--muted, #6f747e);
+  color: var(--muted, var(--ink-2));
   font-size: 13px;
   margin-top: 12px;
 }

@@ -2,11 +2,11 @@
   margin: 12px 0 8px;
   font-size: 13px;
   line-height: 1.6;
-  color: #6d7d91;
+  color: var(--ink-2);
 }
 .reply-progress-flow {
   display: inline-block;
-  color: #6d7d91;
+  color: var(--ink-2);
   background: linear-gradient(100deg, #6d7d91 30%, #b7c6d8 45%, #5076a5 50%, #b7c6d8 55%, #6d7d91 70%);
   background-size: 250% 100%;
   background-clip: text;
@@ -23,7 +23,7 @@
   }
 }
 .live-conversations .live-process-preview {
-  color: #748296;
+  color: var(--ink-3);
   font-size: 13px;
 }
 .live-process-preview strong {
@@ -40,7 +40,7 @@
 .reply-process-history {
   margin: 12px 0;
   font-size: 12px;
-  color: #748296;
+  color: var(--ink-3);
 }
 .reply-process-history summary {
   cursor: pointer;

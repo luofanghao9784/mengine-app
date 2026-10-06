@@ -55,7 +55,7 @@
   font-weight: 600;
 }
 .live-card-heading .document-inline-title:focus {
-  border-color: #b9cff7;
+  border-color: var(--line);
   outline: none;
   box-shadow: 0 0 0 2px #1769ef10;
 }

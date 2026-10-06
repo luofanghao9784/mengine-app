@@ -223,7 +223,7 @@
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background: #e4e9f0;
+  background: var(--soft);
 }
 .magazine-dots i.selected {
   background: var(--magazine-color);
@@ -246,7 +246,7 @@
   content: '';
   position: absolute;
   height: 1px;
-  background: #e3e9f1;
+  background: var(--soft);
   top: 14px;
   left: 33px;
   right: -4px;
@@ -302,7 +302,7 @@
   transform: rotate(4deg);
 }
 .briefing-card .briefing-magazine .briefing-document-cover {
-  border-color: #e0e6de;
+  border-color: var(--line);
   background: #f7f8f4;
   color: #354e43;
   box-shadow: 0 9px 17px #24395510;
@@ -456,7 +456,7 @@
 }
 /* Read state also applies to magazine photo headlines. */
 .briefing-grid .briefing-card.is-read .briefing-magazine h3 {
-  color: #8b929d;
+  color: var(--ink-3);
 }
 .briefing-grid .briefing-card.is-read .magazine-with-photo h3 {
   color: #d3d8e1;
@@ -478,7 +478,7 @@
   margin: 0;
   border-radius: 8px;
   overflow: hidden;
-  background: #edf1f5;
+  background: var(--soft);
 }
 .briefing-grid .magazine-reporting .magazine-photo::after {
   display: none;
@@ -503,7 +503,7 @@
   text-shadow: none;
 }
 .briefing-grid .briefing-card.is-read .magazine-reporting.magazine-with-photo h3 {
-  color: #8b929d;
+  color: var(--ink-3);
 }
 .briefing-grid .magazine-reporting.magazine-with-photo .magazine-copy p,
 .briefing-grid .magazine-reporting.magazine-with-photo .magazine-footer,

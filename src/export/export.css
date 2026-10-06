@@ -1,7 +1,7 @@
 .export-panel {
   margin: 22px 0;
   padding: 22px;
-  border: 1px solid #dfe6e7;
+  border: 1px solid var(--line);
   border-radius: 14px;
   background: var(--surface, #fff);
   color: var(--text-primary, #263831);
@@ -23,7 +23,7 @@
 }
 .export-heading p {
   margin: 0;
-  color: var(--text-secondary, #718078);
+  color: var(--text-secondary, var(--ink-2));
   font-size: 13px;
 }
 .export-toolbar {
@@ -35,14 +35,14 @@
 .export-note {
   padding: 12px 14px;
   background: #f2f7f4;
-  color: #58705f;
+  color: var(--ink-2);
   border-radius: 9px;
   line-height: 1.8;
   font-size: 12px;
   margin: 17px 0;
 }
 .export-muted {
-  color: var(--text-secondary, #718078);
+  color: var(--text-secondary, var(--ink-2));
   font-size: 12px;
   line-height: 1.8;
 }
@@ -55,7 +55,7 @@
 .export-batch-card {
   padding: 14px;
   text-align: left;
-  border: 1px solid #e1e8e2;
+  border: 1px solid var(--line);
   border-radius: 10px;
   background: #fff;
   cursor: pointer;
@@ -78,16 +78,16 @@
 .export-batch-card span {
   font-size: 12px;
   margin-top: 7px;
-  color: #65756a;
+  color: var(--ink-2);
 }
 .export-batch-card small {
   font-size: 11px;
   margin-top: 5px;
-  color: #839086;
+  color: var(--ink-3);
 }
 .export-picker,
 .export-detail {
-  border-top: 1px solid #e4eae5;
+  border-top: 1px solid var(--line);
   margin-top: 20px;
   padding-top: 20px;
 }
@@ -103,7 +103,7 @@
   justify-content: space-between;
   gap: 12px;
   padding: 14px 0;
-  border-bottom: 1px solid #edf0eb;
+  border-bottom: 1px solid var(--line);
   min-width: 0;
 }
 .export-choices label {
@@ -127,7 +127,7 @@
 .export-choices small,
 .export-items small {
   display: block;
-  color: #758278;
+  color: var(--ink-2);
   font-size: 12px;
   line-height: 1.8;
   margin-top: 4px;
@@ -192,7 +192,7 @@
   font-size: 16px;
 }
 .export-detail-heading small {
-  color: #829086;
+  color: var(--ink-3);
   font-size: 11px;
   overflow-wrap: anywhere;
 }
@@ -206,7 +206,7 @@
   padding: 6px 9px;
   background: #f4f6f0;
   border-radius: 6px;
-  color: #61755e;
+  color: var(--ink-2);
   font-size: 12px;
 }
 .export-items li {
@@ -226,7 +226,7 @@
   width: 23px;
   border-radius: 6px;
   background: #edf2e8;
-  color: #718065;
+  color: var(--ink-2);
   display: grid;
   place-items: center;
   flex: none;
@@ -235,7 +235,7 @@
 .export-items code {
   display: block;
   font-size: 10px;
-  color: #86917f;
+  color: var(--ink-3);
   margin-top: 5px;
   overflow-wrap: anywhere;
   white-space: normal;
@@ -257,7 +257,7 @@
 .export-cleanup p,
 .export-cleanup small {
   font-size: 12px;
-  color: #72816d;
+  color: var(--ink-2);
 }
 .export-cleanup p {
   margin: 7px 0;
