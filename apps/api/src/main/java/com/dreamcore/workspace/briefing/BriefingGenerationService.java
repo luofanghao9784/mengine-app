@@ -37,6 +37,9 @@ public class BriefingGenerationService {
     private final JdbcTemplate db;private final ConversationService tasks;private final BriefingContentService contents;
     private final IdentityService identities;private final MaterialAccess access;private final DepartureAccess departure;
     private final AgentSettings agents;private final PlanClock clock;private final JsonMapper json=new JsonMapper();
+    @Value("${dreamcore.briefing.once-tenant:}") private String onceTenant="";
+    @Value("${dreamcore.briefing.once-owner:}") private String onceOwner="";
+    private boolean automaticAllowed(UUID tenant,UUID actor){return automaticEnabled||(tenant.toString().equals(onceTenant)&&actor.toString().equals(onceOwner));}
     private final boolean tasksEnabled;private final String newsSource;private final int mergeSeconds,dailyLimit;
     @Value("${dreamcore.briefing.automatic-enabled:true}") private boolean automaticEnabled=true;
     public BriefingGenerationService(JdbcTemplate db,ConversationService tasks,BriefingContentService contents,IdentityService identities,MaterialAccess access,DepartureAccess departure,AgentSettings agents,PlanClock clock,
@@ -189,7 +192,7 @@ public class BriefingGenerationService {
           ORDER BY w.id,m.account_id LIMIT 100 ON CONFLICT DO NOTHING
           """);
     }
-    public List<UUID> candidates(){return db.queryForList("SELECT id FROM briefing_generation_policies WHERE (? AND enabled) OR EXISTS(SELECT 1 FROM briefing_generation_batches b WHERE b.policy_id=briefing_generation_policies.id AND b.status IN ('QUEUED','RUNNING','WAITING_DATA','WAITING_RESOURCE','WAITING_CAPABILITY') AND (? OR b.trigger_kind='GENERATE_MORE' OR EXISTS(SELECT 1 FROM briefing_generation_requests request WHERE request.batch_id=b.id))) ORDER BY checked_at NULLS FIRST,id LIMIT 20",UUID.class,automaticEnabled,automaticEnabled);}
+    public List<UUID> candidates(){return db.queryForList("SELECT id FROM briefing_generation_policies WHERE ((? OR (tenant_id::text=? AND owner_id::text=?)) AND enabled) OR EXISTS(SELECT 1 FROM briefing_generation_batches b WHERE b.policy_id=briefing_generation_policies.id AND b.status IN ('QUEUED','RUNNING','WAITING_DATA','WAITING_RESOURCE','WAITING_CAPABILITY') AND (? OR (b.tenant_id::text=? AND b.owner_id::text=?) OR b.trigger_kind='GENERATE_MORE' OR EXISTS(SELECT 1 FROM briefing_generation_requests request WHERE request.batch_id=b.id))) ORDER BY checked_at NULLS FIRST,id LIMIT 20",UUID.class,automaticEnabled,onceTenant,onceOwner,automaticEnabled,onceTenant,onceOwner);}
     private List<Source> sources(UUID tenant,UUID space){var sources=new ArrayList<>(db.query("""
         SELECT m.id,v.id version_id,v.filename,v.created_at,coalesce(k.status,'NOT_REQUESTED') parse_status FROM active_materials m
         JOIN material_versions v ON v.material_id=m.id AND v.number=m.current_version
@@ -237,13 +240,14 @@ public class BriefingGenerationService {
     @Transactional public void tick(UUID id){
         var rows=db.queryForList("SELECT * FROM briefing_generation_policies WHERE id=?",id);if(rows.isEmpty())return;var p=rows.getFirst();
         UUID tenant=(UUID)p.get("tenant_id"),actor=(UUID)p.get("owner_id"),space=(UUID)p.get("workspace_id");lock(actor,tenant);
+        boolean automaticAllowed=automaticAllowed(tenant,actor);
         String newsSource=newsSource(tenant);
         p=db.queryForMap("SELECT * FROM briefing_generation_policies WHERE id=? FOR UPDATE",id);Instant now=clock.now();
         db.update("UPDATE briefing_generation_policies SET checked_at=? WHERE id=?",time(now),id);
         if("SUSPENDED".equals(db.queryForObject("SELECT status FROM tenants WHERE id=?",String.class,tenant))){db.update("UPDATE briefing_generation_policies SET reason='TENANT_SERVICE_SUSPENDED' WHERE id=?",id);return;}
         // A missing installation prerequisite is terminal for a manual request, not an endless reservation.
         if(!newsCapability(tenant).available())db.update("UPDATE briefing_generation_batches SET status='FAILED',reason='NEWS_SOURCE_UNAVAILABLE',finished_at=? WHERE policy_id=? AND business_type='INFO' AND task_id IS NULL AND status IN ('QUEUED','WAITING_DATA','WAITING_CAPABILITY')",time(now),id);
-        var active=db.queryForList("SELECT * FROM briefing_generation_batches WHERE policy_id=? AND status IN ('QUEUED','RUNNING','WAITING_DATA','WAITING_RESOURCE','WAITING_CAPABILITY') AND (? OR trigger_kind='GENERATE_MORE' OR EXISTS(SELECT 1 FROM briefing_generation_requests request WHERE request.batch_id=briefing_generation_batches.id)) AND NOT (coalesce(business_type,'AUTO')='INFO' AND status='WAITING_DATA' AND reason='NEWS_SOURCE_UNAVAILABLE' AND ?) ORDER BY CASE WHEN task_id IS NOT NULL THEN 0 ELSE 1 END,CASE WHEN trigger_kind='GENERATE_MORE' OR EXISTS(SELECT 1 FROM briefing_generation_requests manual WHERE manual.batch_id=briefing_generation_batches.id) THEN 0 ELSE 1 END,CASE WHEN business_type='INFO' THEN 0 ELSE 1 END,created_at LIMIT 1 FOR UPDATE",id,automaticEnabled,newsSource.isBlank()||!agents.publicWebEnabled());
+        var active=db.queryForList("SELECT * FROM briefing_generation_batches WHERE policy_id=? AND status IN ('QUEUED','RUNNING','WAITING_DATA','WAITING_RESOURCE','WAITING_CAPABILITY') AND (? OR trigger_kind='GENERATE_MORE' OR EXISTS(SELECT 1 FROM briefing_generation_requests request WHERE request.batch_id=briefing_generation_batches.id)) AND NOT (coalesce(business_type,'AUTO')='INFO' AND status='WAITING_DATA' AND reason='NEWS_SOURCE_UNAVAILABLE' AND ?) ORDER BY CASE WHEN task_id IS NOT NULL THEN 0 ELSE 1 END,CASE WHEN trigger_kind='GENERATE_MORE' OR EXISTS(SELECT 1 FROM briefing_generation_requests manual WHERE manual.batch_id=briefing_generation_batches.id) THEN 0 ELSE 1 END,CASE WHEN business_type='INFO' THEN 0 ELSE 1 END,created_at LIMIT 1 FOR UPDATE",id,automaticAllowed,newsSource.isBlank()||!agents.publicWebEnabled());
         try{authority(actor,tenant,space);}catch(IdentityException e){
             for(var b:active){if(b.get("task_id")!=null)tasks.interruptTasks(tenant,List.of((UUID)b.get("task_id")),"BRIEFING_AUTHORITY_REVOKED");finish((UUID)b.get("id"),"AUTHORITY_REVOKED","AUTHORITY_REVOKED");}
             db.update("UPDATE briefing_generation_policies SET reason='AUTHORITY_REVOKED' WHERE id=?",id);return;
@@ -261,7 +265,7 @@ public class BriefingGenerationService {
             p.put("context_key",contextKey);
         }
         if(active.isEmpty()){
-            if(!automaticEnabled||!Boolean.TRUE.equals(p.get("enabled")))return;
+            if(!automaticAllowed||!Boolean.TRUE.equals(p.get("enabled")))return;
             // Failed/cancelled automatic runs require an explicit retry; new source versions may proceed.
             boolean goalChanged=unseen.isEmpty()&&p.get("context_key")!=null&&!p.get("context_key").equals(contextKey);
             boolean changed=!unseen.isEmpty()||goalChanged;
@@ -343,11 +347,26 @@ public class BriefingGenerationService {
         for(var b:db.queryForList("SELECT b.* FROM briefing_generation_batches b JOIN conversation_tasks t ON t.id=b.task_id WHERE b.tenant_id=? AND b.status IN ('QUEUED','RUNNING','WAITING_DATA','WAITING_RESOURCE','WAITING_CAPABILITY') AND t.status NOT IN ('QUEUED','RUNNING') ORDER BY b.id",tenant))
             reconcile(db.queryForMap("SELECT * FROM briefing_generation_policies WHERE id=?",b.get("policy_id")),b);
     }
+    private boolean emptyNewsSearch(UUID task,int attempt){
+        return Boolean.TRUE.equals(db.queryForObject("""
+            SELECT coalesce(web_sources,'[]'::jsonb)='[]'::jsonb
+            AND (SELECT count(*) FROM briefing_news_search_queries q WHERE q.task_id=t.id)=2
+            AND (SELECT count(*) FROM conversation_tool_receipts r WHERE r.task_id=t.id AND r.attempt_number=? AND r.name='public_search' AND r.status='succeeded')=2
+            AND EXISTS(SELECT 1 FROM conversation_tool_receipts r WHERE r.task_id=t.id AND r.attempt_number=? AND r.name='task_control' AND r.status='succeeded')
+            AND NOT EXISTS(SELECT 1 FROM conversation_tool_receipts r WHERE r.task_id=t.id AND r.attempt_number=? AND (r.status<>'succeeded' OR r.name NOT IN ('activate_skill','public_search','task_control')))
+            FROM conversation_tasks t WHERE t.id=?
+            """,Boolean.class,attempt,attempt,attempt,task));
+    }
     private void reconcile(Map<String,Object> p,Map<String,Object> b){
         UUID batch=(UUID)b.get("id"),task=(UUID)b.get("task_id"),tenant=(UUID)p.get("tenant_id");
         if(!p.get("epoch").equals(b.get("policy_epoch"))){tasks.interruptTasks(tenant,List.of(task),"BRIEFING_AUTHORITY_CHANGED");finish(batch,"AUTHORITY_REVOKED","AUTHORITY_CHANGED");return;}
         var t=db.queryForMap("SELECT status,attempt,error_code FROM conversation_tasks WHERE id=?",task);String status=(String)t.get("status");
         if(Set.of("QUEUED","RUNNING").contains(status))return;
+        // A bounded news search with no readable article is a completed empty result, not a generation error.
+        if(status.equals("PARTIAL")&&"INFO".equals(b.get("business_type"))&&emptyNewsSearch(task,(Integer)t.get("attempt"))){
+            finish(batch,"NO_NEW_CONTENT","NEWS_NO_NEW_CONTENT");
+            db.update("UPDATE briefing_generation_policies SET info_day=? WHERE id=?",java.sql.Date.valueOf(clock.now().atZone(ZoneId.of("Asia/Shanghai")).toLocalDate()),p.get("id"));return;
+        }
         if(status.equals("SUCCEEDED")){
             boolean delivered=contents.find(task,(Integer)t.get("attempt"))!=null;finish(batch,delivered?"SUCCEEDED":"NO_NEW_CONTENT",delivered?null:"NO_NEW_CONTENT");
             if("INFO".equals(b.get("business_type")))db.update("UPDATE briefing_generation_policies SET info_day=? WHERE id=?",java.sql.Date.valueOf(clock.now().atZone(ZoneId.of("Asia/Shanghai")).toLocalDate()),p.get("id"));

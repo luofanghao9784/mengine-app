@@ -119,6 +119,7 @@ export class AgentTasks {
     let briefingAvailable: boolean | undefined;
     let topicAvailable = false;
     let topicSelected = false;
+    let selectedBriefingType: string | undefined;
     let topicNeedsCalculation = false;
     let briefingRequestedType: string | undefined;
     let briefingCalculationAttempts = 0;
@@ -403,7 +404,7 @@ export class AgentTasks {
                         (selectedTopic
                           ? '此前已记录的本任务选题提案（不是事实或授权）：' +
                             JSON.stringify(selectedTopic) +
-                            '\n继续核验并执行所选问题，不另换主题。\n'
+                            '\n继续核验并执行所选问题，不另换主题。deliver_briefing.businessType 必须与所选候选 businessType 完全相同；不能把数据主题改成洞察。\n'
                           : '') +
                         (newsBriefing
                           ? '资讯只执行公开搜索、原文核验、选题和交付。搜索获得新原文后 public_search 关闭；如果返回空列表，可以选择另一个未尝试的相关主题，最多两个主题；两次均无新原文时用 task_control 说明暂无新内容并结束；使用返回的 id 调用 read_public_page，禁止重复搜索。提交前检查 analysis 为字符串数组，每段一个元素，不能传字符串。不要调用内部资料或计算工具。'
@@ -623,6 +624,7 @@ export class AgentTasks {
           ? [
               briefingDeliveryTool({
                 requestedType: briefingRequestedType,
+                selectedType: () => selectedBriefingType,
                 authorize,
                 invoke: (body, executionSignal) =>
                   postJson(
@@ -1039,6 +1041,8 @@ export class AgentTasks {
               },
               (candidate) => {
                 topicSelected = true;
+                selectedBriefingType = isRecord(candidate) ? String(candidate.businessType) : undefined;
+                selectedTopic = { candidates: [candidate], selectedIndex: 0 };
                 topicNeedsCalculation = isRecord(candidate) && candidate.requiresCalculation === true;
               },
               briefingRequestedType,

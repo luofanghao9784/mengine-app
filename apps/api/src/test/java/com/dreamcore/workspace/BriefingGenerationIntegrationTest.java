@@ -608,4 +608,34 @@ class BriefingGenerationIntegrationTest {
   db.update("UPDATE conversation_tasks SET status='FAILED',error_code='TASK_LIMIT',lease_token=NULL,lease_until=NULL WHERE id=?",j.id());generation.tick(p);
   assertEquals(0,generation.state(actor,tenant).automaticQuota().used());assertEquals(0,generation.state(actor,tenant).automaticQuota().reserved());assertEquals(8,generation.state(actor,tenant).automaticQuota().remaining());
  }
+
+ @Test void scopedAutomaticRunDoesNotEnableOtherOwnersAndStillUsesAutomaticQuota(){
+  upload("marker 限定账号自动执行验证",true);UUID p=policy();
+  var once=new BriefingGenerationService(db,conversations,contents,identities,access,departure,new AgentSettings("verification",true,false),new com.dreamcore.workspace.plans.PlanClock(),true,"",0,6);
+  org.springframework.test.util.ReflectionTestUtils.setField(once,"automaticEnabled",false);
+  assertFalse(once.candidates().contains(p));
+  org.springframework.test.util.ReflectionTestUtils.setField(once,"onceTenant",tenant.toString());
+  org.springframework.test.util.ReflectionTestUtils.setField(once,"onceOwner",reader.toString());
+  assertFalse(once.candidates().contains(p));once.tick(p);assertNull(conversations.claim());
+  org.springframework.test.util.ReflectionTestUtils.setField(once,"onceOwner",actor.toString());
+  assertTrue(once.candidates().contains(p));once.tick(p);var j=conversations.claim();assertNotNull(j);deliver(j,"限定账号的一次自动运行合成卡片，仍应占用自动额度。");once.tick(p);
+  assertEquals(1,once.state(actor,tenant).automaticQuota().used());assertEquals(0,once.state(actor,tenant).quota().used());
+ }
+
+ @Test void boundedEmptyNewsSearchFinishesWithoutChargingOrHidingOtherPartialFailures(){
+  for(boolean twoSearches:List.of(false,true)){
+   upload("marker 合成资讯空搜索证明。",true);var b=manual();UUID p=policy();generation.tick(p);var j=conversations.claim();
+   db.update("UPDATE briefing_generation_batches SET business_type='INFO' WHERE id=?",b.id());
+   db.update("INSERT INTO briefing_news_search_scope(task_id,tenant_id,provider,scope) VALUES(?,?,'bing-rss','{}')",j.id(),tenant);
+   for(int i=1;i<=(twoSearches?2:1);i++){
+    db.update("INSERT INTO briefing_news_search_queries(task_id,topic_id,query) VALUES(?,?,?)",j.id(),"TOPIC"+i,"synthetic topic "+i);
+    db.update("INSERT INTO conversation_tool_receipts(task_id,attempt_number,sequence,name,status) VALUES(?,1,?,'public_search','succeeded')",j.id(),i);
+   }
+   db.update("INSERT INTO conversation_tool_receipts(task_id,attempt_number,sequence,name,status) VALUES(?,1,3,'task_control','succeeded')",j.id());
+   db.update("UPDATE conversation_tasks SET status='PARTIAL',web_sources='[]',lease_token=NULL,lease_until=NULL WHERE id=?",j.id());generation.tick(p);
+   assertEquals(twoSearches?"NO_NEW_CONTENT":"FAILED",generation.get(actor,tenant,b.id()).status());
+   assertEquals(0,generation.state(actor,tenant).quota().used());
+  }
+ }
+
 }

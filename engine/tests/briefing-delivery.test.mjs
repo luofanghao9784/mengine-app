@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { createServer } from 'node:http';
-import { briefingDeliveryTool, hasPreparedBriefing } from '../dist/runtime/briefing-delivery.js';
+import { briefingDeliveryTool, hasPreparedBriefing, normalizeBriefingArguments } from '../dist/runtime/briefing-delivery.js';
 import { AgentTasks } from '../dist/runtime/agent-task.js';
 import { runHarness } from '../dist/runtime/harness.js';
 import { listen, close, body, json } from './fixtures/agent.mjs';
@@ -220,7 +220,7 @@ test('dataset briefing closes retrieval after three lookups and delivers an hone
       assert.match(instructions, /compare_dataset/);
       assert.match(instructions, /每张卡回答：发现了什么/);
       assert.match(instructions, /只有来源介绍而没有新业务发现时不凑卡/);
-      assert.ok(request.tools.find(t => t.name === 'deliver_briefing').description.includes('智能画报表达规范 1.0.1'));
+      assert.ok(request.tools.find(t => t.name === 'deliver_briefing').description.includes('智能画报表达规范 1.0.2'));
       let name = 'task_context', args;
       if (calls === 1) args = { action: 'dataset_search' };
       else if (calls === 2) args = { action: 'dataset_read', referenceId: datasetId, versionId: snapshotId, columnLimit: 10 };
@@ -268,4 +268,21 @@ test('lossless paragraph compatibility reaches the real checked delivery without
  for(const analysis of ['只有一个段落，不能凭空补充另一个段落。',JSON.stringify([7,8]),JSON.stringify(Array(5).fill(paragraphs[0])),'x'.repeat(2201)]){
   const original={analysis};assert.equal(normalizeBriefingArguments(original),original);
  }
+});
+
+test('delivery stays with the selected topic type before any platform write', async () => {
+  let writes = 0;
+  const tool = briefingDeliveryTool({ selectedType: () => 'DATA', authorize: async () => {},
+    invoke: async () => { writes++; return { contractVersion: '1.0', status: 'PREPARED', artifactId: randomUUID(), title: '业务发现', visibility: 'PRIVATE_AFTER_TASK_SUCCEEDS' }; } });
+  await assert.rejects(tool.execute({ businessType: 'INSIGHT' }, new AbortController().signal), { code: 'BRIEFING_TYPE_MISMATCH' });
+  assert.equal(writes, 0);
+  await tool.execute({ businessType: 'DATA' }, new AbortController().signal);
+  assert.equal(writes, 1);
+});
+
+test('existing single-newline paragraphs normalize without rewriting or inventing paragraphs', () => {
+  const paragraphs = ['第一段仅保留原来已经表达的完整业务内容。','第二段继续使用原有业务依据，不添加任何结论。'];
+  assert.deepEqual(normalizeBriefingArguments({ analysis: paragraphs.join('\n') }), { analysis: paragraphs });
+  const single = { analysis: paragraphs.join('') };
+  assert.equal(normalizeBriefingArguments(single), single);
 });

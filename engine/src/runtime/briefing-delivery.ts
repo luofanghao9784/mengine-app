@@ -4,7 +4,7 @@ import { RuntimeError, type Json, type TaskTool } from './ports.js';
 /** Protocol guidance only. Placeholder text is never business evidence. */
 export const BRIEFING_EDITORIAL_HINTS: Record<string, string> = {
   BRIEFING_TYPE_MISMATCH:
-    'Keep businessType equal to the platform requested briefing type. A completed calculation does not change the requested type. For SUGGESTION deliver evidence-grounded actions, omit calculationArtifactId and avoid unsupported quantitative claims. If no useful content of the requested type is supported, use the status-only receipt; do not substitute DATA.',
+    'Keep businessType equal to the platform requested or selected-topic briefing type. A completed calculation does not change the requested type. For SUGGESTION deliver evidence-grounded actions, omit calculationArtifactId and avoid unsupported quantitative claims. If no useful content of the requested type is supported, use the status-only receipt; do not substitute DATA.',
   BRIEFING_INTERNAL_LANGUAGE:
     'Rewrite user-visible title, summary and paragraphs in business Chinese. Remove tool names, raw IDs and raw status codes; e.g. deposit means 定金, canceled means 已取消, finance_confirmed means 财务已确认, never proof of refund or cash receipt.',
   BRIEFING_NO_BUSINESS_INSIGHT:
@@ -12,7 +12,7 @@ export const BRIEFING_EDITORIAL_HINTS: Record<string, string> = {
   BRIEFING_UNVERIFIED_QUANTITY:
     'Sample observations do not prove majority, share, growth or rank. Remove quantitative claims unless a verified full-snapshot comparison supports them. A fixed date-to-month comparison is available; never fabricate a statistical result.',
   BRIEFING_RATIO_NOT_VERIFIED:
-    'Grouped sum comparisons do not verify category counts or ratios. Remove majority/share claims and use supported individual observations; do not invent a denominator.',
+    '标题、摘要及每段正文均删除“占比”“比例”“多数”“大多数”“主要形式”等未经核验的构成表述，包括增长比例等措辞。分组金额计算只证明金额及两期变化；改为具体金额与“较前期增加/减少X%”（仅使用计算中的 changePercent），或明确限定的个别观察。检查所有段落后重新交付，不补造分母、不重复原稿。',
 };
 export const BRIEFING_ANALYSIS_ARRAY_HINT =
   'analysis must be a JSON array of paragraph strings, for example {"analysis":["First complete evidence-grounded paragraph.","Second complete evidence-grounded paragraph."]}. Replace placeholders with supported business content. Do not send analysis as one string, a Markdown block, or a string containing serialized JSON. Preserve the title and summary fields; correct the analysis type before calling deliver_briefing again.';
@@ -23,6 +23,7 @@ export function normalizeBriefingArguments(value: unknown): unknown {
   let paragraphs: unknown;
   try { paragraphs = JSON.parse(value.analysis); } catch {
     paragraphs = value.analysis.split(/\r?\n\s*\r?\n/).map((p) => p.trim());
+    if (Array.isArray(paragraphs) && paragraphs.length === 1) paragraphs = value.analysis.split(/\r?\n/).map((p) => p.trim());
   }
   if (!Array.isArray(paragraphs) || paragraphs.length < 2 || paragraphs.length > 4 ||
       paragraphs.some((p) => typeof p !== 'string' || p.length < 12 || p.length > 500)) return value;
@@ -31,6 +32,7 @@ export function normalizeBriefingArguments(value: unknown): unknown {
 
 export function briefingDeliveryTool(options: {
   requestedType?: string;
+  selectedType?(): string | undefined;
   authorize(): Promise<void>;
   invoke(body: unknown, signal: AbortSignal): Promise<unknown>;
 }): TaskTool {
@@ -75,7 +77,8 @@ export function briefingDeliveryTool(options: {
       additionalProperties: false,
     },
     async execute(args, signal) {
-      if (options.requestedType && (!isRecord(args) || args.businessType !== options.requestedType))
+      const requiredType = options.requestedType || options.selectedType?.();
+      if (requiredType && (!isRecord(args) || args.businessType !== requiredType))
         throw new RuntimeError('BRIEFING_TYPE_MISMATCH');
       await options.authorize();
       const r = await options.invoke(args, signal);
