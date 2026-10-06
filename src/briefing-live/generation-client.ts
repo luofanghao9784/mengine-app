@@ -56,7 +56,8 @@ export const generationClient = {
         v.policies.every(policy) &&
         Array.isArray(v.batches) &&
         v.batches.every(batch) &&
-        (v.quota === undefined || quota(v.quota)),
+        (v.quota === undefined || quota(v.quota)) &&
+        (v.automaticQuota === undefined || quota(v.automaticQuota)),
       undefined,
       signal,
     ),

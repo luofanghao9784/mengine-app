@@ -466,7 +466,7 @@ class BriefingGenerationIntegrationTest {
   var time=new java.util.concurrent.atomic.AtomicReference<>(java.time.Instant.now().plusSeconds(86400));
   var clock=new com.dreamcore.workspace.plans.PlanClock(){@Override public java.time.Instant now(){return time.get();}};
   var limited=new BriefingGenerationService(db,conversations,contents,identities,access,departure,new AgentSettings("verification",true,false),clock,true,"",0,1);
-  UUID p=policy();limited.tick(p);deliver(conversations.claim(),"合成成功出卡后应占用每日额度。");limited.tick(p);
+  UUID p=policy();limited.generate(actor,tenant,UUID.randomUUID(),space,"INSIGHT");limited.tick(p);deliver(conversations.claim(),"合成成功出卡后应占用每日额度。");limited.tick(p);
   var more=limited.generate(actor,tenant,UUID.randomUUID(),space,"INSIGHT");limited.tick(p);assertEquals("DAILY_RUN_LIMIT",limited.get(actor,tenant,more.id()).reason());assertNull(limited.get(actor,tenant,more.id()).taskId());
   time.set(time.get().plusSeconds(86400));limited.tick(p);assertEquals("RUNNING",limited.get(actor,tenant,more.id()).status());
  }
@@ -477,7 +477,7 @@ class BriefingGenerationIntegrationTest {
   var time=new java.util.concurrent.atomic.AtomicReference<>(java.time.Instant.now().plusSeconds(86400));
   var clock=new com.dreamcore.workspace.plans.PlanClock(){@Override public java.time.Instant now(){return time.get();}};
   var limited=new BriefingGenerationService(db,conversations,contents,identities,access,departure,new AgentSettings("verification",true,false),clock,true,"",0,1);
-  UUID p=policy();limited.tick(p);deliver(conversations.claim(),"合成重置后成功出卡，保留真实历史计次。");limited.tick(p);
+  UUID p=policy();limited.generate(actor,tenant,UUID.randomUUID(),space,"INSIGHT");limited.tick(p);deliver(conversations.claim(),"合成重置后成功出卡，保留真实历史计次。");limited.tick(p);
   var more=limited.generate(actor,tenant,UUID.randomUUID(),space,"INSIGHT");limited.tick(p);
   assertEquals("DAILY_RUN_LIMIT",limited.get(actor,tenant,more.id()).reason());
   db.update("INSERT INTO briefing_quota_resets(id,tenant_id,owner_id,reset_at,reason) VALUES (?,?,?,?,?)",UUID.randomUUID(),tenant,reader,java.sql.Timestamp.from(time.get().plusSeconds(1)),"合成其他账号重置");
@@ -576,5 +576,36 @@ class BriefingGenerationIntegrationTest {
   assertEquals(0,db.queryForObject("SELECT count(*) FROM briefing_topic_selections WHERE task_id=?",Integer.class,j.id()));
   var valid=new AgentTaskService.TopicSelection(List.of(new AgentTaskService.TopicCandidate("合成建议问题","已有获权依据",false,"可执行措施","SUGGESTION")),0);
   assertEquals(true,agents.selectTopic(j.id(),j.token(),valid).get("recorded"));
+ }
+
+ @Test void automaticEightCardsDoNotConsumeManualQuotaAndCannotBlockManualDispatch(){
+  UUID p=null;
+  for(int i=0;i<8;i++){
+   upload("marker 自动额度独立验证版本 "+i,true);if(p==null)p=policy();generation.tick(p);
+   var j=conversations.claim();assertNotNull(j);deliver(j,"自动独立额度的第"+i+"张不同合成分析卡片。");generation.tick(p);
+  }
+  assertEquals(8,generation.state(actor,tenant).automaticQuota().used());assertEquals(8,generation.state(actor,tenant).automaticQuota().limit());
+  assertEquals(0,generation.state(actor,tenant).quota().used());assertEquals(6,generation.state(actor,tenant).quota().remaining());
+  upload("marker 自动额度第九版",true);generation.tick(p);
+  assertTrue(generation.state(actor,tenant).batches().stream().anyMatch(b->"AUTOMATIC_DAILY_LIMIT".equals(b.reason())&&b.taskId()==null));
+  var b=manual();assertEquals(1,generation.state(actor,tenant).quota().reserved());generation.tick(p);
+  var j=conversations.claim();assertNotNull(j);assertEquals(b.taskId()==null?generation.get(actor,tenant,b.id()).taskId():b.taskId(),j.id());
+  deliver(j,"自动额度用完仍可正常交付手动生成的合成分析卡片。");generation.tick(p);
+  assertEquals(1,generation.state(actor,tenant).quota().used());assertEquals(8,generation.state(actor,tenant).automaticQuota().used());
+ }
+ @Test void sixManualCardsLeaveAutomaticBudgetAvailable(){
+  upload("marker 手动额度先用完验证",true);UUID p=policy();
+  for(int i=0;i<6;i++){manual();generation.tick(p);deliver(conversations.claim(),"第"+i+"次手动生成的不同合成分析卡片。");generation.tick(p);}
+  assertEquals(0,generation.state(actor,tenant).quota().remaining());assertEquals(8,generation.state(actor,tenant).automaticQuota().remaining());
+  upload("marker 新资料触发独立自动额度",true);generation.tick(p);var j=conversations.claim();assertNotNull(j);
+  deliver(j,"手动额度用完后仍可自动交付的新合成分析卡片。");generation.tick(p);
+  assertEquals(6,generation.state(actor,tenant).quota().used());assertEquals(1,generation.state(actor,tenant).automaticQuota().used());
+ }
+
+ @Test void automaticFailureReleasesOnlyAutomaticReservation(){
+  upload("marker 自动失败不扣额度验证",true);UUID p=policy();generation.tick(p);var j=conversations.claim();assertNotNull(j);
+  assertEquals(1,generation.state(actor,tenant).automaticQuota().reserved());assertEquals(0,generation.state(actor,tenant).quota().reserved());
+  db.update("UPDATE conversation_tasks SET status='FAILED',error_code='TASK_LIMIT',lease_token=NULL,lease_until=NULL WHERE id=?",j.id());generation.tick(p);
+  assertEquals(0,generation.state(actor,tenant).automaticQuota().used());assertEquals(0,generation.state(actor,tenant).automaticQuota().reserved());assertEquals(8,generation.state(actor,tenant).automaticQuota().remaining());
  }
 }

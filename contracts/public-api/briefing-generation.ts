@@ -38,7 +38,10 @@ export interface GenerationQuota {
   remaining: number;
 }
 export interface GenerationState {
+  /** Manual generation: daily 6 successful cards. */
   quota?: GenerationQuota;
+  /** Independent automatic generation: daily 8 successful cards. */
+  automaticQuota?: GenerationQuota;
   capabilities?: Record<string, { available: boolean; reason: string | null }>;
   policies: GenerationPolicy[];
   batches: GenerationBatch[];
