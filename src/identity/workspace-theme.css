@@ -114,9 +114,14 @@
   }
 }
 
-/* 画报滚动边缘只模糊下方内容，不叠加浅色画布渐变。 */
+/* 画报边缘先柔化，再让内容透明渐隐，露出真实页面背景。 */
 :root[data-surface='workspace'] .workspace-briefing .access-main > .topbar::after {
   background: transparent;
+}
+
+:root[data-surface='workspace'] .workspace-briefing .access-content[data-scrolled-start] {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, rgb(0 0 0 / 25%) 10px, rgb(0 0 0 / 80%) 26px, #000 40px);
+  mask-image: linear-gradient(to bottom, transparent, rgb(0 0 0 / 25%) 10px, rgb(0 0 0 / 80%) 26px, #000 40px);
 }
 
 /* 顶部分类：玻璃胶囊分段。 */
