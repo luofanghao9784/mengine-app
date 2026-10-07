@@ -211,19 +211,6 @@ export function AdminShell({
               tabIndex={mobileOpen ? -1 : undefined}
               aria-label={realm === 'platform' ? '总台导航' : '企业管理导航'}
             >
-              <div className="admin-navigation-toggle-row">
-                <button
-                  type="button"
-                  className="admin-navigation-toggle"
-                  aria-label={collapsed ? '展开侧边栏' : '折叠侧边栏'}
-                  title={collapsed ? '展开侧边栏' : '折叠侧边栏'}
-                  aria-expanded={!collapsed}
-                  aria-controls={navigationId}
-                  onClick={toggleNavigation}
-                >
-                  {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
-                </button>
-              </div>
               <div className="admin-brand">
                 <DreamcoreLogo />
                 <div className="admin-brand-label">
@@ -297,22 +284,35 @@ export function AdminShell({
                   </section>
                 ))}
               <div className="admin-sidebar-footer">
-                {realm === 'platform' && (
-                  <a
-                    className={`admin-nav-link ${page === 'settings' ? 'active' : ''}`}
-                    aria-current={page === 'settings' ? 'page' : undefined}
-                    href={adminHref(realm, 'settings', hash)}
-                    aria-label="设置"
-                    title="设置"
-                    onClick={(e) => {
-                      if (pending) e.preventDefault();
-                      else setMobileOpen(false);
-                    }}
+                <div className="admin-navigation-toggle-row">
+                  {realm === 'platform' && (
+                    <a
+                      className={`admin-nav-link ${page === 'settings' ? 'active' : ''}`}
+                      aria-current={page === 'settings' ? 'page' : undefined}
+                      href={adminHref(realm, 'settings', hash)}
+                      aria-label="设置"
+                      title="设置"
+                      onClick={(e) => {
+                        if (pending) e.preventDefault();
+                        else setMobileOpen(false);
+                      }}
+                    >
+                      <Settings size={20} aria-hidden="true" />
+                      <span>设置</span>
+                    </a>
+                  )}
+                  <button
+                    type="button"
+                    className="admin-navigation-toggle"
+                    aria-label={collapsed ? '展开侧边栏' : '折叠侧边栏'}
+                    title={collapsed ? '展开侧边栏' : '折叠侧边栏'}
+                    aria-expanded={!collapsed}
+                    aria-controls={navigationId}
+                    onClick={toggleNavigation}
                   >
-                    <Settings size={20} aria-hidden="true" />
-                    <span>设置</span>
-                  </a>
-                )}
+                    {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+                  </button>
+                </div>
                 {realm === 'tenant' && customerLinks && (
                   <div className="admin-customer-links">{customerLinks}</div>
                 )}

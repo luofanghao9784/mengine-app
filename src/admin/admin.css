@@ -916,9 +916,12 @@ button.admin-directory-row:hover {
 .admin-navigation-toggle-row {
   display: flex;
   justify-content: flex-end;
-  margin: -12px 0 6px;
+  align-items: center;
+  gap: 8px;
 }
+.admin-navigation-toggle-row > .admin-nav-link { flex: 1; }
 .admin-navigation-toggle {
+  flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -937,7 +940,8 @@ button.admin-directory-row:hover {
 @media (min-width: 761px) {
   .admin-control.admin-navigation-collapsed { grid-template-columns: 88px minmax(0, 1fr); }
   .admin-control.admin-navigation-collapsed .admin-sidebar { padding-inline: 10px; }
-  .admin-navigation-collapsed .admin-navigation-toggle-row { justify-content: center; }
+  .admin-navigation-collapsed .admin-navigation-toggle-row { flex-direction: column; }
+  .admin-navigation-collapsed .admin-navigation-toggle-row > .admin-nav-link { width: 100%; }
   .admin-control.admin-navigation-collapsed .admin-brand { justify-content: center; padding-inline: 0; }
   .admin-navigation-collapsed .admin-brand-label,
   .admin-navigation-collapsed .admin-scope,
@@ -954,5 +958,5 @@ button.admin-directory-row:hover {
   .admin-control { transition: grid-template-columns 220ms ease; }
 }
 @media (max-width: 760px) {
-  .admin-navigation-toggle-row { display: none; }
+  .admin-navigation-toggle { display: none; }
 }
