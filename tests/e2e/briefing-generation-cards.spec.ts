@@ -1286,3 +1286,25 @@ test('画报会话角标依据当前用户的真实后续会话，刷新保留�
   await expect.poll(() => reads).toBe(9);
   await expect(page.getByRole('img', { name: '已有会话', exact: true })).toHaveCount(0);
 });
+
+
+test('客户端每次进入画报默认推荐，不恢复上次关注标签', async ({ page }) => {
+  await generationFixture(page);
+  await page.addInitScript(({ account, tenant }) => {
+    const key = `dreamcore-view:${account}:${tenant}:briefing:`;
+    sessionStorage.setItem(key + 'view', JSON.stringify('FOCUSED'));
+    sessionStorage.setItem(key + 'tab', JSON.stringify('关注'));
+  }, { account, tenant });
+  await page.goto(home);
+  const recommended = page.getByRole('tab', { name: '推荐', exact: true });
+  const focused = page.getByRole('tab', { name: '关注', exact: true });
+  await expect(recommended).toHaveAttribute('aria-selected', 'true');
+  await focused.click();
+  await expect(focused).toHaveAttribute('aria-selected', 'true');
+  await page.reload();
+  await expect(recommended).toHaveAttribute('aria-selected', 'true');
+  await focused.click();
+  await page.getByRole('link', { name: '会话', exact: true }).click();
+  await page.getByRole('link', { name: '智能画报', exact: true }).click();
+  await expect(recommended).toHaveAttribute('aria-selected', 'true');
+});

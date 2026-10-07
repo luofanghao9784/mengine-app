@@ -40,14 +40,8 @@ export function LiveBriefing({
 function BriefingPage({ tenant, onMonthChange }: BriefingProps) {
   const { session } = useSession();
   const pendingRequest = useContext(RequestPending);
-  const [view, setView] = useViewState<BriefingView | 'RECOMMENDED'>(
-    tenant,
-    'briefing:view',
-    'RECOMMENDED',
-    (v): v is BriefingView | 'RECOMMENDED' =>
-      typeof v === 'string' && ['RECOMMENDED', 'FOCUSED', 'LATEST', 'HIDDEN'].includes(v),
-  );
-  const [tab, setTab] = useViewState(tenant, 'briefing:tab', '推荐', textState);
+  const [view, setView] = useState<BriefingView | 'RECOMMENDED'>('RECOMMENDED');
+  const [tab, setTab] = useState('推荐');
   useEffect(() => {
     if (tab !== '日期') onMonthChange(null);
     return () => onMonthChange(null);
