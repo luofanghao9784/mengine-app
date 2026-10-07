@@ -780,3 +780,37 @@
     transition: none;
   }
 }
+
+.eng3d-tools {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+.eng3d-demo-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 12px;
+  border: 1px solid #f1d6a044;
+  border-radius: 999px;
+  color: #dfd8c9;
+  background: #ffffff08;
+  cursor: pointer;
+}
+.eng3d-demo-toggle[aria-checked='true'] {
+  color: #f1d6a0;
+  background: #f1d6a018;
+  border-color: #f1d6a088;
+}
+.eng3d-demo-toggle:focus-visible {
+  outline: 2px solid #f1d6a0;
+  outline-offset: 3px;
+}
+.eng3d-demo-note {
+  color: #f1d6a0;
+  font-size: 12px;
+}
+.engine-dash-lower[hidden] {
+  display: none;
+}

@@ -75,6 +75,8 @@ const X = (
 );
 
 export function EngineStage3D({
+  demo = false,
+  onDemoChange,
   value,
   samples,
   log,
@@ -82,6 +84,8 @@ export function EngineStage3D({
   reduced,
   hash,
 }: {
+  demo?: boolean;
+  onDemoChange?: () => void;
   value: EngineTelemetry;
   samples: Sample[];
   log: Change[];
@@ -202,7 +206,11 @@ export function EngineStage3D({
       data-webgl={webgl ? 'on' : 'off'}
       data-focus={focus || undefined}
     >
-      <canvas ref={canvas} className="eng3d-gl" aria-label="梦核引擎实时运行图" />
+      <canvas
+        ref={canvas}
+        className="eng3d-gl"
+        aria-label={demo ? '梦核引擎繁忙演示图（模拟数据）' : '梦核引擎实时运行图'}
+      />
       {!webgl && (
         <p className="eng3d-nogl">当前浏览器无法启用 WebGL，3D 运行图不可用，下方读数仍会每 3 秒更新。</p>
       )}
@@ -233,20 +241,38 @@ export function EngineStage3D({
             )}
           </div>
         </div>
-        <div className="eng3d-snap">
-          <svg width="36" height="14" viewBox="0 0 36 14" aria-hidden="true">
-            <path
-              d="M0 7h10l3-5 4 10 3-8 2 3h14"
-              fill="none"
-              stroke="#F1D6A0"
-              strokeWidth="1.2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-          <span>
-            快照 <b>{hms(value.checkedAt)}</b>，可见时每 3 秒
-          </span>
+        <div className="eng3d-tools">
+          {onDemoChange && (
+            <button
+              type="button"
+              role="switch"
+              aria-checked={demo}
+              className="eng3d-demo-toggle"
+              onClick={onDemoChange}
+            >
+              繁忙演示 <span>{demo ? '开' : '关'}</span>
+            </button>
+          )}
+          {demo && (
+            <span className="eng3d-demo-note" role="status">
+              演示数据 · 不执行真实任务
+            </span>
+          )}
+          <div className="eng3d-snap">
+            <svg width="36" height="14" viewBox="0 0 36 14" aria-hidden="true">
+              <path
+                d="M0 7h10l3-5 4 10 3-8 2 3h14"
+                fill="none"
+                stroke="#F1D6A0"
+                strokeWidth="1.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <span>
+              {demo ? '演示快照' : '快照'} <b>{hms(value.checkedAt)}</b>，可见时每 3 秒
+            </span>
+          </div>
         </div>
       </header>
       <div className="eng3d-labels">

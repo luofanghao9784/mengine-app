@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { EngineTelemetry, TenantDistribution } from '../../contracts/public-api/engine-telemetry';
 import type { PlatformUsage } from '../../contracts/public-api/usage';
 import type { DataOperationOverview } from '../../contracts/public-api/data-operations';
@@ -24,6 +24,8 @@ import {
 } from './engine-dashboard-model';
 import { EngineStage3D } from './engine-stage/EngineStage3D';
 import './engine-dashboard.css';
+
+import { busyDemo } from './engine-demo';
 
 const FAST_MS = 3000;
 const SLOW_MS = 60000;
@@ -104,6 +106,16 @@ function usePoll<T>(read: (signal: AbortSignal) => Promise<T>, ms: number, onVal
 }
 
 export function PlatformEngineDashboard({ hash }: { hash: string }) {
+  const [demo, setDemo] = useState(false);
+  const [demoTime, setDemoTime] = useState(Date.now);
+  const simulated = useMemo(() => busyDemo(demoTime), [demoTime]);
+  useEffect(() => {
+    if (!demo) return;
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible') setDemoTime(Date.now());
+    }, FAST_MS);
+    return () => clearInterval(timer);
+  }, [demo]);
   const [samples, setSamples] = useState<Sample[]>([]);
   const [log, setLog] = useState<Change[]>([]);
   const previous = useRef<EngineTelemetry | undefined>(undefined);
@@ -153,14 +165,20 @@ export function PlatformEngineDashboard({ hash }: { hash: string }) {
       ) : (
         <>
           <EngineStage3D
-            value={value}
-            samples={samples}
-            log={log}
-            attentionCount={items.length}
+            key={demo ? 'demo' : 'live'}
+            demo={demo}
+            onDemoChange={() => {
+              setDemoTime(Date.now());
+              setDemo((v) => !v);
+            }}
+            value={demo ? simulated.value : value}
+            samples={demo ? simulated.samples : samples}
+            log={demo ? simulated.log : log}
+            attentionCount={demo ? 0 : items.length}
             reduced={reduced}
             hash={hash}
           />
-          <div className="engine-dash-lower">
+          <div className="engine-dash-lower" hidden={demo}>
             <Pulse samples={samples} />
             <section
               id="engine-attention"
