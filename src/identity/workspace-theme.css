@@ -72,23 +72,37 @@
   }
 }
 
-/* 资料导航融入柔光背景，滚动吸顶时才增加玻璃遮罩。 */
-:root[data-surface='workspace'] .material-toolbar.library-toolbar {
-  background: transparent;
-  border-bottom-color: transparent;
-  border-radius: 14px;
+/* 资料路径是标题区的第二行，随内容滚动保持位置。 */
+:root[data-surface='workspace'] .material-topbar {
+  grid-template-rows: var(--topbar-row-height) auto;
+  row-gap: 0;
 }
-:root[data-surface='workspace'] .access-content[data-scrolled-start] .library-toolbar {
-  background: rgb(255 255 255 / 45%);
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
-}
-:root[data-surface='workspace'] .library-toolbar::after {
+:root[data-surface='workspace'] .material-topbar > .library-toolbar {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  position: static;
+  margin: 0;
+  padding: 0 0 14px;
   background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+:root[data-surface='workspace'] .material-topbar > .library-toolbar::before,
+:root[data-surface='workspace'] .material-topbar > .library-toolbar::after {
+  content: none;
+}
+@media (max-width: 800px) {
+  :root[data-surface='workspace'] .material-topbar {
+    grid-template-rows: auto auto auto;
+  }
+  :root[data-surface='workspace'] .material-topbar > .library-toolbar {
+    grid-row: 3;
+    padding: 8px 0 0;
+  }
 }
 
 /* 顶部分类：玻璃胶囊分段。 */
-:root[data-surface='workspace'] :is(.live-briefing-tabs, .material-tabs) {
+:root[data-surface='workspace'] :is(.live-briefing-tabs, .material-tabs, .library-view-switch) {
   gap: 2px;
   padding: 4px;
   border: 1px solid var(--glass-edge);
@@ -110,6 +124,19 @@
   color: var(--ink);
   box-shadow: 0 1px 6px rgb(40 40 90 / 10%);
 }
+/* 图标分段与范围标签使用同一胶囊材质和选中反馈。 */
+:root[data-surface='workspace'] .library-view-switch .icon-button {
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-2);
+  box-shadow: none;
+}
+:root[data-surface='workspace'] .library-view-switch .icon-button[aria-pressed='true'] {
+  background: var(--surface-raised);
+  color: var(--ink);
+  box-shadow: 0 1px 6px rgb(40 40 90 / 10%);
+}
 :root[data-surface='workspace'] .material-tabs {
   width: auto;
 }
@@ -124,7 +151,7 @@
   font-weight: 550;
 }
 @media (max-width: 800px) {
-  :root[data-surface='workspace'] :is(.live-briefing-tabs, .material-tabs) {
+  :root[data-surface='workspace'] :is(.live-briefing-tabs, .material-tabs, .library-view-switch) {
     padding: 3px;
   }
   :root[data-surface='workspace'] :is(.live-briefing-tabs, .material-tabs) button {

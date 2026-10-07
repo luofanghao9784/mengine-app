@@ -354,6 +354,7 @@ function LibraryListing({
         )}
       </PageActions>
       <LibraryToolbar
+        inHeader={!administration}
         onCreateFolder={data.value?.canMaintain ? () => setModal('folder') : undefined}
         onMaintenance={
           workspace && data.value?.canMaintain

@@ -1,6 +1,6 @@
 import { useRef, type ReactNode } from 'react';
 import { Grid2X2, List, Search, X, FolderPlus, Trash2 } from 'lucide-react';
-import { IconButton } from '../shared/ui';
+import { IconButton, PageActions } from '../shared/ui';
 import './library-toolbar.css';
 
 export function LibrarySearch({
@@ -64,6 +64,7 @@ export function LibrarySearch({
 }
 
 export function LibraryToolbar({
+  inHeader = false,
   children,
   layout,
   onLayout,
@@ -75,12 +76,13 @@ export function LibraryToolbar({
   children?: ReactNode;
   extraActions?: ReactNode;
   disabled?: boolean;
+  inHeader?: boolean;
   layout: 'cards' | 'list';
   onLayout: (layout: 'cards' | 'list') => void;
   onCreateFolder?: () => void;
   onMaintenance?: () => void;
 }) {
-  return (
+  const toolbar = (
     <div className="material-toolbar library-toolbar">
       {children}
       <div className="material-controls library-controls">
@@ -106,4 +108,5 @@ export function LibraryToolbar({
       </div>
     </div>
   );
+  return inHeader ? <PageActions placement="header">{toolbar}</PageActions> : toolbar;
 }

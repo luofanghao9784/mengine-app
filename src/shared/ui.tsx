@@ -76,10 +76,15 @@ export function PageActions({
   placement = 'actions',
 }: {
   children: ReactNode;
-  placement?: 'actions' | 'meta';
+  placement?: 'actions' | 'meta' | 'header';
 }) {
   const target = useContext(PageActionsContext);
-  const container = placement === 'meta' ? target?.parentElement?.querySelector('.topbar-meta') : target;
+  const container =
+    placement === 'header'
+      ? target?.parentElement
+      : placement === 'meta'
+        ? target?.parentElement?.querySelector('.topbar-meta')
+        : target;
   return container ? createPortal(children, container) : null;
 }
 export function SectionHeading({
