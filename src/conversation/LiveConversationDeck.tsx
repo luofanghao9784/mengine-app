@@ -152,6 +152,7 @@ export function LiveConversationDeck({
   const show = (id: string, focus = true) => {
     setActive(id);
     const independentList = id === 'list' && !matchMedia('(max-width: 1000px)').matches;
+    if (independentList !== listExpanded) reflow.capture();
     setListExpanded(independentList);
     const element = Array.from(scroller.current?.querySelectorAll<HTMLElement>('[data-deck-id]') || []).find(
       (c) => c.dataset.deckId === id,
@@ -174,12 +175,14 @@ export function LiveConversationDeck({
     const rail = scroller.current;
     if (!rail || !listExpanded) return;
     const resumeDeck = (event: WheelEvent) => {
-      if (Math.abs(event.deltaX) > Math.abs(event.deltaY) || (event.shiftKey && event.deltaY))
+      if (Math.abs(event.deltaX) > Math.abs(event.deltaY) || (event.shiftKey && event.deltaY)) {
+        reflow.capture();
         setListExpanded(false);
+      }
     };
     rail.addEventListener('wheel', resumeDeck, { passive: true });
     return () => rail.removeEventListener('wheel', resumeDeck);
-  }, [listExpanded]);
+  }, [listExpanded, reflow.capture]);
   useEffect(() => setListExpanded(false), [persistenceKey]);
   useLayoutEffect(() => {
     // Layout measures the restored cards before returning to the active reader.
