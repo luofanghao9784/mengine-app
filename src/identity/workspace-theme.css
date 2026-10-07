@@ -181,7 +181,7 @@
   backdrop-filter: var(--glass-blur);
   transition:
     box-shadow 200ms,
-    transform 200ms,
+    translate 220ms cubic-bezier(0.2, 0.65, 0.25, 1),
     border-color 200ms;
 }
 /* 只调整画报底色的 alpha，正文、图表和类型标签不随之透明。 */
@@ -194,7 +194,6 @@
 :root[data-surface='workspace'] .live-briefing-card:not(.conversation-briefing-preview):is(:hover, :focus-within) {
   border-color: var(--glass-edge);
   box-shadow: var(--glass-shadow-hover);
-  transform: translateY(-2px);
 }
 :root[data-surface='workspace'] .generation-card-copy h3 {
   font-family: inherit;
@@ -304,10 +303,11 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  :root[data-surface='workspace'] .live-briefing-card:is(:hover, :focus-within) {
+    translate: none;
+    transition: none;
+  }
   :root[data-surface='workspace'] .live-composer-surface::before {
     animation: none;
-  }
-  :root[data-surface='workspace'] .live-briefing-card:not(.conversation-briefing-preview):is(:hover, :focus-within) {
-    transform: none;
   }
 }
