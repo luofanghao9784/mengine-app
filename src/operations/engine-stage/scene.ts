@@ -31,7 +31,6 @@ export interface SceneDom {
   haloWrap: HTMLElement;
   halo: HTMLElement;
   coreNum: HTMLElement;
-  coreMix: HTMLElement;
   panel: HTMLElement;
 }
 export interface SceneEvents {
@@ -1132,8 +1131,6 @@ export class EngineScene {
     this.CORE_PX = rad;
     dom.haloWrap.style.transform = `translate3d(${c0.x}px,${c0.y}px,0)`;
     dom.haloWrap.style.opacity = focus && focus !== 'pr' ? '.3' : '1';
-    dom.coreMix.style.transform = `translate3d(${c0.x}px,${c0.y + rad + 16}px,0) translateX(-50%)`;
-    dom.coreMix.style.opacity = focus ? '0' : '1';
     dom.coreNum.style.transform = `translate3d(${c0.x}px,${c0.y}px,0) translate(-50%,-50%) scale(${focus && focus !== 'pr' ? 0.6 : 1})`;
     dom.coreNum.style.opacity = focus && focus !== 'pr' ? '.5' : '1';
   }

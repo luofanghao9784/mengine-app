@@ -110,7 +110,6 @@ export function EngineStage3D({
   const haloWrap = useRef<HTMLDivElement>(null);
   const halo = useRef<HTMLDivElement>(null);
   const coreNum = useRef<HTMLDivElement>(null);
-  const coreMix = useRef<HTMLDivElement>(null);
   const panel = useRef<HTMLElement>(null);
   const channels = value.channels;
   const byCode = new Map(channels.map((c) => [c.code, c]));
@@ -144,7 +143,6 @@ export function EngineStage3D({
         haloWrap: haloWrap.current!,
         halo: halo.current!,
         coreNum: coreNum.current!,
-        coreMix: coreMix.current!,
         panel: panel.current!,
       },
       {
@@ -351,10 +349,10 @@ export function EngineStage3D({
         <b style={{ color: lens === 'f' && tot ? 'var(--coral)' : undefined }}>{n(tot)}</b>
         <span>{LENS[lens].name}</span>
       </div>
-      <div className="eng3d-mix" ref={coreMix}>
+      <div className="eng3d-mix">
         <div className="eng3d-ratio" aria-hidden="true">
           {mix.map(([label, v, color]) => (
-            <span key={label} style={{ width: `${tot ? (v / tot) * 100 : 0}%`, background: color }} />
+            <span key={label} style={{ flexGrow: tot ? v / tot : 0, background: color }} />
           ))}
         </div>
         <div className="eng3d-mix-labels">
