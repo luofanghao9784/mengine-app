@@ -78,19 +78,6 @@
   flex-direction: column;
   gap: 10px;
 }
-.eng3d-mark {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 12px;
-  letter-spacing: 0.2em;
-  color: var(--ash);
-}
-.eng3d-mark i {
-  font-family: var(--f-num);
-  font-size: 14px;
-  letter-spacing: 0.04em;
-}
 .eng3d-brand h1 {
   margin: 0;
   font-family: var(--f-title);
@@ -792,8 +779,4 @@
   .eng3d-cap {
     transition: none;
   }
-}
-.eng3d-mark .dreamcore-symbol {
-  width: 30px;
-  height: 30px;
 }

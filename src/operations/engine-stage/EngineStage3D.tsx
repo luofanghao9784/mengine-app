@@ -5,7 +5,6 @@ import type {
   TelemetryChannelCode,
 } from '../../../contracts/public-api/engine-telemetry';
 import { adminHref } from '../../admin/navigation';
-import { DreamcoreLogo } from '../../components/DreamcoreLogo';
 import {
   BEADS,
   channelInfo,
@@ -209,12 +208,6 @@ export function EngineStage3D({
       )}
       <header className="eng3d-top" ref={top}>
         <div className="eng3d-brand">
-          <div className="eng3d-mark">
-            <DreamcoreLogo />
-            <span>
-              梦核引擎 <i>Mengine</i>
-            </span>
-          </div>
           <h1>
             <button type="button" ref={home} onClick={goHome}>
               引擎仪表盘

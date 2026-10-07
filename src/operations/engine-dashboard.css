@@ -435,7 +435,7 @@
 
 /* Shell around the platform 3D dashboard follows the stage palette; the tenant wall keeps its own. */
 .admin-control.admin-platform.admin-engine-fullscreen {
-  background: #0b0a09;
+  background: radial-gradient(ellipse at 0 0, rgba(241, 214, 160, 0.08), transparent 45%), #0b0a09;
 }
 .admin-control.admin-platform.admin-engine-fullscreen .admin-sidebar {
   --text: #eceae4;
@@ -446,25 +446,22 @@
   --selected: rgba(241, 214, 160, 0.12);
   --selected-text: #f1d6a0;
   --soft: rgba(236, 234, 228, 0.05);
-  background: linear-gradient(180deg, #141210, #0b0a09 70%);
-  border-right: 1px solid rgba(236, 234, 228, 0.08);
-  box-shadow: none;
+  --panel-edge: rgba(236, 234, 228, 0.12);
+  --sidebar-glass: linear-gradient(160deg, rgba(43, 39, 33, 0.62), rgba(16, 15, 14, 0.52));
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 10px 36px rgba(0, 0, 0, 0.18);
 }
 .admin-control.admin-platform.admin-engine-fullscreen .admin-brand strong {
   color: #eceae4;
-  font-family: 'Noto Serif SC', 'Songti SC', serif;
+  font-family: 'Noto Serif SC', 'Songti SC', STSong, serif;
   font-weight: 500;
   letter-spacing: 0.12em;
 }
 .admin-control.admin-platform.admin-engine-fullscreen .admin-brand-english {
   color: #ada89e;
-  font-family: 'Cormorant Garamond', Georgia, serif;
-  font-style: italic;
   letter-spacing: 0.04em;
 }
 .admin-control.admin-platform.admin-engine-fullscreen .admin-nav-group-title {
   color: #8c877d;
-  letter-spacing: 0.2em;
 }
 .admin-control.admin-platform.admin-engine-fullscreen .admin-nav-link {
   color: #ada89e;
