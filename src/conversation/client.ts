@@ -214,6 +214,7 @@ export function createConversationClient(fetcher: typeof fetch = fetch) {
     discussion(
       tenant: string,
       source: { conversationId: string; taskId: string; taskRevision: number; attempt: number },
+      signal?: AbortSignal,
     ) {
       return request(
         root(tenant) +
@@ -224,6 +225,8 @@ export function createConversationClient(fetcher: typeof fetch = fetch) {
           record(v.briefingContext) && v.briefingContext.conversationId === source.conversationId &&
           v.briefingContext.taskId === source.taskId && uuid(v.briefingContext.workspaceId) &&
           v.briefingContext.taskRevision === source.taskRevision && v.briefingContext.attempt === source.attempt,
+        undefined,
+        signal,
       );
     },
     detail(tenant: string, conversation: string, offset = 0, signal?: AbortSignal) {

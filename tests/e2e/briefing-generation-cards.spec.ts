@@ -1244,3 +1244,45 @@ test('多张推荐重排后不横向飞入，保留垂直浮入', async ({ page 
   await expect(page.locator('.recommendation-card').first()).toContainText('合成扩展标题');
   expect(await page.evaluate(() => (window as any).tileMoves)).toEqual([]);
 });
+
+test('画报会话角标依据当前用户的真实后续会话，刷新保留且拒绝读取时隐藏', async ({ page }) => {
+  await generationFixture(page);
+  let exists = true;
+  let reads = 0;
+  const rows = Array.from({ length: 3 }, (_, index) => {
+    const row = item(uid(200 + index), `会话状态合成画报 ${index}`);
+    return { ...row, briefing: { artifactId: uid(300 + index), sha256: 'a'.repeat(64), content: {
+      schemaVersion: 'briefing-text-v1', businessType: 'INSIGHT', title: row.content.title,
+      summary: '这是用于核对已有会话状态的合成画报摘要。',
+      analysis: ['这是用于核对会话状态的合成原文分析内容。', '这里只核对真实会话关联，不创建新的测试会话。'],
+      chart: null, source: null, calculationArtifactId: null, calculationSha256: null, generatedAt: now,
+    } } };
+  });
+  await page.route('**/api/**/recommendations?*', route => route.fulfill({ json: {
+    tenantId: tenant, settings: { revision: 0, enabled: true }, items: rows,
+    snapshot: 'a'.repeat(64), hasMore: false, eligibleTotal: 3, rankedCount: 3,
+    poolLimited: false, poolLimit: 1000, businessOutcome: 'NOT_ASSESSED',
+  } }));
+  await page.route('**/api/**/discussion?*', route => {
+    expect(route.request().method()).toBe('GET'); reads++;
+    const path = new URL(route.request().url()).pathname;
+    const id = rows.find(row => path.includes(row.content.id))!.content.id;
+    if (id === uid(202)) return route.fulfill({ status: 403, json: { code: 'ACCESS_DENIED' } });
+    return route.fulfill({ json: { conversationId: id === uid(200) && exists ? uid(400) : null,
+      title: '合成后续会话', briefingContext: { conversationId: conversation, taskId: id,
+        workspaceId: space, taskRevision: 1, attempt: 1 },
+    } });
+  });
+  await page.goto(home);
+  await expect(page.locator('.recommendation-card')).toHaveCount(3);
+  const first = page.locator(`[data-content-id="${uid(200)}"]`);
+  await expect(first.getByRole('img', { name: '已有会话', exact: true })).toBeVisible();
+  await expect(page.getByRole('img', { name: '已有会话', exact: true })).toHaveCount(1);
+  await expect.poll(() => reads).toBe(3);
+  await page.reload();
+  await expect(first.getByRole('img', { name: '已有会话', exact: true })).toBeVisible();
+  exists = false;
+  await page.reload();
+  await expect.poll(() => reads).toBe(9);
+  await expect(page.getByRole('img', { name: '已有会话', exact: true })).toHaveCount(0);
+});

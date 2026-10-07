@@ -1,3 +1,4 @@
+import { DiscussionMark, type DiscussionSource } from './DiscussionMark';
 import { KeyMetric, AnalysisComposition, SourceCover } from './Composition';
 import { presentationOf } from './presentation';
 import { NewsCover } from './NewsCover';
@@ -35,10 +36,12 @@ export function BriefingStatusMarks({
   pinned = false,
   conversation = false,
   feedback,
+  discussion,
 }: {
   pinned?: boolean;
   conversation?: boolean;
   feedback?: { tenant: string; target: FeedbackTarget };
+  discussion?: { tenant: string; source: DiscussionSource };
 }) {
   return (
     <span className="live-briefing-marks">
@@ -48,6 +51,7 @@ export function BriefingStatusMarks({
           <Star size={16} fill="currentColor" />
         </span>
       )}
+      {discussion && <DiscussionMark {...discussion} />}
       {conversation && (
         <span role="img" aria-label="AI 生成" title="AI 生成">
           <MessageSquare size={16} />
@@ -70,6 +74,7 @@ export function MagazineBody({
   footer,
   briefing,
   feedback,
+  discussion,
 }: {
   compact?: boolean;
   title: string;
@@ -83,6 +88,7 @@ export function MagazineBody({
   footer?: ReactNode;
   briefing?: BriefingDocument | null;
   feedback?: { tenant: string; target: FeedbackTarget };
+  discussion?: { tenant: string; source: DiscussionSource };
 }) {
   const content = briefing?.content;
   const presentation = briefing ? presentationOf(briefing) : null;
@@ -148,7 +154,7 @@ export function MagazineBody({
         </div>
         {verification && <span className="live-verification-label">联调验证 · 未调用真实模型</span>}
       </div>
-      <BriefingStatusMarks feedback={feedback} pinned={pinned} conversation={!publication && !briefing} />
+      <BriefingStatusMarks feedback={feedback} pinned={pinned} conversation={!publication && !briefing} discussion={discussion} />
     </>
   );
 }

@@ -92,7 +92,7 @@ export function ReadingDialog({
           <span title={`${contentLabel || (task ? '会话' : '企业副本')} · ${workspace}`}>
             {contentLabel || (task ? '会话' : '企业副本')} · {workspace}
           </span>
-          <BriefingStatusMarks pinned={pinned} conversation={!!task} />
+          <BriefingStatusMarks pinned={pinned} discussion={task ? { tenant, source: task } : undefined} />
           <button
             type="button"
             className="live-reading-close"
