@@ -88,7 +88,7 @@
 }
 
 /* 顶部分类：玻璃胶囊分段。 */
-:root[data-surface='workspace'] .live-briefing-tabs {
+:root[data-surface='workspace'] :is(.live-briefing-tabs, .material-tabs) {
   gap: 2px;
   padding: 4px;
   border: 1px solid var(--glass-edge);
@@ -97,22 +97,37 @@
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
 }
-:root[data-surface='workspace'] .live-briefing-tabs button {
+:root[data-surface='workspace'] :is(.live-briefing-tabs, .material-tabs) button {
   padding: 6px 16px;
   border: 0;
   border-radius: 999px;
   font-size: 13.5px;
 }
-:root[data-surface='workspace'] .live-briefing-tabs button[aria-selected='true'] {
+:root[data-surface='workspace'] .live-briefing-tabs button[aria-selected='true'],
+:root[data-surface='workspace'] .material-tabs .button.primary,
+:root[data-surface='workspace'] .material-tabs .button.primary:hover:not(:disabled) {
   background: var(--surface-raised);
   color: var(--ink);
   box-shadow: 0 1px 6px rgb(40 40 90 / 10%);
 }
+:root[data-surface='workspace'] .material-tabs {
+  width: auto;
+}
+:root[data-surface='workspace'] .material-tabs .button {
+  min-height: 0;
+  color: var(--ink-2);
+  font-weight: 400;
+  white-space: nowrap;
+}
+:root[data-surface='workspace'] .material-tabs .button.primary {
+  color: var(--ink);
+  font-weight: 550;
+}
 @media (max-width: 800px) {
-  :root[data-surface='workspace'] .live-briefing-tabs {
+  :root[data-surface='workspace'] :is(.live-briefing-tabs, .material-tabs) {
     padding: 3px;
   }
-  :root[data-surface='workspace'] .live-briefing-tabs button {
+  :root[data-surface='workspace'] :is(.live-briefing-tabs, .material-tabs) button {
     padding: 5px 9px;
     font-size: 13px;
   }
