@@ -287,13 +287,6 @@
 :root[data-surface='workspace'] .deck-list::before {
   background: transparent;
 }
-:root[data-surface='workspace'] .deck-fold-bubble-entry[data-card-id='list'] .deck-fold-bubble {
-  --deck-bubble-fill: rgb(235 234 250 / 65%);
-}
-:root[data-surface='workspace'] .deck-fold-bubble-entry[data-card-id='list'] .deck-fold-bubble-surface {
-  stroke: rgb(255 255 255 / 55%);
-  filter: none;
-}
 :root[data-surface='workspace'] .deck-list .live-list-tools::after {
   background: transparent;
 }
