@@ -114,6 +114,11 @@
   }
 }
 
+/* 画报滚动边缘只模糊下方内容，不叠加浅色画布渐变。 */
+:root[data-surface='workspace'] .workspace-briefing .access-main > .topbar::after {
+  background: transparent;
+}
+
 /* 顶部分类：玻璃胶囊分段。 */
 :root[data-surface='workspace'] :is(.live-briefing-tabs, .material-tabs, .library-view-switch) {
   gap: 2px;
