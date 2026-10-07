@@ -72,6 +72,21 @@
   }
 }
 
+/* 资料导航融入柔光背景，滚动吸顶时才增加玻璃遮罩。 */
+:root[data-surface='workspace'] .material-toolbar.library-toolbar {
+  background: transparent;
+  border-bottom-color: transparent;
+  border-radius: 14px;
+}
+:root[data-surface='workspace'] .access-content[data-scrolled-start] .library-toolbar {
+  background: rgb(255 255 255 / 45%);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+}
+:root[data-surface='workspace'] .library-toolbar::after {
+  background: transparent;
+}
+
 /* 顶部分类：玻璃胶囊分段。 */
 :root[data-surface='workspace'] .live-briefing-tabs {
   gap: 2px;
