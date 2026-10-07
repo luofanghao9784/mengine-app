@@ -133,7 +133,7 @@
   }
 }
 
-/* 画报卡片：毛玻璃面板、无衬线标题、中性类型标签。 */
+/* 画报卡片：保留画报原有宋体标题，使用毛玻璃面板与中性类型标签。 */
 :root[data-surface='workspace'] .live-briefing-card {
   background: var(--surface);
   border-color: var(--glass-edge);
@@ -149,7 +149,7 @@
   box-shadow: var(--glass-shadow-hover);
   transform: translateY(-2px);
 }
-:root[data-surface='workspace'] :is(.live-briefing-card h3, .briefing-magazine h3, .generation-card-copy h3) {
+:root[data-surface='workspace'] .generation-card-copy h3 {
   font-family: inherit;
   font-weight: 600;
   letter-spacing: -0.01em;
