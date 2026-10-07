@@ -9,6 +9,8 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
   Settings,
   SlidersHorizontal,
   Users,
@@ -79,6 +81,26 @@ export function AdminShell({
 }) {
   const pending = useContext(RequestPending);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [collapsedByRealm, setCollapsedByRealm] = useState(() => {
+    const read = (key: AdminRealm) => {
+      try {
+        return localStorage.getItem('admin-navigation-collapsed:' + key) === 'true';
+      } catch {
+        return false;
+      }
+    };
+    return { platform: read('platform'), tenant: read('tenant') };
+  });
+  const collapsed = collapsedByRealm[realm];
+  const toggleNavigation = () => {
+    const next = !collapsed;
+    setCollapsedByRealm((previous) => ({ ...previous, [realm]: next }));
+    try {
+      localStorage.setItem('admin-navigation-collapsed:' + realm, String(next));
+    } catch {
+      /* Navigation remains usable when browser storage is unavailable. */
+    }
+  };
   const [titleTarget, setTitleTarget] = useState<HTMLDivElement | null>(null);
   const [actions, setActions] = useState<HTMLDivElement | null>(null);
   const navigationId = useId();
@@ -170,7 +192,7 @@ export function AdminShell({
       <PageTitleContext.Provider value={titleTarget}>
         <PageActionsContext.Provider value={actions}>
           <div
-            className={`admin-shell admin-control admin-${realm} ${page === 'engine' ? 'admin-engine-fullscreen' : ''} ${mobileOpen ? 'admin-menu-open' : ''}`}
+            className={`admin-shell admin-control ${collapsed ? 'admin-navigation-collapsed' : ''} admin-${realm} ${page === 'engine' ? 'admin-engine-fullscreen' : ''} ${mobileOpen ? 'admin-menu-open' : ''}`}
           >
             {mobileOpen && (
               <button
@@ -189,9 +211,22 @@ export function AdminShell({
               tabIndex={mobileOpen ? -1 : undefined}
               aria-label={realm === 'platform' ? '总台导航' : '企业管理导航'}
             >
+              <div className="admin-navigation-toggle-row">
+                <button
+                  type="button"
+                  className="admin-navigation-toggle"
+                  aria-label={collapsed ? '展开侧边栏' : '折叠侧边栏'}
+                  title={collapsed ? '展开侧边栏' : '折叠侧边栏'}
+                  aria-expanded={!collapsed}
+                  aria-controls={navigationId}
+                  onClick={toggleNavigation}
+                >
+                  {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+                </button>
+              </div>
               <div className="admin-brand">
                 <DreamcoreLogo />
-                <div>
+                <div className="admin-brand-label">
                   <strong>梦核引擎</strong>
                   <span className="admin-brand-english">Mengine</span>
                 </div>
@@ -244,6 +279,8 @@ export function AdminShell({
                       {group.items.map(({ id, title, icon: Icon }) => (
                         <a
                           key={id}
+                          aria-label={title}
+                          title={title}
                           className={`admin-nav-link ${navigationPage === id ? 'active' : ''}`}
                           aria-current={page === id ? 'page' : undefined}
                           href={adminHref(realm, id, hash)}
@@ -265,19 +302,21 @@ export function AdminShell({
                     className={`admin-nav-link ${page === 'settings' ? 'active' : ''}`}
                     aria-current={page === 'settings' ? 'page' : undefined}
                     href={adminHref(realm, 'settings', hash)}
+                    aria-label="设置"
+                    title="设置"
                     onClick={(e) => {
                       if (pending) e.preventDefault();
                       else setMobileOpen(false);
                     }}
                   >
                     <Settings size={20} aria-hidden="true" />
-                    设置
+                    <span>设置</span>
                   </a>
                 )}
                 {realm === 'tenant' && customerLinks && (
                   <div className="admin-customer-links">{customerLinks}</div>
                 )}
-                <div className="admin-account">
+                <div className="admin-account" title={account}>
                   <span className="admin-account-avatar" aria-hidden="true">
                     {Array.from(account.trim())[0] || '账'}
                   </span>

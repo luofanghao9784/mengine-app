@@ -81,13 +81,20 @@ export function TenantConsole({
           <SupportRecords id={support.id} test={support.mode === 'TEST'} />
         ) : (
           <>
-            <a className="button ghost" href={back}>
+            <a className="button ghost" href={back} aria-label="返回客户端" title="返回客户端">
               <ArrowLeft size={16} />
-              返回客户端
+              <span>返回客户端</span>
             </a>
-            <a className="button ghost" href={back} target="_blank" rel="noopener noreferrer">
+            <a
+              className="button ghost"
+              href={back}
+              aria-label="新标签页打开客户端"
+              title="新标签页打开客户端"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               <ExternalLink size={16} />
-              新标签页打开客户端
+              <span>新标签页打开客户端</span>
             </a>
           </>
         )
@@ -122,8 +129,8 @@ export function TenantConsole({
             title="没有企业管理权限"
             text="当前账号没有其他企业管理职责，可以返回客户端继续工作。"
           >
-            <a className="button" href={back}>
-              返回客户端
+            <a className="button" href={back} aria-label="返回客户端" title="返回客户端">
+              <span>返回客户端</span>
             </a>
             <Button onClick={refresh}>重新检查权限</Button>
           </Empty>

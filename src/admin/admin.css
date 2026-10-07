@@ -911,3 +911,48 @@ button.admin-directory-row:hover {
   min-height: 32px;
   padding: 6px;
 }
+
+/* Desktop navigation keeps the same controls in its compact icon rail. */
+.admin-navigation-toggle-row {
+  display: flex;
+  justify-content: flex-end;
+  margin: -12px 0 6px;
+}
+.admin-navigation-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--soft);
+  color: var(--muted);
+  cursor: pointer;
+}
+.admin-navigation-toggle:hover { color: var(--text); background: var(--selected); }
+.admin-navigation-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.admin-nav-link svg { flex-shrink: 0; }
+@media (min-width: 761px) {
+  .admin-control.admin-navigation-collapsed { grid-template-columns: 88px minmax(0, 1fr); }
+  .admin-control.admin-navigation-collapsed .admin-sidebar { padding-inline: 10px; }
+  .admin-navigation-collapsed .admin-navigation-toggle-row { justify-content: center; }
+  .admin-control.admin-navigation-collapsed .admin-brand { justify-content: center; padding-inline: 0; }
+  .admin-navigation-collapsed .admin-brand-label,
+  .admin-navigation-collapsed .admin-scope,
+  .admin-navigation-collapsed .admin-nav-group-title,
+  .admin-navigation-collapsed .admin-nav-link > span,
+  .admin-control.admin-navigation-collapsed .admin-account-label,
+  .admin-navigation-collapsed .admin-customer-links a > span { display: none; }
+  .admin-control.admin-navigation-collapsed .admin-nav-link { justify-content: center; padding-inline: 0; }
+  .admin-control.admin-navigation-collapsed .admin-account { flex-direction: column; }
+  .admin-navigation-collapsed .admin-customer-links a { justify-content: center; padding-inline: 0; }
+  .admin-control.admin-navigation-collapsed .admin-account-avatar { width: 36px; }
+}
+@media (min-width: 761px) and (prefers-reduced-motion: no-preference) {
+  .admin-control { transition: grid-template-columns 220ms ease; }
+}
+@media (max-width: 760px) {
+  .admin-navigation-toggle-row { display: none; }
+}
