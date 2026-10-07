@@ -660,9 +660,10 @@ export class EngineScene {
     const heat = this.heat;
     this.worldPts = OUT.p.map((p) => mul(rotX(rotY(p, this.rotA), this.rotB), cs));
     const worldPts = this.worldPts;
-    // A small upper-surface patch only; task photons and their counts are untouched.
-    const targets = OUT.p.map((p, i) => ({ p, i })).filter(({ p }) => p[1] > 0.55);
-    const targetIndex = targets[Math.floor(t / 28) % targets.length].i;
+    // Repair the surface nearest the satellite, never a rotating far-side target.
+    // Task photons and their counts are untouched.
+    const repairOrigin = loopPt(IMPROVE, evo.angle);
+    const targetIndex = this.nearestVert(repairOrigin);
     const patch = [targetIndex, ...OUT.adj[targetIndex]];
     if (evo.strength)
       patch.forEach((i, j) => {
@@ -865,9 +866,8 @@ export class EngineScene {
           point(loopPt(IMPROVE, evo.angle - k * 0.013), 0.43 * (1 - k / 17), 0.028);
         if (evo.strength) {
           const target = worldPts[targetIndex];
-          // A faint fan touches only the upper surface, outside the central readout.
-          const control: V3 = [Math.sign(sat[0] || 1) * 1.9, target[1], Math.max(sat[2], target[2])];
-          const scanPath = (end: V3, u: number) => bz(sat, mix(sat, control, 0.7), control, end, u);
+          // Short local fan: approach from outside the nearby surface without circling the core.
+          const scanPath = (end: V3, u: number) => bz(sat, mul(sat, 0.82), mul(end, 1.18), end, u);
           patch.slice(1, 4).forEach((i) => {
             for (let k = 0; k < 28; k++)
               line(scanPath(worldPts[i], k / 28), scanPath(worldPts[i], (k + 1) / 28), 0.13 * evo.strength);
