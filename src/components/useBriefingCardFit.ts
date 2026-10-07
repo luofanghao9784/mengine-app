@@ -9,7 +9,7 @@ export function useBriefingCardFit(
   key: string,
   columns: number,
   unit: number,
-  selectors: { cards: string; button: string; growVertically?: boolean; measureFullSummary?: boolean } = {
+  selectors: { cards: string; button: string; growVertically?: boolean; measureFullSummary?: boolean; maxRows?: number } = {
     cards: '.briefing-grid .briefing-card',
     button: '.briefing-card-main',
   },
@@ -100,7 +100,7 @@ export function useBriefingCardFit(
         const next: CardSize = wider ? `2×${height as 1 | 2}` : `${width as 1 | 2}×2`;
         updates[id] = {
           size: next,
-          ...(next === size ? { rows: Math.ceil((needed + 10) / (unit + 10)) } : {}),
+          ...(next === size ? { rows: Math.min(selectors.maxRows ?? Infinity, Math.ceil((needed + 10) / (unit + 10))) } : {}),
         };
       }
       if (Object.keys(updates).length)

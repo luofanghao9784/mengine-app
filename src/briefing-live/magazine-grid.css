@@ -34,6 +34,7 @@
 }
 .live-magazine-grid .magazine-main {
   flex: 1;
+  overflow: hidden;
 }
 .live-magazine-grid .magazine-copy {
   gap: 8px;

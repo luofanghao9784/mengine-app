@@ -15,7 +15,7 @@ export type MagazineGridItem = {
   atEnd?: boolean;
   render: ReactNode;
 };
-const selectors = { cards: '.live-briefing-tile', button: '.live-briefing-body', growVertically: true };
+const selectors = { cards: '.live-briefing-tile', button: '.live-briefing-body', growVertically: false, maxRows: 2 };
 export function MagazineGrid({
   items,
   sizing = 'container',
@@ -139,13 +139,8 @@ export function MagazineGrid({
           ? `${Math.max(Number(preferred[0]), Number(minimum.size[0]))}×${Math.max(Number(preferred[2]), Number(minimum.size[2]))}`
           : preferred) as CardSize,
         fixed: preserveSpans || item.wide || !!item.fixedSize,
-        // Automatic cards can narrow to fill a gap; retain enough vertical room
-        // for their measured content instead of fixing a two-column minimum.
-        rows: minimum
-          ? preserveSpans
-            ? Math.min(2, Math.max(Number(minimum.size[2]), minimum.rows || 0))
-            : Math.max(Number(minimum.size[2]), minimum.rows || 0)
-          : undefined,
+        // The magazine supports only the four standard sizes, even for long content.
+        rows: minimum ? Math.min(2, Math.max(Number(minimum.size[2]), minimum.rows || 0)) : undefined,
       };
     }),
     metrics.columns,
