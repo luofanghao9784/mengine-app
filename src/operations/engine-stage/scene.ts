@@ -841,7 +841,7 @@ export class EngineScene {
         line(
           loopPt(IMPROVE, a),
           loopPt(IMPROVE, a + Math.PI / 100),
-          0.055 + (evo.active ? 0.18 * Math.max(0, 1 - distance / 0.5) : 0),
+          0.085 + (evo.active ? 0.28 * Math.max(0, 1 - distance / 0.65) : 0),
         );
       }
       const sat = (this.satellite = loopPt(IMPROVE, evo.angle));
@@ -850,19 +850,19 @@ export class EngineScene {
         normal = norm(cross(tangent, radial));
       const roll = evo.active ? t * 0.32 * (1 - evo.strength * 0.75) : 0.4;
       const wing = add(mul(radial, Math.cos(roll)), mul(normal, Math.sin(roll)));
-      point(sat, 0.9, 0.05);
-      point(sat, 0.12, 0.16);
+      point(sat, 1.05, 0.06);
+      point(sat, 0.18 + evo.strength * 0.08, 0.19);
       for (const side of [-1, 1]) {
         const wingPt = (a: number) =>
           add(sat, add(mul(tangent, Math.cos(a) * 0.14), mul(wing, Math.sin(a) * 0.095 * side)));
         for (let k = 0; k < 24; k++) {
           const a = 0.25 + (k / 24) * 2.35;
-          line(wingPt(a), wingPt(a + 2.35 / 24), 0.65);
+          line(wingPt(a), wingPt(a + 2.35 / 24), 0.85);
         }
       }
       if (evo.active) {
-        for (let k = 1; k <= 12; k++)
-          point(loopPt(IMPROVE, evo.angle - k * 0.012), 0.3 * (1 - k / 13), 0.022);
+        for (let k = 1; k <= 16; k++)
+          point(loopPt(IMPROVE, evo.angle - k * 0.013), 0.43 * (1 - k / 17), 0.028);
         if (evo.strength) {
           const target = worldPts[targetIndex];
           // A faint fan touches only the upper surface, outside the central readout.
@@ -870,19 +870,19 @@ export class EngineScene {
           const scanPath = (end: V3, u: number) => bz(sat, mix(sat, control, 0.7), control, end, u);
           patch.slice(1, 4).forEach((i) => {
             for (let k = 0; k < 28; k++)
-              line(scanPath(worldPts[i], k / 28), scanPath(worldPts[i], (k + 1) / 28), 0.075 * evo.strength);
+              line(scanPath(worldPts[i], k / 28), scanPath(worldPts[i], (k + 1) / 28), 0.13 * evo.strength);
           });
           patch.forEach((i) => {
             const color = mix(blue, C_CH, evo.repair);
-            this.pt(worldPts[i], ...color, 0.6 * evo.strength * visibility(worldPts[i]), 0.038);
+            this.pt(worldPts[i], ...color, 0.85 * evo.strength * visibility(worldPts[i]), 0.05);
           });
           for (const i of patch.slice(1)) {
             const color = mix(blue, C_CH, evo.repair);
-            this.ln(target, worldPts[i], ...color, 0.3 * evo.strength * visibility(target));
+            this.ln(target, worldPts[i], ...color, 0.48 * evo.strength * visibility(target));
           }
           if (evo.phase === '修复中')
             for (let k = 0; k < 2; k++)
-              point(scanPath(target, ((evo.cycle - 9) * 0.7 + k * 0.5) % 1), 0.6, 0.035);
+              point(scanPath(target, ((evo.cycle - 9) * 0.7 + k * 0.5) % 1), 0.9, 0.05);
         }
       }
     }
