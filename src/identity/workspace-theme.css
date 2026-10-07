@@ -212,6 +212,16 @@
     -2px 0 10px rgb(40 40 90 / 5%),
     0 10px 32px rgb(40 40 90 / 7%);
 }
+/* 列表直接呈现在画布上；保留原有层级和几何，仍可被会话覆盖。 */
+:root[data-surface='workspace'] .deck-card.deck-list {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  border-radius: 0;
+}
+:root[data-surface='workspace'] .deck-list .live-list-tools::after {
+  background: transparent;
+}
 :root[data-surface='workspace'] .live-conversations .conversation-user {
   background: var(--accent-soft);
   color: var(--ink);
