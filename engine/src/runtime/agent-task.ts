@@ -1311,7 +1311,7 @@ export class AgentTasks {
         originalIds: originals.ids(),
         tools: result.tools.map((t) => ({ callId: t.callId, name: t.name, status: t.status })),
         artifacts,
-        webSources: web?.snapshot() ?? [],
+        webSources: web?.deliverySources() ?? [],
         skills: [...activated.values()],
         modelCalls: result.modelCalls,
         usage: backend.usage ?? null,

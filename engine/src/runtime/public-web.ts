@@ -428,6 +428,7 @@ export class PublicWebTask {
   private keywordPromises = new Map<string, Promise<void>>();
   private readPromises = new Map<string, Promise<WebSource>>();
   private reads = 0;
+  private selectedNewsIds = new Set<string>();
   private newsPromises = new Map<string, Promise<void>>();
   private newsChecked = new Set<string>();
   private newsRechecks = 0;
@@ -542,7 +543,12 @@ export class PublicWebTask {
   async read(id: string, signal: AbortSignal) {
     const item = this.sources.get(id);
     if (!item) throw new RuntimeError('PUBLIC_SOURCE_NOT_GRANTED');
-    if (item.kind === 'PAGE') return structuredClone(item);
+    if (this.news && !this.selectedNewsIds.has(id) && this.selectedNewsIds.size >= 3)
+      throw new RuntimeError('PUBLIC_SOURCE_SELECTION_LIMIT');
+    if (item.kind === 'PAGE') {
+      if (this.news) this.selectedNewsIds.add(id);
+      return structuredClone(item);
+    }
     let promise = this.readPromises.get(id);
     if (!promise) {
       if (this.reads >= 2) throw new RuntimeError('PUBLIC_READ_LIMIT');
@@ -555,11 +561,17 @@ export class PublicWebTask {
       });
       this.readPromises.set(id, promise);
     }
-    return structuredClone(await promise);
+    const read = await promise;
+    if (this.news) this.selectedNewsIds.add(id);
+    return structuredClone(read);
   }
-  snapshot() {
+  deliverySources() {
+    return this.news ? this.copySources([...this.selectedNewsIds].map(id => this.sources.get(id)!)) : this.snapshot();
+  }
+  snapshot() { return this.copySources([...this.sources.values()]); }
+  private copySources(values: WebSource[]) {
     let imageIncluded = false;
-    return [...this.sources.values()].map((s) => {
+    return values.map((s) => {
       const copy = structuredClone(s);
       if (copy.image) {
         if (imageIncluded) delete copy.image;

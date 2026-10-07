@@ -24,7 +24,7 @@ test('explicit proxy pins CONNECT to the checked IP and never accepts a remote p
  await assert.rejects(publicDnsResolver(bootstrap)('publisher.example.org',signal()),/PUBLIC_ADDRESS_DENIED/);
 });
 
-for (const [earlyWait,work,invalid,emptyFirst] of [[false,false,false,false],[true,false,false,false],[false,true,false,false],[false,true,true,false],[false,true,false,true]]) test(`INFO verified delivery wait=${earlyWait} scopedWork=${work} invalidDelivery=${invalid} emptyFirst=${emptyFirst}`,async t=>{
+for (const [earlyWait,work,invalid,emptyFirst,fourCandidates] of [[false,false,false,false],[true,false,false,false],[false,true,false,false],[false,true,true,false],[false,true,false,true],[false,true,false,false,true]]) test(`INFO verified delivery wait=${earlyWait} scopedWork=${work} invalidDelivery=${invalid} emptyFirst=${emptyFirst} fourCandidates=${Boolean(fourCandidates)}`,async t=>{
  const {createServer}=await import('node:http');const {randomUUID}=await import('node:crypto');const {AgentTasks}=await import('../dist/runtime/agent-task.js');const {listen,close,json,body}=await import('./fixtures/agent.mjs');const {usageFixture}=await import('./fixtures/usage.mjs');
  const contexts=[],receipts=[];let selected=false,step=0;const artifactId=randomUUID();
  const server=createServer(async(req,res)=>{
@@ -38,19 +38,19 @@ for (const [earlyWait,work,invalid,emptyFirst] of [[false,false,false,false],[tr
   if(req.url.endsWith('/deliver-briefing')){assert.equal(input.businessType,'INFO');return json(res,{contractVersion:'1.0',status:'PREPARED',artifactId,title:input.title,visibility:'PRIVATE_AFTER_TASK_SUCCEEDS'});}
   json(res,{},404);
  });const endpoint=await listen(server);t.after(()=>close(server));const {reader,calls}=fixture();let source;const newsSearch=new BingNewsSearch(reader);
- const agent=new AgentTasks({platformBaseUrl:endpoint,executionClass:'verification',modelName:'synthetic-info',publicWeb:{reader,search:{search:(query,sig)=>emptyFirst && query===scope.topics[0].query?Promise.resolve([]):newsSearch.search(query,sig)}},createModel:()=>({usage:null,async *generate(req){
+ const agent=new AgentTasks({platformBaseUrl:endpoint,executionClass:'verification',modelName:'synthetic-info',publicWeb:{reader,search:{search:async(query,sig)=>{const rows=emptyFirst && query===scope.topics[0].query?[]:await newsSearch.search(query,sig);return fourCandidates?Array.from({length:4},(_,i)=>({...rows[0],id:randomUUID(),url:rows[0].url+i})):rows;}}},createModel:()=>({usage:null,async *generate(req){
   step++;assert.ok(!req.tools.some(x=>['task_context','find_skills','activate_skill','search_sources','compare_dataset'].includes(x.name)));
   let name,args;
   if(earlyWait && step===1){yield{type:'tool_call',id:'early-wait',name:'task_control',arguments:JSON.stringify({outcome:'WAITING_CAPABILITY',message:'合成早期能力判断，后续实际执行已成功。'})};yield{type:'finish',reason:'tool_calls'};return;}
   if(emptyFirst && step===2){assert.equal(req.requiredTool,'public_search');assert.ok(!req.tools.find(t=>t.name==='public_search').parameters.properties.topic.enum.includes('FITNESS'));yield{type:'tool_call',id:'second-topic',name:'public_search',arguments:JSON.stringify({topic:'BUSINESS'})};yield{type:'finish',reason:'tool_calls'};return;}
   const phase=step-(earlyWait?1:0)-(emptyFirst && step>2?1:0);
   if(phase===1){assert.equal(req.requiredTool,'public_search');assert.deepEqual(contexts.filter(x=>x.action==='profiles').map(x=>x.scope),['TENANT','WORKSPACE','PERSONAL']);assert.match(JSON.stringify(req.messages),/PRIVATE_COMPANY/);assert.ok(req.tools.some(x=>x.name==='public_search'));name='public_search';args={topic:'FITNESS'};}
-  else if(phase===2){assert.equal(req.requiredTool,'read_public_page');const last=req.messages.flatMap(m=>m.content).filter(b=>b.type==='tool_result').at(-1);source=JSON.parse(JSON.parse(last.content)[0].text).items[0].id;assert.ok(!req.tools.some(x=>['public_search','deliver_briefing','select_briefing_topic'].includes(x.name)));name='read_public_page';args={id:source};}
+  else if(phase===2){assert.equal(req.requiredTool,'read_public_page');const last=req.messages.flatMap(m=>m.content).filter(b=>b.type==='tool_result').at(-1);source=JSON.parse(JSON.parse(last.content)[0].text).items[fourCandidates?3:0].id;assert.ok(!req.tools.some(x=>['public_search','deliver_briefing','select_briefing_topic'].includes(x.name)));name='read_public_page';args={id:source};}
   else if(phase===3){assert.equal(req.requiredTool,'select_briefing_topic');name='select_briefing_topic';args={candidates:[{question:'新政策影响哪些健身安排',evidenceNeeded:'已读取的政策原文',requiresCalculation:false,difference:'新增政策',businessType:'INFO'}],selectedIndex:0};}
   else {assert.equal(req.requiredTool,'deliver_briefing');assert.ok(phase===4 || invalid && phase===5);name='deliver_briefing';args={businessType:'INFO',title:'健身行业新政策',summary:'合成资讯验收摘要',analysis:invalid && phase===4?'合成原文支持相关经营安排。':['合成原文支持相关经营安排。']};if(phase===5)assert.match(JSON.stringify(req.messages),/analysis.*array/);}
   yield{type:'tool_call',id:'info'+step,name,arguments:JSON.stringify(args)};yield{type:'finish',reason:'tool_calls'};
  }})});t.after(()=>agent.stop());const result=await agent.run({contractVersion:'1.5',taskId:randomUUID(),attemptId:randomUUID(),prompt:'合成资讯生成'},signal());
- assert.equal(step,4+(earlyWait?1:0)+(invalid?1:0)+(emptyFirst?1:0));if(invalid)assert.equal(receipts.filter(x=>x.status==='failed' && x.name==='deliver_briefing').length,1);assert.equal(result.outcome,'COMPLETE');assert.equal(result.requiredInput,null);assert.deepEqual(receipts.filter(x=>x.status==='succeeded').map(x=>x.name),['activate_skill',...(earlyWait?['task_control']:[]),'public_search',...(emptyFirst?['public_search']:[]),'read_public_page','select_briefing_topic','deliver_briefing']);assert.equal(result.webSources.length,1);assert.ok(!calls.join('').includes('123456789'));
+ assert.equal(step,4+(earlyWait?1:0)+(invalid?1:0)+(emptyFirst?1:0));if(invalid)assert.equal(receipts.filter(x=>x.status==='failed' && x.name==='deliver_briefing').length,1);assert.equal(result.outcome,'COMPLETE');assert.equal(result.requiredInput,null);assert.deepEqual(receipts.filter(x=>x.status==='succeeded').map(x=>x.name),['activate_skill',...(earlyWait?['task_control']:[]),'public_search',...(emptyFirst?['public_search']:[]),'read_public_page','select_briefing_topic','deliver_briefing']);assert.equal(result.webSources.length,1);assert.equal(result.webSources[0].id,source);if(fourCandidates)assert.ok(result.webSources[0].url.endsWith("3"));assert.ok(!calls.join('').includes('123456789'));
 });
 
 test('news summaries use fixed scopes, reject malformed grants and retain narrow tool phases',async()=>{
@@ -119,4 +119,13 @@ test('an updated reported original remains eligible through its independent rech
  const url='https://publisher.example.org/updated';
  const task=new PublicWebTask('news:topic-search:v1',{discover:async()=>[],read:async()=>({url,title:'合成更新新闻',excerpt:'已有原文发生真实更新的合成正文。'.repeat(5),sha256:'updated',kind:'PAGE',retrievedAt:date,publishedAt:date})},{search:async()=>[{id:'updated',url,title:'合成更新新闻',publishedAt:date}]},true,[{url,sha256:'old'}],scope);
  assert.equal((await task.find(signal(),'FITNESS')).length,1);assert.equal(task.newsDiagnostics().status,'AVAILABLE');
+});
+
+test('four warmed candidates deliver only explicitly read sources and retain the selected cover',async()=>{
+ const pages=Array.from({length:4},(_,i)=>({id:'p'+i,url:'https://publisher.example.org/'+i,title:'合成原文'+i,excerpt:'足够长的合成原文。'.repeat(8),sha256:'hash'+i,kind:'PAGE',retrievedAt:date,publishedAt:date,image:{url:'https://publisher.example.org/image'+i,base64:'synthetic'}}));
+ const task=new PublicWebTask('news:topic-search:v1',{discover:async()=>[],read:async url=>pages.find(p=>p.url===url)},{search:async()=>pages},true,[],scope);
+ const all=await task.find(signal(),'FITNESS');assert.equal(all.length,4);assert.deepEqual(task.deliverySources(),[]);
+ await task.read(all[3].id,signal());const selected=task.deliverySources();assert.equal(selected.length,1);assert.equal(selected[0].url,pages[3].url);assert.equal(selected[0].image.url,pages[3].image.url);
+ await task.read(all[3].id,signal());assert.equal(task.deliverySources().length,1);
+ await task.read(all[0].id,signal());await task.read(all[1].id,signal());await assert.rejects(task.read(all[2].id,signal()),{code:'PUBLIC_SOURCE_SELECTION_LIMIT'});assert.equal(task.deliverySources().length,3);
 });
