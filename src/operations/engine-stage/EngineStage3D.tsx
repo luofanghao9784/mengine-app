@@ -1,3 +1,4 @@
+import type { EvolutionPhase } from './evolution-demo';
 import { useEffect, useRef, useState } from 'react';
 import type {
   EngineTelemetry,
@@ -93,6 +94,7 @@ export function EngineStage3D({
   reduced: boolean;
   hash: string;
 }) {
+  const [evolutionPhase, setEvolutionPhase] = useState<EvolutionPhase>(demo ? '巡检中' : '待接入');
   const [focus, setFocus] = useState<Focus>(null);
   const [sel, setSel] = useState<TelemetryChannelCode | null>(null);
   const [lens, setLens] = useState<Lens>('r');
@@ -146,11 +148,13 @@ export function EngineStage3D({
         panel: panel.current!,
       },
       {
+        evolution: setEvolutionPhase,
         pick: (st, code) => latest.current.focusStage(st, code),
         home: () => latest.current.goHome(),
         hover: (hit, x, y) => setTip(hit ? { hit, x, y } : null),
       },
       reduced,
+      demo,
     );
     scene.current = s;
     setWebgl(s.webgl);
@@ -331,6 +335,12 @@ export function EngineStage3D({
             onMouseLeave={() => scene.current?.hoverLabel(null)}
           >
             {STAGES[st].cap}
+            {st === 'evo' && (
+              <small className="eng3d-evolution-status">
+                {demo ? '演示 · ' : ''}
+                {evolutionPhase}
+              </small>
+            )}
           </button>
         ))}
       </div>
@@ -397,7 +407,7 @@ export function EngineStage3D({
           </button>
         ))}
       </div>
-      <Tip tip={tip} channels={byCode} />
+      <Tip tip={tip} channels={byCode} demo={demo} evolutionPhase={evolutionPhase} />
       <div className="eng3d-hint">悬停看读数，点击推进镜头，拖动旋转，按 1 到 4 切换阶段</div>
       <aside
         className="eng3d-panel"
@@ -410,6 +420,8 @@ export function EngineStage3D({
       >
         {focus && (
           <Panel
+            demo={demo}
+            evolutionPhase={evolutionPhase}
             focus={focus}
             sel={sel}
             setSel={setSel}
@@ -443,9 +455,13 @@ function spark(samples: Sample[], key: Lens) {
 }
 
 function Tip({
+  demo,
+  evolutionPhase,
   tip,
   channels,
 }: {
+  demo: boolean;
+  evolutionPhase: EvolutionPhase;
   tip: { hit: Hit; x: number; y: number } | null;
   channels: Map<TelemetryChannelCode, TelemetryChannel>;
 }) {
@@ -511,7 +527,12 @@ function Tip({
         <h3>
           自进化循环<small>自进化</small>
         </h3>
-        <p className="lead">独立执行器尚未接入，只显示循环结构，不跑光子，也没有数量。</p>
+        <p className="lead">
+          {demo
+            ? `${evolutionPhase}演示：展示局部扫描与候选调整，不修改真实系统。`
+            : '独立执行器尚未接入，巡核卫星停驻待命，不执行真实修复。'}
+        </p>
+        <p>点击查看自进化阶段</p>
       </>
     );
   } else if (tip) {
@@ -545,6 +566,8 @@ function Tip({
 }
 
 function Panel({
+  demo,
+  evolutionPhase,
   focus,
   sel,
   setSel,
@@ -554,6 +577,8 @@ function Panel({
   closer,
   hash,
 }: {
+  demo: boolean;
+  evolutionPhase: EvolutionPhase;
   focus: Stage | 'evo';
   sel: TelemetryChannelCode | null;
   setSel: (code: TelemetryChannelCode | null) => void;
@@ -579,17 +604,47 @@ function Panel({
     return (
       <>
         {head}
-        <p className="psum">{info.sum}</p>
+        <p className="psum">
+          {demo
+            ? '巡核卫星演示：扫描局部网格、校准节点、恢复连接，再验证并回到巡检。所有动作仅改变演示画面，不执行真实任务。'
+            : info.sum}
+        </p>
         <div className="rows">
           {['发现', '候选', '验证', '采用'].map((name) => (
-            <div key={name} className="row static">
+            <div
+              key={name}
+              className="row static"
+              data-current={
+                demo &&
+                {
+                  巡检中: '发现',
+                  扫描中: '发现',
+                  校准中: '候选',
+                  修复中: '候选',
+                  验证中: '验证',
+                  待接入: '',
+                  静态演示: '',
+                }[evolutionPhase] === name
+                  ? true
+                  : undefined
+              }
+            >
               <span className="rn">{name}</span>
-              <span className="rv off">未接入</span>
-              <span className="rq">接入后显示该阶段记录</span>
+              <span className="rv off">{demo ? (name === '采用' ? '不启用' : '演示') : '未接入'}</span>
+              <span className="rq">
+                {demo
+                  ? {
+                      发现: '巡检与局部扫描',
+                      候选: '节点校准与连接修复',
+                      验证: '校验后恢复核心原色',
+                      采用: '不修改真实系统',
+                    }[name]
+                  : '接入后显示该阶段记录'}
+              </span>
             </div>
           ))}
         </div>
-        <p className="foot">自进化循环没有光子流动，不代表有任务在运行。接入后才会出现光子和数量。</p>
+        <p className="foot">巡核卫星与修复光点是演示辅助图形，不计入执行记录。独立执行器尚未接入。</p>
       </>
     );
   const s = sumOf(list),

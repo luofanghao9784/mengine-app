@@ -830,3 +830,16 @@
 .engine-dash-lower[hidden] {
   display: none;
 }
+
+.eng3d-evolution-status {
+  display: block;
+  margin-top: 7px;
+  font-size: 10px;
+  letter-spacing: .08em;
+  color: #91a9bd;
+  opacity: .8;
+}
+.eng3d-panel .row[data-current] {
+  background: rgb(130 182 235 / 8%);
+  box-shadow: inset 2px 0 #8cb6db;
+}

@@ -1,3 +1,4 @@
+import { evolutionFrame, type EvolutionPhase } from './evolution-demo';
 /**
  * 3D engine stage, ported from the confirmed prototype (artifact「梦核引擎仪表盘」3D version, 2026-10-06).
  * Production rules: every photon, gate mote and burst comes from a real snapshot; ambient structure
@@ -34,6 +35,7 @@ export interface SceneDom {
   panel: HTMLElement;
 }
 export interface SceneEvents {
+  evolution: (phase: EvolutionPhase) => void;
   pick: (st: Stage | 'evo', code: TelemetryChannelCode | null) => void;
   home: () => void;
   hover: (hit: Hit | null, x: number, y: number) => void;
@@ -163,7 +165,7 @@ function lattice(N: number, R: number, amp: number, k: number) {
 }
 const OUT = lattice(240, 1, 0.13, 3),
   INN = lattice(90, 0.48, 0.18, 3);
-// The two crossing orbits form the Mengine mark: work loop (+45°, processing) and evolution loop (-45°, not enabled).
+// Crossing Mengine orbits: work (+45°), evolution (-45°, visual simulation only).
 const LOOP_R = 2.35,
   LOOP_TILT = Math.acos(7 / 16);
 function mkLoop(deg: number) {
@@ -282,6 +284,8 @@ export class EngineScene {
   private sel: TelemetryChannelCode | null = null;
   private lens: Lens = 'r';
   private hover: string | null = null;
+  private satellite: V3 = [0, 0, 0];
+  private evolutionPhase: EvolutionPhase | null = null;
   readonly webgl: boolean;
 
   constructor(
@@ -289,6 +293,7 @@ export class EngineScene {
     private dom: SceneDom,
     private events: SceneEvents,
     private reduced: boolean,
+    private demo = false,
   ) {
     this.gl = canvas.getContext('webgl2', { antialias: true, premultipliedAlpha: false, alpha: false });
     try {
@@ -647,9 +652,25 @@ export class EngineScene {
       this.yaw *= Math.pow(0.6, dt);
       this.pitch *= Math.pow(0.5, dt);
     }
+    const evo = evolutionFrame(t, this.demo, reduced);
+    if (this.evolutionPhase !== evo.phase) {
+      this.evolutionPhase = evo.phase;
+      this.events.evolution(evo.phase);
+    }
     const heat = this.heat;
     this.worldPts = OUT.p.map((p) => mul(rotX(rotY(p, this.rotA), this.rotB), cs));
     const worldPts = this.worldPts;
+    // A small upper-surface patch only; task photons and their counts are untouched.
+    const targets = OUT.p.map((p, i) => ({ p, i })).filter(({ p }) => p[1] > 0.55);
+    const targetIndex = targets[Math.floor(t / 28) % targets.length].i;
+    const patch = [targetIndex, ...OUT.adj[targetIndex]];
+    if (evo.strength)
+      patch.forEach((i, j) => {
+        worldPts[i] = add(
+          worldPts[i],
+          mul(norm(worldPts[i]), 0.045 * Math.sin(j * 2.1) * evo.strength * (1 - evo.repair)),
+        );
+      });
     const inPts = INN.p.map((p) => mul(rotX(rotY(p, -this.rotA * 1.6), this.rotB + 0.4), cs));
     // Glowing clusters follow processing records; none when nothing runs.
     const want = Math.min(prS.r * 2 + (act ? 2 : 0), 26);
@@ -799,23 +820,70 @@ export class EngineScene {
         );
       if (this.lens === 'u' && prS.u) this.pt(loopPt(WORK, Math.PI * 0.9), 0.85, 0.77, 0.95, 0.75, 0.18);
     }
-    // Evolution loop: structure only, no photons and no counts.
+    // Patrol satellite: parked in real mode; repair choreography is demo-only.
     {
-      const evHl = this.focus === 'evo' ? 1.8 : this.hover === 'evo' ? 1.5 : 1,
-        segs = 200,
-        phase = reduced ? 0 : t * 0.6;
-      for (let k = 0; k < segs * draw; k++) {
-        if ((k + phase) % 4 >= 2.2) continue;
-        const q1 = loopPt(IMPROVE, (k / segs) * 6.283),
-          q2 = loopPt(IMPROVE, ((k + 1) / segs) * 6.283);
-        const z = clamp((q1[2] / LOOP_R + 1) / 2, 0, 1);
-        this.ln(q1, q2, 0.45, 0.62, 1, (0.2 + 0.16 * z) * evHl);
-        this.ln(mul(q1, 1.006), mul(q2, 1.006), 0.45, 0.62, 1, 0.07 * evHl);
+      const blue: V3 = [0.55, 0.76, 1];
+      const evHl = this.focus === 'evo' || this.hover === 'evo' ? 1.3 : this.focus ? 0.35 : 0.8;
+      const visibility = (p: V3) => {
+        if (!this.VP) return 1;
+        const q = this.proj(this.VP, p),
+          c = this.proj(this.VP, [0, 0, 0]);
+        const d = Math.hypot(q.x - c.x, q.y - c.y);
+        return q.w > c.w && d < this.CORE_PX * 0.9 ? 0.02 : q.w > c.w ? 0.5 : 1;
+      };
+      const line = (a: V3, b: V3, alpha: number) =>
+        this.ln(a, b, ...blue, alpha * evHl * visibility(mix(a, b, 0.5)));
+      const point = (p: V3, alpha: number, size: number) =>
+        this.pt(p, ...blue, alpha * evHl * visibility(p), size);
+      for (let k = 0; k < 200 * draw; k++) {
+        const a = (k / 200) * Math.PI * 2;
+        const distance = Math.abs(Math.atan2(Math.sin(a - evo.angle), Math.cos(a - evo.angle)));
+        line(
+          loopPt(IMPROVE, a),
+          loopPt(IMPROVE, a + Math.PI / 100),
+          0.055 + (evo.active ? 0.18 * Math.max(0, 1 - distance / 0.5) : 0),
+        );
       }
-      for (let k = 0; k < 4; k++) {
-        const q = loopPt(IMPROVE, (k / 4) * 6.283 + 0.8);
-        this.pt(q, 0.55, 0.7, 1, 0.55 * evHl * draw, 0.07);
-        this.pt(q, 0.55, 0.7, 1, 0.12 * evHl * draw, 0.22);
+      const sat = (this.satellite = loopPt(IMPROVE, evo.angle));
+      const tangent = norm(sub(loopPt(IMPROVE, evo.angle + 0.01), sat));
+      const radial = norm(sat),
+        normal = norm(cross(tangent, radial));
+      const roll = evo.active ? t * 0.32 * (1 - evo.strength * 0.75) : 0.4;
+      const wing = add(mul(radial, Math.cos(roll)), mul(normal, Math.sin(roll)));
+      point(sat, 0.9, 0.05);
+      point(sat, 0.12, 0.16);
+      for (const side of [-1, 1]) {
+        const wingPt = (a: number) =>
+          add(sat, add(mul(tangent, Math.cos(a) * 0.14), mul(wing, Math.sin(a) * 0.095 * side)));
+        for (let k = 0; k < 24; k++) {
+          const a = 0.25 + (k / 24) * 2.35;
+          line(wingPt(a), wingPt(a + 2.35 / 24), 0.65);
+        }
+      }
+      if (evo.active) {
+        for (let k = 1; k <= 12; k++)
+          point(loopPt(IMPROVE, evo.angle - k * 0.012), 0.3 * (1 - k / 13), 0.022);
+        if (evo.strength) {
+          const target = worldPts[targetIndex];
+          // A faint fan touches only the upper surface, outside the central readout.
+          const control: V3 = [Math.sign(sat[0] || 1) * 1.9, target[1], Math.max(sat[2], target[2])];
+          const scanPath = (end: V3, u: number) => bz(sat, mix(sat, control, 0.7), control, end, u);
+          patch.slice(1, 4).forEach((i) => {
+            for (let k = 0; k < 28; k++)
+              line(scanPath(worldPts[i], k / 28), scanPath(worldPts[i], (k + 1) / 28), 0.075 * evo.strength);
+          });
+          patch.forEach((i) => {
+            const color = mix(blue, C_CH, evo.repair);
+            this.pt(worldPts[i], ...color, 0.6 * evo.strength * visibility(worldPts[i]), 0.038);
+          });
+          for (const i of patch.slice(1)) {
+            const color = mix(blue, C_CH, evo.repair);
+            this.ln(target, worldPts[i], ...color, 0.3 * evo.strength * visibility(target));
+          }
+          if (evo.phase === '修复中')
+            for (let k = 0; k < 2; k++)
+              point(scanPath(target, ((evo.cycle - 9) * 0.7 + k * 0.5) % 1), 0.6, 0.035);
+        }
       }
     }
     // Input / output light flows.
@@ -1099,6 +1167,13 @@ export class EngineScene {
     const lp = (L: { u: V3; v: V3 }) => Array.from({ length: 80 }, (_, i) => loopPt(L, (i / 80) * 6.283));
     near(lp(WORK), { kind: 'loop', st: 'pr' });
     near(lp(IMPROVE), { kind: 'loop', st: 'evo' });
+    const sat = this.proj(VP, this.satellite),
+      center = this.proj(VP, [0, 0, 0]);
+    if (
+      !(sat.w > center.w && Math.hypot(sat.x - center.x, sat.y - center.y) < this.CORE_PX * 0.9) &&
+      Math.hypot(sat.x - x, sat.y - y) < 18
+    )
+      return { kind: 'loop', st: 'evo' };
     const c0 = this.proj(VP, [0, 0, 0]);
     if (Math.hypot(c0.x - x, c0.y - y) < this.CORE_PX * 0.9) best = { kind: 'core' };
     return best;
