@@ -101,6 +101,19 @@
   }
 }
 
+/* 画报标题栏只从底部收短 10px，首行仍按原高度排列。 */
+:root[data-surface='workspace'] .workspace-briefing .access-main > .topbar {
+  height: 70px;
+  min-height: 70px;
+  grid-template-rows: 80px;
+}
+@media (max-width: 800px) {
+  :root[data-surface='workspace'] .workspace-briefing .access-main > .topbar {
+    grid-template-rows: none;
+    padding-bottom: 4px;
+  }
+}
+
 /* 顶部分类：玻璃胶囊分段。 */
 :root[data-surface='workspace'] :is(.live-briefing-tabs, .material-tabs, .library-view-switch) {
   gap: 2px;
