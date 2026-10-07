@@ -62,7 +62,11 @@ export function AnalysisComposition({
         ))}
       </div>
     );
-  const selected = compact ? sections.slice(0, 2) : sections;
+  const selected = compact
+    ? c.businessType === 'INFO'
+      ? sections.filter((section) => section.role === 'OBSERVATION').slice(0, 1)
+      : sections.slice(0, 2)
+    : sections;
   const layout = p?.layout ?? 'EDITORIAL';
   const Tag = layout === 'STEPS' ? 'ol' : 'div';
   const Block = layout === 'STEPS' ? 'li' : 'div';
