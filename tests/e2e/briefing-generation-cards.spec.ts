@@ -1217,3 +1217,30 @@ test('已完成画报读取失败可关闭并回到生成首页，轮询与刷�
   await expect(page.getByRole('heading', { name: '选择生成数量', exact: true })).toBeVisible();
   expect(f.posts).toHaveLength(0);
 });
+
+test('多张推荐重排后不横向飞入，保留垂直浮入', async ({ page }) => {
+  await page.addInitScript(() => {
+    (window as any).tileMoves = [];
+    const animate = Element.prototype.animate;
+    Element.prototype.animate = function (frames, options) {
+      if (this.matches('.live-briefing-tile')) (window as any).tileMoves.push(frames);
+      return animate.call(this, frames, options);
+    };
+  });
+  await generationFixture(page);
+  let reverse = false;
+  const cards = Array.from({ length: 8 }, (_, index) => item(uid(100 + index), `合成经营发现 ${index}`));
+  await page.route('**/api/**/recommendations?*', route => route.fulfill({ json: {
+    tenantId: tenant, settings: { revision: 0, enabled: true },
+    items: reverse ? cards.map((card, index) => index === 0 ? { ...card, content: { ...card.content, title: '合成扩展标题：' + '需要扩大卡片的经营资料。'.repeat(6) } } : card) : cards, snapshot: 'a'.repeat(64),
+    hasMore: false, eligibleTotal: 8, rankedCount: 8, poolLimited: false,
+    poolLimit: 1000, businessOutcome: 'NOT_ASSESSED',
+  } }));
+  await page.goto(home);
+  await expect(page.locator('.recommendation-card')).toHaveCount(8);
+  reverse = true;
+  await page.getByRole('tab', { name: '空间', exact: true }).click();
+  await page.getByLabel('画报工作空间').selectOption(space);
+  await expect(page.locator('.recommendation-card').first()).toContainText('合成扩展标题');
+  expect(await page.evaluate(() => (window as any).tileMoves)).toEqual([]);
+});

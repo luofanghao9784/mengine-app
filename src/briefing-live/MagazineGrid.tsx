@@ -151,6 +151,9 @@ export function MagazineGrid({
     // Width and text-fit measurements settle synchronously before paint. Do not
     // animate from the provisional one-column layout on mount or page return.
     const contentChanged = previousIdentity.current !== identity;
+    // The page can receive a second ranked snapshot while card fitting settles.
+    // Reflow transforms would fly those cards sideways over their arrival motion.
+    const animateReflow = !grid.current?.closest('.live-briefing');
     previousIdentity.current = identity;
     const next = new Map<string, { x: number; y: number }>();
     for (const element of grid.current?.querySelectorAll<HTMLElement>('.live-briefing-tile') || []) {
@@ -159,6 +162,7 @@ export function MagazineGrid({
       const old = previous.current.get(id);
       if (
         old &&
+        animateReflow &&
         !element.dataset.atEnd &&
         contentChanged &&
         !matchMedia('(prefers-reduced-motion: reduce)').matches &&
