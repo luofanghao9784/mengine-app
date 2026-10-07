@@ -66,6 +66,11 @@ export function useBriefingTabs(options: Options) {
             delete document.documentElement.dataset.briefingSlide;
           })
           .catch(() => {});
+      } else if (current.page.current?.classList.contains('live-briefing')) {
+        // Live cards own their vertical, staggered entrance after data is ready.
+        // Moving the whole page sideways would stack a second motion on top.
+        update();
+        requested.current = null;
       } else {
         update();
         const panel = current.page.current?.querySelector('.briefing-panel') || current.page.current;

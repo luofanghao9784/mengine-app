@@ -17,9 +17,10 @@ const distanceFor = (raw: number) => 108 * (1 - Math.exp(-Math.max(0, raw) / 145
 
 // Entrance is independent of the transform used by layout reflow. It runs for
 // the visible reading area; offscreen cards never wait behind a long queue.
-function useBriefingArrival(page: RefObject<HTMLElement | null>, ready: boolean) {
+function useBriefingArrival(page: RefObject<HTMLElement | null>, ready: boolean, viewKey: string) {
   const [pending, setPending] = useState(true);
   const started = useRef(false);
+  const activeView = useRef(viewKey);
   const animations = useRef<Animation[]>([]);
   const cancel = useCallback(() => {
     animations.current.forEach((animation) => animation.cancel());
@@ -43,7 +44,7 @@ function useBriefingArrival(page: RefObject<HTMLElement | null>, ready: boolean)
     animations.current = cards.map(({ element }, index) => {
       const animation = element.animate(
         [
-          { opacity: 0, translate: '0 12px', scale: '.988' },
+          { opacity: 0, translate: root.classList.contains('live-briefing') ? '0 -12px' : '0 12px', scale: '.988' },
           { opacity: 1, translate: '0 0', scale: '1' },
         ],
         {
@@ -58,10 +59,16 @@ function useBriefingArrival(page: RefObject<HTMLElement | null>, ready: boolean)
     });
   }, [page, cancel]);
   useLayoutEffect(() => {
+    if (activeView.current !== viewKey) {
+      activeView.current = viewKey;
+      started.current = false;
+      cancel();
+      setPending(true);
+    }
     if (!ready || started.current) return;
     started.current = true;
     play();
-  }, [ready, play]);
+  }, [ready, viewKey, play, cancel]);
   useEffect(() => {
     const root = page.current;
     const preference = matchMedia('(prefers-reduced-motion: reduce)');
@@ -93,7 +100,7 @@ function useBriefingArrival(page: RefObject<HTMLElement | null>, ready: boolean)
 export function useBriefingRefresh(options: Options) {
   const latest = useRef(options);
   latest.current = options;
-  const arrival = useBriefingArrival(options.page, options.ready);
+  const arrival = useBriefingArrival(options.page, options.ready, options.viewKey);
   const [state, setState] = useState<{ phase: Phase; distance: number }>({ phase: 'idle', distance: 0 });
   const stateRef = useRef(state);
   const [announcement, setAnnouncement] = useState('');
@@ -159,7 +166,7 @@ export function useBriefingRefresh(options: Options) {
   useEffect(() => {
     if (options.blocked || previousView.current !== options.viewKey) {
       cancel();
-      arrival.cancel();
+      if (options.blocked) arrival.cancel();
       setAnnouncement('');
     }
     previousView.current = options.viewKey;

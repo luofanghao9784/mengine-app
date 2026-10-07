@@ -423,11 +423,13 @@ test('后台自动生成的占位与结果也进入网格，不额外发起生�
   await expect(page.locator('.recommendation-card')).toHaveCount(2);
 });
 
-test('异步推荐卡片提交后才按 Demo 参数入场，下拉完成后重播且无卡面悬浮操作', async ({ page }) => {
+test('异步推荐卡片就绪后向下原地浮入，切换标签无横移且下拉可重播', async ({ page }) => {
   await page.addInitScript(() => {
     (window as any).arrivalLog = [];
+    (window as any).pageMotionLog = [];
     const animate = Element.prototype.animate;
     Element.prototype.animate = function (frames, options) {
+      if (this.matches('.live-briefing')) (window as any).pageMotionLog.push(frames);
       if (this.matches('.live-briefing-card') && Array.isArray(frames) && frames[0]?.translate) {
         (window as any).arrivalLog.push({ title: this.getAttribute('aria-label'), frames, options });
       }
@@ -455,7 +457,7 @@ test('异步推荐卡片提交后才按 Demo 参数入场，下拉完成后重�
   await expect.poll(async () => (await arrivals()).length).toBe(1);
   const [entry] = await arrivals();
   expect(entry.options).toMatchObject({ duration: 380, delay: 0, easing: 'cubic-bezier(.2,.65,.25,1)' });
-  expect(entry.frames[0]).toMatchObject({ opacity: 0, translate: '0 12px', scale: '.988' });
+  expect(entry.frames[0]).toMatchObject({ opacity: 0, translate: '0 -12px', scale: '.988' });
   await page.locator('.recommendation-card').hover();
   await expect(page.locator('.live-card-action-rail')).toHaveCount(0);
   await expect(page.getByRole('button', { name: '刷新智能画报', exact: true })).toHaveCount(0);
@@ -464,6 +466,11 @@ test('异步推荐卡片提交后才按 Demo 参数入场，下拉完成后重�
   await page.mouse.wheel(0, -220);
   await expect.poll(async () => (await arrivals()).length).toBe(2);
   expect(f.posts).toHaveLength(0);
+  await page.getByRole('tab', { name: '类型', exact: true }).click();
+  await page.getByRole('tab', { name: '推荐', exact: true }).click();
+  await expect.poll(async () => (await arrivals()).length).toBeGreaterThan(2);
+  expect(await page.evaluate(() => (window as any).pageMotionLog)).toEqual([]);
+  expect((await arrivals()).every((entry: any) => entry.frames[0].translate === '0 -12px')).toBe(true);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.reload();
   await expect(page.locator('.recommendation-card')).toHaveCount(1);
