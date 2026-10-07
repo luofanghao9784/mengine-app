@@ -14,3 +14,8 @@ body:has(.workspace-shell, .app-shell) {
   user-select: none;
   cursor: grabbing;
 }
+
+/* Move only reader contents, leaving its viewport and scrollbar anchored. */
+[data-reader-elastic] > * {
+  translate: 0 var(--reader-elastic-y, 0px);
+}

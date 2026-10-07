@@ -28,6 +28,7 @@ import { PlatformHome } from '../platform/PlatformHome';
 import { PageActionsContext } from '../shared/ui';
 import { useEffect, useRef, useState } from 'react';
 import { managementHref, returnToWorkspaceHref, workspaceReturnHash } from './navigation';
+import { useElasticReaders } from '../shared/useElasticReaders';
 import { useViewScroll } from '../shared/useViewState';
 import {
   CalendarClock,
@@ -193,6 +194,7 @@ function GuardedAccessShell({
   onInvite: () => void;
 }) {
   const { refresh, logout } = useSession();
+  useElasticReaders(surface === 'workspace');
   const pendingRequest = useContext(RequestPending);
   const [accountOpen, setAccountOpen] = useState(false);
   const [actionsTarget, setActionsTarget] = useState<HTMLDivElement | null>(null);

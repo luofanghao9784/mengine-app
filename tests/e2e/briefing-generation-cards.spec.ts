@@ -1308,3 +1308,48 @@ test('客户端每次进入画报默认推荐，不恢复上次关注标签', as
   await page.getByRole('link', { name: '智能画报', exact: true }).click();
   await expect(recommended).toHaveAttribute('aria-selected', 'true');
 });
+
+test('阅读内容上下边缘缓冲回弹，正常滚动和减少动态效果不受影响', async ({ page }) => {
+  await generationFixture(page);
+  await page.route('**/api/**/feedback?*', route => route.fulfill({ json: { feedback: null } }));
+  await page.route('**/tasks/' + uid(21), route => route.fulfill({ json: {
+    conversation: info,
+    tasks: [{ ...task('合成阅读'), executionClass: 'verification', id: uid(21), status: 'SUCCEEDED', revision: 1, attempt: 1,
+      reply: Array.from({length: 35}, (_, i) => `第${i + 1}段：这是用于验证长资料阅读的内容。`).join('\n\n') }],
+    hasMore: false, cursor: 1,
+  } }));
+  await page.goto(home);
+  await page.getByRole('button', { name: '阅读：已有经营发现', exact: true }).click();
+  const reader = page.locator('.live-reading-scroll');
+  await expect(reader).toContainText('第35段');
+  const edge = async (position: 'middle' | 'bottom' | 'top', delta: number) => reader.evaluate((node, {position, delta}) => {
+    node.scrollTop = position === 'bottom' ? node.scrollHeight : position === 'middle' ? 100 : 0;
+    const wheel = new WheelEvent('wheel', {deltaY: delta, bubbles: true, cancelable: true});
+    node.dispatchEvent(wheel);
+    return {prevented: wheel.defaultPrevented, offset: Number.parseFloat((node as HTMLElement).style.getPropertyValue('--reader-elastic-y')) || 0};
+  }, {position, delta});
+  expect((await edge('middle', 90)).prevented).toBe(false);
+  const bottom = await edge('bottom', 90);
+  expect(bottom.prevented).toBe(true);
+  expect(bottom.offset).toBeLessThan(0);
+  expect(bottom.offset).toBeGreaterThan(-44);
+  await expect(reader).not.toHaveAttribute('data-reader-elastic');
+  const top = await edge('top', -90);
+  expect(top.offset).toBeGreaterThan(0);
+  await expect(reader).not.toHaveAttribute('data-reader-elastic');
+  const touched = await reader.evaluate(node => {
+    node.scrollTop = node.scrollHeight;
+    const point = (y: number) => new Touch({identifier: 1, target: node, clientX: 100, clientY: y});
+    node.dispatchEvent(new TouchEvent('touchstart', {touches: [point(200)], bubbles: true}));
+    const move = new TouchEvent('touchmove', {touches: [point(140)], bubbles: true, cancelable: true});
+    node.dispatchEvent(move);
+    const offset = (node as HTMLElement).style.getPropertyValue('--reader-elastic-y');
+    node.dispatchEvent(new TouchEvent('touchend', {touches: [], bubbles: true}));
+    return {prevented: move.defaultPrevented, offset: Number.parseFloat(offset)};
+  });
+  expect(touched.prevented).toBe(true);
+  expect(touched.offset).toBeLessThan(0);
+  await expect(reader).not.toHaveAttribute('data-reader-elastic');
+  await page.emulateMedia({reducedMotion: 'reduce'});
+  expect(await edge('bottom', 90)).toEqual({prevented: false, offset: 0});
+});
