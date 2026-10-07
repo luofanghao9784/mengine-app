@@ -133,7 +133,7 @@
   }
 }
 
-/* 画报卡片：保留画报原有宋体标题，使用毛玻璃面板与中性类型标签。 */
+/* 画报卡片：保留画报原有宋体标题，使用毛玻璃面板并保留类型配色。 */
 :root[data-surface='workspace'] .live-briefing-card {
   background: var(--surface);
   border-color: var(--glass-edge);
@@ -156,23 +156,12 @@
 }
 :root[data-surface='workspace'] :is(.briefing-card, .live-briefing-card):has(.briefing-magazine),
 :root[data-surface='workspace'] .magazine-type[data-briefing-type] {
-  --magazine-color: var(--ink-2);
-  --magazine-tint: var(--soft);
   --briefing-ink: var(--ink);
   --briefing-muted: var(--ink-2);
-}
-:root[data-surface='workspace'] :is(.briefing-card, .live-briefing-card):has(.magazine-数据),
-:root[data-surface='workspace'] .magazine-type[data-briefing-type='数据'] {
-  --magazine-color: var(--accent-hover);
-  --magazine-tint: var(--accent-soft);
 }
 :root[data-surface='workspace'] .magazine-type {
   border-radius: 999px;
   padding-inline: 9px;
-}
-:root[data-surface='workspace'] .live-magazine-type.publication {
-  background: var(--soft);
-  color: var(--ink-2);
 }
 
 /* 图表：基期中性灰、当期靛蓝；覆盖组件内的固定配色。 */
