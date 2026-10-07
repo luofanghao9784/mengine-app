@@ -27,8 +27,8 @@ export interface SceneDom {
   top: HTMLElement;
   labels: Partial<Record<TelemetryChannelCode, HTMLElement>>;
   caps: Partial<Record<Stage | 'evo', HTMLElement>>;
-  ringWrap: HTMLElement;
-  ring: SVGSVGElement;
+  haloWrap: HTMLElement;
+  halo: HTMLElement;
   coreNum: HTMLElement;
   coreMix: HTMLElement;
   panel: HTMLElement;
@@ -1059,11 +1059,11 @@ export class EngineScene {
     const c0 = this.proj(VP, [0, 0, 0]),
       c1 = this.proj(VP, [1.12, 0, 0]);
     const rad = Math.max(40, Math.hypot(c1.x - c0.x, c1.y - c0.y));
-    dom.ring.setAttribute('width', String(rad * 2));
-    dom.ring.setAttribute('height', String(rad * 2));
+    dom.halo.style.width = `${rad * 2.7}px`;
+    dom.halo.style.height = `${rad * 2.7}px`;
     this.CORE_PX = rad;
-    dom.ringWrap.style.transform = `translate3d(${c0.x}px,${c0.y}px,0)`;
-    dom.ringWrap.style.opacity = focus && focus !== 'pr' ? '.3' : '1';
+    dom.haloWrap.style.transform = `translate3d(${c0.x}px,${c0.y}px,0)`;
+    dom.haloWrap.style.opacity = focus && focus !== 'pr' ? '.3' : '1';
     dom.coreMix.style.transform = `translate3d(${c0.x}px,${c0.y + rad + 16}px,0) translateX(-50%)`;
     dom.coreMix.style.opacity = focus ? '0' : '1';
     dom.coreNum.style.transform = `translate3d(${c0.x}px,${c0.y}px,0) translate(-50%,-50%) scale(${focus && focus !== 'pr' ? 0.6 : 1})`;

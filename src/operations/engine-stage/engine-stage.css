@@ -261,7 +261,7 @@
   color: var(--ash);
   text-shadow: 0 0 12px #000;
 }
-.eng3d-ringwrap {
+.eng3d-halowrap {
   position: absolute;
   left: 0;
   top: 0;
@@ -270,11 +270,26 @@
   will-change: transform, opacity;
   transition: opacity 0.4s;
 }
-.eng3d-ring {
-  display: block;
-  transform: translate(-50%, -50%) rotate(-90deg);
-  overflow: visible;
+.eng3d-halo {
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle, transparent 22%, rgb(241 214 160 / 5%) 42%, rgb(241 214 160 / 2%) 55%, transparent 70%);
+  opacity: .3;
 }
+.eng3d-halo[data-active] { opacity: .8; }
+@keyframes eng3d-breathe { 50% { opacity: .45; } }
+.eng3d[data-motion='full'] .eng3d-halo[data-active] { animation: eng3d-breathe 5s ease-in-out infinite; }
+.eng3d-ratio {
+  display: flex;
+  width: 100%;
+  height: 2px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: rgb(236 234 228 / 6%);
+  opacity: .6;
+}
+.eng3d-ratio span { height: 100%; }
+.eng3d-mix-labels { display: flex; justify-content: center; gap: 16px; }
 .eng3d-mix {
   position: absolute;
   left: 0;
@@ -283,7 +298,8 @@
   pointer-events: none;
   display: flex;
   justify-content: center;
-  gap: 16px;
+  flex-direction: column;
+  gap: 9px;
   transition: opacity 0.4s;
   font-size: 11.5px;
   letter-spacing: 0.04em;

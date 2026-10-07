@@ -105,8 +105,8 @@ export function EngineStage3D({
   const closer = useRef<HTMLButtonElement>(null);
   const labels = useRef<SceneDom['labels']>({});
   const caps = useRef<SceneDom['caps']>({});
-  const ringWrap = useRef<HTMLDivElement>(null);
-  const ring = useRef<SVGSVGElement>(null);
+  const haloWrap = useRef<HTMLDivElement>(null);
+  const halo = useRef<HTMLDivElement>(null);
   const coreNum = useRef<HTMLDivElement>(null);
   const coreMix = useRef<HTMLDivElement>(null);
   const panel = useRef<HTMLElement>(null);
@@ -139,8 +139,8 @@ export function EngineStage3D({
         top: top.current!,
         labels: labels.current,
         caps: caps.current,
-        ringWrap: ringWrap.current!,
-        ring: ring.current!,
+        haloWrap: haloWrap.current!,
+        halo: halo.current!,
         coreNum: coreNum.current!,
         coreMix: coreMix.current!,
         panel: panel.current!,
@@ -184,20 +184,11 @@ export function EngineStage3D({
   const sIn = sumOf(stList('in')),
     sPr = sumOf(stList('pr')),
     sOut = sumOf(stList('out'));
-  const C = 2 * Math.PI * 48;
-  let acc = 0;
-  const arcs = (
-    [
-      ['in', sIn[lens], '#D6E2EE'],
-      ['pr', sPr[lens], '#F1D6A0'],
-      ['out', sOut[lens], '#F0BE72'],
-    ] as const
-  ).map(([k, v, color]) => {
-    const length = tot ? Math.max(0, (v / tot) * C - 1.5) : 0;
-    const arc = { k, color, dash: `${length} ${C}`, offset: -acc };
-    acc += tot ? (v / tot) * C : 0;
-    return arc;
-  });
+  const mix = [
+    ['输入', sIn[lens], '#D6E2EE'],
+    ['处理', sPr[lens], '#F1D6A0'],
+    ['输出', sOut[lens], '#F0BE72'],
+  ] as const;
   const warnTarget = [...channels].sort((a, b) => b.failed + b.unknown - (a.failed + a.unknown))[0];
   return (
     <div
@@ -343,44 +334,28 @@ export function EngineStage3D({
           </button>
         ))}
       </div>
-      <div className="eng3d-ringwrap" ref={ringWrap} aria-hidden="true">
-        <svg className="eng3d-ring" ref={ring} viewBox="0 0 100 100" width="240" height="240">
-          <circle cx="50" cy="50" r="48" fill="none" stroke="rgba(236,234,228,.07)" strokeWidth=".6" />
-          {arcs.map((a) => (
-            <circle
-              key={a.k}
-              data-arc={a.k}
-              cx="50"
-              cy="50"
-              r="48"
-              fill="none"
-              stroke={a.color}
-              strokeWidth="1.1"
-              strokeLinecap="round"
-              strokeDasharray={a.dash}
-              strokeDashoffset={a.offset}
-            />
-          ))}
-        </svg>
+      <div className="eng3d-halowrap" ref={haloWrap} aria-hidden="true">
+        <div className="eng3d-halo" ref={halo} data-active={T.r > 0 ? true : undefined} />
       </div>
       <div className="eng3d-core" ref={coreNum}>
         <b style={{ color: lens === 'f' && tot ? 'var(--coral)' : undefined }}>{n(tot)}</b>
         <span>{LENS[lens].name}</span>
       </div>
       <div className="eng3d-mix" ref={coreMix}>
-        {(
-          [
-            ['输入', sIn[lens], '#D6E2EE'],
-            ['处理', sPr[lens], '#F1D6A0'],
-            ['输出', sOut[lens], '#F0BE72'],
-          ] as const
-        ).map(([label, v, color]) => (
-          <span key={label}>
-            <i style={{ background: color }} />
-            {label}
-            <b>{n(v)}</b>
-          </span>
-        ))}
+        <div className="eng3d-ratio" aria-hidden="true">
+          {mix.map(([label, v, color]) => (
+            <span key={label} style={{ width: `${tot ? (v / tot) * 100 : 0}%`, background: color }} />
+          ))}
+        </div>
+        <div className="eng3d-mix-labels">
+          {mix.map(([label, v, color]) => (
+            <span key={label}>
+              <i style={{ background: color }} />
+              {label}
+              <b>{n(v)}</b>
+            </span>
+          ))}
+        </div>
       </div>
       <div className="eng3d-lens-cap">{LENS[lens].cap}</div>
       <div className="eng3d-reads" role="group" aria-label="查看指标">
