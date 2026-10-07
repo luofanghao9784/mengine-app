@@ -171,6 +171,13 @@
     transform 200ms,
     border-color 200ms;
 }
+/* 只调整画报底色的 alpha，正文、图表和类型标签不随之透明。 */
+:root[data-surface='workspace'] .live-briefing-card:has(.briefing-magazine) {
+  background: rgb(255 255 255 / 80%);
+}
+:root[data-surface='workspace'] .live-briefing-card.is-read:has(.briefing-magazine) {
+  background: rgb(255 255 255 / 70%);
+}
 :root[data-surface='workspace'] .live-briefing-card:not(.conversation-briefing-preview):is(:hover, :focus-within) {
   border-color: var(--glass-edge);
   box-shadow: var(--glass-shadow-hover);
