@@ -45,7 +45,7 @@ for (const mode of ['web:optional:v1', 'web:required:v1']) {
    publicWeb:{reader:{read:async()=>{reads++;return {...source,kind:'PAGE'}}},search:{search:async()=>{searches++;return [source]}}},
    createModel:()=>({async *generate(request) {
     calls++;
-    const steps=[['activate_skill',{id:'public-research',version:'1.0.0'}],['public_search',{query:'健身 会员服务'}],['read_public_page',{id:source.id}]];
+    const steps=[['public_search',{query:'健身 会员服务'}],['read_public_page',{id:source.id}]];
     if(required && calls<=steps.length) {
      const [name,args]=steps[calls-1];assert.ok(request.tools.some(t=>t.name===name));
      yield {type:'tool_call',id:'web-'+calls,name,arguments:JSON.stringify(args)};
@@ -56,11 +56,57 @@ for (const mode of ['web:optional:v1', 'web:required:v1']) {
    }})});
   t.after(()=>agent.stop());
   const result=await agent.run({contractVersion:'1.5',taskId:randomUUID(),attemptId:randomUUID(),prompt:'合成业务背景分析'},new AbortController().signal);
-  assert.equal(result.modelCalls,required?4:1);
+  assert.equal(result.modelCalls,required?3:1);
   assert.equal(searches,required?1:0);assert.equal(reads,required?1:0);
   assert.ok(result.text.includes(required?'已核验':'无需联网'));
  });
 }
 test('keyword length remains enforced before transport with the compatible schema',()=>{
  assert.throws(()=>publicKeywords('x'.repeat(121)),/PUBLIC_QUERY_DENIED/);
+});
+
+for (const empty of [false, true])
+test(`required web closes tools safely with unread evidence (${empty ? 'empty search budget' : 'reserved final'})`, async t => {
+  let calls = 0, reads = 0;
+  const platform = createServer((req, res) => {
+    if (usageFixture(req, res)) return;
+    if (req.url.endsWith('/check')) return json(res, {allowed: true, executionClass: 'verification', publicQuery: 'web:required:v1'});
+    if (req.url.endsWith('/execution/open')) return json(res, {accepted: true, policy: 'READ_ONLY_PRIVATE_V1'});
+    if (req.url.endsWith('/execution/tool')) return json(res, {accepted: true});
+    return json(res, {code: 'unexpected'}, 404);
+  });
+  const url = await listen(platform); t.after(() => close(platform));
+  const agent = new AgentTasks({platformBaseUrl: url, executionClass: 'verification', modelName: 'synthetic-final-phase',
+    publicWeb: {reader: {read: async () => {reads++; return {...source, kind: 'PAGE'};}}, search: {search: async () => empty ? [] : [source]}},
+    createModel: () => ({async *generate(request) {
+      calls++;
+      if (calls === 1) {
+        assert.equal(request.requiredTool, 'public_search');
+        assert.match(JSON.stringify(request.messages), /已由系统启用/);
+        yield {type: 'tool_call', id: 'search', name: 'public_search', arguments: JSON.stringify({query: '健身 服务'})};
+      } else if (empty && calls === 2) {
+        assert.equal(request.requiredTool, 'public_search');
+        yield {type: 'tool_call', id: 'second-search', name: 'public_search', arguments: JSON.stringify({query: '体育 政策'})};
+      } else if (!empty && calls < 7) {
+        assert.equal(request.requiredTool, 'read_public_page');
+        const read = request.tools.find(tool => tool.name === 'read_public_page');
+        assert.deepEqual(read.parameters.properties.id.enum, [source.id]);
+        yield {type: 'tool_call', id: 'bad-read-' + calls, name: 'read_public_page', arguments: JSON.stringify({id: 'not-granted'})};
+      } else {
+        assert.deepEqual(request.tools, []);
+        assert.equal(request.requiredTool, undefined);
+        assert.equal(request.requireToolCall, undefined);
+        yield {type: 'text', text: '本次找到候选来源，但未能读取原文，尚无法核实新闻。'};
+        yield {type: 'finish', reason: 'stop'}; return;
+      }
+      yield {type: 'finish', reason: 'tool_calls'};
+    }})});
+  t.after(() => agent.stop());
+  const result = await agent.run({contractVersion: '1.5', taskId: randomUUID(), attemptId: randomUUID(), prompt: '合成新闻核验'}, new AbortController().signal);
+  assert.equal(calls, empty ? 3 : 7);
+  assert.equal(reads, 0);
+  assert.equal(result.outcome, 'PARTIAL');
+  assert.match(result.requiredInput, /尚未完成新闻原文核验/);
+  assert.match(result.text, /尚无法核实/);
+  assert.equal(result.tools.filter(tool => tool.name === 'activate_skill' && tool.status === 'succeeded').length, 1);
 });
