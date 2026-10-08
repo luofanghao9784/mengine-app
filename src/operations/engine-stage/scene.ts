@@ -1,4 +1,3 @@
-import { workBusinesses } from './work-business';
 import { advanceSatelliteRoll, evolutionFrame, type EvolutionPhase } from './evolution-demo';
 /**
  * 3D engine stage, ported from the confirmed prototype (artifact「梦核引擎仪表盘」3D version, 2026-10-06).
@@ -16,13 +15,12 @@ export type Focus = Stage | 'evo' | null;
 export type Lens = 'r' | 'q' | 'w' | 'u' | 'd' | 'f';
 export type Hit =
   | { kind: 'lane'; st: Stage; code: TelemetryChannelCode }
-  | { kind: 'loop'; st: 'pr' | 'evo'; business?: string }
+  | { kind: 'loop'; st: 'pr' | 'evo' }
   | { kind: 'core' };
 export interface SceneDom {
   top: HTMLElement;
   labels: Partial<Record<TelemetryChannelCode, HTMLElement>>;
   caps: Partial<Record<Stage | 'evo', HTMLElement>>;
-  workLabels: Record<string, HTMLElement>;
   haloWrap: HTMLElement;
   halo: HTMLElement;
   coreNum: HTMLElement;
@@ -30,7 +28,7 @@ export interface SceneDom {
 }
 export interface SceneEvents {
   evolution: (phase: EvolutionPhase) => void;
-  pick: (st: Stage | 'evo', code: TelemetryChannelCode | null, business?: string) => void;
+  pick: (st: Stage | 'evo', code: TelemetryChannelCode | null) => void;
   home: () => void;
   hover: (hit: Hit | null, x: number, y: number) => void;
 }
@@ -265,7 +263,8 @@ export class EngineScene {
   private rotA = 0;
   private rotB = 0;
   private satelliteRoll = 0.4;
-  private workCompletions: { id: string; at: number }[] = [];
+  private workAngle = 0;
+  private workSpeed = sp(0.18);
   private evolutionSeed = Math.floor(Math.random() * 4294967296);
   private coreS = sp(0.2);
   private introK = sp(0);
@@ -327,12 +326,6 @@ export class EngineScene {
     this.codes = next.channels.map((c) => c.code);
     if (changed) this.buildLanes();
     if (this.reduced || prev.size === 0) return;
-    for (const business of workBusinesses) {
-      const completed = next.channels
-        .filter((c) => business.codes.includes(c.code))
-        .reduce((sum, c) => sum + completions(prev.get(c.code), c), 0);
-      if (completed > 0) this.workCompletions.push({ id: business.id, at: this.clock });
-    }
     for (const st of ['pr', 'out'] as const) {
       const n = next.channels
         .filter((c) => channelInfo[c.code].stage === st)
@@ -357,7 +350,6 @@ export class EngineScene {
       this.sparks.length = 0;
       this.rings.length = 0;
       this.bursts.length = 0;
-      this.workCompletions.length = 0;
     }
   }
 
@@ -759,7 +751,7 @@ export class EngineScene {
       this.pt(s.p, c[0], c[1], c[2], a * 1.1, s.s * (1 - u * 0.5));
       this.pt(sub(s.p, mul(s.v, 0.035)), c[0], c[1], c[2], a * 0.4, s.s * 0.8);
     }
-    // Work loop: sparse activity samples (up to two per channel), never a full luminous ring.
+    // Work loop: a single luminous core with local, bidirectional photon exchange.
     const draw = reduced ? 1 : clamp((since - 0.15) / 1.6, 0, 1);
     const prHl =
       this.sel && prCodes.includes(this.sel)
@@ -779,44 +771,53 @@ export class EngineScene {
         this.ln(prev, q, ...C_CH, (prS.r ? 0.09 : 0.07) * shimmer * prHl);
         prev = q;
       }
-      this.workCompletions = this.workCompletions.filter((event) => t - event.at < 1.6);
-      for (const business of workBusinesses) {
-        const counts = this.sum(business.codes);
-        const node = loopPt(WORK, business.angle);
-        const color = counts.u ? ([0.85, 0.77, 0.95] as V3) : counts.f ? C_CO : counts.w ? C_OUT : C_CH;
-        const hl = this.hover === business.id ? 1.35 : prHl;
-        const done = this.workCompletions.find((event) => event.id === business.id);
-        const flash = done ? 1 - (t - done.at) / 1.6 : 0;
-        this.pt(node, ...color, (0.3 + (counts.r ? 0.35 : 0) + flash * 0.2) * hl, 0.055);
-        this.pt(node, ...color, (0.06 + (counts.r ? 0.06 : 0) + flash * 0.08) * hl, 0.19);
-        if (counts.r) {
-          // Continuous activity stays local to this business; it does not travel through other nodes.
-          for (let k = 0; k < 24; k++) {
-            const a = business.angle - 0.16 + (k / 24) * 0.32;
-            const pulse = motion ? 0.7 + 0.3 * Math.cos((a - business.angle) * 24 - t * 1.5) : 0.8;
-            this.ln(loopPt(WORK, a), loopPt(WORK, a + 0.32 / 24), ...C_CH, 0.42 * pulse * hl);
-          }
-          if (motion)
-            for (let k = 0; k < 3; k++) {
-              const a = business.angle - 0.14 + ((t * 0.12 + k * 0.095) % 0.28);
-              this.pt(loopPt(WORK, a), ...C_CH, 0.55 * hl, 0.035);
+      // One orbiting work core. Photon exchanges indicate ongoing activity, not completed jobs.
+      const load = Math.min(1, Math.log1p(prS.r) / Math.log(101));
+      if (motion)
+        this.workAngle =
+          (this.workAngle + dt * this.spr(this.workSpeed, 0.14 + 0.06 * load, dt, 5)) % (Math.PI * 2);
+      const node = loopPt(WORK, this.workAngle);
+      const visibility = (p: V3) => {
+        if (!this.VP) return 1;
+        const q = this.proj(this.VP, p),
+          c = this.proj(this.VP, [0, 0, 0]);
+        return q.w > c.w && Math.hypot(q.x - c.x, q.y - c.y) < this.CORE_PX * 0.9
+          ? 0.06
+          : q.w > c.w
+            ? 0.55
+            : 1;
+      };
+      const point = (p: V3, color: V3, alpha: number, size: number) =>
+        this.pt(p, ...color, alpha * prHl * draw * visibility(p), size);
+      const energy = prS.r ? 1 : 0.55;
+      point(node, C_CH, 0.08 * energy, 0.42);
+      point(node, C_CH, 0.2 * energy, 0.22);
+      point(node, [1, 0.97, 0.88], 0.9 * energy, 0.095);
+      point(node, [1, 1, 0.98], energy, 0.043);
+      // A short, soft wake keeps the orbit readable without lighting the entire ring.
+      for (let j = 1; j <= 9; j++)
+        point(loopPt(WORK, this.workAngle - j * 0.012), C_CH, (1 - j / 10) * 0.24 * energy, 0.038);
+      if (prS.r && motion) {
+        const surface = mul(norm(node), 1.08);
+        const tangent = norm(cross(norm(node), [0, 1, 0.01]));
+        const packets = 2 + Math.round(load * 2);
+        for (const direction of [1, -1]) {
+          const color: V3 = direction === 1 ? [1, 0.9, 0.68] : [0.78, 0.87, 1];
+          for (let k = 0; k < packets; k++) {
+            const phase = (t * 0.48 + k / packets + (direction === 1 ? 0 : 0.17)) % 1;
+            for (let j = 0; j < 4; j++) {
+              const trail = phase - j * 0.018;
+              if (trail < 0) continue;
+              const u = direction === 1 ? trail : 1 - trail;
+              const p = add(mix(node, surface, u), mul(tangent, Math.sin(u * Math.PI) * 0.1 * direction));
+              const fade = Math.sin(trail * Math.PI);
+              point(p, color, fade * (1 - j / 4) * 0.65, 0.042 - j * 0.006);
             }
-        }
-        // Queue indicators are static, capped; the label carries the exact count.
-        for (let k = 0; k < Math.min(counts.q, 4); k++)
-          this.pt(
-            add(node, [0.07 + (k % 2) * 0.045, -0.07 - Math.floor(k / 2) * 0.045, 0]),
-            ...C_CH,
-            0.35 * hl,
-            0.022,
-          );
-        if (done && motion) {
-          const progress = (t - done.at) / 1.6;
-          const destination = mul(norm(node), 1.08);
-          this.pt(mix(node, destination, progress), ...C_CH, 0.55 * (1 - progress), 0.045);
+          }
         }
       }
     }
+
     // Patrol satellite: parked in real mode; repair choreography is demo-only.
     {
       const blue: V3 = [0.55, 0.76, 1];
@@ -1122,26 +1123,6 @@ export class EngineScene {
         clamp(s.y - h / 2, topY, H - h - (st === 'evo' && this.portrait ? 90 : 64)),
       );
     }
-    for (const business of workBusinesses) {
-      const el = dom.workLabels[business.id];
-      if (!el) continue;
-      const p = this.proj(VP, loopPt(WORK, business.angle));
-      const x = clamp(p.x - el.offsetWidth / 2, 12, W - el.offsetWidth - 12);
-      let y = clamp(p.y + 16, topY, H - el.offsetHeight - 130);
-      // Keep business labels clear of the fixed input/processing/output legend.
-      if (
-        !this.portrait &&
-        x < W / 2 + 110 &&
-        x + el.offsetWidth > W / 2 - 110 &&
-        y < H * 0.69 + 44 &&
-        y + el.offsetHeight > H * 0.69
-      )
-        y = H * 0.69 + 54;
-      el.style.transform = `translate3d(${x}px,${y}px,0)`;
-      el.style.opacity = focus ? '0' : '1';
-      el.style.pointerEvents = focus ? 'none' : 'auto';
-      el.inert = !!focus;
-    }
     const c0 = this.proj(VP, [0, 0, 0]),
       c1 = this.proj(VP, [1.12, 0, 0]);
     const rad = Math.max(40, Math.hypot(c1.x - c0.x, c1.y - c0.y));
@@ -1182,10 +1163,6 @@ export class EngineScene {
     });
     const lp = (L: { u: V3; v: V3 }) => Array.from({ length: 80 }, (_, i) => loopPt(L, (i / 80) * 6.283));
     near(lp(WORK), { kind: 'loop', st: 'pr' });
-    for (const business of workBusinesses) {
-      const node = this.proj(VP, loopPt(WORK, business.angle));
-      if (Math.hypot(node.x - x, node.y - y) < 16) return { kind: 'loop', st: 'pr', business: business.id };
-    }
     near(lp(IMPROVE), { kind: 'loop', st: 'evo' });
     const sat = this.proj(VP, this.satellite),
       center = this.proj(VP, [0, 0, 0]);
@@ -1232,12 +1209,12 @@ export class EngineScene {
     const h = this.hitTest(e);
     if (h) {
       if (h.kind === 'core') return;
-      this.events.pick(h.st, h.kind === 'lane' ? h.code : null, h.kind === 'loop' ? h.business : undefined);
+      this.events.pick(h.st, h.kind === 'lane' ? h.code : null);
     } else if (this.focus) this.events.home();
   };
   private onLeave = () => this.setHover(null, 0, 0);
   private setHover(h: Hit | null, x: number, y: number) {
-    this.hover = !h ? null : h.kind === 'lane' ? h.code : h.kind === 'loop' ? h.business || h.st : null;
+    this.hover = !h ? null : h.kind === 'lane' ? h.code : h.kind === 'loop' ? h.st : null;
     this.canvas.style.cursor = !h ? '' : h.kind === 'core' ? 'grab' : 'pointer';
     this.events.hover(h, x, y);
   }
