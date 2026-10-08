@@ -270,6 +270,7 @@ export class EngineScene {
   private rotA = 0;
   private rotB = 0;
   private satelliteRoll = 0.4;
+  private evolutionSeed = Math.floor(Math.random() * 4294967296);
   private coreS = sp(0.2);
   private introK = sp(0);
   private clock = 0;
@@ -652,7 +653,7 @@ export class EngineScene {
       this.yaw *= Math.pow(0.6, dt);
       this.pitch *= Math.pow(0.5, dt);
     }
-    const evo = evolutionFrame(t, this.demo, reduced);
+    const evo = evolutionFrame(t, this.demo, reduced, this.evolutionSeed);
     if (this.evolutionPhase !== evo.phase) {
       this.evolutionPhase = evo.phase;
       this.events.evolution(evo.phase);
@@ -884,7 +885,7 @@ export class EngineScene {
           }
           if (evo.phase === '修复中')
             for (let k = 0; k < 2; k++)
-              point(scanPath(target, ((evo.cycle - 9) * 0.7 + k * 0.5) % 1), 0.9, 0.05);
+              point(scanPath(target, ((evo.scanTime - 5) * 0.7 + k * 0.5) % 1), 0.9, 0.05);
         }
       }
     }
