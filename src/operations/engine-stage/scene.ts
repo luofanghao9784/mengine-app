@@ -264,6 +264,7 @@ export class EngineScene {
   private rotB = 0;
   private satelliteRoll = 0.4;
   private workAngle = 0;
+  private followBlend = sp(0);
   private workSpeed = sp(0.18);
   private evolutionSeed = Math.floor(Math.random() * 4294967296);
   private coreS = sp(0.2);
@@ -550,17 +551,26 @@ export class EngineScene {
   }
   private camTarget(): { e: V3; c: V3 } {
     const f = this.focus;
+    if (f === 'pr' || f === 'evo') {
+      // Follow the current rendered orbit position, reserving room for the detail card.
+      const subject = f === 'pr' ? loopPt(WORK, this.workAngle) : this.satellite;
+      const distance = this.portrait ? 7 : 6.4;
+      const halfHeight = distance * Math.tan((38 * Math.PI) / 360);
+      const panel = this.dom.panel;
+      const offset: V3 =
+        this.W < 760
+          ? [0, -halfHeight * Math.min(0.66, panel.offsetHeight / this.H), 0]
+          : [(halfHeight * Math.min(0.48, panel.offsetWidth / this.W) * this.W) / this.H, 0, 0];
+      const c = add(subject, offset);
+      return { e: add(c, [0, 0, distance]), c };
+    }
     if (this.portrait) {
       if (f === 'in') return { e: [0, 3.2, 6.4], c: [0, 2.4, 0] };
       if (f === 'out') return { e: [0, -2.6, 6.4], c: [0, -2.2, 0] };
-      if (f === 'pr') return { e: [0, 0.4, 5.2], c: [0, -0.6, 0] };
-      if (f === 'evo') return { e: [0, 4.6, 6.2], c: [0, -0.8, 0] };
       return { e: [0, 0.2, 11.2], c: [0, 0, 0] };
     }
     if (f === 'in') return { e: [-1.9, 0.5, 6.4], c: [-1.55, 0, 0] };
     if (f === 'out') return { e: [3.1, 0.4, 5.4], c: [2.9, 0, 0] };
-    if (f === 'pr') return { e: [1.6, 0.45, 6.6], c: [1.45, 0, 0] };
-    if (f === 'evo') return { e: [1.5, 4.4, 6.4], c: [1.3, -0.4, 0] };
     const aspectK = clamp(1.6 / (this.W / this.H || 1.6), 1, 1.5);
     return { e: [0, 0.18, 8.6 * aspectK], c: [0, -0.05, 0] };
   }
@@ -957,9 +967,11 @@ export class EngineScene {
     const tg = this.camTarget();
     const e = tg.e.map((v, i) => this.spr(this.CAM.e[i], v, dt, this.focus ? 14 : 10)) as V3,
       c = tg.c.map((v, i) => this.spr(this.CAM.c[i], v, dt, this.focus ? 14 : 10)) as V3;
-    const drift = reduced ? 0 : 1;
-    const orbitYaw = this.yaw + drift * Math.sin(t * 0.05) * 0.08 + this.mx * 0.06 * drift,
-      orbitPitch = this.pitch + this.my * 0.04 * drift;
+    const following = this.focus === 'pr' || this.focus === 'evo';
+    const freeOrbit = 1 - this.spr(this.followBlend, following ? 1 : 0, dt, 14);
+    const drift = reduced ? 0 : freeOrbit;
+    const orbitYaw = this.yaw * freeOrbit + drift * Math.sin(t * 0.05) * 0.08 + this.mx * 0.06 * drift,
+      orbitPitch = this.pitch * freeOrbit + this.my * 0.04 * drift;
     let eye = sub(e, c);
     eye = rotY(eye, orbitYaw);
     eye = rotX(eye, clamp(orbitPitch, -0.6, 0.6));
