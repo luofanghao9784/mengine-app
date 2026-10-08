@@ -1,7 +1,7 @@
 import { advanceSatelliteRoll, evolutionFrame, type EvolutionPhase } from './evolution-demo';
 /**
  * 3D engine stage, ported from the confirmed prototype (artifact「梦核引擎仪表盘」3D version, 2026-10-06).
- * Production rules: every photon, gate mote and burst comes from a real snapshot; ambient structure
+ * Production rules: activity samples, gate motes and bursts are driven by real snapshots; ambient structure
  * (lattice, dust, loop outlines) carries no counts. Reduced motion freezes time and draws no photons.
  */
 import type {
@@ -9,14 +9,7 @@ import type {
   TelemetryChannel,
   TelemetryChannelCode,
 } from '../../../contracts/public-api/engine-telemetry';
-import {
-  BEADS,
-  channelInfo,
-  completions,
-  LANE_PARTICLES,
-  particles,
-  type Stage,
-} from '../engine-dashboard-model';
+import { BEADS, channelInfo, completions, particles, type Stage } from '../engine-dashboard-model';
 
 export type Focus = Stage | 'evo' | null;
 export type Lens = 'r' | 'q' | 'w' | 'u' | 'd' | 'f';
@@ -270,6 +263,8 @@ export class EngineScene {
   private rotA = 0;
   private rotB = 0;
   private satelliteRoll = 0.4;
+  private workAngle = 0;
+  private workSpeed = sp(0.18);
   private evolutionSeed = Math.floor(Math.random() * 4294967296);
   private coreS = sp(0.2);
   private introK = sp(0);
@@ -756,7 +751,7 @@ export class EngineScene {
       this.pt(s.p, c[0], c[1], c[2], a * 1.1, s.s * (1 - u * 0.5));
       this.pt(sub(s.p, mul(s.v, 0.035)), c[0], c[1], c[2], a * 0.4, s.s * 0.8);
     }
-    // Work loop: processing photons, one per running record (max six per channel).
+    // Work loop: sparse activity samples (up to two per channel), never a full luminous ring.
     const draw = reduced ? 1 : clamp((since - 0.15) / 1.6, 0, 1);
     const prHl =
       this.sel && prCodes.includes(this.sel)
@@ -773,31 +768,33 @@ export class EngineScene {
         const q = loopPt(WORK, (k / segs) * 6.283),
           fr = k / segs;
         const shimmer = 0.75 + 0.25 * Math.sin(fr * 6.283 * 2 - t * 0.6);
-        this.ln(prev, q, ...C_CH, (prS.r ? 0.16 : 0.07) * shimmer * prHl);
+        this.ln(prev, q, ...C_CH, (prS.r ? 0.09 : 0.07) * shimmer * prHl);
         prev = q;
       }
       // Six route ticks on the work loop are markers only, not task positions.
       for (let k = 0; k < 6; k++) {
         const a = (k / 6) * 6.283 + 0.3;
         if (a / 6.283 > draw) continue;
-        this.pt(loopPt(WORK, a), ...C_CH, 0.35 * prHl, 0.045);
+        this.pt(loopPt(WORK, a), ...C_CH, 0.2 * prHl, 0.035);
       }
       if (motion) {
-        let idx = 0;
-        prCodes.forEach((code) => {
-          const v = this.V(code),
-            hl = this.sel ? (this.sel === code ? 1.3 : 0.35) : prHl;
-          const n = particles(v.r, LANE_PARTICLES);
-          for (let k = 0; k < n; k++, idx++) {
-            const a0 = t * 0.32 + idx * 0.61;
-            for (let j = 0; j < 6; j++)
-              this.pt(
-                loopPt(WORK, a0 - j * 0.022),
-                ...mix([1, 0.96, 0.88], C_CH, j / 6),
-                (1 - j / 6) * 0.62 * hl * draw * phK,
-                0.05 - j * 0.004,
-              );
-          }
+        const load = Math.min(1, Math.log1p(prS.r) / Math.log(101));
+        this.workAngle =
+          (this.workAngle + dt * this.spr(this.workSpeed, 0.18 + 0.18 * load, dt, 5)) % (Math.PI * 2);
+        const dots = prCodes.flatMap((code) =>
+          Array.from({ length: particles(this.V(code).r, 2) }, () => code),
+        );
+        dots.forEach((code, idx) => {
+          const hl = this.sel ? (this.sel === code ? 1.3 : 0.35) : prHl;
+          const a0 = this.workAngle + (idx / dots.length) * Math.PI * 2;
+          const pulse = 0.25 + 0.75 * Math.pow((Math.sin(t * 0.75 + idx * 2.4) + 1) / 2, 2);
+          for (let j = 0; j < 3; j++)
+            this.pt(
+              loopPt(WORK, a0 - j * 0.014),
+              ...mix([1, 0.96, 0.88], C_CH, j / 3),
+              (1 - j / 3) * (0.22 + 0.08 * load) * pulse * hl * draw * phK,
+              0.038 - j * 0.007,
+            );
         });
       }
       // Queue motes at the loop entrance: one per queued record, at most ten.

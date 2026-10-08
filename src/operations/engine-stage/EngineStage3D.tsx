@@ -43,7 +43,7 @@ const STAGES: Record<Stage | 'evo', { name: string; sum: string; cap: string; sm
   },
 };
 const LENS: Record<Lens, { name: string; cap: string }> = {
-  r: { name: '执行中', cap: '光子数量对应执行中的记录' },
+  r: { name: '执行中', cap: '光流反映执行活跃度，准确数量见读数' },
   q: { name: '排队', cap: '入口处的光尘对应排队记录，每条一颗，最多 10 颗' },
   w: { name: '等待', cap: '等待资料、决定或部分完成的记录' },
   u: { name: '待核对', cap: '超时或断连后无法确认动作是否已发生的记录' },
