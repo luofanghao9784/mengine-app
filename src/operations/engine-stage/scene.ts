@@ -856,6 +856,8 @@ export class EngineScene {
       for (const side of [-1, 1]) {
         const wingPt = (a: number) =>
           add(sat, add(mul(tangent, Math.cos(a) * 0.14), mul(wing, Math.sin(a) * 0.095 * side)));
+        // One understated wing-tip light makes the symmetric wings' rotation legible.
+        if (side === 1) point(wingPt(1.4), 0.25 + evo.strength * 0.35, 0.022);
         for (let k = 0; k < 24; k++) {
           const a = 0.25 + (k / 24) * 2.35;
           line(wingPt(a), wingPt(a + 2.35 / 24), 0.85);

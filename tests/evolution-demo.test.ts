@@ -40,8 +40,8 @@ test('satellite roll remains continuous and bounded across four hours of scan tr
     const frame = evolutionFrame(i * dt, true, false);
     const next = advanceSatelliteRoll(angle, dt, frame);
     const speed = ((next - angle + tau) % tau) / dt;
-    assert.ok(speed >= 0.08 - 1e-9 && speed <= 0.32 + 1e-9, 'speed stays 4.6–18.3 degrees per second');
-    assert.ok(Math.abs(speed - previousSpeed) <= 0.004, 'no jump at scan or orbit boundaries');
+    assert.ok(speed >= 0.32 - 1e-9 && speed <= 1.05 + 1e-9, 'speed stays 18.3–60.2 degrees per second');
+    assert.ok(Math.abs(speed - previousSpeed) <= 0.016, 'no jump at scan or orbit boundaries');
     assert.ok(next >= 0 && next < tau);
     if (next < angle) wraps++;
     angle = next;
@@ -55,5 +55,13 @@ test('real, reduced and zero-time frames preserve satellite orientation; resume 
   assert.equal(advanceSatelliteRoll(angle, 60, evolutionFrame(12, true, true)), angle);
   assert.equal(advanceSatelliteRoll(angle, 0, evolutionFrame(12, true, false)), angle);
   const resumed = advanceSatelliteRoll(angle, 60, evolutionFrame(12, true, false));
-  assert.ok(resumed > angle && resumed - angle <= 0.32 / 30);
+  assert.ok(resumed > angle && resumed - angle <= 1.05 / 30);
+});
+
+test('scan rotation remains visibly active rather than nearly stationary', () => {
+  let angle = 0;
+  for (let i = 0; i < 5 * 60; i++) {
+    angle = advanceSatelliteRoll(angle, 1 / 60, evolutionFrame(6 + i / 60, true, false));
+  }
+  assert.ok(angle > 5 && angle < 5.3, 'five seconds of scanning rotates about 300 degrees');
 });

@@ -31,6 +31,9 @@ export function advanceSatelliteRoll(
   frame: Pick<ReturnType<typeof evolutionFrame>, 'active' | 'strength'>,
 ) {
   if (!frame.active) return angle;
-  const speed = 0.32 * (1 - Math.max(0, Math.min(1, frame.strength)) * 0.75);
+  const strength = Math.max(0, Math.min(1, frame.strength));
+  const eased = strength * strength * (3 - 2 * strength);
+  // Visible scan rotation, smoothly returning to a quiet patrol spin.
+  const speed = 0.32 + 0.73 * eased;
   return (angle + Math.max(0, Math.min(1 / 30, deltaSeconds)) * speed) % (Math.PI * 2);
 }
