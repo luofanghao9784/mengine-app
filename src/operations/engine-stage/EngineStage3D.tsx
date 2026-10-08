@@ -1,3 +1,4 @@
+import { workBusinesses } from './work-business';
 import type { EvolutionPhase } from './evolution-demo';
 import { useEffect, useRef, useState } from 'react';
 import type {
@@ -96,6 +97,7 @@ export function EngineStage3D({
 }) {
   const [evolutionPhase, setEvolutionPhase] = useState<EvolutionPhase>(demo ? '巡检中' : '待接入');
   const [focus, setFocus] = useState<Focus>(null);
+  const [businessId, setBusinessId] = useState<string | null>(null);
   const [sel, setSel] = useState<TelemetryChannelCode | null>(null);
   const [lens, setLens] = useState<Lens>('r');
   const [tip, setTip] = useState<{ hit: Hit; x: number; y: number } | null>(null);
@@ -107,6 +109,7 @@ export function EngineStage3D({
   const closer = useRef<HTMLButtonElement>(null);
   const labels = useRef<SceneDom['labels']>({});
   const caps = useRef<SceneDom['caps']>({});
+  const workLabels = useRef<SceneDom['workLabels']>({});
   const haloWrap = useRef<HTMLDivElement>(null);
   const halo = useRef<HTMLDivElement>(null);
   const coreNum = useRef<HTMLDivElement>(null);
@@ -114,7 +117,12 @@ export function EngineStage3D({
   const channels = value.channels;
   const byCode = new Map(channels.map((c) => [c.code, c]));
   const stList = (st: Stage) => channels.filter((c) => channelInfo[c.code].stage === st);
-  const focusStage = (st: Stage | 'evo', code: TelemetryChannelCode | null = null) => {
+  const focusStage = (
+    st: Stage | 'evo',
+    code: TelemetryChannelCode | null = null,
+    business: string | null = null,
+  ) => {
+    setBusinessId(business);
     setFocus((was) => {
       if (!was) requestAnimationFrame(() => closer.current?.focus({ preventScroll: true }));
       return st;
@@ -140,6 +148,7 @@ export function EngineStage3D({
         top: top.current!,
         labels: labels.current,
         caps: caps.current,
+        workLabels: workLabels.current,
         haloWrap: haloWrap.current!,
         halo: halo.current!,
         coreNum: coreNum.current!,
@@ -147,7 +156,7 @@ export function EngineStage3D({
       },
       {
         evolution: setEvolutionPhase,
-        pick: (st, code) => latest.current.focusStage(st, code),
+        pick: (st, code, business) => latest.current.focusStage(st, code, business),
         home: () => latest.current.goHome(),
         hover: (hit, x, y) => setTip(hit ? { hit, x, y } : null),
       },
@@ -317,6 +326,37 @@ export function EngineStage3D({
               </button>
             );
           })}
+        {workBusinesses.map((business) => {
+          const counts = sumOf(channels.filter((c) => business.codes.includes(c.code)));
+          return (
+            <button
+              key={business.id}
+              type="button"
+              className="eng3d-business"
+              data-business={business.id}
+              ref={(el) => {
+                if (el) workLabels.current[business.id] = el;
+                else delete workLabels.current[business.id];
+              }}
+              onClick={() => focusStage('pr', null, business.id)}
+              onMouseEnter={() => scene.current?.hoverLabel(business.id)}
+              onMouseLeave={() => scene.current?.hoverLabel(null)}
+              aria-label={`${business.name}，执行中 ${counts.r}，排队 ${counts.q}，查看详情`}
+            >
+              <strong>{business.name}</strong>
+              <span>
+                执行 {n(counts.r)} · 排队 {n(counts.q)}
+              </span>
+              {(counts.w > 0 || counts.u > 0 || counts.f > 0) && (
+                <small>
+                  {counts.w > 0 && `等待 ${n(counts.w)} `}
+                  {counts.u > 0 && `待核对 ${n(counts.u)} `}
+                  {counts.f > 0 && <em>保留异常 {n(counts.f)}</em>}
+                </small>
+              )}
+            </button>
+          );
+        })}
         {(['in', 'pr', 'out', 'evo'] as const).map((st) => (
           <button
             key={st}
@@ -418,12 +458,20 @@ export function EngineStage3D({
       >
         {focus && (
           <Panel
+            businessId={businessId}
             demo={demo}
             evolutionPhase={evolutionPhase}
             focus={focus}
             sel={sel}
             setSel={setSel}
-            list={focus === 'evo' ? [] : stList(focus)}
+            list={
+              focus === 'evo'
+                ? []
+                : stList(focus).filter(
+                    (c) =>
+                      !businessId || workBusinesses.find((b) => b.id === businessId)!.codes.includes(c.code),
+                  )
+            }
             samples={samples}
             close={goHome}
             closer={closer}
@@ -503,12 +551,18 @@ function Tip({
       </>
     );
   } else if (tip?.hit.kind === 'loop' && tip.hit.st === 'pr') {
-    const list = all.filter((c) => channelInfo[c.code].stage === 'pr'),
+    const business = workBusinesses.find(
+      (b) => b.id === (tip.hit.kind === 'loop' ? tip.hit.business : undefined),
+    );
+    const list = all.filter((c) =>
+        business ? business.codes.includes(c.code) : channelInfo[c.code].stage === 'pr',
+      ),
       s = sumOf(list);
     body = (
       <>
         <h3>
-          工作循环<small>处理</small>
+          {business?.name || '工作循环'}
+          <small>处理</small>
         </h3>
         <dl>
           {row('执行中', s.r)}
@@ -564,6 +618,7 @@ function Tip({
 }
 
 function Panel({
+  businessId,
   demo,
   evolutionPhase,
   focus,
@@ -577,6 +632,7 @@ function Panel({
 }: {
   demo: boolean;
   evolutionPhase: EvolutionPhase;
+  businessId: string | null;
   focus: Stage | 'evo';
   sel: TelemetryChannelCode | null;
   setSel: (code: TelemetryChannelCode | null) => void;
@@ -586,7 +642,10 @@ function Panel({
   closer: React.RefObject<HTMLButtonElement | null>;
   hash: string;
 }) {
-  const info = STAGES[focus];
+  const business = workBusinesses.find((b) => b.id === businessId);
+  const info = business
+    ? { ...STAGES[focus], name: business.name, sum: business.description }
+    : STAGES[focus];
   const head = (
     <div className="ph">
       <div>

@@ -1,3 +1,4 @@
+import { workBusinesses } from './work-business';
 import { advanceSatelliteRoll, evolutionFrame, type EvolutionPhase } from './evolution-demo';
 /**
  * 3D engine stage, ported from the confirmed prototype (artifact「梦核引擎仪表盘」3D version, 2026-10-06).
@@ -15,12 +16,13 @@ export type Focus = Stage | 'evo' | null;
 export type Lens = 'r' | 'q' | 'w' | 'u' | 'd' | 'f';
 export type Hit =
   | { kind: 'lane'; st: Stage; code: TelemetryChannelCode }
-  | { kind: 'loop'; st: 'pr' | 'evo' }
+  | { kind: 'loop'; st: 'pr' | 'evo'; business?: string }
   | { kind: 'core' };
 export interface SceneDom {
   top: HTMLElement;
   labels: Partial<Record<TelemetryChannelCode, HTMLElement>>;
   caps: Partial<Record<Stage | 'evo', HTMLElement>>;
+  workLabels: Record<string, HTMLElement>;
   haloWrap: HTMLElement;
   halo: HTMLElement;
   coreNum: HTMLElement;
@@ -28,7 +30,7 @@ export interface SceneDom {
 }
 export interface SceneEvents {
   evolution: (phase: EvolutionPhase) => void;
-  pick: (st: Stage | 'evo', code: TelemetryChannelCode | null) => void;
+  pick: (st: Stage | 'evo', code: TelemetryChannelCode | null, business?: string) => void;
   home: () => void;
   hover: (hit: Hit | null, x: number, y: number) => void;
 }
@@ -263,8 +265,7 @@ export class EngineScene {
   private rotA = 0;
   private rotB = 0;
   private satelliteRoll = 0.4;
-  private workAngle = 0;
-  private workSpeed = sp(0.18);
+  private workCompletions: { id: string; at: number }[] = [];
   private evolutionSeed = Math.floor(Math.random() * 4294967296);
   private coreS = sp(0.2);
   private introK = sp(0);
@@ -326,6 +327,12 @@ export class EngineScene {
     this.codes = next.channels.map((c) => c.code);
     if (changed) this.buildLanes();
     if (this.reduced || prev.size === 0) return;
+    for (const business of workBusinesses) {
+      const completed = next.channels
+        .filter((c) => business.codes.includes(c.code))
+        .reduce((sum, c) => sum + completions(prev.get(c.code), c), 0);
+      if (completed > 0) this.workCompletions.push({ id: business.id, at: this.clock });
+    }
     for (const st of ['pr', 'out'] as const) {
       const n = next.channels
         .filter((c) => channelInfo[c.code].stage === st)
@@ -350,6 +357,7 @@ export class EngineScene {
       this.sparks.length = 0;
       this.rings.length = 0;
       this.bursts.length = 0;
+      this.workCompletions.length = 0;
     }
   }
 
@@ -771,53 +779,43 @@ export class EngineScene {
         this.ln(prev, q, ...C_CH, (prS.r ? 0.09 : 0.07) * shimmer * prHl);
         prev = q;
       }
-      // Six route ticks on the work loop are markers only, not task positions.
-      for (let k = 0; k < 6; k++) {
-        const a = (k / 6) * 6.283 + 0.3;
-        if (a / 6.283 > draw) continue;
-        this.pt(loopPt(WORK, a), ...C_CH, 0.2 * prHl, 0.035);
+      this.workCompletions = this.workCompletions.filter((event) => t - event.at < 1.6);
+      for (const business of workBusinesses) {
+        const counts = this.sum(business.codes);
+        const node = loopPt(WORK, business.angle);
+        const color = counts.u ? ([0.85, 0.77, 0.95] as V3) : counts.f ? C_CO : counts.w ? C_OUT : C_CH;
+        const hl = this.hover === business.id ? 1.35 : prHl;
+        const done = this.workCompletions.find((event) => event.id === business.id);
+        const flash = done ? 1 - (t - done.at) / 1.6 : 0;
+        this.pt(node, ...color, (0.3 + (counts.r ? 0.35 : 0) + flash * 0.2) * hl, 0.055);
+        this.pt(node, ...color, (0.06 + (counts.r ? 0.06 : 0) + flash * 0.08) * hl, 0.19);
+        if (counts.r) {
+          // Continuous activity stays local to this business; it does not travel through other nodes.
+          for (let k = 0; k < 24; k++) {
+            const a = business.angle - 0.16 + (k / 24) * 0.32;
+            const pulse = motion ? 0.7 + 0.3 * Math.cos((a - business.angle) * 24 - t * 1.5) : 0.8;
+            this.ln(loopPt(WORK, a), loopPt(WORK, a + 0.32 / 24), ...C_CH, 0.42 * pulse * hl);
+          }
+          if (motion)
+            for (let k = 0; k < 3; k++) {
+              const a = business.angle - 0.14 + ((t * 0.12 + k * 0.095) % 0.28);
+              this.pt(loopPt(WORK, a), ...C_CH, 0.55 * hl, 0.035);
+            }
+        }
+        // Queue indicators are static, capped; the label carries the exact count.
+        for (let k = 0; k < Math.min(counts.q, 4); k++)
+          this.pt(
+            add(node, [0.07 + (k % 2) * 0.045, -0.07 - Math.floor(k / 2) * 0.045, 0]),
+            ...C_CH,
+            0.35 * hl,
+            0.022,
+          );
+        if (done && motion) {
+          const progress = (t - done.at) / 1.6;
+          const destination = mul(norm(node), 1.08);
+          this.pt(mix(node, destination, progress), ...C_CH, 0.55 * (1 - progress), 0.045);
+        }
       }
-      if (motion) {
-        const load = Math.min(1, Math.log1p(prS.r) / Math.log(101));
-        this.workAngle =
-          (this.workAngle + dt * this.spr(this.workSpeed, 0.18 + 0.18 * load, dt, 5)) % (Math.PI * 2);
-        const dots = prCodes.flatMap((code) =>
-          Array.from({ length: particles(this.V(code).r, 2) }, () => code),
-        );
-        dots.forEach((code, idx) => {
-          const hl = this.sel ? (this.sel === code ? 1.3 : 0.35) : prHl;
-          const a0 = this.workAngle + (idx / dots.length) * Math.PI * 2;
-          const pulse = 0.25 + 0.75 * Math.pow((Math.sin(t * 0.75 + idx * 2.4) + 1) / 2, 2);
-          for (let j = 0; j < 3; j++)
-            this.pt(
-              loopPt(WORK, a0 - j * 0.014),
-              ...mix([1, 0.96, 0.88], C_CH, j / 3),
-              (1 - j / 3) * (0.22 + 0.08 * load) * pulse * hl * draw * phK,
-              0.038 - j * 0.007,
-            );
-        });
-      }
-      // Queue motes at the loop entrance: one per queued record, at most ten.
-      const pq = Math.min(prS.q, BEADS),
-        gate = loopPt(WORK, Math.PI * 1.04);
-      for (let k = 0; k < pq; k++) {
-        const a = k * 2.4 + t * 0.12,
-          r = 0.05 + (0.1 * ((k * 7) % 5)) / 5;
-        this.pt(
-          add(gate, [Math.cos(a) * r, Math.sin(a * 1.3) * r, Math.sin(a) * r * 0.5]),
-          ...C_CH,
-          0.3 * prHl * draw * gateK,
-          0.032 * (gateK > 1 ? 1.4 : 1),
-        );
-      }
-      if (prS.f)
-        this.pt(
-          loopPt(WORK, Math.PI * 1.1),
-          ...C_CO,
-          this.lens === 'f' ? 0.8 : 0.35,
-          this.lens === 'f' ? 0.2 : 0.09,
-        );
-      if (this.lens === 'u' && prS.u) this.pt(loopPt(WORK, Math.PI * 0.9), 0.85, 0.77, 0.95, 0.75, 0.18);
     }
     // Patrol satellite: parked in real mode; repair choreography is demo-only.
     {
@@ -1124,6 +1122,26 @@ export class EngineScene {
         clamp(s.y - h / 2, topY, H - h - (st === 'evo' && this.portrait ? 90 : 64)),
       );
     }
+    for (const business of workBusinesses) {
+      const el = dom.workLabels[business.id];
+      if (!el) continue;
+      const p = this.proj(VP, loopPt(WORK, business.angle));
+      const x = clamp(p.x - el.offsetWidth / 2, 12, W - el.offsetWidth - 12);
+      let y = clamp(p.y + 16, topY, H - el.offsetHeight - 130);
+      // Keep business labels clear of the fixed input/processing/output legend.
+      if (
+        !this.portrait &&
+        x < W / 2 + 110 &&
+        x + el.offsetWidth > W / 2 - 110 &&
+        y < H * 0.69 + 44 &&
+        y + el.offsetHeight > H * 0.69
+      )
+        y = H * 0.69 + 54;
+      el.style.transform = `translate3d(${x}px,${y}px,0)`;
+      el.style.opacity = focus ? '0' : '1';
+      el.style.pointerEvents = focus ? 'none' : 'auto';
+      el.inert = !!focus;
+    }
     const c0 = this.proj(VP, [0, 0, 0]),
       c1 = this.proj(VP, [1.12, 0, 0]);
     const rad = Math.max(40, Math.hypot(c1.x - c0.x, c1.y - c0.y));
@@ -1164,6 +1182,10 @@ export class EngineScene {
     });
     const lp = (L: { u: V3; v: V3 }) => Array.from({ length: 80 }, (_, i) => loopPt(L, (i / 80) * 6.283));
     near(lp(WORK), { kind: 'loop', st: 'pr' });
+    for (const business of workBusinesses) {
+      const node = this.proj(VP, loopPt(WORK, business.angle));
+      if (Math.hypot(node.x - x, node.y - y) < 16) return { kind: 'loop', st: 'pr', business: business.id };
+    }
     near(lp(IMPROVE), { kind: 'loop', st: 'evo' });
     const sat = this.proj(VP, this.satellite),
       center = this.proj(VP, [0, 0, 0]);
@@ -1210,12 +1232,12 @@ export class EngineScene {
     const h = this.hitTest(e);
     if (h) {
       if (h.kind === 'core') return;
-      this.events.pick(h.st, h.kind === 'lane' ? h.code : null);
+      this.events.pick(h.st, h.kind === 'lane' ? h.code : null, h.kind === 'loop' ? h.business : undefined);
     } else if (this.focus) this.events.home();
   };
   private onLeave = () => this.setHover(null, 0, 0);
   private setHover(h: Hit | null, x: number, y: number) {
-    this.hover = !h ? null : h.kind === 'lane' ? h.code : h.kind === 'loop' ? h.st : null;
+    this.hover = !h ? null : h.kind === 'lane' ? h.code : h.kind === 'loop' ? h.business || h.st : null;
     this.canvas.style.cursor = !h ? '' : h.kind === 'core' ? 'grab' : 'pointer';
     this.events.hover(h, x, y);
   }

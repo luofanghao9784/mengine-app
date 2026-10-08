@@ -846,3 +846,24 @@
 }
 
 .eng3d[data-focus] .eng3d-mix { opacity: 0; }
+
+.eng3d-business {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 3;
+  padding: 5px 9px;
+  border: 0;
+  border-radius: 8px;
+  background: rgb(11 10 9 / 30%);
+  text-align: center;
+  cursor: pointer;
+  color: var(--ash);
+  text-shadow: 0 1px 5px #000;
+  white-space: nowrap;
+}
+.eng3d-business strong { display: block; color: var(--champagne); font-weight: 400; font-size: 12px; letter-spacing: .1em; }
+.eng3d-business span, .eng3d-business small { display: block; margin-top: 4px; font-size: 10px; }
+.eng3d-business em { color: var(--coral); font-style: normal; }
+.eng3d-business:hover { background: rgb(241 214 160 / 8%); }
+.eng3d-business:focus-visible { outline: 1px solid var(--champagne); outline-offset: 3px; }
