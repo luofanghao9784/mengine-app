@@ -1,4 +1,4 @@
-import { evolutionFrame, type EvolutionPhase } from './evolution-demo';
+import { advanceSatelliteRoll, evolutionFrame, type EvolutionPhase } from './evolution-demo';
 /**
  * 3D engine stage, ported from the confirmed prototype (artifact「梦核引擎仪表盘」3D version, 2026-10-06).
  * Production rules: every photon, gate mote and burst comes from a real snapshot; ambient structure
@@ -269,6 +269,7 @@ export class EngineScene {
   private my = 0;
   private rotA = 0;
   private rotB = 0;
+  private satelliteRoll = 0.4;
   private coreS = sp(0.2);
   private introK = sp(0);
   private clock = 0;
@@ -848,7 +849,7 @@ export class EngineScene {
       const tangent = norm(sub(loopPt(IMPROVE, evo.angle + 0.01), sat));
       const radial = norm(sat),
         normal = norm(cross(tangent, radial));
-      const roll = evo.active ? t * 0.32 * (1 - evo.strength * 0.75) : 0.4;
+      const roll = (this.satelliteRoll = advanceSatelliteRoll(this.satelliteRoll, dt, evo));
       const wing = add(mul(radial, Math.cos(roll)), mul(normal, Math.sin(roll)));
       point(sat, 1.05, 0.06);
       point(sat, 0.18 + evo.strength * 0.08, 0.19);

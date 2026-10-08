@@ -23,3 +23,14 @@ export function evolutionFrame(seconds: number, demo: boolean, reduced: boolean)
     active && cycle >= 4 && cycle < 13 ? Math.min(1, (cycle - 4) / 1.2, (13 - cycle) / 1.5) : 0;
   return { active, phase, cycle, angle, strength, repair: Math.min(1, Math.max(0, (cycle - 6) / 5)) };
 }
+
+/** Integrate angular velocity; scan transitions must never scale elapsed time. */
+export function advanceSatelliteRoll(
+  angle: number,
+  deltaSeconds: number,
+  frame: Pick<ReturnType<typeof evolutionFrame>, 'active' | 'strength'>,
+) {
+  if (!frame.active) return angle;
+  const speed = 0.32 * (1 - Math.max(0, Math.min(1, frame.strength)) * 0.75);
+  return (angle + Math.max(0, Math.min(1 / 30, deltaSeconds)) * speed) % (Math.PI * 2);
+}
