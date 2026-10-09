@@ -1,4 +1,4 @@
-# Internal review deployment; authentication applies to the entire HTTPS site.
+# Public website preview; product, login and API routes retain the internal access gate.
 server {
  listen 80;
  server_name ai.9pop.top;
@@ -37,7 +37,13 @@ server {
  location /tenant-admin/ { root /var/www/dreamcore-app-check-20261010; try_files $uri $uri/ /tenant-admin/index.html; }
  location /platform-admin/ { root /var/www/dreamcore-app-check-20261010; try_files $uri $uri/ /platform-admin/index.html; }
  location /assets/ { root /var/www/dreamcore-app-check-20261010; try_files $uri =404; }
+ location = / { auth_basic off; try_files /index.html =404; }
+ location = /index.html { auth_basic off; try_files $uri =404; }
+ location = /favicon.svg { auth_basic off; try_files $uri =404; }
+ location = /news-cover.svg { auth_basic off; try_files $uri =404; }
+ location /website-assets/ { auth_basic off; try_files $uri =404; }
  location /demo/ {
+  auth_basic off;
   if ($http_sec_fetch_dest != iframe) { return 404; }
   add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'none'; frame-ancestors 'self'; form-action 'none'; base-uri 'self'" always;
   add_header X-Robots-Tag "noindex, nofollow, noarchive" always;

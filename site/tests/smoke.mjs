@@ -17,7 +17,15 @@ try{
  assert.equal(await page.evaluate(()=>sessionStorage.getItem('dreamcore:document:real-synthetic-user:tenant:draft')),'must-survive');
  assert.equal(await page.evaluate(()=>localStorage.getItem('dreamcore:synthetic-guard')),'must-survive');
  const figures=page.locator('figure.client-frame');const count=await figures.count();
- for(let i=0;i<count;i++){await figures.nth(i).scrollIntoViewIfNeeded();await figures.nth(i).locator('iframe').waitFor();}
+ for(let i=0;i<count;i++){
+  await figures.nth(i).scrollIntoViewIfNeeded();
+  const iframe=figures.nth(i).locator('iframe');await iframe.waitFor({timeout:15000});
+  const frame=await (await iframe.elementHandle()).contentFrame();
+  await frame.waitForFunction(()=>document.querySelector('#root')?.children.length>0,{},{timeout:15000});
+  await frame.waitForLoadState('networkidle');
+  assert.deepEqual(await frame.evaluate(()=>window.__unmocked||[]),[]);
+  assert.ok((await frame.locator('body').innerText()).length>100);
+ }
  await page.waitForLoadState('networkidle');
  const missing=[];for(const frame of page.frames().slice(1))missing.push(...await frame.evaluate(()=>window.__unmocked||[]));
  assert.deepEqual(missing,[]);assert.deepEqual(errors,[]);assert.deepEqual(api,[]);assert.deepEqual(external,[]);

@@ -233,6 +233,8 @@ function answer(method: string, url: URL): unknown {
         canConfigure: false, canAcceptInitialResponsibility: false, canEnterManagement: false,
         capabilities: [], pendingHandover: null };
     else if (path.includes('/conversation-attachments/drafts/')) json = { conversation: null };
+    else if (path.includes('/conversations/') && path.endsWith('/attachments')) json = [];
+    else if (path.includes('/conversations/') && path.endsWith('/answer-snapshot')) json = { items: [] };
     else if (path.endsWith('/business-status'))
       json = { tenantId: tenant, businessEnabled: true, canExport: false, exitState: null, exportDeadline: null };
     else if (briefTasks.some((t) => path.endsWith('/tasks/' + t))) {
