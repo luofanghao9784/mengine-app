@@ -104,11 +104,13 @@
   font-variant-numeric: lining-nums tabular-nums;
 }
 
-/* 主要按钮：品牌蓝实底；其余按钮保持中性。 */
-:root[data-surface] .admin-control:not(.admin-engine-fullscreen) .button.primary {
+/* 主要按钮：品牌蓝实底；其余按钮保持中性。
+ * 标签页由 aria-selected 和下划线表达选中状态，不套用操作按钮的底色和阴影。
+ */
+:root[data-surface] .admin-control:not(.admin-engine-fullscreen) .button.primary:not([role='tab']) {
   background: var(--accent);
   box-shadow: 0 4px 12px rgb(63 99 201 / 22%);
 }
-:root[data-surface] .admin-control:not(.admin-engine-fullscreen) .button:not(.primary, .ghost) {
+:root[data-surface] .admin-control:not(.admin-engine-fullscreen) .button:not(.primary, .ghost, [role='tab']) {
   background: rgb(255 253 249 / 80%);
 }

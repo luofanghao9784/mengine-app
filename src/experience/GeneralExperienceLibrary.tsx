@@ -93,6 +93,7 @@ export function GeneralExperienceLibrary({
   return (
     <div className="admin-dashboard experience-management">
       <PageActions>{refreshControl}</PageActions>
+      {/* 标签保持中性按钮样式，选中效果统一由 aria-selected 驱动。 */}
       {!tenant && (
         <div
           className="experience-management-tabs experience-library-tabs"
@@ -103,7 +104,7 @@ export function GeneralExperienceLibrary({
             role="tab"
             disabled={locked}
             aria-selected={!processing}
-            variant={!processing ? 'primary' : 'ghost'}
+            variant="ghost"
             onClick={() => setTab('content')}
           >
             经验内容
@@ -112,7 +113,7 @@ export function GeneralExperienceLibrary({
             role="tab"
             disabled={locked}
             aria-selected={processing}
-            variant={processing ? 'primary' : 'ghost'}
+            variant="ghost"
             onClick={() => setTab('processing')}
           >
             积累与改进
