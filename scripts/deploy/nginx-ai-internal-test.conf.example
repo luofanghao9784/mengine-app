@@ -1,4 +1,4 @@
-# Public website preview; product, login and API routes retain the internal access gate.
+# Website and login are public; application sessions enforce product access.
 server {
  listen 80;
  server_name ai.9pop.top;
@@ -10,8 +10,7 @@ server {
  server_name ai.9pop.top;
  ssl_certificate /etc/letsencrypt/live/ai.9pop.top/fullchain.pem;
  ssl_certificate_key /etc/letsencrypt/live/ai.9pop.top/privkey.pem;
- auth_basic "Mengine Internal Test";
- auth_basic_user_file /etc/nginx/dreamcore-internal.htpasswd;
+ auth_basic off;
  root /var/www/dreamcore-site-20261010;
  index index.html;
  client_max_body_size 65m;
