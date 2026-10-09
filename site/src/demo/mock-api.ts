@@ -228,7 +228,12 @@ function answer(method: string, url: URL): unknown {
           canMaintain: true,
         })),
       };
-    } else if (path.endsWith('/business-status'))
+    } else if (path.endsWith('/governance'))
+      json = { tenantId: tenant, ownerId: null, ownerName: null, revision: 0, owner: false,
+        canConfigure: false, canAcceptInitialResponsibility: false, canEnterManagement: false,
+        capabilities: [], pendingHandover: null };
+    else if (path.includes('/conversation-attachments/drafts/')) json = { conversation: null };
+    else if (path.endsWith('/business-status'))
       json = { tenantId: tenant, businessEnabled: true, canExport: false, exitState: null, exportDeadline: null };
     else if (briefTasks.some((t) => path.endsWith('/tasks/' + t))) {
       const id = briefTasks.find((t) => path.endsWith('/tasks/' + t))!;

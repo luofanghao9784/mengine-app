@@ -5,8 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5180",
-    "build": "tsc --noEmit && vite build",
-    "preview": "vite preview --host 127.0.0.1 --port 5181"
+    "build": "tsc -p tsconfig.integration.json && vite build",
+    "preview": "vite preview --host 127.0.0.1 --port 5181",
+    "test:types": "tsc -p tsconfig.integration.json",
+    "test:auth": "node --experimental-strip-types --test tests/auth.test.ts",
+    "test:smoke": "node tests/smoke.mjs"
   },
   "dependencies": {
     "@fontsource/cormorant-garamond": "^5.3.0",

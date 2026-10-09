@@ -14,6 +14,7 @@ export default defineConfig({
   },
   server: { fs: { allow: ['..'] } },
   build: {
+    assetsDir: 'website-assets',
     rollupOptions: { input: ['index.html', 'demo/index.html', 'login/index.html', 'login/admin.html', 'login/platform.html'] },
   },
 });

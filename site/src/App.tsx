@@ -469,7 +469,7 @@ export function App() {
             <p>从一份资料、一个问题、一项真实任务开始。</p>
             <a className="btn gold big" href="#top">回到开头</a>
           </div>
-          <p className="legal">© 2026 岚云智能 · Mengine 梦核引擎 · Mengine Workspace 梦擎工作空间<span>公司全称、联系方式与备案信息待补</span></p>
+          <p className="legal">© 2026 贵州岚云智能科技有限公司 · Mengine 梦核引擎 · Mengine Workspace 梦擎工作空间<span>联系电话：18586861020 · 暂未备案，仅供内部测试</span></p>
         </footer>
       </div>
     </>
