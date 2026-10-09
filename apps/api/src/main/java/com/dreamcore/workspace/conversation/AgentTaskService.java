@@ -17,6 +17,7 @@ public class AgentTaskService {
     private final JdbcTemplate db;private final ConversationService conversations;private final KnowledgeService knowledge;private final AgentSettings settings;
     private final org.springframework.transaction.support.TransactionTemplate transactions;private final IdentityAudit audit;
     private final DatasetCalculationService datasets;private final TableCalculationService tables;private final BriefingContentService briefings;
+    @org.springframework.beans.factory.annotation.Autowired private com.dreamcore.workspace.briefing.BriefingFlowGuard briefingFlow;
     private final TaskOriginals originals;private final AgentUsageLedger usage;private final TaskContextGuard contextGuard;
     private final com.dreamcore.workspace.preferences.ExpressionPreferences expressionPreferences;private final com.dreamcore.workspace.preferences.ExpressionRuleBooks expressionRuleBooks;
     @org.springframework.beans.factory.annotation.Autowired private com.dreamcore.workspace.news.NewsSourceCatalog newsCatalog;
@@ -265,7 +266,9 @@ public class AgentTaskService {
         String waitReason="WAITING_INPUT".equals(state)?"INPUT_REQUIRED":"WAITING_CAPABILITY".equals(state)?"CAPABILITY_UNAVAILABLE":null;
         db.update("UPDATE conversation_tasks SET status=?,wait_reason=?,required_input=?,revision=revision+1,reply=?,model_name=?,model_calls=?,token_usage=CAST(? AS jsonb),tool_receipts=CAST(? AS jsonb),engine_version=?,web_sources=CAST(? AS jsonb),skills=CAST(? AS jsonb),lease_token=NULL,lease_until=NULL,finished_at=now() WHERE id=?",state,waitReason,r.requiredInput(),r.text(),r.modelName(),r.modelCalls(),json.writeValueAsString(r.usage()),json.writeValueAsString(r.tools()),r.engineVersion(),json.writeValueAsString(r.webSources()),json.writeValueAsString(r.skills()),job.id());
         if("SUCCEEDED".equals(state)&&db.queryForObject("SELECT EXISTS(SELECT 1 FROM briefing_generation_batches WHERE task_id=? AND business_type='INFO')",Boolean.class,job.id()))for(var source:r.webSources())if("PAGE".equals(source.kind()))db.update("INSERT INTO news_article_deliveries(tenant_id,owner_id,url,sha256,task_id,published_at,retrieved_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT DO NOTHING",job.tenant(),job.actor(),source.url(),source.sha256(),job.id(),source.publishedAt()==null?null:java.sql.Timestamp.from(source.publishedAt()),java.sql.Timestamp.from(source.retrievedAt()));
-        conversations.archive(job.id());usage.terminal(job.id(),job.token(),state);
+        conversations.archive(job.id());
+        if("SUCCEEDED".equals(state)&&briefingFlow!=null)briefingFlow.retain(job.id());
+        usage.terminal(job.id(),job.token(),state);
         int revision=db.queryForObject("SELECT revision FROM conversation_tasks WHERE id=?",Integer.class,job.id());conversations.event(job.tenant(),job.space(),job.conversation(),job.id(),state,revision);audit.record(job.actor(),job.tenant(),state.equals("SUCCEEDED")?"TASK_COMPLETE":"TASK_"+state,job.id(),"SUCCESS");
     }
     private void validateResearch(ConversationService.Job job,AgentResult result){

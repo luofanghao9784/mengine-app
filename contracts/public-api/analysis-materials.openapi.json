@@ -1,0 +1,239 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Private calculation material pool",
+    "version": "0.1.0",
+    "description": "Disabled unless ANALYSIS_MATERIAL_API_ENABLED=true. Only the originating task owner can retain/read registered server calculations from completed readable tasks. No automatic collection, model tool, enterprise execution identity or publication is enabled. Artifact identity is the idempotency key; retries never extend validity."
+  },
+  "security": [
+    {
+      "sessionCookie": []
+    }
+  ],
+  "paths": {
+    "/api/v1/tenants/{tenant}/analysis-materials": {
+      "post": {
+        "operationId": "retainCalculationMaterial",
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Retain"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Private immutable evidence; CURRENT only means unchanged against latest available snapshot. The internal consumer must additionally enforce its required business coverage cutoff.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Version"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "403": {
+            "description": "Inactive membership, tenant, or missing CSRF token"
+          },
+          "404": {
+            "description": "Unavailable or inaccessible private evidence"
+          },
+          "409": {
+            "description": "Version or business scope conflict"
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/analysis-materials/{material}/versions/{number}": {
+      "get": {
+        "operationId": "readCalculationMaterialHistory",
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "material",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Private immutable evidence; CURRENT only means unchanged against latest available snapshot. The internal consumer must additionally enforce its required business coverage cutoff.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Version"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "403": {
+            "description": "Inactive membership, tenant, or missing CSRF token"
+          },
+          "404": {
+            "description": "Unavailable or inaccessible private evidence"
+          },
+          "409": {
+            "description": "Version or business scope conflict"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "SESSION"
+      }
+    },
+    "schemas": {
+      "Version": {
+        "type": "object",
+        "required": [
+          "materialId",
+          "versionId",
+          "number",
+          "state",
+          "generatedAt",
+          "validUntil",
+          "checkedAt",
+          "coverageThrough",
+          "observedSnapshotId",
+          "content"
+        ],
+        "properties": {
+          "materialId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "versionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "CURRENT",
+              "STALE",
+              "EXPIRED",
+              "SUPERSEDED"
+            ]
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "validUntil": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "coverageThrough": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "observedSnapshotId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "content": {
+            "type": "object",
+            "description": "Exact existing server computation artifact with datasetSource and calculation; no model-authored payload is accepted."
+          }
+        }
+      },
+      "Retain": {
+        "type": "object",
+        "required": [
+          "artifactId",
+          "materialId",
+          "expectedVersion",
+          "validUntil"
+        ],
+        "properties": {
+          "artifactId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "materialId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "validUntil": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Explicit bounded validity, future and no later than 31 days after actual computation. Cannot assert business data freshness."
+          }
+        }
+      }
+    }
+  }
+}

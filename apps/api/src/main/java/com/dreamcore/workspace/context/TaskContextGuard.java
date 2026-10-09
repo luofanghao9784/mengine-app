@@ -8,10 +8,12 @@ import org.springframework.stereotype.Service;
 /** No dependency on task services: suitable for both callbacks and the final commit fence. */
 @Service
 public class TaskContextGuard {
+ @org.springframework.beans.factory.annotation.Autowired private com.dreamcore.workspace.briefing.BriefingFlowGuard briefingFlow;
  private final JdbcTemplate db;
  public TaskContextGuard(JdbcTemplate db){this.db=db;}
  @org.springframework.transaction.annotation.Transactional
  public void requireCurrent(UUID task){
+  if(briefingFlow!=null)briefingFlow.requireCurrent(task);
   // Serialize tenant future-use changes even while the default usage row does not exist.
   db.queryForList("SELECT pg_advisory_xact_lock_shared(hashtextextended('general-use:'||tenant_id::text,0)) FROM conversation_tasks WHERE id=?",task);
   // Fence a simultaneous revision/publication through the caller's transaction, including final commit.

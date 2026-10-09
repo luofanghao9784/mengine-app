@@ -127,3 +127,8 @@ test('DATA briefing calculator cannot mistake a summary receipt for a two-period
  assert.deepEqual(tool.parameters.properties.operation.enum,['COMPARE']);
  await assert.rejects(tool.execute({operation:'SUMMARY'},new AbortController().signal),{code:'INVALID_TOOL_ARGUMENTS'});
 });
+
+test('mixed summary/comparison arguments return actionable hints without echoing business values',async()=>{
+ const tool=datasetComparisonTool({allowSummary:true,authorize:async()=>{},invoke:async()=>{throw Error('must not invoke');}});
+ await assert.rejects(tool.execute({...request,operation:'SUMMARY',groupColumns:['private-header']},new AbortController().signal),e=>e.code==='INVALID_TOOL_ARGUMENTS'&&e.hint.includes('OMIT')&&!e.hint.includes('private-header'));
+});

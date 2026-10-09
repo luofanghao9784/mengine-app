@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bound deployment collector: four 9POP business archives, one read-only snapshot."""
+"""Bound deployment collector: approved 9POP business archives, one read-only snapshot."""
 import json
 import os
 from pathlib import Path
@@ -7,6 +7,7 @@ import re
 import subprocess
 import sys
 import uuid
+from business_catalog import DEFINITIONS as BUSINESS_DEFINITIONS
 
 DEFINITIONS = {
  'ninepop_orders_v1': ('订单明细', '财务', ['订单ID','会员ID','会员姓名','门店','课程','支付方案','订单状态','应收阶段','订单金额（分）','已付金额（分）','当前应收（分）','创建时间','确认时间','删除时间'], "SELECT f.id,f.member_id,m.name,s.name,f.course_name,f.payment_method,f.order_status,f.receivable_stage,f.total_amount_cents,f.paid_amount_cents,f.current_receivable_amount_cents,f.created_at,f.confirmed_at,f.deleted_at FROM full_orders f LEFT JOIN members m ON m.id=f.member_id LEFT JOIN stores s ON s.id=f.store_id ORDER BY f.created_at,f.id"),
@@ -14,6 +15,7 @@ DEFINITIONS = {
  'ninepop_members_v1': ('会员档案', '运营', ['会员ID','会员姓名','门店','主教练','销售教练','会员状态','档案类型','共创会员','创建时间','更新时间'], "SELECT m.id,m.name,s.name,c.name,sc.name,m.status,m.profile_type,m.is_co_create,m.created_at,m.updated_at FROM members m LEFT JOIN stores s ON s.id=m.store_id LEFT JOIN coaches c ON c.id=m.main_coach_id LEFT JOIN coaches sc ON sc.id=m.sales_coach_id ORDER BY m.created_at,m.id"),
  'ninepop_sessions_v1': ('课时明细', '运营', ['课时ID','会员ID','会员姓名','会员课程ID','归属门店','授课门店','教练','课程时间','营业日期','课时状态','有效状态','来源','作废时间'], "SELECT r.id,r.member_id,m.name,r.member_course_id,s.name,ts.name,c.name,r.session_datetime,r.business_date,r.status,r.effective_status,r.source_type,r.voided_at FROM session_records r LEFT JOIN members m ON m.id=r.member_id LEFT JOIN stores s ON s.id=r.home_store_id LEFT JOIN stores ts ON ts.id=r.teaching_store_id LEFT JOIN coaches c ON c.id=r.coach_id ORDER BY r.session_datetime,r.id")
 }
+DEFINITIONS.update(BUSINESS_DEFINITIONS)
 MAX_BYTES = 20 * 1024 * 1024
 MAX_CELLS = 1000000
 
@@ -58,6 +60,7 @@ def validate(request, config):
         uuid.UUID(config[key])
     uuid.UUID(request['runId'])
     if set(config['datasetIds']) != set(DEFINITIONS): raise ValueError('definitions')
+    if len(set(config['datasetIds'].values())) != len(DEFINITIONS): raise ValueError('duplicate identities')
     expected = {key: {'id': config['datasetIds'][key], 'key': key, 'columns': value[2]} for key,value in DEFINITIONS.items()}
     for value in expected.values(): uuid.UUID(value['id'])
     datasets=request.get('datasets')

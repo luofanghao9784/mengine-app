@@ -19,7 +19,8 @@ export function ComparisonVisual({
       ? [...chart.rows].sort((a, b) => compareDecimal(b.current, a.current))
       : chart.rows;
   const rows = compact ? all.slice(0, style === 'TABLE' ? 4 : 6) : all;
-  const missingGroups = all.filter((r) => r.baseline === null || r.current === null).length;
+  const summary = document.content.datasetBasis?.periodMode === 'SUMMARY';
+  const missingGroups = summary ? 0 : all.filter((r) => r.baseline === null || r.current === null).length;
   const field = style === 'DELTA_BAR' ? 'difference' : 'current';
   const numeric = (raw: string | null) => Number(displayAmount(raw, chart.unit) ?? 0);
   const exact = (raw: string | null) => formatBriefingNumber(displayAmount(raw, chart.unit));
@@ -124,7 +125,7 @@ export function ComparisonVisual({
         </small>
       )}
       <small className="briefing-comparison-scope">
-        {chart.metric} · {chart.range} · 缺失不记零
+        {chart.metric} · {chart.range} · {summary ? '按分组汇总' : '缺失不记零'}
       </small>
     </div>
   );

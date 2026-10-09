@@ -131,3 +131,16 @@ test('text insight may cite a dataset snapshot without claiming a calculation', 
 test('rule version provenance validates metadata and keeps legacy cards readable',()=>{
  const doc=JSON.parse(readFileSync(new URL('../contracts/fixtures/dataset-briefing.json',import.meta.url),'utf8'));assert.ok(isBriefingDocument(doc));doc.ruleTrace={status:'RECORDED',versions:[{source:'GLOBAL',target:'BRIEFING',revision:1}]};assert.ok(isBriefingDocument(doc));doc.ruleTrace.versions[0].revision=0;assert.equal(isBriefingDocument(doc),false);doc.ruleTrace={status:'NOT_RECORDED',versions:[]};assert.ok(isBriefingDocument(doc));
 });
+
+test('summary evidence accepts a single series without invented baseline or growth', () => {
+  const value = JSON.parse(readFileSync(new URL('../contracts/fixtures/dataset-briefing.json', import.meta.url), 'utf8'));
+  value.content.datasetBasis.periodMode = 'SUMMARY';
+  value.content.datasetBasis.periodColumn = '不适用';
+  value.content.chart.baseline = '不适用';
+  value.content.chart.current = '本次汇总';
+  for (const row of [...value.content.chart.rows, value.content.chart.totals]) {
+    row.baseline = row.difference = row.changePercent = row.baselineRank = row.currentRank = row.issue = null;
+  }
+  value.content.presentation = {version:'briefing-presentation-v1',layout:'EDITORIAL',chartStyle:'CURRENT_BAR',focusGroup:null,focusValue:null,sections:[]};
+  assert.ok(isBriefingDocument(value));
+});

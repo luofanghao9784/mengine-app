@@ -46,6 +46,7 @@ export function DataBriefing({
 }) {
   const c = document.content,
     ch = c.chart;
+  const summary = c.datasetBasis?.periodMode === 'SUMMARY';
   const amount = (raw: string | null) => value(displayAmount(raw, ch?.unit ?? ''));
   if (!ch)
     return (
@@ -91,36 +92,34 @@ export function DataBriefing({
         <>
           <AnalysisComposition document={document} />
           <details className="data-briefing-table">
-            <summary>查看完整对比数据</summary>
+            <summary>{summary ? '查看完整汇总数据' : '查看完整对比数据'}</summary>
             <div className="data-table-scroll">
               <table>
                 <thead>
                   <tr>
                     <th>门店 / 分组{ch.unit === '分' ? '（金额：元）' : ''}</th>
-                    <th>{ch.baseline}</th>
+                    {!summary && <th>{ch.baseline}</th>}
                     <th>{ch.current}</th>
-                    <th>差额</th>
-                    <th>变化率</th>
-                    <th>排名变化</th>
+                    {!summary && <><th>差额</th><th>变化率</th><th>排名变化</th></>}
                   </tr>
                 </thead>
                 <tbody>
                   {[...ch.rows, { ...ch.totals, group: '总计' }].map((r) => (
                     <tr key={r.group}>
                       <th>{r.group}</th>
-                      <td>{amount(r.baseline)}</td>
+                      {!summary && <td>{amount(r.baseline)}</td>}
                       <td>{amount(r.current)}</td>
-                      <td>{amount(r.difference)}</td>
+                      {!summary && <><td>{amount(r.difference)}</td>
                       <td>{r.changePercent === null ? '不可计算' : value(r.changePercent) + '%'}</td>
                       <td>
                         {r.baselineRank === null ? '—' : `${r.baselineRank} → ${r.currentRank ?? '缺数据'}`}
-                      </td>
+                      </td></>}
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            <p>缺失期间不记为零；非正基期不计算变化率；并列采用相同名次。</p>
+            <p>{summary ? '汇总使用完整固定快照内符合筛选条件的记录，无对照期间，不计算变化率。' : '缺失期间不记为零；非正基期不计算变化率；并列采用相同名次。'}</p>
           </details>
           <ReadingEvidence
             title="统计口径与计算依据"
@@ -145,8 +144,8 @@ export function DataBriefing({
                   统计指标：{ch.metric}。
                 </p>
                 <p>
-                  纳入比较 {c.datasetBasis?.matchedRows} 行，其他期间 {c.datasetBasis?.ignoredRows}{' '}
-                  行不纳入比较。读取范围为完整固定快照，快照本身不证明外部业务数据完整。
+                  纳入{summary ? '汇总' : '比较'} {c.datasetBasis?.matchedRows} 行，筛选排除 {c.datasetBasis?.ignoredRows}{' '}
+                  行。读取范围为完整固定快照，快照本身不证明外部业务数据完整。
                 </p>
               </>
             ) : (

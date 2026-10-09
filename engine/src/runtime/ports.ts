@@ -44,7 +44,7 @@ export interface RuntimeResult {
   finalResponseReserved?: boolean;
 }
 export class RuntimeError extends Error {
-  constructor(readonly code: string) {
+  constructor(readonly code: string, readonly hint?: string) {
     super(code);
   }
 }

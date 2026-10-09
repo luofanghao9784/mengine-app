@@ -1,5 +1,4 @@
 import { BRIEFING_ANALYSIS_ARRAY_HINT, BRIEFING_EDITORIAL_HINTS } from './briefing-delivery.js';
-import { ContextRequestError } from './task-context.js';
 import type { RealtimePort } from './realtime.js';
 import { randomUUID } from 'node:crypto';
 import { Context } from '@deepseek-ai/cordis';
@@ -475,7 +474,7 @@ export async function runHarness(options: {
                     ? ` ${BRIEFING_ANALYSIS_ARRAY_HINT}` : '';
                   throw new Error(`${code}: ${validationIssues.join('; ')}${correction} Correct these fields before retrying; do not repeat the same invalid submission.`);
                 }
-                throw new Error(error instanceof ContextRequestError ? `${code}: ${error.hint}` : BRIEFING_EDITORIAL_HINTS[code] ? `${code}: ${BRIEFING_EDITORIAL_HINTS[code]}` : code);
+                throw new Error(error instanceof RuntimeError && error.hint ? `${code}: ${error.hint}` : BRIEFING_EDITORIAL_HINTS[code] ? `${code}: ${BRIEFING_EDITORIAL_HINTS[code]}` : code);
               }
             },
           });

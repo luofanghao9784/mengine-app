@@ -85,7 +85,7 @@ def available(port):
 
 
 def clean_environment():
-    prefixes = ('SPRING_', 'DATABASE_', 'INVITATION_', 'PHONE_', 'BOOTSTRAP_', 'API_', 'ENGINE_', 'SERVER_', 'MANAGEMENT_', 'DREAMCORE_', 'MATERIAL_', 'BACKUP_', 'OPERATIONS_', 'KNOWLEDGE_', 'TASK_', 'AGENT_', 'PLATFORM_', 'COMPANY_', 'COLLECTION_', 'EXPERIENCE_', 'GENERAL_EXPERIENCE_', 'BRIEFING_', 'ONGOING_', 'PG')
+    prefixes = ('SPRING_', 'DATABASE_', 'INVITATION_', 'PHONE_', 'BOOTSTRAP_', 'API_', 'ENGINE_', 'SERVER_', 'MANAGEMENT_', 'DREAMCORE_', 'MATERIAL_', 'BACKUP_', 'OPERATIONS_', 'KNOWLEDGE_', 'TASK_', 'AGENT_', 'PLATFORM_', 'COMPANY_', 'COLLECTION_', 'EXPERIENCE_', 'GENERAL_EXPERIENCE_', 'BRIEFING_', 'ONGOING_', 'ANALYSIS_', 'PG')
     return {k: v for k, v in os.environ.items() if not k.startswith(prefixes) and k not in ('JAVA_TOOL_OPTIONS', 'JDK_JAVA_OPTIONS')}
 
 
@@ -264,9 +264,51 @@ def collection_environment(path):
     return {'DREAMCORE_COLLECTION_EXECUTABLE': str(executable)}
 
 
+def instance_collection_environment(root, explicit=None):
+    """Retain explicitly installed collection on ordinary restarts, never on restore."""
+    if explicit is not None:
+        return collection_environment(explicit)
+    saved = root / 'collection-runtime.json'
+    if (root / 'restore.json').exists() or (root / 'restore.json').is_symlink():
+        return {}
+    if saved.exists() or saved.is_symlink():
+        return collection_environment(saved)
+    return {}
+
+
+
+def instance_analysis_environment(root):
+    """Explicit per-instance acceptance API; never inherited or activated on restore."""
+    disabled = {'ANALYSIS_MATERIAL_API_ENABLED': 'false'}
+    saved = root / 'analysis-runtime.json'
+    if (root / 'restore.json').exists() or (root / 'restore.json').is_symlink():
+        return disabled
+    if not saved.exists() and not saved.is_symlink():
+        return disabled
+    value = private_read(saved)
+    if set(value) != {'materialApiEnabled'} or type(value['materialApiEnabled']) is not bool:
+        raise TrialError('分析素材接口配置必须仅包含 materialApiEnabled 布尔值。')
+    return {'ANALYSIS_MATERIAL_API_ENABLED': str(value['materialApiEnabled']).lower()}
+
+
+def instance_briefing_environment(root):
+    disabled = {'BRIEFING_DAILY_ENABLED': 'false'}
+    saved = root / 'briefing-runtime.json'
+    if (root / 'restore.json').exists() or (root / 'restore.json').is_symlink():
+        return disabled
+    if not saved.exists() and not saved.is_symlink():
+        return disabled
+    value = private_read(saved)
+    if set(value) != {'dailyEnabled'} or type(value['dailyEnabled']) is not bool:
+        raise TrialError('定时画报配置必须仅包含 dailyEnabled 布尔值。')
+    return {'BRIEFING_DAILY_ENABLED': str(value['dailyEnabled']).lower()}
+
+
 def start(root, model_config=None, reconnect_live=False, phone_local=False, collection_config=None, enable_live=False):
     os.umask(0o077)
-    collection_env = collection_environment(collection_config)
+    collection_env = instance_collection_environment(root, collection_config)
+    analysis_env = instance_analysis_environment(root)
+    briefing_env = instance_briefing_environment(root)
     model = None
     if model_config is not None:
         import live_model
@@ -355,7 +397,11 @@ def start(root, model_config=None, reconnect_live=False, phone_local=False, coll
         env.update({'PHONE_DELIVERY': 'local' if phone_local else 'disabled', 'PHONE_LOCAL_PREVIEW': str(phone_local).lower(), 'PHONE_OUTBOX': str(root / 'phone-sms')})
         env['PLATFORM_COOKIE_NAME'] = 'DREAMCORE_PLATFORM_TRIAL_' + hashlib.sha256(str(root).encode()).hexdigest()[:12]
         env.update(collection_env)
+        if collection_config is not None:
+            private_write(root / 'collection-runtime.json', {'executable': collection_env['DREAMCORE_COLLECTION_EXECUTABLE']})
         env.update(model_api_env)
+        env.update(analysis_env)
+        env.update(briefing_env)
         model_status = {'agentMode': mode, 'model': model['model'] if model else None, 'cloudVerifiedByStartup': False}
         private_write(root / 'runtime.json', {'runId': run_id, 'state': 'starting', 'webUrl': f"http://127.0.0.1:{settings['ports']['web']}", **model_status, 'revision': subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'], cwd=WORKSPACE, text=True).strip(), 'apiSha256': hashlib.sha256(jar.read_bytes()).hexdigest()})
         runtime_started = True

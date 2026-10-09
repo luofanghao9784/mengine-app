@@ -15,6 +15,9 @@ public class BriefingGenerationController {
     private final BriefingGenerationService service;
     public BriefingGenerationController(BriefingGenerationService service){this.service=service;}
     @ModelAttribute public void headers(HttpServletResponse r){r.setHeader("Cache-Control","private, no-store");r.setHeader("X-Content-Type-Options","nosniff");}
+    public record DailyRequest(@NotNull UUID workspaceId,@Min(0) int expectedRevision,boolean enabled,java.time.Instant firstRunAt) {}
+    @GetMapping("/daily") public BriefingGenerationService.Daily daily(Authentication a,@PathVariable UUID tenant,@RequestParam UUID workspaceId){return service.daily(UUID.fromString(a.getName()),tenant,workspaceId);}
+    @PostMapping("/daily") public BriefingGenerationService.Daily daily(Authentication a,@PathVariable UUID tenant,@Valid @RequestBody DailyRequest b){return service.configureDaily(UUID.fromString(a.getName()),tenant,b.workspaceId(),b.expectedRevision(),b.enabled(),b.firstRunAt());}
     @GetMapping public BriefingGenerationService.State state(Authentication a,@PathVariable UUID tenant){return service.state(UUID.fromString(a.getName()),tenant);}
     @PostMapping public BriefingGenerationService.Batch generate(Authentication a,@PathVariable UUID tenant,@Valid @RequestBody Generate b){return service.generate(UUID.fromString(a.getName()),tenant,b.requestId(),b.workspaceId(),b.businessType());}
     @PostMapping("/selection") public java.util.List<BriefingGenerationService.Batch> selection(Authentication a,@PathVariable UUID tenant,@Valid @RequestBody Selection b){return service.generateSelection(UUID.fromString(a.getName()),tenant,b.requestId(),b.workspaceId(),b.count(),b.types());}

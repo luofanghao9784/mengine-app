@@ -70,7 +70,7 @@ export interface BriefingDocument {
       periodColumn: string;
       matchedRows: number;
       ignoredRows: number;
-      periodMode?: 'EXACT' | 'MONTH' | null;
+      periodMode?: 'EXACT' | 'MONTH' | 'SUMMARY' | null;
       timeZone?: string | null;
     } | null;
     calculationArtifactId: string | null;

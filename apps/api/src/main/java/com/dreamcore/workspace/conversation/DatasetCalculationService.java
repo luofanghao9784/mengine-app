@@ -26,6 +26,7 @@ public class DatasetCalculationService {
                               BriefingContentService.Row totals, int missingDateRows) {}
     public record SummaryRow(List<String> group,String value,int records) {}
     public record Summary(String recipeVersion,String status,Request request,String inputSha256,int matchedRows,int ignoredRows,int missingDateRows,List<SummaryRow> rows,String total) {}
+    @org.springframework.beans.factory.annotation.Autowired private com.dreamcore.workspace.analysis.CalculationMaterialService materials;
     private final JdbcTemplate db;
     private final MaterialAccess access;
     private final IdentityAudit audit;
@@ -102,6 +103,18 @@ public class DatasetCalculationService {
         int groupIndex=columns.indexOf(request.groupColumn()),periodIndex=columns.indexOf(request.periodColumn()),valueIndex=columns.indexOf(request.valueColumn());
         var data=json.readTree(rowsText); int count=((Number)source.get("row_count")).intValue();
         if (!data.isArray() || data.size()!=count || count>100000) invalid("DATASET_SHAPE_INVALID");
+        if(materials!=null&&Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM briefing_flow_tasks WHERE task_id=?)",Boolean.class,job.id()))){
+            var reuse=materials.reusable(job.actor(),job.tenant(),request,request.datasetId(),request.snapshotId());
+            if(reuse.isPresent()){
+                var cached=reuse.get();var value=(tools.jackson.databind.node.ObjectNode)cached.content().path("calculation").deepCopy();
+                String input=IdentityService.hash(columnsText+"\n"+rowsText);
+                value.set("request",json.valueToTree(request));value.put("inputSha256",input);
+                var result=save(job,request,source,count,input,value);
+                var artifact=UUID.fromString(((Map<?,?>)result.get("artifact")).get("id").toString());
+                db.update("INSERT INTO briefing_material_uses(task_id,artifact_id,material_id,version_number,version_id) VALUES (?,?,?,?,?) ON CONFLICT DO NOTHING",job.id(),artifact,cached.materialId(),cached.number(),cached.versionId());
+                audit.record(job.actor(),job.tenant(),"TASK_DATASET_REUSED",artifact,"SUCCESS");return result;
+            }
+        }
         var groups=new TreeMap<String,BigDecimal[]>();int matched=0,ignored=0,missing=0;
         var summaryGroups=new LinkedHashMap<List<String>,BigDecimal>();var records=new HashMap<List<String>,Integer>();
         BigDecimal summaryTotal=BigDecimal.ZERO;
@@ -144,6 +157,9 @@ public class DatasetCalculationService {
         if(!complete)total=new BriefingContentService.Row(null,total.baseline(),total.current(),null,null,null,null,"UNEQUAL_GROUP_COVERAGE");
         calculation=new Calculation(mode.equals("MONTH")?"dataset-compare-month-1":"dataset-compare-1","COMPUTED",request,inputHash,matched,ignored,List.copyOf(output),total,missing);
         }
+        return save(job,request,source,count,inputHash,calculation);
+    }
+    private Map<String,Object> save(ConversationService.Job job,Request request,Map<String,Object> source,int count,String inputHash,Object calculation){
         var metadata=new Source(request.datasetId(),request.snapshotId(),((Number)source.get("version")).intValue(),(String)source.get("name"),inputHash,count,
             ((Timestamp)source.get("collected_at")).toInstant().toString(),source.get("coverage_through")==null?null:((Timestamp)source.get("coverage_through")).toInstant().toString());
         byte[] body=json.writeValueAsBytes(Map.of("datasetSource",metadata,"calculation",calculation));String sha=hash(body),filename="dataset-comparison-"+sha.substring(0,20)+".json";
@@ -154,6 +170,7 @@ public class DatasetCalculationService {
             artifact=UUID.randomUUID();db.update("INSERT INTO conversation_artifacts(id,tenant_id,workspace_id,task_id,filename,sha256,content,attempt_number) VALUES (?,?,?,?,?,?,?,?)",artifact,job.tenant(),job.space(),job.id(),filename,sha,body,source.get("attempt"));
             audit.record(job.actor(),job.tenant(),"TASK_DATASET_COMPUTED",artifact,"SUCCESS");
         } else artifact=existing.getFirst();
+        db.update("INSERT INTO analysis_computation_receipts(artifact_id,sha256) VALUES (?,?) ON CONFLICT DO NOTHING",artifact,sha);
         return Map.of("contractVersion","1.0","status","COMPUTED","datasetSource",metadata,"calculation",calculation,"artifact",Map.of("id",artifact,"filename",filename,"sha256",sha,"bytes",body.length));
     }
     private BigDecimal measure(tools.jackson.databind.JsonNode record,boolean count,int index){

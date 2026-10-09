@@ -115,6 +115,7 @@ export class AgentTasks {
     let generalExperienceAvailable: boolean | undefined;
     let datasetComparisonAvailable: boolean | undefined;
     let datasetAnalysisAvailable = false;
+    let datasetBriefingSummaryAvailable = false;
     let planAllowed: boolean | undefined;
     let tablesAvailable: boolean | undefined;
     let planManagementAvailable = false;
@@ -251,6 +252,7 @@ export class AgentTasks {
           throw new RuntimeError('TASK_ACCESS_DENIED');
         datasetComparisonAvailable = datasetComparison;
         datasetAnalysisAvailable = datasetComparison && response.datasetAnalysisVersion === '1.0';
+        datasetBriefingSummaryAvailable = datasetAnalysisAvailable && response.datasetBriefingSummaryVersion === '1.0';
         const briefing = response.briefingContentVersion === '1.0';
         if (
           (response.briefingContentVersion !== undefined && !briefing) ||
@@ -382,7 +384,7 @@ export class AgentTasks {
                   'Use dataset_search for exact IDs and columns, then dataset_read with columnLimit 10 to inspect required columns and actual period values.',
                   `Successful dataset_read calls so far: ${briefingDatasetReads}. Read only the pages needed to establish the calculation parameters.`,
                   'compare_dataset computes ALL rows in the pinned snapshot; do not page through every row to calculate totals. Reserve calls for calculation and delivery.',
-                  'If the data does not support an exact two-period grouped calculation, choose a grounded INSIGHT or SUGGESTION without invented totals, explicitly limiting claims to observed evidence, or report insufficient evidence.',
+                  datasetBriefingSummaryAvailable ? 'Grouped totals use operation SUMMARY: groupColumns is an array of 1..3 exact headers; SUM uses one valueColumn and COUNT counts rows. OMIT groupColumn, periodColumn, baseline, current and periodMode for SUMMARY. Its artifact can be delivered as a single-series DATA card. Use COMPARE only for real two-category comparisons. Do not mix the parameter forms. If calculation is unsupported, report the concrete evidence gap.' : 'If the data does not support an exact two-period grouped calculation, choose a grounded INSIGHT or SUGGESTION without invented totals, explicitly limiting claims to observed evidence, or report insufficient evidence.',
                 ].join(' ')
               : '';
           const phaseMessages = briefingGeneration
@@ -653,7 +655,7 @@ export class AgentTasks {
         ...(datasetComparisonAvailable && task.contractVersion === '1.5'
           ? [
               datasetComparisonTool({
-                allowSummary: datasetAnalysisAvailable && !briefingGeneration,
+                allowSummary: datasetAnalysisAvailable && (!briefingGeneration || datasetBriefingSummaryAvailable),
                 allowDateRange: datasetAnalysisAvailable,
                 authorize,
                 invoke: (body, executionSignal) =>

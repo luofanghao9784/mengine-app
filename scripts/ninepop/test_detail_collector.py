@@ -37,7 +37,7 @@ class DetailCollectorTest(unittest.TestCase):
   process=type('Result',(),{'returncode':0,'stdout':json.dumps(self.data)})()
   with patch.object(c.subprocess,'run',return_value=process) as run:
    output=c.collect(self.req,self.cfg)
-   self.assertEqual(4,len(output['snapshots']));self.assertIn('StrictHostKeyChecking=yes',run.call_args.args[0])
+   self.assertEqual(len(c.DEFINITIONS),len(output['snapshots']));self.assertIn('StrictHostKeyChecking=yes',run.call_args.args[0])
  def test_shape_type_and_result_scope_rejected(self):
   for mode in ('missing','width','type','long'):
    data=copy.deepcopy(self.data);key=next(iter(c.DEFINITIONS))
@@ -52,4 +52,27 @@ class DetailCollectorTest(unittest.TestCase):
  def test_source_failure_returns_no_snapshots(self):
   with patch.object(c.subprocess,'run',return_value=type('Result',(),{'returncode':1,'stdout':'private failure'})()):
    with self.assertRaises(ValueError):c.collect(self.req,self.cfg)
+ def test_finance_statuses_and_references_preserved(self):
+  key='ninepop_ledger_v1';columns=c.DEFINITIONS[key][2]
+  rows=[]
+  for status in ['effective','projected','voided']:
+   row=['']*len(columns)
+   for name,value in [('流水ID','entry-'+status),('金额（分）','125'),('账务状态',status),('现金状态','not_cash'),('原流水ID','original')]:
+    row[columns.index(name)]=value
+   rows.append(row)
+  self.data['datasets'][key]=rows
+  output=c.result(self.req,self.cfg,self.data)
+  snapshot=next(s for s in output['snapshots'] if s['datasetId']==self.cfg['datasetIds'][key])
+  self.assertEqual(rows,snapshot['rows'])
+ def test_full_catalog_protocol_size_and_sensitive_fields(self):
+  self.assertLess(len(json.dumps(self.req).encode()),65536)
+  compile(c.remote_program(),'remote','exec')
+  for _,_,_,query in c.DEFINITIONS.values():
+   projection=query.split(' FROM ',1)[0].lower()
+   for forbidden in ['password','token','phone','address','payload_json','attachment','finance_note','metadata_json']:
+    self.assertNotIn(forbidden,projection)
+ def test_dataset_ids_must_be_unique(self):
+  cfg=copy.deepcopy(self.cfg);keys=list(cfg['datasetIds']);cfg['datasetIds'][keys[1]]=cfg['datasetIds'][keys[0]]
+  req=copy.deepcopy(self.req);req['datasets'][1]['id']=req['datasets'][0]['id']
+  with self.assertRaises(ValueError):c.validate(req,cfg)
 if __name__=='__main__':unittest.main()

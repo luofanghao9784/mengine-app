@@ -1,0 +1,94 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "负责人每日画报日程",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/v1/tenants/{tenant}/briefing/generation/daily": {
+      "parameters": [
+        {
+          "in": "path",
+          "name": "tenant",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "负责人本人读取日程",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "workspaceId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "日程；未配置时 enabled=false、revision=0"
+          },
+          "403": {
+            "description": "非负责人或支持身份拒绝"
+          }
+        }
+      },
+      "post": {
+        "summary": "配置北京时间每天 09:00、每轮最多一张；须 CSRF，部署开关启用后才可开启",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "workspaceId",
+                  "expectedRevision",
+                  "enabled"
+                ],
+                "properties": {
+                  "workspaceId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "expectedRevision": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "firstRunAt": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date-time",
+                    "description": "可选首次定时验收点，必须在未来24小时内；之后恢复每日09:00。"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "保存后日程，含 nextDue、revision、zone"
+          },
+          "403": {
+            "description": "权限或 CSRF 拒绝"
+          },
+          "409": {
+            "description": "版本冲突或日程部署功能未启用"
+          }
+        }
+      }
+    }
+  }
+}
