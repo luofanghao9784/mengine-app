@@ -1,0 +1,185 @@
+/* 登录页自己的样式只有这几条，其余都来自产品。 */
+.login-page .access-wordmark {
+  color: inherit;
+  text-decoration: none;
+}
+.login-page .access-auth-card form > .button {
+  width: 100%;
+  justify-content: center;
+}
+.login-result {
+  margin: 0 0 14px;
+  font-size: var(--font-caption);
+  color: #c0392b;
+}
+.login-result[data-ok] {
+  color: var(--accent);
+}
+.login-page .access-wordmark {
+  margin-bottom: 28px;
+}
+.login-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 16px;
+  border-radius: 999px;
+  background: var(--soft, rgb(25 27 46 / 5%));
+  border: 1px solid var(--line);
+}
+.login-tabs a {
+  padding: 7px 18px;
+  border-radius: 999px;
+  font-size: var(--font-body);
+  color: var(--ink-2, var(--muted));
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    background 0.2s,
+    color 0.2s;
+}
+.login-tabs a:hover {
+  color: var(--ink);
+}
+.login-tabs a[aria-current='page'] {
+  background: var(--surface-raised, #fff);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgb(25 27 46 / 10%);
+}
+.login-home {
+  margin-top: 22px;
+  font-size: var(--font-caption);
+  color: var(--ink-3, var(--muted));
+  text-decoration: none;
+}
+.login-home:hover {
+  color: var(--accent);
+}
+@media (max-width: 420px) {
+  .login-tabs a {
+    padding-inline: 12px;
+    font-size: var(--font-caption);
+  }
+}
+
+/* 三端切换时的背景过渡：三层天色叠在一起，当前的那层淡入 */
+.login-page {
+  position: relative;
+  isolation: isolate;
+}
+.login-sky {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+}
+.login-sky i {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.9s ease;
+}
+.login-sky i[data-on] {
+  opacity: 1;
+}
+.login-sky [data-sky='workspace'] {
+  background:
+    radial-gradient(60% 50% at 8% 6%, #dcd8ff 0%, transparent 70%),
+    radial-gradient(50% 44% at 96% 10%, #cfe7ff 0%, transparent 70%),
+    radial-gradient(60% 50% at 50% 110%, #ffe9d2 0%, transparent 70%),
+    #f3f4f8;
+}
+.login-sky [data-sky='admin'] {
+  background:
+    radial-gradient(60% 50% at 6% 4%, #f6e3bd 0%, transparent 70%),
+    radial-gradient(50% 46% at 96% 12%, #dfe6ee 0%, transparent 70%),
+    #f5f3ee;
+}
+.login-sky [data-sky='platform'] {
+  background:
+    radial-gradient(70% 60% at 50% 46%, #221b12 0%, transparent 70%),
+    radial-gradient(40% 40% at 88% 8%, rgb(157 182 242 / 10%) 0%, transparent 70%),
+    #0b0a09;
+}
+.login-page .access-auth-card,
+.login-page .access-auth-card input,
+.login-page .button,
+.login-tabs,
+.login-tabs a,
+.login-page h1,
+.login-page p,
+.login-page .field span,
+.login-page .dreamcore-logo,
+.login-home {
+  transition:
+    background-color 0.6s ease,
+    color 0.6s ease,
+    border-color 0.6s ease,
+    box-shadow 0.6s ease;
+}
+
+/* 运营平台：深色，取自引擎仪表盘的暖黑与香槟金 */
+:root[data-surface='platform-admin'] .login-page {
+  --ink: #eceae4;
+  --text: #eceae4;
+  --ink-2: #ada89e;
+  --ink-3: #8c877d;
+  --muted: #ada89e;
+  --text-secondary: #ada89e;
+  --line: rgb(236 234 228 / 14%);
+  --card-edge: rgb(236 234 228 / 14%);
+  --soft: rgb(236 234 228 / 6%);
+  --surface-raised: rgb(236 234 228 / 12%);
+  --accent: #f1d6a0;
+  --accent-hover: #f0be72;
+  --accent-text: #0b0a09;
+  --blue-ink: #f1d6a0;
+  --mark-work: #f1d6a0;
+  --mark-evolve: #9db6f2;
+  color: var(--ink);
+  color-scheme: dark;
+}
+:root[data-surface='platform-admin'] .login-page .access-auth-card {
+  background: rgb(22 20 17 / 78%);
+  box-shadow: 0 30px 90px rgb(0 0 0 / 55%);
+  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
+}
+:root[data-surface='platform-admin'] .login-page :is(h1, .dreamcore-wordmark, .field span) {
+  color: var(--ink);
+}
+:root[data-surface='platform-admin'] .login-page .access-auth-card > p,
+:root[data-surface='platform-admin'] .login-page .dreamcore-wordmark-cn {
+  color: var(--ink-2);
+}
+:root[data-surface='platform-admin'] .login-page input {
+  background: rgb(236 234 228 / 5%);
+  border-color: var(--line);
+  color: var(--ink);
+}
+:root[data-surface='platform-admin'] .login-page .button.primary {
+  background: var(--accent);
+  color: var(--accent-text);
+  border-color: transparent;
+}
+:root[data-surface='platform-admin'] .login-page .phone-password button {
+  color: var(--accent);
+}
+:root[data-surface='platform-admin'] .login-result {
+  color: #ff9d8f;
+}
+@media (prefers-reduced-motion: reduce) {
+  .login-sky i,
+  .login-page * {
+    transition: none !important;
+  }
+}
+
+/* 运营平台的背景：引擎舞台上的那片星云 */
+.nebula {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
