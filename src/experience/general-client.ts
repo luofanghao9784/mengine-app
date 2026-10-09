@@ -239,9 +239,10 @@ export function createGeneralExperienceClient(fetcher: typeof fetch = fetch) {
       state: string,
       offset: number,
       signal?: AbortSignal,
+      basis = 'ALL',
     ) =>
       request(
-        path(tenant) + '?' + new URLSearchParams({ query, state, offset: String(offset) }),
+        path(tenant) + '?' + new URLSearchParams({ query, state, offset: String(offset), basis }),
         'GET',
         (v): v is GeneralExperiencePage =>
           isGeneralPage(v) && (tenant === undefined || v.items.every((i) => i.status === 'AVAILABLE')),

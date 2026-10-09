@@ -72,7 +72,7 @@
   grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 12px;
 }
-.experience-processing-metrics section {
+.experience-processing-metrics :is(section, .experience-metric-card) {
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -131,7 +131,7 @@
   .experience-management-drawer .experience-boundaries {
     grid-template-columns: 1fr;
   }
-  .experience-processing-metrics section {
+  .experience-processing-metrics :is(section, .experience-metric-card) {
     padding: 16px;
   }
 }
@@ -357,4 +357,163 @@
   padding: 0;
   min-height: 0;
   color: var(--accent);
+}
+
+/* 经验库：类别和列表共享管理端的表面、边框与品牌色。 */
+.general-library-layout {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.general-library-categories {
+  background: var(--surface, #fff);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 20px 14px;
+}
+.general-library-categories header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 6px;
+}
+.general-library-categories h2,
+.general-library-heading h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+.general-library-categories > p {
+  margin: 10px 6px 20px;
+  font-size: 12px;
+}
+.general-library-categories nav {
+  display: grid;
+  gap: 8px;
+}
+.general-library-categories nav button {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 12px;
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.general-library-categories nav button span {
+  display: grid;
+  gap: 6px;
+}
+.general-library-categories nav strong {
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 600;
+}
+.general-library-categories nav small {
+  font-size: 11px;
+  line-height: 1.6;
+}
+.general-library-categories nav button:hover {
+  background: var(--surface-soft, #f8f7f4);
+}
+.general-library-categories nav button[aria-pressed='true'] {
+  background: color-mix(in srgb, var(--accent, #3459db) 8%, transparent);
+  border-color: color-mix(in srgb, var(--accent, #3459db) 18%, transparent);
+  color: var(--accent, #3459db);
+}
+.general-library-categories nav button[aria-pressed='true'] strong {
+  color: inherit;
+}
+.general-library-categories nav button:focus-visible {
+  outline: 2px solid var(--accent, #3459db);
+  outline-offset: 2px;
+}
+.general-library-categories nav button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.general-library-categories footer {
+  border-top: 1px solid var(--line);
+  margin: 20px 6px 0;
+  padding-top: 16px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.7;
+}
+.general-library-results {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+.general-library-heading p {
+  margin: 8px 0 0;
+  font-size: 12px;
+}
+@media (max-width: 1100px) {
+  .general-library-layout {
+    grid-template-columns: 210px minmax(0, 1fr);
+    gap: 16px;
+  }
+}
+@media (max-width: 800px) {
+  .general-library-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .general-library-categories nav {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .general-library-categories nav button {
+    flex-direction: column;
+  }
+}
+@media (max-width: 480px) {
+  .general-library-categories nav {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .general-library-categories nav button {
+    flex-direction: row;
+  }
+}
+
+.experience-metric-card {
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+}
+.experience-metric-card:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+.experience-metric-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.experience-metric-detail > strong {
+  display: block;
+  font-size: 36px;
+  margin: 12px 0;
+}
+.experience-metric-detail p {
+  line-height: 1.8;
+}
+.experience-metric-detail dl > div {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr);
+  gap: 14px;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+}
+.experience-metric-detail dt {
+  color: var(--muted);
+}
+.experience-metric-detail dd {
+  margin: 0;
+  line-height: 1.7;
 }

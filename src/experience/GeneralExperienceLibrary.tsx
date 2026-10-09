@@ -1,6 +1,6 @@
 import { Select } from '../shared/Select';
 import { useEffect, useState } from 'react';
-import { BookOpen, RefreshCw } from 'lucide-react';
+import { BookOpen, RefreshCw, Layers, Workflow, MessageSquareText } from 'lucide-react';
 import { useSession } from '../identity/session';
 import { IdentityError, record, uuid } from '../identity/client';
 import { Badge, Button, Empty, Field, Modal, PageActions } from '../shared/ui';
@@ -24,6 +24,30 @@ import type {
 type Selection = { id: string; version: string };
 const selectionState = (v: unknown): v is Selection | null =>
   v === null || (record(v) && uuid(v.id) && uuid(v.version));
+const categories = [
+  { id: 'ALL', label: '全部经验', description: '统一查看所有通用经验', icon: Layers },
+  { id: 'OBSERVED_EXECUTION', label: '执行积累', description: '从实际执行中提炼的方法', icon: Workflow },
+  {
+    id: 'FEEDBACK_CORRECTION',
+    label: '反馈纠正',
+    description: '从反馈与纠错中总结的方法',
+    icon: MessageSquareText,
+  },
+] as const;
+const metricDescriptions: Record<string, string> = {
+  当前可用: '已发布且来源仍可读取的通用经验，可在经验内容中查看。',
+  已停用: '已停止供新任务使用、且仍可查看历史内容的通用经验。',
+  来源撤回: '已撤回的通用经验条目；不再出现在可用内容列表中。',
+  WAITING: '已登记并进入等待队列，尚未开始自动处理。',
+  PROCESSING: '正在执行提炼、核验或发布；部分结果仍在核对。',
+  RETRYING: '本次处理暂未完成，按已有重试策略等待后续执行。',
+  ADMITTED: '处理已形成入库结果；不等同当前可用经验数量。',
+  DUPLICATE: '已完成处理，但与已有内容重复，没有新增经验。',
+  NOT_ADMITTED: '已跳过、未通过核验或发生版本冲突，没有形成入库结果。',
+  UNAVAILABLE: '贡献来源已失效，相关内容无法继续处理。',
+  FAILED: '处理执行失败；该计数不表示已自动恢复。',
+  UNKNOWN: '执行结果尚无法确认，以后续核对结果为准。',
+};
 const stamp = (v: string) => new Date(v).toLocaleString('zh-CN', { hour12: false });
 
 export function GeneralExperienceLibrary({
@@ -56,6 +80,10 @@ export function GeneralExperienceLibrary({
     'AVAILABLE',
     (v): v is string => v === 'AVAILABLE' || v === 'STOPPED',
   );
+  const [category, setCategory] = useViewState(scope, 'general:category', 'ALL', (v): v is string =>
+    categories.some((item) => item.id === v),
+  );
+  const activeCategory = categories.find((item) => item.id === category)!;
   const [page, setPage] = useViewState(scope, 'general:page', 0, pageState);
   const [selection, select] = useViewState<Selection | null>(
     scope,
@@ -63,6 +91,7 @@ export function GeneralExperienceLibrary({
     null,
     selectionState,
   );
+  const [metric, setMetric] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const refresh = () => setAttempt((n) => n + 1);
   const refreshControl = (
@@ -72,8 +101,11 @@ export function GeneralExperienceLibrary({
   );
   const processing = !tenant && tab === 'processing';
   const data = useRemote(
-    (signal) => (processing ? Promise.resolve(null) : api.contents(tenant, query, state, page * 20, signal)),
-    [tenant, query, state, page, attempt, processing, session.identity],
+    (signal) =>
+      processing
+        ? Promise.resolve(null)
+        : api.contents(tenant, query, state, page * 20, signal, tenant ? 'ALL' : category),
+    [tenant, query, state, page, category, attempt, processing, session.identity],
   );
   const observation = useRemote(
     (signal) => (processing ? api.processing(signal) : Promise.resolve(null)),
@@ -86,6 +118,18 @@ export function GeneralExperienceLibrary({
     }, 30000);
     return () => clearInterval(id);
   }, [processing, selection]);
+  const metricLabel =
+    metric && (generalProcessingLabels[metric as keyof typeof generalProcessingLabels] || metric);
+  const metricValue =
+    !metric || !observation.value
+      ? 0
+      : metric === '当前可用'
+        ? observation.value.available
+        : metric === '已停用'
+          ? observation.value.stopped
+          : metric === '来源撤回'
+            ? observation.value.withdrawn
+            : observation.value.counts[metric as keyof typeof generalProcessingLabels];
   const error = data.error || observation.error;
   useEffect(() => {
     if (error && !locked) select(null);
@@ -120,208 +164,325 @@ export function GeneralExperienceLibrary({
           </Button>
         </div>
       )}
-      {processing ? (
-        <p className="muted">自动脱敏、提炼和核验后的积累概况。每 30 秒更新，无需人工审核。</p>
-      ) : (
-        <>
-          {tenant && <p className="muted">经过自动脱敏、提炼和核验的通用方法。适用条件与限制随内容保留。</p>}
-          <form
-            className="experience-management-filters"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (locked) return;
-              setQuery(input);
-              setPage(0);
-            }}
-          >
-            <Field label="搜索通用经验">
-              <input
-                aria-label="搜索通用经验"
-                disabled={locked}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="名称、用途或标签"
-                maxLength={200}
-              />
-            </Field>
-            {
-              <Field label="状态">
-                <Select
+      <div className={!tenant && !processing ? 'general-library-layout' : undefined}>
+        {!tenant && !processing && (
+          <aside className="general-library-categories" aria-label="经验分类">
+            <header>
+              <BookOpen size={18} />
+              <h2>经验分类</h2>
+            </header>
+            <p className="muted">汇集已入库的通用经验</p>
+            <nav aria-label="选择经验类别">
+              {categories.map(({ id, label, description, icon: Icon }) => (
+                <button
+                  key={id}
+                  type="button"
                   disabled={locked}
-                  aria-label="通用经验状态"
-                  value={state}
-                  onChange={(e) => {
-                    setState(e.target.value);
+                  aria-pressed={category === id}
+                  onClick={() => {
+                    setCategory(id);
                     setPage(0);
                     select(null);
                   }}
                 >
-                  <option value="AVAILABLE">当前可用</option>
-                  <option value="STOPPED">{tenant ? '本企业已停用' : '已停用'}</option>
-                </Select>
-              </Field>
-            }
-            <Button type="submit" disabled={locked}>
-              搜索
-            </Button>
-          </form>
-        </>
-      )}
-      {error ? (
-        <Failure error={error} retry={refresh} />
-      ) : processing ? (
-        !observation.value ? (
-          <Loading />
-        ) : (
-          <>
-            {!observation.value.enabled && <p role="status">自动上送尚未启用，以下保留已有处理记录。</p>}
-            <div className="experience-processing-metrics">
-              {(
-                [
-                  ['当前可用', observation.value.available],
-                  ['已停用', observation.value.stopped],
-                  ['来源撤回', observation.value.withdrawn],
-                ] as const
-              ).map(([label, value]) => (
-                <section className="admin-section" key={label}>
-                  <span>{label}</span>
-                  <strong>{value}</strong>
-                </section>
+                  <Icon size={18} />
+                  <span>
+                    <strong>{label}</strong>
+                    <small>{description}</small>
+                  </span>
+                </button>
               ))}
-            </div>
-            <h2 className="general-experience-heading">自动处理</h2>
-            <p className="muted">
-              以下按已登记的贡献来源计数；入库次数不等于当前经验数量，也不代表使用效果。
-            </p>
-            <div className="experience-processing-metrics">
-              {Object.entries(generalProcessingLabels).map(([key, label]) => (
-                <section className="admin-section" key={key}>
-                  <span>{label}</span>
-                  <strong>{observation.value!.counts[key as keyof typeof generalProcessingLabels]}</strong>
-                </section>
-              ))}
-            </div>
-            <p className="muted">最近更新：{stamp(observation.value.checkedAt)}</p>
-          </>
-        )
-      ) : !data.value ? (
-        <Loading />
-      ) : (
-        <>
-          {!tenant ? (
-            <section className="data-ops-list-card" aria-label="通用经验列表">
-              <div className="data-archive-scroll">
-                <table className="data-archive-table experience-archive-table">
-                  <thead>
-                    <tr>
-                      <th>经验名称</th>
-                      <th>标签</th>
-                      <th>版本</th>
-                      <th>状态</th>
-                      <th>最近更新</th>
-                      <th>操作</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.value.items.map((item) => (
-                      <tr key={item.id}>
-                        <td>
-                          <Button
-                            variant="ghost"
-                            disabled={locked}
-                            onClick={() => select({ id: item.id, version: item.versionId })}
-                          >
-                            <h2>{item.title}</h2>
-                          </Button>
-                          <small>{item.summary}</small>
-                        </td>
-                        <td>
-                          <span className="experience-management-tags">
-                            {item.tags.length ? item.tags.map((tag) => <Badge key={tag}>{tag}</Badge>) : '—'}
-                          </span>
-                        </td>
-                        <td>V{item.number}</td>
-                        <td>
-                          <Badge>{item.status === 'STOPPED' ? '已停用' : '当前可用'}</Badge>
-                        </td>
-                        <td>{stamp(item.updatedAt)}</td>
-                        <td>
-                          <Button
-                            variant="ghost"
-                            disabled={locked}
-                            onClick={() => select({ id: item.id, version: item.versionId })}
-                          >
-                            查看详情
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {!data.value.items.length && (
-                <p className="data-archive-empty">{query ? '没有匹配的通用经验' : '暂无通用经验'}</p>
-              )}
-              <Pager
-                page={page}
-                next={data.value.hasMore}
-                onPage={(p) => {
-                  if (!locked) setPage(p);
-                }}
-              />
-            </section>
+            </nav>
+            <footer>经验经脱敏和自动核验后入库</footer>
+          </aside>
+        )}
+        <div className="general-library-results">
+          {!tenant && !processing && (
+            <header className="general-library-heading">
+              <h2>{activeCategory.label}</h2>
+              <p className="muted">{activeCategory.description} · 点击经验名称查看详情</p>
+            </header>
+          )}
+          {processing ? (
+            <p className="muted">自动脱敏、提炼和核验后的积累概况。每 30 秒更新，无需人工审核。</p>
           ) : (
             <>
-              {data.value.items.length ? (
-                <div className="experience-management-list">
-                  {data.value.items.map((item) => (
-                    <button
-                      className="experience-management-card"
-                      key={item.id}
+              {tenant && (
+                <p className="muted">经过自动脱敏、提炼和核验的通用方法。适用条件与限制随内容保留。</p>
+              )}
+              <form
+                className="experience-management-filters"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (locked) return;
+                  setQuery(input);
+                  setPage(0);
+                }}
+              >
+                <Field label="搜索通用经验">
+                  <input
+                    aria-label="搜索通用经验"
+                    disabled={locked}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    placeholder="名称、用途或标签"
+                    maxLength={200}
+                  />
+                </Field>
+                {
+                  <Field label="状态">
+                    <Select
                       disabled={locked}
-                      onClick={() => select({ id: item.id, version: item.versionId })}
+                      aria-label="通用经验状态"
+                      value={state}
+                      onChange={(e) => {
+                        setState(e.target.value);
+                        setPage(0);
+                        select(null);
+                      }}
                     >
-                      <div>
-                        <Badge>通用经验</Badge>
-                        <span>
-                          {tenant && state === 'STOPPED'
-                            ? '本企业已停用'
-                            : item.status === 'STOPPED'
-                              ? '已停用'
-                              : '当前可用'}{' '}
-                          · v{item.number}
-                        </span>
-                      </div>
-                      <h2>{item.title}</h2>
-                      <p>{item.summary}</p>
-                      <footer>
-                        <span className="experience-management-tags">
-                          {item.tags.map((tag) => (
-                            <Badge key={tag}>{tag}</Badge>
-                          ))}
-                        </span>
-                        <time>{stamp(item.updatedAt)}</time>
-                      </footer>
+                      <option value="AVAILABLE">当前可用</option>
+                      <option value="STOPPED">{tenant ? '本企业已停用' : '已停用'}</option>
+                    </Select>
+                  </Field>
+                }
+                <Button type="submit" disabled={locked}>
+                  搜索
+                </Button>
+              </form>
+            </>
+          )}
+          {error ? (
+            <Failure error={error} retry={refresh} />
+          ) : processing ? (
+            !observation.value ? (
+              <Loading />
+            ) : (
+              <>
+                {!observation.value.enabled && <p role="status">自动上送尚未启用，以下保留已有处理记录。</p>}
+                <div className="experience-processing-metrics">
+                  {(
+                    [
+                      ['当前可用', observation.value.available],
+                      ['已停用', observation.value.stopped],
+                      ['来源撤回', observation.value.withdrawn],
+                    ] as const
+                  ).map(([label, value]) => (
+                    <button
+                      type="button"
+                      className="admin-section experience-metric-card"
+                      key={label}
+                      disabled={locked}
+                      onClick={() => setMetric(label)}
+                      aria-label={`${label} ${value}，查看详情`}
+                    >
+                      <span>{label}</span>
+                      <strong>{value}</strong>
                     </button>
                   ))}
                 </div>
+                <h2 className="general-experience-heading">自动处理</h2>
+                <p className="muted">
+                  以下按已登记的贡献来源计数；入库次数不等于当前经验数量，也不代表使用效果。
+                </p>
+                <div className="experience-processing-metrics">
+                  {Object.entries(generalProcessingLabels).map(([key, label]) => (
+                    <button
+                      type="button"
+                      className="admin-section experience-metric-card"
+                      key={key}
+                      disabled={locked}
+                      onClick={() => setMetric(key)}
+                      aria-label={`${label} ${observation.value!.counts[key as keyof typeof generalProcessingLabels]}，查看详情`}
+                    >
+                      <span>{label}</span>
+                      <strong>
+                        {observation.value!.counts[key as keyof typeof generalProcessingLabels]}
+                      </strong>
+                    </button>
+                  ))}
+                </div>
+                <p className="muted">最近更新：{stamp(observation.value.checkedAt)}</p>
+              </>
+            )
+          ) : !data.value ? (
+            <Loading />
+          ) : (
+            <>
+              {!tenant ? (
+                <section className="data-ops-list-card" aria-label="通用经验列表">
+                  <div className="data-archive-scroll">
+                    <table className="data-archive-table experience-archive-table">
+                      <thead>
+                        <tr>
+                          <th>经验名称</th>
+                          <th>标签</th>
+                          <th>版本</th>
+                          <th>状态</th>
+                          <th>最近更新</th>
+                          <th>操作</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.value.items.map((item) => (
+                          <tr key={item.id}>
+                            <td>
+                              <Button
+                                variant="ghost"
+                                disabled={locked}
+                                onClick={() => select({ id: item.id, version: item.versionId })}
+                              >
+                                <h2>{item.title}</h2>
+                              </Button>
+                              <small>{item.summary}</small>
+                            </td>
+                            <td>
+                              <span className="experience-management-tags">
+                                {item.tags.length
+                                  ? item.tags.map((tag) => <Badge key={tag}>{tag}</Badge>)
+                                  : '—'}
+                              </span>
+                            </td>
+                            <td>V{item.number}</td>
+                            <td>
+                              <Badge>{item.status === 'STOPPED' ? '已停用' : '当前可用'}</Badge>
+                            </td>
+                            <td>{stamp(item.updatedAt)}</td>
+                            <td>
+                              <Button
+                                variant="ghost"
+                                disabled={locked}
+                                onClick={() => select({ id: item.id, version: item.versionId })}
+                              >
+                                查看详情
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {!data.value.items.length && (
+                    <p className="data-archive-empty">
+                      {query
+                        ? '没有匹配的通用经验'
+                        : category === 'ALL'
+                          ? '暂无通用经验'
+                          : `暂无${activeCategory.label}经验`}
+                    </p>
+                  )}
+                  <Pager
+                    page={page}
+                    next={data.value.hasMore}
+                    onPage={(p) => {
+                      if (!locked) setPage(p);
+                    }}
+                  />
+                </section>
               ) : (
-                <Empty
-                  icon={BookOpen}
-                  title={query ? '没有匹配的通用经验' : '暂无通用经验'}
-                  text="满足清洗和自动核验要求的方法入库后，会显示在这里。"
-                />
+                <>
+                  {data.value.items.length ? (
+                    <div className="experience-management-list">
+                      {data.value.items.map((item) => (
+                        <button
+                          className="experience-management-card"
+                          key={item.id}
+                          disabled={locked}
+                          onClick={() => select({ id: item.id, version: item.versionId })}
+                        >
+                          <div>
+                            <Badge>通用经验</Badge>
+                            <span>
+                              {tenant && state === 'STOPPED'
+                                ? '本企业已停用'
+                                : item.status === 'STOPPED'
+                                  ? '已停用'
+                                  : '当前可用'}{' '}
+                              · v{item.number}
+                            </span>
+                          </div>
+                          <h2>{item.title}</h2>
+                          <p>{item.summary}</p>
+                          <footer>
+                            <span className="experience-management-tags">
+                              {item.tags.map((tag) => (
+                                <Badge key={tag}>{tag}</Badge>
+                              ))}
+                            </span>
+                            <time>{stamp(item.updatedAt)}</time>
+                          </footer>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <Empty
+                      icon={BookOpen}
+                      title={query ? '没有匹配的通用经验' : '暂无通用经验'}
+                      text="满足清洗和自动核验要求的方法入库后，会显示在这里。"
+                    />
+                  )}
+                  <Pager
+                    page={page}
+                    next={data.value.hasMore}
+                    onPage={(p) => {
+                      if (!locked) setPage(p);
+                    }}
+                  />
+                </>
               )}
-              <Pager
-                page={page}
-                next={data.value.hasMore}
-                onPage={(p) => {
-                  if (!locked) setPage(p);
-                }}
-              />
             </>
           )}
-        </>
+        </div>
+      </div>
+      {processing && metric && observation.value && !error && (
+        <Modal title={`${metricLabel}详情`} onClose={() => setMetric(null)}>
+          <div className="experience-metric-detail">
+            <span className="muted">{metricLabel}</span>
+            <strong>{metricValue}</strong>
+            <p>{metricDescriptions[metric]}</p>
+            <dl>
+              <div>
+                <dt>统计口径</dt>
+                <dd>
+                  {['当前可用', '已停用', '来源撤回'].includes(metric)
+                    ? '通用经验条目数'
+                    : '贡献来源与通用经验调整记录的处理状态合计；同一经验可能对应多条记录。'}
+                </dd>
+              </div>
+              <div>
+                <dt>自动上送</dt>
+                <dd>{observation.value.enabled ? '已启用' : '尚未启用，保留已有处理记录'}</dd>
+              </div>
+              <div>
+                <dt>最近更新</dt>
+                <dd>{stamp(observation.value.checkedAt)}</dd>
+              </div>
+            </dl>
+            {metricValue === 0 && (
+              <p className="muted">
+                当前没有此状态的
+                {['当前可用', '已停用', '来源撤回'].includes(metric) ? '经验条目' : '处理记录'}。
+              </p>
+            )}
+            <p className="muted">此处展示汇总详情，数量不代表使用效果。</p>
+            {(metric === '当前可用' || metric === '已停用') && (
+              <Button
+                onClick={() => {
+                  setState(metric === '当前可用' ? 'AVAILABLE' : 'STOPPED');
+                  setCategory('ALL');
+                  setQuery('');
+                  setInput('');
+                  setPage(0);
+                  select(null);
+                  setMetric(null);
+                  setTab('content');
+                }}
+              >
+                查看{metricLabel}经验
+              </Button>
+            )}
+          </div>
+        </Modal>
       )}
       {selection && !error && (
         <GeneralDetail

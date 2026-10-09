@@ -880,3 +880,32 @@
   border-radius: var(--radius-panel);
 }
 .platform-record-directory .platform-management-table { overflow: auto; }
+
+/* 设置栏目使用文字与下划线标记当前页，避免套用实底操作按钮样式。 */
+.admin-platform.admin-control .platform-settings-nav {
+  gap: 24px;
+  padding-bottom: 0;
+}
+.admin-platform.admin-control .platform-settings-nav .button {
+  padding: 8px 0 12px;
+  margin-bottom: -1px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--muted);
+}
+.admin-platform.admin-control .platform-settings-nav .button.ghost[aria-current='page'] {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+.admin-platform.admin-control .platform-settings-nav .button:hover:not(:disabled) {
+  background: transparent;
+  color: var(--accent);
+}
+.admin-platform.admin-control .platform-settings-nav .button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}

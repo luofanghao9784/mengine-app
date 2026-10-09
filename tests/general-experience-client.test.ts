@@ -94,6 +94,12 @@ test('search is encoded, paginated and never routed through the other realm', as
   assert.equal(url.searchParams.get('query'), '销售 & 核对');
   assert.equal(url.searchParams.get('offset'), '20');
   assert.ok(url.pathname.includes('/general-experiences'));
+  await api.contents(undefined, '核对', 'STOPPED', 20, undefined, 'FEEDBACK_CORRECTION');
+  const classified = new URL(called, 'http://fixture');
+  assert.equal(classified.pathname, '/api/platform-admin/v1/experience-library');
+  assert.equal(classified.searchParams.get('basis'), 'FEEDBACK_CORRECTION');
+  assert.equal(classified.searchParams.get('state'), 'STOPPED');
+  assert.equal(classified.searchParams.get('offset'), '20');
 });
 
 test('usage mutations use customer CSRF, exact version, revision and unchanged request identity', async () => {
@@ -331,7 +337,14 @@ test('usage aggregates cannot imply business success, include private rows or cr
 });
 
 test('effective general usage cannot be inferred from the enterprise switch', () => {
-  const state = { entryId: id, versionId: version, enabled: true, usable: false, revision: 0, canManage: true };
+  const state = {
+    entryId: id,
+    versionId: version,
+    enabled: true,
+    usable: false,
+    revision: 0,
+    canManage: true,
+  };
   assert.equal(isGeneralUsage(state), true);
   assert.equal(isGeneralUsage({ ...state, enabled: false, usable: true }), false);
   const { usable, ...old } = state;

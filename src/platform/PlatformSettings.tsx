@@ -47,7 +47,7 @@ export function PlatformSettings({ hash }: { hash: string }) {
   const pending = useContext(RequestPending);
   return (
     <div className="admin-dashboard">
-      <nav className="platform-detail-nav" aria-label="总台设置栏目">
+      <nav className="platform-detail-nav platform-settings-nav" aria-label="总台设置栏目">
         {(
           [
             ['staff', '管理人员'],
@@ -58,7 +58,7 @@ export function PlatformSettings({ hash }: { hash: string }) {
           <Button
             key={key}
             disabled={pending}
-            variant={current === key ? 'primary' : 'ghost'}
+            variant="ghost"
             aria-current={current === key ? 'page' : undefined}
             onClick={() => {
               location.hash = `admin=settings&section=${key}`;

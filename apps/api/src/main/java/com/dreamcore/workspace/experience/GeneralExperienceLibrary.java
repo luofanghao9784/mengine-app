@@ -32,10 +32,14 @@ public class GeneralExperienceLibrary {
  private ExperienceGeneralizationRuntime.Method method(Map<String,Object> row){return json.readValue(row.get("method").toString(),ExperienceGeneralizationRuntime.Method.class);}
  private Instant updated(Map<String,Object> row){return ((java.sql.Timestamp)row.get("updated_at")).toInstant();}
  @Transactional public Page contents(UUID actor,UUID tenant,String query,String state,int offset){
+  return contents(actor,tenant,query,state,offset,"ALL");
+ }
+ @Transactional public Page contents(UUID actor,UUID tenant,String query,String state,int offset,String basis){
   access(actor,tenant);
+  if(basis==null||!Set.of("ALL","OBSERVED_EXECUTION","FEEDBACK_CORRECTION").contains(basis))throw IdentityException.invalid();
   if(query==null||query.length()>200||offset<0||offset>100000||!Set.of("AVAILABLE","STOPPED").contains(state))throw IdentityException.invalid();
   String filter=tenant==null?" AND e.status=?":" AND e.status='AVAILABLE' AND general_experience_dependencies_enabled(?::uuid,v.id)=?";
-  var args=new ArrayList<Object>();args.add(tenant==null);if(tenant==null)args.add(state);else {args.add(tenant);args.add(state.equals("AVAILABLE"));}args.add(query.strip());args.add(offset);
+  var args=new ArrayList<Object>();args.add(tenant==null);if(tenant==null)args.add(state);else {args.add(tenant);args.add(state.equals("AVAILABLE"));}if(!basis.equals("ALL")){filter+=" AND v.method->>'basis'=?";args.add(basis);}args.add(query.strip());args.add(offset);
   var rows=db.queryForList(BASE+filter+" AND strpos(lower(concat_ws(' ',v.method->>'title',v.method->>'summary',v.method->'tags')),lower(?))>0 ORDER BY e.updated_at DESC,e.id LIMIT 21 OFFSET ?",args.toArray());
   var items=rows.stream().limit(20).map(r->{var m=method(r);return new Summary((UUID)r.get("id"),(UUID)r.get("version_id"),((Number)r.get("number")).intValue(),(String)r.get("status"),m.title(),m.summary(),m.tags(),updated(r));}).toList();
   return new Page(items,rows.size()>20);

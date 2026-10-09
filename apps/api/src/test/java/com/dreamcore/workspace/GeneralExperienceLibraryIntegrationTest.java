@@ -91,6 +91,14 @@ class GeneralExperienceLibraryIntegrationTest {
   // Synthetic duplicate asset rows use the same valid source; pagination is independent of source totals.
   for(int n=0;n<22;n++){UUID e=UUID.randomUUID(),v=UUID.randomUUID();db.update("INSERT INTO general_experience_entries(id,status) VALUES (?,?)",e,n==0?"STOPPED":"AVAILABLE");db.update("INSERT INTO general_experience_versions(id,entry_id,number,method,content_fingerprint) SELECT ?,?,1,method,content_fingerprint FROM general_experience_versions WHERE id=?",v,e,r.versionId());db.update("INSERT INTO general_experience_origins(version_id,source_version) SELECT ?,source_version FROM general_experience_origins WHERE version_id=?",v,r.versionId());db.update("UPDATE general_experience_entries SET published_version=? WHERE id=?",v,e);}
   var first=library.contents(platform,null,method().title(),"AVAILABLE",0);var second=library.contents(platform,null,method().title(),"AVAILABLE",20);assertEquals(20,first.items().size());assertTrue(first.hasMore());assertEquals(2,second.items().size());assertFalse(second.hasMore());assertTrue(Collections.disjoint(first.items().stream().map(GeneralExperienceLibrary.Summary::id).toList(),second.items().stream().map(GeneralExperienceLibrary.Summary::id).toList()));
+  // Classification must happen before LIMIT/OFFSET, and keeps the original visibility checks.
+  db.update("UPDATE general_experience_versions SET method=jsonb_set(method,'{basis}','\"FEEDBACK_CORRECTION\"'::jsonb) WHERE id=?",r.versionId());
+  var observed=library.contents(platform,null,method().title(),"AVAILABLE",0,"OBSERVED_EXECUTION");
+  assertEquals(20,observed.items().size());assertTrue(observed.hasMore());
+  assertEquals(1,library.contents(platform,null,method().title(),"AVAILABLE",20,"OBSERVED_EXECUTION").items().size());
+  assertEquals(List.of(r.entryId()),library.contents(platform,null,method().title(),"AVAILABLE",0,"FEEDBACK_CORRECTION").items().stream().map(GeneralExperienceLibrary.Summary::id).toList());
+  assertEquals(400,assertThrows(IdentityException.class,()->library.contents(platform,null,"","AVAILABLE",0,"PRIVATE")).status);
+  assertThrows(IdentityException.class,()->library.contents(owner,null,"","AVAILABLE",0,"OBSERVED_EXECUTION"));
   var after=library.processing(platform,false);assertEquals(before.available()+21,after.available());assertEquals(before.stopped()+1,after.stopped());assertEquals(before.counts(),after.counts());
  }
  @Test void pendingCandidatesAndRawFailuresAreOnlyFiniteAggregates(){

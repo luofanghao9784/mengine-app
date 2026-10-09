@@ -40,6 +40,21 @@
               "minimum": 0,
               "maximum": 100000
             }
+          },
+          {
+            "name": "basis",
+            "in": "query",
+            "required": false,
+            "description": "按入库方法的实际依据分类；在分页前与搜索、状态及原有可见性规则共同筛选。",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ALL",
+                "OBSERVED_EXECUTION",
+                "FEEDBACK_CORRECTION"
+              ],
+              "default": "ALL"
+            }
           }
         ],
         "responses": {
@@ -215,6 +230,21 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 100000
+            }
+          },
+          {
+            "name": "basis",
+            "in": "query",
+            "required": false,
+            "description": "按入库方法的实际依据分类；在分页前与搜索、状态及原有可见性规则共同筛选。",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ALL",
+                "OBSERVED_EXECUTION",
+                "FEEDBACK_CORRECTION"
+              ],
+              "default": "ALL"
             }
           }
         ],
