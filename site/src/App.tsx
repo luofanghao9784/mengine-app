@@ -270,9 +270,8 @@ export function App() {
         <div className="chapters">
           <header className="chapter hero" id="top" data-zoom="0.7" data-shift="-1.45">
             <div className="hero-copy">
-              <p className="eyebrow">Mengine 梦核引擎</p>
-              <h1><span>让 AI 主动工作，</span><span><em>让经验成为能力。</em></span></h1>
-              <p className="lede">梦核引擎每天读企业的数据和资料，把值得关注的事编成画报，送到每个人面前。员工在梦擎工作空间里接着追问、把事做完；做过的事，会变成下一次的经验。</p>
+              <h1><span>懂业务，会沉淀，</span><span><em>才是好 AI</em></span></h1>
+              <p className="lede">未来的差距，不在谁的 Agent 更多，<br />而在谁的 AI 更懂业务，更懂工作如何推进。<b>Mengine 梦核引擎。</b></p>
               <div className="cta">
                 <a className="btn solid big" href="#engine">看它怎么工作</a>
                 <a className="btn line big" href="#workspace">看梦擎工作空间</a>
