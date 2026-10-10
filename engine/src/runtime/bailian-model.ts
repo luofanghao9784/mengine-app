@@ -23,7 +23,11 @@ export class BailianModel extends ChatCompletionsModel {
     )
       throw new RuntimeError('INVALID_MODEL_CONFIG');
     const path = '/compatible-mode/v1/chat/completions';
-    let endpoint = new URL(`https://${config.workspaceId}.cn-beijing.maas.aliyuncs.com${path}`);
+    // Numeric console workspace IDs use the fixed Beijing shared endpoint.
+    // The supplied workspace-scoped API key remains the cloud authorization.
+    const host = /^\d+$/.test(config.workspaceId) ? 'dashscope.aliyuncs.com'
+      : `${config.workspaceId}.cn-beijing.maas.aliyuncs.com`;
+    let endpoint = new URL(`https://${host}${path}`);
     // Test-only loopback transport is never exposed through production environment variables.
     if (config.localVerification) {
       try {

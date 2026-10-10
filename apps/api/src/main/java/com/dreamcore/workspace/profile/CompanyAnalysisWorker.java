@@ -11,7 +11,7 @@ public class CompanyAnalysisWorker {
  private final CompanyAnalysisQueue queue;private final CompanyInferenceService inference;private final CompanyAnalysisRuntime runtime;private final boolean enabled;
  private final ExecutorService pool=Executors.newVirtualThreadPerTaskExecutor();private final Semaphore capacity=new Semaphore(2);private final Set<UUID> local=ConcurrentHashMap.newKeySet();
  public CompanyAnalysisWorker(CompanyAnalysisQueue queue,CompanyInferenceService inference,CompanyAnalysisRuntime runtime,@Value("${dreamcore.company-analysis.enabled:false}") boolean enabled){this.queue=queue;this.inference=inference;this.runtime=runtime;this.enabled=enabled;}
- @Scheduled(fixedDelayString="${dreamcore.company-analysis.poll-ms:30000}",initialDelayString="${dreamcore.company-analysis.initial-delay-ms:30000}")
+ @Scheduled(fixedDelayString="${dreamcore.company-analysis.poll-ms:3000}",initialDelayString="${dreamcore.company-analysis.initial-delay-ms:30000}")
  public void tick(){if(enabled&&runtime.configured())runOnce();}
  public void runOnce(){
   for(var recovery:queue.recoveries())if(!local.contains(recovery.id()))recover(recovery);

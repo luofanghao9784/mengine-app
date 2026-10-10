@@ -133,7 +133,8 @@ export class ChatCompletionsModel implements ModelPort {
               type: 'function',
               function: { name: '', arguments: '' },
             };
-            if (part.id !== undefined) {
+            // Null continuation IDs carry no new identity; validate at completion.
+            if (part.id !== undefined && part.id !== null) {
               if (typeof part.id !== 'string') throw new RuntimeError('INVALID_MODEL_RESPONSE');
               call.id += part.id;
             }

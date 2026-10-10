@@ -23,7 +23,7 @@ export function sourceQueries(prompt: string, query: string, continuity?: Json):
   const trimmed = query.trim();
   if (!trimmed && context && !selected) {
     if (canFallback) return [name.trim()];
-    throw new RuntimeError('SEARCH_QUERY_REQUIRED');
+    throw new RuntimeError('SEARCH_QUERY_REQUIRED', 'No selected files: supply a short literal keyword from the current request, such as 员工守则 or 寄养. Do not repeat an empty query. This error does not mean the library is empty.');
   }
   if (
     canFallback &&

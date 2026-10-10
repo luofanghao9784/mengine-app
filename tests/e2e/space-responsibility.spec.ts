@@ -5,7 +5,7 @@ const tenant = id(1),
   owner = id(3),
   next = id(4),
   spaceId = id(5);
-async function fixture(context: BrowserContext, limited = false) {
+async function fixture(context: BrowserContext, limited = false, exitOnly = false) {
   const changes: Record<string, unknown>[] = [];
   const people = [
     { accountId: manager, displayName: '合成管理员', role: 'TENANT_ADMIN' },
@@ -31,6 +31,7 @@ async function fixture(context: BrowserContext, limited = false) {
     description: '合成空间说明',
   };
   let created = limited;
+  let archived = false;
   await context.route('**/api/**', async (route) => {
     const url = new URL(route.request().url()),
       path = url.pathname,
@@ -60,7 +61,7 @@ async function fixture(context: BrowserContext, limited = false) {
         canEnterManagement: true,
         canAcceptInitialResponsibility: false,
         pendingHandover: null,
-        capabilities: [],
+        capabilities: exitOnly ? [{capability:'TENANT_EXIT',workspaceId:null}] : [],
       });
     if (path.endsWith('/overview'))
       return json({
@@ -72,6 +73,15 @@ async function fixture(context: BrowserContext, limited = false) {
         sharedWorkspaceCount: created ? 1 : 0,
         invitationDelivery: 'DISABLED',
       });
+    if (path.endsWith(`/workspaces/${spaceId}/archive`)) {
+      if (post) {
+        const body = route.request().postDataJSON();
+        changes.push(body);
+        archived = body.archived;
+        space.version++;
+      }
+      return json({ id: spaceId, archived, revision: space.version, dependentRecords: 0 });
+    }
     if (path.endsWith('/workspaces')) {
       if (post) {
         const body = route.request().postDataJSON();
@@ -157,4 +167,29 @@ test('ordinary responsible member gets scoped spaces without enterprise manageme
   await expect(page.getByRole('button', { name: '设为只读', exact: true })).toBeDisabled();
   await page.setViewportSize({ width: 360, height: 900 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test('empty workspace archive preserves restoration and hides mutation controls', async ({
+  context,
+  page,
+}) => {
+  const changes = await fixture(context, true);
+  await page.goto(`/tenant-admin/#tenant=${tenant}&admin=members`);
+  await page.getByRole('button', { name: '管理空间 合成项目空间', exact: true }).click();
+  await page.getByRole('checkbox', { name: '确认归档此空间' }).check();
+  await page.getByRole('button', { name: '归档空间', exact: true }).click();
+  await expect(page.getByText('已归档', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '添加成员', exact: true })).toHaveCount(0);
+  await page.screenshot({ path: 'test-results/workspace-archive.png', fullPage: true });
+  await page.getByRole('checkbox', { name: '确认恢复此空间' }).check();
+  await page.getByRole('button', { name: '恢复空间', exact: true }).click();
+  await expect(page.getByRole('button', { name: '添加成员', exact: true })).toBeVisible();
+  expect(changes.map((c) => c.archived)).toEqual([true, false]);
+});
+
+test('explicit enterprise exit capability exposes the exit entry without configuration rights',async({context,page})=>{
+ await fixture(context,true,true);
+ await page.goto(`/tenant-admin/#tenant=${tenant}&admin=company&detail=retention`);
+ await expect(page.getByRole('link',{name:'保留与退出',exact:true})).toBeVisible();
+ await expect(page.getByRole('link',{name:'资讯来源',exact:true})).toHaveCount(0);
 });

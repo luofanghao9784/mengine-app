@@ -36,6 +36,15 @@ export function EnterpriseOverview({
   const waiting = data.error ? '暂不可用' : '加载中';
   return (
     <div className="enterprise-overview-cards">
+      <section className="enterprise-info-card" aria-label="企业退出与清理">
+        <div className="enterprise-card-heading">
+          <h2>企业退出与清理</h2>
+        </div>
+        <p className="admin-note">
+          暂停服务保留企业资产。正式退出由具有企业退出权限的人员在企业管理端“企业信息 →
+          保留与退出”办理，经过迁出期后清理在线内容。总台保留企业记录用于审计，备份副本需独立核验。
+        </p>
+      </section>
       <section className="enterprise-info-card" aria-label="企业信息">
         <div className="enterprise-card-heading">
           <h2>企业信息</h2>

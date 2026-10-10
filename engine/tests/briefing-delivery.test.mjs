@@ -286,3 +286,15 @@ test('existing single-newline paragraphs normalize without rewriting or inventin
   const single = { analysis: paragraphs.join('') };
   assert.equal(normalizeBriefingArguments(single), single);
 });
+
+test('missing presentation receives conservative composition without invented business content', async () => {
+ for(const businessType of ['DATA','INSIGHT']) {
+  let received;
+  const tool=briefingDeliveryTool({presentationAvailable:true,authorize:async()=>{},invoke:async body=>{received=body;return{contractVersion:'1.0',status:'PREPARED',artifactId:randomUUID(),title:body.title,visibility:'PRIVATE_AFTER_TASK_SUCCEEDS'};}});
+  const body={businessType,title:'合成经营分析结果',summary:'这是根据获权资料形成的完整分析摘要。',analysis:['第一段只使用已经取得的经营数据证据。','第二段明确当前数据范围和待核实事项。']};
+  const result=await runHarness({prompt:'合成结构兼容验收',tools:[tool],finishOnDeliverable:true,hasCompletedDeliverable:hasPreparedBriefing,model:{async *generate(){yield{type:'tool_call',id:'compose',name:'deliver_briefing',arguments:JSON.stringify(body)};yield{type:'finish',reason:'tool_calls'};}}});
+  assert.equal(result.status,'completed');assert.deepEqual(received.analysis,body.analysis);
+  assert.deepEqual(received.presentation,{version:'briefing-presentation-v1',layout:'EDITORIAL',chartStyle:businessType==='DATA'?'TABLE':null,focusGroup:null,focusValue:null,sections:[]});
+  const explicit={...body,presentation:{wrong:'shape'}};assert.deepEqual(tool.normalizeArguments(explicit).presentation,explicit.presentation);
+ }
+});

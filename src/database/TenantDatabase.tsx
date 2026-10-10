@@ -13,6 +13,7 @@ import {
   type DataConnection,
 } from './client';
 import './database.css';
+import { DatasetLifecyclePanel } from './DatasetLifecyclePanel';
 const date = (v: string | null) => (v ? new Date(v).toLocaleString('zh-CN', { hour12: false }) : '尚无记录');
 const frequency = (s: CollectionSchedule) =>
   s.frequency === 'DAILY'
@@ -60,7 +61,12 @@ function useProgressRefresh(active: boolean, refresh: () => void) {
 export function TenantDatabase({ tenant, hash }: { tenant: string; hash: string }) {
   const pending = useContext(RequestPending),
     params = new URLSearchParams(hash.slice(1));
-  const section = params.get('section') === 'access' ? 'access' : 'data',
+  const section =
+      params.get('section') === 'access'
+        ? 'access'
+        : params.get('section') === 'lifecycle'
+          ? 'lifecycle'
+          : 'data',
     connection = params.get('connection'),
     dataset = params.get('dataset');
   const href = (extra: Record<string, string>) => adminHref('tenant', 'database', hash, extra);
@@ -71,12 +77,13 @@ export function TenantDatabase({ tenant, hash }: { tenant: string; hash: string 
           [
             ['data', '数据管理'],
             ['access', '数据接入'],
+            ['lifecycle', '撤下与清理'],
           ] as const
         ).map(([key, label]) => (
           <Button
             key={key}
             disabled={pending}
-            variant={section === key ? 'primary' : 'ghost'}
+            variant="ghost"
             aria-current={section === key ? 'page' : undefined}
             onClick={() => {
               location.hash = href({ section: key });
@@ -86,7 +93,9 @@ export function TenantDatabase({ tenant, hash }: { tenant: string; hash: string 
           </Button>
         ))}
       </nav>
-      {section === 'access' ? (
+      {section === 'lifecycle' ? (
+        <DatasetLifecyclePanel tenant={tenant} />
+      ) : section === 'access' ? (
         uuid(connection) ? (
           <ConnectionDetail key={connection} tenant={tenant} id={connection} hash={hash} />
         ) : (
@@ -262,6 +271,7 @@ function DatasetDetail({ tenant, id, hash }: { tenant: string; id: string; hash:
             <h2>{data.name}</h2>
             <Badge>{runStatus(data.latestRun)}</Badge>
           </div>
+          <DatasetLifecyclePanel tenant={tenant} id={id} />
           <p className="admin-note">
             {data.workspaceName}
             {data.description && ` · ${data.description}`}

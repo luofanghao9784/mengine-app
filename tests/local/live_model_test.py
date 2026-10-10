@@ -87,6 +87,15 @@ class LiveModelBoundaryTest(unittest.TestCase):
             self.assertNotIn(self.value['apiKey'], json.dumps({**trial.clean_environment(), **api}))
             self.assertNotIn('other-project-secret', json.dumps(engine))
 
+    def test_explicit_automatic_work_overrides_manual_mode_without_ambient_activation(self):
+        with self.assertRaises(trial.TrialError):
+            trial.model_environments(None, 23001, 'synthetic', 23002, automatic_work=True)
+        api, _ = trial.model_environments(self.value, 23001, 'synthetic', 23002, True, automatic_work=True)
+        for key in ('COMPANY_INFORMATION_ENABLED', 'EXPERIENCE_INTAKE_ENABLED',
+                    'EXPERIENCE_ANALYSIS_ENABLED', 'EXPERIENCE_GENERALIZATION_ENABLED',
+                    'BRIEFING_AUTOMATIC_ENABLED', 'ONGOING_PLANS_ENABLED'):
+            self.assertEqual(api[key], 'true')
+
     def test_default_start_does_not_load_model_file(self):
         root = self.workspace / 'instance'
         root.mkdir(mode=0o700)

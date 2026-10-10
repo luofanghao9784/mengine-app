@@ -132,3 +132,14 @@ test('mixed summary/comparison arguments return actionable hints without echoing
  const tool=datasetComparisonTool({allowSummary:true,authorize:async()=>{},invoke:async()=>{throw Error('must not invoke');}});
  await assert.rejects(tool.execute({...request,operation:'SUMMARY',groupColumns:['private-header']},new AbortController().signal),e=>e.code==='INVALID_TOOL_ARGUMENTS'&&e.hint.includes('OMIT')&&!e.hint.includes('private-header'));
 });
+
+test('null optional placeholders normalize without changing business choices or IDs', async () => {
+ const {normalizeDatasetArguments}=await import('../dist/runtime/dataset-comparison.js');
+ const args={datasetId:id,snapshotId:id,operation:'SUMMARY',groupColumns:['status'],aggregation:'COUNT',groupColumn:null,periodColumn:null,baseline:null,current:null,dateColumn:null,dateFrom:null,dateTo:null};
+ const normalized=normalizeDatasetArguments(args);
+ assert.deepEqual(normalized,{datasetId:id,snapshotId:id,operation:'SUMMARY',groupColumns:['status'],aggregation:'COUNT'});
+ assert.equal(args.groupColumn,null);
+ const invalid={...args,baseline:'actual-period'};
+ await assert.rejects(datasetComparisonTool({authorize:async()=>{},invoke:async()=>{throw Error('must not invoke');}}).execute(normalizeDatasetArguments(invalid),new AbortController().signal),{code:'INVALID_TOOL_ARGUMENTS'});
+ assert.equal(normalizeDatasetArguments({datasetId:null}).datasetId,null);
+});
