@@ -265,6 +265,8 @@ export class EngineScene {
   private satelliteRoll = 0.4;
   private workAngle = 0;
   private followBlend = sp(0);
+  private followK = 0;
+  private eyePos: V3 = [0, 0.2, 11];
   private workSpeed = sp(0.18);
   private evolutionSeed = Math.floor(Math.random() * 4294967296);
   private coreS = sp(0.2);
@@ -537,6 +539,29 @@ export class EngineScene {
     PT[o + 6] = a;
     PT[o + 7] = s;
     this.np++;
+  }
+  /** Signal pulse around the orbiting subject while the camera follows it: camera-facing rings that expand and fade. */
+  private pulse(p: V3, color: V3, strength: number, t: number) {
+    if (strength < 0.02) return;
+    const view = norm(sub(this.eyePos, p));
+    const right = norm(cross([0, 1, 0.01], view)),
+      up = cross(view, right);
+    const WAVES = 3,
+      SEG = 72;
+    for (let w = 0; w < WAVES; w++) {
+      // Reduced motion: three still rings instead of travelling waves.
+      const u = this.reduced ? (w + 1) / (WAVES + 1) : (t / 2.6 + w / WAVES) % 1;
+      const rad = 0.13 + u * 0.66;
+      const alpha = (1 - u) * (1 - u) * Math.min(1, u * 7) * strength;
+      // Lines only: a main ring plus a fainter one just outside it, so the stroke reads without dots.
+      const at = (a: number, r: number) => add(p, add(mul(right, Math.cos(a) * r), mul(up, Math.sin(a) * r)));
+      for (let s = 0; s < SEG; s++) {
+        const a0 = (s / SEG) * Math.PI * 2,
+          a1 = ((s + 1) / SEG) * Math.PI * 2;
+        this.ln(at(a0, rad), at(a1, rad), ...color, alpha * 0.95);
+        this.ln(at(a0, rad * 1.014), at(a1, rad * 1.014), ...color, alpha * 0.4);
+      }
+    }
   }
   private ln(a: V3, b: V3, r: number, g: number, bl: number, al: number) {
     if (this.nl >= MAX_LN - 2 || al < 0.003) return;
@@ -817,6 +842,7 @@ export class EngineScene {
       point(node, C_CH, 0.2 * energy, 0.22);
       point(node, [1, 0.97, 0.88], 0.9 * energy, 0.095);
       point(node, [1, 1, 0.98], energy, 0.043);
+      if (this.focus === 'pr') this.pulse(node, C_CH, this.followK * energy * draw * visibility(node), t);
       // A short, soft wake keeps the orbit readable without lighting the entire ring.
       for (let j = 1; j <= 9; j++)
         point(loopPt(WORK, this.workAngle - j * 0.012), C_CH, (1 - j / 10) * 0.24 * energy, 0.038);
@@ -873,6 +899,7 @@ export class EngineScene {
       const wing = add(mul(radial, Math.cos(roll)), mul(normal, Math.sin(roll)));
       point(sat, 1.05, 0.06);
       point(sat, 0.18 + evo.strength * 0.08, 0.19);
+      if (this.focus === 'evo') this.pulse(sat, blue, this.followK * visibility(sat), t);
       for (const side of [-1, 1]) {
         const wingPt = (a: number) =>
           add(sat, add(mul(tangent, Math.cos(a) * 0.14), mul(wing, Math.sin(a) * 0.095 * side)));
@@ -890,9 +917,18 @@ export class EngineScene {
           const target = worldPts[targetIndex];
           // Short local fan: approach from outside the nearby surface without circling the core.
           const scanPath = (end: V3, u: number) => bz(sat, mul(sat, 0.82), mul(end, 1.18), end, u);
-          patch.slice(1, 4).forEach((i) => {
-            for (let k = 0; k < 28; k++)
-              line(scanPath(worldPts[i], k / 28), scanPath(worldPts[i], (k + 1) / 28), 0.13 * evo.strength);
+          // Links from the satellite to the patch: a steady beam with a brighter band travelling down each line,
+          // plus a fainter twin beside it so the stroke reads against the nebula.
+          const twin = (end: V3, u: number) => bz(sat, mul(sat, 0.86), mul(end, 1.14), end, u);
+          patch.slice(0, 4).forEach((i, n) => {
+            const head = this.reduced ? 0.5 : (t * 0.55 + n * 0.23) % 1;
+            for (let k = 0; k < 28; k++) {
+              const u = (k + 0.5) / 28;
+              const band = Math.max(0, 1 - Math.abs(u - head) / 0.14);
+              const alpha = (0.34 + 0.62 * band * band) * evo.strength;
+              line(scanPath(worldPts[i], k / 28), scanPath(worldPts[i], (k + 1) / 28), alpha);
+              line(twin(worldPts[i], k / 28), twin(worldPts[i], (k + 1) / 28), alpha * 0.4);
+            }
           });
           patch.forEach((i) => {
             const color = mix(blue, C_CH, evo.repair);
@@ -900,7 +936,7 @@ export class EngineScene {
           });
           for (const i of patch.slice(1)) {
             const color = mix(blue, C_CH, evo.repair);
-            this.ln(target, worldPts[i], ...color, 0.48 * evo.strength * visibility(target));
+            this.ln(target, worldPts[i], ...color, 0.72 * evo.strength * visibility(target));
           }
           if (evo.phase === '修复中')
             for (let k = 0; k < 2; k++)
@@ -983,6 +1019,7 @@ export class EngineScene {
       c = tg.c.map((v, i) => this.spr(this.CAM.c[i], v, dt, rate)) as V3;
     const following = this.focus === 'pr' || this.focus === 'evo';
     const freeOrbit = 1 - this.spr(this.followBlend, following ? 1 : 0, dt, 14);
+    this.followK = 1 - freeOrbit;
     const drift = reduced ? 0 : freeOrbit;
     const orbitYaw = this.yaw * freeOrbit + drift * Math.sin(t * 0.05) * 0.08 + this.mx * 0.06 * drift,
       orbitPitch = this.pitch * freeOrbit + this.my * 0.04 * drift;
@@ -990,6 +1027,7 @@ export class EngineScene {
     eye = rotY(eye, orbitYaw);
     eye = rotX(eye, clamp(orbitPitch, -0.6, 0.6));
     eye = add(eye, c);
+    this.eyePos = eye;
     const VP = mm(persp((38 * Math.PI) / 180, this.W / this.H, 0.1, 80), lookAt(eye, c, [0, 1, 0]));
     this.VP = VP;
     const cp = this.proj(VP, [0, 0, 0]);
