@@ -223,7 +223,7 @@ def public_search_environments(value):
     return {'AGENT_PUBLIC_WEB_ENABLED': 'true', 'AGENT_NEWS_SEARCH_PROVIDER': provider}, engine
 
 
-def model_environments(model, engine_port, engine_token, api_port, manual_acceptance=False, public_search=None):
+def model_environments(model, engine_port, engine_token, api_port, manual_acceptance=False, public_search=None, automatic_work=False):
     engine_env = {'PATH': os.environ.get('PATH', '/usr/bin:/bin'), 'ENGINE_HOST': '127.0.0.1',
                   'ENGINE_PORT': str(engine_port), 'TASK_ENGINE_TOKEN': engine_token}
     api_env = {'AGENT_TASK_MODE': 'off'}
@@ -236,6 +236,12 @@ def model_environments(model, engine_port, engine_token, api_port, manual_accept
         api_env.update({'COMPANY_INFORMATION_ENABLED': 'false', 'EXPERIENCE_INTAKE_ENABLED': 'false',
                         'EXPERIENCE_ANALYSIS_ENABLED': 'false', 'EXPERIENCE_GENERALIZATION_ENABLED': 'false',
                         'BRIEFING_AUTOMATIC_ENABLED': 'false', 'ONGOING_PLANS_ENABLED': 'false'})
+    if automatic_work:
+        if not model:
+            raise TrialError('自动业务流程需要真实模型配置。')
+        api_env.update({k: 'true' for k in ('COMPANY_INFORMATION_ENABLED', 'EXPERIENCE_INTAKE_ENABLED',
+            'EXPERIENCE_ANALYSIS_ENABLED', 'EXPERIENCE_GENERALIZATION_ENABLED',
+            'BRIEFING_AUTOMATIC_ENABLED', 'ONGOING_PLANS_ENABLED')})
     search_api, search_engine = public_search_environments(public_search)
     api_env.update(search_api)
     engine_env.update(search_engine)
@@ -391,7 +397,7 @@ def start(root, model_config=None, reconnect_live=False, phone_local=False, coll
             raise TrialError('数据库目录不能是符号链接。')
         engine_port=free_port()
         engine_token=secrets.token_urlsafe(48)
-        model_api_env, engine_env = model_environments(model, engine_port, engine_token, settings['ports']['api'], settings.get('manualModelAcceptance', False), settings.get('publicSearch'))
+        model_api_env, engine_env = model_environments(model, engine_port, engine_token, settings['ports']['api'], settings.get('manualModelAcceptance', False), settings.get('publicSearch'), settings.get('automaticWorkEnabled', False))
         env = {**clean_environment(), 'TASK_ENABLED':'true', 'TASK_ENGINE_TOKEN':engine_token, 'ENGINE_BASE_URL':f'http://127.0.0.1:{engine_port}', 'DATABASE_URL': f"jdbc:postgresql://127.0.0.1:{settings['ports']['database']}/dreamcore_trial", 'DATABASE_USER': 'dreamcore_trial', 'DATABASE_PASSWORD': secret,
                'KNOWLEDGE_ENABLED': str((WORKSPACE / 'workers/parser/.venv/bin/python').exists()).lower(), 'KNOWLEDGE_PARSER_ROOT': str(WORKSPACE / 'workers/parser'), 'MATERIAL_STORAGE_ROOT': str(root / 'objects'), 'SPRING_PROFILES_ACTIVE': 'local', 'INVITATION_DELIVERY': 'local', 'INVITATION_OUTBOX': str(root / 'invitations'), 'API_HOST': '127.0.0.1', 'API_PORT': str(settings['ports']['api']), 'SERVER_SERVLET_SESSION_COOKIE_NAME': 'DREAMCORE_TRIAL_' + hashlib.sha256(str(root).encode()).hexdigest()[:12]}
         env.update({'PHONE_DELIVERY': 'local' if phone_local else 'disabled', 'PHONE_LOCAL_PREVIEW': str(phone_local).lower(), 'PHONE_OUTBOX': str(root / 'phone-sms')})

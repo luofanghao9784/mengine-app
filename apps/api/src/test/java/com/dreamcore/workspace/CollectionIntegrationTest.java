@@ -23,6 +23,8 @@ class CollectionIntegrationTest {
     @TestConfiguration static class Config {
         @Bean @Primary CollectionAdapter syntheticCollector(){return new CollectionAdapter(){public boolean available(){return true;}public Result collect(Request r){return new Result("1.0",r.datasets().stream().map(d->new Snapshot(d.id(),Instant.parse("2026-01-01T00:00:00Z"),List.of(d.columns().stream().map(c->"synthetic-"+c).toList()))).toList());}};}
     }
+    @Autowired DatasetLifecycleService lifecycle;
+    @Autowired WorkspaceArchiveService archives;
     @Autowired CollectionDeployment deployment;
     @Autowired CollectionService service;@Autowired CollectionWorker worker;@Autowired JdbcTemplate db;
     @Autowired TenantAdminService admins;@Autowired TenantServiceRuntime runtime;@Autowired PasswordEncoder passwords;
@@ -46,6 +48,41 @@ class CollectionIntegrationTest {
     CollectionService.Run start(){return service.updateNow(admin,tenant,connection,UUID.randomUUID(),service.detail(admin,tenant,connection).revision());}
     CollectionAdapter.Result result(String name,Instant coverage){return new CollectionAdapter.Result("1.0",List.of(new CollectionAdapter.Snapshot(dataset,coverage,List.of(List.of(name,"3")))));}
     void code(String expected,Runnable action){assertEquals(expected,assertThrows(IdentityException.class,action::run).code);}
+    @Test void datasetLifecycleRequiresScopeAndCapabilityAndErasesAllSnapshots() {
+        code("MATERIAL_LOCATION_UNAVAILABLE",()->lifecycle.get(admin,tenant,dataset));
+        code("CAPABILITY_REQUIRED",()->lifecycle.act(reader,tenant,dataset,UUID.randomUUID(),0,"WITHDRAW",true));
+        admins.grant(owner,tenant,space,admin,UUID.randomUUID(),admins.spaceInfo(owner,tenant,space).version(),true);
+        start();var claim=service.claim(tenant,connection,Instant.now());assertTrue(service.complete(claim,result("待清理正文",null),Instant.now()));
+        start();var late=service.claim(tenant,connection,Instant.now());
+        UUID key=UUID.randomUUID();var receipt=lifecycle.act(admin,tenant,dataset,key,0,"WITHDRAW",true);
+        assertEquals("WITHDRAWN",receipt.state());assertEquals(1,receipt.rows());
+        assertEquals(receipt,lifecycle.act(admin,tenant,dataset,key,0,"WITHDRAW",true));
+        assertFalse(service.complete(late,result("不得复活",null),Instant.now()));
+        assertTrue(service.datasets(reader,tenant,"",0,20).items().isEmpty());
+        code("CAPABILITY_REQUIRED",()->lifecycle.act(admin,tenant,dataset,UUID.randomUUID(),1,"PURGE",true));
+        db.update("INSERT INTO governance_capabilities(tenant_id,account_id,workspace_id,capability,granted_by) VALUES (?,?,?,'LIFECYCLE_PURGE',?)",tenant,admin,space,admin);
+        code("INVALID_REQUEST",()->lifecycle.act(admin,tenant,dataset,UUID.randomUUID(),1,"PURGE",false));
+        code("DATASET_LIFECYCLE_CONFLICT",()->lifecycle.act(admin,tenant,dataset,UUID.randomUUID(),0,"PURGE",true));
+        UUID purge=UUID.randomUUID();var cleared=lifecycle.act(admin,tenant,dataset,purge,1,"PURGE",true);
+        assertEquals("PURGED",cleared.state());assertEquals(0,cleared.rows());
+        assertTrue(admins.records(admin,tenant,0,50).stream().anyMatch(r->r.action().equals("DATASET_PURGE")));
+        assertEquals(cleared,lifecycle.act(admin,tenant,dataset,purge,1,"PURGE",true));
+        assertEquals("[]",db.queryForObject("SELECT data_rows::text FROM dataset_snapshots WHERE dataset_id=?",String.class,dataset));
+        assertThrows(Exception.class,()->db.update("UPDATE business_datasets SET status='ACTIVE' WHERE id=?",dataset));
+    }
+    @Test void workspaceArchiveBlocksDependenciesAndNewContentAndCanRestore() {
+        code("WORKSPACE_ARCHIVE_DEPENDENCIES",()->archives.act(admin,tenant,space,UUID.randomUUID(),admins.spaceInfo(admin,tenant,space).version(),true));
+        UUID empty=admins.createSpace(admin,tenant,UUID.randomUUID(),"空空间",owner,"").id();
+        assertThrows(IdentityException.class,()->archives.get(reader,tenant,empty));
+        UUID key=UUID.randomUUID();var archived=archives.act(owner,tenant,empty,key,0,true);
+        assertTrue(archived.archived());assertEquals(archived,archives.act(owner,tenant,empty,key,0,true));
+        assertEquals(0,db.queryForObject("SELECT count(*) FROM pg_trigger WHERE tgname='archive_insert_guard' AND tgrelid IN ('departure_export_sets'::regclass,'departure_export_grants'::regclass,'object_lifecycle_scopes'::regclass)",Integer.class));
+        assertTrue(admins.records(admin,tenant,0,50).stream().anyMatch(r->r.action().equals("WORKSPACE_ARCHIVE")));
+        code("WORKSPACE_ARCHIVED",()->admins.renameSpace(admin,tenant,empty,UUID.randomUUID(),1,"不能修改"));
+        assertThrows(Exception.class,()->db.update("INSERT INTO material_folders(id,tenant_id,workspace_id,name,created_by) VALUES (?,?,?,'不能写入',?)",UUID.randomUUID(),tenant,empty,owner));
+        assertFalse(archives.act(owner,tenant,empty,UUID.randomUUID(),1,false).archived());
+        assertDoesNotThrow(()->db.update("INSERT INTO material_folders(id,tenant_id,workspace_id,name,created_by) VALUES (?,?,?,'恢复后可写入',?)",UUID.randomUUID(),tenant,empty,owner));
+    }
     @Test void controlsDoNotGrantContentAndSpaceReaderCannotControl(){
         assertTrue(service.detail(admin,tenant,connection).canControl());assertEquals(0,service.datasets(admin,tenant,"",0,20).items().size());
         code("DATASET_NOT_FOUND",()->service.preview(admin,tenant,dataset,0,20));

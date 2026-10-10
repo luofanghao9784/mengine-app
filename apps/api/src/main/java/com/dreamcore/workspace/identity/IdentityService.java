@@ -140,7 +140,7 @@ public class IdentityService {
         UUID permission=permissionActor(actor,tenant);
         // Tenant admin and platform role do not confer access to another member's personal workspace.
         var spaces = db.query("""
-            SELECT w.id,w.name,w.kind FROM workspaces w WHERE w.tenant_id=? AND
+            SELECT w.id,w.name,w.kind FROM workspaces w WHERE w.tenant_id=? AND NOT w.archived AND
             ((w.kind='PERSONAL' AND w.owner_id=?) OR (w.kind='SHARED' AND EXISTS(SELECT 1 FROM workspace_members m
                 WHERE m.tenant_id=w.tenant_id AND m.workspace_id=w.id AND m.account_id=?))) AND departure_content_readable(?,w.tenant_id,w.id) ORDER BY w.id
             """, (r,n) -> new Workspace(r.getObject("id", UUID.class),r.getString("name"),r.getString("kind")), tenant, permission, permission, permission);

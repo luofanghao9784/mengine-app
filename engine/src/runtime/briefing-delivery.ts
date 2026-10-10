@@ -49,7 +49,22 @@ export function briefingDeliveryTool(options: {
 }): TaskTool {
   return {
     name: 'deliver_briefing',
-    normalizeArguments: normalizeBriefingArguments,
+    normalizeArguments(value: unknown) {
+      const normalized = normalizeBriefingArguments(value);
+      if (!options.presentationAvailable || !isRecord(normalized)) return normalized;
+      const copy = { ...normalized };
+      if (typeof copy.presentation === 'string' && copy.presentation.length <= 2048) {
+        try { copy.presentation = JSON.parse(copy.presentation); } catch { /* schema rejection retains feedback */ }
+      }
+      // A conservative composition requires no guessed numbers, section roles or emphasis.
+      // Explicit malformed presentations still fail validation; valid model choices are preserved.
+      if (copy.presentation === undefined) copy.presentation = {
+        version: 'briefing-presentation-v1', layout: 'EDITORIAL',
+        chartStyle: copy.businessType === 'DATA' || options.requestedType === 'DATA' ? 'TABLE' : null,
+        focusGroup: null, focusValue: null, sections: [],
+      };
+      return copy;
+    },
     description:
       'Create a real private briefing card on 智能画报. Set businessType to INFO (资讯), DATA (数据), INSIGHT (洞察), SUGGESTION (建议), or RESULT (成果). For text categories omit calculationArtifactId and use actual granted evidence; only DATA requires the calculation below. Do not create cards for greetings or routine status replies; create for a complete useful theme or an explicit user request. Only DATA requires compare_table (XLSX) or compare_dataset (collected database snapshot) and its artifact.id; INFO, INSIGHT, SUGGESTION and RESULT use granted evidence without a calculation. Write a short editorial title, summary and 2–4 analysis paragraphs grounded in that calculation and source scope. Summary and each paragraph must be complete sentences ending in punctuation. Distinguish observed changes from unverified causes. Chart values, periods, units and provenance are taken by the platform from the verified calculation, never from model-supplied numbers. One immutable card per task attempt, private to the current user, visible only after successful task delivery. After PREPARED, finish with a short confirmation; NO_NEW_CONTENT means a duplicate was suppressed, so report no new card; do not repeat raw IDs, hashes or the entire report. This is not enterprise publication or a scheduled plan.' +
       '\n' +
@@ -57,7 +72,7 @@ export function briefingDeliveryTool(options: {
       '\n' +
       BRIEFING_ANALYSIS_ARRAY_HINT +
       (options.presentationAvailable
-        ? '\nChoose presentation according to the business question, not random decoration. version=briefing-presentation-v1. DATA: GROUPED_BAR for a few two-period groups; DUMBBELL for paired comparisons across many groups; DELTA_BAR for verified increases/decreases; CURRENT_BAR for current-period ranking; TABLE for exact values and gaps. KEY_METRIC highlights CURRENT, DIFFERENCE or CHANGE_PERCENT from the verified totals (focusGroup=null) or an exact group. No long-term trend, share, funnel or progress claims from a two-period sum. Non-DATA: EDITORIAL for prose or labeled analysis sections, STEPS for actual recommended actions, COMPARISON for actual supported options, SOURCE for a source filename cover (not proof of a generated file). sections selects 0-based analysis paragraphIndex with OBSERVATION/INTERPRETATION/ACTION/OPTION/CAUTION roles. At least two ACTION/CAUTION sections for STEPS, two OPTION sections for COMPARISON. Do not relabel observations as actions/options. Keep the full analysis; composition never adds facts, executable code, media URLs or chart numbers.'
+        ? '\nChoose presentation according to the business question, not random decoration. version=briefing-presentation-v1. Send presentation as a JSON OBJECT, never a string. Minimal DATA example: {"version":"briefing-presentation-v1","layout":"EDITORIAL","chartStyle":"TABLE","focusGroup":null,"focusValue":null,"sections":[]}. Minimal text example uses the same object with chartStyle:null. DATA: GROUPED_BAR for a few two-period groups; DUMBBELL for paired comparisons across many groups; DELTA_BAR for verified increases/decreases; CURRENT_BAR for current-period ranking; TABLE for exact values and gaps. KEY_METRIC highlights CURRENT, DIFFERENCE or CHANGE_PERCENT from the verified totals (focusGroup=null) or an exact group. No long-term trend, share, funnel or progress claims from a two-period sum. Non-DATA: EDITORIAL for prose or labeled analysis sections, STEPS for actual recommended actions, COMPARISON for actual supported options, SOURCE for a source filename cover (not proof of a generated file). sections selects 0-based analysis paragraphIndex with OBSERVATION/INTERPRETATION/ACTION/OPTION/CAUTION roles. At least two ACTION/CAUTION sections for STEPS, two OPTION sections for COMPARISON. Do not relabel observations as actions/options. Keep the full analysis; composition never adds facts, executable code, media URLs or chart numbers.'
         : ''),
     parameters: {
       type: 'object',

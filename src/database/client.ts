@@ -67,10 +67,47 @@ const dataset = (v: unknown): v is BusinessDataset =>
   nullableTime(v.collectedAt) &&
   nullableTime(v.coverageThrough) &&
   nullableRun(v.latestRun);
+import type { DatasetLifecycle } from '../../contracts/public-api/collection.ts';
+export type { DatasetLifecycle } from '../../contracts/public-api/collection.ts';
+const lifecycle = (v: unknown): v is DatasetLifecycle =>
+  record(v) &&
+  uuid(v.id) &&
+  text(v.name) &&
+  ['ACTIVE', 'WITHDRAWN', 'PURGED'].includes(String(v.state)) &&
+  [v.revision, v.snapshots, v.rows].every(count) &&
+  typeof v.canWithdraw === 'boolean' &&
+  typeof v.canPurge === 'boolean';
 export function createDatabaseClient(fetcher: typeof fetch = fetch) {
   const request = createIdentityRequest(fetcher),
     root = (tenant: string) => `/api/v1/tenants/${tenant}/database`;
   return {
+    lifecycle: (tenant: string, id: string, signal?: AbortSignal) =>
+      request(
+        root(tenant) + '/lifecycle/' + id,
+        'GET',
+        (v): v is DatasetLifecycle => lifecycle(v) && v.id === id,
+        undefined,
+        signal,
+      ),
+    lifecycleRecords: (tenant: string, signal?: AbortSignal) =>
+      request(
+        root(tenant) + '/lifecycle',
+        'GET',
+        (v): v is DatasetLifecycle[] => Array.isArray(v) && v.every(lifecycle),
+        undefined,
+        signal,
+      ),
+    lifecycleAction: (
+      tenant: string,
+      id: string,
+      body: { requestId: string; expectedRevision: number; action: string; confirmed: boolean },
+    ) =>
+      request(
+        root(tenant) + '/lifecycle/' + id,
+        'POST',
+        (v): v is DatasetLifecycle => lifecycle(v) && v.id === id,
+        body,
+      ),
     summary: (tenant: string, signal?: AbortSignal) =>
       request(
         root(tenant) + '/summary',

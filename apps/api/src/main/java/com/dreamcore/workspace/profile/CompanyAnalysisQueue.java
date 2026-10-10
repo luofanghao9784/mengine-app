@@ -15,18 +15,32 @@ public class CompanyAnalysisQueue {
   db.update("UPDATE company_analysis_items i SET state='CANCELLED',error_code='COMPANY_SOURCE_CHANGED',updated_at=now() WHERE state IN ('QUEUED','RETRY_WAIT') AND NOT EXISTS(SELECT 1 FROM company_analysis_current_chunks c WHERE c.id=i.chunk_id)");
   db.update("UPDATE company_analysis_items i SET state='QUEUED',run_id=NULL,attempts=0,error_code=NULL,next_attempt_at=now()+interval '30 seconds',updated_at=now() WHERE (i.state='CANCELLED' OR i.state='SUCCEEDED' AND EXISTS(SELECT 1 FROM company_inference_runs r WHERE r.id=i.run_id AND r.fenced)) AND EXISTS(SELECT 1 FROM company_analysis_current_chunks c WHERE c.id=i.chunk_id)");
  }
- @Transactional(readOnly=true) public List<UUID> tenants(){return db.queryForList("SELECT i.tenant_id FROM company_analysis_items i WHERE i.state IN ('QUEUED','RETRY_WAIT') AND i.next_attempt_at<=clock_timestamp() AND NOT EXISTS(SELECT 1 FROM company_analysis_attempts a WHERE a.tenant_id=i.tenant_id AND a.state IN ('CLAIMED','DISPATCHED')) GROUP BY i.tenant_id ORDER BY min(i.next_attempt_at),i.tenant_id LIMIT 20",UUID.class);}
+ @Transactional(readOnly=true) public List<UUID> tenants(){return db.queryForList("SELECT i.tenant_id FROM company_analysis_items i WHERE i.state IN ('QUEUED','RETRY_WAIT') AND i.next_attempt_at<=clock_timestamp() AND (SELECT count(*) FROM company_analysis_attempts a WHERE a.tenant_id=i.tenant_id AND a.state IN ('CLAIMED','DISPATCHED'))<2 GROUP BY i.tenant_id ORDER BY min(i.next_attempt_at),i.tenant_id LIMIT 20",UUID.class);}
  @Transactional public CompanyInferenceService.Job claim(UUID tenant){
   db.queryForList("SELECT id FROM tenants WHERE id=? FOR SHARE",tenant);
   db.queryForList("SELECT pg_advisory_xact_lock(hashtextextended(?,0))","company-analysis:"+tenant);
-  if(Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM company_analysis_attempts WHERE tenant_id=? AND state IN ('CLAIMED','DISPATCHED'))",Boolean.class,tenant)))return null;
+  var slots=db.queryForList("SELECT slot FROM generate_series(1,2) AS slot WHERE NOT EXISTS(SELECT 1 FROM company_analysis_attempts WHERE tenant_id=? AND dispatch_slot=slot AND state IN ('CLAIMED','DISPATCHED')) ORDER BY slot LIMIT 1",Integer.class,tenant);
+  if(slots.isEmpty())return null;
   var actors=db.queryForList("SELECT m.account_id FROM tenant_memberships m JOIN accounts a ON a.id=m.account_id LEFT JOIN tenant_governance g ON g.tenant_id=m.tenant_id WHERE m.tenant_id=? AND m.status='ACTIVE' AND a.status='ACTIVE' AND (m.role='TENANT_ADMIN' OR m.account_id=g.owner_id OR EXISTS(SELECT 1 FROM governance_capabilities c WHERE c.tenant_id=m.tenant_id AND c.account_id=m.account_id AND c.workspace_id IS NULL AND c.capability='PROFILE_MAINTAIN')) ORDER BY (m.account_id=g.owner_id) DESC NULLS LAST,m.account_id LIMIT 1",UUID.class,tenant);
   if(actors.isEmpty())return null;
-  var chunks=db.queryForList("SELECT i.chunk_id FROM company_analysis_items i JOIN company_analysis_current_chunks c ON c.id=i.chunk_id WHERE i.tenant_id=? AND i.state IN ('QUEUED','RETRY_WAIT') AND i.next_attempt_at<=clock_timestamp() ORDER BY i.next_attempt_at,i.chunk_id LIMIT 3 FOR UPDATE OF i SKIP LOCKED",UUID.class,tenant);
-  if(chunks.isEmpty())return null;
+  // Choose a file, not random UUID fragments. Another batch may analyze another file.
+  var versions=db.queryForList("SELECT c.version_id FROM company_analysis_items i JOIN company_analysis_current_chunks eligible ON eligible.id=i.chunk_id JOIN knowledge_chunks c ON c.id=i.chunk_id WHERE i.tenant_id=? AND i.state IN ('QUEUED','RETRY_WAIT') AND i.next_attempt_at<=clock_timestamp() AND NOT EXISTS(SELECT 1 FROM company_analysis_items busy JOIN knowledge_chunks bc ON bc.id=busy.chunk_id WHERE bc.version_id=c.version_id AND busy.state='RUNNING') ORDER BY i.next_attempt_at,c.version_id,c.ordinal LIMIT 1",UUID.class,tenant);
+  if(versions.isEmpty())return null;
+  var file=db.queryForList("SELECT c.id,c.content,i.state,i.next_attempt_at<=clock_timestamp() AS due FROM knowledge_chunks c JOIN company_analysis_current_chunks eligible ON eligible.id=c.id LEFT JOIN company_analysis_items i ON i.chunk_id=c.id WHERE c.version_id=? ORDER BY c.ordinal,c.id",versions.getFirst());
+  var chunks=new ArrayList<UUID>();var pending=new ArrayList<UUID>();int characters=0;
+  for(var part:file){
+   int size=((String)part.get("content")).length();
+   if(!chunks.isEmpty()&&(chunks.size()>=64||characters+size>8000)){
+    if(!pending.isEmpty())break;
+    chunks.clear();characters=0;
+   }
+   chunks.add((UUID)part.get("id"));characters+=size;
+   if(Set.of("QUEUED","RETRY_WAIT").contains(String.valueOf(part.get("state")))&&Boolean.TRUE.equals(part.get("due")))pending.add((UUID)part.get("id"));
+  }
+  if(pending.isEmpty())return null;
   var job=inference.begin(actors.getFirst(),tenant,chunks);
-  db.update("INSERT INTO company_analysis_attempts(run_id,tenant_id,state) VALUES (?,?,'CLAIMED')",job.id(),tenant);
-  for(UUID chunk:chunks)db.update("UPDATE company_analysis_items SET state='RUNNING',run_id=?,error_code=NULL,updated_at=now() WHERE chunk_id=?",job.id(),chunk);
+  db.update("INSERT INTO company_analysis_attempts(run_id,tenant_id,state,dispatch_slot) VALUES (?,?,'CLAIMED',?)",job.id(),tenant,slots.getFirst());
+  for(UUID chunk:pending)db.update("UPDATE company_analysis_items SET state='RUNNING',run_id=?,error_code=NULL,updated_at=now() WHERE chunk_id=?",job.id(),chunk);
   return job;
  }
  @Transactional public void dispatched(CompanyInferenceService.Job job,CompanyAnalysisRuntime.Descriptor runtime){

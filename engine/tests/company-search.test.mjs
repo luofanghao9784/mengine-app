@@ -116,3 +116,7 @@ for (const failed of [false, true])
     assert.equal(result.outcome, failed ? 'PARTIAL' : 'COMPLETE');
     assert.deepEqual(result.sourceIds, failed ? [] : [id]);
   });
+
+test('empty unrestricted search returns bounded correction without copying the prompt', () => {
+ assert.throws(()=>sourceQueries('private wording','',context()),e=>e.code==='SEARCH_QUERY_REQUIRED'&&e.hint.includes('keyword')&&!e.hint.includes('private wording'));
+});

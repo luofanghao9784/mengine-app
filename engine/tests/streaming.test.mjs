@@ -76,7 +76,7 @@ test('fragmented tool JSON executes only after complete frame and DONE', async (
       );
       await delay(20);
       assert.equal(executions, 0);
-      send(res, frame({ tool_calls: [{ index: 0, function: { arguments: '"合成"}' } }] }));
+      send(res, frame({ tool_calls: [{ index: 0, id: null, function: { arguments: '"合成"}' } }] }));
       send(res, frame({}, 'tool_calls'));
       complete = true;
     } else {

@@ -209,3 +209,22 @@ test('authenticated optional transport pins artifact and exposes recoverable rec
     400,
   );
 });
+
+test('five granted inputs are read in one call and evidence still requires exact provenance', async () => {
+ const input=request();for(let n=6;n<10;n++)input.job.inputs.push({...input.job.inputs[0],chunkId:id(n)});
+ const {company,calls}=analyzer([
+  tool('company_input',{all:true},1),
+  tool('company_group',{field:'INDUSTRY'},2),
+  tool('submit_company_candidates',{candidates:[candidate]},3),
+ ]);
+ const result=await company.run(input);assert.equal(result.outcome,'COMPLETE');assert.equal(calls(),3);assert.deepEqual(result.candidates,[candidate]);
+});
+
+test('whole-file batch preserves all source identities and enforces a total text budget', async () => {
+ const {validCompanyRequest}=await import('../dist/runtime/company-analysis.js');
+ const input=request();for(let n=6;n<26;n++)input.job.inputs.push({...input.job.inputs[0],chunkId:id(n)});
+ const {company,calls}=analyzer([tool('company_input',{all:true},1),tool('company_group',{field:'INDUSTRY'},2),tool('submit_company_candidates',{candidates:[candidate]},3)]);
+ assert.equal(validCompanyRequest(input),true);assert.equal((await company.run(input)).outcome,'COMPLETE');assert.equal(calls(),3);
+ const tooLarge=request();tooLarge.job.inputs[0].text='字'.repeat(8000);tooLarge.job.inputs.push({...tooLarge.job.inputs[0],chunkId:id(6),text:'字'});assert.equal(validCompanyRequest(tooLarge),false);
+ const tooMany=request();for(let n=6;n<70;n++)tooMany.job.inputs.push({...tooMany.job.inputs[0],chunkId:id(n)});assert.equal(validCompanyRequest(tooMany),false);
+});

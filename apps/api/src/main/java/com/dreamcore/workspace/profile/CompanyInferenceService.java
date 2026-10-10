@@ -38,12 +38,13 @@ public class CompanyInferenceService {
  /** Called by a platform worker, not a client endpoint. All model inputs are fixed here. */
  @Transactional public Job begin(UUID actor,UUID tenant,List<UUID> chunks){
   write(actor,tenant);
-  if(chunks==null||chunks.isEmpty()||chunks.size()>5||chunks.stream().anyMatch(Objects::isNull)||new HashSet<>(chunks).size()!=chunks.size())throw IdentityException.invalid();
+  if(chunks==null||chunks.isEmpty()||chunks.size()>64||chunks.stream().anyMatch(Objects::isNull)||new HashSet<>(chunks).size()!=chunks.size())throw IdentityException.invalid();
   var inputs=new ArrayList<Input>();
   for(UUID chunk:chunks){
    var values=db.query("SELECT c.*,v.filename FROM knowledge_chunks c JOIN material_versions v ON v.id=c.version_id WHERE c.id=? AND c.tenant_id=? AND company_chunk_eligible(c.id)",(r,n)->new Input(r.getObject("id",UUID.class),r.getObject("version_id",UUID.class),r.getString("filename"),r.getString("locator"),r.getString("content")),chunk,tenant);
    if(values.isEmpty())throw unavailable();inputs.add(values.getFirst());
   }
+  if(inputs.stream().mapToInt(i->i.text().length()).sum()>8000)throw IdentityException.invalid();
   var groups=information.get(actor,tenant).groups();var revisions=new LinkedHashMap<String,Integer>();for(var g:groups)revisions.put(g.field().name(),g.revision());
   UUID id=UUID.randomUUID(),lease=UUID.randomUUID();
   db.update("INSERT INTO company_inference_runs(id,tenant_id,actor_id,state,lease_token,lease_until,group_revisions) VALUES (?,?,?,'RUNNING',?,now()+interval '90 seconds',?::jsonb)",id,tenant,actor,lease,json.writeValueAsString(revisions));

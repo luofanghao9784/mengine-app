@@ -19,6 +19,8 @@ async function fixture(
   options: { reader?: boolean; unavailable?: boolean; lost?: boolean } = {},
 ) {
   const requests: Record<string, unknown>[] = [];
+  let lifecycleState = 'ACTIVE',
+    lifecycleRevision = 0;
   let schedule = { enabled: true, frequency: 'HOURLY', dailyTime: null, timeZone: 'Asia/Shanghai' },
     revision = 0,
     started = false,
@@ -77,6 +79,26 @@ async function fixture(
         pendingHandover: null,
         capabilities: [],
       });
+    const lifecycle = () => ({
+      id: dataset,
+      name: '合成订单数据',
+      state: lifecycleState,
+      revision: lifecycleRevision,
+      snapshots: 1,
+      rows: lifecycleState === 'PURGED' ? 0 : 1,
+      canWithdraw: !options.reader && lifecycleState === 'ACTIVE',
+      canPurge: !options.reader && lifecycleState === 'WITHDRAWN',
+    });
+    if (path.endsWith('/lifecycle/' + dataset)) {
+      if (route.request().method() === 'POST') {
+        const b = route.request().postDataJSON();
+        requests.push(b);
+        lifecycleState = b.action === 'WITHDRAW' ? 'WITHDRAWN' : 'PURGED';
+        lifecycleRevision++;
+      }
+      return json(lifecycle());
+    }
+    if (path.endsWith('/lifecycle')) return json(lifecycleState === 'ACTIVE' ? [] : [lifecycle()]);
     if (path.endsWith('/summary'))
       return json({ datasets: 1, available: 1, updating: started ? 1 : 0, failed: 0 });
     if (path.endsWith('/datasets')) return json({ items: [data()], hasMore: false });
@@ -168,4 +190,26 @@ test('unavailable connection blocks update and uncertain response reuses the ori
   await expect.poll(() => writes.length).toBe(2);
   expect(writes[0]).toEqual(writes[1]);
   await expect(page.getByRole('button', { name: '更新中', exact: true })).toBeDisabled();
+});
+
+test('withdrawal and body purge require confirmation and show distinct final state', async ({
+  page,
+  context,
+}) => {
+  const writes = await fixture(context);
+  await page.goto(`/tenant-admin/#tenant=${tenant}&admin=database&dataset=${dataset}`);
+  await page.getByRole('button', { name: '撤下数据集', exact: true }).click();
+  await expect(page.getByRole('button', { name: '确认撤下', exact: true })).toBeDisabled();
+  await page.getByRole('checkbox', { name: '我已确认影响范围', exact: true }).check();
+  await page.getByRole('button', { name: '确认撤下', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.getByRole('button', { name: '撤下与清理', exact: true }).click();
+  await page.getByRole('button', { name: '清理在线正文', exact: true }).click();
+  await expect(page.getByRole('dialog')).toContainText('不删除外部源数据库及备份');
+  await page.getByRole('checkbox').check();
+  await page.screenshot({ path: 'test-results/dataset-cleanup-confirm.png', fullPage: true });
+  await page.getByRole('button', { name: '确认清理', exact: true }).click();
+  await expect(page.getByText('在线正文已清理', { exact: true })).toBeVisible();
+  expect(writes.map((w) => w.action)).toEqual(['WITHDRAW', 'PURGE']);
+  expect(writes[1]).toMatchObject({ expectedRevision: 1, confirmed: true });
 });

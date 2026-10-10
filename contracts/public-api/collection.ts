@@ -57,3 +57,15 @@ export interface DatasetPreview {
   rows: (string | null)[][];
   hasMore: boolean;
 }
+
+/** Explicit withdrawal is separate from irreversible online-body erasure. */
+export interface DatasetLifecycle {
+  id: string;
+  name: string;
+  state: 'ACTIVE' | 'WITHDRAWN' | 'PURGED';
+  revision: number;
+  snapshots: number;
+  rows: number;
+  canWithdraw: boolean;
+  canPurge: boolean;
+}

@@ -192,7 +192,7 @@ public class TenantAdminService {
     }
     private UUID spaceMutation(UUID actor,UUID tenant,UUID id,UUID key,String operation,String fingerprint) {
         requireSpaceManagement(actor,tenant,id,false);UUID prior=identities.priorRequest(actor,key,operation,fingerprint);
-        db.queryForList("SELECT id FROM tenants WHERE id=? FOR UPDATE",tenant);requireSpaceManagement(actor,tenant,id);return prior;
+        db.queryForList("SELECT id FROM tenants WHERE id=? FOR UPDATE",tenant);requireSpaceManagement(actor,tenant,id);if(Boolean.TRUE.equals(db.queryForObject("SELECT archived FROM workspaces WHERE id=?",Boolean.class,id)))throw new IdentityException(409,"WORKSPACE_ARCHIVED");return prior;
     }
     private void activeOwner(UUID actor,UUID tenant,UUID owner) {
         if(owner==null)throw IdentityException.invalid();
@@ -247,6 +247,7 @@ public class TenantAdminService {
     public SharedWorkspace renameSpace(UUID actor, UUID tenant, UUID id, UUID key, long expectedVersion, String suppliedName) {
         String name=IdentityService.name(suppliedName,100), fingerprint=IdentityService.hash(tenant+"\n"+id+"\n"+expectedVersion+"\n"+name);
         UUID prior=mutation(actor,tenant,key,"RENAME_SHARED_SPACE",fingerprint); SharedWorkspace current=space(tenant,id);
+        if(Boolean.TRUE.equals(db.queryForObject("SELECT archived FROM workspaces WHERE id=?",Boolean.class,id)))throw new IdentityException(409,"WORKSPACE_ARCHIVED");
         if (prior!=null) return current; version(expectedVersion,current.version());
         if (!current.name().equals(name)) {
             db.update("UPDATE workspaces SET name=?,management_version=management_version+1 WHERE tenant_id=? AND id=?",name,tenant,id);
@@ -310,7 +311,7 @@ public class TenantAdminService {
             LEFT JOIN accounts successor ON successor.id=h.to_account
             LEFT JOIN data_connections connection ON connection.id=e.target_id AND connection.tenant_id=e.tenant_id
             WHERE e.tenant_id=? AND e.outcome='SUCCESS' AND e.action IN ('INVITATION_CREATE','INVITATION_REVOKE','INVITATION_ACCEPT',
-                'MEMBER_ENABLE','MEMBER_DISABLE','MEMBER_SECURITY_DISABLE','MEMBER_ROLE','GOVERNANCE_ROLE','OWNER_ACCEPT','OWNER_HANDOVER_OFFER','OWNER_HANDOVER_ACCEPT','OWNER_HANDOVER_REJECT','OWNER_HANDOVER_CANCEL','WORKSPACE_CREATE','WORKSPACE_OWNER_CHANGE','WORKSPACE_RENAME','WORKSPACE_GRANT','WORKSPACE_REVOKE','WORKSPACE_MAINTAIN','WORKSPACE_READONLY','TENANT_RENAME','COLLECTION_CONFIGURE','COLLECTION_NOW','COMPANY_INFORMATION_ADD','COMPANY_INFORMATION_EDIT','COMPANY_INFORMATION_REMOVE','COMPANY_INFORMATION_CLEAR','COMPANY_INFORMATION_ADOPT','COMPANY_INFORMATION_KEEP','GENERAL_EXPERIENCE_USE_STOP','GENERAL_EXPERIENCE_USE_RESTORE')
+                'MEMBER_ENABLE','MEMBER_DISABLE','MEMBER_SECURITY_DISABLE','MEMBER_ROLE','GOVERNANCE_ROLE','OWNER_ACCEPT','OWNER_HANDOVER_OFFER','OWNER_HANDOVER_ACCEPT','OWNER_HANDOVER_REJECT','OWNER_HANDOVER_CANCEL','WORKSPACE_CREATE','WORKSPACE_OWNER_CHANGE','WORKSPACE_RENAME','WORKSPACE_GRANT','WORKSPACE_REVOKE','WORKSPACE_MAINTAIN','WORKSPACE_READONLY','WORKSPACE_ARCHIVE','WORKSPACE_RESTORE','DATASET_WITHDRAW','DATASET_PURGE','TENANT_RENAME','COLLECTION_CONFIGURE','COLLECTION_NOW','COMPANY_INFORMATION_ADD','COMPANY_INFORMATION_EDIT','COMPANY_INFORMATION_REMOVE','COMPANY_INFORMATION_CLEAR','COMPANY_INFORMATION_ADOPT','COMPANY_INFORMATION_KEEP','GENERAL_EXPERIENCE_USE_STOP','GENERAL_EXPERIENCE_USE_RESTORE')
             ORDER BY e.created_at DESC,e.id DESC LIMIT ? OFFSET ?
             """,(r,n)->new AuditEntry(r.getLong("id"),r.getObject("actor_id",UUID.class),r.getString("actor_name"),r.getString("action"),
                 r.getObject("target_id",UUID.class),r.getString("target_name"),r.getObject("related_account_id",UUID.class),

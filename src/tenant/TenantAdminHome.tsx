@@ -1,3 +1,4 @@
+import { WorkspaceArchive, readWorkspaceArchive } from './WorkspaceArchive';
 import { adminHref } from '../admin/navigation';
 import { SpaceOwnerForm } from './SpaceOwnerForm';
 import { useRequestLock } from '../shared/request-guard';
@@ -87,6 +88,10 @@ const actions: Record<string, string> = {
   WORKSPACE_OWNER_CHANGE: '更换空间负责人',
   WORKSPACE_CREATE: '创建共享空间',
   WORKSPACE_RENAME: '修改空间名称',
+  WORKSPACE_ARCHIVE: '归档空间',
+  WORKSPACE_RESTORE: '恢复空间',
+  DATASET_WITHDRAW: '撤下数据集',
+  DATASET_PURGE: '清理数据集在线正文',
   WORKSPACE_GRANT: '授权空间成员',
   WORKSPACE_REVOKE: '撤销空间授权',
   WORKSPACE_MAINTAIN: '授予资料维护权限',
@@ -759,7 +764,16 @@ export function Confirm({
 }
 function SpaceDetail({ tenant, id, onChange }: { tenant: string; id: string; onChange: () => void }) {
   const [attempt, setAttempt] = useState(0);
-  const data = useRemote((signal) => api.space(tenant, id, signal), [tenant, id, attempt]);
+  const data = useRemote(
+    async (signal) => {
+      const [space, archive] = await Promise.all([
+        api.space(tenant, id, signal),
+        readWorkspaceArchive(tenant, id, signal),
+      ]);
+      return { space, archive };
+    },
+    [tenant, id, attempt],
+  );
   const refresh = () => {
     setAttempt((v) => v + 1);
     onChange();
@@ -769,7 +783,12 @@ function SpaceDetail({ tenant, id, onChange }: { tenant: string; id: string; onC
   ) : !data.value ? (
     <Loading />
   ) : (
-    <SpaceContents key={`${id}:${attempt}`} tenant={tenant} space={data.value} refresh={refresh} />
+    <>
+      <WorkspaceArchive tenant={tenant} id={id} onChange={refresh} />
+      {!data.value.archive.archived && (
+        <SpaceContents key={`${id}:${attempt}`} tenant={tenant} space={data.value.space} refresh={refresh} />
+      )}
+    </>
   );
 }
 function SpaceContents({

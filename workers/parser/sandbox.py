@@ -5,7 +5,7 @@ ROOT = Path(__file__).resolve().parent
 
 def profile(job):
     def quote(p): return json.dumps(str(p), ensure_ascii=False)
-    paths = ['/System/Library', '/usr/lib', '/usr/share/locale', '/opt/homebrew', str(ROOT), str(job)]
+    paths = ['/System/Library', '/usr/lib', '/usr/share/locale', '/opt/homebrew', str(Path(sys.base_prefix).resolve()), str(ROOT), str(job)]
     return '(version 1) (deny default) (allow process*) (allow sysctl-read) (allow mach-lookup) (allow file-read-metadata) (allow file-read-data (literal "/")) ' + ' '.join('(allow file-read* (subpath ' + quote(p) + '))' for p in paths) + ' (allow file-read* (literal "/dev/null") (literal "/dev/urandom")) (allow file-write* (literal "/dev/null") (subpath ' + quote(job) + '))'
 
 def run(job, extension, script=None):

@@ -47,7 +47,7 @@ export function TenantConsole({
   const limited = governance.value && !governance.value.canConfigure;
   const limitedPages: AdminPage[] = ['members', 'database', 'materials', 'experience'];
   if (
-    governance.value?.capabilities.some((c) => c.capability === 'PROFILE_MAINTAIN' && c.workspaceId === null)
+    governance.value?.capabilities.some((c) => ['PROFILE_MAINTAIN', 'TENANT_EXIT'].includes(c.capability) && c.workspaceId === null)
   )
     limitedPages.push('company');
   const page = limited && !limitedPages.includes(requestedPage) ? 'members' : requestedPage;
@@ -224,11 +224,12 @@ export function TenantConsole({
               ['background', '企业背景'],
               ['preferences', 'AI内容偏好'],
               ...(governance.value.canConfigure ? [['news', '资讯来源']] : []),
-              ...(governance.value.canConfigure
-                ? [
-                    ['records', '管理记录'],
-                    ['retention', '保留与退出'],
-                  ]
+              ...(governance.value.canConfigure ? [['records', '管理记录']] : []),
+              ...(governance.value.canConfigure ||
+              governance.value.capabilities.some(
+                (c) => c.capability === 'TENANT_EXIT' && c.workspaceId === null,
+              )
+                ? [['retention', '保留与退出']]
                 : []),
             ].map(([key, label]) => (
               <a
@@ -261,7 +262,11 @@ export function TenantConsole({
               initialTab="records"
               hideNavigation
             />
-          ) : secondary === 'retention' && governance.value.canConfigure ? (
+          ) : secondary === 'retention' &&
+            (governance.value.canConfigure ||
+              governance.value.capabilities.some(
+                (c) => c.capability === 'TENANT_EXIT' && c.workspaceId === null,
+              )) ? (
             <DeparturePanel key={tenant} tenant={tenant} only="exit" />
           ) : (
             <CompanyInformation key={tenant} tenant={tenant} />
