@@ -59,3 +59,12 @@ test('foreign links, URL credentials and bad tokens never cause requests',async(
  for(const value of ['https://evil.test/workspace/#invite='+'a'.repeat(43),'https://x@ai.9pop.top/workspace/#invite='+'a'.repeat(43),'bad'])assert.equal((await auth.readInvitation(value)).ok,false);
  assert.equal(calls.length,0);
 });
+
+test("common website login requests surface selection; dedicated login clears it",async()=>{
+ const { pendingSurfaceChoice, clearSurfaceChoice }=await import("../../src/identity/surface-choice.ts");
+ clearSurfaceChoice();setup(()=>identity(true,true));
+ await auth.signIn({surface:"workspace",phone:"13800000000",password:"synthetic"});
+ assert.equal(pendingSurfaceChoice(),true);
+ await auth.signIn({surface:"platform",account:"operator",password:"synthetic"});
+ assert.equal(pendingSurfaceChoice(),false);
+});

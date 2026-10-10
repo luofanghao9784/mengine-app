@@ -1,4 +1,5 @@
-/** Same-origin adapter to the existing customer/platform authentication realms. */
+/** Same-origin adapter to unified account authentication. */
+import { requestSurfaceChoice, clearSurfaceChoice } from "../../../src/identity/surface-choice.ts";
 import { createIdentityRequest, isIdentity, IdentityError, record, uuid } from '../../../src/identity/client.ts';
 export type Surface = 'workspace' | 'admin' | 'platform';
 export type Credentials =
@@ -22,6 +23,7 @@ export async function signIn(credentials: Credentials): Promise<AuthResult> {
     if (platform && !identity.platformAdmin) return { ok: false, message: '当前账号没有运营平台访问权限。' };
     if (credentials.surface === 'admin' && !identity.memberships.some(m => m.role === 'TENANT_ADMIN'))
       return { ok: false, message: '当前账号没有企业管理权限，请从梦擎工作空间入口登录。' };
+    if (platform) clearSurfaceChoice(); else requestSurfaceChoice();
     return { ok: true, redirect: platform ? '/platform-admin/' : credentials.surface === 'admin' ? '/tenant-admin/' : '/workspace/' };
   } catch (error) { return failure(error); }
 }
