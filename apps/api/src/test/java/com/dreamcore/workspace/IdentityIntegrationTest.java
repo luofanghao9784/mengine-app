@@ -232,8 +232,9 @@ class IdentityIntegrationTest {
     }
 
     @Test void bootstrapCannotRunTwiceAndAuditNeverContainsCredentials() throws Exception {
+        int rolesBefore=db.queryForObject("SELECT count(*) FROM platform_roles",Integer.class);
         assertThrows(IdentityException.class, () -> identities.bootstrap("other-platform@example.test","合成",PASSWORD));
-        assertEquals(1,db.queryForObject("SELECT count(*) FROM platform_roles",Integer.class));
+        assertEquals(rolesBefore,db.queryForObject("SELECT count(*) FROM platform_roles",Integer.class));
         String audit = db.queryForList("SELECT * FROM identity_audit").toString();
         assertFalse(audit.contains(PASSWORD)); assertFalse(audit.contains("@example.test")); assertFalse(audit.contains("token"));
         assertTrue(audit.contains("INVITATION_ACCEPT"));
