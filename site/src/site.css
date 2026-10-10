@@ -1140,6 +1140,44 @@ h2 {
   border: 0;
   transform-origin: 0 0;
   pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.45s;
+}
+.client-view[data-ready] iframe {
+  opacity: 1;
+}
+/* 产品界面还没载入时的占位，载入后淡出 */
+.client-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  font-size: 14px;
+  color: var(--ink-3);
+  transition: opacity 0.3s;
+}
+.client-view[data-ready] .client-loading {
+  opacity: 0;
+}
+.client-loading i {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid rgb(91 87 217 / 22%);
+  border-top-color: var(--indigo);
+  animation: client-spin 0.9s linear infinite;
+}
+@keyframes client-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .client-loading i {
+    animation: none;
+  }
 }
 
 .say-row {

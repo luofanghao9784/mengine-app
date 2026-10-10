@@ -21,8 +21,14 @@ const VIEW_W = 1440;
 const VIEW_H = 900;
 
 function ClientFrame({ hash, title, openFirstCard }: { hash: string; title: string; openFirstCard?: boolean }) {
-  const [ref, inView] = useInView<HTMLDivElement>('300px');
+  // 提前两屏左右就开始加载，加载过就一直留着：滚到跟前时界面已经在了，来回滚动也不会重新加载。
+  const [ref, inView] = useInView<HTMLDivElement>('1600px');
+  const [seen, setSeen] = useState(false);
+  const [ready, setReady] = useState(false);
   const [scale, setScale] = useState(0.6);
+  useEffect(() => {
+    if (inView) setSeen(true);
+  }, [inView]);
   useEffect(() => {
     const el = ref.current!;
     const fit = () => setScale(el.clientWidth / VIEW_W);
@@ -33,6 +39,7 @@ function ClientFrame({ hash, title, openFirstCard }: { hash: string; title: stri
   }, [ref]);
   // “有据”一段要展示阅读窗口：客户端加载好之后，替访客点开第一张画报。
   const opened = (frame: HTMLIFrameElement) => {
+    setReady(true);
     if (!openFirstCard) return;
     let tries = 0;
     const timer = setInterval(() => {
@@ -48,8 +55,9 @@ function ClientFrame({ hash, title, openFirstCard }: { hash: string; title: stri
         <span>{title}</span>
         <em>产品实际界面 · 演示数据</em>
       </figcaption>
-      <div className="client-view" ref={ref} style={{ height: VIEW_H * scale }}>
-        {inView && (
+      <div className="client-view" ref={ref} style={{ height: VIEW_H * scale }} data-ready={ready || undefined}>
+        <p className="client-loading" aria-hidden={ready}><i />正在载入产品界面…</p>
+        {seen && (
           <iframe
             src={`./demo/index.html#tenant=${TENANT}&${hash}`}
             title={title}
