@@ -9,12 +9,13 @@ import { useReducedMotion } from './hooks';
 const caps = { in: '输入', pr: '工作循环', out: '输出', evo: '自进化循环' } as const;
 
 /* 讲到输入、输出时，光流两端的标签展开成卡片：数据从哪来，成果到哪去。卡片由 3D 场景逐帧定位，跟着镜头走。 */
-const ends: Record<string, { icon: LucideIcon; name: string; line: string }> = {
+// tag 是官网上这条通道的叫法；不写就沿用产品仪表盘的通道名。输出两条在仪表盘里叫“会话流式输出”“成果导出”，是给运维看的说法，官网另起。
+const ends: Record<string, { icon: LucideIcon; name: string; line: string; tag?: string }> = {
   COLLECTION: { icon: Database, name: '业务系统', line: '收款、会员、订单' },
   KNOWLEDGE: { icon: FileStack, name: '上传的文件', line: '文档、表格、拍照的单据' },
   RETRIEVAL: { icon: Library, name: '团队资料库', line: '已有的资料和历史成果' },
-  RESPONSE: { icon: MessageSquareText, name: '会话回答', line: '一段段返回，带着出处' },
-  EXPORT: { icon: FileText, name: '成果文件', line: '文稿、表格，存进工作空间' },
+  RESPONSE: { icon: MessageSquareText, name: '会话回答', line: '每个结论都带着出处', tag: '逐段返回' },
+  EXPORT: { icon: FileText, name: '成果文件', line: '文稿、表格，留给团队接着用', tag: '保存与共享' },
 };
 
 interface Key {
@@ -131,6 +132,7 @@ export function EngineBackdrop() {
           .map((c) => {
             const stage = channelInfo[c.code].stage;
             const end = ends[c.code];
+            const tag = end?.tag ?? channelInfo[c.code].name;
             return (
               <div
                 key={c.code}
@@ -145,11 +147,11 @@ export function EngineBackdrop() {
                   <div className="end-card">
                     <i><end.icon size={20} strokeWidth={1.6} /></i>
                     <p><b>{end.name}</b><span>{end.line}</span></p>
-                    <em><small>{channelInfo[c.code].name}</small>{c.running}</em>
+                    <em><small>{tag}</small>{c.running}</em>
                   </div>
                 ) : (
                   <>
-                    <span className="n">{channelInfo[c.code].name}</span>
+                    <span className="n">{tag}</span>
                     <span className="v" style={{ color: stage === 'in' ? '#D6E2EE' : '#F0BE72' }}>{c.running}</span>
                   </>
                 )}
