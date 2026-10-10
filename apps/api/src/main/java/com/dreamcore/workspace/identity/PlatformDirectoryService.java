@@ -19,7 +19,7 @@ public class PlatformDirectoryService {
     private final IdentityAudit audit;
     private static final String CUSTOMERS="""
         SELECT a.*,(SELECT count(*) FROM tenant_memberships m WHERE m.account_id=a.id) AS tenant_count
-        FROM accounts a WHERE NOT EXISTS(SELECT 1 FROM platform_accounts p WHERE p.account_id=a.id)
+        FROM accounts a WHERE (NOT EXISTS(SELECT 1 FROM platform_accounts p WHERE p.account_id=a.id) OR EXISTS(SELECT 1 FROM tenant_memberships m WHERE m.account_id=a.id))
         """;
     private static final org.springframework.jdbc.core.RowMapper<Customer> CUSTOMER=(r,n)->new Customer(
         r.getObject("id",UUID.class),r.getString("display_name"),r.getString("phone"),r.getString("email"),r.getString("status"),r.getLong("management_version"),r.getLong("tenant_count"));
@@ -61,11 +61,16 @@ public class PlatformDirectoryService {
         String reason=IdentityService.name(suppliedReason,500),operation="CUSTOMER_ACCOUNT_STATUS";
         String fingerprint=IdentityService.hash(id+"\n"+expectedVersion+"\n"+next+"\n"+reason);
         UUID prior=identities.priorRequest(actor,request,operation,fingerprint);
+        db.queryForList("SELECT pg_advisory_xact_lock(hashtextextended('platform-staff-management',0))");
         db.queryForList("SELECT id FROM accounts WHERE id=? FOR UPDATE",id);
         identities.platform(actor);var current=customer(id);
         if(prior!=null) return detail(actor,id);
+        if(next.equals("ACTIVE") && Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM unified_identity_links WHERE source_id=?)",Boolean.class,id)))throw new IdentityException(409,"IDENTITY_LINK_REQUIRES_REVIEW");
         if(current.version()!=expectedVersion) throw new IdentityException(409,"STALE_MANAGEMENT_VERSION");
         if(!current.status().equals(next)) {
+            if(next.equals("DISABLED") && Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM platform_roles WHERE account_id=? AND role='PLATFORM_ADMIN')",Boolean.class,id))
+                && db.queryForObject("SELECT count(*) FROM platform_roles r JOIN accounts a ON a.id=r.account_id WHERE r.role='PLATFORM_ADMIN' AND a.status='ACTIVE'",Long.class)<=1)
+                throw new IdentityException(409,"LAST_PLATFORM_ADMIN");
             db.update("UPDATE accounts SET status=?,management_version=management_version+1,credential_version=credential_version+1 WHERE id=?",next,id);
             db.update("DELETE FROM spring_session WHERE principal_name=?",id.toString());
             db.update("INSERT INTO platform_account_changes(id,actor_id,account_id,previous_status,next_status,reason) VALUES (?,?,?,?,?,?)",UUID.randomUUID(),actor,id,current.status(),next,reason);
@@ -77,7 +82,7 @@ public class PlatformDirectoryService {
     @Transactional(readOnly=true)
     public List<Staff> staff(UUID actor) {
         identities.platform(actor);
-        return db.query("SELECT a.id,a.display_name,p.login_name,p.management_version,a.status,EXISTS(SELECT 1 FROM platform_roles r WHERE r.account_id=a.id AND r.role='PLATFORM_ADMIN') AS administrator FROM platform_accounts p JOIN accounts a ON a.id=p.account_id ORDER BY p.created_at,a.id",
+        return db.query("SELECT a.id,a.display_name,coalesce(p.login_name,a.phone,a.email) AS login_name,a.management_version,a.status,EXISTS(SELECT 1 FROM platform_roles r WHERE r.account_id=a.id AND r.role='PLATFORM_ADMIN') AS administrator FROM accounts a LEFT JOIN platform_accounts p ON a.id=p.account_id WHERE p.account_id IS NOT NULL OR EXISTS(SELECT 1 FROM platform_roles r WHERE r.account_id=a.id) ORDER BY a.created_at,a.id",
             (r,n)->new Staff(r.getObject(1,UUID.class),r.getString(2),r.getString(3),r.getString("status"),r.getBoolean("administrator"),r.getLong("management_version")));
     }
 }

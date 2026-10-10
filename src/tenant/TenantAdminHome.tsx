@@ -284,16 +284,7 @@ export function TenantAdminHome({
         >
           <fieldset className="tenant-modal-fields" disabled={writing}>
             {dialog.kind === 'invite' && (
-              <TextForm
-                label="受邀手机号"
-                phone
-                action="生成邀请"
-                description="邀请成员加入当前企业。当前为本地验证，可从邀请列表复制本地邀请链接，未发送真实短信。"
-                submit={async (value, requestId) => {
-                  await api.invite(tenant, { requestId, phone: value });
-                  complete('成员邀请已生成，等待接受。');
-                }}
-              />
+              <MemberInviteForm tenant={tenant} done={() => complete('成员邀请已生成，等待接受。')} />
             )}
             {dialog.kind === 'create' && (
               <SpaceOwnerForm
@@ -1147,5 +1138,69 @@ function SpaceOwnerRecords({ tenant, space }: { tenant: string; space: string })
         ))
       )}
     </details>
+  );
+}
+
+function MemberInviteForm({ tenant, done }: { tenant: string; done: () => void }) {
+  const [phone, setPhone] = useState(''),
+    [spaces, setSpaces] = useState<string[]>([]);
+  const [page, setPage] = useState(0);
+  const choices = useRemote((signal) => api.spaces(tenant, '', page * 20, signal), [tenant, page]);
+  const task = useSubmission<{ phone: string; workspaceIds: string[] }>();
+  useRequestLock(task.busy || task.uncertain);
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        void task.submit({ phone, workspaceIds: spaces }, async (body, requestId) => {
+          await api.invite(tenant, { ...body, requestId });
+          done();
+        });
+      }}
+    >
+      <fieldset disabled={task.busy || task.uncertain}>
+        <Field label="受邀手机号">
+          <input required type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
+        </Field>
+        <p>
+          可选初始共享空间，加入后获得阅读权限。最多选择 20 个，已选择 {spaces.length}{' '}
+          个。当前邀请仅用于本地验证。
+        </p>
+        {choices.error ? (
+          <Failure error={choices.error} retry={() => window.location.reload()} />
+        ) : (
+          choices.value?.map((space) => (
+            <label key={space.id} style={{ display: 'block' }}>
+              <input
+                type="checkbox"
+                disabled={!spaces.includes(space.id) && spaces.length >= 20}
+                checked={spaces.includes(space.id)}
+                onChange={(e) =>
+                  setSpaces((old) =>
+                    e.target.checked ? [...old, space.id] : old.filter((id) => id !== space.id),
+                  )
+                }
+              />
+              {space.name}
+            </label>
+          ))
+        )}
+        <Pager page={page} next={choices.value?.length === 20} onPage={setPage} />
+        <SubmitError error={task.error} uncertain={task.uncertain} />
+        <Button type="submit">生成邀请</Button>
+      </fieldset>
+      {task.uncertain && (
+        <Button
+          onClick={() =>
+            void task.submit({ phone, workspaceIds: spaces }, async (body, requestId) => {
+              await api.invite(tenant, { ...body, requestId });
+              done();
+            })
+          }
+        >
+          核对并重试
+        </Button>
+      )}
+    </form>
   );
 }

@@ -8,7 +8,7 @@ import trial
 
 COVERAGE = trial.WORKSPACE / 'contracts/local-backup/coverage.json'
 CONTROL_TABLES = [
-    'accounts', 'platform_accounts', 'platform_roles', 'platform_staff_invitations', 'tenants', 'tenant_memberships', 'workspace_members', 'workspaces',
+    'accounts', 'platform_accounts', 'platform_roles', 'unified_identity_links', 'platform_initialization', 'invitation_space_plans', 'invitation_initial_spaces', 'platform_staff_invitations', 'tenants', 'tenant_memberships', 'workspace_members', 'workspaces',
     'tenant_governance', 'governance_initial_designations', 'governance_capabilities', 'governance_handovers', 'governance_security_stops',
     'profile_entries', 'profile_versions', 'business_sources', 'business_source_config_versions',
     'experience_entries', 'experience_versions', 'ongoing_plans', 'ongoing_plan_versions', 'content_lifecycle',
@@ -100,7 +100,7 @@ def quarantine(sql):
     UPDATE invitations SET status='REVOKED' WHERE status='PENDING';
     UPDATE governance_handovers SET status='CANCELLED' WHERE status='PENDING';
     UPDATE accounts SET status='DISABLED',password_hash='!RECOVERY_DISABLED!',credential_version=credential_version+1;
-    UPDATE tenants SET status='SUSPENDED';
+    UPDATE tenants SET status='SUSPENDED' WHERE status<>'PENDING';
     UPDATE tenant_memberships SET status='DISABLED',role='MEMBER';
     DELETE FROM platform_roles; DELETE FROM governance_capabilities; DELETE FROM workspace_members;
     DELETE FROM governance_initial_designations;
@@ -417,6 +417,12 @@ def reopen_current(sql, current_sql, root):
     import secrets
     import backup_experience
     sql = backup_experience.isolated_sql(sql)
+    # New merges/initialization after the snapshot cannot be resurrected from an older identity map.
+    for table in ('unified_identity_links', 'platform_initialization'):
+        if not has_table(sql, table) or not has_table(current_sql, table):
+            backup.fail('统一身份恢复缺少关联及初始化凭据；保持隔离，需人工核对。')
+        if json_rows(sql, f'SELECT * FROM {table} ORDER BY 1') != json_rows(current_sql, f'SELECT * FROM {table} ORDER BY 1'):
+            backup.fail('统一身份关联或初始化状态已变化；保持隔离，不能复活旧主体。')
     accounts = {x['id']: x for x in json_rows(current_sql, "SELECT id::text,email,phone FROM accounts WHERE status='ACTIVE'")}
     local_accounts = json_rows(sql, 'SELECT id::text,email,phone FROM accounts')
     eligible = {x['id'] for x in local_accounts if x == accounts.get(x['id'])}
@@ -426,19 +432,23 @@ def reopen_current(sql, current_sql, root):
     # Private ownership is itself a read grant. Do not leave an old private owner active after a changed/missing mapping.
     blocked_private_owners = {x['owner_id'] for x in local_spaces if x['kind'] == 'PERSONAL' and x['id'] not in valid_spaces}
     eligible -= blocked_private_owners
-    # Platform audit actors are never reopened through customer credentials or tenant membership.
-    # A role left by the pre-separation schema is insufficient to create a platform identity.
+    # Dedicated credentials are optional. Restore roles only from the current authorized intersection.
     if not has_table(sql, 'platform_accounts') or not has_table(current_sql, 'platform_accounts'):
-        backup.fail('恢复身份结构不含独立总台账号；请使用对应版本的已核验适配器。')
+        backup.fail('恢复身份结构缺少总台凭据；请使用对应版本的已核验适配器。')
     local_platform = {x['account_id']: x for x in json_rows(sql, 'SELECT account_id::text,login_name FROM platform_accounts')}
-    all_current_platform = {x['account_id'] for x in json_rows(current_sql, 'SELECT account_id::text FROM platform_accounts')}
-    authorized_platform = {x['account_id']: x for x in json_rows(current_sql, """SELECT p.account_id::text,p.login_name,p.management_version
-        FROM platform_accounts p JOIN accounts a ON a.id=p.account_id AND a.status='ACTIVE'
-        JOIN platform_roles r ON r.account_id=p.account_id AND r.role='PLATFORM_ADMIN'
-        WHERE NOT EXISTS(SELECT 1 FROM tenant_memberships m WHERE m.account_id=p.account_id)""")}
-    platform = {identity for identity, row in authorized_platform.items()
-                if identity in eligible and local_platform.get(identity, {}).get('login_name') == row['login_name']}
-    eligible -= set(local_platform) | all_current_platform
+    authorized_platform = {x['account_id']: x for x in json_rows(current_sql, """SELECT a.id::text account_id,p.login_name,p.management_version
+        FROM accounts a JOIN platform_roles r ON r.account_id=a.id AND r.role='PLATFORM_ADMIN'
+        LEFT JOIN platform_accounts p ON p.account_id=a.id WHERE a.status='ACTIVE'""")}
+    platform = {identity for identity, row in authorized_platform.items() if identity in eligible
+                and (row['login_name'] is None and identity not in local_platform
+                     or row['login_name'] is not None and local_platform.get(identity, {}).get('login_name') == row['login_name'])}
+    dedicated = {identity for identity in platform if authorized_platform[identity]['login_name'] is not None
+                 and local_platform.get(identity, {}).get('login_name') == authorized_platform[identity]['login_name']}
+    # Historical platform placeholders have no usable common credential. Dual-role people retain theirs.
+    legacy = {x['id'] for x in local_accounts if (x['id'] in local_platform or authorized_platform.get(x['id'], {}).get('login_name') is not None) and x['phone'] is None
+              and (x['email'] or '').endswith('.invalid')}
+    eligible -= legacy
+    platform -= legacy - dedicated
     tenant_versions = {x['id']:x['management_version'] for x in json_rows(current_sql, "SELECT id::text,management_version FROM tenants WHERE status='ACTIVE'")}
     current_tenants = set(tenant_versions)
     local_tenants = {x['id'] for x in json_rows(sql, 'SELECT id::text FROM tenants')}
@@ -499,10 +509,15 @@ def reopen_current(sql, current_sql, root):
     for identity in sorted(platform):
         password = secrets.token_urlsafe(24)
         current = authorized_platform[identity]
-        statements.append(f"UPDATE accounts SET status='ACTIVE',password_hash='!PLATFORM_ONLY!',credential_version=credential_version+1 WHERE id={quoted_id(identity)}")
-        statements.append(f"UPDATE platform_accounts SET password_hash={literal(password_hash(password))},credential_version=credential_version+1,management_version={int(current['management_version'])} WHERE account_id={quoted_id(identity)}")
+        if identity not in eligible:
+            statements.append(f"UPDATE accounts SET status='ACTIVE',password_hash='!PLATFORM_ONLY!',credential_version=credential_version+1 WHERE id={quoted_id(identity)}")
         statements.append(f"INSERT INTO platform_roles VALUES({quoted_id(identity)},'PLATFORM_ADMIN')")
-        platform_credentials.append({'accountId': identity, 'loginName': current['login_name'], 'password': password, 'realm': 'platform'})
+        if identity in dedicated:
+            statements.append(f"UPDATE platform_accounts SET password_hash={literal(password_hash(password))},credential_version=credential_version+1,management_version={int(current['management_version'])} WHERE account_id={quoted_id(identity)}")
+            platform_credentials.append({'accountId': identity, 'loginName': current['login_name'], 'password': password, 'realm': 'platform'})
+        else:
+            common = next(x for x in credentials if x['accountId'] == identity)
+            platform_credentials.append({**common, 'loginName': common['phone'] or common['email'], 'realm': 'unified'})
     if not platform:
         # Explicit local activation can create an operations-only identity, never a customer admin.
         identity, password = str(uuid.uuid4()), secrets.token_urlsafe(24)
@@ -520,7 +535,7 @@ def reopen_current(sql, current_sql, root):
     sql(';\n'.join(statements)+';')
     trial.private_write(root/'accounts.json', {'restored': True, 'platform': platform_credentials[0],
         'platformRecovered': platform_credentials, 'recovered': credentials,
-        'note': '仅本地私有新凭据。总台使用独立登录入口和 loginName；recovered 仅为客户账号。旧会话失效，旧任务与计划未自动重启。'})
+        'note': '仅本地私有新凭据。realm=platform 使用专用凭据；realm=unified 使用统一凭据。recovered 可包含总台及企业双重身份。旧会话失效，旧任务与计划未自动重启。'})
     return {'accountsEnabled': len(eligible), 'platformAccountsEnabled': len(platform), 'membershipsEnabled': len(members), 'sharedGrantsEnabled': len(grants),
             'privateOwnersHeld': len(blocked_private_owners), 'heldTenantIds': sorted(held_tenants), 'oldCredentialsRestored': False}
 

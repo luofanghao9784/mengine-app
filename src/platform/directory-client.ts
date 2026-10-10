@@ -1,3 +1,4 @@
+import { challenge } from '../identity/phone-client';
 import { createIdentityRequest, record, text, uuid, isIdentity } from '../identity/client';
 import type {
   CustomerAccount,
@@ -97,8 +98,16 @@ export const directoryClient = {
       { token },
       signal,
     ),
-  acceptInvite: (body: { token: string; username: string; password: string; displayName: string }) =>
-    request('/api/platform-admin/v1/auth/invitation/accept', 'POST', isIdentity, body),
+  challengeInvite: (token: string) =>
+    request('/api/platform-admin/v1/auth/invitation/challenge', 'POST', challenge, { token }),
+  acceptInvite: (body: {
+    token: string;
+    username: string;
+    password?: string;
+    displayName?: string;
+    challengeId?: string;
+    code?: string;
+  }) => request('/api/platform-admin/v1/auth/invitation/accept', 'POST', isIdentity, body),
   list: (tenant: string, q: string, status: string, offset: number, signal?: AbortSignal) =>
     request(
       `/api/platform-admin/v1/tenants/${tenant}/accounts?` +

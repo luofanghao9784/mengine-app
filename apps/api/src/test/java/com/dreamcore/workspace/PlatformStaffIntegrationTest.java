@@ -112,14 +112,16 @@ class PlatformStaffIntegrationTest {
         var response=browser.post("/staff/invitations",Map.of("requestId",UUID.randomUUID(),"phone",phone));
         assertEquals(200,response.statusCode(),response.body());assertFalse(response.body().contains("token"));
         UUID invite=UUID.fromString(JSON.readTree(response.body()).get("id").asString());String token=delivery.localToken(invite);
+        UUID existingUnified=UUID.randomUUID();
+        db.update("INSERT INTO accounts(id,phone,phone_verified_at,display_name,password_hash) VALUES (?,?,now(),'已有统一账号',?)",existingUnified,phone,passwords.encode(PWD));
         var recipient=new Browser();
         assertEquals(200,recipient.post("/auth/invitation/preview",Map.of("token",token)).statusCode());
         var accepted=recipient.post("/auth/invitation/accept",Map.of("token",token,"username",phone,"password",PWD,"displayName","新总台人员"));
         assertEquals(200,accepted.statusCode(),accepted.body());
         UUID id=UUID.fromString(JSON.readTree(accepted.body()).get("account").get("id").asString());fixtures.add(id);
         assertEquals(200,recipient.send("GET",BASE+"/staff",null,null).statusCode());
-        assertEquals(401,recipient.send("GET","/api/v1/me",null,null).statusCode());
+        assertEquals(200,recipient.send("GET","/api/v1/me",null,null).statusCode());
         assertEquals(204,browser.post("/staff/"+id+"/revoke",Map.of("requestId",UUID.randomUUID(),"expectedVersion",1)).statusCode());
-        assertEquals(401,recipient.send("GET",BASE+"/staff",null,null).statusCode());
+        assertEquals(403,recipient.send("GET",BASE+"/staff",null,null).statusCode());
     }
 }

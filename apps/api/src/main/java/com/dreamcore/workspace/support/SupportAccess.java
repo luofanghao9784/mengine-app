@@ -10,8 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
  private static final String SELECT="""
  SELECT s.id,s.actor_id,s.tenant_id,g.owner_id,s.mode,t.name FROM headquarters_support_access s
  JOIN platform_sessions p ON p.token_hash=s.session_hash AND p.account_id=s.actor_id
- JOIN platform_accounts pa ON pa.account_id=s.actor_id AND pa.credential_version=p.credential_version
- JOIN accounts a ON a.id=s.actor_id AND a.status='ACTIVE'
+ JOIN accounts a ON a.id=s.actor_id AND a.status='ACTIVE' AND a.credential_version=p.credential_version
  JOIN tenants t ON t.id=s.tenant_id JOIN tenant_governance g ON g.tenant_id=t.id
  JOIN tenant_memberships m ON m.tenant_id=t.id AND m.account_id=g.owner_id AND m.status='ACTIVE'
  JOIN accounts o ON o.id=g.owner_id AND o.status='ACTIVE'
@@ -75,7 +74,8 @@ import org.springframework.transaction.annotation.Transactional;
  public SupportContext.Access forObject(UUID actor,UUID tenant,String table,UUID object){
   var rows=db.queryForList("SELECT DISTINCT c.access_id,s.session_hash FROM headquarters_support_changes c JOIN headquarters_support_access s ON s.id=c.access_id WHERE c.operation='INSERT' AND c.table_name=? AND c.object_id=? AND s.actor_id=? AND s.tenant_id=? ORDER BY c.access_id",table,object.toString(),actor,tenant);
   if(rows.isEmpty()){
-   if(Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM platform_accounts WHERE account_id=?)",Boolean.class,actor)))throw new IdentityException(403,"SUPPORT_ACCESS_EXPIRED");
+   // A platform administrator may also perform ordinary work as a tenant member.
+   // Support-created objects remain distinguished by their immutable access provenance.
    return null;
   }
   var r=rows.getFirst();return read((UUID)r.get("access_id"),(String)r.get("session_hash"));

@@ -59,7 +59,7 @@ test('realm contracts keep customer usage writes separate and require exact vers
     if (path.endsWith('{entry}'))
       assert.ok(operations.get.parameters.some((p) => p.name === 'version' && p.required));
   }
-  assert.equal(spec.components.securitySchemes.platformCookie.name, 'DREAMCORE_PLATFORM');
+  assert.equal(spec.components.securitySchemes.platformCookie.name, 'DREAMCORE_SESSION');
   assert.equal(spec.components.securitySchemes.customerCookie.name, 'DREAMCORE_SESSION');
   assert.equal(Object.keys(spec.paths).filter((p) => p.endsWith('/processing')).length, 1);
 });

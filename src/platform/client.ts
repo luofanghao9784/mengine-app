@@ -13,7 +13,7 @@ import { createIdentityRequest, isContact, IdentityError, record, text, uuid } f
 const count = (v: unknown): v is number => Number.isSafeInteger(v) && (v as number) >= 0;
 const date = (v: unknown): v is string => text(v) && Number.isFinite(Date.parse(v));
 export const isTenant = (v: unknown): v is Tenant =>
-  record(v) && uuid(v.id) && text(v.name) && ['ACTIVE', 'SUSPENDED'].includes(String(v.status));
+  record(v) && uuid(v.id) && text(v.name) && ['ACTIVE', 'SUSPENDED', 'PENDING'].includes(String(v.status));
 const isInvitation = (v: unknown): v is Invitation =>
   record(v) &&
   uuid(v.id) &&
@@ -54,7 +54,8 @@ const isOverview = (v: unknown): v is PlatformOverview =>
   count(v.totalTenants) &&
   count(v.activeTenants) &&
   count(v.suspendedTenants) &&
-  v.totalTenants === v.activeTenants + v.suspendedTenants &&
+  (v.pendingTenants === undefined || count(v.pendingTenants)) &&
+  v.totalTenants === v.activeTenants + v.suspendedTenants + (Number(v.pendingTenants) || 0) &&
   v.platform === 'AVAILABLE' &&
   v.database === 'AVAILABLE' &&
   ['LOCAL', 'DISABLED'].includes(String(v.invitationDelivery)) &&

@@ -22,6 +22,8 @@ public class PhoneIdentityService {
     private final IdentityAudit audit;
     private final DepartureAccess departure;
     private final GovernanceService governance;
+    @org.springframework.beans.factory.annotation.Autowired private InvitationWorkspaceAccess invitationSpaces;
+    @org.springframework.beans.factory.annotation.Autowired private LoginThrottle throttle;
     public PhoneIdentityService(JdbcTemplate db,IdentityService identities,PhoneVerificationService verification,
             PasswordEncoder passwords,IdentityAudit audit,DepartureAccess departure,GovernanceService governance) {
         this.db=db;this.identities=identities;this.verification=verification;this.passwords=passwords;
@@ -33,9 +35,11 @@ public class PhoneIdentityService {
         if(rows.isEmpty()) throw new IdentityException(409,"INVITATION_UNAVAILABLE");
         UUID tenant=(UUID)rows.getFirst().get("tenant_id");
         var tenants=db.queryForList("SELECT status FROM tenants WHERE id=?"+(lock?" FOR UPDATE":""),String.class,tenant);
-        if(tenants.isEmpty() || !"ACTIVE".equals(tenants.getFirst())) throw new IdentityException(409,"INVITATION_UNAVAILABLE");
+        if(tenants.isEmpty() || !java.util.List.of("ACTIVE","PENDING").contains(tenants.getFirst())) throw new IdentityException(409,"INVITATION_UNAVAILABLE");
         rows=db.queryForList("SELECT *,expires_at>now() AS unexpired FROM invitations WHERE token_hash=?"+(lock?" FOR UPDATE":""),token);
         var invite=rows.getFirst();
+        if("PENDING".equals(tenants.getFirst()) && !Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM governance_initial_designations WHERE tenant_id=? AND invitation_id=?)",Boolean.class,tenant,invite.get("id"))))
+            throw new IdentityException(409,"INVITATION_UNAVAILABLE");
         if(!"ACCEPTED".equals(invite.get("status")) && !("PENDING".equals(invite.get("status")) && Boolean.TRUE.equals(invite.get("unexpired"))))
             throw new IdentityException(409,"INVITATION_UNAVAILABLE");
         if(invite.get("phone")==null) throw new IdentityException(409,"LEGACY_INVITATION");
@@ -82,6 +86,8 @@ public class PhoneIdentityService {
     public Accepted accept(UUID actor,long actorVersion,String token,String name,String password,UUID proof,String browser,boolean owner,UUID requestId,String ip) {
         var i=invitation(token,true);UUID tenant=(UUID)i.get("tenant_id"),invite=(UUID)i.get("id");String phone=(String)i.get("phone");
         departure.requireTenantActivation(tenant);
+        boolean opening="PENDING".equals(db.queryForObject("SELECT status FROM tenants WHERE id=?",String.class,tenant));
+        if(opening && !owner)throw new IdentityException(400,"OWNER_ACCEPTANCE_REQUIRED");
         db.queryForList("SELECT pg_advisory_xact_lock(hashtextextended(?,0))","phone:"+phone);
         UUID account=accountFor(phone);
         if(account!=null) {
@@ -105,8 +111,10 @@ public class PhoneIdentityService {
             db.update("INSERT INTO tenant_memberships(tenant_id,account_id,role) VALUES (?,?,?)",tenant,account,i.get("role"));
             db.update("INSERT INTO workspaces(id,tenant_id,owner_id,name,kind) VALUES (?,?,?,'个人空间','PERSONAL')",UUID.randomUUID(),tenant,account);
             db.update("UPDATE invitations SET status='ACCEPTED',accepted_by=? WHERE id=?",account,invite);
+            invitationSpaces.apply(invite,account);
             audit.record(account,tenant,"INVITATION_ACCEPT",invite,"SUCCESS");
         }
+        if(opening)db.update("UPDATE tenants SET status='ACTIVE',management_version=management_version+1 WHERE id=?",tenant);
         if(owner) {
             if(requestId==null) throw IdentityException.invalid();
             var snapshot=governance.snapshot(account,tenant);
@@ -116,15 +124,26 @@ public class PhoneIdentityService {
     }
     @Transactional
     public IdentityService.Me bind(UUID actor,String suppliedPhone,String password,UUID proof,String browser,String ip) {
+        return bind(actor,suppliedPhone,password,proof,browser,ip,null);
+    }
+    @Transactional
+    public IdentityService.Me bind(UUID actor,String suppliedPhone,String password,UUID proof,String browser,String ip,String nextPassword) {
         String phone=PhoneNumbers.normalize(suppliedPhone);
         db.queryForList("SELECT pg_advisory_xact_lock(hashtextextended(?,0))","phone:"+phone);
         db.queryForList("SELECT id FROM accounts WHERE id=? FOR NO KEY UPDATE",actor);
         var a=identities.account(actor);
         if(a.phone()!=null) throw new IdentityException(409,"PHONE_ALREADY_BOUND");
         // Ownership of a cached legacy session alone is insufficient to change its login identity.
-        identities.login(a.email(),password,ip);
+        boolean legacyPlatform=a.email()!=null && a.email().endsWith("@identity.invalid");
+        if(legacyPlatform) {
+            if(!throttle.allow("bind-platform:"+actor,"bind-platform:"+ip))throw new IdentityException(429,"LOGIN_THROTTLED");
+            var credentials=db.queryForList("SELECT password_hash FROM platform_accounts WHERE account_id=?",String.class,actor);
+            if(credentials.isEmpty()||password==null||!passwords.matches(password,credentials.getFirst()))throw new IdentityException(401,"AUTHENTICATION_REQUIRED");
+            IdentityService.password(nextPassword);
+        } else identities.login(a.email(),password,ip);
         if(accountFor(phone)!=null) throw new IdentityException(409,"PHONE_IN_USE");
         verification.consume(proof,phone,"BIND",browser,actor,null);
+        if(legacyPlatform)db.update("UPDATE accounts SET password_hash=? WHERE id=?",passwords.encode(nextPassword),actor);
         db.update("UPDATE accounts SET phone=?,phone_verified_at=now(),credential_version=credential_version+1 WHERE id=?",phone,actor);
         revokeSessions(actor);
         audit.record(actor,null,"PHONE_BIND",actor,"SUCCESS");

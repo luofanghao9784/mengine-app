@@ -68,7 +68,8 @@ class IdentityIntegrationTest {
         return JSON.readTree(Files.readString(Path.of(env.getRequiredProperty("dreamcore.invitation.outbox"),invite + ".json"))).get("token").asString();
     }
     JsonNode create(String name, String email) throws Exception {
-        return platform.ok("POST","/api/platform-admin/v1/tenants",Map.of("requestId",UUID.randomUUID(),"name",name,"adminEmail",email),201);
+        // These legacy fixtures keep email acceptance covered; new phone activation is tested separately.
+        return JSON.readTree(JSON.writeValueAsString(identities.createTenant(platformId,UUID.randomUUID(),name,email)));
     }
     Client acceptNew(String invite, String email) throws Exception {
         Client user = new Client();
@@ -110,11 +111,11 @@ class IdentityIntegrationTest {
     }
     @Test void rolesNeverGrantCrossTenantOrPrivateWorkspaceAccess() throws Exception {
         for (Client forbidden : List.of(platform,adminB)) {
-            assertEquals(forbidden.platformRealm ? 401 : 403,forbidden.send("GET","/api/v1/tenants/"+tenantA+"/context",null,false).statusCode());
-            assertEquals(forbidden.platformRealm ? 401 : 403,forbidden.send("GET","/api/tenant-admin/v1/tenants/"+tenantA+"/invitations",null,false).statusCode());
+            assertEquals(403,forbidden.send("GET","/api/v1/tenants/"+tenantA+"/context",null,false).statusCode());
+            assertEquals(403,forbidden.send("GET","/api/tenant-admin/v1/tenants/"+tenantA+"/invitations",null,false).statusCode());
         }
         assertEquals(403,employee.send("GET","/api/tenant-admin/v1/tenants/"+tenantA+"/invitations",null,false).statusCode());
-        assertEquals(401,adminA.send("GET","/api/platform-admin/v1/tenants",null,false).statusCode());
+        assertEquals(403,adminA.send("GET","/api/platform-admin/v1/tenants",null,false).statusCode());
         var adminSpaces = adminA.ok("GET","/api/v1/tenants/"+tenantA+"/context",null,200).get("workspaces");
         var employeeSpaces = employee.ok("GET","/api/v1/tenants/"+tenantA+"/context",null,200).get("workspaces");
         assertEquals(1,adminSpaces.size()); assertEquals(1,employeeSpaces.size());
@@ -200,10 +201,10 @@ class IdentityIntegrationTest {
 
     @Test void tenantCreationRetryDoesNotDuplicateTenantOrInvitation() throws Exception {
         UUID requestId = UUID.randomUUID();
-        var body = Map.of("requestId",requestId,"name","重试合成企业","adminEmail","retry-admin@example.test");
+        var body = Map.of("requestId",requestId,"name","重试合成企业","adminPhone","19900000091");
         var first = platform.ok("POST","/api/platform-admin/v1/tenants",body,201);
         assertEquals(first,platform.ok("POST","/api/platform-admin/v1/tenants",body,201));
-        assertEquals(409,platform.send("POST","/api/platform-admin/v1/tenants",Map.of("requestId",requestId,"name","另一名称","adminEmail","retry-admin@example.test"),true).statusCode());
+        assertEquals(409,platform.send("POST","/api/platform-admin/v1/tenants",Map.of("requestId",requestId,"name","另一名称","adminPhone","19900000091"),true).statusCode());
         assertEquals(1,db.queryForObject("SELECT count(*) FROM tenants WHERE name='重试合成企业'",Integer.class));
     }
     @Test void failedDeliveryRollsBackTenantAndInvitation() throws Exception {
@@ -212,7 +213,7 @@ class IdentityIntegrationTest {
         Files.move(outbox,saved);
         try {
             Files.writeString(outbox,"synthetic obstruction");
-            var result = platform.send("POST","/api/platform-admin/v1/tenants",Map.of("requestId",UUID.randomUUID(),"name","不可遗留企业","adminEmail","delivery-fail@example.test"),true);
+            var result = platform.send("POST","/api/platform-admin/v1/tenants",Map.of("requestId",UUID.randomUUID(),"name","不可遗留企业","adminPhone","19900000092"),true);
             assertEquals(503,result.statusCode());
             assertFalse(result.body().contains(outbox.toString()));
             assertEquals(0,db.queryForObject("SELECT count(*) FROM tenants WHERE name='不可遗留企业'",Integer.class));
@@ -226,7 +227,7 @@ class IdentityIntegrationTest {
         // Restore the shared fixture's session for independent tests.
         employee.login("employee@example.test");
         db.update("DELETE FROM platform_roles WHERE account_id=?",platformId);
-        try { assertEquals(401,platform.send("GET","/api/platform-admin/v1/tenants",null,false).statusCode()); }
+        try { assertEquals(403,platform.send("GET","/api/platform-admin/v1/tenants",null,false).statusCode()); }
         finally { db.update("INSERT INTO platform_roles(account_id,role) VALUES (?,'PLATFORM_ADMIN')",platformId); platform.login("platform@example.test"); }
     }
 
@@ -257,16 +258,16 @@ class IdentityIntegrationTest {
             assertEquals(400,platform.send("GET","/api/platform-admin/v1/tenants?"+invalid,null,false).statusCode());
         var runtime=platform.ok("GET","/api/platform-admin/v1/overview",null,200);
         assertEquals("LOCAL",runtime.get("invitationDelivery").asString());
-        assertEquals(runtime.get("totalTenants").asLong(),runtime.get("activeTenants").asLong()+runtime.get("suspendedTenants").asLong());
+        assertEquals(runtime.get("totalTenants").asLong(),runtime.get("activeTenants").asLong()+runtime.get("suspendedTenants").asLong()+runtime.get("pendingTenants").asLong());
         for(Client forbidden:List.of(adminA,employee)) {
             for(String denied:List.of(path,path+"/records","/api/platform-admin/v1/overview"))
-                assertEquals(401,forbidden.send("GET",denied,null,false).statusCode());
-            assertEquals(401,forbidden.send("POST",path+"/status",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"status","SUSPENDED","internalReason","内部核对-不可给客户","publicReason","合成公开服务说明"),true).statusCode());
-            assertEquals(401,forbidden.send("POST",path+"/initial-admin-invitation",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"email","forbidden@example.test"),true).statusCode());
+                assertEquals(403,forbidden.send("GET",denied,null,false).statusCode());
+            assertEquals(403,forbidden.send("POST",path+"/status",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"status","SUSPENDED","internalReason","内部核对-不可给客户","publicReason","合成公开服务说明"),true).statusCode());
+            assertEquals(403,forbidden.send("POST",path+"/initial-admin-invitation",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"email","forbidden@example.test"),true).statusCode());
         }
         assertEquals(403,platform.send("POST",path+"/status",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"status","SUSPENDED","internalReason","内部核对-不可给客户","publicReason","合成公开服务说明"),false).statusCode());
         assertEquals(404,platform.send("GET","/api/platform-admin/v1/tenants/"+UUID.randomUUID(),null,false).statusCode());
-        assertEquals(401,platform.send("GET","/api/v1/tenants/"+id+"/context",null,false).statusCode());
+        assertEquals(403,platform.send("GET","/api/v1/tenants/"+id+"/context",null,false).statusCode());
         for(String forbidden:List.of("content","conversations","impersonate")) assertEquals(404,platform.send("GET",path+"/"+forbidden,null,false).statusCode());
     }
     @Test void platformSuspensionIsVersionedIdempotentAndTenantScoped() throws Exception {
@@ -317,12 +318,12 @@ class IdentityIntegrationTest {
         assertFalse(records.toString().contains("suspend-pending@example.test"));
     }
     @Test void initialOwnerProjectionAndRevokeAreVersionedAndDoNotReplaceAcceptedOwner() throws Exception {
-        var created=platform.ok("POST","/api/platform-admin/v1/tenants",Map.of("requestId",UUID.randomUUID(),"name","负责人投影合成企业","adminEmail","owner-projection@example.test","designateAuthorizationOwner",true),201);
+        var created=JSON.readTree(JSON.writeValueAsString(identities.createTenant(platformId,UUID.randomUUID(),"负责人投影合成企业","owner-projection@example.test",true)));
         String id=created.get("tenant").get("id").asString(),path="/api/platform-admin/v1/tenants/"+id;
         String original=created.get("invitation").get("id").asString();
         assertEquals("AWAITING_INVITATION",platform.ok("GET",path,null,200).get("owner").get("state").asString());
         var revoke=Map.of("requestId",UUID.randomUUID(),"expectedVersion",0);
-        assertEquals(401,adminA.send("POST",path+"/initial-admin-invitation/revoke",revoke,true).statusCode());
+        assertEquals(403,adminA.send("POST",path+"/initial-admin-invitation/revoke",revoke,true).statusCode());
         assertEquals(403,platform.send("POST",path+"/initial-admin-invitation/revoke",revoke,false).statusCode());
         var revoked=platform.ok("POST",path+"/initial-admin-invitation/revoke",revoke,200);
         assertEquals("INVITATION_INACTIVE",revoked.get("owner").get("state").asString());
@@ -436,9 +437,9 @@ class IdentityIntegrationTest {
         String id=space.get("id").asString();
         for(Client forbidden:List.of(platform,adminB,member)) {
             for(String route:List.of("/overview","/members","/workspaces","/records","/workspaces/"+id,"/workspaces/"+id+"/members","/invitations"))
-                assertEquals(forbidden.platformRealm ? 401 : 403,forbidden.send("GET",f.path+route,null,false).statusCode());
-            assertEquals(forbidden.platformRealm ? 401 : 403,forbidden.send("POST",f.path+"/workspaces",body,true).statusCode());
-            assertEquals(forbidden.platformRealm ? 401 : 403,forbidden.send("POST",f.path+"/members/"+f.adminId+"/status",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"status","DISABLED"),true).statusCode());
+                assertEquals(403,forbidden.send("GET",f.path+route,null,false).statusCode());
+            assertEquals(403,forbidden.send("POST",f.path+"/workspaces",body,true).statusCode());
+            assertEquals(403,forbidden.send("POST",f.path+"/members/"+f.adminId+"/status",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"status","DISABLED"),true).statusCode());
         }
         assertEquals(403,f.admin.send("POST",f.path+"/workspaces",body,false).statusCode());
         assertEquals(400,f.admin.send("POST",f.path+"/workspaces",Map.of("requestId",UUID.randomUUID(),"name","注入","kind","PERSONAL"),true).statusCode());

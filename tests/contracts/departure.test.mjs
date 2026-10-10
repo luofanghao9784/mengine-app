@@ -48,7 +48,7 @@ test('exit inventory recognizes exact data snapshots without accepting an extern
 });
 test('all endpoints are scoped, no-store, CSRF-bound and support precise conflict', () => {
   assert.equal(spec.components.securitySchemes.sessionCookie.name, 'DREAMCORE_SESSION');
-  assert.equal(spec.components.securitySchemes.platformSessionCookie.name, 'DREAMCORE_PLATFORM');
+  assert.equal(spec.components.securitySchemes.platformSessionCookie.name, 'DREAMCORE_SESSION');
   for (const [path, verbs] of Object.entries(spec.paths))
     for (const [method, op] of Object.entries(verbs)) {
       const platform = path.startsWith('/api/platform-admin/');

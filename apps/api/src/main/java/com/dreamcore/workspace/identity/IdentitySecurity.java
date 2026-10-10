@@ -44,6 +44,7 @@ public class IdentitySecurity {
                 .dispatcherTypeMatchers(jakarta.servlet.DispatcherType.ERROR).permitAll()
                 .requestMatchers("/api/v1/system/info", "/actuator/health", "/api/v1/auth/csrf", "/api/v1/auth/login", "/api/v1/auth/invitations/accept").permitAll()
                 .requestMatchers("/api/v1/auth/phone/configuration", "/api/v1/auth/phone/invitation", "/api/v1/auth/phone/switch-account", "/api/v1/auth/phone/challenges", "/api/v1/auth/phone/accept", "/api/v1/auth/phone/reset", "/api/v1/auth/phone/local-code/*").permitAll()
+                .requestMatchers("/api/platform-admin/v1/auth/csrf", "/api/platform-admin/v1/auth/login", "/api/platform-admin/v1/auth/invitation/preview", "/api/platform-admin/v1/auth/invitation/challenge", "/api/platform-admin/v1/auth/invitation/accept").permitAll()
                 .requestMatchers("/internal/v1/agent-access/**").permitAll() // Every operation validates a running task attempt capability.
                 .anyRequest().authenticated())
             .exceptionHandling(e -> e
@@ -51,6 +52,7 @@ public class IdentitySecurity {
                 .accessDeniedHandler((request,response,error) -> writeError(response,403,"ACCESS_DENIED")))
             .addFilterBefore(new OncePerRequestFilter() {
                 @Override protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain) throws ServletException, IOException {
+                    response.setHeader("Cache-Control","no-store");
                     var auth = SecurityContextHolder.getContext().getAuthentication();
                     if (auth != null && auth.isAuthenticated() && !(auth instanceof AnonymousAuthenticationToken)) {
                         var currentSession=request.getSession(false);
@@ -62,6 +64,12 @@ public class IdentitySecurity {
                             SecurityContextHolder.clearContext();
                             writeError(response,401,"AUTHENTICATION_REQUIRED"); return;
                         }
+                    }
+                    String path=request.getRequestURI();
+                    if(path.startsWith("/api/platform-admin/") && !List.of("/api/platform-admin/v1/auth/csrf","/api/platform-admin/v1/auth/login","/api/platform-admin/v1/auth/invitation/preview", "/api/platform-admin/v1/auth/invitation/challenge","/api/platform-admin/v1/auth/invitation/accept","/api/platform-admin/v1/auth/logout").contains(path)
+                        && auth!=null && auth.isAuthenticated() && !(auth instanceof AnonymousAuthenticationToken)) {
+                        try { identities.platform(UUID.fromString(auth.getName())); }
+                        catch(IdentityException denied) { writeError(response,403,"ACCESS_DENIED");return; }
                     }
                     chain.doFilter(request,response);
                 }

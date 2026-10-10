@@ -1,3 +1,4 @@
+import { SurfaceLinks } from '../identity/SurfaceAccess';
 import { NewsSources } from '../news/NewsSources';
 import { ExpressionPreferencesPanel } from '../preferences/ExpressionPreferencesPanel';
 import './tenant-redesign.css';
@@ -81,6 +82,7 @@ export function TenantConsole({
           <SupportRecords id={support.id} test={support.mode === 'TEST'} />
         ) : (
           <>
+            <SurfaceLinks surface="tenant-admin" tenant={tenant} />
             <a className="button ghost" href={back} aria-label="返回客户端" title="返回客户端">
               <ArrowLeft size={16} />
               <span>返回客户端</span>

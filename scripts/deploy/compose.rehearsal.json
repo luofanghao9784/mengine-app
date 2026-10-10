@@ -1,0 +1,293 @@
+{
+  "name": "dreamcore-rehearsal",
+  "services": {
+    "database": {
+      "image": "${POSTGRES_IMAGE:?Set a verified immutable linux amd64 image}",
+      "profiles": [
+        "rehearsal"
+      ],
+      "restart": "no",
+      "mem_limit": "512m",
+      "memswap_limit": "512m",
+      "cpus": 0.4,
+      "pids_limit": 192,
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      },
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "environment": {
+        "POSTGRES_DB": "dreamcore_trial",
+        "POSTGRES_USER": "dreamcore_trial",
+        "POSTGRES_PASSWORD_FILE": "/run/secrets/database-password"
+      },
+      "volumes": [
+        {
+          "type": "bind",
+          "source": "${DREAMCORE_ROOT:?Set an independent absolute rehearsal directory}/postgres",
+          "target": "/var/lib/postgresql",
+          "read_only": false,
+          "bind": {
+            "create_host_path": false
+          }
+        },
+        {
+          "type": "bind",
+          "source": "${DREAMCORE_ROOT:?Set an independent absolute rehearsal directory}/secrets/database-password",
+          "target": "/run/secrets/database-password",
+          "read_only": true,
+          "bind": {
+            "create_host_path": false
+          }
+        }
+      ],
+      "command": [
+        "postgres",
+        "-c",
+        "shared_buffers=64MB",
+        "-c",
+        "max_connections=30"
+      ],
+      "networks": [
+        "database"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "pg_isready -U dreamcore_trial -d dreamcore_trial"
+        ],
+        "interval": "5s",
+        "timeout": "3s",
+        "retries": 20
+      }
+    },
+    "api": {
+      "image": "${JAVA_IMAGE:?Set a verified immutable linux amd64 image}",
+      "profiles": [
+        "rehearsal"
+      ],
+      "restart": "no",
+      "mem_limit": "1280m",
+      "memswap_limit": "1280m",
+      "cpus": 0.75,
+      "pids_limit": 192,
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      },
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "user": "10001:10001",
+      "read_only": true,
+      "cap_drop": [
+        "ALL"
+      ],
+      "tmpfs": [
+        "/tmp:rw,noexec,nosuid,size=128m,mode=1777"
+      ],
+      "working_dir": "/app",
+      "command": [
+        "java",
+        "-Xms128m",
+        "-Xmx768m",
+        "-XX:ActiveProcessorCount=2",
+        "-jar",
+        "/app/api.jar"
+      ],
+      "env_file": [
+        "${DREAMCORE_ROOT:?Set an independent absolute rehearsal directory}/secrets/api.env"
+      ],
+      "environment": {
+        "API_HOST": "0.0.0.0",
+        "API_PORT": "18181",
+        "DATABASE_URL": "jdbc:postgresql://database:5432/dreamcore_trial",
+        "DATABASE_USER": "dreamcore_trial",
+        "ENGINE_BASE_URL": "http://engine:18182",
+        "MATERIAL_STORAGE_ROOT": "/data/objects",
+        "TASK_ENABLED": "false",
+        "AGENT_TASK_MODE": "off",
+        "KNOWLEDGE_ENABLED": "false",
+        "DREAMCORE_COLLECTION_ENABLED": "false",
+        "DREAMCORE_BRIEFING_ENABLED": "false",
+        "BRIEFING_DAILY_ENABLED": "false",
+        "BRIEFING_AUTOMATIC_ENABLED": "false",
+        "ONGOING_PLANS_ENABLED": "false",
+        "COMPANY_INFORMATION_ENABLED": "false",
+        "EXPERIENCE_INTAKE_ENABLED": "false",
+        "EXPERIENCE_ANALYSIS_ENABLED": "false",
+        "EXPERIENCE_GENERALIZATION_ENABLED": "false",
+        "INVITATION_DELIVERY": "disabled",
+        "PHONE_DELIVERY": "disabled",
+        "PHONE_LOCAL_PREVIEW": "false",
+        "SERVER_SERVLET_SESSION_COOKIE_SECURE": "true",
+        "SERVER_SERVLET_SESSION_COOKIE_NAME": "DREAMCORE_AI_SESSION",
+        "PLATFORM_COOKIE_NAME": "DREAMCORE_AI_PLATFORM",
+        "SERVER_FORWARD_HEADERS_STRATEGY": "none"
+      },
+      "volumes": [
+        {
+          "type": "bind",
+          "source": "${DREAMCORE_ROOT:?Set an independent absolute rehearsal directory}/release/api.jar",
+          "target": "/app/api.jar",
+          "read_only": true,
+          "bind": {
+            "create_host_path": false
+          }
+        },
+        {
+          "type": "bind",
+          "source": "${DREAMCORE_ROOT:?Set an independent absolute rehearsal directory}/objects",
+          "target": "/data/objects",
+          "read_only": false,
+          "bind": {
+            "create_host_path": false
+          }
+        }
+      ],
+      "networks": [
+        "database",
+        "runtime"
+      ],
+      "depends_on": {
+        "database": {
+          "condition": "service_healthy"
+        }
+      }
+    },
+    "engine": {
+      "image": "${NODE_IMAGE:?Set a verified immutable linux amd64 image}",
+      "profiles": [
+        "rehearsal"
+      ],
+      "restart": "no",
+      "mem_limit": "640m",
+      "memswap_limit": "640m",
+      "cpus": 0.5,
+      "pids_limit": 192,
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      },
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "user": "10001:10001",
+      "read_only": true,
+      "cap_drop": [
+        "ALL"
+      ],
+      "tmpfs": [
+        "/tmp:rw,noexec,nosuid,size=64m,mode=1777"
+      ],
+      "working_dir": "/app",
+      "command": [
+        "node",
+        "--max-old-space-size=384",
+        "dist/main.js"
+      ],
+      "env_file": [
+        "${DREAMCORE_ROOT:?Set an independent absolute rehearsal directory}/secrets/engine.env"
+      ],
+      "environment": {
+        "ENGINE_HOST": "0.0.0.0",
+        "ENGINE_PORT": "18182",
+        "AGENT_PLATFORM_URL": "http://api:18181",
+        "AGENT_MODEL_PROVIDER": "off",
+        "AGENT_CANDIDATE_TRIALS_ENABLED": "false",
+        "AGENT_PUBLIC_WEB_ENABLED": "false"
+      },
+      "volumes": [
+        {
+          "type": "bind",
+          "source": "${DREAMCORE_ROOT:?Set an independent absolute rehearsal directory}/release/engine",
+          "target": "/app",
+          "read_only": true,
+          "bind": {
+            "create_host_path": false
+          }
+        }
+      ],
+      "networks": [
+        "runtime"
+      ]
+    },
+    "web": {
+      "image": "${NGINX_IMAGE:?Set a verified immutable linux amd64 image}",
+      "profiles": [
+        "rehearsal"
+      ],
+      "restart": "no",
+      "mem_limit": "64m",
+      "memswap_limit": "64m",
+      "cpus": 0.1,
+      "pids_limit": 192,
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      },
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "user": "101:101",
+      "read_only": true,
+      "cap_drop": [
+        "ALL"
+      ],
+      "tmpfs": [
+        "/tmp:rw,noexec,nosuid,size=16m,mode=1777"
+      ],
+      "ports": [
+        "127.0.0.1:18480:8080"
+      ],
+      "volumes": [
+        {
+          "type": "bind",
+          "source": "${DREAMCORE_ROOT:?Set an independent absolute rehearsal directory}/release/web",
+          "target": "/usr/share/nginx/html",
+          "read_only": true,
+          "bind": {
+            "create_host_path": false
+          }
+        },
+        {
+          "type": "bind",
+          "source": "${DREAMCORE_ROOT:?Set an independent absolute rehearsal directory}/release/nginx-internal.conf",
+          "target": "/etc/nginx/conf.d/default.conf",
+          "read_only": true,
+          "bind": {
+            "create_host_path": false
+          }
+        }
+      ],
+      "networks": [
+        "runtime"
+      ],
+      "depends_on": [
+        "api"
+      ]
+    }
+  },
+  "networks": {
+    "database": {
+      "internal": true
+    },
+    "runtime": {
+      "internal": true
+    }
+  }
+}

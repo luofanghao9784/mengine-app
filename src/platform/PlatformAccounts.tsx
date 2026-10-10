@@ -157,7 +157,7 @@ function AccountDetail({
         <section className="platform-account-safety" aria-label="账号安全操作">
           <div>
             <h3>账号安全</h3>
-            <p>停用影响该账号的所有企业登录，成员身份与空间授权保留。</p>
+            <p>停用影响该账号的三端和所有企业登录，成员身份与空间授权保留。</p>
           </div>
           <Button
             variant={account.status === 'ACTIVE' ? 'danger' : 'primary'}
@@ -214,7 +214,7 @@ function AccountStatus({
   const disable = account.status === 'ACTIVE';
   return (
     <Modal
-      title={disable ? '停用客户账号' : '恢复客户账号'}
+      title={disable ? '停用统一账号' : '恢复统一账号'}
       onClose={() => {
         if (!task.busy && !task.uncertain) close();
       }}

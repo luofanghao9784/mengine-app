@@ -75,7 +75,8 @@
     "test:client-b1": "python3 scripts/with-test-postgres.py node --experimental-strip-types scripts/verify-phone-flow.ts --client-b1",
     "test:phone-flow": "python3 scripts/with-test-postgres.py node --experimental-strip-types scripts/verify-phone-flow.ts",
     "trial:start:phone": "python3 scripts/local/trial.py start --phone-local --directory .local/phone-trial",
-    "test:client-all": "python3 scripts/with-test-postgres.py node --experimental-strip-types scripts/verify-phone-flow.ts --client-all"
+    "test:client-all": "python3 scripts/with-test-postgres.py node --experimental-strip-types scripts/verify-phone-flow.ts --client-all",
+    "test:unified-identity": "python3 scripts/with-test-postgres.py node --experimental-strip-types scripts/verify-unified-identity.ts"
   },
   "dependencies": {
     "@fontsource/cormorant-garamond": "^5.3.0",

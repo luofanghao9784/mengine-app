@@ -21,7 +21,7 @@ import '../governance/governance.css';
 import './platform.css';
 import { ownerStateLabel } from '../admin/platform-attention';
 
-const statusLabel = (s: string) => (s === 'ACTIVE' ? '运行中' : '已暂停');
+const statusLabel = (s: string) => (s === 'ACTIVE' ? '运行中' : s === 'PENDING' ? '待负责人激活' : '已暂停');
 const invitationLabel: Record<string, string> = {
   PENDING: '等待接受邀请',
   ACCEPTED: '已接受邀请',
@@ -340,7 +340,7 @@ function TenantView({
                       <Button
                         icon={Send}
                         onClick={() => setAction('invite')}
-                        disabled={value.tenant.status !== 'ACTIVE' || delivery !== 'LOCAL'}
+                        disabled={value.tenant.status === 'SUSPENDED' || delivery !== 'LOCAL'}
                       >
                         重新邀请或更换手机号
                       </Button>
@@ -368,11 +368,15 @@ function TenantView({
                   </p>
                 </div>
                 <Button
+                  disabled={pending || value.tenant.status === 'PENDING'}
                   variant={value.tenant.status === 'ACTIVE' ? 'danger' : 'primary'}
                   onClick={() => setAction('status')}
-                  disabled={pending}
                 >
-                  {value.tenant.status === 'ACTIVE' ? '暂停服务' : '恢复服务'}
+                  {value.tenant.status === 'PENDING'
+                    ? '等待负责人激活'
+                    : value.tenant.status === 'ACTIVE'
+                      ? '暂停服务'
+                      : '恢复服务'}
                 </Button>
               </div>
             </section>

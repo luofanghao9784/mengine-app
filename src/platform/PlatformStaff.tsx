@@ -1,3 +1,5 @@
+import { CodeField } from '../identity/PhoneAuth';
+import type { Challenge } from '../identity/phone-client';
 import { useState } from 'react';
 import { Plus, ShieldCheck } from 'lucide-react';
 import { Badge, Button, Field, Modal, PageActions } from '../shared/ui';
@@ -30,7 +32,7 @@ export function PlatformStaffList() {
       </PageActions>
       <section className="admin-section">
         <h2>管理人员</h2>
-        <p className="admin-note">管理人员使用独立平台账号。管理资格不包含客户业务内容访问权。</p>
+        <p className="admin-note">管理人员使用统一账号，可另设总台专用密码。总台资格不自动授予企业资料访问权。</p>
         {data.error ? (
           <Failure error={data.error} retry={refresh} />
         ) : !data.value ? (
@@ -183,7 +185,7 @@ function RevokeStaff({
       <p>
         {target.invitation
           ? `撤销给 ${target.name} 的邀请，原链接将失效。`
-          : `撤销 ${target.name} 的总台资格，其总台登录和未接受的管理人员邀请将失效。客户账号及企业成员身份不受影响。`}
+          : `撤销 ${target.name} 的总台资格，其总台登录和未接受的管理人员邀请将失效。该账号的企业成员身份及访问资格不受影响。`}
       </p>
       <SubmitError error={task.error} uncertain={task.uncertain} />
       <div className="form-actions">
@@ -236,7 +238,9 @@ function LocalStaffLink({ invitation }: { invitation: StaffInvitation }) {
   );
 }
 export function PlatformInvitation({ token, done }: { token: string; done: () => void }) {
-  const { authenticated } = useSession();
+  const { authenticated, session, logout } = useSession();
+  const [challenge, setChallenge] = useState<Challenge | null>(null);
+  const [code, setCode] = useState('');
   const [attempt, setAttempt] = useState(0);
   const data = useRemote((signal) => api.previewInvite(token, signal), [token, attempt]);
   const [password, setPassword] = useState(''),
@@ -260,7 +264,14 @@ export function PlatformInvitation({ token, done }: { token: string; done: () =>
               void task.submit(
                 { username: data.value!.loginName, password, displayName: name },
                 async (body) => {
-                  const identity = await api.acceptInvite({ ...body, token });
+                  const identity = await api.acceptInvite({
+                    ...body,
+                    password:
+                      session.identity?.account.phone === data.value!.loginName ? undefined : body.password,
+                    token,
+                    challengeId: challenge?.id,
+                    code: challenge ? code : undefined,
+                  });
                   setPassword('');
                   authenticated(identity);
                   done();
@@ -268,7 +279,7 @@ export function PlatformInvitation({ token, done }: { token: string; done: () =>
               );
             }}
           >
-            <p>接受后可承担平台管理职责。此账号独立于客户端账号。</p>
+            <p>接受后，此账号将获得总台管理权限。已有企业身份保持不变。</p>
             <Field label="受邀管理账号">
               <input readOnly value={data.value.loginName} autoComplete="username" />
             </Field>
@@ -283,20 +294,48 @@ export function PlatformInvitation({ token, done }: { token: string; done: () =>
                 />
               </Field>
             )}
-            <Field label={data.value.existingAccount ? '平台账号密码' : '设置平台账号密码'}>
-              <input
-                type="password"
-                required
-                minLength={6}
-                maxLength={128}
-                autoComplete={data.value.existingAccount ? 'current-password' : 'new-password'}
-                value={password}
-                disabled={locked}
-                onChange={(e) => setPassword(e.target.value)}
+            {!data.value.existingAccount && (
+              <CodeField
+                purpose="JOIN"
+                phone={data.value.loginName}
+                token={token}
+                issue={() => api.challengeInvite(token)}
+                challenge={challenge}
+                setChallenge={setChallenge}
+                code={code}
+                setCode={setCode}
               />
-            </Field>
+            )}
+            {session.identity && session.identity.account.phone !== data.value.loginName && (
+              <>
+                <p role="alert">当前账号与受邀手机号不匹配，请先切换账号。</p>
+                <Button onClick={() => void logout()}>切换账号</Button>
+              </>
+            )}
+            {session.identity?.account.phone !== data.value.loginName && (
+              <Field label={data.value.existingAccount ? '账号密码' : '设置账号密码'}>
+                <input
+                  type="password"
+                  required
+                  minLength={6}
+                  maxLength={128}
+                  autoComplete={data.value.existingAccount ? 'current-password' : 'new-password'}
+                  value={password}
+                  disabled={locked}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </Field>
+            )}
             <SubmitError error={task.error} uncertain={task.uncertain} />
-            <Button variant="primary" type="submit" disabled={task.busy}>
+            <Button
+              variant="primary"
+              type="submit"
+              disabled={
+                task.busy ||
+                (!data.value.existingAccount && !challenge) ||
+                (!!session.identity && session.identity.account.phone !== data.value.loginName)
+              }
+            >
               {task.busy
                 ? '正在接受…'
                 : task.uncertain

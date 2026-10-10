@@ -1580,7 +1580,7 @@
       "platformSessionCookie": {
         "type": "apiKey",
         "in": "cookie",
-        "name": "DREAMCORE_PLATFORM"
+        "name": "DREAMCORE_SESSION"
       }
     },
     "parameters": {

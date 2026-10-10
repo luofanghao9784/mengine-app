@@ -18,7 +18,13 @@ export type Challenge = {
   localPreview: boolean;
 };
 export type Joined = { identity: Identity; membership: Membership };
-export type Verification = { phone: string; password: string; challengeId: string; code: string };
+export type Verification = {
+  unifiedPassword?: string;
+  phone: string;
+  password: string;
+  challengeId: string;
+  code: string;
+};
 export type Join = {
   requestId: string;
   token?: string;
@@ -38,7 +44,7 @@ const preview = (v: unknown): v is InvitationPreview =>
   ['PENDING', 'ACCEPTED'].includes(String(v.status)) &&
   ['CREATE', 'LOGIN', 'CONFIRM', 'SWITCH'].includes(String(v.action)) &&
   typeof v.designatedOwner === 'boolean';
-const challenge = (v: unknown): v is Challenge =>
+export const challenge = (v: unknown): v is Challenge =>
   record(v) &&
   uuid(v.id) &&
   text(v.expiresAt) &&

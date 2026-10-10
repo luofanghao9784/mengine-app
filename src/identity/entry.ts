@@ -18,7 +18,7 @@ export function rememberedTenant(
   storage?: Storage,
 ): string | null {
   try {
-    return (storage ?? sessionStorage).getItem(tenantKey(account, surface));
+    return (storage ?? localStorage).getItem(tenantKey(account, surface));
   } catch {
     return null;
   }
@@ -30,7 +30,7 @@ export function rememberTenant(
   storage?: Storage,
 ) {
   try {
-    (storage ?? sessionStorage).setItem(tenantKey(account, surface), tenant);
+    (storage ?? localStorage).setItem(tenantKey(account, surface), tenant);
   } catch {
     /* Only a navigation preference; explicit destinations remain usable. */
   }

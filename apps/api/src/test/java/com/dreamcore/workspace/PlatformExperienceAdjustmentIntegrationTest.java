@@ -168,7 +168,7 @@ class PlatformExperienceAdjustmentIntegrationTest {
  @Test void platformHttpRequiresItsOwnCookieAndCsrfAndNeverReturnsProposalBody()throws Exception{
   seed();var base=publish(method());db.update("UPDATE accounts SET password_hash=? WHERE id=?",passwords.encode("synthetic-customer-123"),owner);
   String path="/api/platform-admin/v1/experience-library/"+base.entryId()+"/adjustments";
-  var customer=new Browser();customer.login("customer",Map.of("email",owner+"@dispatch.test","password","synthetic-customer-123"));assertEquals(401,customer.get(path+"?version="+base.versionId()).statusCode());
+  var customer=new Browser();customer.login("customer",Map.of("email",owner+"@dispatch.test","password","synthetic-customer-123"));assertEquals(403,customer.get(path+"?version="+base.versionId()).statusCode());
   var admin=new Browser();admin.login("platform",Map.of("username",platform+"@platform.test","password","synthetic-platform-456"));
   var page=admin.get(path+"?version="+base.versionId());assertEquals(200,page.statusCode(),page.body());assertTrue(page.headers().firstValue("cache-control").orElseThrow().contains("no-store"));
   var change=change(base);var builder=java.net.http.HttpRequest.newBuilder(java.net.URI.create("http://127.0.0.1:"+port+path)).header("Content-Type","application/json").POST(java.net.http.HttpRequest.BodyPublishers.ofString(admin.json.writeValueAsString(change)));

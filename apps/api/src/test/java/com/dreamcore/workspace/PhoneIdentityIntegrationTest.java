@@ -193,7 +193,7 @@ class PhoneIdentityIntegrationTest {
         var i=invite(true);var c=join(i);UUID account=UUID.fromString(c.me().get("account").get("id").asString());
         assertEquals(0,db.queryForObject("SELECT count(*) FROM tenant_governance WHERE tenant_id=? AND owner_id IS NOT NULL",Integer.class,i.tenant()));
         assertEquals(0,db.queryForObject("SELECT count(*) FROM workspace_members WHERE account_id=?",Integer.class,account));
-        assertEquals(401,c.send("GET","/api/platform-admin/v1/tenants",null,false).statusCode());
+        assertEquals(403,c.send("GET","/api/platform-admin/v1/tenants",null,false).statusCode());
     }
     @Test void disabledOrSuspendedIdentityCannotBeRecoveredViaInvitation()throws Exception{
         var i=invite(false);var c=join(i);var old=c.me();UUID account=UUID.fromString(old.get("account").get("id").asString());

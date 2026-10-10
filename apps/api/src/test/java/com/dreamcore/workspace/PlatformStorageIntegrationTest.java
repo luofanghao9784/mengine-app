@@ -34,9 +34,9 @@ class PlatformStorageIntegrationTest {
   var body=Map.of(platform?"username":"email",(platform?operator:member)+"@example.test","password",PASSWORD);var req=HttpRequest.newBuilder(URI.create(base+"/login")).header(csrf.get("headerName").asString(),csrf.get("token").asString()).header("Content-Type","application/json").POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body))).build();assertEquals(200,http.send(req,HttpResponse.BodyHandlers.ofString()).statusCode());return http;
  }
  HttpResponse<String> get(HttpClient http)throws Exception{return http.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/api/platform-admin/v1/storage-status")).GET().build(),HttpResponse.BodyHandlers.ofString());}
- @Test void independentPlatformLoginNoStoreAndRevocationAreEnforced()throws Exception{
-  assertEquals(401,get(HttpClient.newHttpClient()).statusCode());assertEquals(401,get(login(false)).statusCode());
+ @Test void unifiedPlatformRoleNoStoreAndRevocationAreEnforced()throws Exception{
+  assertEquals(401,get(HttpClient.newHttpClient()).statusCode());assertEquals(403,get(login(false)).statusCode());
   var platform=login(true);var r=get(platform);assertEquals(200,r.statusCode());assertEquals("private, no-store",r.headers().firstValue("Cache-Control").orElseThrow());assertFalse(r.body().contains(SECRET));
-  db.update("DELETE FROM platform_roles WHERE account_id=?",operator);assertEquals(401,get(platform).statusCode());assertEquals(403,assertThrows(IdentityException.class,()->service.status(member)).status);
+  db.update("DELETE FROM platform_roles WHERE account_id=?",operator);assertEquals(403,get(platform).statusCode());assertEquals(403,assertThrows(IdentityException.class,()->service.status(member)).status);
  }
 }

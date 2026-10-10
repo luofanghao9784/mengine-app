@@ -313,9 +313,7 @@ export function AdminShell({
                     {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
                   </button>
                 </div>
-                {realm === 'tenant' && customerLinks && (
-                  <div className="admin-customer-links">{customerLinks}</div>
-                )}
+                {customerLinks && <div className="admin-customer-links">{customerLinks}</div>}
                 <div className="admin-account" title={account}>
                   <span className="admin-account-avatar" aria-hidden="true">
                     {Array.from(account.trim())[0] || '账'}

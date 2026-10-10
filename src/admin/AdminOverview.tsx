@@ -84,7 +84,11 @@ function ScopedOverview({
             </>
           ) : (
             <>
-              <Stat title="服务企业" value={summary.value.value.totalTenants} note="当前已开通" />
+              <Stat
+                title="服务企业"
+                value={summary.value.value.totalTenants}
+                note={`${summary.value.value.pendingTenants ?? 0} 家待激活`}
+              />
               <Stat
                 title="正常服务"
                 value={summary.value.value.activeTenants}

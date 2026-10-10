@@ -11,6 +11,7 @@ VERSION = 'local-3'
 chunks, notes = [], set()
 MAX_CHARS, MAX_CHUNKS = 400_000, 500
 used = 0
+TOOL_ROOT = '/usr/bin' if sys.platform == 'linux' else '/opt/homebrew/bin'
 class Limit(Exception): pass
 
 def add(locator, text, method='TEXT'):
@@ -60,7 +61,7 @@ def ocr(path, locator):
         with Image.open(path) as im:
             oriented = im.getexif().get(274, 1) in range(2, 9)
             if oriented: ImageOps.exif_transpose(im).convert('RGB').save(normalized)
-        text = command(['/opt/homebrew/bin/tesseract', str(normalized if oriented else path), 'stdout', '-l', 'chi_sim', '--psm', '3'])
+        text = command([TOOL_ROOT + '/tesseract', str(normalized if oriented else path), 'stdout', '-l', 'chi_sim', '--psm', '3'])
     finally: normalized.unlink(missing_ok=True)
     notes.add('OCR_REVIEW_REQUIRED')
     add(locator, text, 'OCR')
@@ -191,17 +192,17 @@ def parse(path, extension):
                 for i in range(sheet.nrows): add(f'{sheet.name} · 第 {i + 1} 行', json.dumps(sheet.row_values(i), ensure_ascii=False), 'TABLE')
         finally: book.release_resources()
     elif extension == 'pdf':
-        info = command(['/opt/homebrew/bin/pdfinfo', str(path)])
+        info = command([TOOL_ROOT + '/pdfinfo', str(path)])
         count = int(re.search(r'^Pages:\s+(\d+)', info, re.M).group(1))
         if count > 30: notes.add('PAGE_LIMIT')
         # PDF text layers can omit diagrams or images even when some text exists.
         notes.add('PDF_LAYOUT_NOT_INTERPRETED')
         for page in range(1, min(count, 30) + 1):
-            text = command(['/opt/homebrew/bin/pdftotext', '-f', str(page), '-l', str(page), '-enc', 'UTF-8', str(path), '-'])
+            text = command([TOOL_ROOT + '/pdftotext', '-f', str(page), '-l', str(page), '-enc', 'UTF-8', str(path), '-'])
             if text.strip(): add(f'第 {page} 页', text)
             else:
                 prefix = str(path.parent / 'page')
-                command(['/opt/homebrew/bin/pdftoppm', '-f', str(page), '-l', str(page), '-singlefile', '-scale-to', '1800', '-png', str(path), prefix])
+                command([TOOL_ROOT + '/pdftoppm', '-f', str(page), '-l', str(page), '-singlefile', '-scale-to', '1800', '-png', str(path), prefix])
                 ocr(Path(prefix + '.png'), f'第 {page} 页')
                 Path(prefix + '.png').unlink(missing_ok=True)
     elif extension in ('png', 'jpg', 'jpeg'): ocr(path, '图片文字')

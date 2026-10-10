@@ -26,7 +26,7 @@ public class PhoneIdentityController {
     public record Accept(@NotNull UUID requestId,@Size(max=64) String token,@Size(max=80) String displayName,
                          @Size(max=128) String password,UUID challengeId,@Size(max=6) String code,boolean acceptResponsibility) {}
     public record Verification(@NotNull @Size(max=40) String phone,@NotNull @Size(max=128) String password,
-                               @NotNull UUID challengeId,@NotNull @Size(max=6) String code) {}
+                               @NotNull UUID challengeId,@NotNull @Size(max=6) String code,@Size(min=6,max=128) String unifiedPassword) {}
     public record Change(@NotNull @Size(max=128) String currentPassword,@NotNull @Size(max=128) String password) {}
     public record Joined(IdentityService.Me identity,IdentityService.Membership membership) {}
     private final LocalPhoneDelivery delivery;
@@ -58,14 +58,11 @@ public class PhoneIdentityController {
         return hash;
     }
     private void authenticate(UUID id,long version,HttpServletRequest request,HttpServletResponse response) {
-        var auth=UsernamePasswordAuthenticationToken.authenticated(id.toString(),null,List.of(new SimpleGrantedAuthority("ROLE_USER")));
-        sessions.onAuthentication(auth,request,response);
-        request.getSession().setAttribute("CREDENTIAL_VERSION",version);
-        var context=SecurityContextHolder.createEmptyContext();context.setAuthentication(auth);
-        SecurityContextHolder.setContext(context);contexts.saveContext(context,request,response);
+        UnifiedLogin.authenticate(identities,id,version,"PASSWORD",request,response);
     }
+
     private void clear(HttpServletRequest request) {
-        var session=request.getSession(false);if(session!=null)session.invalidate();SecurityContextHolder.clearContext();
+        var session=request.getSession(false);if(session!=null){identities.closeSupportSession(IdentityService.hash(session.getId()));session.invalidate();}SecurityContextHolder.clearContext();
     }
     @GetMapping("/configuration")
     public Map<String,Object> configuration(HttpServletRequest request) {
@@ -116,7 +113,7 @@ public class PhoneIdentityController {
     public IdentityService.Me bind(Authentication auth,@Valid @RequestBody Verification body,HttpServletRequest request,HttpServletResponse response) {
         UUID actor=IdentityController.actor(auth);identities.account(actor);String browser=browser(request);
         verification.verify(body.challengeId(),body.code(),"BIND",browser);
-        var result=phones.bind(actor,body.phone(),body.password(),body.challengeId(),browser,request.getRemoteAddr());
+        var result=phones.bind(actor,body.phone(),body.password(),body.challengeId(),browser,request.getRemoteAddr(),body.unifiedPassword());
         clear(request);authenticate(actor,result.account().credentialVersion(),request,response);return result;
     }
     @PostMapping("/reset") @ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT)

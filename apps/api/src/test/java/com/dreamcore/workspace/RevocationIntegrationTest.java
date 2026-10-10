@@ -233,9 +233,9 @@ class RevocationIntegrationTest {
     @ParameterizedTest @EnumSource(PlatformAction.class)
     void queuedPlatformMutationsRecheckRemovedRole(PlatformAction action) throws Exception {
         UUID key=UUID.randomUUID();String path;Map<String,Object> body;
-        String pending=operator.ok("/api/platform-admin/v1/tenants",Map.of("requestId",UUID.randomUUID(),"name","Pending fixture","adminEmail",UUID.randomUUID()+"@revoke.example.test"),201).get("tenant").get("id").asString();
+        String pending=operator.ok("/api/platform-admin/v1/tenants",Map.of("requestId",UUID.randomUUID(),"name","Pending fixture","adminPhone","+86199"+String.format("%08d",Math.abs(UUID.randomUUID().getLeastSignificantBits()%100000000L))),201).get("tenant").get("id").asString();
         if(action==PlatformAction.CREATE) {
-            path="/api/platform-admin/v1/tenants";body=Map.of("requestId",key,"name","Forbidden tenant","adminEmail",UUID.randomUUID()+"@revoke.example.test");
+            path="/api/platform-admin/v1/tenants";body=Map.of("requestId",key,"name","Forbidden tenant","adminPhone","+86199"+String.format("%08d",Math.abs(UUID.randomUUID().getLeastSignificantBits()%100000000L)));
         } else if(action==PlatformAction.STATUS) {
             path="/api/platform-admin/v1/tenants/"+a+"/status";body=Map.of("requestId",key,"expectedVersion",0,"status","SUSPENDED","internalReason","合成撤权检查","publicReason","合成服务状态");
         } else {
@@ -268,6 +268,6 @@ class RevocationIntegrationTest {
         for(String response:List.of(operator.ok("/api/platform-admin/v1/tenants/"+a+"/records",null,200).toString(),manager.ok(management()+"/records",null,200).toString())) {
             assertFalse(response.contains(document));assertFalse(response.contains(folder.toString()));assertFalse(response.contains("MATERIAL_"));assertFalse(response.contains("private-name"));assertFalse(response.contains("synthetic-private-original"));
         }
-        rejected(operator.get(downloads.get(0)),401);rejected(manager.get(downloads.get(0)),404);
+        rejected(operator.get(downloads.get(0)),403);rejected(manager.get(downloads.get(0)),404);
     }
 }

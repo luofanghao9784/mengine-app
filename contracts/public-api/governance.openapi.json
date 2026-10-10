@@ -786,8 +786,8 @@
       "platformSessionCookie": {
         "type": "apiKey",
         "in": "cookie",
-        "name": "DREAMCORE_PLATFORM",
-        "description": "独立总台会话；企业用户 Cookie 不授予平台权限。写入前从 /api/platform-admin/v1/auth/csrf 取得令牌。"
+        "name": "DREAMCORE_SESSION",
+        "description": "统一身份会话；服务端另行核对总台角色，企业成员身份不授予平台权限。写入前从 /api/platform-admin/v1/auth/csrf 取得令牌。"
       }
     },
     "schemas": {

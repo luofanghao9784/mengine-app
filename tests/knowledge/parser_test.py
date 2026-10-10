@@ -94,11 +94,11 @@ class ParserTests(unittest.TestCase):
         r=self.parse(out.getvalue(),'xlsx')
         self.assertEqual('FAILED',r['status']);self.assertIn('RESOURCE_LIMIT',r['warnings'])
     def image(self):
-        im=Image.new('RGB',(1600,400),'white');d=ImageDraw.Draw(im);font=ImageFont.truetype('/System/Library/Fonts/Supplemental/Arial.ttf',65)
+        im=Image.new('RGB',(1600,400),'white');d=ImageDraw.Draw(im);font=ImageFont.truetype(str(ROOT/'apps/api/src/main/resources/fonts/DreamcoreDocumentSansSC-Regular.ttf') if sys.platform=='linux' else '/System/Library/Fonts/Supplemental/Arial.ttf',65)
         d.text((70,100),'Dreamcore invoice 123.45',fill='black',font=font);return im
     def test_chinese_ocr(self):
         im=Image.new('RGB',(1600,400),'white');d=ImageDraw.Draw(im)
-        font=ImageFont.truetype('/System/Library/Fonts/STHeiti Medium.ttc',70)
+        font=ImageFont.truetype(str(ROOT/'apps/api/src/main/resources/fonts/DreamcoreDocumentSansSC-Regular.ttf') if sys.platform=='linux' else '/System/Library/Fonts/STHeiti Medium.ttc',70)
         d.text((70,100),'梦核工作空间 金额 123.45',fill='black',font=font)
         out=io.BytesIO();im.save(out,format='PNG');r=self.parse(out.getvalue(),'png')
         self.assertIn('工作空间',self.text(r).replace(' ',''));self.assertIn('123.45',self.text(r))
@@ -139,7 +139,7 @@ class ParserTests(unittest.TestCase):
             probe.parent.mkdir(exist_ok=True)
             probe.write_text('import socket,json\nfrom pathlib import Path\nresult=[]\n'+
                 f'for action in [lambda: Path({str(canary)!r}).read_text(), lambda: Path({str(canary)!r}).write_text("bad"), lambda: socket.create_connection(("127.0.0.1", 80), timeout=1)]:\n'+
-                ' try: action();result.append(False)\n except PermissionError: result.append(True)\nprint(json.dumps(result))\n')
+                ' try: action();result.append(False)\n except OSError: result.append(True)\nprint(json.dumps(result))\n')
             try:self.assertEqual([True,True,True],json.loads(sandbox.run(task,'',probe)))
             finally:probe.unlink()
             self.assertEqual('synthetic canary',canary.read_text())

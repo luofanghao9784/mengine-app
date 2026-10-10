@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Dreamcore Identity and Tenant API",
-    "version": "1.4.0",
-    "description": "M2-A1 身份、M2-B2 总台与 M2-B3 企业管理接口。同源 Cookie 会话，所有写请求必须带 CSRF。总台仅提供企业运行与管理元信息，不提供客户内容或代入入口。 M2-C1 共享资料查看与维护分开授权，已有访问成员默认只读。 总台改为独立平台凭据与会话；客户端和企业端继续共用客户账号。历史平台角色不会自动转换为独立总台登录。"
+    "version": "2.0.0",
+    "description": "统一用户身份，三端共用 Cookie 会话及 CSRF。总台可有专用凭据；权限来自独立的平台角色、企业成员和空间授权。新企业须由首位负责人明确激活，总部支持访问仍是独立受控上下文。"
   },
   "security": [
     {
@@ -1197,7 +1197,7 @@
       "post": {
         "operationId": "changeTenantStatus",
         "summary": "停用或恢复企业",
-        "description": "独立平台身份、CSRF、版本与请求幂等。内部备注与企业可见说明分别必填并记录；客户 me 仅暴露有效成员所属企业的公开服务说明。暂停保留数据和成员授权，阻断新执行并使在途租约失效；运行中模型结果待核对，不伪称取消。恢复只安排未来正常触发，不补跑积压、不恢复单独停用计划或成员。",
+        "description": "统一身份的平台角色、CSRF、版本与请求幂等。内部备注与企业可见说明分别必填并记录；客户 me 仅暴露有效成员所属企业的公开服务说明。暂停保留数据和成员授权，阻断新执行并使在途租约失效；运行中模型结果待核对，不伪称取消。恢复只安排未来正常触发，不补跑积压、不恢复单独停用计划或成员。",
         "responses": {
           "200": {
             "description": "成功",
@@ -3315,7 +3315,7 @@
     "/api/platform-admin/v1/auth/csrf": {
       "get": {
         "operationId": "platformAuthCsrf",
-        "summary": "取得独立总台会话 CSRF",
+        "summary": "取得统一会话 CSRF",
         "responses": {
           "200": {
             "description": "成功",
@@ -4098,7 +4098,7 @@
       "post": {
         "operationId": "revokeInitialAdminInvitation",
         "summary": "撤销尚未接受的初始负责人邀请",
-        "description": "独立总台身份及 CSRF。校验请求标识、企业版本并串行核对邀请状态；接受后禁止撤销。重试只返回当前状态，不撤销后续新邀请。企业暂停时仍可撤销；不撤销成员资格或负责人职责。",
+        "description": "统一身份的总台角色及 CSRF。校验请求标识、企业版本并串行核对邀请状态；接受后禁止撤销。重试只返回当前状态，不撤销后续新邀请。企业暂停时仍可撤销；不撤销成员资格或负责人职责。",
         "responses": {
           "200": {
             "description": "成功",
@@ -4221,7 +4221,7 @@
     "/api/platform-admin/v1/auth/password": {
       "post": {
         "operationId": "changeOwnPlatformPassword",
-        "summary": "修改本人独立总台密码，成功后使其全部总台会话失效，不影响客户会话",
+        "summary": "修改本人总台专用密码，成功后使该主体全部旧会话失效，统一密码保持不变",
         "security": [
           {
             "platformSessionCookie": []
@@ -4276,6 +4276,138 @@
           }
         }
       }
+    },
+    "/api/platform-admin/v1/auth/credentials": {
+      "post": {
+        "summary": "设置本人总台专用凭据",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformCredentials"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "已保存，旧会话失效"
+          },
+          "400": {
+            "description": "输入或凭据不匹配"
+          },
+          "401": {
+            "description": "未认证"
+          },
+          "403": {
+            "description": "无权操作"
+          },
+          "409": {
+            "description": "状态冲突或需受控核验"
+          }
+        }
+      },
+      "get": {
+        "summary": "查看本人专用凭据是否设置，不返回密码",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "配置状态",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "configured",
+                    "username"
+                  ],
+                  "properties": {
+                    "configured": {
+                      "type": "boolean"
+                    },
+                    "username": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/platform-admin/v1/auth/link-customer": {
+      "post": {
+        "summary": "分别核验后关联旧双账号",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnifiedIdentityLink"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "已保存，旧会话失效"
+          },
+          "400": {
+            "description": "输入或凭据不匹配"
+          },
+          "401": {
+            "description": "未认证"
+          },
+          "403": {
+            "description": "无权操作"
+          },
+          "409": {
+            "description": "状态冲突或需受控核验"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -4288,8 +4420,8 @@
       "platformSessionCookie": {
         "type": "apiKey",
         "in": "cookie",
-        "name": "DREAMCORE_PLATFORM",
-        "description": "独立总台会话；企业用户 Cookie 不授予平台权限。写入前从 /api/platform-admin/v1/auth/csrf 取得令牌。"
+        "name": "DREAMCORE_SESSION",
+        "description": "与客户端共用身份会话；仅平台角色获准访问总台，不赋予企业内容权限。"
       }
     },
     "parameters": {
@@ -4423,7 +4555,8 @@
           "status": {
             "enum": [
               "ACTIVE",
-              "SUSPENDED"
+              "SUSPENDED",
+              "PENDING"
             ]
           }
         },
@@ -4653,16 +4786,10 @@
             "minLength": 1,
             "maxLength": 100
           },
-          "adminEmail": {
-            "type": "string",
-            "maxLength": 254,
-            "description": "去除首尾空白并转小写；不区分邮箱大小写",
-            "deprecated": true
-          },
           "designateAuthorizationOwner": {
             "type": "boolean",
-            "default": false,
-            "description": "明确指定初始管理员可接受授权负责人职责；不自动生效或迁移存量。"
+            "deprecated": true,
+            "description": "兼容旧客户端字段；新开通始终指定初始负责人，不接受取消指定。"
           },
           "adminPhone": {
             "type": "string",
@@ -4672,31 +4799,10 @@
         },
         "required": [
           "requestId",
-          "name"
+          "name",
+          "adminPhone"
         ],
-        "additionalProperties": false,
-        "oneOf": [
-          {
-            "required": [
-              "adminPhone"
-            ],
-            "not": {
-              "required": [
-                "adminEmail"
-              ]
-            }
-          },
-          {
-            "required": [
-              "adminEmail"
-            ],
-            "not": {
-              "required": [
-                "adminPhone"
-              ]
-            }
-          }
-        ]
+        "additionalProperties": false
       },
       "Invite": {
         "type": "object",
@@ -4715,6 +4821,16 @@
             "type": "string",
             "maxLength": 40,
             "description": "手机号；中国大陆号码可省略 +86，其他号码须带国家区号。服务端规范化为 E.164。"
+          },
+          "workspaceIds": {
+            "type": "array",
+            "maxItems": 20,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "接受时重新核验的初始共享空间阅读授权。"
           }
         },
         "required": [
@@ -4848,6 +4964,11 @@
           "checkedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "pendingTenants": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "待负责人激活的企业，不计为正式开通"
           }
         },
         "required": [
@@ -5789,7 +5910,8 @@
             "pattern": "^[0-9]{6}$"
           },
           "acceptResponsibility": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "新企业激活必须为 true，明确接受初始负责人职责。"
           }
         },
         "required": [
@@ -5835,6 +5957,12 @@
             "type": "string",
             "writeOnly": true,
             "pattern": "^[0-9]{6}$"
+          },
+          "unifiedPassword": {
+            "type": "string",
+            "minLength": 6,
+            "maxLength": 128,
+            "description": "旧总台占位身份绑定手机号时必填，作为统一登录密码；password 为当前总台专用密码。原客户身份绑定保留原统一密码。"
           }
         },
         "required": [
@@ -6231,6 +6359,53 @@
           "changedAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "PlatformCredentials": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "username",
+          "currentPassword",
+          "password"
+        ],
+        "properties": {
+          "username": {
+            "type": "string",
+            "maxLength": 254
+          },
+          "currentPassword": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "password": {
+            "type": "string",
+            "minLength": 6,
+            "maxLength": 128
+          }
+        }
+      },
+      "UnifiedIdentityLink": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "phone",
+          "currentPassword",
+          "customerPassword"
+        ],
+        "properties": {
+          "phone": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "currentPassword": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "customerPassword": {
+            "type": "string",
+            "maxLength": 128
           }
         }
       }

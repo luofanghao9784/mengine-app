@@ -9,6 +9,13 @@ def profile(job):
     return '(version 1) (deny default) (allow process*) (allow sysctl-read) (allow mach-lookup) (allow file-read-metadata) (allow file-read-data (literal "/")) ' + ' '.join('(allow file-read* (subpath ' + quote(p) + '))' for p in paths) + ' (allow file-read* (literal "/dev/null") (literal "/dev/urandom")) (allow file-write* (literal "/dev/null") (subpath ' + quote(job) + '))'
 
 def run(job, extension, script=None):
+    if sys.platform == 'linux':
+        # Java invokes Python with -I, so the script directory is not on sys.path.
+        import importlib.util
+        spec = importlib.util.spec_from_file_location('dreamcore_linux_sandbox', ROOT / 'linux_sandbox.py')
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module.run_linux(job, extension, script)
     if sys.platform != 'darwin' or not Path('/usr/bin/sandbox-exec').exists(): raise RuntimeError('SANDBOX_UNAVAILABLE')
     job = Path(job).resolve(strict=True)
     env = {'PATH': '/opt/homebrew/bin:/usr/bin:/bin', 'LANG': 'en_US.UTF-8', 'TMPDIR': str(job), 'TESSDATA_PREFIX': str(ROOT / '.local/tessdata'), 'OMP_THREAD_LIMIT': '1', 'PYTHONDONTWRITEBYTECODE': '1'}

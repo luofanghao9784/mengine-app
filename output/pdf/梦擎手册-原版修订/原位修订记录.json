@@ -1,0 +1,2345 @@
+[
+  {
+    "page": 1,
+    "rect": [
+      355,
+      71,
+      541,
+      84
+    ],
+    "text": "客户产品介绍册 · 2026 年 10 月",
+    "size": 7.6,
+    "color": "#D9CFB4",
+    "font": "body",
+    "leading": null,
+    "align": "left",
+    "label": "发行口径",
+    "actual_size": 7.6
+  },
+  {
+    "page": 1,
+    "rect": [
+      450,
+      55,
+      543,
+      70
+    ],
+    "text": "",
+    "size": 9,
+    "color": null,
+    "font": "body",
+    "leading": null,
+    "align": "left",
+    "label": "合并封面发行信息"
+  },
+  {
+    "page": 1,
+    "rect": [
+      53,
+      669,
+      540,
+      706
+    ],
+    "text": "员工可以结合获准资料查找信息、分析数据、整理文稿，\n并将审阅后的成果保存和共享。",
+    "size": 11,
+    "color": "#DDDAD1",
+    "font": "body",
+    "leading": 21,
+    "align": "left",
+    "label": "",
+    "actual_size": 11
+  },
+  {
+    "page": 2,
+    "rect": [
+      48,
+      789,
+      145,
+      801
+    ],
+    "text": "产品介绍手册 · V0.1 修订",
+    "size": 7,
+    "color": "#777C90",
+    "font": "body",
+    "leading": 9,
+    "align": "left",
+    "label": "",
+    "actual_size": 7
+  },
+  {
+    "page": 3,
+    "rect": [
+      48,
+      789,
+      145,
+      801
+    ],
+    "text": "产品介绍手册 · V0.1 修订",
+    "size": 7,
+    "color": "#777C90",
+    "font": "body",
+    "leading": 9,
+    "align": "left",
+    "label": "",
+    "actual_size": 7
+  },
+  {
+    "page": 4,
+    "rect": [
+      48,
+      789,
+      145,
+      801
+    ],
+    "text": "产品介绍手册 · V0.1 修订",
+    "size": 7,
+    "color": "#777C90",
+    "font": "body",
+    "leading": 9,
+    "align": "left",
+    "label": "",
+    "actual_size": 7
+  },
+  {
+    "page": 5,
+    "rect": [
+      48,
+      789,
+      145,
+      801
+    ],
+    "text": "产品介绍手册 · V0.1 修订",
+    "size": 7,
+    "color": "#777C90",
+    "font": "body",
+    "leading": 9,
+    "align": "left",
+    "label": "",
+    "actual_size": 7
+  },
+  {
+    "page": 6,
+    "rect": [
+      48,
+      789,
+      145,
+      801
+    ],
+    "text": "产品介绍手册 · V0.1 修订",
+    "size": 7,
+    "color": "#777C90",
+    "font": "body",
+    "leading": 9,
+    "align": "left",
+    "label": "",
+    "actual_size": 7
+  },
+  {
+    "page": 7,
+    "rect": [
+      48,
+      789,
+      145,
+      801
+    ],
+    "text": "产品介绍手册 · V0.1 修订",
+    "size": 7,
+    "color": "#777C90",
+    "font": "body",
+    "leading": 9,
+    "align": "left",
+    "label": "",
+    "actual_size": 7
+  },
+  {
+    "page": 8,
+    "rect": [
+      48,
+      789,
+      145,
+      801
+    ],
+    "text": "产品介绍手册 · V0.1 修订",
+    "size": 7,
+    "color": "#777C90",
+    "font": "body",
+    "leading": 9,
+    "align": "left",
+    "label": "",
+    "actual_size": 7
+  },
+  {
+    "page": 9,
+    "rect": [
+      48,
+      789,
+      145,
+      801
+    ],
+    "text": "产品介绍手册 · V0.1 修订",
+    "size": 7,
+    "color": "#777C90",
+    "font": "body",
+    "leading": 9,
+    "align": "left",
+    "label": "",
+    "actual_size": 7
+  },
+  {
+    "page": 10,
+    "rect": [
+      48,
+      789,
+      145,
+      801
+    ],
+    "text": "产品介绍手册 · V0.1 修订",
+    "size": 7,
+    "color": "#777C90",
+    "font": "body",
+    "leading": 9,
+    "align": "left",
+    "label": "",
+    "actual_size": 7
+  },
+  {
+    "page": 11,
+    "rect": [
+      48,
+      789,
+      145,
+      801
+    ],
+    "text": "产品介绍手册 · V0.1 修订",
+    "size": 7,
+    "color": "#777C90",
+    "font": "body",
+    "leading": 9,
+    "align": "left",
+    "label": "",
+    "actual_size": 7
+  },
+  {
+    "page": 12,
+    "rect": [
+      48,
+      789,
+      145,
+      801
+    ],
+    "text": "产品介绍手册 · V0.1 修订",
+    "size": 7,
+    "color": "#B8B2A2",
+    "font": "body",
+    "leading": 9,
+    "align": "left",
+    "label": "",
+    "actual_size": 7
+  },
+  {
+    "page": 13,
+    "rect": [
+      48,
+      789,
+      145,
+      801
+    ],
+    "text": "产品介绍手册 · V0.1 修订",
+    "size": 7,
+    "color": "#B8B2A2",
+    "font": "body",
+    "leading": 9,
+    "align": "left",
+    "label": "",
+    "actual_size": 7
+  },
+  {
+    "page": 14,
+    "rect": [
+      48,
+      789,
+      145,
+      801
+    ],
+    "text": "产品介绍手册 · V0.1 修订",
+    "size": 7,
+    "color": "#777C90",
+    "font": "body",
+    "leading": 9,
+    "align": "left",
+    "label": "",
+    "actual_size": 7
+  },
+  {
+    "page": 15,
+    "rect": [
+      48,
+      789,
+      145,
+      801
+    ],
+    "text": "产品介绍手册 · V0.1 修订",
+    "size": 7,
+    "color": "#777C90",
+    "font": "body",
+    "leading": 9,
+    "align": "left",
+    "label": "",
+    "actual_size": 7
+  },
+  {
+    "page": 16,
+    "rect": [
+      48,
+      789,
+      145,
+      801
+    ],
+    "text": "产品介绍手册 · V0.1 修订",
+    "size": 7,
+    "color": "#777C90",
+    "font": "body",
+    "leading": 9,
+    "align": "left",
+    "label": "",
+    "actual_size": 7
+  },
+  {
+    "page": 17,
+    "rect": [
+      48,
+      789,
+      145,
+      801
+    ],
+    "text": "产品介绍手册 · V0.1 修订",
+    "size": 7,
+    "color": "#777C90",
+    "font": "body",
+    "leading": 9,
+    "align": "left",
+    "label": "",
+    "actual_size": 7
+  },
+  {
+    "page": 18,
+    "rect": [
+      48,
+      789,
+      145,
+      801
+    ],
+    "text": "产品介绍手册 · V0.1 修订",
+    "size": 7,
+    "color": "#777C90",
+    "font": "body",
+    "leading": 9,
+    "align": "left",
+    "label": "",
+    "actual_size": 7
+  },
+  {
+    "page": 19,
+    "rect": [
+      48,
+      789,
+      145,
+      801
+    ],
+    "text": "产品介绍手册 · V0.1 修订",
+    "size": 7,
+    "color": "#777C90",
+    "font": "body",
+    "leading": 9,
+    "align": "left",
+    "label": "",
+    "actual_size": 7
+  },
+  {
+    "page": 20,
+    "rect": [
+      48,
+      789,
+      145,
+      801
+    ],
+    "text": "产品介绍手册 · V0.1 修订",
+    "size": 7,
+    "color": "#777C90",
+    "font": "body",
+    "leading": 9,
+    "align": "left",
+    "label": "",
+    "actual_size": 7
+  },
+  {
+    "page": 21,
+    "rect": [
+      48,
+      789,
+      145,
+      801
+    ],
+    "text": "产品介绍手册 · V0.1 修订",
+    "size": 7,
+    "color": "#777C90",
+    "font": "body",
+    "leading": 9,
+    "align": "left",
+    "label": "",
+    "actual_size": 7
+  },
+  {
+    "page": 22,
+    "rect": [
+      48,
+      789,
+      145,
+      801
+    ],
+    "text": "产品介绍手册 · V0.1 修订",
+    "size": 7,
+    "color": "#777C90",
+    "font": "body",
+    "leading": 9,
+    "align": "left",
+    "label": "",
+    "actual_size": 7
+  },
+  {
+    "page": 23,
+    "rect": [
+      48,
+      789,
+      145,
+      801
+    ],
+    "text": "产品介绍手册 · V0.1 修订",
+    "size": 7,
+    "color": "#777C90",
+    "font": "body",
+    "leading": 9,
+    "align": "left",
+    "label": "",
+    "actual_size": 7
+  },
+  {
+    "page": 24,
+    "rect": [
+      48,
+      789,
+      145,
+      801
+    ],
+    "text": "产品介绍手册 · V0.1 修订",
+    "size": 7,
+    "color": "#777C90",
+    "font": "body",
+    "leading": 9,
+    "align": "left",
+    "label": "",
+    "actual_size": 7
+  },
+  {
+    "page": 25,
+    "rect": [
+      48,
+      789,
+      145,
+      801
+    ],
+    "text": "产品介绍手册 · V0.1 修订",
+    "size": 7,
+    "color": "#B8B2A2",
+    "font": "body",
+    "leading": 9,
+    "align": "left",
+    "label": "",
+    "actual_size": 7
+  },
+  {
+    "page": 2,
+    "rect": [
+      395,
+      308,
+      431,
+      322
+    ],
+    "text": "",
+    "size": 9,
+    "color": null,
+    "font": "body",
+    "leading": null,
+    "align": "left",
+    "label": "取消即将开放标签"
+  },
+  {
+    "page": 2,
+    "rect": [
+      63,
+      653,
+      531,
+      700
+    ],
+    "text": "本册介绍梦擎工作空间的主要功能、数据基座搭建与配套服务。界面使用演示数据，应用场景用于说明使用方式。具体开通内容与服务范围以双方确认的方案为准。",
+    "size": 9.3,
+    "color": null,
+    "font": "body",
+    "leading": 15,
+    "align": "left",
+    "label": "",
+    "actual_size": 9.3
+  },
+  {
+    "page": 2,
+    "rect": [
+      61,
+      732,
+      533,
+      762
+    ],
+    "text": "阅读建议：可先了解会话、画报与资料库，再结合企业现有资料，阅读数据基座搭建和实施服务部分。",
+    "size": 9,
+    "color": null,
+    "font": "body",
+    "leading": 15,
+    "align": "left",
+    "label": "",
+    "actual_size": 9
+  },
+  {
+    "page": 3,
+    "rect": [
+      63,
+      401,
+      195,
+      444
+    ],
+    "text": "结合企业资料提问，\n继续分析、起草和修改。",
+    "size": 9,
+    "color": null,
+    "font": "body",
+    "leading": 15,
+    "align": "left",
+    "label": "",
+    "actual_size": 9
+  },
+  {
+    "page": 3,
+    "rect": [
+      233,
+      401,
+      365,
+      444
+    ],
+    "text": "将资讯、数据与分析整理\n成卡片，便于阅读、关注\n和继续讨论。",
+    "size": 9,
+    "color": null,
+    "font": "body",
+    "leading": 15,
+    "align": "left",
+    "label": "",
+    "actual_size": 9
+  },
+  {
+    "page": 3,
+    "rect": [
+      403,
+      401,
+      534,
+      444
+    ],
+    "text": "按工作空间组织文件，\n管理访问权限和版本，\n保存团队共享成果。",
+    "size": 9,
+    "color": null,
+    "font": "body",
+    "leading": 15,
+    "align": "left",
+    "label": "",
+    "actual_size": 9
+  },
+  {
+    "page": 3,
+    "rect": [
+      58,
+      477,
+      250,
+      497
+    ],
+    "text": "产品的三个组成部分",
+    "size": 12,
+    "color": null,
+    "font": "original",
+    "leading": null,
+    "align": "left",
+    "label": "",
+    "actual_size": 12
+  },
+  {
+    "page": 3,
+    "rect": [
+      102,
+      692,
+      531,
+      720
+    ],
+    "text": "我们协助企业盘点资料和业务系统，整理数据、确认口径、配置权限及更新机制，\n为引擎提供工作基础，并配套使用培训与持续支持。",
+    "size": 9,
+    "color": null,
+    "font": "body",
+    "leading": 15,
+    "align": "left",
+    "label": "",
+    "actual_size": 9
+  },
+  {
+    "page": 4,
+    "rect": [
+      48,
+      121,
+      546,
+      186
+    ],
+    "text": "企业资料与 AI，\n如何用于日常工作",
+    "size": 23,
+    "color": null,
+    "font": "original",
+    "leading": 30,
+    "align": "left",
+    "label": "标题措辞",
+    "actual_size": 23
+  },
+  {
+    "page": 4,
+    "rect": [
+      48,
+      198,
+      540,
+      231
+    ],
+    "text": "企业已有资料和业务记录，也开始使用 AI。要完成具体工作，还需要整理来源、\n明确使用权限，并让生成的成果能够被团队继续使用。",
+    "size": 10.4,
+    "color": null,
+    "font": "body",
+    "leading": 18,
+    "align": "left",
+    "label": "",
+    "actual_size": 10.4
+  },
+  {
+    "page": 4,
+    "rect": [
+      319,
+      298,
+      534,
+      318
+    ],
+    "text": "个人成果需要供团队复用",
+    "size": 12,
+    "color": null,
+    "font": "original",
+    "leading": null,
+    "align": "left",
+    "label": "",
+    "actual_size": 12
+  },
+  {
+    "page": 4,
+    "rect": [
+      64,
+      565,
+      277,
+      586
+    ],
+    "text": "经营分析需要明确的依据",
+    "size": 12,
+    "color": null,
+    "font": "original",
+    "leading": null,
+    "align": "left",
+    "label": "",
+    "actual_size": 12
+  },
+  {
+    "page": 4,
+    "rect": [
+      319,
+      565,
+      534,
+      586
+    ],
+    "text": "实际使用需要实施与培训",
+    "size": 12,
+    "color": null,
+    "font": "original",
+    "leading": null,
+    "align": "left",
+    "label": "",
+    "actual_size": 12
+  },
+  {
+    "page": 4,
+    "rect": [
+      329,
+      706,
+      532,
+      750
+    ],
+    "text": "围绕具体任务搭建数据基座，\n完成配置、培训与试用，\n再根据实际情况调整。",
+    "size": 9,
+    "color": null,
+    "font": "body",
+    "leading": 15,
+    "align": "left",
+    "label": "",
+    "actual_size": 9
+  },
+  {
+    "page": 5,
+    "rect": [
+      48,
+      121,
+      546,
+      186
+    ],
+    "text": "从资料准备到成果共享，\n一项工作的六个步骤",
+    "size": 23,
+    "color": null,
+    "font": "original",
+    "leading": 30,
+    "align": "left",
+    "label": "标题措辞",
+    "actual_size": 23
+  },
+  {
+    "page": 5,
+    "rect": [
+      326,
+      667,
+      512,
+      686
+    ],
+    "text": "员工负责哪些环节",
+    "size": 11,
+    "color": null,
+    "font": "original",
+    "leading": null,
+    "align": "left",
+    "label": "",
+    "actual_size": 11
+  },
+  {
+    "page": 5,
+    "rect": [
+      52,
+      332,
+      127,
+      381
+    ],
+    "text": "选定文件与数据，\n确认版本、期间\n和使用权限。",
+    "size": 8.4,
+    "color": null,
+    "font": "body",
+    "leading": 13,
+    "align": "left",
+    "label": "",
+    "actual_size": 8.4
+  },
+  {
+    "page": 5,
+    "rect": [
+      135,
+      332,
+      210,
+      381
+    ],
+    "text": "说明问题、用途、\n时间范围和\n输出要求。",
+    "size": 8.4,
+    "color": null,
+    "font": "body",
+    "leading": 13,
+    "align": "left",
+    "label": "",
+    "actual_size": 8.4
+  },
+  {
+    "page": 5,
+    "rect": [
+      218,
+      332,
+      293,
+      381
+    ],
+    "text": "检索相关资料，\n使用适用工具\n完成处理。",
+    "size": 8.4,
+    "color": null,
+    "font": "body",
+    "leading": 13,
+    "align": "left",
+    "label": "",
+    "actual_size": 8.4
+  },
+  {
+    "page": 5,
+    "rect": [
+      302,
+      332,
+      377,
+      381
+    ],
+    "text": "核对事实、数字\n和业务含义，\n补充缺失信息。",
+    "size": 8.4,
+    "color": null,
+    "font": "body",
+    "leading": 13,
+    "align": "left",
+    "label": "",
+    "actual_size": 8.4
+  },
+  {
+    "page": 5,
+    "rect": [
+      385,
+      332,
+      460,
+      381
+    ],
+    "text": "保存个人文稿，\n审阅后发布到\n共享空间。",
+    "size": 8.4,
+    "color": null,
+    "font": "body",
+    "leading": 13,
+    "align": "left",
+    "label": "",
+    "actual_size": 8.4
+  },
+  {
+    "page": 5,
+    "rect": [
+      468,
+      332,
+      543,
+      381
+    ],
+    "text": "同事按权限使用，\n维护需要更新\n的资料与成果。",
+    "size": 8.4,
+    "color": null,
+    "font": "body",
+    "leading": 13,
+    "align": "left",
+    "label": "",
+    "actual_size": 8.4
+  },
+  {
+    "page": 6,
+    "rect": [
+      346,
+      247,
+      534,
+      367
+    ],
+    "text": "从一项工作开始\n\n先完成资料准备、配置和使用培训，再根据实际效果逐步扩大使用范围。",
+    "size": 10.3,
+    "color": null,
+    "font": "body",
+    "leading": 18,
+    "align": "left",
+    "label": "",
+    "actual_size": 10.3
+  },
+  {
+    "page": 7,
+    "rect": [
+      48,
+      121,
+      546,
+      157
+    ],
+    "text": "结合企业资料，完成具体任务",
+    "size": 23,
+    "color": null,
+    "font": "original",
+    "leading": 30,
+    "align": "left",
+    "label": "标题措辞",
+    "actual_size": 23
+  },
+  {
+    "page": 7,
+    "rect": [
+      319,
+      611,
+      532,
+      669
+    ],
+    "text": "结果可以保存为个人文稿，继续编辑和维护版本，并导出 Word 或 PDF。共享给团队需要单独发布，个人保存不会自动公开。",
+    "size": 9,
+    "color": null,
+    "font": "body",
+    "leading": 15,
+    "align": "left",
+    "label": "",
+    "actual_size": 9
+  },
+  {
+    "page": 8,
+    "rect": [
+      48,
+      167,
+      538,
+      200
+    ],
+    "text": "系统根据岗位、关注主题和资料权限定期整理资讯、业务数据与分析建议。\n员工可以查看详情、继续追问，也可以手动发起生成。",
+    "size": 10.4,
+    "color": null,
+    "font": "body",
+    "leading": 18,
+    "align": "left",
+    "label": "",
+    "actual_size": 10.4
+  },
+  {
+    "page": 8,
+    "rect": [
+      58,
+      495,
+      295,
+      516
+    ],
+    "text": "五类内容，便于分类阅读",
+    "size": 12,
+    "color": null,
+    "font": "original",
+    "leading": null,
+    "align": "left",
+    "label": "",
+    "actual_size": 12
+  },
+  {
+    "page": 8,
+    "rect": [
+      64,
+      659,
+      199,
+      679
+    ],
+    "text": "从阅读进入讨论",
+    "size": 12,
+    "color": null,
+    "font": "original",
+    "leading": null,
+    "align": "left",
+    "label": "",
+    "actual_size": 12
+  },
+  {
+    "page": 8,
+    "rect": [
+      234,
+      658,
+      366,
+      696
+    ],
+    "text": "定期生成，\n也可手动发起",
+    "size": 12,
+    "color": null,
+    "font": "original",
+    "leading": 17,
+    "align": "left",
+    "label": "",
+    "actual_size": 12
+  },
+  {
+    "page": 8,
+    "rect": [
+      234,
+      700,
+      365,
+      758
+    ],
+    "text": "根据岗位、关注主题\n和资料权限生成内容；\n员工也可按当前需要\n手动发起。",
+    "size": 9,
+    "color": null,
+    "font": "body",
+    "leading": 15,
+    "align": "left",
+    "label": "",
+    "actual_size": 9
+  },
+  {
+    "page": 8,
+    "rect": [
+      404,
+      659,
+      534,
+      679
+    ],
+    "text": "依据不足时不生成",
+    "size": 12,
+    "color": null,
+    "font": "original",
+    "leading": null,
+    "align": "left",
+    "label": "",
+    "actual_size": 12
+  },
+  {
+    "page": 9,
+    "rect": [
+      48,
+      113,
+      546,
+      149
+    ],
+    "text": "查看来源，核对分析依据",
+    "size": 23,
+    "color": null,
+    "font": "original",
+    "leading": 30,
+    "align": "left",
+    "label": "标题措辞",
+    "actual_size": 23
+  },
+  {
+    "page": 9,
+    "rect": [
+      48,
+      159,
+      538,
+      193
+    ],
+    "text": "阅读画报时，可以查看相关资料、数据期间和统计口径。\n需要进一步核对的事项，可在会话中补充材料并继续分析。",
+    "size": 10.4,
+    "color": null,
+    "font": "body",
+    "leading": 18,
+    "align": "left",
+    "label": "",
+    "actual_size": 10.4
+  },
+  {
+    "page": 9,
+    "rect": [
+      391,
+      214,
+      535,
+      234
+    ],
+    "text": "保留数据版本",
+    "size": 11,
+    "color": null,
+    "font": "original",
+    "leading": null,
+    "align": "left",
+    "label": "",
+    "actual_size": 11
+  },
+  {
+    "page": 9,
+    "rect": [
+      391,
+      289,
+      535,
+      309
+    ],
+    "text": "说明统计口径",
+    "size": 11,
+    "color": null,
+    "font": "original",
+    "leading": null,
+    "align": "left",
+    "label": "",
+    "actual_size": 11
+  },
+  {
+    "page": 9,
+    "rect": [
+      391,
+      363,
+      535,
+      383
+    ],
+    "text": "区分事实与判断",
+    "size": 11,
+    "color": null,
+    "font": "original",
+    "leading": null,
+    "align": "left",
+    "label": "",
+    "actual_size": 11
+  },
+  {
+    "page": 9,
+    "rect": [
+      58,
+      438,
+      303,
+      459
+    ],
+    "text": "业务状态与分析表述",
+    "size": 12,
+    "color": null,
+    "font": "original",
+    "leading": null,
+    "align": "left",
+    "label": "",
+    "actual_size": 12
+  },
+  {
+    "page": 9,
+    "rect": [
+      62,
+      720,
+      533,
+      750
+    ],
+    "text": "自动画报：面向获授权员工，根据岗位和关注主题定期整理内容。生成范围以可用资料和当前权限为基础，不预设固定数量。",
+    "size": 9,
+    "color": null,
+    "font": "body",
+    "leading": 15,
+    "align": "left",
+    "label": "",
+    "actual_size": 9
+  },
+  {
+    "page": 10,
+    "rect": [
+      48,
+      121,
+      546,
+      157
+    ],
+    "text": "按业务组织资料与共享成果",
+    "size": 23,
+    "color": null,
+    "font": "original",
+    "leading": 30,
+    "align": "left",
+    "label": "标题措辞",
+    "actual_size": 23
+  },
+  {
+    "page": 10,
+    "rect": [
+      319,
+      471,
+      534,
+      492
+    ],
+    "text": "保留文件与历史版本",
+    "size": 12,
+    "color": null,
+    "font": "original",
+    "leading": null,
+    "align": "left",
+    "label": "",
+    "actual_size": 12
+  },
+  {
+    "page": 10,
+    "rect": [
+      319,
+      614,
+      534,
+      635
+    ],
+    "text": "审阅后明确发布成果",
+    "size": 12,
+    "color": null,
+    "font": "original",
+    "leading": null,
+    "align": "left",
+    "label": "",
+    "actual_size": 12
+  },
+  {
+    "page": 11,
+    "rect": [
+      48,
+      121,
+      546,
+      157
+    ],
+    "text": "选择常用技能，补充本次材料",
+    "size": 23,
+    "color": null,
+    "font": "original",
+    "leading": 30,
+    "align": "left",
+    "label": "标题措辞",
+    "actual_size": 23
+  },
+  {
+    "page": 11,
+    "rect": [
+      48,
+      167,
+      540,
+      201
+    ],
+    "text": "技能将常见任务的步骤、所需资料和输出要求预先组织好。\n员工选择适合的技能，再补充本次信息。以下为八项典型技能。",
+    "size": 10.4,
+    "color": null,
+    "font": "body",
+    "leading": 18,
+    "align": "left",
+    "label": "",
+    "actual_size": 10.4
+  },
+  {
+    "page": 11,
+    "rect": [
+      60,
+      287,
+      158,
+      327
+    ],
+    "text": "汇总本周经营数据，\n整理主要变化和\n需要跟进的问题。",
+    "size": 8.5,
+    "color": null,
+    "font": "body",
+    "leading": 13,
+    "align": "left",
+    "label": "",
+    "actual_size": 8.5
+  },
+  {
+    "page": 11,
+    "rect": [
+      187,
+      287,
+      285,
+      327
+    ],
+    "text": "比对两份表格，\n列出差异及需要\n进一步核对的项目。",
+    "size": 8.5,
+    "color": null,
+    "font": "body",
+    "leading": 13,
+    "align": "left",
+    "label": "",
+    "actual_size": 8.5
+  },
+  {
+    "page": 11,
+    "rect": [
+      315,
+      287,
+      413,
+      327
+    ],
+    "text": "整理金额、期限、\n付款条件及重点\n条款，供经办人审阅。",
+    "size": 8.5,
+    "color": null,
+    "font": "body",
+    "leading": 13,
+    "align": "left",
+    "label": "",
+    "actual_size": 8.5
+  },
+  {
+    "page": 11,
+    "rect": [
+      442,
+      287,
+      540,
+      327
+    ],
+    "text": "整理会议结论、分工\n和待办；人员与时间\n以会议记录为依据。",
+    "size": 8.5,
+    "color": null,
+    "font": "body",
+    "leading": 13,
+    "align": "left",
+    "label": "",
+    "actual_size": 8.5
+  },
+  {
+    "page": 11,
+    "rect": [
+      60,
+      435,
+      158,
+      475
+    ],
+    "text": "整理供应商报价，\n按一致的项目和\n条件进行比较。",
+    "size": 8.5,
+    "color": null,
+    "font": "body",
+    "leading": 13,
+    "align": "left",
+    "label": "",
+    "actual_size": 8.5
+  },
+  {
+    "page": 11,
+    "rect": [
+      187,
+      435,
+      285,
+      475
+    ],
+    "text": "根据目标、预算和\n时间起草方案，\n列出准备事项。",
+    "size": 8.5,
+    "color": null,
+    "font": "body",
+    "leading": 13,
+    "align": "left",
+    "label": "",
+    "actual_size": 8.5
+  },
+  {
+    "page": 11,
+    "rect": [
+      315,
+      435,
+      413,
+      475
+    ],
+    "text": "结合客户记录整理\n回访对象、沟通背景\n和需要确认的问题。",
+    "size": 8.5,
+    "color": null,
+    "font": "body",
+    "leading": 13,
+    "align": "left",
+    "label": "",
+    "actual_size": 8.5
+  },
+  {
+    "page": 11,
+    "rect": [
+      442,
+      435,
+      540,
+      475
+    ],
+    "text": "根据有效制度回答\n工作问题，并提供\n相关条文依据。",
+    "size": 8.5,
+    "color": null,
+    "font": "body",
+    "leading": 13,
+    "align": "left",
+    "label": "",
+    "actual_size": 8.5
+  },
+  {
+    "page": 11,
+    "rect": [
+      64,
+      638,
+      197,
+      660
+    ],
+    "text": "减少重复描述",
+    "size": 12,
+    "color": null,
+    "font": "original",
+    "leading": null,
+    "align": "left",
+    "label": "",
+    "actual_size": 12
+  },
+  {
+    "page": 11,
+    "rect": [
+      64,
+      663,
+      197,
+      706
+    ],
+    "text": "预设步骤和输出要求，\n员工补充本次材料，\n再核对生成结果。",
+    "size": 9,
+    "color": null,
+    "font": "body",
+    "leading": 15,
+    "align": "left",
+    "label": "",
+    "actual_size": 9
+  },
+  {
+    "page": 11,
+    "rect": [
+      404,
+      638,
+      535,
+      660
+    ],
+    "text": "保留依据与权限",
+    "size": 12,
+    "color": null,
+    "font": "original",
+    "leading": null,
+    "align": "left",
+    "label": "",
+    "actual_size": 12
+  },
+  {
+    "page": 11,
+    "rect": [
+      404,
+      663,
+      535,
+      706
+    ],
+    "text": "技能使用获准资料，\n结果按任务呈现依据，\n便于后续核对。",
+    "size": 9,
+    "color": null,
+    "font": "body",
+    "leading": 15,
+    "align": "left",
+    "label": "",
+    "actual_size": 9
+  },
+  {
+    "page": 11,
+    "rect": [
+      62,
+      734,
+      533,
+      764
+    ],
+    "text": "典型技能：经营周报、数据核对、合同要点、会议纪要、报价对比、活动方案、回访清单和制度问答。具体使用时补充本次任务材料。",
+    "size": 9,
+    "color": null,
+    "font": "body",
+    "leading": 15,
+    "align": "left",
+    "label": "",
+    "actual_size": 9
+  },
+  {
+    "page": 12,
+    "rect": [
+      319,
+      714,
+      532,
+      757
+    ],
+    "text": "结合任务反馈和经验维护，将经过核验的有效方法用于后续工作，持续改进处理质量。",
+    "size": 9,
+    "color": null,
+    "font": "body",
+    "leading": 15,
+    "align": "left",
+    "label": "",
+    "actual_size": 9
+  },
+  {
+    "page": 13,
+    "rect": [
+      48,
+      113,
+      546,
+      150
+    ],
+    "text": "引擎如何处理任务与积累经验",
+    "size": 23,
+    "color": "#EAD9AA",
+    "font": "original",
+    "leading": 30,
+    "align": "left",
+    "label": "标题措辞",
+    "actual_size": 23
+  },
+  {
+    "page": 13,
+    "rect": [
+      48,
+      159,
+      540,
+      193
+    ],
+    "text": "数据与资料进入引擎后，经过检索、计算和分析形成成果。\n工作循环积累与采用经验，自进化循环检查运行情况并验证改进。",
+    "size": 10.4,
+    "color": "#DDDAD1",
+    "font": "body",
+    "leading": 18,
+    "align": "left",
+    "label": "",
+    "actual_size": 10.4
+  },
+  {
+    "page": 13,
+    "rect": [
+      144,
+      421,
+      545,
+      451
+    ],
+    "text": "读取已接入的业务数据并保留版本，解析文件内容，为任务检索相关资料。读取范围随使用者和任务授权执行。",
+    "size": 9,
+    "color": "#DDDAD1",
+    "font": "body",
+    "leading": 15,
+    "align": "left",
+    "label": "",
+    "actual_size": 9
+  },
+  {
+    "page": 13,
+    "rect": [
+      144,
+      478,
+      545,
+      508
+    ],
+    "text": "根据当前问题组织处理步骤，调用适用工具完成计算，再由 AI 整理说明。缺少依据的部分需要补充或核对。",
+    "size": 9,
+    "color": "#DDDAD1",
+    "font": "body",
+    "leading": 15,
+    "align": "left",
+    "label": "",
+    "actual_size": 9
+  },
+  {
+    "page": 13,
+    "rect": [
+      144,
+      535,
+      545,
+      565
+    ],
+    "text": "将结果呈现为会话回答、智能画报或成果文件。员工可以继续讨论、修改，并按需要保存或共享。",
+    "size": 9,
+    "color": "#DDDAD1",
+    "font": "body",
+    "leading": 15,
+    "align": "left",
+    "label": "",
+    "actual_size": 9
+  },
+  {
+    "page": 13,
+    "rect": [
+      144,
+      593,
+      545,
+      623
+    ],
+    "text": "任务采用经验库中适用的方法。有效做法与纠正经过提炼和核验后进入经验库，供后续同类工作使用。",
+    "size": 9,
+    "color": "#DDDAD1",
+    "font": "body",
+    "leading": 15,
+    "align": "left",
+    "label": "",
+    "actual_size": 9
+  },
+  {
+    "page": 13,
+    "rect": [
+      144,
+      650,
+      545,
+      680
+    ],
+    "text": "检查引擎运行情况，分析问题原因，验证调整效果，并保留通过验证的改进。改进过程遵守相应授权与运行规则。",
+    "size": 9,
+    "color": "#DDDAD1",
+    "font": "body",
+    "leading": 15,
+    "align": "left",
+    "label": "",
+    "actual_size": 9
+  },
+  {
+    "page": 13,
+    "rect": [
+      62,
+      734,
+      533,
+      764
+    ],
+    "text": "工作循环用于处理企业任务与积累经验；自进化循环用于检查和改进引擎。两者相互配合，分别保留处理与验证依据。",
+    "size": 9,
+    "color": "#E6D6B7",
+    "font": "body",
+    "leading": 15,
+    "align": "left",
+    "label": "",
+    "actual_size": 9
+  },
+  {
+    "page": 14,
+    "rect": [
+      64,
+      285,
+      533,
+      329
+    ],
+    "text": "企业数据基座将文件、业务记录和相关说明组织为可查找、可读取、可计算的依据，包含数据内容、业务口径、来源版本、权限和更新机制。它是引擎工作的基础，也是我们的重点实施服务。",
+    "size": 9.2,
+    "color": null,
+    "font": "body",
+    "leading": 15,
+    "align": "left",
+    "label": "",
+    "actual_size": 9.2
+  },
+  {
+    "page": 15,
+    "rect": [
+      48,
+      113,
+      546,
+      150
+    ],
+    "text": "数据基座搭建的六项工作",
+    "size": 23,
+    "color": null,
+    "font": "original",
+    "leading": 30,
+    "align": "left",
+    "label": "标题措辞",
+    "actual_size": 23
+  },
+  {
+    "page": 15,
+    "rect": [
+      48,
+      159,
+      540,
+      192
+    ],
+    "text": "我们协助企业盘点资料与业务系统，整理关键数据、统一业务口径、配置权限，\n建立接入与持续更新机制，并通过实际任务验证后交付数据基座及维护说明。",
+    "size": 10,
+    "color": null,
+    "font": "body",
+    "leading": 17,
+    "align": "left",
+    "label": "",
+    "actual_size": 10
+  },
+  {
+    "page": 15,
+    "rect": [
+      103,
+      513,
+      530,
+      541
+    ],
+    "text": "根据企业条件选择文件上传、定期报表或系统接入。新增接口及自动化渠道单独评估实施条件、维护责任与成本。",
+    "size": 8.9,
+    "color": null,
+    "font": "body",
+    "leading": 14.5,
+    "align": "left",
+    "label": "",
+    "actual_size": 8.9
+  },
+  {
+    "page": 15,
+    "rect": [
+      48,
+      761,
+      540,
+      774
+    ],
+    "text": "具体系统适配、历史数据整理量和后续维护范围，在服务方案中单独约定；企业负责提供授权并确认业务事实。",
+    "size": 8.2,
+    "color": null,
+    "font": "body",
+    "leading": 11,
+    "align": "left",
+    "label": "",
+    "actual_size": 8.2
+  },
+  {
+    "page": 16,
+    "rect": [
+      48,
+      113,
+      546,
+      150
+    ],
+    "text": "接入方式与交付成果",
+    "size": 23,
+    "color": null,
+    "font": "original",
+    "leading": 30,
+    "align": "left",
+    "label": "标题措辞",
+    "actual_size": 23
+  },
+  {
+    "page": 16,
+    "rect": [
+      60,
+      272,
+      218,
+      299
+    ],
+    "text": "资料主要为表格、文档\n或 PDF 文件",
+    "size": 8.6,
+    "color": null,
+    "font": "body",
+    "leading": 14,
+    "align": "left",
+    "label": "",
+    "actual_size": 8.6
+  },
+  {
+    "page": 16,
+    "rect": [
+      239,
+      272,
+      534,
+      299
+    ],
+    "text": "整理关键文件与有效版本，约定格式、业务说明和更新责任，\n先完成目标任务。",
+    "size": 8.6,
+    "color": null,
+    "font": "body",
+    "leading": 14,
+    "align": "left",
+    "label": "",
+    "actual_size": 8.6
+  },
+  {
+    "page": 16,
+    "rect": [
+      234,
+      482,
+      366,
+      519
+    ],
+    "text": "可用资料与数据",
+    "size": 12,
+    "color": null,
+    "font": "original",
+    "leading": null,
+    "align": "left",
+    "label": "",
+    "actual_size": 12
+  },
+  {
+    "page": 16,
+    "rect": [
+      102,
+      730,
+      534,
+      761
+    ],
+    "text": "根据条件逐步接入：没有合适接口时，可以先采用获准文件交付。缺少历史事实时明确资料缺口，不通过模型补齐。",
+    "size": 9,
+    "color": null,
+    "font": "body",
+    "leading": 15,
+    "align": "left",
+    "label": "",
+    "actual_size": 9
+  },
+  {
+    "page": 17,
+    "rect": [
+      48,
+      113,
+      546,
+      150
+    ],
+    "text": "从门店报表到持续分析",
+    "size": 23,
+    "color": null,
+    "font": "original",
+    "leading": 30,
+    "align": "left",
+    "label": "标题措辞",
+    "actual_size": 23
+  },
+  {
+    "page": 18,
+    "rect": [
+      48,
+      121,
+      546,
+      186
+    ],
+    "text": "四个常见场景，\n结合日常任务使用",
+    "size": 23,
+    "color": null,
+    "font": "original",
+    "leading": 30,
+    "align": "left",
+    "label": "标题措辞",
+    "actual_size": 23
+  },
+  {
+    "page": 18,
+    "rect": [
+      48,
+      198,
+      540,
+      231
+    ],
+    "text": "以下为应用示例，用于说明资料准备、操作过程和成果用途。\n实际任务使用企业获准资料开展。",
+    "size": 10.4,
+    "color": null,
+    "font": "body",
+    "leading": 18,
+    "align": "left",
+    "label": "",
+    "actual_size": 10.4
+  },
+  {
+    "page": 18,
+    "rect": [
+      71,
+      533,
+      218,
+      579
+    ],
+    "text": "制度与业务\n资料问答",
+    "size": 15,
+    "color": null,
+    "font": "original",
+    "leading": 21,
+    "align": "left",
+    "label": "",
+    "actual_size": 15
+  },
+  {
+    "page": 18,
+    "rect": [
+      102,
+      730,
+      534,
+      761
+    ],
+    "text": "员工需要核对关键事实、业务口径和共享范围。AI 协助查找、计算和起草，重要结论由具备相应职责的人员确认。",
+    "size": 9,
+    "color": null,
+    "font": "body",
+    "leading": 15,
+    "align": "left",
+    "label": "",
+    "actual_size": 9
+  },
+  {
+    "page": 19,
+    "rect": [
+      48,
+      113,
+      546,
+      150
+    ],
+    "text": "文稿起草与团队成果复用",
+    "size": 23,
+    "color": null,
+    "font": "original",
+    "leading": 30,
+    "align": "left",
+    "label": "标题措辞",
+    "actual_size": 23
+  },
+  {
+    "page": 19,
+    "rect": [
+      80,
+      443,
+      216,
+      469
+    ],
+    "text": "部门负责人、资料维护人员\n及团队成员",
+    "size": 8.3,
+    "color": null,
+    "font": "body",
+    "leading": 13,
+    "align": "left",
+    "label": "",
+    "actual_size": 8.3
+  },
+  {
+    "page": 20,
+    "rect": [
+      48,
+      167,
+      540,
+      201
+    ],
+    "text": "企业资料按企业和工作空间分别管理，员工与 AI 只能使用授权范围内的内容。\n阅读、维护和共享分别控制权限，重要管理操作留有记录。",
+    "size": 10.4,
+    "color": null,
+    "font": "body",
+    "leading": 18,
+    "align": "left",
+    "label": "",
+    "actual_size": 10.4
+  },
+  {
+    "page": 20,
+    "rect": [
+      402,
+      609,
+      534,
+      649
+    ],
+    "text": "维护与使用\n分别授权",
+    "size": 12,
+    "color": null,
+    "font": "original",
+    "leading": 17,
+    "align": "left",
+    "label": "",
+    "actual_size": 12
+  },
+  {
+    "page": 20,
+    "rect": [
+      62,
+      734,
+      533,
+      764
+    ],
+    "text": "开通前说明：涉及模型服务的数据处理、资料保存和退出安排，会在开通前向客户说明，并在具体服务方案中约定。",
+    "size": 9,
+    "color": null,
+    "font": "body",
+    "leading": 15,
+    "align": "left",
+    "label": "",
+    "actual_size": 9
+  },
+  {
+    "page": 21,
+    "rect": [
+      48,
+      121,
+      546,
+      186
+    ],
+    "text": "从配置与培训，\n到团队日常使用",
+    "size": 23,
+    "color": null,
+    "font": "original",
+    "leading": 30,
+    "align": "left",
+    "label": "标题措辞",
+    "actual_size": 23
+  },
+  {
+    "page": 21,
+    "rect": [
+      48,
+      198,
+      540,
+      214
+    ],
+    "text": "围绕以下五步开展服务，具体交付物、培训次数和支持范围在实施方案中约定。",
+    "size": 10.2,
+    "color": null,
+    "font": "body",
+    "leading": 17,
+    "align": "left",
+    "label": "",
+    "actual_size": 10.2
+  },
+  {
+    "page": 21,
+    "rect": [
+      410,
+      630,
+      533,
+      644
+    ],
+    "text": "服务约定",
+    "size": 8.5,
+    "color": null,
+    "font": "bold",
+    "leading": null,
+    "align": "left",
+    "label": "",
+    "actual_size": 8.5
+  },
+  {
+    "page": 21,
+    "rect": [
+      404,
+      654,
+      534,
+      714
+    ],
+    "text": "双方明确实施范围、\n维护责任及验收方式。\n新增需求单独评估，\n形成相应服务方案。",
+    "size": 9,
+    "color": null,
+    "font": "body",
+    "leading": 15,
+    "align": "left",
+    "label": "",
+    "actual_size": 9
+  },
+  {
+    "page": 22,
+    "rect": [
+      48,
+      121,
+      546,
+      186
+    ],
+    "text": "评估实际任务的\n完成情况与使用效果",
+    "size": 23,
+    "color": null,
+    "font": "original",
+    "leading": 30,
+    "align": "left",
+    "label": "标题措辞",
+    "actual_size": 23
+  },
+  {
+    "page": 22,
+    "rect": [
+      102,
+      730,
+      534,
+      761
+    ],
+    "text": "试点前约定指标与核对方法，结合实际记录评估结果质量、人员投入和团队使用情况，不预设节省比例或经营增长。",
+    "size": 9,
+    "color": null,
+    "font": "body",
+    "leading": 15,
+    "align": "left",
+    "label": "",
+    "actual_size": 9
+  },
+  {
+    "page": 23,
+    "rect": [
+      48,
+      121,
+      546,
+      157
+    ],
+    "text": "资料准备与使用中的常见问题",
+    "size": 23,
+    "color": null,
+    "font": "original",
+    "leading": 30,
+    "align": "left",
+    "label": "标题措辞",
+    "actual_size": 23
+  },
+  {
+    "page": 24,
+    "rect": [
+      48,
+      113,
+      546,
+      150
+    ],
+    "text": "使用方式与服务费用",
+    "size": 23,
+    "color": null,
+    "font": "original",
+    "leading": 30,
+    "align": "left",
+    "label": "标题措辞",
+    "actual_size": 23
+  },
+  {
+    "page": 24,
+    "rect": [
+      96,
+      293,
+      532,
+      322
+    ],
+    "text": "通过电脑或手机浏览器访问工作空间。具体支持的浏览器和使用条件在开通时说明。",
+    "size": 9,
+    "color": null,
+    "font": "body",
+    "leading": 15,
+    "align": "left",
+    "label": "",
+    "actual_size": 9
+  },
+  {
+    "page": 24,
+    "rect": [
+      96,
+      386,
+      532,
+      416
+    ],
+    "text": "系统根据员工岗位、关注主题和资料权限定期生成画报，也可手动发起。具体内容取决于可用资料和任务要求。",
+    "size": 9,
+    "color": null,
+    "font": "body",
+    "leading": 15,
+    "align": "left",
+    "label": "",
+    "actual_size": 9
+  },
+  {
+    "page": 24,
+    "rect": [
+      96,
+      480,
+      532,
+      510
+    ],
+    "text": "服务包括产品使用、数据基座搭建、培训与持续支持。根据使用规模、资料情况和系统接入需求制定报价；新增系统对接、历史数据整理和定制需求另行评估。",
+    "size": 8.9,
+    "color": null,
+    "font": "body",
+    "leading": 14.5,
+    "align": "left",
+    "label": "",
+    "actual_size": 8.9
+  },
+  {
+    "page": 24,
+    "rect": [
+      58,
+      542,
+      314,
+      564
+    ],
+    "text": "根据实际需求制定服务方案",
+    "size": 12,
+    "color": null,
+    "font": "original",
+    "leading": null,
+    "align": "left",
+    "label": "",
+    "actual_size": 12
+  },
+  {
+    "page": 24,
+    "rect": [
+      48,
+      655,
+      540,
+      669
+    ],
+    "text": "具体服务范围与费用以正式报价为准；接入维护和新增需求根据实际工作量评估。",
+    "size": 8.5,
+    "color": null,
+    "font": "body",
+    "leading": 13,
+    "align": "left",
+    "label": "",
+    "actual_size": 8.5
+  },
+  {
+    "page": 24,
+    "rect": [
+      69,
+      722,
+      533,
+      754
+    ],
+    "text": "可以先沟通一项经常开展的工作，明确预期成果和现有资料，再通过实际任务评估产品与服务是否适合团队。",
+    "size": 9.5,
+    "color": null,
+    "font": "body",
+    "leading": 16,
+    "align": "left",
+    "label": "",
+    "actual_size": 9.5
+  },
+  {
+    "page": 25,
+    "rect": [
+      48,
+      121,
+      546,
+      187
+    ],
+    "text": "沟通工作需求，\n确定合适的使用方案",
+    "size": 23,
+    "color": "#EAD9AA",
+    "font": "original",
+    "leading": 30,
+    "align": "left",
+    "label": "标题措辞",
+    "actual_size": 23
+  },
+  {
+    "page": 25,
+    "rect": [
+      403,
+      250,
+      534,
+      286
+    ],
+    "text": "一位业务负责人",
+    "size": 12,
+    "color": "#EAD9AA",
+    "font": "original",
+    "leading": null,
+    "align": "left",
+    "label": "",
+    "actual_size": 12
+  },
+  {
+    "page": 25,
+    "rect": [
+      48,
+      702,
+      535,
+      716
+    ],
+    "text": "联系我们",
+    "size": 9,
+    "color": "#EAD9AA",
+    "font": "bold",
+    "leading": null,
+    "align": "left",
+    "label": "",
+    "actual_size": 9
+  },
+  {
+    "page": 25,
+    "rect": [
+      60,
+      734,
+      193,
+      762
+    ],
+    "text": "联系人\n林云",
+    "size": 10,
+    "color": "#EAD9AA",
+    "font": "body",
+    "leading": 17,
+    "align": "left",
+    "label": "",
+    "actual_size": 10
+  },
+  {
+    "page": 25,
+    "rect": [
+      230,
+      734,
+      364,
+      762
+    ],
+    "text": "联系电话\n18586861020",
+    "size": 10,
+    "color": "#EAD9AA",
+    "font": "body",
+    "leading": 17,
+    "align": "left",
+    "label": "",
+    "actual_size": 10
+  },
+  {
+    "page": 25,
+    "rect": [
+      389,
+      722,
+      549,
+      773
+    ],
+    "text": "",
+    "size": 9,
+    "color": null,
+    "font": "body",
+    "leading": null,
+    "align": "left",
+    "label": "不展示其他联系信息"
+  },
+  {
+    "page": 5,
+    "rect": [
+      447.66796875,
+      440.3704528808594,
+      536.1480102539062,
+      450.5777587890625
+    ],
+    "text": "产品界面示意 · 演示数据",
+    "size": 7.2,
+    "color": "#74788A",
+    "font": "body",
+    "leading": 9,
+    "align": "left",
+    "label": "",
+    "actual_size": 7.2
+  },
+  {
+    "page": 7,
+    "rect": [
+      447.66796875,
+      207.12045288085938,
+      536.1480102539062,
+      217.3277587890625
+    ],
+    "text": "产品界面示意 · 演示数据",
+    "size": 7.2,
+    "color": "#74788A",
+    "font": "body",
+    "leading": 9,
+    "align": "left",
+    "label": "",
+    "actual_size": 7.2
+  },
+  {
+    "page": 8,
+    "rect": [
+      447.66796875,
+      225.87045288085938,
+      536.1480102539062,
+      236.0777587890625
+    ],
+    "text": "产品界面示意 · 演示数据",
+    "size": 7.2,
+    "color": "#74788A",
+    "font": "body",
+    "leading": 9,
+    "align": "left",
+    "label": "",
+    "actual_size": 7.2
+  },
+  {
+    "page": 9,
+    "rect": [
+      233.19140625,
+      217.62045288085938,
+      321.67120361328125,
+      227.8277587890625
+    ],
+    "text": "产品界面示意 · 演示数据",
+    "size": 7.2,
+    "color": "#74788A",
+    "font": "body",
+    "leading": 9,
+    "align": "left",
+    "label": "",
+    "actual_size": 7.2
+  },
+  {
+    "page": 10,
+    "rect": [
+      447.66796875,
+      225.87045288085938,
+      536.1480102539062,
+      236.0777587890625
+    ],
+    "text": "产品界面示意 · 演示数据",
+    "size": 7.2,
+    "color": "#74788A",
+    "font": "body",
+    "leading": 9,
+    "align": "left",
+    "label": "",
+    "actual_size": 7.2
+  },
+  {
+    "page": 17,
+    "rect": [
+      447.66796875,
+      362.3704528808594,
+      536.1480102539062,
+      372.5777587890625
+    ],
+    "text": "产品界面示意 · 演示数据",
+    "size": 7.2,
+    "color": "#74788A",
+    "font": "body",
+    "leading": 9,
+    "align": "left",
+    "label": "",
+    "actual_size": 7.2
+  }
+]

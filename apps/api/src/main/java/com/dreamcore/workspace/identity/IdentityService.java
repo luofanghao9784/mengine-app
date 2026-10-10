@@ -69,18 +69,21 @@ public class IdentityService {
     static void password(String value) {
         if (value == null || value.length() < 6 || value.length() > 128) throw new IdentityException(400, "PASSWORD_POLICY");
     }
+    public void closeSupportSession(String hash) {
+        if(hash!=null)db.update("DELETE FROM platform_sessions WHERE token_hash=?",hash);
+    }
     public boolean active(UUID account) {
-        return Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM accounts WHERE id=? AND status='ACTIVE')", Boolean.class, account));
+        return Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM accounts WHERE id=? AND status='ACTIVE' AND NOT EXISTS(SELECT 1 FROM unified_identity_links l WHERE l.source_id=accounts.id))", Boolean.class, account));
     }
     public boolean validSession(UUID account,long version) {
-        return Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM accounts WHERE id=? AND status='ACTIVE' AND credential_version=? AND NOT EXISTS(SELECT 1 FROM platform_accounts p WHERE p.account_id=accounts.id))",Boolean.class,account,version));
+        return Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM accounts WHERE id=? AND status='ACTIVE' AND NOT EXISTS(SELECT 1 FROM unified_identity_links l WHERE l.source_id=accounts.id) AND credential_version=?)",Boolean.class,account,version));
     }
     public Account login(String suppliedEmail, String password, String ip) {
         boolean byPhone = suppliedEmail != null && !suppliedEmail.contains("@");
         String normalized = byPhone ? PhoneNumbers.normalize(suppliedEmail) : email(suppliedEmail);
         if (!throttle.allow(normalized, ip)) { audit.denial(null, "LOGIN_THROTTLED"); throw new IdentityException(429, "LOGIN_THROTTLED"); }
         if (password == null || password.length() > 128) throw new IdentityException(401, "INVALID_CREDENTIALS");
-        var rows = db.queryForList("SELECT id,password_hash,status,credential_version FROM accounts WHERE NOT EXISTS(SELECT 1 FROM platform_accounts p WHERE p.account_id=accounts.id) AND " + (byPhone ? "phone=?" : "email=? AND phone IS NULL"), normalized);
+        var rows = db.queryForList("SELECT id,password_hash,status,credential_version FROM accounts WHERE " + (byPhone ? "phone=?" : "email=? AND phone IS NULL") + " AND NOT EXISTS(SELECT 1 FROM unified_identity_links l WHERE l.source_id=accounts.id)", normalized);
         String encoded = rows.isEmpty() ? dummyHash : (String) rows.getFirst().get("password_hash");
         boolean matches = passwords.matches(password, encoded);
         if (!matches || rows.isEmpty() || !"ACTIVE".equals(rows.getFirst().get("status"))) {
@@ -93,12 +96,12 @@ public class IdentityService {
         return new Account(current.id(),current.email(),current.displayName(),current.phone(),(Long)rows.getFirst().get("credential_version"));
     }
     public Account account(UUID id) {
-        var rows = db.query("SELECT * FROM accounts WHERE id=? AND status='ACTIVE'", ACCOUNT, id);
+        var rows = db.query("SELECT * FROM accounts WHERE id=? AND status='ACTIVE' AND NOT EXISTS(SELECT 1 FROM unified_identity_links l WHERE l.source_id=accounts.id)", ACCOUNT, id);
         if (rows.isEmpty()) throw new IdentityException(401, "AUTHENTICATION_REQUIRED");
         return rows.getFirst();
     }
     public Me me(UUID actor) {
-        return new Me(account(actor), false, db.query("""
+        return new Me(account(actor), isPlatformAdmin(actor), db.query("""
             SELECT t.id,t.name,m.role,t.status,t.service_public_reason,t.service_changed_at FROM tenant_memberships m JOIN tenants t ON t.id=m.tenant_id
             WHERE m.account_id=? AND m.status='ACTIVE' ORDER BY t.created_at,t.id
             """, (r,n) -> new Membership(r.getObject("id", UUID.class), r.getString("name"), r.getString("role"),new ServiceNotice(r.getString("status"),"SUSPENDED".equals(r.getString("status"))?r.getString("service_public_reason"):null,r.getTimestamp("service_changed_at")==null?null:r.getTimestamp("service_changed_at").toInstant())), actor));
@@ -154,7 +157,7 @@ public class IdentityService {
     public UUID bootstrap(String suppliedEmail, String displayName, String password) {
         String normalized = email(suppliedEmail); String display = name(displayName,80); password(password);
         db.execute("SELECT pg_advisory_xact_lock(743012009)");
-        if (db.queryForObject("SELECT count(*) FROM platform_accounts", Integer.class) != 0) throw new IdentityException(409, "BOOTSTRAP_ALREADY_COMPLETED");
+        if (db.queryForObject("SELECT (SELECT count(*) FROM platform_accounts)+(SELECT count(*) FROM platform_initialization)", Integer.class) != 0) throw new IdentityException(409, "BOOTSTRAP_ALREADY_COMPLETED");
         UUID id = UUID.randomUUID();
         db.update("INSERT INTO accounts(id,email,display_name,password_hash) VALUES (?,?,?,?)",id,"platform-"+id+"@identity.invalid",display,passwords.encode(UUID.randomUUID().toString()));
         db.update("INSERT INTO platform_accounts(account_id,login_name,password_hash) VALUES (?,?,?)",id,normalized,passwords.encode(password));
@@ -169,8 +172,16 @@ public class IdentityService {
     }
     @Transactional
     public TenantCreated createTenant(UUID actor, UUID requestId, String tenantName, String adminEmail, boolean designateOwner) {
+        return createTenantRecord(actor,requestId,tenantName,adminEmail,designateOwner,false);
+    }
+    /** The interactive opening path always names and atomically activates its first owner. */
+    @Transactional
+    public TenantCreated requestOpening(UUID actor,UUID requestId,String tenantName,String phone) {
+        return createTenantRecord(actor,requestId,tenantName,PhoneNumbers.normalize(phone),true,true);
+    }
+    private TenantCreated createTenantRecord(UUID actor, UUID requestId, String tenantName, String adminEmail, boolean designateOwner,boolean pending) {
         platform(actor); String display = name(tenantName,100); String normalized = adminEmail != null && adminEmail.contains("@") ? email(adminEmail) : PhoneNumbers.normalize(adminEmail);
-        String fingerprint = hash(display + "\n" + normalized + (designateOwner ? "\nOWNER_DESIGNATED" : ""));
+        String fingerprint = hash(display + "\n" + normalized + (designateOwner ? "\nOWNER_DESIGNATED" : "") + (pending ? "\nPENDING_OPENING" : ""));
         UUID prior = priorRequest(actor,requestId,"CREATE_TENANT",fingerprint);
         platform(actor); // The request key may have waited while platform access was revoked.
         if (prior != null) {
@@ -178,7 +189,7 @@ public class IdentityService {
             return new TenantCreated(tenant(prior),invitation(invite));
         }
         UUID id = UUID.randomUUID();
-        db.update("INSERT INTO tenants(id,name) VALUES (?,?)",id,display);
+        db.update("INSERT INTO tenants(id,name,status) VALUES (?,?,?)",id,display,pending?"PENDING":"ACTIVE");
         Invitation invite = issue(actor,id,normalized,"TENANT_ADMIN");
         db.update("INSERT INTO tenant_initial_admin(tenant_id,invitation_id) VALUES (?,?)",id,invite.id());
         if(designateOwner) db.update("INSERT INTO governance_initial_designations(tenant_id,invitation_id,designated_by) VALUES (?,?,?)",id,invite.id(),actor);

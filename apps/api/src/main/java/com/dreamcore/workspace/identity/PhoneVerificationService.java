@@ -24,7 +24,7 @@ public class PhoneVerificationService {
     @Transactional
     public Receipt issue(String phone, String purpose, String browser, UUID account, UUID invitation, boolean eligible, String ip) {
         delivery.requireEnabled();
-        if (!List.of("JOIN","BIND","RESET").contains(purpose)) throw IdentityException.invalid();
+        if (!List.of("JOIN","BIND","RESET","STAFF").contains(purpose)) throw IdentityException.invalid();
         String scope=IdentityService.hash(browser);
         // Phone-wide cooldown prevents using new browsers to bypass resend limits.
         db.queryForList("SELECT pg_advisory_xact_lock(hashtextextended(?,0))","sms:"+phone);

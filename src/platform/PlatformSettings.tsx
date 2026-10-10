@@ -1,7 +1,7 @@
 import { Select } from '../shared/Select';
 import { useContext, useRef, useState } from 'react';
 import { History, RefreshCw } from 'lucide-react';
-import { Button, Badge, Empty, PageActions } from '../shared/ui';
+import { Button, Badge, Empty, PageActions, Field } from '../shared/ui';
 import { Failure, Loading, Pager, useRemote } from '../shared/admin';
 import { RequestPending, useRequestLock } from '../shared/request-guard';
 import { useViewState, textState, pageState } from '../shared/useViewState';
@@ -31,13 +31,17 @@ const actions: Record<string, string> = {
   PLATFORM_LOGIN: '登录总台',
   PLATFORM_LOGOUT: '退出总台',
   PLATFORM_LOGIN_FAILED: '总台登录被拒绝',
+  PLATFORM_INITIALIZATION_REQUEST: '发起首位管理员激活',
+  PLATFORM_CREDENTIALS_SET: '设置总台专用凭据',
+  UNIFIED_IDENTITY_LINK: '关联统一账号',
   PLATFORM_PASSWORD_CHANGE: '修改本人密码',
   PLATFORM_PASSWORD_CHANGE_FAILED: '改密校验未通过',
 };
 function targetHref(r: ManagementRecord) {
   if (r.category === 'ENTERPRISE' && r.tenantId)
     return `#admin=tenants&enterprise=${r.tenantId}&section=records`;
-  if (r.category === 'ACCOUNT' && r.targetId) return `#admin=tenants&directory=accounts&account=${r.targetId}`;
+  if (r.category === 'ACCOUNT' && r.targetId)
+    return `#admin=tenants&directory=accounts&account=${r.targetId}`;
   if (r.category === 'STAFF') return '#admin=settings&section=staff';
   return null;
 }
@@ -73,7 +77,10 @@ export function PlatformSettings({ hash }: { hash: string }) {
       ) : current === 'records' ? (
         <ManagementRecords />
       ) : (
-        <MyPlatformAccount />
+        <>
+          <MyPlatformAccount />
+          <LinkCustomerAccount />
+        </>
       )}
     </div>
   );
@@ -166,6 +173,8 @@ function ManagementRecords() {
 }
 function MyPlatformAccount() {
   const { session, expire } = useSession();
+  const credentials = useRemote(() => api.credentials(), []);
+  const [username, setUsername] = useState('');
   const [current, setCurrent] = useState(''),
     [next, setNext] = useState(''),
     [confirm, setConfirm] = useState('');
@@ -180,11 +189,16 @@ function MyPlatformAccount() {
         {session.identity?.account.displayName} ·{' '}
         {session.identity?.account.phone || session.identity?.account.email}
       </p>
+      {!session.identity?.account.phone && (
+        <p>
+          <a href="/workspace/#bind">绑定手机号并设置统一登录密码</a>（需要已启用手机核验）
+        </p>
+      )}
       {state === 'done' || state === 'unknown' ? (
         <div>
           <p role="status">
             {state === 'done'
-              ? '密码已修改，所有总台登录已失效。请使用新密码重新登录。'
+              ? '专用凭据已保存，三端旧登录均已失效。请重新登录。'
               : '暂时无法确认密码是否修改成功。请重新登录核对，先尝试新密码；如果不成功，再尝试原密码。'}
           </p>
           <Button variant="primary" onClick={expire}>
@@ -208,7 +222,7 @@ function MyPlatformAccount() {
             setState('busy');
             setError('');
             try {
-              await api.password(current, next);
+              await api.configureCredentials(username || credentials.value!.username, current, next);
               setCurrent('');
               setNext('');
               setConfirm('');
@@ -238,23 +252,94 @@ function MyPlatformAccount() {
           }}
         >
           <fieldset disabled={state === 'busy'}>
-            <PasswordField label="当前总台密码" value={current} change={setCurrent} />
+            {!credentials.value ? (
+              <p>正在读取专用凭据…</p>
+            ) : (
+              <>
+                <Field label="总台专用账号">
+                  <input
+                    required
+                    maxLength={254}
+                    value={username || credentials.value.username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="手机号或英文账号"
+                    autoComplete="username"
+                  />
+                </Field>
+                <PasswordField
+                  label={credentials.value.configured ? '当前总台专用密码' : '当前统一登录密码'}
+                  value={current}
+                  change={setCurrent}
+                />
+              </>
+            )}
             <PasswordField label="新总台密码" value={next} change={setNext} creating />
             <PasswordField label="确认新密码" value={confirm} change={setConfirm} creating />
             <p className="admin-note">
-              修改后，所有设备上的总台登录会失效。客户账号与企业管理端登录保持原状。
+              总台专用账号可使用手机号或以字母开头的英文账号。修改后，该账号所有设备上的三端登录均会失效，请重新登录。统一登录密码保持不变。
             </p>
             {error && (
               <p className="access-alert" role="alert">
                 {error}
               </p>
             )}
-            <Button type="submit" variant="primary">
+            <Button type="submit" variant="primary" disabled={!credentials.value}>
               {state === 'busy' ? '正在修改…' : '修改密码'}
             </Button>
           </fieldset>
         </form>
       )}
     </section>
+  );
+}
+
+function LinkCustomerAccount() {
+  const { expire } = useSession();
+  const [phone, setPhone] = useState(''),
+    [current, setCurrent] = useState(''),
+    [customer, setCustomer] = useState('');
+  const [busy, setBusy] = useState(false),
+    [error, setError] = useState('');
+  useRequestLock(busy);
+  return (
+    <details className="admin-section">
+      <summary>关联已有客户账号</summary>
+      <p>
+        仅用于历史上分开的总台和客户账号。分别验证两个账号后，把总台登录与权限关联到客户账号，原操作历史保留；旧总台身份停止使用，待接受的平台邀请撤销，在途平台管理工作按撤权停止。完成后所有旧登录失效。
+      </p>
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (busy) return;
+          setBusy(true);
+          setError('');
+          try {
+            await api.linkCustomer(current, phone, customer);
+            setCurrent('');
+            setCustomer('');
+            expire();
+          } catch (e) {
+            setError(e instanceof IdentityError ? e.message : '关联结果未确认，请重新登录核对。');
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        <fieldset disabled={busy}>
+          <PasswordField label="原总台专用密码" value={current} change={setCurrent} />
+          <Field label="已有客户账号手机号">
+            <input
+              required
+              autoComplete="username"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+            />
+          </Field>
+          <PasswordField label="已有客户账号密码" value={customer} change={setCustomer} />
+          {error && <p role="alert">{error}</p>}
+          <Button type="submit">验证并关联账号</Button>
+        </fieldset>
+      </form>
+    </details>
   );
 }

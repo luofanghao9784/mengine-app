@@ -1,3 +1,4 @@
+import { SurfaceLinks } from '../identity/SurfaceAccess';
 import { SupportPageRedirect } from '../platform/SupportApp';
 import { PlatformDataOperations } from '../operations/PlatformDataOperations';
 import { PlatformEngineDashboard } from '../operations/PlatformEngineDashboard';
@@ -19,6 +20,7 @@ export function PlatformConsole({ logout }: { logout: () => void }) {
   const enterprisePage = page === 'tenants' || page === 'accounts';
   return (
     <AdminShell
+      customerLinks={<SurfaceLinks surface="platform-admin" />}
       realm="platform"
       name="平台管理"
       account={session.identity?.account.displayName || ''}

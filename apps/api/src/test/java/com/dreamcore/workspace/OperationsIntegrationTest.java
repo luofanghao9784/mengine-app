@@ -196,8 +196,8 @@ class OperationsIntegrationTest {
         var r=http.send(HttpRequest.newBuilder(URI.create(base+path)).GET().build(),HttpResponse.BodyHandlers.ofString());assertEquals(200,r.statusCode());assertEquals("private, no-store",r.headers().firstValue("Cache-Control").orElseThrow());
         for(String secret:List.of(SECRET,member.toString(),space.toString(),"prompt","filename","conversationId","modelName","@example.test"))assertFalse(r.body().contains(secret));
         var monitor=http.send(HttpRequest.newBuilder(URI.create(base+"/api/tenant-admin/v1/tenants/"+tenant+"/engine-telemetry")).GET().build(),HttpResponse.BodyHandlers.ofString());assertEquals(200,monitor.statusCode());assertEquals("private, no-store",monitor.headers().firstValue("Cache-Control").orElseThrow());assertFalse(monitor.body().contains(SECRET));
-        assertEquals(401,http.send(HttpRequest.newBuilder(URI.create(base+"/api/platform-admin/v1/engine-telemetry")).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
-        assertEquals(401,http.send(HttpRequest.newBuilder(URI.create(base+"/api/platform-admin/v1/engine-telemetry/tenants")).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
+        assertEquals(403,http.send(HttpRequest.newBuilder(URI.create(base+"/api/platform-admin/v1/engine-telemetry")).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
+        assertEquals(403,http.send(HttpRequest.newBuilder(URI.create(base+"/api/platform-admin/v1/engine-telemetry/tenants")).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
         assertEquals(404,http.send(HttpRequest.newBuilder(URI.create(base+"/api/tenant-admin/v1/tenants/"+tenant+"/engine-telemetry/tenants")).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
         db.update("INSERT INTO platform_accounts(account_id,login_name,password_hash) VALUES (?,?,?)",operator,operator+"@example.test",passwords.encode(PASSWORD));
         var platformCsrf=json.readTree(http.send(HttpRequest.newBuilder(URI.create(base+"/api/platform-admin/v1/auth/csrf")).GET().build(),HttpResponse.BodyHandlers.ofString()).body());
@@ -208,9 +208,11 @@ class OperationsIntegrationTest {
         assertEquals(Set.of("checkedAt","tenants","otherTenants","otherRunning"),new HashSet<>(json.readTree(distribution.body()).propertyNames()));
         for(String secret:List.of(member.toString(),space.toString(),"prompt","filename","@example.test"))assertFalse(distribution.body().contains(secret));
         db.update("DELETE FROM platform_roles WHERE account_id=?",operator);
-        assertEquals(401,http.send(HttpRequest.newBuilder(URI.create(base+"/api/platform-admin/v1/engine-telemetry")).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
-        assertEquals(401,http.send(HttpRequest.newBuilder(URI.create(base+"/api/platform-admin/v1/engine-telemetry/tenants")).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
+        assertEquals(403,http.send(HttpRequest.newBuilder(URI.create(base+"/api/platform-admin/v1/engine-telemetry")).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
+        assertEquals(403,http.send(HttpRequest.newBuilder(URI.create(base+"/api/platform-admin/v1/engine-telemetry/tenants")).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
+        var customerCsrf=json.readTree(http.send(HttpRequest.newBuilder(URI.create(base+"/api/v1/auth/csrf")).GET().build(),HttpResponse.BodyHandlers.ofString()).body());
+        assertEquals(200,http.send(HttpRequest.newBuilder(URI.create(base+"/api/v1/auth/login")).header(customerCsrf.get("headerName").asString(),customerCsrf.get("token").asString()).header("Content-Type","application/json").POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(Map.of("email",admin+"@example.test","password",PASSWORD)))).build(),HttpResponse.BodyHandlers.ofString()).statusCode());
         assertEquals(400,http.send(HttpRequest.newBuilder(URI.create(base+path+"?days=8")).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
-        assertEquals(401,http.send(HttpRequest.newBuilder(URI.create(base+"/api/platform-admin/v1/operations")).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
+        assertEquals(403,http.send(HttpRequest.newBuilder(URI.create(base+"/api/platform-admin/v1/operations")).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
     }
 }

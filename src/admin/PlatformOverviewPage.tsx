@@ -48,7 +48,9 @@ export function PlatformOverviewPage({ hash }: { hash: string }) {
               )}
             </dd>
             <a href={enterpriseHref}>
-              {summary.value ? `${summary.value.suspendedTenants} 家已暂停 · 查看企业` : '查看企业'}
+              {summary.value
+                ? `${summary.value.pendingTenants ?? 0} 家待激活 · ${summary.value.suspendedTenants} 家已暂停 · 查看企业`
+                : '查看企业'}
             </a>
           </div>
           <div>

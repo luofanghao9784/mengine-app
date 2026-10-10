@@ -4,6 +4,7 @@ export interface PlatformOverview {
   totalTenants: number;
   activeTenants: number;
   suspendedTenants: number;
+  pendingTenants?: number;
   platform: 'AVAILABLE';
   database: 'AVAILABLE';
   invitationDelivery: 'LOCAL' | 'DISABLED';

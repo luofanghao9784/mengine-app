@@ -15,7 +15,7 @@ public class PlatformAdminService {
     public record ServiceChange(String status,String internalReason,String publicReason,Instant changedAt) {}
     public record Detail(IdentityService.Tenant tenant, long version, Instant createdAt,
                          IdentityService.Invitation initialAdminInvitation, long activeMemberCount, long workspaceCount, Owner owner, ServiceChange serviceChange) {}
-    public record Overview(long totalTenants, long activeTenants, long suspendedTenants,
+    public record Overview(long totalTenants, long activeTenants, long suspendedTenants,long pendingTenants,
                            String platform, String database, String invitationDelivery, Instant checkedAt) {}
     public record AuditEntry(long id, UUID actorId, String actorName, String action, UUID targetId, String outcome, Instant createdAt, String internalReason,String publicReason) {}
     private final TenantServiceRuntime runtime;
@@ -30,7 +30,7 @@ public class PlatformAdminService {
     }
     public List<TenantSummary> tenants(UUID actor, String query, String status, int offset, int limit) {
         identities.platform(actor); bounds(offset,limit);
-        if (query == null || query.length()>100 || status == null || !List.of("","ACTIVE","SUSPENDED").contains(status)) throw IdentityException.invalid();
+        if (query == null || query.length()>100 || status == null || !List.of("","ACTIVE","SUSPENDED","PENDING").contains(status)) throw IdentityException.invalid();
         return db.query("""
             SELECT t.id,t.name,t.status,t.created_at,
               (SELECT count(*) FROM tenant_memberships m WHERE m.tenant_id=t.id AND m.status='ACTIVE') member_count,
@@ -49,8 +49,8 @@ public class PlatformAdminService {
     public Overview overview(UUID actor) {
         identities.platform(actor);
         return db.queryForObject("""
-            SELECT count(*) total,count(*) FILTER(WHERE status='ACTIVE') active,count(*) FILTER(WHERE status='SUSPENDED') suspended FROM tenants
-            """,(r,n) -> new Overview(r.getLong("total"),r.getLong("active"),r.getLong("suspended"),"AVAILABLE","AVAILABLE",delivery.mode(),Instant.now()));
+            SELECT count(*) total,count(*) FILTER(WHERE status='ACTIVE') active,count(*) FILTER(WHERE status='SUSPENDED') suspended,count(*) FILTER(WHERE status='PENDING') pending FROM tenants
+            """,(r,n) -> new Overview(r.getLong("total"),r.getLong("active"),r.getLong("suspended"),r.getLong("pending"),"AVAILABLE","AVAILABLE",delivery.mode(),Instant.now()));
     }
     @Transactional(readOnly=true, isolation=org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public Detail detail(UUID actor, UUID tenant) {
@@ -113,6 +113,7 @@ public class PlatformAdminService {
         version(current,expectedVersion);
         if("ACTIVE".equals(status))departure.requireTenantActivation(tenant);
         String before=db.queryForObject("SELECT status FROM tenants WHERE id=?",String.class,tenant);
+        if("PENDING".equals(before))throw new IdentityException(409,"OWNER_ACCEPTANCE_REQUIRED");
         if (!status.equals(before)) {
             Instant now=clock.now();UUID change=UUID.randomUUID();
             if("SUSPENDED".equals(status))runtime.suspend(tenant,now);else runtime.resume(tenant,now);
@@ -133,13 +134,14 @@ public class PlatformAdminService {
         identities.platform(actor);
         if (prior!=null) return projection(tenant);
         version(current,expectedVersion);
-        if (!"ACTIVE".equals(db.queryForObject("SELECT status FROM tenants WHERE id=?",String.class,tenant))) throw new IdentityException(409,"TENANT_SUSPENDED");
+        if (!List.of("ACTIVE","PENDING").contains(db.queryForObject("SELECT status FROM tenants WHERE id=?",String.class,tenant))) throw new IdentityException(409,"TENANT_SUSPENDED");
         var initial=db.queryForList("SELECT invitation_id FROM tenant_initial_admin WHERE tenant_id=?",UUID.class,tenant);
         if (initial.isEmpty()) throw new IdentityException(409,"INITIAL_ADMIN_UNAVAILABLE");
         var invite=identities.invitation(initial.getFirst());
         if ("ACCEPTED".equals(invite.status()) || db.queryForObject("SELECT count(*) FROM tenant_memberships WHERE tenant_id=? AND role='TENANT_ADMIN'",Long.class,tenant)>0)
             throw new IdentityException(409,"INITIAL_ADMIN_ALREADY_SET");
         db.update("UPDATE invitations SET status='REVOKED' WHERE id=?",invite.id());
+        if("PENDING".equals(db.queryForObject("SELECT status FROM tenants WHERE id=?",String.class,tenant)) && normalized.contains("@"))throw new IdentityException(400,"PHONE_REQUIRED");
         var next=identities.issue(actor,tenant,normalized,"TENANT_ADMIN");
         db.update("UPDATE tenant_initial_admin SET invitation_id=? WHERE tenant_id=?",next.id(),tenant);
         db.update("UPDATE governance_initial_designations SET invitation_id=? WHERE tenant_id=?",next.id(),tenant);

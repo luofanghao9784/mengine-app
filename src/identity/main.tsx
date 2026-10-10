@@ -1,3 +1,4 @@
+import { SurfaceEntry } from './SurfaceAccess';
 import '../shared/gesture-boundaries.css';
 import { createRoot } from 'react-dom/client';
 import { SessionProvider } from './session';
@@ -34,7 +35,9 @@ createRoot(root).render(
     ) : surface === 'platform-admin' ? (
       <PlatformApp />
     ) : (
-      <AccessApp surface={surface} initialInvitation={invitation} />
+      <SurfaceEntry surface={surface}>
+        <AccessApp surface={surface} initialInvitation={invitation} />
+      </SurfaceEntry>
     )}
   </SessionProvider>,
 );

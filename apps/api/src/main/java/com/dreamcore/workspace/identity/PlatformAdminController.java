@@ -34,7 +34,7 @@ public class PlatformAdminController {
     }
     @PostMapping("/tenants") @ResponseStatus(org.springframework.http.HttpStatus.CREATED)
     public IdentityService.TenantCreated create(Authentication auth, @Valid @RequestBody IdentityController.CreateTenant body) {
-        return identities.createTenant(IdentityController.actor(auth),body.requestId(),body.name(),PhoneNumbers.contact(body.adminPhone(),body.adminEmail()),Boolean.TRUE.equals(body.designateAuthorizationOwner()));
+        return identities.requestOpening(IdentityController.actor(auth),body.requestId(),body.name(),body.adminPhone());
     }
     @GetMapping("/overview")
     public PlatformAdminService.Overview overview(Authentication auth) { return service.overview(IdentityController.actor(auth)); }

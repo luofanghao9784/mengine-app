@@ -57,7 +57,8 @@ export function PlatformApp() {
         <section className="platform-login-card">
           <ShieldCheck size={32} aria-hidden="true" />
           <h1>梦擎总台</h1>
-          <p>使用平台管理账号登录</p>
+          <p>使用总台专用账号和密码登录</p>
+          <a href="/workspace/">手机号统一登录</a>
           {session.phase === 'loading' ? (
             <p role="status">正在检查登录状态…</p>
           ) : session.phase === 'unavailable' ? (
@@ -93,6 +94,16 @@ export function PlatformApp() {
             </form>
           )}
           {error && <p role="alert">{error}</p>}
+        </section>
+      </main>
+    );
+  if (!session.identity?.platformAdmin)
+    return (
+      <main className="platform-login">
+        <section className="platform-login-card">
+          <h1>当前账号没有总台权限</h1>
+          <a href="/workspace/">进入工作空间</a>
+          <Button onClick={() => void signOut()}>切换账号</Button>
         </section>
       </main>
     );

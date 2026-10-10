@@ -25,6 +25,17 @@ public class PlatformIdentityController {
     public void password(Authentication auth,@Valid @RequestBody Password body,HttpServletRequest request,HttpServletResponse response) {
         identities.changePassword(IdentityController.actor(auth),body.currentPassword(),body.password(),request,response);
     }
+    public record Credentials(@NotNull @Size(max=254) String username,@NotNull @Size(max=128) String currentPassword,@NotNull @Size(min=6,max=128) String password) {}
+    @GetMapping("/credentials") public Map<String,Object> credentials(Authentication auth) { return identities.credentials(IdentityController.actor(auth)); }
+    @PostMapping("/credentials") @ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT)
+    public void credentials(Authentication auth,@Valid @RequestBody Credentials body,HttpServletRequest request,HttpServletResponse response) {
+        identities.configureCredentials(IdentityController.actor(auth),body.username(),body.currentPassword(),body.password(),request,response);
+    }
+    public record Link(@NotNull @Size(max=128) String currentPassword,@NotNull @Size(max=40) String phone,@NotNull @Size(max=128) String customerPassword) {}
+    @PostMapping("/link-customer") @ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT)
+    public void link(Authentication auth,@Valid @RequestBody Link body,HttpServletRequest request,HttpServletResponse response) {
+        identities.linkCustomer(IdentityController.actor(auth),body.currentPassword(),body.phone(),body.customerPassword(),request,response);
+    }
     @GetMapping("/me") public IdentityService.Me me(Authentication auth) { return identities.me(IdentityController.actor(auth)); }
     @PostMapping("/logout") @ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT)
     public void logout(HttpServletRequest request,HttpServletResponse response) { identities.logout(request,response); }

@@ -54,3 +54,14 @@ test('normal login submits phone while legacy email migration stays explicit', a
     { email: 'legacy@example.test', password: '123456' },
   ]);
 });
+
+test('surface choice remains available when browser storage is denied', async () => {
+  const { requestSurfaceChoice, pendingSurfaceChoice, clearSurfaceChoice } =
+    await import('../src/identity/surface-choice.ts');
+  clearSurfaceChoice();
+  assert.equal(pendingSurfaceChoice(), false);
+  requestSurfaceChoice();
+  assert.equal(pendingSurfaceChoice(), true);
+  clearSurfaceChoice();
+  assert.equal(pendingSurfaceChoice(), false);
+});

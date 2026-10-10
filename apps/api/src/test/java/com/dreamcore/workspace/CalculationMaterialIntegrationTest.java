@@ -121,8 +121,9 @@ class CalculationMaterialIntegrationTest extends DatasetCalculationFixture {
     }
     @Test void expiredVersionRemainsHistoricalButCannotBeUsedAsCurrent() throws Exception {
         var c=calculate(true);UUID material=UUID.randomUUID();
-        pool.retain(owner,tenant,c.artifact(),material,0,Instant.now().plusMillis(500));
-        Thread.sleep(550);
+        Instant expiry=Instant.now().plusSeconds(5);
+        pool.retain(owner,tenant,c.artifact(),material,0,expiry);
+        Thread.sleep(Math.max(0,java.time.Duration.between(Instant.now(),expiry).toMillis())+50);
         assertEquals("EXPIRED",pool.read(owner,tenant,material,1,false).state());
         denied(()->pool.read(owner,tenant,material,1,true));
     }

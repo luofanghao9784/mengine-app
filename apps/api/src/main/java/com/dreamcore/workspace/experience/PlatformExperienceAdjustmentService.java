@@ -26,7 +26,7 @@ public class PlatformExperienceAdjustmentService {
  private Map<String,Object> run(UUID id,boolean lock){var rows=db.queryForList("SELECT * FROM general_experience_adjustment_runs WHERE id=?"+(lock?" FOR UPDATE":""),id);if(rows.isEmpty())throw changed();return rows.getFirst();}
  private void authorize(UUID actor){
   identities.platform(actor);db.queryForList("SELECT pg_advisory_xact_lock_shared(hashtextextended('platform-staff-management',0))");
-  if(db.queryForList("SELECT p.account_id FROM platform_accounts p JOIN accounts a ON a.id=p.account_id WHERE p.account_id=? FOR SHARE OF p,a",actor).isEmpty())throw IdentityException.denied();identities.platform(actor);
+  if(db.queryForList("SELECT a.id FROM accounts a WHERE a.id=? FOR SHARE OF a",actor).isEmpty())throw IdentityException.denied();identities.platform(actor);
  }
  private Adjustment project(Map<String,Object> p){
   UUID result=(UUID)p.get("result_version");if(result!=null&&!Boolean.TRUE.equals(db.queryForObject("SELECT general_experience_available(?)",Boolean.class,result)))result=null;

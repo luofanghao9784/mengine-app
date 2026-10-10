@@ -1,3 +1,4 @@
+import { requestSurfaceChoice } from './surface-choice';
 import { useRequestLock } from '../shared/request-guard';
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
@@ -73,8 +74,9 @@ function PhoneField({ value, change }: { value: string; change: (v: string) => v
     </Field>
   );
 }
-function CodeField({
+export function CodeField({
   purpose,
+  issue,
   phone,
   token,
   challenge,
@@ -83,6 +85,7 @@ function CodeField({
   setCode,
 }: {
   purpose: 'JOIN' | 'BIND' | 'RESET';
+  issue?: () => Promise<Challenge>;
   phone?: string;
   token?: string;
   challenge: Challenge | null;
@@ -127,7 +130,7 @@ function CodeField({
               setError('');
               setLocalCode('');
               try {
-                const next = await phoneClient.challenge(purpose, phone, token);
+                const next = await (issue ? issue() : phoneClient.challenge(purpose, phone, token));
                 setChallenge(next);
                 setCode('');
                 setUntil(Date.now() + next.retryAfterSeconds * 1000);
@@ -197,8 +200,7 @@ export function PhoneAuth({
     [password, setPassword] = useState(''),
     [name, setName] = useState('');
   const [code, setCode] = useState(''),
-    [challenge, setChallenge] = useState<Challenge | null>(null),
-    [acceptOwner, setAcceptOwner] = useState(false);
+    [challenge, setChallenge] = useState<Challenge | null>(null);
   const [previewState, setPreview] = useState<{ context: string; value: InvitationPreview } | null>(null),
     [previewError, setPreviewError] = useState(''),
     [attempt, setAttempt] = useState(0);
@@ -212,11 +214,12 @@ export function PhoneAuth({
   const previewKey = `${identity?.account.id || 'anonymous'}:${identity?.account.phone || ''}:${effectiveToken || 'stored'}:${attempt}`;
   const preview = previewState?.context === previewKey ? previewState.value : null;
   const binding = !!identity && !identity.account.phone;
+  const legacyPlatform = binding && identity.account.email?.endsWith('@identity.invalid');
+  const [unifiedPassword, setUnifiedPassword] = useState('');
   useEffect(() => {
     let active = true;
     setPreview(null);
     setPreviewError('');
-    setAcceptOwner(false);
     setCode('');
     setChallenge(null);
     setError('');
@@ -249,7 +252,13 @@ export function PhoneAuth({
     try {
       if (binding) {
         if (!challenge) throw new Error('verification required');
-        const identity = await phoneClient.bind({ phone, password, challengeId: challenge.id, code });
+        const identity = await phoneClient.bind({
+          phone,
+          password,
+          unifiedPassword: legacyPlatform ? unifiedPassword : undefined,
+          challengeId: challenge.id,
+          code,
+        });
         setPassword('');
         authenticated(identity);
         setMode('login');
@@ -257,6 +266,7 @@ export function PhoneAuth({
         const identity = await identityClient.legacyLogin(email.trim(), password);
         setPassword('');
         authenticated(identity);
+        requestSurfaceChoice();
         setMode('login');
       } else if (mode === 'reset') {
         if (!challenge) throw new Error('verification required');
@@ -273,11 +283,13 @@ export function PhoneAuth({
           password: preview.action === 'CONFIRM' ? undefined : password,
           challengeId: challenge?.id,
           code: challenge ? code : undefined,
-          acceptResponsibility: acceptOwner,
+          acceptResponsibility: preview.designatedOwner,
         });
         setPassword('');
-        onJoined(result.membership);
         authenticated(result.identity);
+        if (preview.designatedOwner)
+          window.location.assign(`/tenant-admin/#tenant=${encodeURIComponent(result.membership.tenantId)}`);
+        else onJoined(result.membership);
       } else {
         await login(phone.trim(), password);
         setPassword('');
@@ -430,19 +442,28 @@ export function PhoneAuth({
               <PasswordField
                 value={password}
                 change={setPassword}
-                label={binding ? '原账号密码' : creating || mode === 'reset' ? '设置密码' : '密码'}
+                label={
+                  binding
+                    ? legacyPlatform
+                      ? '总台专用密码'
+                      : '原账号密码'
+                    : creating || mode === 'reset'
+                      ? '设置密码'
+                      : '密码'
+                }
                 creating={creating || mode === 'reset'}
               />
             )}
-            {joining && preview.designatedOwner && preview.status === 'PENDING' && (
-              <label className="phone-owner">
-                <input
-                  type="checkbox"
-                  checked={acceptOwner}
-                  onChange={(e) => setAcceptOwner(e.target.checked)}
-                />
-                我接受企业授权负责人职责，可任命管理员及管理授权；资料访问仍按单独授权。
-              </label>
+            {legacyPlatform && (
+              <PasswordField
+                value={unifiedPassword}
+                change={setUnifiedPassword}
+                label="设置统一登录密码"
+                creating
+              />
+            )}
+            {joining && preview.designatedOwner && (
+              <p>接受后，你将成为该企业的初始负责人，并开通企业。资料访问仍按空间授权。</p>
             )}
             <ErrorMessage error={error} />
             <Button
@@ -453,23 +474,25 @@ export function PhoneAuth({
             >
               {busy
                 ? '正在处理…'
-                : binding
-                  ? '绑定并继续'
-                  : mode === 'legacy'
-                    ? legacyAllowed
-                      ? '登录原账号'
-                      : '验证原账号'
-                    : mode === 'reset'
-                      ? '重置密码'
-                      : creating
-                        ? '加入并开始使用'
-                        : confirming
-                          ? preview.status === 'ACCEPTED'
-                            ? '进入企业'
-                            : '确认加入'
-                          : joining
-                            ? '登录并加入'
-                            : '登录'}
+                : joining && preview.designatedOwner
+                  ? '接受并开通企业'
+                  : binding
+                    ? '绑定并继续'
+                    : mode === 'legacy'
+                      ? legacyAllowed
+                        ? '登录原账号'
+                        : '验证原账号'
+                      : mode === 'reset'
+                        ? '重置密码'
+                        : creating
+                          ? '加入并开始使用'
+                          : confirming
+                            ? preview.status === 'ACCEPTED'
+                              ? '进入企业'
+                              : '确认加入'
+                            : joining
+                              ? '登录并加入'
+                              : '登录'}
             </Button>
           </fieldset>
         </form>

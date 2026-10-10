@@ -31,7 +31,7 @@ public class GeneralExperienceManagement {
   identities.platform(actor);
   // Serialize with staff revocation and account disabling; recheck after a blocked lock is acquired.
   db.queryForList("SELECT pg_advisory_xact_lock_shared(hashtextextended('platform-staff-management',0))");
-  if(db.queryForList("SELECT p.account_id FROM platform_accounts p JOIN accounts a ON a.id=p.account_id WHERE p.account_id=? FOR SHARE OF p,a",actor).isEmpty())throw IdentityException.denied();
+  if(db.queryForList("SELECT a.id FROM accounts a WHERE a.id=? FOR SHARE OF a",actor).isEmpty())throw IdentityException.denied();
   identities.platform(actor);
   if(change==null||change.requestId()==null||change.versionId()==null||change.expectedRevision()==null||change.expectedRevision()<1||change.status()==null||!Set.of("AVAILABLE","STOPPED").contains(change.status()))throw IdentityException.invalid();
   String reason=reason(change.reason());

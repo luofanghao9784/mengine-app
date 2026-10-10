@@ -32,6 +32,25 @@ export function createSettingsClient(fetcher: typeof fetch = fetch) {
         undefined,
         signal,
       ),
+    linkCustomer: (currentPassword: string, phone: string, customerPassword: string) =>
+      request('/api/platform-admin/v1/auth/link-customer', 'POST', (v): v is null => v === null, {
+        currentPassword,
+        phone,
+        customerPassword,
+      }),
+    credentials: () =>
+      request(
+        '/api/platform-admin/v1/auth/credentials',
+        'GET',
+        (v): v is { configured: boolean; username: string } =>
+          record(v) && typeof v.configured === 'boolean' && typeof v.username === 'string',
+      ),
+    configureCredentials: (username: string, currentPassword: string, password: string) =>
+      request('/api/platform-admin/v1/auth/credentials', 'POST', (v): v is null => v === null, {
+        username,
+        currentPassword,
+        password,
+      }),
     password: (currentPassword: string, password: string) =>
       request('/api/platform-admin/v1/auth/password', 'POST', (v): v is null => v === null, {
         currentPassword,

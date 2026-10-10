@@ -142,7 +142,12 @@ export default function AccessApp({
         retry={phoneConfiguration.error ? () => setPhoneAttempt((n) => n + 1) : undefined}
       />
     );
-  if (session.phase === 'anonymous' || inviting || (!session.identity?.account.phone && !legacyAllowed))
+  if (
+    session.phase === 'anonymous' ||
+    inviting ||
+    (!session.identity?.account.phone &&
+      (!legacyAllowed || new URLSearchParams(location.hash.slice(1)).has('bind')))
+  )
     return (
       <div className="access-auth-layout">
         <a className="access-wordmark" href={entryHref('workspace')}>
@@ -166,6 +171,7 @@ export default function AccessApp({
     );
   return (
     <AccessShell
+      key={session.identity!.account.id}
       surface={surface}
       identity={session.identity!}
       notice={notice}
@@ -230,11 +236,8 @@ function GuardedAccessShell({
     ? `${briefingMonth.slice(0, 4)}年${Number(briefingMonth.slice(5))}月`
     : editionDate.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' });
   const params = new URLSearchParams(routeHash.slice(1));
-  const tenant = entryTenant(
-    params.get('tenant'),
-    identity.memberships,
-    rememberedTenant(identity.account.id, surface),
-  );
+  const [initialTenant] = useState(() => rememberedTenant(identity.account.id, surface));
+  const tenant = entryTenant(params.get('tenant'), eligible, initialTenant);
   const view = params.get('view');
   const departure = view === 'departure',
     plans = view === 'plans',
@@ -267,13 +270,19 @@ function GuardedAccessShell({
     if (selected) rememberTenant(identity.account.id, selected.tenantId, surface);
   }, [identity.account.id, selected?.tenantId, surface]);
   const allowed = surface === 'platform-admin' ? identity.platformAdmin : !!selected;
-  const notifications = useWorkspaceNotifications(tenant, surface === 'workspace' && allowed,
-    routeHash, identity.account.id);
+  const notifications = useWorkspaceNotifications(
+    tenant,
+    surface === 'workspace' && allowed,
+    routeHash,
+    identity.account.id,
+  );
   const links: Surface[] = [
     'workspace',
-    ...(management.includes(tenant) || surface === 'tenant-admin' ? ['tenant-admin' as const] : []),
+    ...(management.includes(tenant) ? ['tenant-admin' as const] : []),
+    ...(identity.platformAdmin ? ['platform-admin' as const] : []),
   ];
   const surfaceHref = (target: Surface) => {
+    if (target === 'platform-admin') return '/platform-admin/';
     if (target === 'workspace' && surface !== 'workspace') return returnToWorkspaceHref(routeHash, tenant);
     if (target !== 'workspace' && surface === 'workspace') return managementHref(target, tenant, routeHash);
     return entryHref(target, tenant || undefined);
@@ -299,7 +308,7 @@ function GuardedAccessShell({
   };
   if (selected?.service?.status === 'SUSPENDED')
     return <SuspendedEnterprise membership={selected} identity={identity} />;
-  if (surface === 'tenant-admin' && selected)
+  if (surface === 'tenant-admin' && selected && management.includes(tenant))
     return (
       <UploadProvider>
         <TenantConsole key={tenant} tenant={tenant} name={selected.tenantName} />
@@ -326,8 +335,13 @@ function GuardedAccessShell({
                     href: conversationHref(tenant),
                     notification: notifications?.conversations ? '会话有待处理内容' : undefined,
                   },
-                  { label: '智能画报', icon: LayoutPanelTop, active: briefing, href: briefingHref(tenant),
-                    notification: notifications?.briefing ? '智能画报有未读卡片' : undefined },
+                  {
+                    label: '智能画报',
+                    icon: LayoutPanelTop,
+                    active: briefing,
+                    href: briefingHref(tenant),
+                    notification: notifications?.briefing ? '智能画报有未读卡片' : undefined,
+                  },
                   {
                     label: '资料库',
                     icon: LibraryBig,
@@ -384,7 +398,10 @@ function GuardedAccessShell({
                                   : labels[surface]}
                 </h1>
                 {surface === 'workspace' && briefing && (
-                  <time className="workspace-edition" dateTime={briefingMonth ?? editionDate.toLocaleDateString('en-CA')}>
+                  <time
+                    className="workspace-edition"
+                    dateTime={briefingMonth ?? editionDate.toLocaleDateString('en-CA')}
+                  >
                     {editionLabel}
                   </time>
                 )}

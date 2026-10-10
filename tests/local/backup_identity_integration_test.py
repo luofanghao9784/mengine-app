@@ -19,7 +19,9 @@ ident = fixture.ident
 @unittest.skipUnless(os.environ.get('RUN_BACKUP_DB_TESTS') == '1', 'explicit synthetic PostgreSQL test opt-in')
 class BackupIdentityAdapterTest(unittest.TestCase):
     setUp = fixture.RealBackupTest.setUp
-    seed = fixture.RealBackupTest.seed
+    def seed(self, sql):
+        fixture.RealBackupTest.seed(self, sql)
+        sql(f"DELETE FROM platform_roles WHERE account_id='{ident(1)}'")
     seed_current_modules = fixture.RealBackupTest.seed_current_modules
 
     def seed_platform(self, numbers=(501, 502)):
@@ -81,7 +83,7 @@ class BackupIdentityAdapterTest(unittest.TestCase):
             self.assertEqual(sql('SELECT count(*) FROM platform_roles'), '0')
             self.assertFalse((root / 'accounts.json').exists())
 
-    def test_matching_platforms_get_only_independent_credentials_and_legacy_role_is_not_promoted(self):
+    def test_matching_legacy_credentials_restore_without_granting_customer_platform_role(self):
         self.seed_platform()
         bundle = self.snapshot()
         with backup.offline_database(self.source) as (_, __, current):
@@ -173,3 +175,32 @@ class BackupIdentityAdapterTest(unittest.TestCase):
                 self.assertEqual(sql('SELECT count(*) FROM platform_roles'), '0')
                 self.assertEqual(sql("SELECT count(*) FROM platform_accounts WHERE password_hash='!RECOVERY_DISABLED!'"), '2')
                 self.assertEqual(sql("SELECT count(*) FROM tenant_memberships WHERE status='ACTIVE'"), '0')
+
+    def test_dual_role_keeps_one_subject_and_optional_credentials(self):
+        with backup.offline_database(self.source) as (_, __, sql):
+            sql(f"UPDATE accounts SET phone='+8619900887766',phone_verified_at=now() WHERE id='{ident(1)}'; INSERT INTO platform_roles VALUES('{ident(1)}','PLATFORM_ADMIN')")
+        bundle = self.snapshot()
+        with backup.offline_database(self.source) as (_, __, current):
+            with self.offline_copy(bundle) as (root, sql):
+                recovery.quarantine(sql)
+                result = recovery.reopen_current(sql, current, root)
+                self.assertEqual(result['platformAccountsEnabled'], 1)
+                self.assertEqual(result['membershipsEnabled'], 1)
+                values = trial.private_read(root / 'accounts.json')
+                self.assertEqual(values['platform']['realm'], 'unified')
+                self.assertEqual(values['platform']['accountId'], ident(1))
+                self.assertEqual(values['platform']['password'], values['recovered'][0]['password'])
+                self.assertEqual(sql('SELECT count(*) FROM platform_accounts'), '0')
+
+    def test_changed_identity_mapping_blocks_reopening_and_pending_tenant_stays_pending(self):
+        with backup.offline_database(self.source) as (_, __, sql):
+            sql(f"INSERT INTO tenants(id,name,status) VALUES('{ident(777)}','Pending synthetic','PENDING')")
+        bundle = self.snapshot()
+        with backup.offline_database(self.source) as (_, __, current):
+            current("INSERT INTO platform_initialization(singleton,completed_at) VALUES(true,now())")
+            with self.offline_copy(bundle) as (root, sql):
+                recovery.quarantine(sql)
+                self.assertEqual(sql(f"SELECT status FROM tenants WHERE id='{ident(777)}'"), 'PENDING')
+                with self.assertRaisesRegex(trial.TrialError, '保持隔离'):
+                    recovery.reopen_current(sql, current, root)
+                self.assertEqual(sql("SELECT count(*) FROM accounts WHERE status='ACTIVE'"), '0')

@@ -1,9 +1,9 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "独立总台管理人员邀请与资格",
-    "version": "1.0.0",
-    "description": "新人员独立创建平台凭据；已有平台人员验证其平台密码。接受后才授予资格。撤销不能移除最后有效管理员，客户身份保持不变。本地合成投递不等于真实短信发送。"
+    "title": "统一身份的总台人员邀请与资格",
+    "version": "2.0.0",
+    "description": "邀请已有用户授予平台角色，新用户须验证手机并建立统一账号；专用凭据可选且独立维护。仅密码登录，STAFF 验证码只能激活邀请，不能作为登录接口。"
   },
   "paths": {
     "/api/platform-admin/v1/staff/invitations": {
@@ -35,7 +35,7 @@
             "description": "平台会话失效"
           },
           "403": {
-            "description": "独立平台资格、受邀身份或 CSRF 不符合"
+            "description": "平台角色、受邀身份或 CSRF 不符合"
           },
           "409": {
             "description": "最后管理员保护、邀请不可用或幂等冲突"
@@ -70,7 +70,7 @@
             "description": "平台会话失效"
           },
           "403": {
-            "description": "独立平台资格、受邀身份或 CSRF 不符合"
+            "description": "平台角色、受邀身份或 CSRF 不符合"
           },
           "409": {
             "description": "最后管理员保护、邀请不可用或幂等冲突"
@@ -120,7 +120,7 @@
             "description": "平台会话失效"
           },
           "403": {
-            "description": "独立平台资格、受邀身份或 CSRF 不符合"
+            "description": "平台角色、受邀身份或 CSRF 不符合"
           },
           "409": {
             "description": "最后管理员保护、邀请不可用或幂等冲突"
@@ -179,7 +179,7 @@
             "description": "平台会话失效"
           },
           "403": {
-            "description": "独立平台资格、受邀身份或 CSRF 不符合"
+            "description": "平台角色、受邀身份或 CSRF 不符合"
           },
           "409": {
             "description": "最后管理员保护、邀请不可用或幂等冲突"
@@ -245,7 +245,7 @@
             "description": "平台会话失效"
           },
           "403": {
-            "description": "独立平台资格、受邀身份或 CSRF 不符合"
+            "description": "平台角色、受邀身份或 CSRF 不符合"
           },
           "409": {
             "description": "最后管理员保护、邀请不可用或幂等冲突"
@@ -293,7 +293,7 @@
             "description": "平台会话失效"
           },
           "403": {
-            "description": "独立平台资格、受邀身份或 CSRF 不符合"
+            "description": "平台角色、受邀身份或 CSRF 不符合"
           },
           "409": {
             "description": "最后管理员保护、邀请不可用或幂等冲突"
@@ -351,7 +351,7 @@
             "description": "平台会话失效"
           },
           "403": {
-            "description": "独立平台资格、受邀身份或 CSRF 不符合"
+            "description": "平台角色、受邀身份或 CSRF 不符合"
           },
           "409": {
             "description": "最后管理员保护、邀请不可用或幂等冲突"
@@ -382,6 +382,65 @@
         },
         "description": "无需已登录管理员，但必须先获取同域匿名 Cookie 和 CSRF。邀请令牌只进入请求正文，不进入查询参数。"
       }
+    },
+    "/api/platform-admin/v1/auth/invitation/challenge": {
+      "post": {
+        "operationId": "previewStaffInvitation",
+        "security": [
+          {
+            "platformSessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "仅限邀请激活的验证挑战",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "identity.openapi.json#/components/schemas/PhoneChallengeReceipt"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "输入不符合规则"
+          },
+          "401": {
+            "description": "平台会话失效"
+          },
+          "403": {
+            "description": "平台角色、受邀身份或 CSRF 不符合"
+          },
+          "409": {
+            "description": "最后管理员保护、邀请不可用或幂等冲突"
+          },
+          "503": {
+            "description": "投递不可用，不创建邀请"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Token"
+              }
+            }
+          }
+        },
+        "description": "无需已登录管理员，但必须先获取同域匿名 Cookie 和 CSRF。邀请令牌只进入请求正文，不进入查询参数。",
+        "summary": "新用户验证受邀手机号"
+      }
     }
   },
   "components": {
@@ -389,7 +448,7 @@
       "platformSessionCookie": {
         "type": "apiKey",
         "in": "cookie",
-        "name": "DREAMCORE_PLATFORM"
+        "name": "DREAMCORE_SESSION"
       }
     },
     "schemas": {
@@ -527,12 +586,19 @@
               "null"
             ],
             "maxLength": 80
+          },
+          "challengeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^[0-9]{6}$"
           }
         },
         "required": [
           "token",
-          "username",
-          "password"
+          "username"
         ]
       },
       "LocalLink": {

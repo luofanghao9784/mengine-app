@@ -25,7 +25,7 @@ export interface Identity {
 export interface Tenant {
   id: string;
   name: string;
-  status: 'ACTIVE' | 'SUSPENDED';
+  status: 'ACTIVE' | 'SUSPENDED' | 'PENDING';
 }
 export interface Workspace {
   id: string;
@@ -64,6 +64,7 @@ export interface CreateTenant {
   designateAuthorizationOwner?: boolean;
 }
 export interface InviteMember {
+  workspaceIds?: string[];
   requestId: string;
   email?: string;
   phone?: string;

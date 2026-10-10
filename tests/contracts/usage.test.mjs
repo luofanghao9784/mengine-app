@@ -10,7 +10,7 @@ const check = ajv.compile({ ...spec.components.schemas.Cost, components: spec.co
 test('usage reads preserve independent realm and exclude procurement fields from tenant response', () => {
   assert.equal(Object.keys(spec.paths).length, 3);
   assert.equal(spec.components.securitySchemes.sessionCookie.name, 'DREAMCORE_SESSION');
-  assert.equal(spec.components.securitySchemes.platformSessionCookie.name, 'DREAMCORE_PLATFORM');
+  assert.equal(spec.components.securitySchemes.platformSessionCookie.name, 'DREAMCORE_SESSION');
   for (const [path, route] of Object.entries(spec.paths)) {
     assert.deepEqual(Object.keys(route), ['get']);
     const platform = path.includes('/platform-admin/');
