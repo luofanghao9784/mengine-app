@@ -11,7 +11,7 @@ const caps = { in: '输入', pr: '工作循环', out: '输出', evo: '自进化�
 /* 讲到输入、输出时，光流两端的标签展开成卡片：数据从哪来，成果到哪去。卡片由 3D 场景逐帧定位，跟着镜头走。 */
 // tag 是官网上这条通道的叫法；不写就沿用产品仪表盘的通道名。输出两条在仪表盘里叫“会话流式输出”“成果导出”，是给运维看的说法，官网另起。
 const ends: Record<string, { icon: LucideIcon; name: string; line: string; tag?: string }> = {
-  COLLECTION: { icon: Database, name: '业务系统', line: '收款、会员、订单' },
+  COLLECTION: { icon: Database, name: '业务系统', line: '订单、回款、客户' },
   KNOWLEDGE: { icon: FileStack, name: '上传的文件', line: '文档、表格、拍照的单据' },
   RETRIEVAL: { icon: Library, name: '团队资料库', line: '已有的资料和历史成果' },
   RESPONSE: { icon: MessageSquareText, name: '会话回答', line: '每个结论都带着出处', tag: '逐段返回' },

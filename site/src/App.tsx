@@ -20,7 +20,16 @@ const TENANT = '00000000-0000-4000-8000-000000000001';
 const VIEW_W = 1440;
 const VIEW_H = 900;
 
-function ClientFrame({ hash, title, openFirstCard }: { hash: string; title: string; openFirstCard?: boolean }) {
+/* 演示数据有三个视角，各自一套画报、会话和资料库；每块界面右上角都能切换，几块界面一起换。 */
+const PERSONAS = [
+  ['boss', '老板'],
+  ['sales', '销售'],
+  ['finance', '财务'],
+] as const;
+type PersonaKey = (typeof PERSONAS)[number][0];
+type PersonaProps = { persona: PersonaKey; onPersona: (p: PersonaKey) => void };
+
+function ClientFrame({ hash, title, openFirstCard, persona, onPersona }: { hash: string; title: string; openFirstCard?: boolean } & PersonaProps) {
   // 提前两屏左右就开始加载，加载过就一直留着：滚到跟前时界面已经在了，来回滚动也不会重新加载。
   const [ref, inView] = useInView<HTMLDivElement>('1600px');
   const [seen, setSeen] = useState(false);
@@ -29,6 +38,8 @@ function ClientFrame({ hash, title, openFirstCard }: { hash: string; title: stri
   useEffect(() => {
     if (inView) setSeen(true);
   }, [inView]);
+  // 换视角会重新载入这块界面，先回到占位。
+  useEffect(() => setReady(false), [persona]);
   useEffect(() => {
     const el = ref.current!;
     const fit = () => setScale(el.clientWidth / VIEW_W);
@@ -54,12 +65,18 @@ function ClientFrame({ hash, title, openFirstCard }: { hash: string; title: stri
         <i /><i /><i />
         <span>{title}</span>
         <em>产品实际界面 · 演示数据</em>
+        <div className="persona" role="group" aria-label="切换演示视角">
+          {PERSONAS.map(([key, label]) => (
+            <button type="button" key={key} aria-pressed={persona === key} onClick={() => onPersona(key)}>{label}</button>
+          ))}
+        </div>
       </figcaption>
       <div className="client-view" ref={ref} style={{ height: VIEW_H * scale }} data-ready={ready || undefined}>
         <p className="client-loading" aria-hidden={ready}><i />正在载入产品界面…</p>
         {seen && (
           <iframe
-            src={`./demo/index.html#tenant=${TENANT}&${hash}`}
+            key={persona}
+            src={`./demo/index.html?persona=${persona}#tenant=${TENANT}&${hash}`}
             title={title}
             tabIndex={-1}
             width={VIEW_W}
@@ -75,13 +92,13 @@ function ClientFrame({ hash, title, openFirstCard }: { hash: string; title: stri
 
 /* —— 技能中心（尚未开放，这里是内容预览） —— */
 const skills: { icon: LucideIcon; name: string; line: string; needs: string; ask: string }[] = [
-  { icon: ChartColumn, name: '经营周报', line: '汇总这一周的经营数据，写成一页能直接转发的周报。', needs: '经营数据', ask: '用“经营周报”整理本周各门店的收款和到店情况' },
-  { icon: ListChecks, name: '数据核对', line: '两份表格逐项比对，列出对不上的地方和可能的原因。', needs: '两份表格', ask: '用“数据核对”比对 9 月收款明细和银行流水' },
-  { icon: FileSignature, name: '合同要点', line: '读一份合同，提出金额、期限、付款条件和需要留意的条款。', needs: '合同文件', ask: '用“合同要点”看一下这份场地租赁合同' },
-  { icon: NotebookPen, name: '会议纪要', line: '把会议记录整理成结论、分工和待办，注明谁负责、何时完成。', needs: '会议记录', ask: '用“会议纪要”整理周一店长例会的记录' },
-  { icon: Scale, name: '报价对比', line: '把几家供应商的报价放进一张表，按同一口径比较。', needs: '报价单', ask: '用“报价对比”比较三家器材供应商的报价' },
-  { icon: Megaphone, name: '活动方案', line: '按目标、预算和时间起草一份活动方案，列出要准备的事项。', needs: '目标与预算', ask: '用“活动方案”起草国庆期间的会员回流活动' },
-  { icon: PhoneCall, name: '回访清单', line: '从客户记录里找出该联系的人，并给出每个人的沟通要点。', needs: '客户记录', ask: '用“回访清单”找出 60 天没到店的会员' },
+  { icon: ChartColumn, name: '经营周报', line: '汇总这一周的经营数据，写成一页能直接转发的周报。', needs: '经营数据', ask: '用“经营周报”整理本周各大区的销售和回款情况' },
+  { icon: ListChecks, name: '数据核对', line: '两份表格逐项比对，列出对不上的地方和可能的原因。', needs: '两份表格', ask: '用“数据核对”比对 9 月回款明细和银行流水' },
+  { icon: FileSignature, name: '合同要点', line: '读一份合同，提出金额、期限、付款条件和需要留意的条款。', needs: '合同文件', ask: '用“合同要点”看一下这份设备采购合同' },
+  { icon: NotebookPen, name: '会议纪要', line: '把会议记录整理成结论、分工和待办，注明谁负责、何时完成。', needs: '会议记录', ask: '用“会议纪要”整理周一经营例会的记录' },
+  { icon: Scale, name: '报价对比', line: '把几家供应商的报价放进一张表，按同一口径比较。', needs: '报价单', ask: '用“报价对比”比较三家物流供应商的报价' },
+  { icon: Megaphone, name: '活动方案', line: '按目标、预算和时间起草一份活动方案，列出要准备的事项。', needs: '目标与预算', ask: '用“活动方案”起草年底的老客户答谢活动' },
+  { icon: PhoneCall, name: '回访清单', line: '从客户记录里找出该联系的人，并给出每个人的沟通要点。', needs: '客户记录', ask: '用“回访清单”找出 90 天没有下单的客户' },
   { icon: BookOpenCheck, name: '制度问答', line: '按公司现行制度回答员工的问题，并指出依据的是哪一条。', needs: '公司制度', ask: '用“制度问答”查一下试用期请假怎么算' },
 ];
 
@@ -111,10 +128,10 @@ function SkillCenter() {
 function Control() {
   const [granted, setGranted] = useState(true);
   const files: [string, string, boolean][] = [
-    ['财务部', '9 月收款明细.xlsx', true],
+    ['财务部', '9 月回款明细.xlsx', true],
     ['财务部', '供应商付款计划.xlsx', true],
-    ['运营管理中心', '国庆活动方案.pdf', false],
-    ['运营管理中心', '门店培训手册.pdf', false],
+    ['销售部', '四季度销售政策.pdf', false],
+    ['销售部', '产品介绍与报价模板.pdf', false],
   ];
   return (
     <div className="control">
@@ -208,6 +225,8 @@ export function App() {
   const [scrolled, setScrolled] = useState(false);
   const [tone, setTone] = useState<'night' | 'day'>('night');
   const [curtain, setCurtain] = useState(false);
+  const [persona, setPersona] = useState<PersonaKey>('boss');
+  const view = { persona, onPersona: setPersona };
   useEffect(() => {
     const smooth = (a: number, b: number, x: number) => {
       const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
@@ -368,7 +387,7 @@ export function App() {
             <h2>打开，先看到结论。</h2>
             <p>不用自己去翻报表。引擎把值得关注的事写成一张张卡片，排好版，等你来看。</p>
           </div>
-          <ClientFrame hash="view=briefing" title="智能画报" />
+          <ClientFrame hash="view=briefing" title="智能画报" {...view} />
           <div className="facts">
             <div><h3>一张卡片，只说一件事</h3><p>资讯、数据、洞察、建议、成果，一共五类。标题就是结论，不用点开去猜。</p></div>
             <div><h3>没有新发现，就不凑数</h3><p>数据没变，也没有值得说的事，引擎会跳过这一轮。它不会为了显得勤快而刷屏。</p></div>
@@ -382,7 +401,7 @@ export function App() {
             <h2>掌握全局的数据，<br />每个判断都有理有据。</h2>
             <p>很多人不敢把 AI 的结论拿去开会，是因为说不清它是怎么得出来的。梦核不是照着一份资料回答，而是掌握全局的数据；点开任何一张画报，都能看到它依据了哪些数据和资料。</p>
           </div>
-          <ClientFrame hash="view=briefing" title="画报阅读窗口" openFirstCard />
+          <ClientFrame hash="view=briefing" title="画报阅读窗口" openFirstCard {...view} />
           <div className="say-row">
             <div className="say">
               <p className="label">连措辞都有规矩</p>
@@ -410,7 +429,7 @@ export function App() {
             <h2>看到问题，<br />就地往下追。</h2>
             <p>每张画报都能直接发起会话。背景和依据会自动带上，不用把事情从头再讲一遍。</p>
           </div>
-          <ClientFrame hash="view=conversations&conversation=00000000-0000-4000-8000-000000000040" title="AI 会话" />
+          <ClientFrame hash="view=conversations&conversation=00000000-0000-4000-8000-000000000040" title="AI 会话" {...view} />
           <div className="facts">
             <div><h3>它会动手</h3><p>查资料库、联网检索、读表格，需要计算时在隔离环境里跑程序。</p></div>
             <div><h3>只用你能看的</h3><p>它能翻到哪些资料，跟着提问的人的权限走。</p></div>
@@ -424,7 +443,7 @@ export function App() {
             <h2>资料和成果，<br />都留在团队里。</h2>
             <p>上传的文件、AI 做出来的文稿和表格，都存在这里。下一次工作，从已有的东西接着做。</p>
           </div>
-          <ClientFrame hash="view=library&scope=personal" title="资料库" />
+          <ClientFrame hash="view=library&scope=personal" title="资料库" {...view} />
           <div className="facts">
             <div><h3>个人空间和企业资料库</h3><p>自己的草稿放个人空间，大家共用的放企业资料库，一键切换。</p></div>
             <div><h3>每次修改都留版本</h3><p>谁在什么时候改了什么，查得到，也退得回去。</p></div>
