@@ -1,6 +1,83 @@
-.news-cover{margin:0 0 24px;overflow:hidden;border-radius:12px}
-.news-cover img{display:block;width:100%;max-height:360px;object-fit:cover;background:var(--soft)}
-.news-cover figcaption{padding-top:8px;color:var(--ink-3);font-size:12px}
-.news-cover figcaption a{margin-left:6px;color:inherit;text-decoration:underline;text-underline-offset:3px}
-.news-cover.is-compact{margin:12px 0 14px;border-radius:8px;flex-shrink:0}
-.news-cover.is-compact img{height:132px;max-height:132px}
+.news-cover {
+  --cover-accent: var(--magazine-accent, #5f7f4a);
+  margin: 0 0 24px;
+}
+.news-cover-layer {
+  overflow: hidden;
+  border-radius: 12px;
+  background: linear-gradient(
+    170deg,
+    color-mix(in srgb, var(--cover-accent) 28%, white),
+    color-mix(in srgb, var(--cover-accent) 10%, white)
+  );
+}
+.news-cover-layer img {
+  display: block;
+  width: 100%;
+  max-height: 360px;
+  object-fit: cover;
+}
+.news-cover-layer svg {
+  display: block;
+  width: 100%;
+  height: 200px;
+}
+.news-cover-layer ellipse {
+  fill: none;
+  stroke: rgb(255 255 255 / 72%);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+.news-cover figcaption {
+  padding-top: 8px;
+  color: var(--ink-3);
+  font-size: 12px;
+}
+.news-cover figcaption a {
+  margin-left: 6px;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/*
+ * 卡面：封面铺到卡片顶部与两侧。figure 在正文流里只占位，图层相对卡片正文按钮定位，
+ * 所以不受正文区溢出裁切的影响；类型标签与时间叠在封面之上。
+ */
+.news-cover.is-compact {
+  --cover-height: 150px;
+  flex: none;
+  height: calc(var(--cover-height) - 58px);
+  margin: 0 0 12px;
+}
+.news-cover.is-compact .news-cover-layer {
+  position: absolute;
+  inset: 0 0 auto;
+  height: var(--cover-height);
+  border-radius: 23px 23px 0 0;
+}
+.news-cover.is-compact :is(img, svg) {
+  height: 100%;
+  max-height: none;
+}
+.live-briefing-card .magazine-with-cover .magazine-eyebrow {
+  position: relative;
+  z-index: 1;
+}
+.live-briefing-card .magazine-with-cover .magazine-eyebrow time {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 72%);
+  color: var(--ink-2);
+}
+/* 最小的一格放不下封面加标题，这时只留文字，保证标题完整。 */
+@container live-briefing-tile (max-width: 300px) and (max-height: 300px) {
+  .news-cover.is-compact {
+    display: none;
+  }
+  .live-briefing-card .magazine-with-cover .magazine-eyebrow time {
+    padding: 0;
+    background: none;
+    color: inherit;
+  }
+}
