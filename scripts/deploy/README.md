@@ -63,3 +63,7 @@ API 1280MiB / 0.75 核，引擎 640MiB / 0.5 核，数据库 512MiB / 0.4 核，
 `stage` 包含 `manifest.json`（`commit`、`files` 路径→SHA-256）、`api.jar`、`web/`、`site/`、`parser/`。仅打包受版本控制源码生成的产物，不含本地凭据与运行数据库。发布后证据在 `/var/lib/dreamcore/deploy-evidence/unified-<SHA前12位>/`。
 
 如需回退，先重新关闭 API 入口并停止服务，保存发布后的数据库及对象增量；经核对后将 `database-before.dump` 恢复到独立新库，配合旧 JAR、网页及原配置验证后切换。不得直接用旧 JAR 连接 V108，亦不得在已产生新写入后直接覆盖当前库。纯前端回退可先恢复旧资源、最后替换 HTML。
+
+## 2026-10-11 现有 V108 云端手动模型接入
+
+`enable-cloud-model.py` 是本轮一次性部署脚本，前提为独立 Node 24.20.0、固定引擎包和已核对的 API 包；不得用于其他实例或重复覆盖运行目录。`prepare` 从标准输入接收获准的私有模型 JSON，`activate` 停 API 后复核无排队/运行任务再切换，`rollback` 只回退配置及产物，不还原数据库。凭据不得放命令行参数。云端先使用 `TASK_CONCURRENCY=2`；后台自动工作保持关闭。完整范围、测试和回退见[接入记录](../../docs/交接/云端模型接入-2026-10-11.md)。

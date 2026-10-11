@@ -141,6 +141,7 @@ export class AgentTasks {
         2500,
       );
     const authorize = async () => {
+      const started = performance.now();
       try {
         const response = await invoke('check', {});
         if (
@@ -269,7 +270,8 @@ export class AgentTasks {
           throw new RuntimeError('TASK_ACCESS_DENIED');
         briefingGeneration = generation;
         planManagementAvailable = response.planManagementVersion === '1.0';
-      } catch {
+      } catch (error) {
+        console.warn(JSON.stringify({ event: 'TASK_AUTHORIZATION_CHECK_FAILED', code: error instanceof RuntimeError ? error.code : 'INVALID_CHECK_RESPONSE', durationMs: Math.round(performance.now() - started) }));
         denied = true;
         controller.abort();
         throw new RuntimeError('TASK_ACCESS_DENIED');

@@ -16,7 +16,7 @@ class ConversationWorkerParallelTest {
   TaskRuntime runtime=(task,attempt,sources)->{entered.countDown();try{assertTrue(release.await(5,TimeUnit.SECONDS));}catch(InterruptedException e){throw new RuntimeException(e);}if(task.equals(jobs.getFirst().id()))throw new RuntimeException("synthetic failure");return new TaskRuntime.Result("1.0","synthetic",task,attempt,"SOURCE_LOOKUP","synthetic",List.of());};
   doAnswer(i->{finished.countDown();return null;}).when(service).finish(any(),any());
   doAnswer(i->{finished.countDown();return null;}).when(service).fail(any(),any());
-  var worker=new ConversationWorker(service,runtime,agents);
+  var worker=new ConversationWorker(service,runtime,agents,20);
   try{worker.tick();assertTrue(entered.await(3,TimeUnit.SECONDS),"Five runtime calls must overlap before any returns");release.countDown();assertTrue(finished.await(3,TimeUnit.SECONDS));verify(service,times(4)).finish(any(),any());verify(service,times(1)).fail(any(),eq("TASK_RUNTIME_UNAVAILABLE"));}finally{release.countDown();worker.stop();}
  }
 
@@ -25,9 +25,31 @@ class ConversationWorkerParallelTest {
   var job=new ConversationService.Job(UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID(),"synthetic",UUID.randomUUID(),"SOURCE_LOOKUP");
   when(service.claim()).thenReturn(job,null);when(service.sources(job)).thenReturn(List.of());
   TaskRuntime runtime=(task,attempt,sources)->{entered.countDown();try{new CountDownLatch(1).await();}catch(InterruptedException e){interrupted.countDown();throw new RuntimeException(e);}throw new AssertionError();};
-  var worker=new ConversationWorker(service,runtime,agents);worker.tick();assertTrue(entered.await(3,TimeUnit.SECONDS));worker.stop();assertTrue(interrupted.await(3,TimeUnit.SECONDS));
+  var worker=new ConversationWorker(service,runtime,agents,20);worker.tick();assertTrue(entered.await(3,TimeUnit.SECONDS));worker.stop();assertTrue(interrupted.await(3,TimeUnit.SECONDS));
   // Join tasks, so the assertions cannot pass before the catch path runs.
   var f=ConversationWorker.class.getDeclaredField("executor");f.setAccessible(true);assertTrue(((ExecutorService)f.get(worker)).awaitTermination(3,TimeUnit.SECONDS));
   verify(service,never()).fail(any(),any());verify(service,never()).finish(any(),any());
  }
+ @Test void deploymentLimitLeavesExcessJobsQueuedAndReleasesCapacity() throws Exception {
+  var service=mock(ConversationService.class);var agents=mock(AgentTaskService.class);
+  var entered=new CountDownLatch(2);var release=new CountDownLatch(1);var finished=new CountDownLatch(2);
+  var queue=new ConcurrentLinkedQueue<ConversationService.Job>();
+  for(int i=0;i<3;i++)queue.add(new ConversationService.Job(UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID(),"synthetic",UUID.randomUUID(),"SOURCE_LOOKUP"));
+  when(service.claim()).thenAnswer(i->queue.poll());when(service.sources(any())).thenReturn(List.of());
+  TaskRuntime runtime=(task,attempt,sources)->{entered.countDown();try{assertTrue(release.await(5,TimeUnit.SECONDS));}catch(InterruptedException e){throw new RuntimeException(e);}return new TaskRuntime.Result("1.0","synthetic",task,attempt,"SOURCE_LOOKUP","synthetic",List.of());};
+  doAnswer(i->{finished.countDown();return null;}).when(service).finish(any(),any());
+  var worker=new ConversationWorker(service,runtime,agents,2);
+  try{
+   worker.tick();assertTrue(entered.await(3,TimeUnit.SECONDS));worker.tick();
+   assertEquals(1,queue.size());verify(service,times(2)).claim();
+   release.countDown();assertTrue(finished.await(3,TimeUnit.SECONDS));
+   long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(3);
+   while(!queue.isEmpty() && System.nanoTime()<deadline){worker.tick();Thread.sleep(10);}
+   assertTrue(queue.isEmpty());verify(service,timeout(3000).times(3)).finish(any(),any());
+  }finally{release.countDown();worker.stop();}
+ }
+ @Test void invalidDeploymentLimitIsRejected(){
+  for(int limit:new int[]{0,-1,21})assertThrows(IllegalArgumentException.class,()->new ConversationWorker(mock(ConversationService.class),mock(TaskRuntime.class),mock(AgentTaskService.class),limit));
+ }
+
 }

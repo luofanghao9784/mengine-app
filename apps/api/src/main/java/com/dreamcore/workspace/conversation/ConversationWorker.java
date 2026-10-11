@@ -8,15 +8,20 @@ import org.springframework.stereotype.Component;
 @ConditionalOnProperty(name="dreamcore.tasks.enabled",havingValue="true")
 public class ConversationWorker {
     private final java.util.concurrent.ExecutorService executor=java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor();
-    private final java.util.concurrent.Semaphore slots=new java.util.concurrent.Semaphore(20);
+    private final java.util.concurrent.Semaphore slots;
+    private final int concurrency;
     private volatile boolean stopping;
     @jakarta.annotation.PreDestroy public void stop(){stopping=true;executor.shutdownNow();}
     private final ConversationService service;private final TaskRuntime runtime;private final AgentTaskService agents;
-    public ConversationWorker(ConversationService service,TaskRuntime runtime,AgentTaskService agents){this.service=service;this.runtime=runtime;this.agents=agents;}
+    public ConversationWorker(ConversationService service,TaskRuntime runtime,AgentTaskService agents,
+        @org.springframework.beans.factory.annotation.Value("${dreamcore.tasks.concurrency:20}") int concurrency){
+        if(concurrency<1 || concurrency>20)throw new IllegalArgumentException("Task concurrency must be between 1 and 20");
+        this.service=service;this.runtime=runtime;this.agents=agents;this.concurrency=concurrency;this.slots=new java.util.concurrent.Semaphore(concurrency);
+    }
     @Scheduled(fixedDelayString="${dreamcore.tasks.poll-ms:500}",initialDelayString="${dreamcore.tasks.initial-delay-ms:1000}")
     public void tick(){
         if(stopping)return;
-        for(int i=0;i<20 && slots.tryAcquire();i++){
+        for(int i=0;i<concurrency && slots.tryAcquire();i++){
             ConversationService.Job job;
             try{job=service.claim();}catch(Exception error){slots.release();return;}
             if(job==null){slots.release();return;}

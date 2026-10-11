@@ -146,6 +146,15 @@ export function createEngineServer(
       } catch (error) {
         if (!abort.signal.aborted) {
           const code = error instanceof RuntimeError ? error.code : 'INVALID_AGENT_REQUEST';
+          console.warn(
+            JSON.stringify({
+              event: 'ENGINE_REQUEST_FAILED',
+              route: request.url === '/internal/v1/conversation-title' ? 'title' : 'agent',
+              code,
+              errorType: error instanceof Error ? error.name : typeof error,
+              frames: error instanceof Error ? error.stack?.split('\n').slice(1, 4).map(line => line.match(/(?:dist|node_modules)\/[\w./-]+:\d+:\d+/)?.[0] ?? 'runtime') : [],
+            }),
+          );
           return send(code === 'INVALID_AGENT_REQUEST' ? 400 : code === 'ATTEMPT_ALREADY_SEEN' ? 409 : 503, {
             code,
           });
