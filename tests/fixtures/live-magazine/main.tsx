@@ -280,6 +280,34 @@ if (location.search.includes('faces')) {
     }),
   );
   documents[2].content.chart!.range = '全部快照 · 210 行';
+  // News covers: a source image, and two type-coloured textures that differ by title.
+  const news = (title: string, cover: BriefingDocument['cover']): BriefingDocument => ({
+    ...structuredClone(longTitle),
+    cover,
+    content: {
+      ...structuredClone(longTitle.content),
+      businessType: 'INFO',
+      title,
+      presentation: {
+        version: 'briefing-presentation-v1',
+        layout: 'EDITORIAL',
+        chartStyle: null,
+        focusGroup: null,
+        focusValue: null,
+        sections: [{ role: 'OBSERVATION', paragraphIndex: 0 }],
+      },
+    },
+  });
+  documents.push(
+    news('场馆配套做得专业，维护成本更低、复购更高', {
+      dataUrl:
+        'data:image/png;base64,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',
+      sourceUrl: 'https://example.com/news',
+      sourceTitle: '合成来源',
+    }),
+    news('假日体旅融合升温，门店可借势做本地活动', null),
+    news('公共场馆系统恢复办卡，提示重视会员系统的连续性', null),
+  );
 }
 
 function FixtureGrid({ items }: ComponentProps<typeof MagazineGrid>) {

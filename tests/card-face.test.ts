@@ -176,3 +176,10 @@ test('reader-chosen order keeps the source order by default and sinks missing va
     ['甲', '乙', '丙', '丁'],
   );
 });
+
+test('news cover variation is stable per title and differs between titles', async () => {
+  const { coverSeed } = await import('../src/briefing-live/cover-seed.ts');
+  assert.equal(coverSeed('同一个标题'), coverSeed('同一个标题'));
+  assert.notEqual(coverSeed('假日体旅融合升温'), coverSeed('公共场馆系统恢复办卡'));
+  assert.ok(Number.isSafeInteger(coverSeed('')) && coverSeed('') >= 0);
+});

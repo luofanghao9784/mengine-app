@@ -118,7 +118,7 @@ export function MagazineBody({
   return (
     <>
       <div
-        className={`briefing-magazine live-magazine magazine-${type}${chart ? ' magazine-with-chart' : ''}${chart && presentation?.chartStyle !== 'TABLE' ? ' magazine-with-face' : ''}${composed ? ' magazine-with-composition' : ''}`}
+        className={`briefing-magazine live-magazine magazine-${type}${chart ? ' magazine-with-chart' : ''}${chart && presentation?.chartStyle !== 'TABLE' ? ' magazine-with-face' : ''}${composed ? ' magazine-with-composition' : ''}${content?.businessType === 'INFO' ? ' magazine-with-cover' : ''}`}
         data-presentation={presentation?.layout ?? 'EDITORIAL'}
         data-magazine-type={type}
       >
@@ -133,8 +133,10 @@ export function MagazineBody({
         </div>
         <div className="magazine-main">
           <div className="magazine-copy" ref={copyRef}>
+            {content?.businessType === 'INFO' && (
+              <NewsCover cover={briefing?.cover} seed={content.title} compact />
+            )}
             <h3>{content?.title ?? title}</h3>
-            {content?.businessType === 'INFO' && <NewsCover cover={briefing?.cover} compact />}
             {!compact && briefing && <KeyMetric document={briefing} />}
             {chart && <CardFace document={briefing!} />}
             <p className="magazine-summary live-briefing-excerpt" title={summary}>

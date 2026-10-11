@@ -49,7 +49,7 @@ export function DataBriefing({
   if (!ch)
     return (
       <article className="data-briefing" data-briefing-type={briefingTypeLabels[c.businessType]}>
-        {c.businessType === 'INFO' && <NewsCover cover={document.cover} />}
+        {c.businessType === 'INFO' && <NewsCover cover={document.cover} seed={c.title} />}
         <p className="data-briefing-summary">{c.summary}</p>
         <SourceCover document={document} />
         {!compact && (
