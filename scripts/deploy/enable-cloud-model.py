@@ -137,8 +137,8 @@ def activate():
     assert digest(STAGE/'workspace-api-0.1.0-SNAPSHOT.jar')==json.loads((EVIDENCE/'prepared.json').read_text())['apiSha256']
     health('http://127.0.0.1:18482/healthz')
     limits=json.loads(run('docker','inspect','--format','{{json .HostConfig}}',CONTAINER))
-    (EVIDENCE/'database-limits-before.json').write_text(json.dumps({'NanoCpus':limits['NanoCpus']}))
-    run('docker','update','--cpus','1',CONTAINER)
+    (EVIDENCE/'database-limits-before.json').write_text(json.dumps({k:limits[k] for k in ('NanoCpus','Memory','MemorySwap')}))
+    run('docker','update','--cpus','1','--memory','1g','--memory-swap','1g',CONTAINER)
     # Stop API before final queue guard/snapshot. No old work is silently resumed.
     run('systemctl','stop',API_UNIT)
     try:
@@ -170,6 +170,7 @@ def rollback():
     run('systemctl','start',API_UNIT);health('http://127.0.0.1:18481/api/v1/auth/csrf')
     run('systemctl','stop',ENGINE_UNIT)
     limits=EVIDENCE/'database-limits-before.json'
+    # Keep the OOM mitigation on artifact rollback; reducing live DB memory needs separate review.
     if limits.exists():run('docker','update','--cpus',str(json.loads(limits.read_text())['NanoCpus']/1000000000),CONTAINER)
     print(json.dumps({'rolledBack':True,'databaseRestored':False}))
 
