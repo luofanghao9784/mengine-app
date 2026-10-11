@@ -4,8 +4,9 @@
 }
 /* Magazine presentation is independent of stored facts, sizes and layout. */
 :is(.briefing-card, .live-briefing-card):has(.briefing-magazine),
-.magazine-type[data-briefing-type] {
+:is(.magazine-type, .live-briefing-tabs button, .data-briefing)[data-briefing-type] {
   --magazine-color: #526747;
+  --magazine-accent: #5f7f4a;
   --magazine-tint: #eff3eb;
   --briefing-ink: #202c3c;
   --briefing-muted: #657184;
@@ -13,28 +14,33 @@
   --magazine-value-size: 36px;
 }
 :is(.briefing-card, .live-briefing-card):has(.magazine-数据),
-.magazine-type[data-briefing-type='数据'] {
-  --magazine-color: #365eae;
-  --magazine-tint: #eef3fc;
+:is(.magazine-type, .live-briefing-tabs button, .data-briefing)[data-briefing-type='数据'] {
+  --magazine-color: #3f3cab;
+  --magazine-accent: #5b57d9;
+  --magazine-tint: #eeedfb;
 }
 :is(.briefing-card, .live-briefing-card):has(.magazine-洞察),
-.magazine-type[data-briefing-type='洞察'] {
+:is(.magazine-type, .live-briefing-tabs button, .data-briefing)[data-briefing-type='洞察'] {
   --magazine-color: #785571;
+  --magazine-accent: #8f5c86;
   --magazine-tint: #f5eff4;
 }
 :is(.briefing-card, .live-briefing-card):has(.magazine-建议),
-.magazine-type[data-briefing-type='建议'] {
+:is(.magazine-type, .live-briefing-tabs button, .data-briefing)[data-briefing-type='建议'] {
   --magazine-color: #97601b;
+  --magazine-accent: #b8761d;
   --magazine-tint: #fbf3e7;
 }
 :is(.briefing-card, .live-briefing-card):has(.magazine-成果),
-.magazine-type[data-briefing-type='成果'] {
+:is(.magazine-type, .live-briefing-tabs button, .data-briefing)[data-briefing-type='成果'] {
   --magazine-color: #347369;
+  --magazine-accent: #2f7b6f;
   --magazine-tint: #edf5f2;
 }
 :is(.briefing-card, .live-briefing-card):has(.magazine-会话),
-.magazine-type[data-briefing-type='会话'] {
+:is(.magazine-type, .live-briefing-tabs button, .data-briefing)[data-briefing-type='会话'] {
   --magazine-color: #4d659b;
+  --magazine-accent: #5b6fa8;
   --magazine-tint: #eff3fc;
 }
 .briefing-grid
@@ -512,7 +518,7 @@
   text-shadow: none;
 }
 
-.magazine-type[data-briefing-type='全部'] {
+:is(.magazine-type, .live-briefing-tabs button, .data-briefing)[data-briefing-type='全部'] {
   --magazine-color: #657184;
   --magazine-tint: #edf1f6;
 }

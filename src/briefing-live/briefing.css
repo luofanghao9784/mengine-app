@@ -773,10 +773,54 @@
   cursor: pointer;
   transition: box-shadow 140ms ease-out;
 }
-.live-briefing-type-options button[aria-pressed='true'],
+/* 选中的类型用该类型的重点色填充；未选中的保持浅底。 */
+.live-briefing-type-options button.magazine-type {
+  transition:
+    background 140ms ease-out,
+    color 140ms ease-out,
+    box-shadow 140ms ease-out;
+}
+.live-briefing-type-options button[aria-pressed='true'] {
+  background: var(--magazine-accent, var(--ink-2));
+  color: #fff;
+}
 .live-briefing-type-options button:focus-visible {
-  outline: 1px solid var(--magazine-color);
+  outline: 2px solid var(--magazine-accent, var(--ink-2));
   outline-offset: 2px;
+}
+/* 顶部“类型”标签带上当前所选类型的颜色。 */
+.live-briefing-tabs button[data-briefing-type]::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--magazine-accent);
+  vertical-align: 1px;
+}
+/* 洞察卡右下角的淡引号，只作类型识别，不承载内容。 */
+.live-briefing-card .live-magazine.magazine-洞察:not(.magazine-with-chart) {
+  position: relative;
+  isolation: isolate;
+}
+.live-briefing-card .live-magazine.magazine-洞察:not(.magazine-with-chart)::after {
+  content: '”';
+  position: absolute;
+  right: -20px;
+  bottom: -20px;
+  z-index: -1;
+  width: 150px;
+  height: 104px;
+  overflow: hidden;
+  border-bottom-right-radius: 23px;
+  color: color-mix(in srgb, var(--magazine-accent) 10%, transparent);
+  font:
+    400 230px/1 Georgia,
+    'Times New Roman',
+    serif;
+  text-align: right;
+  pointer-events: none;
 }
 .live-briefing-type-options button:hover {
   box-shadow: 0 2px 8px #21344912;

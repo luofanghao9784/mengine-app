@@ -5,7 +5,8 @@ import { NewsCover } from './NewsCover';
 import { ReadingEvidence } from './ReadingEvidence';
 import { displayAmount } from './money-display';
 import type { BriefingDocument } from '../../contracts/public-api/briefing-content';
-import { formatBriefingNumber as value } from './content';
+import { briefingTypeLabels, formatBriefingNumber as value } from './content';
+import { DetailChart } from './DetailChart';
 import { BriefingChart as MagazineChart } from '../components/BriefingChart';
 import { toMagazineChart } from './chart-presentation';
 import '../briefingDesign.css';
@@ -18,24 +19,21 @@ export function BriefingChart({
   document: BriefingDocument;
   compact?: boolean;
 }) {
+  // The full reading uses one interactive graphic for every chart style; cards keep compact forms.
+  if (!compact)
+    return document.content.chart ? (
+      <figure className="data-briefing-chart briefing-detail-chart">
+        <DetailChart document={document} />
+        <figcaption>
+          {document.content.chart.unit === '分' ? '金额以元显示，计算依据保留原始单位。' : '按同口径比较。'}
+          具体日期与统计范围见下方依据。
+        </figcaption>
+      </figure>
+    ) : null;
   if (presentationOf(document)?.chartStyle && presentationOf(document)?.chartStyle !== 'GROUPED_BAR')
-    return <ComparisonVisual document={document} compact={compact} />;
-  const chart = toMagazineChart(document, compact);
-  if (!chart) return null;
-  if (compact) return <MagazineChart chart={chart} spacious />;
-  return (
-    <figure className="data-briefing-chart briefing-detail-chart">
-      <div className="data-chart-scroll">
-        <div style={{ minWidth: chart.rows.length > 6 ? chart.rows.length * 64 + 34 : undefined }}>
-          <MagazineChart chart={chart} spacious={false} />
-        </div>
-      </div>
-      <figcaption>
-        {document.content.chart?.unit === '分' ? '金额以元显示，计算依据保留原始单位。' : '按同口径比较。'}
-        具体日期与统计范围见下方依据。
-      </figcaption>
-    </figure>
-  );
+    return <ComparisonVisual document={document} compact />;
+  const chart = toMagazineChart(document, true);
+  return chart && <MagazineChart chart={chart} spacious />;
 }
 export function DataBriefing({
   document,
@@ -50,7 +48,7 @@ export function DataBriefing({
   const amount = (raw: string | null) => value(displayAmount(raw, ch?.unit ?? ''));
   if (!ch)
     return (
-      <article className="data-briefing">
+      <article className="data-briefing" data-briefing-type={briefingTypeLabels[c.businessType]}>
         {c.businessType === 'INFO' && <NewsCover cover={document.cover} />}
         <p className="data-briefing-summary">{c.summary}</p>
         <SourceCover document={document} />
@@ -84,7 +82,10 @@ export function DataBriefing({
       </article>
     );
   return (
-    <div className={'data-briefing ' + (compact ? 'is-compact' : '')}>
+    <div
+      className={'data-briefing ' + (compact ? 'is-compact' : '')}
+      data-briefing-type={briefingTypeLabels[c.businessType]}
+    >
       <p className="data-briefing-summary">{c.summary}</p>
       <KeyMetric document={document} />
       <BriefingChart document={document} compact={compact} />

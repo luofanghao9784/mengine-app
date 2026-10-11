@@ -225,7 +225,9 @@ function BriefingPage({ tenant, onMonthChange }: BriefingProps) {
               role="tab"
               aria-selected={tab === label}
               aria-controls="live-briefing-panel"
-
+              data-briefing-type={
+                (label === '类型' && tab === '类型' && briefingTypeLabels[businessType]) || undefined
+              }
               disabled={pendingRequest || pullRefresh.active}
               onClick={() => selectTab(index)}
             >
@@ -492,7 +494,19 @@ function Card({
             date={card.completedAt}
             pinned={card.preference.pinned}
             feedback={{ tenant, target: feedbackTarget }}
-            discussion={card.briefing ? { tenant, source: { conversationId: card.conversationId, taskId: card.taskId, taskRevision: card.taskRevision, attempt: card.attempt } } : undefined}
+            discussion={
+              card.briefing
+                ? {
+                    tenant,
+                    source: {
+                      conversationId: card.conversationId,
+                      taskId: card.taskId,
+                      taskRevision: card.taskRevision,
+                      attempt: card.attempt,
+                    },
+                  }
+                : undefined
+            }
             verification={card.executionClass === 'verification'}
             footer={card.artifactCount > 0 ? <span>{card.artifactCount} 份成果</span> : undefined}
           />

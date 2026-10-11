@@ -8,7 +8,18 @@
 }
 .briefing-key-metric {
   padding: 12px 0;
-  color: var(--accent);
+  color: var(--briefing-ink, var(--ink));
+}
+/* 卡面上的重点数字领读图形，不再整块着色。 */
+.live-briefing-card .briefing-key-metric {
+  padding: 0;
+}
+.live-briefing-card .briefing-key-metric > div {
+  margin: 2px 0;
+}
+.live-briefing-card .briefing-key-metric strong {
+  font-size: 40px;
+  line-height: 1.1;
 }
 .briefing-key-metric > span,
 .briefing-key-metric small {
@@ -39,7 +50,7 @@
   list-style: none;
 }
 .briefing-section {
-  border-left: 2px solid var(--magazine-color, var(--accent));
+  border-left: 2px solid var(--magazine-accent, var(--accent));
   padding: 0 0 0 10px;
   min-width: 0;
 }
@@ -57,6 +68,28 @@
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+/* 行动步骤：大号序号取类型重点色，文字保持正文色。 */
+.briefing-sections.layout-steps {
+  counter-reset: briefing-step;
+  gap: 12px;
+}
+.briefing-sections.layout-steps .briefing-section {
+  position: relative;
+  counter-increment: briefing-step;
+  border: 0;
+  padding-left: 38px;
+}
+.briefing-sections.layout-steps .briefing-section::before {
+  content: counter(briefing-step);
+  position: absolute;
+  left: 0;
+  top: -2px;
+  color: var(--magazine-accent, var(--accent));
+  font:
+    400 30px/1 Georgia,
+    'Times New Roman',
+    serif;
 }
 .briefing-sections.layout-comparison {
   grid-template-columns: repeat(2, minmax(0, 1fr));

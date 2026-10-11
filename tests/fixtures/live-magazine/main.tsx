@@ -12,6 +12,7 @@ import { ReadingDialog } from '../../../src/briefing-live/ReadingDialog';
 import '../../../src/styles.css';
 import '../../../src/briefing-live/briefing.css';
 import '../../../src/recommendation/recommendation.css';
+import '../../../src/identity/workspace-theme.css';
 
 const chart: NonNullable<BriefingDocument['content']['chart']> = {
   type: 'GROUPED_BAR',
@@ -171,6 +172,114 @@ if (location.search.includes('expressive')) {
     };
     documents.push(doc);
   }
+}
+
+// Card-face graphics with varied synthetic values, shown under the workspace theme.
+if (location.search.includes('faces')) {
+  document.documentElement.dataset.surface = 'workspace';
+  documents.splice(0);
+  const row = (group: string, baseline: string | null, current: string | null, rank: number) => {
+    const both = baseline !== null && current !== null;
+    const difference = both ? String(Number(current) - Number(baseline)) : null;
+    return {
+      group,
+      baseline,
+      current,
+      difference,
+      changePercent:
+        both && Number(baseline) > 0
+          ? ((Number(difference) / Number(baseline)) * 100).toFixed(1).replace(/\.0$/, '')
+          : null,
+      baselineRank: baseline === null ? null : rank,
+      currentRank: current === null ? null : rank,
+      issue: both ? null : ('MISSING_PERIOD' as const),
+    };
+  };
+  const face = (
+    title: string,
+    labels: [string, string],
+    rows: ReturnType<typeof row>[],
+    presentation: Partial<NonNullable<BriefingDocument['content']['presentation']>> = {},
+    summary = false,
+  ): BriefingDocument => {
+    const doc = structuredClone(edge);
+    doc.content.title = title;
+    doc.content.chart = {
+      ...chart,
+      metric: summary ? '记录数' : '合成收款',
+      unit: summary ? '条' : '元',
+      baseline: labels[0],
+      current: labels[1],
+      range: summary ? '全部快照' : '两期各 1—30 日',
+      rows,
+      totals: { ...chart.totals, baseline: null, current: null, difference: null, changePercent: null },
+    };
+    doc.content.presentation = {
+      version: 'briefing-presentation-v1',
+      layout: 'EDITORIAL',
+      chartStyle: 'GROUPED_BAR',
+      focusGroup: null,
+      focusValue: null,
+      sections: [],
+      ...presentation,
+    };
+    if (summary)
+      Object.assign(doc.content, {
+        schemaVersion: 'briefing-dataset-v1',
+        datasetBasis: {
+          groupColumn: '状态',
+          periodColumn: '状态',
+          matchedRows: 398,
+          ignoredRows: 0,
+          periodMode: 'SUMMARY',
+        },
+      });
+    return doc;
+  };
+  const stores = [
+    row('合成门店甲', '82400', '91200', 1),
+    row('合成门店乙', '76900', '64300', 2),
+    row('合成门店丙', '58200', '73500', 3),
+    row('合成门店丁', '44600', '38900', 4),
+    row('合成门店戊', null, '47400', 5),
+  ];
+  documents.push(
+    face('两店上升两店回落，门店丙涨幅最大', ['2026-08', '2026-09'], stores),
+    face(
+      '在读课程占三分之二，请假与冻结合计两成',
+      ['', '本次汇总'],
+      [
+        ['在读', '268'],
+        ['请假', '52'],
+        ['冻结', '31'],
+        ['已结课', '22'],
+        ['已退课', '14'],
+        ['已取消', '11'],
+      ].map(([group, value], i) => row(group, null, value, i + 1)),
+      { chartStyle: 'CURRENT_BAR' },
+      true,
+    ),
+    face(
+      '门店乙已取消定金最多，占其定金的一成六',
+      ['已取消', '财务已确认'],
+      [
+        row('合成门店乙', '12700', '65900', 1),
+        row('合成门店丁', '7900', '64800', 2),
+        row('合成门店甲', '4100', '176200', 3),
+        row('合成门店戊', '2600', '73400', 4),
+        row('合成门店丙', null, '109800', 5),
+      ],
+    ),
+    face('九月收款较八月的增减，门店丙增加最多', ['2026-08', '2026-09'], stores, {
+      chartStyle: 'DELTA_BAR',
+    }),
+    face('门店丙九月收款 73,500 元', ['2026-08', '2026-09'], stores, {
+      layout: 'KEY_METRIC',
+      focusGroup: '合成门店丙',
+      focusValue: 'CURRENT',
+    }),
+  );
+  documents[2].content.chart!.range = '全部快照 · 210 行';
 }
 
 function FixtureGrid({ items }: ComponentProps<typeof MagazineGrid>) {
