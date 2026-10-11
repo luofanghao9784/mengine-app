@@ -1,0 +1,726 @@
+/* 画报主页演示：方案 B。卡片保持线上的白色毛玻璃底，只有重点色跟随类型。 */
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: linear-gradient(160deg, #e9ebf6, #f3f4f8 40%, #eeedf6);
+}
+.h-page {
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  padding: 20px 24px 64px;
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.h-top {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.h-top > div {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.h-top h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+.h-top span {
+  color: var(--ink-3);
+}
+.h-top nav {
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 70%);
+}
+.h-top button {
+  padding: 5px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--ink-2);
+  font: inherit;
+  cursor: pointer;
+}
+.h-top button[aria-pressed='true'] {
+  background: #fff;
+  box-shadow: 0 1px 4px rgb(25 27 46 / 10%);
+  color: var(--ink);
+  font-weight: 600;
+}
+.h-grid {
+  display: grid;
+  gap: 10px;
+}
+.h-tile {
+  min-width: 0;
+}
+.h-slot {
+  height: 100%;
+}
+
+/* 卡片 */
+.h-card {
+  --k-ink: #191b2e;
+  --k-ink2: #4f5368;
+  --k-ink3: #8b8fa3;
+  --k-warm: #d9773c;
+  --k-accent: #5b57d9;
+  --k-chip: #3f3cab;
+  --k-rule: color-mix(in srgb, var(--k-accent) 20%, transparent);
+  position: relative;
+  box-sizing: border-box;
+  height: 100%;
+  overflow: hidden;
+  border: 1px solid var(--glass-edge);
+  border-radius: 24px;
+  background: var(--surface);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--card-shadow);
+  color: var(--k-ink);
+  transition:
+    translate 0.22s var(--ease),
+    box-shadow 0.22s ease;
+}
+.h-card[data-type='资讯'] {
+  --k-accent: #5f7f4a;
+  --k-chip: #486238;
+}
+.h-card[data-type='洞察'] {
+  --k-accent: #8f5c86;
+  --k-chip: #744a6c;
+}
+.h-card[data-type='建议'] {
+  --k-accent: #b8761d;
+  --k-chip: #8e5a12;
+}
+.h-card[data-type='成果'] {
+  --k-accent: #2f7b6f;
+  --k-chip: #24635a;
+}
+@media (hover: hover) and (pointer: fine) {
+  .h-card:hover {
+    translate: 0 -3px;
+    box-shadow:
+      0 16px 32px -8px #294c7b29,
+      0 5px 12px -4px #294c7b1a;
+  }
+}
+.h-art {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+.h-content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  height: 100%;
+  padding: 20px;
+}
+.h-content.is-passive {
+  pointer-events: none;
+}
+.h-push {
+  margin-top: auto;
+}
+.h-eyebrow {
+  flex: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 24px;
+  color: var(--k-ink3);
+}
+.h-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--k-accent) 10%, white);
+  color: var(--k-chip);
+  font-weight: 600;
+}
+.h-title {
+  margin: 10px 0 0;
+  font:
+    600 24px/1.35 'Songti SC',
+    STSong,
+    serif;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.h-title.is-three {
+  -webkit-line-clamp: 3;
+}
+.h-title.is-four {
+  -webkit-line-clamp: 4;
+}
+.h-title.is-compact {
+  font-size: 22px;
+}
+.h-caption {
+  margin: 10px 0 4px;
+  color: var(--k-ink2);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.h-summary {
+  margin: 8px 0 0;
+  color: var(--k-ink2);
+  font-size: 14px;
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.h-summary.is-three {
+  -webkit-line-clamp: 3;
+}
+.h-hero {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  white-space: nowrap;
+}
+.h-hero strong {
+  font:
+    400 40px/1.1 Georgia,
+    'Songti SC',
+    serif;
+  letter-spacing: -0.01em;
+}
+.h-hero span,
+.h-note {
+  color: var(--k-ink2);
+}
+.h-note {
+  margin-top: 6px;
+}
+.h-card footer {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--k-ink3);
+}
+.h-card footer.is-centered {
+  justify-content: center;
+}
+.h-headline {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+.h-headline .h-title {
+  flex: 1;
+  max-width: 58%;
+}
+.h-value {
+  margin-top: 8px;
+  text-align: right;
+}
+.h-value .h-hero {
+  justify-content: flex-end;
+}
+.h-value small {
+  display: block;
+  margin-top: 2px;
+  color: var(--k-ink2);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.h-lead {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 54px;
+  margin-top: 10px;
+}
+.h-lead .h-hero strong {
+  font-size: 44px;
+}
+.h-lead small {
+  display: grid;
+  gap: 1px;
+  color: var(--k-ink2);
+  font-variant-numeric: tabular-nums;
+}
+.h-lead b {
+  color: var(--k-ink);
+  font-size: 14px;
+}
+.h-split {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 0.46fr) minmax(0, 0.54fr);
+  gap: 18px;
+  min-height: 0;
+}
+.h-stack {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+.h-stack > .h-col:first-child {
+  display: contents;
+}
+.h-stack > .h-col.is-middle {
+  order: 1;
+  flex: 1;
+}
+.h-stack footer {
+  order: 2;
+}
+.h-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.h-col.is-middle {
+  justify-content: center;
+}
+.h-col-head {
+  align-self: flex-end;
+  margin-bottom: 6px;
+  color: var(--k-ink3);
+}
+
+/* 数据图形 */
+.h-stop-top {
+  stop-color: var(--k-accent);
+  stop-opacity: 0.26;
+}
+.h-stop-end {
+  stop-color: var(--k-accent);
+  stop-opacity: 0;
+}
+.h-wash {
+  animation: h-fade 0.7s 0.4s both;
+}
+.h-line {
+  fill: none;
+  stroke: var(--k-accent);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  animation: h-draw 0.9s var(--ease) both;
+}
+.h-dot {
+  fill: var(--k-accent);
+  stroke: #fff;
+  stroke-width: 2;
+}
+.h-rule {
+  stroke: var(--k-rule);
+  stroke-width: 1;
+}
+.h-cross {
+  stroke: var(--k-ink3);
+  stroke-width: 1;
+}
+.h-tick {
+  fill: var(--k-ink3);
+  font-size: 11px;
+}
+.h-band {
+  fill: color-mix(in srgb, var(--k-accent) 7%, transparent);
+}
+.h-slope .h-stroke {
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  opacity: 0.5;
+  transition:
+    opacity 0.2s,
+    stroke-width 0.2s;
+  animation: h-draw 0.7s var(--ease) both;
+}
+.h-slope .h-hit {
+  stroke: transparent;
+  stroke-width: 22;
+}
+.h-slope.is-up .h-stroke {
+  stroke: var(--k-accent);
+}
+.h-slope.is-down .h-stroke {
+  stroke: var(--k-warm);
+}
+.h-slope.is-down .h-dot {
+  fill: var(--k-warm);
+}
+.h-slope.is-new .h-dot {
+  fill: #b9bccb;
+}
+.h-slope.is-active .h-stroke {
+  stroke-width: 3.5;
+  opacity: 1;
+}
+.h-end {
+  fill: var(--k-ink);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.h-name {
+  fill: var(--k-ink3);
+  font-size: 12px;
+}
+.h-slope.is-active .h-end {
+  font-size: 13px;
+  font-weight: 600;
+}
+.h-slope.is-active .h-name {
+  fill: var(--k-ink);
+}
+.h-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.h-legend i {
+  width: 14px;
+  height: 2px;
+  border-radius: 1px;
+}
+.h-legend i + i,
+.h-legend i:not(:first-child) {
+  margin-left: 8px;
+}
+.h-legend i.is-block {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+.h-legend i.is-up {
+  background: var(--k-accent);
+}
+.h-legend i.is-down {
+  background: var(--k-warm);
+}
+
+/* 比例带：贴着卡片底边铺满 */
+.h-strip {
+  position: absolute;
+  inset: auto 0 0 0;
+  display: flex;
+  gap: 2px;
+}
+.h-strip i {
+  display: flex;
+  align-items: center;
+  min-width: 3px;
+  padding-left: 12px;
+  white-space: nowrap;
+  transform-origin: left;
+  transition: opacity 0.2s;
+  animation: h-grow 0.6s var(--ease) both;
+}
+.h-strip i.is-dim {
+  opacity: 0.4;
+}
+.h-strip b {
+  font-style: normal;
+  font-weight: 600;
+  color: var(--k-ink);
+}
+.h-strip .tone-0 {
+  background: var(--k-accent);
+}
+.h-strip .tone-0 b {
+  color: #fff;
+}
+.h-strip .tone-1 {
+  background: color-mix(in srgb, var(--k-accent) 42%, white);
+}
+.h-strip .tone-2 {
+  background: color-mix(in srgb, var(--k-accent) 28%, white);
+}
+.h-strip .tone-3 {
+  background: color-mix(in srgb, var(--k-accent) 17%, white);
+}
+
+/* 名次榜 */
+.h-rank {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  margin: 8px 0;
+  padding: 0;
+  list-style: none;
+}
+.h-rank li {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+}
+.h-rank-no {
+  color: color-mix(in srgb, var(--k-accent) 34%, white);
+  font:
+    400 32px/1 Georgia,
+    serif;
+}
+.h-rank li.is-lead .h-rank-no {
+  color: var(--k-accent);
+}
+.h-rank-body {
+  display: grid;
+  gap: 6px;
+}
+.h-rank-body > span {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+}
+.h-rank-body b {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.h-rank-body i {
+  height: 5px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--k-accent) 24%, white);
+  transform-origin: left;
+  animation: h-grow 0.6s var(--ease) both;
+}
+.h-rank li.is-lead .h-rank-body i {
+  background: var(--k-accent);
+}
+
+/* 接续条 */
+.h-bars {
+  display: grid;
+  gap: 12px;
+}
+.h-bars > div {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 42px;
+  align-items: center;
+  gap: 8px;
+  color: var(--k-ink2);
+}
+.h-bars > div.is-lead {
+  color: var(--k-ink);
+  font-weight: 600;
+}
+.h-bars b {
+  text-align: right;
+  font-weight: inherit;
+  font-variant-numeric: tabular-nums;
+}
+.h-bar-track {
+  display: flex;
+  gap: 2px;
+}
+.h-bar-track i {
+  height: 8px;
+  border-radius: 4px 0 0 4px;
+  background: var(--k-accent);
+  transform-origin: left;
+  animation: h-grow 0.55s var(--ease) both;
+}
+.h-bar-track i.is-warm {
+  border-radius: 0 4px 4px 0;
+  background: var(--k-warm);
+}
+
+/* 资讯 */
+.h-cover {
+  position: absolute;
+  inset: 0 0 auto 0;
+  overflow: hidden;
+  background: linear-gradient(
+    170deg,
+    color-mix(in srgb, var(--k-accent) 28%, white),
+    color-mix(in srgb, var(--k-accent) 10%, white)
+  );
+}
+.h-cover > span {
+  position: absolute;
+  right: 14px;
+  bottom: 10px;
+  color: color-mix(in srgb, var(--k-accent) 70%, black);
+  opacity: 0.6;
+}
+.h-arc {
+  fill: none;
+  stroke: color-mix(in srgb, var(--k-accent) 30%, transparent);
+  stroke-width: 1.25;
+  animation: h-fade 0.8s both;
+}
+.h-cover .h-arc {
+  stroke: rgb(255 255 255 / 70%);
+  stroke-width: 1.5;
+}
+
+/* 洞察 */
+.h-glyph {
+  position: absolute;
+  right: 6px;
+  bottom: -118px;
+  color: color-mix(in srgb, var(--k-accent) 10%, transparent);
+  font:
+    400 280px/1 Georgia,
+    serif;
+  user-select: none;
+}
+.h-glyph.is-small {
+  bottom: -96px;
+  font-size: 220px;
+}
+.h-quote {
+  margin: 0;
+  padding-left: 14px;
+  border-left: 2px solid var(--k-accent);
+  font-size: 15px;
+  line-height: 1.65;
+}
+.h-quote.is-spaced {
+  margin-top: 16px;
+  font-size: 14px;
+}
+.h-quote span {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--k-chip);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* 建议 */
+.h-steps {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  margin: 10px 0;
+  padding: 0;
+  list-style: none;
+}
+.h-steps li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  animation: h-rise 0.5s var(--ease) both;
+}
+.h-steps b {
+  color: var(--k-accent);
+  font:
+    400 32px/1 Georgia,
+    serif;
+}
+.h-steps span {
+  padding-top: 2px;
+  font-size: 14px;
+  line-height: 1.55;
+}
+.h-caution {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--k-accent) 16%, transparent);
+  color: var(--k-chip);
+  font-weight: 600;
+}
+.h-corner {
+  inset: auto 0 0 auto;
+  width: 46%;
+  height: auto;
+}
+.h-corner circle {
+  fill: color-mix(in srgb, var(--k-accent) 14%, transparent);
+}
+.h-corner path {
+  fill: none;
+  stroke: var(--k-accent);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* 成果 */
+.h-sheets {
+  position: absolute;
+  right: -14px;
+  bottom: -64px;
+  width: 232px;
+}
+.h-sheets.is-small {
+  right: -34px;
+  bottom: -84px;
+  width: 190px;
+}
+.h-sheets g {
+  animation: h-fade 0.6s both;
+}
+.h-sheet {
+  fill: #fff;
+  stroke: color-mix(in srgb, var(--k-accent) 20%, transparent);
+  filter: drop-shadow(0 4px 8px color-mix(in srgb, var(--k-accent) 14%, transparent));
+}
+.h-sheet-head {
+  fill: var(--k-accent);
+}
+.h-sheet-line {
+  fill: color-mix(in srgb, var(--k-accent) 20%, white);
+}
+.h-sheet-chart {
+  fill: color-mix(in srgb, var(--k-accent) 12%, white);
+}
+.h-textside {
+  max-width: 60%;
+}
+
+@keyframes h-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+}
+@keyframes h-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes h-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+@keyframes h-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .h-page *,
+  .h-page *::before {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+@media (max-width: 520px) {
+  .h-page {
+    padding: 16px 16px 48px;
+  }
+}

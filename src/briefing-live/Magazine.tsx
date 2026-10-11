@@ -6,7 +6,7 @@ import { FeedbackMark } from './FeedbackMark';
 import type { FeedbackTarget } from '../../contracts/public-api/feedback';
 import { briefingTypeLabels } from './content';
 import type { BriefingDocument } from '../../contracts/public-api/briefing-content';
-import { BriefingChart } from './DataBriefing';
+import { CardFace } from './CardFace';
 import {
   ChartNoAxesCombined,
   FileCheck2,
@@ -118,7 +118,7 @@ export function MagazineBody({
   return (
     <>
       <div
-        className={`briefing-magazine live-magazine magazine-${type}${chart ? ' magazine-with-chart' : ''}${composed ? ' magazine-with-composition' : ''}`}
+        className={`briefing-magazine live-magazine magazine-${type}${chart ? ' magazine-with-chart' : ''}${chart && presentation?.chartStyle !== 'TABLE' ? ' magazine-with-face' : ''}${composed ? ' magazine-with-composition' : ''}`}
         data-presentation={presentation?.layout ?? 'EDITORIAL'}
         data-magazine-type={type}
       >
@@ -136,7 +136,7 @@ export function MagazineBody({
             <h3>{content?.title ?? title}</h3>
             {content?.businessType === 'INFO' && <NewsCover cover={briefing?.cover} compact />}
             {!compact && briefing && <KeyMetric document={briefing} />}
-            {chart && <BriefingChart document={briefing!} compact />}
+            {chart && <CardFace document={briefing!} />}
             <p className="magazine-summary live-briefing-excerpt" title={summary}>
               {summary}
               {!content && truncated ? '…' : ''}
@@ -154,7 +154,12 @@ export function MagazineBody({
         </div>
         {verification && <span className="live-verification-label">联调验证 · 未调用真实模型</span>}
       </div>
-      <BriefingStatusMarks feedback={feedback} pinned={pinned} conversation={!publication && !briefing} discussion={discussion} />
+      <BriefingStatusMarks
+        feedback={feedback}
+        pinned={pinned}
+        conversation={!publication && !briefing}
+        discussion={discussion}
+      />
     </>
   );
 }
