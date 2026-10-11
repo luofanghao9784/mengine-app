@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { AgentTasks } from '../../dist/runtime/agent-task.js';
 import { createEngineServer } from '../../dist/server.js';
-const [platformBaseUrl, token] = process.argv.slice(2);
+const [platformBaseUrl, token, mode] = process.argv.slice(2);
 if (new URL(platformBaseUrl).hostname !== '127.0.0.1' || !token?.startsWith('synthetic-'))
   throw Error('Local fixture only');
 const agent = new AgentTasks({
@@ -27,7 +27,7 @@ const agent = new AgentTasks({
           if (results.length === 1) {
             name = 'task_context';
             args = { action: 'dataset_read', referenceId: source.datasetId, versionId: source.snapshotId };
-          } else if (results.length === 2) {
+          } else if (results.length === 2 && request.tools.some(t=>t.name==='select_briefing_topic')) {
             assert.equal(results[1].result.completeDataset, false);
             name = 'select_briefing_topic';
             args = {
@@ -40,7 +40,7 @@ const agent = new AgentTasks({
               }],
               selectedIndex: 0,
             };
-          } else if (results.length === 3) {
+          } else if (!results.some(r=>r.calculation)) {
             name = 'compare_dataset';
             args = {
               datasetId: source.datasetId,
@@ -51,9 +51,10 @@ const agent = new AgentTasks({
               baseline: '前期',
               current: '本期',
             };
-          } else if (results.length === 4) {
-            assert.equal(results[3].calculation.totals.current, '1.20');
-            assert.equal(results[3].calculation.ignoredRows, 1);
+            if(mode==='composition')args={datasetId:source.datasetId,snapshotId:source.snapshotId,operation:'COMPOSITION',groupColumns:['门店'],valueColumn:'收款（元）'};
+          } else if (!results.some(r=>r.status==='PREPARED'||r.status==='NO_NEW_CONTENT')) {
+            const verified=results.find(r=>r.calculation);
+            if(!mode){assert.equal(verified.calculation.totals.current, '1.20');assert.equal(verified.calculation.ignoredRows, 1);}
             name = 'deliver_briefing';
             args = {
               businessType: 'DATA',
@@ -65,16 +66,17 @@ const agent = new AgentTasks({
                 focusValue: 'CURRENT',
                 sections: [],
               },
-              calculationArtifactId: results[3].artifact.id,
-              title: '门店两期收款比较',
+              calculationArtifactId: verified.artifact.id,
+              title: mode==='composition'?'甲店收款占比高于乙店':'门店两期收款比较',
               summary: '两家门店的同口径收款合计由零点六元增长到一点二元。',
               analysis: [
                 '两家门店均采用固定数据版本中的完整记录进行比较，其他期间未纳入统计。',
                 '当前数字只能说明两期收款变化，经营原因仍需结合其他业务资料判断。',
               ],
             };
+            if(mode)delete args.presentation;
           } else {
-            assert.equal(results[4].status, 'PREPARED');
+            assert.equal(results.at(-1).status, mode==='zero'?'NO_NEW_CONTENT':'PREPARED');
             this.lastUsage = { inputTokens: 10, outputTokens: 2 };
             this.usage.inputTokens += 10;
             this.usage.outputTokens += 2;

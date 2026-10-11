@@ -24,7 +24,7 @@ public class DatasetCalculationService {
     public record Calculation(String recipeVersion, String status, Request request, String inputSha256,
                               int matchedRows, int ignoredRows, List<BriefingContentService.Row> rows,
                               BriefingContentService.Row totals, int missingDateRows) {}
-    public record SummaryRow(List<String> group,String value,int records) {}
+    public record SummaryRow(List<String> group,String value,int records,@com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) String sharePercent) {public SummaryRow(List<String> group,String value,int records){this(group,value,records,null);}}
     public record Summary(String recipeVersion,String status,Request request,String inputSha256,int matchedRows,int ignoredRows,int missingDateRows,List<SummaryRow> rows,String total) {}
     @org.springframework.beans.factory.annotation.Autowired private com.dreamcore.workspace.analysis.CalculationMaterialService materials;
     private final JdbcTemplate db;
@@ -69,8 +69,9 @@ public class DatasetCalculationService {
     }
     public Map<String,Object> calculate(ConversationService.Job job, Request request) {
         if (request == null || request.datasetId() == null || request.snapshotId() == null) throw IdentityException.invalid();
-        boolean summary="SUMMARY".equals(request.operation());
-        if(request.operation()!=null&&!Set.of("COMPARE","SUMMARY").contains(request.operation()))invalid("INVALID_REQUEST");
+        boolean composition="COMPOSITION".equals(request.operation());
+        boolean summary="SUMMARY".equals(request.operation())||composition;
+        if(request.operation()!=null&&!Set.of("COMPARE","SUMMARY","COMPOSITION").contains(request.operation()))invalid("INVALID_REQUEST");
         if(summary&&(request.groupColumn()!=null||request.periodColumn()!=null||request.baseline()!=null||request.current()!=null||request.periodMode()!=null))invalid("INVALID_REQUEST");
         if(!summary){if(request.groupColumns()!=null)invalid("INVALID_REQUEST");label(request.baseline());label(request.current());}
         if(request.missingDates()!=null&&!Set.of("FAIL","EXCLUDE").contains(request.missingDates()))invalid("INVALID_REQUEST");
@@ -96,6 +97,7 @@ public class DatasetCalculationService {
         boolean countRows="COUNT".equals(request.aggregation());
         if(request.aggregation()!=null&&!Set.of("SUM","COUNT").contains(request.aggregation()))invalid("INVALID_REQUEST");
         var requested=summary?request.groupColumns():countRows?Arrays.asList(request.groupColumn(),request.periodColumn()):Arrays.asList(request.groupColumn(),request.periodColumn(),request.valueColumn());
+        if(composition && (requested==null||requested.size()!=1))invalid("DATASET_COLUMNS_INVALID");
         if(requested==null||requested.isEmpty()||requested.size()>3)invalid("DATASET_COLUMNS_INVALID");
         if(summary&&!countRows&&(request.valueColumn()==null||!columns.contains(request.valueColumn())||requested.contains(request.valueColumn())))invalid("DATASET_COLUMNS_INVALID");
         if(request.dateColumn()!=null&&!columns.contains(request.dateColumn()))invalid("DATASET_COLUMNS_INVALID");
@@ -133,6 +135,7 @@ public class DatasetCalculationService {
             if(summary){
                 var key=new ArrayList<String>();for(String column:requested){var cell=record.get(columns.indexOf(column));if(!cell.isString())invalid("DATASET_LABEL_INVALID");key.add(label(cell.asString()));}
                 BigDecimal number=measure(record,countRows,valueIndex);
+                if(composition&&number.signum()<0)invalid("DATASET_COMPOSITION_NEGATIVE");
                 var immutable=List.copyOf(key);summaryGroups.merge(immutable,number,BigDecimal::add);records.merge(immutable,1,Integer::sum);summaryTotal=summaryTotal.add(number);matched++;
                 if(summaryGroups.size()>50)invalid("DATASET_GROUP_LIMIT");continue;
             }
@@ -147,8 +150,8 @@ public class DatasetCalculationService {
         String inputHash=IdentityService.hash(columnsText+"\n"+rowsText);
         if(summary){
             if(matched==0)invalid("DATASET_NO_MATCHING_DATA");
-            var output=new ArrayList<SummaryRow>();for(var entry:summaryGroups.entrySet())output.add(new SummaryRow(entry.getKey(),decimal(entry.getValue()),records.get(entry.getKey())));
-            calculation=new Summary("dataset-summary-1","COMPUTED",request,inputHash,matched,ignored,missing,List.copyOf(output),decimal(summaryTotal));
+            var output=new ArrayList<SummaryRow>();for(var entry:summaryGroups.entrySet())output.add(new SummaryRow(entry.getKey(),decimal(entry.getValue()),records.get(entry.getKey()),composition&&summaryTotal.signum()>0?entry.getValue().multiply(BigDecimal.valueOf(100)).divide(summaryTotal,6,RoundingMode.HALF_UP).toPlainString():null));
+            calculation=new Summary(composition?"dataset-composition-1":"dataset-summary-1","COMPUTED",request,inputHash,matched,ignored,missing,List.copyOf(output),decimal(summaryTotal));
         }else{
         if(groups.isEmpty() || groups.values().stream().noneMatch(v->v[0]!=null) || groups.values().stream().noneMatch(v->v[1]!=null))invalid("DATASET_NO_COMPARABLE_DATA");
         var beforeRanks=ranks(groups,0);var afterRanks=ranks(groups,1);var output=new ArrayList<BriefingContentService.Row>();BigDecimal before=BigDecimal.ZERO,after=BigDecimal.ZERO;boolean complete=true;

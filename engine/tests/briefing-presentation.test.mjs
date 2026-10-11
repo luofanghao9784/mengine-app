@@ -61,3 +61,14 @@ test('schema uses the actual Harness subset and validates structured nullable ar
     validateJsonSchemaValue(schema, { ...args, presentation: { ...presentation, number: 123 } }).length,
   );
 });
+
+test('default summary follows verified artifact while explicit table and malformed choices are preserved', () => {
+ const t=briefingDeliveryTool({presentationAvailable:true,isSummaryCalculation:id=>id==='verified-summary',authorize:async()=>{},invoke:async()=>({})});
+ const {presentation: ignored,...body}=args;
+ assert.equal(t.normalizeArguments({...body,calculationArtifactId:'verified-summary'}).presentation.chartStyle,'CURRENT_BAR');
+ assert.equal(t.normalizeArguments(body).presentation.chartStyle,'GROUPED_BAR');
+ assert.equal(t.normalizeArguments({...body,presentation:{...presentation,chartStyle:'TABLE'}}).presentation.chartStyle,'TABLE');
+ assert.match(t.description,/up to 6 groups.*slope chart/);
+ assert.match(t.description,/DUMBBELL has the same card face/);
+ assert.match(t.description,/two or more explicit recommended actions/);
+});

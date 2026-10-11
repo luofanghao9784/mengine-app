@@ -3,6 +3,8 @@ import { isRecord } from './http-json.js';
 import { RuntimeError, type Json, type TaskTool } from './ports.js';
 /** Protocol guidance only. Placeholder text is never business evidence. */
 export const BRIEFING_EDITORIAL_HINTS: Record<string, string> = {
+  BRIEFING_TITLE_TOPIC_ONLY:
+    '数据卡卡面不显示摘要。标题只说主题，请改为来源支持的结论，尽量含关键数字或方向，建议不超过28字；不要为了改标题编造事实。',
   BRIEFING_PRESENTATION_INVALID:
     'Choose a supported presentation layout/chartStyle; sections must reference distinct existing analysis paragraph indices (0-based). STEPS only for SUGGESTION with ACTION/CAUTION; COMPARISON only INSIGHT/SUGGESTION with at least two OPTION sections. DATA only EDITORIAL/KEY_METRIC, chartStyle required. focusGroup must exactly match a verified calculation group and is only allowed for KEY_METRIC. Do not submit numbers, URLs, HTML, CSS or code.',
   BRIEFING_TYPE_MISMATCH:
@@ -42,6 +44,7 @@ export function normalizeBriefingArguments(value: unknown): unknown {
 
 export function briefingDeliveryTool(options: {
   presentationAvailable?: boolean;
+  isSummaryCalculation?(artifactId: unknown): boolean;
   requestedType?: string;
   selectedType?(): string | undefined;
   authorize(): Promise<void>;
@@ -60,19 +63,19 @@ export function briefingDeliveryTool(options: {
       // Explicit malformed presentations still fail validation; valid model choices are preserved.
       if (copy.presentation === undefined) copy.presentation = {
         version: 'briefing-presentation-v1', layout: 'EDITORIAL',
-        chartStyle: copy.businessType === 'DATA' || options.requestedType === 'DATA' ? 'TABLE' : null,
+        chartStyle: copy.businessType === 'DATA' || options.requestedType === 'DATA' ? (options.isSummaryCalculation?.(copy.calculationArtifactId) ? 'CURRENT_BAR' : 'GROUPED_BAR') : null,
         focusGroup: null, focusValue: null, sections: [],
       };
       return copy;
     },
     description:
-      'Create a real private briefing card on 智能画报. Set businessType to INFO (资讯), DATA (数据), INSIGHT (洞察), SUGGESTION (建议), or RESULT (成果). For text categories omit calculationArtifactId and use actual granted evidence; only DATA requires the calculation below. Do not create cards for greetings or routine status replies; create for a complete useful theme or an explicit user request. Only DATA requires compare_table (XLSX) or compare_dataset (collected database snapshot) and its artifact.id; INFO, INSIGHT, SUGGESTION and RESULT use granted evidence without a calculation. Write a short editorial title, summary and 2–4 analysis paragraphs grounded in that calculation and source scope. Summary and each paragraph must be complete sentences ending in punctuation. Distinguish observed changes from unverified causes. Chart values, periods, units and provenance are taken by the platform from the verified calculation, never from model-supplied numbers. One immutable card per task attempt, private to the current user, visible only after successful task delivery. After PREPARED, finish with a short confirmation; NO_NEW_CONTENT means a duplicate was suppressed, so report no new card; do not repeat raw IDs, hashes or the entire report. This is not enterprise publication or a scheduled plan.' +
+      'Create a real private briefing card on 智能画报. Set businessType to INFO (资讯), DATA (数据), INSIGHT (洞察), SUGGESTION (建议), or RESULT (成果). For text categories omit calculationArtifactId and use actual granted evidence; only DATA requires the calculation below. Do not create cards for greetings or routine status replies; create for a complete useful theme or an explicit user request. Only DATA requires compare_table (XLSX) or compare_dataset (collected database snapshot) and its artifact.id; INFO, INSIGHT, SUGGESTION and RESULT use granted evidence without a calculation. Write a short editorial title, summary and 2–4 analysis paragraphs grounded in that calculation and source scope. Summary and each paragraph must be complete sentences ending in punctuation. Distinguish observed changes from unverified causes. Chart values, periods, units and provenance are taken by the platform from the verified calculation, never from model-supplied numbers. One immutable card per task attempt, private to the current user, visible only after successful task delivery. After PREPARED, finish with a short confirmation; NO_NEW_CONTENT means duplicate or empty verified data was suppressed, so report no new card; do not repeat raw IDs, hashes or the entire report. This is not enterprise publication or a scheduled plan.' +
       '\n' +
       BRIEFING_WRITING_RULES +
       '\n' +
       BRIEFING_ANALYSIS_ARRAY_HINT +
       (options.presentationAvailable
-        ? '\nChoose presentation according to the business question, not random decoration. version=briefing-presentation-v1. Send presentation as a JSON OBJECT, never a string. Minimal DATA example: {"version":"briefing-presentation-v1","layout":"EDITORIAL","chartStyle":"TABLE","focusGroup":null,"focusValue":null,"sections":[]}. Minimal text example uses the same object with chartStyle:null. DATA: GROUPED_BAR for a few two-period groups; DUMBBELL for paired comparisons across many groups; DELTA_BAR for verified increases/decreases; CURRENT_BAR for current-period ranking; TABLE for exact values and gaps. KEY_METRIC highlights CURRENT, DIFFERENCE or CHANGE_PERCENT from the verified totals (focusGroup=null) or an exact group. No long-term trend, share, funnel or progress claims from a two-period sum. Non-DATA: EDITORIAL for prose or labeled analysis sections, STEPS for actual recommended actions, COMPARISON for actual supported options, SOURCE for a source filename cover (not proof of a generated file). sections selects 0-based analysis paragraphIndex with OBSERVATION/INTERPRETATION/ACTION/OPTION/CAUTION roles. At least two ACTION/CAUTION sections for STEPS, two OPTION sections for COMPARISON. Do not relabel observations as actions/options. Keep the full analysis; composition never adds facts, executable code, media URLs or chart numbers.'
+        ? '\nChoose presentation according to the business question, not random decoration. version=briefing-presentation-v1. Send presentation as a JSON OBJECT, never a string. Minimal DATA example: {"version":"briefing-presentation-v1","layout":"EDITORIAL","chartStyle":"GROUPED_BAR","focusGroup":null,"focusValue":null,"sections":[]}. Minimal text example uses the same object with chartStyle:null. DATA: GROUPED_BAR compares the same metric across two periods: up to 6 groups appear as a slope chart highlighting the largest increase; title the main change or overall direction. Category comparisons or more than 6 groups use paired thin bars. DUMBBELL has the same card face as GROUPED_BAR and remains for compatibility. DELTA_BAR emphasizes verified increases/decreases. CURRENT_BAR ranks current values or period summaries. TABLE is an explicit choice when readers need to check exact values individually. Use KEY_METRIC when the conclusion centers on a single value; specify focusGroup (null for totals) and focusValue. It highlights CURRENT, DIFFERENCE or CHANGE_PERCENT from the verified totals (focusGroup=null) or an exact group. No long-term trend, share, funnel or progress claims from a two-period sum. Non-DATA: EDITORIAL for prose or labeled analysis sections, STEPS for SUGGESTION with two or more explicit recommended actions, COMPARISON for two or more actual supported options, SOURCE for a source filename cover (not proof of a generated file). sections selects 0-based analysis paragraphIndex with OBSERVATION/INTERPRETATION/ACTION/OPTION/CAUTION roles. At least two ACTION/CAUTION sections for STEPS, two OPTION sections for COMPARISON. Do not relabel observations as actions/options. Keep the full analysis; composition never adds facts, executable code, media URLs or chart numbers.'
         : ''),
     parameters: {
       type: 'object',
@@ -167,6 +170,10 @@ export function briefingDeliveryTool(options: {
       if (requiredType && (!isRecord(args) || args.businessType !== requiredType))
         throw new RuntimeError('BRIEFING_TYPE_MISMATCH');
       await options.authorize();
+      if (isRecord(args) && (args.businessType === 'DATA' || requiredType === 'DATA') &&
+          typeof args.title === 'string' && /(?:分析|分布|情况)[。！!]?$/u.test(args.title.trim()) &&
+          !/(?:增长|增加|减少|下降|上升|高于|低于|最多|最少|领先|落后|翻倍|持平|为零)/u.test(args.title))
+        throw new RuntimeError('BRIEFING_TITLE_TOPIC_ONLY', BRIEFING_EDITORIAL_HINTS.BRIEFING_TITLE_TOPIC_ONLY);
       const r = await options.invoke(args, signal);
       await options.authorize();
       if (

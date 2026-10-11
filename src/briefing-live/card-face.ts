@@ -16,7 +16,7 @@ export const slopeGroupLimit = 6;
 /** Whether the two columns are periods of one measure rather than two categories of it. */
 export function isPeriodComparison(document: BriefingDocument): boolean {
   const { chart, datasetBasis } = document.content;
-  if (!chart || datasetBasis?.periodMode === 'SUMMARY') return false;
+  if (!chart || datasetBasis?.periodMode === 'SUMMARY' || document.content.datasetBasis?.periodMode === 'COMPOSITION') return false;
   return (
     datasetBasis?.periodMode === 'MONTH' || (isPeriodLabel(chart.baseline) && isPeriodLabel(chart.current))
   );
@@ -32,7 +32,7 @@ export function faceKind(document: BriefingDocument): FaceKind | null {
   if (!chart) return null;
   const style = presentationOf(document)?.chartStyle;
   if (style === 'TABLE') return 'TABLE';
-  if (datasetBasis?.periodMode === 'SUMMARY' || style === 'CURRENT_BAR') return 'RANK';
+  if (datasetBasis?.periodMode === 'SUMMARY' || document.content.datasetBasis?.periodMode === 'COMPOSITION' || style === 'CURRENT_BAR') return 'RANK';
   if (style === 'DELTA_BAR') return 'DELTA';
   return slopeEligible(document) ? 'SLOPE' : 'PAIR';
 }

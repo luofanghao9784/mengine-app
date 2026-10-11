@@ -1,3 +1,4 @@
+import { displayChart } from './display-labels.ts';
 import type { BriefingDocument, BriefingRow } from '../../contracts/public-api/briefing-content';
 import { compareDecimal, presentationOf } from './presentation';
 import { displayAmount } from './money-display';
@@ -11,7 +12,7 @@ export function ComparisonVisual({
   document: BriefingDocument;
   compact?: boolean;
 }) {
-  const chart = document.content.chart,
+  const chart = displayChart(document),
     style = presentationOf(document)?.chartStyle;
   if (!chart || !style || style === 'GROUPED_BAR') return null;
   const all =
@@ -19,7 +20,7 @@ export function ComparisonVisual({
       ? [...chart.rows].sort((a, b) => compareDecimal(b.current, a.current))
       : chart.rows;
   const rows = compact ? all.slice(0, style === 'TABLE' ? 4 : 6) : all;
-  const summary = document.content.datasetBasis?.periodMode === 'SUMMARY';
+  const summary = ['SUMMARY','COMPOSITION'].includes(document.content.datasetBasis?.periodMode ?? '');
   const missingGroups = summary ? 0 : all.filter((r) => r.baseline === null || r.current === null).length;
   const field = style === 'DELTA_BAR' ? 'difference' : 'current';
   const numeric = (raw: string | null) => Number(displayAmount(raw, chart.unit) ?? 0);
@@ -61,7 +62,7 @@ export function ComparisonVisual({
           <tbody>
             {rows.map((r) => (
               <tr key={r.group}>
-                <th>{r.group}</th>
+                <th>{r.displayGroup ?? r.group}</th>
                 <td>{exact(r.baseline)}</td>
                 <td>{exact(r.current)}</td>
                 <td>{exact(r.difference)}</td>
@@ -74,7 +75,7 @@ export function ComparisonVisual({
           {rows.map((r) => (
             <div className="briefing-comparison-row" key={r.group}>
               <div className="briefing-comparison-label">
-                <span>{r.group}</span>
+                <span>{r.displayGroup ?? r.group}</span>
                 <strong>{text(r)}</strong>
               </div>
               <svg viewBox="0 0 100 16" preserveAspectRatio="none" aria-hidden="true">

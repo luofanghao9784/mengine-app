@@ -1,6 +1,7 @@
 /** The model supplies prose; the platform supplies immutable verified chart values. */
 export interface BriefingRow {
   group: string | null;
+  displayGroup?: string; // presentation projection only; never stored as evidence
   baseline: string | null;
   current: string | null;
   difference: string | null;
@@ -22,6 +23,7 @@ export interface BriefingPresentation {
   }[];
 }
 export interface BriefingDocument {
+  chartLabels?: { groups: Record<string,string>; columns: Record<string,string> } | null;
   cover?: { dataUrl: string; sourceUrl: string; sourceTitle: string } | null;
   artifactId: string;
   sha256: string;
@@ -45,6 +47,7 @@ export interface BriefingDocument {
       range: string;
       rows: BriefingRow[];
       totals: BriefingRow;
+      composition?: { rows: { group: string[]; value: string; records: number; sharePercent: string | null }[]; total: string; percentScale: 6 } | null;
     } | null;
     source: {
       id: string;
@@ -70,7 +73,7 @@ export interface BriefingDocument {
       periodColumn: string;
       matchedRows: number;
       ignoredRows: number;
-      periodMode?: 'EXACT' | 'MONTH' | 'SUMMARY' | null;
+      periodMode?: 'EXACT' | 'MONTH' | 'SUMMARY' | 'COMPOSITION' | null;
       timeZone?: string | null;
     } | null;
     calculationArtifactId: string | null;

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { createServer } from 'node:http';
-import { briefingDeliveryTool, hasPreparedBriefing, normalizeBriefingArguments } from '../dist/runtime/briefing-delivery.js';
+import { briefingDeliveryTool, hasPreparedBriefing, hasTerminalBriefing, normalizeBriefingArguments } from '../dist/runtime/briefing-delivery.js';
 import { AgentTasks } from '../dist/runtime/agent-task.js';
 import { runHarness } from '../dist/runtime/harness.js';
 import { listen, close, body, json } from './fixtures/agent.mjs';
@@ -220,7 +220,7 @@ test('dataset briefing closes retrieval after three lookups and delivers an hone
       assert.match(instructions, /compare_dataset/);
       assert.match(instructions, /每张卡回答：发现了什么/);
       assert.match(instructions, /只有来源介绍而没有新业务发现时不凑卡/);
-      assert.ok(request.tools.find(t => t.name === 'deliver_briefing').description.includes('智能画报表达规范 1.0.2'));
+      assert.ok(request.tools.find(t => t.name === 'deliver_briefing').description.includes('智能画报表达规范 1.0.3'));
       let name = 'task_context', args;
       if (calls === 1) args = { action: 'dataset_search' };
       else if (calls === 2) args = { action: 'dataset_read', referenceId: datasetId, versionId: snapshotId, columnLimit: 10 };
@@ -294,7 +294,20 @@ test('missing presentation receives conservative composition without invented bu
   const body={businessType,title:'合成经营分析结果',summary:'这是根据获权资料形成的完整分析摘要。',analysis:['第一段只使用已经取得的经营数据证据。','第二段明确当前数据范围和待核实事项。']};
   const result=await runHarness({prompt:'合成结构兼容验收',tools:[tool],finishOnDeliverable:true,hasCompletedDeliverable:hasPreparedBriefing,model:{async *generate(){yield{type:'tool_call',id:'compose',name:'deliver_briefing',arguments:JSON.stringify(body)};yield{type:'finish',reason:'tool_calls'};}}});
   assert.equal(result.status,'completed');assert.deepEqual(received.analysis,body.analysis);
-  assert.deepEqual(received.presentation,{version:'briefing-presentation-v1',layout:'EDITORIAL',chartStyle:businessType==='DATA'?'TABLE':null,focusGroup:null,focusValue:null,sections:[]});
+  assert.deepEqual(received.presentation,{version:'briefing-presentation-v1',layout:'EDITORIAL',chartStyle:businessType==='DATA'?'GROUPED_BAR':null,focusGroup:null,focusValue:null,sections:[]});
   const explicit={...body,presentation:{wrong:'shape'}};assert.deepEqual(tool.normalizeArguments(explicit).presentation,explicit.presentation);
  }
+});
+
+test('synthetic model corrects a topic-only title before delivery; long conclusions are advisory',async()=>{
+ let calls=0,writes=0;
+ const tool=briefingDeliveryTool({requestedType:'DATA',authorize:async()=>{},invoke:async body=>{writes++;return {contractVersion:'1.0',status:'PREPARED',artifactId:randomUUID(),title:body.title,visibility:'PRIVATE_AFTER_TASK_SUCCEEDS'};}});
+ const r=await runHarness({prompt:'合成标题检查',tools:[tool],finishOnDeliverable:true,hasCompletedDeliverable:hasTerminalBriefing,model:{async *generate(request){
+  calls++;
+  if(calls===2)assert.match(JSON.stringify(request.messages),/BRIEFING_TITLE_TOPIC_ONLY/);
+  assert.match(tool.description,/不超过28个字/);
+  yield {type:'tool_call',id:`title-${calls}`,name:'deliver_briefing',arguments:JSON.stringify({businessType:'DATA',title:calls===1?'门店订单金额分布与支付完成情况分析':'甲店收款增长一倍，当前结论仅覆盖已核验的两期同口径完整记录',summary:'两期同口径收款增长一倍，需要结合业务背景解读。',analysis:['本次只使用已核验的完整固定记录进行比较。','变化原因仍需结合其他业务资料进一步核实。']})};
+  yield {type:'finish',reason:'tool_calls'};
+ }}});
+ assert.equal(r.status,'completed');assert.equal(calls,2);assert.equal(writes,1);
 });

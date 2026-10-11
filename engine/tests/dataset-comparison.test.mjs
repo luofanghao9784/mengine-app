@@ -143,3 +143,13 @@ test('null optional placeholders normalize without changing business choices or 
  await assert.rejects(datasetComparisonTool({authorize:async()=>{},invoke:async()=>{throw Error('must not invoke');}}).execute(normalizeDatasetArguments(invalid),new AbortController().signal),{code:'INVALID_TOOL_ARGUMENTS'});
  assert.equal(normalizeDatasetArguments({datasetId:null}).datasetId,null);
 });
+
+test('composition is capability-gated and checks exact total and rounded platform shares',async()=>{
+ const args={datasetId:id,snapshotId:id,operation:'COMPOSITION',groupColumns:['门店'],valueColumn:'金额'};
+ const response=result();response.calculation={recipeVersion:'dataset-composition-1',status:'COMPUTED',request:{...args},inputSha256:sha,matchedRows:5,ignoredRows:1,missingDateRows:0,rows:[{group:['甲'],value:'9007199254740993',records:3,sharePercent:'75.000000'},{group:['乙'],value:'3002399751580331',records:2,sharePercent:'25.000000'}],total:'12009599006321324'};
+ let verified=0;const tool=datasetComparisonTool({allowComposition:true,onVerified:()=>verified++,authorize:async()=>{},invoke:async()=>response});assertObjectJsonSchema(tool.parameters);
+ assert.deepEqual(await tool.execute(args,new AbortController().signal),response);
+ await assert.rejects(datasetComparisonTool({authorize:async()=>{},invoke:async()=>response}).execute(args,new AbortController().signal),{code:'INVALID_TOOL_ARGUMENTS'});
+ response.calculation.rows[0].sharePercent='74.999999';await assert.rejects(tool.execute(args,new AbortController().signal),{code:'DATASET_RESULT_INVALID'});
+ response.calculation.rows[0].sharePercent='75.000000';response.calculation.total='12009599006321325';await assert.rejects(tool.execute(args,new AbortController().signal),{code:'DATASET_RESULT_INVALID'});assert.equal(verified,1);
+});

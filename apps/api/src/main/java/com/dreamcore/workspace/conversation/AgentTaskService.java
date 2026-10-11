@@ -157,7 +157,12 @@ public class AgentTaskService {
             audit.record(job.actor(),job.tenant(),"TASK_BRIEFING_SKIPPED",job.token(),"SUCCESS");
             return Map.of("contractVersion","1.0","status","NO_NEW_CONTENT","reason","NO_USEFUL_CONTENT");
         }
-        var doc=briefings.create(job,request);
+        BriefingContentService.Document doc;
+        try{doc=briefings.create(job,request);}
+        catch(BriefingContentService.NoUsefulData empty){
+            audit.record(job.actor(),job.tenant(),"TASK_BRIEFING_SKIPPED",job.token(),"SUCCESS");
+            return Map.of("contractVersion","1.0","status","NO_NEW_CONTENT","reason","NO_USEFUL_CONTENT");
+        }
         if(doc==null){
             audit.record(job.actor(),job.tenant(),"TASK_BRIEFING_DUPLICATE",job.token(),"SUCCESS");
             return Map.of("contractVersion","1.0","status","NO_NEW_CONTENT","reason","DUPLICATE_CONTENT");

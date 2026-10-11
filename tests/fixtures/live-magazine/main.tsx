@@ -282,6 +282,16 @@ if (location.search.includes('faces')) {
   documents[2].content.chart!.range = '全部快照 · 210 行';
 }
 
+if (location.search.includes('labels')) {
+  const doc=structuredClone(documents[0]);
+  doc.content.title='合成状态显示核对';
+  doc.content.chart!.baseline='finance_confirmed';doc.content.chart!.current='canceled';
+  doc.content.chart!.rows[0].group='active';doc.content.chart!.rows[1].group='unknown_status';
+  doc.chartLabels={groups:{active:'开课中'},columns:{finance_confirmed:'财务已确认',canceled:'已取消'}};
+  doc.content.presentation={version:'briefing-presentation-v1',layout:'KEY_METRIC',chartStyle:'GROUPED_BAR',focusGroup:'active',focusValue:'CURRENT',sections:[]};
+  documents.splice(0,documents.length,doc);
+}
+
 function FixtureGrid({ items }: ComponentProps<typeof MagazineGrid>) {
   const [saved, setSaved] = useState<FollowPreference | undefined>(
     () => JSON.parse(sessionStorage.getItem('fixture-follow') || 'null') || undefined,

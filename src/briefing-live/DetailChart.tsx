@@ -1,3 +1,4 @@
+import { displayChart } from './display-labels.ts';
 import { useState } from 'react';
 import type { BriefingDocument, BriefingRow } from '../../contracts/public-api/briefing-content';
 import { Rows, Slope, exact, slopeLayout, unitOf, useFaceBox, type RowsKind } from './CardFace';
@@ -52,10 +53,10 @@ export function DetailChart({ document }: { document: BriefingDocument }) {
   const [chosen, setChosen] = useState<View>();
   const [sort, setSort] = useState<RowSort>('SOURCE');
   const [active, setActive] = useState<string | null>(null);
-  const chart = document.content.chart;
+  const chart = displayChart(document);
   const kind = faceKind(document);
   if (!chart || !kind) return null;
-  const summary = document.content.datasetBasis?.periodMode === 'SUMMARY';
+  const summary = document.content.datasetBasis?.periodMode === 'SUMMARY' || document.content.datasetBasis?.periodMode === 'COMPOSITION';
   // A rate of change between two categories is not a change; only periods get one in the readout.
   const periods = isPeriodComparison(document);
   // Inside the article there is no card edge to run to; keep a small inset for the end labels.
@@ -108,7 +109,7 @@ export function DetailChart({ document }: { document: BriefingDocument }) {
             </div>
           )}
           <div className="detail-readout" aria-live="polite">
-            <strong>{shown.group ?? '总计'}</strong>
+            <strong>{shown.displayGroup ?? shown.group ?? '总计'}</strong>
             {summary ? (
               <span>
                 {chart.current} {exact(shown.current, chart)} {unitOf(chart)}

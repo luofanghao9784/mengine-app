@@ -116,6 +116,7 @@ export class AgentTasks {
     let datasetComparisonAvailable: boolean | undefined;
     let datasetAnalysisAvailable = false;
     let datasetBriefingSummaryAvailable = false;
+    let datasetCompositionAvailable = false;
     let planAllowed: boolean | undefined;
     let tablesAvailable: boolean | undefined;
     let planManagementAvailable = false;
@@ -253,6 +254,7 @@ export class AgentTasks {
           throw new RuntimeError('TASK_ACCESS_DENIED');
         datasetComparisonAvailable = datasetComparison;
         datasetAnalysisAvailable = datasetComparison && response.datasetAnalysisVersion === '1.0';
+        datasetCompositionAvailable = datasetComparison && response.datasetCompositionVersion === '1.0';
         datasetBriefingSummaryAvailable = datasetAnalysisAvailable && response.datasetBriefingSummaryVersion === '1.0';
         const briefing = response.briefingContentVersion === '1.0';
         if (
@@ -628,6 +630,7 @@ export class AgentTasks {
           };
         },
       };
+      const summaryCalculations = new Set<string>();
       let sequence = 0;
       const tools: TaskTool[] = [
         search,
@@ -638,6 +641,7 @@ export class AgentTasks {
           ? [
               briefingDeliveryTool({
                 presentationAvailable: briefingPresentationAvailable,
+                isSummaryCalculation: (id) => typeof id === 'string' && summaryCalculations.has(id),
                 requestedType: briefingRequestedType,
                 selectedType: () => selectedBriefingType,
                 authorize,
@@ -657,11 +661,16 @@ export class AgentTasks {
         ...(datasetComparisonAvailable && task.contractVersion === '1.5'
           ? [
               datasetComparisonTool({
+                allowComposition: datasetCompositionAvailable,
                 allowSummary: datasetAnalysisAvailable && (!briefingGeneration || datasetBriefingSummaryAvailable),
                 allowDateRange: datasetAnalysisAvailable,
                 authorize,
-                invoke: (body, executionSignal) =>
-                  postJson(
+                onVerified: (receipt) => {
+                  if (isRecord(receipt.calculation) && isRecord(receipt.artifact) &&
+                      ['dataset-summary-1','dataset-composition-1'].includes(String(receipt.calculation.recipeVersion)) &&
+                      typeof receipt.artifact.id === 'string') summaryCalculations.add(receipt.artifact.id);
+                },
+                invoke: (body, executionSignal) => postJson(
                     new URL(`/internal/v1/agent-access/${task.taskId}/compare-dataset`, this.platform),
                     task.attemptId,
                     body,
@@ -681,6 +690,7 @@ export class AgentTasks {
                       'DATASET_COLUMNS_INVALID',
                       'DATASET_SHAPE_INVALID',
                       'DATASET_NUMBER_INVALID',
+                      'DATASET_COMPOSITION_NEGATIVE',
                       'DATASET_NUMBER_LIMIT',
                       'DATASET_GROUP_LIMIT',
                       'DATASET_PERIODS_MISSING',

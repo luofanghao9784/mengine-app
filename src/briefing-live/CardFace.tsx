@@ -1,3 +1,4 @@
+import { displayChart } from './display-labels.ts';
 import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import type { BriefingDocument, BriefingRow } from '../../contracts/public-api/briefing-content';
 import { ComparisonVisual } from './ComparisonVisual';
@@ -80,7 +81,7 @@ export function slopeLayout(chart: Chart, box: Box, lead: boolean) {
   const height = box.h - top;
   const digits = (side: 'baseline' | 'current') =>
     Math.max(...chart.rows.map((row) => exact(row[side], chart).length)) * 7.2;
-  const names = Math.min(5, Math.max(...chart.rows.map((row) => row.group!.length))) * 12.5;
+  const names = Math.min(5, Math.max(...chart.rows.map((row) => (row.displayGroup ?? row.group!).length))) * 12.5;
   const leftLabel = 12 + digits('baseline') + (narrow ? 0 : 10 + names);
   const rightLabel = 12 + digits('current') + 10 + names;
   const width = box.left + box.w + box.right;
@@ -146,7 +147,7 @@ export function Slope({
             {shown.changePercent === null ? '—' : formatBriefingNumber(signedText(shown.changePercent)) + '%'}
           </strong>
           <small>
-            <b>{shown.group}</b>
+            <b>{shown.displayGroup ?? shown.group}</b>
             {exact(shown.baseline, chart)} → {exact(shown.current, chart)} {unitOf(chart)}
           </small>
         </div>
@@ -212,7 +213,7 @@ export function Slope({
                   </text>
                   {!narrow && (
                     <text className="face-name" x={box.left} y={left[i]! + 4}>
-                      {clip(row.group!, names)}
+                      {clip(row.displayGroup ?? row.group!, names)}
                     </text>
                   )}
                 </>
@@ -224,7 +225,7 @@ export function Slope({
                     {exact(row.current, chart)}
                   </text>
                   <text className="face-name" x={width - box.right} y={right[i]! + 4} textAnchor="end">
-                    {clip(row.group!, names)}
+                    {clip(row.displayGroup ?? row.group!, names)}
                   </text>
                 </>
               )}
@@ -319,7 +320,7 @@ export function Rows({
             {kind === 'RANK' && <span className="face-rank">{i + 1}</span>}
             <span className="face-row">
               <span className="face-row-text">
-                <span>{row.group}</span>
+                <span>{row.displayGroup ?? row.group}</span>
                 <b>
                   {kind === 'PAIR'
                     ? `${exact(row.baseline, chart)} · ${exact(row.current, chart)}`
@@ -356,7 +357,7 @@ export function Rows({
 /** The card-face graphic for a verified comparison. The full reading keeps every group and the evidence. */
 export function CardFace({ document }: { document: BriefingDocument }) {
   const [ref, box, bleed] = useFaceBox();
-  const chart = document.content.chart;
+  const chart = displayChart(document);
   const kind = faceKind(document);
   if (!chart || !kind) return null;
   const presentation = presentationOf(document);

@@ -16,7 +16,10 @@ public class BriefingContentService {
         public Request(UUID calculationArtifactId,String title,String summary,List<String> analysis){this(calculationArtifactId,title,summary,analysis,"DATA");}
     }
     public record Row(String group,String baseline,String current,String difference,String changePercent,Integer baselineRank,Integer currentRank,String issue) {}
-    public record Chart(String type,String metric,String unit,String baseline,String current,String range,List<Row> rows,Row totals) {}
+    public record Composition(List<DatasetCalculationService.SummaryRow> rows,String total,int percentScale) {}
+    public record Chart(String type,String metric,String unit,String baseline,String current,String range,List<Row> rows,Row totals,@com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) Composition composition) {
+        public Chart(String type,String metric,String unit,String baseline,String current,String range,List<Row> rows,Row totals){this(type,metric,unit,baseline,current,range,rows,totals,null);}
+    }
     public record Source(UUID id,UUID materialId,UUID versionId,int version,String filename,String sha256,String scopeExcerpt) {}
     public record DatasetBasis(String groupColumn,String periodColumn,int matchedRows,int ignoredRows,String periodMode,String timeZone) {public DatasetBasis(String groupColumn,String periodColumn,int matchedRows,int ignoredRows){this(groupColumn,periodColumn,matchedRows,ignoredRows,null,null);}}
     public record Content(String schemaVersion,String businessType,String title,String summary,List<String> analysis,Chart chart,Source source,UUID calculationArtifactId,String calculationSha256,String generatedAt,DatasetCalculationService.Source datasetSource,DatasetBasis datasetBasis,BriefingPresentationPolicy.Presentation presentation) {
@@ -25,7 +28,7 @@ public class BriefingContentService {
     }
     public record RuleVersion(String source,String target,int revision) {}
     public record RuleTrace(String status,List<RuleVersion> versions) {}
-    public record Document(UUID artifactId,String sha256,Content content,RuleTrace ruleTrace,NewsImage.Cover cover) {public Document(UUID artifactId,String sha256,Content content,RuleTrace ruleTrace){this(artifactId,sha256,content,ruleTrace,null);}public Document(UUID artifactId,String sha256,Content content){this(artifactId,sha256,content,null);}}
+    public record Document(UUID artifactId,String sha256,Content content,RuleTrace ruleTrace,NewsImage.Cover cover,BriefingDisplayLabels.Labels chartLabels) {public Document(UUID artifactId,String sha256,Content content,RuleTrace ruleTrace,NewsImage.Cover cover){this(artifactId,sha256,content,ruleTrace,cover,null);}public Document(UUID artifactId,String sha256,Content content,RuleTrace ruleTrace){this(artifactId,sha256,content,ruleTrace,null);}public Document(UUID artifactId,String sha256,Content content){this(artifactId,sha256,content,null);}}
     private final JdbcTemplate db;private final IdentityAudit audit;private final JsonMapper json=new JsonMapper();
     public BriefingContentService(JdbcTemplate db,IdentityAudit audit){this.db=db;this.audit=audit;}
     public boolean statusOnly(Request request){return request!=null&&request.title()!=null&&request.title().strip().matches("(?i)^(暂无|没有|无)(新的?|新增)?(内容|画报|卡片|结果)[。.!！]*$|^no new (content|briefing|cards?)[.!]*$");}
@@ -37,6 +40,16 @@ public class BriefingContentService {
        AND EXISTS(SELECT 1 FROM conversation_tool_receipts tool WHERE tool.task_id=a.task_id AND tool.attempt_number=a.attempt_number AND tool.name='deliver_briefing' AND tool.status='succeeded')
        ORDER BY a.id LIMIT 1
        """;
+    public static final class NoUsefulData extends RuntimeException {}
+    /** Use every verified group, not totals: positive and negative groups can cancel. */
+    public static boolean hasUsefulData(List<Row> rows){
+        return rows.stream().anyMatch(r->nonzero(r.baseline())||nonzero(r.current()));
+    }
+    private static boolean nonzero(String value){
+        if(value==null)return false;
+        try{return new java.math.BigDecimal(value).signum()!=0;}
+        catch(NumberFormatException e){throw new IdentityException(422,"BRIEFING_CHART_INVALID");}
+    }
     private void text(String value,int min,int max,boolean sentence){
         if(value==null||value.strip().length()<min||value.length()>max||value.codePoints().anyMatch(c->Character.isISOControl(c)&&c!=10)||sentence&&!value.strip().matches("(?s).*[。！？.!?]$"))throw new IdentityException(422,"BRIEFING_TEXT_INCOMPLETE");
     }
@@ -52,7 +65,7 @@ public class BriefingContentService {
         request.analysis().forEach(s->text(s,12,500,true));
         boolean automatic=Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM briefing_generation_batches WHERE task_id=?)",Boolean.class,job.id()));
         boolean datasetSample=Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM task_dataset_reads WHERE task_id=?)",Boolean.class,job.id()));
-        BriefingEditorialQuality.validate(request,automatic,datasetSample,type.equals("DATA")&&request.calculationArtifactId()!=null);
+        if(!type.equals("DATA"))BriefingEditorialQuality.validate(request,automatic,datasetSample,false);
         int attempt=db.queryForObject("SELECT attempt FROM conversation_tasks WHERE id=? AND lease_token=? FOR UPDATE",Integer.class,job.id(),job.token());
         if(!type.equals("DATA"))return createText(job,request,type,attempt);
         if(request.calculationArtifactId()==null)throw IdentityException.invalid();
@@ -61,6 +74,7 @@ public class BriefingContentService {
         var item=input.getFirst();byte[] bytes=(byte[])item.get("content");if(!hash(bytes).equals(item.get("sha256")))throw new IdentityException(502,"BRIEFING_CALCULATION_INVALID");
         var receipt=json.readTree(bytes);if(receipt.has("datasetSource"))return createDataset(job,request,attempt,receipt,(String)item.get("sha256"));var calc=receipt.path("calculation");var params=calc.path("request");
         if(!calc.path("recipeVersion").asText().equals("table-compare-1")||!calc.path("status").asText().equals("COMPUTED")||!calc.path("inputSha256").equals(receipt.path("source").path("sha256")))throw new IdentityException(422,"BRIEFING_CALCULATION_INVALID");
+        BriefingEditorialQuality.validate(request,automatic,datasetSample,true);
         var source=json.treeToValue(receipt.path("source"),Source.class);
         if(db.queryForObject("SELECT count(*) FROM conversation_agent_grants WHERE task_id=? AND attempt_id=? AND chunk_id=?",Integer.class,job.id(),job.token(),source.id())!=1)throw new IdentityException(403,"BRIEFING_CALCULATION_NOT_GRANTED");
         List<Row> rows=new ArrayList<>();for(var row:calc.path("rows"))rows.add(json.treeToValue(row,Row.class));
@@ -75,6 +89,7 @@ public class BriefingContentService {
             if(!old.calculationArtifactId().equals(request.calculationArtifactId())||!old.title().equals(request.title().strip())||!old.summary().equals(request.summary().strip())||!old.analysis().equals(request.analysis())||!BriefingPresentationPolicy.same(old,presentation))throw new IdentityException(409,"BRIEFING_ALREADY_CREATED");
             return doc;
         }
+        if(!hasUsefulData(rows))throw new NoUsefulData();
         var content=new Content("briefing-data-v1","DATA",request.title().strip(),request.summary().strip(),List.copyOf(request.analysis()),chart,source,request.calculationArtifactId(),(String)item.get("sha256"),Instant.now().toString(),null,null,presentation);
         if(!reserve(job,content))return null;
         byte[] body=json.writeValueAsBytes(content);if(body.length>20000)throw new IdentityException(413,"BRIEFING_CONTENT_LIMIT");
@@ -85,27 +100,46 @@ public class BriefingContentService {
     }
     private Document createDataset(ConversationService.Job job,Request request,int attempt,tools.jackson.databind.JsonNode receipt,String calculationHash){
         var source=json.treeToValue(receipt.path("datasetSource"),DatasetCalculationService.Source.class);
-        boolean summary="dataset-summary-1".equals(receipt.path("calculation").path("recipeVersion").asString());
+        boolean composition="dataset-composition-1".equals(receipt.path("calculation").path("recipeVersion").asString());
+        boolean summary=composition||"dataset-summary-1".equals(receipt.path("calculation").path("recipeVersion").asString());
+        Composition shares=null;
         DatasetCalculationService.Calculation calc;
         if(summary){
             var total=json.treeToValue(receipt.path("calculation"),DatasetCalculationService.Summary.class);
+            if(composition){validateComposition(total);shares=new Composition(total.rows(),total.total(),6);}
             var rows=total.rows().stream().map(r->new Row(String.join(" / ",r.group()),null,r.value(),null,null,null,null,null)).toList();
             calc=new DatasetCalculationService.Calculation(total.recipeVersion(),total.status(),total.request(),total.inputSha256(),total.matchedRows(),total.ignoredRows(),rows,new Row(null,null,total.total(),null,null,null,null,null),total.missingDateRows());
         }else calc=json.treeToValue(receipt.path("calculation"),DatasetCalculationService.Calculation.class);
-        if(!Set.of("dataset-compare-1","dataset-compare-month-1","dataset-summary-1").contains(calc.recipeVersion()) || !"COMPUTED".equals(calc.status()) || !source.sha256().equals(calc.inputSha256()) || !source.datasetId().equals(calc.request().datasetId()) || !source.snapshotId().equals(calc.request().snapshotId()))throw new IdentityException(422,"BRIEFING_CALCULATION_INVALID");
+        if(!Set.of("dataset-compare-1","dataset-compare-month-1","dataset-summary-1","dataset-composition-1").contains(calc.recipeVersion()) || !"COMPUTED".equals(calc.status()) || !source.sha256().equals(calc.inputSha256()) || !source.datasetId().equals(calc.request().datasetId()) || !source.snapshotId().equals(calc.request().snapshotId()))throw new IdentityException(422,"BRIEFING_CALCULATION_INVALID");
         if(db.queryForObject("SELECT count(*) FROM task_dataset_reads WHERE task_id=? AND attempt_number=? AND dataset_id=? AND snapshot_id=?",Integer.class,job.id(),attempt,source.datasetId(),source.snapshotId())!=1 || db.queryForObject("SELECT count(*) FROM identity_audit WHERE target_id=? AND action='TASK_DATASET_COMPUTED' AND outcome='SUCCESS' AND tenant_id=?",Integer.class,request.calculationArtifactId(),job.tenant())!=1 || db.queryForObject("SELECT count(*) FROM conversation_tool_receipts WHERE task_id=? AND attempt_number=? AND name='compare_dataset' AND status='succeeded'",Integer.class,job.id(),attempt)==0)throw new IdentityException(403,"BRIEFING_CALCULATION_NOT_GRANTED");
         if(calc.rows()==null || calc.rows().isEmpty() || calc.rows().size()>50 || calc.totals()==null || calc.matchedRows()+calc.ignoredRows()!=source.rowCount())throw new IdentityException(422,"BRIEFING_CHART_INVALID");
+        BriefingEditorialQuality.validate(request,Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM briefing_generation_batches WHERE task_id=?)",Boolean.class,job.id())),true,true,composition);
         boolean countRows="COUNT".equals(calc.request().aggregation());
         String metric=countRows?"记录数":calc.request().valueColumn(),unit=countRows?"条":metric.endsWith("_cents")?"分":metric.endsWith("_grams")?"克":"原数据数值单位";var match=java.util.regex.Pattern.compile("[（(]([^）)]{1,12})[）)]").matcher(metric);if(match.find())unit=match.group(1);
-        var chart=new Chart("GROUPED_BAR",metric,unit,summary?"不适用":calc.request().baseline(),summary?"本次汇总":calc.request().current(),calc.request().dateColumn()==null?"全部快照 · "+source.rowCount()+" 行":"日期筛选 · "+calc.matchedRows()+" 行 · 缺日 "+calc.missingDateRows()+" 行",calc.rows(),calc.totals());
-        var presentation=summary?new BriefingPresentationPolicy.Presentation("briefing-presentation-v1","EDITORIAL","CURRENT_BAR",null,null,List.of()):BriefingPresentationPolicy.resolve(request,"DATA",chart);
+        var chart=new Chart("GROUPED_BAR",metric,unit,summary?"不适用":calc.request().baseline(),summary?"本次汇总":calc.request().current(),calc.request().dateColumn()==null?"全部快照 · "+source.rowCount()+" 行":"日期筛选 · "+calc.matchedRows()+" 行 · 缺日 "+calc.missingDateRows()+" 行",calc.rows(),calc.totals(),shares);
+        var presentation=summary&&request.presentation()==null?new BriefingPresentationPolicy.Presentation("briefing-presentation-v1","EDITORIAL","CURRENT_BAR",null,null,List.of()):BriefingPresentationPolicy.resolve(request,"DATA",chart);
         var prior=db.queryForList("SELECT a.id,a.sha256,a.content FROM conversation_artifacts a WHERE task_id=? AND attempt_number=? AND EXISTS(SELECT 1 FROM identity_audit p WHERE p.target_id=a.id AND p.action='TASK_BRIEFING_CREATED' AND p.tenant_id=a.tenant_id)",job.id(),attempt);
         if(!prior.isEmpty()){var doc=read(prior.getFirst());var old=doc.content();if(!Objects.equals(old.calculationArtifactId(),request.calculationArtifactId()) || !old.title().equals(request.title().strip()) || !old.summary().equals(request.summary().strip()) || !old.analysis().equals(request.analysis())||!BriefingPresentationPolicy.same(old,presentation))throw new IdentityException(409,"BRIEFING_ALREADY_CREATED");return doc;}
-        var content=new Content("briefing-dataset-v1","DATA",request.title().strip(),request.summary().strip(),List.copyOf(request.analysis()),chart,null,request.calculationArtifactId(),calculationHash,Instant.now().toString(),source,new DatasetBasis(summary?String.join(" / ",calc.request().groupColumns()):calc.request().groupColumn(),summary?"不适用":calc.request().periodColumn(),calc.matchedRows(),calc.ignoredRows(),summary?"SUMMARY":calc.request().periodMode()==null?"EXACT":calc.request().periodMode(),calc.request().timeZone()==null?"Asia/Shanghai":calc.request().timeZone()),presentation);
+        if(!hasUsefulData(calc.rows()))throw new NoUsefulData();
+        var content=new Content("briefing-dataset-v1","DATA",request.title().strip(),request.summary().strip(),List.copyOf(request.analysis()),chart,null,request.calculationArtifactId(),calculationHash,Instant.now().toString(),source,new DatasetBasis(summary?String.join(" / ",calc.request().groupColumns()):calc.request().groupColumn(),summary?"不适用":calc.request().periodColumn(),calc.matchedRows(),calc.ignoredRows(),composition?"COMPOSITION":summary?"SUMMARY":calc.request().periodMode()==null?"EXACT":calc.request().periodMode(),calc.request().timeZone()==null?"Asia/Shanghai":calc.request().timeZone()),presentation);
         if(!reserve(job,content))return null;
         byte[] body=json.writeValueAsBytes(content);var size=db.queryForMap("SELECT count(*) n,coalesce(sum(octet_length(content)),0) bytes FROM conversation_artifacts WHERE task_id=? AND attempt_number=?",job.id(),attempt);
         if(body.length>20000 || ((Number)size.get("n")).intValue()>=8 || ((Number)size.get("bytes")).longValue()+body.length>65536)throw new IdentityException(413,"BRIEFING_CONTENT_LIMIT");
         UUID id=UUID.randomUUID();String sha=hash(body);db.update("INSERT INTO conversation_artifacts(id,tenant_id,workspace_id,task_id,filename,sha256,content,attempt_number) VALUES (?,?,?,?,?,?,?,?)",id,job.tenant(),job.space(),job.id(),"briefing-dataset-"+sha.substring(0,20)+".json",sha,body,attempt);audit.record(job.actor(),job.tenant(),"TASK_BRIEFING_CREATED",id,"SUCCESS");return new Document(id,sha,content);
+    }
+    private void validateComposition(DatasetCalculationService.Summary total){
+        try {
+            if(!"COMPOSITION".equals(total.request().operation())||total.request().groupColumns().size()!=1||total.rows().isEmpty())throw new IllegalArgumentException();
+            var denominator=new java.math.BigDecimal(total.total());var sum=java.math.BigDecimal.ZERO;var keys=new HashSet<List<String>>();int records=0;
+            for(var row:total.rows()){
+                var value=new java.math.BigDecimal(row.value());
+                if(value.signum()<0||row.records()<1||row.group().size()!=1||!keys.add(row.group()))throw new IllegalArgumentException();
+                sum=sum.add(value);records+=row.records();
+                String expected=denominator.signum()>0?value.multiply(java.math.BigDecimal.valueOf(100)).divide(denominator,6,java.math.RoundingMode.HALF_UP).toPlainString():null;
+                if(!Objects.equals(expected,row.sharePercent()))throw new IllegalArgumentException();
+            }
+            if(sum.compareTo(denominator)!=0||records!=total.matchedRows())throw new IllegalArgumentException();
+        }catch(RuntimeException e){throw new IdentityException(422,"BRIEFING_CALCULATION_INVALID");}
     }
     private Document createText(ConversationService.Job job,Request request,String type,int attempt){
         if(request.calculationArtifactId()!=null)throw IdentityException.invalid();
@@ -155,7 +189,12 @@ public class BriefingContentService {
     private Document read(Map<String,Object> row){
         byte[] bytes=(byte[])row.get("content");String sha=(String)row.get("sha256");if(!hash(bytes).equals(sha))throw new IdentityException(502,"BRIEFING_CONTENT_INVALID");
         Content content=json.readValue(bytes,Content.class);if(!Set.of("briefing-data-v1","briefing-text-v1","briefing-dataset-v1").contains(content.schemaVersion()))throw new IdentityException(502,"BRIEFING_CONTENT_INVALID");
-        return new Document((UUID)row.get("id"),sha,content,ruleTrace((UUID)row.get("id")),content.businessType().equals("INFO")?cover((UUID)row.get("id")):null);
+        BriefingDisplayLabels.Labels labels=null;
+        if(content.datasetSource()!=null){
+            var keys=db.queryForList("SELECT d.dataset_key FROM business_datasets d JOIN conversation_artifacts a ON a.tenant_id=d.tenant_id WHERE a.id=? AND d.id=?",String.class,row.get("id"),content.datasetSource().datasetId());
+            if(!keys.isEmpty())labels=BriefingDisplayLabels.forContent(keys.getFirst(),content);
+        }
+        return new Document((UUID)row.get("id"),sha,content,ruleTrace((UUID)row.get("id")),content.businessType().equals("INFO")?cover((UUID)row.get("id")):null,labels);
     }
     private NewsImage.Cover cover(UUID artifact){
         var rows=db.queryForList("SELECT t.web_sources FROM conversation_tasks t JOIN conversation_artifacts a ON a.task_id=t.id WHERE a.id=?",artifact);

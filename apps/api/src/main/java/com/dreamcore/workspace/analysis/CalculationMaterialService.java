@@ -84,7 +84,7 @@ public class CalculationMaterialService {
         var content=json.readTree((byte[])evidence.get("content"));
         var calculation=content.path("calculation");
         String recipe=calculation.path("recipeVersion").asString("");
-        if(!Set.of("dataset-compare-1","dataset-compare-month-1","dataset-summary-1").contains(recipe)
+        if(!Set.of("dataset-compare-1","dataset-compare-month-1","dataset-summary-1","dataset-composition-1").contains(recipe)
             || !"COMPUTED".equals(calculation.path("status").asString(""))
             || !((String)evidence.get("filename")).startsWith("dataset-comparison-")) throw missing();
         var normalizedRequest=json.readValue(calculation.path("request").toString(),java.util.TreeMap.class);

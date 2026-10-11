@@ -1,3 +1,4 @@
+import { displayChart } from './display-labels.ts';
 import { FileText } from 'lucide-react';
 import type { BriefingDocument } from '../../contracts/public-api/briefing-content';
 import { presentationOf, sectionLabels } from './presentation';
@@ -7,7 +8,7 @@ import './composition.css';
 
 export function KeyMetric({ document }: { document: BriefingDocument }) {
   const p = presentationOf(document),
-    chart = document.content.chart;
+    chart = displayChart(document);
   if (p?.layout !== 'KEY_METRIC' || !chart) return null;
   const row = p.focusGroup ? chart.rows.find((r) => r.group === p.focusGroup)! : chart.totals;
   const field =
@@ -27,7 +28,7 @@ export function KeyMetric({ document }: { document: BriefingDocument }) {
   return (
     <div className="briefing-key-metric" data-composition="KEY_METRIC">
       <span>
-        {p.focusGroup ?? '总计'} · {chart.metric}
+        {row.displayGroup ?? p.focusGroup ?? '总计'} · {chart.metric}
       </span>
       <div>
         <strong>

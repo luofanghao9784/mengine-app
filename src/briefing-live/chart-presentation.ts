@@ -1,3 +1,4 @@
+import { displayChart } from './display-labels.ts';
 import { displayAmount } from './money-display.ts';
 import type { BriefingDocument } from '../../contracts/public-api/briefing-content';
 import type { BriefingChart } from '../briefingPresentation';
@@ -5,7 +6,7 @@ import { formatBriefingNumber } from './content.ts';
 
 /** Display projection only; receipts, decimal strings and source order stay intact. */
 export function toMagazineChart(document: BriefingDocument, compact = false): BriefingChart | null {
-  const chart = document.content.chart;
+  const chart = displayChart(document);
   if (!chart) return null;
   const rows = compact ? chart.rows.slice(0, 6) : chart.rows;
   const cellRange = /^\$?[A-Z]{1,3}\$?\d+(?::\$?[A-Z]{1,3}\$?\d+)?$/i.test(
@@ -21,7 +22,7 @@ export function toMagazineChart(document: BriefingDocument, compact = false): Br
         : ''),
     columns: [chart.baseline, chart.current],
     rows: rows.map((row) => ({
-      label: row.group!,
+      label: row.displayGroup ?? row.group!,
       previous: Number(displayAmount(row.baseline, chart.unit) ?? 0),
       value: Number(displayAmount(row.current, chart.unit) ?? 0),
       previousMissing: row.baseline === null,

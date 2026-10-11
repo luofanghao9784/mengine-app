@@ -93,3 +93,12 @@ test('spreadsheet coordinates stay in source evidence rather than becoming a sta
 test('cent charts show yuan while original receipts remain unchanged',()=>{
  const source=structuredClone(document);source.content.chart!.unit='分';source.content.chart!.rows=[{group:'甲',baseline:'100',current:'309100',difference:'309000',changePercent:'309000',baselineRank:1,currentRank:1,issue:null}];const before=JSON.stringify(source);const result=toMagazineChart(source)!;assert.equal(result.unit,'元');assert.equal(result.rows[0].previous,1);assert.equal(result.rows[0].value,3091);assert.equal(JSON.stringify(source),before);
 });
+
+test('platform display labels translate graphics only and preserve raw evidence and unknown values', () => {
+ const doc=structuredClone(document);
+ doc.content.chart!.rows=[row('active','1','2'),row('unknown','3','4')];
+ doc.content.chart!.baseline='finance_confirmed';doc.content.chart!.current='canceled';
+ doc.chartLabels={groups:{active:'开课中'},columns:{finance_confirmed:'财务已确认',canceled:'已取消'}};
+ const before=JSON.stringify(doc);const view=toMagazineChart(doc)!;
+ assert.deepEqual(view.columns,['财务已确认','已取消']);assert.deepEqual(view.rows.map(r=>r.label),['开课中','unknown']);assert.equal(JSON.stringify(doc),before);assert.equal(doc.content.chart!.rows[0].group,'active');
+});
