@@ -1,3 +1,9 @@
+import { analyzeWikiInsight, wikiInsightContext } from './wiki-insight.js';
+import { analyzeWikiGraph, wikiGraphContext } from './wiki-graph.js';
+import { learnWiki, wikiSource } from './wiki-learning.js';
+import { PresentationRenderer } from './presentation-renderer.js';
+import { presentationToolSchema, parseDeck } from './presentation-spec.js';
+import { uploadArtifact, ARTIFACT_MAX_BYTES } from './artifact-transfer.js';
 import { publicSearchMode, publicKeywords, requirePublicEvidence } from './public-search-mode.js';
 import { newsBriefingBackground, newsBriefingToolAllowed } from './news-briefing-flow.js';
 import {
@@ -31,7 +37,7 @@ import { OriginalInputs } from './original-inputs.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 import { runHarness } from './harness.js';
-import { RuntimeError, type Json, type ModelPort, type TaskTool } from './ports.js';
+import { RuntimeError, type Json, type ModelPort, type TaskTool, type RuntimeResult } from './ports.js';
 import { isRecord, platformEndpoint, postJson } from './http-json.js';
 import { createTaskTools } from './task-tools.js';
 import { CandidateSession, type NpmCandidates } from './candidate-tools.js';
@@ -59,6 +65,7 @@ export interface AgentConfiguration {
   sandbox?: TaskSandbox;
   publicWeb?: { reader: PublicReader; search?: PublicSearch };
   catalog?: TrustedCatalog;
+  presentationRenderer?: PresentationRenderer;
   candidates?: { registry: NpmCandidates; sandbox: PackageSandbox };
 }
 export class AgentTasks {
@@ -96,6 +103,9 @@ export class AgentTasks {
     this.active.set(key, controller);
     const sources = new Map<string, Source>();
     const tableHandles = new Map<string, string>();
+    let wikiLearning: ReturnType<typeof wikiSource> | undefined;
+    let wikiGraph: ReturnType<typeof wikiGraphContext> | undefined;
+    let wikiInsight: ReturnType<typeof wikiInsightContext> | undefined;
     let briefingGeneration: boolean | undefined;
     let expressionPreferences: unknown;
     let expressionRuleBooks: unknown;
@@ -141,6 +151,13 @@ export class AgentTasks {
         limit,
         2500,
       );
+    let artifactTransferAvailable: boolean | undefined;
+    let presentationAvailable: boolean | undefined;
+    let presentationWorkflow: Record<string, unknown> | undefined;
+    const uploadedArtifacts = new Map<
+      string,
+      { name: string; sha256: string; uploadId: string; bytes: number }
+    >();
     const authorize = async () => {
       const started = performance.now();
       try {
@@ -151,6 +168,25 @@ export class AgentTasks {
           response.executionClass !== this.config.executionClass
         )
           throw new RuntimeError('TASK_ACCESS_DENIED');
+        if (response.wikiInsight !== undefined) {
+          const next = wikiInsightContext(response.wikiInsight);
+          if(wikiLearning || wikiGraph || (wikiInsight && JSON.stringify(next)!==JSON.stringify(wikiInsight))) throw new RuntimeError('TASK_ACCESS_DENIED');
+          wikiInsight=next; return;
+        }
+        if(wikiInsight) throw new RuntimeError('TASK_ACCESS_DENIED');
+        if (response.wikiGraph !== undefined) {
+          const next = wikiGraphContext(response.wikiGraph);
+          if (wikiLearning || (wikiGraph && JSON.stringify(next) !== JSON.stringify(wikiGraph))) throw new RuntimeError('TASK_ACCESS_DENIED');
+          wikiGraph = next; return;
+        }
+        if (wikiGraph) throw new RuntimeError('TASK_ACCESS_DENIED');
+        if (response.wikiLearning !== undefined) {
+          const next = wikiSource(response.wikiLearning);
+          if (wikiLearning && JSON.stringify(next) !== JSON.stringify(wikiLearning)) throw new RuntimeError('TASK_ACCESS_DENIED');
+          wikiLearning = next;
+          return;
+        }
+        if (wikiLearning) throw new RuntimeError('TASK_ACCESS_DENIED');
         expressionInstructions(response.expressionPreferences, false);
         expressionPreferences = response.expressionPreferences;
         ruleBookInstructions(response.expressionRuleBooks, false);
@@ -236,6 +272,43 @@ export class AgentTasks {
         workAvailable = work;
         planAllowed = plan;
         answerStream = response.answerStreamVersion === '1.0' && !realtimeAvailable;
+        const advertisedTransfer = response.artifactTransferVersion === '1.0';
+        const transfer = advertisedTransfer && task.contractVersion === '1.5';
+        if (
+          (response.artifactTransferVersion !== undefined &&
+            response.artifactTransferVersion !== '' &&
+            !advertisedTransfer) ||
+          (artifactTransferAvailable !== undefined && artifactTransferAvailable !== transfer)
+        )
+          throw new RuntimeError('TASK_ACCESS_DENIED');
+        artifactTransferAvailable = transfer;
+        const ppt = response.presentationRendererVersion === '1.0';
+        if (
+          (response.presentationRendererVersion !== undefined &&
+            response.presentationRendererVersion !== '' &&
+            !ppt) ||
+          (presentationAvailable !== undefined && presentationAvailable !== ppt) ||
+          (ppt && !advertisedTransfer)
+        )
+          throw new RuntimeError('TASK_ACCESS_DENIED');
+        presentationAvailable = ppt;
+        if (ppt) {
+          const workflow = response.presentationWorkflow;
+          if (!isRecord(workflow) || workflow.version !== '1.0' ||
+              !['NONE', 'REQUESTED', 'DRAFT', 'CONFIRMED'].includes(String(workflow.state)))
+            throw new RuntimeError('PRESENTATION_CONFIRMATION_UNAVAILABLE');
+          if (workflow.state === 'CONFIRMED' || workflow.state === 'DRAFT') {
+            parseDeck(workflow.spec);
+            if (!Array.isArray(workflow.sources) || workflow.sources.length > 10) throw new RuntimeError('INVALID_REMOTE_RESPONSE');
+            for (const source of workflow.sources) {
+              if (!isRecord(source) || typeof source.id !== 'string' || typeof source.filename !== 'string' ||
+                  typeof source.content !== 'string' || typeof source.locator !== 'string' || !Number.isInteger(source.version))
+                throw new RuntimeError('INVALID_REMOTE_RESPONSE');
+              sources.set(source.id, source as Source);
+            }
+          }
+          presentationWorkflow = workflow;
+        }
         const tables = response.tableComparisonVersion === '1.0';
         if (
           (response.tableComparisonVersion !== undefined &&
@@ -255,7 +328,8 @@ export class AgentTasks {
         datasetComparisonAvailable = datasetComparison;
         datasetAnalysisAvailable = datasetComparison && response.datasetAnalysisVersion === '1.0';
         datasetCompositionAvailable = datasetComparison && response.datasetCompositionVersion === '1.0';
-        datasetBriefingSummaryAvailable = datasetAnalysisAvailable && response.datasetBriefingSummaryVersion === '1.0';
+        datasetBriefingSummaryAvailable =
+          datasetAnalysisAvailable && response.datasetBriefingSummaryVersion === '1.0';
         const briefing = response.briefingContentVersion === '1.0';
         if (
           (response.briefingContentVersion !== undefined && !briefing) ||
@@ -273,7 +347,13 @@ export class AgentTasks {
         briefingGeneration = generation;
         planManagementAvailable = response.planManagementVersion === '1.0';
       } catch (error) {
-        console.warn(JSON.stringify({ event: 'TASK_AUTHORIZATION_CHECK_FAILED', code: error instanceof RuntimeError ? error.code : 'INVALID_CHECK_RESPONSE', durationMs: Math.round(performance.now() - started) }));
+        console.warn(
+          JSON.stringify({
+            event: 'TASK_AUTHORIZATION_CHECK_FAILED',
+            code: error instanceof RuntimeError ? error.code : 'INVALID_CHECK_RESPONSE',
+            durationMs: Math.round(performance.now() - started),
+          }),
+        );
         denied = true;
         controller.abort();
         throw new RuntimeError('TASK_ACCESS_DENIED');
@@ -315,7 +395,14 @@ export class AgentTasks {
               newsScope,
             )
           : undefined;
-      const catalog = this.config.catalog ?? (await TrustedCatalog.load());
+      const pptReady =
+        !!this.config.presentationRenderer && !!presentationAvailable && !!artifactTransferAvailable;
+      const catalog =
+        this.config.catalog ??
+        (await TrustedCatalog.load(
+          undefined,
+          new Set(pptReady ? ['artifact-transfer-v1', 'pptx-renderer-v1'] : []),
+        ));
       if (candidatesAllowed && publicQuery && !webMode && this.config.candidates)
         candidateSession = new CandidateSession(
           publicQuery,
@@ -324,6 +411,7 @@ export class AgentTasks {
         );
       const allowed = new Set([
         'search_sources',
+        ...(pptReady ? ['render_presentation'] : []),
         ...(web ? ['public_search', 'read_public_page'] : []),
         ...(candidateSession ? ['candidate_tool'] : []),
         ...(this.config.sandbox ? ['process_original'] : []),
@@ -343,7 +431,17 @@ export class AgentTasks {
             )
           : invoke(action, body, 4096),
       );
-      const newsBriefing = task.contractVersion === '1.5' && !!briefingGeneration && !!newsScope;
+      if (wikiLearning || wikiGraph || wikiInsight) {
+        if (task.contractVersion !== '1.5') throw new RuntimeError('TASK_RUNTIME_INCOMPATIBLE');
+        await invoke('execution/open', {contractVersion:'1.5', tools:[]});
+        const result = wikiInsight ? await analyzeWikiInsight(wikiInsight, metered, signal) : wikiGraph ? await analyzeWikiGraph(wikiGraph, metered, signal) : await learnWiki(wikiLearning!, metered, signal);
+        await authorize();
+        return {contractVersion:'1.5', outcome:'COMPLETE', requiredInput:null, engineVersion:ENGINE_VERSION,
+          taskId:task.taskId, attemptId:task.attemptId, mode:'AGENT', executionClass:this.config.executionClass,
+          modelName:this.config.modelName, text:result.text, sourceIds:wikiLearning?.fragments.map(c=>c.id) ?? [],
+          originalIds:[], tools:[], artifacts:[], webSources:[], skills:[], modelCalls:result.modelCalls, usage:backend.usage ?? null};
+      }
+      const newsBriefing = task.contractVersion === '1.5'  && !!briefingGeneration && !!newsScope;
       let newsBackground: Json[] = [];
       let publicInstructions = '';
       let publicSkill: { id: string; version: string } | undefined;
@@ -388,7 +486,9 @@ export class AgentTasks {
                   'Use dataset_search for exact IDs and columns, then dataset_read with columnLimit 10 to inspect required columns and actual period values.',
                   `Successful dataset_read calls so far: ${briefingDatasetReads}. Read only the pages needed to establish the calculation parameters.`,
                   'compare_dataset computes ALL rows in the pinned snapshot; do not page through every row to calculate totals. Reserve calls for calculation and delivery.',
-                  datasetBriefingSummaryAvailable ? 'Grouped totals use operation SUMMARY: groupColumns is an array of 1..3 exact headers; SUM uses one valueColumn and COUNT counts rows. OMIT groupColumn, periodColumn, baseline, current and periodMode for SUMMARY. Its artifact can be delivered as a single-series DATA card. Use COMPARE only for real two-category comparisons. Do not mix the parameter forms. If calculation is unsupported, report the concrete evidence gap.' : 'If the data does not support an exact two-period grouped calculation, choose a grounded INSIGHT or SUGGESTION without invented totals, explicitly limiting claims to observed evidence, or report insufficient evidence.',
+                  datasetBriefingSummaryAvailable
+                    ? 'Grouped totals use operation SUMMARY: groupColumns is an array of 1..3 exact headers; SUM uses one valueColumn and COUNT counts rows. OMIT groupColumn, periodColumn, baseline, current and periodMode for SUMMARY. Its artifact can be delivered as a single-series DATA card. Use COMPARE only for real two-category comparisons. Do not mix the parameter forms. If calculation is unsupported, report the concrete evidence gap.'
+                    : 'If the data does not support an exact two-period grouped calculation, choose a grounded INSIGHT or SUGGESTION without invented totals, explicitly limiting claims to observed evidence, or report insufficient evidence.',
                 ].join(' ')
               : '';
           const phaseMessages = briefingGeneration
@@ -421,23 +521,29 @@ export class AgentTasks {
                         (newsBriefing
                           ? '资讯只执行公开搜索、原文核验、选题和交付。搜索获得新原文后 public_search 关闭；如果返回空列表，可以选择另一个未尝试的相关主题，最多三个相关主题；候选不足时选择另一个相关主题，不重复已有主题；全部尝试后仍无新原文时用 task_control 说明暂无新内容并结束；使用返回的 id 调用 read_public_page，禁止重复搜索。提交前检查 analysis 为字符串数组，每段一个元素，不能传字符串。不要调用内部资料或计算工具。'
                           : deliveryReady
-                          ? briefingRequestedType && briefingRequestedType !== 'DATA'
-                            ? `A calculation has completed, but the requested type remains ${briefingRequestedType}. Retrieval and calculation are now closed. Deliver the requested text category using authorized evidence; omit calculationArtifactId and do not invent quantitative claims. If no useful requested-type content is supported, use status-only delivery. Never substitute DATA.`
-                            : 'The platform has verified one complete table calculation for this briefing. Retrieval and calculation are now closed. Call deliver_briefing with its existing calculation artifact, preserving its periods, scope and gaps. Write one complete theme; do not compute another range or repeat searches. A duplicate receipt means no new card, never fabricate novelty.'
-                          : retrievalClosed
-                            ? 'Dataset retrieval is closed after three successful lookups. Choose compare_dataset or compare_table using already granted evidence to complete ONE supported calculation, or deliver_briefing for a useful grounded INSIGHT or SUGGESTION with explicit sample limits. If evidence is insufficient, use task_control to state the concrete gap, or a status-only delivery for no useful new content. DATA still requires a successful verified calculation. Do not repeat reads or invent totals, trends or full coverage.'
-                            : `System briefing retrieval: ${briefingSearches}/${briefingSearchLimit} internal searches used. The first lookup reads the selected versions; at most two targeted lookups follow. Do not repeat searches to fill the budget. ${
-                                briefingSearches >= briefingSearchLimit
-                                  ? 'Internal search is now closed. Use the existing granted evidence to calculate and deliver one grounded theme. If evidence is insufficient, explain the concrete gap without claiming a card was generated.'
-                                  : 'Once evidence supports a useful theme, for DATA use compare_table for files or compare_dataset for collected datasets (aggregation COUNT for lesson/member record counts with no numeric measure, SUM only for verified numeric columns; count rows is not distinct members), then deliver_briefing for the card. A text reply is not card delivery.'
-                              }${datasetGuide}`),
+                            ? briefingRequestedType && briefingRequestedType !== 'DATA'
+                              ? `A calculation has completed, but the requested type remains ${briefingRequestedType}. Retrieval and calculation are now closed. Deliver the requested text category using authorized evidence; omit calculationArtifactId and do not invent quantitative claims. If no useful requested-type content is supported, use status-only delivery. Never substitute DATA.`
+                              : 'The platform has verified one complete table calculation for this briefing. Retrieval and calculation are now closed. Call deliver_briefing with its existing calculation artifact, preserving its periods, scope and gaps. Write one complete theme; do not compute another range or repeat searches. A duplicate receipt means no new card, never fabricate novelty.'
+                            : retrievalClosed
+                              ? 'Dataset retrieval is closed after three successful lookups. Choose compare_dataset or compare_table using already granted evidence to complete ONE supported calculation, or deliver_briefing for a useful grounded INSIGHT or SUGGESTION with explicit sample limits. If evidence is insufficient, use task_control to state the concrete gap, or a status-only delivery for no useful new content. DATA still requires a successful verified calculation. Do not repeat reads or invent totals, trends or full coverage.'
+                              : `System briefing retrieval: ${briefingSearches}/${briefingSearchLimit} internal searches used. The first lookup reads the selected versions; at most two targeted lookups follow. Do not repeat searches to fill the budget. ${
+                                  briefingSearches >= briefingSearchLimit
+                                    ? 'Internal search is now closed. Use the existing granted evidence to calculate and deliver one grounded theme. If evidence is insufficient, explain the concrete gap without claiming a card was generated.'
+                                    : 'Once evidence supports a useful theme, for DATA use compare_table for files or compare_dataset for collected datasets (aggregation COUNT for lesson/member record counts with no numeric measure, SUM only for verified numeric columns; count rows is not distinct members), then deliver_briefing for the card. A text reply is not card delivery.'
+                                }${datasetGuide}`),
                     },
                   ],
                 },
                 ...request.messages,
               ]
             : datasetAnalysisAvailable
-              ? [{ role: 'system' as const, content: [{ type: 'text' as const, text: DATASET_ANALYSIS_GUIDANCE }] }, ...request.messages]
+              ? [
+                  {
+                    role: 'system' as const,
+                    content: [{ type: 'text' as const, text: DATASET_ANALYSIS_GUIDANCE }],
+                  },
+                  ...request.messages,
+                ]
               : request.messages;
           const preferenceText =
             expressionInstructions(expressionPreferences, !!briefingGeneration) +
@@ -467,7 +573,10 @@ export class AgentTasks {
                         type: 'text',
                         text:
                           (webMode === 'REQUIRED'
-                            ? phaseTools.length ? publicInstructions + '\n用户要求本次联网查证：public-research 已由系统启用；调用 public_search 后，只使用返回的来源 id 调用 read_public_page。无法查证则明确报告能力缺口，不能伪称已联网。' : '工具阶段已结束，或两次公开搜索未找到可读取的来源。不得继续搜索。只根据已读取的来源回答；尚未读到原文时明确说明未完成联网核验并建议具体的公开主题，不编造新闻，不声称服务宕机或网络断开。'
+                            ? phaseTools.length
+                              ? publicInstructions +
+                                '\n用户要求本次联网查证：public-research 已由系统启用；调用 public_search 后，只使用返回的来源 id 调用 read_public_page。无法查证则明确报告能力缺口，不能伪称已联网。'
+                              : '工具阶段已结束，或两次公开搜索未找到可读取的来源。不得继续搜索。只根据已读取的来源回答；尚未读到原文时明确说明未完成联网核验并建议具体的公开主题，不编造新闻，不声称服务宕机或网络断开。'
                             : '本次允许按需调用联网工具；需要最新或外部事实时启用 public-research 后搜索和阅读，无需联网的内部工作可直接处理。') +
                           ' 仅拟定通用公开关键词，不把企业名、人员姓名、内部文件原文、业务明细、经营数字或凭据发到外部。不要把完整工作要求作为搜索词。',
                       },
@@ -476,23 +585,62 @@ export class AgentTasks {
                   ...messages,
                 ]
               : messages,
-            tools: phaseTools.map((tool) => tool.name === 'read_public_page' && web?.snapshot().length ? { ...tool, parameters: { type: 'object', properties: { id: { type: 'string', enum: web.snapshot().map(item => item.id), description: 'Copy an exact id returned by this task public_search; never use a URL, title, index or invented id.' } }, required: ['id'], additionalProperties: false } } : tool.name === 'public_search' && newsBriefing ? { ...tool, parameters: { type: 'object', properties: { topic: { type: 'string', enum: newsScope!.topics.filter(t => !newsTopicsTried.has(t.id)).map(t => t.id) } }, required: ['topic'], additionalProperties: false } } : tool).filter(
-              (t) =>
-                (t.name !== 'search_sources' ||
-                  !briefingGeneration ||
-                  briefingSearches < briefingSearchLimit) &&
-                (t.name !== 'task_context' || !briefingGeneration || briefingDatasetLookups < 3) &&
-                (!publicTools.has(t.name) || activated.has('public-research')) &&
-                (t.name !== 'read_public_page' || !!web?.snapshot().length) &&
-                (!deliveryReady || t.name === 'deliver_briefing') &&
-                (!briefingGeneration ||
-                  !topicAvailable ||
-                  topicSelected ||
-                  !['compare_table', 'compare_dataset', 'deliver_briefing'].includes(t.name)) &&
-                (t.name !== 'select_briefing_topic' || !topicSelected) &&
-                (t.name !== 'candidate_tool' || activated.has('candidate-trials')) &&
-                (t.name !== 'process_original' || activated.has('file-processing')),
-            ),
+            tools: phaseTools
+              .map((tool) =>
+                tool.name === 'read_public_page' && web?.snapshot().length
+                  ? {
+                      ...tool,
+                      parameters: {
+                        type: 'object',
+                        properties: {
+                          id: {
+                            type: 'string',
+                            enum: web.snapshot().map((item) => item.id),
+                            description:
+                              'Copy an exact id returned by this task public_search; never use a URL, title, index or invented id.',
+                          },
+                        },
+                        required: ['id'],
+                        additionalProperties: false,
+                      },
+                    }
+                  : tool.name === 'public_search' && newsBriefing
+                    ? {
+                        ...tool,
+                        parameters: {
+                          type: 'object',
+                          properties: {
+                            topic: {
+                              type: 'string',
+                              enum: newsScope!.topics
+                                .filter((t) => !newsTopicsTried.has(t.id))
+                                .map((t) => t.id),
+                            },
+                          },
+                          required: ['topic'],
+                          additionalProperties: false,
+                        },
+                      }
+                    : tool,
+              )
+              .filter(
+                (t) =>
+                  (t.name !== 'search_sources' ||
+                    !briefingGeneration ||
+                    briefingSearches < briefingSearchLimit) &&
+                  (t.name !== 'task_context' || !briefingGeneration || briefingDatasetLookups < 3) &&
+                  (!publicTools.has(t.name) || activated.has('public-research')) &&
+                  (t.name !== 'read_public_page' || !!web?.snapshot().length) &&
+                  (!deliveryReady || t.name === 'deliver_briefing') &&
+                  (!briefingGeneration ||
+                    !topicAvailable ||
+                    topicSelected ||
+                    !['compare_table', 'compare_dataset', 'deliver_briefing'].includes(t.name)) &&
+                  (t.name !== 'select_briefing_topic' || !topicSelected) &&
+                  (t.name !== 'candidate_tool' || activated.has('candidate-trials')) &&
+                  (t.name !== 'process_original' || activated.has('file-processing')) &&
+                  (t.name !== 'render_presentation' || activated.has('pptx-generator')),
+              ),
             ...(briefingGeneration &&
             topicAvailable &&
             topicSelected &&
@@ -508,8 +656,17 @@ export class AgentTasks {
                     ? { requireToolCall: true }
                     : {}),
             ...(request.tools.length > 0 && newsBriefing && !blockingQuestion
-              ? { requiredTool: newsNoResults ? 'task_control' : !newsSearched ? 'public_search' : !newsRead ? 'read_public_page' :
-                  topicAvailable && !topicSelected ? 'select_briefing_topic' : 'deliver_briefing' }
+              ? {
+                  requiredTool: newsNoResults
+                    ? 'task_control'
+                    : !newsSearched
+                      ? 'public_search'
+                      : !newsRead
+                        ? 'read_public_page'
+                        : topicAvailable && !topicSelected
+                          ? 'select_briefing_topic'
+                          : 'deliver_briefing',
+                }
               : {}),
             ...(phaseTools.length > 0 && webMode === 'REQUIRED' && !briefingGeneration && !publicRead
               ? {
@@ -662,15 +819,23 @@ export class AgentTasks {
           ? [
               datasetComparisonTool({
                 allowComposition: datasetCompositionAvailable,
-                allowSummary: datasetAnalysisAvailable && (!briefingGeneration || datasetBriefingSummaryAvailable),
+                allowSummary:
+                  datasetAnalysisAvailable && (!briefingGeneration || datasetBriefingSummaryAvailable),
                 allowDateRange: datasetAnalysisAvailable,
                 authorize,
                 onVerified: (receipt) => {
-                  if (isRecord(receipt.calculation) && isRecord(receipt.artifact) &&
-                      ['dataset-summary-1','dataset-composition-1'].includes(String(receipt.calculation.recipeVersion)) &&
-                      typeof receipt.artifact.id === 'string') summaryCalculations.add(receipt.artifact.id);
+                  if (
+                    isRecord(receipt.calculation) &&
+                    isRecord(receipt.artifact) &&
+                    ['dataset-summary-1', 'dataset-composition-1'].includes(
+                      String(receipt.calculation.recipeVersion),
+                    ) &&
+                    typeof receipt.artifact.id === 'string'
+                  )
+                    summaryCalculations.add(receipt.artifact.id);
                 },
-                invoke: (body, executionSignal) => postJson(
+                invoke: (body, executionSignal) =>
+                  postJson(
                     new URL(`/internal/v1/agent-access/${task.taskId}/compare-dataset`, this.platform),
                     task.attemptId,
                     body,
@@ -742,7 +907,13 @@ export class AgentTasks {
             'Load an exact trusted skill version for this task. The next model call sees its allowed tools. Unknown or unauthorized bundles fail; never installs remote packages.',
           parameters: {
             type: 'object',
-            properties: { id: { type: 'string', enum: catalog.available(allowed).map(item => item.id) }, version: { type: 'string', enum: [...new Set(catalog.available(allowed).map(item => item.version))] } },
+            properties: {
+              id: { type: 'string', enum: catalog.available(allowed).map((item) => item.id) },
+              version: {
+                type: 'string',
+                enum: [...new Set(catalog.available(allowed).map((item) => item.version))],
+              },
+            },
             required: ['id', 'version'],
             additionalProperties: false,
           },
@@ -755,6 +926,24 @@ export class AgentTasks {
           },
         },
       ];
+      if (catalog.available(allowed).some((item) => item.files))
+        tools.push({
+          name: 'read_skill_resource',
+          description:
+            'Read a pinned text resource from an already activated skill. Never executes scripts or installs dependencies.',
+          parameters: {
+            type: 'object',
+            properties: { id: { type: 'string' }, version: { type: 'string' }, path: { type: 'string' } },
+            required: ['id', 'version', 'path'],
+            additionalProperties: false,
+          },
+          execute: async (args) => {
+            await authorize();
+            const { id, version, path } = args as { id: string; version: string; path: string };
+            if (activated.get(id)?.version !== version) throw new RuntimeError('SKILL_NOT_ACTIVE');
+            return { content: await catalog.readResource(id, version, path, allowed) };
+          },
+        });
       const contextEnabled = task.contractVersion === '1.5' && contextAvailable;
       const continuity = contextEnabled ? await taskBootstrap(invoke) : undefined;
       if (webMode && continuity) privateSearchTexts.push(JSON.stringify(continuity));
@@ -786,7 +975,13 @@ export class AgentTasks {
             parameters: webMode
               ? {
                   type: 'object',
-                  properties: { query: { type: 'string', description: 'Public keywords only; at most 120 characters. Validated before transport.' } },
+                  properties: {
+                    query: {
+                      type: 'string',
+                      description:
+                        'Public keywords only; at most 120 characters. Validated before transport.',
+                    },
+                  },
                   required: ['query'],
                   additionalProperties: false,
                 }
@@ -829,12 +1024,19 @@ export class AgentTasks {
               publicSearched = true;
               if (newsBriefing) {
                 newsTopicsTried.add(topic!);
-                newsNoResults = items.length === 0 && newsTopicsTried.size >= Math.min(3, newsScope!.topics.length);
+                newsNoResults =
+                  items.length === 0 && newsTopicsTried.size >= Math.min(3, newsScope!.topics.length);
                 newsSearched = items.length > 0 || newsNoResults;
-                if (newsNoResults && web.newsDiagnostics().status === 'READ_FAILED') throw new RuntimeError('PUBLIC_NEWS_READ_FAILED');
-                if (newsNoResults && web.newsDiagnostics().status === 'CANDIDATE_LIMIT') throw new RuntimeError('PUBLIC_NEWS_CANDIDATE_LIMIT');
+                if (newsNoResults && web.newsDiagnostics().status === 'READ_FAILED')
+                  throw new RuntimeError('PUBLIC_NEWS_READ_FAILED');
+                if (newsNoResults && web.newsDiagnostics().status === 'CANDIDATE_LIMIT')
+                  throw new RuntimeError('PUBLIC_NEWS_CANDIDATE_LIMIT');
               }
-              return { items: items.map(({ image: _image, ...item }) => item), ...(newsBriefing ? { diagnostics: web.newsDiagnostics() } : {}), untrusted: true };
+              return {
+                items: items.map(({ image: _image, ...item }) => item),
+                ...(newsBriefing ? { diagnostics: web.newsDiagnostics() } : {}),
+                untrusted: true,
+              };
             },
           },
           {
@@ -948,6 +1150,118 @@ export class AgentTasks {
           },
         });
       }
+      let presentationRendered = false;
+      let presentationDelivered = false;
+      const hasDeliveredPresentation = (receipts: RuntimeResult['tools']) =>
+        presentationWorkflow?.state === 'CONFIRMED' && receipts.every(r => r.status === 'succeeded') &&
+        receipts.some(r => {
+          if (r.name !== 'render_presentation' || !isRecord(r.output) || !Array.isArray(r.output.artifacts)) return false;
+          const artifacts = r.output.artifacts;
+          return artifacts.length === 2 && ['presentation.pptx', 'presentation-source.json'].every(name =>
+            artifacts.some(a => isRecord(a) && a.name === name && typeof a.uploadId === 'string' &&
+              typeof a.sha256 === 'string' && uploadedArtifacts.get(a.uploadId)?.sha256 === a.sha256));
+        });
+      if (pptReady)
+        tools.push({
+          name: 'render_presentation',
+          description:
+            'Prepare a complete 1–8 slide draft for user confirmation. The task pauses and no PPTX is rendered until the platform records explicit user confirmation. On a confirmed task this tool renders the immutable server draft, ignoring replacement model content. Generate an editable PPTX and reusable source JSON. Fixed native renderer, no scripts, URLs or paths. Activate pptx-generator first. Include exact sourceIds from search_sources for claims based on workspace files. No invented numbers. One deck per task attempt. Tables: up to 6 rows × 5 columns. Charts: 2–8 nonnegative data points.',
+          parameters: presentationWorkflow?.state === 'CONFIRMED'
+            ? { type: 'object', properties: {}, additionalProperties: false }
+            : presentationToolSchema,
+          execute: async (args, executionSignal): Promise<Json> => {
+            await authorize();
+            if (!activated.has('pptx-generator')) throw new RuntimeError('SKILL_NOT_ACTIVE');
+            if (presentationRendered) throw new RuntimeError('PRESENTATION_ALREADY_RENDERED');
+            const confirmed = presentationWorkflow?.state === 'CONFIRMED';
+            const spec = parseDeck(presentationWorkflow?.spec ?? args);
+            const references: Record<string, string> = {};
+            for (const slide of spec.slides)
+              for (const id of slide.sourceIds) {
+                const source = sources.get(id);
+                if (!source) throw new RuntimeError('PRESENTATION_SOURCE_NOT_GRANTED');
+                references[id] = `${source.filename} · v${source.version} · ${source.locator} · ${id}`;
+              }
+            presentationRendered = true;
+            if (!confirmed) {
+              const receipt = await invoke('presentation/propose', spec);
+              if (!isRecord(receipt) || receipt.recorded !== true) throw new RuntimeError('INVALID_REMOTE_RESPONSE');
+              outcome = 'WAITING_INPUT';
+              requiredInput = 'PPT 大纲已准备好。请在大纲卡片中检查内容、调整标题和页序，然后确认生成。';
+              blockingQuestion = true;
+              return { draftSaved: true, requiresConfirmation: true, artifacts: [] };
+            }
+            const files = await this.config.presentationRenderer!.render(
+              spec,
+              references,
+              AbortSignal.any([signal, executionSignal]),
+            );
+            await authorize();
+            return {
+              recipe: 'dreamcore-pptx/1.0.0',
+              slideCount: spec.slides.length,
+              artifacts: files.map((f) => ({
+                name: f.name,
+                sha256: f.sha256,
+                contentBase64: Buffer.from(f.bytes).toString('base64'),
+              })),
+            };
+          },
+        });
+      // Transfer bytes before the bounded Harness receipt/model context; keep the normal tool-output limit.
+      if (artifactTransferAvailable)
+        for (const tool of tools) {
+          if (
+            !['run_javascript', 'process_original', 'candidate_tool', 'render_presentation'].includes(
+              tool.name,
+            )
+          )
+            continue;
+          const execute = tool.execute;
+          tool.execute = async (args, executionSignal) => {
+            const output = await execute(args, executionSignal);
+            if (!isRecord(output) || !Array.isArray(output.artifacts)) return output;
+            const artifacts: Json[] = [];
+            for (const artifact of output.artifacts) {
+              if (
+                !isRecord(artifact) ||
+                typeof artifact.name !== 'string' ||
+                typeof artifact.sha256 !== 'string' ||
+                typeof artifact.contentBase64 !== 'string' ||
+                artifact.contentBase64.length > Math.ceil(ARTIFACT_MAX_BYTES / 3) * 4
+              )
+                throw new RuntimeError('INVALID_ARTIFACT');
+              const bytes = Buffer.from(artifact.contentBase64, 'base64');
+              if (
+                bytes.toString('base64') !== artifact.contentBase64 ||
+                uploadedArtifacts.size >= 8 ||
+                [...uploadedArtifacts.values()].reduce((sum, f) => sum + f.bytes, 0) + bytes.length >
+                  ARTIFACT_MAX_BYTES
+              )
+                throw new RuntimeError('INVALID_ARTIFACT');
+              await authorize();
+              const uploaded = await uploadArtifact(
+                invoke,
+                { name: artifact.name, sha256: artifact.sha256, bytes },
+                AbortSignal.any([signal, executionSignal]),
+              );
+              const receipt = { ...uploaded, bytes: bytes.length };
+              uploadedArtifacts.set(uploaded.uploadId, receipt);
+              artifacts.push(receipt);
+            }
+            return { ...output, artifacts } as Json;
+          };
+          // The model sees display metadata only, never a staging identifier.
+          tool.modelOutput = (value) =>
+            !isRecord(value) || !Array.isArray(value.artifacts)
+              ? value
+              : ({
+                  ...value,
+                  artifacts: value.artifacts.map((a) =>
+                    isRecord(a) ? { name: a.name, sha256: a.sha256, bytes: a.bytes } : a,
+                  ),
+                } as Json);
+        }
       let outcome: 'COMPLETE' | 'PARTIAL' | 'WAITING_INPUT' | 'WAITING_CAPABILITY' = 'COMPLETE';
       let requiredInput: string | null = null;
       let blockingQuestion = false;
@@ -1054,9 +1368,10 @@ export class AgentTasks {
             requiredInput = args.message.trim();
             if (newsBriefing && newsNoResults) {
               blockingQuestion = true;
-              requiredInput = web!.newsDiagnostics().status === 'ALREADY_REPORTED'
-                ? '本轮候选资讯均已报道，未找到可核验的新原文；这不代表当天没有相关新闻。'
-                : '本轮相关主题的搜索候选不足或原文不满足核验要求，暂未生成资讯；这不代表当天没有相关新闻。';
+              requiredInput =
+                web!.newsDiagnostics().status === 'ALREADY_REPORTED'
+                  ? '本轮候选资讯均已报道，未找到可核验的新原文；这不代表当天没有相关新闻。'
+                  : '本轮相关主题的搜索候选不足或原文不满足核验要求，暂未生成资讯；这不代表当天没有相关新闻。';
             }
             return { recorded: true, outcome, message: requiredInput, businessActionPerformed: false };
           },
@@ -1169,14 +1484,19 @@ export class AgentTasks {
             }
             if (briefingGeneration && ['compare_table', 'compare_dataset'].includes(tool.name))
               briefingCalculationReady = true;
+            if (tool.name === 'render_presentation' && presentationWorkflow?.state === 'CONFIRMED' &&
+                hasDeliveredPresentation([{ callId: 'verified-ppt-delivery', name: tool.name, status: 'succeeded', output }]))
+              presentationDelivered = true;
             return output;
           };
         }
       }
       const result = await runHarness({
         realtime,
-        shouldConcludeTurn: () => blockingQuestion,
-        prompt: task.prompt,
+        shouldConcludeTurn: () => blockingQuestion || presentationDelivered,
+        prompt: task.prompt + (presentationWorkflow && presentationWorkflow.state !== 'NONE'
+          ? '\n\n平台PPT任务：先激活 pptx-generator，再调用 render_presentation。未确认时该工具保存大纲并暂停。已确认时直接调用，工具严格使用保存稿，无需重新检索或改写。平台设置：' + JSON.stringify(presentationWorkflow.options ?? {}) + (presentationWorkflow.state === 'CONFIRMED' ? '\n当前已确认：render_presentation 仅传空对象 {}。完整内容由平台保存并渲染。' : '')
+          : ''),
         context: continuity,
         model,
         tools,
@@ -1206,10 +1526,10 @@ export class AgentTasks {
             }),
           );
         },
-        finalResponseReserveMs: briefingGeneration ? 10000 : undefined,
+        finalResponseReserveMs: briefingGeneration || pptReady ? 10000 : undefined,
         finishOnDeliverable: briefingGeneration,
         invalidDeliveryAttempts: briefingGeneration ? 3 : undefined,
-        hasCompletedDeliverable: briefingGeneration ? hasTerminalBriefing : hasPreparedBriefing,
+        hasCompletedDeliverable: briefingGeneration ? hasTerminalBriefing : receipts => hasDeliveredPresentation(receipts) || hasPreparedBriefing(receipts),
       });
       if (publicSkill)
         result.tools.unshift({
@@ -1222,7 +1542,11 @@ export class AgentTasks {
         throw new RuntimeError('TASK_STOPPED');
       }
       if (result.status === 'completed' && !blockingQuestion) {
-        if (webMode === 'REQUIRED' && !publicRead && (result.finalResponseReserved || publicQueries.size >= 2)) {
+        if (
+          webMode === 'REQUIRED' &&
+          !publicRead &&
+          (result.finalResponseReserved || publicQueries.size >= 2)
+        ) {
           outcome = 'PARTIAL';
           requiredInput = '本次尚未完成新闻原文核验，请重新查询或调整检索范围；当前回复不作为已核实资讯。';
         } else requirePublicEvidence(webMode, publicSearched, publicRead);
@@ -1240,6 +1564,12 @@ export class AgentTasks {
             toolCalls: result.tools.length,
           }),
         );
+      const terminalPresentation = hasDeliveredPresentation(result.tools);
+      if (terminalPresentation && result.status === 'completed') {
+        outcome = 'COMPLETE';
+        requiredInput = null;
+        result.text = 'PPT 已按确认稿生成，可下载演示文稿和内容源文件。';
+      }
       const terminalBriefing = briefingGeneration && hasTerminalBriefing(result.tools);
       if (terminalBriefing && result.status === 'completed') {
         outcome = 'COMPLETE';
@@ -1262,6 +1592,7 @@ export class AgentTasks {
         result.finalResponseReserved &&
         outcome === 'COMPLETE' &&
         !terminalBriefing &&
+        !terminalPresentation &&
         !hasPreparedBriefing(result.tools)
       ) {
         outcome = 'PARTIAL';
@@ -1281,11 +1612,28 @@ export class AgentTasks {
           t.status === 'succeeded' &&
           (t.name === 'run_javascript' ||
             t.name === 'process_original' ||
+            t.name === 'render_presentation' ||
             (t.name === 'candidate_tool' && isRecord(t.output) && Array.isArray(t.output.artifacts))),
       )) {
         const output = receipt.output;
         if (!isRecord(output) || !Array.isArray(output.artifacts)) throw new RuntimeError('INVALID_ARTIFACT');
         for (const artifact of output.artifacts) {
+          if (artifactTransferAvailable && isRecord(artifact) && typeof artifact.uploadId === 'string') {
+            const uploaded = uploadedArtifacts.get(artifact.uploadId);
+            if (
+              !uploaded ||
+              artifact.name !== uploaded.name ||
+              artifact.sha256 !== uploaded.sha256 ||
+              artifact.bytes !== uploaded.bytes ||
+              artifact.contentBase64 !== undefined ||
+              artifacts.length >= 8
+            )
+              throw new RuntimeError('INVALID_ARTIFACT');
+            total += uploaded.bytes;
+            if (total > ARTIFACT_MAX_BYTES) throw new RuntimeError('INVALID_ARTIFACT');
+            artifacts.push({ name: uploaded.name, sha256: uploaded.sha256, uploadId: uploaded.uploadId });
+            continue;
+          }
           if (
             !isRecord(artifact) ||
             typeof artifact.contentBase64 !== 'string' ||
@@ -1297,15 +1645,21 @@ export class AgentTasks {
           total += bytes.length;
           if (
             artifacts.length >= 8 ||
-            total > 65536 ||
+            total > (artifactTransferAvailable ? ARTIFACT_MAX_BYTES : 65536) ||
             createHash('sha256').update(bytes).digest('hex') !== artifact.sha256
           )
             throw new RuntimeError('INVALID_ARTIFACT');
-          artifacts.push({
-            name: artifact.name,
-            sha256: artifact.sha256,
-            contentBase64: artifact.contentBase64,
-          });
+          if (artifactTransferAvailable && task.contractVersion === '1.5') {
+            artifacts.push(
+              await uploadArtifact(invoke, { name: artifact.name, sha256: artifact.sha256, bytes }, signal),
+            );
+          } else {
+            artifacts.push({
+              name: artifact.name,
+              sha256: artifact.sha256,
+              contentBase64: artifact.contentBase64,
+            });
+          }
         }
       }
       if (candidateUsed && candidateSession) {
@@ -1313,7 +1667,7 @@ export class AgentTasks {
         total += Buffer.from(report.contentBase64, 'base64').length;
         if (
           artifacts.length >= 8 ||
-          total > 65536 ||
+          total > (artifactTransferAvailable ? ARTIFACT_MAX_BYTES : 65536) ||
           artifacts.some((a) => isRecord(a) && a.name === report.name)
         )
           throw new RuntimeError('INVALID_ARTIFACT');

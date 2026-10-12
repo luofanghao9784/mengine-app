@@ -19,6 +19,28 @@ class TaskDatasetIntegrationTest extends TaskDatasetFixture {
   UUID next=version(2,"新版本");var read=call(t,request("dataset_read",dataset,snapshot,0));assertEquals(1,read.get("source").get("version").asInt());assertTrue(read.get("source").get("coverageThrough").isNull());assertEquals(5,read.get("rows").size());assertTrue(read.get("hasMore").asBoolean());assertFalse(read.get("completeDataset").asBoolean());assertEquals(5,read.get("nextOffset").asInt());assertEquals("旧版本0",read.get("rows").get(0).get(0).asString());
   var tail=call(t,request("dataset_read",dataset,snapshot,5));assertFalse(tail.get("hasMore").asBoolean());assertEquals(1,tail.get("rows").size());denied(()->call(t,request("dataset_read",dataset,next,0)));assertTrue(agents.active(t));
  }
+ @Test void deploymentExplanationsReachOnlyAuthorizedTaskColumnsWithoutRuntimeInference(){
+  UUID defined=UUID.randomUUID(),snap=UUID.randomUUID(),run=UUID.randomUUID();
+  String fields="[{\"column\":\"编号\",\"type\":\"text\",\"meaning\":\"来源标识\",\"unit\":\"\",\"evidence\":\"部署时源字典\",\"status\":\"SOURCE_DOCUMENTED\"}]";
+  db.update("INSERT INTO business_datasets(id,tenant_id,connection_id,workspace_id,dataset_key,name,column_names,field_definitions) VALUES (?,?,?,?,'defined','部署定义数据','[\"编号\"]',CAST(? AS jsonb))",defined,tenant,connection,space,fields);
+  db.update("INSERT INTO collection_runs(id,tenant_id,connection_id,execution_epoch,trigger_kind,status) VALUES (?,?,?,1,'SCHEDULED','SUCCEEDED')",run,tenant,connection);
+  db.update("INSERT INTO dataset_snapshots(id,tenant_id,connection_id,dataset_id,run_id,version,data_rows,row_count,collected_at) VALUES (?,?,?,?,?,1,'[[\"001\"]]',1,now())",snap,tenant,connection,defined,run);
+  db.update("UPDATE business_datasets SET current_snapshot=? WHERE id=?",snap,defined);
+  var t=task(null,"AUTHORIZED_LIBRARY");var result=call(t,request("dataset_read",defined,snap,0));
+  assertEquals("DEPLOYMENT",result.at("/source/definitionOrigin").asString());
+  assertEquals("部署时源字典",result.at("/source/fieldDefinitions/0/evidence").asString());
+  assertFalse(result.at("/source/authority").asBoolean());
+  db.update("DELETE FROM workspace_members WHERE tenant_id=? AND workspace_id=? AND account_id=?",tenant,space,owner);
+  denied(()->call(t,request("dataset_read",defined,snap,0)));
+ }
+ @Test void deniedWorkspaceIsExcludedBeforeTaskMetadataOrFieldsAreProjected(){
+  db.update("INSERT INTO library_permission_rollouts VALUES (?,true)",tenant);
+  db.update("INSERT INTO library_policies(tenant_id,object_kind,object_id,workspace_id) VALUES (?,'WORKSPACE',?,?)",tenant,space,space);
+  db.update("INSERT INTO library_grants(tenant_id,object_kind,object_id,principal_kind,principal_id,content,download) VALUES (?,'WORKSPACE',?,'ACCOUNT',?,'NONE','DENY')",tenant,space,owner);
+  var t=task(null,"AUTHORIZED_LIBRARY");
+  assertEquals(0,call(t,request("dataset_search",null,null,0)).get("items").size());
+  denied(()->call(t,request("dataset_read",dataset,snapshot,0)));
+ }
  @Test void taskScopeAndDatasetIdentityNeverGrantOtherContent(){
   var t=task(null,"WORKSPACE");assertEquals(0,call(t,request("dataset_search",null,null,0)).get("items").size());denied(()->call(t,request("dataset_read",dataset,snapshot,0)));
   db.update("UPDATE conversation_tasks SET source_scope='SELECTED' WHERE id=?",t.id());assertEquals("SELECTED_ONLY",call(t,request("dataset_search",null,null,0)).get("reason").asString());assertTrue(call(t,request("dataset_read",dataset,snapshot,0)).get("unavailable").asBoolean());

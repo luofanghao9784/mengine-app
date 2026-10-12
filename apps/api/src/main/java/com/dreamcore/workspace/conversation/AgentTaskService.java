@@ -11,6 +11,9 @@ import tools.jackson.databind.json.JsonMapper;
 
 @Service
 public class AgentTaskService {
+    @org.springframework.beans.factory.annotation.Autowired private com.dreamcore.workspace.knowledge.WikiLearningService wikiLearning;
+    @org.springframework.beans.factory.annotation.Autowired private com.dreamcore.workspace.knowledge.WikiGraphService wikiGraph;
+    @org.springframework.beans.factory.annotation.Autowired private com.dreamcore.workspace.knowledge.WikiInsightService wikiInsight;
     public record Input(UUID id,String filename,int version,String locator,String content) {}
     public record SearchResult(List<Input> items,String matchStatus,KnowledgeService.Coverage coverage,boolean hasMore) {}
     public record Download(String filename,String sha256,byte[] bytes) {}
@@ -22,6 +25,8 @@ public class AgentTaskService {
     private final com.dreamcore.workspace.preferences.ExpressionPreferences expressionPreferences;private final com.dreamcore.workspace.preferences.ExpressionRuleBooks expressionRuleBooks;
     @org.springframework.beans.factory.annotation.Autowired private com.dreamcore.workspace.news.NewsSourceCatalog newsCatalog;
     @org.springframework.beans.factory.annotation.Autowired private com.dreamcore.workspace.news.NewsSearchPolicy newsSearch;
+    @org.springframework.beans.factory.annotation.Autowired private ArtifactTransferService artifactTransfers;
+    @org.springframework.beans.factory.annotation.Autowired private PresentationWorkflow presentations;
     private final JsonMapper json=new JsonMapper();
     public AgentTaskService(JdbcTemplate db,ConversationService conversations,KnowledgeService knowledge,AgentSettings settings,org.springframework.transaction.PlatformTransactionManager manager,IdentityAudit audit,TaskOriginals originals,AgentUsageLedger usage,TaskContextGuard contextGuard,TableCalculationService tables,BriefingContentService briefings,DatasetCalculationService datasets,com.dreamcore.workspace.preferences.ExpressionPreferences expressionPreferences,com.dreamcore.workspace.preferences.ExpressionRuleBooks expressionRuleBooks){this.expressionRuleBooks=expressionRuleBooks;this.expressionPreferences=expressionPreferences;this.datasets=datasets;this.briefings=briefings;this.tables=tables;this.contextGuard=contextGuard;this.usage=usage;this.originals=originals;this.transactions=new org.springframework.transaction.support.TransactionTemplate(manager);this.audit=audit;this.db=db;this.conversations=conversations;this.knowledge=knowledge;this.settings=settings;}
     private IdentityException denied(){return new IdentityException(403,"TASK_ACCESS_DENIED");}
@@ -47,7 +52,7 @@ public class AgentTaskService {
     }
     private String scope(UUID task){return db.queryForObject("SELECT source_scope FROM conversation_tasks WHERE id=?",String.class,task);}
     private List<UUID> grants(ConversationService.Job job){return db.queryForList("SELECT chunk_id FROM conversation_agent_grants WHERE task_id=? AND attempt_id=? ORDER BY chunk_id",UUID.class,job.id(),job.token());}
-    @Transactional public Map<String,Object> check(UUID task,UUID attempt){var preferenceJob=authorized(task,attempt);String query=db.queryForObject("SELECT public_query FROM conversation_tasks WHERE id=?",String.class,task);var response=new LinkedHashMap<String,Object>(Map.of("allowed",true,"executionClass",settings.mode(),"publicQuery",query==null?"":query,"candidateTrialsAllowed",settings.candidateTrialsEnabled() && query!=null && !com.dreamcore.workspace.news.NewsSearchPolicy.QUERY.equals(query),"contextVersion","1.0","taskWorkVersion","1.0","tableComparisonVersion",tables.available()?"1.0":"","briefingContentVersion","1.0","planManagementVersion","1.0","planAllowed",db.queryForObject("SELECT EXISTS(SELECT 1 FROM ongoing_plan_runs WHERE task_id=?)",Boolean.class,task)));response.put("newsSeen",db.queryForList("SELECT url,sha256 FROM news_article_deliveries WHERE tenant_id=? AND owner_id=? ORDER BY created_at DESC LIMIT 200",preferenceJob.tenant(),preferenceJob.actor()));response.put("briefingRequestedType",db.queryForList("SELECT business_type FROM briefing_generation_batches WHERE task_id=? AND business_type IS NOT NULL",String.class,task).stream().findFirst().orElse(""));response.put("topicStrategyVersion","1.0");response.put("topicSelectionRecorded",db.queryForObject("SELECT EXISTS(SELECT 1 FROM briefing_topic_selections WHERE task_id=?)",Boolean.class,task));var topicRows=db.queryForList("SELECT candidates::text,selected_index FROM briefing_topic_selections WHERE task_id=?",task);if(!topicRows.isEmpty()){var topic=topicRows.getFirst();response.put("topicSelection",Map.of("candidates",json.readValue(topic.get("candidates").toString(),List.class),"selectedIndex",topic.get("selected_index")));}response.put("datasetComparisonVersion","1.0");response.put("datasetContextVersion","1.0");response.put("generalExperienceVersion","1.0");response.put("realtimeVersion","1.0");response.put("answerStreamVersion","1.0");response.put("expressionRuleBooks",expressionRuleBooks.taskSnapshot(preferenceJob.actor(),preferenceJob.tenant(),task));response.put("expressionPreferences",expressionPreferences.effective(preferenceJob.actor(),preferenceJob.tenant()));response.put("briefingGeneration",db.queryForObject("SELECT EXISTS(SELECT 1 FROM briefing_generation_batches WHERE task_id=?)",Boolean.class,task));if(com.dreamcore.workspace.news.NewsSearchPolicy.QUERY.equals(query))response.put("newsSearch",newsSearch.scope(task));return response;}
+    @Transactional public Map<String,Object> check(UUID task,UUID attempt){var preferenceJob=authorized(task,attempt);if(wikiInsight.ownsTask(task))return Map.of("allowed",true,"executionClass",settings.mode(),"wikiInsight",wikiInsight.context(preferenceJob));if(wikiGraph.ownsTask(task))return Map.of("allowed",true,"executionClass",settings.mode(),"wikiGraph",wikiGraph.context(preferenceJob));if(wikiLearning.ownsTask(task))return Map.of("allowed",true,"executionClass",settings.mode(),"wikiLearning",wikiLearning.context(preferenceJob));String query=db.queryForObject("SELECT public_query FROM conversation_tasks WHERE id=?",String.class,task);var response=new LinkedHashMap<String,Object>(Map.of("allowed",true,"executionClass",settings.mode(),"publicQuery",query==null?"":query,"candidateTrialsAllowed",settings.candidateTrialsEnabled() && query!=null && !com.dreamcore.workspace.news.NewsSearchPolicy.QUERY.equals(query),"contextVersion","1.0","taskWorkVersion","1.0","tableComparisonVersion",tables.available()?"1.0":"","briefingContentVersion","1.0","planManagementVersion","1.0","planAllowed",db.queryForObject("SELECT EXISTS(SELECT 1 FROM ongoing_plan_runs WHERE task_id=?)",Boolean.class,task)));response.put("artifactTransferVersion",artifactTransfers.available()?"1.0":"");response.put("presentationRendererVersion",artifactTransfers.presentationAvailable()?"1.0":"");if(artifactTransfers.presentationAvailable())response.put("presentationWorkflow",presentations.context(preferenceJob));response.put("newsSeen",db.queryForList("SELECT url,sha256 FROM news_article_deliveries WHERE tenant_id=? AND owner_id=? ORDER BY created_at DESC LIMIT 200",preferenceJob.tenant(),preferenceJob.actor()));response.put("briefingRequestedType",db.queryForList("SELECT business_type FROM briefing_generation_batches WHERE task_id=? AND business_type IS NOT NULL",String.class,task).stream().findFirst().orElse(""));response.put("topicStrategyVersion","1.0");response.put("topicSelectionRecorded",db.queryForObject("SELECT EXISTS(SELECT 1 FROM briefing_topic_selections WHERE task_id=?)",Boolean.class,task));var topicRows=db.queryForList("SELECT candidates::text,selected_index FROM briefing_topic_selections WHERE task_id=?",task);if(!topicRows.isEmpty()){var topic=topicRows.getFirst();response.put("topicSelection",Map.of("candidates",json.readValue(topic.get("candidates").toString(),List.class),"selectedIndex",topic.get("selected_index")));}response.put("datasetComparisonVersion","1.0");response.put("datasetContextVersion","1.0");response.put("generalExperienceVersion","1.0");response.put("realtimeVersion","1.0");response.put("answerStreamVersion","1.0");response.put("expressionRuleBooks",expressionRuleBooks.taskSnapshot(preferenceJob.actor(),preferenceJob.tenant(),task));response.put("expressionPreferences",expressionPreferences.effective(preferenceJob.actor(),preferenceJob.tenant()));response.put("briefingGeneration",db.queryForObject("SELECT EXISTS(SELECT 1 FROM briefing_generation_batches WHERE task_id=?)",Boolean.class,task));if(com.dreamcore.workspace.news.NewsSearchPolicy.QUERY.equals(query))response.put("newsSearch",newsSearch.scope(task));return response;}
     @Transactional public Object selectNewsQuery(UUID task,UUID attempt,String topic){authorized(task,attempt);return newsSearch.select(task,topic);}
     public record TopicCandidate(String question,String evidenceNeeded,boolean requiresCalculation,String difference,String businessType) {}
     public record TopicSelection(List<TopicCandidate> candidates,Integer selectedIndex) {}
@@ -68,15 +73,18 @@ public class AgentTaskService {
         if(!json.readTree(stored.get("candidates").toString()).equals(json.readTree(value))||!body.selectedIndex().equals(stored.get("selected_index")))throw new IdentityException(409,"TASK_STATE_CHANGED");
         return Map.of("recorded",true,"selectedIndex",body.selectedIndex(),"strategyVersion","1.0.0","proposalOnly",true);
     }
+    @Transactional public Object proposePresentation(UUID task,UUID attempt,Map<String,Object> spec){var job=authorized(task,attempt);if(!artifactTransfers.presentationAvailable()||!Boolean.TRUE.equals(db.queryForObject("SELECT jsonb_exists(allowed_tools,'render_presentation') FROM conversation_attempts WHERE task_id=? AND attempt_id=?",Boolean.class,task,attempt)))throw denied();return presentations.propose(job,spec);}
     public record ExecutionOpen(String contractVersion,List<String> tools) {}
     public record ToolReceipt(Integer sequence,String name,String status) {}
-    private static final Set<String> REGISTERED_TOOLS=Set.of("select_briefing_topic","deliver_briefing","compare_table","compare_dataset","search_sources","run_javascript","find_skills","activate_skill","public_search","read_public_page","candidate_tool","list_originals","read_original","process_original","ask_user","task_control","task_context","task_plan","task_preference","manage_plan");
+    private static final Set<String> REGISTERED_TOOLS=Set.of("select_briefing_topic","deliver_briefing","compare_table","compare_dataset","search_sources","run_javascript","find_skills","activate_skill","read_skill_resource","render_presentation","public_search","read_public_page","candidate_tool","list_originals","read_original","process_original","ask_user","task_control","task_context","task_plan","task_preference","manage_plan");
     @Transactional public Map<String,Object> openExecution(UUID task,UUID attempt,ExecutionOpen body){
         authorized(task,attempt);
-        if(body==null || !Set.of("1.5","1.6").contains(body.contractVersion()==null?"":body.contractVersion()) || body.tools()==null || body.tools().isEmpty() || body.tools().size()>16 || new HashSet<>(body.tools()).size()!=body.tools().size() || body.tools().stream().anyMatch(t->t==null || !REGISTERED_TOOLS.contains(t)))throw new IdentityException(502,"TASK_RUNTIME_INCOMPATIBLE");
+        if(body==null || !Set.of("1.5","1.6").contains(body.contractVersion()==null?"":body.contractVersion()) || body.tools()==null || body.tools().isEmpty() && !wikiLearning.ownsTask(task) && !wikiGraph.ownsTask(task) && !wikiInsight.ownsTask(task) || body.tools().size()>20 || new HashSet<>(body.tools()).size()!=body.tools().size() || body.tools().stream().anyMatch(t->t==null || !REGISTERED_TOOLS.contains(t)))throw new IdentityException(502,"TASK_RUNTIME_INCOMPATIBLE");
+        if((wikiLearning.ownsTask(task) || wikiGraph.ownsTask(task) || wikiInsight.ownsTask(task)) && !body.tools().isEmpty())throw denied();
         if(!settings.mode().equals("verification") && body.tools().stream().anyMatch(t->Set.of("candidate_tool","run_javascript","list_originals","read_original","process_original").contains(t)))throw denied();
         if(body.tools().contains("task_plan")&&db.queryForObject("SELECT count(*) FROM ongoing_plan_runs WHERE task_id=?",Integer.class,task)==0)throw denied();
         if(body.contractVersion().equals("1.5")&&body.tools().stream().anyMatch(t->Set.of("task_plan","task_preference","manage_plan").contains(t)))throw denied();
+        if(body.tools().contains("render_presentation") && !artifactTransfers.presentationAvailable())throw denied();
         String policy=body.contractVersion().equals("1.6")?"SCOPED_PRIVATE_V2":"READ_ONLY_PRIVATE_V1";
         var row=db.queryForMap("SELECT execution_policy,allowed_tools FROM conversation_attempts WHERE task_id=? AND attempt_id=? FOR UPDATE",task,attempt);
         String encoded=json.writeValueAsString(body.tools().stream().sorted().toList());
@@ -233,18 +241,31 @@ public class AgentTaskService {
             && Boolean.TRUE.equals(db.queryForObject("SELECT coalesce((SELECT name='deliver_briefing' AND status='succeeded' FROM conversation_tool_receipts WHERE task_id=? AND attempt_number=(SELECT attempt FROM conversation_tasks WHERE id=?) ORDER BY sequence DESC LIMIT 1),false)",Boolean.class,job.id(),job.id()))
             && r.tools().stream().allMatch(t->t!=null&&("succeeded".equals(t.status())||"deliver_briefing".equals(t.name())&&"failed".equals(t.status())));
         if("COMPLETE".equals(outcome) && r.tools().stream().anyMatch(t->t!=null && !"succeeded".equals(t.status()))&&!recoveredDelivery)incompatible();
-        if(Set.of("WAITING_INPUT","WAITING_CAPABILITY").contains(outcome) && r.tools().stream().noneMatch(t->t!=null && ("task_control".equals(t.name()) || "WAITING_INPUT".equals(outcome) && "ask_user".equals(t.name()) && Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM conversation_live_questions WHERE task_id=? AND attempt_number=(SELECT attempt FROM conversation_tasks WHERE id=?) AND blocking)",Boolean.class,job.id(),job.id()))) && "succeeded".equals(t.status())))incompatible();
+        if(Set.of("WAITING_INPUT","WAITING_CAPABILITY").contains(outcome) && r.tools().stream().noneMatch(t->t!=null && ("render_presentation".equals(t.name()) && "WAITING_INPUT".equals(outcome) && presentations.draft(job.id()) || "task_control".equals(t.name()) || "WAITING_INPUT".equals(outcome) && "ask_user".equals(t.name()) && Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM conversation_live_questions WHERE task_id=? AND attempt_number=(SELECT attempt FROM conversation_tasks WHERE id=?) AND blocking)",Boolean.class,job.id(),job.id()))) && "succeeded".equals(t.status())))incompatible();
         if("1.5".equals(r.contractVersion())){
             var stored=db.queryForList("SELECT name,status FROM conversation_tool_receipts WHERE task_id=? AND attempt_number=(SELECT attempt FROM conversation_tasks WHERE id=?) ORDER BY sequence",job.id(),job.id());
             var expectedTools=r.tools().stream().map(t->t==null?"invalid":t.name()+"/"+t.status()).sorted().toList();
             if(!stored.stream().map(t->t.get("name")+"/"+t.get("status")).sorted().toList().equals(expectedTools) || db.queryForObject("SELECT count(*) FROM conversation_attempts WHERE task_id=? AND attempt_id=? AND execution_policy IN ('READ_ONLY_PRIVATE_V1','SCOPED_PRIVATE_V2')",Integer.class,job.id(),job.token())!=1)incompatible();
         }
+        if("COMPLETE".equals(outcome) && Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM conversation_presentations WHERE task_id=?)",Boolean.class,job.id())) && r.tools().stream().noneMatch(t->t!=null && "render_presentation".equals(t.name()) && "succeeded".equals(t.status())))incompatible();
+        wikiLearning.validateResult(job,r);
+        wikiGraph.validateResult(job,r);
+        wikiInsight.validateResult(job,r);
         usage.validateResult(job.id(),job.token(),r.modelCalls(),r.usage());
         var calls=new HashSet<String>();boolean code=false;
         for(var tool:r.tools()){
-            if(tool==null || tool.callId()==null || !tool.callId().matches("[!-~]{1,128}") || !calls.add(tool.callId()) || (tool.status()==null || !Set.of("succeeded","failed").contains(tool.status())) || tool.name()==null || !Set.of("select_briefing_topic","deliver_briefing","compare_table","compare_dataset","search_sources","run_javascript","find_skills","activate_skill","public_search","read_public_page","candidate_tool","list_originals","read_original","process_original","ask_user","task_control","task_context","task_plan","task_preference","manage_plan").contains(tool.name()))incompatible();
+            if(tool==null || tool.callId()==null || !tool.callId().matches("[!-~]{1,128}") || !calls.add(tool.callId()) || (tool.status()==null || !Set.of("succeeded","failed").contains(tool.status())) || tool.name()==null || !Set.of("select_briefing_topic","deliver_briefing","compare_table","compare_dataset","search_sources","run_javascript","find_skills","activate_skill","read_skill_resource","render_presentation","public_search","read_public_page","candidate_tool","list_originals","read_original","process_original","ask_user","task_control","task_context","task_plan","task_preference","manage_plan").contains(tool.name()))incompatible();
             if("candidate_tool".equals(tool.name())) {if(!settings.candidateTrialsEnabled() || !settings.mode().equals("verification") || db.queryForObject("SELECT public_query IS NOT NULL FROM conversation_tasks WHERE id=?",Boolean.class,job.id())!=Boolean.TRUE || r.skills()==null || r.skills().stream().noneMatch(s->s!=null && "candidate-trials".equals(s.id())))incompatible();code=code || "succeeded".equals(tool.status());}
             if("process_original".equals(tool.name())){if(!settings.mode().equals("verification") || r.originalIds().isEmpty() || r.skills()==null || r.skills().stream().noneMatch(s->s!=null && "file-processing".equals(s.id())))incompatible();code=code || "succeeded".equals(tool.status());}
+            if("render_presentation".equals(tool.name())){
+                if(!artifactTransfers.presentationAvailable() || !"1.5".equals(r.contractVersion()) || r.skills()==null || r.skills().stream().noneMatch(v->v!=null && "pptx-generator".equals(v.id()) && "1.0.0".equals(v.version())))incompatible();
+                if("succeeded".equals(tool.status())){
+                    if("WAITING_INPUT".equals(outcome) && presentations.draft(job.id()) && r.artifacts().isEmpty())continue;
+                    if(!presentations.confirmed(job.id()))incompatible();
+                    if(r.artifacts().size()!=2 || r.artifacts().stream().anyMatch(a->a==null || a.uploadId()==null || a.contentBase64()!=null) || !r.artifacts().stream().map(AgentResult.Artifact::name).collect(java.util.stream.Collectors.toSet()).equals(Set.of("presentation.pptx","presentation-source.json")))incompatible();
+                    code=true;
+                }
+            }
             if("run_javascript".equals(tool.name())){if(!settings.mode().equals("verification"))incompatible();code=code || "succeeded".equals(tool.status());}
         }
         if(!r.originalIds().isEmpty() && r.tools().stream().noneMatch(t->"read_original".equals(t.name())))incompatible();
@@ -255,20 +276,35 @@ public class AgentTaskService {
         validateResearch(job,r);
         int total=db.queryForObject("SELECT coalesce(sum(octet_length(content)),0) FROM conversation_artifacts WHERE task_id=? AND attempt_number=(SELECT attempt FROM conversation_tasks WHERE id=?)",Integer.class,job.id(),job.id());
         if(r.artifacts().size()+db.queryForObject("SELECT count(*) FROM conversation_artifacts WHERE task_id=? AND attempt_number=(SELECT attempt FROM conversation_tasks WHERE id=?)",Integer.class,job.id(),job.id())>8)incompatible();
-        var files=new ArrayList<Download>();
+        var files=new ArrayList<ArtifactTransferService.File>();
+        var transferIds=new HashSet<UUID>();var names=new HashSet<String>();int inlineBytes=0;
         try{
             for(var artifact:r.artifacts()){
-                if(artifact==null || artifact.name()==null || !artifact.name().matches("[A-Za-z0-9][A-Za-z0-9._-]{0,79}") || artifact.contentBase64()==null || artifact.contentBase64().length()>90000 || artifact.sha256()==null || !artifact.sha256().matches("[0-9a-f]{64}"))incompatible();
-                byte[] bytes=Base64.getDecoder().decode(artifact.contentBase64());total+=bytes.length;
-                if(total>65536 || !Base64.getEncoder().encodeToString(bytes).equals(artifact.contentBase64()) || !HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)).equals(artifact.sha256()))incompatible();
-                files.add(new Download(artifact.name(),artifact.sha256(),bytes));
+                if(artifact==null || artifact.name()==null || !artifact.name().matches("[A-Za-z0-9][A-Za-z0-9._-]{0,79}") ||
+                   !names.add(artifact.name().toLowerCase(Locale.ROOT)) || artifact.sha256()==null || !artifact.sha256().matches("[0-9a-f]{64}"))incompatible();
+                if(Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM conversation_artifacts WHERE task_id=? AND attempt_number=(SELECT attempt FROM conversation_tasks WHERE id=?) AND lower(filename)=lower(?))",Boolean.class,job.id(),job.id(),artifact.name())))incompatible();
+                if(artifact.uploadId()!=null){
+                    if(!"1.5".equals(r.contractVersion()) || artifact.contentBase64()!=null || !transferIds.add(artifact.uploadId()))incompatible();
+                    var file=artifactTransfers.resolve(job.id(),job.token(),artifact.uploadId(),artifact.name(),artifact.sha256());
+                    total+=file.bytes().length;files.add(file);
+                }else{
+                    if(artifact.contentBase64()==null || artifact.contentBase64().length()>90000)incompatible();
+                    byte[] bytes=Base64.getDecoder().decode(artifact.contentBase64());total+=bytes.length;inlineBytes+=bytes.length;
+                    if(inlineBytes>65536 || !Base64.getEncoder().encodeToString(bytes).equals(artifact.contentBase64()) || !HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)).equals(artifact.sha256()))incompatible();
+                    files.add(new ArtifactTransferService.File(UUID.randomUUID(),artifact.name(),artifact.sha256(),bytes));
+                }
+                if(total>ArtifactTransferService.MAX_BYTES)incompatible();
             }
         }catch(IdentityException error){throw error;}catch(Exception error){incompatible();}
+        if(transferIds.isEmpty() && total>65536)incompatible();
         int ordinal=0;
         for(UUID source:r.sourceIds())db.update("INSERT INTO conversation_sources(tenant_id,workspace_id,task_id,chunk_id,ordinal,attempt_number) VALUES (?,?,?,?,?,(SELECT attempt FROM conversation_tasks WHERE id=?))",job.tenant(),job.space(),job.id(),source,ordinal++,job.id());
-        for(var file:files)db.update("INSERT INTO conversation_artifacts(id,tenant_id,workspace_id,task_id,filename,sha256,content,attempt_number) VALUES (?,?,?,?,?,?,?,(SELECT attempt FROM conversation_tasks WHERE id=?))",UUID.randomUUID(),job.tenant(),job.space(),job.id(),file.filename(),file.sha256(),file.bytes(),job.id());
+        for(var file:files){
+            db.update("INSERT INTO conversation_artifacts(id,tenant_id,workspace_id,task_id,filename,sha256,content,attempt_number,transferred) VALUES (?,?,?,?,?,?,?,(SELECT attempt FROM conversation_tasks WHERE id=?),?)",file.id(),job.tenant(),job.space(),job.id(),file.filename(),file.sha256(),file.bytes(),job.id(),transferIds.contains(file.id()));
+            if(transferIds.contains(file.id()))artifactTransfers.published(job.id(),job.token(),file.id());
+        }
         String state="COMPLETE".equals(outcome)?"SUCCEEDED":outcome;
-        String waitReason="WAITING_INPUT".equals(state)?"INPUT_REQUIRED":"WAITING_CAPABILITY".equals(state)?"CAPABILITY_UNAVAILABLE":null;
+        String waitReason="WAITING_INPUT".equals(state)?(presentations.draft(job.id())?"PRESENTATION_CONFIRMATION":"INPUT_REQUIRED"):"WAITING_CAPABILITY".equals(state)?"CAPABILITY_UNAVAILABLE":null;
         db.update("UPDATE conversation_tasks SET status=?,wait_reason=?,required_input=?,revision=revision+1,reply=?,model_name=?,model_calls=?,token_usage=CAST(? AS jsonb),tool_receipts=CAST(? AS jsonb),engine_version=?,web_sources=CAST(? AS jsonb),skills=CAST(? AS jsonb),lease_token=NULL,lease_until=NULL,finished_at=now() WHERE id=?",state,waitReason,r.requiredInput(),r.text(),r.modelName(),r.modelCalls(),json.writeValueAsString(r.usage()),json.writeValueAsString(r.tools()),r.engineVersion(),json.writeValueAsString(r.webSources()),json.writeValueAsString(r.skills()),job.id());
         if("SUCCEEDED".equals(state)&&db.queryForObject("SELECT EXISTS(SELECT 1 FROM briefing_generation_batches WHERE task_id=? AND business_type='INFO')",Boolean.class,job.id()))for(var source:r.webSources())if("PAGE".equals(source.kind()))db.update("INSERT INTO news_article_deliveries(tenant_id,owner_id,url,sha256,task_id,published_at,retrieved_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT DO NOTHING",job.tenant(),job.actor(),source.url(),source.sha256(),job.id(),source.publishedAt()==null?null:java.sql.Timestamp.from(source.publishedAt()),java.sql.Timestamp.from(source.retrievedAt()));
         conversations.archive(job.id());
@@ -284,6 +320,7 @@ public class AgentTaskService {
         for(var skill:result.skills()){
             if(skill==null || skill.id()==null || !skill.id().matches("[a-z][a-z0-9-]{0,63}") || !skills.add(skill.id()) || skill.version()==null || !skill.version().matches("[0-9]{1,8}\\.[0-9]{1,8}\\.[0-9]{1,8}") || skill.sha256()==null || !skill.sha256().matches("[a-f0-9]{64}") || "public-research".equals(skill.id()) && !publicAllowed || "candidate-trials".equals(skill.id()) && (!publicAllowed || !settings.candidateTrialsEnabled()))incompatible();
         }
+        if(result.tools().stream().anyMatch(t->"read_skill_resource".equals(t.name())) && skills.isEmpty())incompatible();
         if(!skills.isEmpty() && result.tools().stream().noneMatch(t->"activate_skill".equals(t.name())))incompatible();
         if(!result.webSources().isEmpty() && (!skills.contains("public-research") || result.tools().stream().noneMatch(t->"public_search".equals(t.name()))))incompatible();
         if(result.tools().stream().anyMatch(t->Set.of("public_search","read_public_page").contains(t.name())) && !skills.contains("public-research"))incompatible();

@@ -75,3 +75,25 @@
     padding: 16px;
   }
 }
+
+.input-foundation-intro {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.input-foundation-intro h2 {
+  margin: 0;
+}
+.input-foundation-label {
+  color: var(--muted);
+  font-size: 13px;
+}
+.deployed-fields {
+  margin: 24px 0;
+}
+.deployed-fields summary {
+  cursor: pointer;
+  font-weight: 600;
+}

@@ -56,6 +56,16 @@ async function fixture(context: BrowserContext, control: { mode?: string; paths?
         invitationDelivery: 'DISABLED',
         checkedAt: new Date().toISOString(),
       });
+    if (path.endsWith('/knowledge/workbench'))
+      return json({
+        tenantId: tenant,
+        checkedAt: new Date().toISOString(),
+        summary: { total: 0, ready: 0, processing: 0, attention: 0, notStarted: 0 },
+        spaces: [],
+        filteredTotal: 0,
+        items: [],
+        hasMore: false,
+      });
     if (path.endsWith('/overview'))
       return json({
         tenantId: tenant,
@@ -247,8 +257,8 @@ test('enterprise sidebar, unified member navigation and customer return stay sep
   const back = '#' + new URLSearchParams({ tenant, view: 'conversations', conversation: id(9) });
   await page.goto('/tenant-admin/#' + new URLSearchParams({ tenant, back }));
   const nav = page.getByRole('complementary', { name: '企业管理导航' });
-  await expect(nav.locator('nav a')).toHaveCount(8);
-  await expect(page.getByRole('heading', { level: 1, name: '企业概览', exact: true })).toBeVisible();
+  await expect(nav.locator('nav a')).toHaveCount(13);
+  await expect(page.getByRole('heading', { level: 1, name: '知识工作台', exact: true })).toBeVisible();
   await nav.getByRole('link', { name: '成员与空间', exact: true }).click();
   await expect(page.getByRole('navigation', { name: '成员与空间' }).getByRole('link')).toHaveCount(4);
   await expect(page.getByRole('navigation', { name: '管理工作区' })).toHaveCount(0);
@@ -270,9 +280,9 @@ test('enterprise sidebar, unified member navigation and customer return stay sep
     '/workspace/' + back,
   );
   await expect(page.locator('a[href*="/platform-admin/"]')).toHaveCount(0);
-  await nav.getByRole('link', { name: '企业概览', exact: true }).click();
-  await expect(page.getByRole('heading', { level: 1, name: '企业概览', exact: true })).toBeVisible();
-  await expect(page.getByText('启用成员', { exact: true })).toBeVisible();
+  await nav.getByRole('link', { name: '知识工作台', exact: true }).click();
+  await expect(page.getByRole('heading', { level: 1, name: '知识工作台', exact: true })).toBeVisible();
+  await expect(page.getByText('暂无可访问的共享资料', { exact: true })).toBeVisible();
   await page.screenshot({ path: 'test-results/tenant-admin-overview.png', fullPage: true });
   for (const width of [834, 360]) {
     await page.setViewportSize({ width, height: 900 });
@@ -373,4 +383,17 @@ test('overview rejects mismatched monthly scope and fits a narrow viewport', asy
   await expect(monthly.getByText('暂时无法读取', { exact: true })).toBeVisible();
   await expect(page.getByText('53', { exact: true })).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test('enterprise settings restores existing identity rename entry without changing background tags', async ({
+  page,
+  context,
+}) => {
+  await fixture(context);
+  await page.goto(`/tenant-admin/#tenant=${tenant}&admin=company&detail=settings`);
+  await expect(page.getByRole('heading', { name: '企业设置', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '修改名称', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '邀请成员', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: '修改名称', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '修改企业名称', exact: true })).toBeVisible();
 });

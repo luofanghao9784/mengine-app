@@ -14,8 +14,9 @@
         },
         "tools": {
           "type": "array",
-          "minItems": 1,
-          "maxItems": 16,
+          "minItems": 0,
+          "description": "Empty only for server-registered Wiki learning, relationship or source insight tasks; other tasks require at least one tool. Server authorization enforces the task kind.",
+          "maxItems": 20,
           "uniqueItems": true,
           "items": {
             "enum": [
@@ -37,7 +38,9 @@
               "compare_dataset",
               "deliver_briefing",
               "manage_plan",
-              "ask_user"
+              "ask_user",
+              "read_skill_resource",
+              "render_presentation"
             ]
           }
         }
@@ -121,7 +124,9 @@
             "compare_dataset",
             "deliver_briefing",
             "manage_plan",
-            "ask_user"
+            "ask_user",
+            "read_skill_resource",
+            "render_presentation"
           ]
         },
         "status": {

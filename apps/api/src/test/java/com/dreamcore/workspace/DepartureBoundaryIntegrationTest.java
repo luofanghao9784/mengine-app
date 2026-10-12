@@ -47,7 +47,7 @@ class DepartureBoundaryIntegrationTest {
   assertEquals(List.of(shared),identities.context(actor,tenant).workspaces().stream().map(IdentityService.Workspace::id).toList());
   assertTrue(materials.list(other,tenant,null,null,"",0,1).items().isEmpty());assertEquals(0,knowledge.search(other,tenant,null,"departure",0,1).coverage().totalVersions());
   assertTrue(identities.context(other,tenant).workspaces().isEmpty());
-  denied(403,()->materials.list(actor,tenant,excluded,null,"",0,20));denied(403,()->materials.list(actor,tenant,personal,null,"",0,20));
+  denied(404,()->materials.list(actor,tenant,excluded,null,"",0,20));denied(404,()->materials.list(actor,tenant,personal,null,"",0,20));
  }
  @Test void currentSharedExportRightNeverReopensPrivateConversationsOrNewWork(){
   var sent=conversations.submit(actor,tenant,null,shared,UUID.randomUUID(),"合成旧任务","AGENT");var running=conversations.claim();assertNotNull(running);exit();
@@ -61,10 +61,10 @@ class DepartureBoundaryIntegrationTest {
  }
  @Test void exitDeadlineAndRevocationAreEffectiveWithoutWaitingForCleanup(){
   var f=file(shared);UUID id=exit();UUID version=db.queryForObject("SELECT id FROM material_versions WHERE material_id=?",UUID.class,f.id());assertTrue(materials.download(actor,tenant,shared,f.id(),version).bytes().length>0);
-  db.update("DELETE FROM governance_capabilities WHERE tenant_id=? AND account_id=? AND capability='BULK_EXPORT'",tenant,actor);denied(403,()->materials.download(actor,tenant,shared,f.id(),version));
+  db.update("DELETE FROM governance_capabilities WHERE tenant_id=? AND account_id=? AND capability='BULK_EXPORT'",tenant,actor);denied(404,()->materials.download(actor,tenant,shared,f.id(),version));
   db.update("INSERT INTO governance_capabilities(tenant_id,account_id,capability,granted_by) VALUES (?,?,'BULK_EXPORT',?)",tenant,actor,actor);
   db.update("UPDATE departure_executions SET effective_at=now()-interval '2 days',deadline=now()-interval '1 day' WHERE id=?",id);
-  denied(403,()->materials.download(actor,tenant,shared,f.id(),version));assertTrue(materials.list(actor,tenant,null,null,"",0,20).items().isEmpty());
+  denied(404,()->materials.download(actor,tenant,shared,f.id(),version));assertTrue(materials.list(actor,tenant,null,null,"",0,20).items().isEmpty());
   denied(409,()->identities.invite(actor,tenant,UUID.randomUUID(),"new-"+UUID.randomUUID()+"@example.test"));denied(409,()->admin.createSpace(actor,tenant,UUID.randomUUID(),"不应恢复业务",actor,""));
  }
  @Test void ordinaryMemberEnableCannotUndoFormalOffboarding(){

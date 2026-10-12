@@ -12,6 +12,16 @@ export class IdentityError extends Error {
   readonly status: number;
   constructor(code: string, status = 0) {
     const messages: Record<string, string> = {
+      PRESENTATION_UNAVAILABLE: 'PPT 生成环境尚未开放，请稍后再试。',
+      PRESENTATION_CONFIRMATION_REQUIRED: '请先在大纲卡片中确认内容，再继续生成 PPT。',
+      PRESENTATION_OPTIONS_MISMATCH: '生成的大纲与页数或风格设置不一致，请重试。',
+      GOVERNANCE_PROPOSAL_CHANGED: '来源、维护记录或提案状态已变化，请刷新后重新核对。',
+      WIKI_NO_CANDIDATES: '暂无可分析的有效共享知识，请先学习并发布。',
+      WIKI_REVISION_CONFLICT: '知识已被更新，请刷新后核对最新版本再操作。',
+      WIKI_SOURCE_CHANGED: '知识、资料版本或解析批次已变化，请刷新后重新学习或分析。',
+      WIKI_SOURCE_NOT_READY: '尚无可学习的解析片段，请先完成资料解析。',
+      WIKI_LEARNING_BUSY: '已有等待、进行中或待核对的 Wiki 任务，请查看学习草稿或知识关系中的原任务。',
+      WIKI_RESULT_INVALID: 'Wiki 结果未通过范围或引用依据检查，请核对来源后重新发起。',
       SUPPORT_ACCESS_EXPIRED: '总部访问已失效，请返回总台重新进入。',
       SUPPORT_SCOPE_DENIED: '此操作不属于当前总部访问范围。负责人交接须通过专门流程。',
       CONVERSATION_BUSY: '会话正在执行，请选择停止并删除。',
@@ -63,10 +73,10 @@ export class IdentityError extends Error {
       LIBRARY_MOVE_TOO_LARGE: '本次涉及的目录或人员过多，请缩小移动范围。',
       LIBRARY_MOVE_PREVIEW_STALE: '资料、成员或权限已有变化，请重新预览并核对后移动。',
       LIBRARY_MOVE_PERMISSION_MANAGER_REQUIRED: '此次移动涉及权限变化，需要空间管理员确认。',
+      LIBRARY_AUDIT_UNAVAILABLE: '操作记录服务暂不可用，本次操作未执行，请稍后重试。',
       LIBRARY_PERMISSION_DENIED: '你没有此资料的操作权限。',
       LIBRARY_DOWNLOAD_DENIED: '此资料未授予下载权限，可继续在线查看。',
       LIBRARY_MANAGE_FILES_REQUIRED: '移动和删除需要管理员或明确委派资格。',
-      LIBRARY_AUDIT_UNAVAILABLE: '操作记录服务暂不可用，本次操作未执行，请稍后重试。',
       LIBRARY_POLICY_PREVIEW_STALE: '成员、资料或权限已变化，请重新核对影响后保存。',
       LIBRARY_POLICY_PREVIEW_TOO_LARGE: '本次涉及的人员与资料过多，请联系管理员拆分授权范围。',
       LIBRARY_POLICY_CONFLICT: '权限或部门成员已被其他人修改，请重新打开并核对。',
@@ -98,6 +108,14 @@ export class IdentityError extends Error {
       TASK_ORIGINAL_TOO_LARGE: '单份原件上限 256 KiB，合计上限 512 KiB，请选择较小文件。',
       TASK_ORIGINALS_DISABLED: '当前任务环境尚未开放原件处理。',
       MATERIAL_TOO_LARGE: '文件超过本环境的上传上限，请选择较小文件。',
+      MATERIAL_GOVERNANCE_VERSION_CONFLICT: '文件版本或检查记录已经变化，请重新核对后再处理。',
+      MATERIAL_GOVERNANCE_TEXT_LIMIT: '检查文本超过本批 200 万字节或字符的处理范围，请拆分资料后重试。',
+      MATERIAL_GOVERNANCE_UTF8_REQUIRED: '该文本不是有效 UTF-8 编码，请先转换编码并上传新版本。',
+      MATERIAL_GOVERNANCE_REDACTION_TEXT_ONLY:
+        '自动脱敏仅支持 UTF-8 TXT 或 Markdown 原件；其他格式请修订原件后上传新版本。',
+      MATERIAL_GOVERNANCE_NO_SENSITIVE_MATCH: '当前版本没有可替换的敏感格式，不会生成重复版本。',
+      MATERIAL_TEXT_UNSUPPORTED:
+        '该资料不支持在线正文编辑，请上传新版本。仅支持 256 KB 内的 UTF-8 TXT 或 Markdown。',
       MATERIAL_VERSION_CONFLICT: '已有更新的版本。请关闭详情并刷新，核对最新版本后再上传。',
       MATERIAL_FOLDER_DEPTH: '文件夹层级已达到本环境上限。',
       MATERIAL_STORAGE_UNAVAILABLE: '原件存储暂不可用，请稍后重试。',

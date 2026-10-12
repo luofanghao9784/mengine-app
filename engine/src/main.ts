@@ -1,3 +1,4 @@
+import { PresentationRenderer } from './runtime/presentation-renderer.js';
 import { createEngineServer } from './server.js';
 import { AgentTasks } from './runtime/agent-task.js';
 import { BingNewsSearch } from './runtime/news-search.js';
@@ -34,12 +35,16 @@ const publicWeb = webEnabled
           : {}),
     }
   : undefined;
+const presentationRenderer =
+  process.env.AGENT_PPT_RENDERER_ENABLED === 'true' ? new PresentationRenderer() : undefined;
+if (presentationRenderer) await presentationRenderer.check();
 const agent = model
   ? new AgentTasks({
       platformBaseUrl: process.env.AGENT_PLATFORM_URL ?? '',
       executionClass: 'live',
       modelName: model.modelName,
       publicWeb,
+      presentationRenderer,
       createModel: model.createModel,
     })
   : undefined;

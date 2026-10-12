@@ -1,3 +1,8 @@
+import { DocumentCatalog } from './mengine/DocumentCatalog';
+import { MaterialGovernance } from '../material/MaterialGovernance';
+import { GovernanceProposals } from '../material/GovernanceProposals';
+import { WikiSources } from './WikiSources';
+import { TenantAudit } from '../tenant/TenantAudit';
 import { SurfaceLinks } from '../identity/SurfaceAccess';
 import { NewsSources } from '../news/NewsSources';
 import { ExpressionPreferencesPanel } from '../preferences/ExpressionPreferencesPanel';
@@ -46,9 +51,20 @@ export function TenantConsole({
   );
   const refresh = () => setAttempt((n) => n + 1);
   const limited = governance.value && !governance.value.canConfigure;
-  const limitedPages: AdminPage[] = ['members', 'database', 'materials', 'experience'];
+  const limitedPages: AdminPage[] = [
+    'members',
+    'database',
+    'materials',
+    'experience',
+    'wiki',
+    'proposals',
+    'catalog',
+    'governance',
+  ];
   if (
-    governance.value?.capabilities.some((c) => ['PROFILE_MAINTAIN', 'TENANT_EXIT'].includes(c.capability) && c.workspaceId === null)
+    governance.value?.capabilities.some(
+      (c) => ['PROFILE_MAINTAIN', 'TENANT_EXIT'].includes(c.capability) && c.workspaceId === null,
+    )
   )
     limitedPages.push('company');
   const page = limited && !limitedPages.includes(requestedPage) ? 'members' : requestedPage;
@@ -137,6 +153,16 @@ export function TenantConsole({
             <Button onClick={refresh}>重新检查权限</Button>
           </Empty>
         </>
+      ) : page === 'catalog' ? (
+        <DocumentCatalog key={tenant} tenant={tenant} hash={hash} />
+      ) : page === 'governance' ? (
+        <MaterialGovernance key={tenant} tenant={tenant} />
+      ) : page === 'proposals' ? (
+        <GovernanceProposals tenant={tenant} />
+      ) : page === 'wiki' ? (
+        <WikiSources key={tenant} tenant={tenant} />
+      ) : page === 'audit' ? (
+        <TenantAudit key={tenant} tenant={tenant} />
       ) : page === 'overview' ? (
         <AdminOverview
           realm="tenant"
@@ -224,6 +250,7 @@ export function TenantConsole({
           <nav className="platform-detail-nav" aria-label="企业信息栏目">
             {[
               ['background', '企业背景'],
+              ...(governance.value.canConfigure ? [['settings', '企业设置']] : []),
               ['preferences', 'AI内容偏好'],
               ...(governance.value.canConfigure ? [['news', '资讯来源']] : []),
               ...(governance.value.canConfigure ? [['records', '管理记录']] : []),
@@ -240,7 +267,8 @@ export function TenantConsole({
                 href={adminHref('tenant', 'company', hash, key === 'background' ? {} : { detail: key })}
                 aria-current={
                   key === secondary ||
-                  (key === 'background' && !['preferences', 'records', 'retention'].includes(secondary || ''))
+                  (key === 'background' &&
+                    !['preferences', 'records', 'retention', 'settings', 'news'].includes(secondary || ''))
                     ? 'page'
                     : undefined
                 }
@@ -252,18 +280,20 @@ export function TenantConsole({
               </a>
             ))}
           </nav>
-          {secondary === 'news' && governance.value.canConfigure ? (
+          {secondary === 'settings' && governance.value.canConfigure ? (
+            <TenantAdminHome
+              key={tenant + ':settings'}
+              tenant={tenant}
+              compact
+              hideNavigation
+              initialTab="settings"
+            />
+          ) : secondary === 'news' && governance.value.canConfigure ? (
             <NewsSources key={tenant} tenant={tenant} />
           ) : secondary === 'preferences' ? (
             <ExpressionPreferencesPanel key={tenant} scope="TENANT" tenant={tenant} />
           ) : secondary === 'records' && governance.value.canConfigure ? (
-            <TenantAdminHome
-              key={tenant + ':records'}
-              tenant={tenant}
-              compact
-              initialTab="records"
-              hideNavigation
-            />
+            <TenantAudit key={tenant + ':records'} tenant={tenant} />
           ) : secondary === 'retention' &&
             (governance.value.canConfigure ||
               governance.value.capabilities.some(

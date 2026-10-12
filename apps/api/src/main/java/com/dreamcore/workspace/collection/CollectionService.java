@@ -19,7 +19,7 @@ public class CollectionService {
     public record Connection(UUID id,String name,String routeLabel,String accessSummary,String status,long revision,boolean canControl,
         Schedule schedule,Instant nextDue,Instant lastSuccessAt,Run currentRun,Run lastRun) {}
     public record Dataset(UUID id,UUID connectionId,UUID workspaceId,String workspaceName,String name,String description,
-        List<String> columns,Integer version,Integer rowCount,Instant collectedAt,Instant coverageThrough,Run latestRun) {}
+        List<String> columns,List<DatasetField> fieldDefinitions,Integer version,Integer rowCount,Instant collectedAt,Instant coverageThrough,Run latestRun) {}
     public record Summary(long datasets,long available,long updating,long failed) {}
     public record DataPage(List<Dataset> items,boolean hasMore) {}
     public record Preview(Dataset dataset,List<List<String>> rows,boolean hasMore) {}
@@ -43,7 +43,7 @@ public class CollectionService {
         return controls(actor,tenant)||Boolean.TRUE.equals(db.queryForObject("""
             SELECT EXISTS(SELECT 1 FROM business_datasets d JOIN workspace_members g
               ON g.tenant_id=d.tenant_id AND g.workspace_id=d.workspace_id AND g.account_id=headquarters_permission_actor(?,g.tenant_id)
-              WHERE d.tenant_id=? AND d.connection_id=? AND d.status='ACTIVE')
+              WHERE d.tenant_id=? AND d.connection_id=? AND d.status='ACTIVE' AND (library_mask(g.account_id,d.tenant_id,'WORKSPACE',d.workspace_id)&1)=1)
             """,Boolean.class,actor,tenant,connection));
     }
     private Run run(Map<String,Object> row){return new Run((UUID)row.get("id"),(String)row.get("trigger_kind"),(String)row.get("status"),(String)row.get("reason"),instant(row.get("created_at")),instant(row.get("started_at")),instant(row.get("finished_at")));}
@@ -52,7 +52,7 @@ public class CollectionService {
     private String effectiveStatus(Map<String,Object> c){return "READY".equals(c.get("status"))&&!adapter.available()?"UNCONFIGURED":(String)c.get("status");}
     private Connection project(UUID actor,UUID tenant,Map<String,Object> c){
         UUID id=(UUID)c.get("id");String state=effectiveStatus(c);boolean control=controls(actor,tenant);
-        String scope=control?(String)c.get("access_summary"):"当前获权空间："+String.join("、",db.queryForList("SELECT DISTINCT w.name FROM business_datasets d JOIN workspaces w ON w.id=d.workspace_id JOIN workspace_members g ON g.tenant_id=d.tenant_id AND g.workspace_id=d.workspace_id AND g.account_id=headquarters_permission_actor(?,g.tenant_id) WHERE d.tenant_id=? AND d.connection_id=? AND d.status='ACTIVE' AND departure_content_readable(headquarters_permission_actor(?,d.tenant_id),d.tenant_id,d.workspace_id) ORDER BY w.name",String.class,actor,tenant,id,actor));
+        String scope=control?(String)c.get("access_summary"):"当前获权空间："+String.join("、",db.queryForList("SELECT DISTINCT w.name FROM business_datasets d JOIN workspaces w ON w.id=d.workspace_id JOIN workspace_members g ON g.tenant_id=d.tenant_id AND g.workspace_id=d.workspace_id AND g.account_id=headquarters_permission_actor(?,g.tenant_id) WHERE d.tenant_id=? AND d.connection_id=? AND d.status='ACTIVE' AND (library_mask(g.account_id,d.tenant_id,'WORKSPACE',d.workspace_id)&1)=1 AND departure_content_readable(headquarters_permission_actor(?,d.tenant_id),d.tenant_id,d.workspace_id) ORDER BY w.name",String.class,actor,tenant,id,actor));
         Instant success=db.queryForObject("SELECT max(finished_at) FROM collection_runs WHERE connection_id=? AND status='SUCCEEDED'",(r,n)->instant(r.getTimestamp(1)),id);
         return new Connection(id,(String)c.get("name"),(String)c.get("route_label"),scope,state,((Number)c.get("revision")).longValue(),control,
             new Schedule((Boolean)c.get("auto_enabled"),(String)c.get("frequency"),(String)c.get("daily_time"),(String)c.get("time_zone")),"READY".equals(state)?instant(c.get("next_due")):null,success,latest(id,true),latest(id,false));
@@ -161,7 +161,7 @@ public class CollectionService {
     }
     public List<Map<String,Object>> candidates(){return db.queryForList("SELECT c.tenant_id,c.id FROM data_connections c JOIN tenants t ON t.id=c.tenant_id WHERE t.status='ACTIVE' AND NOT EXISTS(SELECT 1 FROM departure_executions e WHERE e.tenant_id=c.tenant_id AND e.kind='TENANT_EXIT' AND e.state<>'CANCELLED') AND ((c.status='READY' AND c.auto_enabled AND c.next_due<=now()) OR EXISTS(SELECT 1 FROM collection_runs r WHERE r.connection_id=c.id AND (r.status='QUEUED' OR (r.status='RUNNING' AND r.lease_until<=now())))) ORDER BY c.next_due NULLS LAST,c.id LIMIT 100");}
     private Dataset dataset(Map<String,Object> d){
-        UUID connection=(UUID)d.get("connection_id");return new Dataset((UUID)d.get("id"),connection,(UUID)d.get("workspace_id"),(String)d.get("workspace_name"),(String)d.get("name"),(String)d.get("description"),strings(d.get("column_names")),(Integer)d.get("version"),(Integer)d.get("row_count"),instant(d.get("collected_at")),instant(d.get("coverage_through")),latest(connection,false));
+        UUID connection=(UUID)d.get("connection_id");return new Dataset((UUID)d.get("id"),connection,(UUID)d.get("workspace_id"),(String)d.get("workspace_name"),(String)d.get("name"),(String)d.get("description"),strings(d.get("column_names")),DatasetField.read(d.get("field_definitions")),(Integer)d.get("version"),(Integer)d.get("row_count"),instant(d.get("collected_at")),instant(d.get("coverage_through")),latest(connection,false));
     }
     private static final String DATASETS="""
         SELECT d.*,w.name AS workspace_name,s.version,s.row_count,s.collected_at,s.coverage_through
@@ -169,7 +169,7 @@ public class CollectionService {
         JOIN workspace_members g ON g.tenant_id=w.tenant_id AND g.workspace_id=w.id AND g.account_id=headquarters_permission_actor(?,g.tenant_id)
         LEFT JOIN dataset_snapshots s ON s.dataset_id=d.id AND s.id=d.current_snapshot
         LEFT JOIN LATERAL (SELECT status FROM collection_runs r WHERE r.connection_id=d.connection_id ORDER BY created_at DESC,id DESC LIMIT 1) latest_run ON true
-        WHERE d.tenant_id=? AND d.status='ACTIVE' AND departure_content_readable(headquarters_permission_actor(?,d.tenant_id),d.tenant_id,d.workspace_id)
+        WHERE d.tenant_id=? AND d.status='ACTIVE' AND (library_mask(g.account_id,d.tenant_id,'WORKSPACE',d.workspace_id)&1)=1 AND departure_content_readable(headquarters_permission_actor(?,d.tenant_id),d.tenant_id,d.workspace_id)
         """;
     @Transactional public Summary summary(UUID actor,UUID tenant){
         member(actor,tenant);

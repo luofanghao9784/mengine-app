@@ -66,7 +66,20 @@ const dataset = (v: unknown): v is BusinessDataset =>
   (v.rowCount === null || count(v.rowCount)) &&
   nullableTime(v.collectedAt) &&
   nullableTime(v.coverageThrough) &&
-  nullableRun(v.latestRun);
+  nullableRun(v.latestRun) &&
+  (v.fieldDefinitions === undefined ||
+    (Array.isArray(v.fieldDefinitions) &&
+      (v.fieldDefinitions.length === 0 || v.fieldDefinitions.length === v.columns.length) &&
+      v.fieldDefinitions.every(
+        (f, i) =>
+          record(f) &&
+          f.column === (v.columns as string[])[i] &&
+          text(f.type) &&
+          text(f.meaning) &&
+          typeof f.unit === 'string' &&
+          text(f.evidence) &&
+          ['SOURCE_DOCUMENTED', 'DEPLOYMENT_INFERRED', 'UNKNOWN'].includes(String(f.status)),
+      )));
 import type { DatasetLifecycle } from '../../contracts/public-api/collection.ts';
 export type { DatasetLifecycle } from '../../contracts/public-api/collection.ts';
 const lifecycle = (v: unknown): v is DatasetLifecycle =>

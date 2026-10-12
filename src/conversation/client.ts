@@ -137,7 +137,7 @@ const task = (v: unknown): v is ConversationTask =>
       text(a.sha256) &&
       /^[0-9a-f]{64}$/.test(a.sha256) &&
       count(a.bytes) &&
-      a.bytes <= 65536,
+      a.bytes <= 20971520,
   ) &&
   states.includes(String(v.status)) &&
   count(v.revision) &&
@@ -353,7 +353,7 @@ export function createConversationClient(fetcher: typeof fetch = fetch) {
                   text(f.filename) &&
                   digest(f.sha256) &&
                   count(f.bytes) &&
-                  f.bytes <= 65536,
+                  f.bytes <= 20971520,
               ),
           ),
         undefined,
@@ -398,7 +398,7 @@ export function createConversationClient(fetcher: typeof fetch = fetch) {
             const next = await reader.read();
             if (next.done) break;
             length += next.value.length;
-            if (length > 65536 || length > artifact.bytes) throw new IdentityError('CONTRACT_MISMATCH');
+            if (length > 20971520 || length > artifact.bytes) throw new IdentityError('CONTRACT_MISMATCH');
             chunks.push(next.value);
           }
         } finally {

@@ -1,3 +1,6 @@
+import { PresentationDraft } from './PresentationDraft';
+import { presentationClient } from './presentation-client';
+import type { PresentationOptions } from '../../contracts/public-api/presentation';
 import { LiveReply, ReplyProgress } from './LiveReply';
 import { ReplyText } from './ReplyText';
 import { CardTypeTag } from './CardTypeTag';
@@ -390,7 +393,9 @@ function ConversationView({
             t.id ===
               (responseId === 'auto' && latestTask?.status === 'WAITING_INPUT'
                 ? latestTask.id
-                : responseId) && t.status === 'WAITING_INPUT',
+                : responseId) &&
+            t.status === 'WAITING_INPUT' &&
+            t.waitReason !== 'PRESENTATION_CONFIRMATION',
         )
       : undefined;
   // Reset session-owned state before committing a new selection; keep the deck/list DOM mounted.
@@ -732,6 +737,17 @@ function TaskCard({
             <ReplyText text={task.reply} />
           </div>
         )}
+        {task.status === 'WAITING_INPUT' &&
+          task.waitReason === 'PRESENTATION_CONFIRMATION' &&
+          !task.sourcesUnavailable && (
+            <PresentationDraft
+              tenant={tenant}
+              conversation={conversation}
+              task={task.id}
+              revision={task.revision}
+              changed={changed}
+            />
+          )}
         {task.reply && retainedProcess.length > 0 && (
           <details className="reply-process-history">
             <summary>查看处理过程</summary>
@@ -1162,6 +1178,17 @@ export function ConversationComposer({
   const [loaded] = useState(() => readTabDraft(key));
   const initial = useRef(record(loaded.value) ? loaded.value : {});
   const [stored, setStored] = useState(!loaded.unreadable);
+  const pptCapability = useRemote((signal) => presentationClient.capability(tenant, signal), [tenant]);
+  const [presentation, setPresentation] = useState<PresentationOptions | undefined>(() => {
+    const value = initial.current.presentation;
+    return record(value) &&
+      Number.isInteger(value.pages) &&
+      Number(value.pages) >= 1 &&
+      Number(value.pages) <= 8 &&
+      ['ocean', 'ink'].includes(String(value.theme))
+      ? (value as unknown as PresentationOptions)
+      : undefined;
+  });
   // New sends always use AI. Uncertain historical sends retain their exact body below.
   const mode: SendTask['mode'] = 'AGENT';
   const [publicQuery, setPublicQuery] = useState(
@@ -1266,6 +1293,7 @@ export function ConversationComposer({
         draftConversation,
         draftRequestId,
         selectedOnly,
+        presentation,
       }),
     );
   }, [
@@ -1279,6 +1307,7 @@ export function ConversationComposer({
     draftConversation,
     draftRequestId,
     selectedOnly,
+    presentation,
   ]);
   const allowed = context.workspaces.some((s) => s.id === (space || location));
   return (
@@ -1358,12 +1387,13 @@ export function ConversationComposer({
           workspaceId: space || location,
           prompt: text.trim(),
           mode,
+          ...(presentation ? { presentation } : {}),
           sourceScope:
             selectedOnly && originals.length ? ('SELECTED' as const) : ('AUTHORIZED_LIBRARY' as const),
           ...(mode === 'AGENT' && originals.length
             ? { originals: originals.map(({ materialId, versionId }) => ({ materialId, versionId })) }
             : {}),
-          ...(mode === 'AGENT' && !selectedOnly && publicWebEnabled
+          ...(mode === 'AGENT' && !presentation && !selectedOnly && publicWebEnabled
             ? { publicQuery: publicQuery.trim() || 'web:optional:v1' }
             : {}),
         };
@@ -1378,6 +1408,7 @@ export function ConversationComposer({
             draftConversation,
             draftRequestId,
             selectedOnly,
+            presentation,
           }),
         );
         setPending(body);
@@ -1391,6 +1422,7 @@ export function ConversationComposer({
           const result = await api.send(tenant, selected || draftConversation, body, request.signal);
           if (request.signal.aborted) return;
           setText('');
+          setPresentation(undefined);
           setPublicQuery('');
           setOriginals([]);
           setPending(undefined);
@@ -1443,6 +1475,45 @@ export function ConversationComposer({
               </Button>
             </div>
           )}
+          {presentation && (
+            <div className="presentation-options" aria-label="PPT 生成设置">
+              <strong>PPT 生成</strong>
+              <label>
+                页数{' '}
+                <select
+                  aria-label="PPT 页数"
+                  value={presentation.pages}
+                  onChange={(e) => setPresentation({ ...presentation, pages: Number(e.target.value) })}
+                >
+                  {Array.from({ length: 8 }, (_, i) => (
+                    <option key={i} value={i + 1}>
+                      {i + 1} 页
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                风格{' '}
+                <select
+                  aria-label="PPT 风格"
+                  value={presentation.theme}
+                  onChange={(e) =>
+                    setPresentation({
+                      ...presentation,
+                      theme: e.target.value as PresentationOptions['theme'],
+                    })
+                  }
+                >
+                  <option value="ocean">海蓝商务</option>
+                  <option value="ink">墨色简约</option>
+                </select>
+              </label>
+              <Button variant="ghost" onClick={() => setPresentation(undefined)}>
+                取消技能
+              </Button>
+              <small>填写主题，可通过附件选择空间资料。先确认大纲，再生成 PPT。</small>
+            </div>
+          )}
           <div className="live-composer-input">
             <Field label={mode === 'AGENT' ? '工作要求' : '资料关键词'}>
               <textarea
@@ -1466,17 +1537,36 @@ export function ConversationComposer({
                   composing.current = false;
                 }}
                 required
-                maxLength={mode === 'AGENT' ? 2000 : 200}
+                maxLength={presentation ? 1900 : mode === 'AGENT' ? 2000 : 200}
                 rows={3}
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                placeholder="告诉我你想处理的工作"
+                placeholder={
+                  presentation ? '这份 PPT 讲什么？面向谁？希望达成什么目的？' : '告诉我你想处理的工作'
+                }
               />
             </Field>
           </div>
           <div className="live-composer-controls" inert={fromBriefing && !expanded}>
             <div className="live-composer-controls-content">
               <div className="live-composer-tools">
+                {!responseTask && !briefingContext && (
+                  <Button
+                    variant="ghost"
+                    aria-label="技能：PPT 生成"
+                    aria-pressed={!!presentation}
+                    disabled={!pptCapability.value?.available || preparing}
+                    title={
+                      pptCapability.value?.available ? '生成可编辑 PPT，先确认大纲' : 'PPT 生成环境尚未开放'
+                    }
+                    onClick={() => {
+                      setPresentation(presentation ? undefined : { pages: 6, theme: 'ocean' });
+                      textarea.current?.focus();
+                    }}
+                  >
+                    PPT 生成
+                  </Button>
+                )}
                 <div ref={toolsAnchor} className="live-composer-workspace">
                   {selected || draftConversation ? (
                     <span className="button live-workspace-label" title="会话工作空间">

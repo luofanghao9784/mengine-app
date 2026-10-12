@@ -206,6 +206,39 @@ public class MaterialService {
         audit.record(actor,tenant,material==null?"MATERIAL_UPLOAD":"MATERIAL_VERSION",id,"SUCCESS");
         return document(actor,tenant,workspace,id);
     }
+    public record Pipeline(UUID materialId,int version,Instant receivedAt,String parsing,String governance,int issues,String publication) {}
+    @Transactional public Pipeline pipeline(UUID actor,UUID tenant,UUID workspace,UUID material) {
+        access.requireObject(actor,tenant,workspace,"MATERIAL",material,false);access.requireMaterialActive(tenant,workspace,material);
+        return db.queryForObject("""
+          SELECT m.id,v.number,v.created_at,coalesce(r.status,'NOT_STARTED') parsing,
+          CASE WHEN g.id IS NULL THEN 'NOT_CHECKED' WHEN g.source='NO_TEXT' THEN 'NO_TEXT' ELSE 'CHECKED' END governance,
+          CASE WHEN g.id IS NULL THEN 0 ELSE cardinality(array_remove(g.issues,'review'))+CASE WHEN g.review_at IS NULL OR g.review_at<(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Shanghai')::date THEN 1 ELSE 0 END END issues,
+          CASE WHEN a.id IS NULL THEN 'NOT_PUBLISHED' WHEN a.archived THEN 'ARCHIVED'
+            WHEN av.source_version_id=v.id AND av.source_run_id=r.id AND r.status IN('READY','PARTIAL') AND av.article IS NOT NULL AND m.in_library AND w.kind='SHARED' THEN 'PUBLISHED' ELSE 'STALE' END publication
+          FROM active_materials m JOIN workspaces w ON w.id=m.workspace_id
+          JOIN material_versions v ON v.material_id=m.id AND v.number=m.current_version
+          LEFT JOIN LATERAL (SELECT id,status FROM knowledge_runs WHERE version_id=v.id ORDER BY generation DESC LIMIT 1) r ON true
+          LEFT JOIN LATERAL (SELECT * FROM material_governance_reports WHERE material_id=m.id AND version_id=v.id AND (run_id IS NULL OR run_id=r.id) ORDER BY revision DESC LIMIT 1) g ON true
+          LEFT JOIN wiki_articles a ON a.material_id=m.id AND a.tenant_id=m.tenant_id
+          LEFT JOIN wiki_article_versions av ON av.article_id=a.id AND av.revision=a.revision
+          WHERE m.tenant_id=? AND m.workspace_id=? AND m.id=?
+          """,(r,n)->new Pipeline(material,r.getInt("number"),r.getTimestamp("created_at").toInstant(),r.getString("parsing"),r.getString("governance"),r.getInt("issues"),r.getString("publication")),tenant,workspace,material);
+    }
+    public record EditableText(UUID materialId, UUID versionId, int version, String filename, String content) {}
+    /** Original UTF-8 text for an authorized maintainer, not parsed or AI-reconstructed content. */
+    @Transactional public EditableText editableText(UUID actor,UUID tenant,UUID workspace,UUID material) {
+        access.requireObject(actor,tenant,workspace,"MATERIAL",material,true);
+        access.requireMaterialActive(tenant,workspace,material);
+        var rows=db.queryForList("SELECT v.* FROM materials m JOIN material_versions v ON v.material_id=m.id AND v.tenant_id=m.tenant_id AND v.number=m.current_version WHERE m.tenant_id=? AND m.workspace_id=? AND m.id=?",tenant,workspace,material);
+        if(rows.isEmpty())throw missing();var row=rows.getFirst();String filename=(String)row.get("filename");
+        if(!filename.toLowerCase(Locale.ROOT).matches(".*[.](txt|md|markdown)$")||(Long)row.get("size_bytes")>262144)throw new IdentityException(409,"MATERIAL_TEXT_UNSUPPORTED");
+        byte[] bytes=store.read((UUID)row.get("object_id"),(Long)row.get("size_bytes"),(String)row.get("sha256"));
+        String content;
+        try {content=java.nio.charset.StandardCharsets.UTF_8.newDecoder().onMalformedInput(java.nio.charset.CodingErrorAction.REPORT).decode(java.nio.ByteBuffer.wrap(bytes)).toString();}
+        catch(java.nio.charset.CharacterCodingException e){throw new IdentityException(409,"MATERIAL_TEXT_UNSUPPORTED");}
+        if(content.indexOf(0)>=0)throw new IdentityException(409,"MATERIAL_TEXT_UNSUPPORTED");
+        return new EditableText(material,(UUID)row.get("id"),(Integer)row.get("number"),filename,content);
+    }
     @Transactional
     public Download download(UUID actor,UUID tenant,UUID workspace,UUID material,UUID version) {
         access.requireDownload(actor,tenant,workspace,material);

@@ -21,23 +21,22 @@ public class MaterialProcessingService {
     public MaterialProcessingService(JdbcTemplate db,IdentityService identities,MaterialAccess access,@Value("${dreamcore.knowledge.enabled:false}") boolean enabled,@Value("${dreamcore.material.max-bytes:20971520}") int maxBytes){this.db=db;this.identities=identities;this.access=access;this.enabled=enabled;this.maxBytes=maxBytes;}
     private static final String SOURCE="""
       WITH visible AS (
-       SELECT m.id material_id,m.workspace_id,w.name workspace_name,m.name,v.id version_id,v.number version,v.size_bytes,m.updated_at,
+       SELECT m.id material_id,m.workspace_id,CASE WHEN (library_mask(?,m.tenant_id,'WORKSPACE',w.id)&1)=1 THEN w.name ELSE '共享资料' END workspace_name,m.name,v.id version_id,v.number version,v.size_bytes,m.updated_at,
         coalesce(r.status,'NOT_STARTED') status,coalesce(r.generation,0) generation,r.finished_at,
-        (g.can_maintain AND NOT EXISTS(SELECT 1 FROM departure_executions d WHERE d.tenant_id=m.tenant_id AND d.kind='TENANT_EXIT' AND d.state<>'CANCELLED')) can_maintain
+        ((library_mask(?,m.tenant_id,'MATERIAL',m.id)&2)=2 AND NOT EXISTS(SELECT 1 FROM departure_executions d WHERE d.tenant_id=m.tenant_id AND d.kind='TENANT_EXIT' AND d.state<>'CANCELLED')) can_maintain
        FROM active_materials m JOIN workspaces w ON w.id=m.workspace_id AND w.tenant_id=m.tenant_id AND w.kind='SHARED'
-       JOIN workspace_members g ON g.tenant_id=m.tenant_id AND g.workspace_id=m.workspace_id AND g.account_id=?
        JOIN material_versions v ON v.material_id=m.id AND v.tenant_id=m.tenant_id AND v.workspace_id=m.workspace_id AND v.number=m.current_version
        LEFT JOIN LATERAL (SELECT status,generation,finished_at FROM knowledge_runs r WHERE r.version_id=v.id ORDER BY generation DESC LIMIT 1) r ON true
        WHERE m.tenant_id=? AND m.in_library AND (?::uuid IS NULL OR m.workspace_id=?::uuid)
-        AND departure_content_readable(g.account_id,m.tenant_id,m.workspace_id)
+        AND NOT w.archived AND (library_mask(?,m.tenant_id,'MATERIAL',m.id)&1)=1
       )
       """;
     @Transactional
     public Page list(UUID actor,UUID tenant,UUID workspace,String query,String state,int offset,int limit){
         if(query==null||query.length()>180||state==null||!Set.of("ALL","READY","PROCESSING","ATTENTION","NOT_STARTED").contains(state)||offset<0||offset>100000||limit<1||limit>50)throw IdentityException.invalid();
         identities.member(actor,tenant,false);
-        if(workspace!=null && !"SHARED".equals(access.require(actor,tenant,workspace,false).kind()))throw new IdentityException(404,"MATERIAL_LOCATION_UNAVAILABLE");
-        Object[] scope={actor,tenant,workspace,workspace};
+        if(workspace!=null && !"SHARED".equals(access.requireObject(actor,tenant,workspace,"WORKSPACE",workspace,false).kind()))throw new IdentityException(404,"MATERIAL_LOCATION_UNAVAILABLE");
+        Object[] scope={actor,actor,tenant,workspace,workspace,actor};
         var summary=db.queryForObject(SOURCE+"""
           SELECT count(*) total,count(*) FILTER(WHERE status='READY') ready,
            count(*) FILTER(WHERE status IN ('QUEUED','RUNNING')) processing,

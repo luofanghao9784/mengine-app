@@ -27,6 +27,8 @@ public class MaterialCleanupService {
         if(db.queryForObject("SELECT count(*) FROM content_cleanup_blobs WHERE job_id=? AND deleted_at IS NULL",Long.class,job.id())>0){db.update("UPDATE content_cleanup_jobs SET state='QUEUED',lease_token=NULL,lease_until=NULL WHERE id=?",job.id());return;}
         var docs=db.queryForList("SELECT material_id FROM content_cleanup_materials WHERE job_id=?",UUID.class,job.id());
         for(UUID material:docs){
+            db.queryForList("SELECT scrub_wiki_material(?)",material);
+            db.queryForList("SELECT scrub_governance_proposals(?)",material);
             db.queryForList("SELECT scrub_experience_material(?)",material);
             db.queryForList("SELECT scrub_feedback_material(?)",material);
             db.queryForList("SELECT scrub_adjustment_material(?)",material);

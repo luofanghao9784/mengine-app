@@ -123,3 +123,5 @@
     flex-basis: calc(100% - 74px);
   }
 }
+
+.tenant-member-avatar {display:inline-flex;align-items:center;justify-content:center;min-width:30px;height:30px;margin-right:10px;border-radius:50%;background:var(--wash,#eef2f5);font-size:12px;font-weight:500;}

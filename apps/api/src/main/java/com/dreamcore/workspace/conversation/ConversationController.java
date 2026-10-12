@@ -12,10 +12,13 @@ import org.springframework.web.bind.annotation.*;
 @RestController @RequestMapping("/api/v1/tenants/{tenant}/conversations")
 @ConditionalOnWebApplication(type=ConditionalOnWebApplication.Type.SERVLET)
 public class ConversationController {
-    public record Send(@NotNull UUID requestId,UUID workspaceId,@NotNull String prompt,@NotNull String mode,@Size(max=2048) String publicQuery,@Size(max=3) java.util.List<TaskOriginals.Selection> originals,String sourceScope,@Valid ConversationService.BriefingReference briefingContext) {}
+    public record Send(@NotNull UUID requestId,UUID workspaceId,@NotNull String prompt,@NotNull String mode,@Size(max=2048) String publicQuery,@Size(max=3) java.util.List<TaskOriginals.Selection> originals,String sourceScope,@Valid ConversationService.BriefingReference briefingContext,PresentationWorkflow.Options presentation) {
+        public Send(UUID requestId,UUID workspaceId,String prompt,String mode,String publicQuery,java.util.List<TaskOriginals.Selection> originals,String sourceScope,ConversationService.BriefingReference briefingContext){this(requestId,workspaceId,prompt,mode,publicQuery,originals,sourceScope,briefingContext,null);}
+    }
     public record Action(@NotNull UUID requestId,@NotNull @Min(0) Integer expectedRevision,@NotNull String action,@Size(max=2000) String input,@Size(max=3) java.util.List<TaskOriginals.Selection> originals) {}
     public record Management(@NotNull UUID requestId,@Min(0) int expectedRevision,@NotNull String action,boolean stopRunning) {}
     public record Read(@Min(0) long replyRevision) {}
+    @org.springframework.beans.factory.annotation.Autowired private PresentationWorkflow presentations;
     private final ConversationManagement management;
     private final ConversationService service;private final AgentTaskService agents;private final ConversationTitles titles;public ConversationController(ConversationService service,AgentTaskService agents,ConversationTitles titles,ConversationManagement management){this.service=service;this.agents=agents;this.titles=titles;this.management=management;}
     private void title(UUID actor,UUID tenant,UUID conversation){try{titles.request(actor,tenant,conversation);}catch(RuntimeException ignored){/* Metadata must never fail a submitted task or readable reply. */}}
@@ -30,10 +33,14 @@ public class ConversationController {
     @PostMapping @ResponseStatus(HttpStatus.ACCEPTED) public ConversationService.Detail create(Authentication auth,@PathVariable UUID tenant,@Valid @RequestBody Send body){return submit(auth,tenant,null,body);}
     @PostMapping("/{conversation}/tasks") @ResponseStatus(HttpStatus.ACCEPTED) public ConversationService.Detail send(Authentication auth,@PathVariable UUID tenant,@PathVariable UUID conversation,@Valid @RequestBody Send body){return submit(auth,tenant,conversation,body);}
     private ConversationService.Detail submit(Authentication auth,UUID tenant,UUID conversation,Send body){
+        if(body.presentation()!=null)return presentations.submit(actor(auth),tenant,conversation,body);
         if(body.briefingContext()!=null)return agents.sendDiscussion(actor(auth),tenant,conversation,body.briefingContext(),body.workspaceId(),body.requestId(),body.prompt(),body.mode(),body.publicQuery(),body.originals(),body.sourceScope());
         var result=service.submitClient(actor(auth),tenant,conversation,body.workspaceId(),body.requestId(),body.prompt(),body.mode(),body.publicQuery(),body.originals(),body.sourceScope());
         title(actor(auth),tenant,result.conversation().id());return result;
     }
+    @GetMapping("/presentation-capability") public Object presentationCapability(Authentication auth,@PathVariable UUID tenant){service.list(actor(auth),tenant,0,1);return java.util.Map.of("available",presentations.available());}
+    @GetMapping("/{conversation}/tasks/{task}/presentation") public Object presentation(Authentication auth,@PathVariable UUID tenant,@PathVariable UUID conversation,@PathVariable UUID task){return presentations.read(actor(auth),tenant,conversation,task);}
+    @PostMapping("/{conversation}/tasks/{task}/presentation/confirm") public Object confirmPresentation(Authentication auth,@PathVariable UUID tenant,@PathVariable UUID conversation,@PathVariable UUID task,@RequestBody PresentationWorkflow.Confirm body){return presentations.confirm(actor(auth),tenant,conversation,task,body);}
     @PostMapping("/{conversation}/tasks/{task}") public ConversationService.Detail action(Authentication auth,@PathVariable UUID tenant,@PathVariable UUID conversation,@PathVariable UUID task,@Valid @RequestBody Action body){return service.action(actor(auth),tenant,conversation,task,body.requestId(),body.expectedRevision(),body.action(),body.input(),body.originals());}
     @GetMapping("/{conversation}/tasks/{task}/attempts") public ConversationService.Attempts attempts(Authentication auth,@PathVariable UUID tenant,@PathVariable UUID conversation,@PathVariable UUID task,@RequestParam(defaultValue="0") int offset,@RequestParam(defaultValue="10") int limit){return service.attempts(actor(auth),tenant,conversation,task,offset,limit);}
     @GetMapping("/{conversation}/tasks/{task}/briefing") public BriefingContentService.Document briefing(Authentication auth,@PathVariable UUID tenant,@PathVariable UUID conversation,@PathVariable UUID task,@RequestParam int revision,@RequestParam int attempt){return agents.briefing(actor(auth),tenant,conversation,task,revision,attempt);}

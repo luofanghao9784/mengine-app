@@ -196,6 +196,7 @@ public class ConversationService {
         if(rows.isEmpty())throw new IdentityException(404,"CONVERSATION_NOT_FOUND");var row=rows.getFirst();String state=(String)row.get("status");
         if("SYSTEM_BRIEFING".equals(row.get("origin")))throw new IdentityException(409,"CONVERSATION_PURPOSE_MISMATCH");
         if(revision!=(Integer)row.get("revision"))throw new IdentityException(409,"TASK_STATE_CHANGED");
+        if("RESUME".equals(action) && Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM conversation_presentations WHERE task_id=? AND state='DRAFT')",Boolean.class,task)))throw new IdentityException(409,"PRESENTATION_CONFIRMATION_REQUIRED");
         boolean stopping=Set.of("PAUSE","CANCEL").contains(action), reconcile=action.equals("RECONCILE");
         String next,reason=null;String supplemental=(String)row.get("supplemental_input");String execution=(String)row.get("execution_class");
         if(reconcile){

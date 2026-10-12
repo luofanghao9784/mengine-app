@@ -18,3 +18,12 @@ test('manual update is a revision bound idempotent request, never an uploaded re
  for(const path of Object.values(spec.paths))for(const [method,op] of Object.entries(path)){assert.deepEqual(op.security,[{sessionCookie:[]}]);if(method==='post')assert.ok(op.parameters.some(p=>p.name==='X-CSRF-TOKEN'&&p.required));}
  assert.equal(Object.keys(spec.paths).some(p=>p.includes('credential')||p.includes('deploy')),false);
 });
+test('field explanations carry deployment evidence and distinguish inference from unknown',()=>{
+ const validate=valid('DatasetField');
+ const field={column:'金额',type:'decimal',meaning:'待核实金额口径',unit:'',evidence:'只有源字段，缺少业务定义',status:'UNKNOWN'};
+ assert.ok(validate(field));
+ assert.ok(validate({...field,status:'DEPLOYMENT_INFERRED'}));
+ assert.equal(validate({...field,status:'AI_CONFIRMED'}),false);
+ assert.equal(validate({...field,sql:'SELECT * FROM source'}),false);
+ const {evidence,...missing}=field;assert.equal(validate(missing),false);
+});

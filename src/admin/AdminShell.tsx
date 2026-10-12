@@ -27,14 +27,19 @@ import { DreamcoreLogo } from '../components/DreamcoreLogo';
 
 const entries: Record<AdminRealm, { id: AdminPage; title: string; icon: LucideIcon }[]> = {
   tenant: [
-    { id: 'overview', title: '企业概览', icon: LayoutDashboard },
+    { id: 'overview', title: '知识工作台', icon: LayoutDashboard },
     { id: 'usage', title: '运行与用量', icon: Wallet },
     { id: 'engine', title: '引擎仪表盘', icon: Activity },
     { id: 'members', title: '成员与空间', icon: Users },
-    { id: 'database', title: '数据库', icon: Database },
+    { id: 'database', title: '数据基座', icon: Database },
+    { id: 'catalog', title: '企业资料列表', icon: BookOpen },
+    { id: 'governance', title: '数据治理', icon: SlidersHorizontal },
     { id: 'materials', title: '资料库', icon: Archive },
     { id: 'experience', title: '经验库', icon: BookOpen },
     { id: 'company', title: '企业信息', icon: Building2 },
+    { id: 'audit', title: '操作审计', icon: Archive },
+    { id: 'wiki', title: 'Wiki 知识', icon: BookOpen },
+    { id: 'proposals', title: '业务提案', icon: Archive },
   ],
   platform: [
     { id: 'overview', title: '概览', icon: LayoutDashboard },
@@ -247,13 +252,23 @@ export function AdminShell({
                     {
                       label: '梦核引擎',
                       items: nav.filter((item) =>
-                        ['engine', 'database', 'materials', 'experience'].includes(item.id),
+                        ['engine', 'database', 'catalog', 'materials', 'experience', 'wiki'].includes(
+                          item.id,
+                        ),
                       ),
                     },
                     {
                       label: '企业管理',
                       items: nav.filter((item) =>
-                        ['overview', 'members', 'company', 'usage'].includes(item.id),
+                        [
+                          'overview',
+                          'governance',
+                          'members',
+                          'company',
+                          'usage',
+                          'audit',
+                          'proposals',
+                        ].includes(item.id),
                       ),
                     },
                   ]

@@ -73,6 +73,20 @@ class MaterialIntegrationTest {
     String download(UUID space,JsonNode detail) {
         return base(space)+"/materials/"+detail.get("document").get("id").asString()+"/versions/"+detail.get("versions").get(0).get("id").asString()+"/download";
     }
+    @Test void editableTextUsesOriginalAndMaintenanceAndVersionUpload() throws Exception {
+        UUID space=shared();var doc=put(space,"original.md","# 原始正文\n");String path=base(space)+"/materials/"+doc.get("id").asString();
+        var response=writer.send("GET",path+"/editable-text",null);assertEquals(200,response.statusCode());assertEquals("private, no-store",response.headers().firstValue("cache-control").orElseThrow());
+        var original=json(response);assertEquals("# 原始正文\n",original.get("content").asString());assertEquals(1,original.get("version").asInt());
+        assertEquals(403,viewer.send("GET",path+"/editable-text",null).statusCode());assertEquals(404,manager.send("GET",path+"/editable-text",null).statusCode());assertEquals(403,outsider.send("GET",path+"/editable-text",null).statusCode());
+        Map<String,Object> body=Map.of("requestId",UUID.randomUUID(),"expectedVersion",1);byte[] edited="# 编辑正文".getBytes(StandardCharsets.UTF_8);
+        assertEquals(201,writer.upload(path+"/versions",body,"original.md",edited,true).statusCode());assertEquals(201,writer.upload(path+"/versions",body,"original.md",edited,true).statusCode());
+        assertEquals(409,writer.upload(path+"/versions",Map.of("requestId",UUID.randomUUID(),"expectedVersion",1),"original.md",edited,true).statusCode());
+        assertEquals(2,writer.ok("GET",path+"/editable-text",null,200).get("version").asInt());
+        var pipeline=viewer.ok("GET",path+"/pipeline",null,200);assertEquals(2,pipeline.get("version").asInt());assertEquals("NOT_CHECKED",pipeline.get("governance").asString());assertEquals("NOT_PUBLISHED",pipeline.get("publication").asString());assertEquals(404,manager.send("GET",path+"/pipeline",null).statusCode());
+        var binary=put(space,"report.pdf","synthetic");assertEquals(409,writer.send("GET",base(space)+"/materials/"+binary.get("id").asString()+"/editable-text",null).statusCode());
+        var invalid=writer.upload(base(space)+"/materials",Map.of("requestId",UUID.randomUUID()),"invalid.txt",new byte[]{(byte)0xff},true);
+        assertEquals(409,writer.send("GET",base(space)+"/materials/"+json(invalid).get("id").asString()+"/editable-text",null).statusCode());
+    }
     @Test void originalsVersionsFoldersAndSharedAggregateUseRealBytes() throws Exception {
         UUID space=shared(),key=UUID.randomUUID();
         var folderBody=Map.of("requestId",key,"name","月报");

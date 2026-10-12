@@ -125,6 +125,7 @@ export interface ConversationEvents {
   hasMore: boolean;
 }
 export interface SendTask {
+  presentation?: import('./presentation').PresentationOptions;
   briefingContext?: BriefingReference;
   sourceScope?: 'AUTHORIZED_LIBRARY' | 'SELECTED';
   originals?: OriginalSelection[];

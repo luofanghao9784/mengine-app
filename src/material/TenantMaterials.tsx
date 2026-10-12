@@ -15,6 +15,7 @@ import { DocumentDialog, LiveLibrary } from './Library';
 import { materialClient } from './client';
 import { knowledgeClient } from './knowledge-client';
 import './processing.css';
+import { MaterialGovernance } from './MaterialGovernance';
 const states: Record<MaterialProcessingPage['state'], string> = {
   ALL: '全部状态',
   READY: '已解析',
@@ -41,6 +42,7 @@ export function TenantMaterials({ tenant, hash }: { tenant: string; hash: string
   const params = new URLSearchParams(hash.slice(1));
   const files =
     params.get('section') === 'files' || (!params.has('admin') && params.get('view') === 'library');
+  const governance = !files && params.get('section') !== 'processing';
   const [recycle, setRecycle] = useState(params.get('detail') === 'content-lifecycle');
   const context = useRemote(
     (signal) => identityClient.context(tenant, signal),
@@ -55,8 +57,11 @@ export function TenantMaterials({ tenant, hash }: { tenant: string; hash: string
         </Button>
       </PageActions>
       <nav className="platform-detail-nav" aria-label="资料库栏目">
-        <a className="button ghost" aria-current={!files ? 'page' : undefined} href={href()}>
-          处理概览
+        <a className="button ghost" aria-current={governance ? 'page' : undefined} href={href()}>
+          数据治理
+        </a>
+        <a className="button ghost" aria-current={!files && !governance ? 'page' : undefined} href={href({ section: 'processing' })}>
+          解析处理
         </a>
         <a
           className="button ghost"
@@ -72,7 +77,7 @@ export function TenantMaterials({ tenant, hash }: { tenant: string; hash: string
         <Loading />
       ) : (
         <>
-          {files ? (
+          {governance ? <MaterialGovernance tenant={tenant} /> : files ? (
             <LiveLibrary tenant={tenant} administration />
           ) : (
             <ProcessingList tenant={tenant} context={context.value} />

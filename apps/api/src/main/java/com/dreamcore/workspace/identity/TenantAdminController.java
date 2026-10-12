@@ -84,7 +84,9 @@ public class TenantAdminController {
     }
     @GetMapping("/records")
     public List<TenantAdminService.AuditEntry> records(Authentication auth, @PathVariable UUID tenant,
-            @RequestParam(defaultValue="0") int offset, @RequestParam(defaultValue="50") int limit) {
-        return service.records(IdentityController.actor(auth),tenant,offset,limit);
+            @RequestParam(defaultValue="0") int offset, @RequestParam(defaultValue="50") int limit,
+            @RequestParam(defaultValue="") String q,@RequestParam(defaultValue="") String category,
+            @RequestParam(required=false) java.time.Instant from,@RequestParam(required=false) java.time.Instant to) {
+        return service.records(IdentityController.actor(auth),tenant,offset,limit,q,category,from,to);
     }
 }

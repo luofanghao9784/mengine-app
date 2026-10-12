@@ -862,6 +862,13 @@
                 "type": "null"
               }
             ]
+          },
+          "fieldDefinitions": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/DatasetField"
+            }
           }
         }
       },
@@ -979,6 +986,47 @@
           "expectedRevision": {
             "type": "integer",
             "minimum": 0
+          }
+        }
+      },
+      "DatasetField": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "column",
+          "type",
+          "meaning",
+          "unit",
+          "evidence",
+          "status"
+        ],
+        "properties": {
+          "column": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "type": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "meaning": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "unit": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "evidence": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "status": {
+            "enum": [
+              "SOURCE_DOCUMENTED",
+              "DEPLOYMENT_INFERRED",
+              "UNKNOWN"
+            ]
           }
         }
       }

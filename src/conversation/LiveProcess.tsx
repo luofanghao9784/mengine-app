@@ -10,6 +10,8 @@ const tools: Record<string, string> = {
   task_context: '读取工作上下文',
   find_skills: '查找可用能力',
   activate_skill: '准备工作能力',
+  read_skill_resource: '读取技能说明',
+  render_presentation: '生成 PPT',
   public_search: '查找公开资料',
   read_public_page: '阅读网页',
   task_control: '记录任务状态',

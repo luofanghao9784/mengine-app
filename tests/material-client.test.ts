@@ -168,3 +168,42 @@ test('upload receipts distinguish accepted version from current version and refu
     false,
   );
 });
+
+test('editable text and pipeline receipts are bound to the requested material', async () => {
+  const value = { materialId: id, versionId: space, version: 2, filename: '合成.md', content: '' };
+  assert.deepEqual(
+    await createMaterialClient(async () => response(value)).editableText(tenant, space, id),
+    value,
+  );
+  await assert.rejects(
+    createMaterialClient(async () => response({ ...value, materialId: tenant })).editableText(
+      tenant,
+      space,
+      id,
+    ),
+    (e) => e instanceof IdentityError && e.code === 'CONTRACT_MISMATCH',
+  );
+  const pipeline = {
+    materialId: id,
+    version: 2,
+    receivedAt: entry.updatedAt,
+    parsing: 'READY',
+    governance: 'CHECKED',
+    issues: 1,
+    publication: 'STALE',
+  };
+  assert.deepEqual(
+    await createMaterialClient(async () => response(pipeline)).pipeline(tenant, space, id),
+    pipeline,
+  );
+  for (const patch of [
+    { materialId: tenant },
+    { parsing: 'invented' },
+    { publication: 'DONE' },
+    { issues: -1 },
+  ])
+    await assert.rejects(
+      createMaterialClient(async () => response({ ...pipeline, ...patch })).pipeline(tenant, space, id),
+      (e) => e instanceof IdentityError && e.code === 'CONTRACT_MISMATCH',
+    );
+});

@@ -88,7 +88,10 @@ test('conversation reads allow granted cross-space sources but reject foreign te
     );
   assert.deepEqual(await createConversationClient(async () => response(detail)).detail(tenant, id), detail);
   const crossSpace = { ...detail, tasks: [{ ...task, sources: [{ ...chunk, workspaceId: id }] }] };
-  assert.deepEqual(await createConversationClient(async () => response(crossSpace)).detail(tenant, id), crossSpace);
+  assert.deepEqual(
+    await createConversationClient(async () => response(crossSpace)).detail(tenant, id),
+    crossSpace,
+  );
 });
 test('events reject cursor rollback and unsorted sequences', async () => {
   const event = { seq: 4, taskId: id, kind: 'SUCCEEDED', revision: 2 };
@@ -111,9 +114,14 @@ test('events accept live updates followed by the durable completion event', asyn
     cursor: 7,
     hasMore: false,
   };
-  assert.deepEqual(await createConversationClient(async () => response(events)).events(tenant, id, 3), events);
+  assert.deepEqual(
+    await createConversationClient(async () => response(events)).events(tenant, id, 3),
+    events,
+  );
   await assert.rejects(
-    createConversationClient(async () => response({ ...events, items: [{ ...events.items[0], kind: 'UNKNOWN' }] })).events(tenant, id, 3),
+    createConversationClient(async () =>
+      response({ ...events, items: [{ ...events.items[0], kind: 'UNKNOWN' }] }),
+    ).events(tenant, id, 3),
     (e) => e instanceof IdentityError && e.code === 'CONTRACT_MISMATCH',
   );
 });
@@ -124,18 +132,28 @@ test('card discussion sends only version references while retaining display geom
   for (const destination of [undefined, id]) {
     let sends = 0;
     let sent: Record<string, unknown> | undefined;
-    const body = { requestId: id, workspaceId: space, prompt: '合成画报数据缺口追问',
-      mode: 'AGENT' as const, sourceScope: 'AUTHORIZED_LIBRARY' as const, briefingContext: context };
+    const body = {
+      requestId: id,
+      workspaceId: space,
+      prompt: '合成画报数据缺口追问',
+      mode: 'AGENT' as const,
+      sourceScope: 'AUTHORIZED_LIBRARY' as const,
+      briefingContext: context,
+    };
     const before = structuredClone(body);
     const api = createConversationClient(async (path, init) => {
       if (String(path).endsWith('/csrf')) return response({ token: 'synthetic', headerName: 'X-CSRF-TOKEN' });
       sends++;
-      assert.equal(String(path), `/api/v1/tenants/${tenant}/conversations${destination ? `/${destination}/tasks` : ''}`);
+      assert.equal(
+        String(path),
+        `/api/v1/tenants/${tenant}/conversations${destination ? `/${destination}/tasks` : ''}`,
+      );
       sent = JSON.parse(String(init?.body));
       assert.equal(new Headers(init?.headers).get('X-CSRF-TOKEN'), 'synthetic');
       if ('presentation' in (sent!.briefingContext as object))
         return new Response(JSON.stringify({ code: 'INVALID_REQUEST' }), {
-          status: 400, headers: { 'content-type': 'application/json' },
+          status: 400,
+          headers: { 'content-type': 'application/json' },
         });
       return response(detail);
     });
@@ -377,42 +395,146 @@ test('exact task detail accepts actionable waits but rejects another task or con
 test('new task responses accept empty supplemental input while rejecting invalid types and oversized text', async () => {
   for (const supplementalInput of [undefined, null, '', '补充要求']) {
     const payload = { ...detail, tasks: [{ ...task, supplementalInput }] };
-    const client = createConversationClient(async (url) => String(url).endsWith('/auth/csrf')
-      ? response({ headerName: 'X-CSRF-TOKEN', token: 'synthetic' }) : response(payload));
+    const client = createConversationClient(async (url) =>
+      String(url).endsWith('/auth/csrf')
+        ? response({ headerName: 'X-CSRF-TOKEN', token: 'synthetic' })
+        : response(payload),
+    );
     assert.equal((await client.detail(tenant, id)).tasks[0].supplementalInput, supplementalInput);
-    assert.equal((await client.send(tenant, undefined, { requestId: id, workspaceId: space, prompt: 'hello', mode: 'SOURCE_LOOKUP' })).conversation.id, id);
+    assert.equal(
+      (
+        await client.send(tenant, undefined, {
+          requestId: id,
+          workspaceId: space,
+          prompt: 'hello',
+          mode: 'SOURCE_LOOKUP',
+        })
+      ).conversation.id,
+      id,
+    );
   }
   for (const supplementalInput of [false, 0, {}, 'x'.repeat(12001)]) {
-    await assert.rejects(createConversationClient(async () => response({ ...detail, tasks: [{ ...task, supplementalInput }] })).detail(tenant, id),
-      (error) => error instanceof IdentityError && error.code === 'CONTRACT_MISMATCH');
+    await assert.rejects(
+      createConversationClient(async () =>
+        response({ ...detail, tasks: [{ ...task, supplementalInput }] }),
+      ).detail(tenant, id),
+      (error) => error instanceof IdentityError && error.code === 'CONTRACT_MISMATCH',
+    );
   }
 });
 
 test('conversation management metadata and receipts reject invalid or foreign responses', async () => {
-  const page={tenantId:tenant,enabled:true,agentMode:'off',publicWebEnabled:false,hasMore:false,items:[{...conversation,managementRevision:0,running:true,unread:true,replyRevision:2,latestReplyTaskId:id,trashedAt:null}]};
-  assert.equal((await createConversationClient(async()=>response(page)).list(tenant)).items[0].unread,true);
-  for(const change of [{running:'yes'},{replyRevision:-1},{managementRevision:0.5},{latestReplyTaskId:'invalid'},{trashedAt:'bad-date'}]) {
-    await assert.rejects(createConversationClient(async()=>response({...page,items:[{...page.items[0],...change}]})).list(tenant));
+  const page = {
+    tenantId: tenant,
+    enabled: true,
+    agentMode: 'off',
+    publicWebEnabled: false,
+    hasMore: false,
+    items: [
+      {
+        ...conversation,
+        managementRevision: 0,
+        running: true,
+        unread: true,
+        replyRevision: 2,
+        latestReplyTaskId: id,
+        trashedAt: null,
+      },
+    ],
+  };
+  assert.equal(
+    (await createConversationClient(async () => response(page)).list(tenant)).items[0].unread,
+    true,
+  );
+  for (const change of [
+    { running: 'yes' },
+    { replyRevision: -1 },
+    { managementRevision: 0.5 },
+    { latestReplyTaskId: 'invalid' },
+    { trashedAt: 'bad-date' },
+  ]) {
+    await assert.rejects(
+      createConversationClient(async () =>
+        response({ ...page, items: [{ ...page.items[0], ...change }] }),
+      ).list(tenant),
+    );
   }
-  const body={requestId:id,expectedRevision:0,action:'TRASH' as const,stopRunning:true};
-  for(const receipt of [{id:space,revision:1,trashedAt:null},{id,revision:-1,trashedAt:null},{id,revision:1,trashedAt:'bad-date'}])
-    await assert.rejects(createConversationClient(async(url)=>response(String(url).endsWith('/csrf')?{headerName:'X-CSRF-TOKEN',token:'fixture'}:receipt)).manage(tenant,id,body));
-  for(const receipt of [{id:space,readReplyRevision:2},{id,readReplyRevision:1}])
-    await assert.rejects(createConversationClient(async(url)=>response(String(url).endsWith('/csrf')?{headerName:'X-CSRF-TOKEN',token:'fixture'}:receipt)).read(tenant,id,2));
-  let path='';await createConversationClient(async(url)=>{path=String(url);return response({...page,items:[]});}).list(tenant,0,undefined,true);
+  const body = { requestId: id, expectedRevision: 0, action: 'TRASH' as const, stopRunning: true };
+  for (const receipt of [
+    { id: space, revision: 1, trashedAt: null },
+    { id, revision: -1, trashedAt: null },
+    { id, revision: 1, trashedAt: 'bad-date' },
+  ])
+    await assert.rejects(
+      createConversationClient(async (url) =>
+        response(String(url).endsWith('/csrf') ? { headerName: 'X-CSRF-TOKEN', token: 'fixture' } : receipt),
+      ).manage(tenant, id, body),
+    );
+  for (const receipt of [
+    { id: space, readReplyRevision: 2 },
+    { id, readReplyRevision: 1 },
+  ])
+    await assert.rejects(
+      createConversationClient(async (url) =>
+        response(String(url).endsWith('/csrf') ? { headerName: 'X-CSRF-TOKEN', token: 'fixture' } : receipt),
+      ).read(tenant, id, 2),
+    );
+  let path = '';
+  await createConversationClient(async (url) => {
+    path = String(url);
+    return response({ ...page, items: [] });
+  }).list(tenant, 0, undefined, true);
   assert.ok(path.includes('/conversations/trash?'));
 });
 
 test('conversation list validates the persisted briefing discussion marker and tolerates older servers', async () => {
   for (const briefingDiscussion of [undefined, false, true]) {
-    const page = await createConversationClient(async () => response({
-      tenantId: tenant, enabled: true, agentMode: 'off', publicWebEnabled: false,
-      items: [{ ...conversation, briefingDiscussion }], hasMore: false,
-    })).list(tenant);
+    const page = await createConversationClient(async () =>
+      response({
+        tenantId: tenant,
+        enabled: true,
+        agentMode: 'off',
+        publicWebEnabled: false,
+        items: [{ ...conversation, briefingDiscussion }],
+        hasMore: false,
+      }),
+    ).list(tenant);
     assert.equal(page.items[0].briefingDiscussion, briefingDiscussion);
   }
-  await assert.rejects(createConversationClient(async () => response({
-    tenantId: tenant, enabled: true, agentMode: 'off', publicWebEnabled: false,
-    items: [{ ...conversation, briefingDiscussion: 'true' }], hasMore: false,
-  })).list(tenant));
+  await assert.rejects(
+    createConversationClient(async () =>
+      response({
+        tenantId: tenant,
+        enabled: true,
+        agentMode: 'off',
+        publicWebEnabled: false,
+        items: [{ ...conversation, briefingDiscussion: 'true' }],
+        hasMore: false,
+      }),
+    ).list(tenant),
+  );
+});
+
+test('large artifact download accepts exact bytes and rejects a truncated payload', async () => {
+  const bytes = new Uint8Array(600000).fill(42);
+  const sha256 = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))]
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+  const artifact = { id, filename: 'report.pptx', sha256, bytes: bytes.length };
+  const client = (payload: Uint8Array) =>
+    createConversationClient(
+      async () =>
+        new Response(payload as BodyInit, {
+          headers: {
+            'content-type': 'application/octet-stream',
+            'content-disposition': 'attachment; filename="report.pptx"',
+            'x-content-sha256': sha256,
+          },
+        }),
+    );
+  assert.equal((await client(bytes).download(tenant, id, id, artifact)).size, 600000);
+  await assert.rejects(
+    client(bytes.subarray(0, 599999)).download(tenant, id, id, artifact),
+    (e) => e instanceof IdentityError && e.code === 'CONTRACT_MISMATCH',
+  );
 });

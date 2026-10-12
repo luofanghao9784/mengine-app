@@ -13,6 +13,8 @@ public class TaskContextGuard {
  public TaskContextGuard(JdbcTemplate db){this.db=db;}
  @org.springframework.transaction.annotation.Transactional
  public void requireCurrent(UUID task){
+  db.queryForList("SELECT a.id FROM wiki_graphs g JOIN wiki_graph_inputs i ON i.graph_id=g.id JOIN wiki_articles a ON a.id=i.article_id WHERE g.task_id=? ORDER BY a.id FOR SHARE OF a",task);
+  if(!Boolean.TRUE.equals(db.queryForObject("SELECT wiki_graph_current(?) AND wiki_insight_current(?)",Boolean.class,task,task)))throw new IdentityException(409,"TASK_CONTEXT_CHANGED");
   if(briefingFlow!=null)briefingFlow.requireCurrent(task);
   // Serialize tenant future-use changes even while the default usage row does not exist.
   db.queryForList("SELECT pg_advisory_xact_lock_shared(hashtextextended('general-use:'||tenant_id::text,0)) FROM conversation_tasks WHERE id=?",task);

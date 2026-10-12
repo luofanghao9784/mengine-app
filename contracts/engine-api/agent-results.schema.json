@@ -132,7 +132,9 @@
                   "compare_dataset",
                   "deliver_briefing",
                   "manage_plan",
-                  "ask_user"
+                  "ask_user",
+                  "read_skill_resource",
+                  "render_presentation"
                 ]
               },
               "status": {
@@ -167,12 +169,37 @@
               "contentBase64": {
                 "type": "string",
                 "maxLength": 90000
+              },
+              "uploadId": {
+                "type": "string",
+                "format": "uuid"
               }
             },
             "required": [
               "name",
-              "sha256",
-              "contentBase64"
+              "sha256"
+            ],
+            "oneOf": [
+              {
+                "required": [
+                  "contentBase64"
+                ],
+                "not": {
+                  "required": [
+                    "uploadId"
+                  ]
+                }
+              },
+              {
+                "required": [
+                  "uploadId"
+                ],
+                "not": {
+                  "required": [
+                    "contentBase64"
+                  ]
+                }
+              }
             ]
           }
         },
@@ -434,6 +461,26 @@
                       "const": "succeeded"
                     }
                   }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "contractVersion": {
+                "const": "1.4"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "artifacts": {
+                "items": {
+                  "required": [
+                    "contentBase64"
+                  ]
                 }
               }
             }

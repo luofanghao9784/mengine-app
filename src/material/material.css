@@ -646,3 +646,7 @@
     transition: none;
   }
 }
+
+.material-pipeline { display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;padding:0;list-style:none; }
+.material-pipeline li {display:flex;flex-direction:column;gap:8px;border:1px solid var(--line,#ddd);border-radius:12px;padding:14px;}
+.material-pipeline small {color:var(--muted,#666);}

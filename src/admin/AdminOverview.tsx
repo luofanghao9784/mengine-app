@@ -1,7 +1,7 @@
+import { KnowledgeDashboard } from './mengine/KnowledgeDashboard';
 import { useState } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { KnowledgeWorkbench } from './KnowledgeWorkbench';
 import { useRemote, Failure, Loading } from '../shared/admin';
-import { Button, PageActions } from '../shared/ui';
 import { tenantClient } from '../tenant/client';
 import { platformClient } from '../platform/client';
 import { getTelemetry } from '../operations/telemetry-client';
@@ -10,10 +10,38 @@ import { adminHref, type AdminRealm } from './navigation';
 import { PlatformOverviewPage } from './PlatformOverviewPage';
 
 export function AdminOverview(props: Parameters<typeof ScopedOverview>[0]) {
-  return props.realm === 'platform' ? (
-    <PlatformOverviewPage hash={props.hash} />
-  ) : (
-    <ScopedOverview {...props} />
+  if (props.realm === 'platform') return <PlatformOverviewPage hash={props.hash} />;
+  const layout = new URLSearchParams(props.hash.slice(1)).get('layout') || 'dashboard';
+  return (
+    <>
+      <nav className="platform-detail-nav" aria-label="工作台页面版本">
+        {[
+          ['dashboard', '知识仪表盘'],
+          ['workbench', '资料工作台'],
+          ['operations', '企业运行概览'],
+        ].map(([key, label]) => (
+          <a
+            key={key}
+            className="button ghost"
+            aria-current={layout === key ? 'page' : undefined}
+            href={adminHref('tenant', 'overview', props.hash, { layout: key })}
+          >
+            {label}
+          </a>
+        ))}
+      </nav>
+      {layout === 'workbench' ? (
+        <KnowledgeWorkbench
+          tenant={props.tenant!}
+          hash={props.hash}
+          responsibilityPending={props.responsibilityPending || false}
+        />
+      ) : layout === 'operations' ? (
+        <ScopedOverview {...props} />
+      ) : (
+        <KnowledgeDashboard key={props.tenant} tenant={props.tenant!} hash={props.hash} />
+      )}
+    </>
   );
 }
 
@@ -62,11 +90,6 @@ function ScopedOverview({
   const refresh = () => setAttempt((n) => n + 1);
   return (
     <div className="admin-dashboard tenant-overview">
-      <PageActions>
-        <Button variant="ghost" icon={RefreshCw} onClick={refresh}>
-          刷新
-        </Button>
-      </PageActions>
       {summary.error ? (
         <Failure error={summary.error} retry={refresh} />
       ) : !summary.value ? (

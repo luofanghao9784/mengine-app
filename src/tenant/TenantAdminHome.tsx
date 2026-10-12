@@ -62,43 +62,7 @@ const tabs = [
   ['settings', '企业设置', Settings],
 ] as const;
 const inviteLabels = { PENDING: '等待接受', ACCEPTED: '已加入', REVOKED: '已撤销', EXPIRED: '已过期' };
-const actions: Record<string, string> = {
-  INVITATION_CREATE: '创建邀请',
-  INVITATION_REVOKE: '撤销邀请',
-  INVITATION_ACCEPT: '接受邀请',
-  MEMBER_ENABLE: '恢复成员',
-  MEMBER_DISABLE: '停用成员',
-  MEMBER_SECURITY_DISABLE: '紧急安全停用成员',
-  MEMBER_ROLE: '调整管理员角色',
-  GOVERNANCE_ROLE: '调整企业管理员',
-  OWNER_ACCEPT: '接受初始负责人职责',
-  COMPANY_INFORMATION_ADD: '添加企业信息',
-  COMPANY_INFORMATION_EDIT: '调整企业信息',
-  COMPANY_INFORMATION_REMOVE: '移除企业信息',
-  COMPANY_INFORMATION_ADOPT: '采用企业信息建议',
-  GENERAL_EXPERIENCE_USE_STOP: '停止本企业使用通用经验',
-  GENERAL_EXPERIENCE_USE_RESTORE: '恢复本企业使用通用经验',
-  COMPANY_INFORMATION_KEEP: '保留当前企业信息',
-  COMPANY_INFORMATION_CLEAR: '清空企业信息分组',
-  COLLECTION_CONFIGURE: '调整自动取数',
-  COLLECTION_NOW: '立即更新数据',
-  OWNER_HANDOVER_OFFER: '发起企业负责人交接',
-  OWNER_HANDOVER_ACCEPT: '接受企业负责人交接',
-  OWNER_HANDOVER_REJECT: '拒绝企业负责人交接',
-  OWNER_HANDOVER_CANCEL: '撤销企业负责人交接',
-  WORKSPACE_OWNER_CHANGE: '更换空间负责人',
-  WORKSPACE_CREATE: '创建共享空间',
-  WORKSPACE_RENAME: '修改空间名称',
-  WORKSPACE_ARCHIVE: '归档空间',
-  WORKSPACE_RESTORE: '恢复空间',
-  DATASET_WITHDRAW: '撤下数据集',
-  DATASET_PURGE: '清理数据集在线正文',
-  WORKSPACE_GRANT: '授权空间成员',
-  WORKSPACE_REVOKE: '撤销空间授权',
-  WORKSPACE_MAINTAIN: '授予资料维护权限',
-  WORKSPACE_READONLY: '取消资料维护权限',
-  TENANT_RENAME: '修改企业名称',
-};
+import { auditActions as actions } from './audit-labels';
 const time = (date: string) => new Date(date).toLocaleString('zh-CN', { hour12: false });
 const role = (value: string) => (value === 'TENANT_ADMIN' ? '企业管理员' : '成员');
 export function TenantAdminHome({
@@ -151,7 +115,7 @@ export function TenantAdminHome({
         <Button variant="ghost" icon={RefreshCw} onClick={refresh} disabled={writing}>
           刷新
         </Button>
-        {tab !== 'records' && (
+        {!['records', 'settings', 'operations'].includes(tab) && (
           <Button
             variant="primary"
             icon={Plus}
@@ -411,6 +375,7 @@ function Filter({
   );
 }
 function Members({ tenant, attempt, refresh }: { tenant: string; attempt: number; refresh: () => void }) {
+  const { session } = useSession();
   const [q, setQ] = useViewState(tenant, 'admin:members:query', '', textState),
     [status, setStatus] = useViewState(tenant, 'admin:members:status', '', textState),
     [page, setPage] = useViewState(tenant, 'admin:members:page', 0, pageState);
@@ -461,7 +426,13 @@ function Members({ tenant, attempt, refresh }: { tenant: string; attempt: number
               {data.value.slice(0, 20).map((m) => (
                 <li className="tenant-member-grid" key={m.accountId}>
                   <span className="tenant-person">
-                    <strong>{m.displayName}</strong>
+                    <strong>
+                      <span className="tenant-member-avatar" aria-hidden="true">
+                        {Array.from(m.displayName).slice(-2).join('')}
+                      </span>
+                      {m.displayName}
+                      {m.accountId === session.identity?.account.id && <small> · 你</small>}
+                    </strong>
                     <small>{m.phone || m.email}</small>
                   </span>
                   <Badge>{role(m.role)}</Badge>
@@ -922,7 +893,13 @@ function SpaceContents({
               {data.value.slice(0, 20).map((m) => (
                 <li key={m.accountId}>
                   <span className="tenant-person">
-                    <strong>{m.displayName}</strong>
+                    <strong>
+                      <span className="tenant-member-avatar" aria-hidden="true">
+                        {Array.from(m.displayName).slice(-2).join('')}
+                      </span>
+                      {m.displayName}
+                      {m.accountId === session.identity?.account.id && <small> · 你</small>}
+                    </strong>
                     <small>{m.phone || m.email}</small>
                   </span>
                   <Badge>{m.canMaintain ? '可维护' : '只读'}</Badge>
@@ -1020,7 +997,13 @@ function AddGrant({
             {data.value.slice(0, 20).map((m) => (
               <li key={m.accountId}>
                 <span className="tenant-person">
-                  <strong>{m.displayName}</strong>
+                  <strong>
+                    <span className="tenant-member-avatar" aria-hidden="true">
+                      {Array.from(m.displayName).slice(-2).join('')}
+                    </span>
+                    {m.displayName}
+                    {m.accountId === session.identity?.account.id && <small> · 你</small>}
+                  </strong>
                   <small>{m.phone || m.email}</small>
                 </span>
                 <Button

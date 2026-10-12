@@ -49,7 +49,7 @@ class CollectionIntegrationTest {
     CollectionAdapter.Result result(String name,Instant coverage){return new CollectionAdapter.Result("1.0",List.of(new CollectionAdapter.Snapshot(dataset,coverage,List.of(List.of(name,"3")))));}
     void code(String expected,Runnable action){assertEquals(expected,assertThrows(IdentityException.class,action::run).code);}
     @Test void datasetLifecycleRequiresScopeAndCapabilityAndErasesAllSnapshots() {
-        code("MATERIAL_LOCATION_UNAVAILABLE",()->lifecycle.get(admin,tenant,dataset));
+        code("MATERIAL_NOT_FOUND",()->lifecycle.get(admin,tenant,dataset));
         code("CAPABILITY_REQUIRED",()->lifecycle.act(reader,tenant,dataset,UUID.randomUUID(),0,"WITHDRAW",true));
         admins.grant(owner,tenant,space,admin,UUID.randomUUID(),admins.spaceInfo(owner,tenant,space).version(),true);
         start();var claim=service.claim(tenant,connection,Instant.now());assertTrue(service.complete(claim,result("待清理正文",null),Instant.now()));
@@ -200,6 +200,45 @@ class CollectionIntegrationTest {
         assertThrows(IllegalArgumentException.class,()->deployment.apply(manifest(List.of(new CollectionDeployment.Dataset(dataset,space,"sales","新名称","",List.of("另一列"))))));
         UUID replacement=UUID.randomUUID();deployment.apply(manifest(List.of(new CollectionDeployment.Dataset(replacement,space,"sales","新口径数据","",List.of("门店")))));
         code("DATASET_NOT_FOUND",()->service.preview(reader,tenant,dataset,0,20));assertNull(service.preview(reader,tenant,replacement,0,20).dataset().version());
+    }
+    @Test void deployedFieldsAreScopedImmutableAndLegacyCompatible() {
+        var fields=List.of(new DatasetField("门店","text","门店名称","","源字典说明","SOURCE_DOCUMENTED"),new DatasetField("数量","integer","含义未明确","","仅有字段名","UNKNOWN"));
+        UUID defined=UUID.randomUUID();
+        var definition=new CollectionDeployment.Dataset(defined,space,"defined","部署字段资料","部署说明",List.of("门店","数量"),fields);
+        deployment.apply(manifest(List.of(definition)));
+        assertEquals(fields,service.preview(reader,tenant,defined,0,20).dataset().fieldDefinitions());
+        code("DATASET_NOT_FOUND",()->service.preview(admin,tenant,defined,0,20));
+        assertThrows(IdentityException.class,()->service.preview(outside,tenant,defined,0,20));
+        deployment.apply(manifest(List.of(definition))); // same definition can be redeployed
+        var changed=List.of(fields.getFirst(),new DatasetField("数量","integer","推断为次数","次","部署推断","DEPLOYMENT_INFERRED"));
+        assertThrows(IllegalArgumentException.class,()->deployment.apply(manifest(List.of(new CollectionDeployment.Dataset(defined,space,"defined","部署字段资料","部署说明",List.of("门店","数量"),changed)))));
+        assertThrows(org.springframework.dao.DataAccessException.class,()->db.update("UPDATE business_datasets SET field_definitions='[]' WHERE id=?",defined));
+        assertEquals(fields,service.preview(reader,tenant,defined,0,20).dataset().fieldDefinitions());
+        db.update("DELETE FROM workspace_members WHERE tenant_id=? AND workspace_id=? AND account_id=?",tenant,space,reader);
+        code("DATASET_NOT_FOUND",()->service.preview(reader,tenant,defined,0,20));
+    }
+    @Test void workspaceAclRestrictionHidesDatasetCatalogSummaryAndSourceFromExistingMember(){
+        db.update("INSERT INTO library_permission_rollouts VALUES (?,true)",tenant);
+        db.update("INSERT INTO library_policies(tenant_id,object_kind,object_id,workspace_id) VALUES (?,'WORKSPACE',?,?)",tenant,space,space);
+        db.update("INSERT INTO library_grants(tenant_id,object_kind,object_id,principal_kind,principal_id,content,download) VALUES (?,'WORKSPACE',?,'ACCOUNT',?,'NONE','DENY')",tenant,space,reader);
+        assertEquals(0,service.summary(reader,tenant).datasets());
+        assertTrue(service.datasets(reader,tenant,"",0,20).items().isEmpty());
+        assertTrue(service.connections(reader,tenant).isEmpty());
+        code("DATASET_NOT_FOUND",()->service.preview(reader,tenant,dataset,0,20));
+        assertTrue(service.detail(admin,tenant,connection).canControl());
+        assertEquals(1,service.summary(owner,tenant).datasets());
+    }
+    @Test void deploymentRejectsIncompleteFieldExplanationsAndPurgeErasesThem() {
+        var field=new DatasetField("门店","text","门店名称","","源字典说明","SOURCE_DOCUMENTED");
+        assertThrows(IllegalArgumentException.class,()->DatasetField.validate(List.of("门店","数量"),List.of(field)));
+        assertThrows(IllegalArgumentException.class,()->DatasetField.validate(List.of("另一列"),List.of(field)));
+        assertThrows(IllegalArgumentException.class,()->DatasetField.validate(List.of("门店"),List.of(new DatasetField("门店","text","意义","","","UNKNOWN"))));
+        UUID defined=UUID.randomUUID();deployment.apply(manifest(List.of(new CollectionDeployment.Dataset(defined,space,"defined","部署说明","",List.of("门店"),List.of(field)))));
+        admins.grant(owner,tenant,space,admin,UUID.randomUUID(),admins.spaceInfo(owner,tenant,space).version(),true);
+        db.update("INSERT INTO governance_capabilities(tenant_id,account_id,workspace_id,capability,granted_by) VALUES (?,?,?,'LIFECYCLE_PURGE',?)",tenant,admin,space,admin);
+        lifecycle.act(admin,tenant,defined,UUID.randomUUID(),0,"WITHDRAW",true);
+        lifecycle.act(admin,tenant,defined,UUID.randomUUID(),1,"PURGE",true);
+        assertEquals("[]",db.queryForObject("SELECT field_definitions::text FROM business_datasets WHERE id=?",String.class,defined));
     }
     @Test void scopedSummaryFiltersAndHumanActionsEnterTenantManagementRecords(){
         assertEquals(0,service.summary(admin,tenant).datasets());assertEquals(1,service.summary(reader,tenant).datasets());assertEquals(0,service.summary(reader,tenant).available());

@@ -18,12 +18,12 @@ public class DatasetTaskContext {
     private Map<String,Object> task(UUID id){return db.queryForMap("SELECT * FROM conversation_tasks WHERE id=?",id);}
     private List<Map<String,Object>> rows(Map<String,Object> t,UUID dataset,UUID snapshot,String q,int offset,int limit){
         return db.queryForList("""
-          SELECT d.id,d.workspace_id,d.name,d.description,d.column_names,s.id snapshot_id,s.version,s.row_count,s.coverage_through,s.collected_at
+          SELECT d.id,d.workspace_id,d.name,d.description,d.column_names,d.field_definitions,s.id snapshot_id,s.version,s.row_count,s.coverage_through,s.collected_at
           FROM business_datasets d JOIN workspace_members g ON g.tenant_id=d.tenant_id AND g.workspace_id=d.workspace_id AND g.account_id=?
           LEFT JOIN task_dataset_reads pin ON pin.task_id=? AND pin.attempt_number=? AND pin.dataset_id=d.id
           JOIN dataset_snapshots s ON s.dataset_id=d.id AND s.id=coalesce(pin.snapshot_id,
             (SELECT pick.snapshot_id FROM briefing_dataset_selections pick WHERE pick.task_id=? AND pick.dataset_id=d.id AND NOT pick.invalidated),d.current_snapshot)
-          WHERE d.tenant_id=? AND d.status='ACTIVE' AND NOT d.scrubbed AND NOT s.scrubbed
+          WHERE d.tenant_id=? AND d.status='ACTIVE' AND (library_mask(g.account_id,d.tenant_id,'WORKSPACE',d.workspace_id)&1)=1 AND NOT d.scrubbed AND NOT s.scrubbed
            AND (?<>'SELECTED' OR EXISTS(SELECT 1 FROM briefing_dataset_selections pick WHERE pick.task_id=? AND pick.dataset_id=d.id AND pick.snapshot_id=s.id AND NOT pick.invalidated))
            AND (? IN ('AUTHORIZED_LIBRARY','SELECTED') OR d.workspace_id=?::uuid) AND departure_content_readable(?,d.tenant_id,d.workspace_id)
            AND (?::uuid IS NULL OR d.id=?::uuid) AND (?::uuid IS NULL OR s.id=?::uuid)
@@ -42,7 +42,7 @@ public class DatasetTaskContext {
     private Map<String,Object> metadata(Map<String,Object> d,int columnOffset,int columnLimit){
         List<String> columns=json.readValue(d.get("column_names").toString(),json.getTypeFactory().constructCollectionType(List.class,String.class));
         if(columnOffset>=columns.size())throw IdentityException.invalid();int end=Math.min(columns.size(),columnOffset+columnLimit);
-        return map("datasetId",d.get("id"),"snapshotId",d.get("snapshot_id"),"version",d.get("version"),"name",d.get("name"),"description",d.get("description"),"columns",columns.subList(columnOffset,end),"columnOffset",columnOffset,"nextColumnOffset",end<columns.size()?end:null,"totalColumns",columns.size(),"rowCount",d.get("row_count"),"coverageThrough",time(d.get("coverage_through")),"collectedAt",time(d.get("collected_at")),"authority",false,"businessReading",columns.contains("收款状态")&&columns.contains("收款类型")?Map.of("statusLabels",Map.of("finance_confirmed","财务已确认（不能据此认定到账）","canceled","已取消（不能据此认定已退款）"),"typeLabels",Map.of("deposit","定金"),"money","列名明确标注（分）的金额，展示给读者时换算为元；保留原数值用于计算。","scope","样本仅支持样本观察，原始状态含义未知时说明尚待核实，不推断定金比例。", "dateComparison","可用 compare_dataset 的 periodMode=MONTH 将日期按业务时区归月，月份必须为 YYYY-MM；缺失或格式不明的日期会拒绝计算。") : Map.of());
+        return map("datasetId",d.get("id"),"snapshotId",d.get("snapshot_id"),"version",d.get("version"),"name",d.get("name"),"description",d.get("description"),"columns",columns.subList(columnOffset,end),"fieldDefinitions",com.dreamcore.workspace.collection.DatasetField.read(d.get("field_definitions")).stream().filter(f->columns.subList(columnOffset,end).contains(f.column())).toList(),"definitionOrigin","DEPLOYMENT","columnOffset",columnOffset,"nextColumnOffset",end<columns.size()?end:null,"totalColumns",columns.size(),"rowCount",d.get("row_count"),"coverageThrough",time(d.get("coverage_through")),"collectedAt",time(d.get("collected_at")),"authority",false,"businessReading",columns.contains("收款状态")&&columns.contains("收款类型")?Map.of("statusLabels",Map.of("finance_confirmed","财务已确认（不能据此认定到账）","canceled","已取消（不能据此认定已退款）"),"typeLabels",Map.of("deposit","定金"),"money","列名明确标注（分）的金额，展示给读者时换算为元；保留原数值用于计算。","scope","样本仅支持样本观察，原始状态含义未知时说明尚待核实，不推断定金比例。", "dateComparison","可用 compare_dataset 的 periodMode=MONTH 将日期按业务时区归月，月份必须为 YYYY-MM；缺失或格式不明的日期会拒绝计算。") : Map.of());
     }
     public Object read(UUID task,TaskContextService.Request r){
         db.queryForList("SELECT id FROM conversation_tasks WHERE id=? FOR UPDATE",task);var t=task(task);

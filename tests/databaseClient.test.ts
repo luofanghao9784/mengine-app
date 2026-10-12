@@ -49,3 +49,30 @@ test('manual update sends only request and revision through customer CSRF withou
   assert.equal(calls[0].path, '/api/v1/auth/csrf');
   assert.deepEqual(calls[1].body, { requestId: id, expectedRevision: 2 });
 });
+
+test('deployed definitions preserve uncertainty and reject mismatched field scope', async () => {
+  const field = {
+    column: '门店',
+    type: 'text',
+    meaning: '门店名称',
+    unit: '',
+    evidence: '部署来源说明',
+    status: 'DEPLOYMENT_INFERRED',
+  };
+  const value = {
+    dataset: { ...dataset, columns: ['门店'], fieldDefinitions: [field] },
+    rows: [],
+    hasMore: false,
+  };
+  assert.deepEqual(await createDatabaseClient(async () => Response.json(value)).preview(id, id, 0), value);
+  for (const patch of [{ column: '受限字段' }, { status: 'AI_CONFIRMED' }, { evidence: '' }])
+    await assert.rejects(
+      createDatabaseClient(async () =>
+        Response.json({
+          ...value,
+          dataset: { ...value.dataset, fieldDefinitions: [{ ...field, ...patch }] },
+        }),
+      ).preview(id, id, 0),
+      mismatch,
+    );
+});

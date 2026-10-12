@@ -52,6 +52,10 @@ public class MaterialController {
             @RequestParam(defaultValue="0") int offset,@RequestParam(defaultValue="50") int limit) {
         return service.detail(actor(auth),tenant,workspace,material,offset,limit);
     }
+    @GetMapping("/workspaces/{workspace}/materials/{material}/pipeline")
+    public MaterialService.Pipeline pipeline(Authentication auth,@PathVariable UUID tenant,@PathVariable UUID workspace,@PathVariable UUID material){return service.pipeline(actor(auth),tenant,workspace,material);}
+    @GetMapping("/workspaces/{workspace}/materials/{material}/editable-text")
+    public MaterialService.EditableText editableText(Authentication auth,@PathVariable UUID tenant,@PathVariable UUID workspace,@PathVariable UUID material){return service.editableText(actor(auth),tenant,workspace,material);}
     @GetMapping("/workspaces/{workspace}/materials/{material}/versions/{version}") public MaterialService.Version exactVersion(Authentication auth,@PathVariable UUID tenant,@PathVariable UUID workspace,@PathVariable UUID material,@PathVariable UUID version){return service.version(actor(auth),tenant,workspace,material,version);}
     @GetMapping("/workspaces/{workspace}/materials/{material}/versions/{version}/download")
     public ResponseEntity<byte[]> download(Authentication auth,@PathVariable UUID tenant,@PathVariable UUID workspace,@PathVariable UUID material,@PathVariable UUID version) {

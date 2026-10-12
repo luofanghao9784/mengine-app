@@ -1,0 +1,199 @@
+{
+  "schemaVersion": 1,
+  "reviewedAt": "2026-10-12T07:38:59.602023+00:00",
+  "items": [
+    {
+      "id": "pptx-generator",
+      "title": "PPT 生成",
+      "repository": "https://github.com/MiniMax-AI/skills",
+      "commit": "60aaae52bb2af8162732751a4332f62a5fef518b",
+      "directory": "skills/pptx-generator",
+      "license": "MIT",
+      "licenseStatus": "declared",
+      "stage": "source-prepared",
+      "runtimeEnabled": false,
+      "files": [
+        {
+          "upstreamPath": "CREDITS.md",
+          "bytes": 2609,
+          "sha256": "536cfa5cf8171d6c9418a7520d732ce5a382fa68947654bd5f037bdfc6368897",
+          "url": "https://raw.githubusercontent.com/MiniMax-AI/skills/60aaae52bb2af8162732751a4332f62a5fef518b/CREDITS.md",
+          "localPath": "engine/skill-sources/upstream/pptx-generator/CREDITS.md"
+        },
+        {
+          "upstreamPath": "LICENSE",
+          "bytes": 1064,
+          "sha256": "eed4ccce37c2d24822da3bd9d5bee7bc12d494741de56ada513d0b97f537fcd0",
+          "url": "https://raw.githubusercontent.com/MiniMax-AI/skills/60aaae52bb2af8162732751a4332f62a5fef518b/LICENSE",
+          "localPath": "engine/skill-sources/upstream/pptx-generator/LICENSE"
+        },
+        {
+          "upstreamPath": "LICENSES/Apache-2.0.txt",
+          "bytes": 11357,
+          "sha256": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd",
+          "url": "https://raw.githubusercontent.com/MiniMax-AI/skills/60aaae52bb2af8162732751a4332f62a5fef518b/LICENSES/Apache-2.0.txt",
+          "localPath": "engine/skill-sources/upstream/pptx-generator/LICENSES/Apache-2.0.txt"
+        },
+        {
+          "upstreamPath": "skills/pptx-generator/SKILL.md",
+          "bytes": 7930,
+          "sha256": "6eeb36239fdef35ab133ca462e1ec4674cb96dd9c5cd63da39c29151899bda10",
+          "url": "https://raw.githubusercontent.com/MiniMax-AI/skills/60aaae52bb2af8162732751a4332f62a5fef518b/skills/pptx-generator/SKILL.md",
+          "localPath": "engine/skill-sources/upstream/pptx-generator/skills/pptx-generator/SKILL.md"
+        },
+        {
+          "upstreamPath": "skills/pptx-generator/references/design-system.md",
+          "bytes": 16159,
+          "sha256": "8a225af2ebd3bfa979616da74b7ec34395712fe1a8195e5613214aa291211996",
+          "url": "https://raw.githubusercontent.com/MiniMax-AI/skills/60aaae52bb2af8162732751a4332f62a5fef518b/skills/pptx-generator/references/design-system.md",
+          "localPath": "engine/skill-sources/upstream/pptx-generator/skills/pptx-generator/references/design-system.md"
+        },
+        {
+          "upstreamPath": "skills/pptx-generator/references/editing.md",
+          "bytes": 6577,
+          "sha256": "5385ef88e7d081c43ee488ca308174743678314d53f6afc5df9b932390dcb3bf",
+          "url": "https://raw.githubusercontent.com/MiniMax-AI/skills/60aaae52bb2af8162732751a4332f62a5fef518b/skills/pptx-generator/references/editing.md",
+          "localPath": "engine/skill-sources/upstream/pptx-generator/skills/pptx-generator/references/editing.md"
+        },
+        {
+          "upstreamPath": "skills/pptx-generator/references/pitfalls.md",
+          "bytes": 3849,
+          "sha256": "247a8eb1860524fdd0d8a3365a791490c162d4a58677eb3f329d4dd682ce0257",
+          "url": "https://raw.githubusercontent.com/MiniMax-AI/skills/60aaae52bb2af8162732751a4332f62a5fef518b/skills/pptx-generator/references/pitfalls.md",
+          "localPath": "engine/skill-sources/upstream/pptx-generator/skills/pptx-generator/references/pitfalls.md"
+        },
+        {
+          "upstreamPath": "skills/pptx-generator/references/pptxgenjs.md",
+          "bytes": 12752,
+          "sha256": "4b66df00dd581c2eeadb140fd9bbad71daea6fb48b424f97b993f8521e41d470",
+          "url": "https://raw.githubusercontent.com/MiniMax-AI/skills/60aaae52bb2af8162732751a4332f62a5fef518b/skills/pptx-generator/references/pptxgenjs.md",
+          "localPath": "engine/skill-sources/upstream/pptx-generator/skills/pptx-generator/references/pptxgenjs.md"
+        },
+        {
+          "upstreamPath": "skills/pptx-generator/references/slide-types.md",
+          "bytes": 15790,
+          "sha256": "fa2c0da76d420463990317dc5932e607cea5e126389ca391e3e5718629b0cb38",
+          "url": "https://raw.githubusercontent.com/MiniMax-AI/skills/60aaae52bb2af8162732751a4332f62a5fef518b/skills/pptx-generator/references/slide-types.md",
+          "localPath": "engine/skill-sources/upstream/pptx-generator/skills/pptx-generator/references/slide-types.md"
+        }
+      ]
+    },
+    {
+      "id": "web-dashboard",
+      "title": "Web 数据看板",
+      "repository": "https://github.com/anthropics/skills",
+      "commit": "dbd4588f9e1033efb41dad4bef2f7947c8993d44",
+      "directory": "skills/web-artifacts-builder",
+      "license": "Apache-2.0",
+      "licenseStatus": "declared",
+      "stage": "source-prepared",
+      "runtimeEnabled": false,
+      "files": [
+        {
+          "upstreamPath": "skills/web-artifacts-builder/LICENSE.txt",
+          "bytes": 11345,
+          "sha256": "bc6b3af2f331cbc7fb0da1344efb2cbe5877a31498b4d70dbc7000f3405a1362",
+          "url": "https://raw.githubusercontent.com/anthropics/skills/dbd4588f9e1033efb41dad4bef2f7947c8993d44/skills/web-artifacts-builder/LICENSE.txt",
+          "localPath": "engine/skill-sources/upstream/web-dashboard/skills/web-artifacts-builder/LICENSE.txt"
+        },
+        {
+          "upstreamPath": "skills/web-artifacts-builder/SKILL.md",
+          "bytes": 3087,
+          "sha256": "81c5002c6643b0de7b8710b00e7a9038daa6fb9b68d59870ee6adb12da8d10f8",
+          "url": "https://raw.githubusercontent.com/anthropics/skills/dbd4588f9e1033efb41dad4bef2f7947c8993d44/skills/web-artifacts-builder/SKILL.md",
+          "localPath": "engine/skill-sources/upstream/web-dashboard/skills/web-artifacts-builder/SKILL.md"
+        },
+        {
+          "upstreamPath": "skills/web-artifacts-builder/scripts/bundle-artifact.sh",
+          "bytes": 1517,
+          "sha256": "abf0e480bf6585b56fab8526a407dfb7dc740812bddd70c636e1e8f3df5f9618",
+          "url": "https://raw.githubusercontent.com/anthropics/skills/dbd4588f9e1033efb41dad4bef2f7947c8993d44/skills/web-artifacts-builder/scripts/bundle-artifact.sh",
+          "localPath": "engine/skill-sources/upstream/web-dashboard/skills/web-artifacts-builder/scripts/bundle-artifact.sh"
+        },
+        {
+          "upstreamPath": "skills/web-artifacts-builder/scripts/init-artifact.sh",
+          "bytes": 9924,
+          "sha256": "355e5dd4382aaaee91f01f1627eaeab30b2676ffa8d9b3ec328a1ae450ebccaa",
+          "url": "https://raw.githubusercontent.com/anthropics/skills/dbd4588f9e1033efb41dad4bef2f7947c8993d44/skills/web-artifacts-builder/scripts/init-artifact.sh",
+          "localPath": "engine/skill-sources/upstream/web-dashboard/skills/web-artifacts-builder/scripts/init-artifact.sh"
+        },
+        {
+          "upstreamPath": "skills/web-artifacts-builder/scripts/shadcn-components.tar.gz",
+          "bytes": 19967,
+          "sha256": "1296f069e825de7933de7e8ac63672495cacce3f88f2dc45554dbcddbcbca60f",
+          "url": "https://raw.githubusercontent.com/anthropics/skills/dbd4588f9e1033efb41dad4bef2f7947c8993d44/skills/web-artifacts-builder/scripts/shadcn-components.tar.gz",
+          "localPath": "engine/skill-sources/upstream/web-dashboard/skills/web-artifacts-builder/scripts/shadcn-components.tar.gz"
+        }
+      ]
+    },
+    {
+      "id": "personal-space-organizer",
+      "title": "个人空间智能整理",
+      "repository": "https://github.com/ComposioHQ/awesome-claude-skills",
+      "commit": "be2a406907dbc61b73e6827ded415c96139d13a2",
+      "directory": "file-organizer",
+      "license": null,
+      "licenseStatus": "review-required",
+      "stage": "candidate",
+      "runtimeEnabled": false,
+      "files": [
+        {
+          "upstreamPath": "file-organizer/SKILL.md",
+          "bytes": 11312,
+          "sha256": "a8b91952bab7f73511db68149c4a54672b40699903a8e35ed5044c3e3039ded5",
+          "url": "https://raw.githubusercontent.com/ComposioHQ/awesome-claude-skills/be2a406907dbc61b73e6827ded415c96139d13a2/file-organizer/SKILL.md"
+        }
+      ]
+    },
+    {
+      "id": "infographic",
+      "title": "一图读懂",
+      "repository": "https://github.com/JimLiu/baoyu-skills",
+      "commit": "1567581c26ec29f4216c6e6835415bf30343b0e3",
+      "directory": "skills/baoyu-infographic",
+      "license": "MIT",
+      "licenseStatus": "declared",
+      "stage": "candidate",
+      "runtimeEnabled": false,
+      "files": [
+        {
+          "upstreamPath": "LICENSE",
+          "bytes": 1064,
+          "sha256": "601839401f6ce68b7a8aec0f7ba247ab8ef0848113378220bec4b2615cc84ee7",
+          "url": "https://raw.githubusercontent.com/JimLiu/baoyu-skills/1567581c26ec29f4216c6e6835415bf30343b0e3/LICENSE"
+        },
+        {
+          "upstreamPath": "skills/baoyu-infographic/SKILL.md",
+          "bytes": 19957,
+          "sha256": "1572aaa294c5f7547889f520b6efeed979aeaaf58b4e7c4bcaaa26ace2ee3564",
+          "url": "https://raw.githubusercontent.com/JimLiu/baoyu-skills/1567581c26ec29f4216c6e6835415bf30343b0e3/skills/baoyu-infographic/SKILL.md"
+        }
+      ]
+    },
+    {
+      "id": "meeting-minutes",
+      "title": "会议录音整理",
+      "repository": "https://github.com/aws-samples/sample-for-kiro-meeting-minutes-skill",
+      "commit": "b2c21cfb05266fe88ca36a91817f405a5234e995",
+      "directory": "",
+      "license": "MIT-0",
+      "licenseStatus": "declared",
+      "stage": "candidate",
+      "runtimeEnabled": false,
+      "files": [
+        {
+          "upstreamPath": "LICENSE",
+          "bytes": 947,
+          "sha256": "7cb750713252efd1d578837ba8785b61319109906f0c10b87adab7cf4badfc42",
+          "url": "https://raw.githubusercontent.com/aws-samples/sample-for-kiro-meeting-minutes-skill/b2c21cfb05266fe88ca36a91817f405a5234e995/LICENSE"
+        },
+        {
+          "upstreamPath": "SKILL.md",
+          "bytes": 3094,
+          "sha256": "77028859d93406c0eb784f85e44d5257ca52b35af12b8ffdd8a0f9afbff19649",
+          "url": "https://raw.githubusercontent.com/aws-samples/sample-for-kiro-meeting-minutes-skill/b2c21cfb05266fe88ca36a91817f405a5234e995/SKILL.md"
+        }
+      ]
+    }
+  ]
+}

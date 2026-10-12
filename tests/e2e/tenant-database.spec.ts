@@ -47,6 +47,24 @@ async function fixture(
     name: '合成订单数据',
     description: '合成销售记录',
     columns: ['门店', '数量'],
+    fieldDefinitions: [
+      {
+        column: '门店',
+        type: 'text',
+        meaning: '发生业务的门店',
+        unit: '',
+        evidence: '合成源系统字段定义',
+        status: 'SOURCE_DOCUMENTED',
+      },
+      {
+        column: '数量',
+        type: 'integer',
+        meaning: '数量含义尚待来源核实',
+        unit: '',
+        evidence: '目前只有字段名，不能确定统计口径',
+        status: 'UNKNOWN',
+      },
+    ],
     version: 1,
     rowCount: 1,
     collectedAt: '2026-10-04T00:00:00Z',
@@ -132,10 +150,16 @@ test('dataset dashboard, scoped preview and connector controls preserve independ
 }) => {
   const writes = await fixture(context);
   await page.goto(`/tenant-admin/#tenant=${tenant}&admin=database`);
-  await expect(page.getByRole('link', { name: /合成订单数据/ })).toBeVisible();
+  await expect(page.getByRole('cell', { name: /合成订单数据/ })).toBeVisible();
   await page.screenshot({ path: 'test-results/tenant-database-dashboard.png', fullPage: true });
+  await expect(page.getByRole('columnheader', { name: '字段数', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: '查看数据与字段' })).toBeVisible();
+  await page.getByRole('link', { name: '数据集运行列表', exact: true }).click();
   await page.getByRole('link', { name: /合成订单数据/ }).click();
   await expect(page.getByRole('cell', { name: '合成门店' })).toBeVisible();
+  await expect(page.getByText('合成源系统字段定义')).toBeVisible();
+  await expect(page.getByRole('cell', { name: '尚不明确', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: /生成字段|新建数据表|新增连接/ })).toHaveCount(0);
   await page.screenshot({ path: 'test-results/tenant-dataset-preview.png', fullPage: true });
   await page.getByRole('link', { name: '查看对应接入' }).click();
   await page.getByRole('button', { name: '调整自动取数' }).click();
@@ -172,7 +196,7 @@ test('space responsible reader sees scoped data without collection controls or d
   await expect(page.getByRole('button', { name: '调整自动取数' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '立即更新' })).toHaveCount(0);
   await expect(page.getByRole('textbox')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: '数据管理', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '数据资产', exact: true })).toBeVisible();
 });
 test('unavailable connection blocks update and uncertain response reuses the original request', async ({
   page,

@@ -1263,6 +1263,158 @@
           }
         ]
       }
+    },
+    "/api/v1/tenants/{tenant}/conversations/presentation-capability": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "PPT 平台开关状态（引擎仍需就绪）",
+        "responses": {
+          "200": {
+            "description": "当前会话所有者及资料权限复核，private, no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "available"
+                  ],
+                  "properties": {
+                    "available": {
+                      "type": "boolean"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/conversations/{conversation}/tasks/{task}/presentation": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "conversation",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "task",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "读取当前任务的持久化 PPT 大纲",
+        "responses": {
+          "200": {
+            "description": "当前会话所有者及资料权限复核，private, no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresentationDraft"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/conversations/{conversation}/tasks/{task}/presentation/confirm": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "conversation",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "task",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "summary": "确认大纲并原子恢复任务；不接受客户端修改正文或来源",
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PresentationConfirmation"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "当前会话所有者及资料权限复核，private, no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "任务或大纲版本变化；重复请求须内容完全一致"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1970,6 +2122,27 @@
             ],
             "additionalProperties": false,
             "description": "从画报首次发送时携带固定版本引用，服务端原子创建或复用本人讨论。"
+          },
+          "presentation": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "pages",
+              "theme"
+            ],
+            "properties": {
+              "pages": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 8
+              },
+              "theme": {
+                "enum": [
+                  "ocean",
+                  "ink"
+                ]
+              }
+            }
           }
         },
         "required": [
@@ -2027,6 +2200,37 @@
                 "originals": {
                   "maxItems": 0
                 }
+              }
+            }
+          },
+          {
+            "if": {
+              "required": [
+                "presentation"
+              ]
+            },
+            "then": {
+              "properties": {
+                "mode": {
+                  "const": "AGENT"
+                },
+                "prompt": {
+                  "maxLength": 1900
+                }
+              },
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "publicQuery"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "briefingContext"
+                    ]
+                  }
+                ]
               }
             }
           }
@@ -2163,7 +2367,7 @@
           "bytes": {
             "type": "integer",
             "minimum": 0,
-            "maximum": 65536
+            "maximum": 20971520
           }
         },
         "required": [
@@ -3259,6 +3463,281 @@
             "minimum": 0
           }
         }
+      },
+      "PresentationConfirmation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requestId",
+          "expectedRevision",
+          "draftRevision",
+          "title",
+          "theme",
+          "slides"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "draftRevision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 48,
+            "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+          },
+          "theme": {
+            "enum": [
+              "ocean",
+              "ink"
+            ]
+          },
+          "slides": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 8,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "index",
+                "title"
+              ],
+              "properties": {
+                "index": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 7
+                },
+                "title": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 40,
+                  "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+                }
+              }
+            }
+          }
+        }
+      },
+      "PresentationDraft": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "state"
+        ],
+        "properties": {
+          "state": {
+            "enum": [
+              "NONE",
+              "REQUESTED",
+              "DRAFT",
+              "CONFIRMED"
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "options": {
+            "type": "object",
+            "properties": {
+              "pages": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 8
+              },
+              "theme": {
+                "enum": [
+                  "ocean",
+                  "ink"
+                ]
+              }
+            },
+            "additionalProperties": false
+          },
+          "spec": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "title",
+                  "theme",
+                  "slides"
+                ],
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 48,
+                    "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+                  },
+                  "theme": {
+                    "type": "string",
+                    "enum": [
+                      "ocean",
+                      "ink"
+                    ]
+                  },
+                  "slides": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 8,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "title",
+                        "sourceIds"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "cover",
+                            "bullets",
+                            "table",
+                            "chart"
+                          ]
+                        },
+                        "title": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40,
+                          "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+                        },
+                        "sourceIds": {
+                          "type": "array",
+                          "maxItems": 10,
+                          "uniqueItems": true,
+                          "items": {
+                            "type": "string",
+                            "format": "uuid"
+                          }
+                        },
+                        "subtitle": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100,
+                          "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+                        },
+                        "bullets": {
+                          "type": "array",
+                          "minItems": 1,
+                          "maxItems": 4,
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 90,
+                            "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+                          }
+                        },
+                        "headers": {
+                          "type": "array",
+                          "minItems": 2,
+                          "maxItems": 5,
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 16,
+                            "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+                          }
+                        },
+                        "rows": {
+                          "type": "array",
+                          "minItems": 1,
+                          "maxItems": 6,
+                          "items": {
+                            "type": "array",
+                            "minItems": 2,
+                            "maxItems": 5,
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 24,
+                              "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+                            }
+                          }
+                        },
+                        "labels": {
+                          "type": "array",
+                          "minItems": 2,
+                          "maxItems": 8,
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 12,
+                            "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+                          }
+                        },
+                        "values": {
+                          "type": "array",
+                          "minItems": 2,
+                          "maxItems": 8,
+                          "items": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1000000000000
+                          }
+                        },
+                        "series": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 24,
+                          "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+                        },
+                        "unit": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 12,
+                          "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "state": {
+                  "enum": [
+                    "DRAFT",
+                    "CONFIRMED"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "spec",
+                "revision"
+              ],
+              "properties": {
+                "spec": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        ]
       }
     }
   }

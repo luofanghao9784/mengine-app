@@ -1,0 +1,72 @@
+.presentation-draft {
+  margin: 16px 0;
+  padding: 18px;
+  border: 1px solid var(--border, #d6e0eb);
+  border-radius: 16px;
+  background: var(--surface, #fff);
+}
+.presentation-draft h3 {
+  margin: 0 0 8px;
+}
+.presentation-draft fieldset {
+  border: 0;
+  padding: 0;
+  min-width: 0;
+}
+.presentation-draft label {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+}
+.presentation-draft input,
+.presentation-draft select {
+  font: inherit;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid #ccd8e5;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+}
+.presentation-draft ol {
+  list-style: none;
+  padding: 0;
+}
+.presentation-draft ol > li {
+  border-top: 1px solid #dde5ec;
+  padding: 12px 0;
+}
+.presentation-slide-heading {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.presentation-slide-heading input {
+  flex: 1;
+  width: 100px;
+}
+.presentation-draft small {
+  color: #617184;
+}
+.presentation-table {
+  max-width: 100%;
+  overflow: auto;
+}
+.presentation-table th,
+.presentation-table td {
+  padding: 6px;
+  text-align: left;
+  border-bottom: 1px solid #dde5ec;
+}
+.presentation-options {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  align-items: center;
+}
+.presentation-options select {
+  font: inherit;
+  padding: 5px;
+}

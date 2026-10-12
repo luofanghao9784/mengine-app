@@ -1,3 +1,5 @@
+import { MaterialPipeline } from './MaterialPipeline';
+import { MaterialTextEditor } from './TextEditor';
 import { LibraryAccessBrowser, LibraryJournal } from './AccessBrowser';
 import { LibraryPermissions, LibraryEvents, useLibraryPermissionsEnabled } from './Permissions';
 import { adminHref } from '../admin/navigation';
@@ -855,6 +857,7 @@ export function DocumentDialog({
   const [page, setPage] = useState(0),
     [attempt, setAttempt] = useState(0),
     [upload, setUpload] = useState<number>();
+  const [editingText, setEditingText] = useState(false);
   const readerKey = (administration ? 'admin:' : '') + 'material:' + entry.workspaceId + ':' + entry.id;
   const [analysis, setAnalysis] = useViewState<MaterialVersion | null>(
     tenant,
@@ -964,6 +967,20 @@ export function DocumentDialog({
   const unavailable = failure ? <Failure error={failure} retry={refreshReader} /> : <Loading />;
   return (
     <>
+      {editingText && (
+        <MaterialTextEditor
+          tenant={tenant}
+          workspace={entry.workspaceId}
+          material={entry.id}
+          close={() => setEditingText(false)}
+          completed={() => {
+            setEditingText(false);
+            setAnalysis(null);
+            setAttempt((n) => n + 1);
+            changed();
+          }}
+        />
+      )}
       <Modal
         title="资料阅读"
         onClose={() => {
@@ -1025,11 +1042,21 @@ export function DocumentDialog({
                               上传新版本
                             </Button>
                           )}
+                          {data.value.document.canMaintain &&
+                            /[.](txt|md|markdown)$/i.test(data.value.document.name) && (
+                              <Button onClick={() => setEditingText(true)}>编辑正文</Button>
+                            )}
                           <LibraryEvents
                             tenant={tenant}
                             kind="MATERIAL"
                             id={entry.id}
                             canAudit={data.value.document.canManagePermissions}
+                          />
+                          <MaterialPipeline
+                            key={data.value.document.version}
+                            tenant={tenant}
+                            workspace={entry.workspaceId}
+                            material={entry.id}
                           />
                           <h3>历史版本</h3>
                           <ul className="material-versions">

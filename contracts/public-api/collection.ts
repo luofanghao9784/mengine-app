@@ -28,6 +28,15 @@ export interface DataConnection {
   currentRun: CollectionRun | null;
   lastRun: CollectionRun | null;
 }
+/** Supplied by deployment tools. Inference is not a verified business fact. */
+export interface DatasetField {
+  column: string;
+  type: string;
+  meaning: string;
+  unit: string;
+  evidence: string;
+  status: 'SOURCE_DOCUMENTED' | 'DEPLOYMENT_INFERRED' | 'UNKNOWN';
+}
 export interface BusinessDataset {
   id: string;
   connectionId: string;
@@ -36,6 +45,7 @@ export interface BusinessDataset {
   name: string;
   description: string;
   columns: string[];
+  fieldDefinitions?: DatasetField[];
   version: number | null;
   rowCount: number | null;
   collectedAt: string | null;

@@ -13,6 +13,7 @@ import {
   type DataConnection,
 } from './client';
 import './database.css';
+import '../admin/mengine/mengine.css';
 import { DatasetLifecyclePanel } from './DatasetLifecyclePanel';
 const date = (v: string | null) => (v ? new Date(v).toLocaleString('zh-CN', { hour12: false }) : '尚无记录');
 const frequency = (s: CollectionSchedule) =>
@@ -72,11 +73,18 @@ export function TenantDatabase({ tenant, hash }: { tenant: string; hash: string 
   const href = (extra: Record<string, string>) => adminHref('tenant', 'database', hash, extra);
   return (
     <div className="admin-dashboard tenant-database-page">
-      <nav className="platform-detail-nav" aria-label="数据库栏目">
+      <section className="admin-section input-foundation-intro">
+        <div>
+          <h2>梦擎数据基座</h2>
+          <p className="admin-note">查看已接入的业务来源与获权数据，为梦擎提供可追溯的输入。</p>
+        </div>
+        <span className="input-foundation-label">外部来源 · 只读采集</span>
+      </section>
+      <nav className="platform-detail-nav" aria-label="数据基座栏目">
         {(
           [
-            ['data', '数据管理'],
-            ['access', '数据接入'],
+            ['data', '数据资产'],
+            ['access', '数据来源'],
             ['lifecycle', '撤下与清理'],
           ] as const
         ).map(([key, label]) => (
@@ -110,6 +118,7 @@ export function TenantDatabase({ tenant, hash }: { tenant: string; hash: string 
   );
 }
 function DataList({ tenant, hash }: { tenant: string; hash: string }) {
+  const catalog = new URLSearchParams(hash.slice(1)).get('layout') !== 'directory';
   const [query, setQuery] = useViewState(tenant, 'database:query', '', textState),
     [draft, setDraft] = useState(query);
   const [state, setState] = useViewState(tenant, 'database:state', '', textState),
@@ -129,6 +138,23 @@ function DataList({ tenant, hash }: { tenant: string; hash: string }) {
   useProgressRefresh(!!data.value?.summary.updating, refresh);
   return (
     <>
+      <nav className="platform-detail-nav" aria-label="数据资产页面版本">
+        {(
+          [
+            ['catalog', '数据资产表格'],
+            ['directory', '数据集运行列表'],
+          ] as const
+        ).map(([key, label]) => (
+          <a
+            key={key}
+            className="button ghost"
+            aria-current={(catalog ? key === 'catalog' : key === 'directory') ? 'page' : undefined}
+            href={adminHref('tenant', 'database', hash, { section: 'data', layout: key })}
+          >
+            {label}
+          </a>
+        ))}
+      </nav>
       <PageActions>
         <Button variant="ghost" icon={RefreshCw} onClick={refresh}>
           刷新
@@ -202,35 +228,88 @@ function DataList({ tenant, hash }: { tenant: string; hash: string }) {
           />
         ) : (
           <>
-            <div className="tenant-directory-scroll">
-              <div className="tenant-list-columns tenant-dataset-grid">
-                <span>数据集</span>
-                <span>所属空间</span>
-                <span>记录数</span>
-                <span>更新状态</span>
-                <span>最近成功</span>
+            {catalog ? (
+              <div className="mengine-dashboard">
+                <div className="mengine-table-scroll">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>数据资产 / 说明</th>
+                        <th>所属空间</th>
+                        <th>字段数</th>
+                        <th>记录数</th>
+                        <th>版本 / 状态</th>
+                        <th>数据覆盖至</th>
+                        <th>操作</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.value.list.items.map((d) => (
+                        <tr key={d.id}>
+                          <td>
+                            <strong>{d.name}</strong>
+                            <small>{d.description || '尚无业务说明'}</small>
+                          </td>
+                          <td>{d.workspaceName}</td>
+                          <td>{d.columns.length}</td>
+                          <td>{d.rowCount ?? '—'}</td>
+                          <td>
+                            {d.version === null ? '暂无可用版本' : `v${d.version}`}
+                            <small>{runStatus(d.latestRun)}</small>
+                          </td>
+                          <td>{date(d.coverageThrough)}</td>
+                          <td>
+                            <a
+                              href={adminHref('tenant', 'database', hash, {
+                                section: 'data',
+                                dataset: d.id,
+                                layout: 'catalog',
+                              })}
+                            >
+                              查看数据与字段
+                            </a>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-              <div className="admin-directory-list">
-                {data.value.list.items.map((d) => (
-                  <a
-                    className="admin-directory-row tenant-dataset-grid"
-                    key={d.id}
-                    href={adminHref('tenant', 'database', hash, { section: 'data', dataset: d.id })}
-                  >
-                    <span>
-                      <strong>{d.name}</strong>
-                      <small>{d.version === null ? '暂无可用数据' : `版本 ${d.version}`}</small>
-                    </span>
-                    <span>{d.workspaceName}</span>
-                    <span>{d.version === null ? '—' : d.rowCount?.toLocaleString('zh-CN')}</span>
-                    <span>
-                      <Badge>{runStatus(d.latestRun)}</Badge>
-                    </span>
-                    <time>{date(d.collectedAt)}</time>
-                  </a>
-                ))}
+            ) : (
+              <div className="tenant-directory-scroll">
+                <div className="tenant-list-columns tenant-dataset-grid">
+                  <span>数据集</span>
+                  <span>所属空间</span>
+                  <span>记录数</span>
+                  <span>更新状态</span>
+                  <span>最近成功</span>
+                </div>
+                <div className="admin-directory-list">
+                  {data.value.list.items.map((d) => (
+                    <a
+                      className="admin-directory-row tenant-dataset-grid"
+                      key={d.id}
+                      href={adminHref('tenant', 'database', hash, {
+                        section: 'data',
+                        dataset: d.id,
+                        layout: 'directory',
+                      })}
+                    >
+                      <span>
+                        <strong>{d.name}</strong>
+                        <small>{d.version === null ? '暂无可用数据' : `版本 ${d.version}`}</small>
+                      </span>
+                      <span>{d.workspaceName}</span>
+                      <span>{d.version === null ? '—' : d.rowCount?.toLocaleString('zh-CN')}</span>
+                      <span>
+                        <Badge>{runStatus(d.latestRun)}</Badge>
+                      </span>
+                      <time>{date(d.collectedAt)}</time>
+                    </a>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
             <Pager page={page} next={data.value.list.hasMore} onPage={setPage} />
           </>
         )}
@@ -256,9 +335,15 @@ function DatasetDetail({ tenant, id, hash }: { tenant: string; id: string; hash:
         </Button>
       </PageActions>
       <div>
-        <a className="button ghost" href={adminHref('tenant', 'database', hash, { section: 'data' })}>
+        <a
+          className="button ghost"
+          href={adminHref('tenant', 'database', hash, {
+            section: 'data',
+            layout: new URLSearchParams(hash.slice(1)).get('layout') || 'catalog',
+          })}
+        >
           <ArrowLeft size={16} />
-          返回数据管理
+          返回数据资产
         </a>
       </div>
       {remote.error ? (
@@ -294,6 +379,52 @@ function DatasetDetail({ tenant, id, hash }: { tenant: string; id: string; hash:
               <dd>{data.rowCount ?? '尚未获取'}</dd>
             </div>
           </dl>
+          <details className="deployed-fields" open>
+            <summary>字段与业务说明</summary>
+            <p className="admin-note">由部署时整理并随数据定义保存；推断和未知项不代表已核实的业务事实。</p>
+            {data.fieldDefinitions?.length ? (
+              <div className="database-table-scroll" tabIndex={0} aria-label="字段说明表格">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>字段 / 类型</th>
+                      <th>含义 / 单位</th>
+                      <th>判断依据</th>
+                      <th>说明性质</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.fieldDefinitions.map((f) => (
+                      <tr key={f.column}>
+                        <td>
+                          <strong>{f.column}</strong>
+                          <div>{f.type}</div>
+                        </td>
+                        <td>
+                          {f.meaning}
+                          <div>单位：{f.unit || '未确定或不适用'}</div>
+                        </td>
+                        <td>{f.evidence}</td>
+                        <td>
+                          {
+                            {
+                              SOURCE_DOCUMENTED: '来源有据',
+                              DEPLOYMENT_INFERRED: '部署推断',
+                              UNKNOWN: '尚不明确',
+                            }[f.status]
+                          }
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="admin-note">
+                此来源尚未提供字段说明；请由部署维护人员补充，不根据字段名自动推断。
+              </p>
+            )}
+          </details>
           {reason(data.latestRun) && (
             <p className="access-alert">
               {reason(data.latestRun)}。{data.version !== null && '上次成功的数据仍可使用。'}

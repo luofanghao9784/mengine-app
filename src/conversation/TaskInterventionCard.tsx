@@ -70,6 +70,19 @@ export function TaskInterventionCard({
     ].includes(task.status)
   )
     return null;
+  if (waiting && task.waitReason === 'PRESENTATION_CONFIRMATION')
+    return (
+      <div className="task-intervention-actions">
+        <SubmitError error={submit.error} uncertain={submit.uncertain} />
+        <Button
+          variant="ghost"
+          disabled={submit.busy || (pending && !submit.uncertain)}
+          onClick={() => send({ action: 'CANCEL', expectedRevision: task.revision })}
+        >
+          {submit.uncertain ? '重试结束任务' : '结束此项工作'}
+        </Button>
+      </div>
+    );
   const title = task.reconciliationRequired
     ? '需要核对执行结果'
     : waiting
@@ -187,9 +200,7 @@ export function TaskInterventionCard({
                 </>
               )
             )}
-            {['WAITING_INPUT', 'WAITING_CAPABILITY', 'PAUSED', 'RESULT_UNKNOWN'].includes(
-              task.status,
-            ) && (
+            {['WAITING_INPUT', 'WAITING_CAPABILITY', 'PAUSED', 'RESULT_UNKNOWN'].includes(task.status) && (
               <Button
                 icon={X}
                 variant="ghost"

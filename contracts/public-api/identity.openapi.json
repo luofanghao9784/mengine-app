@@ -2786,6 +2786,53 @@
               "maximum": 100,
               "default": 50
             }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 160
+            },
+            "description": "管理记录筛选；from 含起点，to 不含终点。"
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "",
+                "IDENTITY",
+                "SPACE",
+                "DATA",
+                "COMPANY",
+                "EXPERIENCE"
+              ]
+            },
+            "description": "管理记录筛选；from 含起点，to 不含终点。"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "管理记录筛选；from 含起点，to 不含终点。"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "管理记录筛选；from 含起点，to 不含终点。"
           }
         ]
       }

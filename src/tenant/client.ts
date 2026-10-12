@@ -260,8 +260,23 @@ export function createTenantClient(fetcher: typeof fetch = fetch) {
         spaceCheck(tenant, space),
         body,
       ),
-    records: (tenant: string, offset = 0, signal?: AbortSignal) =>
-      request(path(tenant) + '/records' + page(offset), 'GET', list(isRecord), undefined, signal),
+    records: (
+      tenant: string,
+      offset = 0,
+      signal?: AbortSignal,
+      filters: { q?: string; category?: string; from?: string; to?: string } = {},
+    ) =>
+      request(
+        path(tenant) +
+          '/records' +
+          page(offset) +
+          '&' +
+          new URLSearchParams(Object.entries(filters).filter(([, v]) => !!v) as [string, string][]),
+        'GET',
+        list(isRecord),
+        undefined,
+        signal,
+      ),
   };
 }
 export const tenantClient = createTenantClient();

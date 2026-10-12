@@ -9,6 +9,9 @@ public record AgentResult(String contractVersion,String engineVersion,UUID taskI
     }
     public record Skill(String id,String version,String sha256) {}
     public record Tool(String callId,String name,String status) {}
-    public record Artifact(String name,String sha256,String contentBase64) {}
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    public record Artifact(String name,String sha256,String contentBase64,UUID uploadId) {
+        public Artifact(String name,String sha256,String contentBase64){this(name,sha256,contentBase64,null);}
+    }
     public record Usage(long inputTokens,long outputTokens) {}
 }

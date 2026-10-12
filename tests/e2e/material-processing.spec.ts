@@ -147,7 +147,7 @@ test('processing summary, filters, fixed-version detail and same-request retry',
   context,
 }) => {
   const state = await fixture(context, { lost: true });
-  await page.goto(start);
+  await page.goto(start + '&section=processing');
   await expect(page.getByRole('heading', { name: '资料处理', exact: true })).toBeVisible();
   await expect(page.locator('.processing-metrics')).toContainText('4');
   await page.getByLabel('处理状态').selectOption('ATTENTION');
@@ -176,7 +176,7 @@ test('read-only detail, narrow screen and revocation clear previously visible co
 }) => {
   const state = await fixture(context, { reader: true });
   await page.setViewportSize({ width: 360, height: 900 });
-  await page.goto(start);
+  await page.goto(start + '&section=processing');
   await expect(page.getByRole('button', { name: /合成月度数据说明.*查看详情/ })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: '.local/admin-materials/mobile.png', fullPage: true });
@@ -196,7 +196,7 @@ test('file navigation preserves admin realm and client return; recycle uses same
   context,
 }) => {
   await fixture(context);
-  await page.goto(start);
+  await page.goto(start + '&section=processing');
   await page.getByRole('link', { name: '文件与目录' }).click();
   await page.getByRole('button', { name: '全部资料', exact: true }).click();
   await expect(page).toHaveURL(/admin=materials.*section=files.*scope=all/);
@@ -204,7 +204,7 @@ test('file navigation preserves admin realm and client return; recycle uses same
   expect(new URLSearchParams(new URL(page.url()).hash.slice(1)).get('back')).toBe(
     '#tenant=' + tenant + '&view=briefing',
   );
-  await page.getByRole('link', { name: '处理概览', exact: true }).click();
+  await page.getByRole('link', { name: '解析处理', exact: true }).click();
   await page.getByRole('button', { name: '回收站', exact: true }).click();
   await expect(page.getByRole('button', { name: '个人空间', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: '合成销售空间', exact: true }).click();

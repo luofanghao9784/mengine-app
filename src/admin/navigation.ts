@@ -8,6 +8,11 @@ export const tenantPages = [
   'materials',
   'experience',
   'company',
+  'audit',
+  'wiki',
+  'proposals',
+  'catalog',
+  'governance',
 ] as const;
 export const platformPages = [
   'overview',

@@ -15,11 +15,23 @@ for (const [path, entry] of Object.entries(lock.packages).sort(([a], [b]) => a.l
   const metadata = JSON.parse(await readFile(join(root, path, 'package.json'), 'utf8'));
   if (metadata.version !== entry.version) throw new Error(`Install differs from lock: ${path}`);
   let license;
-  try { license = (await readFile(join(root, path, 'LICENSE'), 'utf8')).trim(); }
-  catch (error) {
-    if(error.code !== 'ENOENT') throw error;
-    license = (await readFile(join(root, 'vendor-licenses', metadata.name, metadata.version, 'LICENSE'), 'utf8')).trim();
+  for (const filename of ['LICENSE', 'LICENSE.txt', 'LICENSE.md', 'LICENSE.markdown', 'license.md']) {
+    try {
+      license = (await readFile(join(root, path, filename), 'utf8')).trim();
+      break;
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+    }
   }
+  if (!license && metadata.name === 'https' && metadata.version === '1.0.0') {
+    // This legacy dependency ships only package.json, no executable or license file.
+    license =
+      'https@1.0.0 is a metadata-only package. Its package.json declares ISC and author hardus van der berg. The distributed package contains no license text or executable code. Node uses its built-in https module.';
+  }
+  if (!license)
+    license = (
+      await readFile(join(root, 'vendor-licenses', metadata.name, metadata.version, 'LICENSE'), 'utf8')
+    ).trim();
   text += `| ${metadata.name} | ${metadata.version} | ${metadata.license} |\n`;
   if (!groups.has(license)) groups.set(license, []);
   groups.get(license).push(`${metadata.name}@${metadata.version}`);

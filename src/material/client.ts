@@ -168,6 +168,67 @@ export function createMaterialClient(fetcher: typeof fetch = fetch) {
         signal,
       );
     },
+    pipeline(tenant: string, space: string, document: string, signal?: AbortSignal) {
+      return request(
+        root(tenant, space) + `/materials/${id(document)}/pipeline`,
+        'GET',
+        (
+          v,
+        ): v is {
+          materialId: string;
+          version: number;
+          receivedAt: string;
+          parsing: string;
+          governance: string;
+          issues: number;
+          publication: string;
+        } =>
+          record(v) &&
+          v.materialId === document &&
+          count(v.version) &&
+          v.version > 0 &&
+          date(v.receivedAt) &&
+          [
+            'NOT_STARTED',
+            'QUEUED',
+            'RUNNING',
+            'READY',
+            'PARTIAL',
+            'FAILED',
+            'UNSUPPORTED',
+            'CANCELLED',
+          ].includes(String(v.parsing)) &&
+          ['NOT_CHECKED', 'NO_TEXT', 'CHECKED'].includes(String(v.governance)) &&
+          count(v.issues) &&
+          ['NOT_PUBLISHED', 'PUBLISHED', 'ARCHIVED', 'STALE'].includes(String(v.publication)),
+        undefined,
+        signal,
+      );
+    },
+    editableText(tenant: string, space: string, document: string, signal?: AbortSignal) {
+      return request(
+        root(tenant, space) + `/materials/${id(document)}/editable-text`,
+        'GET',
+        (
+          v,
+        ): v is {
+          materialId: string;
+          versionId: string;
+          version: number;
+          filename: string;
+          content: string;
+        } =>
+          record(v) &&
+          v.materialId === document &&
+          uuid(v.versionId) &&
+          Number.isInteger(v.version) &&
+          Number(v.version) > 0 &&
+          text(v.filename) &&
+          typeof v.content === 'string',
+        undefined,
+        signal,
+      );
+    },
     detail(tenant: string, space: string, document: string, offset = 0, signal?: AbortSignal) {
       return request(
         root(tenant, space) + `/materials/${id(document)}?offset=${offset}&limit=20`,

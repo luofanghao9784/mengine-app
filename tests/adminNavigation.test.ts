@@ -3,7 +3,13 @@ import assert from 'node:assert/strict';
 import { adminPage, adminHref, tenantPages, platformPages } from '../src/admin/navigation.ts';
 const tenant = '00000000-0000-4000-8000-000000000001';
 test('admin surfaces retain distinct destinations and own defaults', () => {
-  assert.equal(tenantPages.length, 8);
+  assert.equal(tenantPages.length, 13);
+  assert.equal(adminPage('tenant', '#admin=audit'), 'audit');
+  assert.equal(adminPage('tenant', '#admin=proposals'), 'proposals');
+  assert.equal(adminPage('platform', '#admin=proposals'), 'overview');
+  assert.equal(adminPage('platform', '#admin=audit'), 'overview');
+  assert.equal(adminPage('tenant', '#admin=wiki'), 'wiki');
+  assert.equal(adminPage('platform', '#admin=wiki'), 'overview');
   assert.equal(platformPages.length, 10);
   assert.equal(adminPage('tenant', ''), 'overview');
   assert.equal(adminPage('platform', ''), 'overview');

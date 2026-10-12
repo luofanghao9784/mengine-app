@@ -1,5 +1,5 @@
 {
-  "version": "1.0",
+  "version": "2.0",
   "items": [
     {
       "id": "source-review",
@@ -7,7 +7,9 @@
       "title": "资料核对",
       "file": "source-review.md",
       "sha256": "9588866c2622a45804635701b6774b0c9188f7925be66ef2a7ed7b7c78b3a7e4",
-      "tools": ["search_sources"],
+      "tools": [
+        "search_sources"
+      ],
       "source": "dreamcore-bundled",
       "license": "project-internal"
     },
@@ -17,7 +19,10 @@
       "title": "公开资料查找与阅读",
       "file": "public-research.md",
       "sha256": "e51cb5ba27d83e282999753dfead35c01fa83e2191f780f3b4afc13ae43a299f",
-      "tools": ["public_search", "read_public_page"],
+      "tools": [
+        "public_search",
+        "read_public_page"
+      ],
       "source": "dreamcore-bundled",
       "license": "project-internal"
     },
@@ -27,7 +32,9 @@
       "title": "候选工具隔离试验",
       "file": "candidate-trials.md",
       "sha256": "35f71c6a6bfd17ceed3baba989e2a6b65817965bef19beb5c58f0dbc567642dd",
-      "tools": ["candidate_tool"],
+      "tools": [
+        "candidate_tool"
+      ],
       "source": "dreamcore-bundled",
       "license": "project-internal"
     },
@@ -37,9 +44,45 @@
       "title": "完整文件统计与文稿提取",
       "file": "file-processing.md",
       "sha256": "cb9bdf4c267492b0647e09f30eee88e797d22917636487bb4278b004e1175cd0",
-      "tools": ["process_original"],
+      "tools": [
+        "process_original"
+      ],
       "source": "dreamcore-bundled",
       "license": "project-internal"
+    },
+    {
+      "id": "pptx-generator",
+      "version": "1.0.0",
+      "title": "PPT 生成",
+      "file": "pptx-generator/SKILL.md",
+      "source": "https://github.com/MiniMax-AI/skills",
+      "license": "MIT",
+      "upstreamCommit": "60aaae52bb2af8162732751a4332f62a5fef518b",
+      "tools": [
+        "render_presentation"
+      ],
+      "requires": [
+        "artifact-transfer-v1",
+        "pptx-renderer-v1"
+      ],
+      "files": [
+        {
+          "path": "pptx-generator/SKILL.md",
+          "bytes": 3690,
+          "sha256": "2802b6fbd1c17af720e662c02d5e02bdb7a9d9c6b633bbc03c520925e2c17b99"
+        },
+        {
+          "path": "pptx-generator/LICENSE",
+          "bytes": 1064,
+          "sha256": "eed4ccce37c2d24822da3bd9d5bee7bc12d494741de56ada513d0b97f537fcd0"
+        },
+        {
+          "path": "pptx-generator/references/layout.md",
+          "bytes": 723,
+          "sha256": "d227c3192cf6f52c4e46e441d3f69b7d8a0b8b3aac2d30c21da04dc3ff27213b"
+        }
+      ],
+      "sha256": "e891085f4294f689added82ccc5316fdebb28a2fcd4b56ee664a3a263f083d32"
     }
   ]
 }

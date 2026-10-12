@@ -54,6 +54,10 @@ class AgentIntegrationTest {
         denied(404,()->agents.download(reader,tenant,d.conversation().id(),j.id(),artifact));denied(404,()->agents.download(admin,tenant,d.conversation().id(),j.id(),artifact));denied(403,()->agents.download(owner,other,d.conversation().id(),j.id(),artifact));
         denied(403,()->agents.check(j.id(),j.token()));db.update("DELETE FROM workspace_members WHERE workspace_id=? AND account_id=?",space,owner);denied(404,()->agents.download(owner,tenant,d.conversation().id(),j.id(),artifact));denied(404,()->detail(d.conversation().id()));
     }
+    @Test void presentationIsOffByDefaultAndCannotBeRegisteredByTheEngine(){
+        send(owner,personal);var j=conversations.claim();assertEquals("",agents.check(j.id(),j.token()).get("presentationRendererVersion"));
+        denied(403,()->agents.openExecution(j.id(),j.token(),new AgentTaskService.ExecutionOpen("1.5",List.of("render_presentation"))));
+    }
     @Test void grantSearchCannotEscapeTaskSpaceEvenWhenOwnerHasOtherAccess(){
         source(space);var d=send(owner,personal);var j=conversations.claim();assertTrue(agents.search(j.id(),j.token(),"amount").isEmpty());assertEquals(0,db.queryForObject("SELECT count(*) FROM conversation_agent_grants WHERE task_id=?",Integer.class,j.id()));
     }

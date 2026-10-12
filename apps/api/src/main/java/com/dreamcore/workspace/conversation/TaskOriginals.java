@@ -36,6 +36,15 @@ public class TaskOriginals {
             db.update("INSERT INTO conversation_originals(tenant_id,workspace_id,task_id,material_id,version_id) VALUES (?,?,?,?,?) ON CONFLICT (task_id,version_id) DO NOTHING",tenant,sourceSpace,task,selection.materialId(),selection.versionId());
         }
     }
+    /** Internal bounded analysis only. Normal client selection remains capped at three. */
+    public void selectAnalysis(UUID actor,UUID tenant,UUID space,UUID task,List<Selection> selections){
+        if(selections==null||selections.isEmpty()||selections.size()>18||selections.stream().map(Selection::materialId).distinct().count()!=selections.size())throw IdentityException.invalid();
+        if(!Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM conversation_tasks WHERE id=? AND tenant_id=? AND requested_by=? AND source_scope='SELECTED' AND mode='AGENT' AND status='QUEUED')",Boolean.class,task,tenant,actor)))throw new IdentityException(403,"TASK_ACCESS_DENIED");
+        for(int offset=0;offset<selections.size();offset+=3)select(actor,tenant,space,task,selections.subList(offset,Math.min(offset+3,selections.size())));
+        boolean raw="verification".equals(db.queryForObject("SELECT execution_class FROM conversation_tasks WHERE id=?",String.class,task));
+        long total=db.queryForObject("SELECT coalesce(sum(v.size_bytes),0) FROM conversation_originals o JOIN material_versions v ON v.id=o.version_id WHERE o.task_id=?",Long.class,task);
+        if(total>(raw?524288:62914560))throw new IdentityException(413,"TASK_ORIGINAL_TOO_LARGE");
+    }
     public List<File> list(UUID actor,UUID tenant,UUID space,UUID task){
         access.require(actor,tenant,space,false);
         var selections=db.query("SELECT material_id,version_id FROM conversation_originals WHERE tenant_id=? AND task_id=? ORDER BY version_id",(r,n)->new Selection(r.getObject(1,UUID.class),r.getObject(2,UUID.class)),tenant,task);

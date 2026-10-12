@@ -54,7 +54,7 @@ export async function runHarness(options: {
     !options.prompt.trim() ||
     options.prompt.length > 16000 ||
     (options.context !== undefined && Buffer.byteLength(JSON.stringify(options.context)) > 24576) ||
-    options.tools.length > 16 ||
+    options.tools.length > 20 ||
     new Set(options.tools.map((t) => t.name)).size !== options.tools.length ||
     options.tools.some((t) => !/^[a-z][a-z0-9_]{0,63}$/.test(t.name))
   )
