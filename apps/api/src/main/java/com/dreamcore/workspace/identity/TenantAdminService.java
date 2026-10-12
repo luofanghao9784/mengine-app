@@ -1,5 +1,6 @@
 package com.dreamcore.workspace.identity;
 
+import com.dreamcore.workspace.material.LibraryPrivilegeGuard;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -231,6 +232,7 @@ public class TenantAdminService {
         String fingerprint=IdentityService.hash(tenant+"\n"+id+"\n"+expected+"\n"+owner+"\n"+previousAccess);
         UUID prior=mutation(actor,tenant,key,"SPACE_OWNER_CHANGE",fingerprint);var current=space(tenant,id);
         if(prior!=null)return current;version(expected,current.version());activeOwner(actor,tenant,owner);
+        var ownAccess=LibraryPrivilegeGuard.snapshot(db,actor,tenant);
         if(!owner.equals(current.ownerId())) {
             if(current.ownerId()!=null) {
                 if(previousAccess.equals("REMOVE"))db.update("DELETE FROM workspace_members WHERE tenant_id=? AND workspace_id=? AND account_id=?",tenant,id,current.ownerId());
@@ -241,6 +243,7 @@ public class TenantAdminService {
             db.update("INSERT INTO workspace_owner_changes(id,tenant_id,workspace_id,actor_id,previous_owner,next_owner,previous_access) VALUES (?,?,?,?,?,?,?)",UUID.randomUUID(),tenant,id,actor,current.ownerId(),owner,current.ownerId()==null?"NONE":previousAccess);
             db.update("INSERT INTO identity_audit(actor_id,tenant_id,action,target_id,related_account_id,outcome) VALUES (?,?,'WORKSPACE_OWNER_CHANGE',?,?,'SUCCESS')",actor,tenant,id,owner);
         }
+        LibraryPrivilegeGuard.verify(db,actor,tenant,ownAccess);
         identities.remember(actor,key,"SPACE_OWNER_CHANGE",fingerprint,id);return space(tenant,id);
     }
     @Transactional
@@ -266,6 +269,7 @@ public class TenantAdminService {
         if(!spaceOwner(actor,tenant,id))governance.contentGrant(actor,tenant,accountId,enabled);
         if (enabled && (!"ACTIVE".equals(target.status()) || !"ACTIVE".equals(target.accountStatus())))
             throw new IdentityException(409,"MEMBER_INACTIVE");
+        var ownAccess=LibraryPrivilegeGuard.snapshot(db,actor,tenant);
         int changed=enabled ? db.update("INSERT INTO workspace_members(tenant_id,workspace_id,account_id) VALUES (?,?,?) ON CONFLICT DO NOTHING",tenant,id,accountId)
             : db.update("DELETE FROM workspace_members WHERE tenant_id=? AND workspace_id=? AND account_id=?",tenant,id,accountId);
         if (changed>0) {
@@ -273,6 +277,7 @@ public class TenantAdminService {
             db.update("INSERT INTO identity_audit(actor_id,tenant_id,action,target_id,related_account_id,outcome) VALUES (?,?,?,?,?,'SUCCESS')",
                 actor,tenant,enabled?"WORKSPACE_GRANT":"WORKSPACE_REVOKE",id,accountId);
         }
+        LibraryPrivilegeGuard.verify(db,actor,tenant,ownAccess);
         identities.remember(actor,key,"SPACE_MEMBERSHIP",fingerprint,id); return space(tenant,id);
     }
     @Transactional
@@ -285,6 +290,7 @@ public class TenantAdminService {
         if(!enabled&&accountId.equals(current.ownerId()))throw new IdentityException(409,"SPACE_OWNER_CHANGE_REQUIRED");
         if(!spaceOwner(actor,tenant,id))governance.contentGrant(actor,tenant,accountId,enabled);
         if (enabled && (!"ACTIVE".equals(target.status()) || !"ACTIVE".equals(target.accountStatus()))) throw new IdentityException(409,"MEMBER_INACTIVE");
+        var ownAccess=LibraryPrivilegeGuard.snapshot(db,actor,tenant);
         var grants=db.queryForList("SELECT can_maintain FROM workspace_members WHERE tenant_id=? AND workspace_id=? AND account_id=?",Boolean.class,tenant,id,accountId);
         if (grants.isEmpty()) throw new IdentityException(404,"WORKSPACE_GRANT_NOT_FOUND");
         if (grants.getFirst()!=enabled) {
@@ -293,12 +299,27 @@ public class TenantAdminService {
             db.update("INSERT INTO identity_audit(actor_id,tenant_id,action,target_id,related_account_id,outcome) VALUES (?,?,?,?,?,'SUCCESS')",
                 actor,tenant,enabled?"WORKSPACE_MAINTAIN":"WORKSPACE_READONLY",id,accountId);
         }
+        LibraryPrivilegeGuard.verify(db,actor,tenant,ownAccess);
         identities.remember(actor,key,"SPACE_MAINTENANCE",fingerprint,id); return space(tenant,id);
     }
     @Transactional
     public List<AuditEntry> records(UUID actor, UUID tenant, int offset, int limit) {
+        return records(actor,tenant,offset,limit,"","",null,null);
+    }
+    @Transactional
+    public List<AuditEntry> records(UUID actor,UUID tenant,int offset,int limit,String query,String category,Instant from,Instant to) {
         identities.member(actor,tenant,true); page(offset,limit);
-        return db.query("""
+        if(query==null||query.length()>160||category==null||from!=null&&to!=null&&!from.isBefore(to))throw IdentityException.invalid();
+        String group=switch(category){
+            case "" -> "true";
+            case "IDENTITY" -> "e.action LIKE 'INVITATION_%' OR e.action LIKE 'MEMBER_%' OR e.action LIKE 'OWNER_%' OR e.action='GOVERNANCE_ROLE'";
+            case "SPACE" -> "e.action LIKE 'WORKSPACE_%'";
+            case "DATA" -> "e.action LIKE 'COLLECTION_%' OR e.action LIKE 'DATASET_%'";
+            case "COMPANY" -> "e.action LIKE 'COMPANY_%' OR e.action='TENANT_RENAME'";
+            case "EXPERIENCE" -> "e.action LIKE 'GENERAL_EXPERIENCE_%'";
+            default -> throw IdentityException.invalid();
+        };
+        String base="""
             SELECT e.id,e.actor_id,a.display_name AS actor_name,e.action,e.target_id,e.related_account_id,b.display_name AS related_name,e.created_at,
               CASE WHEN e.action LIKE 'INVITATION_%' THEN coalesce(i.phone,i.email) WHEN e.action LIKE 'MEMBER_%' OR e.action='GOVERNANCE_ROLE' OR e.action='OWNER_ACCEPT' THEN c.display_name
                    WHEN e.action LIKE 'OWNER_HANDOVER_%' THEN successor.display_name
@@ -312,9 +333,10 @@ public class TenantAdminService {
             LEFT JOIN data_connections connection ON connection.id=e.target_id AND connection.tenant_id=e.tenant_id
             WHERE e.tenant_id=? AND e.outcome='SUCCESS' AND e.action IN ('INVITATION_CREATE','INVITATION_REVOKE','INVITATION_ACCEPT',
                 'MEMBER_ENABLE','MEMBER_DISABLE','MEMBER_SECURITY_DISABLE','MEMBER_ROLE','GOVERNANCE_ROLE','OWNER_ACCEPT','OWNER_HANDOVER_OFFER','OWNER_HANDOVER_ACCEPT','OWNER_HANDOVER_REJECT','OWNER_HANDOVER_CANCEL','WORKSPACE_CREATE','WORKSPACE_OWNER_CHANGE','WORKSPACE_RENAME','WORKSPACE_GRANT','WORKSPACE_REVOKE','WORKSPACE_MAINTAIN','WORKSPACE_READONLY','WORKSPACE_ARCHIVE','WORKSPACE_RESTORE','DATASET_WITHDRAW','DATASET_PURGE','TENANT_RENAME','COLLECTION_CONFIGURE','COLLECTION_NOW','COMPANY_INFORMATION_ADD','COMPANY_INFORMATION_EDIT','COMPANY_INFORMATION_REMOVE','COMPANY_INFORMATION_CLEAR','COMPANY_INFORMATION_ADOPT','COMPANY_INFORMATION_KEEP','GENERAL_EXPERIENCE_USE_STOP','GENERAL_EXPERIENCE_USE_RESTORE')
-            ORDER BY e.created_at DESC,e.id DESC LIMIT ? OFFSET ?
-            """,(r,n)->new AuditEntry(r.getLong("id"),r.getObject("actor_id",UUID.class),r.getString("actor_name"),r.getString("action"),
+            """;
+        String sql="SELECT * FROM ("+base+") e WHERE ("+group+") AND (?='' OR strpos(lower(e.actor_name||' '||e.action||' '||coalesce(e.target_name,'')||' '||coalesce(e.related_name,'')),lower(?))>0) AND (?::timestamptz IS NULL OR e.created_at>=?::timestamptz) AND (?::timestamptz IS NULL OR e.created_at<?::timestamptz) ORDER BY e.created_at DESC,e.id DESC LIMIT ? OFFSET ?";
+        return db.query(sql,(r,n)->new AuditEntry(r.getLong("id"),r.getObject("actor_id",UUID.class),r.getString("actor_name"),r.getString("action"),
                 r.getObject("target_id",UUID.class),r.getString("target_name"),r.getObject("related_account_id",UUID.class),
-                r.getString("related_name"),r.getTimestamp("created_at").toInstant()),tenant,limit,offset);
+                r.getString("related_name"),r.getTimestamp("created_at").toInstant()),tenant,query.strip(),query.strip(),from==null?null:from.toString(),from==null?null:from.toString(),to==null?null:to.toString(),to==null?null:to.toString(),limit,offset);
     }
 }

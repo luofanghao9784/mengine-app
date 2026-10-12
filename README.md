@@ -548,3 +548,5 @@ npm run test:contracts
 
 
 2026-10-06 真实画报接入模型表达与受控版式组合：两期对比、哑铃、增减、本期排名、表格和重点数字，配合分析分区、建议步骤、方案对照及引用封面。数字来自原核验计算，段落由索引复用完整分析，旧卡兼容且不重生成。检查：`npm run build`、`npm run build:engine`、`node --experimental-strip-types --test tests/briefing-presentation.test.ts tests/briefing-chart-presentation.test.ts`、`node --test engine/tests/briefing-presentation.test.mjs engine/tests/briefing-delivery.test.mjs engine/tests/briefing-topic-strategy.test.mjs`、`npx playwright test tests/e2e/briefing-expressive.spec.ts tests/e2e/briefing-live-layout.spec.ts`。后台检查及能力边界见[实施交接](docs/交接/画报表达与模型版式选择-2026-10-06.md)。
+
+> **2026-10-12 资料权限首期接续：** 用户授权补齐并启用实际网站；新增严格祖先禁止、派生来源复核、权限影响预览、管理员定位与共享给我，范围和实际发布证据见[首期启用记录](docs/交接/资料权限首期启用-2026-10-12.md)。该记录更新先前“不得启用”的阶段结论。

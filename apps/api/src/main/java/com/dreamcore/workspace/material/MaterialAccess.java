@@ -43,6 +43,18 @@ public class MaterialAccess {
         int m=mask(actor,tenant,kind,id);
         if((m&1)==0||((m&8)==0&&!manages(actor,tenant,workspace)))throw new IdentityException(403,"LIBRARY_MANAGE_FILES_REQUIRED");
     }
+    public void requireVersion(UUID actor,UUID tenant,UUID version,boolean download){
+        var rows=db.queryForList("SELECT workspace_id,material_id FROM material_versions WHERE tenant_id=? AND id=?",tenant,version);
+        if(rows.isEmpty())throw new IdentityException(404,"MATERIAL_NOT_FOUND");
+        var row=rows.getFirst();UUID space=(UUID)row.get("workspace_id"),material=(UUID)row.get("material_id");
+        if(download)requireDownload(actor,tenant,space,material);else requireObject(actor,tenant,space,"MATERIAL",material,false);
+        requireVersionActive(tenant,space,version);
+    }
+    public void requireTaskSources(UUID actor,UUID tenant,UUID task,boolean download){
+        identities.member(actor,tenant,false);
+        if(!Boolean.TRUE.equals(db.queryForObject("SELECT library_task_sources_allowed(?,?,?,?)",Boolean.class,actor,tenant,task,download)))
+            throw new IdentityException(403,download?"LIBRARY_DOWNLOAD_DENIED":"LIBRARY_PERMISSION_DENIED");
+    }
     /** Caller also checks current actor/space permission in the same transaction. */
     public void requireVersionActive(UUID tenant,UUID workspace,UUID version) {
         if(!Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM material_versions v JOIN active_materials m ON m.id=v.material_id WHERE v.tenant_id=? AND v.workspace_id=? AND v.id=?)",Boolean.class,tenant,workspace,version)))throw new IdentityException(404,"MATERIAL_NOT_FOUND");

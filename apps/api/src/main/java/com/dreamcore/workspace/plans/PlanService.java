@@ -151,8 +151,8 @@ public class PlanService {
    SELECT m.id AS material_id,v.id AS version_id,coalesce(k.status,'NOT_REQUESTED') AS parse_status FROM active_materials m
    JOIN material_versions v ON v.material_id=m.id AND v.number=m.current_version
    LEFT JOIN LATERAL(SELECT status FROM knowledge_runs WHERE version_id=v.id ORDER BY generation DESC LIMIT 1) k ON true
-   WHERE m.in_library AND m.tenant_id=? AND m.workspace_id=? ORDER BY m.id LIMIT 1001
-   """,(r,n)->new Version(r.getObject("material_id",UUID.class),r.getObject("version_id",UUID.class),r.getString("parse_status")),tenant,c.workspaceId());
+   WHERE m.in_library AND m.tenant_id=? AND m.workspace_id=? AND (library_mask(?,m.tenant_id,'MATERIAL',m.id)&1)=1 ORDER BY m.id LIMIT 1001
+   """,(r,n)->new Version(r.getObject("material_id",UUID.class),r.getObject("version_id",UUID.class),r.getString("parse_status")),tenant,c.workspaceId(),owner);
   if(versions.size()>1000){runtime(id,"WAITING_RESOURCE","SOURCE_COUNT_LIMIT");return;}
   if(versions.isEmpty()||versions.stream().noneMatch(v->Set.of("READY","PARTIAL").contains(v.parseStatus()))){runtime(id,"WAITING_DATA",versions.isEmpty()?"NO_MATERIALS":versions.stream().anyMatch(v->Set.of("FAILED","UNSUPPORTED","CANCELLED").contains(v.parseStatus()))?"SOURCE_REQUIRES_ATTENTION":"MATERIALS_NOT_READY");return;}
   String sourceKey=fingerprint(versions.stream().map(v->List.of(v.materialId(),v.versionId())).toList());

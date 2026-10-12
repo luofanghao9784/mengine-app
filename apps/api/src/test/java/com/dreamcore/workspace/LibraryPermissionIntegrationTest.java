@@ -57,6 +57,7 @@ class LibraryPermissionIntegrationTest {
   UUID department=UUID.randomUUID();permissions.saveDepartment(admin,tenant,department,new LibraryPermissionService.DepartmentChange(UUID.randomUUID(),0,"销售",List.of(external)));
   save("MATERIAL",file,false,List.of(new LibraryPermissionService.Grant("DEPARTMENT",department,"READ","DENY",false,null),new LibraryPermissionService.Grant("ACCOUNT",external,"EDIT","INHERIT",false,department)));
   assertTrue(permissions.effective(external,tenant,"MATERIAL",file).canEdit());assertFalse(permissions.effective(external,tenant,"MATERIAL",file).canDownload());
+  assertEquals(department,launch.departmentExceptions(admin,tenant,department).getFirst().roleDepartmentId());assertThrows(IdentityException.class,()->launch.departmentExceptions(reader,tenant,department));
   permissions.saveDepartment(admin,tenant,department,new LibraryPermissionService.DepartmentChange(UUID.randomUUID(),1,"销售",List.of()));
   assertFalse(permissions.effective(external,tenant,"MATERIAL",file).canRead());
   permissions.saveDepartment(admin,tenant,department,new LibraryPermissionService.DepartmentChange(UUID.randomUUID(),2,"销售",List.of(external)));
@@ -107,4 +108,38 @@ class LibraryPermissionIntegrationTest {
   assertThrows(org.springframework.dao.DataAccessException.class,()->db.update("DELETE FROM library_events WHERE tenant_id=?",tenant));
  }
 
+
+ @Autowired LibraryLaunchService launch;
+ @Test void previewIsReadOnlyConfirmedChangeDetectsMembershipDriftAndReplays(){
+  var change=new LibraryPermissionService.Change(UUID.randomUUID(),0,true,List.of(grant(external,"READ","DENY")));
+  var preview=launch.preview(admin,tenant,"MATERIAL",file,change);
+  assertEquals(0,permissions.policy(admin,tenant,"MATERIAL",file).revision());
+  assertFalse(permissions.effective(external,tenant,"MATERIAL",file).canRead());
+  assertTrue(preview.changes().stream().anyMatch(c->c.accountId().equals(external)&&c.beforeMask()==0&&c.afterMask()==1));
+  db.update("UPDATE workspace_members SET can_maintain=true WHERE workspace_id=? AND account_id=?",space,reader);
+  var stale=new LibraryLaunchService.Confirmation(change,preview.fingerprint());
+  assertEquals("LIBRARY_POLICY_PREVIEW_STALE",assertThrows(IdentityException.class,()->launch.confirm(admin,tenant,"MATERIAL",file,stale)).code);
+  var current=new LibraryLaunchService.Confirmation(change,launch.preview(admin,tenant,"MATERIAL",file,change).fingerprint());
+  launch.confirm(admin,tenant,"MATERIAL",file,current);launch.confirm(admin,tenant,"MATERIAL",file,current);
+  assertTrue(permissions.effective(external,tenant,"MATERIAL",file).canRead());
+  assertEquals(1,permissions.events(admin,tenant,"MATERIAL",file,0).stream().filter(e->e.action().equals("PERMISSION_CHANGE")).count());
+ }
+ @Test void metadataManagementAndSharedOnlyEntryDoNotExposeParentContent(){
+  assertTrue(launch.locate(admin,tenant,"MANAGE","budget",0).items().stream().anyMatch(i->i.id().equals(file)&&!i.canRead()));
+  assertTrue(launch.locate(reader,tenant,"MANAGE","",0).items().isEmpty());
+  save("MATERIAL",file,false,List.of(grant(external,"READ","DENY")));
+  var shared=launch.locate(external,tenant,"SHARED","",0).items();assertEquals(List.of(file),shared.stream().map(LibraryLaunchService.Item::id).toList());
+  assertTrue(launch.explain(admin,tenant,"MATERIAL",file).people().stream().anyMatch(p->p.id().equals(external)&&p.mask()==1));
+  assertTrue(launch.explain(external,tenant,"MATERIAL",file).people().isEmpty());
+  assertTrue(launch.explain(external,tenant,"MATERIAL",file).reasons().stream().noneMatch(r->r.scope().equals("机密目录")));
+ }
+ @Test void independentRangeCannotBypassAncestorsAndDepartmentsCannotSelfEscalate(){
+  save("FOLDER",folder,true,List.of(grant(external,"NONE","DENY")));
+  save("MATERIAL",file,false,List.of(grant(external,"EDIT","ALLOW")));
+  assertFalse(permissions.effective(external,tenant,"MATERIAL",file).canRead());
+  UUID department=UUID.randomUUID();permissions.saveDepartment(admin,tenant,department,new LibraryPermissionService.DepartmentChange(UUID.randomUUID(),0,"销售",List.of(reader)));
+  save("MATERIAL",file,false,List.of(new LibraryPermissionService.Grant("DEPARTMENT",department,"EDIT","ALLOW",false,null)));
+  assertEquals("LIBRARY_SELF_GRANT_REQUIRES_REVIEW",assertThrows(IdentityException.class,()->permissions.saveDepartment(admin,tenant,department,new LibraryPermissionService.DepartmentChange(UUID.randomUUID(),1,"销售",List.of(reader,admin)))).code);
+  assertFalse(permissions.effective(admin,tenant,"MATERIAL",file).canRead());
+ }
 }

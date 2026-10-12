@@ -54,7 +54,7 @@ public class FeedbackService {
  private Map<String,Object> publication(UUID actor,UUID tenant,Target t,boolean lock){
   identities.member(actor,tenant,false);departure.requirePrivateRead(actor,tenant);
   var rows=db.queryForList("SELECT p.id publication_id,v.id material_version_id,v.number material_version,v.workspace_id,v.sha256,v.tenant_id FROM document_publications p JOIN material_versions v ON v.id=p.material_version_id JOIN workspaces w ON w.id=v.workspace_id WHERE p.id=? AND v.id=? AND v.tenant_id=? AND w.kind='SHARED'",t.publicationId(),t.materialVersionId(),tenant);
-  if(rows.isEmpty())throw new IdentityException(404,"FEEDBACK_TARGET_UNAVAILABLE");var r=rows.getFirst();access.require(actor,tenant,(UUID)r.get("workspace_id"),false);access.requireVersionActive(tenant,(UUID)r.get("workspace_id"),t.materialVersionId());
+  if(rows.isEmpty())throw new IdentityException(404,"FEEDBACK_TARGET_UNAVAILABLE");var r=rows.getFirst();access.require(actor,tenant,(UUID)r.get("workspace_id"),false);access.requireVersion(actor,tenant,t.materialVersionId(),false);
   if(number(r,"material_version")!=t.materialVersion())throw new IdentityException(409,"FEEDBACK_TARGET_CHANGED");
   r.put("feedback_actor",actor);
   if(lock)db.queryForList("SELECT pg_advisory_xact_lock(hashtextextended(?,0))","publication-feedback:"+actor+":"+t.materialVersionId());

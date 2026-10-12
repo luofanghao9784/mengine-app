@@ -65,7 +65,7 @@ public class LibraryMoveService {
         var changes=new ArrayList<AccessChange>();
         for(var o:objects)for(var person:people){
             UUID account=(UUID)person.get("id");
-            var masks=db.queryForMap("SELECT library_mask(?,?,?,?) before_mask,library_projected_mask(?,?,?,?,?,?,?,?) after_mask",account,tenant,o.kind(),o.id(),account,tenant,o.kind(),o.id(),kind,id,target,proposal.inheritDestination());
+            var masks=db.queryForMap("SELECT library_mask(?,?,?,?) before_mask,library_effective_projected_mask(?,?,?,?,?,?,?,?) after_mask",account,tenant,o.kind(),o.id(),account,tenant,o.kind(),o.id(),kind,id,target,proposal.inheritDestination());
             int before=(Integer)masks.get("before_mask"),after=(Integer)masks.get("after_mask");
             if(before!=after)changes.add(new AccessChange(account,(String)person.get("display_name"),o.id(),o.name(),before,after));
         }

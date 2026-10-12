@@ -72,12 +72,12 @@ public class LibraryPermissionService {
             if(g.principalKind().equals("ACCOUNT"))validMember(tenant,g.principalId());else validDepartment(tenant,g.principalId());
             if(g.roleDepartmentId()!=null){validDepartment(tenant,g.roleDepartmentId());if(!g.principalKind().equals("ACCOUNT")||!Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM library_department_members WHERE tenant_id=? AND department_id=? AND account_id=?)",Boolean.class,tenant,g.roleDepartmentId(),g.principalId())))throw IdentityException.invalid();}
         }
-        int beforeMask=mask(actor,tenant,kind,id);
+        var beforeMasks=LibraryPrivilegeGuard.snapshot(db,actor,tenant);
         db.update("INSERT INTO library_policies(tenant_id,object_kind,object_id,workspace_id,inherit,revision) VALUES (?,?,?,?,?,1) ON CONFLICT(tenant_id,object_kind,object_id) DO UPDATE SET inherit=EXCLUDED.inherit,revision=library_policies.revision+1",tenant,kind,id,before.workspaceId(),change.inherit());
         db.update("DELETE FROM library_grants WHERE tenant_id=? AND object_kind=? AND object_id=?",tenant,kind,id);
         for(Grant g:change.grants())db.update("INSERT INTO library_grants VALUES (?,?,?,?,?,?,?,?,?)",tenant,kind,id,g.principalKind(),g.principalId(),g.content(),g.download(),g.manageFiles(),g.roleDepartmentId());
         // No administrator self-escalation while its approval workflow remains unspecified.
-        if((mask(actor,tenant,kind,id)&~beforeMask)!=0)throw new IdentityException(403,"LIBRARY_SELF_GRANT_REQUIRES_REVIEW");
+        LibraryPrivilegeGuard.verify(db,actor,tenant,beforeMasks);
         Policy result=policy(actor,tenant,kind,id);event(actor,tenant,before.workspaceId(),kind,id,"PERMISSION_CHANGE",before,result);receipt(actor,change.requestId(),fp,result);return result;
     }
     private void validMember(UUID tenant,UUID account){if(account==null||!Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM tenant_memberships m JOIN accounts a ON a.id=m.account_id WHERE m.tenant_id=? AND m.account_id=? AND m.status='ACTIVE' AND a.status='ACTIVE')",Boolean.class,tenant,account)))throw IdentityException.invalid();}
@@ -94,6 +94,7 @@ public class LibraryPermissionService {
         if(replay!=null)return json.readValue(replay,Department.class);
         String name=MaterialService.name(change.name());change.members().forEach(member->validMember(tenant,member));
         boolean exists=Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM library_departments WHERE tenant_id=? AND id=?)",Boolean.class,tenant,id));
+        var beforeMasks=LibraryPrivilegeGuard.snapshot(db,actor,tenant);
         Department before=exists?department(tenant,id):null;
         if((before==null?0:before.revision())!=change.revision())throw new IdentityException(409,"LIBRARY_POLICY_CONFLICT");
         db.update("INSERT INTO library_departments(id,tenant_id,name,revision) VALUES (?,?,?,1) ON CONFLICT(id) DO UPDATE SET name=EXCLUDED.name,revision=library_departments.revision+1 WHERE library_departments.tenant_id=EXCLUDED.tenant_id",id,tenant,name);
@@ -108,6 +109,7 @@ public class LibraryPermissionService {
         }
         db.update("DELETE FROM library_department_members WHERE tenant_id=? AND department_id=?",tenant,id);
         for(UUID member:change.members())db.update("INSERT INTO library_department_members VALUES (?,?,?)",tenant,id,member);
+        LibraryPrivilegeGuard.verify(db,actor,tenant,beforeMasks);
         Department result=department(tenant,id);event(actor,tenant,null,"DEPARTMENT",id,"DEPARTMENT_MEMBERS_CHANGE",before,result);receipt(actor,change.requestId(),fp,result);return result;
     }
     @Transactional public List<Event> events(UUID actor,UUID tenant,String kind,UUID id,int offset){return events(actor,tenant,kind,id,offset,true);}

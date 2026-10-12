@@ -53,17 +53,17 @@ public class RecommendationService {
  private Pool pool(UUID actor,UUID tenant,UUID workspace,boolean generatedOnly,String businessType,boolean publicationsOnly,boolean focused,boolean unreadOnly){
   if(workspace!=null)access.require(actor,tenant,workspace,false);
   var sql="""
-   WITH spaces AS MATERIALIZED (
+   WITH readable AS MATERIALIZED (SELECT rt.id FROM readable_source_tasks rt JOIN conversation_tasks own ON own.id=rt.id WHERE own.tenant_id=? AND own.requested_by=?), spaces AS MATERIALIZED (
     SELECT w.* FROM workspaces w LEFT JOIN workspace_members g ON g.tenant_id=w.tenant_id AND g.workspace_id=w.id AND g.account_id=?
     WHERE w.tenant_id=? AND (w.id=?::uuid OR ?::uuid IS NULL)
      AND ((w.kind='PERSONAL' AND w.owner_id=?) OR (w.kind='SHARED' AND g.account_id IS NOT NULL))
    ), candidates AS (
-    SELECT t.id,'TASK' kind,'task:'||t.id||':'||t.revision||':'||t.attempt version_key,c.workspace_id,w.name workspace_name,coalesce(convert_from(b.content,'UTF8')::jsonb->>'title',CASE WHEN EXISTS(SELECT 1 FROM readable_source_tasks title_source WHERE title_source.id=(SELECT first_task.id FROM conversation_tasks first_task WHERE first_task.conversation_id=c.id ORDER BY first_task.created_at,first_task.id LIMIT 1)) THEN c.title ELSE '会话内容暂不可用' END) AS title,
+    SELECT t.id,'TASK' kind,'task:'||t.id||':'||t.revision||':'||t.attempt version_key,c.workspace_id,w.name workspace_name,coalesce(convert_from(b.content,'UTF8')::jsonb->>'title',CASE WHEN EXISTS(SELECT 1 FROM readable title_source WHERE title_source.id=(SELECT first_task.id FROM conversation_tasks first_task WHERE first_task.conversation_id=c.id ORDER BY first_task.created_at,first_task.id LIMIT 1)) THEN c.title ELSE '会话内容暂不可用' END) AS title,
      coalesce(convert_from(b.content,'UTF8')::jsonb->>'summary',left(t.reply,600)) excerpt,(b.id IS NULL AND length(t.reply)>600) truncated,t.finished_at created_at,t.execution_class,c.id conversation_id,
      t.revision task_revision,t.attempt,coalesce(p.revision,0) preference_revision,NULL::uuid material_id,0 material_version,'' filename,coalesce(p.pinned,false) pinned
     FROM conversations c JOIN spaces w ON w.id=c.workspace_id
     JOIN LATERAL(SELECT t.* FROM conversation_tasks t WHERE t.conversation_id=c.id AND t.status='SUCCEEDED' AND t.mode='AGENT' AND t.reply IS NOT NULL
-      AND EXISTS(SELECT 1 FROM readable_source_tasks r WHERE r.id=t.id) AND (t.origin='USER' OR ?) AND (NOT ? OR EXISTS (%s)) AND (?::text IS NULL OR EXISTS(SELECT 1 FROM (%s) classified WHERE convert_from(classified.content,'UTF8')::jsonb->>'businessType'=?)) ORDER BY t.finished_at DESC,t.id DESC %s) t ON true
+      AND EXISTS(SELECT 1 FROM readable r WHERE r.id=t.id) AND (t.origin='USER' OR ?) AND (NOT ? OR EXISTS (%s)) AND (?::text IS NULL OR EXISTS(SELECT 1 FROM (%s) classified WHERE convert_from(classified.content,'UTF8')::jsonb->>'businessType'=?)) ORDER BY t.finished_at DESC,t.id DESC %s) t ON true
     LEFT JOIN LATERAL (%s) b ON true
     LEFT JOIN %s AND p.owner_id=c.owner_id
     WHERE c.tenant_id=? AND c.owner_id=? AND c.purpose IN ('BUSINESS','BRIEFING_GENERATION') AND NOT coalesce(p.hidden,false) AND NOT ? AND (NOT ? OR coalesce(p.pinned,false))
@@ -75,15 +75,15 @@ public class RecommendationService {
     JOIN material_versions v ON v.material_id=m.id AND v.number=m.current_version
     JOIN document_publications p ON p.material_version_id=v.id
     LEFT JOIN publication_preferences pref ON pref.tenant_id=v.tenant_id AND pref.material_id=m.id AND pref.actor_id=?
-    WHERE (?::text IS NULL OR ?='RESULT') AND (NOT ? OR coalesce(pref.pinned,false))
+    WHERE (library_mask(?,m.tenant_id,'MATERIAL',m.id)&1)=1 AND (?::text IS NULL OR ?='RESULT') AND (NOT ? OR coalesce(pref.pinned,false))
    )
    SELECT c.*,o.opened_at,count(*) OVER() eligible_total FROM candidates c LEFT JOIN delivery_observations o
     ON o.tenant_id=? AND o.actor_id=? AND o.target_kind=c.kind AND o.target_id=c.id AND o.version_key=c.version_key
    WHERE (NOT ? OR (c.kind='TASK' AND o.opened_at IS NULL))
    ORDER BY c.created_at DESC,c.id LIMIT 1000
    """.formatted(BriefingContentService.ELIGIBLE,BriefingContentService.ELIGIBLE,generatedOnly?"":"LIMIT 1",BriefingContentService.ELIGIBLE,generatedOnly?"briefing_card_preferences p ON p.task_id=t.id":"briefing_preferences p ON p.conversation_id=c.id");
-  final long[] total={0};db.execute("SET LOCAL statement_timeout='3s'");
-  var items=db.query(sql,(r,n)->{total[0]=r.getLong("eligible_total");return new Candidate(r.getObject("id",UUID.class),r.getString("kind"),r.getString("version_key"),r.getObject("workspace_id",UUID.class),r.getString("workspace_name"),r.getString("title"),r.getString("excerpt"),r.getBoolean("truncated"),r.getTimestamp("created_at").toInstant(),r.getString("execution_class"),r.getObject("conversation_id",UUID.class),r.getInt("task_revision"),r.getInt("attempt"),r.getInt("preference_revision"),r.getObject("material_id",UUID.class),r.getInt("material_version"),r.getString("filename"),r.getBoolean("pinned"),r.getTimestamp("opened_at")==null?null:r.getTimestamp("opened_at").toInstant());},actor,tenant,workspace,workspace,actor,generatedOnly,generatedOnly,businessType,businessType,tenant,actor,publicationsOnly,focused,actor,businessType,businessType,focused,tenant,actor,unreadOnly);
+  final long[] total={0};db.execute("SET LOCAL jit=off");db.execute("SET LOCAL statement_timeout='3s'");
+  var items=db.query(sql,(r,n)->{total[0]=r.getLong("eligible_total");return new Candidate(r.getObject("id",UUID.class),r.getString("kind"),r.getString("version_key"),r.getObject("workspace_id",UUID.class),r.getString("workspace_name"),r.getString("title"),r.getString("excerpt"),r.getBoolean("truncated"),r.getTimestamp("created_at").toInstant(),r.getString("execution_class"),r.getObject("conversation_id",UUID.class),r.getInt("task_revision"),r.getInt("attempt"),r.getInt("preference_revision"),r.getObject("material_id",UUID.class),r.getInt("material_version"),r.getString("filename"),r.getBoolean("pinned"),r.getTimestamp("opened_at")==null?null:r.getTimestamp("opened_at").toInstant());},tenant,actor,actor,tenant,workspace,workspace,actor,generatedOnly,generatedOnly,businessType,businessType,tenant,actor,publicationsOnly,focused,actor,actor,businessType,businessType,focused,tenant,actor,unreadOnly);
   return new Pool(items,total[0]);
  }
  private Presentation presentation(UUID actor,UUID tenant){
@@ -138,7 +138,7 @@ public class RecommendationService {
  public record PublicationPreference(int revision,boolean pinned){}
  @Transactional public PublicationPreference publicationPreference(UUID actor,UUID tenant,UUID material){
   identities.member(actor,tenant,false);departure.requirePrivateRead(actor,tenant);
-  var rows=db.queryForList("SELECT m.workspace_id FROM active_materials m JOIN workspaces w ON w.id=m.workspace_id WHERE m.id=? AND m.tenant_id=? AND w.kind='SHARED' AND EXISTS(SELECT 1 FROM document_publications p WHERE p.material_id=m.id)",UUID.class,material,tenant);if(rows.isEmpty())throw new IdentityException(404,"DELIVERY_NOT_FOUND");access.require(actor,tenant,rows.getFirst(),false);
+  var rows=db.queryForList("SELECT m.workspace_id FROM active_materials m JOIN workspaces w ON w.id=m.workspace_id WHERE m.id=? AND m.tenant_id=? AND w.kind='SHARED' AND EXISTS(SELECT 1 FROM document_publications p WHERE p.material_id=m.id)",UUID.class,material,tenant);if(rows.isEmpty())throw new IdentityException(404,"DELIVERY_NOT_FOUND");access.requireObject(actor,tenant,rows.getFirst(),"MATERIAL",material,false);
   var values=db.query("SELECT revision,pinned FROM publication_preferences WHERE tenant_id=? AND actor_id=? AND material_id=?",(r,n)->new PublicationPreference(r.getInt(1),r.getBoolean(2)),tenant,actor,material);return values.isEmpty()?new PublicationPreference(0,false):values.getFirst();
  }
  @Transactional public PublicationPreference followPublication(UUID actor,UUID tenant,UUID material,UUID key,int revision,boolean pinned){
@@ -154,7 +154,7 @@ public class RecommendationService {
    conversations.historical(actor,tenant,(UUID)r.get("conversation_id"),target.id());if(!target.versionKey().equals("task:"+target.id()+":"+r.get("revision")+":"+r.get("attempt")))throw new IdentityException(409,"DELIVERY_VERSION_CHANGED");
   }else{
    var rows=db.queryForList("SELECT v.workspace_id FROM material_versions v JOIN document_publications p ON p.material_version_id=v.id WHERE v.tenant_id=? AND v.id=?",tenant,target.id());if(rows.isEmpty())throw new IdentityException(404,"DELIVERY_NOT_FOUND");
-   UUID w=(UUID)rows.getFirst().get("workspace_id");access.require(actor,tenant,w,false);access.requireVersionActive(tenant,w,target.id());if(!target.versionKey().equals("publication:"+target.id()))throw new IdentityException(409,"DELIVERY_VERSION_CHANGED");
+   UUID w=(UUID)rows.getFirst().get("workspace_id");access.require(actor,tenant,w,false);access.requireVersion(actor,tenant,target.id(),false);if(!target.versionKey().equals("publication:"+target.id()))throw new IdentityException(409,"DELIVERY_VERSION_CHANGED");
   }
   db.update("INSERT INTO delivery_observations(tenant_id,actor_id,target_kind,target_id,version_key) VALUES (?,?,?,?,?) ON CONFLICT DO NOTHING",tenant,actor,target.kind(),target.id(),target.versionKey());
   return new Opened(target,db.queryForObject("SELECT opened_at FROM delivery_observations WHERE tenant_id=? AND actor_id=? AND target_kind=? AND target_id=? AND version_key=?",(r,n)->r.getTimestamp(1).toInstant(),tenant,actor,target.kind(),target.id(),target.versionKey()),"USER_OPEN_ACTION","NOT_ASSESSED");

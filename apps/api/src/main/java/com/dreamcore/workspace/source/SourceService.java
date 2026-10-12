@@ -56,18 +56,18 @@ public class SourceService {
     }
     private LocalDate date(Object value){return value==null?null:((Date)value).toLocalDate();}
     private Instant instant(Object value){return value==null?null:((java.sql.Timestamp)value).toInstant();}
-    private Source project(Map<String,Object> r,boolean canMaintain){
+    private Source project(UUID actor,Map<String,Object> r,boolean canMaintain){
         UUID id=(UUID)r.get("id");LocalDate from=date(r.get("expected_from")),through=date(r.get("expected_through"));
-        Instant last=db.queryForObject("SELECT max(submitted_at) FROM business_source_submissions b WHERE source_id=? AND status='ACTIVE' AND NOT EXISTS(SELECT 1 FROM business_source_versions x JOIN material_versions v ON v.id=x.version_id WHERE x.submission_id=b.id AND NOT EXISTS(SELECT 1 FROM active_materials m WHERE m.id=v.material_id))",(result,n)->instant(result.getTimestamp(1)),id);
+        Instant last=db.queryForObject("SELECT max(submitted_at) FROM business_source_submissions b WHERE source_id=? AND status='ACTIVE' AND NOT EXISTS(SELECT 1 FROM business_source_versions x JOIN material_versions v ON v.id=x.version_id WHERE x.submission_id=b.id AND NOT EXISTS(SELECT 1 FROM active_materials m WHERE m.id=v.material_id AND (library_mask(?,m.tenant_id,'MATERIAL',m.id)&1)=1))",(result,n)->instant(result.getTimestamp(1)),id,actor);
         String coverage="UNKNOWN";
         if(from!=null){
-            boolean declared=Boolean.TRUE.equals(db.queryForObject("SELECT coalesce(range_agg(daterange(coverage_from,coverage_through,'[]')) @> daterange(?::date,?::date,'[]'),false) FROM business_source_submissions b WHERE source_id=? AND status='ACTIVE' AND NOT EXISTS(SELECT 1 FROM business_source_versions x JOIN material_versions v ON v.id=x.version_id WHERE x.submission_id=b.id AND NOT EXISTS(SELECT 1 FROM active_materials m WHERE m.id=v.material_id))",Boolean.class,from,through,id));
+            boolean declared=Boolean.TRUE.equals(db.queryForObject("SELECT coalesce(range_agg(daterange(coverage_from,coverage_through,'[]')) @> daterange(?::date,?::date,'[]'),false) FROM business_source_submissions b WHERE source_id=? AND status='ACTIVE' AND NOT EXISTS(SELECT 1 FROM business_source_versions x JOIN material_versions v ON v.id=x.version_id WHERE x.submission_id=b.id AND NOT EXISTS(SELECT 1 FROM active_materials m WHERE m.id=v.material_id AND (library_mask(?,m.tenant_id,'MATERIAL',m.id)&1)=1))",Boolean.class,from,through,id,actor));
             coverage=declared?"DECLARED":last==null?"MISSING":"GAP";
         }
         Integer cadence=(Integer)r.get("cadence_hours");
         Instant anchor=instant(r.get("due_anchor_at")),qualifying=null;
         if(from==null) qualifying=last;
-        else if("DECLARED".equals(coverage)) qualifying=db.queryForObject("SELECT max(submitted_at) FROM business_source_submissions b WHERE source_id=? AND status='ACTIVE' AND NOT EXISTS(SELECT 1 FROM business_source_versions x JOIN material_versions v ON v.id=x.version_id WHERE x.submission_id=b.id AND NOT EXISTS(SELECT 1 FROM active_materials m WHERE m.id=v.material_id)) AND coverage_from<=? AND coverage_through>=?",(result,n)->instant(result.getTimestamp(1)),id,through,from);
+        else if("DECLARED".equals(coverage)) qualifying=db.queryForObject("SELECT max(submitted_at) FROM business_source_submissions b WHERE source_id=? AND status='ACTIVE' AND NOT EXISTS(SELECT 1 FROM business_source_versions x JOIN material_versions v ON v.id=x.version_id WHERE x.submission_id=b.id AND NOT EXISTS(SELECT 1 FROM active_materials m WHERE m.id=v.material_id AND (library_mask(?,m.tenant_id,'MATERIAL',m.id)&1)=1)) AND coverage_from<=? AND coverage_through>=?",(result,n)->instant(result.getTimestamp(1)),id,actor,through,from);
         if(qualifying!=null && qualifying.isAfter(anchor))anchor=qualifying;
         Instant due=cadence==null?null:anchor.plusSeconds(cadence*3600L);
         return new Source(id,(UUID)r.get("tenant_id"),(UUID)r.get("workspace_id"),(String)r.get("name"),(String)r.get("description"),
@@ -77,10 +77,10 @@ public class SourceService {
     @Transactional public Page list(UUID actor,UUID tenant,UUID space,int offset,int limit){
         page(offset,limit);boolean maintain=access.require(actor,tenant,space,false).canMaintain();departure.requireActiveBusiness(actor,tenant);
         var rows=db.queryForList("SELECT * FROM business_sources WHERE tenant_id=? AND workspace_id=? ORDER BY updated_at DESC,id LIMIT ? OFFSET ?",tenant,space,limit+1,offset);
-        return new Page(rows.stream().limit(limit).map(r->project(r,maintain)).toList(),rows.size()>limit);
+        return new Page(rows.stream().limit(limit).map(r->project(actor,r,maintain)).toList(),rows.size()>limit);
     }
     @Transactional public Source get(UUID actor,UUID tenant,UUID space,UUID id){
-        return project(row(actor,tenant,space,id,false),access.require(actor,tenant,space,false).canMaintain());
+        return project(actor,row(actor,tenant,space,id,false),access.require(actor,tenant,space,false).canMaintain());
     }
     @Transactional public Source create(UUID actor,UUID tenant,UUID space,UUID key,Settings settings){
         access.require(actor,tenant,space,true);Settings s=normalize(tenant,space,settings);
@@ -113,11 +113,11 @@ public class SourceService {
         var found=db.query("SELECT revision,settings,changed_by,effective_at FROM business_source_config_versions WHERE source_id=? ORDER BY revision DESC LIMIT ? OFFSET ?",(r,n)->new ConfigVersion(r.getInt(1),json.readValue(r.getString(2),Settings.class),r.getObject(3,UUID.class),r.getTimestamp(4).toInstant()),source,limit+1,offset);
         return new ConfigHistory(found.stream().limit(limit).toList(),found.size()>limit);
     }
-    private List<Version> versions(UUID tenant,UUID space,List<UUID> ids){return versions(tenant,space,ids,false);}
-    private List<Version> versions(UUID tenant,UUID space,List<UUID> ids,boolean allowMissing){
+    private List<Version> versions(UUID actor,UUID tenant,UUID space,List<UUID> ids){return versions(actor,tenant,space,ids,false);}
+    private List<Version> versions(UUID actor,UUID tenant,UUID space,List<UUID> ids,boolean allowMissing){
         var found=new ArrayList<Version>();
         for(UUID id:ids){
-            var rows=db.query("SELECT v.material_id,v.id,v.number,v.filename,v.sha256 FROM material_versions v JOIN active_materials m ON m.id=v.material_id WHERE v.tenant_id=? AND v.workspace_id=? AND v.id=?",(r,n)->new Version(r.getObject(1,UUID.class),r.getObject(2,UUID.class),r.getInt(3),r.getString(4),r.getString(5)),tenant,space,id);
+            var rows=db.query("SELECT v.material_id,v.id,v.number,v.filename,v.sha256 FROM material_versions v JOIN active_materials m ON m.id=v.material_id WHERE v.tenant_id=? AND v.workspace_id=? AND v.id=? AND (library_mask(?,m.tenant_id,'MATERIAL',m.id)&1)=1",(r,n)->new Version(r.getObject(1,UUID.class),r.getObject(2,UUID.class),r.getInt(3),r.getString(4),r.getString(5)),tenant,space,id,actor);
             if(rows.isEmpty()){if(allowMissing)continue;throw new IdentityException(404,"SOURCE_VERSION_UNAVAILABLE");}found.add(rows.getFirst());
         }
         return found;
@@ -127,8 +127,8 @@ public class SourceService {
         var rows=db.queryForList("SELECT * FROM business_source_submissions WHERE tenant_id=? AND workspace_id=? AND source_id=? AND id=?",tenant,space,source,submission);
         if(rows.isEmpty())throw missing();var r=rows.getFirst();
         var ids=db.queryForList("SELECT version_id FROM business_source_versions WHERE submission_id=? ORDER BY version_id",UUID.class,submission);
-        var available=versions(tenant,space,ids,true);
-        return new Submission(submission,source,date(r.get("coverage_from")),date(r.get("coverage_through")),(String)r.get("note"),(String)r.get("status"),(Integer)r.get("revision"),(UUID)r.get("submitted_by"),instant(r.get("submitted_at")),available,ids.size()-available.size());
+        var available=versions(actor,tenant,space,ids,true);
+        return new Submission(submission,source,date(r.get("coverage_from")),date(r.get("coverage_through")),available.size()==ids.size()?(String)r.get("note"):"部分来源无权访问，提交说明已隐藏",(String)r.get("status"),(Integer)r.get("revision"),(UUID)r.get("submitted_by"),instant(r.get("submitted_at")),available,ids.size()-available.size());
     }
     @Transactional public Submissions submissions(UUID actor,UUID tenant,UUID space,UUID source,int offset,int limit){
         page(offset,limit);row(actor,tenant,space,source,false);
@@ -138,7 +138,7 @@ public class SourceService {
     @Transactional public Submission submit(UUID actor,UUID tenant,UUID space,UUID source,UUID key,LocalDate from,LocalDate through,String note,List<UUID> versionIds){
         access.require(actor,tenant,space,true);
         if(from==null || through==null || from.isAfter(through) || versionIds==null || versionIds.isEmpty() || versionIds.size()>100 || versionIds.stream().anyMatch(Objects::isNull) || new HashSet<>(versionIds).size()!=versionIds.size())throw IdentityException.invalid();
-        note=text(note,2000,false);var ids=versionIds.stream().sorted().toList();versions(tenant,space,ids);
+        note=text(note,2000,false);var ids=versionIds.stream().sorted().toList();versions(actor,tenant,space,ids);
         String fingerprint=IdentityService.hash(json.writeValueAsString(new Object[]{tenant,space,source,from,through,note,ids}));
         UUID prior=identities.priorRequest(actor,key,"SOURCE_SUBMIT",fingerprint);
         var current=row(actor,tenant,space,source,true);if(prior!=null)return submission(actor,tenant,space,source,prior);

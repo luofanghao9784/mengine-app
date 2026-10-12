@@ -84,4 +84,28 @@ class DocumentPublicationIntegrationTest {
   lifecycle.act(owner,tenant,source,"MATERIAL",original.id(),UUID.randomUUID(),1,"PURGE");var removal=cleanup.claim();for(UUID object:cleanup.pending(removal)){cleanup.remove(object);cleanup.removed(removal,object);}cleanup.finish(removal);
   assertEquals("",db.queryForObject("SELECT body FROM private_document_versions WHERE document_id=?",String.class,d.id()));assertEquals(0,db.queryForObject("SELECT count(*) FROM private_document_exports WHERE document_id=?",Integer.class,d.id()));assertNull(db.queryForObject("SELECT reply FROM conversation_tasks WHERE id=?",String.class,job.id()));assertArrayEquals(independent,materials.download(reader,tenant,destination,published.materialId(),published.materialVersionId()).bytes());
  }
+
+ @Autowired LibraryPermissionService permissions;
+ @Test void enabledLibraryAllowsOnlineAnalysisButBlocksExportsAndRevokesDerivedCopies(){
+  db.update("INSERT INTO library_permission_rollouts VALUES (?,true)",tenant);
+  db.update("UPDATE workspace_members SET can_maintain=true WHERE workspace_id=? AND account_id=?",source,owner);
+  var original=materials.upload(owner,tenant,source,null,null,null,UUID.randomUUID(),new org.springframework.mock.web.MockMultipartFile("file","restricted.txt","text/plain","synthetic restricted source".getBytes()));
+  UUID version=materials.detail(owner,tenant,source,original.id(),0,20).versions().getFirst().id();
+  var submitted=conversations.submit(owner,tenant,null,source,UUID.randomUUID(),"只在系统内分析","AGENT",null,List.of(new TaskOriginals.Selection(original.id(),version)));
+  var job=conversations.claim();assertNotNull(job);
+  agents.finish(job,new AgentResult("1.4","0.8.0",job.id(),job.token(),"AGENT","verification","local-verification","有来源的在线分析",List.of(),List.of(),List.of(),1,null,List.of(),List.of(),List.of()));
+  var derived=documents.create(owner,tenant,submitted.conversation().id(),job.id(),null,UUID.randomUUID()).document();
+  documents.export(owner,tenant,derived.id(),1,"docx"); // cached before revocation must not bypass new policy
+  permissions.save(admin,tenant,"MATERIAL",original.id(),new LibraryPermissionService.Change(UUID.randomUUID(),0,true,List.of(new LibraryPermissionService.Grant("ACCOUNT",owner,"READ","DENY",false,null))));
+  assertNotNull(documents.detail(owner,tenant,derived.id(),null));
+  assertEquals("LIBRARY_DOWNLOAD_DENIED",assertThrows(IdentityException.class,()->documents.export(owner,tenant,derived.id(),1,"docx")).code);
+  assertThrows(IdentityException.class,()->publications.publish(owner,tenant,derived.id(),1,UUID.randomUUID(),destination,folder,null,null,"docx",true)); // recipient lacks source reading
+  permissions.save(admin,tenant,"MATERIAL",original.id(),new LibraryPermissionService.Change(UUID.randomUUID(),1,true,List.of(new LibraryPermissionService.Grant("ACCOUNT",owner,"READ","DENY",false,null),new LibraryPermissionService.Grant("ACCOUNT",reader,"READ","DENY",false,null))));
+  var published=publications.publish(owner,tenant,derived.id(),1,UUID.randomUUID(),destination,folder,null,null,"docx",true);
+  assertNotNull(materials.detail(reader,tenant,destination,published.materialId(),0,20));
+  assertThrows(IdentityException.class,()->materials.download(reader,tenant,destination,published.materialId(),published.materialVersionId()));
+  permissions.save(admin,tenant,"MATERIAL",original.id(),new LibraryPermissionService.Change(UUID.randomUUID(),2,true,List.of(new LibraryPermissionService.Grant("ACCOUNT",owner,"NONE","DENY",false,null),new LibraryPermissionService.Grant("ACCOUNT",reader,"NONE","DENY",false,null))));
+  assertThrows(IdentityException.class,()->documents.detail(owner,tenant,derived.id(),null));
+  assertThrows(IdentityException.class,()->materials.detail(reader,tenant,destination,published.materialId(),0,20));
+ }
 }

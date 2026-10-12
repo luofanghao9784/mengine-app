@@ -32,7 +32,7 @@ public class MaterialLifecycleService {
         var original=object(tenant,space,kind,id);var states=db.queryForList("SELECT * FROM content_lifecycle WHERE object_kind=? AND object_id=?",kind,id);
         boolean purge=canPurge(actor,tenant,space);
         UUID parent=(UUID)original.get(kind.equals("MATERIAL")?"folder_id":"parent_id");
-        var path=originalPath(tenant,space,parent);
+        var path=originalPath(actor,tenant,space,parent);
         boolean parentAvailable=parent==null || !db.queryForList("SELECT id FROM active_material_folders WHERE tenant_id=? AND workspace_id=? AND id=?",tenant,space,parent).isEmpty();
         if(states.isEmpty())return new Item(id,kind,(String)original.get("name"),"ACTIVE",0,null,null,null,purge,path,parentAvailable);
         var l=states.getFirst();return new Item(id,kind,(String)original.get("name"),(String)l.get("state"),(Integer)l.get("revision"),time(l,"trashed_at"),time(l,"purge_after"),(UUID)l.get("purge_job_id"),purge,path,parentAvailable);
@@ -44,20 +44,20 @@ public class MaterialLifecycleService {
     private List<UUID> folders(UUID tenant,UUID space,UUID id){return db.queryForList("WITH RECURSIVE tree AS (SELECT id FROM material_folders WHERE tenant_id=? AND workspace_id=? AND id=? UNION ALL SELECT f.id FROM material_folders f JOIN tree t ON f.parent_id=t.id) SELECT id FROM tree",UUID.class,tenant,space,id);}
     private List<UUID> materials(UUID tenant,UUID space,String kind,UUID id){if(kind.equals("MATERIAL"))return List.of(id);return db.queryForList("WITH RECURSIVE tree AS (SELECT id FROM material_folders WHERE tenant_id=? AND workspace_id=? AND id=? UNION ALL SELECT f.id FROM material_folders f JOIN tree t ON f.parent_id=t.id) SELECT m.id FROM materials m JOIN tree t ON m.folder_id=t.id",UUID.class,tenant,space,id);}
     @Transactional public Preview preview(UUID actor,UUID tenant,UUID space,String kind,UUID id){
-        access.requireManageFiles(actor,tenant,space,kind,id);var item=item(actor,tenant,space,kind,id);var docs=materials(tenant,space,kind,id);long count=0;for(UUID material:docs)count+=db.queryForObject("SELECT count(*) FROM material_versions WHERE material_id=?",Long.class,material);
+        access.requireManageFiles(actor,tenant,space,kind,id);var item=item(actor,tenant,space,kind,id);var docs=materials(tenant,space,kind,id);for(UUID m:docs)access.requireManageFiles(actor,tenant,space,"MATERIAL",m);if(kind.equals("FOLDER"))for(UUID f:folders(tenant,space,id))access.requireManageFiles(actor,tenant,space,"FOLDER",f);long count=0;for(UUID material:docs)count+=db.queryForObject("SELECT count(*) FROM material_versions WHERE material_id=?",Long.class,material);
         return new Preview(item,docs.size(),count,kind.equals("FOLDER")?folders(tenant,space,id).size():0,"CURRENT_PERMISSIONS_NO_TASK_RESTART");
     }
     // Only names and original directory metadata are exposed; deleted bodies stay unreadable.
-    private List<String> originalPath(UUID tenant,UUID space,UUID parent){
+    private List<String> originalPath(UUID actor,UUID tenant,UUID space,UUID parent){
         var path=new ArrayList<String>();
-        path.add(db.queryForObject("SELECT name FROM workspaces WHERE tenant_id=? AND id=?",String.class,tenant,space));
+        if((access.mask(actor,tenant,"WORKSPACE",space)&1)!=0)path.add(db.queryForObject("SELECT name FROM workspaces WHERE tenant_id=? AND id=?",String.class,tenant,space));
         if(parent!=null)path.addAll(db.queryForList("""
             WITH RECURSIVE trail AS (
               SELECT id,parent_id,name,0 AS depth FROM material_folders WHERE tenant_id=? AND workspace_id=? AND id=?
               UNION ALL SELECT f.id,f.parent_id,f.name,t.depth+1 FROM material_folders f JOIN trail t ON t.parent_id=f.id
                 WHERE f.tenant_id=? AND f.workspace_id=? AND t.depth<128
-            ) SELECT name FROM trail ORDER BY depth DESC
-            """,String.class,tenant,space,parent,tenant,space));
+            ) SELECT name FROM trail WHERE (library_mask(?,?,'FOLDER',id)&1)=1 ORDER BY depth DESC
+            """,String.class,tenant,space,parent,tenant,space,actor,tenant));
         return List.copyOf(path);
     }
     @Transactional public Page list(UUID actor,UUID tenant,UUID space,int offset,int limit){

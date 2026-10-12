@@ -26,6 +26,50 @@ async function fixture(page: Page, enabled = true, moves: Record<string, unknown
     else if (path.endsWith('/phone/configuration')) json = { delivery: 'DISABLED', localPreview: false };
     else if (path.endsWith('/csrf')) json = { headerName: 'X-CSRF-TOKEN', token: 'synthetic' };
     else if (path.endsWith('/library-access/status')) json = { enabled };
+    else if (path.endsWith('/library-access/locate'))
+      json = {
+        items: [
+          {
+            kind: 'MATERIAL',
+            id: file,
+            workspaceId: space,
+            name: '预算.txt',
+            canRead: false,
+            canManagePermissions: true,
+          },
+        ],
+        hasMore: false,
+      };
+    else if (path.endsWith('/explanation'))
+      json = {
+        reasons: [
+          {
+            scope: '财务空间',
+            principal: '销售部门',
+            content: 'READ',
+            download: 'DENY',
+            inherit: true,
+            allowsEffective: true,
+          },
+        ],
+        people: [{ id: colleague, name: '销售同事', mask: 1 }],
+      };
+    else if (path.includes('/library-access/') && path.endsWith('/preview'))
+      json = {
+        fingerprint: 'policy-preview',
+        objects: 1,
+        changes: [
+          {
+            accountId: colleague,
+            name: '销售同事',
+            kind: 'MATERIAL',
+            objectId: file,
+            objectName: '预算.txt',
+            beforeMask: 5,
+            afterMask: 1,
+          },
+        ],
+      };
     else if (path.endsWith('/library-access/directory'))
       json = {
         people: [
@@ -134,9 +178,12 @@ test('文件权限显示三个内容档位与独立下载，核对后才提交',
   await expect(dialog).toHaveCount(0);
   expect(saves).toHaveLength(1);
   expect(saves[0]).toMatchObject({
-    revision: 0,
-    inherit: true,
-    grants: [{ principalId: colleague, content: 'READ', download: 'DENY', manageFiles: false }],
+    fingerprint: 'policy-preview',
+    change: {
+      revision: 0,
+      inherit: true,
+      grants: [{ principalId: colleague, content: 'READ', download: 'DENY', manageFiles: false }],
+    },
   });
 });
 test('未启用企业不出现新版设置入口', async ({ page }) => {
@@ -194,4 +241,16 @@ test('取消跨权限移动不发送变更', async ({ page }) => {
   await dialog.getByRole('button', { name: '取消移动' }).click();
   await expect(dialog).toHaveCount(0);
   expect(moves).toHaveLength(0);
+});
+
+test('无阅读权限的管理员可通过定位入口管理授权但不打开正文', async ({ page }) => {
+  await fixture(page);
+  await page.getByRole('button', { name: '资料权限管理', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: '资料权限管理', exact: true });
+  await expect(dialog.getByText('无内容阅读权限', { exact: false })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: '查看文件', exact: true })).toHaveCount(0);
+  await dialog.getByRole('button', { name: '权限设置', exact: true }).click();
+  const policy = page.getByRole('dialog', { name: '权限设置 · 预算.txt' });
+  await policy.getByText('查看生效权限与授权来源').click();
+  await expect(policy.getByText(/财务空间 · 销售部门/)).toBeVisible();
 });

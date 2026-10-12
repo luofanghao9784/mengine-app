@@ -18,14 +18,14 @@ public class DocumentPublicationService {
     private final RowMapper<Publication> mapper=(r,n)->new Publication(r.getObject("id",UUID.class),r.getObject("tenant_id",UUID.class),r.getObject("document_id",UUID.class),r.getInt("document_version"),r.getObject("workspace_id",UUID.class),r.getObject("destination_folder_id",UUID.class),r.getObject("material_id",UUID.class),r.getObject("material_version_id",UUID.class),r.getInt("material_version"),r.getString("filename"),r.getString("format"),r.getString("sha256"),r.getTimestamp("published_at").toInstant());
     private Publication receipt(UUID actor,UUID tenant,UUID id){
         var rows=db.query("SELECT * FROM document_publications WHERE tenant_id=? AND actor_id=? AND id=?",mapper,tenant,actor,id);
-        if(rows.isEmpty())throw new IdentityException(404,"DOCUMENT_NOT_FOUND");return rows.getFirst();
+        if(rows.isEmpty())throw new IdentityException(404,"DOCUMENT_NOT_FOUND");var value=rows.getFirst();access.requireObject(actor,tenant,value.workspaceId(),"MATERIAL",value.materialId(),false);return value;
     }
     @Transactional public Page list(UUID actor,UUID tenant,UUID document,int offset,int limit){
         if(offset<0 || offset>10000 || limit<1 || limit>30)throw IdentityException.invalid();
         documents.detail(actor,tenant,document,null);
         var values=db.query("""
             SELECT p.* FROM document_publications p JOIN workspace_members g ON g.tenant_id=p.tenant_id AND g.workspace_id=p.workspace_id AND g.account_id=p.actor_id
-            WHERE p.tenant_id=? AND p.actor_id=? AND p.document_id=? ORDER BY p.published_at DESC,p.id LIMIT ? OFFSET ?
+            WHERE p.tenant_id=? AND p.actor_id=? AND p.document_id=? AND (library_mask(p.actor_id,p.tenant_id,'MATERIAL',p.material_id)&1)=1 ORDER BY p.published_at DESC,p.id LIMIT ? OFFSET ?
             """,mapper,tenant,actor,document,limit+1,offset);
         return new Page(tenant,document,values.stream().limit(limit).toList(),values.size()>limit);
     }
@@ -33,12 +33,17 @@ public class DocumentPublicationService {
         if(!acknowledged || version<1 || workspace==null || format==null || !Set.of("docx","pdf").contains(format) || (material==null && expectedVersion!=null) || (material!=null && (folder!=null || expectedVersion==null || expectedVersion<1)))throw IdentityException.invalid();
         String fingerprint=IdentityService.hash(new tools.jackson.databind.json.JsonMapper().writeValueAsString(new Object[]{tenant,document,version,workspace,folder,material,expectedVersion,format}));
         UUID prior=identities.priorRequest(actor,key,"DOCUMENT_PUBLISH",fingerprint);
-        var destination=access.require(actor,tenant,workspace,true);
+        var destination=access.requireObject(actor,tenant,workspace,material!=null?"MATERIAL":folder!=null?"FOLDER":"WORKSPACE",material!=null?material:folder!=null?folder:workspace,true);
         if(!destination.kind().equals("SHARED"))throw new IdentityException(400,"DOCUMENT_PUBLISH_TARGET_INVALID");
         if(prior!=null){documents.detail(actor,tenant,document,version);return receipt(actor,tenant,prior);}
         // export acquires the private document lock. Different request keys for the same publication serialize here.
-        var exported=documents.export(actor,tenant,document,version,format);
+        var exported=documents.publicationContent(actor,tenant,document,version,format);
         var source=documents.detail(actor,tenant,document,version);
+        if(Boolean.TRUE.equals(db.queryForObject("SELECT library_permissions_enabled(?)",Boolean.class,tenant))){
+            String targetKind=material!=null?"MATERIAL":folder!=null?"FOLDER":"WORKSPACE";UUID target=material!=null?material:folder!=null?folder:workspace;
+            var audience=db.queryForList("SELECT account_id FROM tenant_memberships WHERE tenant_id=? AND status='ACTIVE' AND (library_mask(account_id,tenant_id,?,?)&1)=1",UUID.class,tenant,targetKind,target);
+            for(UUID recipient:audience)access.requireTaskSources(recipient,tenant,source.document().taskId(),false);
+        }
         var existing=db.queryForList("SELECT id FROM document_publications WHERE tenant_id=? AND actor_id=? AND document_id=? AND document_version=? AND workspace_id=? AND folder_id IS NOT DISTINCT FROM ? AND update_material_id IS NOT DISTINCT FROM ? AND format=?",UUID.class,tenant,actor,document,version,workspace,folder,material,format);
         UUID id;
         if(!existing.isEmpty())id=existing.getFirst();

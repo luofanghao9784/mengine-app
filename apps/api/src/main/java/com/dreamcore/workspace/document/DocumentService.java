@@ -98,9 +98,11 @@ public class DocumentService {
         identities.remember(actor,key,"DOCUMENT_SAVE",fingerprint,id);
         db.update("INSERT INTO private_document_writes(actor_id,request_id,tenant_id,document_id,version) VALUES (?,?,?,?,?)",actor,key,tenant,id,saved.version().number());return saved;
     }
-    @Transactional public Export export(UUID actor,UUID tenant,UUID id,int version,String format){
+    @Transactional public Export export(UUID actor,UUID tenant,UUID id,int version,String format){return render(actor,tenant,id,version,format,true);}
+    @Transactional public Export publicationContent(UUID actor,UUID tenant,UUID id,int version,String format){return render(actor,tenant,id,version,format,false);}
+    private Export render(UUID actor,UUID tenant,UUID id,int version,String format,boolean download){
         if(!Set.of("docx","pdf").contains(format))throw IdentityException.invalid();
-        require(actor,tenant,id,true);var value=detail(actor,tenant,id,version).version();
+        var source=require(actor,tenant,id,true);access.requireTaskSources(actor,tenant,source.taskId(),download);var value=detail(actor,tenant,id,version).version();
         if(Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM private_document_exports x JOIN object_lifecycle l ON l.kind='EXPORT_CACHE' AND l.parent_id=x.document_id AND (l.details->>'version')::integer=x.version AND l.details->>'format'=x.format AND l.original_anchor=x.created_at WHERE x.tenant_id=? AND x.document_id=? AND x.version=? AND x.format=? AND NOT object_is_active('EXPORT_CACHE',l.object_id))",Boolean.class,tenant,id,version,format)))throw new IdentityException(410,"DOCUMENT_EXPORT_EXPIRED");
         var cached=db.query("SELECT sha256,content FROM private_document_exports WHERE tenant_id=? AND document_id=? AND version=? AND format=?",(r,n)->new Export("document-v"+version+"."+format,r.getString(1),r.getBytes(2),DocumentRenderer.contentType(format)),tenant,id,version,format);
         if(!cached.isEmpty())return cached.getFirst();

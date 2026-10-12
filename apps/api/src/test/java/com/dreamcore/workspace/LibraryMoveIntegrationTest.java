@@ -40,8 +40,8 @@ class LibraryMoveIntegrationTest {
  }
  @Test void independentScopeSurvivesUnlessExplicitlyChanged(){
   save("MATERIAL",file,false,List.of(grant(admin,"EDIT","ALLOW"),grant(reader,"READ","ALLOW")));
-  var p=preview("MATERIAL",file,target,false);assertTrue(p.independent());assertTrue(p.changes().isEmpty());
-  moves.move(admin,tenant,space,"MATERIAL",file,command(p));assertTrue(permissions.effective(reader,tenant,"MATERIAL",file).canRead());
+  var p=preview("MATERIAL",file,target,false);assertTrue(p.independent());assertFalse(p.changes().isEmpty());
+  moves.move(admin,tenant,space,"MATERIAL",file,command(p));assertFalse(permissions.effective(reader,tenant,"MATERIAL",file).canRead());assertFalse(permissions.policy(admin,tenant,"MATERIAL",file).inherit());
   p=preview("MATERIAL",file,source,false);moves.move(admin,tenant,space,"MATERIAL",file,command(p));
   p=preview("MATERIAL",file,target,true);assertFalse(p.changes().isEmpty());moves.move(admin,tenant,space,"MATERIAL",file,command(p));
   assertFalse(permissions.effective(reader,tenant,"MATERIAL",file).canRead());assertEquals(2,permissions.policy(admin,tenant,"MATERIAL",file).grants().size());
@@ -107,5 +107,14 @@ class LibraryMoveIntegrationTest {
   var ordinary=http.send(java.net.http.HttpRequest.newBuilder(java.net.URI.create(base+events)).GET().build(),java.net.http.HttpResponse.BodyHandlers.ofString());
   assertEquals(200,ordinary.statusCode());assertFalse(ordinary.body().contains("REQUEST_DOWNLOAD"));assertFalse(ordinary.body().contains("PERMISSION_CHANGE"));
   assertEquals(403,http.send(java.net.http.HttpRequest.newBuilder(java.net.URI.create(base+events+"?view=AUDIT")).GET().build(),java.net.http.HttpResponse.BodyHandlers.ofString()).statusCode());
+  assertEquals(2,db.queryForObject("SELECT count(*) FROM library_request_journal WHERE request_id=?",Integer.class,event.get("request_id")));
+  assertEquals(403,db.queryForObject("SELECT status FROM library_request_journal WHERE request_id=? AND phase='RESPONSE_FINISHED'",Integer.class,event.get("request_id")));
+  assertThrows(org.springframework.dao.DataAccessException.class,()->db.update("DELETE FROM library_request_journal WHERE request_id=?",event.get("request_id")));
+  String trigger="journal_failure_"+tenant.toString().replace("-","");
+  db.execute("CREATE FUNCTION "+trigger+"() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.tenant_id='"+tenant+"'::uuid THEN RAISE EXCEPTION 'synthetic journal failure'; END IF; RETURN NEW; END $$");
+  db.execute("CREATE TRIGGER "+trigger+" BEFORE INSERT ON library_request_journal FOR EACH ROW EXECUTE FUNCTION "+trigger+"()");
+  try{assertEquals(503,http.send(java.net.http.HttpRequest.newBuilder(java.net.URI.create(base+path)).GET().build(),java.net.http.HttpResponse.BodyHandlers.ofString()).statusCode());}
+  finally{db.execute("DROP TRIGGER "+trigger+" ON library_request_journal");db.execute("DROP FUNCTION "+trigger+"()");}
+
  }
 }

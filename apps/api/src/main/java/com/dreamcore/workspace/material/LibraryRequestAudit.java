@@ -22,9 +22,9 @@ public class LibraryRequestAudit implements WebMvcConfigurer, HandlerInterceptor
     private final JdbcTemplate db;
     private final org.slf4j.Logger log=org.slf4j.LoggerFactory.getLogger(getClass());
     public LibraryRequestAudit(JdbcTemplate db){this.db=db;}
-    @Override public void addInterceptors(InterceptorRegistry registry){registry.addInterceptor(this).addPathPatterns("/api/v1/tenants/**");}
+    @Override public void addInterceptors(InterceptorRegistry registry){registry.addInterceptor(this).addPathPatterns("/api/v1/tenants/**","/api/tenant-admin/v1/tenants/**");}
     @Override public boolean preHandle(HttpServletRequest request,HttpServletResponse response,Object handler){
-        request.setAttribute(REQUEST_ID,UUID.randomUUID());
+        if(request.getAttribute(REQUEST_ID)==null)request.setAttribute(REQUEST_ID,UUID.randomUUID());
         var auth=SecurityContextHolder.getContext().getAuthentication();
         if(auth!=null)try{request.setAttribute(ACTOR,UUID.fromString(auth.getName()));}catch(IllegalArgumentException ignored){}
         return true;

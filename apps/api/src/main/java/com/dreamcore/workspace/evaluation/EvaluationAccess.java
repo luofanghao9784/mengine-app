@@ -25,7 +25,7 @@ public class EvaluationAccess {
   if(tenant==null||e==null||e.id()==null||e.kind()==null||e.revision()<0||e.attempt()<0)throw IdentityException.invalid();
   if(e.kind().equals("MATERIAL_VERSION")){
    var rows=db.queryForList("SELECT v.workspace_id,v.number FROM material_versions v JOIN active_materials m ON m.id=v.material_id WHERE v.tenant_id=? AND v.id=?",tenant,e.id());if(rows.isEmpty())throw missing();var r=rows.getFirst();
-   if(!workspace.equals(r.get("workspace_id")))throw missing();materials.require(actor,tenant,workspace,false);materials.requireVersionActive(tenant,workspace,e.id());
+   if(!workspace.equals(r.get("workspace_id")))throw missing();materials.require(actor,tenant,workspace,false);materials.requireVersion(actor,tenant,e.id(),false);
    return new Fact("NO_MODEL","material:"+e.id(),"AVAILABLE",e.revision()==((Number)r.get("number")).intValue()&&e.attempt()==0,List.of(e.id()));
   }
   departure.requirePrivateRead(actor,tenant);
@@ -34,7 +34,7 @@ public class EvaluationAccess {
    var rows=db.queryForList("SELECT f.*,v.status FROM feedback_entries f JOIN feedback_versions v ON v.feedback_id=f.id AND v.revision=f.revision JOIN readable_feedback rf ON rf.id=f.id WHERE f.id=? AND f.tenant_id=? AND f.actor_id=?",e.id(),tenant,actor);if(rows.isEmpty())throw missing();feedback=rows.getFirst();task=(UUID)feedback.get("task_id");if(!Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM feedback_versions v WHERE v.feedback_id=? AND v.revision=? AND object_is_active('FEEDBACK_VERSION',v.id))",Boolean.class,e.id(),e.revision())))throw missing();
   }else if(!e.kind().equals("TASK"))throw IdentityException.invalid();
   if(feedback!=null&&"PUBLICATION".equals(feedback.get("kind"))){
-   if(!workspace.equals(feedback.get("workspace_id")))throw missing();UUID version=(UUID)feedback.get("material_version_id");materials.require(actor,tenant,workspace,false);materials.requireVersionActive(tenant,workspace,version);
+   if(!workspace.equals(feedback.get("workspace_id")))throw missing();UUID version=(UUID)feedback.get("material_version_id");materials.require(actor,tenant,workspace,false);materials.requireVersion(actor,tenant,version,false);
    return new Fact("NO_MODEL","publication:"+feedback.get("publication_id"),(String)feedback.get("status"),e.revision()==((Number)feedback.get("revision")).intValue()&&e.attempt()==0&&"ACTIVE".equals(feedback.get("status")),List.of(version));
   }
   var rows=db.queryForList("SELECT t.* FROM conversation_tasks t JOIN conversations c ON c.id=t.conversation_id JOIN readable_source_tasks r ON r.id=t.id WHERE t.id=? AND t.tenant_id=? AND c.owner_id=?",task,tenant,actor);if(rows.isEmpty())throw missing();var t=rows.getFirst();if(!workspace.equals(t.get("workspace_id")))throw missing();materials.require(actor,tenant,workspace,false);

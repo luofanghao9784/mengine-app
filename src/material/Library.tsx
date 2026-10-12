@@ -1,3 +1,4 @@
+import { LibraryAccessBrowser, LibraryJournal } from './AccessBrowser';
 import { LibraryPermissions, LibraryEvents, useLibraryPermissionsEnabled } from './Permissions';
 import { adminHref } from '../admin/navigation';
 import { LibraryToolbar, LibrarySearch } from './LibraryToolbar';
@@ -78,6 +79,10 @@ function LibraryContents({
   context: TenantContext;
   administration?: boolean;
 }) {
+  const enabled = useLibraryPermissionsEnabled(tenant);
+  const [accessBrowser, setAccessBrowser] = useState<'MANAGE' | 'SHARED'>();
+  const [journal, setJournal] = useState(false);
+  const [sharedFile, setSharedFile] = useState<{ id: string; workspaceId: string }>();
   const [hash, setHash] = useState(location.hash);
   useEffect(() => {
     const change = () => {
@@ -122,6 +127,33 @@ function LibraryContents({
             </Button>
           </div>
         </PageActions>
+      )}
+      {enabled && (
+        <div className="material-tabs" aria-label="资料授权入口">
+          <Button onClick={() => setAccessBrowser('SHARED')}>共享给我</Button>
+          <Button onClick={() => setAccessBrowser('MANAGE')}>资料权限管理</Button>
+          {context.role === 'TENANT_ADMIN' && <Button onClick={() => setJournal(true)}>访问请求留痕</Button>}
+        </div>
+      )}
+      {accessBrowser && (
+        <LibraryAccessBrowser
+          tenant={tenant}
+          mode={accessBrowser}
+          close={() => setAccessBrowser(undefined)}
+          open={(item) => setSharedFile(item)}
+        />
+      )}
+      {journal && <LibraryJournal tenant={tenant} close={() => setJournal(false)} />}
+      {sharedFile && (
+        <DocumentDialog
+          tenant={tenant}
+          entry={sharedFile}
+          maxBytes={20971520}
+          close={() => setSharedFile(undefined)}
+          changed={() => {}}
+          verification={context}
+          administration={administration}
+        />
       )}
       {!allowed || (folder && !uuid(folder)) ? (
         <Empty icon={Folder} title="此位置暂不可用" text="空间或文件夹不存在，或你没有查看权限。" />

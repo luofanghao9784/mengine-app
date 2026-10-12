@@ -60,7 +60,7 @@ public class TaskContextService {
  private void dependencies(Task target,Collection<UUID> versions){
   for(UUID version:new LinkedHashSet<>(versions)){
    var rows=db.queryForList("SELECT workspace_id FROM material_versions WHERE tenant_id=? AND id=?",UUID.class,target.tenant(),version);if(rows.isEmpty())throw missing();
-   materials.require(target.actor(),target.tenant(),rows.getFirst(),false);materials.requireVersionActive(target.tenant(),rows.getFirst(),version);
+   materials.requireVersion(target.actor(),target.tenant(),version,false);
    db.update("INSERT INTO task_context_materials(task_id,attempt_number,version_id) VALUES (?,?,?) ON CONFLICT DO NOTHING",target.id(),target.attempt(),version);
   }
   if(db.queryForObject("SELECT count(*) FROM task_context_materials WHERE task_id=? AND attempt_number=?",Integer.class,target.id(),target.attempt())>256)throw new IdentityException(413,"TASK_CONTEXT_LIMIT");
@@ -152,7 +152,7 @@ public class TaskContextService {
   return e;
  }
  private void trackExperience(Task t,ExperienceService.Entry e){
-  if(e.version().content().accessMode().equals("SOURCE_BOUND")){
+  if(e.version().content().accessMode().equals("SOURCE_BOUND") || Boolean.TRUE.equals(db.queryForObject("SELECT library_permissions_enabled(?)",Boolean.class,t.tenant()))){
    for(var ref:e.version().evidence())if(ref.kind().equals("TASK"))datasets.inherit(t.id(),ref.referenceId());
    var deps=new LinkedHashSet<UUID>();for(var ref:e.version().evidence())if(ref.kind().equals("MATERIAL_VERSION"))deps.add(ref.referenceId());else deps.addAll(sourceVersions(ref.referenceId()));dependencies(t,deps);
   }

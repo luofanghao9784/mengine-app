@@ -26,6 +26,30 @@ interface Policy {
   };
   grants: Grant[];
 }
+interface Impact {
+  fingerprint: string;
+  objects: number;
+  changes: {
+    accountId: string;
+    name: string;
+    kind: string;
+    objectId: string | null;
+    objectName: string;
+    beforeMask: number;
+    afterMask: number;
+  }[];
+}
+interface Explanation {
+  reasons: {
+    scope: string;
+    principal: string;
+    content: string;
+    download: string;
+    inherit: boolean;
+    allowsEffective: boolean;
+  }[];
+  people: { id: string; name: string; mask: number }[];
+}
 interface Directory {
   people: { id: string; name: string }[];
   departments: Department[];
@@ -64,6 +88,7 @@ const isDirectory = (v: unknown): v is Directory =>
 const errorText = (e: unknown) => (e instanceof Error ? e.message : '操作未完成，请稍后重试');
 const actionNames: Record<string, string> = {
   PERMISSION_CHANGE: '修改权限',
+  PERMISSION_IMPACT: '权限变更影响',
   ROLE_GRANT_REVOKED: '调岗撤销个人授权',
   MATERIAL_UPLOAD: '上传文件',
   MATERIAL_VERSION: '上传新版本',
@@ -125,13 +150,25 @@ export function LibraryPermissions({
   const [grants, setGrants] = useState<Grant[]>([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const [confirmation, setConfirmation] = useState(false);
+  const [confirmation, setConfirmation] = useState<Impact>();
+  const [explanation, setExplanation] = useState<Explanation>();
   const pending = useRef<{ fingerprint: string; id: string } | undefined>(undefined);
   useEffect(() => {
     const abort = new AbortController();
     void request(root(tenant) + `/${kind}/${id}`, 'GET', isPolicy, undefined, abort.signal)
       .then((p) => {
         setPolicy(p);
+        void request(
+          root(tenant) + `/${kind}/${id}/explanation`,
+          'GET',
+          (v): v is Explanation => record(v) && Array.isArray(v.reasons) && Array.isArray(v.people),
+          undefined,
+          abort.signal,
+        )
+          .then(setExplanation)
+          .catch((e) => {
+            if (!abort.signal.aborted) setError(errorText(e));
+          });
         setInherit(p.inherit);
         setGrants(p.grants);
         if (p.effective.canManagePermissions)
@@ -149,28 +186,48 @@ export function LibraryPermissions({
     return () => abort.abort();
   }, [tenant, kind, id]);
   const update = (index: number, patch: Partial<Grant>) => {
-    setConfirmation(false);
+    setConfirmation(undefined);
     setGrants((old) => old.map((g, i) => (i === index ? { ...g, ...patch } : g)));
   };
-  const save = async () => {
-    if (!policy) return;
+  const body = () => {
+    if (!policy) throw new Error('权限尚未加载');
+    const fingerprint = JSON.stringify({ tenant, kind, id, revision: policy.revision, inherit, grants });
+    if (pending.current?.fingerprint !== fingerprint)
+      pending.current = { fingerprint, id: crypto.randomUUID() };
+    return { requestId: pending.current!.id, revision: policy.revision, inherit, grants };
+  };
+  const preview = async () => {
     setBusy(true);
     setError('');
     try {
-      const fingerprint = JSON.stringify({ tenant, kind, id, revision: policy.revision, inherit, grants });
-      if (pending.current?.fingerprint !== fingerprint)
-        pending.current = { fingerprint, id: crypto.randomUUID() };
+      setConfirmation(
+        await request(
+          root(tenant) + `/${kind}/${id}/preview`,
+          'POST',
+          (v): v is Impact => record(v) && typeof v.fingerprint === 'string' && Array.isArray(v.changes),
+          body(),
+        ),
+      );
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const save = async () => {
+    if (!policy || !confirmation) return;
+    setBusy(true);
+    setError('');
+    try {
       await request(root(tenant) + `/${kind}/${id}`, 'PUT', isPolicy, {
-        requestId: pending.current!.id,
-        revision: policy.revision,
-        inherit,
-        grants,
+        change: body(),
+        fingerprint: confirmation.fingerprint,
       });
       changed();
       close();
     } catch (e) {
       setError(errorText(e));
-      setConfirmation(false);
+      setConfirmation(undefined);
     } finally {
       setBusy(false);
     }
@@ -190,7 +247,35 @@ export function LibraryPermissions({
             本人：{policy.effective.canEdit ? '可编辑' : policy.effective.canRead ? '仅查看' : '不可查看'} ·{' '}
             {policy.effective.canDownload ? '可下载' : '不可下载'}
           </p>
-          <p className="muted">管理权限不代表能阅读文件。多个允许授权合并，明确禁止优先。</p>
+          <p className="muted">
+            管理权限不代表能阅读文件。多个允许授权合并，明确禁止优先；独立范围也不能绕过上级的禁止。派生成果还需拥有来源权限。
+          </p>
+          {explanation && (
+            <details>
+              <summary>查看生效权限与授权来源</summary>
+              {explanation.people.length > 0 && (
+                <ul>
+                  {explanation.people.map((p) => (
+                    <li key={p.id}>
+                      {p.name}：{describeAccess(p.mask)}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <ul>
+                {explanation.reasons.map((r, i) => (
+                  <li key={i}>
+                    {r.scope} · {r.principal}：
+                    {{ NONE: '不可查看', READ: '仅查看', EDIT: '可编辑' }[r.content] || r.content} /{' '}
+                    {{ ALLOW: '允许下载', DENY: '禁止下载', INHERIT: '未单独授予下载' }[r.download] ||
+                      r.download}
+                    {!r.allowsEffective ? '（上层允许不继承，明确禁止仍生效）' : ''}
+                    {!r.inherit ? ' · 此范围停止继承允许授权' : ''}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
           {policy.effective.canManagePermissions && directory ? (
             <>
               <Field label="默认权限">
@@ -199,11 +284,11 @@ export function LibraryPermissions({
                   value={String(inherit)}
                   onChange={(e) => {
                     setInherit(e.target.value === 'true');
-                    setConfirmation(false);
+                    setConfirmation(undefined);
                   }}
                 >
                   <option value="true">继承上级权限，并应用下方授权</option>
-                  <option value="false">独立范围，仅使用下方授权</option>
+                  <option value="false">独立范围，保留上级明确禁止</option>
                 </select>
               </Field>
               {kind === 'WORKSPACE' && (
@@ -271,7 +356,7 @@ export function LibraryPermissions({
                   <Button
                     onClick={() => {
                       setGrants((old) => old.filter((_, j) => j !== i));
-                      setConfirmation(false);
+                      setConfirmation(undefined);
                     }}
                   >
                     移除此项授权
@@ -296,7 +381,7 @@ export function LibraryPermissions({
                         roleDepartmentId: null,
                       },
                     ]);
-                    setConfirmation(false);
+                    setConfirmation(undefined);
                   }}
                 >
                   <option value="">选择授权对象</option>
@@ -319,15 +404,27 @@ export function LibraryPermissions({
                     将{inherit ? '保留继承' : '停止继承'}，保存以上 {grants.length}{' '}
                     项明确授权。影响该对象及继承它的子目录和文件；不可查看或禁止下载优先。确认后立即生效并留痕。
                   </p>
+                  <p>本次影响 {confirmation.changes.length} 项人员与对象权限：</p>
+                  {!confirmation.changes.length && <p>现有成员的生效权限不变。</p>}
+                  <ul>
+                    {confirmation.changes.map((c, i) => (
+                      <li key={i}>
+                        {c.name} · {c.objectName}：{describeAccess(c.beforeMask)} →{' '}
+                        {describeAccess(c.afterMask)}
+                      </li>
+                    ))}
+                  </ul>
                   <Button disabled={busy} onClick={() => void save()}>
                     确认保存
                   </Button>
-                  <Button disabled={busy} onClick={() => setConfirmation(false)}>
+                  <Button disabled={busy} onClick={() => setConfirmation(undefined)}>
                     返回核对
                   </Button>
                 </div>
               ) : (
-                <Button onClick={() => setConfirmation(true)}>核对并保存</Button>
+                <Button disabled={busy} onClick={() => void preview()}>
+                  {busy ? '正在计算影响…' : '核对并保存'}
+                </Button>
               )}
             </>
           ) : !policy.effective.canManagePermissions ? (
@@ -472,6 +569,17 @@ export function LibraryEvents({
                   <details>
                     <summary>变更详情</summary>
                     <PermissionEventSummary before={e.beforeValue} after={e.afterValue} />
+                    {audit && (
+                      <details>
+                        <summary>完整变更快照</summary>
+                        <p>变更前</p>
+                        <pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+                          {e.beforeValue || '无'}
+                        </pre>
+                        <p>变更后</p>
+                        <pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{e.afterValue}</pre>
+                      </details>
+                    )}
                   </details>
                 )}
               </li>
@@ -497,6 +605,37 @@ export function LibraryDepartments({ tenant }: { tenant: string }) {
 function DepartmentEditor({ tenant }: { tenant: string }) {
   const [data, setData] = useState<Directory>();
   const [selected, setSelected] = useState<Department>();
+  const [exceptions, setExceptions] =
+    useState<
+      {
+        accountId: string;
+        kind: string;
+        id: string;
+        name: string;
+        roleDepartmentId: string | null;
+        content: string;
+        download: string;
+      }[]
+    >();
+  const [exceptionError, setExceptionError] = useState('');
+  useEffect(() => {
+    setExceptions(undefined);
+    setExceptionError('');
+    if (!selected) return;
+    const abort = new AbortController();
+    void request(
+      root(tenant) + `/departments/${selected.id}/exceptions`,
+      'GET',
+      (v): v is NonNullable<typeof exceptions> => Array.isArray(v),
+      undefined,
+      abort.signal,
+    )
+      .then(setExceptions)
+      .catch((e) => {
+        if (!abort.signal.aborted) setExceptionError(errorText(e));
+      });
+    return () => abort.abort();
+  }, [tenant, selected?.id]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -557,8 +696,30 @@ function DepartmentEditor({ tenant }: { tenant: string }) {
                 </label>
               ))}
               <p>保存立即更新部门授权；移除成员时，岗位关联的个人授权会一并撤销并记录。</p>
+              {exceptionError && <p role="alert">{exceptionError}</p>}
+              {error && <p role="alert">{error}</p>}
+              {exceptions && (
+                <section>
+                  <h4>调离成员的个人授权例外</h4>
+                  <ul>
+                    {exceptions
+                      .filter((g) => !selected.members.includes(g.accountId))
+                      .map((g) => (
+                        <li key={g.accountId + g.kind + g.id}>
+                          {data.people.find((p) => p.id === g.accountId)?.name || '成员'} · {g.name}：
+                          {g.roleDepartmentId === selected.id
+                            ? '随此次调离撤销'
+                            : '个人独立或其他部门关联，继续保留'}
+                        </li>
+                      ))}
+                  </ul>
+                  <p className="muted">
+                    如需保留本部门关联授权，请先在相应资料的权限设置中解除调岗关联，再重新打开本部门。
+                  </p>
+                </section>
+              )}
               <Button
-                disabled={busy || !selected.name.trim()}
+                disabled={busy || !selected.name.trim() || !exceptions || !!exceptionError}
                 onClick={() => {
                   setBusy(true);
                   setError('');

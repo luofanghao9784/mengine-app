@@ -61,13 +61,13 @@ public class ExperienceService {
  NOT EXISTS (SELECT 1 FROM experience_evidence r WHERE r.version_id=v.id AND NOT (
  EXISTS(SELECT 1 FROM workspaces w LEFT JOIN workspace_members g ON g.workspace_id=w.id AND g.tenant_id=w.tenant_id AND g.account_id=headquarters_permission_actor(p.actor,w.tenant_id)
  WHERE w.id=r.source_workspace_id AND w.tenant_id=e.tenant_id AND ((w.kind='PERSONAL' AND w.owner_id=headquarters_permission_actor(p.actor,w.tenant_id)) OR (w.kind='SHARED' AND g.account_id IS NOT NULL))
- AND ((r.kind='MATERIAL_VERSION' AND EXISTS(SELECT 1 FROM material_versions mv JOIN active_materials am ON am.id=mv.material_id WHERE mv.id=r.material_version_id AND mv.tenant_id=e.tenant_id AND mv.workspace_id=w.id))
+ AND ((r.kind='MATERIAL_VERSION' AND EXISTS(SELECT 1 FROM material_versions mv JOIN active_materials am ON am.id=mv.material_id WHERE mv.id=r.material_version_id AND mv.tenant_id=e.tenant_id AND mv.workspace_id=w.id AND (library_mask(p.actor,e.tenant_id,'MATERIAL',am.id)&1)=1))
  OR (r.kind='TASK' AND EXISTS(SELECT 1 FROM conversation_tasks t JOIN conversations c ON c.id=t.conversation_id WHERE t.id=r.task_id AND t.tenant_id=e.tenant_id AND t.workspace_id=w.id AND c.owner_id=headquarters_permission_actor(p.actor,e.tenant_id) AND EXISTS(SELECT 1 FROM readable_source_tasks rt WHERE rt.id=t.id)))))))
  """;
- static final String VISIBLE="(object_is_active('EXPERIENCE_VERSION',v.id) AND NOT v.scrubbed AND (v.access_mode='INDEPENDENT_COPY' OR "+EVIDENCE_VISIBLE+"))";
+ static final String VISIBLE="(object_is_active('EXPERIENCE_VERSION',v.id) AND NOT v.scrubbed AND ((v.access_mode='INDEPENDENT_COPY' AND NOT library_permissions_enabled(e.tenant_id)) OR "+EVIDENCE_VISIBLE+"))";
  private boolean evidenceAllowed(UUID actor,UUID tenant,Evidence ref){
   try{access.require(actor,tenant,ref.workspaceId(),false);
-   if(ref.kind().equals("MATERIAL_VERSION")){access.requireVersionActive(tenant,ref.workspaceId(),ref.referenceId());return true;}
+   if(ref.kind().equals("MATERIAL_VERSION")){access.requireVersion(actor,tenant,ref.referenceId(),false);return true;}
    return Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM conversation_tasks t JOIN conversations c ON c.id=t.conversation_id WHERE t.id=? AND t.tenant_id=? AND t.workspace_id=? AND c.owner_id=? AND EXISTS(SELECT 1 FROM readable_source_tasks rt WHERE rt.id=t.id))",Boolean.class,ref.referenceId(),tenant,ref.workspaceId(),actor));
   }catch(IdentityException ex){if(ex.status==403||ex.status==404)return false;throw ex;}
  }
@@ -80,8 +80,7 @@ public class ExperienceService {
    String status=db.queryForObject("SELECT status FROM conversation_tasks WHERE id=?",String.class,r.referenceId());
    if(!Set.of("SUCCEEDED","FAILED","CANCELLED","INTERRUPTED").contains(status))throw new IdentityException(409,"EXPERIENCE_TASK_UNFINISHED");
    // Freeze only identifiers of source dependencies, never prompts, replies or raw content.
-   var ids=new TreeSet<UUID>(db.queryForList("SELECT version_id FROM conversation_originals WHERE task_id=? UNION SELECT k.version_id FROM conversation_sources s JOIN knowledge_chunks k ON k.id=s.chunk_id WHERE s.task_id=? UNION SELECT k.version_id FROM conversation_agent_grants g JOIN knowledge_chunks k ON k.id=g.chunk_id WHERE g.task_id=?",UUID.class,r.referenceId(),r.referenceId(),r.referenceId()));
-   for(String table:List.of("feedback_task_sources","task_context_materials"))if(Boolean.TRUE.equals(db.queryForObject("SELECT to_regclass(?) IS NOT NULL",Boolean.class,table)))ids.addAll(db.queryForList("SELECT version_id FROM "+table+" WHERE task_id=?",UUID.class,r.referenceId()));
+   var ids=db.queryForList("SELECT version_id FROM library_task_versions(?)",UUID.class,r.referenceId());
    for(UUID v:ids){var spaces=db.queryForList("SELECT workspace_id FROM material_versions WHERE tenant_id=? AND id=?",UUID.class,tenant,v);if(spaces.isEmpty())throw new IdentityException(404,"EXPERIENCE_EVIDENCE_UNAVAILABLE");all.add(new Evidence("MATERIAL_VERSION",v,spaces.getFirst()));}
   }
   if(all.size()>100 || c.accessMode().equals("SOURCE_BOUND")&&all.isEmpty())throw IdentityException.invalid();

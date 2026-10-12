@@ -172,7 +172,7 @@ public class AgentTaskService {
     @Transactional public BriefingContentService.Document briefing(UUID actor,UUID tenant,UUID conversation,UUID task,int revision,int attempt){
         var detail=conversations.taskDetail(actor,tenant,conversation,task);var value=detail.tasks().getFirst();
         if(value.revision()!=revision||value.attempt()!=attempt||!"SUCCEEDED".equals(value.status())||value.sourcesUnavailable())throw new IdentityException(409,"BRIEFING_VERSION_UNAVAILABLE");
-        var doc=briefings.find(task,attempt);if(doc==null)throw new IdentityException(404,"BRIEFING_NOT_FOUND");download(actor,tenant,conversation,task,doc.artifactId());return doc;
+        var doc=briefings.find(task,attempt);if(doc==null)throw new IdentityException(404,"BRIEFING_NOT_FOUND");artifact(actor,tenant,conversation,task,doc.artifactId(),false);return doc;
     }
     public record Discussion(UUID conversationId,String title,ConversationService.BriefingReference briefingContext) {}
     /** Opening a card discussion is read-only; a user send establishes the thread atomically. */
@@ -296,8 +296,10 @@ public class AgentTaskService {
             if("PAGE".equals(source.kind()) && result.tools().stream().noneMatch(t->"read_public_page".equals(t.name())))incompatible();
         }
     }
-    @Transactional public Download download(UUID actor,UUID tenant,UUID conversation,UUID task,UUID artifact){
+    @Transactional public Download download(UUID actor,UUID tenant,UUID conversation,UUID task,UUID artifact){return artifact(actor,tenant,conversation,task,artifact,true);}
+    private Download artifact(UUID actor,UUID tenant,UUID conversation,UUID task,UUID artifact,boolean download){
         var context=conversations.require(actor,tenant,conversation,false);conversations.requireReadable(task);
+        if(download&&!Boolean.TRUE.equals(db.queryForObject("SELECT library_task_sources_allowed(?,?,?,true)",Boolean.class,actor,tenant,task)))throw new IdentityException(403,"LIBRARY_DOWNLOAD_DENIED");
         var rows=db.query("SELECT a.filename,a.sha256,a.content FROM conversation_artifacts a JOIN conversation_tasks t ON t.id=a.task_id WHERE a.tenant_id=? AND a.workspace_id=? AND a.task_id=? AND a.id=? AND object_is_active('ARTIFACT',a.id) AND t.conversation_id=? AND EXISTS(SELECT 1 FROM conversation_attempts h WHERE h.task_id=t.id AND h.attempt_number=a.attempt_number AND h.status IN ('SUCCEEDED','PARTIAL','WAITING_INPUT','WAITING_CAPABILITY'))",(rs,n)->new Download(rs.getString(1),rs.getString(2),rs.getBytes(3)),tenant,context.workspaceId(),task,artifact,conversation);
         if(rows.isEmpty())throw new IdentityException(404,"ARTIFACT_NOT_FOUND");
         for(UUID id:db.queryForList("SELECT chunk_id FROM conversation_sources WHERE task_id=?",UUID.class,task))knowledge.citation(actor,tenant,id);
