@@ -40,17 +40,17 @@ public class ActivityService {
             throw new IdentityException(404,"MATERIAL_LOCATION_UNAVAILABLE");
         var args=new ArrayList<Object>(List.of(actor,tenant));
         String sql="""
-            SELECT v.id,v.workspace_id,w.name AS workspace_name,m.folder_id,v.material_id,v.number,
+            SELECT v.id,v.workspace_id,CASE WHEN (library_mask(viewer.actor,w.tenant_id,'WORKSPACE',w.id)&1)=1 THEN w.name ELSE '共享资料' END AS workspace_name,m.folder_id,v.material_id,v.number,
                    v.filename,a.display_name,v.created_at,
                    CASE WHEN p.id IS NOT NULL THEN CASE WHEN v.number=1 THEN 'DOCUMENT_PUBLISHED' ELSE 'DOCUMENT_UPDATED' END
                         ELSE CASE WHEN v.number=1 THEN 'MATERIAL_UPLOADED' ELSE 'MATERIAL_UPDATED' END END AS kind
             FROM material_versions v
             JOIN workspaces w ON w.tenant_id=v.tenant_id AND w.id=v.workspace_id AND w.kind='SHARED'
-            JOIN workspace_members g ON g.tenant_id=w.tenant_id AND g.workspace_id=w.id AND g.account_id=?
+            CROSS JOIN (SELECT ?::uuid AS actor) viewer
             JOIN active_materials m ON m.tenant_id=v.tenant_id AND m.workspace_id=v.workspace_id AND m.id=v.material_id
             JOIN accounts a ON a.id=v.created_by
             LEFT JOIN document_publications p ON p.tenant_id=v.tenant_id AND p.material_version_id=v.id
-            WHERE v.tenant_id=? AND departure_content_readable(g.account_id,w.tenant_id,w.id)
+            WHERE v.tenant_id=? AND (library_mask(viewer.actor,w.tenant_id,'MATERIAL',m.id)&1)=1
             """;
         if(workspace!=null) { sql+=" AND v.workspace_id=?"; args.add(workspace); }
         if(before!=null) { sql+=" AND (v.created_at,v.id)<(?,?)"; args.add(Timestamp.from(before)); args.add(beforeId); }

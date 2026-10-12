@@ -11,8 +11,14 @@ public class IdentityAudit {
     private final JdbcTemplate db;
     public IdentityAudit(JdbcTemplate db) { this.db = db; }
     public void record(UUID actor, UUID tenant, String action, UUID target, String outcome) {
-        db.update("INSERT INTO identity_audit(actor_id,tenant_id,action,target_id,outcome) VALUES (?,?,?,?,?)",
-                actor, tenant, action, target, outcome);
+        db.update("INSERT INTO identity_audit(actor_id,tenant_id,action,target_id,outcome,request_id) VALUES (?,?,?,?,?,?)",
+                actor, tenant, action, target, outcome, currentRequestId());
+    }
+    public static UUID currentRequestId() {
+        var attributes=org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
+        if(attributes==null)return null;
+        Object id=attributes.getAttribute(com.dreamcore.workspace.material.LibraryRequestAudit.REQUEST_ID,org.springframework.web.context.request.RequestAttributes.SCOPE_REQUEST);
+        return id instanceof UUID value?value:null;
     }
     // Failed requests roll back their business transaction, but their audit must survive.
     @Transactional(propagation = Propagation.REQUIRES_NEW)

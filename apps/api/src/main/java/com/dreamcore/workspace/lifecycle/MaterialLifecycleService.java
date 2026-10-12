@@ -26,7 +26,7 @@ public class MaterialLifecycleService {
     private IdentityException missing(){return new IdentityException(404,"LIFECYCLE_NOT_FOUND");}
     private String table(String kind){return switch(kind){case "MATERIAL"->"materials";case "FOLDER"->"material_folders";default->throw IdentityException.invalid();};}
     private Instant time(Map<String,Object> r,String key){return r.get(key)==null?null:((java.sql.Timestamp)r.get(key)).toInstant();}
-    private boolean canPurge(UUID actor,UUID tenant,UUID space){var permission=access.require(actor,tenant,space,true);return permission.kind().equals("PERSONAL") || governance.allows(actor,tenant,GovernanceAccess.Capability.LIFECYCLE_PURGE,space);}
+    private boolean canPurge(UUID actor,UUID tenant,UUID space){return "PERSONAL".equals(db.queryForObject("SELECT kind FROM workspaces WHERE tenant_id=? AND id=?",String.class,tenant,space)) || governance.allows(actor,tenant,GovernanceAccess.Capability.LIFECYCLE_PURGE,space);}
     private Map<String,Object> object(UUID tenant,UUID space,String kind,UUID id){var rows=db.queryForList("SELECT * FROM "+table(kind)+" WHERE tenant_id=? AND workspace_id=? AND id=?",tenant,space,id);if(rows.isEmpty())throw missing();return rows.getFirst();}
     private Item item(UUID actor,UUID tenant,UUID space,String kind,UUID id){
         var original=object(tenant,space,kind,id);var states=db.queryForList("SELECT * FROM content_lifecycle WHERE object_kind=? AND object_id=?",kind,id);
@@ -44,7 +44,7 @@ public class MaterialLifecycleService {
     private List<UUID> folders(UUID tenant,UUID space,UUID id){return db.queryForList("WITH RECURSIVE tree AS (SELECT id FROM material_folders WHERE tenant_id=? AND workspace_id=? AND id=? UNION ALL SELECT f.id FROM material_folders f JOIN tree t ON f.parent_id=t.id) SELECT id FROM tree",UUID.class,tenant,space,id);}
     private List<UUID> materials(UUID tenant,UUID space,String kind,UUID id){if(kind.equals("MATERIAL"))return List.of(id);return db.queryForList("WITH RECURSIVE tree AS (SELECT id FROM material_folders WHERE tenant_id=? AND workspace_id=? AND id=? UNION ALL SELECT f.id FROM material_folders f JOIN tree t ON f.parent_id=t.id) SELECT m.id FROM materials m JOIN tree t ON m.folder_id=t.id",UUID.class,tenant,space,id);}
     @Transactional public Preview preview(UUID actor,UUID tenant,UUID space,String kind,UUID id){
-        access.require(actor,tenant,space,true);var item=item(actor,tenant,space,kind,id);var docs=materials(tenant,space,kind,id);long count=0;for(UUID material:docs)count+=db.queryForObject("SELECT count(*) FROM material_versions WHERE material_id=?",Long.class,material);
+        access.requireManageFiles(actor,tenant,space,kind,id);var item=item(actor,tenant,space,kind,id);var docs=materials(tenant,space,kind,id);long count=0;for(UUID material:docs)count+=db.queryForObject("SELECT count(*) FROM material_versions WHERE material_id=?",Long.class,material);
         return new Preview(item,docs.size(),count,kind.equals("FOLDER")?folders(tenant,space,id).size():0,"CURRENT_PERMISSIONS_NO_TASK_RESTART");
     }
     // Only names and original directory metadata are exposed; deleted bodies stay unreadable.
@@ -65,14 +65,14 @@ public class MaterialLifecycleService {
     }
     @Transactional public Page list(UUID actor,UUID tenant,UUID space,int offset,int limit,String view,String query){
         if(offset<0 || offset>100000 || limit<1 || limit>50 || view==null || !Set.of("ALL","TRASH","RECORDS").contains(view) || query==null || query.length()>180)throw IdentityException.invalid();
-        access.require(actor,tenant,space,true);
+        access.require(actor,tenant,space,!Boolean.TRUE.equals(db.queryForObject("SELECT library_permissions_enabled(?)",Boolean.class,tenant)));
         String filter=switch(view){case "TRASH"->"l.state='TRASHED' AND l.purge_after>now()";case "RECORDS"->"(l.state IN ('PURGING','PURGED') OR (l.state='TRASHED' AND l.purge_after<=now()))";default->"l.state<>'ACTIVE'";};
         var rows=db.queryForList("""
             SELECT l.object_kind,l.object_id FROM content_lifecycle l
             LEFT JOIN materials m ON l.object_kind='MATERIAL' AND m.id=l.object_id AND m.tenant_id=l.tenant_id AND m.workspace_id=l.workspace_id
             LEFT JOIN material_folders f ON l.object_kind='FOLDER' AND f.id=l.object_id AND f.tenant_id=l.tenant_id AND f.workspace_id=l.workspace_id
             WHERE l.tenant_id=? AND l.workspace_id=? AND
-            """+filter+" AND strpos(lower(coalesce(m.name,f.name,'')),lower(?))>0 ORDER BY l.changed_at DESC,l.object_kind,l.object_id LIMIT ? OFFSET ?",tenant,space,query.trim(),limit+1,offset);
+            """+filter+" AND (library_mask(?::uuid,l.tenant_id,l.object_kind,l.object_id)&1)=1 AND ((library_mask(?::uuid,l.tenant_id,l.object_kind,l.object_id)&8)=8 OR library_can_manage(?::uuid,l.tenant_id,l.workspace_id)) AND strpos(lower(coalesce(m.name,f.name,'')),lower(?))>0 ORDER BY l.changed_at DESC,l.object_kind,l.object_id LIMIT ? OFFSET ?",tenant,space,actor,actor,actor,query.trim(),limit+1,offset);
         return new Page(rows.stream().limit(limit).map(r->item(actor,tenant,space,(String)r.get("object_kind"),(UUID)r.get("object_id"))).toList(),rows.size()>limit);
     }
     @Transactional public Receipt act(UUID actor,UUID tenant,UUID space,String kind,UUID id,UUID key,int revision,String action){
@@ -80,7 +80,11 @@ public class MaterialLifecycleService {
         String fingerprint=IdentityService.hash(json.writeValueAsString(new Object[]{tenant,space,kind,id,revision,action}));
         UUID prior=identities.priorRequest(actor,key,"MATERIAL_LIFECYCLE",fingerprint);
         // Upgrade before taking any SHARE lock: this serializes with uploads, reads and late parser/task writes.
-        access.check(actor,tenant,space,true,false);db.queryForList("SELECT id FROM tenants WHERE id=? FOR UPDATE",tenant);access.require(actor,tenant,space,true);
+        identities.member(actor,tenant,false,false);db.queryForList("SELECT id FROM tenants WHERE id=? FOR UPDATE",tenant);access.requireManageFiles(actor,tenant,space,kind,id);
+        if(kind.equals("FOLDER")){
+            for(UUID f:folders(tenant,space,id))access.requireManageFiles(actor,tenant,space,"FOLDER",f);
+            for(UUID m:materials(tenant,space,kind,id))access.requireManageFiles(actor,tenant,space,"MATERIAL",m);
+        }
         var before=item(actor,tenant,space,kind,id);if((action.equals("PURGE") || action.equals("RETRY_CLEANUP")) && !before.canPurge())throw new IdentityException(403,"CAPABILITY_REQUIRED");
         if(prior!=null)return json.readValue(db.queryForObject("SELECT receipt::text FROM content_lifecycle_receipts WHERE actor_id=? AND request_id=?",String.class,actor,key),Receipt.class);
         if(before.revision()!=revision)throw new IdentityException(409,"LIFECYCLE_REVISION_CONFLICT");

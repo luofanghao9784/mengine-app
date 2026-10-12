@@ -42,8 +42,8 @@ public class KnowledgeService {
     private final RowMapper<Chunk> mapper=(r,n)->new Chunk(r.getObject("id",UUID.class),r.getObject("tenant_id",UUID.class),r.getObject("workspace_id",UUID.class),r.getObject("material_id",UUID.class),r.getObject("version_id",UUID.class),r.getObject("run_id",UUID.class),r.getInt("number"),r.getString("filename"),r.getString("locator"),r.getString("method"),r.getString("content"));
     @Transactional
     public Analysis analysis(UUID actor,UUID tenant,UUID space,UUID material,UUID version,int offset,int limit) {
-        page(offset,limit);var permission=access.require(actor,tenant,space,false);version(tenant,space,material,version,false);
-        var rows=latest(version); var chunks=List.<Chunk>of();
+        page(offset,limit);var permission=access.requireObject(actor,tenant,space,"MATERIAL",material,false);version(tenant,space,material,version,false);
+        audit.record(actor,tenant,"MATERIAL_PREVIEW",version,"SUCCESS");var rows=latest(version); var chunks=List.<Chunk>of();
         if(rows.isEmpty()) return new Analysis(tenant,space,material,version,0,"NOT_STARTED",null,List.of(),permission.canMaintain(),enabled,chunks,false);
         var row=rows.getFirst();String status=(String)row.get("status"),warnings=(String)row.get("warnings");
         if(Set.of("READY","PARTIAL").contains(status)) chunks=db.query(SELECT+" WHERE c.tenant_id=? AND c.workspace_id=? AND c.run_id=? ORDER BY c.ordinal LIMIT ? OFFSET ?",mapper,tenant,space,row.get("id"),limit+1,offset);
@@ -52,7 +52,7 @@ public class KnowledgeService {
     /** Called in the upload transaction, after the immutable version is inserted. */
     @Transactional
     public void onUpload(UUID actor,UUID tenant,UUID space,UUID material,UUID version) {
-        if(enabled) { access.require(actor,tenant,space,true);enqueue(actor,tenant,space,material,version,1); }
+        if(enabled) { access.requireObject(actor,tenant,space,"MATERIAL",material,true);enqueue(actor,tenant,space,material,version,1); }
     }
     private UUID enqueue(UUID actor,UUID tenant,UUID space,UUID material,UUID version,int generation) {
         UUID id=UUID.randomUUID();
@@ -63,7 +63,7 @@ public class KnowledgeService {
     public Analysis request(UUID actor,UUID tenant,UUID space,UUID material,UUID version,UUID key,int expectedGeneration) {
         String fingerprint=IdentityService.hash(tenant+"\n"+space+"\n"+material+"\n"+version+"\n"+expectedGeneration);
         UUID prior=identities.priorRequest(actor,key,"KNOWLEDGE_PARSE",fingerprint);
-        access.require(actor,tenant,space,true);version(tenant,space,material,version,true);
+        access.requireObject(actor,tenant,space,"MATERIAL",material,true);version(tenant,space,material,version,true);
         if(prior!=null) return analysis(actor,tenant,space,material,version,0,20);
         if(!enabled) throw new IdentityException(503,"KNOWLEDGE_UNAVAILABLE");
         var rows=latest(version);int generation=rows.isEmpty()?0:(Integer)rows.getFirst().get("generation");
@@ -105,7 +105,7 @@ public class KnowledgeService {
               ORDER BY k.generation DESC LIMIT 1
             ) r ON true
             LEFT JOIN workspace_members g ON g.tenant_id=w.tenant_id AND g.workspace_id=w.id AND g.account_id=?
-            WHERE m.tenant_id=? AND ((w.kind='PERSONAL' AND w.owner_id=?) OR (w.kind='SHARED' AND g.account_id IS NOT NULL)) AND departure_content_readable(coalesce(g.account_id,w.owner_id),w.tenant_id,w.id)
+            WHERE m.tenant_id=? AND (library_mask(?,w.tenant_id,'MATERIAL',m.id)&1)=1
             """;
         if(selectedVersions==null)scope+=" AND ((pin.version_id IS NULL AND requested.version_id IS NULL AND m.current_version=v.number) OR coalesce(pin.version_id,requested.version_id)=v.id)";
         else {scope+=" AND v.id IN ("+String.join(",",Collections.nCopies(selectedVersions.size(),"?"))+")";args.addAll(selectedVersions);}
@@ -152,7 +152,7 @@ public class KnowledgeService {
     public Chunk citation(UUID actor,UUID tenant,UUID id) {
         identities.member(actor,tenant,false);
         var rows=db.query(SELECT+" WHERE c.tenant_id=? AND c.id=?",mapper,tenant,id);if(rows.isEmpty()) throw missing();
-        var chunk=rows.getFirst();access.require(actor,tenant,chunk.workspaceId(),false);access.requireVersionActive(tenant,chunk.workspaceId(),chunk.versionId());return chunk;
+        var chunk=rows.getFirst();access.requireObject(actor,tenant,chunk.workspaceId(),"MATERIAL",chunk.materialId(),false);access.requireVersionActive(tenant,chunk.workspaceId(),chunk.versionId());audit.record(actor,tenant,"MATERIAL_CITATION_READ",chunk.versionId(),"SUCCESS");return chunk;
     }
     @Transactional
     public Job claim() {
@@ -166,14 +166,14 @@ public class KnowledgeService {
     @Transactional
     public Input input(Job job) {
         new com.dreamcore.workspace.support.SupportAccess(db).bindObject(job.actor(),job.tenant(),"knowledge_runs",job.id());
-        access.require(job.actor(),job.tenant(),job.workspace(),true);if(!owned(job)) return null;
+        if(!owned(job)) return null;access.requireObject(job.actor(),job.tenant(),job.workspace(),"MATERIAL",job.material(),true);
         var v=version(job.tenant(),job.workspace(),job.material(),job.version(),false);
         return new Input((String)v.get("filename"),store.read((UUID)v.get("object_id"),(Long)v.get("size_bytes"),(String)v.get("sha256")));
     }
     @Transactional
     public void finish(Job job,DocumentParser.Result result) {
         new com.dreamcore.workspace.support.SupportAccess(db).bindObject(job.actor(),job.tenant(),"knowledge_runs",job.id());
-        access.require(job.actor(),job.tenant(),job.workspace(),true);if(!owned(job)) return;
+        if(!owned(job)) return;access.requireObject(job.actor(),job.tenant(),job.workspace(),"MATERIAL",job.material(),true);
         access.requireVersionActive(job.tenant(),job.workspace(),job.version());
         int ordinal=0;
         for(var c:result.chunks()) db.update("INSERT INTO knowledge_chunks(id,tenant_id,workspace_id,material_id,version_id,run_id,ordinal,locator,method,content) VALUES (?,?,?,?,?,?,?,?,?,?)",UUID.randomUUID(),job.tenant(),job.workspace(),job.material(),job.version(),job.id(),ordinal++,c.locator(),c.method(),c.content());

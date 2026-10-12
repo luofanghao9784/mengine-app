@@ -82,7 +82,10 @@ class GeneralExperienceTaskContextIntegrationTest {
   seed();var r=publish(method());var t=working();db.update("UPDATE conversation_tasks SET source_scope='SELECTED' WHERE id=?",t.id());assertEquals("SELECTED_ONLY",search(t).get("reason").asString());assertTrue(read(t,r,0).get("unavailable").asBoolean());assertTrue(use(t,r,UUID.randomUUID(),"DIRECT").get("unavailable").asBoolean());assertEquals(0,db.queryForObject("SELECT count(*) FROM task_general_experience_reads WHERE task_id=?",Integer.class,t.id()));
   var next=working();denied(404,()->call(next,new TaskContextService.Request("general_experience_read",null,null,null,r.entryId(),UUID.randomUUID(),null,null,null,null,null)));denied(403,()->context.context(next.id(),UUID.randomUUID(),request("general_experience_read",r,0,null,null,null,null)));
  }
- @Test void stoppingAndRestoringFencesInflightAttemptWithoutErasingPastResults(){
+ @org.junit.jupiter.params.ParameterizedTest
+ @org.junit.jupiter.params.provider.ValueSource(booleans={false,true})
+ void stoppingAndRestoringFencesInflightAttemptWithoutErasingPastResults(boolean libraryEnabled){
+  if(libraryEnabled)db.update("INSERT INTO library_permission_rollouts VALUES (?,true)",tenant);
   seed();var r=publish(method());var done=working();read(done,r,0);finish(done,"保留过去基于通用方法的合成结果");var active=working();read(active,r,0);
   db.update("UPDATE general_experience_entries SET status='STOPPED' WHERE id=?",r.entryId());assertFalse(agents.active(active));assertEquals("保留过去基于通用方法的合成结果",db.queryForObject("SELECT reply FROM conversation_tasks WHERE id=?",String.class,done.id()));assertTrue(db.queryForObject("SELECT EXISTS(SELECT 1 FROM readable_source_tasks WHERE id=?)",Boolean.class,done.id()));
   db.update("UPDATE general_experience_entries SET status='AVAILABLE' WHERE id=?",r.entryId());assertFalse(agents.active(active));assertThrows(IdentityException.class,()->finish(active,"迟到回复"));var fresh=working();assertNotNull(read(fresh,r,0));

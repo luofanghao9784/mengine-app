@@ -1,3 +1,4 @@
+import { LibraryPermissions, LibraryEvents, useLibraryPermissionsEnabled } from './Permissions';
 import { adminHref } from '../admin/navigation';
 import { LibraryToolbar, LibrarySearch } from './LibraryToolbar';
 import { SharedActivity } from '../activity/Activity';
@@ -193,6 +194,8 @@ function LibraryListing({
     (v): v is 'cards' | 'list' => v === 'cards' || v === 'list',
   );
   const [modal, setModal] = useState<'folder' | 'upload'>();
+  const permissionsEnabled = useLibraryPermissionsEnabled(tenant);
+  const [permissionTarget, setPermissionTarget] = useState<{ kind: string; id: string; name: string }>();
   const [document, setDocument] = useViewState<Pick<MaterialEntry, 'id' | 'workspaceId'> | null>(
     tenant,
     listingKey + ':document',
@@ -259,9 +262,7 @@ function LibraryListing({
   });
   const personal = current?.kind === 'PERSONAL';
   const recycleHref = (view: 'TRASH' | 'RECORDS') =>
-    href(tenant, personal ? 'personal' : workspace!, folder || undefined) +
-    '&recycle=' +
-    view.toLowerCase();
+    href(tenant, personal ? 'personal' : workspace!, folder || undefined) + '&recycle=' + view.toLowerCase();
   const returnScroll = useRef<number | null>(null);
   useEffect(() => {
     if (recycle || !data.value || returnScroll.current === null) return;
@@ -475,11 +476,7 @@ function LibraryListing({
                   className="material-entry"
                   onClick={() =>
                     item.kind === 'FOLDER'
-                      ? (location.hash = href(
-                          tenant,
-                          personal ? 'personal' : item.workspaceId,
-                          item.id,
-                        ))
+                      ? (location.hash = href(tenant, personal ? 'personal' : item.workspaceId, item.id))
                       : item.kind === 'DRAFT'
                         ? setDraftDocument(item.id)
                         : setDocument({ id: item.id, workspaceId: item.workspaceId })
@@ -515,16 +512,30 @@ function LibraryListing({
                     </small>
                   </div>
                 </button>
-                {item.kind !== 'DRAFT' && item.canMaintain && (
-                  <MaterialEntryActions
-                    tenant={tenant}
-                    workspace={item.workspaceId}
-                    id={item.id}
-                    kind={item.kind === 'FOLDER' ? 'FOLDER' : 'MATERIAL'}
-                    name={item.name}
-                    changed={refresh}
-                  />
+                {permissionsEnabled && item.kind !== 'DRAFT' && (
+                  <Button
+                    onClick={() =>
+                      setPermissionTarget({
+                        kind: item.kind === 'FOLDER' ? 'FOLDER' : 'MATERIAL',
+                        id: item.id,
+                        name: item.name,
+                      })
+                    }
+                  >
+                    权限设置
+                  </Button>
                 )}
+                {item.kind !== 'DRAFT' &&
+                  (item.canManageFiles ?? (!permissionsEnabled && item.canMaintain)) && (
+                    <MaterialEntryActions
+                      tenant={tenant}
+                      workspace={item.workspaceId}
+                      id={item.id}
+                      kind={item.kind === 'FOLDER' ? 'FOLDER' : 'MATERIAL'}
+                      name={item.name}
+                      changed={refresh}
+                    />
+                  )}
               </div>
             ))}
           </div>
@@ -549,6 +560,27 @@ function LibraryListing({
           close={() => setContentSearch(false)}
           verification={context}
         />
+      )}
+      {permissionTarget && (
+        <LibraryPermissions
+          tenant={tenant}
+          {...permissionTarget}
+          close={() => setPermissionTarget(undefined)}
+          changed={refresh}
+        />
+      )}
+      {permissionsEnabled && workspace && !personal && (
+        <Button
+          onClick={() =>
+            setPermissionTarget({
+              kind: folder ? 'FOLDER' : 'WORKSPACE',
+              id: folder || workspace,
+              name: folder ? '当前文件夹' : '当前空间',
+            })
+          }
+        >
+          当前位置权限
+        </Button>
       )}
       {modal === 'folder' && workspace && (
         <FolderDialog
@@ -951,13 +983,22 @@ export function DocumentDialog({
                             <dt>当前最新版本</dt>
                             <dd>v{data.value.document.version}</dd>
                             <dt>权限</dt>
-                            <dd>{data.value.document.canMaintain ? '可阅读、下载与维护' : '可阅读与下载'}</dd>
+                            <dd>
+                              {(data.value.document.canMaintain ? '可编辑' : '仅查看') +
+                                (data.value?.document.canDownload === false ? ' · 不可下载' : ' · 可下载')}
+                            </dd>
                           </dl>
                           {data.value.document.canMaintain && (
                             <Button icon={Upload} onClick={() => setUpload(data.value!.document.version)}>
                               上传新版本
                             </Button>
                           )}
+                          <LibraryEvents
+                            tenant={tenant}
+                            kind="MATERIAL"
+                            id={entry.id}
+                            canAudit={data.value.document.canManagePermissions}
+                          />
                           <h3>历史版本</h3>
                           <ul className="material-versions">
                             {data.value.versions.map((v) => (
@@ -967,7 +1008,8 @@ export function DocumentDialog({
                                     v{v.number} · {v.filename}
                                   </strong>
                                   <small>
-                                    {size(v.sizeBytes)} · {new Date(v.createdAt).toLocaleString('zh-CN')}
+                                    {size(v.sizeBytes)} · {new Date(v.createdAt).toLocaleString('zh-CN')} ·{' '}
+                                    {v.createdByName || '历史提交人'}
                                   </small>
                                   <details className="material-checksum">
                                     <summary>文件校验信息</summary>
@@ -985,7 +1027,11 @@ export function DocumentDialog({
                                 >
                                   查看 v{v.number} 解析
                                 </Button>
-                                <Button icon={Download} disabled={busy} onClick={() => void download(v)}>
+                                <Button
+                                  icon={Download}
+                                  disabled={busy || data.value?.document.canDownload === false}
+                                  onClick={() => void download(v)}
+                                >
                                   下载 v{v.number}
                                 </Button>
                               </li>
@@ -1016,7 +1062,11 @@ export function DocumentDialog({
                         close={close}
                       />
                     )}
-                    <Button icon={Download} disabled={busy} onClick={() => void download(selectedVersion)}>
+                    <Button
+                      icon={Download}
+                      disabled={busy || data.value?.document.canDownload === false}
+                      onClick={() => void download(selectedVersion)}
+                    >
                       下载原件
                     </Button>
                   </div>

@@ -25,7 +25,10 @@ export const isEntry = (v: unknown): v is MaterialEntry =>
   Array.isArray(v.path) &&
   v.path.length > 0 &&
   v.path.every(text) &&
-  typeof v.canMaintain === 'boolean';
+  typeof v.canMaintain === 'boolean' &&
+  ['canDownload', 'canManageFiles', 'canManagePermissions'].every(
+    (key) => v[key] === undefined || typeof v[key] === 'boolean',
+  );
 export const isPage = (v: unknown): v is MaterialPage =>
   record(v) &&
   uuid(v.tenantId) &&

@@ -30,7 +30,7 @@ public class TaskOriginals {
             var spaces=db.queryForList("SELECT workspace_id FROM material_versions WHERE tenant_id=? AND material_id=? AND id=?",UUID.class,tenant,selection.materialId(),selection.versionId());
             if(spaces.isEmpty())throw new IdentityException(404,"TASK_ORIGINAL_UNAVAILABLE");UUID sourceSpace=spaces.getFirst();
             if(!sourceSpace.equals(space) && "WORKSPACE".equals(db.queryForObject("SELECT source_scope FROM conversation_tasks WHERE id=?",String.class,task)))throw new IdentityException(404,"TASK_ORIGINAL_UNAVAILABLE");
-            access.require(actor,tenant,sourceSpace,false);var file=metadata(tenant,sourceSpace,selection);total+=file.bytes();
+            access.requireObject(actor,tenant,sourceSpace,"MATERIAL",selection.materialId(),false);var file=metadata(tenant,sourceSpace,selection);total+=file.bytes();
             boolean raw="verification".equals(db.queryForObject("SELECT execution_class FROM conversation_tasks WHERE id=?",String.class,task));
             if(file.bytes()>(raw?262144:20971520) || total>(raw?524288:62914560))throw new IdentityException(413,"TASK_ORIGINAL_TOO_LARGE");
             db.update("INSERT INTO conversation_originals(tenant_id,workspace_id,task_id,material_id,version_id) VALUES (?,?,?,?,?) ON CONFLICT (task_id,version_id) DO NOTHING",tenant,sourceSpace,task,selection.materialId(),selection.versionId());
@@ -39,7 +39,7 @@ public class TaskOriginals {
     public List<File> list(UUID actor,UUID tenant,UUID space,UUID task){
         access.require(actor,tenant,space,false);
         var selections=db.query("SELECT material_id,version_id FROM conversation_originals WHERE tenant_id=? AND task_id=? ORDER BY version_id",(r,n)->new Selection(r.getObject(1,UUID.class),r.getObject(2,UUID.class)),tenant,task);
-        return selections.stream().map(s->{UUID sourceSpace=db.queryForObject("SELECT workspace_id FROM material_versions WHERE tenant_id=? AND id=?",UUID.class,tenant,s.versionId());access.require(actor,tenant,sourceSpace,false);var f=metadata(tenant,sourceSpace,s);boolean read=db.queryForObject("SELECT EXISTS(SELECT 1 FROM conversation_original_reads r JOIN conversation_tasks t ON t.id=r.task_id WHERE r.task_id=? AND r.version_id=? AND r.attempt_number=t.attempt AND t.status<>'QUEUED')",Boolean.class,task,s.versionId());return new File(f.materialId(),f.versionId(),f.filename(),f.version(),f.bytes(),f.sha256(),read,sourceSpace,f.attachmentConversationId());}).toList();
+        return selections.stream().map(s->{UUID sourceSpace=db.queryForObject("SELECT workspace_id FROM material_versions WHERE tenant_id=? AND id=?",UUID.class,tenant,s.versionId());access.requireObject(actor,tenant,sourceSpace,"MATERIAL",s.materialId(),false);var f=metadata(tenant,sourceSpace,s);boolean read=db.queryForObject("SELECT EXISTS(SELECT 1 FROM conversation_original_reads r JOIN conversation_tasks t ON t.id=r.task_id WHERE r.task_id=? AND r.version_id=? AND r.attempt_number=t.attempt AND t.status<>'QUEUED')",Boolean.class,task,s.versionId());return new File(f.materialId(),f.versionId(),f.filename(),f.version(),f.bytes(),f.sha256(),read,sourceSpace,f.attachmentConversationId());}).toList();
     }
     public List<UUID> readIds(UUID task,UUID attempt){return db.queryForList("SELECT version_id FROM conversation_original_reads WHERE task_id=? AND attempt_id=? ORDER BY version_id",UUID.class,task,attempt);}
     public Content read(ConversationService.Job job,UUID version){

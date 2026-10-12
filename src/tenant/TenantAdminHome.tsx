@@ -1,3 +1,4 @@
+import { LibraryDepartments } from '../material/Permissions';
 import { WorkspaceArchive, readWorkspaceArchive } from './WorkspaceArchive';
 import { adminHref } from '../admin/navigation';
 import { SpaceOwnerForm } from './SpaceOwnerForm';
@@ -226,7 +227,12 @@ export function TenantAdminHome({
             </nav>
           )}
           <section className="access-panel tenant-section" key={tab}>
-            {tab === 'members' && <Members tenant={tenant} attempt={attempt} refresh={refresh} />}
+            {tab === 'members' && (
+              <>
+                <Members tenant={tenant} attempt={attempt} refresh={refresh} />
+                <LibraryDepartments tenant={tenant} />
+              </>
+            )}
             {tab === 'invitations' && (
               <Invitations
                 tenant={tenant}

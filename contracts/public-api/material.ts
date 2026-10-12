@@ -12,6 +12,9 @@ export interface MaterialEntry {
   updatedAt: string;
   path: string[];
   canMaintain: boolean;
+  canDownload?: boolean;
+  canManageFiles?: boolean;
+  canManagePermissions?: boolean;
 }
 export interface MaterialPage {
   tenantId: string;
@@ -31,6 +34,7 @@ export interface MaterialVersion {
   sizeBytes: number;
   sha256: string;
   createdBy: string;
+  createdByName?: string;
   createdAt: string;
 }
 export interface MaterialDetail {

@@ -60,6 +60,21 @@ class ClientInputIntegrationTest {
   assertThrows(IdentityException.class,()->live.publish(j.id(),j.token(),new LiveAnswerService.Update(1,2,"合成资料中的文字后续","STREAMING")));
   assertThrows(IdentityException.class,()->agents.search(j.id(),j.token(),"marker"));assertThrows(IdentityException.class,()->agents.search(restricted.id(),restricted.token(),"marker"));
  }
+ @Test void fileOnlyGrantSupportsAiSourcesWithoutParentMembershipAndRevocationHidesHistory(){
+  var file=upload(shared,"marker cross department");
+  db.update("INSERT INTO library_permission_rollouts VALUES (?,true)",tenant);
+  db.update("DELETE FROM workspace_members WHERE workspace_id=? AND account_id=?",shared,actor);
+  db.update("INSERT INTO library_policies(tenant_id,object_kind,object_id,workspace_id) VALUES (?,'MATERIAL',?,?)",tenant,file.id(),shared);
+  db.update("INSERT INTO library_grants(tenant_id,object_kind,object_id,principal_kind,principal_id,content,download) VALUES (?,'MATERIAL',?,'ACCOUNT',?,'READ','DENY')",tenant,file.id(),actor);
+  var j=task(null,List.of(new TaskOriginals.Selection(file.id(),file.acceptedVersion().id())),"SELECTED");
+  assertEquals(1,agents.search(j.id(),j.token(),"marker").size());
+  assertEquals(1,db.queryForObject("SELECT count(*) FROM readable_source_tasks WHERE id=?",Integer.class,j.id()));
+  assertThrows(IdentityException.class,()->materials.download(actor,tenant,shared,file.id(),file.acceptedVersion().id()));
+  db.update("DELETE FROM library_grants WHERE tenant_id=? AND object_id=?",tenant,file.id());
+  assertEquals(0,db.queryForObject("SELECT count(*) FROM readable_source_tasks WHERE id=?",Integer.class,j.id()));
+  assertThrows(IdentityException.class,()->agents.search(j.id(),j.token(),"marker"));
+ }
+
  @Test void promptRestrictionAndUnknownSelectionsCannotEscape(){
   var one=upload(personal,"marker selected");upload(shared,"marker outside");
   var d=conversations.submitClient(actor,tenant,null,personal,UUID.randomUUID(),"只用所选资料查找 marker","AGENT",null,List.of(new TaskOriginals.Selection(one.id(),one.acceptedVersion().id())),"AUTHORIZED_LIBRARY");var j=conversations.claim();assertEquals(d.tasks().getLast().id(),j.id());assertEquals(1,agents.search(j.id(),j.token(),"marker").size());

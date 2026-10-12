@@ -1,3 +1,5 @@
+import { LibraryMove } from '../material/Move';
+import { useLibraryPermissionsEnabled } from '../material/Permissions';
 import { useContext, useRef, useState } from 'react';
 import { MoreHorizontal, Trash2 } from 'lucide-react';
 import type {
@@ -30,6 +32,8 @@ export function MaterialEntryActions({
   const anchor = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [confirm, setConfirm] = useState(false);
+  const [move, setMove] = useState(false);
+  const permissionEnabled = useLibraryPermissionsEnabled(tenant);
   const pending = useContext(RequestPending);
   return (
     <>
@@ -43,6 +47,16 @@ export function MaterialEntryActions({
         />
         {open && (
           <ActionPopover anchor={anchor} label={`资料操作 ${name}`} onClose={() => setOpen(false)}>
+            {permissionEnabled && (
+              <Button
+                onClick={() => {
+                  setOpen(false);
+                  setMove(true);
+                }}
+              >
+                移动
+              </Button>
+            )}
             <Button
               icon={Trash2}
               onClick={() => {
@@ -55,6 +69,17 @@ export function MaterialEntryActions({
           </ActionPopover>
         )}
       </div>
+      {move && (
+        <LibraryMove
+          tenant={tenant}
+          workspace={workspace}
+          id={id}
+          kind={kind}
+          name={name}
+          close={() => setMove(false)}
+          changed={changed}
+        />
+      )}
       {confirm && (
         <MaterialActionDialog
           tenant={tenant}
