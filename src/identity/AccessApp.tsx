@@ -1,3 +1,4 @@
+import { SkillCenter, skillsHref } from '../skills/SkillCenter';
 import { SuspendedEnterprise } from './SuspendedEnterprise';
 import { TenantConsole } from '../admin/TenantConsole';
 import { UploadProvider } from '../material/UploadManager';
@@ -19,7 +20,7 @@ import { Documents } from '../documents/Documents';
 import { documentsHref } from '../documents/routes';
 import { Conversations, conversationHref } from '../conversation/Conversations';
 import { LiveBriefing, briefingHref } from '../briefing-live/Briefing';
-import { MessageSquare, LayoutPanelTop, ExternalLink } from 'lucide-react';
+import { MessageSquare, LayoutPanelTop, ExternalLink, Grid2X2 } from 'lucide-react';
 import { ManagementHome } from '../governance/ManagementHome';
 import { Profiles } from '../profile/Profiles';
 import { governanceClient } from '../governance/client';
@@ -244,6 +245,7 @@ function GuardedAccessShell({
     experiences = view === 'experiences',
     profiles = view === 'profiles',
     conversations = view === 'conversations',
+    skills = view === 'skills',
     documents = view === 'documents',
     briefing = view === 'briefing' || (surface === 'workspace' && !view),
     fromBriefing = params.get('from') === 'briefing',
@@ -288,23 +290,25 @@ function GuardedAccessShell({
     return entryHref(target, tenant || undefined);
   };
   const choose = (id: string) => {
-    location.hash = departure
-      ? `tenant=${encodeURIComponent(id)}&view=departure`
-      : plans
-        ? `tenant=${encodeURIComponent(id)}&view=plans`
-        : experiences
-          ? `tenant=${encodeURIComponent(id)}&view=experiences`
-          : profiles
-            ? `tenant=${encodeURIComponent(id)}&view=profiles`
-            : documents
-              ? documentsHref(id)
-              : briefing
-                ? briefingHref(id)
-                : library
-                  ? libraryHref(id, libraryScope && libraryScope !== 'personal' ? 'enterprise' : 'personal')
-                  : conversations
-                    ? conversationHref(id)
-                    : `tenant=${encodeURIComponent(id)}${new URLSearchParams(location.hash.slice(1)).get('view') === 'spaces' ? '&view=spaces' : ''}`;
+    location.hash = skills
+      ? skillsHref(id)
+      : departure
+        ? `tenant=${encodeURIComponent(id)}&view=departure`
+        : plans
+          ? `tenant=${encodeURIComponent(id)}&view=plans`
+          : experiences
+            ? `tenant=${encodeURIComponent(id)}&view=experiences`
+            : profiles
+              ? `tenant=${encodeURIComponent(id)}&view=profiles`
+              : documents
+                ? documentsHref(id)
+                : briefing
+                  ? briefingHref(id)
+                  : library
+                    ? libraryHref(id, libraryScope && libraryScope !== 'personal' ? 'enterprise' : 'personal')
+                    : conversations
+                      ? conversationHref(id)
+                      : `tenant=${encodeURIComponent(id)}${new URLSearchParams(location.hash.slice(1)).get('view') === 'spaces' ? '&view=spaces' : ''}`;
   };
   if (selected?.service?.status === 'SUSPENDED')
     return <SuspendedEnterprise membership={selected} identity={identity} />;
@@ -348,6 +352,7 @@ function GuardedAccessShell({
                     active: library || documents,
                     href: libraryHref(tenant),
                   },
+                  { label: '技能中心', icon: Grid2X2, active: skills, href: skillsHref(tenant) },
                 ]}
               />
             ) : (
@@ -395,7 +400,9 @@ function GuardedAccessShell({
                                 ? '会话'
                                 : surface === 'workspace' && library
                                   ? '资料库'
-                                  : labels[surface]}
+                                  : skills
+                                    ? '技能中心'
+                                    : labels[surface]}
                 </h1>
                 {surface === 'workspace' && briefing && (
                   <time
@@ -411,6 +418,7 @@ function GuardedAccessShell({
             actions={
               surface !== 'workspace' ||
               library ||
+              skills ||
               conversations ||
               briefing ||
               documents ||
@@ -518,6 +526,12 @@ function GuardedAccessShell({
               </Empty>
             ) : profiles ? (
               <Profiles tenant={tenant} personalOnly />
+            ) : skills ? (
+              <SkillCenter
+                key={`${identity.account.id}:${tenant}`}
+                tenant={tenant}
+                account={identity.account.id}
+              />
             ) : documents ? (
               <Documents key={tenant} tenant={tenant} />
             ) : briefing || conversations ? (

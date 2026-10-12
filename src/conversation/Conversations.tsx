@@ -1189,6 +1189,14 @@ export function ConversationComposer({
       ? (value as unknown as PresentationOptions)
       : undefined;
   });
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.hash.slice(1));
+    if (params.get('tenant') !== tenant || params.get('skill') !== 'ppt' || !pptCapability.value?.available)
+      return;
+    setPresentation((current) => current ?? { pages: 6, theme: 'ocean' });
+    params.delete('skill');
+    window.history.replaceState(window.history.state, '', '#' + params);
+  }, [tenant, pptCapability.value?.available]);
   // New sends always use AI. Uncertain historical sends retain their exact body below.
   const mode: SendTask['mode'] = 'AGENT';
   const [publicQuery, setPublicQuery] = useState(
