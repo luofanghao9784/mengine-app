@@ -52,13 +52,21 @@ public class RecommendationService {
  }
  private Pool pool(UUID actor,UUID tenant,UUID workspace,boolean generatedOnly,String businessType,boolean publicationsOnly,boolean focused,boolean unreadOnly){
   if(workspace!=null)access.require(actor,tenant,workspace,false);
+  // Materialize cheap eligibility before recursive authorization; failed/non-briefing history
+  // must not consume the listing budget. Every candidate still uses the current permission fence.
   var sql="""
-   WITH readable AS MATERIALIZED (SELECT rt.id FROM readable_source_tasks rt JOIN conversation_tasks own ON own.id=rt.id WHERE own.tenant_id=? AND own.requested_by=?), spaces AS MATERIALIZED (
+   WITH eligible_tasks AS MATERIALIZED (
+    SELECT t.id FROM conversation_tasks t WHERE t.tenant_id=? AND t.requested_by=?
+     AND t.status='SUCCEEDED' AND t.mode='AGENT' AND t.reply IS NOT NULL
+     AND (NOT ? OR EXISTS (%s))
+   ), readable AS MATERIALIZED (
+    SELECT id FROM eligible_tasks e WHERE EXISTS(SELECT 1 FROM readable_source_tasks r WHERE r.id=e.id OFFSET 0)
+   ), spaces AS MATERIALIZED (
     SELECT w.* FROM workspaces w LEFT JOIN workspace_members g ON g.tenant_id=w.tenant_id AND g.workspace_id=w.id AND g.account_id=?
     WHERE w.tenant_id=? AND (w.id=?::uuid OR ?::uuid IS NULL)
      AND ((w.kind='PERSONAL' AND w.owner_id=?) OR (w.kind='SHARED' AND g.account_id IS NOT NULL))
    ), candidates AS (
-    SELECT t.id,'TASK' kind,'task:'||t.id||':'||t.revision||':'||t.attempt version_key,c.workspace_id,w.name workspace_name,coalesce(convert_from(b.content,'UTF8')::jsonb->>'title',CASE WHEN EXISTS(SELECT 1 FROM readable title_source WHERE title_source.id=(SELECT first_task.id FROM conversation_tasks first_task WHERE first_task.conversation_id=c.id ORDER BY first_task.created_at,first_task.id LIMIT 1)) THEN c.title ELSE '会话内容暂不可用' END) AS title,
+    SELECT t.id,'TASK' kind,'task:'||t.id||':'||t.revision||':'||t.attempt version_key,c.workspace_id,w.name workspace_name,coalesce(convert_from(b.content,'UTF8')::jsonb->>'title',CASE WHEN (SELECT CASE WHEN first_task.tenant_id=c.tenant_id AND first_task.requested_by=c.owner_id THEN EXISTS(SELECT 1 FROM readable_source_tasks r WHERE r.id=first_task.id OFFSET 0) ELSE false END FROM conversation_tasks first_task WHERE first_task.conversation_id=c.id ORDER BY first_task.created_at,first_task.id LIMIT 1) THEN c.title ELSE '会话内容暂不可用' END) AS title,
      coalesce(convert_from(b.content,'UTF8')::jsonb->>'summary',left(t.reply,600)) excerpt,(b.id IS NULL AND length(t.reply)>600) truncated,t.finished_at created_at,t.execution_class,c.id conversation_id,
      t.revision task_revision,t.attempt,coalesce(p.revision,0) preference_revision,NULL::uuid material_id,0 material_version,'' filename,coalesce(p.pinned,false) pinned
     FROM conversations c JOIN spaces w ON w.id=c.workspace_id
@@ -81,9 +89,9 @@ public class RecommendationService {
     ON o.tenant_id=? AND o.actor_id=? AND o.target_kind=c.kind AND o.target_id=c.id AND o.version_key=c.version_key
    WHERE (NOT ? OR (c.kind='TASK' AND o.opened_at IS NULL))
    ORDER BY c.created_at DESC,c.id LIMIT 1000
-   """.formatted(BriefingContentService.ELIGIBLE,BriefingContentService.ELIGIBLE,generatedOnly?"":"LIMIT 1",BriefingContentService.ELIGIBLE,generatedOnly?"briefing_card_preferences p ON p.task_id=t.id":"briefing_preferences p ON p.conversation_id=c.id");
+   """.formatted(BriefingContentService.ELIGIBLE,BriefingContentService.ELIGIBLE,BriefingContentService.ELIGIBLE,generatedOnly?"":"LIMIT 1",BriefingContentService.ELIGIBLE,generatedOnly?"briefing_card_preferences p ON p.task_id=t.id":"briefing_preferences p ON p.conversation_id=c.id");
   final long[] total={0};db.execute("SET LOCAL jit=off");db.execute("SET LOCAL statement_timeout='3s'");
-  var items=db.query(sql,(r,n)->{total[0]=r.getLong("eligible_total");return new Candidate(r.getObject("id",UUID.class),r.getString("kind"),r.getString("version_key"),r.getObject("workspace_id",UUID.class),r.getString("workspace_name"),r.getString("title"),r.getString("excerpt"),r.getBoolean("truncated"),r.getTimestamp("created_at").toInstant(),r.getString("execution_class"),r.getObject("conversation_id",UUID.class),r.getInt("task_revision"),r.getInt("attempt"),r.getInt("preference_revision"),r.getObject("material_id",UUID.class),r.getInt("material_version"),r.getString("filename"),r.getBoolean("pinned"),r.getTimestamp("opened_at")==null?null:r.getTimestamp("opened_at").toInstant());},tenant,actor,actor,tenant,workspace,workspace,actor,generatedOnly,generatedOnly,businessType,businessType,tenant,actor,publicationsOnly,focused,actor,actor,businessType,businessType,focused,tenant,actor,unreadOnly);
+  var items=db.query(sql,(r,n)->{total[0]=r.getLong("eligible_total");return new Candidate(r.getObject("id",UUID.class),r.getString("kind"),r.getString("version_key"),r.getObject("workspace_id",UUID.class),r.getString("workspace_name"),r.getString("title"),r.getString("excerpt"),r.getBoolean("truncated"),r.getTimestamp("created_at").toInstant(),r.getString("execution_class"),r.getObject("conversation_id",UUID.class),r.getInt("task_revision"),r.getInt("attempt"),r.getInt("preference_revision"),r.getObject("material_id",UUID.class),r.getInt("material_version"),r.getString("filename"),r.getBoolean("pinned"),r.getTimestamp("opened_at")==null?null:r.getTimestamp("opened_at").toInstant());},tenant,actor,generatedOnly,actor,tenant,workspace,workspace,actor,generatedOnly,generatedOnly,businessType,businessType,tenant,actor,publicationsOnly,focused,actor,actor,businessType,businessType,focused,tenant,actor,unreadOnly);
   return new Pool(items,total[0]);
  }
  private Presentation presentation(UUID actor,UUID tenant){
