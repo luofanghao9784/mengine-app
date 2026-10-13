@@ -273,7 +273,6 @@ async function generationFixture(page: Page, initial = false) {
 
 async function submitGeneration(page: Page) {
   await page.getByRole('button', { name: '生成更多', exact: true }).click();
-  await page.getByRole('button', { name: '下一步', exact: true }).click();
   await page.getByRole('button', { name: '生成 1 张', exact: true }).click();
 }
 

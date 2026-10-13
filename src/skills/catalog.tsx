@@ -104,142 +104,126 @@ export function Preview({ id, large = false }: { id: SkillId; large?: boolean })
       className={`skill-art ${id} ${large ? 'large' : ''}`}
       aria-label={`${skills.find((s) => s.id === id)?.sample}，合成示例`}
     >
-      {id === 'ppt' ? (
-        <>
-          <div className="slide-back">
-            <span>营收变化 / REVENUE</span>
-            <div className="tiny-bars">
-              <i />
-              <i />
-              <i />
-              <i />
-            </div>
-          </div>
-          <div className="slide-front">
-            <span>BUSINESS REVIEW</span>
+      {id === 'ppt' && (
+        <div className="sk-deck">
+          <i className="sk-sheet" />
+          <i className="sk-sheet" />
+          <div className="sk-sheet sk-slide">
+            <span className="sk-kicker">季度经营复盘</span>
             <b>
               把每一份努力
               <br />
-              讲成清晰的成果。
+              讲成清晰的成果
             </b>
-            <div>
-              季度经营复盘 <ArrowRight size={13} />
+            <div className="sk-lines">
+              <i />
+              <i />
+            </div>
+            <div className="sk-bars">
+              <i />
+              <i />
+              <i />
+              <i />
             </div>
             <em>01 / 06</em>
           </div>
-          <span className="art-tag">PPTX · 可编辑</span>
-        </>
-      ) : null}
-      {id === 'dashboard' ? (
-        <div className="dashboard-preview">
-          <div className="mini-top">
+        </div>
+      )}
+      {id === 'dashboard' && (
+        <div className="sk-sheet sk-board">
+          <div className="sk-head">
             <b>经营概览</b>
-            <span>本季度⌄</span>
+            <span>本季度</span>
           </div>
-          <div className="metric-row">
+          <div className="sk-kpis">
             <div>
               <small>季度营收</small>
               <b>
-                450 <em>万</em>
+                450<em>万</em>
               </b>
             </div>
             <div>
-              <small>三月客户数</small>
+              <small>新签客户</small>
               <b>52</b>
             </div>
-            <span>合成数据</span>
-          </div>
-          <div className="chart-preview">
-            <div className="axis-labels">
-              <span>180</span>
-              <span>120</span>
-              <span>60</span>
-            </div>
-            <div className="graph">
-              <i style={{ height: '48%' }} />
-              <i style={{ height: '65%' }} />
-              <i style={{ height: '83%' }} />
-              <div className="graph-labels">
-                <span>一月</span>
-                <span>二月</span>
-                <span>三月</span>
-              </div>
+            <div>
+              <small>回款率</small>
+              <b>
+                86<em>%</em>
+              </b>
             </div>
           </div>
-        </div>
-      ) : null}
-      {id === 'organizer' ? (
-        <div className="organizer-preview">
-          <div className="loose-files">
-            <span>
-              <FileText size={13} /> 方案_最终版
-            </span>
-            <span>
-              <FileText size={13} /> 会议记录_01
-            </span>
-            <span>
-              <FileText size={13} /> 数据_新
-            </span>
-          </div>
-          <ArrowRight size={20} />
-          <div className="tidy-files">
-            <span>
-              <Folder size={16} /> 项目方案 <small>03</small>
-            </span>
-            <span>
-              <Folder size={16} /> 会议资料 <small>05</small>
-            </span>
-            <span>
-              <Folder size={16} /> 经营数据 <small>02</small>
-            </span>
-          </div>
-        </div>
-      ) : null}
-      {id === 'infographic' ? (
-        <div className="info-preview">
-          <span>让重要信息，有迹可循</span>
-          <b>从想法，到行动</b>
-          <div className="info-nodes">
-            <i>
-              01
-              <br />
-              <small>明确目标</small>
-            </i>
-            <span>—</span>
-            <i>
-              02
-              <br />
-              <small>拆解路径</small>
-            </i>
-            <span>—</span>
-            <i>
-              03
-              <br />
-              <small>推进落地</small>
-            </i>
-          </div>
-          <div className="info-line" />
-        </div>
-      ) : null}
-      {id === 'meeting' ? (
-        <div className="meeting-preview">
-          <div className="wave">
-            {Array.from({ length: 30 }, (_, i) => (
-              <i key={i} style={{ height: 10 + ((i * 17) % 39) }} />
+          <div className="sk-chart">
+            {[38, 52, 46, 64, 58, 78, 92].map((h, i) => (
+              <i key={i} style={{ height: `${h}%` }} />
             ))}
           </div>
-          <div className="meeting-note">
-            <b>产品周会 · 纪要</b>
-            <span>
-              <Check size={12} /> 关键结论已归纳
+        </div>
+      )}
+      {id === 'organizer' && (
+        <div className="sk-tidy">
+          <div className="sk-loose">
+            <span className="sk-sheet">
+              <FileText size={12} /> 方案_最终版
             </span>
-            <span>
-              <Check size={12} /> 待办与原始录音关联
+            <span className="sk-sheet">
+              <FileText size={12} /> 会议记录_01
+            </span>
+            <span className="sk-sheet">
+              <FileText size={12} /> 数据_新
             </span>
           </div>
-          <span className="audio-time">12:36 / 32:18 · 示例</span>
+          <ArrowRight size={18} />
+          <div className="sk-sheet sk-folders">
+            <span>
+              <Folder size={14} /> 项目方案 <small>3</small>
+            </span>
+            <span>
+              <Folder size={14} /> 会议资料 <small>5</small>
+            </span>
+            <span>
+              <Folder size={14} /> 经营数据 <small>2</small>
+            </span>
+          </div>
         </div>
-      ) : null}
+      )}
+      {id === 'infographic' && (
+        <div className="sk-sheet sk-poster">
+          <b>从想法，到行动</b>
+          <div className="sk-flow">
+            {['明确目标', '拆解路径', '推进落地'].map((label, i) => (
+              <span key={label}>
+                <i>{i + 1}</i>
+                <small>{label}</small>
+              </span>
+            ))}
+          </div>
+          <div className="sk-lines">
+            <i />
+            <i />
+          </div>
+        </div>
+      )}
+      {id === 'meeting' && (
+        <div className="sk-sheet sk-minutes">
+          <div className="sk-wave">
+            <AudioLines size={14} />
+            <div>
+              {Array.from({ length: 34 }, (_, i) => (
+                <i key={i} style={{ height: 4 + ((i * 17) % 19) }} />
+              ))}
+            </div>
+            <small>32:18</small>
+          </div>
+          <b>产品周会 · 纪要</b>
+          <span>
+            <Check size={12} /> 关键结论已归纳
+          </span>
+          <span>
+            <Check size={12} /> 待办与原始录音关联
+          </span>
+        </div>
+      )}
     </div>
   );
 }

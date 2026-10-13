@@ -165,6 +165,7 @@ async function fixture(page: Page, enabled = true, moves: Record<string, unknown
 }
 test('文件权限显示三个内容档位与独立下载，核对后才提交', async ({ page }) => {
   const saves = await fixture(page);
+  await page.getByRole('button', { name: '资料操作 预算.txt' }).click();
   await page.getByRole('button', { name: '权限设置', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: '权限设置 · 预算.txt' });
   await expect(dialog).toBeVisible();
@@ -190,11 +191,12 @@ test('未启用企业不出现新版设置入口', async ({ page }) => {
   await fixture(page, false);
   await expect(page.getByText('预算.txt', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: '权限设置', exact: true })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: '当前位置权限' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '权限', exact: true })).toHaveCount(0);
 });
 test('手机宽度可配置独立范围并取消，不写入权限', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const saves = await fixture(page);
+  await page.getByRole('button', { name: '资料操作 预算.txt' }).click();
   await page.getByRole('button', { name: '权限设置', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: '权限设置 · 预算.txt' });
   await dialog.getByLabel('默认权限').selectOption('false');
@@ -245,6 +247,7 @@ test('取消跨权限移动不发送变更', async ({ page }) => {
 
 test('无阅读权限的管理员可通过定位入口管理授权但不打开正文', async ({ page }) => {
   await fixture(page);
+  await page.getByRole('button', { name: '权限', exact: true }).click();
   await page.getByRole('button', { name: '资料权限管理', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: '资料权限管理', exact: true });
   await expect(dialog.getByText('无内容阅读权限', { exact: false })).toBeVisible();

@@ -46,12 +46,13 @@ export function useElasticReaders(enabled: boolean) {
         const style = getComputedStyle(node);
         if (!/(auto|scroll)/.test(style.overflowY)) continue;
         if (!(node instanceof HTMLElement) || !node.matches(readers)) return null;
-        // The magazine feed owns its pull-to-refresh gesture separately.
-        if (node.matches('.access-content') && node.querySelector('.live-briefing')) return null;
         return node;
       }
       return null;
     };
+    // The magazine feed keeps its own pull-to-refresh at the top; only its bottom edge springs here.
+    const refreshes = (node: HTMLElement, delta: number) =>
+      delta < 0 && node.matches('.access-content') && !!node.querySelector('.live-briefing');
     const atEdge = (node: HTMLElement, delta: number) =>
       delta < 0 ? node.scrollTop <= 1 : node.scrollTop >= node.scrollHeight - node.clientHeight - 1;
     const pull = (node: HTMLElement, delta: number, pause: boolean) => {
@@ -68,6 +69,44 @@ export function useElasticReaders(enabled: boolean) {
       paint(direction * (44 - (44 - current) * Math.exp(-Math.abs(delta) / 160)));
       if (pause) idle = window.setTimeout(release, 70);
     };
+    // A trackpad keeps sending wheel events after the fingers lift. Holding the stretch until that
+    // inertial tail ends reads as a pause before the spring, so the tail is told apart from a push.
+    let gesture: {
+      at: number;
+      direction: number;
+      last: number;
+      peak: number;
+      falling: number;
+      momentum: boolean;
+    } | null = null;
+    const tail = { at: 0, bounced: false };
+    const coasting = (event: WheelEvent, delta: number) => {
+      const native = (event as WheelEvent & { momentum?: boolean }).momentum;
+      if (typeof native === 'boolean' || event.deltaMode !== WheelEvent.DOM_DELTA_PIXEL) {
+        gesture = null;
+        return native === true;
+      }
+      const at = performance.now(),
+        direction = Math.sign(delta),
+        size = Math.abs(delta);
+      const previous = gesture;
+      if (
+        !previous ||
+        at - previous.at > 140 ||
+        direction !== previous.direction ||
+        (previous.momentum && size > previous.last * 1.5 && size - previous.last >= 3)
+      ) {
+        gesture = { at, direction, last: size, peak: size, falling: 0, momentum: false };
+        return false;
+      }
+      if (size < previous.last - 0.1) previous.falling++;
+      else if (size > previous.last + 0.1) previous.falling = 0;
+      previous.peak = Math.max(previous.peak, size);
+      previous.momentum ||= previous.falling >= 3 && size <= previous.peak * 0.6;
+      previous.at = at;
+      previous.last = size;
+      return previous.momentum;
+    };
     const wheel = (event: WheelEvent) => {
       if (
         reduced.matches ||
@@ -82,12 +121,24 @@ export function useElasticReaders(enabled: boolean) {
       if (!node) return;
       const delta =
         event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? node.clientHeight : 1);
+      if (refreshes(node, delta)) return;
+      const inertial = coasting(event, delta);
       if (!atEdge(node, delta)) {
         release();
         return;
       }
       if (event.cancelable) event.preventDefault();
-      pull(node, delta, true);
+      if (!inertial) {
+        pull(node, delta, true);
+        return;
+      }
+      // Fingers are off: spring back now. A fling that runs into the edge gets one short bounce.
+      const now = performance.now();
+      if (now - tail.at > 140) tail.bounced = false;
+      tail.at = now;
+      if (!tail.bounced && (active !== node || !offset)) pull(node, delta * 4, false);
+      tail.bounced = true;
+      release();
     };
     const start = (event: TouchEvent) => {
       if (reduced.matches || event.touches.length !== 1) return;
@@ -109,6 +160,7 @@ export function useElasticReaders(enabled: boolean) {
       if (touch.axis !== 'y') return;
       touch.x = point.clientX;
       touch.y = point.clientY;
+      if (refreshes(touch.reader, dy)) return;
       if (atEdge(touch.reader, dy)) {
         if (event.cancelable) event.preventDefault();
         pull(touch.reader, dy, false);

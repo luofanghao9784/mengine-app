@@ -20,7 +20,7 @@ import { Documents } from '../documents/Documents';
 import { documentsHref } from '../documents/routes';
 import { Conversations, conversationHref } from '../conversation/Conversations';
 import { LiveBriefing, briefingHref } from '../briefing-live/Briefing';
-import { MessageSquare, LayoutPanelTop, ExternalLink, Grid2X2 } from 'lucide-react';
+import { MessageSquare, LayoutPanelTop, ExternalLink, Puzzle } from 'lucide-react';
 import { ManagementHome } from '../governance/ManagementHome';
 import { Profiles } from '../profile/Profiles';
 import { governanceClient } from '../governance/client';
@@ -352,7 +352,7 @@ function GuardedAccessShell({
                     active: library || documents,
                     href: libraryHref(tenant),
                   },
-                  { label: '技能中心', icon: Grid2X2, active: skills, href: skillsHref(tenant) },
+                  { label: '技能中心', icon: Puzzle, active: skills, href: skillsHref(tenant) },
                 ]}
               />
             ) : (
@@ -380,7 +380,7 @@ function GuardedAccessShell({
         </aside>
         <div className="access-main">
           <PageHeader
-            className={surface === 'workspace' && library ? 'material-topbar' : ''}
+            className={surface === 'workspace' && (library || skills) ? 'material-topbar' : ''}
             heading={
               <>
                 <h1>
@@ -527,11 +527,7 @@ function GuardedAccessShell({
             ) : profiles ? (
               <Profiles tenant={tenant} personalOnly />
             ) : skills ? (
-              <SkillCenter
-                key={`${identity.account.id}:${tenant}`}
-                tenant={tenant}
-                account={identity.account.id}
-              />
+              <SkillCenter key={tenant} tenant={tenant} />
             ) : documents ? (
               <Documents key={tenant} tenant={tenant} />
             ) : briefing || conversations ? (

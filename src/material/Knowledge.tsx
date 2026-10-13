@@ -2,7 +2,7 @@ import { useViewState } from '../shared/useViewState';
 import { useEffect, useState } from 'react';
 import type { KnowledgeChunk } from '../../contracts/public-api/knowledge';
 import { useSession } from '../identity/session';
-import { Button, Modal, Badge, Field } from '../shared/ui';
+import { Button, Modal, Badge, Field, DocumentText } from '../shared/ui';
 import { Failure, Loading, Pager, useRemote, useSubmission, SubmitError } from '../shared/admin';
 import { knowledgeClient as api } from './knowledge-client';
 import { IdentityError } from '../identity/client';
@@ -44,6 +44,59 @@ function Fragment({ chunk }: { chunk: KnowledgeChunk }) {
     </article>
   );
 }
+/** Reading view: consecutive text lines become one passage, consecutive table rows one table. */
+function ReadingFlow({ chunks, header }: { chunks: KnowledgeChunk[]; header: boolean }) {
+  const row = (content: string) => {
+    try {
+      const cells: unknown = JSON.parse(content);
+      return Array.isArray(cells) ? cells.map((cell) => (cell == null ? '' : String(cell))) : null;
+    } catch {
+      return null;
+    }
+  };
+  const groups: { id: string; text?: string[]; rows?: string[][] }[] = [];
+  for (const chunk of chunks) {
+    const cells = chunk.method === 'TABLE' ? row(chunk.content) : null;
+    const last = groups.at(-1);
+    if (cells) {
+      if (last?.rows) last.rows.push(cells);
+      else groups.push({ id: chunk.id, rows: [cells] });
+    } else if (last?.text) last.text.push(chunk.content);
+    else groups.push({ id: chunk.id, text: [chunk.content] });
+  }
+  return (
+    <div className="reader-flow">
+      {groups.map((group, index) =>
+        group.rows ? (
+          <div className="document-table-scroll" key={group.id}>
+            <table>
+              {header && index === 0 && (
+                <thead>
+                  <tr>
+                    {group.rows[0].map((cell, i) => (
+                      <th key={i}>{cell}</th>
+                    ))}
+                  </tr>
+                </thead>
+              )}
+              <tbody>
+                {group.rows.slice(header && index === 0 ? 1 : 0).map((cells, i) => (
+                  <tr key={i}>
+                    {cells.map((cell, j) => (
+                      <td key={j}>{cell}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <DocumentText key={group.id} text={group.text!.join('\n')} />
+        ),
+      )}
+    </div>
+  );
+}
 export function AnalysisPanel({
   tenant,
   space,
@@ -61,6 +114,7 @@ export function AnalysisPanel({
   const [attempt, setAttempt] = useState(0),
     [page, setPage] = useState(0);
   const [denied, setDenied] = useState<unknown>();
+  const [segments, setSegments] = useState(false);
   const submit = useSubmission<{ expectedGeneration: number }>();
   const data = useRemote(
     (signal) => api.analysis(tenant, space, material, version, page * 20, signal),
@@ -87,8 +141,18 @@ export function AnalysisPanel({
   const value = data.value;
   return (
     <section className="knowledge-analysis" aria-label="版本解析内容">
-      <div className="material-section">
+      <div className="material-section reader-bar">
         <h3>{processingStatusLabel[value.status]}</h3>
+        {!!value.chunks.length && (
+          <div className="reader-view" role="group" aria-label="正文显示方式">
+            <button type="button" aria-pressed={!segments} onClick={() => setSegments(false)}>
+              阅读
+            </button>
+            <button type="button" aria-pressed={segments} onClick={() => setSegments(true)}>
+              AI 读到的分段
+            </button>
+          </div>
+        )}
         {value.canMaintain && value.available && !busy && (
           <Button
             disabled={submit.busy}
@@ -124,9 +188,11 @@ export function AnalysisPanel({
         </p>
       ))}
       <SubmitError error={submit.error} uncertain={submit.uncertain} />
-      {value.chunks.map((c) => (
-        <Fragment key={c.id} chunk={c} />
-      ))}
+      {segments ? (
+        value.chunks.map((c) => <Fragment key={c.id} chunk={c} />)
+      ) : (
+        <ReadingFlow chunks={value.chunks} header={page === 0} />
+      )}
       {!!value.chunks.length && <Pager page={page} next={value.hasMore} onPage={setPage} />}
     </section>
   );
