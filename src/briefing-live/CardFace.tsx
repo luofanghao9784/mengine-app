@@ -27,13 +27,16 @@ export function useFaceBox() {
     const measure = () => {
       const own = element.getBoundingClientRect();
       const outer = body?.getBoundingClientRect();
+      // DOM rectangles include entrance/reflow scaling; SVG coordinates use layout pixels.
+      const scaleX = outer && body!.offsetWidth ? outer.width / body!.offsetWidth : 1;
+      const scaleY = outer && body!.offsetHeight ? outer.height / body!.offsetHeight : 1;
       const next = {
-        w: Math.round(own.width),
-        h: Math.round(own.height),
-        left: outer ? Math.max(0, Math.round(own.left - outer.left)) : 0,
-        right: outer ? Math.max(0, Math.round(outer.right - own.right)) : 0,
-        top: outer ? Math.max(0, Math.round(own.top - outer.top)) : 0,
-        bottom: outer ? Math.max(0, Math.round(outer.bottom - own.bottom)) : 0,
+        w: Math.round(own.width / scaleX),
+        h: Math.round(own.height / scaleY),
+        left: outer ? Math.max(0, Math.round((own.left - outer.left) / scaleX)) : 0,
+        right: outer ? Math.max(0, Math.round((outer.right - own.right) / scaleX)) : 0,
+        top: outer ? Math.max(0, Math.round((own.top - outer.top) / scaleY)) : 0,
+        bottom: outer ? Math.max(0, Math.round((outer.bottom - own.bottom) / scaleY)) : 0,
       };
       setBox((old) =>
         (Object.keys(next) as (keyof Box)[]).every((key) => old[key] === next[key]) ? old : next,
