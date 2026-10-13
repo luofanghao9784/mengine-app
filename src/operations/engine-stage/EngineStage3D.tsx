@@ -1,5 +1,5 @@
 import type { EvolutionPhase } from './evolution-demo';
-import { useEffect, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import type {
   EngineTelemetry,
   TelemetryChannel,
@@ -19,6 +19,14 @@ import {
 import { EngineScene, type Focus, type Hit, type Lens, type SceneDom } from './scene';
 import './engine-stage.css';
 
+/** Hosts may relabel channels: the tenant scene shell names the input lanes after their data sources. */
+type ChannelNameMap = Partial<Record<TelemetryChannelCode, string>>;
+const NO_NAMES: ChannelNameMap = {};
+const ChannelNames = createContext<ChannelNameMap>(NO_NAMES);
+const useChannelName = () => {
+  const names = useContext(ChannelNames);
+  return (code: TelemetryChannelCode) => names[code] ?? channelInfo[code].name;
+};
 const n = (v: number) => v.toLocaleString('zh-CN');
 const hms = (v: number | string) => new Date(v).toLocaleTimeString('zh-CN', { hour12: false });
 const STAGES: Record<Stage | 'evo', { name: string; sum: string; cap: string; small: string }> = {
@@ -84,6 +92,8 @@ export function EngineStage3D({
   attentionCount,
   reduced,
   hash,
+  onScene,
+  channelNames,
 }: {
   demo?: boolean;
   onDemoChange?: () => void;
@@ -93,7 +103,11 @@ export function EngineStage3D({
   attentionCount: number;
   reduced: boolean;
   hash: string;
+  /** Hosts that add their own world content (scene extension) receive the scene instance. */
+  onScene?: (scene: EngineScene | null) => void;
+  channelNames?: ChannelNameMap;
 }) {
+  const nameOf = (code: TelemetryChannelCode) => channelNames?.[code] ?? channelInfo[code].name;
   const [evolutionPhase, setEvolutionPhase] = useState<EvolutionPhase>(demo ? '巡检中' : '待接入');
   const [focus, setFocus] = useState<Focus>(null);
   const [sel, setSel] = useState<TelemetryChannelCode | null>(null);
@@ -156,7 +170,9 @@ export function EngineStage3D({
     );
     scene.current = s;
     setWebgl(s.webgl);
+    onScene?.(s);
     return () => {
+      onScene?.(null);
       s.destroy();
       scene.current = null;
     };
@@ -193,245 +209,253 @@ export function EngineStage3D({
   ] as const;
   const warnTarget = [...channels].sort((a, b) => b.failed + b.unknown - (a.failed + a.unknown))[0];
   return (
-    <div
-      className="eng3d"
-      data-motion={reduced ? 'reduced' : 'full'}
-      data-webgl={webgl ? 'on' : 'off'}
-      data-focus={focus || undefined}
-    >
-      <canvas
-        ref={canvas}
-        className="eng3d-gl"
-        aria-label={demo ? '梦核引擎繁忙演示图（模拟数据）' : '梦核引擎实时运行图'}
-      />
-      {!webgl && (
-        <p className="eng3d-nogl">当前浏览器无法启用 WebGL，3D 运行图不可用，下方读数仍会每 3 秒更新。</p>
-      )}
-      <header className="eng3d-top" ref={top}>
-        <div className="eng3d-brand">
-          <h1>
-            <button type="button" ref={home} onClick={goHome}>
-              引擎仪表盘
-            </button>
-          </h1>
-          <div className="eng3d-trail">
-            <i data-idle={T.r ? undefined : true} />
-            <span>{T.r ? `${n(T.r)} 项执行中` : '空闲，没有执行中的记录'}</span>
-            {attentionCount > 0 && (
+    <ChannelNames.Provider value={channelNames ?? NO_NAMES}>
+      <div
+        className="eng3d"
+        data-motion={reduced ? 'reduced' : 'full'}
+        data-webgl={webgl ? 'on' : 'off'}
+        data-focus={focus || undefined}
+      >
+        <canvas
+          ref={canvas}
+          className="eng3d-gl"
+          aria-label={demo ? '梦核引擎繁忙演示图（模拟数据）' : '梦核引擎实时运行图'}
+        />
+        {!webgl && (
+          <p className="eng3d-nogl">当前浏览器无法启用 WebGL，3D 运行图不可用，下方读数仍会每 3 秒更新。</p>
+        )}
+        <header className="eng3d-top" ref={top}>
+          <div className="eng3d-brand">
+            <h1>
+              <button type="button" ref={home} onClick={goHome}>
+                引擎仪表盘
+              </button>
+            </h1>
+            <div className="eng3d-trail">
+              <i data-idle={T.r ? undefined : true} />
+              <span>{T.r ? `${n(T.r)} 项执行中` : '空闲，没有执行中的记录'}</span>
+              {attentionCount > 0 && (
+                <button
+                  type="button"
+                  className="eng3d-warn"
+                  onClick={() =>
+                    warnTarget && warnTarget.failed + warnTarget.unknown > 0
+                      ? focusStage(channelInfo[warnTarget.code].stage, warnTarget.code)
+                      : document
+                          .getElementById('engine-attention')
+                          ?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth' })
+                  }
+                >
+                  {attentionCount} 项需要留意
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="eng3d-tools">
+            {onDemoChange && (
               <button
                 type="button"
-                className="eng3d-warn"
-                onClick={() =>
-                  warnTarget && warnTarget.failed + warnTarget.unknown > 0
-                    ? focusStage(channelInfo[warnTarget.code].stage, warnTarget.code)
-                    : document
-                        .getElementById('engine-attention')
-                        ?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth' })
-                }
+                role="switch"
+                aria-checked={demo}
+                className="eng3d-demo-toggle"
+                onClick={onDemoChange}
               >
-                {attentionCount} 项需要留意
+                繁忙演示 <span>{demo ? '开' : '关'}</span>
               </button>
             )}
+            {demo && (
+              <span className="eng3d-demo-note" role="status">
+                演示数据 · 不执行真实任务
+              </span>
+            )}
+            <div className="eng3d-snap">
+              <svg width="36" height="14" viewBox="0 0 36 14" aria-hidden="true">
+                <path
+                  d="M0 7h10l3-5 4 10 3-8 2 3h14"
+                  fill="none"
+                  stroke="#F1D6A0"
+                  strokeWidth="1.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <span>
+                {demo ? '演示快照' : '快照'} <b>{hms(value.checkedAt)}</b>，可见时每 3 秒
+              </span>
+            </div>
           </div>
-        </div>
-        <div className="eng3d-tools">
-          {onDemoChange && (
+        </header>
+        <div className="eng3d-labels">
+          {channels
+            .filter((c) => channelInfo[c.code].stage !== 'pr')
+            .map((c) => {
+              const v = vals(c),
+                st = channelInfo[c.code].stage,
+                lv = v[lens];
+              return (
+                <button
+                  key={c.code}
+                  type="button"
+                  className="eng3d-lbl"
+                  data-channel={c.code}
+                  data-photons={reduced ? 0 : particles(c.running)}
+                  data-queue-dots={Math.min(c.queued, BEADS)}
+                  ref={(el) => {
+                    if (el) labels.current[c.code] = el;
+                    else delete labels.current[c.code];
+                  }}
+                  aria-label={`${nameOf(c.code)}，执行中 ${v.r}，排队 ${v.q}，查看详情`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    focusStage(st, c.code);
+                  }}
+                  onMouseEnter={() => scene.current?.hoverLabel(c.code)}
+                  onMouseLeave={() => scene.current?.hoverLabel(null)}
+                >
+                  <span className="n">{nameOf(c.code)}</span>
+                  <span
+                    className="v"
+                    style={{ color: lens === 'f' && lv ? 'var(--coral)' : lv ? stageColor[st] : '#5f5c56' }}
+                  >
+                    {n(lv)}
+                  </span>
+                  <span className="q">
+                    {lens === 'r' ? (
+                      <>
+                        排队 {n(v.q)}
+                        {v.q > BEADS && <span className="more">+{n(v.q - BEADS)}</span>}
+                      </>
+                    ) : (
+                      `执行中 ${n(v.r)}`
+                    )}
+                    {v.f > 0 && lens !== 'f' && <em> 异常 {n(v.f)}</em>}
+                    {v.u > 0 && <em className="u"> 待核对 {n(v.u)}</em>}
+                  </span>
+                </button>
+              );
+            })}
+          {(['in', 'pr', 'out', 'evo'] as const).map((st) => (
             <button
+              key={st}
               type="button"
-              role="switch"
-              aria-checked={demo}
-              className="eng3d-demo-toggle"
-              onClick={onDemoChange}
+              className={`eng3d-cap ${st === 'evo' ? 'evo' : ''}`}
+              ref={(el) => {
+                if (el) caps.current[st] = el;
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                focusStage(st);
+              }}
+              onMouseEnter={() => scene.current?.hoverLabel(st)}
+              onMouseLeave={() => scene.current?.hoverLabel(null)}
             >
-              繁忙演示 <span>{demo ? '开' : '关'}</span>
+              {STAGES[st].cap}
+              {st === 'evo' && (
+                <small className="eng3d-evolution-status">
+                  {demo ? '演示 · ' : ''}
+                  {evolutionPhase}
+                </small>
+              )}
             </button>
-          )}
-          {demo && (
-            <span className="eng3d-demo-note" role="status">
-              演示数据 · 不执行真实任务
-            </span>
-          )}
-          <div className="eng3d-snap">
-            <svg width="36" height="14" viewBox="0 0 36 14" aria-hidden="true">
-              <path
-                d="M0 7h10l3-5 4 10 3-8 2 3h14"
-                fill="none"
-                stroke="#F1D6A0"
-                strokeWidth="1.2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            <span>
-              {demo ? '演示快照' : '快照'} <b>{hms(value.checkedAt)}</b>，可见时每 3 秒
-            </span>
+          ))}
+        </div>
+        <div className="eng3d-halowrap" ref={haloWrap} aria-hidden="true">
+          <div className="eng3d-halo" ref={halo} data-active={T.r > 0 ? true : undefined} />
+        </div>
+        <div className="eng3d-core" ref={coreNum}>
+          <b style={{ color: lens === 'f' && tot ? 'var(--coral)' : undefined }}>{n(tot)}</b>
+          <span>{LENS[lens].name}</span>
+        </div>
+        <div className="eng3d-mix">
+          <div className="eng3d-ratio" aria-hidden="true">
+            {mix.map(([label, v, color]) => (
+              <span key={label} style={{ flexGrow: tot ? v / tot : 0, background: color }} />
+            ))}
+          </div>
+          <div className="eng3d-mix-labels">
+            {mix.map(([label, v, color]) => (
+              <span key={label}>
+                <i style={{ background: color }} />
+                {label}
+                <b>{n(v)}</b>
+              </span>
+            ))}
           </div>
         </div>
-      </header>
-      <div className="eng3d-labels">
-        {channels
-          .filter((c) => channelInfo[c.code].stage !== 'pr')
-          .map((c) => {
-            const v = vals(c),
-              st = channelInfo[c.code].stage,
-              lv = v[lens];
+        <div className="eng3d-lens-cap">{LENS[lens].cap}</div>
+        <div className="eng3d-reads" role="group" aria-label="查看指标">
+          {lensKeys.map((k) => {
+            const alert = k === 'f' && T.f > 0;
             return (
               <button
-                key={c.code}
+                key={k}
                 type="button"
-                className="eng3d-lbl"
-                data-channel={c.code}
-                data-photons={reduced ? 0 : particles(c.running)}
-                data-queue-dots={Math.min(c.queued, BEADS)}
-                ref={(el) => {
-                  if (el) labels.current[c.code] = el;
-                  else delete labels.current[c.code];
-                }}
-                aria-label={`${channelInfo[c.code].name}，执行中 ${v.r}，排队 ${v.q}，查看详情`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  focusStage(st, c.code);
-                }}
-                onMouseEnter={() => scene.current?.hoverLabel(c.code)}
-                onMouseLeave={() => scene.current?.hoverLabel(null)}
+                data-lens={k}
+                aria-pressed={lens === k}
+                onClick={() => setLens(k)}
               >
-                <span className="n">{channelInfo[c.code].name}</span>
-                <span
-                  className="v"
-                  style={{ color: lens === 'f' && lv ? 'var(--coral)' : lv ? stageColor[st] : '#5f5c56' }}
-                >
-                  {n(lv)}
-                </span>
-                <span className="q">
-                  {lens === 'r' ? (
-                    <>
-                      排队 {n(v.q)}
-                      {v.q > BEADS && <span className="more">+{n(v.q - BEADS)}</span>}
-                    </>
-                  ) : (
-                    `执行中 ${n(v.r)}`
-                  )}
-                  {v.f > 0 && lens !== 'f' && <em> 异常 {n(v.f)}</em>}
-                  {v.u > 0 && <em className="u"> 待核对 {n(v.u)}</em>}
-                </span>
+                <span>{LENS[k].name}</span>
+                <b className={alert ? 'a' : undefined}>{n(T[k])}</b>
+                <svg width="60" height="22" viewBox="0 0 60 22" aria-hidden="true">
+                  {spark(samples, k).map((p, i) => (
+                    <polyline
+                      key={i}
+                      points={p}
+                      fill="none"
+                      stroke={alert ? '#FF6F61' : lens === k ? '#F1D6A0' : '#6c6962'}
+                      strokeWidth="1"
+                    />
+                  ))}
+                </svg>
               </button>
             );
           })}
-        {(['in', 'pr', 'out', 'evo'] as const).map((st) => (
-          <button
-            key={st}
-            type="button"
-            className={`eng3d-cap ${st === 'evo' ? 'evo' : ''}`}
-            ref={(el) => {
-              if (el) caps.current[st] = el;
-            }}
-            onClick={(e) => {
-              e.stopPropagation();
-              focusStage(st);
-            }}
-            onMouseEnter={() => scene.current?.hoverLabel(st)}
-            onMouseLeave={() => scene.current?.hoverLabel(null)}
-          >
-            {STAGES[st].cap}
-            {st === 'evo' && (
-              <small className="eng3d-evolution-status">
-                {demo ? '演示 · ' : ''}
-                {evolutionPhase}
-              </small>
-            )}
-          </button>
-        ))}
-      </div>
-      <div className="eng3d-halowrap" ref={haloWrap} aria-hidden="true">
-        <div className="eng3d-halo" ref={halo} data-active={T.r > 0 ? true : undefined} />
-      </div>
-      <div className="eng3d-core" ref={coreNum}>
-        <b style={{ color: lens === 'f' && tot ? 'var(--coral)' : undefined }}>{n(tot)}</b>
-        <span>{LENS[lens].name}</span>
-      </div>
-      <div className="eng3d-mix">
-        <div className="eng3d-ratio" aria-hidden="true">
-          {mix.map(([label, v, color]) => (
-            <span key={label} style={{ flexGrow: tot ? v / tot : 0, background: color }} />
-          ))}
         </div>
-        <div className="eng3d-mix-labels">
-          {mix.map(([label, v, color]) => (
-            <span key={label}>
-              <i style={{ background: color }} />
-              {label}
-              <b>{n(v)}</b>
-            </span>
-          ))}
-        </div>
-      </div>
-      <div className="eng3d-lens-cap">{LENS[lens].cap}</div>
-      <div className="eng3d-reads" role="group" aria-label="查看指标">
-        {lensKeys.map((k) => {
-          const alert = k === 'f' && T.f > 0;
-          return (
-            <button key={k} type="button" data-lens={k} aria-pressed={lens === k} onClick={() => setLens(k)}>
-              <span>{LENS[k].name}</span>
-              <b className={alert ? 'a' : undefined}>{n(T[k])}</b>
-              <svg width="60" height="22" viewBox="0 0 60 22" aria-hidden="true">
-                {spark(samples, k).map((p, i) => (
-                  <polyline
-                    key={i}
-                    points={p}
-                    fill="none"
-                    stroke={alert ? '#FF6F61' : lens === k ? '#F1D6A0' : '#6c6962'}
-                    strokeWidth="1"
-                  />
-                ))}
-              </svg>
+        <div className="eng3d-log" aria-live="polite">
+          {log.length > 0 && <h2>最近变化</h2>}
+          {log.map((e) => (
+            <button
+              key={e.key}
+              type="button"
+              data-channel={e.code}
+              onClick={() => focusStage(channelInfo[e.code].stage, e.code)}
+            >
+              <time>{hms(e.at)}</time>
+              <span>
+                {nameOf(e.code)} {e.text}
+              </span>
+              <b className={e.kind}>{(e.delta > 0 ? '+' : '') + e.delta}</b>
             </button>
-          );
-        })}
+          ))}
+        </div>
+        <Tip tip={tip} channels={byCode} demo={demo} evolutionPhase={evolutionPhase} />
+        <div className="eng3d-hint">悬停看读数，点击推进镜头，拖动旋转，按 1 到 4 切换阶段</div>
+        <aside
+          className="eng3d-panel"
+          ref={panel}
+          data-open={focus ? true : undefined}
+          data-side={focus === 'in' ? 'left' : undefined}
+          aria-hidden={focus ? undefined : true}
+          inert={focus ? undefined : true}
+          aria-label={focus ? `${STAGES[focus].name}详情` : undefined}
+        >
+          {focus && (
+            <Panel
+              demo={demo}
+              evolutionPhase={evolutionPhase}
+              focus={focus}
+              sel={sel}
+              setSel={setSel}
+              list={focus === 'evo' ? [] : stList(focus)}
+              samples={samples}
+              close={goHome}
+              closer={closer}
+              hash={hash}
+            />
+          )}
+        </aside>
       </div>
-      <div className="eng3d-log" aria-live="polite">
-        {log.length > 0 && <h2>最近变化</h2>}
-        {log.map((e) => (
-          <button
-            key={e.key}
-            type="button"
-            data-channel={e.code}
-            onClick={() => focusStage(channelInfo[e.code].stage, e.code)}
-          >
-            <time>{hms(e.at)}</time>
-            <span>
-              {channelInfo[e.code].name} {e.text}
-            </span>
-            <b className={e.kind}>{(e.delta > 0 ? '+' : '') + e.delta}</b>
-          </button>
-        ))}
-      </div>
-      <Tip tip={tip} channels={byCode} demo={demo} evolutionPhase={evolutionPhase} />
-      <div className="eng3d-hint">悬停看读数，点击推进镜头，拖动旋转，按 1 到 4 切换阶段</div>
-      <aside
-        className="eng3d-panel"
-        ref={panel}
-        data-open={focus ? true : undefined}
-        data-side={focus === 'in' ? 'left' : undefined}
-        aria-hidden={focus ? undefined : true}
-        inert={focus ? undefined : true}
-        aria-label={focus ? `${STAGES[focus].name}详情` : undefined}
-      >
-        {focus && (
-          <Panel
-            demo={demo}
-            evolutionPhase={evolutionPhase}
-            focus={focus}
-            sel={sel}
-            setSel={setSel}
-            list={focus === 'evo' ? [] : stList(focus)}
-            samples={samples}
-            close={goHome}
-            closer={closer}
-            hash={hash}
-          />
-        )}
-      </aside>
-    </div>
+    </ChannelNames.Provider>
   );
 }
 
@@ -463,6 +487,7 @@ function Tip({
   tip: { hit: Hit; x: number; y: number } | null;
   channels: Map<TelemetryChannelCode, TelemetryChannel>;
 }) {
+  const nameOf = useChannelName();
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ x: 0, y: 0 });
   useEffect(() => {
@@ -490,7 +515,7 @@ function Tip({
     body = (
       <>
         <h3>
-          {channelInfo[tip.hit.code].name}
+          {nameOf(tip.hit.code)}
           <small>{STAGES[tip.hit.st].name}</small>
         </h3>
         <dl>
@@ -586,6 +611,7 @@ function Panel({
   closer: React.RefObject<HTMLButtonElement | null>;
   hash: string;
 }) {
+  const nameOf = useChannelName();
   const info = STAGES[focus];
   const head = (
     <div className="ph">
@@ -665,7 +691,7 @@ function Panel({
               aria-current={sel === c.code}
               onClick={() => setSel(sel === c.code ? null : c.code)}
             >
-              <span className="rn">{channelInfo[c.code].name}</span>
+              <span className="rn">{nameOf(c.code)}</span>
               <span className={`rv ${v.r ? '' : 'off'}`}>{n(v.r)}</span>
               <span className="rq">
                 排队 {n(v.q)}
@@ -693,6 +719,7 @@ function Detail({
   samples: Sample[];
   hash: string;
 }) {
+  const nameOf = useChannelName();
   const v = vals(c),
     w = 352,
     ht = 70;
@@ -744,7 +771,7 @@ function Detail({
             viewBox={`0 0 ${w} ${ht + 2}`}
             width="100%"
             role="img"
-            aria-label={`${channelInfo[c.code].name}近 5 分钟执行中与排队`}
+            aria-label={`${nameOf(c.code)}近 5 分钟执行中与排队`}
           >
             <path d={`M0 ${ht}H${w}`} stroke="rgba(236,234,228,.1)" />
             {segments.map((r, i) => {

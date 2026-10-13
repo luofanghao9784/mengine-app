@@ -32,7 +32,31 @@ export interface SceneEvents {
   home: () => void;
   hover: (hit: Hit | null, x: number, y: number) => void;
 }
-type V3 = [number, number, number];
+export type V3 = [number, number, number];
+/**
+ * Extra world content that shares this stage's model, camera and bloom (tenant admin scene shell).
+ * `camera` returns a view to hold while the extension owns the picture, or null to leave the engine's own framing.
+ * `pointer` returns undefined when the engine should handle the pointer, otherwise whether it is over something.
+ */
+export interface SceneExtension {
+  draw(api: {
+    pt: (p: V3, color: V3, alpha: number, size: number) => void;
+    ln: (a: V3, b: V3, color: V3, alpha: number) => void;
+    t: number;
+    dt: number;
+    reduced: boolean;
+  }): void;
+  camera(aspect: number): { e: V3; c: V3 } | null;
+  pointer(x: number, y: number, click: boolean): boolean | undefined;
+  /** Opacity of the core's own lattice (1 = unchanged) while the extension shows what is inside it. */
+  coreAlpha?(): number;
+  /** True while the picture should stay still: no completion bursts, sparks or heat flashes on the core. */
+  calm?(): boolean;
+  /** Opacity of everything the engine itself drew this frame (lanes, loops, satellite, core); 0 leaves only the extension and the dust. */
+  engineAlpha?(): number;
+  /** Moves the far end of the i-th input lane (landscape layout), so upstream content can hand over to it. */
+  inputStart?(index: number, far: V3): V3;
+}
 type Values = { r: number; q: number; w: number; u: number; f: number; d: number };
 const ZERO: Values = { r: 0, q: 0, w: 0, u: 0, f: 0, d: 0 };
 const values = (c: TelemetryChannel): Values => ({
@@ -280,6 +304,10 @@ export class EngineScene {
   private VP: number[] | null = null;
   private observer: ResizeObserver;
   private focus: Focus = null;
+  private extension: SceneExtension | null = null;
+  private viewK = sp(1);
+  private viewTarget = 1;
+  private viewS = 1;
   private sel: TelemetryChannelCode | null = null;
   private lens: Lens = 'r';
   private hover: string | null = null;
@@ -347,6 +375,22 @@ export class EngineScene {
   hoverLabel(key: string | null) {
     this.hover = key;
   }
+  setExtension(extension: SceneExtension | null) {
+    this.extension = extension;
+    this.buildLanes();
+  }
+  /** The host covers the lower part of the canvas: keep the picture inside the visible top fraction. */
+  setViewport(visible: number, immediate = false) {
+    this.viewTarget = clamp(visible, 0.05, 1);
+    if (immediate) {
+      this.viewK.x = this.viewTarget;
+      this.viewK.v = 0;
+    }
+  }
+  /** Canvas pixel position of a world point in the last rendered frame; w <= 0 means behind the camera. */
+  project(p: V3) {
+    return this.VP ? this.proj(this.VP, p) : { x: 0, y: 0, w: -1 };
+  }
   setReduced(reduced: boolean) {
     this.reduced = reduced;
     if (reduced) {
@@ -375,12 +419,13 @@ export class EngineScene {
     const k = n > 1 ? i / (n - 1) - 0.5 : 0;
     if (!this.portrait) {
       const sx = st === 'in' ? -1 : 1,
-        far: V3 = [
+        base: V3 = [
           sx * 5.6,
           k * (st === 'in' ? 2.6 : 1.6) + (st === 'in' ? 0.15 : -0.1),
           (st === 'in' ? [-0.8, 0.4, -0.3][i] : [0.3, -0.5][i]) || 0,
         ];
-      const dir = norm([sx, k * 0.45, far[2] * 0.15]),
+      const far = (st === 'in' && this.extension?.inputStart?.(i, base)) || base,
+        dir = norm([sx, k * 0.45, far[2] * 0.15]),
         end = mul(dir, 1.06);
       return st === 'in'
         ? { p0: far, p1: [far[0] + 2.4, far[1], far[2]] as V3, p2: add(end, mul(dir, 1.5)), p3: end }
@@ -575,6 +620,9 @@ export class EngineScene {
     return s.x;
   }
   private camTarget(): { e: V3; c: V3 } {
+    const visibleH = this.H * Math.max(this.viewK.x, 0.5);
+    const own = this.extension?.camera(this.W / (visibleH || 1));
+    if (own) return own;
     const f = this.focus;
     if (f === 'pr' || f === 'evo') {
       // Follow the current rendered orbit position, reserving room for the detail card.
@@ -596,7 +644,7 @@ export class EngineScene {
     }
     if (f === 'in') return { e: [-1.9, 0.5, 6.4], c: [-1.55, 0, 0] };
     if (f === 'out') return { e: [3.1, 0.4, 5.4], c: [2.9, 0, 0] };
-    const aspectK = clamp(1.6 / (this.W / this.H || 1.6), 1, 1.5);
+    const aspectK = clamp(1.6 / (this.W / visibleH || 1.6), 1, 1.5);
     return { e: [0, 0.18, 8.6 * aspectK], c: [0, -0.05, 0] };
   }
   private proj(VP: number[], p: V3) {
@@ -725,6 +773,12 @@ export class EngineScene {
     });
     for (let i = 0; i < heat.length; i++) heat[i] *= Math.exp(-dt * 1.4);
     // Completion bursts: only scheduled from real snapshot deltas.
+    if (this.extension?.calm?.()) {
+      this.bursts.length = 0;
+      this.sparks.length = 0;
+      this.rings.length = 0;
+      this.heat.fill(0);
+    }
     this.bursts = this.bursts.filter((b) => {
       if (b.at > t) return true;
       const front = worldPts.map((p, i) => ({ i, z: p[2] })).filter((o) => o.z > 0.1);
@@ -736,6 +790,7 @@ export class EngineScene {
       this.rings.push({ p, n, l: 0, m: 1.1 });
       return false;
     });
+    const coreK = this.extension?.coreAlpha?.() ?? 1;
     OUT.e.forEach(([i, j]) => {
       const a = worldPts[i],
         b = worldPts[j],
@@ -743,14 +798,14 @@ export class EngineScene {
         depth = 0.35 + 0.65 * clamp((z + 1) / 2, 0, 1),
         h = (heat[i] + heat[j]) / 2;
       const col = mix(C_SIL, mix(C_CH, [1, 0.97, 0.9], clamp(h - 0.6, 0, 1)), clamp(h * 1.4, 0, 1));
-      this.ln(a, b, col[0], col[1], col[2], (0.085 * depth + h * 0.85 * depth) * ia);
+      this.ln(a, b, col[0], col[1], col[2], (0.085 * depth + h * 0.85 * depth) * ia * coreK);
     });
-    INN.e.forEach(([i, j]) => this.ln(inPts[i], inPts[j], 0.62, 0.6, 0.57, 0.09 * ia));
+    INN.e.forEach(([i, j]) => this.ln(inPts[i], inPts[j], 0.62, 0.6, 0.57, 0.09 * ia * coreK));
     worldPts.forEach((p, i) => {
       const z = clamp((p[2] / cs + 1) / 2, 0, 1),
         h = Math.max(0, heat[i]);
       const col = h > 0 ? mix(C_SIL, C_CH, clamp(h * 1.5, 0, 1)) : C_SIL;
-      this.pt(p, col[0], col[1], col[2], (0.22 + 0.5 * z + h * 0.8) * ia, 0.028 + h * 0.06);
+      this.pt(p, col[0], col[1], col[2], (0.22 + 0.5 * z + h * 0.8) * ia * coreK, 0.028 + h * 0.06);
     });
     this.pt([0, 0, 0], 1, 0.86, 0.62, (0.05 + 0.02 * Math.sin(t * 2.1)) * ia + (act ? 0.03 : 0), 2.4 * cs);
     for (let k = this.rings.length - 1; k >= 0; k--) {
@@ -996,6 +1051,20 @@ export class EngineScene {
       if (v.u && this.lens === 'u') this.pt(gc, 0.85, 0.77, 0.95, 0.7, 0.18);
       if (v.w && this.lens === 'w') this.pt(gc, ...col, 0.6, 0.16);
     });
+    const ownPt = this.np,
+      ownLn = this.nl,
+      solo = this.extension?.engineAlpha?.() ?? 1;
+    if (solo < 0.999) {
+      for (let i = 0; i < ownPt; i++) this.PT[i * 8 + 6] *= solo;
+      for (let i = 0; i < ownLn; i++) this.LN[i * 7 + 6] *= solo;
+    }
+    this.extension?.draw({
+      pt: (p, c, a, s) => this.pt(p, c[0], c[1], c[2], a, s),
+      ln: (a, b, c, al) => this.ln(a, b, c[0], c[1], c[2], al),
+      t,
+      dt,
+      reduced,
+    });
     DUST.forEach((d) =>
       this.pt(d.p, 0.85, 0.8, 0.72, d.a * (0.6 + 0.4 * Math.sin(t * 0.5 + d.ph)) * ia, d.s),
     );
@@ -1014,7 +1083,12 @@ export class EngineScene {
     eye = rotX(eye, clamp(orbitPitch, -0.6, 0.6));
     eye = add(eye, c);
     this.eyePos = eye;
-    const VP = mm(persp((38 * Math.PI) / 180, this.W / this.H, 0.1, 80), lookAt(eye, c, [0, 1, 0]));
+    let VP = mm(persp((38 * Math.PI) / 180, this.W / this.H, 0.1, 80), lookAt(eye, c, [0, 1, 0]));
+    // Covered canvas: scale and lift the picture into the visible band, exactly as a shorter canvas would frame it.
+    const k = this.spr(this.viewK, this.viewTarget, dt, 70),
+      s = Math.max(k, 0.5);
+    if (k < 0.999) VP = mm([s, 0, 0, 0, 0, s, 0, 0, 0, 0, 1, 0, 0, 1 - k, 0, 1], VP);
+    this.viewS = k < 0.999 ? s : 1;
     this.VP = VP;
     const cp = this.proj(VP, [0, 0, 0]);
     this.CORE_UV = [cp.x / this.W, 1 - cp.y / this.H];
@@ -1042,7 +1116,7 @@ export class EngineScene {
     gl.drawArrays(gl.LINES, 0, this.nl);
     gl.useProgram(P.pt.p);
     gl.uniformMatrix4fv(P.pt.u.uVP, false, VP);
-    gl.uniform1f(P.pt.u.uK, h / 2 / Math.tan((19 * Math.PI) / 180));
+    gl.uniform1f(P.pt.u.uK, (this.viewS * h) / 2 / Math.tan((19 * Math.PI) / 180));
     gl.bindVertexArray(this.vaoPt);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.ptBuf);
     gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.PT, 0, this.np * 8);
@@ -1092,7 +1166,8 @@ export class EngineScene {
 
   /* ---------- HUD placement ---------- */
   private placeLabels(VP: number[]) {
-    const { W, H, focus } = this,
+    const { W, focus } = this,
+      H = this.H * this.viewK.x,
       dom = this.dom;
     const panelOpen = !!focus && W >= 760,
       pLeft = panelOpen && focus === 'in',
@@ -1248,6 +1323,12 @@ export class EngineScene {
         return;
       }
     }
+    const own = this.extension?.pointer(e.clientX - r.left, e.clientY - r.top, false);
+    if (own !== undefined) {
+      this.setHover(null, 0, 0);
+      this.canvas.style.cursor = own ? 'pointer' : '';
+      return;
+    }
     const h = this.hitTest(e);
     this.setHover(h, e.clientX - r.left, e.clientY - r.top);
   };
@@ -1256,6 +1337,8 @@ export class EngineScene {
     this.drag = null;
     this.canvas.classList.remove('drag');
     if (moved) return;
+    const r = this.canvas.getBoundingClientRect();
+    if (this.extension?.pointer(e.clientX - r.left, e.clientY - r.top, true) !== undefined) return;
     const h = this.hitTest(e);
     if (h) {
       if (h.kind === 'core') return;
