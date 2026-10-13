@@ -54,7 +54,6 @@ const clamp01 = (u: number) => Math.max(0, Math.min(1, u));
 /* ---------- 数据基座：三个来源 → 三道处理星门 → 引擎的三条输入光流 ---------- */
 /** 治理的五步。接入和 AI 可用不设门：第 1–3 步各有一道星门。 */
 export const GATES = ['接入', '解析', '口径标注', '检查', 'AI 可用'];
-const PASSED = ['61', '59', '52', '50', '47'];
 /** 每条记录停在哪道门前（5 = 已可用）。 */
 export const GATE_OF: Record<string, number> = {
   d1: 2,
@@ -67,19 +66,6 @@ export const GATE_OF: Record<string, number> = {
   d8: 4,
   d9: 5,
   d10: 5,
-};
-/** 清单里的记录来自哪个来源：0 外部数据集、1 内部资料库。 */
-const SOURCE_OF: Record<string, number> = {
-  d1: 0,
-  d2: 1,
-  d3: 1,
-  d4: 0,
-  d5: 1,
-  d6: 0,
-  d7: 0,
-  d8: 1,
-  d9: 0,
-  d10: 1,
 };
 /** 三个来源：位置、光尘半径、占全部粒子的比例、规模说明。数量为合成数据。 */
 const SOURCES: { name: string; sub: string; c: V3; r: number; share: number }[] = [
@@ -213,6 +199,42 @@ export class World implements SceneExtension {
   ) {
     this.buildFlow();
     this.buildStars(relations, sourceKind);
+  }
+  private knowledgeRevision = '';
+  setKnowledge(items: Item[], relations: [string, string, string][], sourceKind: Record<string, number>) {
+    const revision = JSON.stringify([items, relations, sourceKind]);
+    if (revision === this.knowledgeRevision) return;
+    this.knowledgeRevision = revision;
+    this.knowledge = items;
+    this.grow = [];
+    this.near.clear();
+    this.hover = '';
+    this.buildStars(relations, sourceKind);
+  }
+  private passed = ['—', '—', '—', '—', '—'];
+  private sourceNotes = ['尚未读取', '尚未读取', '尚未接入'];
+  private gates: Record<string, number> = {};
+  private origins: Record<string, number> = {};
+  setFoundation(
+    items: (Item & { gate: number; sourceKind: number })[],
+    passed: number[] | null,
+    sources: { count: number }[],
+  ) {
+    this.data = items;
+    this.passed = passed ? passed.map(String) : ['—', '—', '—', '—', '—'];
+    this.sourceNotes = [0, 1, 2].map((i) =>
+      i === 2 ? '尚未接入' : sources[i] ? `${sources[i].count} 项资产` : '尚未读取',
+    );
+    this.gates = Object.fromEntries(items.map((x) => [x.id, x.gate]));
+    this.origins = Object.fromEntries(items.map((x) => [x.id, x.sourceKind]));
+    this.runners = items
+      .filter((x) => x.tone === 'run')
+      .map((x, i) => ({
+        id: x.id,
+        gate: Math.max(1, Math.min(4, x.gate)),
+        seed: ((i + 1) * 0.137) % 1,
+        at: [0, 0, 0],
+      }));
   }
   private buildFlow() {
     const r = seeded(5),
@@ -364,7 +386,7 @@ export class World implements SceneExtension {
     const lit = (k: number) => (this.gate === null || this.gate === k ? 1 : 0.2);
     // 选中一条卡住的记录时，它卡在的那道门亮起来（不再单独摆出光珠）。
     const held = this.data.find((d) => d.id === this.selected && d.tone !== 'ok' && d.tone !== 'run'),
-      heldAt = held ? GATE_OF[held.id] : -1;
+      heldAt = held ? this.gates[held.id] : -1;
 
     /* ----- 三道处理星门：由大到小 ----- */
     const rim = (x: number, rad: number, b: number): V3 => [x, CY + Math.cos(b) * rad, Math.sin(b) * rad];
@@ -476,7 +498,7 @@ export class World implements SceneExtension {
     this.doneAt = null;
     if (done && this.view === 'data') {
       const w = reduced ? 0.5 : (t * 0.06) % 1;
-      this.doneAt = lane(SOURCE_OF[done.id] ?? 0, w);
+      this.doneAt = lane(this.origins[done.id] ?? 0, w);
       pt(this.doneAt, CHAMPAGNE, A, 0.2);
       ring(this.doneAt, 0.36 + 0.04 * Math.sin(t * 2.2), 0.85 * A);
     }
@@ -554,7 +576,7 @@ export class World implements SceneExtension {
           key: 's' + i,
           kind: 'source',
           text: s.name,
-          sub: s.sub,
+          sub: this.sourceNotes[i],
           p: linkAt(i, XL),
         }),
       );
@@ -562,7 +584,7 @@ export class World implements SceneExtension {
         out.push({
           key: 'g' + (k + 1),
           kind: 'gate',
-          text: PASSED[k + 1],
+          text: this.passed[k + 1],
           sub: GATES[k + 1],
           p: [x, CY - GR[k] * 1.38 - 0.4, 0],
           on: this.gate === k + 1,
@@ -572,14 +594,14 @@ export class World implements SceneExtension {
       out.push({
         key: 'g0',
         kind: 'stage',
-        text: PASSED[0],
+        text: this.passed[0],
         sub: GATES[0],
         p: [GX[0] - 2.7, CY + GR[0] * 1.08, 0],
       });
       out.push({
         key: 'g4',
         kind: 'stage',
-        text: PASSED[4],
+        text: this.passed[4],
         sub: GATES[4],
         p: [-1.5, CY + 1.75, 0],
         on: this.gate === 4,

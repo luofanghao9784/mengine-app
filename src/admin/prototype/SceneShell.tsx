@@ -3,9 +3,11 @@ import { EngineStage3D } from '../../operations/engine-stage/EngineStage3D';
 import { busyDemo } from '../../operations/engine-demo';
 import type { EngineScene, Focus } from '../../operations/engine-stage/scene';
 import { DataWork } from './DataWork';
+import { useFoundation, asItem, type Foundation } from './foundation-api';
 import { activity, aside, daily, steps, STEP_NAMES, tabs, usage } from './content';
-import { briefing, homeCards, places, stats, type Item, type Place, type Tone } from './data';
-import { related, relations, sourceKind } from './knowledge';
+import { homeCards, places, stats, type Item, type Place, type Tone } from './data';
+import { useKnowledge, type Knowledge } from './knowledge-api';
+import { api } from './foundation-api';
 import { GATES, GATE_OF, World } from './world';
 import './scene-shell.css';
 
@@ -41,6 +43,7 @@ function useReduced() {
 
 export function SceneShell() {
   const reduced = useReduced();
+  const foundation = useFoundation();
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const t = window.setInterval(() => setNow(Date.now()), 3000);
@@ -61,10 +64,23 @@ export function SceneShell() {
   const shell = useRef<HTMLDivElement>(null);
   const labels = useRef<HTMLDivElement>(null);
   const scene = useRef<EngineScene | null>(null);
-  const world = useMemo(
-    () => new World(places.data.items, places.knowledge.items, relations, sourceKind),
-    [],
-  );
+  const knowledge = useKnowledge(place === 'knowledge');
+  const world = useMemo(() => new World([], [], [], {}), []);
+  useEffect(() => {
+    world.setKnowledge(
+      knowledge.data?.items || [],
+      knowledge.data?.relations || [],
+      knowledge.data?.sourceKind || {},
+    );
+  }, [world, knowledge.data]);
+
+  useEffect(() => {
+    world.setFoundation(
+      (foundation.data?.items || []).map((a) => ({ ...asItem(a), gate: a.gate, sourceKind: a.sourceKind })),
+      foundation.data?.passed || null,
+      foundation.data?.sources || [],
+    );
+  }, [world, foundation.data]);
 
   const hasScene = (p: Place) => SCENE.includes(p);
   const work = place !== 'home';
@@ -89,18 +105,38 @@ export function SceneShell() {
   // 画布始终铺满窗口，卡片盖住下半部分；告诉场景“可见的是上面这一截”，它会把画面收进去，不用重建画布。
   useEffect(() => scene.current?.setViewport(top / height, live !== null), [top, height, live]);
 
-  const current = (p: Place) => picked[p] || (tabs[p][filter[p] ?? 0]?.items ?? places[p].items)[0]?.id || '';
+  const current = (p: Place) =>
+    picked[p] ||
+    (p === 'data'
+      ? ''
+      : p === 'knowledge'
+        ? knowledge.tabs[filter[p] ?? 0]?.items[0]?.id || ''
+        : (tabs[p][filter[p] ?? 0]?.items ?? places[p].items)[0]?.id || '');
   const pick = (p: Place) => (id: string) => setPicked((old) => ({ ...old, [p]: id }));
   world.view = place === 'data' || place === 'knowledge' ? place : null;
   world.selected = world.view ? current(place) : '';
   world.gate = place === 'data' ? gate : null;
-  world.onPick = pick(place);
-  world.onGate = setGate;
+  world.onPick = (id) => {
+    if (place === 'knowledge') setFilter((old) => ({ ...old, knowledge: 0 }));
+    pick(place)(id);
+  };
+  world.onGate = (next) => {
+    setGate(next);
+    setFilter((old) => ({ ...old, data: next === 4 ? 2 : 0 }));
+    setPicked((old) => ({ ...old, data: '' }));
+  };
 
   const sceneFocus = () =>
     (stage.current?.querySelector('.eng3d')?.getAttribute('data-focus') || null) as Focus;
   const go = (next: Place, id?: string) => {
-    if (id) setPicked((old) => ({ ...old, [next]: id }));
+    if (id) {
+      setPicked((old) => ({ ...old, [next]: id }));
+      if (next === 'knowledge') setFilter((old) => ({ ...old, knowledge: 0 }));
+      if (next === 'data') {
+        setFilter((old) => ({ ...old, data: 2 }));
+        setGate(null);
+      }
+    }
     setPlace(next);
     // 切换板块不改变 3D 视图的大小：全屏还是全屏，半屏还是半屏，收起还是收起。
     // 只有去没有 3D 的页面才收起，回来时恢复到之前那一档。
@@ -216,10 +252,17 @@ export function SceneShell() {
           box.appendChild(el);
         }
         el.className = `world-label ${l.kind}${l.on ? ' on' : ''}${l.dim ? ' dim' : ''}`;
-        const html = `<b>${l.text}</b>` + (l.sub ? `<span>${l.sub}</span>` : '');
+        const html = JSON.stringify([l.text, l.sub]);
         if (el.dataset.html !== html) {
           el.dataset.html = html;
-          el.innerHTML = html;
+          const title = document.createElement('b');
+          title.textContent = l.text;
+          el.replaceChildren(title);
+          if (l.sub) {
+            const sub = document.createElement('span');
+            sub.textContent = l.sub;
+            el.appendChild(sub);
+          }
         }
         el.style.transform = `translate3d(${p.x.toFixed(1)}px,${p.y.toFixed(1)}px,0)`;
       }
@@ -294,6 +337,14 @@ export function SceneShell() {
           </svg>
         </span>
         <h1>{work ? info.name : '引擎'}</h1>
+        <span className="live-state">
+          {place === 'data'
+            ? '数据基座 · ' + (foundation.data ? '已连接' : '等待连接')
+            : place === 'knowledge'
+              ? '知识库 · ' +
+                (knowledge.error || (knowledge.busy ? '正在同步' : knowledge.data?.status || '等待连接'))
+              : '引擎与其他板块为演示 · 数据基座与知识库已接入'}
+        </span>
       </header>
 
       <div className="deck">
@@ -337,6 +388,7 @@ export function SceneShell() {
           <Usage />
         ) : place === 'data' ? (
           <DataWork
+            foundation={foundation}
             picked={current(place)}
             pick={pick(place)}
             filter={filter[place] ?? 0}
@@ -347,6 +399,7 @@ export function SceneShell() {
         ) : work ? (
           <Work
             key={place}
+            knowledge={knowledge}
             place={place}
             picked={current(place)}
             pick={pick(place)}
@@ -356,11 +409,13 @@ export function SceneShell() {
             setGate={setGate}
           />
         ) : (
-          <Home go={go} />
+          <Home go={go} foundation={foundation} knowledge={knowledge} />
         )}
       </div>
 
-      {palette && <Palette go={go} close={() => setPalette(false)} />}
+      {palette && (
+        <Palette knowledge={knowledge} foundation={foundation} go={go} close={() => setPalette(false)} />
+      )}
     </div>
   );
 }
@@ -396,16 +451,48 @@ const StatCard = ({ c, go }: { c: (typeof homeCards)[number]; go: (p: Place) => 
 );
 
 /** 引擎首页：待办、常用数据、每日请求和最近动态。半屏时只露出上面两行，卡片升到顶时一屏排完。 */
-function Home({ go }: { go: (p: Place, id?: string) => void }) {
+function Home({
+  go,
+  foundation,
+  knowledge,
+}: {
+  go: (p: Place, id?: string) => void;
+  foundation: Foundation;
+  knowledge: Knowledge;
+}) {
+  const assets = foundation.data?.items || [];
+  const todos = assets
+    .filter((x) => x.needsAttention)
+    .slice(0, 8)
+    .map((x) => ({ id: x.id, title: x.title, sub: x.label, place: 'data' as Place, act: '查看' }));
+  const cards = homeCards.map((c) =>
+    c.place === 'data'
+      ? {
+          ...c,
+          value: foundation.data ? String(assets.filter((x) => x.available).length) : '—',
+          unit: foundation.data ? `/ ${assets.filter((x) => x.status !== 'archived').length} 可用` : '',
+          note: foundation.data ? '当前企业数据基座' : '登录数据基座后查看',
+          ratio: assets.length ? assets.filter((x) => x.available).length / assets.length : 0,
+        }
+      : c.place === 'knowledge'
+        ? {
+            ...c,
+            value: knowledge.data ? String(knowledge.data.items.length) : '—',
+            unit: '条',
+            note: knowledge.error || knowledge.data?.status || '读取当前企业知识',
+          }
+        : c,
+  );
+
   return (
     <section className="cards home" aria-label="待办与常用数据">
       <article className="card todo">
         <header>
           <h2>需要你处理</h2>
-          <span>{briefing.todos.length} 项，按影响排序</span>
+          <span>{todos.length} 项，按影响排序</span>
         </header>
         <ol>
-          {briefing.todos.map((t, i) => (
+          {todos.map((t, i) => (
             <li key={t.id}>
               <button type="button" onClick={() => go(t.place, t.id)}>
                 <span className="n">{i + 1}</span>
@@ -420,7 +507,7 @@ function Home({ go }: { go: (p: Place, id?: string) => void }) {
           ))}
         </ol>
       </article>
-      {homeCards.slice(0, 4).map((c) => (
+      {cards.slice(0, 4).map((c) => (
         <StatCard key={c.label} c={c} go={go} />
       ))}
       <article className="card chart">
@@ -432,7 +519,7 @@ function Home({ go }: { go: (p: Place, id?: string) => void }) {
       </article>
       <article className="card feed">
         <header>
-          <h2>最近动态</h2>
+          <h2>最近动态 · 演示</h2>
           <button type="button" onClick={() => go('company')}>
             全部审计 →
           </button>
@@ -447,7 +534,7 @@ function Home({ go }: { go: (p: Place, id?: string) => void }) {
           ))}
         </div>
       </article>
-      {homeCards.slice(4).map((c) => (
+      {cards.slice(4).map((c) => (
         <StatCard key={c.label} c={c} go={go} />
       ))}
     </section>
@@ -516,6 +603,7 @@ function Usage() {
 const toneClass = (t: Tone) => `tone-${t}`;
 
 function Work({
+  knowledge,
   place,
   picked,
   pick,
@@ -524,6 +612,7 @@ function Work({
   gate,
   setGate,
 }: {
+  knowledge: Knowledge;
   place: Place;
   picked: string;
   pick: (id: string) => void;
@@ -532,15 +621,29 @@ function Work({
   gate: number | null;
   setGate: (gate: number | null) => void;
 }) {
+  const workTabs = place === 'knowledge' ? knowledge.tabs : tabs[place];
+  const [source, setSource] = useState<Item | null>(null),
+    [actionError, setActionError] = useState('');
+  const selection = useRef(picked);
+  selection.current = picked;
+  useEffect(() => {
+    setSource(null);
+    setActionError('');
+  }, [picked, knowledge.data]);
   const info = places[place],
-    side = stats[place],
-    more = aside[place],
-    tab = tabs[place][filter] || tabs[place][0],
-    all = tabs[place].flatMap((x) => x.items);
+    side = place === 'knowledge' ? knowledge.stats : stats[place],
+    more = place === 'knowledge' ? knowledge.aside : aside[place],
+    tab = workTabs[filter] || workTabs[0],
+    all = workTabs.flatMap((x) => x.items);
   const shown = tab.items.filter(
     (x) => gate === null || (GATE_OF[x.id] === gate && x.tone !== 'ok' && x.tone !== 'run'),
   );
-  const current = all.find((x) => x.id === picked) || shown[0] || tab.items[0];
+  const current =
+    source ||
+    (place === 'knowledge'
+      ? shown.find((x) => x.id === picked) || shown[0]
+      : all.find((x) => x.id === picked) || shown[0] || tab.items[0]) ||
+    knowledge.empty;
   const groups = shown.reduce<[string, Item[]][]>((acc, x) => {
     const g = acc.find(([name]) => name === x.group);
     if (g) g[1].push(x);
@@ -562,12 +665,26 @@ function Work({
     requestAnimationFrame(() => list.current?.querySelector<HTMLElement>('[aria-pressed="true"]')?.focus());
   };
   const flow = place === 'data' ? steps[current.id] : undefined;
-  const links = place === 'knowledge' ? related(current.id) : [];
+  const links = place === 'knowledge' ? knowledge.related(current.id) : [];
+  async function act(label: string) {
+    setActionError('');
+    try {
+      if (label === '返回知识') setSource(null);
+      else if (label === '查看来源') {
+        const id = picked;
+        const result = await api<Item>('/scene-knowledge/' + encodeURIComponent(current.id) + '/source');
+        if (selection.current === id) setSource(result);
+      } else if (label === '重新核验') await knowledge.refresh(true);
+    } catch (e) {
+      setSource(null);
+      setActionError((e as Error).message);
+    }
+  }
   return (
     <section className="cards work" aria-label={info.name}>
       <article className="card list">
         <div className="tabs" role="tablist" aria-label={`${info.name}栏目`}>
-          {tabs[place].map((f, i) => (
+          {workTabs.map((f, i) => (
             <button
               key={f.label}
               type="button"
@@ -624,7 +741,11 @@ function Work({
           </span>
         </header>
         <div className="card-scroll">
-          <p className={`verdict ${toneClass(current.tone)}`}>{current.verdict}</p>
+          <p className={`verdict ${toneClass(current.tone)}`}>
+            {actionError ||
+              (place === 'knowledge' && (knowledge.error || (knowledge.busy ? '正在同步知识与关联…' : ''))) ||
+              current.verdict}
+          </p>
           {flow && (
             <ol className="flow">
               {flow.map(([text, state], i) => (
@@ -659,19 +780,38 @@ function Work({
             <div className="related">
               <h3>关联知识 {links.length}</h3>
               {links.map((r) => (
-                <button key={r.id} type="button" onClick={() => pick(r.id)}>
+                <button
+                  key={r.id}
+                  type="button"
+                  onClick={() => {
+                    setFilter(0);
+                    pick(r.id);
+                  }}
+                >
                   <b>{r.name}</b>
                   <span>{r.why}</span>
                 </button>
               ))}
-              {links.length === 0 && <p>这条知识目前没有关联。</p>}
+              {links.length === 0 && (
+                <p>
+                  {knowledge.data?.needsGraph
+                    ? '关联待模型分析确认，星图暂以独立节点呈现。'
+                    : '这条知识目前没有已验证关联。'}
+                </p>
+              )}
             </div>
           )}
         </div>
         {current.actions.length > 0 && (
           <footer>
             {current.actions.map((a, i) => (
-              <button key={a} type="button" className={i === 0 ? 'primary' : undefined}>
+              <button
+                key={a}
+                type="button"
+                disabled={place === 'knowledge' && knowledge.busy}
+                onClick={place === 'knowledge' ? () => void act(a) : undefined}
+                className={i === 0 ? 'primary' : undefined}
+              >
                 {a}
               </button>
             ))}
@@ -722,7 +862,17 @@ function Work({
   );
 }
 
-function Palette({ go, close }: { go: (p: Place, id?: string) => void; close: () => void }) {
+function Palette({
+  knowledge,
+  go,
+  close,
+  foundation,
+}: {
+  go: (p: Place, id?: string) => void;
+  close: () => void;
+  foundation: Foundation;
+  knowledge: Knowledge;
+}) {
   const [q, setQ] = useState('');
   const [at, setAt] = useState(0);
   const all = useMemo(
@@ -734,7 +884,12 @@ function Palette({ go, close }: { go: (p: Place, id?: string) => void; close: ()
         sub: '前往',
       })),
       ...(Object.keys(places) as Place[]).flatMap((p) =>
-        places[p].items.map((x) => ({
+        (p === 'data'
+          ? (foundation.data?.items || []).map(asItem)
+          : p === 'knowledge'
+            ? knowledge.data?.items || []
+            : places[p].items
+        ).map((x) => ({
           place: p,
           id: x.id as string | undefined,
           label: x.name,
@@ -742,7 +897,7 @@ function Palette({ go, close }: { go: (p: Place, id?: string) => void; close: ()
         })),
       ),
     ],
-    [],
+    [foundation.data, knowledge.data],
   );
   const hits = all
     .filter((x) => !q.trim() || (x.label + x.sub).toLowerCase().includes(q.trim().toLowerCase()))
