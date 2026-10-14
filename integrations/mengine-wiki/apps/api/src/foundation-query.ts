@@ -1,3 +1,4 @@
+import {datasetAvailability,canUseCurrentData} from './data-availability.js';
 import {dictionaryFingerprint} from './dictionary-version.js';
 import { Store } from './store.js';
 import { canRead, canUseAI, type User, visibleText } from './domain.js';
@@ -10,17 +11,19 @@ export const beijingTime=(value:string)=>new Intl.DateTimeFormat('zh-CN',{timeZo
 export function datasetUpdatedAt(store:Store,tenant:string,id:string,fallback:string){const r=store.db.prepare('SELECT data FROM data_batches WHERE dataset_id=? AND tenant_id=? ORDER BY seq DESC LIMIT 1').get(id,tenant) as {data:string}|undefined;return r?JSON.parse(r.data).at||fallback:fallback;}
 export function readDataset(store:Store,u:User,id:string){
  const d=store.doc(u.tenantId,id),row=store.db.prepare('SELECT data FROM data_sets WHERE id=? AND tenant_id=?').get(id,u.tenantId) as {data:string}|undefined;
- if(!d||!row||!canRead(u,d))throw fail(403,'没有该数据集的内容读取权限');
+ if(!d||!row||!canRead(u,d))throw fail(404,'数据集不存在或无权访问');
  const raw=JSON.parse(row.data);const dict=store.db.prepare('SELECT data FROM data_dictionary WHERE dataset_id=? AND tenant_id=?').get(id,u.tenantId) as {data:string}|undefined;const confirmed=dict?JSON.parse(dict.data).confirmed:null;const valid=confirmed?.fingerprint===dictionaryFingerprint(store,u.tenantId,raw);
  return {document:d,business:valid&&confirmed.origin==='model'?confirmed.definition:null,dictionaryStatus:confirmed?(valid?(confirmed.origin==='model'?'generated':'legacy'):'changed'):'unconfirmed',definition:raw as {fields:Field[];source:string;purpose:string;updatePolicy:string}};
 }
 export function listDatasets(store:Store,u:User,selected?:string,search?:string){
- return (store.db.prepare('SELECT id FROM data_sets WHERE tenant_id=? ORDER BY id').all(u.tenantId) as {id:string}[]).filter(r=>!selected||r.id===selected).flatMap(r=>{const d=store.doc(u.tenantId,r.id);if(!d||!canUseAI(u,d)||(search&&!`${d.title} ${d.summary}`.toLowerCase().includes(search.toLowerCase())))return [];const {definition,business,dictionaryStatus}=readDataset(store,u,r.id);return [{document:d,definition,business,dictionaryStatus}];}).slice(0,20);
+ return (store.db.prepare('SELECT id FROM data_sets WHERE tenant_id=? ORDER BY id').all(u.tenantId) as {id:string}[]).filter(r=>!selected||r.id===selected).flatMap(r=>{const d=store.doc(u.tenantId,r.id);if(!d||!canUseCurrentData(store,u,d)||(search&&!`${d.title} ${d.summary}`.toLowerCase().includes(search.toLowerCase())))return [];const {definition,business,dictionaryStatus}=readDataset(store,u,r.id);return [{document:d,definition,business,dictionaryStatus}];}).slice(0,20);
 }
 // A constrained query language, never executable SQL. Model queries always exclude sensitive columns.
 export function queryDataset(store:Store,u:User,id:string,input:unknown,model=false,recordIds?:Set<string>,validateOnly=false){
  const {document,definition,business,dictionaryStatus}=readDataset(store,u,id);
  if(model&&!validateOnly&&!canUseAI(u,document))throw fail(403,"此数据集已暂停提供给 AI");
+ const sourceFreshness=datasetAvailability(store,u.tenantId,id);
+ if(model&&!validateOnly&&!sourceFreshness.allowed)throw fail(409,sourceFreshness.reason);
  if(!input||typeof input!=='object'||Array.isArray(input))throw fail(400,'查询格式无效');
  const q=input as Query;if(Object.keys(q).some(k=>!['operation','field','groupBy','filters','limit'].includes(k))||!['records','count','sum','min','max'].includes(q.operation))throw fail(400,'不支持的查询操作');
  const limit=q.limit??(model?10:20);if(!Number.isInteger(limit)||limit<1||limit>100)throw fail(400,'结果上限应为 1–100');
@@ -34,7 +37,7 @@ export function queryDataset(store:Store,u:User,id:string,input:unknown,model=fa
  const visibleFields=definition.fields.filter(allowed);
  const source=store.db.prepare("SELECT data FROM data_rows WHERE dataset_id=? AND tenant_id=? AND status='ready' ORDER BY updated_at DESC,id").all(id,u.tenantId) as {data:string}[];
  const records=source.map(r=>JSON.parse(r.data) as {id:string;values:Record<string,string>}).filter(r=>!recordIds||recordIds.has(r.id)).map(r=>({...r,values:Object.fromEntries(visibleFields.map(f=>[f.name,visibleText(model?{...u,clearance:0}:u,r.values[f.name]||'')]))})).filter(r=>filters.every(f=>{const value=r.values[f.field];if(!value)return false;const field=getField(f.field);if(field.type==='number'&&!/^-?\d{1,15}(\.\d{1,6})?$/.test(value))return false;const left=field.type==='number'?decimal(value):value,right=field.type==='number'?decimal(f.value):f.value;return f.operator==='eq'?left===right:f.operator==='gte'?left>=right:left<=right;}));
- const common={dataUpdatedAt:datasetUpdatedAt(store,u.tenantId,id,document.createdAt),datasetId:id,title:document.title,version:document.version,source:definition.source,purpose:definition.purpose,query:q,matchedRecords:records.length,scope:'仅质量检查通过且当前岗位可读的记录',dictionaryStatus,business,calculatedAt:new Date().toISOString()};
+ const common={sourceFreshness,dataUpdatedAt:datasetUpdatedAt(store,u.tenantId,id,document.createdAt),datasetId:id,title:document.title,version:document.version,source:definition.source,purpose:definition.purpose,query:q,matchedRecords:records.length,scope:'仅质量检查通过且当前岗位可读的记录',dictionaryStatus,business,calculatedAt:new Date().toISOString()};
  if(q.operation==='records')return {document,result:{...common,fields:visibleFields,records:records.slice(0,limit),truncated:records.length>limit}};
  const groups=new Map<string,typeof records>();for(const r of records){const key=q.groupBy?r.values[q.groupBy]:'';const group=groups.get(key)||[];group.push(r);groups.set(key,group);}if(!q.groupBy&&!groups.size)groups.set('',[]);
  if(q.field&&records.some(r=>r.values[q.field!]&&!/^-?\d{1,15}(\.\d{1,6})?$/.test(r.values[q.field!])))throw fail(403,'统计字段含受限值，无法计算');

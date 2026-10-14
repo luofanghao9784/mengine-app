@@ -6,7 +6,7 @@ import type {FastifyInstance,FastifyRequest} from 'fastify';
 import {Store} from './store.js';
 import {Model} from './model.js';
 import {listDatasets,readDataset} from './foundation-query.js';
-import {canEdit,now,type User,type Proposal,type Doc} from './domain.js';
+import {canRegenerateDictionary,now,type User,type Proposal,type Doc} from './domain.js';
 import {redactForGovernance} from './governance-ai.js';
 const fail=(statusCode:number,message:string)=>Object.assign(Error(message),{statusCode});
 export type BusinessDefinition=Semantics & {tableMeaning:string;usageRules:string;fields:{name:string;label:string;meaning:string;unit:string;rules:string;evidence:string}[]};
@@ -34,7 +34,7 @@ export function reconcileDictionaryJobs(store:Store){
   if(job&&['queued','running','retry_wait'].includes(job.state))continue;
   // Reuse the original authorized actor, or the dataset owner for pre-queue imports.
   const u=store.user(job?.actor_id||d.ownerId);
-  if(!u||!u.active||u.tenantId!==row.tenant_id||!canEdit(u,d))continue;
+  if(!u||!u.active||u.tenantId!==row.tenant_id||!canRegenerateDictionary(u,d))continue;
   if(dictionaryState(store,u,row.id).status==='generated')continue;
   enqueueDictionary(store,u,row.id);
  }
@@ -51,11 +51,11 @@ export function registerDictionary(app:FastifyInstance,store:Store,model:Model,s
  app.get<{Params:{id:string}}>('/api/foundation/:id/dictionary',async req=>{
   const u=session(req),s=dictionaryState(store,u,req.params.id);
   const job=store.db.prepare('SELECT state,error,attempts,next_at AS nextAt FROM dictionary_jobs WHERE dataset_id=? AND tenant_id=?').get(req.params.id,u.tenantId) as {state:string;error:string}|undefined;
-  return {...s.data,job,pendingProposal:null,fingerprint:s.fingerprint,status:s.status,mode:'model-only',canGenerate:canEdit(u,s.document),sourceFields:s.definition.fields,source:s.definition.source,busy:running.has(u.tenantId+':'+req.params.id)||['queued','running','retry_wait'].includes(job?.state||'')};
+  return {...s.data,job,pendingProposal:null,fingerprint:s.fingerprint,status:s.status,mode:'model-only',canGenerate:canRegenerateDictionary(u,s.document),sourceFields:s.definition.fields,source:s.definition.source,busy:running.has(u.tenantId+':'+req.params.id)||['queued','running','retry_wait'].includes(job?.state||'')};
  });
  const generate=async(u:User,id:string,refresh:()=>User)=>{
   const s=dictionaryState(store,u,id);
-  if(!canEdit(u,s.document))throw fail(403,'需要数据集编辑权限才能触发模型生成');
+  if(!canRegenerateDictionary(u,s.document))throw fail(403,'需要口径生成职责和来源使用权限');
   if(s.document.aiPaused)throw fail(409,'此数据集已暂停提供给 AI，请恢复后生成口径');
   if(!model.status().configured||!model.status().enabled)throw fail(503,'模型未配置或暂停');
   const key=u.tenantId+':'+id;if(running.has(key))throw fail(409,'模型正在生成字段与口径，请等待完成');running.add(key);store.recordFlow(s.document,'dictionary-generating');
@@ -87,7 +87,7 @@ export function registerDictionary(app:FastifyInstance,store:Store,model:Model,s
    for(const f of definition.fields)for(const k of ['label','meaning','unit','rules','evidence'] as const)f[k]=redactForGovernance(f[k]);
    definition.tableMeaning=redactForGovernance(definition.tableMeaning);definition.usageRules=redactForGovernance(definition.usageRules);
    const fresh=refresh(),current=dictionaryState(store,fresh,id);
-   if(fresh.id!==u.id||!canEdit(fresh,current.document)||current.fingerprint!==s.fingerprint||current.data.revision!==s.data.revision||current.document.policyVersion!==s.document.policyVersion)throw fail(409,'资料、权限或字典已变化，请重新生成');
+   if(fresh.id!==u.id||!canRegenerateDictionary(fresh,current.document)||current.fingerprint!==s.fingerprint||current.data.revision!==s.data.revision||current.document.policyVersion!==s.document.policyVersion)throw fail(409,'资料、权限或字典已变化，请重新生成');
    for(const snapshot of snapshots){const latest=readDataset(store,fresh,snapshot.id);if(latest.document.version!==snapshot.version||latest.document.policyVersion!==snapshot.policyVersion||dictionaryFingerprint(store,fresh.tenantId,latest.definition)!==snapshot.fingerprint)throw fail(409,'关联候选已变化，请重新生成');}
    const generated={definition,fingerprint:s.fingerprint,origin:'model',provider:model.status().model,confirmedBy:'AI 自动生成',confirmedById:null,at:now(),reason:'模型生成并通过结构校验；不代表已核验未知业务事实',warnings};
    store.db.transaction(()=>{

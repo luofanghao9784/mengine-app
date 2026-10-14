@@ -45,7 +45,7 @@ test('旧人工口径方案不可继续批准，非维护人员不能触发生�
  assert.equal((await ctx.app.inject({method:'POST',url:'/api/proposals/legacy-dict/resolve',headers:h,payload:{decision:'approve'}})).statusCode,410);
  const login=await ctx.app.inject({method:'POST',url:'/api/auth/login',payload:{email:'external@mengine.demo',password:DEMO_PASSWORD}});
  const outside={cookie:String(login.headers['set-cookie']).split(';')[0]};
- assert.equal((await ctx.app.inject({method:'POST',url:`/api/foundation/${id}/dictionary/generate`,headers:outside,payload:{}})).statusCode,403);
+ assert.equal((await ctx.app.inject({method:'POST',url:`/api/foundation/${id}/dictionary/generate`,headers:outside,payload:{}})).statusCode,404);
 }));
 async function until(check:()=>boolean){for(let i=0;i<200;i++){if(check())return;await new Promise(r=>setTimeout(r,30));}assert.fail('后台任务未按时完成');}
 test('导入事务完成后自动生成字段口径，不依赖打开页面，后台失败保留记录',()=>fixture(async(ctx,h)=>{
@@ -88,7 +88,7 @@ test('已有快照可启用定时同步，后台到期自动运行；撤销发�
  const job=()=>JSON.parse((ctx.store.db.prepare('SELECT data FROM database_sync_jobs WHERE id=?').get(jobId) as any).data);
  await until(()=>job().state==='succeeded');assert.ok((ctx.store.db.prepare('SELECT data FROM data_rows WHERE dataset_id=?').all(id) as any[]).some(r=>JSON.parse(r.data).values.amount_yuan==='3.33'));
  await until(()=>(ctx.store.db.prepare('SELECT state FROM dictionary_jobs WHERE dataset_id=?').get(id) as any).state==='succeeded');
- const before=ctx.store.doc('mengine-demo',id)!.version;const j=job();j.nextAt='2000-01-01T00:00:00.000Z';ctx.store.db.prepare('UPDATE database_sync_jobs SET data=? WHERE id=?').run(JSON.stringify(j),jobId);const actor=ctx.store.user('u-admin')!;actor.active=false;ctx.store.saveUser(actor);
+ const before=ctx.store.doc('mengine-demo',id)!.version;const j=job();j.nextAt='2000-01-01T00:00:00.000Z';ctx.store.db.prepare('UPDATE database_sync_jobs SET data=? WHERE id=?').run(JSON.stringify(j),jobId);const actor=ctx.store.user('u-admin')!;ctx.store.addUser({...actor,id:'backup-admin',email:'backup-admin@test.invalid'},DEMO_PASSWORD);actor.active=false;ctx.store.saveUser(actor);
  await until(()=>job().state==='failed');assert.equal(ctx.store.doc('mengine-demo',id)!.version,before);
 }));
 

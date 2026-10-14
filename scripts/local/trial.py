@@ -310,7 +310,7 @@ def instance_briefing_environment(root):
     return {'BRIEFING_DAILY_ENABLED': str(value['dailyEnabled']).lower()}
 
 
-def start(root, model_config=None, reconnect_live=False, phone_local=False, collection_config=None, enable_live=False):
+def start(root, model_config=None, reconnect_live=False, phone_local=False, collection_config=None, enable_live=False, automatic_work=False):
     os.umask(0o077)
     collection_env = instance_collection_environment(root, collection_config)
     analysis_env = instance_analysis_environment(root)
@@ -320,6 +320,8 @@ def start(root, model_config=None, reconnect_live=False, phone_local=False, coll
         import live_model
         model = live_model.load(model_config)
         live_model.check(model)
+    if automatic_work and model is None:
+        raise TrialError('自动工作循环需要 start --live 和有效模型配置。')
     mode = 'live' if model else 'off'
     # Keep the credential file outside the persistent instance and all instance backups.
     private_root = (WORKSPACE / '.local/model-private').resolve()
@@ -397,6 +399,9 @@ def start(root, model_config=None, reconnect_live=False, phone_local=False, coll
             raise TrialError('数据库目录不能是符号链接。')
         engine_port=free_port()
         engine_token=secrets.token_urlsafe(48)
+        if automatic_work:
+            settings['automaticWorkEnabled'] = True
+            private_write(root / 'config.json', settings)
         model_api_env, engine_env = model_environments(model, engine_port, engine_token, settings['ports']['api'], settings.get('manualModelAcceptance', False), settings.get('publicSearch'), settings.get('automaticWorkEnabled', False))
         env = {**clean_environment(), 'TASK_ENABLED':'true', 'TASK_ENGINE_TOKEN':engine_token, 'ENGINE_BASE_URL':f'http://127.0.0.1:{engine_port}', 'DATABASE_URL': f"jdbc:postgresql://127.0.0.1:{settings['ports']['database']}/dreamcore_trial", 'DATABASE_USER': 'dreamcore_trial', 'DATABASE_PASSWORD': secret,
                'KNOWLEDGE_ENABLED': str((WORKSPACE / 'workers/parser/.venv/bin/python').exists()).lower(), 'KNOWLEDGE_PARSER_ROOT': str(WORKSPACE / 'workers/parser'), 'MATERIAL_STORAGE_ROOT': str(root / 'objects'), 'SPRING_PROFILES_ACTIVE': 'local', 'INVITATION_DELIVERY': 'local', 'INVITATION_OUTBOX': str(root / 'invitations'), 'API_HOST': '127.0.0.1', 'API_PORT': str(settings['ports']['api']), 'SERVER_SERVLET_SESSION_COOKIE_NAME': 'DREAMCORE_TRIAL_' + hashlib.sha256(str(root).encode()).hexdigest()[:12]}
@@ -530,8 +535,11 @@ def main():
     parser.add_argument('--model-config', type=Path, help='本工作树 .local/model-private 内的私有模型配置。')
     parser.add_argument('--reconnect-live', action='store_true', help='已 activate 的恢复实例显式重新接入真实模型；旧任务/计划不自动恢复。')
     parser.add_argument('--enable-live', action='store_true', help='明确授权已有非恢复实例接入真实模型，保留数据；关闭自动分析/画报与定时计划，只供手动验收。')
+    parser.add_argument('--automatic-work', action='store_true', help='显式启用并保存真实模型自动工作循环：企业分析、经验和已配置的计划。')
     parser.add_argument('--collection-config', type=Path, help='部署维护的 0600 采集器配置；不从继承环境读取。')
     args = parser.parse_args()
+    if args.automatic_work and (args.command != 'start' or not args.live):
+        raise TrialError('--automatic-work 仅适用于 start --live。')
     if args.collection_config and args.command != 'start':
         raise TrialError('采集配置仅适用于 start。')
     if (args.live or args.model_config) and (args.command != 'start' or not args.live):
@@ -546,7 +554,7 @@ def main():
     if args.command == 'start':
         if args.live:
             from live_model import DEFAULT_CONFIG
-            start(root, args.model_config or DEFAULT_CONFIG, args.reconnect_live, phone_local=args.phone_local, collection_config=args.collection_config, enable_live=args.enable_live)
+            start(root, args.model_config or DEFAULT_CONFIG, args.reconnect_live, phone_local=args.phone_local, collection_config=args.collection_config, enable_live=args.enable_live, automatic_work=args.automatic_work)
         else:
             start(root, phone_local=args.phone_local, collection_config=args.collection_config)
     elif args.command == 'invitation':

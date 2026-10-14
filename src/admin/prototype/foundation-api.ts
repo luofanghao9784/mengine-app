@@ -138,16 +138,24 @@ export const ACTIONS: Record<string, string> = {
   handle: '记录处理措施',
 };
 export async function api<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
-  const r = await fetch('/mengine-api' + path, {
+  const tenant = new URLSearchParams(location.search).get('tenant');
+  const headers: Record<string,string> = {};
+  if (tenant && body !== undefined) {
+    const csrf = await fetch('/api/v1/auth/csrf', { credentials:'same-origin', signal });
+    if (!csrf.ok) throw Object.assign(Error('请重新登录企业管理端'), {status:csrf.status});
+    const token = await csrf.json(); headers[token.headerName] = token.token;
+  }
+  const url = tenant ? `/api/tenant-admin/v1/tenants/${encodeURIComponent(tenant)}/scene/dispatch?path=${encodeURIComponent(path)}` : '/mengine-api' + path;
+  const r = await fetch(url, {
     credentials: 'same-origin',
     cache: 'no-store',
     signal,
     ...(body !== undefined
-      ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+      ? { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
       : {}),
   });
   const data = await r.json().catch(() => ({ message: '数据服务暂不可用' }));
-  if (!r.ok) throw Object.assign(Error(data.message || '请求失败'), { status: r.status });
+  if (!r.ok) throw Object.assign(Error(data.message || (data.code === 'SCENE_REVISION_CONFLICT' ? '资源、权限或处理状态已变化，请刷新后重新提交。' : data.code === 'SCENE_OPERATION_FORBIDDEN' ? '当前账号没有此操作权限，非管理员不能审批本人申请。' : data.code === 'SCENE_READ_ONLY' ? '企业内容只读，此操作已停用。' : data.code === 'SCENE_TENANT_NOT_BOUND' ? '该企业尚未绑定数据来源，请联系总台配置。' : ['SCENE_NOT_CONFIGURED', 'SCENE_UPSTREAM_UNAVAILABLE', 'SCENE_UPSTREAM_FAILED'].includes(data.code) ? '企业数据服务暂不可用，请稍后重试。' : '请求失败')), { status: r.status });
   return data as T;
 }
 export function useFoundation() {

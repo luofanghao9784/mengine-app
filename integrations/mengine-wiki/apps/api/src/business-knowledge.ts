@@ -1,3 +1,4 @@
+import {canUseCurrentData} from './data-availability.js';
 import { createHash } from "node:crypto";
 import type { Store } from "./store.js";
 import type { Model } from "./model.js";
@@ -35,7 +36,7 @@ export function createBusinessKnowledge(store: Store, model: Model) {
   const running = new Set<string>();
   const context = (u: User, id: string) => {
     const d = store.doc(u.tenantId, id);
-    if (!d || !canUseAI(u, d) || d.kind !== "数据表") return null;
+    if (!d || !canUseCurrentData(store,u,d) || d.kind !== "数据表") return null;
     const dataset = readDataset(store, u, id);
     if (dataset.dictionaryStatus !== "generated") return null;
     const rows = store.db

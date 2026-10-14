@@ -22,6 +22,8 @@ public class EngineTelemetryService {
       SELECT 1 FROM conversation_live_output o WHERE o.task_id=t.id AND o.attempt_number=t.attempt AND o.state='STREAMING') THEN 'RESPONSE' ELSE 'TASK' END,
       tenant_id,status,finished_at FROM conversation_tasks t
     UNION ALL SELECT 'EXPORT',tenant_id,CASE state WHEN 'GENERATING' THEN 'RUNNING' WHEN 'READY' THEN 'SUCCEEDED' ELSE state END,generated_at FROM export_batches
+    UNION ALL SELECT 'SCENE_KNOWLEDGE',tenant_id,state,finished_at FROM scene_processing_runs WHERE operation='/scene-knowledge/sync'
+    UNION ALL SELECT 'COMPANY',tenant_id,CASE state WHEN 'RETRY_WAIT' THEN 'WAITING_CAPABILITY' ELSE state END,NULL::timestamptz FROM company_analysis_items WHERE state IN ('QUEUED','RETRY_WAIT')
     UNION ALL SELECT 'COMPANY',tenant_id,CASE state WHEN 'CLAIMED' THEN 'RUNNING' WHEN 'DISPATCHED' THEN 'RUNNING' WHEN 'RETURNED' THEN 'SUCCEEDED' ELSE state END,finished_at FROM company_analysis_attempts
     UNION ALL SELECT 'EXPERIENCE',i.tenant_id,CASE WHEN a.outcome IN('CREATED','UPDATED','DUPLICATE') THEN 'SUCCEEDED' WHEN a.outcome='CONFLICT' THEN 'FAILED' WHEN a.outcome='SOURCE_UNAVAILABLE' THEN 'CANCELLED' ELSE CASE i.state WHEN 'RETRY_WAIT' THEN 'WAITING_CAPABILITY' WHEN 'QUALIFIED' THEN 'WAITING_CAPABILITY' WHEN 'REJECTED' THEN 'CANCELLED' ELSE i.state END END,coalesce(a.created_at,i.updated_at) FROM experience_analysis_items i LEFT JOIN experience_admissions a ON a.run_id=i.run_id
     UNION ALL SELECT 'GENERALIZATION',tenant_id,CASE state WHEN 'RETRY_WAIT' THEN 'WAITING_CAPABILITY' WHEN 'ADMITTED' THEN 'SUCCEEDED' WHEN 'DUPLICATE' THEN 'SUCCEEDED' WHEN 'QUALIFIED' THEN 'WAITING_CAPABILITY' WHEN 'REJECTED' THEN 'CANCELLED' WHEN 'CONFLICT' THEN 'WAITING_CAPABILITY' ELSE state END,updated_at FROM experience_generalization_sources
@@ -37,7 +39,7 @@ public class EngineTelemetryService {
   var rows=db.query("""
    WITH scope AS (SELECT ?::uuid tenant), units AS (
    """+UNITS+"""
-   ), codes AS (SELECT unnest(ARRAY['COLLECTION','KNOWLEDGE','RETRIEVAL','TASK','COMPANY','EXPERIENCE','GENERALIZATION','GENERAL_ADJUSTMENT','RESPONSE','EXPORT']) code), filtered AS MATERIALIZED (
+   ), codes AS (SELECT unnest(ARRAY['COLLECTION','KNOWLEDGE','RETRIEVAL','TASK','COMPANY','SCENE_KNOWLEDGE','EXPERIENCE','GENERALIZATION','GENERAL_ADJUSTMENT','RESPONSE','EXPORT']) code), filtered AS MATERIALIZED (
     SELECT u.* FROM units u,scope s WHERE s.tenant IS NULL OR u.tenant_id=s.tenant
    ) SELECT c.code,statement_timestamp() checked_at,
      count(*) FILTER(WHERE u.state='RUNNING') running,
@@ -47,7 +49,7 @@ public class EngineTelemetryService {
      count(*) FILTER(WHERE u.state IN('UNKNOWN','RESULT_UNKNOWN')) unknown,
      count(*) FILTER(WHERE u.state='SUCCEEDED' AND u.done>=statement_timestamp()-interval '5 minutes' AND u.done<=statement_timestamp()) completed,
      max(u.done) FILTER(WHERE u.state='SUCCEEDED' AND u.done<=statement_timestamp()) last_done
-   FROM codes c LEFT JOIN filtered u ON u.code=c.code GROUP BY c.code ORDER BY array_position(ARRAY['COLLECTION','KNOWLEDGE','RETRIEVAL','TASK','COMPANY','EXPERIENCE','GENERALIZATION','GENERAL_ADJUSTMENT','RESPONSE','EXPORT'],c.code)
+   FROM codes c LEFT JOIN filtered u ON u.code=c.code GROUP BY c.code ORDER BY array_position(ARRAY['COLLECTION','KNOWLEDGE','RETRIEVAL','TASK','COMPANY','SCENE_KNOWLEDGE','EXPERIENCE','GENERALIZATION','GENERAL_ADJUSTMENT','RESPONSE','EXPORT'],c.code)
    """,(r,n)->Map.entry(r.getTimestamp("checked_at").toInstant(),new Channel(r.getString("code"),r.getLong("running"),r.getLong("queued"),r.getLong("waiting"),r.getLong("failed"),r.getLong("unknown"),r.getLong("completed"),r.getTimestamp("last_done")==null?null:r.getTimestamp("last_done").toInstant())),tenant);
   if(platform) identities.platform(actor); else identities.member(actor,tenant,true);
   // Method engineering and experience maintenance are not an autonomous evolution executor.

@@ -6,7 +6,11 @@ export const roleLabels = {
   auditor: "审计员",
 } as const;
 export type Role = keyof typeof roleLabels;
+export type Scope = { type: "tenant" | "department" | "resource"; id: string };
+export type Duties = { governance?: Scope[]; inspection?: Scope[]; approval?: Scope[]; connections?: string[]; ingest?: boolean };
 export type User = {
+  departmentId?: string;
+  duties?: Duties;
   id: string;
   tenantId: string;
   name: string;
@@ -22,6 +26,7 @@ export type Grant = {
   level: "read" | "edit";
 };
 export type Doc = {
+  departmentId?: string;
   aiPaused?: boolean;
   id: string;
   tenantId: string;
@@ -71,7 +76,7 @@ export type Proposal = {
   reason: string;
   documentVersion: number;
   policyVersion: number;
-  status: "pending" | "applied" | "rejected";
+  status: "pending" | "applied" | "rejected" | "withdrawn" | "invalidated";
   createdAt: string;
   resolvedAt?: string;
 };
@@ -84,55 +89,46 @@ export type FlowEventName =
 export const now = () => new Date().toISOString();
 export const classificationLabels = ["公开", "企业内部", "机密", "严格受限"];
 export const sameTenant = (u: User, d: Doc) => u.tenantId === d.tenantId;
-export function canRead(u: User, d: Doc) {
-  return (
-    u.active &&
-    sameTenant(u, d) &&
-    d.status === "ready" &&
-    (u.role === "admin" || u.clearance >= d.classification) &&
-    (u.role === "admin" || u.id === d.ownerId ||
-      d.audience === "organization" ||
-      (d.audience === "department" && u.department === d.department) ||
-      d.grants.some((g) =>
-        g.subjectType === "user"
-          ? g.subjectId === u.id
-          : g.subjectType === "role"
-            ? g.subjectId === u.role
-            : g.subjectId === u.department,
-      ))
-  );
+const validIdentity = (u: User) => u.active && Object.hasOwn(roleLabels, u.role);
+const level = (u: User) => u.role === "admin" ? 3 : u.clearance;
+const scoped = (u: User, d: Doc, scopes: Scope[] = []) => scopes.some(s =>
+  s.type === "tenant" ? s.id === u.tenantId : s.type === "resource" ? s.id === d.id : !!d.departmentId && s.id === d.departmentId);
+const boundary = (u: User, d: Doc) => validIdentity(u) && sameTenant(u,d);
+export function canReadResource(u: User, d: Doc) {
+  if (!boundary(u,d) || d.status !== "ready" || level(u) < d.classification) return false;
+  return u.role === "admin" || d.audience === "organization" || u.id === d.ownerId ||
+    (d.audience === "department" && !!u.departmentId && u.departmentId === d.departmentId) ||
+    d.grants.some(g => g.subjectType === "user" ? g.subjectId === u.id : g.subjectType === "role" ? g.subjectId === u.role : !!u.departmentId && g.subjectId === u.departmentId);
 }
-export const canUseAI = (u: User, d: Doc) => !d.aiPaused && canRead(u,d);
-export function canEdit(u: User, d: Doc) {
-  return (
-    u.role !== "auditor" &&
-    canRead(u, d) &&
-    (u.id === d.ownerId ||
-      u.role === "steward" ||
-      (u.role === "manager" && u.department === d.department) ||
-      d.grants.some(
-        (g) =>
-          g.level === "edit" &&
-          (g.subjectType === "user"
-            ? g.subjectId === u.id
-            : g.subjectType === "role"
-              ? g.subjectId === u.role
-              : g.subjectId === u.department),
-      ))
-  );
-}
-export function canManage(u: User, d: Doc) {
-  return (
-    u.active &&
-    u.role !== "auditor" &&
-    sameTenant(u, d) &&
-    (u.role === "admin" ||
-      (u.role === "steward" && u.clearance >= d.classification) ||
-      u.id === d.ownerId)
-  );
-}
-export const canGovern = (u: User) =>
-  ["admin", "steward", "auditor"].includes(u.role);
+export const canRead = canReadResource;
+export const canUseAI = (u: User,d: Doc) => canReadResource(u,d) && !d.aiPaused;
+export const canEditContent = (_u: User,_d: Doc): boolean => false;
+export const canEditSchema = canEditContent;
+export const canMutateRecords = canEditContent;
+/** Compatibility only for rejecting legacy customer content writes. Never use for system jobs. */
+export const canEdit = canEditContent;
+export const canManageOrganization = (u: User) => validIdentity(u) && u.role === "admin";
+export const canViewAudit = (u: User) => validIdentity(u) && ["admin","auditor"].includes(u.role);
+export const canViewGovernanceMetadata = (u: User,d: Doc) => boundary(u,d) &&
+  (u.role === "admin" || u.role === "steward" && scoped(u,d,u.duties?.governance));
+export const canGovernResource = (u: User,d: Doc) => canViewGovernanceMetadata(u,d) &&
+  level(u) >= d.classification && !["archived","queued","processing"].includes(d.status);
+export const canInspectQuarantinedContent = (u: User,d: Doc) => boundary(u,d) &&
+  d.status === "quarantined" && level(u) >= d.classification &&
+  (u.role === "admin" || u.role === "steward" && scoped(u,d,u.duties?.inspection));
+export const canRecheck = canGovernResource;
+export const canRegenerateDictionary = (u: User,d: Doc) => canGovernResource(u,d) && canUseAI(u,d);
+export const canViewPolicy = (u: User,d: Doc) => boundary(u,d) && (u.role === "admin" || canRead(u,d) || canViewGovernanceMetadata(u,d));
+export const canRequestAccess = (u: User,d: Doc) => boundary(u,d) && d.status === "ready";
+export const canManagePolicy = (u: User,d: Doc) => boundary(u,d) && u.role === "admin";
+export const canApprovePolicy = (u: User,d: Doc,applicant?:string) => boundary(u,d) &&
+  (u.role === "admin" || u.role === "steward" && u.id !== applicant && level(u) >= d.classification && scoped(u,d,u.duties?.approval));
+export const canIngest = (u: User) => validIdentity(u) && u.role !== "auditor" && (u.role === "admin" || u.duties?.ingest === true);
+export const canManageConnection = (u: User, tenant: string, id?: string) => validIdentity(u) && u.tenantId === tenant &&
+  (u.role === "admin" || u.role === "steward" && !!id && (u.duties?.connections || []).includes(id));
+export const canRunSync = (u: User,d: Doc) => canGovernResource(u,d);
+export const canManage = canViewGovernanceMetadata;
+export const canGovern = (u: User) => validIdentity(u) && ["admin","steward"].includes(u.role);
 export function visibleText(u: User, text: string) {
   return u.clearance >= 2
     ? text
@@ -147,7 +143,12 @@ export function metadata(d: Doc, u: User) {
     ...safe,
     summary: canRead(u, d) ? visibleText(u, d.summary) : "",
     canRead: canRead(u, d),
-    canEdit: canEdit(u, d),
+    canEdit: false,
+    canViewPolicy: canViewPolicy(u,d),
+    canManagePolicy: canManagePolicy(u,d),
+    canGovern: canGovernResource(u,d),
+    canRecheck: canRecheck(u,d),
+    canInspect: canInspectQuarantinedContent(u,d),
     canManage: canManage(u, d),
   };
 }
@@ -200,7 +201,7 @@ export function retrieve(u: User, docs: Doc[], question: string): Evidence[] {
     .filter((d) => canUseAI(u, d))
     .flatMap((d) =>
       chunks(d.content).map((c) => {
-        const safe = visibleText(u, c.text);
+        const safe = visibleText({ ...u, clearance: 0 }, c.text);
         const hits = query.filter((q) => safe.toLowerCase().includes(q)).length;
         const titleHits = query.filter((q) =>
           d.title.toLowerCase().includes(q),

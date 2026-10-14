@@ -3,6 +3,7 @@ import { EngineStage3D } from '../../operations/engine-stage/EngineStage3D';
 import { busyDemo } from '../../operations/engine-demo';
 import type { EngineScene, Focus } from '../../operations/engine-stage/scene';
 import { DataWork } from './DataWork';
+import { AccessWork } from './AccessWork';
 import { useFoundation, asItem, type Foundation } from './foundation-api';
 import { activity, aside, daily, steps, STEP_NAMES, tabs, usage } from './content';
 import { homeCards, places, stats, type Item, type Place, type Tone } from './data';
@@ -51,7 +52,7 @@ export function SceneShell() {
   }, []);
   const sim = useMemo(() => busyDemo(now), [now]);
 
-  const [place, setPlace] = useState<Place>('home');
+  const [place, setPlace] = useState<Place>(() => new URLSearchParams(window.location.search).has('tenant') ? 'data' : 'home');
   const [sheet, setSheet] = useState<Sheet>('half');
   const [picked, setPicked] = useState<Partial<Record<Place, string>>>({});
   const [filter, setFilter] = useState<Partial<Record<Place, number>>>({});
@@ -384,7 +385,7 @@ export function SceneShell() {
             <Icon name="search" />
           </button>
         </nav>
-        {place === 'usage' ? (
+        {place === 'members' ? (<AccessWork />) : place === 'usage' ? (
           <Usage />
         ) : place === 'data' ? (
           <DataWork

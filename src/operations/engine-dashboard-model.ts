@@ -23,7 +23,8 @@ export const channelInfo: Record<TelemetryChannelCode, { name: string; stage: St
   },
   RETRIEVAL: { name: '资料检索', stage: 'in', desc: '为会话与画报任务查找当前账号有权读取的资料。' },
   TASK: { name: '会话与画报', stage: 'pr', desc: '执行员工发起的会话，以及系统主动生成的画报任务。' },
-  COMPANY: { name: '企业信息分析', stage: 'pr', desc: '从企业资料中提炼企业信息，并记录推断依据。' },
+  COMPANY: { name: '企业信息分析', stage: 'pr', desc: '从企业资料中提炼企业信息，并记录推断依据。排队按资料片段计数，执行中按分析批次计数。' },
+  SCENE_KNOWLEDGE: { name: '业务知识与星图', stage: 'pr', desc: '按企业处理数据基座的业务知识、资料知识和知识关联；状态来自实际执行记录。' },
   EXPERIENCE: { name: '经验提炼与核验', stage: 'pr', desc: '从任务与反馈中提炼经验，并由独立会话核验。' },
   GENERALIZATION: {
     name: '通用经验清洗',
@@ -43,7 +44,9 @@ export const LANE_PARTICLES = 6;
 export const ORBIT_PARTICLES = 10;
 export const BEADS = 10;
 /** One dot per actual running record, capped; no running record means no dot. */
-export const particles = (running: number, cap = LANE_PARTICLES) => Math.min(Math.max(0, running), cap);
+export const particles = (running: number, cap = LANE_PARTICLES) => Number.isFinite(running) && Number.isFinite(cap)
+  ? Math.floor(Math.min(Math.max(0, running), Math.max(0, cap)))
+  : 0;
 export const beads = (queued: number) => ({
   shown: Math.min(Math.max(0, queued), BEADS),
   more: Math.max(0, queued - BEADS),

@@ -1,6 +1,6 @@
 import { SkillCenter, skillsHref } from '../skills/SkillCenter';
 import { SuspendedEnterprise } from './SuspendedEnterprise';
-import { TenantConsole } from '../admin/TenantConsole';
+import { TenantScene } from '../admin/TenantScene';
 import { UploadProvider } from '../material/UploadManager';
 import { phoneClient } from './phone-client';
 import { PhoneAuth } from './PhoneAuth';
@@ -228,7 +228,7 @@ function GuardedAccessShell({
       : [];
   const eligible =
     surface === 'tenant-admin'
-      ? identity.memberships.filter((m) => management.includes(m.tenantId))
+      ? identity.memberships.filter((m) => m.service?.status !== 'SUSPENDED')
       : identity.memberships;
   const [routeHash, setRouteHash] = useState(location.hash);
   const [briefingMonth, setBriefingMonth] = useState<string | null>(null);
@@ -312,10 +312,10 @@ function GuardedAccessShell({
   };
   if (selected?.service?.status === 'SUSPENDED')
     return <SuspendedEnterprise membership={selected} identity={identity} />;
-  if (surface === 'tenant-admin' && selected && management.includes(tenant))
+  if (surface === 'tenant-admin' && selected)
     return (
       <UploadProvider>
-        <TenantConsole key={tenant} tenant={tenant} name={selected.tenantName} />
+        <TenantScene key={tenant} tenant={tenant} name={selected.tenantName} enterprises={eligible.map(m => ({id:m.tenantId,name:m.tenantName}))} onChoose={choose} />
       </UploadProvider>
     );
   return (

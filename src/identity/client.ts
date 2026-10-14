@@ -12,6 +12,11 @@ export class IdentityError extends Error {
   readonly status: number;
   constructor(code: string, status = 0) {
     const messages: Record<string, string> = {
+      SCENE_TENANT_NOT_BOUND: '该企业尚未绑定数据来源，请先完成企业接入配置。',
+      SCENE_NOT_CONFIGURED: '企业数据接口尚未配置，请联系部署维护人员。',
+      SCENE_UPSTREAM_UNAVAILABLE: '企业数据服务暂不可用，请稍后重试。',
+      SCENE_UPSTREAM_FAILED: '数据处理未完成，请查看来源状态后重试。',
+      SCENE_TENANT_MISMATCH: '企业来源校验失败，本次同步已停止。',
       PRESENTATION_UNAVAILABLE: 'PPT 生成环境尚未开放，请稍后再试。',
       PRESENTATION_CONFIRMATION_REQUIRED: '请先在大纲卡片中确认内容，再继续生成 PPT。',
       PRESENTATION_OPTIONS_MISMATCH: '生成的大纲与页数或风格设置不一致，请重试。',

@@ -52,7 +52,7 @@ class UnifiedIdentityIntegrationTest {
         }
         HttpResponse<String> get(String path)throws Exception{return send("GET",path,null,null);}
         String csrf()throws Exception{return JSON.readTree(get("/api/v1/auth/csrf").body()).get("token").asString();}
-        HttpResponse<String> post(String path,Object body)throws Exception{return send("POST",path,body,csrf());}
+        HttpResponse<String> post(String path,Object body)throws Exception{return send("POST",path,body,path.startsWith("/api/platform-admin/")?JSON.readTree(get("/api/platform-admin/v1/auth/csrf").body()).get("token").asString():csrf());}
         void login(Fixture f,boolean platform)throws Exception {
             var result=platform?post("/api/platform-admin/v1/auth/login",Map.of("username",f.login(),"password","dedicated-pass")):
                 post("/api/v1/auth/login",Map.of("phone",f.phone(),"password","unified-pass"));
@@ -60,13 +60,14 @@ class UnifiedIdentityIntegrationTest {
             assertEquals(f.id().toString(),JSON.readTree(result.body()).get("account").get("id").asString());
         }
     }
-    @Test void eitherCredentialEntersSameIdentityWithoutBroadeningTenantAccess()throws Exception {
+    @Test void sameAccountStillRequiresIndependentRealmLogins()throws Exception {
         var f=fixture(true);
         for(boolean dedicated:List.of(false,true)) {
             var b=new Browser();b.login(f,dedicated);
-            var me=b.get("/api/v1/me");assertEquals(200,me.statusCode());
-            var data=JSON.readTree(me.body());assertEquals(f.id().toString(),data.get("account").get("id").asString());
-            assertTrue(data.get("platformAdmin").asBoolean());assertEquals(1,data.get("memberships").size());
+            assertEquals(dedicated?401:200,b.get("/api/v1/me").statusCode());
+            assertEquals(dedicated?200:401,b.get("/api/platform-admin/v1/auth/me").statusCode());
+            b.login(f,!dedicated);
+            assertEquals(f.id().toString(),JSON.readTree(b.get("/api/v1/me").body()).get("account").get("id").asString());
             assertEquals(200,b.get("/api/platform-admin/v1/auth/me").statusCode());
             assertEquals(200,b.get("/api/v1/tenants/"+f.tenant()+"/context").statusCode());
             assertEquals(403,b.get("/api/v1/tenants/"+f.foreignTenant()+"/context").statusCode());
@@ -74,9 +75,10 @@ class UnifiedIdentityIntegrationTest {
     }
     @Test void dedicatedCredentialsAreOptionalAndRevokingRoleKeepsCustomerSession()throws Exception {
         var f=fixture(false);var b=new Browser();b.login(f,false);
+        assertEquals(200,b.post("/api/platform-admin/v1/auth/login",Map.of("username",f.phone(),"password","unified-pass")).statusCode());
         assertEquals(200,b.get("/api/platform-admin/v1/auth/me").statusCode());
         db.update("DELETE FROM platform_roles WHERE account_id=?",f.id());
-        assertEquals(403,b.get("/api/platform-admin/v1/auth/me").statusCode());
+        assertEquals(401,b.get("/api/platform-admin/v1/auth/me").statusCode());
         assertEquals(200,b.get("/api/v1/tenants/"+f.tenant()+"/context").statusCode());
         assertFalse(JSON.readTree(b.get("/api/v1/me").body()).get("platformAdmin").asBoolean());
     }
@@ -89,13 +91,13 @@ class UnifiedIdentityIntegrationTest {
         assertEquals(403,b.send("POST","/api/platform-admin/v1/auth/logout",null,null).statusCode());
         assertEquals(200,b.get("/api/v1/me").statusCode());
     }
-    @Test void logoutFromEitherEntranceInvalidatesBothSurfaces()throws Exception {
+    @Test void logoutOnlyInvalidatesItsOwnRealm()throws Exception {
         var f=fixture(true);
         for(String path:List.of("/api/v1/auth/logout","/api/platform-admin/v1/auth/logout")) {
-            var b=new Browser();b.login(f,true);
+            var b=new Browser();b.login(f,false);b.login(f,true);
             assertEquals(204,b.post(path,null).statusCode());
-            assertEquals(401,b.get("/api/v1/me").statusCode());
-            assertEquals(401,b.get("/api/platform-admin/v1/auth/me").statusCode());
+            assertEquals(path.startsWith("/api/platform-admin/")?200:401,b.get("/api/v1/me").statusCode());
+            assertEquals(path.startsWith("/api/platform-admin/")?401:200,b.get("/api/platform-admin/v1/auth/me").statusCode());
         }
     }
     @Test void changingDedicatedPasswordExpiresAllBrowsersButPreservesUnifiedPassword()throws Exception {
@@ -115,7 +117,7 @@ class UnifiedIdentityIntegrationTest {
     }
     @Autowired org.springframework.core.env.Environment environment;
     @Test void openingRequiresExplicitOwnerAndActivatesAtomically()throws Exception {
-        var f=fixture(true);var b=new Browser();b.login(f,false);
+        var f=fixture(true);var b=new Browser();b.login(f,false);b.login(f,true);
         UUID request=UUID.randomUUID();
         var body=Map.of("requestId",request,"name","待开通合成企业","adminPhone",f.phone());
         var created=b.post("/api/platform-admin/v1/tenants",body);
@@ -142,15 +144,16 @@ class UnifiedIdentityIntegrationTest {
 
     @Test void unifiedUserCanSetDedicatedCredentialsWithoutCreatingAnotherAccount()throws Exception {
         var f=fixture(false);var b=new Browser();b.login(f,false);
+        assertEquals(200,b.post("/api/platform-admin/v1/auth/login",Map.of("username",f.phone(),"password","unified-pass")).statusCode());
         var configured=b.post("/api/platform-admin/v1/auth/credentials",Map.of("username",f.login(),"currentPassword","unified-pass","password","dedicated-pass"));
         assertEquals(204,configured.statusCode(),configured.body());
         assertEquals(401,b.get("/api/v1/me").statusCode());
         assertEquals(f.id(),db.queryForObject("SELECT account_id FROM platform_accounts WHERE login_name=?",UUID.class,f.login()));
-        b.login(f,true);assertEquals(1,JSON.readTree(b.get("/api/v1/me").body()).get("memberships").size());
+        b.login(f,true);assertEquals(401,b.get("/api/v1/me").statusCode());b.login(f,false);assertEquals(1,JSON.readTree(b.get("/api/v1/me").body()).get("memberships").size());
         var other=new Browser();other.login(f,false);
     }
     @Test void platformInvitationVerifiesPhoneAndReusesUnifiedIdentity()throws Exception {
-        var inviter=fixture(true);var b=new Browser();b.login(inviter,false);
+        var inviter=fixture(true);var b=new Browser();b.login(inviter,true);
         String phone="+8619900112233";
         var invitation=b.post("/api/platform-admin/v1/staff/invitations",Map.of("requestId",UUID.randomUUID(),"phone",phone));
         assertEquals(200,invitation.statusCode(),invitation.body());
@@ -167,7 +170,8 @@ class UnifiedIdentityIntegrationTest {
         UUID account=UUID.fromString(JSON.readTree(accepted.body()).get("account").get("id").asString());provisioned.add(account);
         assertEquals(0,db.queryForObject("SELECT count(*) FROM platform_accounts WHERE account_id=?",Integer.class,account));
         assertEquals(200,new Browser().post("/api/v1/auth/login",Map.of("phone",phone,"password","staff-unified-pass")).statusCode());
-        assertTrue(JSON.readTree(recipient.get("/api/v1/me").body()).get("platformAdmin").asBoolean());
+        assertEquals(401,recipient.get("/api/v1/me").statusCode());
+        assertTrue(JSON.readTree(recipient.get("/api/platform-admin/v1/auth/me").body()).get("platformAdmin").asBoolean());
         assertEquals(200,recipient.post("/api/platform-admin/v1/auth/invitation/accept",body).statusCode(),"Accepted proof retry must not duplicate the account");
     }
 
@@ -205,21 +209,11 @@ class UnifiedIdentityIntegrationTest {
         assertEquals(0,db.queryForObject("SELECT count(*) FROM workspace_members WHERE workspace_id=? AND account_id=?",Integer.class,space,member.id()));
     }
 
-    @Test void legacyPlatformCanVerifyPhoneAndSetUnifiedPasswordWithoutNewSubject()throws Exception {
-        var f=fixture(true);
-        db.update("UPDATE accounts SET phone=null,phone_verified_at=null,email=?,password_hash='!LEGACY!' WHERE id=?","platform-"+f.id()+"@identity.invalid",f.id());
-        var b=new Browser();b.login(f,true);
-        var issued=b.post("/api/v1/auth/phone/challenges",Map.of("purpose","BIND","phone",f.phone()));
-        assertEquals(200,issued.statusCode(),issued.body());
-        String challenge=JSON.readTree(issued.body()).get("id").asString();
-        String code=JSON.readTree(b.get("/api/v1/auth/phone/local-code/"+challenge).body()).get("code").asString();
-        var body=new HashMap<String,Object>();body.put("phone",f.phone());body.put("password","incorrect");body.put("unifiedPassword","unified-pass");body.put("challengeId",challenge);body.put("code",code);
-        assertEquals(401,b.post("/api/v1/auth/phone/bind",body).statusCode());
-        assertNull(db.queryForObject("SELECT phone FROM accounts WHERE id=?",String.class,f.id()));
-        body.put("password","dedicated-pass");
-        var bound=b.post("/api/v1/auth/phone/bind",body);assertEquals(200,bound.statusCode(),bound.body());
-        assertEquals(f.id().toString(),JSON.readTree(bound.body()).get("account").get("id").asString());
-        new Browser().login(f,false);new Browser().login(f,true);
+    @Test void platformCookieCannotAuthenticateCustomerBindingRequests()throws Exception {
+        var f=fixture(true);var b=new Browser();b.login(f,true);
+        assertEquals(401,b.get("/api/v1/me").statusCode());
+        assertEquals(401,b.post("/api/v1/auth/phone/bind",Map.of("phone",f.phone(),"password","dedicated-pass","challengeId",UUID.randomUUID(),"code","123456")).statusCode());
+        assertEquals(200,b.get("/api/platform-admin/v1/auth/me").statusCode());
     }
 
     @Test void simultaneousOwnerActivationCreatesOneMembershipAndPersonalSpace()throws Exception {

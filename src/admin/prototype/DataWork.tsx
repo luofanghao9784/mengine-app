@@ -175,6 +175,8 @@ export function DataWork({
       setPending('');
     }
   }
+  if (unauthorized && new URLSearchParams(window.location.search).has('tenant'))
+    return <section className="cards work data live-foundation"><article className="card live-login"><h2>企业登录已失效</h2><p>请重新登录后继续管理本企业的数据。</p><a href="/tenant-admin/" target="_top">返回企业登录</a></article></section>;
   if (unauthorized)
     return (
       <section className="cards work data live-foundation">
@@ -523,8 +525,7 @@ export function DataWork({
                   </dl>
                   {a.kind === 'document' && a.actions.includes('remediate') && (
                     <p className="live-note">
-                      规则治理会脱敏正文中的手机号、身份证号和邮箱，补齐缺失标签并将复核周期更新为 90
-                      天；原版本保留。人工通过仅关闭当前问题。
+                      规则治理会重新检查现有来源，不修改正文、标签和复核日期。人工通过只记录业务核验结论；隔离内容必须通过实际复检后才能恢复使用。
                     </p>
                   )}
                   {a.issues.length > 0 && (

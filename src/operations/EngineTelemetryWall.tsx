@@ -18,6 +18,7 @@ const names: Record<TelemetryChannelCode, string> = {
   RETRIEVAL: '资料检索任务',
   TASK: '会话与画报任务',
   COMPANY: '企业信息分析',
+  SCENE_KNOWLEDGE: '业务知识与星图',
   EXPERIENCE: '经验提炼与核验',
   GENERALIZATION: '通用经验清洗',
   GENERAL_ADJUSTMENT: '总库调整核验',
@@ -37,7 +38,7 @@ const groups = [
     title: '处理',
     english: 'PROCESS',
     icon: Cpu,
-    codes: ['TASK', 'COMPANY', 'EXPERIENCE', 'GENERALIZATION', 'GENERAL_ADJUSTMENT'],
+    codes: ['TASK', 'COMPANY', 'SCENE_KNOWLEDGE', 'EXPERIENCE', 'GENERALIZATION', 'GENERAL_ADJUSTMENT'],
   },
   { id: 'output', title: '输出', english: 'OUTPUT', icon: ArrowUpFromLine, codes: ['RESPONSE', 'EXPORT'] },
 ] as const;

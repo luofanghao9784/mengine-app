@@ -12,6 +12,10 @@ test('busy demo covers every channel and changes without touching real telemetry
     [...telemetryChannels],
   );
   assert.ok(first.channels.every((c) => c.running > 0 && c.queued > 0));
+  for (const c of [...first.channels, ...second.channels]) {
+    for (const key of ['running', 'queued', 'waiting', 'failed', 'unknown', 'completedRecent'] as const)
+      assert.ok(Number.isSafeInteger(c[key]) && c[key] >= 0, `${c.code}.${key}`);
+  }
   assert.notEqual(
     first.channels.reduce((n, c) => n + c.running, 0),
     second.channels.reduce((n, c) => n + c.running, 0),

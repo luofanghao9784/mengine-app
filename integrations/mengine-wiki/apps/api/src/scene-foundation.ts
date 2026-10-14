@@ -12,7 +12,7 @@ import {
   scan,
   canManage,
   canRead,
-  canEdit,
+  canGovernResource,
   now,
   type User,
   type Doc,
@@ -47,13 +47,12 @@ export function registerSceneFoundation(
   );
   const auth = (req: FastifyRequest) => {
     const u = session(req);
-    if (!canGovern(u))
-      throw fail(403, "数据基座管理需要管理员、治理负责人或审计岗位");
+    if (!u.active) throw fail(401,"账号不可用");
     return u;
   };
   const visible = (u: User, d: Doc) =>
     u.tenantId === d.tenantId &&
-    (u.role === "auditor" || canManage(u, d) || canRead(u, d));
+    (canManage(u, d) || canRead(u, d));
   const get = (u: User, id: string) => {
     const d = store.doc(u.tenantId, id);
     if (!d || !visible(u, d)) throw fail(404, "资产不存在或未授权");
@@ -271,15 +270,15 @@ export function registerSceneFoundation(
         actions.push("analyze");
       if (
         set &&
-        canEdit(u, d) &&
+        canGovernResource(u, d) &&
         !activeJob &&
         !d.aiPaused &&
         model.status().configured &&
         model.status().enabled
       )
         actions.push("dictionary");
-      if (set && canEdit(u, d) && u.clearance >= 2) actions.push("recheck");
-      if (sync?.enabled && sync.state !== "running" && canEdit(u, d))
+      if (set && canGovernResource(u, d) && u.clearance >= 2) actions.push("recheck");
+      if (sync?.enabled && sync.state !== "running" && canGovernResource(u, d))
         actions.push("sync");
     }
     return {
@@ -483,7 +482,7 @@ export function registerSceneFoundation(
           action: safe(x.action),
           detail: safe(x.detail),
         })),
-      dictionary: dict(u, d, set),
+      dictionary: canRead(u,d) ? dict(u, d, set) : null,
       findings,
       events: store.flowEvents(u.tenantId, d.id),
       batches: (
@@ -564,6 +563,8 @@ export function registerSceneFoundation(
       store.db.transaction(() => {
         store.version(d);
         if (b.action === "allow") {
+          const checked=scan(d.content,d.tags,d.reviewAt);
+          if(checked.sensitive)throw fail(409,"来源仍存在风险，请在源系统修正后复检");
           d.status = "ready";
           d.version++;
           d.aiPaused = false;

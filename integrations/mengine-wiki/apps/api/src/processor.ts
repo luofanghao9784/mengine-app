@@ -3,7 +3,7 @@ import { join } from "node:path";
 import mammoth from "mammoth";
 import { PDFParse } from "pdf-parse";
 import { Store } from "./store.js";
-import { now, scan, type Doc } from "./domain.js";
+import { now, scan, canIngest, type Doc } from "./domain.js";
 export class Processor {
   active = new Map<string, Promise<void>>();
   running = 0;
@@ -57,6 +57,8 @@ export class Processor {
     let d = this.store.doc(doc.tenantId, doc.id);
     if (!d || !["queued", "processing"].includes(d.status)) return;
     try {
+      const actor=this.store.user(d.uploadedBy?.id || d.ownerId);
+      if(!actor || actor.tenantId!==d.tenantId || !canIngest(actor))throw new Error("任务执行人已失去导入权限，解析停止");
       d.status = "processing";
       this.store.saveDoc(d, "parsing");
       const bytes = await readFile(d.originalPath);
@@ -78,6 +80,8 @@ export class Processor {
         throw new Error("提取正文超过 200 万字符，请拆分文件");
       const latest = this.store.doc(d.tenantId, d.id);
       if (!latest || latest.status === "archived") return;
+      const currentActor=this.store.user(doc.uploadedBy?.id || doc.ownerId);
+      if(!currentActor || currentActor.tenantId!==doc.tenantId || !canIngest(currentActor) || latest.version!==doc.version || latest.policyVersion!==doc.policyVersion)throw new Error("任务身份或来源版本已变化，拒绝发布解析结果");
       d = latest;
       d.content = text;
       d.summary = text.replace(/[#*`]/g, "").slice(0, 180);

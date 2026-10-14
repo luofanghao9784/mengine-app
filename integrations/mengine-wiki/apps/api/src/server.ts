@@ -1,4 +1,6 @@
+import { registerAccess, visibleProposals } from "./access-control.js";
 import {registerSceneKnowledge} from './scene-knowledge.js';
+import {registerPlatformBridge} from './platform-bridge.js';
 import {registerSceneFoundation} from './scene-foundation.js';
 import {registerLifecycle} from './resource-lifecycle.js';
 import {registerBusinessQueries} from './business-queries.js';
@@ -24,6 +26,9 @@ import {
   canRead,
   canUseAI,
   canEdit,
+  canIngest,
+  canViewAudit,
+  canGovernResource,
   canManage,
   canGovern,
   metadata,
@@ -132,12 +137,13 @@ export async function buildServer(
     }
   };
   const assertManage = (u: User, d: Doc) => {
-    if (!canManage(u, d)) throw error(403, "当前岗位没有资料管理权限");
+    if (!canGovernResource(u, d) && !(u.role === "admin" && ["failed","archived"].includes(d.status))) throw error(404, "资料不存在或无权访问");
   };
   const publicPaths = new Set([
     "/api/auth/login",
     "/api/auth/demo",
     "/api/health",
+    "/api/internal/platform-scene",
   ]);
   app.addHook("onRequest", async (req, reply) => {
     reply
@@ -249,14 +255,7 @@ export async function buildServer(
     const all = store.documents(u.tenantId);
     const docs = all.filter((d) => canRead(u, d));
     const governed = all.filter((d) => canManage(u, d));
-    const mine = store.proposals(u.tenantId).filter((p) => {
-      const d = store.doc(u.tenantId, p.documentId);
-      return (
-        d &&
-        (p.authorId === u.id || canGovern(u)) &&
-        (canRead(u, d) || (p.action === "permissions" && canManage(u, d)))
-      );
-    });
+    const mine = visibleProposals(store,u);
     return {
       stats: {
         visible: docs.length,
@@ -329,7 +328,7 @@ export async function buildServer(
   });
   app.post("/api/documents", async (req, reply) => {
     const u = session(req);
-    if (u.role === "auditor") throw error(403, "审计岗位不能导入资料");
+    if (!canIngest(u)) throw error(403, "未授予资料导入能力");
     limited(`upload:${u.tenantId}`, 60, 3600000);
     const file = await req.file();
     if (!file) throw error(400, "请选择资料");
@@ -491,6 +490,7 @@ export async function buildServer(
   registerBusinessQueries(app,store,session);
   registerSceneFoundation(app,store,model,processor,session);
   registerSceneKnowledge(app,store,model,session);
+  registerPlatformBridge(app,store,process.env.MENGINE_PLATFORM_BRIDGE_KEY || '');
   app.get("/api/governance", async (req) => {
     const u = session(req);
     if (!canGovern(u)) throw error(403, "该岗位没有治理中心权限");
@@ -510,7 +510,7 @@ export async function buildServer(
     let count = 0;
     for (const d of store
       .documents(u.tenantId)
-      .filter((d) => canManage(u, d) && d.status === "ready" && !store.db.prepare('SELECT 1 FROM data_sets WHERE id=? AND tenant_id=?').get(d.id,u.tenantId))) {
+      .filter((d) => canGovernResource(u, d) && d.status === "ready" && !store.db.prepare('SELECT 1 FROM data_sets WHERE id=? AND tenant_id=?').get(d.id,u.tenantId))) {
       const report = scan(d.content, d.tags, d.reviewAt);
       d.quality = report.quality;
       d.issues = report.issues;
@@ -545,27 +545,11 @@ export async function buildServer(
       if(store.db.prepare('SELECT 1 FROM data_sets WHERE id=? AND tenant_id=?').get(d.id,u.tenantId))throw error(409, '数据表请使用结构化治理复检');
       if (!["ready", "quarantined"].includes(d.status))
         throw error(409, "当前状态不能处理");
-      store.version(d);
-      d.content = d.content
-        .replace(/\b1[3-9]\d{9}\b/g, "[手机号已脱敏]")
-        .replace(/\b\d{17}[\dXx]\b/g, "[身份证号已脱敏]")
-        .replace(/[\w.+-]+@[\w.-]+\.[a-z]{2,}/gi, "[邮箱已脱敏]");
-      if (!d.tags.length) d.tags = ["待分类"];
-      d.reviewAt = new Date(Date.now() + 90 * 86400000)
-        .toISOString()
-        .slice(0, 10);
-      d.status = "ready";
-      d.version++;
-      d.summary = d.content.slice(0, 180);
-      Object.assign(d, scan(d.content, d.tags, d.reviewAt));
-      d.updatedAt = now();
-      store.saveDoc(d, "remediated");
-      store.audit(
-        u,
-        "governance.remediated",
-        d.title,
-        "正文敏感字段已脱敏，复核周期已更新，原件仍受限保存",
-      );
+      const report=scan(d.content,d.tags,d.reviewAt);
+      d.quality=report.quality;d.issues=report.issues;
+      d.status=report.sensitive?"quarantined":"ready";
+      d.updatedAt=now();store.saveDoc(d,"rescanned");
+      store.audit(u,"governance.rechecked",d.id,"重新检查来源；未修改业务内容或标签");
       return metadata(d, u);
     },
   );
@@ -592,6 +576,7 @@ export async function buildServer(
     return { name };
   });
   app.delete<{ Params: { name: string } }>("/api/departments/:name", async req => {
+    throw error(410,"请使用稳定部门 ID 的组织管理接口");
     const u = session(req), name = req.params.name;
     if (u.role !== "admin") throw error(403, "只有企业管理员可以维护部门");
     if (!store.departments(u.tenantId).includes(name)) throw error(404, "部门不存在");
@@ -693,7 +678,7 @@ export async function buildServer(
       if (u.role !== "admin") throw error(403, "只有企业管理员可以分配岗位");
       const m = store.user(req.params.id);
       if (!m || m.tenantId !== u.tenantId) throw error(404, "成员不存在");
-      if (m.id === u.id) throw error(409, "不能修改自己的岗位与访问级别");
+
       if (!store.departments(u.tenantId).includes(req.body.department)) throw error(400, "请先创建当前企业的部门");
       if(req.body.name!==undefined&&!req.body.name.trim())throw error(400,"姓名不能为空");
       Object.assign(m, req.body, req.body.name===undefined?{}:{name:req.body.name.trim()});
@@ -709,196 +694,13 @@ export async function buildServer(
   );
   app.get("/api/audit", async (req) => {
     const u = session(req);
-    if (!canGovern(u)) throw error(403, "没有审计访问权限");
+    if (!canViewAudit(u)) throw error(403, "没有审计访问权限");
     return {
       items: store.audits(u.tenantId),
       valid: store.auditValid(u.tenantId),
     };
   });
-  app.get("/api/proposals", async (req) => {
-    const u = session(req);
-    return {
-      items: store
-        .proposals(u.tenantId)
-        .filter((p) => {
-          const d = store.doc(u.tenantId, p.documentId);
-          return (
-            d &&
-            (p.authorId === u.id || canGovern(u)) &&
-            (canRead(u, d) || (p.action === "permissions" && canManage(u, d)))
-          );
-        })
-        .map((p) => {
-          const d = store.doc(u.tenantId, p.documentId)!;
-          const allowed = p.action === "permissions"
-            ? ["admin", "steward"].includes(u.role) && canManage(u, d)
-            : canEdit(u, d);
-          const blockedReason = !allowed ? "当前岗位没有执行此方案的权限"
-            : p.documentVersion !== d.version || p.policyVersion !== d.policyVersion ? "资料或权限已变化，请驳回后重新提交"
-            : p.action === "permissions" && p.authorId === u.id ? "权限变更需要另一位授权负责人复核" : "";
-          return { ...p, title: d.title, author: store.user(p.authorId)?.name,
-            canApprove: p.status === "pending" && !blockedReason,
-            canReject: p.status === "pending" && allowed, canWithdraw:p.status==="pending"&&p.authorId===u.id, blockedReason };
-        }),
-    };
-  });
-  const patchSchema = object({
-    grants: {
-      type: "array",
-      maxItems: 30,
-      items: object(
-        {
-          subjectType: enumOf(["user", "department", "role"]),
-          subjectId: str(100),
-          level: enumOf(["read", "edit"]),
-        },
-        ["subjectType", "subjectId", "level"],
-      ),
-    },
-    audience: enumOf(["private", "department", "organization"]),
-    tags: { type: "array", maxItems: 10, items: str(30) },
-    summary: str(2000),
-  });
-  app.post<{
-    Body: {
-      documentId: string;
-      action: Proposal["action"];
-      patch: Proposal["patch"];
-      reason: string;
-    };
-  }>(
-    "/api/proposals",
-    {
-      schema: {
-        body: object(
-          {
-            documentId: str(),
-            action: enumOf(["organize", "permissions", "summary"]),
-            patch: patchSchema,
-            reason: str(1000),
-          },
-          ["documentId", "action", "patch", "reason"],
-        ),
-      },
-    },
-    async (req) => {
-      const u = session(req),
-        d = docFor(u, req.body.documentId);
-      assertRead(u, d);
-      if (req.body.action !== "permissions" && !canEdit(u, d))
-        throw error(403, "不能为没有编辑权的资料生成修改方案");
-      const allowed =
-        req.body.action === "permissions"
-          ? ["audience", "grants"]
-          : req.body.action === "organize"
-            ? ["tags"]
-            : ["summary"];
-      if (
-        Object.keys(req.body.patch).length < 1 ||
-        !Object.keys(req.body.patch).every((k) => allowed.includes(k))
-      )
-        throw error(400, "变更字段与操作类型不符");
-      if (req.body.patch.grants) {
-        for (const g of req.body.patch.grants as Doc["grants"]) {
-          if (
-            g.subjectType === "user" &&
-            !store.users(u.tenantId).some((m) => m.id === g.subjectId)
-          )
-            throw error(400, "授权成员不属于当前企业");
-          if (
-            g.subjectType === "department" &&
-            !store.departments(u.tenantId).includes(g.subjectId)
-          )
-            throw error(400, "未知部门");
-          if (
-            g.subjectType === "role" &&
-            !Object.keys(roleLabels).includes(g.subjectId)
-          )
-            throw error(400, "未知岗位");
-        }
-      }
-      const p: Proposal = {
-        ...req.body,
-        id: randomUUID(),
-        tenantId: u.tenantId,
-        authorId: u.id,
-        documentVersion: d.version,
-        policyVersion: d.policyVersion,
-        status: "pending",
-        createdAt: now(),
-      };
-      store.proposal(p);
-      store.audit(
-        u,
-        "proposal.created",
-        d.title,
-        `提交${p.action}变更方案，等待确认`,
-      );
-      return p;
-    },
-  );
-  app.post<{
-    Params: { id: string };
-    Body: { decision: "approve" | "reject" };
-  }>(
-    "/api/proposals/:id/resolve",
-    {
-      schema: {
-        body: object({ decision: enumOf(["approve", "reject"]) }, ["decision"]),
-      },
-    },
-    async (req) => {
-      const u = session(req);
-      const p = store.proposals(u.tenantId).find((p) => p.id === req.params.id);
-      if (!p) throw error(404, "方案不存在");
-      if(p.action==="dictionary")throw error(410,"人工口径审批已停用，字段与口径由模型自动生成");
-      const d = docFor(u, p.documentId);
-      if (p.action === "permissions") {
-        if (!["admin", "steward"].includes(u.role) || !canManage(u, d))
-          throw error(403, "需要企业管理员或治理负责人审批");
-      } else if (!canEdit(u, d)) throw error(403, "当前没有内容编辑权限");
-      if (p.status !== "pending") throw error(409, "方案已处理");
-      const beforeApproval=structuredClone(d);
-      if (req.body.decision === "approve") {
-        if (
-          d.version !== p.documentVersion ||
-          d.policyVersion !== p.policyVersion
-        )
-          throw error(409, "资料或权限已变化，请重新生成方案");
-        if (p.action === "permissions" && p.authorId === u.id)
-          throw error(403, "权限范围变更需要另一位授权负责人复核");
-        if (p.action === "permissions") {
-          if (p.patch.audience)
-            d.audience = p.patch.audience as Doc["audience"];
-          if (p.patch.grants) d.grants = p.patch.grants as Doc["grants"];
-          d.policyVersion++;
-        } else if (p.action === "organize") {
-          d.tags = p.patch.tags as string[];
-          d.version++;
-
-        } else {
-          d.summary = String(p.patch.summary);
-          d.version++;
-        }
-        d.updatedAt = now();
-      }
-      p.status = req.body.decision === "approve" ? "applied" : "rejected";
-      p.resolvedAt = now();
-      store.db.transaction(() => {
-        if(p.status === "applied")store.version(beforeApproval);
-        store.saveDoc(d, p.status === "applied" ?
-          (p.action === "permissions" ? "permissions-applied" : "change-applied") : undefined);
-        store.proposal(p);
-        store.audit(
-          u,
-          `proposal.${p.status}`,
-          d.title,
-          `${p.action} · ${p.reason}`,
-        );
-      })();
-      return { proposal: p };
-    },
-  );
+  registerAccess(app,store,session);
   app.get("/api/model", async (req) => {
     session(req);
     return model.status();

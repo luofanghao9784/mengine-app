@@ -1,3 +1,4 @@
+import {seedDataset} from './helpers/structured-fixture.js';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtemp,rm} from 'node:fs/promises';
@@ -11,7 +12,7 @@ import {dictionaryFingerprint} from '../src/dictionary-version.js';
 const field=(name:string,type='text',sensitive=false)=>({name,label:name,type,required:false,unique:false,sensitive,description:'测试字段'});
 async function fixture(fn:(c:any)=>Promise<void>){const root=await mkdtemp(join(tmpdir(),'business-rules-'));const ctx=await buildServer({demo:true,storage:root,model:{apiKey:'test-only',baseUrl:'https://example.test/v1',model:'test'}});const login=await ctx.app.inject({method:'POST',url:'/api/auth/login',payload:{email:'admin@mengine.demo',password:DEMO_PASSWORD}});const h={cookie:String(login.headers['set-cookie']).split(';')[0]};
  const post=(url:string,payload:any)=>ctx.app.inject({method:'POST',url,headers:h,payload});
- const create=async(title:string,fields:any[],rows:any[])=>{const c=await post('/api/foundation',{title,department:'企业管理',purpose:'测试业务',source:'合成验收数据',updatePolicy:'人工',fields});assert.equal(c.statusCode,201,c.body);const id=c.json().id;for(const [i,values] of rows.entries()){const r=await post(`/api/foundation/${id}/records`,{values,expectedVersion:i+1,reason:'隔离测试样例'});assert.equal(r.statusCode,201,r.body);}return id;};
+ const create=async(title:string,fields:any[],rows:any[])=>seedDataset(ctx.store,ctx.store.user('u-admin')!,title,fields,rows);
  const base=await create('订单',[field('id'),field('amount','number'),field('date','date'),field('secret','text',true)],[{id:'1',amount:'0.10',date:'2026-10-11',secret:'private-one'},{id:'2',amount:'0.20',date:'2026-10-12'},{id:'3',amount:'999',date:'错误'}]);
  const target=await create('支付',[field('order_id'),field('status'),field('secret','text',true)],[{order_id:'1',status:'paid'},{order_id:'1',status:'paid'},{order_id:'2',status:'pending'},{order_id:'',status:'paid'}]);
  const source=JSON.parse((ctx.store.db.prepare('SELECT data FROM data_sets WHERE id=?').get(base) as any).data);
@@ -39,7 +40,7 @@ test('自动口径仍校验日期与目标权限，目标撤权不可绕过，�
  assert.equal((runBusinessQuery(c.store,c.user,c.base,'date_count',{dateFrom:'2026-10-11',dateTo:'2026-10-11'}).result as any).groups[0].value,'1');
  assert.throws(()=>runBusinessQuery(c.store,c.user,c.base,'paid_total',{filters:'override'} as any),/参数/);
  const d=c.store.doc(c.user.tenantId,c.target);d.ownerId='someone';d.grants=[];d.audience='private';d.policyVersion++;c.store.saveDoc(d);
- const member={...c.user,role:'member'};assert.throws(()=>runBusinessQuery(c.store,member,c.base,'paid_total'),/权限/);
+ const member={...c.user,role:'member'};assert.throws(()=>runBusinessQuery(c.store,member,c.base,'paid_total'),{statusCode:404});
  const catalog=businessCatalog(c.store,member,c.base).templates;
  assert.equal(catalog.find((t:any)=>t.id==='paid_total')!.available,false);assert.equal(catalog.find((t:any)=>t.id==='date_count')!.available,true);
 }));

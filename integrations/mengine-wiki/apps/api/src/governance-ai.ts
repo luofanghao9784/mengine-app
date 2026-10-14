@@ -19,7 +19,7 @@ type Report = Assessment & {
   proposalIds: Partial<Record<"organize" | "summary", string>>;
 };
 // Also bind metadata: governance scans can change quality without increasing the document version.
-export const governanceFingerprint = (d: Doc) => digest(JSON.stringify(d));
+export const governanceFingerprint = (d: Doc) => { const value={...d,department:d.departmentId||d.department}; delete value.departmentId; return digest(JSON.stringify(value)); };
 export function redactForGovernance(value: string) {
   return value
     .replace(/-----BEGIN [^-]*PRIVATE KEY-----[\s\S]*?-----END [^-]*PRIVATE KEY-----/g, "[私钥已移除]")

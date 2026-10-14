@@ -56,6 +56,11 @@ public class IdentitySecurity {
                     var auth = SecurityContextHolder.getContext().getAuthentication();
                     if (auth != null && auth.isAuthenticated() && !(auth instanceof AnonymousAuthenticationToken)) {
                         var currentSession=request.getSession(false);
+                        if(currentSession!=null && "PLATFORM_PASSWORD".equals(currentSession.getAttribute("AUTHENTICATION_SOURCE"))) {
+                            identities.closeSupportSession(IdentityService.hash(currentSession.getId()));
+                            currentSession.invalidate();SecurityContextHolder.clearContext();
+                            writeError(response,401,"AUTHENTICATION_REQUIRED");return;
+                        }
                         Object savedVersion=currentSession==null?null:currentSession.getAttribute("CREDENTIAL_VERSION");
                         long version=savedVersion instanceof Number number?number.longValue():0;
                         if (!identities.validSession(UUID.fromString(auth.getName()),version)) {

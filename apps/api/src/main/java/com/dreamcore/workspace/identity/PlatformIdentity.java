@@ -13,7 +13,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Dedicated credentials authenticate the same user and browser session as the unified entrance. */
+/** Dedicated platform cookies never replace or invalidate the shared enterprise/employee session. */
 @Service
 public class PlatformIdentity {
     private final String cookieName;
@@ -34,36 +34,61 @@ public class PlatformIdentity {
         this.db=db; this.passwords=passwords; this.identities=identities; this.audit=audit; this.throttle=throttle;
         dummy=passwords.encode(UUID.randomUUID().toString());
     }
+    private String secret() {
+        byte[] bytes=new byte[32]; new SecureRandom().nextBytes(bytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    }
     private void cookie(HttpServletRequest request, HttpServletResponse response, String value, long seconds) {
         response.addHeader("Set-Cookie", ResponseCookie.from(cookieName,value).httpOnly(true)
             .secure(request.isSecure()).sameSite("Strict").path(PATH).maxAge(seconds).build().toString());
         response.setHeader("Cache-Control","no-store");
     }
     public String presentedSessionHash(HttpServletRequest request) {
-        var session=request.getSession(false);
-        return session==null?null:IdentityService.hash(session.getId());
+        if(request.getCookies()!=null)for(var c:request.getCookies())if(cookieName.equals(c.getName())&&c.getValue().length()==43)return IdentityService.hash(c.getValue());
+        return null;
     }
     public Session read(HttpServletRequest request) {
-        var session=request.getSession(false);
-        if(session==null)return null;
-        var saved=session.getAttribute(org.springframework.security.web.context.HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY);
-        if(!(saved instanceof org.springframework.security.core.context.SecurityContext context) || context.getAuthentication()==null)return null;
-        UUID actor=UUID.fromString(context.getAuthentication().getName());
-        Object version=session.getAttribute("CREDENTIAL_VERSION");
-        if(!(version instanceof Number number)||!identities.validSession(actor,number.longValue()))return null;
-        try { identities.platform(actor); } catch(IdentityException denied) { return null; }
-        String hash=presentedSessionHash(request);
-        db.update("DELETE FROM platform_sessions WHERE token_hash=? AND expires_at<=now()",hash);
-        // A server-side support capability lease, never an alternate authentication cookie.
-        db.update("INSERT INTO platform_sessions(token_hash,csrf_hash,account_id,credential_version,expires_at) VALUES (?,?,?,?,now()+(? * interval '1 second')) ON CONFLICT(token_hash) DO UPDATE SET expires_at=EXCLUDED.expires_at WHERE platform_sessions.account_id=EXCLUDED.account_id AND platform_sessions.credential_version=EXCLUDED.credential_version",
-            hash,IdentityService.hash("support:"+hash),actor,number.longValue(),session.getMaxInactiveInterval());
-        return new Session(hash,IdentityService.hash("support:"+hash),actor);
+        if (request.getCookies()==null) return null;
+        for (var cookie:request.getCookies()) {
+            if (!cookieName.equals(cookie.getName()) || cookie.getValue().length()!=43) continue;
+            var rows=db.query("""
+                SELECT s.token_hash,s.csrf_hash,s.account_id FROM platform_sessions s
+                LEFT JOIN platform_accounts p ON p.account_id=s.account_id
+                LEFT JOIN accounts a ON a.id=s.account_id
+                WHERE s.token_hash=? AND s.expires_at>now() AND (s.account_id IS NULL OR
+                  (a.status='ACTIVE' AND a.credential_version=s.credential_version AND EXISTS
+                    (SELECT 1 FROM platform_roles r WHERE r.account_id=s.account_id AND r.role='PLATFORM_ADMIN')))
+                """,(r,n)->new Session(r.getString(1),r.getString(2),r.getObject(3,UUID.class)),IdentityService.hash(cookie.getValue()));
+            return rows.isEmpty()?null:rows.getFirst();
+        }
+        return null;
+    }
+    private String issue(HttpServletRequest request,HttpServletResponse response,UUID actor,Long version) {
+        String token=secret(),csrf=IdentityService.hash("csrf:"+token); long ttl=actor==null?1200:28800;
+        db.update("INSERT INTO platform_sessions(token_hash,csrf_hash,account_id,credential_version,expires_at) VALUES (?,?,?,?,now()+(? * interval '1 second'))",
+            IdentityService.hash(token),IdentityService.hash(csrf),actor,version,ttl);
+        cookie(request,response,token,ttl);
+        return csrf;
     }
     @Transactional
     public Map<String,String> csrf(HttpServletRequest request,HttpServletResponse response) {
-        var token=(org.springframework.security.web.csrf.CsrfToken)request.getAttribute(org.springframework.security.web.csrf.CsrfToken.class.getName());
+        Session session=read(request); String token=null;
+        if(session==null) token=issue(request,response,null,null);
+        else for(var cookie:request.getCookies()) if(cookieName.equals(cookie.getName())) token=IdentityService.hash("csrf:"+cookie.getValue());
+        db.update("DELETE FROM platform_sessions WHERE expires_at<=now()");
         response.setHeader("Cache-Control","no-store");
-        return Map.of("token",token.getToken(),"headerName",token.getHeaderName());
+        return Map.of("token",token,"headerName","X-CSRF-TOKEN");
+    }
+    public boolean validCsrf(Session session,String supplied) {
+        return session!=null && supplied!=null && supplied.length()==64 && java.security.MessageDigest.isEqual(
+            session.csrfHash().getBytes(java.nio.charset.StandardCharsets.UTF_8),
+            IdentityService.hash(supplied).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+    void authenticate(UUID actor,long version,HttpServletRequest request,HttpServletResponse response) {
+        identities.platform(actor);
+        var previous=read(request);
+        if(previous!=null)db.update("DELETE FROM platform_sessions WHERE token_hash=?",previous.tokenHash());
+        issue(request,response,actor,version);
     }
     @Transactional
     public IdentityService.Me login(String username,String password,HttpServletRequest request,HttpServletResponse response) {
@@ -71,13 +96,24 @@ public class PlatformIdentity {
         if(!throttle.allow("platform:"+normalized,"platform:"+request.getRemoteAddr())) throw new IdentityException(429,"LOGIN_THROTTLED");
         if(password==null || password.length()>128) throw new IdentityException(401,"INVALID_CREDENTIALS");
         var rows=db.queryForList("SELECT p.*,a.credential_version AS unified_version FROM platform_accounts p JOIN accounts a ON a.id=p.account_id WHERE login_name=? AND a.status='ACTIVE'",normalized);
+        // Invited operators without dedicated credentials can explicitly sign into this realm
+        // with their verified business credential, without touching the business session.
+        if(rows.isEmpty()) {
+            try {
+                var account=identities.login(normalized,password,request.getRemoteAddr());
+                if(Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM platform_accounts WHERE account_id=?)",Boolean.class,account.id())))throw new IdentityException(401,"INVALID_CREDENTIALS");
+                identities.platform(account.id());authenticate(account.id(),account.credentialVersion(),request,response);
+                audit.record(account.id(),null,"PLATFORM_LOGIN",account.id(),"SUCCESS");return me(account.id());
+            } catch(IdentityException denied) {
+                audit.denial(null,"PLATFORM_LOGIN_FAILED");throw new IdentityException(401,"INVALID_CREDENTIALS");
+            }
+        }
         boolean matched=passwords.matches(password,rows.isEmpty()?dummy:(String)rows.getFirst().get("password_hash"));
         if(!matched || rows.isEmpty()) { audit.denial(null,"PLATFORM_LOGIN_FAILED"); throw new IdentityException(401,"INVALID_CREDENTIALS"); }
         var row=rows.getFirst(); UUID actor=(UUID)row.get("account_id"); identities.platform(actor);
         Session previous=read(request);
         if(previous!=null) db.update("DELETE FROM platform_sessions WHERE token_hash=?",previous.tokenHash());
-        UnifiedLogin.authenticate(identities,actor,((Number)row.get("unified_version")).longValue(),"PLATFORM_PASSWORD",request,response);
-        cookie(request,response,"",0);
+        issue(request,response,actor,((Number)row.get("unified_version")).longValue());
         audit.record(actor,null,"PLATFORM_LOGIN",actor,"SUCCESS");
         return me(actor);
     }
@@ -169,7 +205,6 @@ public class PlatformIdentity {
             db.update("DELETE FROM platform_sessions WHERE token_hash=?",session.tokenHash());
             if(session.actor()!=null) audit.record(session.actor(),null,"PLATFORM_LOGOUT",session.actor(),"SUCCESS");
         }
-        new org.springframework.security.web.authentication.logout.SecurityContextLogoutHandler().logout(request,response,org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication());
         cookie(request,response,"",0);
     }
 }

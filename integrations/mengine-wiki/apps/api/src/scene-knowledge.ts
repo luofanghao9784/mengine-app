@@ -2,7 +2,7 @@ import { createBusinessKnowledge } from "./business-knowledge.js";
 import type { Model } from "./model.js";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { Store } from "./store.js";
-import { canGovern, canUseAI, type User } from "./domain.js";
+import { canUseAI, type User } from "./domain.js";
 import { redactForGovernance } from "./governance-ai.js";
 const fail = (statusCode: number, message: string) =>
   Object.assign(Error(message), { statusCode });
@@ -17,7 +17,6 @@ export function registerSceneKnowledge(
   const business = createBusinessKnowledge(store, model);
   const auth = (req: FastifyRequest) => {
     const u = session(req);
-    if (!canGovern(u)) throw fail(403, "没有知识管理权限");
     return u;
   };
   const call = async (req: FastifyRequest, url: string, payload?: unknown) => {

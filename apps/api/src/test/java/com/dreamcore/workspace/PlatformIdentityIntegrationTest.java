@@ -63,10 +63,10 @@ class PlatformIdentityIntegrationTest {
         assertEquals(0,db.queryForObject("SELECT count(*) FROM tenant_memberships WHERE account_id=?",Integer.class,provisionedPlatform));
         var browser=new Browser();
         assertEquals(200,browser.post(CUSTOMER,"/login",Map.of("email",login,"password",customerPassword)).statusCode());
-        assertEquals(200,browser.get(PLATFORM+"/me"));
+        assertEquals(401,browser.get(PLATFORM+"/me"));
         assertEquals(401,browser.post(PLATFORM,"/login",Map.of("username",login,"password",customerPassword)).statusCode());
         assertEquals(200,browser.post(PLATFORM,"/login",Map.of("username",login,"password",platformPassword)).statusCode());
-        assertEquals(provisionedPlatform.toString(),JSON.readTree(browser.send("GET","/api/v1/me",null,null).body()).get("account").get("id").asString());
+        assertEquals(customer.toString(),JSON.readTree(browser.send("GET","/api/v1/me",null,null).body()).get("account").get("id").asString());
         db.update("DELETE FROM platform_roles WHERE account_id=?",customer);
     }
     @Test void pendingEnterpriseStatusUsesPlatformRealmWithoutExpiringItsSession() throws Exception {
@@ -90,15 +90,15 @@ class PlatformIdentityIntegrationTest {
         db.update("INSERT INTO accounts(id,email,display_name,password_hash) VALUES (?,?,?,?)",UUID.randomUUID(),customerLogin,"合成客户",passwords.encode("synthetic-customer-status"));
         var customer=new Browser();
         assertEquals(200,customer.post(CUSTOMER,"/login",Map.of("email",customerLogin,"password","synthetic-customer-status")).statusCode());
-        assertEquals(403,customer.get(statusPath));
-        assertEquals(404,platform.get("/api/v1/platform/tenants/"+tenant+"/departure-status"));
+        assertEquals(401,customer.get(statusPath));
+        assertEquals(401,platform.get("/api/v1/platform/tenants/"+tenant+"/departure-status"));
         assertEquals(200,platform.get(PLATFORM+"/me"));
     }
     @Test void deploymentCannotConfigureInvalidOrSharedCustomerCookieName() {
         assertThrows(IllegalArgumentException.class,()->new com.dreamcore.workspace.identity.PlatformIdentity(db,passwords,identities,null,null,"bad;name","CUSTOMER"));
         assertThrows(IllegalArgumentException.class,()->new com.dreamcore.workspace.identity.PlatformIdentity(db,passwords,identities,null,null,"SAME","SAME"));
     }
-    @Test void legacyDistinctActorsRemainDistinctButBrowserSessionIsUnified() throws Exception {
+    @Test void platformAndSharedCustomerSessionsCoexistAndLogoutIndependently() throws Exception {
         String login="platform-"+UUID.randomUUID()+"@example.test";
         String customerPassword="customer-synthetic-123",platformPassword="platform-synthetic-456";
         UUID customer=UUID.randomUUID();
@@ -112,37 +112,37 @@ class PlatformIdentityIntegrationTest {
         var browser=new Browser();
         assertEquals(200,browser.post(CUSTOMER,"/login",Map.of("email",login,"password",customerPassword)).statusCode());
         assertEquals(200,browser.get("/api/v1/me"));
-        assertEquals(403,browser.get("/api/platform-admin/v1/overview"));
+        assertEquals(401,browser.get("/api/platform-admin/v1/overview"));
         assertEquals(401,browser.post(PLATFORM,"/login",Map.of("username",login,"password",customerPassword)).statusCode());
         assertEquals(403,browser.send("POST",PLATFORM+"/login",Map.of("username",login,"password",platformPassword),new Browser().csrf(CUSTOMER)).statusCode());
         var signedIn=browser.post(PLATFORM,"/login",Map.of("username",login,"password",platformPassword));
         assertEquals(200,signedIn.statusCode(),signedIn.body());
-        String issuedCookie=signedIn.headers().allValues("set-cookie").stream().filter(c->!c.startsWith("DREAMCORE_PLATFORM_SYNTHETIC=")).findFirst().orElseThrow();
-        assertFalse(issuedCookie.startsWith("DREAMCORE_PLATFORM_SYNTHETIC="));
-        assertTrue(issuedCookie.contains("Path=/"));
+        String issuedCookie=signedIn.headers().allValues("set-cookie").stream().filter(c->c.startsWith("DREAMCORE_PLATFORM_SYNTHETIC=")).findFirst().orElseThrow();
+        assertTrue(issuedCookie.startsWith("DREAMCORE_PLATFORM_SYNTHETIC="));
+        assertTrue(issuedCookie.contains("Path=/api/platform-admin/"));
         assertTrue(issuedCookie.contains("HttpOnly"));
         assertTrue(issuedCookie.contains("SameSite="));
         assertEquals(platform.toString(),JSON.readTree(signedIn.body()).get("account").get("id").asString());
         assertEquals(0,JSON.readTree(signedIn.body()).get("memberships").size());
         assertEquals(200,browser.get("/api/platform-admin/v1/overview"));
-        assertEquals(provisionedPlatform.toString(),JSON.readTree(browser.send("GET","/api/v1/me",null,null).body()).get("account").get("id").asString());
+        assertEquals(customer.toString(),JSON.readTree(browser.send("GET","/api/v1/me",null,null).body()).get("account").get("id").asString());
         // Parallel tabs can request CSRF without invalidating each other's next action.
         String first=browser.csrf(PLATFORM); assertNotNull(first); assertNotNull(browser.csrf(PLATFORM));
         assertEquals(204,browser.post(PLATFORM,"/logout",null).statusCode());
-        assertEquals(401,browser.get(PLATFORM+"/me")); assertEquals(401,browser.get("/api/v1/me"));
+        assertEquals(401,browser.get(PLATFORM+"/me")); assertEquals(200,browser.get("/api/v1/me"));
         assertEquals(200,browser.post(PLATFORM,"/login",Map.of("username",login,"password",platformPassword)).statusCode());
         assertEquals(204,browser.post(CUSTOMER,"/logout",null).statusCode());
-        assertEquals(401,browser.get("/api/v1/me")); assertEquals(401,browser.get(PLATFORM+"/me"));
+        assertEquals(401,browser.get("/api/v1/me")); assertEquals(200,browser.get(PLATFORM+"/me"));
         db.update("UPDATE platform_accounts SET credential_version=credential_version+1 WHERE account_id=?",platform);
         assertEquals(401,browser.get(PLATFORM+"/me"));
         assertEquals(200,browser.post(CUSTOMER,"/login",Map.of("email",login,"password",customerPassword)).statusCode());
         assertEquals(200,browser.post(PLATFORM,"/login",Map.of("username",login,"password",platformPassword)).statusCode());
         db.update("UPDATE accounts SET credential_version=credential_version+1 WHERE id=?",customer);
-        assertEquals(200,browser.get("/api/v1/me")); assertEquals(200,browser.get(PLATFORM+"/me"));
+        assertEquals(401,browser.get("/api/v1/me")); assertEquals(200,browser.get(PLATFORM+"/me"));
         db.update("DELETE FROM platform_roles WHERE account_id=?",platform);
-        assertEquals(403,browser.get(PLATFORM+"/me"));
+        assertEquals(401,browser.get(PLATFORM+"/me"));
         db.update("INSERT INTO platform_roles(account_id,role) VALUES (?,'PLATFORM_ADMIN')",platform);
-        assertEquals(200,browser.get(PLATFORM+"/me"),"Explicitly regranted role is available on the valid unified session; old support contexts stay closed");
+        assertEquals(401,browser.get(PLATFORM+"/me"),"Revoked platform cookies must not revive when a role is regranted");
         // No platform session or principal can be reused for a customer login.
         assertEquals(401,browser.post(CUSTOMER,"/login",Map.of("email",login,"password",platformPassword)).statusCode());
     }
@@ -158,7 +158,7 @@ class PlatformIdentityIntegrationTest {
         db.update("INSERT INTO accounts(id,email,display_name,password_hash) VALUES (?,?,?,?)",customer,login,"客户",passwords.encode("customer-only"));
         Browser first=new Browser(),second=new Browser(),customerOnly=new Browser();
         for(Browser b:java.util.List.of(first,customerOnly)) assertEquals(200,b.post(CUSTOMER,"/login",Map.of("email",login,"password","customer-only")).statusCode());
-        assertEquals(403,customerOnly.post(PLATFORM,"/password",Map.of("currentPassword",old,"password",next)).statusCode());
+        assertEquals(401,customerOnly.post(PLATFORM,"/password",Map.of("currentPassword",old,"password",next)).statusCode());
         for(Browser b:java.util.List.of(first,second)) assertEquals(200,b.post(PLATFORM,"/login",Map.of("username",login,"password",old)).statusCode());
         assertEquals(403,first.send("POST",PLATFORM+"/password",Map.of("currentPassword",old,"password",next),new Browser().csrf(CUSTOMER)).statusCode());
         assertEquals(400,first.post(PLATFORM,"/password",Map.of("currentPassword","incorrect","password",next)).statusCode());
@@ -167,7 +167,7 @@ class PlatformIdentityIntegrationTest {
         assertEquals(200,second.get(PLATFORM+"/me"));
         assertEquals(204,first.post(PLATFORM,"/password",Map.of("currentPassword",old,"password",next)).statusCode());
         assertEquals(401,first.get(PLATFORM+"/me"));assertEquals(401,second.get(PLATFORM+"/me"));
-        assertEquals(401,first.get("/api/v1/me"));assertEquals(200,customerOnly.get("/api/v1/me"));
+        assertEquals(200,first.get("/api/v1/me"));assertEquals(200,customerOnly.get("/api/v1/me"));
         assertEquals(0,db.queryForObject("SELECT count(*) FROM platform_sessions WHERE account_id=?",Integer.class,actor));
         assertEquals(1,db.queryForObject("SELECT count(*) FROM identity_audit WHERE actor_id=? AND action='PLATFORM_PASSWORD_CHANGE'",Integer.class,actor));
         assertEquals(1,db.queryForObject("SELECT count(*) FROM identity_audit WHERE actor_id=? AND action='PLATFORM_PASSWORD_CHANGE_FAILED'",Integer.class,actor));

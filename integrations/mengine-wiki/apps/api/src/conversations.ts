@@ -1,3 +1,4 @@
+import {canUseCurrentData} from './data-availability.js';
 import {dictionaryFingerprint} from './dictionary-version.js';
 import { randomUUID } from "node:crypto";
 import { canUseAI, now, visibleText, type Evidence, type Proposal, type User } from "./domain.js";
@@ -48,7 +49,7 @@ export class Conversations {
       const d = this.store.doc(u.tenantId, ref.documentId);
       const dataset=ref.dataFingerprint?this.store.db.prepare('SELECT data FROM data_sets WHERE id=? AND tenant_id=?').get(ref.documentId,u.tenantId) as {data:string}|undefined:undefined;
       if(ref.dataFingerprint&&(!dataset||dictionaryFingerprint(this.store,u.tenantId,JSON.parse(dataset.data))!==ref.dataFingerprint))return false;
-      return !!d && canUseAI(u, d) && d.version === ref.version && d.policyVersion === ref.policyVersion;
+      return !!d && canUseCurrentData(this.store,u,d) && d.version === ref.version && d.policyVersion === ref.policyVersion;
     });
   }
   // Questions can quote an earlier answer, so the entire dependent turn is hidden.

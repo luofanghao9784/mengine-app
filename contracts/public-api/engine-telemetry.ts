@@ -5,6 +5,7 @@ export const telemetryChannels = [
   'RETRIEVAL',
   'TASK',
   'COMPANY',
+  'SCENE_KNOWLEDGE',
   'EXPERIENCE',
   'GENERALIZATION',
   'GENERAL_ADJUSTMENT',

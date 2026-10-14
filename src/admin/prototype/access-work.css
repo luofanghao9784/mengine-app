@@ -1,0 +1,7 @@
+.access-work { padding: 20px; height: 100%; overflow: auto; color: #e9e4d8; background: #1a1d1c; line-height: 1.6; }
+.access-work h2 { font-size: 21px; }.access-work h3 { font-size: 17px; }.access-work p { color: #c3c6bf; }
+.access-work nav,.access-inline { display: flex; gap: 10px; flex-wrap: wrap; }
+.access-work button,.access-work input:not([type=checkbox]),.access-work select,.access-work textarea { color: #e9e4d8; background: #292e2b; border: 1px solid #555f55; border-radius: 6px; padding: 8px 12px; font: inherit; }
+.access-work label { display: block; margin: 10px 0; }.access-work label>select,.access-work label>textarea { display: block; min-width: 260px; max-width: 100%; }.access-work textarea { min-height: 70px; width: 100%; }
+.access-work button { cursor: pointer; margin: 4px; }.access-work button:disabled { opacity: .5; cursor: default; }.access-work button[aria-pressed=true] { border-color: #b7cc9b; background: #394736; }
+.access-work article,.access-work fieldset,.access-work details { padding: 12px; margin: 12px 0; border: 1px solid #465145; border-radius: 8px; }.access-work fieldset { max-height: 260px; overflow: auto; }.access-work summary { cursor: pointer; }.access-work pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }.access-work [role=alert] { color: #ffbbad; }.access-work input[type=checkbox] { margin-right: 8px; }

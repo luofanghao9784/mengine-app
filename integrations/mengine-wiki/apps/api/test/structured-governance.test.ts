@@ -1,3 +1,4 @@
+import {seedDataset} from './helpers/structured-fixture.js';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtemp,rm} from 'node:fs/promises';
@@ -9,7 +10,7 @@ import {dictionaryFingerprint} from '../src/dictionary-version.js';
 import {scanStructured,contradictoryFilters} from '../src/structured-governance.js';
 async function fixture(fn:(ctx:Awaited<ReturnType<typeof buildServer>>,h:{cookie:string})=>Promise<void>){const dir=await mkdtemp(join(tmpdir(),'structured-gov-')),ctx=await buildServer({demo:true,storage:dir});const login=await ctx.app.inject({method:'POST',url:'/api/auth/login',payload:{email:'admin@mengine.demo',password:DEMO_PASSWORD}});try{await fn(ctx,{cookie:String(login.headers['set-cookie']).split(';')[0]});}finally{await ctx.app.close();await rm(dir,{recursive:true,force:true});}}
 const field={name:'record_id',label:'记录编号',type:'text',required:true,unique:true,sensitive:false,description:''};
-async function create(c:any,h:any,title='测试表'){const r=await c.app.inject({method:'POST',url:'/api/foundation',headers:h,payload:{title,department:'企业管理',purpose:'校验',source:'测试源',updatePolicy:'测试',fields:[field]}});assert.equal(r.statusCode,201,r.body);return r.json().id;}
+async function create(c:any,h:any,title='测试表'){return seedDataset(c.store,c.store.user('u-admin')!,title,[field as any]);}
 function row(c:any,id:string,key:string,value:string,status='ready'){const d=c.store.doc('mengine-demo',id);const r={id:key,version:1,values:{record_id:value},issues:status==='quarantined'?['旧异常']:[],status,updatedAt:new Date().toISOString(),actor:'测试'};c.store.db.prepare('INSERT INTO data_rows VALUES(?,?,?,?,?,?)').run(key,id,d.tenantId,status,r.updatedAt,JSON.stringify(r));}
 const state=(c:any,h:any)=>c.app.inject({url:'/api/governance/structured',headers:h});
 test('结构化问题发现、处理、复检恢复与审计闭环，版本冲突拒绝执行',()=>fixture(async(c,h)=>{
@@ -20,7 +21,10 @@ test('结构化问题发现、处理、复检恢复与审计闭环，版本冲�
  const run=()=>c.app.inject({method:'POST',url:`/api/governance/structured/${id}/recheck`,headers:h,payload:{expectedVersion:version,reason:'按结构约束重新校验'}});
  const result=await run();assert.equal(result.statusCode,200,result.body);assert.equal(result.json().recovered,1);assert.equal(result.json().isolated,1);assert.equal((await run()).statusCode,409);
  assert.equal((c.store.db.prepare('SELECT status FROM data_rows WHERE id=?').get('recover') as any).status,'ready');
- const doc=c.store.doc('mengine-demo',id)!;assert.equal((await c.app.inject({method:'POST',url:`/api/foundation/${id}/records`,headers:h,payload:{rowId:'bad',expectedVersion:doc.version,reason:'补全记录编号',values:{record_id:'fixed'}}})).statusCode,201);
+ const doc=c.store.doc('mengine-demo',id)!;assert.equal((await c.app.inject({method:'POST',url:`/api/foundation/${id}/records`,headers:h,payload:{rowId:'bad',expectedVersion:doc.version,reason:'补全记录编号',values:{record_id:'fixed'}}})).statusCode,403);
+ // Emulate corrected source input in this isolated fixture; customer record writes remain prohibited.
+ const sourceRow=JSON.parse((c.store.db.prepare('SELECT data FROM data_rows WHERE id=?').get('bad') as any).data);sourceRow.values.record_id='fixed';sourceRow.status='ready';sourceRow.issues=[];sourceRow.version++;
+ c.store.db.prepare('UPDATE data_rows SET status=?,data=? WHERE id=?').run('ready',JSON.stringify(sourceRow),'bad');
  const fixed=(await state(c,h)).json();assert.equal(fixed.findings.find((x:any)=>x.id===f.id).status,'resolved');assert.ok(c.store.auditValid('mengine-demo'));
  const audit=c.store.db.prepare("SELECT data FROM audit WHERE tenant_id='mengine-demo'").all() as any[];assert.ok(audit.some(r=>JSON.parse(r.data).action==='structured.rechecked'));
 }));
@@ -30,7 +34,7 @@ test('跨表检测匹配率、孤立记录和重复展开风险，权限撤回�
  const b={relations:[{id:'link',name:'测试关联',targetId:target,keys:[{local:'record_id',foreign:'record_id'}],evidence:'测试字段映射',targetFingerprint:dictionaryFingerprint(c.store,'mengine-demo',get(target))}],templates:[]};
  c.store.db.prepare('INSERT INTO data_dictionary VALUES(?,?,?)').run(source,'mengine-demo',JSON.stringify({revision:1,confirmed:{origin:'model',fingerprint:dictionaryFingerprint(c.store,'mengine-demo',get(source)),definition:b},history:[]}));
  const out=(await state(c,h)).json(),r=out.tables.find((t:any)=>t.id===source).relations[0];assert.equal(r.matchRate,50);assert.equal(r.missing,1);assert.equal(r.ambiguous,1);assert.ok(out.findings.some((f:any)=>f.kind==='rule'));
- const owner=c.store.user('u-admin')!,limited={...owner,id:'u-steward',role:'steward' as const,clearance:1};const targetDoc=c.store.doc('mengine-demo',target)!;targetDoc.classification=3;c.store.saveDoc(targetDoc);const sourceDoc=c.store.doc('mengine-demo',source)!;sourceDoc.classification=1;sourceDoc.audience='organization';c.store.saveDoc(sourceDoc);
+ const owner=c.store.user('u-admin')!,limited={...owner,id:'u-steward',role:'steward' as const,clearance:1,duties:{governance:[{type:'resource' as const,id:source},{type:'resource' as const,id:target}]}};const targetDoc=c.store.doc('mengine-demo',target)!;targetDoc.classification=3;c.store.saveDoc(targetDoc);const sourceDoc=c.store.doc('mengine-demo',source)!;sourceDoc.classification=1;sourceDoc.audience='organization';c.store.saveDoc(sourceDoc);
  const restricted=scanStructured(c.store,limited);assert.equal(restricted.tables.find(t=>t.id===source)?.relations.length,0);assert.ok(!JSON.stringify(restricted).includes('目标表'));
  assert.equal((await c.app.inject({url:'/api/governance/structured'})).statusCode,401);
  const login=await c.app.inject({method:'POST',url:'/api/auth/login',payload:{email:'external@mengine.demo',password:DEMO_PASSWORD}});const outsider={cookie:String(login.headers['set-cookie']).split(';')[0]};const outside=await state(c,outsider);assert.equal(outside.statusCode,200);assert.deepEqual(outside.json().tables,[]);assert.deepEqual(outside.json().findings,[]);

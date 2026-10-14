@@ -228,3 +228,46 @@ test('whole-file batch preserves all source identities and enforces a total text
  const tooLarge=request();tooLarge.job.inputs[0].text='字'.repeat(8000);tooLarge.job.inputs.push({...tooLarge.job.inputs[0],chunkId:id(6),text:'字'});assert.equal(validCompanyRequest(tooLarge),false);
  const tooMany=request();for(let n=6;n<70;n++)tooMany.job.inputs.push({...tooMany.job.inputs[0],chunkId:id(n)});assert.equal(validCompanyRequest(tooMany),false);
 });
+
+
+test('all label groups are inspected in one call without weakening provenance', async () => {
+ const {company,calls}=analyzer([
+  tool('company_input',{all:true},1), tool('company_group',{all:true},2),
+  tool('submit_company_candidates',{candidates:[candidate]},3),
+ ]);
+ const result=await company.run(request());assert.equal(result.outcome,'COMPLETE');assert.equal(calls(),3);
+ assert.deepEqual(result.candidates,[candidate]);
+});
+test('a delivery without reading its group remains rejected', async () => {
+ const {company}=analyzer([tool('company_input',{all:true},1),
+  tool('submit_company_candidates',{candidates:[candidate]},2),
+  [{type:'text',text:'No tool receipt'},{type:'finish',reason:'stop'}]]);
+ const result=await company.run(request());assert.equal(result.outcome,'FAILED');assert.deepEqual(result.candidates,[]);
+ assert.equal(result.code,'COMPANY_EVIDENCE_INVALID');
+});
+test('exhausted execution retains a diagnostic code and does not manufacture delivery', async () => {
+ const {company,calls}=analyzer(Array.from({length:8},(_,i)=>tool('company_input',{all:true},i+1)));
+ const result=await company.run(request());assert.equal(result.outcome,'FAILED');assert.equal(result.code,'MODEL_CALL_LIMIT');
+ assert.equal(calls(),8);assert.deepEqual(result.candidates,[]);
+});
+
+
+test('specific correction repairs non-term meaning without accepting invalid business evidence', async () => {
+ const {company,calls}=analyzer([
+  tool('company_input',{all:true},1),tool('company_group',{all:true},2),
+  tool('submit_company_candidates',{candidates:[{...candidate,meaning:'An industry definition'}]},3),
+  r=>{ assert.ok(JSON.stringify(r.messages).includes('require meaning='));
+    return tool('submit_company_candidates',{candidates:[candidate]},4); },
+ ]);
+ const result=await company.run(request());assert.equal(result.outcome,'COMPLETE');assert.equal(calls(),4);
+ assert.deepEqual(result.candidates,[candidate]);
+});
+
+
+test('duplicate evidence is corrected before the unchanged backend validation', async () => {
+ const {company}=analyzer([tool('company_input',{all:true},1),tool('company_group',{all:true},2),
+  tool('submit_company_candidates',{candidates:[{...candidate,evidence:[...candidate.evidence,...candidate.evidence]}]},3),
+  r=>{assert.ok(JSON.stringify(r.messages).includes('one evidence entry per chunkId'));
+    return tool('submit_company_candidates',{candidates:[candidate]},4); }]);
+ const result=await company.run(request());assert.equal(result.outcome,'COMPLETE');assert.deepEqual(result.candidates,[candidate]);
+});

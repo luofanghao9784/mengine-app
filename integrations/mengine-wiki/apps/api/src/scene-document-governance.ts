@@ -58,7 +58,7 @@ export function documentFindings(s: Store, u: User, d: Doc) {
         title === "内容信息量偏低"
           ? "正文信息量低于现有规则阈值，可核实业务适用性并记录人工结论。"
           : title === "已超过复核日期"
-            ? "资料已超过复核日期，请核实有效性；规则治理可更新复核周期。"
+            ? "资料已超过复核日期，请由责任人核实有效性，更新来源资料后重新检查。"
             : "原系统资料检查规则命中；请由责任人核实处理，敏感资料保持原权限限制。",
       count: 1,
       status: approved
@@ -85,6 +85,16 @@ export function documentFindings(s: Store, u: User, d: Doc) {
     } as DocumentFinding;
   });
   for (const f of old.filter((f) => !current.some((x) => x.id === f.id))) {
+    if (!["ready", "quarantined"].includes(d.status)) {
+      // An unavailable processor result is not evidence that an issue disappeared.
+      if (f.manualApproval && f.manualApproval !== fingerprint) {
+        f.status = "open";
+        f.manualApproval = undefined;
+        f.history = [...f.history, {at, actor: u.name, action: "重新发现", note: "资料状态已变化，等待处理完成后重新核验"}].slice(-50);
+      }
+      current.push(f);
+      continue;
+    }
     if (f.status !== "resolved") {
       f.status = "resolved";
       f.manualApproval = undefined;
@@ -95,6 +105,7 @@ export function documentFindings(s: Store, u: User, d: Doc) {
         note: "当前资料检查中问题已消失",
       });
     }
+    f.history = f.history.slice(-50);
     current.push(f);
   }
   s.db.transaction(() => {
@@ -115,6 +126,8 @@ export function recordDocumentDecision(
   action: string,
   reason: string,
 ) {
+  if (!["ready", "quarantined"].includes(d.status))
+    throw Object.assign(Error("资料尚未完成处理，请处理完成后核验"), {statusCode:409});
   const f = documentFindings(s, u, d).find((f) => f.id === id);
   if (!f) throw Object.assign(Error("资料治理问题不存在"), { statusCode: 404 });
   if (f.status === "resolved")

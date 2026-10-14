@@ -138,11 +138,15 @@ test("模型失败、结构无效与服务暂停不会伪造成功；失败后�
 }));
 
 test("同一用户不能并发研判，限流阻止重复模型消耗", async () => fixture(async (ctx, login) => {
-  const headers = await login("steward"); let release!: () => void, started!: () => void;
+  const headers = await login("admin"); let release!: () => void, started!: () => void;
   const gate = new Promise<void>(r => { release = r; }), entered = new Promise<void>(r => { started = r; });
   ctx.model.complete = async (_s, input) => { started(); await gate; return { text: JSON.stringify(answer(input)), usage: {} }; };
-  const pending = analyze(ctx, headers).then(r => r); await entered;
-  assert.equal((await analyze(ctx, headers)).statusCode, 429); release(); assert.equal((await pending).statusCode, 200);
+  const pending = analyze(ctx, headers).then(r => r);
+  try {
+    await Promise.race([entered, pending.then(r => { throw new Error(`请求在调用模型前结束：${r.statusCode}`); })]);
+    assert.equal((await analyze(ctx, headers)).statusCode, 429);
+  } finally { release(); }
+  assert.equal((await pending).statusCode, 200);
   for (let i = 0; i < 4; i++) assert.equal((await analyze(ctx, headers)).statusCode, 200);
   assert.equal((await analyze(ctx, headers)).statusCode, 429);
   assert.equal((ctx.store.db.prepare("SELECT COUNT(*) AS n FROM governance_ai_reports").get() as { n: number }).n, 5);

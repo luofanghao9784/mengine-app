@@ -1,3 +1,4 @@
+import { migrateAccess } from "./access-migration.js";
 import Database from "better-sqlite3";
 import {
   randomUUID,
@@ -59,8 +60,8 @@ export class Store {
  CREATE TABLE IF NOT EXISTS wiki_learning_failures(tenant_id TEXT NOT NULL,source_id TEXT NOT NULL,fingerprint TEXT NOT NULL,PRIMARY KEY(tenant_id,source_id));
  CREATE TABLE IF NOT EXISTS wiki_auto_graphs(tenant_id TEXT NOT NULL,user_id TEXT NOT NULL,data TEXT NOT NULL,PRIMARY KEY(tenant_id,user_id));
  CREATE TABLE IF NOT EXISTS departments(tenant_id TEXT NOT NULL,name TEXT NOT NULL,PRIMARY KEY(tenant_id,name));
- INSERT OR IGNORE INTO departments SELECT tenant_id,json_extract(data,'$.department') FROM users;
- INSERT OR IGNORE INTO departments SELECT tenant_id,json_extract(data,'$.department') FROM documents;
+ INSERT OR IGNORE INTO departments(tenant_id,name) SELECT tenant_id,json_extract(data,'$.department') FROM users;
+ INSERT OR IGNORE INTO departments(tenant_id,name) SELECT tenant_id,json_extract(data,'$.department') FROM documents;
  CREATE TABLE IF NOT EXISTS harness_runs(id TEXT PRIMARY KEY,tenant_id TEXT NOT NULL,user_id TEXT NOT NULL,data TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS data_sets(id TEXT PRIMARY KEY,tenant_id TEXT NOT NULL,data TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS data_rows(id TEXT PRIMARY KEY,dataset_id TEXT NOT NULL REFERENCES data_sets(id),tenant_id TEXT NOT NULL,status TEXT NOT NULL,updated_at TEXT NOT NULL,data TEXT NOT NULL);
@@ -76,12 +77,16 @@ export class Store {
     const jobColumns = (this.db.prepare('PRAGMA table_info(dictionary_jobs)').all() as {name:string}[]).map(c=>c.name);
     if(!jobColumns.includes('attempts'))this.db.exec('ALTER TABLE dictionary_jobs ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0');
     if(!jobColumns.includes('next_at'))this.db.exec("ALTER TABLE dictionary_jobs ADD COLUMN next_at TEXT NOT NULL DEFAULT ''");
+    migrateAccess(this);
   }
   departments(tenant: string): string[] {
-    return (this.db.prepare("SELECT name FROM departments WHERE tenant_id=? ORDER BY name").all(tenant) as { name: string }[]).map(r => r.name);
+    return (this.db.prepare("SELECT name FROM departments WHERE tenant_id=? AND active=1 ORDER BY name").all(tenant) as { name: string }[]).map(r => r.name);
   }
   ensureDepartment(tenant: string, name: string) {
-    this.db.prepare("INSERT OR IGNORE INTO departments VALUES(?,?)").run(tenant, name);
+    this.db.prepare("INSERT OR IGNORE INTO departments(tenant_id,name,id,active) VALUES(?,?,?,1)").run(tenant, name, randomUUID());
+  }
+  departmentId(tenant: string, name: string): string | undefined {
+    return (this.db.prepare("SELECT id FROM departments WHERE tenant_id=? AND name=? AND active=1").get(tenant,name) as {id:string}|undefined)?.id;
   }
   tenant(id: string) {
     return this.db.prepare("SELECT id,name FROM tenants WHERE id=?").get(id) as
@@ -110,6 +115,8 @@ export class Store {
   }
   addUser(u: User, password: string) {
     this.ensureDepartment(u.tenantId, u.department);
+    u.departmentId = this.departmentId(u.tenantId,u.department);
+    if(u.role === "admin")u.clearance=3;
     this.db
       .prepare("INSERT INTO users VALUES(?,?,?,?,?)")
       .run(
@@ -121,6 +128,10 @@ export class Store {
       );
   }
   saveUser(u: User) {
+    u.departmentId = this.departmentId(u.tenantId,u.department);
+    if(u.role === "admin")u.clearance=3;
+    const prior=this.user(u.id);
+    if(prior?.active && prior.role === "admin" && (!u.active || u.role !== "admin") && this.users(u.tenantId).filter(x=>x.active && x.role === "admin").length <= 1)throw Object.assign(Error("不能停用或降级最后一位企业管理员"),{statusCode:409});
     this.db
       .prepare("UPDATE users SET data=? WHERE id=? AND tenant_id=?")
       .run(JSON.stringify(u), u.id, u.tenantId);
@@ -143,6 +154,8 @@ export class Store {
     this.db.transaction(() => {
       const previous = this.doc(d.tenantId, d.id);
       this.ensureDepartment(d.tenantId, d.department);
+      d.departmentId = this.departmentId(d.tenantId,d.department);
+      d.grants=d.grants.map(g=>g.subjectType === "department" ? {...g,subjectId:this.departmentId(d.tenantId,g.subjectId)||g.subjectId} : g);
       this.db
         .prepare("INSERT INTO documents VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data")
         .run(d.id, d.tenantId, d.sha, JSON.stringify(d));

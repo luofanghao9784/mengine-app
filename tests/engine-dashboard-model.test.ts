@@ -152,3 +152,16 @@ test('completion bursts come from snapshot deltas, never from the window size al
   assert.equal(completions(c(5, '2026-10-06T09:59:00Z'), c(3, '2026-10-06T09:59:59Z')), 1);
   assert.equal(completions(c(0, null), c(0, null)), 0);
 });
+
+test('scene knowledge uses processing orbit; queued company sources do not fake running particles', () => {
+  const t=totals(snapshot({SCENE_KNOWLEDGE:{running:2},COMPANY:{queued:20}}));
+  assert.equal(t.pr,2);assert.equal(t.in,0);assert.equal(t.q,20);assert.equal(particles(t.pr),2);
+  assert.equal(totals(snapshot({COMPANY:{queued:20}})).pr,0);
+});
+
+test('invalid particle counts cannot stop the animation frame', () => {
+  for (const n of [NaN, Infinity, -Infinity, -3]) assert.equal(particles(n), 0);
+  assert.equal(particles(2.8), 2);
+  assert.equal(particles(4, NaN), 0);
+  assert.equal(particles(4, -1), 0);
+});
