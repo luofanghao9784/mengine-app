@@ -4,10 +4,11 @@ import {canUseCurrentData} from './data-availability.js';
 import {digest} from './store.js';
 
 // This is a source authorization snapshot, never an instruction to grant target-space access.
-export function exportGovernance(store:Store, tenant:string, serviceActor:string, serviceUser:User, doc:Doc) {
+export function exportGovernance(store:Store, tenant:string, _serviceActor:string, _serviceUser:User, doc:Doc) {
   const mappings=store.db.prepare('SELECT actor_id,user_id FROM platform_actor_bindings WHERE platform_tenant=? ORDER BY actor_id').all(tenant) as {actor_id:string;user_id:string}[];
   const allowedActors=mappings.filter(m=>{const u=store.user(m.user_id);return !!u&&canUseCurrentData(store,u,doc);}).map(m=>m.actor_id);
-  if(canUseCurrentData(store,serviceUser,doc))allowedActors.push(serviceActor);
+  // Service callers (including collection-worker) do not receive end-user rights.
+  // Readers come exclusively from verified identity mappings, so every caller sees one revision.
   const policy={sourceId:doc.id,sourceVersion:doc.version,policyVersion:doc.policyVersion,classification:doc.classification,audience:doc.audience,departmentId:doc.departmentId??null,aiPaused:!!doc.aiPaused,allowedActors:[...new Set(allowedActors)].sort()};
   return {...policy,policyDigest:digest(JSON.stringify(policy))};
 }

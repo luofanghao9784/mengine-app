@@ -67,9 +67,18 @@ def prepare():
  print('PREPARED',sha(E/'api-candidate.jar'))
  backup_manifest()
 def activate():
+ manifest=json.loads((S/'manifest.json').read_text())
+ for name,value in manifest['files'].items():assert sha(S/name)==value,name
+ with zipfile.ZipFile(E/'api-candidate.jar') as candidate:
+  for p in (S/'BOOT-INF').rglob('*'):
+   if p.is_file():assert candidate.read(str(p.relative_to(S)))==p.read_bytes(),str(p)
  assert sha(A/'release/api.jar')==sha(E/'api-before.jar')
  maintenance()
- pending=active();(E/'drain-before.json').write_text(json.dumps(pending))
+ pending=active()
+ for _ in range(30):
+  if not pending:break
+  time.sleep(1);pending=active()
+ (E/'drain-before.json').write_text(json.dumps(pending))
  assert not pending,'Tasks active; leave maintenance and wait, no processes stopped'
  run('systemctl','stop','dreamcore-app-rehearsal.service')
  run('systemctl','stop','dreamcore-wiki.service')

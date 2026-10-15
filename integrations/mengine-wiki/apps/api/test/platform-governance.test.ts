@@ -12,11 +12,12 @@ test('source policy changes revoke mapped actors and cannot grant foreign or ina
  const store={user:(id:string)=>users.find(u=>u.id===id),db:{prepare:()=>({all:()=>users.map(u=>({actor_id:u.id,user_id:u.id}))})}} as unknown as Store;
  const doc={id:'doc',tenantId:'t1',kind:'资料',status:'ready',version:1,policyVersion:1,classification:1,audience:'organization',ownerId:'admin',grants:[]} as unknown as Doc;
  const before=exportGovernance(store,'enterprise','service',admin,doc);
- assert.deepEqual(before.allowedActors,['admin','member','service']);
+ assert.deepEqual(before.allowedActors,['admin','member']);
+ assert.deepEqual(before,exportGovernance(store,'enterprise','collection-worker',admin,doc));
  assert.deepEqual(before,exportGovernance(store,'enterprise','service',admin,doc));
  doc.audience='private';doc.policyVersion++;
  const after=exportGovernance(store,'enterprise','service',admin,doc);
- assert.deepEqual(after.allowedActors,['admin','service']);assert.notEqual(after.policyDigest,before.policyDigest);
+ assert.deepEqual(after.allowedActors,['admin']);assert.notEqual(after.policyDigest,before.policyDigest);
  doc.aiPaused=true;assert.deepEqual(exportGovernance(store,'enterprise','service',admin,doc).allowedActors,[]);
 });
 test('derived policies require every source and intersect their readers',()=>{
