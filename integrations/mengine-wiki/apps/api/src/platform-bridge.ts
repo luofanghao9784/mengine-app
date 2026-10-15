@@ -55,12 +55,12 @@ export function registerPlatformBridge(app: FastifyInstance, store: Store, secre
     const get=p.method==='GET'&&/^\/scene-(foundation(?:\/[^/?]+)?|knowledge(?:\/[^/?]+\/source)?)$/.test(p.path);
     const post=p.method==='POST'&&/^\/scene-(foundation(?:\/scan|\/[^/?]+\/actions)|knowledge\/sync)$/.test(p.path);
     if(p.method==='GET'&&p.path==='/scene-export'&&!p.actor.startsWith('customer:')){
-      const assets=store.documents(u.tenantId).filter(d=>canUseCurrentData(store,u,d)).map(d=>{
+      const assets=store.documents(u.tenantId).filter(d=>!d.restrictedContent&&canUseCurrentData(store,u,d)).map(d=>{
         const base={id:d.id,title:d.title,kind:d.kind,version:d.version,policyVersion:d.policyVersion,tags:d.tags,department:d.department,updatedAt:d.updatedAt};
         if(d.kind!=='数据表')return {...base,content:redactForGovernance(d.content)};
         const set=readDataset(store,u,d.id);if((set.definition as any).provenance?.governanceMode==='deployment'&&set.dictionaryStatus!=='generated')return null;const fields=set.definition.fields.filter(f=>!f.sensitive);
-        const rows=(store.db.prepare("SELECT data FROM data_rows WHERE tenant_id=? AND dataset_id=? AND status='ready' ORDER BY id").all(u.tenantId,d.id) as {data:string}[]).map(r=>{const v=JSON.parse(r.data).values;return fields.map(f=>redactForGovernance(String(v[f.name]??'')));});
-        return {...base,fields,dictionary:set.dictionaryStatus==='generated'?set.business:null,dictionaryStatus:set.dictionaryStatus,rows};
+        const rows=(store.db.prepare("SELECT data FROM data_rows WHERE tenant_id=? AND dataset_id=? AND status='ready' ORDER BY id").all(u.tenantId,d.id) as {data:string}[]).map(r=>{const raw=JSON.parse(r.data),v=raw.values;return fields.map(f=>raw.sourceNullFields?.includes(f.name)?null:redactForGovernance(String(v[f.name]??'')));});
+        return {...base,fields,analysisPolicy:set.analysisPolicy,fieldEvidence:set.fieldEvidence,dictionary:set.dictionaryStatus==='generated'?set.business:null,dictionaryStatus:set.dictionaryStatus,rows};
       }).filter(Boolean);
       const revision=digest(JSON.stringify(assets));
       return {contractVersion:'1.0',tenantId:p.tenant,revision,assets};
@@ -72,7 +72,16 @@ export function registerPlatformBridge(app: FastifyInstance, store: Store, secre
     try{
       if(p.method==='POST')store.audit(u,'platform.scene.dispatch',p.path,`总台企业 ${p.tenant}；发起人 ${p.actor}`);
       const result=await app.inject({method:p.method,url:'/api'+p.path,headers:{cookie:'mengine_session='+token},...(p.method==='POST'?{payload:p.body??{}}:{})});
-      return reply.code(result.statusCode).send(result.json());
+      const body=result.json();
+      // Central export currently targets a shared scene workspace. Restricted
+      // source-derived knowledge must not be flattened into that workspace.
+      if(p.method==='GET'&&p.path==='/scene-knowledge'&&!p.actor.startsWith('customer:')&&!p.actor.startsWith('deployment:')){
+        const restricted=store.documents(u.tenantId).filter(d=>d.restrictedContent).map(d=>d.id);
+        body.items=(body.items||[]).filter((k:any)=>!restricted.some(id=>k.id.startsWith('business-'+id+'-')||k.id.startsWith('deployment-'+id+'-')));
+        const visible=new Set(body.items.map((k:any)=>k.id));body.sourceKind=Object.fromEntries(Object.entries(body.sourceKind||{}).filter(([id])=>visible.has(id)));
+        body.relations=(body.relations||[]).filter((r:any)=>visible.has(r[0])&&visible.has(r[1]));
+      }
+      return reply.code(result.statusCode).send(body);
     }finally{store.db.prepare('DELETE FROM sessions WHERE token_hash=?').run(digest(token));}
   });
 }

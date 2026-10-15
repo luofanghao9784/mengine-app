@@ -6,7 +6,7 @@ import {realpathSync} from 'node:fs';
 import {resolve,basename,sep} from 'node:path';
 export type ConnectionConfig={kind:'sqlite'|'postgres'|'mysql'|'deployed';provider?:string;name:string;host?:string;port?:number;database?:string;username?:string;password?:string;schema?:string;file?:string;ca?:string};
 export type SourceColumn={name:string;type:string;nullable:boolean;primary:boolean;comment:string};
-export type SourceTable={name:string;comment:string;columns:SourceColumn[]};
+export type SourceTable={access?:'owner-only';name:string;comment:string;columns:SourceColumn[]};
 const fail=(message:string)=>Object.assign(Error(message),{statusCode:400});
 export function validateConnection(input:unknown):ConnectionConfig{
  if(!input||typeof input!=='object'||Array.isArray(input))throw fail('连接配置无效');const c=input as ConnectionConfig;
@@ -19,7 +19,7 @@ export function validateConnection(input:unknown):ConnectionConfig{
 }
 const pq=(s:string)=>'"'+s.replaceAll('"','""')+'"',mq=(s:string)=>'`'+s.replaceAll('`','``')+'`';
 // All operations are fixed SELECTs, in a read-only transaction. Remote TLS verifies server certificates.
-export async function withSource<T>(c:ConnectionConfig,fn:(adapter:{scan:()=>Promise<SourceTable[]>;rows:(table:SourceTable)=>Promise<Record<string,unknown>[]>})=>Promise<T>,tenant:string):Promise<T>{
+export async function withSource<T>(c:ConnectionConfig,fn:(adapter:{scan:()=>Promise<SourceTable[]>;rows:(table:SourceTable)=>Promise<Record<string,unknown>[]>;limits?:{rows:number;columns:number;bytes:number};receipt?:(table:SourceTable)=>unknown})=>Promise<T>,tenant:string):Promise<T>{
  if(c.kind==='deployed')return fn(await deployedSource(c.provider!,tenant));
  if(c.kind==='sqlite'){
   if(!/^[a-zA-Z0-9_-]+$/.test(tenant))throw fail('企业目录无效');const root=realpathSync(resolve(process.env.DATABASE_SOURCE_ROOT||'.runtime/database-sources',tenant));const path=realpathSync(resolve(root,c.file!));if(!path.startsWith(root+sep))throw fail('源文件不在企业接入目录');const db=new Database(path,{readonly:true,fileMustExist:true});db.defaultSafeIntegers(true);db.pragma('query_only=ON');db.exec('BEGIN');

@@ -105,6 +105,14 @@ public class DatasetCalculationService {
         int groupIndex=columns.indexOf(request.groupColumn()),periodIndex=columns.indexOf(request.periodColumn()),valueIndex=columns.indexOf(request.valueColumn());
         var data=json.readTree(rowsText); int count=((Number)source.get("row_count")).intValue();
         if (!data.isArray() || data.size()!=count || count>100000) invalid("DATASET_SHAPE_INVALID");
+        // Enforce the immutable scene definition pinned by this dataset ID, including on cache reuse.
+        var semantics=db.queryForList("SELECT metadata FROM scene_asset_revisions WHERE tenant_id=? AND target_id=? AND kind='TABLE' ORDER BY created_at DESC LIMIT 1",String.class,job.tenant(),request.datasetId());
+        if(!semantics.isEmpty()){
+            var policy=json.readTree(semantics.getFirst()).path("analysisPolicy");
+            if(!countRows)for(var field:policy.path("noSumFields"))if(field.asText().equals(request.valueColumn()))invalid("DATASET_NON_ADDITIVE_FIELD");
+            var used=new HashSet<String>(requested);used.add(request.valueColumn());used.add(request.dateColumn());
+            for(var field:policy.path("excludeFields"))if(used.contains(field.asText()))invalid("DATASET_FIELD_UNCONFIRMED");
+        }
         if(materials!=null&&Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM briefing_flow_tasks WHERE task_id=?)",Boolean.class,job.id()))){
             var reuse=materials.reusable(job.actor(),job.tenant(),request,request.datasetId(),request.snapshotId());
             if(reuse.isPresent()){

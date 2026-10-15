@@ -10,6 +10,12 @@ class DatasetCalculationIntegrationTest extends DatasetCalculationFixture {
  ConversationService.Job start(){var j=task(null,"AUTHORIZED_LIBRARY");agents.openExecution(j.id(),j.token(),new AgentTaskService.ExecutionOpen("1.5",List.of("task_context","compare_dataset","deliver_briefing")));receipt(j,1,"task_context","STARTED");call(j,request("dataset_search",null,null,0));receipt(j,1,"task_context","succeeded");receipt(j,2,"compare_dataset","STARTED");return j;}
  void receipt(ConversationService.Job j,int n,String name,String state){agents.toolReceipt(j.id(),j.token(),new AgentTaskService.ToolReceipt(n,name,state));}
  BriefingContentService.Request card(UUID calc){return new BriefingContentService.Request(calc,"门店两期收款比较","两家门店同口径收款合计增长一倍，需结合业务背景解读。",List.of("图表使用固定数据快照的完整记录计算，两家门店两期数据均可比较。","这里呈现已发生的收款变化，经营原因仍需结合其他信息核实。"));}
+ @Test void sceneNonAdditivePolicyRejectsCalculationBeforeSavingArtifacts(){
+  db.update("INSERT INTO scene_bindings(tenant_id,workspace_id,connection_id,maintainer_id) VALUES (?,?,?,?)",tenant,space,connection,owner);
+  db.update("INSERT INTO scene_asset_revisions(tenant_id,target_id,kind,revision,metadata) VALUES (?,?,'TABLE','policy-test',?::jsonb)",tenant,dataset,"{\"analysisPolicy\":{\"noSumFields\":[\"收款（元）\"],\"excludeFields\":[]}}");
+  var j=start();var error=assertThrows(IdentityException.class,()->agents.compareDataset(j.id(),j.token(),parameters()));
+  assertEquals("DATASET_NON_ADDITIVE_FIELD",error.code);assertEquals(0,db.queryForObject("SELECT count(*) FROM conversation_artifacts WHERE task_id=?",Integer.class,j.id()));
+ }
  @Test void fullPinnedSnapshotUsesExactDecimalsAndCompetitionRanksAndPrivateCard(){
   var j=start();var result=agents.compareDataset(j.id(),j.token(),parameters());assertEquals(result,agents.compareDataset(j.id(),j.token(),parameters()));
   var data=json.valueToTree(result);assertEquals(5,data.at("/calculation/matchedRows").asInt());assertEquals(1,data.at("/calculation/ignoredRows").asInt());assertEquals("0.60",data.at("/calculation/totals/baseline").asString());assertEquals("1.20",data.at("/calculation/totals/current").asString());assertEquals("100.00",data.at("/calculation/totals/changePercent").asString());assertEquals(1,data.at("/calculation/rows/1/currentRank").asInt());assertTrue(data.at("/datasetSource/coverageThrough").isNull());assertFalse(data.toString().contains("部署"));

@@ -6,7 +6,7 @@ import {join} from 'node:path';
 import {buildServer} from '../src/server.js';
 import {seedDataset,seedRows} from './helpers/structured-fixture.js';
 import {deploymentContext,importDeployment} from '../src/deployment-governance.js';
-import {readDataset} from '../src/foundation-query.js';
+import {readDataset,queryDataset} from '../src/foundation-query.js';
 import {createBusinessKnowledge} from '../src/business-knowledge.js';
 import {reconcileDictionaryJobs} from '../src/data-dictionary.js';
 import {createHmac,randomUUID} from 'node:crypto';
@@ -88,3 +88,13 @@ test('signed operator applies only bound tenant; customer realm and replay canno
   const result=await post(signed);assert.equal(result.statusCode,200,result.body);assert.equal((await post(signed)).statusCode,409);
  });}finally{if(previous===undefined)delete process.env.MENGINE_PLATFORM_BRIDGE_KEY;else process.env.MENGINE_PLATFORM_BRIDGE_KEY=previous;}
 });
+
+test('unknown fields and non-additive balances stay outside model aggregation',()=>fixture(async(c,u,id,p)=>{
+ p.datasets[0].analysisPolicy={excludeFields:[],noSumFields:['amount']};importDeployment(c.store,u,p);
+ assert.throws(()=>queryDataset(c.store,u,id,{operation:'sum',field:'amount'},true),/不能无条件累加/);
+ assert.equal((queryDataset(c.store,u,id,{operation:'max',field:'amount'},true).result as any).groups[0].value,'12.3');
+ const p2=structuredClone(p);p2.id='unknown';p2.datasets[0].token=deploymentContext(c.store,u,[id]).datasets[0].token;p2.datasets[0].fieldEvidence[1].status='UNKNOWN';importDeployment(c.store,u,p2);
+ assert.throws(()=>queryDataset(c.store,u,id,{operation:'max',field:'amount'},true),/受限字段/);
+ assert.ok(!(queryDataset(c.store,u,id,{operation:'records'},true).result as any).fields.some((f:any)=>f.name==='amount'));
+ assert.ok((queryDataset(c.store,u,id,{operation:'records'},false).result as any).fields.some((f:any)=>f.name==='amount'));
+}));

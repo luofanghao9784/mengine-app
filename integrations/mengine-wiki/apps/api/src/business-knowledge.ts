@@ -138,7 +138,8 @@ export function createBusinessKnowledge(store: Store, model: Model) {
     add(
       `本次统计记录数：${count.matchedRecords}。统计对象：${c.document.title}。只代表本次已纳入分析的业务记录。`,
     );
-    const fields = c.definition.fields.filter((f) => !f.sensitive),
+    const unknown=new Set(c.fieldEvidence.filter((e:any)=>e.status==='UNKNOWN').map((e:any)=>e.column));
+    const fields = c.definition.fields.filter((f) => !f.sensitive&&!unknown.has(f.name)&&!c.analysisPolicy.excludeFields.includes(f.name)),
       business = c.business as any;
     for (const f of fields.slice(0, 24)) {
       const info = business?.fields?.find((x: any) => x.name === f.name),
@@ -154,9 +155,9 @@ export function createBusinessKnowledge(store: Store, model: Model) {
         for (const operation of ["min", "max", "sum"] as const) {
           if (
             operation === "sum" &&
-            !/(金额|收入|支出|费用|数量|销量|成本|价格|积分|余额|工时|时长|amount|price|quantity|cost|total|duration)/i.test(
+            (c.analysisPolicy.noSumFields.includes(f.name)||!/(金额|收入|支出|费用|数量|销量|成本|价格|积分|余额|工时|时长|amount|price|quantity|cost|total|duration)/i.test(
               label + " " + f.name,
-            )
+            ))
           )
             continue;
           const result = queryDataset(

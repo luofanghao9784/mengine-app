@@ -1,0 +1,2789 @@
+{
+  "existing": [
+    "full_orders",
+    "payment_orders",
+    "t_course_refund_records"
+  ],
+  "new": [
+    {
+      "name": "stores",
+      "columns": [
+        "id",
+        "name",
+        "sort_order",
+        "city",
+        "status",
+        "open_date",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 组织、门店与员工；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 1,
+      "classification": "A",
+      "module": "01"
+    },
+    {
+      "name": "accounts",
+      "columns": [
+        "id",
+        "status",
+        "role_codes",
+        "staff_id",
+        "last_login_at",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 组织、门店与员工；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 1,
+      "classification": "B",
+      "module": "01",
+      "access": "owner-only"
+    },
+    {
+      "name": "staffs",
+      "columns": [
+        "id",
+        "store_id",
+        "position",
+        "role_codes",
+        "is_coach",
+        "coach_id",
+        "status",
+        "joined_at",
+        "left_at",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 组织、门店与员工；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 1,
+      "classification": "B",
+      "module": "01",
+      "access": "owner-only"
+    },
+    {
+      "name": "coaches",
+      "columns": [
+        "id",
+        "staff_id",
+        "store_id",
+        "level",
+        "level_effective_at",
+        "role",
+        "status",
+        "created_at",
+        "updated_at",
+        "payroll_start_month"
+      ],
+      "description": "9POP 组织、门店与员工；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 1,
+      "classification": "B",
+      "module": "01",
+      "access": "owner-only"
+    },
+    {
+      "name": "store_roles",
+      "columns": [
+        "id",
+        "store_id",
+        "coach_id",
+        "created_at"
+      ],
+      "description": "9POP 组织、门店与员工；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 1,
+      "classification": "A",
+      "module": "01"
+    },
+    {
+      "name": "course_products",
+      "columns": [
+        "id",
+        "name",
+        "category",
+        "status",
+        "guarantee_session_count",
+        "validity_days",
+        "trial_commission_cents",
+        "member_self_leave_quota",
+        "payment_methods",
+        "total_amount_cents",
+        "deposit_amount_cents",
+        "final_payment_amount_cents",
+        "deposit_usable_days",
+        "sales_count",
+        "created_at",
+        "updated_at",
+        "course_policy"
+      ],
+      "description": "9POP 课程产品与销售规则；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 1,
+      "classification": "A",
+      "module": "02"
+    },
+    {
+      "name": "course_product_versions",
+      "columns": [
+        "id",
+        "course_product_id",
+        "version_no",
+        "created_at"
+      ],
+      "description": "9POP 课程产品与销售规则；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 1,
+      "classification": "A",
+      "module": "02"
+    },
+    {
+      "name": "course_sales_profile_versions",
+      "columns": [
+        "id",
+        "profile_kind",
+        "base_profile_id",
+        "created_at"
+      ],
+      "description": "9POP 课程产品与销售规则；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 1,
+      "classification": "A",
+      "module": "02"
+    },
+    {
+      "name": "members",
+      "columns": [
+        "id",
+        "store_id",
+        "main_coach_id",
+        "sales_coach_id",
+        "last_active_course_ended_at",
+        "is_co_create",
+        "status",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 会员与课程生命周期；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 1,
+      "classification": "A",
+      "module": "03"
+    },
+    {
+      "name": "member_courses",
+      "columns": [
+        "id",
+        "member_id",
+        "course_product_id",
+        "trial_opening_id",
+        "payment_method",
+        "start_date",
+        "end_date",
+        "total_days",
+        "used_days",
+        "deposit_usable_days",
+        "final_payment_restricted",
+        "guarantee_session_count",
+        "actual_session_count",
+        "member_self_leave_quota",
+        "total_amount_cents",
+        "paid_amount_cents",
+        "deposit_amount_cents",
+        "final_payment_amount_cents",
+        "status",
+        "leave_active",
+        "freeze_active",
+        "leave_start_date",
+        "leave_end_date",
+        "freeze_start_date",
+        "guarantee_extension_enabled",
+        "guarantee_extension_start_date",
+        "guarantee_extension_end_date",
+        "current_course",
+        "is_co_create_course",
+        "created_at",
+        "updated_at",
+        "paid_usable_days",
+        "queue_predecessor_course_id",
+        "queue_paid_business_date",
+        "queue_started"
+      ],
+      "description": "9POP 会员与课程生命周期；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 1,
+      "classification": "A",
+      "module": "03"
+    },
+    {
+      "name": "member_course_events",
+      "columns": [
+        "id",
+        "member_id",
+        "member_course_id",
+        "event_type",
+        "event_date",
+        "coach_id",
+        "source_type",
+        "status",
+        "created_at"
+      ],
+      "description": "9POP 会员与课程生命周期；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 1,
+      "classification": "A",
+      "module": "03"
+    },
+    {
+      "name": "member_self_leave_requests",
+      "columns": [
+        "id",
+        "member_id",
+        "member_course_id",
+        "main_coach_id",
+        "start_date",
+        "planned_end_date",
+        "status",
+        "leave_start_event_id",
+        "leave_end_event_id",
+        "submitted_at",
+        "notice_expires_at",
+        "activated_at",
+        "withdrawn_at",
+        "ended_at",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 会员与课程生命周期；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 1,
+      "classification": "A",
+      "module": "03"
+    },
+    {
+      "name": "full_order_installments",
+      "columns": [
+        "id",
+        "full_order_id",
+        "installment_number",
+        "expected_amount_cents",
+        "month_offset",
+        "collection_opens_at",
+        "cumulative_usable_days",
+        "status",
+        "version",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 订单、收款与退款；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 1,
+      "classification": "A",
+      "module": "04"
+    },
+    {
+      "name": "order_events",
+      "columns": [
+        "id",
+        "order_id",
+        "pending_order_id",
+        "payment_order_id",
+        "event_type",
+        "from_status",
+        "to_status",
+        "actor_id",
+        "actor_role",
+        "created_at"
+      ],
+      "description": "9POP 订单、收款与退款；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 1,
+      "classification": "A",
+      "module": "04"
+    },
+    {
+      "name": "order_payment_plan_amendments",
+      "columns": [
+        "id",
+        "full_order_id",
+        "member_course_id",
+        "member_id",
+        "campaign_profile_id",
+        "campaign_revision",
+        "original_deposit_payment_id",
+        "status",
+        "expires_at",
+        "accepted_at",
+        "accepted_by_member_id",
+        "first_tail_payment_id",
+        "created_at",
+        "updated_at",
+        "confirmed_order_id"
+      ],
+      "description": "9POP 订单、收款与退款；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 1,
+      "classification": "A",
+      "module": "04"
+    },
+    {
+      "name": "payment_channel_bill_batches",
+      "columns": [
+        "id",
+        "provider",
+        "merchant_id",
+        "store_id",
+        "bill_type",
+        "bill_date",
+        "status",
+        "total_count",
+        "gross_amount_cents",
+        "refund_amount_cents",
+        "fee_amount_cents",
+        "net_settlement_cents",
+        "downloaded_at",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 订单、收款与退款；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 1,
+      "classification": "A",
+      "module": "04"
+    },
+    {
+      "name": "payment_channel_bill_items",
+      "columns": [
+        "id",
+        "bill_batch_id",
+        "line_no",
+        "item_type",
+        "gross_amount_cents",
+        "personal_paid_cents",
+        "consumer_coupon_cents",
+        "refund_amount_cents",
+        "fee_amount_cents",
+        "net_amount_cents",
+        "occurred_at",
+        "created_at"
+      ],
+      "description": "9POP 订单、收款与退款；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 1,
+      "classification": "A",
+      "module": "04"
+    },
+    {
+      "name": "payment_digital_receipts",
+      "columns": [
+        "id",
+        "payment_order_id",
+        "gateway_transaction_id",
+        "provider",
+        "channel",
+        "gross_amount_cents",
+        "personal_paid_cents",
+        "consumer_coupon_cents",
+        "confirmed_at",
+        "created_at"
+      ],
+      "description": "9POP 订单、收款与退款；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 1,
+      "classification": "A",
+      "module": "04"
+    },
+    {
+      "name": "payment_gateway_transactions",
+      "columns": [
+        "id",
+        "payment_order_id",
+        "merchant_id",
+        "store_id",
+        "provider",
+        "channel",
+        "payer_type",
+        "payer_actor_id",
+        "amount_cents",
+        "personal_paid_cents",
+        "consumer_coupon_cents",
+        "provider_status",
+        "status",
+        "active_slot",
+        "reconciliation_status",
+        "expires_at",
+        "paid_at",
+        "closed_at",
+        "last_queried_at",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 订单、收款与退款；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 1,
+      "classification": "A",
+      "module": "04"
+    },
+    {
+      "name": "payment_reconciliation_exceptions",
+      "columns": [
+        "id",
+        "provider",
+        "store_id",
+        "exception_type",
+        "severity",
+        "status",
+        "payment_order_id",
+        "gateway_transaction_id",
+        "refund_leg_id",
+        "settlement_batch_id",
+        "expected_amount_cents",
+        "actual_amount_cents",
+        "detected_at",
+        "resolved_at",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 订单、收款与退款；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 1,
+      "classification": "A",
+      "module": "04"
+    },
+    {
+      "name": "payment_refund_legs",
+      "columns": [
+        "id",
+        "refund_record_id",
+        "approval_request_id",
+        "payment_order_id",
+        "gateway_transaction_id",
+        "provider",
+        "refund_ordinal",
+        "amount_cents",
+        "provider_status",
+        "status",
+        "requested_at",
+        "succeeded_at",
+        "last_queried_at",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 订单、收款与退款；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 1,
+      "classification": "A",
+      "module": "04"
+    },
+    {
+      "name": "payment_settlement_batches",
+      "columns": [
+        "id",
+        "provider",
+        "merchant_id",
+        "store_id",
+        "settlement_date",
+        "status",
+        "gross_amount_cents",
+        "refund_amount_cents",
+        "fee_amount_cents",
+        "net_settlement_cents",
+        "transfer_group_id",
+        "reconciled_at",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 订单、收款与退款；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 1,
+      "classification": "A",
+      "module": "04"
+    },
+    {
+      "name": "payment_vouchers",
+      "columns": [
+        "id",
+        "payment_order_id",
+        "status",
+        "is_current",
+        "uploaded_at",
+        "replaced_by_voucher_id",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 订单、收款与退款；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 1,
+      "classification": "A",
+      "module": "04"
+    },
+    {
+      "name": "pending_orders",
+      "columns": [
+        "id",
+        "link_id",
+        "member_id",
+        "course_product_id",
+        "payment_method",
+        "total_amount_cents",
+        "deposit_amount_cents",
+        "final_payment_amount_cents",
+        "deposit_usable_days",
+        "sales_coach_id",
+        "main_coach_id",
+        "store_id",
+        "status",
+        "expires_at",
+        "converted_order_id",
+        "canceled_at",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 订单、收款与退款；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 1,
+      "classification": "A",
+      "module": "04"
+    },
+    {
+      "name": "t_course_refund_finance_entry_links",
+      "columns": [
+        "id",
+        "refund_record_id",
+        "ordinal",
+        "payment_order_id",
+        "original_finance_ledger_entry_id",
+        "finance_ledger_entry_id",
+        "amount_cents",
+        "created_at"
+      ],
+      "description": "9POP 订单、收款与退款；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 1,
+      "classification": "A",
+      "module": "04"
+    },
+    {
+      "name": "t_course_refund_holds",
+      "columns": [
+        "id",
+        "refund_record_id",
+        "approval_request_id",
+        "member_course_id",
+        "status",
+        "active_member_course_id",
+        "calculation_as_of_date",
+        "calculation_version",
+        "refund_effective_date",
+        "anchor_course_snapshot_id",
+        "anchor_vested_revenue_cents",
+        "started_at",
+        "ended_at",
+        "extension_days",
+        "version",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 订单、收款与退款；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 1,
+      "classification": "A",
+      "module": "04"
+    },
+    {
+      "name": "approval_actions",
+      "columns": [
+        "id",
+        "approval_request_id",
+        "node_index",
+        "action_type",
+        "actor_account_id",
+        "fund_disbursement_account_id",
+        "fund_disbursement_approval_id",
+        "created_at"
+      ],
+      "description": "9POP 审批；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 1,
+      "classification": "A",
+      "module": "06"
+    },
+    {
+      "name": "approval_requests",
+      "columns": [
+        "id",
+        "applicant_account_id",
+        "applicant_coach_id",
+        "proxy_actor_account_id",
+        "status",
+        "current_node_index",
+        "version",
+        "member_id",
+        "target_type",
+        "target_coach_id",
+        "store_id",
+        "submitted_at",
+        "finalized_at",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 审批；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 1,
+      "classification": "A",
+      "module": "06"
+    },
+    {
+      "name": "coach_level_history",
+      "columns": [
+        "id",
+        "coach_id",
+        "level",
+        "effective_from",
+        "effective_to",
+        "created_at"
+      ],
+      "description": "9POP 课时、收益与费率；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 2,
+      "classification": "A",
+      "module": "05"
+    },
+    {
+      "name": "coach_rate_versions",
+      "columns": [
+        "id",
+        "effective_from",
+        "effective_to",
+        "p1_rate_cents",
+        "p2_rate_cents",
+        "p3_rate_cents",
+        "co_create_bonus_cents",
+        "venue_fee_cents",
+        "status",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 课时、收益与费率；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 2,
+      "classification": "A",
+      "module": "05"
+    },
+    {
+      "name": "session_records",
+      "columns": [
+        "id",
+        "member_id",
+        "member_course_id",
+        "participant_type",
+        "course_product_id",
+        "home_store_id",
+        "teaching_store_id",
+        "coach_id",
+        "original_coach_id",
+        "business_date",
+        "status",
+        "effective_status",
+        "cross_store_origin_store_id",
+        "claimed_store_id",
+        "claimed_approval_id",
+        "claimed_at",
+        "source_type",
+        "source_approval_id",
+        "special_course_type",
+        "settlement_period",
+        "coach_level_at_session",
+        "rate_version_id",
+        "coach_session_fee_cents",
+        "member_is_co_create_at_session",
+        "co_create_bonus_cents",
+        "special_course_bonus_cents",
+        "venue_fee_cents",
+        "fee_payer_store_id",
+        "venue_fee_payer_store_id",
+        "venue_fee_receiver_store_id",
+        "voided_at",
+        "created_at",
+        "updated_at",
+        "is_substituted"
+      ],
+      "description": "9POP 课时、收益与费率；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 2,
+      "classification": "A",
+      "module": "05"
+    },
+    {
+      "name": "trial_course_commission_entries",
+      "columns": [
+        "id",
+        "opening_id",
+        "coach_id",
+        "store_id",
+        "amount_cents",
+        "settlement_month",
+        "status",
+        "reversal_settlement_month",
+        "reversed_at",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 体验课与转化；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 2,
+      "classification": "A",
+      "module": "12"
+    },
+    {
+      "name": "trial_course_conversions",
+      "columns": [
+        "id",
+        "opening_id",
+        "member_id",
+        "full_order_id",
+        "payment_order_id",
+        "attribution_coach_id",
+        "attribution_store_id",
+        "converted_at",
+        "created_at"
+      ],
+      "description": "9POP 体验课与转化；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 2,
+      "classification": "A",
+      "module": "12"
+    },
+    {
+      "name": "trial_course_openings",
+      "columns": [
+        "id",
+        "link_id",
+        "member_id",
+        "course_product_id",
+        "validity_days",
+        "commission_cents",
+        "store_id",
+        "opening_coach_id",
+        "status",
+        "confirmed_at",
+        "activated_at",
+        "activation_business_date",
+        "start_date",
+        "end_date",
+        "member_course_id",
+        "current_voucher_id",
+        "created_at",
+        "updated_at",
+        "deleted_at",
+        "active_member_id"
+      ],
+      "description": "9POP 体验课与转化；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 2,
+      "classification": "A",
+      "module": "12"
+    },
+    {
+      "name": "trial_course_vouchers",
+      "columns": [
+        "id",
+        "opening_id",
+        "version_no",
+        "platform",
+        "is_current",
+        "status",
+        "uploaded_at",
+        "replaced_by_voucher_id",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 体验课与转化；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 2,
+      "classification": "A",
+      "module": "12"
+    },
+    {
+      "name": "course_experience_officer_assignments",
+      "columns": [
+        "id",
+        "account_id",
+        "member_id",
+        "member_course_id",
+        "profile_mode",
+        "status",
+        "version",
+        "activated_at",
+        "disabled_at",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 特殊课与体验官；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 2,
+      "classification": "A",
+      "module": "13"
+    },
+    {
+      "name": "special_course_entitlements",
+      "columns": [
+        "id",
+        "member_id",
+        "member_course_id",
+        "special_course_type",
+        "total_quota",
+        "reserved_quota",
+        "used_quota",
+        "grant_basis",
+        "grant_basis_days",
+        "granted_as_of_date",
+        "granted_at",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 特殊课与体验官；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 2,
+      "classification": "A",
+      "module": "13"
+    },
+    {
+      "name": "special_course_usage_records",
+      "columns": [
+        "id",
+        "entitlement_id",
+        "member_id",
+        "member_course_id",
+        "session_record_id",
+        "approval_request_id",
+        "special_course_type",
+        "coach_id",
+        "business_date",
+        "status",
+        "submitted_at",
+        "used_at",
+        "released_at",
+        "returned_at",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 特殊课与体验官；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 2,
+      "classification": "A",
+      "module": "13"
+    },
+    {
+      "name": "member_course_store_assignments",
+      "columns": [
+        "id",
+        "member_course_id",
+        "store_id",
+        "effective_from",
+        "effective_to",
+        "source_transfer_id",
+        "created_at"
+      ],
+      "description": "9POP 会员转店；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 2,
+      "classification": "A",
+      "module": "14"
+    },
+    {
+      "name": "member_store_assignments",
+      "columns": [
+        "id",
+        "member_id",
+        "store_id",
+        "main_coach_id",
+        "effective_from",
+        "effective_to",
+        "source_transfer_id",
+        "created_at"
+      ],
+      "description": "9POP 会员转店；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 2,
+      "classification": "A",
+      "module": "14"
+    },
+    {
+      "name": "member_store_transfer_commission_reserves",
+      "columns": [
+        "id",
+        "transfer_id",
+        "member_course_id",
+        "source_store_id",
+        "target_store_id",
+        "estimated_reserve_cents",
+        "locked_reserve_cents",
+        "consumed_commission_cents",
+        "status",
+        "version",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 会员转店；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 2,
+      "classification": "A",
+      "module": "14"
+    },
+    {
+      "name": "member_store_transfer_courses",
+      "columns": [
+        "id",
+        "transfer_id",
+        "member_course_id",
+        "monetary_anchor_cents",
+        "system_remaining_value_cents",
+        "finance_settlement_value_cents",
+        "estimated_commission_reserve_cents",
+        "net_transfer_cents",
+        "commission_transfer_eligible",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 会员转店；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 2,
+      "classification": "A",
+      "module": "14"
+    },
+    {
+      "name": "member_store_transfer_reversals",
+      "columns": [
+        "id",
+        "original_transfer_id",
+        "approval_request_id",
+        "member_id",
+        "restore_store_id",
+        "restore_main_coach_id",
+        "status",
+        "applied_at",
+        "released_at",
+        "created_at",
+        "updated_at",
+        "active_transfer_id"
+      ],
+      "description": "9POP 会员转店；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 2,
+      "classification": "A",
+      "module": "14"
+    },
+    {
+      "name": "member_store_transfer_segments",
+      "columns": [
+        "id",
+        "transfer_course_id",
+        "payment_order_id",
+        "source_sales_coach_id",
+        "sales_store_id",
+        "payment_confirmed_month",
+        "payment_amount_cents",
+        "future_commission_base_cents",
+        "allocated_settlement_value_cents",
+        "personal_rate_bps",
+        "rate_status",
+        "estimated_commission_reserve_cents",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 会员转店；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 2,
+      "classification": "A",
+      "module": "14"
+    },
+    {
+      "name": "member_store_transfer_settlements",
+      "columns": [
+        "id",
+        "transfer_id",
+        "member_course_id",
+        "settlement_type",
+        "settlement_key",
+        "amount_cents",
+        "source_store_id",
+        "target_store_id",
+        "source_ledger_entry_id",
+        "target_ledger_entry_id",
+        "cash_source_ledger_entry_id",
+        "cash_target_ledger_entry_id",
+        "transfer_group_id",
+        "status",
+        "settled_at",
+        "created_at"
+      ],
+      "description": "9POP 会员转店；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 2,
+      "classification": "A",
+      "module": "14"
+    },
+    {
+      "name": "member_store_transfers",
+      "columns": [
+        "id",
+        "approval_request_id",
+        "member_id",
+        "source_store_id",
+        "target_store_id",
+        "original_main_coach_id",
+        "new_main_coach_id",
+        "requested_effective_date",
+        "transfer_commission_payout",
+        "status",
+        "valuation_version",
+        "system_remaining_value_cents",
+        "settlement_value_cents",
+        "estimated_commission_reserve_cents",
+        "net_transfer_cents",
+        "valued_at",
+        "source_payment_account_id",
+        "target_payment_account_id",
+        "payment_prepared_at",
+        "paid_at",
+        "effective_at",
+        "released_at",
+        "version",
+        "created_at",
+        "updated_at",
+        "active_member_id"
+      ],
+      "description": "9POP 会员转店；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 2,
+      "classification": "A",
+      "module": "14"
+    },
+    {
+      "name": "t_course_debt_legacy_reference_snapshot",
+      "columns": [
+        "id",
+        "snapshot_date",
+        "member_course_id",
+        "member_id",
+        "store_id",
+        "sales_coach_id",
+        "course_product_id",
+        "start_date",
+        "end_date",
+        "total_days",
+        "used_days",
+        "remaining_days",
+        "reference_unit_price_cents",
+        "reference_debt_cents",
+        "reference_delta_cents",
+        "snapshot_kind",
+        "reconstruction_basis",
+        "reconstruction_quality",
+        "algorithm_version",
+        "snapshot_run_id",
+        "calculated_at",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 课债与收入释放；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 3,
+      "classification": "A",
+      "module": "07"
+    },
+    {
+      "name": "t_course_debt_payment_segment_snapshot",
+      "columns": [
+        "id",
+        "snapshot_date",
+        "member_course_id",
+        "payment_order_id",
+        "payment_type",
+        "payment_confirmed_at",
+        "payment_confirmed_month",
+        "payment_amount_cents",
+        "segment_vested_revenue_cents",
+        "segment_incremental_vested_revenue_cents",
+        "store_id",
+        "sales_store_id",
+        "sales_coach_id",
+        "allocation_strategy",
+        "course_debt_algorithm_version",
+        "has_negative_increment",
+        "snapshot_run_id",
+        "snapshot_origin",
+        "source_refund_record_id",
+        "calculated_at",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 课债与收入释放；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 3,
+      "classification": "A",
+      "module": "07"
+    },
+    {
+      "name": "t_course_debt_snapshot",
+      "columns": [
+        "id",
+        "snapshot_date",
+        "member_course_id",
+        "member_id",
+        "store_id",
+        "sales_coach_id",
+        "course_product_id",
+        "calculation_mode",
+        "order_created_at",
+        "start_date",
+        "end_date",
+        "total_days",
+        "total_guarantee_sessions",
+        "used_days",
+        "remaining_days",
+        "used_sessions",
+        "remaining_guarantee_sessions",
+        "paid_amount_cents",
+        "path_a_actual_revenue_cents",
+        "path_a_refund_cents",
+        "path_b_actual_revenue_cents",
+        "path_b_refund_cents",
+        "vested_revenue_cents",
+        "incremental_vested_revenue_cents",
+        "course_debt_cents",
+        "path_chosen",
+        "is_in_grace_period",
+        "is_legacy_gifted",
+        "calc_strategy",
+        "algorithm_version",
+        "snapshot_run_id",
+        "full_snapshot_run_id",
+        "snapshot_origin",
+        "source_refund_record_id",
+        "calculated_at",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 课债与收入释放；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 3,
+      "classification": "A",
+      "module": "07"
+    },
+    {
+      "name": "finance_accounts",
+      "columns": [
+        "id",
+        "account_code",
+        "account_type",
+        "store_id",
+        "status",
+        "sort_order",
+        "opened_at",
+        "closed_at",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 财务资金与往来；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 3,
+      "classification": "B",
+      "module": "09",
+      "access": "owner-only"
+    },
+    {
+      "name": "finance_approval_cosigner_slots",
+      "columns": [
+        "slot_no",
+        "account_id",
+        "config_version",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 财务资金与往来；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 3,
+      "classification": "B",
+      "module": "09",
+      "access": "owner-only"
+    },
+    {
+      "name": "finance_ecommerce_income_claims",
+      "columns": [
+        "id",
+        "approval_request_id",
+        "business_store_id",
+        "accounting_period",
+        "platform_key",
+        "released_at",
+        "created_at"
+      ],
+      "description": "9POP 财务资金与往来；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 3,
+      "classification": "B",
+      "module": "09",
+      "access": "owner-only"
+    },
+    {
+      "name": "finance_income_approval_cancellations",
+      "columns": [
+        "approval_request_id",
+        "canceled_at",
+        "reversal_ledger_entry_id"
+      ],
+      "description": "9POP 财务资金与往来；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 3,
+      "classification": "B",
+      "module": "09",
+      "access": "owner-only"
+    },
+    {
+      "name": "finance_income_approval_facts",
+      "columns": [
+        "approval_request_id",
+        "income_source",
+        "account_id",
+        "business_store_id",
+        "payer_store_id",
+        "transfer_group_id",
+        "accounting_period",
+        "platform_code",
+        "platform_key",
+        "income_type",
+        "signed_amount_cents",
+        "occurred_at",
+        "income_route_version",
+        "created_at"
+      ],
+      "description": "9POP 财务资金与往来；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 3,
+      "classification": "B",
+      "module": "09",
+      "access": "owner-only"
+    },
+    {
+      "name": "finance_internal_management_fee_claims",
+      "columns": [
+        "id",
+        "approval_request_id",
+        "payer_store_id",
+        "accounting_period",
+        "released_at",
+        "created_at"
+      ],
+      "description": "9POP 财务资金与往来；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 3,
+      "classification": "B",
+      "module": "09",
+      "access": "owner-only"
+    },
+    {
+      "name": "finance_ledger_entries",
+      "columns": [
+        "id",
+        "account_id",
+        "payment_account_id",
+        "business_store_id",
+        "source_store_id",
+        "direction",
+        "entry_type",
+        "amount_cents",
+        "book_status",
+        "cash_status",
+        "occurred_at",
+        "accounting_period",
+        "source_type",
+        "source_id",
+        "source_action",
+        "source_version",
+        "transfer_group_id",
+        "reversal_of_entry_id",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 财务资金与往来；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 3,
+      "classification": "B",
+      "module": "09",
+      "access": "owner-only"
+    },
+    {
+      "name": "finance_operating_reserve_payment_claims",
+      "columns": [
+        "id",
+        "approval_request_id",
+        "store_id",
+        "payment_purpose",
+        "rent_cycle_id",
+        "payroll_reserve_id",
+        "amount_cents",
+        "payroll_system_amount_cents",
+        "payroll_adjustment_amount_cents",
+        "status",
+        "ledger_entry_id",
+        "reversal_ledger_entry_id",
+        "confirmed_at",
+        "released_at",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 财务资金与往来；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 3,
+      "classification": "B",
+      "module": "09",
+      "access": "owner-only"
+    },
+    {
+      "name": "finance_operating_reserve_policies",
+      "columns": [
+        "policy_key",
+        "fixed_service_reserve_cents",
+        "management_reserve_cents",
+        "tracking_start_month",
+        "activated_at",
+        "version",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 财务资金与往来；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 3,
+      "classification": "B",
+      "module": "09",
+      "access": "owner-only"
+    },
+    {
+      "name": "finance_payment_account_holder_events",
+      "columns": [
+        "id",
+        "payment_account_id",
+        "previous_holder_account_id",
+        "new_holder_account_id",
+        "effective_at",
+        "created_at"
+      ],
+      "description": "9POP 财务资金与往来；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 3,
+      "classification": "B",
+      "module": "09",
+      "access": "owner-only"
+    },
+    {
+      "name": "finance_payment_accounts",
+      "columns": [
+        "id",
+        "code",
+        "finance_account_id",
+        "account_kind",
+        "status",
+        "current_holder_account_id",
+        "sort_order",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 财务资金与往来；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 3,
+      "classification": "B",
+      "module": "09",
+      "access": "owner-only"
+    },
+    {
+      "name": "finance_period_locks",
+      "columns": [
+        "id",
+        "account_id",
+        "accounting_period",
+        "locked",
+        "locked_at",
+        "unlocked_at",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 财务资金与往来；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 3,
+      "classification": "B",
+      "module": "09",
+      "access": "owner-only"
+    },
+    {
+      "name": "finance_petty_cash_entries",
+      "columns": [
+        "id",
+        "payment_account_id",
+        "business_store_id",
+        "business_ledger_entry_id",
+        "direction",
+        "amount_cents",
+        "book_status",
+        "occurred_at",
+        "accounting_period",
+        "reversal_of_entry_id",
+        "source_type",
+        "source_id",
+        "source_action",
+        "source_version",
+        "created_at",
+        "updated_at",
+        "opening_balance_account_id"
+      ],
+      "description": "9POP 财务资金与往来；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 3,
+      "classification": "B",
+      "module": "09",
+      "access": "owner-only"
+    },
+    {
+      "name": "finance_petty_cash_opening_t0_supersessions",
+      "columns": [
+        "id",
+        "opening_entry_id",
+        "payment_account_id",
+        "supersedes_opening_entry_id",
+        "supersedes_supersession_id",
+        "source_preview_id",
+        "source_type",
+        "source_id",
+        "source_action",
+        "source_version",
+        "created_at"
+      ],
+      "description": "9POP 财务资金与往来；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 3,
+      "classification": "B",
+      "module": "09",
+      "access": "owner-only"
+    },
+    {
+      "name": "finance_position_events",
+      "columns": [
+        "id",
+        "position_id",
+        "event_type",
+        "settlement_mode",
+        "amount_cents",
+        "book_status",
+        "occurred_at",
+        "accounting_period",
+        "approval_id",
+        "ledger_entry_id",
+        "source_type",
+        "source_id",
+        "source_action",
+        "source_version",
+        "reversal_of_event_id",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 财务资金与往来；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 3,
+      "classification": "B",
+      "module": "09",
+      "access": "owner-only"
+    },
+    {
+      "name": "finance_positions",
+      "columns": [
+        "id",
+        "finance_account_id",
+        "business_store_id",
+        "position_side",
+        "original_amount_cents",
+        "outstanding_amount_cents",
+        "pending_settlement_amount_cents",
+        "currency",
+        "opened_on",
+        "due_on",
+        "status",
+        "version",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 财务资金与往来；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 3,
+      "classification": "B",
+      "module": "09",
+      "access": "owner-only"
+    },
+    {
+      "name": "finance_store_operating_reserve_openings",
+      "columns": [
+        "store_id",
+        "opening_as_of_date",
+        "payroll_reconciled",
+        "version",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 财务资金与往来；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 3,
+      "classification": "B",
+      "module": "09",
+      "access": "owner-only"
+    },
+    {
+      "name": "finance_store_payroll_reserves",
+      "columns": [
+        "id",
+        "store_id",
+        "payroll_period",
+        "payable_amount_cents",
+        "source_type",
+        "locked",
+        "version",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 财务资金与往来；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 3,
+      "classification": "B",
+      "module": "09",
+      "access": "owner-only"
+    },
+    {
+      "name": "finance_store_rent_cycles",
+      "columns": [
+        "id",
+        "rent_plan_id",
+        "store_id",
+        "cycle_start_month",
+        "cycle_end_month",
+        "due_date",
+        "payment_day",
+        "monthly_rent_cents",
+        "covered_months",
+        "total_rent_cents",
+        "opening_paid_cents",
+        "status",
+        "paid_at",
+        "superseded_at",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 财务资金与往来；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 3,
+      "classification": "B",
+      "module": "09",
+      "access": "owner-only"
+    },
+    {
+      "name": "finance_store_rent_plans",
+      "columns": [
+        "id",
+        "store_id",
+        "monthly_rent_cents",
+        "payment_interval_months",
+        "payment_day",
+        "first_due_date",
+        "version",
+        "status",
+        "superseded_at",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 财务资金与往来；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 3,
+      "classification": "B",
+      "module": "09",
+      "access": "owner-only"
+    },
+    {
+      "name": "finance_reconciliation_account_balances",
+      "columns": [
+        "id",
+        "batch_id",
+        "reconciliation_account_id",
+        "finance_account_id",
+        "account_type",
+        "balance_bucket",
+        "amount_cents",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 财务对账；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 3,
+      "classification": "B",
+      "module": "10",
+      "access": "owner-only"
+    },
+    {
+      "name": "finance_reconciliation_accounts",
+      "columns": [
+        "id",
+        "finance_account_id",
+        "account_type",
+        "balance_bucket",
+        "status",
+        "sort_order",
+        "version",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 财务对账；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 3,
+      "classification": "B",
+      "module": "10",
+      "access": "owner-only"
+    },
+    {
+      "name": "finance_reconciliation_batches",
+      "columns": [
+        "id",
+        "batch_no",
+        "status",
+        "close_result",
+        "cutoff_at",
+        "baseline_batch_id",
+        "correction_of_batch_id",
+        "revision_no",
+        "is_baseline",
+        "baseline_slot",
+        "version",
+        "created_at",
+        "updated_at",
+        "closed_at"
+      ],
+      "description": "9POP 财务对账；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 3,
+      "classification": "B",
+      "module": "10",
+      "access": "owner-only"
+    },
+    {
+      "name": "finance_reconciliation_historical_summaries",
+      "columns": [
+        "id",
+        "reference_no",
+        "cutoff_at",
+        "wecom_merchant_cents",
+        "alipay_merchant_cents",
+        "basic_bank_cents",
+        "meituan_withdrawable_cents",
+        "meituan_unsettled_cents",
+        "douyin_withdrawable_cents",
+        "douyin_unsettled_cents",
+        "ums_unsettled_cents",
+        "petty_cash_cents",
+        "liquid_cents",
+        "unsettled_cents",
+        "actual_account_total_cents",
+        "system_reference_cents",
+        "difference_cents",
+        "known_unposted_cents",
+        "unexplained_cents",
+        "created_at"
+      ],
+      "description": "9POP 财务对账；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 3,
+      "classification": "B",
+      "module": "10",
+      "access": "owner-only"
+    },
+    {
+      "name": "finance_reconciliation_subject_snapshots",
+      "columns": [
+        "id",
+        "batch_id",
+        "subject_key",
+        "finance_account_id",
+        "confirmed_system_net_cents",
+        "projected_net_cents",
+        "position_net_cents",
+        "t0_actual_cents",
+        "post_t0_system_change_cents",
+        "expected_account_total_cents",
+        "actual_account_total_cents",
+        "liquid_cents",
+        "unsettled_cents",
+        "petty_cash_cents",
+        "opening_baseline_difference_cents",
+        "variance_cents",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 财务对账；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 3,
+      "classification": "B",
+      "module": "10",
+      "access": "owner-only"
+    },
+    {
+      "name": "finance_reconciliation_variance_items",
+      "columns": [
+        "id",
+        "batch_id",
+        "finance_account_id",
+        "amount_cents",
+        "sort_order",
+        "created_at"
+      ],
+      "description": "9POP 财务对账；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 3,
+      "classification": "B",
+      "module": "10",
+      "access": "owner-only"
+    },
+    {
+      "name": "payroll_average_eligibility_overrides",
+      "columns": [
+        "id",
+        "store_id",
+        "period_month",
+        "coach_id",
+        "decision",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 工资与提成；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 4,
+      "classification": "B",
+      "module": "08",
+      "access": "owner-only"
+    },
+    {
+      "name": "payroll_commission_payout_transfers",
+      "columns": [
+        "id",
+        "approval_id",
+        "member_id",
+        "member_course_id",
+        "source_sales_coach_id",
+        "funding_store_id",
+        "source_type",
+        "effective_date",
+        "effective_end_date",
+        "rate_bps",
+        "status",
+        "superseded_by_transfer_id",
+        "superseded_at",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 工资与提成；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 4,
+      "classification": "B",
+      "module": "08",
+      "access": "owner-only"
+    },
+    {
+      "name": "payroll_commission_rate_locks",
+      "columns": [
+        "id",
+        "scope",
+        "owner_id",
+        "sales_month",
+        "settled_sales_performance_cents",
+        "locked_rate_bps",
+        "locked_at",
+        "source_type",
+        "source_id",
+        "created_at"
+      ],
+      "description": "9POP 工资与提成；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 4,
+      "classification": "B",
+      "module": "08",
+      "access": "owner-only"
+    },
+    {
+      "name": "payroll_period_locks",
+      "columns": [
+        "period",
+        "locked",
+        "locked_at"
+      ],
+      "description": "9POP 工资与提成；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 4,
+      "classification": "B",
+      "module": "08",
+      "access": "owner-only"
+    },
+    {
+      "name": "payroll_store_founder_assignments",
+      "columns": [
+        "id",
+        "store_id",
+        "effective_month",
+        "founder_coach_id",
+        "source",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 工资与提成；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 4,
+      "classification": "B",
+      "module": "08",
+      "access": "owner-only"
+    },
+    {
+      "name": "payroll_store_manager_commission_assignments",
+      "columns": [
+        "id",
+        "store_id",
+        "effective_month",
+        "manager_coach_id",
+        "source",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 工资与提成；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 4,
+      "classification": "B",
+      "module": "08",
+      "access": "owner-only"
+    },
+    {
+      "name": "payslip_adjustments",
+      "columns": [
+        "id",
+        "payslip_id",
+        "amount_cents",
+        "operation_log_id",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 工资与提成；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 4,
+      "classification": "B",
+      "module": "08",
+      "access": "owner-only"
+    },
+    {
+      "name": "payslips",
+      "columns": [
+        "id",
+        "coach_id",
+        "store_id",
+        "period_month",
+        "version",
+        "status",
+        "locked",
+        "confirmed_at",
+        "unlocked_at",
+        "resend_at",
+        "session_fee_cents",
+        "trial_course_commission_cents",
+        "personal_sales_amount_cents",
+        "personal_commissionable_revenue_cents",
+        "personal_commission_rate_bps",
+        "personal_commission_rate_mixed",
+        "personal_sales_commission_cents",
+        "manager_store_sales_amount_cents",
+        "manager_store_commissionable_revenue_cents",
+        "manager_store_commission_rate_bps",
+        "manager_store_commission_rate_mixed",
+        "manager_store_commission_cents",
+        "commission_algorithm_version",
+        "commission_snapshot_complete",
+        "coach_employment_status",
+        "manager_position_salary_cents",
+        "guarantee_topup_cents",
+        "founder_average_deduction_cents",
+        "refund_deduction_cents",
+        "income_tax_withheld_cents",
+        "manual_adjustment_cents",
+        "gross_before_adjustment_cents",
+        "gross_after_founder_average_deduction_cents",
+        "actual_payable_cents",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 工资与提成；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 4,
+      "classification": "B",
+      "module": "08",
+      "access": "owner-only"
+    },
+    {
+      "name": "dividend_eligibility_transfers",
+      "columns": [
+        "id",
+        "store_id",
+        "from_participant_id",
+        "to_participant_id",
+        "effective_month",
+        "transferred_balance_cents",
+        "created_at"
+      ],
+      "description": "9POP 分红；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 4,
+      "classification": "B",
+      "module": "11",
+      "access": "owner-only"
+    },
+    {
+      "name": "dividend_entitlement_events",
+      "columns": [
+        "id",
+        "store_id",
+        "participant_id",
+        "accounting_period",
+        "event_type",
+        "amount_cents",
+        "original_event_id",
+        "transfer_group_id",
+        "opening_batch_id",
+        "payout_batch_id",
+        "created_at"
+      ],
+      "description": "9POP 分红；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 4,
+      "classification": "B",
+      "module": "11",
+      "access": "owner-only"
+    },
+    {
+      "name": "dividend_event_sources",
+      "columns": [
+        "id",
+        "entitlement_event_id",
+        "source_type",
+        "source_id",
+        "source_action",
+        "source_version",
+        "created_at"
+      ],
+      "description": "9POP 分红；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 4,
+      "classification": "B",
+      "module": "11",
+      "access": "owner-only"
+    },
+    {
+      "name": "dividend_historical_import_batches",
+      "columns": [
+        "id",
+        "store_id",
+        "source_dataset_key",
+        "import_mode",
+        "confirmed_at",
+        "line_count",
+        "reported_unpaid_total_cents",
+        "status",
+        "created_at"
+      ],
+      "description": "9POP 分红；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 4,
+      "classification": "B",
+      "module": "11",
+      "access": "owner-only"
+    },
+    {
+      "name": "dividend_historical_import_lines",
+      "columns": [
+        "id",
+        "batch_id",
+        "store_id",
+        "source_dataset_key",
+        "supersedes_line_id",
+        "settlement_period",
+        "record_kind",
+        "reported_participant_type",
+        "reported_binding_id",
+        "reported_ratio_bps",
+        "reported_gross_cents",
+        "reported_actual_cents",
+        "reported_paid_cents",
+        "reported_unpaid_cents",
+        "reported_subsidy_session_count",
+        "source_participant_id",
+        "resolved_participant_id",
+        "transfer_effective_month",
+        "entitlement_event_id",
+        "balance_event_id",
+        "event_effect",
+        "created_at"
+      ],
+      "description": "9POP 分红；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 4,
+      "classification": "B",
+      "module": "11",
+      "access": "owner-only"
+    },
+    {
+      "name": "dividend_opening_batches",
+      "columns": [
+        "id",
+        "store_id",
+        "confirmed_at",
+        "total_amount_cents",
+        "line_count",
+        "status",
+        "created_at"
+      ],
+      "description": "9POP 分红；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 4,
+      "classification": "B",
+      "module": "11",
+      "access": "owner-only"
+    },
+    {
+      "name": "dividend_opening_lines",
+      "columns": [
+        "id",
+        "opening_batch_id",
+        "participant_id",
+        "stable_line_id",
+        "amount_cents",
+        "created_at"
+      ],
+      "description": "9POP 分红；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 4,
+      "classification": "B",
+      "module": "11",
+      "access": "owner-only"
+    },
+    {
+      "name": "dividend_participants",
+      "columns": [
+        "id",
+        "store_id",
+        "participant_type",
+        "finance_account_id",
+        "coach_id",
+        "member_id",
+        "effective_from_month",
+        "effective_to_month",
+        "eligible",
+        "version",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 分红；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 4,
+      "classification": "B",
+      "module": "11",
+      "access": "owner-only"
+    },
+    {
+      "name": "dividend_payout_allocations",
+      "columns": [
+        "id",
+        "payout_line_id",
+        "source_event_id",
+        "settled_cents",
+        "allocation_rank",
+        "created_at"
+      ],
+      "description": "9POP 分红；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 4,
+      "classification": "B",
+      "module": "11",
+      "access": "owner-only"
+    },
+    {
+      "name": "dividend_payout_batches",
+      "columns": [
+        "id",
+        "store_id",
+        "candidate_id",
+        "status",
+        "total_amount_cents",
+        "occurred_on",
+        "risk_mode_snapshot",
+        "policy_version_snapshot",
+        "available_funds_snapshot_cents",
+        "safety_floor_snapshot_cents",
+        "safe_limit_snapshot_cents",
+        "approval_request_id",
+        "submitted_at",
+        "paid_at",
+        "reversed_at",
+        "version",
+        "created_at",
+        "updated_at",
+        "safety_override_confirmed"
+      ],
+      "description": "9POP 分红；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 4,
+      "classification": "B",
+      "module": "11",
+      "access": "owner-only"
+    },
+    {
+      "name": "dividend_payout_lines",
+      "columns": [
+        "id",
+        "payout_batch_id",
+        "participant_id",
+        "cash_amount_cents",
+        "entitlement_settled_cents",
+        "non_cash_offset_snapshot_cents",
+        "outstanding_before_snapshot_cents",
+        "allocation_rank",
+        "created_at"
+      ],
+      "description": "9POP 分红；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 4,
+      "classification": "B",
+      "module": "11",
+      "access": "owner-only"
+    },
+    {
+      "name": "dividend_payout_reversal_requests",
+      "columns": [
+        "id",
+        "payout_batch_id",
+        "approval_request_id",
+        "status",
+        "completed_at",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 分红；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 4,
+      "classification": "B",
+      "module": "11",
+      "access": "owner-only"
+    },
+    {
+      "name": "dividend_periods",
+      "columns": [
+        "id",
+        "store_id",
+        "accounting_period",
+        "status",
+        "basis_version",
+        "cash_profit_cents",
+        "subsidy_addback_cents",
+        "distributable_basis_cents",
+        "risk_mode_snapshot",
+        "policy_version_snapshot",
+        "ratio_source",
+        "ratio_source_period",
+        "ratio_confirmed_at",
+        "version",
+        "locked_at",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 分红；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 4,
+      "classification": "B",
+      "module": "11",
+      "access": "owner-only"
+    },
+    {
+      "name": "dividend_ratio_lines",
+      "columns": [
+        "id",
+        "dividend_period_id",
+        "participant_id",
+        "ratio_bps",
+        "created_at"
+      ],
+      "description": "9POP 分红；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 4,
+      "classification": "B",
+      "module": "11",
+      "access": "owner-only"
+    },
+    {
+      "name": "dividend_store_policies",
+      "columns": [
+        "store_id",
+        "risk_mode",
+        "basis_version",
+        "cutover_month",
+        "cutover_locked",
+        "enabled",
+        "version",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 分红；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 4,
+      "classification": "B",
+      "module": "11",
+      "access": "owner-only"
+    },
+    {
+      "name": "member_contract_events",
+      "columns": [
+        "id",
+        "member_id",
+        "contract_status_id",
+        "from_status",
+        "to_status",
+        "actor_id",
+        "request_id",
+        "created_at"
+      ],
+      "description": "9POP 电子合同；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 5,
+      "classification": "B",
+      "module": "15",
+      "access": "owner-only"
+    },
+    {
+      "name": "member_contract_statuses",
+      "columns": [
+        "id",
+        "member_id",
+        "store_id",
+        "contract_version",
+        "status",
+        "source",
+        "required_store_id",
+        "qr_config_id",
+        "last_prompted_at",
+        "reported_at",
+        "verified_at",
+        "verified_by_account_id",
+        "resign_required_at",
+        "resign_required_by_account_id",
+        "created_at",
+        "updated_at",
+        "last_import_row_id",
+        "external_contract_id",
+        "external_launched_at"
+      ],
+      "description": "9POP 电子合同；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 5,
+      "classification": "B",
+      "module": "15",
+      "access": "owner-only"
+    },
+    {
+      "name": "announcement_banners",
+      "columns": [
+        "id",
+        "tag",
+        "title",
+        "sort_order",
+        "status",
+        "audience",
+        "placement",
+        "visibility_mode",
+        "publish_at",
+        "expire_at",
+        "offline_at",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 公告、员工手册与通知；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 5,
+      "classification": "A",
+      "module": "16"
+    },
+    {
+      "name": "announcements",
+      "columns": [
+        "id",
+        "title",
+        "status",
+        "audience",
+        "placement",
+        "sort_order",
+        "visibility_mode",
+        "publish_at",
+        "expire_at",
+        "offline_at",
+        "created_at",
+        "updated_at"
+      ],
+      "description": "9POP 公告、员工手册与通知；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 5,
+      "classification": "A",
+      "module": "16"
+    },
+    {
+      "name": "employee_handbook_versions",
+      "columns": [
+        "id",
+        "version",
+        "title",
+        "published_at",
+        "created_at"
+      ],
+      "description": "9POP 公告、员工手册与通知；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
+      "phase": 5,
+      "classification": "A",
+      "module": "16"
+    }
+  ],
+  "excludedFields": {
+    "accounts": [
+      "username",
+      "password_hash",
+      "password_initial",
+      "password_changed_at",
+      "phone",
+      "store_scope_ids"
+    ],
+    "announcement_banners": [
+      "image_file_id",
+      "image_crop_x",
+      "image_crop_y",
+      "image_crop_scale",
+      "overlay_enabled",
+      "title_line2",
+      "subtitle",
+      "created_by",
+      "updated_by"
+    ],
+    "announcements": [
+      "summary",
+      "bubble_title",
+      "content_json",
+      "created_by",
+      "updated_by"
+    ],
+    "approval_actions": [
+      "note"
+    ],
+    "approval_requests": [
+      "template_id",
+      "payload_json",
+      "attachment_file_ids_json",
+      "reason",
+      "reject_reason",
+      "coach_promotion_dedupe_marker"
+    ],
+    "coach_level_history": [
+      "reason",
+      "current_coach_marker"
+    ],
+    "coach_rate_versions": [
+      "created_by",
+      "current_active_marker"
+    ],
+    "coaches": [
+      "name",
+      "avatar_url",
+      "phone",
+      "bio",
+      "gift_recipient_name",
+      "gift_phone",
+      "gift_address"
+    ],
+    "course_experience_officer_assignments": [
+      "activated_by",
+      "activation_reason",
+      "disabled_by",
+      "disable_reason",
+      "active_account_marker",
+      "active_member_marker"
+    ],
+    "course_product_versions": [
+      "snapshot_json",
+      "changed_by",
+      "change_reason"
+    ],
+    "course_products": [
+      "description"
+    ],
+    "course_sales_profile_versions": [
+      "config_snapshot_json",
+      "snapshot_hash",
+      "created_by"
+    ],
+    "dividend_eligibility_transfers": [
+      "reason",
+      "created_by",
+      "idempotency_key"
+    ],
+    "dividend_entitlement_events": [
+      "reason",
+      "created_by"
+    ],
+    "dividend_event_sources": [
+      "source_payload_hash"
+    ],
+    "dividend_historical_import_batches": [
+      "source_file_name",
+      "source_file_sha256",
+      "source_sheet",
+      "preview_hash",
+      "confirmed_by",
+      "reason",
+      "idempotency_key"
+    ],
+    "dividend_historical_import_lines": [
+      "source_row_key",
+      "source_payload_sha256",
+      "reported_display_name",
+      "note"
+    ],
+    "dividend_opening_batches": [
+      "source_file_name",
+      "source_sha256",
+      "confirmed_by",
+      "reason",
+      "idempotency_key"
+    ],
+    "dividend_opening_lines": [
+      "note"
+    ],
+    "dividend_participants": [
+      "display_name",
+      "historical_key",
+      "created_by",
+      "change_reason"
+    ],
+    "dividend_payout_allocations": [],
+    "dividend_payout_batches": [
+      "reason",
+      "created_by",
+      "idempotency_key",
+      "manual_payout_snapshot_json"
+    ],
+    "dividend_payout_lines": [],
+    "dividend_payout_reversal_requests": [
+      "reason",
+      "requested_by",
+      "idempotency_key"
+    ],
+    "dividend_periods": [
+      "source_snapshot_json",
+      "ratio_confirmed_by",
+      "locked_by",
+      "lock_reason"
+    ],
+    "dividend_ratio_lines": [],
+    "dividend_store_policies": [
+      "changed_by",
+      "change_reason"
+    ],
+    "employee_handbook_versions": [
+      "update_summary",
+      "content_markdown",
+      "content_sha256",
+      "source_commit",
+      "source_file_name",
+      "source_file_sha256",
+      "reference_pdf_sha256",
+      "cover_file_id",
+      "published_by"
+    ],
+    "finance_accounts": [
+      "account_name",
+      "close_reason"
+    ],
+    "finance_approval_cosigner_slots": [
+      "updated_by",
+      "update_reason"
+    ],
+    "finance_ecommerce_income_claims": [
+      "release_reason",
+      "active_marker"
+    ],
+    "finance_income_approval_cancellations": [
+      "reason",
+      "canceled_by",
+      "idempotency_key",
+      "payload_hash"
+    ],
+    "finance_income_approval_facts": [
+      "platform_name",
+      "payer_name",
+      "created_by"
+    ],
+    "finance_internal_management_fee_claims": [
+      "release_reason",
+      "released_by",
+      "active_marker"
+    ],
+    "finance_ledger_entries": [
+      "source_payload_hash",
+      "idempotency_key",
+      "description",
+      "metadata_json",
+      "created_by"
+    ],
+    "finance_operating_reserve_payment_claims": [
+      "payroll_detail_snapshot_json",
+      "released_reason",
+      "changed_by"
+    ],
+    "finance_operating_reserve_policies": [
+      "changed_by",
+      "change_reason"
+    ],
+    "finance_payment_account_holder_events": [
+      "reason",
+      "changed_by"
+    ],
+    "finance_payment_accounts": [
+      "name"
+    ],
+    "finance_period_locks": [
+      "locked_by",
+      "lock_reason",
+      "unlocked_by",
+      "unlock_reason"
+    ],
+    "finance_petty_cash_entries": [
+      "movement_type",
+      "holder_account_id_snapshot",
+      "source_payload_hash",
+      "http_idempotency_key",
+      "description",
+      "created_by"
+    ],
+    "finance_petty_cash_opening_t0_supersessions": [
+      "previous_effective_t0",
+      "corrected_effective_t0",
+      "source_payload_hash",
+      "reason",
+      "created_by"
+    ],
+    "finance_position_events": [
+      "effect_direction",
+      "source_payload_hash",
+      "idempotency_key",
+      "description",
+      "metadata_json",
+      "created_by"
+    ],
+    "finance_positions": [
+      "position_type",
+      "counterparty_name",
+      "created_by"
+    ],
+    "finance_reconciliation_account_balances": [
+      "display_name",
+      "masked_identifier"
+    ],
+    "finance_reconciliation_accounts": [
+      "display_name",
+      "masked_identifier",
+      "created_by",
+      "updated_by"
+    ],
+    "finance_reconciliation_batches": [
+      "attachment_file_ids",
+      "created_by",
+      "closed_by"
+    ],
+    "finance_reconciliation_historical_summaries": [
+      "note",
+      "created_by"
+    ],
+    "finance_reconciliation_subject_snapshots": [
+      "subject_name"
+    ],
+    "finance_reconciliation_variance_items": [
+      "reason_type",
+      "note",
+      "created_by"
+    ],
+    "finance_store_operating_reserve_openings": [
+      "confirmed_by",
+      "confirm_reason"
+    ],
+    "finance_store_payroll_reserves": [
+      "changed_by",
+      "change_reason"
+    ],
+    "finance_store_rent_cycles": [
+      "active_marker"
+    ],
+    "finance_store_rent_plans": [
+      "created_by",
+      "change_reason",
+      "active_marker"
+    ],
+    "full_order_installments": [],
+    "member_contract_events": [
+      "action",
+      "actor_type",
+      "idempotency_key",
+      "note"
+    ],
+    "member_contract_statuses": [
+      "contract_name",
+      "admin_note"
+    ],
+    "member_course_events": [
+      "event_time",
+      "applicant",
+      "reason",
+      "metadata_json"
+    ],
+    "member_course_store_assignments": [],
+    "member_courses": [
+      "course_category",
+      "course_snapshot",
+      "course_name",
+      "pause_ended_by",
+      "payment_plan_amendment_json"
+    ],
+    "member_self_leave_requests": [
+      "idempotency_key",
+      "metadata_json"
+    ],
+    "member_store_assignments": [],
+    "member_store_transfer_commission_reserves": [],
+    "member_store_transfer_courses": [
+      "course_name",
+      "course_status_snapshot",
+      "commission_skip_reason",
+      "valuation_reason",
+      "valuation_attachment_file_ids_json",
+      "facts_json"
+    ],
+    "member_store_transfer_reversals": [
+      "reason",
+      "facts_hash",
+      "requested_by",
+      "applied_by",
+      "release_reason"
+    ],
+    "member_store_transfer_segments": [
+      "original_dividend_ratio_snapshot_json"
+    ],
+    "member_store_transfer_settlements": [
+      "source_periods_json",
+      "reason",
+      "created_by",
+      "settled_by"
+    ],
+    "member_store_transfers": [
+      "facts_hash",
+      "valuation_hash",
+      "valued_by",
+      "payment_prepared_by",
+      "paid_by",
+      "release_reason"
+    ],
+    "members": [
+      "name",
+      "phone",
+      "gender",
+      "age",
+      "plate_no",
+      "face_registered",
+      "face_file_id",
+      "co_create_since",
+      "profile_type"
+    ],
+    "order_events": [
+      "reason",
+      "metadata_json"
+    ],
+    "order_payment_plan_amendments": [
+      "token_hash",
+      "original_facts_hash",
+      "plan_json",
+      "terms_hash",
+      "created_by"
+    ],
+    "payment_channel_bill_batches": [
+      "source_file_hash"
+    ],
+    "payment_channel_bill_items": [
+      "provider_transaction_no",
+      "provider_refund_no",
+      "facts_hash"
+    ],
+    "payment_digital_receipts": [
+      "provider_transaction_no",
+      "facts_hash"
+    ],
+    "payment_gateway_transactions": [
+      "payer_wechat_open_id_hash",
+      "provider_transaction_no"
+    ],
+    "payment_reconciliation_exceptions": [
+      "detail_json",
+      "resolved_by",
+      "resolution_note"
+    ],
+    "payment_refund_legs": [
+      "provider_refund_no"
+    ],
+    "payment_settlement_batches": [],
+    "payment_vouchers": [
+      "file_ids",
+      "primary_file_id",
+      "uploaded_by",
+      "finance_reject_reason"
+    ],
+    "payroll_average_eligibility_overrides": [
+      "reason_code",
+      "reason",
+      "changed_by"
+    ],
+    "payroll_commission_payout_transfers": [
+      "from_recipient_coach_id",
+      "to_recipient_coach_id"
+    ],
+    "payroll_commission_rate_locks": [
+      "locked_by"
+    ],
+    "payroll_period_locks": [
+      "locked_by",
+      "reason"
+    ],
+    "payroll_store_founder_assignments": [
+      "reason",
+      "changed_by"
+    ],
+    "payroll_store_manager_commission_assignments": [
+      "reason",
+      "changed_by"
+    ],
+    "payslip_adjustments": [
+      "type",
+      "reason",
+      "created_by"
+    ],
+    "payslips": [
+      "confirmed_by",
+      "unlocked_by",
+      "resend_by",
+      "commission_period_start",
+      "commission_period_end",
+      "commission_missing_snapshot_dates_json",
+      "finance_note",
+      "calculated_source_snapshot_json",
+      "display_snapshot_json",
+      "operation_log_ids_json"
+    ],
+    "pending_orders": [
+      "member_name",
+      "member_phone",
+      "course_snapshot_json",
+      "canceled_by",
+      "cancel_reason"
+    ],
+    "session_records": [
+      "course_snapshot_json",
+      "session_datetime",
+      "check_in_time",
+      "cross_store_claim_deadline",
+      "home_coach_id_at_session",
+      "tags_json",
+      "void_reason",
+      "voided_by",
+      "created_by",
+      "member_business_day_effective_marker"
+    ],
+    "special_course_entitlements": [],
+    "special_course_usage_records": [
+      "release_reason",
+      "active_session_marker"
+    ],
+    "staffs": [
+      "name",
+      "phone",
+      "email",
+      "gender",
+      "avatar_url",
+      "id_card_image_urls",
+      "certificate_image_urls",
+      "attachment_urls",
+      "gift_recipient_name",
+      "gift_phone",
+      "gift_address"
+    ],
+    "store_roles": [
+      "role_type"
+    ],
+    "stores": [
+      "contact_phone",
+      "address",
+      "description",
+      "cover_file_id",
+      "gallery_file_ids"
+    ],
+    "t_course_debt_legacy_reference_snapshot": [
+      "member_name",
+      "store_name",
+      "sales_coach_name",
+      "course_name",
+      "course_status"
+    ],
+    "t_course_debt_payment_segment_snapshot": [
+      "anomaly_reason"
+    ],
+    "t_course_debt_snapshot": [
+      "member_name",
+      "store_name",
+      "sales_coach_name",
+      "course_name",
+      "course_status"
+    ],
+    "t_course_refund_finance_entry_links": [
+      "effect_type"
+    ],
+    "t_course_refund_holds": [
+      "locked_facts_hash",
+      "course_status_before",
+      "pause_state_before_json",
+      "ended_by",
+      "release_reason"
+    ],
+    "trial_course_commission_entries": [
+      "reversed_by",
+      "reversal_reason"
+    ],
+    "trial_course_conversions": [],
+    "trial_course_openings": [
+      "member_name",
+      "member_phone",
+      "product_snapshot_json",
+      "product_name",
+      "created_by",
+      "deleted_by",
+      "delete_reason"
+    ],
+    "trial_course_vouchers": [
+      "file_ids",
+      "primary_file_id",
+      "uploaded_by"
+    ]
+  }
+}

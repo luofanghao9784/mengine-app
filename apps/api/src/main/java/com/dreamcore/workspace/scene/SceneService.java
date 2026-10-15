@@ -66,7 +66,10 @@ public class SceneService {
      String name=f.path("name").asText();columns.add(name);JsonNode meaning=f;
      for(var candidate:a.path("dictionary").path("fields"))if(candidate.path("name").asText().equals(name))meaning=candidate;
      String description=meaning.path("meaning").asText(f.path("label").asText(name));
-     fields.add(new DatasetField(name,trim(f.path("type").asText("text"),40),trim(description.isBlank()?name:description,300),trim(meaning.path("unit").asText(""),40),"数据基座口径版本 "+a.path("version").asInt(),a.path("dictionaryStatus").asText().equals("generated")?"DEPLOYMENT_INFERRED":"UNKNOWN"));
+     String certainty=a.path("dictionaryStatus").asText().equals("generated")?"DEPLOYMENT_INFERRED":"UNKNOWN";
+     String evidence="数据基座口径版本 "+a.path("version").asInt();
+     for(var e:a.path("fieldEvidence"))if(e.path("column").asText().equals(name)){certainty=e.path("status").asText("UNKNOWN");evidence=e.path("reference").asText(evidence);}
+     fields.add(new DatasetField(name,trim(f.path("type").asText("text"),40),trim(description.isBlank()?name:description,300),trim(meaning.path("unit").asText(""),40),trim(evidence,300),certainty));
     }
     var meta=metadata(a);UUID target=id(tenant+":"+a.path("id").asText()+":"+IdentityService.hash(meta.toString()));
     sets.add(new CollectionDeployment.Dataset(target,workspace,trim(a.path("id").asText(),160),trim(a.path("title").asText(),160),trim("标签："+a.path("tags")+"；"+a.path("dictionary").path("tableMeaning").asText(""),1000),columns,fields));
