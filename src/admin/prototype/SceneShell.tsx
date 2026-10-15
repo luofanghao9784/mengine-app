@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { EngineStage3D } from '../../operations/engine-stage/EngineStage3D';
 import { busyDemo } from '../../operations/engine-demo';
 import type { EngineScene, Focus } from '../../operations/engine-stage/scene';
@@ -11,6 +11,7 @@ import { useKnowledge, type Knowledge } from './knowledge-api';
 import { api } from './foundation-api';
 import { GATES, GATE_OF, World } from './world';
 import './scene-shell.css';
+import './glass-theme.css';
 
 /**
  * 原型：企业管理端的“场景外壳”。没有侧边栏和页面，整个管理端是一个铺满窗口的 3D 引擎模型，
@@ -52,18 +53,25 @@ export function SceneShell() {
   }, []);
   const sim = useMemo(() => busyDemo(now), [now]);
 
-  const [place, setPlace] = useState<Place>(() => new URLSearchParams(window.location.search).has('tenant') ? 'data' : 'home');
+  const [place, setPlace] = useState<Place>(() =>
+    new URLSearchParams(window.location.search).has('tenant') ? 'data' : 'home',
+  );
   const [sheet, setSheet] = useState<Sheet>('half');
   const [picked, setPicked] = useState<Partial<Record<Place, string>>>({});
   const [filter, setFilter] = useState<Partial<Record<Place, number>>>({});
   const [gate, setGate] = useState<number | null>(null);
   const [palette, setPalette] = useState(false);
   const [height, setHeight] = useState(() => window.innerHeight);
+  const [width, setWidth] = useState(() => window.innerWidth);
   /** 滚动过程中卡片组顶边的实时位置；null 表示停在某一档上。 */
   const [live, setLive] = useState<number | null>(null);
   const stage = useRef<HTMLDivElement>(null);
   const shell = useRef<HTMLDivElement>(null);
   const labels = useRef<HTMLDivElement>(null);
+  const leader = useRef<SVGSVGElement>(null);
+  const nav = useRef<HTMLElement>(null);
+  /** 导航里当前板块的实心滑块：位置跟着当前项走，切换时滑过去。 */
+  const [pill, setPill] = useState<{ x: number; w: number } | null>(null);
   const scene = useRef<EngineScene | null>(null);
   const knowledge = useKnowledge(place === 'knowledge');
   const world = useMemo(() => new World([], [], [], {}), []);
@@ -90,7 +98,7 @@ export function SceneShell() {
   const allowed: Sheet[] = hasScene(place) ? ORDER : ['peek'];
   const stops: Record<Sheet, number> = {
     // 窄窗口时导航退到第二行，卡片升到顶也要让开它。
-    peek: window.innerWidth < 1180 ? 58 : 4,
+    peek: width < 1180 ? 58 : 4,
     half: Math.round(height * 0.6),
     full: height - 66,
   };
@@ -99,7 +107,10 @@ export function SceneShell() {
   state.current = { place, sheet, palette, allowed, stops, live };
 
   useEffect(() => {
-    const on = () => setHeight(window.innerHeight);
+    const on = () => {
+      setHeight(window.innerHeight);
+      setWidth(window.innerWidth);
+    };
     window.addEventListener('resize', on);
     return () => window.removeEventListener('resize', on);
   }, []);
@@ -198,17 +209,44 @@ export function SceneShell() {
   useEffect(() => {
     const el = shell.current!;
     let timer = 0,
-      at: number | null = null;
+      idle = 0,
+      edge = 0,
+      at: number | null = null,
+      // 一次滑动手势（含触控板惯性）只做一件事：滚卡片内容，或切换三档；停顿 260ms 算新的一次。
+      gesture: 'content' | 'sheet' | 'edge' | null = null;
+    const EDGE_PULL = 90; // 内容滚到头后，新的一次手势要多滑这么多才切换三档，避免误触
     const wheel = (e: WheelEvent) => {
       const s = state.current;
       if (s.palette || s.allowed.length < 2 || e.ctrlKey) return;
+      window.clearTimeout(idle);
+      idle = window.setTimeout(() => {
+        gesture = null;
+        edge = 0;
+      }, 260);
+      if (gesture === 'content') return;
       const min = s.stops[s.allowed[0]],
         max = s.stops[s.allowed[s.allowed.length - 1]],
         cur = at ?? s.live ?? s.stops[s.sheet];
-      if (cur <= min + 0.5) {
-        if (e.deltaY > 0) return;
-        const scroller = (e.target as HTMLElement).closest?.('.card-scroll');
-        if (scroller && scroller.scrollTop > 0) return;
+      if (gesture === null) {
+        const scroller = (e.target as HTMLElement).closest?.('.card-scroll, .src-list') as HTMLElement | null;
+        if (scroller && scroller.scrollHeight > scroller.clientHeight + 1) {
+          const atTop = scroller.scrollTop <= 0,
+            atBottom = scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1;
+          // 还能往这个方向滚：这一整次手势都交给内容。
+          if (e.deltaY > 0 ? !atBottom : !atTop) {
+            gesture = 'content';
+            return;
+          }
+          gesture = 'edge';
+        } else gesture = 'sheet';
+      }
+      // 卡片组已经在最高处，再往下滑没有可切换的了。
+      if (cur <= min + 0.5 && e.deltaY > 0) return;
+      if (gesture === 'edge') {
+        e.preventDefault();
+        edge += Math.abs(e.deltaY);
+        if (edge < EDGE_PULL) return;
+        gesture = 'sheet';
       }
       e.preventDefault();
       at = Math.max(min, Math.min(max, cur - e.deltaY));
@@ -230,6 +268,7 @@ export function SceneShell() {
     return () => {
       el.removeEventListener('wheel', wheel);
       window.clearTimeout(timer);
+      window.clearTimeout(idle);
     };
   }, []);
   // 模型里的文字标注（空间名、选中的记录名）每帧跟着相机投影。
@@ -272,6 +311,60 @@ export function SceneShell() {
           el.remove();
           pool.delete(key);
         }
+      // 数据基座：从模型里选中项的位置牵一条细线到清单里正对着的那张卡。
+      const svg = leader.current;
+      if (svg) {
+        const f = world.focus(),
+          card =
+            f && state.current.sheet !== 'peek' && state.current.live === null
+              ? shell.current?.querySelector('.deck [data-anchor]')
+              : null,
+          p = f ? sc.project(f) : null;
+        const r = card?.getBoundingClientRect(),
+          host = card?.closest('.card-scroll, .deck3d')?.getBoundingClientRect();
+        // 卡片在选中点的左右两侧时接到卡片侧边中点，在下方时接到卡片顶边。
+        let end: { x: number; y: number; side: boolean } | null = null;
+        if (
+          p &&
+          r &&
+          p.w > 0 &&
+          host &&
+          r.bottom > host.top &&
+          r.top < host.bottom &&
+          r.top < window.innerHeight - 48
+        ) {
+          const cy = Math.min(Math.max(r.top + r.height / 2, host.top + 12), host.bottom - 12);
+          if (p.x > r.right + 24) end = { x: r.right, y: cy, side: true };
+          else if (p.x < r.left - 24) end = { x: r.left, y: cy, side: true };
+          else if (p.y < r.top - 24)
+            end = {
+              x: Math.min(Math.max(p.x, r.left + 28), r.right - 28),
+              y: Math.max(r.top, host.top),
+              side: false,
+            };
+        }
+        svg.classList.toggle('on', !!end);
+        if (end) {
+          const x2 = end.x,
+            y2 = end.y,
+            f = (v: number) => v.toFixed(1),
+            mx = (p!.x + x2) / 2,
+            my = (p!.y + y2) / 2;
+          svg
+            .querySelector('path')!
+            .setAttribute(
+              'd',
+              end.side
+                ? `M${f(p!.x)} ${f(p!.y)} C${f(mx)} ${f(p!.y)} ${f(mx)} ${f(y2)} ${f(x2)} ${f(y2)}`
+                : `M${f(p!.x)} ${f(p!.y)} C${f(p!.x)} ${f(my)} ${f(x2)} ${f(my)} ${f(x2)} ${f(y2)}`,
+            );
+          const [a, b] = svg.querySelectorAll('circle');
+          a.setAttribute('cx', p!.x.toFixed(1));
+          a.setAttribute('cy', p!.y.toFixed(1));
+          b.setAttribute('cx', x2.toFixed(1));
+          b.setAttribute('cy', y2.toFixed(1));
+        }
+      }
     };
     frame();
     return () => {
@@ -279,6 +372,11 @@ export function SceneShell() {
       pool.forEach((el) => el.remove());
     };
   }, [world]);
+
+  useLayoutEffect(() => {
+    const on = nav.current?.querySelector<HTMLElement>('button[aria-current="page"]');
+    setPill(on ? { x: on.offsetLeft, w: on.offsetWidth } : null);
+  }, [place, width]);
 
   const info = places[place];
   return (
@@ -289,7 +387,12 @@ export function SceneShell() {
       data-place={place}
       data-sheet={live === null ? sheet : 'moving'}
       data-own={world.view || undefined}
-      style={{ '--deck-top': `${top}px`, '--deck-peek': `${stops.peek}px` } as React.CSSProperties}
+      style={
+        {
+          '--deck-top': `${top}px`,
+          '--deck-peek': `${stops.peek}px`,
+        } as React.CSSProperties
+      }
     >
       <div className="shell-stage" ref={stage}>
         <EngineStage3D
@@ -340,7 +443,9 @@ export function SceneShell() {
         <h1>{work ? info.name : '引擎'}</h1>
         <span className="live-state">
           {place === 'data'
-            ? '数据基座 · ' + (foundation.data ? '已连接' : '等待连接')
+            ? foundation.data
+              ? `资产 ${foundation.data.items.length} · 待处理 ${foundation.data.governance.attention} · 隔离 ${foundation.data.governance.isolated} 项 · 平均质量 ${foundation.data.governance.averageQuality ?? '—'}`
+              : '数据基座 · 等待连接'
             : place === 'knowledge'
               ? '知识库 · ' +
                 (knowledge.error || (knowledge.busy ? '正在同步' : knowledge.data?.status || '等待连接'))
@@ -349,7 +454,14 @@ export function SceneShell() {
       </header>
 
       <div className="deck">
-        <nav className="shell-switch" aria-label="引擎的各个部分">
+        <nav className="shell-switch" aria-label="引擎的各个部分" ref={nav}>
+          {pill && (
+            <span
+              className="switch-pill"
+              aria-hidden="true"
+              style={{ transform: `translateX(${pill.x}px)`, width: pill.w }}
+            />
+          )}
           {SCENE.map((p) => (
             <button
               key={p}
@@ -385,7 +497,9 @@ export function SceneShell() {
             <Icon name="search" />
           </button>
         </nav>
-        {place === 'members' ? (<AccessWork />) : place === 'usage' ? (
+        {place === 'members' ? (
+          <AccessWork />
+        ) : place === 'usage' ? (
           <Usage />
         ) : place === 'data' ? (
           <DataWork
@@ -413,6 +527,12 @@ export function SceneShell() {
           <Home go={go} foundation={foundation} knowledge={knowledge} />
         )}
       </div>
+
+      <svg className="world-leader" ref={leader} aria-hidden="true">
+        <path />
+        <circle r="3.5" />
+        <circle r="2" />
+      </svg>
 
       {palette && (
         <Palette knowledge={knowledge} foundation={foundation} go={go} close={() => setPalette(false)} />
@@ -486,7 +606,7 @@ function Home({
   );
 
   return (
-    <section className="cards home" aria-label="待办与常用数据">
+    <section className="cards home glass" aria-label="待办与常用数据">
       <article className="card todo">
         <header>
           <h2>需要你处理</h2>
@@ -545,7 +665,7 @@ function Home({
 /** 用量与运行：读数、每日请求、用在了哪里、运行质量和额度。 */
 function Usage() {
   return (
-    <section className="cards usage" aria-label="用量与运行">
+    <section className="cards usage glass" aria-label="用量与运行">
       {usage.readings.map(([label, value, note]) => (
         <article key={label} className="card stat">
           <span className="label">{label}</span>
@@ -682,7 +802,7 @@ function Work({
     }
   }
   return (
-    <section className="cards work" aria-label={info.name}>
+    <section className="cards work glass" aria-label={info.name}>
       <article className="card list">
         <div className="tabs" role="tablist" aria-label={`${info.name}栏目`}>
           {workTabs.map((f, i) => (

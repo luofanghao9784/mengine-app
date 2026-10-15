@@ -232,7 +232,7 @@
   letter-spacing: 0.36em;
   white-space: nowrap;
 }
-/* 导航：一条深色的细边长条，每一项是图标加名称；当前项图标变亮，底下一道光。 */
+/* 导航：和卡片同一种深灰磨砂玻璃的长条，每一项是图标加名称；当前项是一片略亮的镜片，图标变金，底下一道光。 */
 .shell-switch {
   flex: none;
   align-self: center;
@@ -246,13 +246,11 @@
   padding: 5px;
   box-sizing: border-box;
   border-radius: 15px;
-  background: linear-gradient(180deg, rgb(36 32 26 / 80%), rgb(16 14 11 / 90%));
-  backdrop-filter: blur(18px) saturate(1.3);
-  box-shadow:
-    0 0 0 1px rgb(241 214 160 / 16%),
-    0 1px 0 rgb(255 255 255 / 8%) inset,
-    0 12px 28px rgb(0 0 0 / 38%);
-  color: #cfc6b4;
+  background: rgb(36 43 55 / 42%);
+  backdrop-filter: blur(34px) saturate(1.7);
+  -webkit-backdrop-filter: blur(34px) saturate(1.7);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 8%) inset;
+  color: #c9d0da;
   white-space: nowrap;
   max-width: 100%;
   overflow-x: auto;
@@ -282,7 +280,7 @@
   padding: 0 11px 0 9px;
   gap: 7px;
   font-size: 12.5px;
-  color: #a39a88;
+  color: #97a0ad;
   letter-spacing: 0.02em;
 }
 .shell-switch button[aria-label='搜索'] {
@@ -290,35 +288,49 @@
 }
 .shell-switch button:hover {
   background: rgb(255 255 255 / 7%);
-  color: #fbf3e2;
+  color: #f4f6f9;
 }
 .shell-switch button:hover .ico {
   opacity: 1;
 }
-.shell-switch button[aria-current='page'] {
-  background: linear-gradient(180deg, rgb(241 214 160 / 18%), rgb(241 214 160 / 7%));
-  color: #f8ecd0;
-  box-shadow: 0 0 0 1px rgb(241 214 160 / 26%) inset;
+.shell-switch button[aria-current='page'],
+.shell-switch button[aria-current='page']:hover {
+  position: relative;
+  z-index: 1;
+  background: transparent;
+  color: #fff;
+  box-shadow: none;
 }
 .shell-switch button[aria-current='page'] .ico {
   opacity: 1;
-  color: var(--champagne);
-  filter: drop-shadow(0 0 5px rgb(241 214 160 / 55%));
+  color: inherit;
+  filter: none;
 }
-.shell-switch button[aria-current='page']::after {
-  content: '';
+/* 当前板块：一块实心浅色滑块垫在按钮下面，切换板块时滑到新位置 */
+.switch-pill {
   position: absolute;
-  inset: auto 14px -1px;
-  height: 2px;
-  border-radius: 2px;
-  background: linear-gradient(90deg, transparent, var(--champagne), transparent);
+  top: 5px;
+  bottom: 5px;
+  left: 0;
+  border-radius: 10px;
+  /* 只用底色强调：引擎的暖金，半透明 */
+  background: rgb(230 197 138 / 24%);
+  pointer-events: none;
+  transition:
+    transform 0.36s cubic-bezier(0.2, 0.8, 0.2, 1),
+    width 0.36s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .switch-pill {
+    transition: none;
+  }
 }
 .shell-switch i {
   align-self: center;
   width: 1px;
   height: 18px;
   margin: 0 6px;
-  background: rgb(241 214 160 / 16%);
+  background: rgb(255 255 255 / 12%);
 }
 
 /* ---- 卡片组：没有整块底板，卡片直接浮在 3D 上；只在最下方垫一层渐暗，保证文字可读 ---- */
@@ -1170,8 +1182,8 @@
   color: var(--ash);
 }
 
-/* ---- 卡片用浅色（日光）：在深色 3D 上更醒目，也和客户端的阅读面一致 ---- */
-.cards {
+/* ---- 卡片用浅色（日光）：旧版样式，只用于还没换成深色玻璃（.glass）的卡片组 ---- */
+.cards:not(.glass) {
   --pearl: #1d1b17;
   --ash: #5b564d;
   --dim: #7a7468;
@@ -1184,82 +1196,82 @@
   color: var(--pearl);
   color-scheme: light;
 }
-.cards .card {
+.cards:not(.glass) .card {
   border-color: rgb(255 255 255 / 70%);
   box-shadow:
     0 1px 0 rgb(255 255 255 / 80%) inset,
     0 20px 44px rgb(0 0 0 / 38%);
 }
-.cards .card.stat:hover {
+.cards:not(.glass) .card.stat:hover {
   border-color: #c99a45;
   background: #fffdf9;
 }
-.cards .card.todo li button:hover,
-.cards .card.list .row:hover,
-.cards .card.facts button.fact:hover {
+.cards:not(.glass) .card.todo li button:hover,
+.cards:not(.glass) .card.list .row:hover,
+.cards:not(.glass) .card.facts button.fact:hover {
   background: rgb(29 27 23 / 5%);
 }
-.cards .card.list .row[aria-pressed='true'],
-.cards .card.facts button.fact[aria-pressed='true'] {
+.cards:not(.glass) .card.list .row[aria-pressed='true'],
+.cards:not(.glass) .card.facts button.fact[aria-pressed='true'] {
   background: rgb(201 154 69 / 16%);
   box-shadow: inset 2px 0 0 #c99a45;
 }
-.cards .card.todo .tag {
+.cards:not(.glass) .card.todo .tag {
   background: rgb(29 27 23 / 6%);
 }
-.cards .card.stat .bar {
+.cards:not(.glass) .card.stat .bar {
   background: rgb(29 27 23 / 9%);
 }
-.cards .card.stat .bar i,
-.cards .tone-warn {
+.cards:not(.glass) .card.stat .bar i,
+.cards:not(.glass) .tone-warn {
   background: #c99a45;
 }
-.cards .tone-bad {
+.cards:not(.glass) .tone-bad {
   background: #d2452f;
 }
-.cards .tone-run {
+.cards:not(.glass) .tone-run {
   background: #3f63c9;
 }
-.cards .tone-ok {
+.cards:not(.glass) .tone-ok {
   background: #2f8f6b;
 }
-.cards .card .tabs button[aria-selected='true'] {
+.cards:not(.glass) .card .tabs button[aria-selected='true'] {
   box-shadow: inset 0 -2px 0 var(--pearl);
   font-weight: 600;
 }
-.cards .card.list .chip {
+.cards:not(.glass) .card.list .chip {
   background: rgb(201 154 69 / 18%);
   color: #5c4212;
 }
-.cards .verdict.tone-bad {
+.cards:not(.glass) .verdict.tone-bad {
   background: rgb(224 89 75 / 11%);
   color: #7d251b;
 }
-.cards .verdict.tone-warn {
+.cards:not(.glass) .verdict.tone-warn {
   background: rgb(201 154 69 / 15%);
   color: #5c4212;
 }
-.cards .verdict.tone-run {
+.cards:not(.glass) .verdict.tone-run {
   background: rgb(63 99 201 / 10%);
   color: #27408f;
 }
-.cards .verdict.tone-ok {
+.cards:not(.glass) .verdict.tone-ok {
   background: rgb(47 143 107 / 11%);
   color: #1a5c44;
 }
-.cards .verdict.tone-plain {
+.cards:not(.glass) .verdict.tone-plain {
   background: rgb(29 27 23 / 5%);
   color: var(--pearl);
 }
-.cards .card.detail footer button {
+.cards:not(.glass) .card.detail footer button {
   border-color: rgb(29 27 23 / 20%);
 }
-.cards .card.detail footer button.primary {
+.cards:not(.glass) .card.detail footer button.primary {
   border-color: var(--pearl);
   background: var(--pearl);
   color: #fffdf9;
 }
-.cards .card-scroll {
+.cards:not(.glass) .card-scroll {
   scrollbar-color: rgb(29 27 23 / 22%) transparent;
 }
 
@@ -1295,4 +1307,34 @@
   .shell-stage .eng3d {
     transition: none;
   }
+}
+
+/* 数据基座：模型里选中项到清单卡片之间的细引线 */
+.world-leader {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s;
+}
+.world-leader.on {
+  opacity: 1;
+}
+.world-leader path {
+  fill: none;
+  stroke: rgb(241 214 160 / 50%);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+}
+.world-leader circle {
+  fill: none;
+  stroke: #f1d6a0;
+  stroke-width: 1;
+}
+.world-leader circle + circle {
+  fill: #f1d6a0;
+  stroke: none;
 }

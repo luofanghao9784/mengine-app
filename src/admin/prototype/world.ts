@@ -567,6 +567,16 @@ export class World implements SceneExtension {
     return !!best || gate >= 1;
   }
 
+  /** 数据基座里选中项在模型中的位置：正在处理的光珠、已可用记录所在的输入光流，或卡住它的那道星门底部。 */
+  focus(): V3 | null {
+    if (this.view !== 'data' || !this.selected) return null;
+    const run = this.runners.find((q) => q.id === this.selected);
+    if (run) return run.at;
+    if (this.doneAt) return this.doneAt;
+    const g = this.gates[this.selected];
+    return g >= 1 && g <= 3 ? [GX[g - 1], CY - GR[g - 1], 0] : null;
+  }
+
   /** 当前视角下要用文字标出来的位置，由外壳投影成 HTML 标签。 */
   labels(): WorldLabel[] {
     const out: WorldLabel[] = [];
