@@ -10,3 +10,23 @@ test('calculation feedback retains only explicitly allowlisted error codes, neve
  await assert.rejects(call(),e=>e.code==='DATASET_COLUMNS_INVALID'&&!e.message.includes('secret'));
  code='RAW_PRIVATE_ERROR';await assert.rejects(call(),e=>e.code==='REMOTE_BAD_REQUEST'&&!e.message.includes('secret'));
 });
+
+// Exercise the actual agent transport allowlist, not a mock RuntimeError.
+test('governed calculation failures survive the agent HTTP boundary with actionable safe hints', async t => {
+ const {readFile}=await import('node:fs/promises');
+ const {datasetComparisonTool}=await import('../dist/runtime/dataset-comparison.js');
+ const source=await readFile(new URL('../dist/runtime/agent-task.js',import.meta.url),'utf8');
+ const block=source.match(/\[\s*'INVALID_REQUEST',[\s\S]*?'DATASET_PERIODS_MISSING',[\s\S]*?\]/)?.[0];
+ assert.ok(block,'agent calculation allowlist exists');
+ const allowed=[...block.matchAll(/'([A-Z_]+)'/g)].map(m=>m[1]);
+ let code='METRIC_DEFINITION_REQUIRED';
+ const server=createServer((req,res)=>json(res,{code,message:'secret-business-row-and-token'},422));
+ const url=await listen(server);t.after(()=>close(server));
+ const tool=datasetComparisonTool({authorize:async()=>{},invoke:body=>postJson(new URL('/calculate',url),'synthetic-only',body,new AbortController().signal,1024,1000,allowed)});
+ const request={datasetId:'00000000-0000-4000-8000-000000000001',snapshotId:'00000000-0000-4000-8000-000000000001',operation:'SUMMARY',aggregation:'COUNT',groupColumns:[]};
+ for(code of ['METRIC_DEFINITION_REQUIRED','METRIC_PLAN_MISMATCH','DATASET_EMPTY']) {
+  await assert.rejects(tool.execute(request,new AbortController().signal),e=>e.code===code&&!!e.hint&&!JSON.stringify(e).includes('secret'));
+ }
+ code='RAW_PRIVATE_ERROR';
+ await assert.rejects(tool.execute(request,new AbortController().signal),e=>e.code==='REMOTE_BAD_REQUEST'&&!JSON.stringify(e).includes('secret'));
+});
