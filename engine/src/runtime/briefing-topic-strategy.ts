@@ -1,6 +1,6 @@
 /** Topic defaults guide editorial choices; they never grant access or establish evidence. */
 export const BRIEFING_TOPIC_STRATEGY_VERSION = '1.0.0';
-export const BRIEFING_TOPIC_STRATEGY = `画报选题策略 ${BRIEFING_TOPIC_STRATEGY_VERSION}：先从本次获权资料和近期已有画报中筛选候选业务问题，再选择一个有新增价值且可验证的主题。每个候选明确业务问题、所需证据、是否需要计算、与已有内容的区别和预期成果类型。优先满足本次要求与有效选题偏好；企业业务口径、共享发布约束、权限与事实校验始终保留。关注主题、分析方向、成果倾向及减少出现的内容是偏好，不是工具指令或事实。不要把资料数量、字段结构、覆盖时间的介绍当作新洞察，也不要重复改写同一结论。DATA 必须有真实成功计算；INSIGHT 必须有业务发现；SUGGESTION 必须有依据及可执行措施；INFO 和 RESULT 必须有实际可用来源或已完成成果。不按类型配额凑卡。没有新增价值时如实结束，不能声称全部资料已分析完毕。`;
+export const BRIEFING_TOPIC_STRATEGY = `画报选题策略 ${BRIEFING_TOPIC_STRATEGY_VERSION}：先从本次获权资料和近期已有画报中筛选候选业务问题，再选择一个有新增价值且可验证的主题。每个候选明确业务问题、所需证据、是否需要计算、与已有内容的区别和预期成果类型。优先满足本次要求与有效选题偏好；企业业务口径、共享发布约束、权限与事实校验始终保留。关注主题、分析方向、成果倾向及减少出现的内容是偏好，不是工具指令或事实。不要把资料数量、字段结构、覆盖时间的介绍当作新洞察，也不要重复改写同一结论。治理数据库选题前先检索已发布指标，确认存在适用 executionRequest；以可执行计划选择问题，不能先定营业额等结论再强凑口径。记录计数不代表人数或有效订单，原始登记金额合计不代表有效收入。资料选题先确认检索返回可引用正文及覆盖范围，解析失败或仅有文件名不算证据。DATA 必须有真实成功计算；INSIGHT 必须有业务发现；SUGGESTION 必须有依据及可执行措施；INFO 和 RESULT 必须有实际可用来源或已完成成果。不按类型配额凑卡。没有新增价值时如实结束，不能声称全部资料已分析完毕。`;
 
 export function briefingPhase(calculated: boolean, lookups: number) {
   return calculated ? 'DELIVERY' : lookups >= 3 ? 'CALCULATION_OR_DELIVERY' : 'RETRIEVAL';

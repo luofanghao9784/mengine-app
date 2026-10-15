@@ -103,7 +103,7 @@ def excel(path):
             if any(x in entry.filename for x in ('externalLinks/', 'drawings/', 'charts/', 'pivotTables/', 'vbaProject')):
                 reject('FILE_TABLE_REPORT_LAYOUT')
     import openpyxl
-    book = openpyxl.load_workbook(path, read_only=True, data_only=False, keep_links=False)
+    book = openpyxl.load_workbook(io.BytesIO(path.read_bytes()), read_only=True, data_only=False, keep_links=False)
     try:
         if len(book.worksheets) != 1 or book.worksheets[0].sheet_state != 'visible':
             reject('FILE_TABLE_MULTIPLE_SHEETS')

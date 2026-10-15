@@ -47,7 +47,10 @@ public class MetricCatalog {
   event(actor,tenant,id,version,"DRAFT");return Map.of("id",id,"version",version);
  }
  @Transactional public Object transition(UUID actor,UUID tenant,boolean platform,UUID id,Transition request,boolean publish){
-  admin(actor,tenant,platform);if(request==null)throw IdentityException.invalid();
+  admin(actor,tenant,platform);return transitionChecked(actor,tenant,id,request,publish);
+ }
+ Object transitionChecked(UUID actor,UUID tenant,UUID id,Transition request,boolean publish){
+  if(request==null)throw IdentityException.invalid();
   db.queryForList("SELECT tenant_id FROM scene_bindings WHERE tenant_id=? FOR UPDATE",tenant);
   var rows=db.queryForList("SELECT m.*,v.source_scope::text scope,v.definition FROM scene_metrics m JOIN scene_metric_versions v ON v.metric_id=m.id AND v.version=m.head_version WHERE m.tenant_id=? AND m.id=? FOR UPDATE OF m",tenant,id);
   if(rows.isEmpty()||!rows.getFirst().get("head_version").equals(request.expectedVersion()))throw conflict();var m=rows.getFirst();

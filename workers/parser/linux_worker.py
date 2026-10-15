@@ -32,7 +32,7 @@ def command(job, extension, script):
         if Path(directory).exists():
             args += ['--ro-bind', directory, directory]
     # No host /home, /run, /etc credentials, API storage, Docker socket or sibling jobs.
-    for path in [ROOT / '.venv', ROOT / '.local/tessdata', script]:
+    for path in [ROOT / '.venv', ROOT / '.local/tessdata', script, *([ROOT / 'structured_table.py'] if script.name == 'parse.py' else [])]:
         args += ['--ro-bind', str(path), str(path)]
     if Path('/etc/ld.so.cache').exists():
         args += ['--ro-bind', '/etc/ld.so.cache', '/etc/ld.so.cache']

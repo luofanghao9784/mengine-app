@@ -87,4 +87,15 @@ class MetricCatalogTest extends TaskDatasetFixture {
   assertEquals("METRIC_CALCULATION_REQUIRED",assertThrows(IdentityException.class,()->agents.deliverBriefing(job.id(),job.token(),card)).code);
  }
 
+ @Test void delegatedDefinitionsPublishWithoutHumanClickAndDoNotChurnOrOverrideEdits(){
+  db.update("INSERT INTO metric_generation_settings(tenant_id,auto_publish) VALUES(?,true)",tenant);
+  generator.generate(owner,tenant,false);
+  var m=db.queryForMap("SELECT id,head_version,published_version FROM scene_metrics WHERE tenant_id=?",tenant);
+  assertEquals(2,m.get("head_version"));assertEquals(2,m.get("published_version"));
+  generator.generate(owner,tenant,false);
+  assertEquals(2,db.queryForObject("SELECT head_version FROM scene_metrics WHERE id=?",Integer.class,m.get("id")));
+  catalog.save(owner,tenant,false,new MetricCatalog.Change((UUID)m.get("id"),2,"synthetic",definition()));
+  generator.generate(owner,tenant,false);
+  assertEquals(3,db.queryForObject("SELECT head_version FROM scene_metrics WHERE id=?",Integer.class,m.get("id")));
+ }
 }

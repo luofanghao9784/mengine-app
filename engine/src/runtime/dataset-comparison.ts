@@ -124,7 +124,17 @@ export function datasetComparisonTool(options: {
       )
         { const hint=argumentHint(args); console.warn(JSON.stringify({event:'DATASET_ARGUMENT_REJECTED',hint})); throw new RuntimeError('INVALID_TOOL_ARGUMENTS', hint); }
       await options.authorize();
-      const r = await options.invoke(args, signal);
+      let r: unknown;
+      try { r = await options.invoke(args, signal); }
+      catch(error) {
+        const hints:Record<string,string>={
+          METRIC_DEFINITION_REQUIRED:'当前数据没有适用且已发布的指标计划。说明缺少可执行口径，结束本次数值选题；不要重复原请求，也不要从样本或自行编程补算。',
+          METRIC_PLAN_MISMATCH:'请求与已发布计划不一致。仅按已检索 executionRequest 原样调用并省略 null；如不适用则说明选题缺少可执行口径，不改变业务范围。',
+          DATASET_EMPTY:'当前快照没有可计算记录。说明等待数据，不把缺失数据解释为经营结果为零。',
+        };
+        if(error instanceof RuntimeError&&hints[error.code])throw new RuntimeError(error.code,hints[error.code]);
+        throw error;
+      }
       await options.authorize();
       if (
         !isRecord(r) ||

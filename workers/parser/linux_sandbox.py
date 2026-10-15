@@ -19,8 +19,16 @@ def run_linux(job, extension, script=None):
     if ROOT not in script.parents or not script.is_file():
         raise RuntimeError('PARSER_SCRIPT_OUTSIDE_RUNTIME')
     runtime = Path('/run/user') / str(os.getuid())
-    if not (runtime / 'bus').exists():
-        raise RuntimeError('PARSER_USER_MANAGER_UNAVAILABLE')
+    try:
+        if not (runtime / 'bus').exists():
+            raise RuntimeError('PARSER_USER_MANAGER_UNAVAILABLE')
+    except PermissionError as error:
+        raise RuntimeError('PARSER_USER_MANAGER_UNAVAILABLE') from error
+    required = [ROOT / '.venv/bin/python', ROOT / '.local/tessdata', ROOT / 'linux_worker.py']
+    if script.name == 'parse.py':
+        required.append(ROOT / 'structured_table.py')
+    if any(not path.exists() for path in required):
+        raise RuntimeError('PARSER_RUNTIME_INCOMPLETE')
     unit = 'dreamcore-parser-' + uuid.uuid4().hex + '.service'
     env = {'PATH': '/usr/bin:/bin', 'LANG': 'C.UTF-8', 'XDG_RUNTIME_DIR': str(runtime),
            'DBUS_SESSION_BUS_ADDRESS': 'unix:path=' + str(runtime / 'bus')}

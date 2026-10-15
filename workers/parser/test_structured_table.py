@@ -24,7 +24,8 @@ class Tables(unittest.TestCase):
  def xlsx(self,mutate):
   import openpyxl
   with tempfile.TemporaryDirectory() as root:
-   p=Path(root)/'input.xlsx';w=openpyxl.Workbook();s=w.active;s.append(['编号','金额']);s.append(['001',12.34]);mutate(w);w.save(p);w.close();return m.extract(p,'xlsx')
+   p=Path(root)/'input'  # Runtime input deliberately has no extension.
+   w=openpyxl.Workbook();s=w.active;s.append(['编号','金额']);s.append(['001',12.34]);mutate(w);w.save(p);w.close();return m.extract(p,'xlsx')
  def test_excel(self):
   self.assertEqual('READY',self.xlsx(lambda w:None)['state'])
   self.assertEqual('FILE_TABLE_NUMBER_PRECISION',self.xlsx(lambda w:setattr(w.active['B2'],'value',12345678901234.12))['reason'])

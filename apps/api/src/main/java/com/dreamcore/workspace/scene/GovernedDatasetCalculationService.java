@@ -39,7 +39,7 @@ public class GovernedDatasetCalculationService extends DatasetCalculationService
   UUID artifact=UUID.fromString(json.valueToTree(result).path("artifact").path("id").asText());
   String planHash=IdentityService.hash(json.writeValueAsString(request));
   db.update("INSERT INTO metric_calculation_receipts(artifact_id,task_id,attempt_number,metric_id,version,dataset_id,snapshot_id,plan_sha256) SELECT ?,id,attempt,?,?,?,?,? FROM conversation_tasks WHERE id=? ON CONFLICT DO NOTHING",artifact,match.get("id"),match.get("version"),request.datasetId(),request.snapshotId(),planHash,job.id());
-  var definition=json.readTree(match.get("definition").toString());result.put("governedMetric",Map.of("id",match.get("id"),"version",match.get("version"),"name",definition.path("name").asText(),"unit",definition.path("unit").asText(),"planSha256",planHash,"referenceOnly",true));
+  var definition=json.readTree(match.get("definition").toString());result.put("governedMetric",Map.of("id",match.get("id"),"version",match.get("version"),"name",definition.path("name").asText(),"unit",definition.path("unit").asText(),"planSha256",planHash,"scope",definition.path("scope").asText(),"grain",definition.path("grain").asText(),"exclusions",definition.path("exclusions").asText(),"interpretation","仅按此定义解释计算结果；保留源单位、快照范围和统计粒度，不把记录条数当人数，不把原始金额合计当有效收入。","referenceOnly",true));
   return result;
  }
 }

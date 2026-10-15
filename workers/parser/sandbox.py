@@ -38,6 +38,7 @@ def run(job, extension, script=None):
 
 if __name__ == '__main__':
     try: print(run(sys.argv[1], sys.argv[2]))
-    except Exception:
-        print(json.dumps({'parserVersion': 'local-3', 'status': 'FAILED', 'warnings': ['PARSER_UNAVAILABLE_OR_LIMIT'], 'chunks': []}))
+    except Exception as error:
+        code = str(error) if isinstance(error, RuntimeError) and str(error) in {'PARSER_USER_MANAGER_UNAVAILABLE', 'PARSER_RUNTIME_INCOMPLETE', 'PARSER_ROOT_FORBIDDEN', 'PARSER_EXIT', 'OUTPUT_LIMIT', 'SANDBOX_UNAVAILABLE'} else 'PARSER_UNAVAILABLE_OR_LIMIT'
+        print(json.dumps({'parserVersion': 'local-3', 'status': 'FAILED', 'warnings': [code], 'chunks': []}))
         sys.exit(0)

@@ -176,3 +176,10 @@ test('published metric identity is preserved and substituted or incomplete versi
   await assert.rejects(tool.execute({...args,...changed},new AbortController().signal),{code:'INVALID_TOOL_ARGUMENTS'});
  assert.equal(calls,2);
 });
+
+test('missing governed plans return a bounded actionable hint without fabricating a receipt',async()=>{
+ const {RuntimeError}=await import('../dist/runtime/ports.js');let calls=0;
+ const tool=datasetComparisonTool({authorize:async()=>{},invoke:async()=>{calls++;throw new RuntimeError('METRIC_DEFINITION_REQUIRED');}});
+ await assert.rejects(tool.execute(request,new AbortController().signal),e=>e.code==='METRIC_DEFINITION_REQUIRED'&&e.hint.includes('不要重复'));
+ assert.equal(calls,1);
+});
