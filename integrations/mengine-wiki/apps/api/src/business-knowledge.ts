@@ -50,6 +50,7 @@ export function createBusinessKnowledge(store: Store, model: Model) {
     if (!rows.length) return null;
     return {
       ...dataset,
+      rows,
       fingerprint: hash([
         "business-profile-v3-business-language",
         d.version,
@@ -122,6 +123,8 @@ export function createBusinessKnowledge(store: Store, model: Model) {
   const profile = (u: User, id: string) => {
     const c = context(u, id);
     if (!c) throw fail(409, "数据尚未治理完成或当前无权使用");
+    // One synchronous profile uses one immutable row read for all aggregates.
+    const records=c.rows.map(r=>JSON.parse(r.data));
     const facts: Fact[] = [];
     const add = (text: string) =>
       facts.push({
@@ -133,7 +136,7 @@ export function createBusinessKnowledge(store: Store, model: Model) {
       u,
       id,
       { operation: "count" },
-      true,
+      true,undefined,false,records,
     ).result;
     add(
       `本次统计记录数：${count.matchedRecords}。统计对象：${c.document.title}。只代表本次已纳入分析的业务记录。`,
@@ -165,7 +168,7 @@ export function createBusinessKnowledge(store: Store, model: Model) {
             u,
             id,
             { operation, field: f.name },
-            true,
+            true,undefined,false,records,
           ).result;
           const r = "groups" in result ? result.groups[0] : undefined;
           if (r && r.value !== null)
@@ -179,7 +182,7 @@ export function createBusinessKnowledge(store: Store, model: Model) {
           u,
           id,
           { operation: "count", groupBy: f.name, limit: 12 },
-          true,
+          true,undefined,false,records,
         ).result;
         if ("groups" in r && r.totalGroups <= 12 && r.totalGroups > 0) {
           add(`${label}共有 ${r.totalGroups} 个分类（含未填写值）。`);
