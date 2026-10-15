@@ -98,4 +98,26 @@ class MetricCatalogTest extends TaskDatasetFixture {
   generator.generate(owner,tenant,false);
   assertEquals(3,db.queryForObject("SELECT head_version FROM scene_metrics WHERE id=?",Integer.class,m.get("id")));
  }
+
+ @Test void catalogBeyondOneHundredIsSearchableAndPagedWithoutDuplicates(){
+  for(int i=0;i<105;i++){var d=definition();d.put("name",i==104?"唯一%目录末尾":"合成指标"+i);catalog.save(owner,tenant,false,new MetricCatalog.Change(null,0,"synthetic",d));}
+  var seen=new HashSet<String>();
+  for(int offset=0;offset<105;offset+=12){var page=json.valueToTree(catalog.list(owner,tenant,false,"",offset,12));assertEquals(105,page.path("total").asInt());for(var m:page.path("items"))assertTrue(seen.add(m.path("id").asText()));}
+  assertEquals(105,seen.size());var found=json.valueToTree(catalog.list(owner,tenant,false,"%",0,12));assertEquals(1,found.path("total").asInt());assertFalse(found.path("hasMore").asBoolean());
+  assertThrows(IdentityException.class,()->catalog.list(owner,tenant,false,"",-1,12));assertThrows(IdentityException.class,()->catalog.list(owner,tenant,false,"",0,101));assertThrows(IdentityException.class,()->catalog.list(owner,UUID.randomUUID(),false,"",0,12));
+ }
+ @Test void generationContinuesInBatchesAndKeepsCandidateKeysUnique(){
+  for(int i=0;i<54;i++){UUID id=UUID.randomUUID();String key="batch-"+i;db.update("INSERT INTO business_datasets(id,tenant_id,connection_id,workspace_id,dataset_key,name,column_names) SELECT ?,tenant_id,connection_id,workspace_id,?,'合成来源',column_names FROM business_datasets WHERE id=?",id,key,dataset);db.update("INSERT INTO scene_asset_links(tenant_id,source_id,kind,target_id,revision,metadata) SELECT tenant_id,?,'TABLE',?,'batch',metadata FROM scene_asset_links WHERE tenant_id=? AND source_id='synthetic'",key,id,tenant);}
+  var first=json.valueToTree(generator.generate(owner,tenant,false));assertEquals(50,first.path("created").asInt());assertTrue(first.path("batchLimited").asBoolean());
+  assertEquals(5,json.valueToTree(generator.generate(owner,tenant,false)).path("created").asInt());assertEquals(0,json.valueToTree(generator.generate(owner,tenant,false)).path("created").asInt());assertEquals(55,db.queryForObject("SELECT count(*) FROM metric_generation_keys WHERE tenant_id=?",Integer.class,tenant));
+ }
+ @Test void delegatedReviewRotatesAcrossLargeCatalogWithoutVersionChurn(){
+  for(int i=0;i<105;i++){var d=definition();d.put("aggregation","COUNT");d.put("valueField","");catalog.save(owner,tenant,false,new MetricCatalog.Change(null,0,"synthetic",d));}
+  db.update("UPDATE scene_metric_versions SET generation='{\"origin\":\"RULE_BASED\"}'::jsonb WHERE metric_id IN(SELECT id FROM scene_metrics WHERE tenant_id=?)",tenant);
+  db.update("INSERT INTO metric_generation_settings(tenant_id,auto_publish) VALUES(?,true)",tenant);
+  generator.generate(owner,tenant,false);assertEquals(50,db.queryForObject("SELECT count(*) FROM scene_metrics WHERE tenant_id=? AND published_version=2",Integer.class,tenant));
+  generator.generate(owner,tenant,false);assertEquals(100,db.queryForObject("SELECT count(*) FROM scene_metrics WHERE tenant_id=? AND published_version=2",Integer.class,tenant));
+  generator.generate(owner,tenant,false);assertEquals(106,db.queryForObject("SELECT count(*) FROM scene_metrics WHERE tenant_id=? AND published_version=2",Integer.class,tenant));
+  generator.generate(owner,tenant,false);assertEquals(2,db.queryForObject("SELECT max(head_version) FROM scene_metrics WHERE tenant_id=?",Integer.class,tenant));
+ }
 }

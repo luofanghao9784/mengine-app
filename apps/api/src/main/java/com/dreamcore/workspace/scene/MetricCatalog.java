@@ -37,11 +37,11 @@ public class MetricCatalog {
  }
  Object saveChecked(UUID actor,UUID tenant,Change request){
   if(request==null||request.sourceId()==null||request.sourceId().length()>160)throw IdentityException.invalid();
-  // Serialize tenant catalog writes, including first insertion and its bounded size.
+  // Serialize tenant catalog writes and version transitions.
   db.queryForList("SELECT tenant_id FROM scene_bindings WHERE tenant_id=? FOR UPDATE",tenant);
   var src=source(actor,tenant,request.sourceId());var definition=validate(request.definition(),JSON.readTree(src.get("metadata").toString()));
   UUID id=request.id()==null?UUID.randomUUID():request.id();int version=1;
-  if(request.id()==null){if(request.expectedVersion()!=0||db.queryForObject("SELECT count(*) FROM scene_metrics WHERE tenant_id=?",Integer.class,tenant)>=100)throw conflict();db.update("INSERT INTO scene_metrics(id,tenant_id,source_id,head_version,created_by) VALUES(?,?,?,1,?)",id,tenant,request.sourceId(),actor);}
+  if(request.id()==null){if(request.expectedVersion()!=0)throw conflict();db.update("INSERT INTO scene_metrics(id,tenant_id,source_id,head_version,created_by) VALUES(?,?,?,1,?)",id,tenant,request.sourceId(),actor);}
   else {var old=db.queryForList("SELECT * FROM scene_metrics WHERE id=? AND tenant_id=? FOR UPDATE",id,tenant);if(old.isEmpty()||!old.getFirst().get("head_version").equals(request.expectedVersion())||!old.getFirst().get("source_id").equals(request.sourceId()))throw conflict();version=request.expectedVersion()+1;db.update("UPDATE scene_metrics SET head_version=?,updated_at=now() WHERE id=?",version,id);}
   db.update("INSERT INTO scene_metric_versions(metric_id,version,definition,source_scope,source_dataset,created_by) VALUES(?,?,?::jsonb,?::jsonb,?,?)",id,version,definition.toString(),src.get("scope"),src.get("target_id"),actor);
   event(actor,tenant,id,version,"DRAFT");return Map.of("id",id,"version",version);
@@ -59,11 +59,16 @@ public class MetricCatalog {
   event(actor,tenant,id,request.expectedVersion(),publish?"PUBLISH":"WITHDRAW");return Map.of("id",id,"published",publish);
  }
  private void event(UUID actor,UUID tenant,UUID id,int version,String action){db.update("INSERT INTO scene_metric_events(tenant_id,metric_id,version,action,actor_id) VALUES(?,?,?,?,?)",tenant,id,version,action,actor);}
- public Object list(UUID actor,UUID tenant,boolean platform){
+ public Object list(UUID actor,UUID tenant,boolean platform){return list(actor,tenant,platform,"",0,12);}
+ public Object list(UUID actor,UUID tenant,boolean platform,String query,int offset,int limit){
   admin(actor,tenant,platform);
-  var rows=db.queryForList("SELECT m.id,m.source_id,m.head_version,m.published_version,m.updated_at,v.definition,v.generation,v.source_dataset,coalesce(l.active AND scene_table_scope(l.metadata)=v.source_scope AND b.governance_valid_until>now(),false) current,coalesce(l.active AND scene_table_scope(l.metadata)=pv.source_scope AND b.governance_valid_until>now(),false) published_current FROM scene_metrics m JOIN scene_metric_versions v ON v.metric_id=m.id AND v.version=m.head_version LEFT JOIN scene_metric_versions pv ON pv.metric_id=m.id AND pv.version=m.published_version LEFT JOIN scene_asset_links l ON l.tenant_id=m.tenant_id AND l.source_id=m.source_id AND l.kind='TABLE' LEFT JOIN scene_bindings b ON b.tenant_id=m.tenant_id WHERE m.tenant_id=? ORDER BY m.updated_at DESC LIMIT 100",tenant);
+  if(query==null||query.length()>200||offset<0||limit<1||limit>100)throw IdentityException.invalid();
+  String term=query.strip();
+  String filter="m.tenant_id=? AND (?='' OR strpos(lower(v.definition->>'name'),lower(?))>0 OR strpos(lower(v.definition->>'meaning'),lower(?))>0)";
+  long total=db.queryForObject("SELECT count(*) FROM scene_metrics m JOIN scene_metric_versions v ON v.metric_id=m.id AND v.version=m.head_version WHERE "+filter,Long.class,tenant,term,term,term);
+  var rows=db.queryForList("SELECT m.id,m.source_id,m.head_version,m.published_version,m.updated_at,v.definition,v.generation,v.source_dataset,coalesce(l.active AND scene_table_scope(l.metadata)=v.source_scope AND b.governance_valid_until>now(),false) current,coalesce(l.active AND scene_table_scope(l.metadata)=pv.source_scope AND b.governance_valid_until>now(),false) published_current FROM scene_metrics m JOIN scene_metric_versions v ON v.metric_id=m.id AND v.version=m.head_version LEFT JOIN scene_metric_versions pv ON pv.metric_id=m.id AND pv.version=m.published_version LEFT JOIN scene_asset_links l ON l.tenant_id=m.tenant_id AND l.source_id=m.source_id AND l.kind='TABLE' LEFT JOIN scene_bindings b ON b.tenant_id=m.tenant_id WHERE "+filter+" ORDER BY m.updated_at DESC,m.id LIMIT ? OFFSET ?",tenant,term,term,term,limit,offset);
   for(var row:rows){row.put("definition",JSON.readTree(row.get("definition").toString()));row.put("generation",JSON.readTree(row.get("generation").toString()));row.put("calculations",db.queryForMap("SELECT count(*) count,max(created_at) last_calculated_at FROM metric_calculation_receipts WHERE metric_id=?",row.get("id")));row.put("history",db.queryForList("SELECT version,action,created_at FROM scene_metric_events WHERE metric_id=? ORDER BY id DESC LIMIT 10",row.get("id")));}
-  return Map.of("items",rows,"referenceOnly",true);
+  return Map.of("items",rows,"referenceOnly",true,"total",total,"offset",offset,"limit",limit,"hasMore",(long)offset+rows.size()<total);
  }
  /** Invoked after dataset authorization and snapshot pinning, in the task transaction. */
  public static Object context(JdbcTemplate db,UUID task,UUID dataset,String query){

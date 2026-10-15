@@ -15,7 +15,7 @@ public class MetricController {
  @GetMapping("/generation") public Object generation(Authentication a,@PathVariable UUID tenant,HttpServletRequest r){return generator.status(actor(a),tenant,platform(r));}
  @PostMapping("/generation") public Object generate(Authentication a,@PathVariable UUID tenant,HttpServletRequest r){return generator.generate(actor(a),tenant,platform(r));}
  @PostMapping("/automatic") public Object automatic(Authentication a,@PathVariable UUID tenant,@RequestBody Automatic body,HttpServletRequest r){return generator.setting(actor(a),tenant,platform(r),body.enabled());}
- @GetMapping public Object list(Authentication a,@PathVariable UUID tenant,HttpServletRequest r){return catalog.list(actor(a),tenant,platform(r));}
+ @GetMapping public Object list(Authentication a,@PathVariable UUID tenant,HttpServletRequest r,@RequestParam(defaultValue="") String query,@RequestParam(defaultValue="0") int offset,@RequestParam(defaultValue="12") int limit){return catalog.list(actor(a),tenant,platform(r),query,offset,limit);}
  @PostMapping public Object save(Authentication a,@PathVariable UUID tenant,@RequestBody MetricCatalog.Change body,HttpServletRequest r){return catalog.save(actor(a),tenant,platform(r),body);}
  @PostMapping("/{id}/publish") public Object publish(Authentication a,@PathVariable UUID tenant,@PathVariable UUID id,@RequestBody MetricCatalog.Transition body,HttpServletRequest r){return catalog.transition(actor(a),tenant,platform(r),id,body,true);}
  @PostMapping("/{id}/withdraw") public Object withdraw(Authentication a,@PathVariable UUID tenant,@PathVariable UUID id,@RequestBody MetricCatalog.Transition body,HttpServletRequest r){return catalog.transition(actor(a),tenant,platform(r),id,body,false);}

@@ -9,6 +9,7 @@ import tools.jackson.databind.json.JsonMapper;
 /** Governed proposals and explicitly delegated definitions; no paid model calls. */
 @Service
 public class MetricDraftGenerator {
+ private static final int BATCH_SIZE=50;
  private final JdbcTemplate db;private final MetricCatalog catalog;private final org.springframework.transaction.support.TransactionTemplate tx;private final JsonMapper json=new JsonMapper();
  public MetricDraftGenerator(JdbcTemplate db,MetricCatalog catalog,org.springframework.transaction.support.TransactionTemplate tx){this.db=db;this.catalog=catalog;this.tx=tx;}
  private String clip(String s,int n){return s.substring(0,Math.min(s.length(),n)).replaceAll("[\\p{Cntrl}]"," ");}
@@ -33,9 +34,9 @@ public class MetricDraftGenerator {
   db.update("INSERT INTO metric_generation_settings(tenant_id) VALUES(?) ON CONFLICT DO NOTHING",tenant);
   if(!Boolean.TRUE.equals(db.queryForObject("SELECT enabled FROM metric_generation_settings WHERE tenant_id=?",Boolean.class,tenant)))return Map.of("created",0,"paused",true);
   var sources=db.queryForList("SELECT l.source_id,l.metadata FROM scene_asset_links l JOIN business_datasets d ON d.id=l.target_id WHERE l.tenant_id=? AND l.active AND l.kind='TABLE' AND d.status='ACTIVE' AND NOT d.scrubbed AND file_dataset_readable(?,l.target_id) AND (library_mask(?,l.tenant_id,'WORKSPACE',d.workspace_id)&1)=1 ORDER BY l.source_id",tenant,actor,actor);
-  int created=0,skipped=0;int count=db.queryForObject("SELECT count(*) FROM scene_metrics WHERE tenant_id=?",Integer.class,tenant);
+  int created=0;boolean batchLimited=false;
   // Give each source one record-count candidate first; then consider documented additive units.
-  for(int pass=0;pass<2;pass++)for(var row:sources){
+  generation: for(int pass=0;pass<2;pass++)for(var row:sources){
    String source=row.get("source_id").toString();var meta=json.readTree(row.get("metadata").toString());var candidates=new LinkedHashMap<String,JsonNode>();
    if(pass==0)candidates.put("",json.createObjectNode());
    else for(var f:meta.path("dictionary").path("fields")){
@@ -46,21 +47,22 @@ public class MetricDraftGenerator {
    for(var c:candidates.entrySet()){
     String key=c.getKey().isEmpty()?"COUNT_ROWS":"SUM:"+c.getKey();
     if(db.queryForObject("SELECT count(*) FROM metric_generation_keys WHERE tenant_id=? AND source_id=? AND candidate_key=?",Integer.class,tenant,source,key)>0)continue;
-    if(count>=100){skipped++;continue;}
+    if(created>=BATCH_SIZE){batchLimited=true;break generation;}
     var result=json.valueToTree(catalog.saveChecked(actor,tenant,new MetricCatalog.Change(null,0,source,definition(meta,c.getKey(),c.getValue()))));UUID id=UUID.fromString(result.path("id").asText());
     db.update("INSERT INTO metric_generation_keys(tenant_id,source_id,candidate_key,metric_id) VALUES(?,?,?,?)",tenant,source,key,id);
     db.update("UPDATE scene_metric_versions SET generation=?::jsonb WHERE metric_id=? AND version=1",json.writeValueAsString(Map.of("origin","RULE_BASED","ruleVersion","1.0","sourceId",source,"candidateKey",key,"reviewRequired",true,"warnings",List.of("统计粒度、可加性及业务范围尚待确认","未读取业务明细或调用付费模型"))),id);
-    created++;count++;
+    created++;
    }
   }
   int published=automaticDefinitions(actor,tenant);
-  db.update("UPDATE metric_generation_settings SET checked_at=now(),created_count=?,error_code=? WHERE tenant_id=?",created,skipped>0?"CATALOG_LIMIT":null,tenant);
-  return Map.of("created",created,"skipped",skipped,"paused",false,"origin","RULE_BASED","published",published);
+  db.update("UPDATE metric_generation_settings SET checked_at=now(),created_count=?,error_code=? WHERE tenant_id=?",created,null,tenant);
+  return Map.of("created",created,"batchLimited",batchLimited,"paused",false,"origin","RULE_BASED","published",published);
  }
  private int automaticDefinitions(UUID actor,UUID tenant){
   if(!Boolean.TRUE.equals(db.queryForObject("SELECT auto_publish FROM metric_generation_settings WHERE tenant_id=?",Boolean.class,tenant)))return 0;
   int published=0;
-  var metrics=db.queryForList("SELECT m.id,m.head_version,m.published_version,m.source_id,v.definition,v.generation,v.source_scope::text scope FROM scene_metrics m JOIN scene_metric_versions v ON v.metric_id=m.id AND v.version=m.head_version JOIN scene_asset_links l ON l.tenant_id=m.tenant_id AND l.source_id=m.source_id AND l.kind='TABLE' AND l.active JOIN business_datasets d ON d.id=l.target_id JOIN dataset_snapshots s ON s.id=d.current_snapshot AND NOT s.scrubbed WHERE m.tenant_id=? AND d.status='ACTIVE' AND NOT d.scrubbed AND file_dataset_readable(?,l.target_id) AND (library_mask(?,l.tenant_id,'WORKSPACE',d.workspace_id)&1)=1 AND v.generation->>'origin' IN('RULE_BASED','AUTO_DEFINED') ORDER BY m.id",tenant,actor,actor);
+  UUID cursor=db.queryForObject("SELECT definition_cursor FROM metric_generation_settings WHERE tenant_id=?",UUID.class,tenant);
+  var metrics=db.queryForList("SELECT m.id,m.head_version,m.published_version,m.source_id,v.definition,v.generation,v.source_scope::text scope FROM scene_metrics m JOIN scene_metric_versions v ON v.metric_id=m.id AND v.version=m.head_version JOIN scene_asset_links l ON l.tenant_id=m.tenant_id AND l.source_id=m.source_id AND l.kind='TABLE' AND l.active JOIN business_datasets d ON d.id=l.target_id JOIN dataset_snapshots s ON s.id=d.current_snapshot AND NOT s.scrubbed WHERE m.tenant_id=? AND d.status='ACTIVE' AND NOT d.scrubbed AND file_dataset_readable(?,l.target_id) AND (library_mask(?,l.tenant_id,'WORKSPACE',d.workspace_id)&1)=1 AND v.generation->>'origin' IN('RULE_BASED','AUTO_DEFINED') ORDER BY (m.id>coalesce(?::uuid,'00000000-0000-0000-0000-000000000000'::uuid)) DESC,m.id LIMIT ?",tenant,actor,actor,cursor,BATCH_SIZE);
   for(var metric:metrics){
    var src=catalog.source(actor,tenant,metric.get("source_id").toString());
    var dataset=db.queryForMap("SELECT d.column_names,s.id,s.data_rows FROM business_datasets d JOIN dataset_snapshots s ON s.id=d.current_snapshot WHERE d.id=? AND NOT s.scrubbed",src.get("target_id"));
@@ -74,6 +76,7 @@ public class MetricDraftGenerator {
    if(decision.reason()==null){catalog.transitionChecked(actor,tenant,id,new MetricCatalog.Transition(head+1),true);published++;}
    else if(metric.get("published_version")!=null)catalog.transitionChecked(actor,tenant,id,new MetricCatalog.Transition(head+1),false);
   }
+  if(!metrics.isEmpty())db.update("UPDATE metric_generation_settings SET definition_cursor=? WHERE tenant_id=?",metrics.getLast().get("id"),tenant);
   return published;
  }
  public Object status(UUID actor,UUID tenant,boolean platform){catalog.admin(actor,tenant,platform);var rows=db.queryForList("SELECT enabled,auto_publish,checked_at,created_count,error_code FROM metric_generation_settings WHERE tenant_id=?",tenant);return rows.isEmpty()?Map.of("enabled",true,"created_count",0):rows.getFirst();}
