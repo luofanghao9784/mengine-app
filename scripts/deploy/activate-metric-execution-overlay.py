@@ -58,7 +58,7 @@ def prepare():
  for n in ['tenant-admin/governance/index.html']:
   shutil.copy2(WEB/n,E/(n.replace('/','-')+'.before'))
  migration='BOOT-INF/classes/db/cloud-migration/V143__metric_generation_execution.sql'
- entries={str(p.relative_to(S)):p.read_bytes() for p in (S/'BOOT-INF').rglob('*') if p.is_file()}
+ entries={name:(S/name).read_bytes() for name in manifest['files'] if name.startswith('BOOT-INF/')}
  for output,overlay in [('api-candidate.jar',entries),('api-rollback.jar',{migration:entries[migration]})]:
   with zipfile.ZipFile(E/'api-before.jar') as old,zipfile.ZipFile(E/output,'w') as new:
    for info in old.infolist():new.writestr(info,overlay.get(info.filename,old.read(info.filename)))
@@ -67,6 +67,7 @@ def prepare():
   with zipfile.ZipFile(E/output) as z:assert z.testzip() is None
  # Assets with the same fingerprint must have the same bytes.
  for p in (S/'web/assets').iterdir():
+  if 'web/assets/'+p.name not in manifest['files']:continue
   target=WEB/'assets'/p.name
   if target.exists():assert sha(p)==sha(target),p.name
  print('PREPARED',sha(E/'api-candidate.jar'))
@@ -75,8 +76,8 @@ def activate():
  manifest=json.loads((S/'manifest.json').read_text())
  for name,value in manifest['files'].items():assert sha(S/name)==value,name
  with zipfile.ZipFile(E/'api-candidate.jar') as candidate:
-  for p in (S/'BOOT-INF').rglob('*'):
-   if p.is_file():assert candidate.read(str(p.relative_to(S)))==p.read_bytes(),str(p)
+  for name in manifest['files']:
+   if name.startswith('BOOT-INF/'):assert candidate.read(name)==(S/name).read_bytes(),name
  assert sha(A/'release/api.jar')==sha(E/'api-before.jar')
  maintenance()
  pending=active()
@@ -105,7 +106,8 @@ def activate():
  atomic(E/'api-candidate.jar',A/'release/api.jar')
  atomic(S/'engine/dataset-comparison.js',ENGINE)
 
- for p in (S/'web/assets').iterdir():atomic(p,WEB/'assets'/p.name)
+ for name in manifest['files']:
+  if name.startswith('web/assets/'):atomic(S/name,WEB/name[4:])
  atomic(S/'web/tenant-admin/governance/index.html',WEB/'tenant-admin/governance/index.html')
  run('systemctl','start','dreamcore-wiki.service');health(WIKI_HEALTH)
  run('systemctl','start','dreamcore-model-engine.service');health('http://127.0.0.1:18482/healthz')

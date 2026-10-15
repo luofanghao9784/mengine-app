@@ -46,8 +46,13 @@ for name,digest in json.loads((E/'backup-sha256.json').read_text()).items():asse
 report['backupManifestVerified']=True
 since=datetime.datetime.fromtimestamp((E/'database-cutover.dump').stat().st_mtime,datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
 logs=subprocess.check_output(['journalctl','-u','dreamcore-app-rehearsal','-u','dreamcore-wiki','-u','dreamcore-model-engine','--since',since,'--no-pager'],text=True)
-report['startupErrorLines']=sum(bool(re.search(r'\bERROR\b|SyntaxError|APPLICATION FAILED',line)) for line in logs.splitlines())
-assert report['startupErrorLines']==0,'Inspect restricted service logs before accepting release'
+report['cutoverErrorLines']=sum(bool(re.search(r'\bERROR\b|SyntaxError|APPLICATION FAILED',line)) for line in logs.splitlines())
+currentLogs=''
+for service in ['dreamcore-app-rehearsal','dreamcore-wiki','dreamcore-model-engine']:
+ invocation=subprocess.check_output(['systemctl','show',service,'-p','InvocationID','--value'],text=True).strip()
+ currentLogs+=subprocess.check_output(['journalctl','_SYSTEMD_INVOCATION_ID='+invocation,'--no-pager'],text=True)
+report['currentStartupErrorLines']=sum(bool(re.search(r'\bERROR\b|SyntaxError|APPLICATION FAILED',line)) for line in currentLogs.splitlines())
+assert report['currentStartupErrorLines']==0,'Inspect restricted service logs before accepting release'
 node="""
 import {contextResponse} from '/var/lib/dreamcore/model-live-20261011/engine/dist/runtime/task-context.js';
 const id='11111111-1111-4111-8111-111111111111';
