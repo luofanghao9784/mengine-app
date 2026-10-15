@@ -38,7 +38,7 @@ export const isContent = (v: unknown): v is RecommendationContent =>
     ? uuid(v.conversationId) &&
       v.materialId === null &&
       Number(v.attempt) > 0 &&
-      ['verification', 'live'].includes(String(v.executionClass)) &&
+      ['verification', 'live', 'external'].includes(String(v.executionClass)) &&
       v.versionKey === `task:${v.id}:${v.taskRevision}:${v.attempt}`
     : v.kind === 'PUBLICATION' &&
       v.conversationId === null &&

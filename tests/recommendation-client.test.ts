@@ -171,3 +171,10 @@ test('opening receipt never changes evidence into business success or another ve
     await assert.rejects(client.opened(tenant, target));
   }
 });
+
+test('recommendation feed accepts externally authored tasks without accepting unknown origins', async () => {
+  const external = { ...item, content: { ...item.content, executionClass: 'external' } };
+  const result = { ...page, items: [external] };
+  assert.deepEqual(await createRecommendationClient(async () => response(result)).list(tenant, space), result);
+  await assert.rejects(createRecommendationClient(async () => response({ ...page, items: [{ ...external, content: { ...external.content, executionClass: 'untrusted' } }] })).list(tenant, space));
+});
