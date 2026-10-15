@@ -72,7 +72,11 @@ public class SceneService {
     for(var f:a.path("fields")){
      columns.add(f.path("name").asText());fields.add(SceneGovernance.field(a,f));
     }
-    var meta=metadata(a);UUID target=id(tenant+":"+a.path("id").asText()+":"+IdentityService.hash(meta.toString()));
+    var meta=metadata(a);
+    String scope=db.queryForObject("SELECT scene_table_scope(?::jsonb)::text",String.class,meta.toString());
+    var prior=db.queryForList("SELECT d.id,d.field_definitions FROM scene_asset_links l JOIN business_datasets d ON d.id=l.target_id WHERE l.tenant_id=? AND l.source_id=? AND l.kind='TABLE' AND l.active AND d.status='ACTIVE' AND NOT d.scrubbed AND d.connection_id=? AND d.workspace_id=? AND scene_table_scope(l.metadata)=?::jsonb",tenant,a.path("id").asText(),connection,workspace,scope);
+    UUID target=prior.isEmpty()?id(tenant+":"+a.path("id").asText()+":"+IdentityService.hash(scope)):(UUID)prior.getFirst().get("id");
+    if(!prior.isEmpty()){fields.clear();fields.addAll(DatasetField.read(prior.getFirst().get("field_definitions")));}
     sets.add(new CollectionDeployment.Dataset(target,workspace,trim(a.path("id").asText(),160),trim(a.path("title").asText(),160),trim("标签："+a.path("tags")+"；"+a.path("dictionary").path("tableMeaning").asText(""),1000),columns,fields));
    }
    boolean tablesChanged=!new HashSet<>(db.queryForList("SELECT target_id FROM scene_asset_links WHERE tenant_id=? AND kind='TABLE' AND active",UUID.class,tenant)).equals(new HashSet<>(sets.stream().map(CollectionDeployment.Dataset::id).toList()));

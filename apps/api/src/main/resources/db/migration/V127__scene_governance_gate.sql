@@ -1,3 +1,11 @@
+-- Preserve the cloud's dataset identity continuity across row-only refreshes.
+CREATE OR REPLACE FUNCTION scene_table_scope(meta jsonb) RETURNS jsonb LANGUAGE sql IMMUTABLE AS $$
+ SELECT (meta - 'version' - 'updatedAt' - 'sourceBasis' - 'governance') ||
+  CASE WHEN meta ? 'sourceBasis' THEN jsonb_build_object('sourceBasis',
+   (SELECT coalesce(jsonb_agg(item - 'version' - 'sha256' - 'collectedAt' ORDER BY item->>'id'),'[]'::jsonb)
+    FROM jsonb_array_elements(meta->'sourceBasis') item)) ELSE '{}'::jsonb END ||
+  CASE WHEN meta ? 'governance' THEN jsonb_build_object('governance',(meta->'governance') - 'sourceVersion' - 'policyDigest' - 'sourcePolicyDigests') ELSE '{}'::jsonb END
+$$;
 -- Source policy is an additional restriction; target workspace/library permissions still apply.
 ALTER TABLE scene_bindings ADD COLUMN governance_valid_until timestamptz;
 CREATE FUNCTION scene_asset_readable(actor uuid,target uuid) RETURNS boolean LANGUAGE sql STABLE AS $$

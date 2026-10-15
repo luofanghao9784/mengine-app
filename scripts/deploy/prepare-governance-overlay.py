@@ -20,14 +20,14 @@ shutil.copy2(root/'integrations/mengine-wiki/dist/api/platform-governance.js',st
 for name in ['SceneService','SceneGovernance']:
  p=pathlib.Path('BOOT-INF/classes/com/dreamcore/workspace/scene')/(name+'.class');(stage/p).parent.mkdir(parents=True,exist_ok=True)
  shutil.copy2(root/'apps/api/target/classes/com/dreamcore/workspace/scene'/p.name,stage/p)
-p=stage/'BOOT-INF/classes/db/cloud-migration/V140__scene_governance_gate.sql';p.parent.mkdir(parents=True,exist_ok=True)
+p=stage/'BOOT-INF/classes/db/cloud-migration/V141__scene_governance_gate.sql';p.parent.mkdir(parents=True,exist_ok=True)
 shutil.copy2(root/'apps/api/src/main/resources/db/migration/V127__scene_governance_gate.sql',p)
 # Publish only the new entry and its complete fingerprinted dependency set.
 web=stage/'web';entry='tenant-admin/governance/index.html';(web/entry).parent.mkdir(parents=True,exist_ok=True)
 shutil.copy2(root/'dist'/entry,web/entry)
 # Keeping old hashed assets is intentional. No existing application entry is replaced by a main build.
 shutil.copytree(root/'dist/assets',web/'assets',dirs_exist_ok=True)
-manifest={'sourceCommit':subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip(),'baseApiSha256':'c3e7f1a8d49d744b052e92a457cc598ee9f6afe07b537bf2759737a81f99e193','baseWikiSha256':expected,'files':{}}
+manifest={'sourceCommit':subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip(),'baseApiSha256':'c7361bd8a680d0b32bad40069c581c350fcac35edc55c1e555fe5f0e31b2b495','baseWikiSha256':expected,'files':{}}
 for p in sorted(stage.rglob('*')):
  if p.is_file() and p.name!='manifest.json':manifest['files'][str(p.relative_to(stage))]=hashlib.sha256(p.read_bytes()).hexdigest()
 (stage/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')

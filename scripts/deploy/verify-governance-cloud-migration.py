@@ -9,4 +9,4 @@ files=sorted(pathlib.Path(sys.argv[1]).glob('V*.sql'),key=lambda p:int(p.name.sp
 for file in files+[pathlib.Path('apps/api/src/main/resources/db/migration/V127__scene_governance_gate.sql')]:
  subprocess.run(args+['-c',file.read_text()],env=env,check=True,stdout=subprocess.DEVNULL)
 subprocess.run(args+['-c',"SELECT scene_asset_readable(gen_random_uuid(),gen_random_uuid()); SELECT library_mask(gen_random_uuid(),gen_random_uuid(),'MATERIAL',gen_random_uuid());"],env=env,check=True)
-print('Cloud migration history through V139 plus governance migration applied successfully.')
+print('Cloud migration history through '+files[-1].name+' plus governance migration applied successfully.')

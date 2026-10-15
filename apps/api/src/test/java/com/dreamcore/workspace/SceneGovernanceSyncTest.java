@@ -34,6 +34,11 @@ class SceneGovernanceSyncTest extends CompanyAnalysisFixture {
   assertEquals(first,db.queryForObject("SELECT target_id FROM scene_asset_links WHERE tenant_id=? AND kind='TABLE'",UUID.class,tenant));
   assertEquals(2,db.queryForObject("SELECT count(*) FROM scene_asset_revisions WHERE tenant_id=?",Integer.class,tenant));
   assertTrue(db.queryForObject("SELECT scene_asset_readable(?,?)",Boolean.class,reader,first));
+  ((tools.jackson.databind.node.ObjectNode)export).put("revision","rows-refreshed");
+  ((tools.jackson.databind.node.ObjectNode)export.path("assets").get(0)).put("version",2);
+  ((tools.jackson.databind.node.ObjectNode)export.path("assets").get(0).path("governance")).put("sourceVersion",2).put("policyDigest","new-row-version");
+  scene.synchronize(admin,tenant,false);
+  assertEquals(first,db.queryForObject("SELECT target_id FROM scene_asset_links WHERE tenant_id=? AND kind='TABLE'",UUID.class,tenant));
   ((tools.jackson.databind.node.ObjectNode)export).put("revision","r2");
   ((tools.jackson.databind.node.ObjectNode)export.path("assets").get(0).path("governance")).set("allowedActors",json.valueToTree(java.util.List.of(admin.toString())));
   ((tools.jackson.databind.node.ObjectNode)export.path("assets").get(1).path("governance")).put("policyVersion",2);

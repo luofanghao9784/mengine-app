@@ -43,16 +43,16 @@ def prepare():
  for name,value in manifest['files'].items():assert sha(S/name)==value,name
  assert sha(A/'release/api.jar')==manifest['baseApiSha256'],'Running API changed'
  for n,value in manifest['baseWikiSha256'].items():assert sha(W/n.replace('-live',''))==value,n
- assert query("SELECT max(version::int) FROM flyway_schema_history WHERE success AND version IS NOT NULL")=='139'
+ assert query("SELECT max(version::int) FROM flyway_schema_history WHERE success AND version IS NOT NULL")=='140'
  assert query('SELECT count(*) FROM flyway_schema_history WHERE NOT success')=='0'
  for n in ['platform-bridge.js','scene-knowledge.js','platform-governance.js']:run(NODE,'--check',str(S/'wiki'/n))
  shutil.copy2(A/'release/api.jar',E/'api-before.jar');shutil.copy2(N,E/'nginx-before.conf')
  for n in ['platform-bridge.js','scene-knowledge.js']:shutil.copy2(W/n,E/(n+'.before'))
  for n in ['tenant-admin/index.html','platform-admin/index.html']:
   shutil.copy2(WEB/n,E/(n.replace('/','-')+'.before'))
- for name,signature in [('library_mask','uuid,uuid,text,uuid'),('library_file_mask','uuid,uuid,uuid,uuid[],text,uuid,uuid,boolean'),('file_dataset_readable','uuid,uuid')]:
+ for name,signature in [('scene_table_scope','jsonb'),('library_mask','uuid,uuid,text,uuid'),('library_file_mask','uuid,uuid,uuid,uuid[],text,uuid,uuid,boolean'),('file_dataset_readable','uuid,uuid')]:
   with (E/'functions-before.sql').open('a') as f:f.write(query(f"SELECT pg_get_functiondef('{name}({signature})'::regprocedure)")+';\n')
- migration='BOOT-INF/classes/db/cloud-migration/V140__scene_governance_gate.sql'
+ migration='BOOT-INF/classes/db/cloud-migration/V141__scene_governance_gate.sql'
  entries={str(p.relative_to(S)):p.read_bytes() for p in (S/'BOOT-INF').rglob('*') if p.is_file()}
  for output,overlay in [('api-candidate.jar',entries),('api-rollback.jar',{migration:entries[migration]})]:
   with zipfile.ZipFile(E/'api-before.jar') as old,zipfile.ZipFile(E/output,'w') as new:
@@ -74,6 +74,7 @@ def activate():
  run('systemctl','stop','dreamcore-app-rehearsal.service')
  run('systemctl','stop','dreamcore-wiki.service')
  pending=active();(E/'drain-after.json').write_text(json.dumps(pending));assert not pending,'Investigate tasks before switching'
+ assert sha(A/'release/api.jar')==sha(E/'api-before.jar'),'Concurrent API release detected'
  with (E/'database-cutover.dump').open('wb') as f:
   run('docker','exec','dreamcore-app-check-20261010','pg_dump','-U','dreamcore_migration_check','-d','dreamcore_trial','-Fc',stdout=f)
  with (E/'database-cutover.dump').open('rb') as f:run('docker','exec','-i','dreamcore-app-check-20261010','pg_restore','--list',stdin=f,stdout=subprocess.DEVNULL)
@@ -94,15 +95,15 @@ def activate():
   tmp=E/(surface+'-linked.html');tmp.write_text(body.replace('</body>',link+'</body>'));atomic(tmp,dest)
  run('systemctl','start','dreamcore-wiki.service');health('http://127.0.0.1:4400/api/health')
  run('systemctl','start','dreamcore-app-rehearsal.service');health('http://127.0.0.1:18481/actuator/health')
- assert query("SELECT max(version::int) FROM flyway_schema_history WHERE success AND version IS NOT NULL")=='140'
+ assert query("SELECT max(version::int) FROM flyway_schema_history WHERE success AND version IS NOT NULL")=='141'
  assert query('SELECT count(*) FROM flyway_schema_history WHERE NOT success')=='0'
  open_entry();print('ACTIVATED; verify first synchronization, authorization, HTTPS and peer services')
 def rollback():
  maintenance();assert not active(),'Wait for active work before rollback'
  run('systemctl','stop','dreamcore-app-rehearsal.service');run('systemctl','stop','dreamcore-wiki.service');assert not active()
  with (E/'database-before-rollback.dump').open('wb') as f:run('docker','exec','dreamcore-app-check-20261010','pg_dump','-U','dreamcore_migration_check','-d','dreamcore_trial','-Fc',stdout=f)
- # Forward-compatible rollback: keep V140 and all new writes. Restore only permission functions and code.
- applied=query("SELECT count(*) FROM flyway_schema_history WHERE version='140' AND success")=='1'
+ # Forward-compatible rollback: keep V141 and all new writes. Restore only permission functions and code.
+ applied=query("SELECT count(*) FROM flyway_schema_history WHERE version='141' AND success")=='1'
  if applied:query((E/'functions-before.sql').read_text())
  atomic(E/('api-rollback.jar' if applied else 'api-before.jar'),A/'release/api.jar')
  for name in ['platform-bridge.js','scene-knowledge.js']:atomic(E/(name+'.before'),W/name)
