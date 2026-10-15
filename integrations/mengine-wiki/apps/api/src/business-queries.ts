@@ -10,7 +10,7 @@ export type QueryTemplate={id:string;name:string;question:string;operation:'reco
 export type Semantics={relations?:Relation[];templates?:QueryTemplate[]};
 const text=(v:unknown,max=300)=>typeof v==='string'&&v.trim().length>0&&v.length<=max;
 export function validateSemanticsShape(b:Semantics){
- for(const [key,max] of [['relations',8],['templates',12]] as const)if(b[key]!==undefined&&(!Array.isArray(b[key])||b[key]!.length>max))throw fail(400,'关联或查询模板数量无效');
+ for(const [key,max] of [['relations',16],['templates',12]] as const)if(b[key]!==undefined&&(!Array.isArray(b[key])||b[key]!.length>max))throw fail(400,'关联或查询模板数量无效');
  const ids=(a:{id:string}[])=>a.every(x=>x&&typeof x==='object'&&typeof x.id==='string'&&/^[a-z][a-z0-9_]{0,39}$/.test(x.id))&&new Set(a.map(x=>x.id)).size===a.length;
  if(!ids(b.relations||[])||!ids(b.templates||[]))throw fail(400,'关联和模板标识必须唯一，使用小写字母、数字及下划线');
  for(const r of b.relations||[])if(Object.keys(r).some(k=>!['id','name','targetId','keys','evidence','targetFingerprint'].includes(k))||!text(r.name,100)||!text(r.targetId,100)||!text(r.evidence,1000)||!Array.isArray(r.keys)||!r.keys.length||r.keys.length>3||r.keys.some(k=>!k||Object.keys(k).some(x=>!['local','foreign'].includes(x))||!text(k.local,40)||!text(k.foreign,40)))throw fail(400,'关联定义无效，请填写关联键和业务依据');

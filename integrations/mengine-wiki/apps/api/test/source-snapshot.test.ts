@@ -47,3 +47,10 @@ test('restricted sources and derived knowledge never enter the shared central ex
   assert.ok(!(await get('/scene-export')).assets.some((a:any)=>a.id===id));assert.ok(!(await get('/scene-knowledge')).items.some((a:any)=>a.id.includes(id)));assert.ok((await get('/scene-knowledge','deployment:codex')).items.some((a:any)=>a.id.includes(id)));
  }finally{await c.app.close();if(old===undefined)delete process.env.MENGINE_PLATFORM_BRIDGE_KEY;else process.env.MENGINE_PLATFORM_BRIDGE_KEY=old;await rm(root,{recursive:true,force:true});}
 });
+
+test('deployment accepts complete high-degree table relationships while retaining a bound',async()=>{
+ const {validateSemanticsShape}=await import('../src/business-queries.js');
+ const relation=(i:number)=>({id:'fk_'+i,name:'合成关系',targetId:'target',keys:[{local:'id',foreign:'id'}],evidence:'合成数据库外键'});
+ assert.doesNotThrow(()=>validateSemanticsShape({relations:Array.from({length:11},(_,i)=>relation(i)),templates:[]}));
+ assert.throws(()=>validateSemanticsShape({relations:Array.from({length:17},(_,i)=>relation(i)),templates:[]}));
+});
