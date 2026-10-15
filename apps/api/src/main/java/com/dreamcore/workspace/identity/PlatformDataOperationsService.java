@@ -25,14 +25,16 @@ public class PlatformDataOperationsService {
   """;
  private String source(String kind){
   String base=kind.equals("CONNECTIONS")?"""
-   SELECT c.tenant_id,md5('connection:'||c.id::text) monitor_key,r.id run_id,coalesce(r.status,'NOT_STARTED') stage,c.status configuration,NULL::text format,NULL::bigint size_bytes,NULL::integer version,
-    (SELECT count(*) FROM business_datasets d WHERE d.connection_id=c.id AND d.status='ACTIVE') dataset_count,
-    (SELECT coalesce(sum(s.row_count),0) FROM business_datasets d JOIN dataset_snapshots s ON s.id=d.current_snapshot WHERE d.connection_id=c.id AND d.status='ACTIVE') row_count,
-    CASE WHEN c.status='UNAVAILABLE' THEN 'CONNECTION_UNAVAILABLE' WHEN c.status='UNCONFIGURED' THEN 'CONNECTION_UNCONFIGURED'
+   SELECT c.tenant_id,md5('connection:'||c.id::text) monitor_key,r.id run_id,coalesce(r.status,'NOT_STARTED') stage,c.effective_status configuration,NULL::text format,NULL::bigint size_bytes,NULL::integer version,
+    (SELECT count(*) FROM business_datasets d WHERE d.connection_id=c.id AND d.status='ACTIVE' AND file_dataset_current(d.id)) dataset_count,
+    (SELECT coalesce(sum(s.row_count),0) FROM business_datasets d JOIN dataset_snapshots s ON s.id=d.current_snapshot WHERE d.connection_id=c.id AND d.status='ACTIVE' AND file_dataset_current(d.id)) row_count,
+    CASE WHEN c.effective_status='UNAVAILABLE' THEN 'CONNECTION_UNAVAILABLE' WHEN c.effective_status='UNCONFIGURED' THEN 'CONNECTION_UNCONFIGURED'
      WHEN r.status IN('FAILED','INTERRUPTED') THEN CASE WHEN r.reason IN('COLLECTION_TIMEOUT','COLLECTION_INVALID_RESULT','COLLECTION_ADAPTER_FAILED','COLLECTION_INTERRUPTED') THEN r.reason ELSE 'OTHER' END ELSE NULL END diagnostic,
     coalesce(r.created_at,c.created_at) created_at,r.finished_at,
     (SELECT max(done.finished_at) FROM collection_runs done WHERE done.connection_id=c.id AND done.status='SUCCEEDED' AND done.finished_at<=statement_timestamp()) last_success_at
-   FROM data_connections c LEFT JOIN LATERAL (SELECT id,status,reason,created_at,finished_at FROM collection_runs x WHERE x.connection_id=c.id ORDER BY x.created_at DESC,x.id DESC LIMIT 1) r ON true
+   FROM (SELECT c0.*,CASE WHEN EXISTS(SELECT 1 FROM file_table_sources f JOIN business_datasets d ON d.id=f.dataset_id WHERE d.connection_id=c0.id)
+     AND NOT EXISTS(SELECT 1 FROM business_datasets d WHERE d.connection_id=c0.id AND d.status='ACTIVE' AND NOT d.scrubbed AND file_dataset_current(d.id))
+     THEN 'UNAVAILABLE' ELSE c0.status END effective_status FROM data_connections c0) c LEFT JOIN LATERAL (SELECT id,status,reason,created_at,finished_at FROM collection_runs x WHERE x.connection_id=c.id ORDER BY x.created_at DESC,x.id DESC LIMIT 1) r ON true
    """:"""
    SELECT m.tenant_id,md5('material:'||m.id::text) monitor_key,r.id run_id,coalesce(r.status,'NOT_STARTED') stage,NULL::text configuration,
     CASE WHEN upper(substring(v.filename from '[.]([^.]+)$')) IN ('PDF','DOCX','XLSX','CSV','TXT','MD','JSON','PPTX','HTML') THEN upper(substring(v.filename from '[.]([^.]+)$')) ELSE 'OTHER' END format,

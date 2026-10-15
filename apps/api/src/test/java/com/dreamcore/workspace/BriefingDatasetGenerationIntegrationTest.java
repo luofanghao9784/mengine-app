@@ -14,6 +14,26 @@ class BriefingDatasetGenerationIntegrationTest extends DatasetCalculationFixture
  UUID policy(){for(int i=0;i<50;i++){generation.discover();var policies=generation.state(owner,tenant).policies().stream().filter(p->p.workspaceId().equals(space)).toList();if(!policies.isEmpty())return policies.getFirst().id();}throw new AssertionError("Fixture policy not discovered");}
  BriefingGenerationService.Batch first(UUID p){generation.tick(p);return generation.state(owner,tenant).batches().stream().filter(b->b.workspaceId().equals(space)).findFirst().orElseThrow();}
  void succeeded(UUID task){db.update("UPDATE conversation_tasks SET status='SUCCEEDED',reply='合成调度完成，仅用于状态验证。',finished_at=now(),lease_token=NULL,lease_until=NULL WHERE id=?",task);}
+
+ @Autowired com.dreamcore.workspace.identity.EngineRetryService platformRetries;
+ @Test void platformRetryCreatesNewAutomaticTaskAndKeepsFailedTask(){
+  UUID operator=UUID.randomUUID();db.update("INSERT INTO accounts(id,email,display_name,password_hash) VALUES (?,?,'合成总台','unused')",operator,operator+"@briefing-retry.test");
+  db.update("INSERT INTO platform_accounts(account_id,login_name,password_hash) VALUES (?,?,'unused')",operator,operator+"@briefing-retry.test");db.update("INSERT INTO platform_roles(account_id,role) VALUES (?,'PLATFORM_ADMIN')",operator);
+  UUID p=policy();var b=first(p);db.update("UPDATE conversation_tasks SET status='FAILED',error_code='TASK_LIMIT',finished_at=now() WHERE id=?",b.taskId());
+  var req=new com.dreamcore.workspace.identity.EngineRetryService.Request(UUID.randomUUID(),tenant,"TASK",b.taskId(),"FAILED",null);
+  var receipt=platformRetries.retry(operator,req);assertNotEquals(b.id(),receipt.id());
+  assertEquals("FAILED",db.queryForObject("SELECT status FROM conversation_tasks WHERE id=?",String.class,b.taskId()));
+  assertEquals(2,db.queryForObject("SELECT count(*) FROM briefing_generation_batches WHERE policy_id=? AND task_id IS NOT NULL",Integer.class,p));
+  assertEquals(receipt.id(),platformRetries.retry(operator,req).id());
+ }
+ @Test void unknownAutomaticResultCannotRetryWithoutReadOnlyExecutionEvidence(){
+  UUID operator=UUID.randomUUID();db.update("INSERT INTO accounts(id,email,display_name,password_hash) VALUES (?,?,'合成总台','unused')",operator,operator+"@unknown-retry.test");
+  db.update("INSERT INTO platform_accounts(account_id,login_name,password_hash) VALUES (?,?,'unused')",operator,operator+"@unknown-retry.test");db.update("INSERT INTO platform_roles(account_id,role) VALUES (?,'PLATFORM_ADMIN')",operator);
+  UUID p=policy();var b=first(p);db.update("UPDATE conversation_tasks SET status='RESULT_UNKNOWN',reconciliation_required=true WHERE id=?",b.taskId());
+  var req=new com.dreamcore.workspace.identity.EngineRetryService.Request(UUID.randomUUID(),tenant,"TASK",b.taskId(),"RESULT_UNKNOWN",null);
+  var ex=assertThrows(com.dreamcore.workspace.identity.IdentityException.class,()->platformRetries.retry(operator,req));assertEquals("TASK_RECONCILIATION_REQUIRED",ex.code);
+  assertEquals(1,db.queryForObject("SELECT count(*) FROM briefing_generation_batches WHERE policy_id=?",Integer.class,p));
+ }
  @Test void datasetOnlyInitializationPinsBeforeClaimAndNextVersionTriggersAfterCompletion(){
   UUID p=policy();var b=first(p);assertEquals("INITIALIZATION",b.trigger());assertEquals("RUNNING",b.status());
   assertEquals(snapshot,db.queryForObject("SELECT snapshot_id FROM briefing_dataset_selections WHERE task_id=?",UUID.class,b.taskId()));
@@ -28,6 +48,51 @@ class BriefingDatasetGenerationIntegrationTest extends DatasetCalculationFixture
   succeeded(job.id());generation.tick(p);generation.tick(p);
   var second=generation.state(owner,tenant).batches().stream().filter(x->!x.id().equals(b.id())).findFirst().orElseThrow();
   assertEquals("DATA_READY",second.trigger());assertEquals(next,db.queryForObject("SELECT snapshot_id FROM briefing_dataset_selections WHERE task_id=?",UUID.class,second.taskId()));
+ }
+ @Test void identicalContentInFreshSnapshotsDoesNotSpendAutomaticModelBudget(){
+  UUID p=policy();var first=first(p);succeeded(first.taskId());generation.tick(p);
+  for(int n=2;n<=5;n++){snapshot=version(n,"old");generation.tick(p);}
+  assertEquals(1,db.queryForObject("SELECT count(*) FROM briefing_generation_batches WHERE policy_id=? AND task_id IS NOT NULL",Integer.class,p));
+  assertEquals(5,db.queryForObject("SELECT count(*) FROM dataset_snapshots WHERE dataset_id=?",Integer.class,dataset));
+  snapshot=version(6,"new");generation.tick(p);
+  assertEquals(2,db.queryForObject("SELECT count(*) FROM briefing_generation_batches WHERE policy_id=? AND task_id IS NOT NULL",Integer.class,p));
+ }
+ @Test void changingBusinessMeaningTriggersAnalysisEvenWithIdenticalRows(){
+  UUID p=policy();var first=first(p);succeeded(first.taskId());generation.tick(p);
+  db.update("UPDATE business_datasets SET description='金额为应收，不是实收；需要重新解释' WHERE id=?",dataset);
+  generation.tick(p);assertEquals(2,db.queryForObject("SELECT count(*) FROM briefing_generation_batches WHERE policy_id=? AND task_id IS NOT NULL",Integer.class,p));
+ }
+ @Test void failureDoesNotAutomaticallyRepeatForIdenticalNewSnapshot(){
+  UUID p=policy();var first=first(p);
+  db.update("UPDATE conversation_tasks SET status='FAILED',error_code='TASK_LIMIT',finished_at=now() WHERE id=?",first.taskId());generation.tick(p);
+  snapshot=version(2,"old");generation.tick(p);
+  assertEquals(1,db.queryForObject("SELECT count(*) FROM briefing_generation_batches WHERE policy_id=? AND task_id IS NOT NULL",Integer.class,p));
+  assertEquals("FAILED",generation.get(owner,tenant,first.id()).status());
+  snapshot=version(3,"new");generation.tick(p);
+  assertEquals(2,db.queryForObject("SELECT count(*) FROM briefing_generation_batches WHERE policy_id=? AND task_id IS NOT NULL",Integer.class,p));
+ }
+ @Test void identicalAuthorizedSourcesAcrossOwnerSpacesRunOnlyOnce(){
+  UUID p=policy();var first=first(p);
+  UUID other=generation.state(owner,tenant).policies().stream().filter(x->x.workspaceId().equals(privateSpace)).findFirst().orElseThrow().id();
+  generation.tick(other);
+  assertEquals(1,db.queryForObject("SELECT count(*) FROM briefing_generation_batches WHERE tenant_id=? AND task_id IS NOT NULL",Integer.class,tenant));
+  assertEquals("EQUIVALENT_ANALYSIS_EXISTS",db.queryForObject("SELECT reason FROM briefing_generation_policies WHERE id=?",String.class,other));
+  succeeded(first.taskId());generation.tick(p);generation.tick(other);
+  assertEquals(1,db.queryForObject("SELECT count(*) FROM briefing_generation_batches WHERE tenant_id=? AND task_id IS NOT NULL",Integer.class,tenant));
+ }
+ @Test void rowReorderingDoesNotReanalyzeButDuplicateRowDoes(){
+  UUID p=policy();var first=first(p);succeeded(first.taskId());generation.tick(p);
+  var rows=new ArrayList<>(rowsFor("old"));Collections.reverse(rows);snapshot=version(2,rows);generation.tick(p);
+  assertEquals(1,db.queryForObject("SELECT count(*) FROM briefing_generation_batches WHERE policy_id=? AND task_id IS NOT NULL",Integer.class,p));
+  rows.add(rows.getFirst());snapshot=version(3,rows);generation.tick(p);
+  assertEquals(2,db.queryForObject("SELECT count(*) FROM briefing_generation_batches WHERE policy_id=? AND task_id IS NOT NULL",Integer.class,p));
+ }
+ @Test void datasetReadReportsActualCalculationCapabilities(){
+  UUID p=policy();first(p);var job=conversations.claim();var read=call(job,request("dataset_read",dataset,snapshot,0));
+  assertTrue(read.path("source").has("calculationCapabilities"));
+  assertFalse(read.at("/source/calculationCapabilities/crossDatasetJoin").asBoolean());
+  assertFalse(read.at("/source/calculationCapabilities/derivedExpressions").asBoolean());
+  assertEquals(50,read.at("/source/calculationCapabilities/maxGroups").asInt());
  }
  @Test void unchangedSnapshotAndCollectionScheduleDoNotCreateExtraBriefings(){
   UUID p=policy();var b=first(p);var j=conversations.claim();succeeded(j.id());generation.tick(p);generation.tick(p);

@@ -1,3 +1,4 @@
+import type { ExecutionReceipts } from './runtime/execution-receipts.js';
 import { ENGINE_VERSION, TASK_PROTOCOLS } from './release.js';
 import { createServer } from 'node:http';
 import { timingSafeEqual } from 'node:crypto';
@@ -13,13 +14,14 @@ const uuid = (v: unknown): v is string =>
 export function createEngineServer(
   options: {
     token?: string;
+    receipts?: ExecutionReceipts;
     agent?: AgentTasks;
     company?: CompanyAnalysis;
     experience?: ExperienceAnalysis;
     generalization?: ExperienceGeneralization;
   } = {},
 ) {
-  const titles = options.agent ? new ConversationTitleTasks(options.agent.config) : undefined;
+  const titles = options.agent ? new ConversationTitleTasks(options.agent.config.routineModel ?? options.agent.config) : undefined;
   const enabled = !!options.token && options.token.length >= 32;
   return createServer(async (request, response) => {
     response.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -85,12 +87,15 @@ export function createEngineServer(
           }
           parts.push(part);
         }
-        const result = await feature.runtime.run(JSON.parse(Buffer.concat(parts).toString('utf8')));
+        const input=JSON.parse(Buffer.concat(parts).toString('utf8'));
+        const result = await (options.receipts && feature.prefix==='COMPANY'
+          ? options.receipts.run<unknown>('COMPANY',input?.job?.id,input?.job?.lease,input,()=>feature.runtime!.run(input))
+          : feature.runtime.run(input));
         if (!response.destroyed) return send(200, result);
       } catch (error) {
         const code = error instanceof RuntimeError ? error.code : 'INVALID_' + feature.prefix + '_REQUEST';
         return send(
-          code === 'ENGINE_BUSY' ? 429 : code === feature.prefix + '_ATTEMPT_CONFLICT' ? 409 : 400,
+          code === 'EXECUTION_RECEIPT_UNAVAILABLE' ? 500 : code === 'ENGINE_BUSY' ? 429 : code === feature.prefix + '_ATTEMPT_CONFLICT' ? 409 : 400,
           { code },
         );
       }
@@ -138,10 +143,10 @@ export function createEngineServer(
           if (bytes > 100000) return send(413, { code: 'TOO_LARGE' });
           chunks.push(chunk);
         }
-        const result = await (request.url === '/internal/v1/conversation-title' ? titles! : options.agent).run(
-          JSON.parse(Buffer.concat(chunks).toString('utf8')),
-          abort.signal,
-        );
+        const input=JSON.parse(Buffer.concat(chunks).toString('utf8'));
+        const execute=()=>(request.url === '/internal/v1/conversation-title' ? titles! : options.agent!).run(input,abort.signal);
+        const result=await (options.receipts && request.url==='/internal/v1/agent-results'
+          ? options.receipts.run<unknown>('AGENT',input?.taskId,input?.attemptId,input,execute) : execute());
         if (!abort.signal.aborted) return send(200, result);
       } catch (error) {
         if (!abort.signal.aborted) {

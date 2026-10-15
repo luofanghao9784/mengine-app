@@ -46,6 +46,22 @@ class KnowledgeIntegrationTest {
     KnowledgeService.Analysis analysis(UUID who,UUID location,File file) {return knowledge.analysis(who,tenant,location,file.material(),file.version(),0,20);}
     void denied(int status,Runnable action) {var error=assertThrows(IdentityException.class,action::run);assertEquals(status,error.status);}
     @AfterEach void clearJobs() {db.update("UPDATE knowledge_runs SET status='CANCELLED' WHERE tenant_id=? AND status IN ('RUNNING','QUEUED')",tenant);}
+    @Test void supersededAutomaticSceneVersionDoesNotStarveCurrentParse() {
+        var file=upload(space,"知识.txt","上一版知识");
+        db.update("INSERT INTO scene_bindings(tenant_id,workspace_id,connection_id,maintainer_id) VALUES (?,?,?,?)",tenant,space,UUID.randomUUID(),owner);
+        db.update("INSERT INTO scene_asset_links(tenant_id,source_id,kind,target_id,revision,metadata) VALUES (?,'article','KNOWLEDGE',?,'r1','{}')",tenant,file.material());
+        materials.upload(owner,tenant,space,null,file.material(),1,UUID.randomUUID(),new MockMultipartFile("file","知识.txt","text/plain","当前知识".getBytes(StandardCharsets.UTF_8)));
+        UUID current=materials.detail(owner,tenant,space,file.material(),0,20).versions().getFirst().id();
+        var job=knowledge.claim();assertEquals(current,job.version());
+        assertEquals("CANCELLED",db.queryForObject("SELECT status FROM knowledge_runs WHERE version_id=?",String.class,file.version()));
+        assertEquals("SOURCE_VERSION_SUPERSEDED",db.queryForObject("SELECT warnings FROM knowledge_runs WHERE version_id=?",String.class,file.version()));
+        assertEquals(2,db.queryForObject("SELECT count(*) FROM material_versions WHERE material_id=?",Integer.class,file.material()));
+    }
+    @Test void ordinaryHistoricalUploadStillGetsItsParse() {
+        var file=upload(space,"普通资料.txt","上一版资料");
+        materials.upload(owner,tenant,space,null,file.material(),1,UUID.randomUUID(),new MockMultipartFile("file","普通资料.txt","text/plain","当前资料".getBytes(StandardCharsets.UTF_8)));
+        assertEquals(file.version(),knowledge.claim().version());
+    }
     @Test void realTextParseSearchAndImmutableCitation() {
         var file=upload(space,"计划.md","梦核进度\n预算 00123.4500\n<script>alert(1)</script>");finish(file);
         var state=analysis(reader,space,file);assertEquals("READY",state.status());assertEquals(3,state.chunks().size());assertFalse(state.canMaintain());

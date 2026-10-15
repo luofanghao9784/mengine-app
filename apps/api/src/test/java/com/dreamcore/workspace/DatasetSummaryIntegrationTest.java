@@ -11,6 +11,18 @@ class DatasetSummaryIntegrationTest extends DatasetCalculationFixture {
  @Override List<String> columns(){return List.of("门店","期间","收款（元）","确认时间");}
  @Override List<List<String>> rowsFor(String marker){return List.of(List.of("甲","已确认","0.10","2026-07-31 23:59:59"),List.of("甲","已确认","0.20","2026-08-01 00:00:00"),List.of("甲","已取消","0.30","2026-08-31T16:00:00Z"),List.of("乙","已确认","0.40","2026-09-01"),List.of("乙","已取消","9",""));}
  DatasetCalculationService.Request summary(String from,String to,String missing,String aggregation){return new DatasetCalculationService.Request(dataset,snapshot,null,null,"COUNT".equals(aggregation)?null:"收款（元）",null,null,null,"Asia/Shanghai",aggregation,"SUMMARY",List.of("门店","期间"),"确认时间",from,to,missing);}
+ @Test void wholeTableTotalsDoNotRequireInventingAGroupingColumn(){
+  var j=start();var sum=new DatasetCalculationService.Request(dataset,snapshot,null,null,"收款（元）",null,null,null,null,"SUM","SUMMARY",List.of(),null,null,null,null);
+  var r=json.valueToTree(agents.compareDataset(j.id(),j.token(),sum));assertEquals("10.00",r.at("/calculation/total").asString());assertEquals(1,r.at("/calculation/rows").size());assertEquals(0,r.at("/calculation/rows/0/group").size());assertEquals(5,r.at("/calculation/rows/0/records").asInt());
+  var count=new DatasetCalculationService.Request(dataset,snapshot,null,null,null,null,null,null,null,"COUNT","SUMMARY",List.of(),null,null,null,null);
+  assertEquals("5",json.valueToTree(agents.compareDataset(j.id(),j.token(),count)).at("/calculation/total").asString());
+  receipt(j,2,"compare_dataset","succeeded");receipt(j,3,"deliver_briefing","STARTED");
+  var card=agents.deliverBriefing(j.id(),j.token(),new BriefingContentService.Request(UUID.fromString(r.at("/artifact/id").asString()),"记录金额合计","所选记录金额合计10.00元。",List.of("按所选数据范围汇总，不代表已到账收入。","本次汇总覆盖五条记录，业务含义需要结合记录状态判断。")));
+  assertNotNull(card);
+  var contents=db.queryForList("SELECT content FROM conversation_artifacts WHERE task_id=? AND filename LIKE 'briefing-dataset-%'",byte[].class,j.id());
+  assertEquals(1,contents.size());assertTrue(new String(contents.getFirst(),java.nio.charset.StandardCharsets.UTF_8).contains("全部记录"));
+
+ }
  @Test void dateRangeSummaryUsesAllRowsExactDecimalsAndMissingDateAccounting(){
   var j=start();var r=json.valueToTree(agents.compareDataset(j.id(),j.token(),summary("2026-08-01",null,"EXCLUDE","SUM")));
   assertEquals("0.90",r.at("/calculation/total").asString());assertEquals(3,r.at("/calculation/matchedRows").asInt());assertEquals(2,r.at("/calculation/ignoredRows").asInt());assertEquals(1,r.at("/calculation/missingDateRows").asInt());assertEquals(3,r.at("/calculation/rows").size());

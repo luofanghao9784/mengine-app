@@ -14,7 +14,7 @@ from trial import WORKSPACE, TrialError, binary, directory, private_read, privat
 FORMAT = 'dreamcore-local-model-v1'
 DEFAULT_CONFIG = WORKSPACE / '.local/model-private/bailian.json'
 DEFAULT_MODEL = 'qwen3.7-plus-2026-05-26'
-MODELS = {DEFAULT_MODEL, 'qwen3.7-flash-2026-07-15', 'qwen3.8-max-0902'}
+MODELS = {'qwen3.7-plus', 'qwen3.7-flash', DEFAULT_MODEL, 'qwen3.7-flash-2026-07-15', 'qwen3.8-max-0902'}
 
 
 def owned_path(path, create=False):
@@ -35,12 +35,14 @@ def owned_path(path, create=False):
 
 def validate(value):
     fields = {'format', 'workspace', 'provider', 'model', 'workspaceId', 'apiKey'}
-    if not isinstance(value, dict) or set(value) != fields or value['format'] != FORMAT or value['workspace'] != str(WORKSPACE):
+    if not isinstance(value, dict) or set(value) not in (fields, fields | {'routineModel'}) or value['format'] != FORMAT or value['workspace'] != str(WORKSPACE):
         raise TrialError('模型配置格式或工作树归属不匹配，请在当前工作树运行 model:configure。')
     if value['provider'] != 'bailian' or not isinstance(value['model'], str) or value['model'] not in MODELS:
-        raise TrialError('当前本地真实验收使用百炼固定模型版本，请检查模型名称。')
+        raise TrialError('当前本地真实验收使用百炼已支持模型版本，请检查模型名称。')
     if not isinstance(value['workspaceId'], str) or not re.fullmatch(r'[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?', value['workspaceId']):
         raise TrialError('百炼工作空间 ID 无效。')
+    if 'routineModel' in value and (not isinstance(value['routineModel'], str) or value['routineModel'] not in MODELS):
+        raise TrialError('常规任务模型须使用受支持的模型 ID。')
     key = value['apiKey']
     if not isinstance(key, str) or not 1 <= len(key) <= 4096 or any(c.isspace() or ord(c) < 33 or ord(c) > 126 for c in key):
         raise TrialError('API Key 为空或包含无效字符，请通过隐藏输入重新配置。')
@@ -59,7 +61,8 @@ def load(path=DEFAULT_CONFIG):
 def engine_environment(value):
     validate(value)
     return {'AGENT_MODEL_PROVIDER': value['provider'], 'AGENT_MODEL_NAME': value['model'],
-            'AGENT_BAILIAN_WORKSPACE_ID': value['workspaceId'], 'AGENT_MODEL_API_KEY': value['apiKey']}
+            'AGENT_BAILIAN_WORKSPACE_ID': value['workspaceId'], 'AGENT_MODEL_API_KEY': value['apiKey'],
+            **({'AGENT_ROUTINE_MODEL_NAME': value['routineModel']} if value.get('routineModel') else {})}
 
 
 def invoke(value, script, tools=False):

@@ -271,3 +271,33 @@ test('duplicate evidence is corrected before the unchanged backend validation', 
     return tool('submit_company_candidates',{candidates:[candidate]},4); }]);
  const result=await company.run(request());assert.equal(result.outcome,'COMPLETE');assert.deepEqual(result.candidates,[candidate]);
 });
+
+test('identical rejected evidence stops before a fifth paid model call and retains the evidence failure', async () => {
+  const bad = {...candidate, evidence:[{chunkId:id(4),quote:'not present in the source'}]};
+  const {company,calls}=analyzer([
+    ...happy().slice(0,2),
+    tool('submit_company_candidates',{candidates:[bad]},3),
+    r=>{assert.ok(JSON.stringify(r.messages).includes('Candidate 1, chunkId '+id(4)));return tool('submit_company_candidates',{candidates:[bad]},4);},
+  ]);
+  const result=await company.run(request());
+  assert.equal(result.outcome,'FAILED');assert.equal(result.code,'COMPANY_EVIDENCE_INVALID');
+  assert.equal(calls(),4);assert.equal(result.modelCalls,4);assert.equal(result.inputTokens,40);assert.deepEqual(result.candidates,[]);
+});
+
+test('evidence correction remains possible without weakening exact quote validation', async () => {
+  const bad={...candidate,evidence:[{chunkId:id(4),quote:'invented'}]};
+  const {company,calls}=analyzer([...happy().slice(0,2),tool('submit_company_candidates',{candidates:[bad]},3),tool('submit_company_candidates',{candidates:[candidate]},4)]);
+  const result=await company.run(request());assert.equal(result.outcome,'COMPLETE');assert.deepEqual(result.candidates,[candidate]);assert.equal(calls(),4);
+});
+
+test('provider errors retain a safe actionable code rather than generic runtime failure', async () => {
+  const {RuntimeError}=await import('../dist/runtime/ports.js');
+  const {company,calls}=analyzer([()=>{throw new RuntimeError('REMOTE_UNAVAILABLE');}]);
+  const result=await company.run(request());assert.equal(result.outcome,'FAILED');assert.equal(result.code,'REMOTE_UNAVAILABLE');assert.equal(calls(),1);assert.equal(result.inputTokens,null);
+});
+
+test('changing invalid quotes cannot spend the entire budget on rejected submissions', async () => {
+  const steps=[...happy().slice(0,2),...[1,2,3].map(n=>tool('submit_company_candidates',{candidates:[{...candidate,evidence:[{chunkId:id(4),quote:'invented '+n}]}]},n+2))];
+  const {company,calls}=analyzer(steps);const result=await company.run(request());
+  assert.equal(result.outcome,'FAILED');assert.equal(result.code,'COMPANY_EVIDENCE_INVALID');assert.equal(calls(),5);assert.equal(result.modelCalls,5);assert.deepEqual(result.candidates,[]);
+});

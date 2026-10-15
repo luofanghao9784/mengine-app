@@ -9,11 +9,12 @@ import org.springframework.beans.factory.annotation.Value;import org.springframe
 @org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication(type=org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication.Type.SERVLET)
 public class CompanyAnalysisWorker {
  private final CompanyAnalysisQueue queue;private final CompanyInferenceService inference;private final CompanyAnalysisRuntime runtime;private final boolean enabled;
- private final ExecutorService pool=Executors.newVirtualThreadPerTaskExecutor();private final Semaphore capacity=new Semaphore(2);private final Set<UUID> local=ConcurrentHashMap.newKeySet();
+ private final ExecutorService pool=Executors.newVirtualThreadPerTaskExecutor();private final Semaphore capacity=new Semaphore(2);private volatile boolean stopping;private final Set<UUID> local=ConcurrentHashMap.newKeySet();
  public CompanyAnalysisWorker(CompanyAnalysisQueue queue,CompanyInferenceService inference,CompanyAnalysisRuntime runtime,@Value("${dreamcore.company-analysis.enabled:false}") boolean enabled){this.queue=queue;this.inference=inference;this.runtime=runtime;this.enabled=enabled;}
  @Scheduled(fixedDelayString="${dreamcore.company-analysis.poll-ms:3000}",initialDelayString="${dreamcore.company-analysis.initial-delay-ms:30000}")
  public void tick(){if(enabled&&runtime.configured())runOnce();}
- public void runOnce(){
+ public synchronized void runOnce(){
+  if(stopping)return;
   for(var recovery:queue.recoveries())if(!local.contains(recovery.id()))recover(recovery);
   queue.discover();
   for(UUID tenant:queue.tenants()){
@@ -40,7 +41,7 @@ public class CompanyAnalysisWorker {
   }
  }
  private static String diagnosticCode(String code){
-  return code!=null&&Set.of("MODEL_CALL_LIMIT","TOOL_CALL_LIMIT","TIME_LIMIT","MODEL_OUTPUT_LIMIT","INVALID_MODEL_RESPONSE","MODEL_INCOMPLETE","INVALID_TOOL_ARGUMENTS","COMPANY_INPUT_INCOMPLETE","COMPANY_EVIDENCE_INVALID","SOURCE_NOT_GRANTED","PROFILE_NOT_GRANTED","TOOL_OUTPUT_LIMIT","TOOL_FAILED","RUNTIME_FAILED","MODEL_NOT_CONFIGURED","COMPANY_DELIVERY_MISSING").contains(code)?code:"COMPANY_ANALYSIS_FAILED";
+  return code!=null&&Set.of("MODEL_CALL_LIMIT","TOOL_CALL_LIMIT","TIME_LIMIT","MODEL_OUTPUT_LIMIT","INVALID_MODEL_RESPONSE","MODEL_INCOMPLETE","INVALID_TOOL_ARGUMENTS","COMPANY_INPUT_INCOMPLETE","COMPANY_EVIDENCE_INVALID","SOURCE_NOT_GRANTED","PROFILE_NOT_GRANTED","TOOL_OUTPUT_LIMIT","TOOL_FAILED","RUNTIME_FAILED","MODEL_NOT_CONFIGURED","COMPANY_DELIVERY_MISSING","MODEL_RATE_LIMITED", "MODEL_PROVIDER_UNAVAILABLE", "MODEL_REQUEST_REJECTED", "MODEL_TIMEOUT", "MODEL_NETWORK_ERROR", "REMOTE_ACCESS_DENIED","REMOTE_UNAVAILABLE","INVALID_REMOTE_RESPONSE","REMOTE_OUTPUT_LIMIT","MODEL_INPUT_LIMIT","INVALID_MODEL_INPUT").contains(code)?code:"COMPANY_ANALYSIS_FAILED";
  }
  public void accept(CompanyAnalysisRuntime.Result result){
   if(!result.outcome().equals("COMPLETE")){queue.fail(result.runId(),result.outcome().equals("CANCELLED")?"COMPANY_SOURCE_CHANGED":diagnosticCode(result.code()),true,result);return;}
@@ -61,5 +62,9 @@ public class CompanyAnalysisWorker {
    if(r.expired()&&unavailable.code.equals("COMPANY_RESULT_LOST"))queue.fail(r.id(),"COMPANY_RESULT_UNKNOWN",true,null);
   }
  }
- @PreDestroy public void stop(){pool.shutdownNow();}
+ @PreDestroy public synchronized void stop(){
+  stopping=true;pool.shutdown();
+  try{if(!pool.awaitTermination(10,TimeUnit.SECONDS))pool.shutdownNow();}
+  catch(InterruptedException interrupted){pool.shutdownNow();Thread.currentThread().interrupt();}
+ }
 }

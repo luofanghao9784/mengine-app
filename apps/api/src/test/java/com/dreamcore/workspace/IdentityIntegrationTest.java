@@ -89,6 +89,15 @@ class IdentityIntegrationTest {
         employee = acceptNew(invitation(adminA,tenantA,"employee@example.test"),"employee@example.test");
         employeeId = employee.ok("GET","/api/v1/me",null,200).get("account").get("id").asString();
     }
+    @Test void retainsExplicitCloudUsernameWithoutChangingPasswordOrPermissions() {
+        db.execute("ALTER TABLE accounts ADD COLUMN IF NOT EXISTS username varchar(40) UNIQUE");
+        db.update("UPDATE accounts SET username='cloud_compat_test' WHERE id=?",UUID.fromString(employeeId));
+        try {
+            assertEquals(UUID.fromString(employeeId),identities.login("cloud_compat_test",PASSWORD,"127.0.0.21").id());
+            assertThrows(IdentityException.class,()->identities.login("cloud_compat_test","wrong","127.0.0.22"));
+            assertThrows(IdentityException.class,()->identities.login("not_provisioned","wrong","127.0.0.23"));
+        } finally {db.update("UPDATE accounts SET username=NULL WHERE id=?",UUID.fromString(employeeId));}
+    }
     @Test void authenticationCsrfSessionRotationAndLogout() throws Exception {
         Client user = new Client();
         assertEquals(401,user.send("GET","/api/v1/me",null,false).statusCode());

@@ -21,11 +21,12 @@ public class KnowledgeService {
     public record Results(UUID tenantId,UUID workspaceId,String query,List<Chunk> items,boolean hasMore,String matchStatus,Coverage coverage) {}
     public record Job(UUID id,UUID tenant,UUID workspace,UUID material,UUID version,UUID actor,UUID token) {}
     public record Input(String filename,byte[] bytes) {}
+    private final FileTableService fileTables;
     private final JdbcTemplate db; private final MaterialAccess access; private final IdentityService identities;
     private final IdentityAudit audit; private final ObjectStore store; private final boolean enabled;
     private final tools.jackson.databind.json.JsonMapper json=new tools.jackson.databind.json.JsonMapper();
-    public KnowledgeService(JdbcTemplate db,MaterialAccess access,IdentityService identities,IdentityAudit audit,ObjectStore store,@Value("${dreamcore.knowledge.enabled:false}") boolean enabled) {
-        this.db=db;this.access=access;this.identities=identities;this.audit=audit;this.store=store;this.enabled=enabled;
+    public KnowledgeService(JdbcTemplate db,MaterialAccess access,IdentityService identities,IdentityAudit audit,ObjectStore store,FileTableService fileTables,@Value("${dreamcore.knowledge.enabled:false}") boolean enabled) {
+        this.fileTables=fileTables;this.db=db;this.access=access;this.identities=identities;this.audit=audit;this.store=store;this.enabled=enabled;
     }
     private IdentityException missing() { return new IdentityException(404,"KNOWLEDGE_NOT_FOUND"); }
     private void page(int offset,int limit) { if(offset<0 || offset>100000 || limit<1 || limit>50) throw IdentityException.invalid(); }
@@ -156,6 +157,15 @@ public class KnowledgeService {
     }
     @Transactional
     public Job claim() {
+        // Imported scene outputs can be superseded before parsing starts. Preserve receipts,
+        // but do not let obsolete automatic versions starve current input or explicit reparses.
+        db.update("""
+          UPDATE knowledge_runs r SET status='CANCELLED',warnings='SOURCE_VERSION_SUPERSEDED',finished_at=now()
+          FROM material_versions v JOIN materials m ON m.id=v.material_id
+          WHERE r.version_id=v.id AND r.status='QUEUED' AND r.generation=1 AND r.attempts=0
+           AND v.number<>m.current_version
+           AND EXISTS(SELECT 1 FROM scene_asset_links l WHERE l.tenant_id=r.tenant_id AND l.target_id=m.id AND l.kind IN ('DOCUMENT','KNOWLEDGE'))
+          """);
         db.update("UPDATE knowledge_runs SET status='FAILED',warnings='WORKER_RETRY_LIMIT',finished_at=now(),lease_token=NULL,lease_until=NULL WHERE status='RUNNING' AND lease_until<now() AND attempts>=3");
         var rows=db.queryForList("SELECT * FROM knowledge_runs WHERE status='QUEUED' OR (status='RUNNING' AND lease_until<now() AND attempts<3) ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1");
         if(rows.isEmpty()) return null;var row=rows.getFirst();UUID token=UUID.randomUUID(),id=(UUID)row.get("id");
@@ -178,6 +188,7 @@ public class KnowledgeService {
         int ordinal=0;
         for(var c:result.chunks()) db.update("INSERT INTO knowledge_chunks(id,tenant_id,workspace_id,material_id,version_id,run_id,ordinal,locator,method,content) VALUES (?,?,?,?,?,?,?,?,?,?)",UUID.randomUUID(),job.tenant(),job.workspace(),job.material(),job.version(),job.id(),ordinal++,c.locator(),c.method(),c.content());
         db.update("UPDATE knowledge_runs SET status=?,parser_version=?,warnings=?,finished_at=now(),lease_token=NULL,lease_until=NULL WHERE id=?",result.status(),result.parserVersion(),String.join(",",result.warnings()),job.id());
+        fileTables.finish(job,result);
         audit.record(job.actor(),job.tenant(),"KNOWLEDGE_FINISH",job.id(),Set.of("READY","PARTIAL").contains(result.status())?"SUCCESS":"FAILURE");
     }
     @Transactional

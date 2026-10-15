@@ -90,7 +90,8 @@ test('internal title route requires authentication and returns a bounded generat
       platformBaseUrl: 'http://127.0.0.1:19001',
       executionClass: 'verification',
       modelName: 'synthetic',
-      createModel: () => model(good),
+      createModel: () => { throw Error('title must use routine route'); },
+      routineModel: {modelName:'routine-fixture',createModel:()=>model(good)},
     }),
   });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
@@ -108,7 +109,9 @@ test('internal title route requires authentication and returns a bounded generat
       }),
     });
     assert.equal(response.status, 200);
-    assert.equal((await response.json()).title, '9POP五店收款分析');
+    const result=await response.json();
+    assert.equal(result.title, '9POP五店收款分析');
+    assert.equal(result.modelName, 'routine-fixture');
   } finally {
     await new Promise((r) => server.close(r));
   }

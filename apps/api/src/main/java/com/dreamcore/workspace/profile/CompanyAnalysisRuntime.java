@@ -7,6 +7,7 @@ import tools.jackson.databind.json.JsonMapper;
 /** Dedicated optional engine protocol. No model credentials or customer session cross this boundary. */
 @Component
 public class CompanyAnalysisRuntime {
+ @org.springframework.beans.factory.annotation.Autowired(required=false) private com.dreamcore.workspace.engine.ExecutionReceipts receipts;
  public record Descriptor(String contractVersion,String engineVersion,boolean configured,String executionClass) {}
  public record Result(String contractVersion,String engineVersion,UUID runId,UUID lease,String outcome,String code,List<CompanyInferenceService.Candidate> candidates,String modelName,Integer modelCalls,Long inputTokens,Long outputTokens) {}
  public static class Failure extends RuntimeException {public final String code;public final boolean sent;public Failure(String code,boolean sent){super(code);this.code=code;this.sent=sent;}}
@@ -44,6 +45,7 @@ public class CompanyAnalysisRuntime {
   finally{if(future!=null&&!future.isDone())future.cancel(true);}
  }
  public Result recover(UUID run,UUID lease,String version){
+  if(receipts!=null){String saved=receipts.result("COMPANY",run,lease);if(saved!=null)return validate(saved.getBytes(java.nio.charset.StandardCharsets.UTF_8),run,lease,version);}
   try{var response=send(request("/internal/v1/company-information/results/"+run+"/"+lease).GET().build());if(response.statusCode()==202)return null;if(response.statusCode()==404&&"COMPANY_RESULT_PENDING".equals(json.readTree(response.body()).path("code").asString()))throw new Failure("COMPANY_RESULT_LOST",true);if(response.statusCode()!=200)throw new Failure("COMPANY_RESULT_UNKNOWN",true);return validate(response.body(),run,lease,version);}
   catch(Failure f){throw f;}catch(Exception e){if(e instanceof InterruptedException)Thread.currentThread().interrupt();throw new Failure("COMPANY_RESULT_UNKNOWN",true);}
  }

@@ -79,11 +79,12 @@ public class IdentityService {
         return Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM accounts WHERE id=? AND status='ACTIVE' AND NOT EXISTS(SELECT 1 FROM unified_identity_links l WHERE l.source_id=accounts.id) AND credential_version=?)",Boolean.class,account,version));
     }
     public Account login(String suppliedEmail, String password, String ip) {
-        boolean byPhone = suppliedEmail != null && !suppliedEmail.contains("@");
-        String normalized = byPhone ? PhoneNumbers.normalize(suppliedEmail) : email(suppliedEmail);
+        boolean byUsername = suppliedEmail != null && suppliedEmail.strip().matches("[a-z][a-z0-9_-]{2,39}");
+        boolean byPhone = !byUsername && suppliedEmail != null && !suppliedEmail.contains("@");
+        String normalized = byUsername ? suppliedEmail.strip() : byPhone ? PhoneNumbers.normalize(suppliedEmail) : email(suppliedEmail);
         if (!throttle.allow(normalized, ip)) { audit.denial(null, "LOGIN_THROTTLED"); throw new IdentityException(429, "LOGIN_THROTTLED"); }
         if (password == null || password.length() > 128) throw new IdentityException(401, "INVALID_CREDENTIALS");
-        var rows = db.queryForList("SELECT id,password_hash,status,credential_version FROM accounts WHERE " + (byPhone ? "phone=?" : "email=? AND phone IS NULL") + " AND NOT EXISTS(SELECT 1 FROM unified_identity_links l WHERE l.source_id=accounts.id)", normalized);
+        var rows = db.queryForList("SELECT id,password_hash,status,credential_version FROM accounts WHERE " + (byUsername ? "to_jsonb(accounts)->>'username'=?" : byPhone ? "phone=?" : "email=? AND phone IS NULL") + " AND NOT EXISTS(SELECT 1 FROM unified_identity_links l WHERE l.source_id=accounts.id)", normalized);
         String encoded = rows.isEmpty() ? dummyHash : (String) rows.getFirst().get("password_hash");
         boolean matches = passwords.matches(password, encoded);
         if (!matches || rows.isEmpty() || !"ACTIVE".equals(rows.getFirst().get("status"))) {

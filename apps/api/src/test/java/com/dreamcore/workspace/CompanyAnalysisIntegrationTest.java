@@ -2,6 +2,51 @@ package com.dreamcore.workspace;
 import com.dreamcore.workspace.profile.*;import java.util.*;import org.junit.jupiter.api.*;import static org.junit.jupiter.api.Assertions.*;import static org.mockito.Mockito.*;
 
 class CompanyAnalysisIntegrationTest extends CompanyAnalysisFixture {
+
+ @org.springframework.beans.factory.annotation.Autowired com.dreamcore.workspace.engine.ExecutionReceipts receipts;
+ @Test void durableReceiptsSurviveRuntimeReplacementAndNeverReacceptAnUncertainAttempt(){
+  var job=claim();queue.dispatched(job,descriptor());
+  var request=new com.dreamcore.workspace.engine.ExecutionReceipts.Claim("a".repeat(64),"synthetic-v1");
+  assertEquals("NEW",receipts.claim("COMPANY",job.id(),job.lease(),request).get("state"));
+  assertEquals("ACCEPTED",new com.dreamcore.workspace.engine.ExecutionReceipts(db).claim("COMPANY",job.id(),job.lease(),request).get("state"));
+  assertThrows(com.dreamcore.workspace.identity.IdentityException.class,()->receipts.claim("COMPANY",job.id(),UUID.randomUUID(),request));
+  assertThrows(com.dreamcore.workspace.identity.IdentityException.class,()->receipts.claim("COMPANY",job.id(),job.lease(),new com.dreamcore.workspace.engine.ExecutionReceipts.Claim("b".repeat(64),"synthetic-v1")));
+  var mapper=new tools.jackson.databind.json.JsonMapper();var completed=result(job,"COMPLETE");
+  var body=new com.dreamcore.workspace.engine.ExecutionReceipts.Finish("a".repeat(64),mapper.readValue(mapper.writeValueAsString(completed),Map.class));
+  receipts.finish("COMPANY",job.id(),job.lease(),body);receipts.finish("COMPANY",job.id(),job.lease(),body);
+  assertEquals("COMPLETED",receipts.claim("COMPANY",job.id(),job.lease(),request).get("state"));
+  var runtime=new CompanyAnalysisRuntime("http://127.0.0.1:1","x".repeat(40),"verification");
+  org.springframework.test.util.ReflectionTestUtils.setField(runtime,"receipts",new com.dreamcore.workspace.engine.ExecutionReceipts(db));
+  assertEquals(completed,runtime.recover(job.id(),job.lease(),"synthetic-v1"));
+  var altered=new HashMap<String,Object>(body.result());altered.put("modelName","changed");
+  assertThrows(com.dreamcore.workspace.identity.IdentityException.class,()->receipts.finish("COMPANY",job.id(),job.lease(),new com.dreamcore.workspace.engine.ExecutionReceipts.Finish("a".repeat(64),altered)));
+ }
+ @Test void modelAuthorizationFailureStopsAutomaticRetryWithoutDiscardingSource(){
+  var job=claim();queue.dispatched(job,descriptor());queue.fail(job.id(),"REMOTE_ACCESS_DENIED",true,null);
+  assertEquals("FAILED",state());due();assertNull(queue.claim(tenant));
+  assertTrue(db.queryForObject("SELECT count(*)>0 FROM company_analysis_items WHERE tenant_id=?",Boolean.class,tenant));
+ }
+
+ @org.springframework.beans.factory.annotation.Autowired com.dreamcore.workspace.identity.EngineRetryService retries;
+ UUID operator(){
+  UUID a=UUID.randomUUID();db.update("INSERT INTO accounts(id,email,display_name,password_hash) VALUES (?,?,'合成总台','unused')",a,a+"@retry.test");
+  db.update("INSERT INTO platform_accounts(account_id,login_name,password_hash) VALUES (?,?,'unused')",a,a+"@retry.test");db.update("INSERT INTO platform_roles(account_id,role) VALUES (?,'PLATFORM_ADMIN')",a);return a;
+ }
+ @Test void platformRetryRequeuesOnlyUnfinishedCompanyChunksAndKeepsOldAttempt(){
+  UUID actor=operator();var job=claim();queue.dispatched(job,descriptor());queue.fail(job.id(),"COMPANY_RESULT_UNKNOWN",true,null);
+  var req=new com.dreamcore.workspace.identity.EngineRetryService.Request(UUID.randomUUID(),tenant,"COMPANY",job.id(),"UNKNOWN",null);
+  assertEquals("QUEUED",retries.retry(actor,req).state());assertEquals("UNKNOWN",db.queryForObject("SELECT state FROM company_analysis_attempts WHERE run_id=?",String.class,job.id()));
+  var next=queue.claim(tenant);assertNotNull(next);assertNotEquals(job.id(),next.id());
+  queue.complete(result(job,"COMPLETE"));assertEquals("RUNNING",state());
+  assertEquals("QUEUED",retries.retry(actor,req).state());assertEquals(2,db.queryForObject("SELECT count(*) FROM company_analysis_attempts WHERE tenant_id=?",Integer.class,tenant));
+ }
+ @Test void historicalCompanyFailureWithSuccessfulSuccessorCannotSpendAgain(){
+  UUID actor=operator();var job=claim();queue.dispatched(job,descriptor());queue.fail(job.id(),"COMPANY_ANALYSIS_FAILED",true,null);due();
+  var next=queue.claim(tenant);queue.dispatched(next,descriptor());queue.complete(result(next,"COMPLETE"));
+  var req=new com.dreamcore.workspace.identity.EngineRetryService.Request(UUID.randomUUID(),tenant,"COMPANY",job.id(),"FAILED",null);
+  var ex=assertThrows(com.dreamcore.workspace.identity.IdentityException.class,()->retries.retry(actor,req));
+  assertEquals("ENGINE_RETRY_ALREADY_PROCESSED",ex.code);assertEquals("SUCCEEDED",state());
+ }
  @Test void twoConcurrentClaimsUseDisjointBatchesAndSlots() throws Exception {
   for(int i=0;i<10;i++)source(space);queue.discover();
   CompanyInferenceService.Job first,second;
@@ -99,6 +144,13 @@ class CompanyAnalysisIntegrationTest extends CompanyAnalysisFixture {
   var third=queue.claim(tenant);assertTrue(third.inputs().stream().mapToInt(i->i.text().length()).sum()<=2000);
   queue.dispatched(third,descriptor());queue.complete(result(third,"COMPLETE"));
   assertNotNull(queue.claim(tenant));assertEquals(9,db.queryForObject("SELECT count(*) FROM company_analysis_items WHERE tenant_id=?",Integer.class,tenant));
+ }
+ @Test void providerDiagnosticSurvivesAndStoppedWorkerDoesNotClaimMore(){
+  var job=claim();queue.dispatched(job,descriptor());var worker=new CompanyAnalysisWorker(queue,inference,mock(CompanyAnalysisRuntime.class),true);
+  worker.accept(new CompanyAnalysisRuntime.Result("1.0","synthetic-v1",job.id(),job.lease(),"FAILED","REMOTE_UNAVAILABLE",List.of(),"synthetic",1,null,null));
+  assertEquals("REMOTE_UNAVAILABLE",db.queryForObject("SELECT error_code FROM company_analysis_attempts WHERE run_id=?",String.class,job.id()));
+  assertEquals("RETRY_WAIT",state());due();worker.stop();worker.runOnce();assertEquals("RETRY_WAIT",state());
+  assertEquals(1,db.queryForObject("SELECT count(*) FROM company_analysis_attempts WHERE tenant_id=?",Integer.class,tenant));
  }
  @Test void workerPreservesOnlySafeDiagnosticCodes(){
   var job=claim();queue.dispatched(job,descriptor());var worker=new CompanyAnalysisWorker(queue,inference,mock(CompanyAnalysisRuntime.class),true);

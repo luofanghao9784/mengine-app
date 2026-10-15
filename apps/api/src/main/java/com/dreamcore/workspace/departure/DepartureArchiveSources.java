@@ -22,7 +22,7 @@ import java.util.*;import org.springframework.jdbc.core.JdbcTemplate;import org.
  }
  private Map<String,Object> dataset(UUID actor,UUID tenant,UUID workspace,Item item){
   materialAccess.require(actor,tenant,workspace,false);
-  var rows=db.queryForList("SELECT d.name,d.column_names,s.row_count,s.coverage_through,s.collected_at,octet_length(s.data_rows::text) AS size_bytes FROM business_datasets d JOIN dataset_snapshots s ON s.dataset_id=d.id WHERE d.tenant_id=? AND d.workspace_id=? AND d.id=? AND s.id=? AND s.version=? AND d.status='ACTIVE' AND NOT d.scrubbed AND NOT s.scrubbed FOR SHARE OF d,s",tenant,workspace,item.objectId(),item.versionId(),item.version());
+  var rows=db.queryForList("SELECT d.name,d.column_names,s.row_count,s.coverage_through,s.collected_at,octet_length(s.data_rows::text) AS size_bytes FROM business_datasets d JOIN dataset_snapshots s ON s.dataset_id=d.id WHERE d.tenant_id=? AND d.workspace_id=? AND d.id=? AND s.id=? AND s.version=? AND d.status='ACTIVE' AND file_dataset_readable(?::uuid,d.id) AND NOT EXISTS(SELECT 1 FROM file_table_sources f WHERE f.dataset_id=d.id AND (library_mask(?::uuid,f.tenant_id,'MATERIAL',f.material_id)&4)=0) AND NOT d.scrubbed AND NOT s.scrubbed FOR SHARE OF d,s",tenant,workspace,item.objectId(),item.versionId(),item.version(),actor,actor);
   if(rows.isEmpty())throw new IdentityException(404,"DEPARTURE_EXPORT_ITEM_UNAVAILABLE");return rows.getFirst();
  }
 }

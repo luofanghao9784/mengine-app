@@ -117,7 +117,7 @@ test('cumulative summary uses separate date filtering and verifies grouped recei
  const tool=datasetComparisonTool({authorize:async()=>{},invoke:async(body)=>{assert.deepEqual(body,args);return response;}});
  assertObjectJsonSchema(tool.parameters);
  assert.deepEqual(await tool.execute(args,new AbortController().signal),response);
- for(const change of [{dateTo:'2026-07-01'},{dateColumn:undefined},{groupColumns:[]},{groupColumns:['门店','门店']},{baseline:'2026-07'}])await assert.rejects(tool.execute({...args,...change},new AbortController().signal),{code:'INVALID_TOOL_ARGUMENTS'});
+ for(const change of [{dateTo:'2026-07-01'},{dateColumn:undefined},{groupColumns:['门店','门店']},{baseline:'2026-07'}])await assert.rejects(tool.execute({...args,...change},new AbortController().signal),{code:'INVALID_TOOL_ARGUMENTS'});
  response.calculation.missingDateRows=2;
  await assert.rejects(tool.execute(args,new AbortController().signal),{code:'DATASET_RESULT_INVALID'});
 });
@@ -152,4 +152,13 @@ test('composition is capability-gated and checks exact total and rounded platfor
  await assert.rejects(datasetComparisonTool({authorize:async()=>{},invoke:async()=>response}).execute(args,new AbortController().signal),{code:'INVALID_TOOL_ARGUMENTS'});
  response.calculation.rows[0].sharePercent='74.999999';await assert.rejects(tool.execute(args,new AbortController().signal),{code:'DATASET_RESULT_INVALID'});
  response.calculation.rows[0].sharePercent='75.000000';response.calculation.total='12009599006321325';await assert.rejects(tool.execute(args,new AbortController().signal),{code:'DATASET_RESULT_INVALID'});assert.equal(verified,1);
+});
+
+test('whole-table summary is capability-gated and verifies the empty grouping receipt',async()=>{
+ const args={datasetId:request.datasetId,snapshotId:request.snapshotId,operation:'SUMMARY',aggregation:'SUM',groupColumns:[],valueColumn:'金额'};
+ const response=result();response.calculation={recipeVersion:'dataset-summary-1',status:'COMPUTED',request:{...args},inputSha256:sha,matchedRows:6,ignoredRows:0,missingDateRows:0,rows:[{group:[],value:'1.20',records:6}],total:'1.20'};
+ const tool=datasetComparisonTool({authorize:async()=>{},invoke:async(body)=>{assert.deepEqual(body,args);return response;}});
+ assert.deepEqual(await tool.execute(args,new AbortController().signal),response);
+ await assert.rejects(datasetComparisonTool({authorize:async()=>{},invoke:async()=>response,allowSummary:false}).execute(args,new AbortController().signal));
+ response.calculation.rows[0].group=['invented'];await assert.rejects(tool.execute(args,new AbortController().signal),{code:'DATASET_RESULT_INVALID'});
 });

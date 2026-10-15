@@ -45,12 +45,25 @@ public class CompanyInferenceService {
    if(values.isEmpty())throw unavailable();inputs.add(values.getFirst());
   }
   if(inputs.stream().mapToInt(i->i.text().length()).sum()>8000)throw IdentityException.invalid();
-  var groups=information.get(actor,tenant).groups();var revisions=new LinkedHashMap<String,Integer>();for(var g:groups)revisions.put(g.field().name(),g.revision());
+  var groups=new ArrayList<CompanyInformationService.Group>();var revisions=new LinkedHashMap<String,Integer>();
+  var dependencies=new LinkedHashSet<UUID>(chunks);
+  for(var group:information.get(actor,tenant).groups()){
+   revisions.put(group.field().name(),group.revision());var selected=new ArrayList<CompanyInformationService.Tag>();
+   for(var tag:group.tags()){
+    var required=db.queryForList("SELECT DISTINCT i.chunk_id FROM profile_versions v JOIN company_profile_inferences p ON p.version_id=v.id JOIN company_inference_inputs i ON i.run_id=p.run_id WHERE v.entry_id=? AND v.revision=?",UUID.class,tag.id(),tag.revision());
+    var combined=new LinkedHashSet<UUID>(dependencies);combined.addAll(required);
+    // Optional context is admitted with its complete provenance, or omitted as a whole.
+    // Never truncate authority dependencies, and never let background context starve new input.
+    if(combined.size()>256)continue;
+    dependencies=combined;selected.add(tag);
+   }
+   groups.add(new CompanyInformationService.Group(group.field(),group.revision(),group.manuallyCleared(),List.copyOf(selected)));
+  }
   UUID id=UUID.randomUUID(),lease=UUID.randomUUID();
   db.update("INSERT INTO company_inference_runs(id,tenant_id,actor_id,state,lease_token,lease_until,group_revisions) VALUES (?,?,?,'RUNNING',?,now()+interval '90 seconds',?::jsonb)",id,tenant,actor,lease,json.writeValueAsString(revisions));
   for(UUID chunk:chunks)db.update("INSERT INTO company_inference_inputs(run_id,chunk_id) VALUES (?,?)",id,chunk);
-  // Current AI labels supplied to the model carry their own sources even when those raw texts are not sent.
-  db.update("INSERT INTO company_inference_inputs(run_id,chunk_id,model_visible) SELECT ?,i.chunk_id,false FROM company_information_tags t JOIN profile_entries e ON e.id=t.profile_id JOIN profile_versions v ON v.entry_id=e.id AND v.revision=e.revision JOIN company_profile_inferences p ON p.version_id=v.id JOIN company_inference_inputs i ON i.run_id=p.run_id WHERE t.tenant_id=? AND v.status='ACTIVE' AND NOT v.scrubbed AND object_is_active('PROFILE_VERSION',v.id) AND company_profile_readable(v.id) ON CONFLICT DO NOTHING",id,tenant);
+  // Pin all dependencies of exactly the optional labels sent to this model call.
+  for(UUID dependency:dependencies)if(!chunks.contains(dependency))db.update("INSERT INTO company_inference_inputs(run_id,chunk_id,model_visible) VALUES (?,?,false) ON CONFLICT DO NOTHING",id,dependency);
   if(!readable(id)||db.queryForObject("SELECT count(*) FROM company_inference_inputs WHERE run_id=?",Integer.class,id)>256)throw unavailable();
   return new Job(id,lease,tenant,inputs,groups);
  }

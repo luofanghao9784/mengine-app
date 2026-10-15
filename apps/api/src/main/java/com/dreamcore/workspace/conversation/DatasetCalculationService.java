@@ -88,7 +88,7 @@ public class DatasetCalculationService {
             JOIN dataset_snapshots s ON s.id=pin.snapshot_id AND s.dataset_id=pin.dataset_id
             JOIN business_datasets d ON d.id=s.dataset_id AND d.tenant_id=t.tenant_id
             WHERE t.id=? AND t.lease_token=? AND (t.source_scope<>'SELECTED' OR EXISTS(SELECT 1 FROM briefing_dataset_selections chosen WHERE chosen.task_id=t.id AND chosen.dataset_id=d.id AND chosen.snapshot_id=s.id AND NOT chosen.invalidated)) AND d.id=? AND s.id=?
-              AND d.status='ACTIVE' AND NOT d.scrubbed AND NOT s.scrubbed
+              AND d.status='ACTIVE' AND file_dataset_readable(t.requested_by,d.id) AND NOT d.scrubbed AND NOT s.scrubbed
             """,job.id(),job.token(),request.datasetId(),request.snapshotId());
         if (sources.size()!=1) throw new IdentityException(403,"DATASET_CALCULATION_NOT_GRANTED");
         var source = sources.getFirst(); access.require(job.actor(),job.tenant(),(UUID)source.get("workspace_id"),false);
@@ -98,7 +98,7 @@ public class DatasetCalculationService {
         if(request.aggregation()!=null&&!Set.of("SUM","COUNT").contains(request.aggregation()))invalid("INVALID_REQUEST");
         var requested=summary?request.groupColumns():countRows?Arrays.asList(request.groupColumn(),request.periodColumn()):Arrays.asList(request.groupColumn(),request.periodColumn(),request.valueColumn());
         if(composition && (requested==null||requested.size()!=1))invalid("DATASET_COLUMNS_INVALID");
-        if(requested==null||requested.isEmpty()||requested.size()>3)invalid("DATASET_COLUMNS_INVALID");
+        if(requested==null||(!summary&&requested.isEmpty())||requested.size()>3)invalid("DATASET_COLUMNS_INVALID");
         if(summary&&!countRows&&(request.valueColumn()==null||!columns.contains(request.valueColumn())||requested.contains(request.valueColumn())))invalid("DATASET_COLUMNS_INVALID");
         if(request.dateColumn()!=null&&!columns.contains(request.dateColumn()))invalid("DATASET_COLUMNS_INVALID");
         if (requested.stream().anyMatch(c -> c == null || !columns.contains(c)) || new HashSet<>(requested).size()!=requested.size()) invalid("DATASET_COLUMNS_INVALID");

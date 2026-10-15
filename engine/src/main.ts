@@ -1,3 +1,4 @@
+import { ExecutionReceipts } from './runtime/execution-receipts.js';
 import { PresentationRenderer } from './runtime/presentation-renderer.js';
 import { createEngineServer } from './server.js';
 import { AgentTasks } from './runtime/agent-task.js';
@@ -43,6 +44,7 @@ const agent = model
       platformBaseUrl: process.env.AGENT_PLATFORM_URL ?? '',
       executionClass: 'live',
       modelName: model.modelName,
+      routineModel: model.routineModel,
       publicWeb,
       presentationRenderer,
       createModel: model.createModel,
@@ -51,8 +53,8 @@ const agent = model
 const company = model
   ? new CompanyAnalysis({
       executionClass: 'live',
-      modelName: model.modelName,
-      createModel: model.createModel,
+      modelName: (model.routineModel ?? model).modelName,
+      createModel: (model.routineModel ?? model).createModel,
     })
   : undefined;
 const experience = model
@@ -71,6 +73,7 @@ const generalization = model
   : undefined;
 const server = createEngineServer({
   token: process.env.TASK_ENGINE_TOKEN,
+  receipts: model ? new ExecutionReceipts(process.env.AGENT_PLATFORM_URL ?? '', process.env.TASK_ENGINE_TOKEN ?? '') : undefined,
   agent,
   company,
   experience,

@@ -32,6 +32,37 @@ class TaskControlIntegrationTest {
  void record(ConversationService.Job j,String name,String state){agents.toolReceipt(j.id(),j.token(),new AgentTaskService.ToolReceipt(1,name,"STARTED"));if(!state.equals("STARTED"))agents.toolReceipt(j.id(),j.token(),new AgentTaskService.ToolReceipt(1,name,state));}
  AgentResult result(ConversationService.Job j,String outcome,String message,List<AgentResult.Tool> tools){return new AgentResult("1.5","0.11.0",j.id(),j.token(),"AGENT","verification","synthetic","合成已取得结果；仍需指定截止日期",List.of(),tools,List.of(),1,null,List.of(),List.of(),List.of(),outcome,message);}
  void finish(ConversationService.Job j,String outcome){agents.openExecution(j.id(),j.token(),new AgentTaskService.ExecutionOpen("1.5",List.of("task_control")));record(j,"task_control","succeeded");agents.finish(j,result(j,outcome,"请指定本次截止日期",List.of(new AgentResult.Tool("control","task_control","succeeded"))));}
+ @org.springframework.beans.factory.annotation.Autowired com.dreamcore.workspace.engine.ExecutionReceipts executionReceipts;
+ @Autowired AgentReceiptRecovery recovery;
+ @Test void recoveredReceiptCannotBypassRevokedAccountAuthority(){
+  send();var j=conversations.claim();agents.openExecution(j.id(),j.token(),new AgentTaskService.ExecutionOpen("1.6",List.of("search_sources")));
+  executionReceipts.claim("AGENT",j.id(),j.token(),new com.dreamcore.workspace.engine.ExecutionReceipts.Claim("d".repeat(64),"0.11.0"));
+  var mapper=new JsonMapper();executionReceipts.finish("AGENT",j.id(),j.token(),new com.dreamcore.workspace.engine.ExecutionReceipts.Finish("d".repeat(64),mapper.readValue(mapper.writeValueAsString(result(j,"COMPLETE",null,List.of())),Map.class)));
+  conversations.fail(j,"TASK_RESULT_UNKNOWN");db.update("UPDATE engine_execution_receipts SET completed_at=now()-interval '10 seconds' WHERE task_id=?",j.id());db.update("UPDATE accounts SET status='DISABLED' WHERE id=?",owner);
+  recovery.recover();assertEquals("RESULT_UNKNOWN",db.queryForObject("SELECT status FROM conversation_tasks WHERE id=?",String.class,j.id()));assertNull(db.queryForObject("SELECT reply FROM conversation_tasks WHERE id=?",String.class,j.id()));assertNotNull(db.queryForObject("SELECT recovery_error_code FROM engine_execution_receipts WHERE task_id=?",String.class,j.id()));
+ }
+ @Test void savedResultCanRecoverAnUnknownAttemptWithoutASecondModelCall(){
+  send();var j=conversations.claim();agents.openExecution(j.id(),j.token(),new AgentTaskService.ExecutionOpen("1.6",List.of("search_sources")));
+  var claim=new com.dreamcore.workspace.engine.ExecutionReceipts.Claim("c".repeat(64),"0.11.0");executionReceipts.claim("AGENT",j.id(),j.token(),claim);
+  var output=result(j,"COMPLETE",null,List.of());var mapper=new JsonMapper();executionReceipts.finish("AGENT",j.id(),j.token(),new com.dreamcore.workspace.engine.ExecutionReceipts.Finish("c".repeat(64),mapper.readValue(mapper.writeValueAsString(output),Map.class)));
+  conversations.fail(j,"TASK_RESULT_UNKNOWN");db.update("UPDATE engine_execution_receipts SET completed_at=now()-interval '10 seconds' WHERE task_id=?",j.id());recovery.recover();
+  assertEquals("SUCCEEDED",task(detail(j.conversation())).status());assertFalse(task(detail(j.conversation())).reconciliationRequired());int revision=task(detail(j.conversation())).revision();recovery.recover();assertEquals(revision,task(detail(j.conversation())).revision());
+ }
+ @Test void persistedAgentCompletionIsNotBlindlyReplayedByReconcile(){
+  send();var j=conversations.claim();agents.openExecution(j.id(),j.token(),new AgentTaskService.ExecutionOpen("1.6",List.of("search_sources")));
+  var claim=new com.dreamcore.workspace.engine.ExecutionReceipts.Claim("a".repeat(64),"synthetic");assertEquals("NEW",executionReceipts.claim("AGENT",j.id(),j.token(),claim).get("state"));
+  executionReceipts.finish("AGENT",j.id(),j.token(),new com.dreamcore.workspace.engine.ExecutionReceipts.Finish("a".repeat(64),Map.of("taskId",j.id().toString(),"attemptId",j.token().toString(),"engineVersion","synthetic")));
+  conversations.fail(j,"TASK_RESULT_UNKNOWN");denied(409,()->action(j.conversation(),j.id(),"RECONCILE",null));
+  assertNotNull(executionReceipts.result("AGENT",j.id(),j.token()));
+ }
+ @Test void scopedRetryChecksActualToolStartsNotJustPolicyName(){
+  send();var j=conversations.claim();agents.openExecution(j.id(),j.token(),new AgentTaskService.ExecutionOpen("1.6",List.of("search_sources","task_preference")));
+  record(j,"search_sources","STARTED");conversations.fail(j,"TASK_RESULT_UNKNOWN");action(j.conversation(),j.id(),"RECONCILE",null);assertFalse(task(detail(j.conversation())).reconciliationRequired());
+ }
+ @Test void scopedRetryRefusesPossiblePreferenceWrites(){
+  send();var j=conversations.claim();agents.openExecution(j.id(),j.token(),new AgentTaskService.ExecutionOpen("1.6",List.of("task_preference")));
+  record(j,"task_preference","STARTED");conversations.fail(j,"TASK_RESULT_UNKNOWN");denied(409,()->action(j.conversation(),j.id(),"RECONCILE",null));
+ }
  @Test void exactTaskDetailSupportsAttentionStatesWithoutWeakeningPublishableHistory(){
   send();var j=conversations.claim();finish(j,"WAITING_INPUT");
   var focused=conversations.taskDetail(owner,tenant,j.conversation(),j.id());assertEquals(1,focused.tasks().size());assertEquals(j.id(),focused.tasks().getFirst().id());assertEquals("WAITING_INPUT",focused.tasks().getFirst().status());

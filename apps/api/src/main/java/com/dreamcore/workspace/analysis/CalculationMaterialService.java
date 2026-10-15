@@ -59,9 +59,9 @@ public class CalculationMaterialService {
             SELECT s.*,d.column_names,d.workspace_id,d.current_snapshot
             FROM business_datasets d JOIN dataset_snapshots s ON s.dataset_id=d.id
             WHERE d.id=? AND d.tenant_id=? AND s.tenant_id=? AND s.id=coalesce(?::uuid,d.current_snapshot)
-              AND d.status='ACTIVE' AND NOT d.scrubbed AND NOT s.scrubbed
+              AND d.status='ACTIVE' AND file_dataset_readable(?::uuid,d.id) AND NOT d.scrubbed AND NOT s.scrubbed
             FOR SHARE OF d,s
-            """,dataset,tenant,tenant,snapshot));
+            """,dataset,tenant,tenant,snapshot,actor));
         access.require(actor,tenant,(UUID)s.get("workspace_id"),false);
         return s;
     }

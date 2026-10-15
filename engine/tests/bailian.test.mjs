@@ -342,3 +342,12 @@ test('a closed retrieval phase selects only advertised calculation, delivery or 
   assert.ok(diagnostics.some(value => JSON.parse(value).calls.some(call => call.advertisedName === false)));
   assert.ok(diagnostics.every(value => !/task_context|deliver_briefing|phase-call/.test(value)), 'diagnostics expose only fixed shape metadata');
 });
+
+ test('routine routing is explicit, independently validated and preserves the base model', () => {
+ const env={AGENT_MODEL_PROVIDER:'bailian',AGENT_MODEL_NAME:'qwen3.8-max-0902',AGENT_MODEL_API_KEY:config.apiKey,AGENT_BAILIAN_WORKSPACE_ID:config.workspaceId};
+ assert.equal(configuredModel(env).routineModel,undefined);
+ const selected=configuredModel({...env,AGENT_ROUTINE_MODEL_NAME:'qwen3.7-plus-2026-05-26'});
+ assert.equal(selected.modelName,'qwen3.8-max-0902');
+ assert.equal(selected.routineModel.modelName,'qwen3.7-plus-2026-05-26');
+ assert.throws(()=>configuredModel({...env,AGENT_ROUTINE_MODEL_NAME:'unapproved'}),{code:'INVALID_MODEL_CONFIG'});
+ });
