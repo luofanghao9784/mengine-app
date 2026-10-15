@@ -107,6 +107,7 @@ def activate():
  for service in ['dreamcore-app-rehearsal','dreamcore-wiki','dreamcore-model-engine']:
   (E/(service+'.unit')).write_bytes(subprocess.check_output(['systemctl','cat',service]))
  backup_manifest()
+ run('python3','/var/lib/dreamcore/deploy-evidence/ninepop-reconnect-20261016/reset-ninepop-cutover.py')
  atomic(E/'api-candidate.jar',A/'release/api.jar')
  for name in manifest['files']:
   if name.startswith('engine/'):atomic(S/name,ENGINE/name.split('/',1)[1])
