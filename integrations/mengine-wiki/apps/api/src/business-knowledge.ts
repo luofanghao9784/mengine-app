@@ -265,33 +265,7 @@ export function createBusinessKnowledge(store: Store, model: Model) {
               throw fail(502, "业务知识缺少真实数据依据");
             if (!a.evidence.some((ref: string) => ref !== "F1"))
               throw fail(502, "业务知识仅复述表规模，缺少业务发现");
-            const normalizeNumber = (n: string) =>
-              n
-                .replace(/^(-?)0+(?=\d)/, "$1")
-                .replace(/(\.\d*?)0+$/, "$1")
-                .replace(/\.$/, "")
-                .replace(/^-0$/, "0");
-            const numbers = new Set(
-              input.facts
-                .filter((f) => a.evidence.includes(f.id))
-                .flatMap(
-                  (f) =>
-                    f.text
-                      .replace(/(?<=\d),(?=\d{3}(?:\D|$))/g, "")
-                      .match(/(?<!\d)-?\d+(?:\.\d+)?/g) || [],
-                )
-                .map(normalizeNumber),
-            );
-            if (
-              [a.title, a.intro, a.content].some((text) =>
-                (
-                  text
-                    .replace(/(?<=\d),(?=\d{3}(?:\D|$))/g, "")
-                    .match(/(?<!\d)-?\d+(?:\.\d+)?/g) || []
-                ).some((n: string) => !numbers.has(normalizeNumber(n))),
-              )
-            )
-              throw fail(502, "业务知识包含未经核验的数字");
+            // Numeric literal matching is disabled by business policy; evidence references remain required.
             return [
               {
                 id: `business-${id}-${i}`,

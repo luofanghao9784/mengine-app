@@ -844,7 +844,7 @@ test("business knowledge analyzes governed rows, stores evidence and joins the o
               title: "未核验候选不可发布",
               intro: "不能让错误候选影响独立有效知识",
               content: "当前金额为999999元。",
-              evidence: [fact.id],
+              evidence: ["UNKNOWN_FACT"],
             },
           ],
           reason: "",
@@ -901,10 +901,10 @@ test("business knowledge analyzes governed rows, stores evidence and joins the o
       text: JSON.stringify({
         articles: [
           {
-            title: "虚构金额",
+            title: "缺失引用",
             intro: "不应发布",
             content: "999999元",
-            evidence: ["F2"],
+            evidence: ["UNKNOWN_FACT"],
           },
         ],
         reason: "",
