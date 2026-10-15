@@ -26,14 +26,15 @@ public class SupportSecurity {
   if(tail.startsWith("workspaces/"))return tail.matches("workspaces/[0-9a-f-]{36}/(library|folders|materials|knowledge|sources|lifecycle|experiences)(/.*)?");
   return tail.matches("(news-sources|database|company-information|experience-library|general-experiences|profiles|retention|departures|departure-exports|export-batches|object-lifecycle|evaluation|methods)(/.*)?");
  }
- @Bean @Order(0) SecurityFilterChain supportSecurityChain(HttpSecurity http,PlatformIdentity identities,SupportAccess access,org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository csrf)throws Exception{
+ @Bean @Order(0) SecurityFilterChain supportSecurityChain(HttpSecurity http,PlatformIdentity identities,SupportAccess access)throws Exception{
   http.securityMatcher("/api/platform-admin/v1/support-access/*/api/**")
    .sessionManagement(c->c.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
    .securityContext(c->c.securityContextRepository(new NullSecurityContextRepository()))
-   .csrf(c->c.csrfTokenRepository(csrf)).requestCache(c->c.disable()).formLogin(c->c.disable()).httpBasic(c->c.disable()).logout(c->c.disable())
+   .csrf(c->c.disable()).requestCache(c->c.disable()).formLogin(c->c.disable()).httpBasic(c->c.disable()).logout(c->c.disable())
    .authorizeHttpRequests(c->c.anyRequest().authenticated())
    .addFilterBefore(new OncePerRequestFilter(){
     protected void doFilterInternal(HttpServletRequest q,HttpServletResponse r,FilterChain chain)throws ServletException,IOException{
+     if(!Set.of("GET","HEAD","OPTIONS").contains(q.getMethod())&&!identities.validCsrf(identities.read(q),q.getHeader("X-CSRF-TOKEN"))){IdentitySecurity.writeError(r,403,"ACCESS_DENIED");return;}
      var previous=SupportContext.current();SupportContext.Access a=null;UUID requestedId=null;String path="";
      try{
       String raw=q.getRequestURI();String prefix="/api/platform-admin/v1/support-access/";

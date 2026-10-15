@@ -1,0 +1,222 @@
+/* 深色扁平玻璃的通用一层：所有带 .glass 的卡片组共用（引擎首页、知识库、经验库、输出、用量与运行、企业信息）。
+   与数据基座同一套：均匀半透明底 + 1px 细边、无高光无投影；卡片里靠留白、字重和细线分层；
+   金色只给选中项和关键数字，状态用小圆点，红色只留给隔离与失败。数据基座自己的布局细节在 glass-surface.css。 */
+.cards.glass {
+  --pearl: #f3f6fa;
+  --ash: #b4bdca;
+  --dim: #838da0;
+  --hair: rgb(255 255 255 / 8%);
+  --glass: transparent;
+  --champagne: #ecc98a;
+  --frost: #a9c1df;
+  --coral: #ff9583;
+  --amber: #f0c674;
+  --green: #93dcb6;
+  --lens: rgb(255 255 255 / 7%);
+  --mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--pearl);
+  color-scheme: dark;
+}
+.cards.glass .card {
+  border: 1px solid rgb(255 255 255 / 8%);
+  border-radius: 22px;
+  background: rgb(36 43 55 / 32%);
+  backdrop-filter: blur(34px) saturate(1.7);
+  -webkit-backdrop-filter: blur(34px) saturate(1.7);
+  box-shadow: none;
+}
+.cards.glass .side .card {
+  border: 1px solid rgb(255 255 255 / 8%);
+}
+.cards.glass .card-scroll {
+  scrollbar-width: none;
+}
+
+/* 卡片标题：小号无衬线、加宽字距，和数据基座的“数据资产”一致 */
+.cards.glass .card > header {
+  padding: 16px 18px 8px;
+}
+.cards.glass .card > header h2 {
+  font: 500 12px/1.3 inherit;
+  font-family: inherit;
+  letter-spacing: 0.16em;
+  color: var(--ash);
+}
+.cards.glass .card > header span {
+  font-size: 12px;
+  color: var(--dim);
+}
+.cards.glass .card.detail > header h2 {
+  font-size: 19px;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: #fff;
+}
+
+/* 栏目页签：文字加金色细下划线 */
+.cards.glass .card .tabs {
+  gap: 16px;
+  padding: 2px 18px 0;
+  border-bottom-color: var(--hair);
+}
+.cards.glass .card .tabs button {
+  min-height: 34px;
+  padding: 0;
+  color: var(--dim);
+}
+.cards.glass .card .tabs button[aria-selected='true'] {
+  color: var(--pearl);
+  font-weight: 500;
+  box-shadow: inset 0 -1.5px 0 var(--champagne);
+}
+
+/* 状态点 */
+.cards.glass .tone-bad {
+  --tone: var(--coral);
+}
+.cards.glass .tone-warn {
+  --tone: var(--amber);
+}
+.cards.glass .tone-run {
+  --tone: var(--frost);
+}
+.cards.glass .tone-ok {
+  --tone: var(--green);
+}
+.cards.glass .tone-plain {
+  --tone: var(--dim);
+}
+.cards.glass i[class*='tone-'] {
+  background: var(--tone);
+}
+.cards.glass .verdict[class*='tone-'] {
+  background: rgb(255 255 255 / 4%);
+  color: var(--pearl);
+  box-shadow: inset 2px 0 0 var(--tone);
+  border-radius: 0 12px 12px 0;
+}
+
+/* 清单与可点的行：悬停很淡的底，选中一片淡镜片，左边一道金线 */
+.cards.glass .card.list .row,
+.cards.glass .card.todo li button,
+.cards.glass .card.facts button.fact {
+  border-radius: 12px;
+}
+.cards.glass .card.list .row:hover,
+.cards.glass .card.todo li button:hover,
+.cards.glass .card.facts button.fact:hover {
+  background: rgb(255 255 255 / 4%);
+}
+.cards.glass .card.list .row[aria-pressed='true'],
+.cards.glass .card.facts button.fact[aria-pressed='true'] {
+  background: var(--lens);
+  box-shadow: inset 2px 0 0 var(--champagne);
+}
+.cards.glass .card.list .t b,
+.cards.glass .card.todo .t b {
+  font-weight: 450;
+}
+.cards.glass .card.list .chip,
+.cards.glass .card.todo .tag {
+  background: rgb(255 255 255 / 6%);
+  color: var(--ash);
+}
+
+/* 读数：细体等宽数字，关键数字用金色 */
+.cards.glass .card.stat .label {
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  color: var(--ash);
+}
+.cards.glass .card.stat .value,
+.cards.glass .card.facts .fact b,
+.cards.glass .card.todo .n {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 300;
+}
+.cards.glass .card.stat .value {
+  color: var(--champagne);
+}
+.cards.glass .card.stat:hover {
+  background: rgb(255 255 255 / 4%);
+  border-color: rgb(255 255 255 / 12%);
+}
+.cards.glass .card.stat .bar {
+  height: 2px;
+  background: rgb(255 255 255 / 10%);
+}
+.cards.glass .card.stat .bar i {
+  background: var(--champagne);
+  opacity: 0.8;
+}
+.cards.glass .card.todo li {
+  border-top-color: var(--hair);
+}
+.cards.glass .card.todo .n {
+  color: var(--champagne);
+}
+.cards.glass .card.facts .fact {
+  border-top-color: var(--hair);
+}
+.cards.glass .card.facts .fact small {
+  color: var(--dim);
+}
+
+/* 详情里的表格、关联、底部操作 */
+.cards.glass .card.detail thead th {
+  color: var(--dim);
+}
+.cards.glass .card.detail tbody th,
+.cards.glass .card.detail tbody td {
+  border-top-color: var(--hair);
+}
+.cards.glass .card.detail tbody td {
+  color: var(--ash);
+}
+.cards.glass .card.detail .related button {
+  border-radius: 12px;
+  background: transparent;
+  box-shadow: inset 0 -1px 0 var(--hair);
+}
+.cards.glass .card.detail .related button:hover {
+  background: rgb(255 255 255 / 4%);
+}
+.cards.glass .card.detail footer {
+  border-top-color: var(--hair);
+}
+.cards.glass .card.detail footer button {
+  border: 0;
+  border-radius: 10px;
+  background: rgb(255 255 255 / 6%);
+  color: var(--pearl);
+}
+.cards.glass .card.detail footer button.primary {
+  background: rgb(236 201 138 / 14%);
+  color: #f8e7c6;
+}
+
+/* 柱状图：细柱、低饱和；失败与重试只是柱顶一小段淡红 */
+.cards.glass .card.chart .bars {
+  gap: 10px;
+}
+.cards.glass .card.chart .bars span {
+  align-items: center;
+}
+.cards.glass .card.chart .bars i {
+  width: min(14px, 100%);
+  border-radius: 3px 3px 0 0;
+  background: rgb(236 201 138 / 55%);
+}
+.cards.glass .card.chart .bars i.bad {
+  border-radius: 3px 3px 0 0;
+  background: rgb(255 149 131 / 70%);
+}
+.cards.glass .card.chart .bars i.bad + i {
+  border-radius: 0;
+}
+.cards.glass .card.chart .bars span:hover i:not(.bad) {
+  background: var(--champagne);
+}

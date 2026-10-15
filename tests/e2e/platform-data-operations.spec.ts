@@ -252,7 +252,7 @@ for (const problem of ['leak', 'wrong'] as const)
     await expect(page.getByText('不应泄露的文件名.txt')).toHaveCount(0);
     await expect(page.locator('.data-ops-records')).toHaveCount(0);
   });
-test('material monitoring and enterprise directory are separate and preserve return context', async ({
+test('material monitoring groups by enterprise before showing individual records', async ({
   page,
   context,
 }) => {
@@ -261,8 +261,9 @@ test('material monitoring and enterprise directory are separate and preserve ret
   await expect(page.getByLabel('搜索企业')).toHaveCount(0);
   await expect(page.getByRole('combobox', { name: '运行状态' })).toHaveCount(0);
   await expect(page.locator('.data-ops-metrics')).toBeVisible();
-  await expect(page.getByRole('cell', { name: /PDF · 2/  })).toBeVisible();
-  await expect(page.locator('.data-ops-tenants')).toHaveCount(0);
+  await expect(page.locator('.data-archive-table')).toHaveCount(0);
+  await expect(page.locator('.data-ops-tenants')).toBeVisible();
+  await expect(page.getByRole('heading', { name: '合成企业 1', exact: true })).toBeVisible();
   await page.getByRole('link', { name: '企业列表', exact: true }).click();
   await expect(page.locator('.data-ops-metrics')).toHaveCount(0);
   await page.getByRole('heading', { name: '合成企业 1', exact: true }).click();

@@ -168,8 +168,8 @@
           },
           "channels": {
             "type": "array",
-            "minItems": 9,
-            "maxItems": 10,
+            "minItems": 10,
+            "maxItems": 11,
             "items": {
               "$ref": "#/components/schemas/Channel"
             }
@@ -198,6 +198,7 @@
               "RETRIEVAL",
               "TASK",
               "COMPANY",
+              "SCENE_KNOWLEDGE",
               "EXPERIENCE",
               "GENERALIZATION",
               "GENERAL_ADJUSTMENT",

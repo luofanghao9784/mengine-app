@@ -24,7 +24,22 @@ import {
   Trash2,
   Activity,
   LibraryBig,
+  Users,
+  ShieldCheck,
+  KeyRound,
+  ScrollText,
+  Sheet,
+  Presentation,
+  FileType,
+  Image,
+  AudioLines,
+  PenLine,
+  Eye,
+  File,
+  type LucideIcon,
 } from 'lucide-react';
+import { ActionPopover } from '../shared/ActionPopover';
+import './library-redesign.css';
 import type { TenantContext } from '../../contracts/public-api/identity';
 import type { MaterialEntry, MaterialVersion } from '../../contracts/public-api/material';
 import { useSession, identityClient } from '../identity/session';
@@ -46,6 +61,69 @@ const size = (bytes: number) =>
     : bytes < 1048576
       ? `${(bytes / 1024).toFixed(1)} KB`
       : `${(bytes / 1048576).toFixed(1)} MB`;
+const typeTones: [RegExp, string, string, LucideIcon][] = [
+  [/^(md|txt|doc|docx|rtf)$/, 'text', '文档', FileText],
+  [/^(xls|xlsx|csv|tsv)$/, 'sheet', '表格', Sheet],
+  [/^(ppt|pptx)$/, 'slides', '演示', Presentation],
+  [/^pdf$/, 'pdf', 'PDF', FileType],
+  [/^(png|jpe?g|gif|webp|svg|bmp)$/, 'image', '图片', Image],
+  [/^(mp3|wav|m4a|aac|mp4|mov|webm)$/, 'media', '音视频', AudioLines],
+];
+function entryType(item: Pick<MaterialEntry, 'kind' | 'name'>) {
+  if (item.kind === 'FOLDER') return { tone: 'folder', label: '文件夹', icon: Folder };
+  if (item.kind === 'DRAFT') return { tone: 'draft', label: '文稿', icon: PenLine };
+  const ext = item.name.includes('.') ? item.name.split('.').at(-1)!.toLowerCase() : '';
+  const found = typeTones.find(([pattern]) => pattern.test(ext));
+  return found
+    ? { tone: found[1], label: ext === 'pdf' ? 'PDF' : `${found[2]} · ${ext.toUpperCase()}`, icon: found[3] }
+    : { tone: 'other', label: ext ? ext.toUpperCase() : '文件', icon: File };
+}
+function PermissionMenu({
+  here,
+  manage,
+  journal,
+}: {
+  here?: () => void;
+  manage: () => void;
+  journal?: () => void;
+}) {
+  const anchor = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const pick = (action: () => void) => () => {
+    setOpen(false);
+    action();
+  };
+  return (
+    <div ref={anchor}>
+      <Button
+        variant="ghost"
+        icon={ShieldCheck}
+        className="lib-tool"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+      >
+        权限
+      </Button>
+      {open && (
+        <ActionPopover anchor={anchor} label="资料权限" onClose={() => setOpen(false)}>
+          {here && (
+            <Button icon={KeyRound} onClick={pick(here)}>
+              当前位置权限
+            </Button>
+          )}
+          <Button icon={ShieldCheck} onClick={pick(manage)}>
+            资料权限管理
+          </Button>
+          {journal && (
+            <Button icon={ScrollText} onClick={pick(journal)}>
+              访问请求留痕
+            </Button>
+          )}
+        </ActionPopover>
+      )}
+    </div>
+  );
+}
 const message = (error: unknown) =>
   error instanceof IdentityError ? error.message : '请求未完成，请稍后重试。';
 const accessDenied = (error: unknown) =>
@@ -130,13 +208,6 @@ function LibraryContents({
           </div>
         </PageActions>
       )}
-      {enabled && (
-        <div className="material-tabs" aria-label="资料授权入口">
-          <Button onClick={() => setAccessBrowser('SHARED')}>共享给我</Button>
-          <Button onClick={() => setAccessBrowser('MANAGE')}>资料权限管理</Button>
-          {context.role === 'TENANT_ADMIN' && <Button onClick={() => setJournal(true)}>访问请求留痕</Button>}
-        </div>
-      )}
       {accessBrowser && (
         <LibraryAccessBrowser
           tenant={tenant}
@@ -171,6 +242,14 @@ function LibraryContents({
           administration={administration}
           hash={hash}
           recycle={recycle === 'trash' ? 'TRASH' : recycle === 'records' ? 'RECORDS' : undefined}
+          access={
+            enabled
+              ? {
+                  browse: setAccessBrowser,
+                  journal: context.role === 'TENANT_ADMIN' ? () => setJournal(true) : undefined,
+                }
+              : undefined
+          }
         />
       )}
     </>
@@ -186,7 +265,9 @@ function LibraryListing({
   administration,
   hash,
   recycle,
+  access,
 }: {
+  access?: { browse: (mode: 'MANAGE' | 'SHARED') => void; journal?: () => void };
   tenant: string;
   context: TenantContext;
   workspace: string | null;
@@ -402,6 +483,36 @@ function LibraryListing({
         }
         layout={layout}
         onLayout={setLayout}
+        extraActions={
+          access && (
+            <>
+              <Button
+                variant="ghost"
+                icon={Users}
+                className="lib-tool"
+                onClick={() => access.browse('SHARED')}
+              >
+                共享给我
+              </Button>
+              <PermissionMenu
+                here={
+                  workspace && !personal
+                    ? () =>
+                        setPermissionTarget({
+                          kind: folder ? 'FOLDER' : 'WORKSPACE',
+                          id: folder || workspace,
+                          name: folder
+                            ? data.value?.trail.at(-1)?.name || '当前文件夹'
+                            : current?.name || '当前空间',
+                        })
+                    : undefined
+                }
+                manage={() => access.browse('MANAGE')}
+                journal={access.journal}
+              />
+            </>
+          )
+        }
       >
         <nav className="material-crumbs" aria-label="文件夹路径">
           <button
@@ -483,7 +594,9 @@ function LibraryListing({
                     location.hash = href(tenant, s.id);
                   }}
                 >
-                  <Folder size={28} />
+                  <span className="lib-type folder">
+                    <Folder size={18} strokeWidth={1.7} />
+                  </span>
                   <strong>{s.name}</strong>
                   <ChevronRight size={16} />
                 </button>
@@ -503,64 +616,45 @@ function LibraryListing({
         <Loading />
       ) : (
         <>
-          <div className={`material-entries ${layout}`}>
-            {data.value.items.map((item) => (
-              <div key={item.id} className="material-entry-shell">
-                <button
-                  className="material-entry"
-                  onClick={() =>
-                    item.kind === 'FOLDER'
-                      ? (location.hash = href(tenant, personal ? 'personal' : item.workspaceId, item.id))
-                      : item.kind === 'DRAFT'
-                        ? setDraftDocument(item.id)
-                        : setDocument({ id: item.id, workspaceId: item.workspaceId })
-                  }
-                >
-                  <div className="material-cover">
-                    {item.kind === 'FOLDER' ? <Folder size={32} /> : <FileText size={32} />}
-                    <span>
-                      {item.kind === 'FOLDER'
-                        ? '文件夹'
-                        : item.kind === 'DRAFT'
-                          ? '文稿'
-                          : item.name.includes('.')
-                            ? item.name.split('.').at(-1)?.toUpperCase()
-                            : '文件'}
+          <div className={`lib-entries ${layout}`}>
+            {layout === 'list' && data.value.items.length > 0 && (
+              <div className="lib-columns" aria-hidden="true">
+                <span>名称</span>
+                <span>{q || !workspace ? '位置' : '版本'}</span>
+                <span>大小</span>
+                <span>更新时间</span>
+              </div>
+            )}
+            {data.value.items.map((item) => {
+              const type = entryType(item);
+              const open = () =>
+                item.kind === 'FOLDER'
+                  ? (location.hash = href(tenant, personal ? 'personal' : item.workspaceId, item.id))
+                  : item.kind === 'DRAFT'
+                    ? setDraftDocument(item.id)
+                    : setDocument({ id: item.id, workspaceId: item.workspaceId });
+              const manage = item.canManageFiles ?? (!permissionsEnabled && item.canMaintain);
+              return (
+                <div key={item.id} className="lib-entry">
+                  <button className="material-entry lib-entry-main" onClick={open}>
+                    <span className={`lib-type ${type.tone}`}>
+                      <type.icon size={18} strokeWidth={1.7} />
                     </span>
-                    <div className="material-cover-art" aria-hidden="true">
-                      {item.kind === 'FOLDER' ? <Folder strokeWidth={1.3} /> : <FileText strokeWidth={1.3} />}
-                    </div>
-                  </div>
-                  <div className="material-entry-body">
                     <strong>{item.name}</strong>
-                    {(q || !workspace || item.kind === 'DOCUMENT') && (
-                      <small>
-                        {q || !workspace
-                          ? item.path.join(' / ')
-                          : `${size(item.sizeBytes!)} · v${item.version}`}
-                      </small>
-                    )}
-                    <small>
+                    <span className="lib-kind">{type.label}</span>
+                    <span className="lib-place">
+                      {q || !workspace
+                        ? item.path.slice(0, -1).join(' / ')
+                        : item.kind === 'DOCUMENT'
+                          ? `v${item.version}`
+                          : ''}
+                    </span>
+                    <span className="lib-size">{item.sizeBytes == null ? '' : size(item.sizeBytes)}</span>
+                    <time dateTime={item.updatedAt}>
                       {new Date(item.updatedAt).toLocaleDateString('zh-CN')}
-                      {item.kind === 'DOCUMENT' ? ' · 原件已保存' : ''}
-                    </small>
-                  </div>
-                </button>
-                {permissionsEnabled && item.kind !== 'DRAFT' && (
-                  <Button
-                    onClick={() =>
-                      setPermissionTarget({
-                        kind: item.kind === 'FOLDER' ? 'FOLDER' : 'MATERIAL',
-                        id: item.id,
-                        name: item.name,
-                      })
-                    }
-                  >
-                    权限设置
-                  </Button>
-                )}
-                {item.kind !== 'DRAFT' &&
-                  (item.canManageFiles ?? (!permissionsEnabled && item.canMaintain)) && (
+                    </time>
+                  </button>
+                  {item.kind !== 'DRAFT' && (permissionsEnabled || manage) && (
                     <MaterialEntryActions
                       tenant={tenant}
                       workspace={item.workspaceId}
@@ -568,10 +662,23 @@ function LibraryListing({
                       kind={item.kind === 'FOLDER' ? 'FOLDER' : 'MATERIAL'}
                       name={item.name}
                       changed={refresh}
+                      canManage={manage}
+                      onOpen={open}
+                      onPermissions={
+                        permissionsEnabled
+                          ? () =>
+                              setPermissionTarget({
+                                kind: item.kind === 'FOLDER' ? 'FOLDER' : 'MATERIAL',
+                                id: item.id,
+                                name: item.name,
+                              })
+                          : undefined
+                      }
                     />
                   )}
-              </div>
-            ))}
+                </div>
+              );
+            })}
           </div>
           {!data.value.items.length && (
             <Empty
@@ -602,19 +709,6 @@ function LibraryListing({
           close={() => setPermissionTarget(undefined)}
           changed={refresh}
         />
-      )}
-      {permissionsEnabled && workspace && !personal && (
-        <Button
-          onClick={() =>
-            setPermissionTarget({
-              kind: folder ? 'FOLDER' : 'WORKSPACE',
-              id: folder || workspace,
-              name: folder ? '当前文件夹' : '当前空间',
-            })
-          }
-        >
-          当前位置权限
-        </Button>
       )}
       {modal === 'folder' && workspace && (
         <FolderDialog
@@ -1023,83 +1117,108 @@ export function DocumentDialog({
                       failure || !data.value ? (
                         unavailable
                       ) : (
-                        <>
+                        <div className="mat-props">
                           <dl className="live-material-properties">
                             <dt>位置</dt>
-                            <dd>{data.value.document.path.join(' / ')}</dd>
+                            <dd>{data.value.document.path.slice(0, -1).join(' / ') || '—'}</dd>
                             <dt>阅读版本</dt>
-                            <dd>v{selectedVersion?.number}</dd>
-                            <dt>当前最新版本</dt>
-                            <dd>v{data.value.document.version}</dd>
-                            <dt>权限</dt>
                             <dd>
-                              {(data.value.document.canMaintain ? '可编辑' : '仅查看') +
-                                (data.value?.document.canDownload === false ? ' · 不可下载' : ' · 可下载')}
+                              v{selectedVersion?.number}
+                              {selectedVersion?.number !== data.value.document.version && (
+                                <small>（最新为 v{data.value.document.version}）</small>
+                              )}
+                            </dd>
+                            <dt>我的权限</dt>
+                            <dd>
+                              <i className="perm-chip edit">
+                                {data.value.document.canMaintain ? '可编辑' : '仅查看'}
+                              </i>
+                              <i
+                                className={`perm-chip ${data.value.document.canDownload === false ? 'none' : ''}`}
+                              >
+                                {data.value.document.canDownload === false ? '不可下载' : '可下载'}
+                              </i>
                             </dd>
                           </dl>
                           {data.value.document.canMaintain && (
-                            <Button icon={Upload} onClick={() => setUpload(data.value!.document.version)}>
-                              上传新版本
-                            </Button>
+                            <div className="mat-props-actions">
+                              <Button icon={Upload} onClick={() => setUpload(data.value!.document.version)}>
+                                上传新版本
+                              </Button>
+                              {/[.](txt|md|markdown)$/i.test(data.value.document.name) && (
+                                <Button icon={PenLine} onClick={() => setEditingText(true)}>
+                                  编辑正文
+                                </Button>
+                              )}
+                            </div>
                           )}
-                          {data.value.document.canMaintain &&
-                            /[.](txt|md|markdown)$/i.test(data.value.document.name) && (
-                              <Button onClick={() => setEditingText(true)}>编辑正文</Button>
-                            )}
-                          <LibraryEvents
-                            tenant={tenant}
-                            kind="MATERIAL"
-                            id={entry.id}
-                            canAudit={data.value.document.canManagePermissions}
-                          />
-                          <MaterialPipeline
-                            key={data.value.document.version}
-                            tenant={tenant}
-                            workspace={entry.workspaceId}
-                            material={entry.id}
-                          />
                           <h3>历史版本</h3>
                           <ul className="material-versions">
                             {data.value.versions.map((v) => (
-                              <li key={v.id}>
+                              <li key={v.id} aria-current={v.id === selectedVersion?.id || undefined}>
                                 <div>
                                   <strong>
-                                    v{v.number} · {v.filename}
+                                    v{v.number}
+                                    {v.number === data.value!.document.version && (
+                                      <i className="perm-chip">最新</i>
+                                    )}
+                                    {v.id === selectedVersion?.id && (
+                                      <i className="perm-chip edit">正在阅读</i>
+                                    )}
                                   </strong>
                                   <small>
-                                    {size(v.sizeBytes)} · {new Date(v.createdAt).toLocaleString('zh-CN')} ·{' '}
-                                    {v.createdByName || '历史提交人'}
+                                    {new Date(v.createdAt).toLocaleString('zh-CN')} ·{' '}
+                                    {v.createdByName || '历史提交人'} · {size(v.sizeBytes)}
                                   </small>
+                                  <small className="mat-version-file">{v.filename}</small>
                                   <details className="material-checksum">
                                     <summary>文件校验信息</summary>
                                     <small>SHA-256：{v.sha256}</small>
                                   </details>
                                 </div>
-                                <Button
-                                  onClick={() => {
-                                    setAnalysis(v);
-                                    setReveal((previous) => ({
-                                      id: 'conversation',
-                                      sequence: (previous?.sequence || 0) + 1,
-                                    }));
-                                  }}
-                                >
-                                  查看 v{v.number} 解析
-                                </Button>
-                                <Button
-                                  icon={Download}
-                                  disabled={busy || data.value?.document.canDownload === false}
-                                  onClick={() => void download(v)}
-                                >
-                                  下载 v{v.number}
-                                </Button>
+                                <div className="mat-version-actions">
+                                  <Button
+                                    variant="ghost"
+                                    icon={Eye}
+                                    disabled={v.id === selectedVersion?.id}
+                                    onClick={() => {
+                                      setAnalysis(v);
+                                      setReveal((previous) => ({
+                                        id: 'conversation',
+                                        sequence: (previous?.sequence || 0) + 1,
+                                      }));
+                                    }}
+                                  >
+                                    阅读 v{v.number}
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    icon={Download}
+                                    disabled={busy || data.value?.document.canDownload === false}
+                                    onClick={() => void download(v)}
+                                  >
+                                    下载 v{v.number}
+                                  </Button>
+                                </div>
                               </li>
                             ))}
                           </ul>
                           {(page > 0 || data.value.hasMore) && (
                             <Pager page={page} next={data.value.hasMore} onPage={setPage} />
                           )}
-                        </>
+                          <MaterialPipeline
+                            key={data.value.document.version}
+                            tenant={tenant}
+                            workspace={entry.workspaceId}
+                            material={entry.id}
+                          />
+                          <LibraryEvents
+                            tenant={tenant}
+                            kind="MATERIAL"
+                            id={entry.id}
+                            canAudit={data.value.document.canManagePermissions}
+                          />
+                        </div>
                       ),
                   },
                 ]

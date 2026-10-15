@@ -88,4 +88,34 @@ class CompanyAnalysisIntegrationTest extends CompanyAnalysisFixture {
  @Test void crashBeforeDispatchIsSafelyRetryableAndDoesNotReportAProviderCall(){
   var job=claim();var worker=new CompanyAnalysisWorker(queue,inference,mock(CompanyAnalysisRuntime.class),true);worker.recover(new CompanyAnalysisQueue.Recovery(job.id(),job.lease(),null,"CLAIMED",true,false));assertEquals("RETRY_WAIT",state());assertEquals(0L,db.queryForObject("SELECT input_tokens FROM company_analysis_attempts WHERE run_id=?",Long.class,job.id()));worker.stop();
  }
+ @Test void confirmedFailuresShrinkOrderedBatchesWithoutSkippingInputs(){
+  for(int i=1;i<=8;i++)extraPart(i,"体".repeat(900));
+  var first=claim();assertEquals(9,first.inputs().size());queue.dispatched(first,descriptor());
+  queue.fail(first.id(),"MODEL_CALL_LIMIT",true,result(first,"FAILED"));due();
+  var second=queue.claim(tenant);assertTrue(second.inputs().size()<first.inputs().size());
+  assertTrue(second.inputs().stream().mapToInt(i->i.text().length()).sum()<=4000);
+  assertEquals(chunk,second.inputs().getFirst().chunkId());queue.dispatched(second,descriptor());
+  queue.fail(second.id(),"MODEL_CALL_LIMIT",true,result(second,"FAILED"));due();
+  var third=queue.claim(tenant);assertTrue(third.inputs().stream().mapToInt(i->i.text().length()).sum()<=2000);
+  queue.dispatched(third,descriptor());queue.complete(result(third,"COMPLETE"));
+  assertNotNull(queue.claim(tenant));assertEquals(9,db.queryForObject("SELECT count(*) FROM company_analysis_items WHERE tenant_id=?",Integer.class,tenant));
+ }
+ @Test void workerPreservesOnlySafeDiagnosticCodes(){
+  var job=claim();queue.dispatched(job,descriptor());var worker=new CompanyAnalysisWorker(queue,inference,mock(CompanyAnalysisRuntime.class),true);
+  worker.accept(new CompanyAnalysisRuntime.Result("1.0","synthetic-v1",job.id(),job.lease(),"FAILED","MODEL_CALL_LIMIT",List.of(),"synthetic",8,12L,3L));
+  assertEquals("MODEL_CALL_LIMIT",db.queryForObject("SELECT error_code FROM company_analysis_attempts WHERE run_id=?",String.class,job.id()));
+  due();job=queue.claim(tenant);queue.dispatched(job,descriptor());
+  worker.accept(new CompanyAnalysisRuntime.Result("1.0","synthetic-v1",job.id(),job.lease(),"FAILED","secret arbitrary payload",List.of(),"synthetic",1,12L,3L));
+  assertEquals("COMPANY_ANALYSIS_FAILED",db.queryForObject("SELECT error_code FROM company_analysis_attempts WHERE run_id=?",String.class,job.id()));worker.stop();
+ }
+
+ @Test void confirmedLostReceiptReleasesOnlyExpiredLeaseAndNeverResends(){
+  var job=claim();queue.dispatched(job,descriptor());var runtime=mock(CompanyAnalysisRuntime.class);
+  when(runtime.recover(job.id(),job.lease(),"synthetic-v1")).thenThrow(new CompanyAnalysisRuntime.Failure("COMPANY_RESULT_LOST",true));
+  var worker=new CompanyAnalysisWorker(queue,inference,runtime,true);
+  worker.recover(new CompanyAnalysisQueue.Recovery(job.id(),job.lease(),"synthetic-v1","DISPATCHED",false,false));assertEquals("RUNNING",state());
+  worker.recover(new CompanyAnalysisQueue.Recovery(job.id(),job.lease(),"synthetic-v1","DISPATCHED",true,false));assertEquals("UNKNOWN",state());
+  due();queue.discover();assertNull(queue.claim(tenant));verify(runtime,never()).execute(any(),any(),any());worker.stop();
+ }
+
 }

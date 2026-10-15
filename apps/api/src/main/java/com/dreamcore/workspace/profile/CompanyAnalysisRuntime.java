@@ -44,7 +44,7 @@ public class CompanyAnalysisRuntime {
   finally{if(future!=null&&!future.isDone())future.cancel(true);}
  }
  public Result recover(UUID run,UUID lease,String version){
-  try{var response=send(request("/internal/v1/company-information/results/"+run+"/"+lease).GET().build());if(response.statusCode()==202)return null;if(response.statusCode()!=200)throw new Failure("COMPANY_RESULT_UNKNOWN",true);return validate(response.body(),run,lease,version);}
+  try{var response=send(request("/internal/v1/company-information/results/"+run+"/"+lease).GET().build());if(response.statusCode()==202)return null;if(response.statusCode()==404&&"COMPANY_RESULT_PENDING".equals(json.readTree(response.body()).path("code").asString()))throw new Failure("COMPANY_RESULT_LOST",true);if(response.statusCode()!=200)throw new Failure("COMPANY_RESULT_UNKNOWN",true);return validate(response.body(),run,lease,version);}
   catch(Failure f){throw f;}catch(Exception e){if(e instanceof InterruptedException)Thread.currentThread().interrupt();throw new Failure("COMPANY_RESULT_UNKNOWN",true);}
  }
  public void cancel(UUID run,UUID lease){try{send(request("/internal/v1/company-information/results/"+run+"/"+lease).DELETE().build());}catch(Exception ignored){if(ignored instanceof InterruptedException)Thread.currentThread().interrupt();}}

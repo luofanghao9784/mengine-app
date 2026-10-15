@@ -18,7 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class IdentityService {
-    public record Account(UUID id, String email, String displayName, String phone,
+    public record Account(UUID id, String email, String displayName, String phone, String username,
                           @com.fasterxml.jackson.annotation.JsonIgnore long credentialVersion) {}
     public record ServiceNotice(String status, String explanation, Instant changedAt) {}
     public record Membership(UUID tenantId, String tenantName, String role, ServiceNotice service) {
@@ -30,7 +30,7 @@ public class IdentityService {
     public record TenantContext(Tenant tenant, String role, List<Workspace> workspaces) {}
     public record Invitation(UUID id, UUID tenantId, String email, String role, String status, Instant expiresAt, String phone) {}
     public record TenantCreated(Tenant tenant, Invitation invitation) {}
-    private static final RowMapper<Account> ACCOUNT = (r, n) -> new Account(r.getObject("id", UUID.class), r.getString("email"), r.getString("display_name"), r.getString("phone"),r.getLong("credential_version"));
+    private static final RowMapper<Account> ACCOUNT = (r, n) -> new Account(r.getObject("id", UUID.class), r.getString("email"), r.getString("display_name"), r.getString("phone"),r.getString("username"),r.getLong("credential_version"));
     private static final RowMapper<Tenant> TENANT = (r, n) -> new Tenant(r.getObject("id", UUID.class), r.getString("name"), r.getString("status"));
     private static final RowMapper<Invitation> INVITATION = (r, n) -> new Invitation(r.getObject("id", UUID.class), r.getObject("tenant_id", UUID.class),
             r.getString("email"), r.getString("role"), r.getString("effective_status"), r.getTimestamp("expires_at").toInstant(), r.getString("phone"));
@@ -81,9 +81,17 @@ public class IdentityService {
     public Account login(String suppliedEmail, String password, String ip) {
         boolean byPhone = suppliedEmail != null && !suppliedEmail.contains("@");
         String normalized = byPhone ? PhoneNumbers.normalize(suppliedEmail) : email(suppliedEmail);
+        return loginCredential(normalized, byPhone ? "phone=?" : "email=? AND phone IS NULL", password, ip);
+    }
+    public Account loginUsername(String supplied, String password, String ip) {
+        String normalized = supplied.strip().toLowerCase(Locale.ROOT);
+        if (!normalized.matches("[a-z][a-z0-9_-]{2,39}")) throw new IdentityException(401, "INVALID_CREDENTIALS");
+        return loginCredential(normalized, "username=?", password, ip);
+    }
+    private Account loginCredential(String normalized, String predicate, String password, String ip) {
         if (!throttle.allow(normalized, ip)) { audit.denial(null, "LOGIN_THROTTLED"); throw new IdentityException(429, "LOGIN_THROTTLED"); }
         if (password == null || password.length() > 128) throw new IdentityException(401, "INVALID_CREDENTIALS");
-        var rows = db.queryForList("SELECT id,password_hash,status,credential_version FROM accounts WHERE " + (byPhone ? "phone=?" : "email=? AND phone IS NULL") + " AND NOT EXISTS(SELECT 1 FROM unified_identity_links l WHERE l.source_id=accounts.id)", normalized);
+        var rows = db.queryForList("SELECT id,password_hash,status,credential_version FROM accounts WHERE " + predicate + " AND NOT EXISTS(SELECT 1 FROM unified_identity_links l WHERE l.source_id=accounts.id)", normalized);
         String encoded = rows.isEmpty() ? dummyHash : (String) rows.getFirst().get("password_hash");
         boolean matches = passwords.matches(password, encoded);
         if (!matches || rows.isEmpty() || !"ACTIVE".equals(rows.getFirst().get("status"))) {
@@ -93,7 +101,7 @@ public class IdentityService {
         audit.record(id, null, "LOGIN", id, "SUCCESS");
         var current=account(id);
         // Bind the new session to the password version that actually matched, even if a reset races.
-        return new Account(current.id(),current.email(),current.displayName(),current.phone(),(Long)rows.getFirst().get("credential_version"));
+        return new Account(current.id(),current.email(),current.displayName(),current.phone(),current.username(),(Long)rows.getFirst().get("credential_version"));
     }
     public Account account(UUID id) {
         var rows = db.query("SELECT * FROM accounts WHERE id=? AND status='ACTIVE' AND NOT EXISTS(SELECT 1 FROM unified_identity_links l WHERE l.source_id=accounts.id)", ACCOUNT, id);

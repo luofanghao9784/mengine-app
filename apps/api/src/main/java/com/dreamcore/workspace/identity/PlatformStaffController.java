@@ -49,9 +49,10 @@ public class PlatformStaffController {
     @PostMapping("/auth/invitation/accept") public IdentityService.Me accept(Authentication auth,@Valid @RequestBody Accept body,HttpServletRequest request,HttpServletResponse response) {
         String browser=browser(request);
         if(staff.requiresPhoneVerification(body.token()) && body.challengeId()!=null)verification.verify(body.challengeId(),body.code(),"STAFF",browser);
-        Object version=request.getSession().getAttribute("CREDENTIAL_VERSION");
-        var account=staff.acceptUnified(IdentityController.actor(auth),version instanceof Number n?n.longValue():-1,body.token(),body.username(),body.password(),body.displayName(),body.challengeId(),browser,request.getRemoteAddr(),verification);
-        UnifiedLogin.authenticate(identities,account.id(),account.credentialVersion(),"PASSWORD",request,response);
+        UUID actor=IdentityController.actor(auth);
+        long version=actor==null?-1:identities.account(actor).credentialVersion();
+        var account=staff.acceptUnified(actor,version,body.token(),body.username(),body.password(),body.displayName(),body.challengeId(),browser,request.getRemoteAddr(),verification);
+        identity.authenticate(account.id(),account.credentialVersion(),request,response);
         return identities.me(account.id());
     }
 }

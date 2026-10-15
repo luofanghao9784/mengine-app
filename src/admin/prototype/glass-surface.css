@@ -1,0 +1,1410 @@
+/* 轻磨砂卡片（先用于数据基座，参照 C2）：卡片底色只有三成多，模糊更强，3D 透得清楚；轮廓靠一圈亮边和上缘反光，阴影很浅。
+   卡片里不用细线分隔，用淡淡的半透明小格子；金色只给选中项和关键数字，状态用小圆点加文字，红色只留给隔离与失败。
+   尺寸约定：卡片内边距 16/20，小格圆角 12，正文 13px，说明 12px，小标题 12px 加宽字距。 */
+.cards.work.data.glass {
+  --pearl: #f3f6fa;
+  --ash: #b4bdca;
+  --dim: #838da0;
+  --hair: rgb(255 255 255 / 8%);
+  --glass: transparent;
+  --champagne: #ecc98a;
+  --frost: #a9c1df;
+  --coral: #ff9583;
+  --amber: #f0c674;
+  --green: #93dcb6;
+  --tile: rgb(255 255 255 / 5%);
+  --tile-edge: rgb(255 255 255 / 7%);
+  --lens: rgb(255 255 255 / 10%);
+  --mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--pearl);
+  color-scheme: dark;
+}
+.cards.work.data.glass {
+  grid-template-columns: 264px minmax(300px, 0.95fr) minmax(0, 1.9fr);
+}
+.cards.work.data.glass .num {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* ---- 卡片 ---- */
+.cards.work.data.glass > .card,
+.cards.work.data.glass .detail-col > .card {
+  box-sizing: border-box;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgb(255 255 255 / 15%);
+  border-radius: 22px;
+  background: linear-gradient(160deg, rgb(255 255 255 / 9%), rgb(255 255 255 / 2%) 40%), rgb(40 48 62 / 34%);
+  backdrop-filter: blur(34px) saturate(1.7);
+  -webkit-backdrop-filter: blur(34px) saturate(1.7);
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 18%) inset,
+    0 10px 30px rgb(0 0 0 / 18%);
+}
+.cards.work.data.glass .card-scroll {
+  scrollbar-width: none;
+}
+.cards.work.data.glass h4 {
+  margin: 20px 0 8px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  color: var(--ash);
+}
+.cards.work.data.glass .none {
+  margin: 12px 2px;
+  color: var(--dim);
+}
+.cards.work.data.glass .live-note {
+  margin: 10px 0;
+  padding: 0;
+  font-size: 12px;
+  color: var(--dim);
+  opacity: 1;
+}
+.cards.work.data.glass .live-error {
+  margin: 8px 0;
+  padding: 0;
+  color: #ffb9ad;
+}
+.cards.work.data.glass .live-notice {
+  margin: 8px 0;
+  padding: 0;
+  color: var(--green);
+}
+.cards.work.data.glass .live-messages {
+  padding: 0 16px;
+}
+.cards.work.data.glass code {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--dim);
+}
+
+/* ---- 按钮 ---- */
+.cards.work.data.glass .step-actions button,
+.cards.work.data.glass .fold-act button,
+.cards.work.data.glass .link-row button,
+.cards.work.data.glass .filter-toggle,
+.cards.work.data.glass .gate-chip,
+.cards.work.data.glass .list-foot button {
+  border: 0;
+  border-radius: 10px;
+  padding: 6px 12px;
+  background: rgb(255 255 255 / 8%);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 14%) inset;
+  color: var(--pearl);
+  font-size: 12.5px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.cards.work.data.glass .step-actions button:hover,
+.cards.work.data.glass .fold-act button:hover,
+.cards.work.data.glass .link-row button:hover,
+.cards.work.data.glass .filter-toggle:hover,
+.cards.work.data.glass .list-foot button:hover {
+  background: rgb(255 255 255 / 12%);
+}
+.cards.work.data.glass button.gold:not(:disabled) {
+  background: rgb(236 201 138 / 16%);
+  box-shadow: 0 0 0 1px rgb(236 201 138 / 42%) inset;
+  color: #fff;
+}
+.cards.work.data.glass button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* ---- 状态色 ---- */
+.cards.work.data.glass .tone-bad {
+  --tone: var(--coral);
+}
+.cards.work.data.glass .tone-warn {
+  --tone: var(--amber);
+}
+.cards.work.data.glass .tone-run {
+  --tone: var(--frost);
+}
+.cards.work.data.glass .tone-ok {
+  --tone: var(--green);
+}
+.cards.work.data.glass .tone-plain {
+  --tone: var(--dim);
+}
+.cards.work.data.glass i[class*='tone-'] {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--tone);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tone) 16%, transparent);
+}
+
+/* ---- 卡片标题行 ---- */
+.cards.work.data.glass .list-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 28px;
+  padding: 14px 16px 10px;
+}
+.cards.work.data.glass .list-head h2 {
+  margin: 0;
+  font: 500 12px/1.3 inherit;
+  font-family: inherit;
+  letter-spacing: 0.16em;
+  color: var(--ash);
+}
+.list-head .count {
+  font-size: 12px;
+  color: var(--pearl);
+}
+.cards.work.data.glass .gate-chip {
+  margin-left: auto;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  box-shadow: 0 0 0 1px rgb(236 201 138 / 40%) inset;
+}
+
+/* ---- 左：数据来源，平铺的小卡 ---- */
+.cards.work.data.glass .src-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 12px 12px;
+}
+.cards.work.data.glass .src {
+  flex: none;
+  border-radius: 16px;
+  background: var(--tile);
+  box-shadow: 0 0 0 1px var(--tile-edge) inset;
+  transition: background 0.15s;
+}
+.cards.work.data.glass .src:hover {
+  background: rgb(255 255 255 / 7%);
+}
+.cards.work.data.glass .src[data-on] {
+  background: var(--lens);
+  box-shadow:
+    0 0 0 1px rgb(236 201 138 / 38%) inset,
+    0 1px 0 rgb(255 255 255 / 14%) inset;
+}
+.cards.work.data.glass .src-pick {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'name count'
+    'note count';
+  align-items: center;
+  column-gap: 10px;
+  width: 100%;
+  padding: 12px 14px 8px;
+  border: 0;
+  background: transparent;
+  color: var(--pearl);
+  text-align: left;
+}
+.src-name {
+  grid-area: name;
+  font-size: 13.5px;
+  font-weight: 500;
+}
+.src-alert {
+  grid-area: name;
+  justify-self: end;
+  margin-right: 2px;
+  font-size: 11.5px;
+  color: var(--coral);
+}
+.src-count {
+  grid-area: count;
+  font-size: 26px;
+  font-weight: 300;
+  line-height: 1;
+  color: var(--ash);
+}
+.src[data-on] .src-count {
+  color: var(--champagne);
+}
+.src-note {
+  grid-area: note;
+  font-size: 11.5px;
+  color: var(--dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cards.work.data.glass .src-gates {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+  padding: 0 10px 10px;
+}
+.cards.work.data.glass .src-gates button {
+  min-width: 0;
+  padding: 5px 0 4px;
+  border: 0;
+  border-radius: 9px;
+  background: rgb(255 255 255 / 4%);
+  color: var(--pearl);
+  text-align: center;
+}
+.cards.work.data.glass .src-gates button:not(:disabled):hover {
+  background: rgb(255 255 255 / 10%);
+}
+.cards.work.data.glass .src-gates button[aria-pressed='true'] {
+  background: rgb(236 201 138 / 18%);
+  box-shadow: 0 0 0 1px rgb(236 201 138 / 45%) inset;
+}
+.cards.work.data.glass .src-gates button:disabled {
+  opacity: 1;
+}
+.src-gates b {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+.src-gates button:disabled b {
+  color: var(--dim);
+}
+.src-gates em {
+  display: block;
+  font-style: normal;
+  font-size: 10px;
+  line-height: 1.3;
+  color: var(--dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
+}
+
+/* ---- 中：数据资产 ---- */
+.cards.work.data.glass .views {
+  flex: none;
+  display: flex;
+  gap: 6px;
+  padding: 0 16px 10px;
+}
+.cards.work.data.glass .views button {
+  border: 0;
+  border-radius: 999px;
+  padding: 4px 11px;
+  background: var(--tile);
+  box-shadow: 0 0 0 1px var(--tile-edge) inset;
+  color: var(--ash);
+  font-size: 12.5px;
+}
+.cards.work.data.glass .views button b {
+  margin-left: 6px;
+  font-weight: 500;
+  color: var(--pearl);
+}
+.cards.work.data.glass .views button[aria-selected='true'] {
+  background: rgb(236 201 138 / 14%);
+  box-shadow: 0 0 0 1px rgb(236 201 138 / 38%) inset;
+  color: #fff;
+}
+.cards.work.data.glass .live-filters {
+  display: grid;
+  gap: 8px;
+  padding: 0 16px 10px;
+  border: 0;
+}
+.live-search {
+  display: flex;
+  gap: 6px;
+}
+.live-search input {
+  flex: 1;
+}
+.cards.work.data.glass .live-filter-set {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+.cards.work.data.glass input,
+.cards.work.data.glass select,
+.cards.work.data.glass textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  border-radius: 10px;
+  background: var(--tile);
+  box-shadow: 0 0 0 1px var(--tile-edge) inset;
+  color: var(--pearl);
+  padding: 7px 10px;
+  font-size: 12.5px;
+}
+.cards.work.data.glass input::placeholder,
+.cards.work.data.glass textarea::placeholder {
+  color: var(--dim);
+}
+.cards.work.data.glass select option {
+  background: #222936;
+}
+.cards.work.data.glass .filter-toggle {
+  flex: none;
+}
+.cards.work.data.glass .filter-toggle[aria-expanded='true'] {
+  box-shadow: 0 0 0 1px rgb(236 201 138 / 40%) inset;
+}
+
+.stages {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 3px;
+}
+.stages i,
+.cards.work.data.glass .card.list .row .stages i {
+  width: auto;
+  height: 2px;
+  border-radius: 1px;
+  background: rgb(255 255 255 / 12%);
+  box-shadow: none;
+}
+.stages i[data-state='done'] {
+  background: var(--champagne);
+  opacity: 0.75;
+}
+.stages i[data-state='held'] {
+  background: var(--coral);
+}
+
+.cards.work.data.glass .card.list .card-scroll {
+  padding: 0 8px 8px;
+}
+.cards.work.data.glass .card.list .row {
+  display: block;
+  min-height: 0;
+  margin-bottom: 2px;
+  padding: 0;
+  border-radius: 14px;
+  background: transparent;
+}
+.cards.work.data.glass .card.list .row:hover {
+  background: rgb(255 255 255 / 4%);
+}
+.cards.work.data.glass .card.list .row:has(.live-select[aria-pressed='true']) {
+  background: var(--lens);
+  box-shadow:
+    0 0 0 1px rgb(255 255 255 / 12%) inset,
+    0 1px 0 rgb(255 255 255 / 16%) inset;
+}
+.cards.work.data.glass .live-select {
+  display: grid;
+  grid-template-columns: 7px minmax(0, 1fr) 112px;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  color: var(--pearl);
+}
+.cards.work.data.glass .live-select > i {
+  align-self: start;
+  margin-top: 6px;
+}
+.cards.work.data.glass .card.list .t {
+  min-width: 0;
+}
+.cards.work.data.glass .card.list .t b {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cards.work.data.glass .card.list .t span {
+  display: block;
+  font-size: 12px;
+  color: var(--ash);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cards.work.data.glass .live-select small {
+  display: block;
+  margin-top: 1px;
+  font-size: 11.5px;
+  color: var(--dim);
+  opacity: 1;
+}
+.ov {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+.ov-nums {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  white-space: nowrap;
+}
+.ov-nums > span {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+}
+.ov-nums b {
+  font-size: 12.5px;
+  font-weight: 500;
+}
+.ov-nums em {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--dim);
+}
+.ov-nums [data-alert] b {
+  color: var(--coral);
+}
+.list-foot {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px 14px;
+  font-size: 11.5px;
+  color: var(--dim);
+}
+.list-foot > span {
+  margin-right: auto;
+}
+
+/* ---- 右上：治理流程 ---- */
+.detail-col {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.cards.work.data.glass .flow-card {
+  flex: none;
+}
+.cards.work.data.glass .detail-col > .card.detail {
+  flex: 1;
+}
+.cards.work.data.glass .detail-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px 6px;
+}
+.detail-head > div {
+  flex: 1;
+  min-width: 0;
+}
+.cards.work.data.glass .detail-head h2 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.detail-head > div > span {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--ash);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.head-nums {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(4, 64px);
+  gap: 6px;
+  margin: 0;
+}
+.head-nums > div {
+  padding: 6px 10px;
+  border-radius: 12px;
+  background: var(--tile);
+  box-shadow: 0 0 0 1px var(--tile-edge) inset;
+}
+.head-nums dt {
+  font-size: 11px;
+  color: var(--dim);
+}
+.head-nums dd {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.3;
+  color: var(--champagne);
+}
+.head-nums [data-alert] dd {
+  color: var(--coral);
+}
+/* 五个节点连成一条线：走过的一段金色实线，卡住的节点红圈，没到的虚线空心。
+   选中的一环不加框：节点外一圈金色光环，名称变亮，下方一个小三角指向下面的内容卡。 */
+.pipeline {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin: 0;
+  padding: 6px 12px 12px;
+  list-style: none;
+}
+.pipeline li {
+  position: relative;
+  min-width: 0;
+}
+.pipeline li + li::before {
+  content: '';
+  position: absolute;
+  top: 22px;
+  left: calc(-50% + 22px);
+  right: calc(50% + 22px);
+  border-top: 2px dashed rgb(255 255 255 / 16%);
+}
+.pipeline li[data-state='done'] + li::before {
+  border-top: 2px solid rgb(236 201 138 / 70%);
+}
+.cards.work.data.glass .pipeline button {
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 8px 4px 14px;
+  border: 0;
+  background: transparent;
+  color: var(--pearl);
+  text-align: center;
+}
+.pipeline .node {
+  box-sizing: border-box;
+  width: 28px;
+  height: 28px;
+  margin-bottom: 7px;
+  border-radius: 50%;
+  border: 2px dashed rgb(255 255 255 / 26%);
+  background: rgb(20 24 31 / 40%);
+  transition: box-shadow 0.2s;
+}
+.pipeline [data-state='done'] .node {
+  border: 0;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 8.4l2.6 2.6L12 5.4' fill='none' stroke='%231b1f27' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+      center/16px no-repeat,
+    var(--champagne);
+}
+.pipeline [data-state='held'] .node {
+  border: 2px solid var(--coral);
+  background: rgb(255 149 131 / 16%);
+}
+.pipeline button:hover .node {
+  box-shadow: 0 0 0 4px rgb(255 255 255 / 8%);
+}
+.pipeline button[aria-selected='true'] .node {
+  box-shadow:
+    0 0 0 4px rgb(16 19 25 / 60%),
+    0 0 0 6px rgb(236 201 138 / 70%);
+}
+.pipeline b {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ash);
+}
+.pipeline button[aria-selected='true'] b {
+  color: #fff;
+}
+.pipeline [data-state='wait'] b {
+  color: var(--dim);
+}
+.pipeline .what {
+  max-width: 100%;
+  font-size: 11.5px;
+  color: var(--ash);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pipeline [data-state='held'] .what {
+  color: #ffc6bc;
+}
+.pipeline time {
+  min-height: 15px;
+  font-size: 10.5px;
+  color: var(--dim);
+}
+
+/* ---- 右下：这一环的内容 ---- */
+.cards.work.data.glass .step-head {
+  flex: none;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'title actions'
+    'intro actions';
+  align-items: center;
+  column-gap: 16px;
+  padding: 16px 20px 12px;
+}
+.cards.work.data.glass .step-head h3 {
+  grid-area: title;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+  color: #fff;
+}
+.step-head p {
+  grid-area: intro;
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--ash);
+}
+.step-actions {
+  grid-area: actions;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.step-actions:empty {
+  display: none;
+}
+.cards.work.data.glass .card.detail .card-scroll {
+  padding: 0 20px 18px;
+}
+.cards.work.data.glass .live-kv {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 28px;
+  margin: 0;
+  font-size: 13px;
+}
+.cards.work.data.glass .live-kv > div {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--hair);
+}
+.cards.work.data.glass .live-kv dt {
+  color: var(--dim);
+  opacity: 1;
+}
+.cards.work.data.glass .live-kv dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.cards.work.data.glass .lead {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--tile);
+  box-shadow: 0 0 0 1px var(--tile-edge) inset;
+}
+.cards.work.data.glass .lead b {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 500;
+}
+.cards.work.data.glass .lead p {
+  margin: 4px 0 6px;
+  color: var(--ash);
+}
+.cards.work.data.glass .lead small {
+  font-size: 11.5px;
+  color: var(--dim);
+}
+
+/* 可展开的一行 */
+.cards.work.data.glass .fold {
+  margin-bottom: 6px;
+  border-radius: 12px;
+  background: var(--tile);
+  box-shadow: 0 0 0 1px var(--tile-edge) inset;
+}
+.cards.work.data.glass .fold[open] {
+  background: rgb(255 255 255 / 6.5%);
+}
+.cards.work.data.glass .fold summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 22px;
+  padding: 10px 14px;
+  cursor: pointer;
+  list-style: none;
+}
+.cards.work.data.glass .fold summary::-webkit-details-marker {
+  display: none;
+}
+.fold-title {
+  flex: 1;
+  min-width: 0;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fold-meta {
+  flex: none;
+  max-width: 45%;
+  font-size: 12px;
+  color: var(--ash);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chev {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin: 0 2px 3px 2px;
+  border-right: 1.5px solid var(--dim);
+  border-bottom: 1.5px solid var(--dim);
+  transform: rotate(45deg);
+  transition: transform 0.2s;
+}
+.fold[open] > summary .chev {
+  transform: rotate(225deg);
+  margin-bottom: -3px;
+}
+.cards.work.data.glass .fold-body {
+  padding: 0 14px 12px 31px;
+  color: var(--ash);
+}
+.cards.work.data.glass .fold-body p {
+  margin: 0 0 6px;
+}
+.cards.work.data.glass .fold-body small {
+  display: block;
+  font-size: 11.5px;
+  color: var(--dim);
+}
+.cards.work.data.glass .fold-body b {
+  color: var(--pearl);
+  font-weight: 500;
+}
+.badge {
+  display: inline-block;
+  min-width: 18px;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 10%);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 18px;
+  text-align: center;
+  color: var(--pearl);
+}
+.cards.work.data.glass .fold-act {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 4px;
+}
+.cards.work.data.glass .fold-act > div {
+  display: flex;
+  gap: 8px;
+}
+.cards.work.data.glass .fold-act textarea {
+  min-height: 64px;
+  resize: vertical;
+}
+.cards.work.data.glass .link-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 6px;
+  padding: 9px 14px;
+  border-radius: 12px;
+  background: var(--tile);
+  box-shadow: 0 0 0 1px var(--tile-edge) inset;
+}
+.cards.work.data.glass .link-row > span {
+  flex: 1;
+  min-width: 0;
+}
+.cards.work.data.glass .link-row b {
+  display: block;
+  font-weight: 500;
+}
+.cards.work.data.glass .link-row small {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--dim);
+}
+
+/* 时间线 */
+.cards.work.data.glass .timeline {
+  position: relative;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.cards.work.data.glass .timeline li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 136px minmax(0, 1fr);
+  gap: 14px;
+  padding: 5px 0 5px 14px;
+}
+.cards.work.data.glass .timeline li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 12px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--champagne);
+  opacity: 0.7;
+}
+.cards.work.data.glass .timeline li + li::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: -6px;
+  height: 14px;
+  border-left: 1px solid rgb(255 255 255 / 14%);
+}
+.cards.work.data.glass .timeline time {
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--dim);
+}
+.cards.work.data.glass .timeline span {
+  color: var(--pearl);
+}
+.cards.work.data.glass .timeline small {
+  display: block;
+  font-size: 11.5px;
+  color: var(--dim);
+}
+.cards.work.data.glass .fold-body .timeline {
+  margin-top: 8px;
+}
+
+@media (max-width: 1180px) {
+  .cards.work.data.glass {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  /* 窄窗口：来源卡横排在最上面一行，不再单独占一栏。 */
+  .cards.work.data.glass .card.sources {
+    grid-column: 1 / -1;
+  }
+  .cards.work.data.glass .card.sources .list-head {
+    display: none;
+  }
+  .cards.work.data.glass .src-list {
+    flex-direction: row;
+    padding: 10px;
+    overflow-x: auto;
+  }
+  .cards.work.data.glass .src {
+    flex: 1 0 200px;
+  }
+  .cards.work.data.glass .src-gates {
+    display: none;
+  }
+}
+
+/* ---- 列表卡右上角的小工具：搜索、筛选、刷新 ---- */
+.cards.work.data.glass .list-head .updated {
+  font-size: 11px;
+  color: var(--dim);
+  font-family: var(--mono);
+}
+.cards.work.data.glass .head-tools {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+.cards.work.data.glass .gate-chip + .head-tools {
+  margin-left: 0;
+}
+.cards.work.data.glass .head-tools .icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ash);
+}
+.cards.work.data.glass .head-tools .icon:hover,
+.cards.work.data.glass .head-tools .icon[aria-expanded='true'] {
+  background: rgb(255 255 255 / 9%);
+  color: var(--pearl);
+}
+.cards.work.data.glass .head-tools svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+}
+.cards.work.data.glass .head-tools [data-busy] svg {
+  animation: head-spin 0.9s linear infinite;
+}
+@keyframes head-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.cards.work.data.glass .dotnum {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  min-width: 13px;
+  height: 13px;
+  border-radius: 7px;
+  background: var(--champagne);
+  color: #1b1f27;
+  font-size: 9px;
+  font-style: normal;
+  line-height: 13px;
+  text-align: center;
+}
+.cards.work.data.glass .head-search {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 10px;
+}
+.cards.work.data.glass .list-head .gate-chip {
+  margin-left: auto;
+}
+
+/* ---- 聚光：一束柔光跟着指针，卡面微亮、靠近的卡片边缘泛金（几张卡共用一束光） ---- */
+.cards.work.data.glass [data-spot] {
+  position: relative;
+}
+.cards.work.data.glass [data-spot]::before,
+.cards.work.data.glass [data-spot]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  border-radius: inherit;
+  pointer-events: none;
+}
+.cards.work.data.glass [data-spot]::before {
+  background: radial-gradient(
+    280px circle at var(--mx, -999px) var(--my, -999px),
+    rgb(255 255 255 / calc(var(--near, 0) * 0.07)),
+    transparent 70%
+  );
+  mix-blend-mode: screen;
+}
+.cards.work.data.glass [data-spot]::after {
+  padding: 1px;
+  background: radial-gradient(
+    240px circle at var(--mx, -999px) var(--my, -999px),
+    rgb(236 201 138 / calc(var(--near, 0) * 0.8)),
+    rgb(255 255 255 / calc(var(--near, 0) * 0.22)) 40%,
+    transparent 72%
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+}
+
+/* ---- 资产清单：逐条弹入、选中框滑动、上下边缘渐隐 ---- */
+.cards.work.data.glass .card-scroll.rows {
+  position: relative;
+  outline: none;
+  -webkit-mask-image: linear-gradient(transparent, #000 10px, #000 calc(100% - 24px), transparent);
+  mask-image: linear-gradient(transparent, #000 10px, #000 calc(100% - 24px), transparent);
+}
+.cards.work.data.glass .row-glide {
+  position: absolute;
+  top: 0;
+  left: 8px;
+  right: 8px;
+  border-radius: 14px;
+  background: var(--lens);
+  box-shadow:
+    0 0 0 1px rgb(255 255 255 / 12%) inset,
+    0 1px 0 rgb(255 255 255 / 16%) inset;
+  pointer-events: none;
+  transition:
+    transform 0.34s cubic-bezier(0.2, 0.8, 0.2, 1),
+    height 0.34s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.cards.work.data.glass .rows:focus-visible .row-glide {
+  box-shadow: 0 0 0 1px rgb(236 201 138 / 55%) inset;
+}
+.cards.work.data.glass .rows .row {
+  position: relative;
+  z-index: 1;
+  animation: row-in 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: calc(var(--i, 0) * 32ms);
+}
+.cards.work.data.glass .card.list .rows .row:has(.live-select[aria-pressed='true']) {
+  background: transparent;
+  box-shadow: none;
+}
+@keyframes row-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+}
+
+/* ---- 流程：选中标记沿着流程线滑到新的一环，下面的内容从切换方向淡入 ---- */
+.cards.work.data.glass .pipeline {
+  position: relative;
+}
+.cards.work.data.glass .pipeline li.caret {
+  position: absolute;
+  bottom: 0;
+  left: calc(12px + (100% - 24px) * (var(--at, 0) + 0.5) / 5);
+  width: 12px;
+  height: 7px;
+  margin-left: -6px;
+  background: var(--champagne);
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+  transition: left 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.cards.work.data.glass .pipeline li.caret::before {
+  display: none;
+}
+.cards.work.data.glass .step-body {
+  animation: step-next 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.cards.work.data.glass .step-body[data-dir='prev'] {
+  animation-name: step-prev;
+}
+@keyframes step-next {
+  from {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+}
+@keyframes step-prev {
+  from {
+    opacity: 0;
+    transform: translateX(-14px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cards.work.data.glass .rows .row,
+  .cards.work.data.glass .step-body {
+    animation: none;
+  }
+  .cards.work.data.glass .row-glide,
+  .cards.work.data.glass .pipeline li.caret {
+    transition: none;
+  }
+}
+
+/* ---- 右：资产一张卡（名称与读数 → 流程线 → 这一环的说明与操作 → 内容） ---- */
+.cards.work.data.glass .card.asset .detail-head {
+  padding: 16px 20px 2px;
+}
+.cards.work.data.glass .card.asset .pipeline {
+  flex: none;
+  padding: 2px 16px 10px;
+}
+.cards.work.data.glass .card.asset .pipeline button {
+  padding: 6px 4px 12px;
+}
+.cards.work.data.glass .card.asset .pipeline .node {
+  width: 24px;
+  height: 24px;
+  margin-bottom: 5px;
+  background-size: 14px;
+}
+.cards.work.data.glass .card.asset .pipeline li + li::before {
+  top: 18px;
+  left: calc(-50% + 18px);
+  right: calc(50% + 18px);
+}
+.cards.work.data.glass .card.asset .pipeline li.caret {
+  left: calc(16px + (100% - 32px) * (var(--at, 0) + 0.5) / 5);
+}
+.cards.work.data.glass .step-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 0 16px;
+  padding: 9px 12px 9px 14px;
+  border-radius: 12px;
+  background: rgb(255 255 255 / 5%);
+  box-shadow: 0 0 0 1px rgb(236 201 138 / 22%) inset;
+}
+.cards.work.data.glass .step-bar p {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 12px;
+  color: var(--ash);
+}
+.cards.work.data.glass .step-bar .step-actions {
+  flex: none;
+}
+.cards.work.data.glass .card.asset .step-body {
+  padding: 14px 20px 18px;
+}
+.cards.work.data.glass .card.asset .step-body > .live-kv:first-child,
+.cards.work.data.glass .card.asset .step-body > .none + .live-kv {
+  margin-top: -6px;
+}
+
+/* ==== 极简一层：去掉小格的描边和多余的底，靠留白、字重和细线分层；玻璃质感只留在卡片本身 ==== */
+.cards.work.data.glass {
+  --tile: rgb(255 255 255 / 3%);
+  --tile-edge: transparent;
+  --lens: rgb(255 255 255 / 7%);
+}
+.cards.work.data.glass > .card {
+  border-color: rgb(255 255 255 / 10%);
+  background: linear-gradient(160deg, rgb(255 255 255 / 6%), rgb(255 255 255 / 1%) 40%), rgb(40 48 62 / 28%);
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 12%) inset,
+    0 8px 24px rgb(0 0 0 / 12%);
+}
+/* 聚光更淡：卡面几乎不亮，边缘只在很近时泛一点光 */
+.cards.work.data.glass [data-spot]::before {
+  background: radial-gradient(
+    300px circle at var(--mx, -999px) var(--my, -999px),
+    rgb(255 255 255 / calc(var(--near, 0) * 0.04)),
+    transparent 70%
+  );
+}
+.cards.work.data.glass [data-spot]::after {
+  background: radial-gradient(
+    220px circle at var(--mx, -999px) var(--my, -999px),
+    rgb(236 201 138 / calc(var(--near, 0) * 0.45)),
+    transparent 70%
+  );
+}
+
+/* 来源：卡片之间只留细线，不再是一块块小格；环节数字去掉底色 */
+.cards.work.data.glass .src-list {
+  gap: 2px;
+}
+.cards.work.data.glass .src {
+  background: transparent;
+  box-shadow: none;
+  border-radius: 14px;
+}
+.cards.work.data.glass .src:hover {
+  background: rgb(255 255 255 / 3%);
+}
+.cards.work.data.glass .src[data-on] {
+  background: var(--lens);
+  box-shadow: none;
+}
+.cards.work.data.glass .src-count {
+  font-weight: 200;
+}
+.cards.work.data.glass .src-gates button {
+  background: transparent;
+}
+.cards.work.data.glass .src-gates button:not(:disabled):hover {
+  background: rgb(255 255 255 / 6%);
+}
+.cards.work.data.glass .src-gates button[aria-pressed='true'] {
+  background: rgb(236 201 138 / 12%);
+  box-shadow: none;
+}
+.cards.work.data.glass .src-gates b {
+  font-weight: 400;
+}
+
+/* 视角：文字页签加下划线，不用胶囊 */
+.cards.work.data.glass .views {
+  gap: 16px;
+  padding: 0 18px 8px;
+}
+.cards.work.data.glass .views button,
+.cards.work.data.glass .views button[aria-selected='true'] {
+  padding: 2px 0 5px;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.cards.work.data.glass .views button[aria-selected='true'] {
+  color: var(--pearl);
+  box-shadow: inset 0 -1.5px 0 var(--champagne);
+}
+.cards.work.data.glass .views button b {
+  font-weight: 400;
+  color: var(--dim);
+}
+.cards.work.data.glass .views button[aria-selected='true'] b {
+  color: var(--champagne);
+}
+
+/* 输入框、按钮：只有很淡的底，没有描边 */
+.cards.work.data.glass input,
+.cards.work.data.glass select,
+.cards.work.data.glass textarea {
+  box-shadow: none;
+  background: rgb(255 255 255 / 5%);
+}
+.cards.work.data.glass .step-actions button,
+.cards.work.data.glass .fold-act button,
+.cards.work.data.glass .link-row button,
+.cards.work.data.glass .gate-chip {
+  background: rgb(255 255 255 / 6%);
+  box-shadow: none;
+}
+.cards.work.data.glass button.gold:not(:disabled) {
+  background: rgb(236 201 138 / 14%);
+  box-shadow: none;
+  color: #f8e7c6;
+}
+
+/* 清单：选中镜片更淡 */
+.cards.work.data.glass .row-glide {
+  box-shadow: none;
+}
+.cards.work.data.glass .card.list .t b {
+  font-weight: 450;
+}
+
+/* 资产卡头：读数去掉小格，只是数字和小标签，用细竖线隔开 */
+.cards.work.data.glass .head-nums {
+  grid-template-columns: repeat(4, auto);
+  gap: 0;
+}
+.cards.work.data.glass .head-nums > div {
+  padding: 0 0 0 16px;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.cards.work.data.glass .head-nums > div + div {
+  margin-left: 16px;
+  border-left: 1px solid var(--hair);
+}
+.cards.work.data.glass .head-nums dd {
+  font-size: 18px;
+  font-weight: 300;
+}
+.cards.work.data.glass .detail-head h2 {
+  font-weight: 400;
+}
+
+/* 流程线：节点更细更小，已完成用细金圈，不再是实心金币 */
+.cards.work.data.glass .card.asset .pipeline .node {
+  width: 18px;
+  height: 18px;
+  margin-bottom: 6px;
+  border: 1.5px dashed rgb(255 255 255 / 24%);
+  background: transparent;
+}
+.cards.work.data.glass .card.asset .pipeline [data-state='done'] .node {
+  border: 1.5px solid rgb(236 201 138 / 85%);
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4.5 8.3l2.3 2.3L11.5 5.8' fill='none' stroke='%23ecc98a' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    center/12px no-repeat;
+}
+.cards.work.data.glass .card.asset .pipeline [data-state='held'] .node {
+  border: 1.5px solid var(--coral);
+  background: rgb(255 149 131 / 10%);
+}
+.cards.work.data.glass .card.asset .pipeline button[aria-selected='true'] .node {
+  box-shadow: 0 0 0 4px rgb(236 201 138 / 16%);
+}
+.cards.work.data.glass .card.asset .pipeline li + li::before {
+  top: 15px;
+  left: calc(-50% + 15px);
+  right: calc(50% + 15px);
+  border-top-width: 1px;
+}
+.cards.work.data.glass .card.asset .pipeline li[data-state='done'] + li::before {
+  border-top: 1px solid rgb(236 201 138 / 55%);
+}
+.cards.work.data.glass .pipeline b {
+  font-weight: 400;
+}
+.cards.work.data.glass .pipeline button[aria-selected='true'] b {
+  font-weight: 500;
+}
+
+/* 说明条：去掉金边和底色，只是一行说明，下面一道细线 */
+.cards.work.data.glass .step-bar {
+  margin: 0 20px;
+  padding: 8px 0 10px;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: inset 0 -1px 0 var(--hair);
+}
+.cards.work.data.glass .card.asset .pipeline li.caret {
+  height: 5px;
+  width: 10px;
+  margin-left: -5px;
+  opacity: 0.8;
+}
+
+/* 折叠行、关联、口径说明：去掉小格，改成上下细线分隔的条目 */
+.cards.work.data.glass .fold,
+.cards.work.data.glass .fold[open],
+.cards.work.data.glass .link-row,
+.cards.work.data.glass .lead {
+  margin-bottom: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: inset 0 -1px 0 var(--hair);
+}
+.cards.work.data.glass .fold summary {
+  padding: 10px 2px;
+}
+.cards.work.data.glass .fold-body {
+  padding: 0 2px 12px 19px;
+}
+.cards.work.data.glass .link-row {
+  padding: 9px 2px;
+}
+.cards.work.data.glass .lead {
+  padding: 0 0 12px;
+}
+.cards.work.data.glass .badge {
+  background: rgb(255 255 255 / 7%);
+  font-weight: 400;
+}
+.cards.work.data.glass .live-kv > div {
+  padding: 8px 0;
+}
+.cards.work.data.glass .head-nums > div {
+  padding: 0;
+}
+.cards.work.data.glass .head-nums > div + div {
+  margin-left: 14px;
+  padding-left: 14px;
+}
+
+/* ==== 扁平：卡片只剩一层均匀的半透明底和一道 1px 细边；去掉上缘高光、斜向反光和投影 ==== */
+.cards.work.data.glass > .card {
+  border: 1px solid rgb(255 255 255 / 8%);
+  background: rgb(36 43 55 / 32%);
+  box-shadow: none;
+}
+/* 边缘的金色流光是拟物的，去掉；只留卡面上一层极淡的随指针的光 */
+.cards.work.data.glass [data-spot]::after {
+  display: none;
+}

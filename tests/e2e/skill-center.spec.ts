@@ -3,7 +3,9 @@ const tenant = '00000000-0000-4000-8000-000000000001';
 const account = '00000000-0000-4000-8000-000000000002';
 const space = '00000000-0000-4000-8000-000000000003';
 for (const available of [true, false]) {
-  test(`real skill center capability=${available}, favorites and conversation handoff`, async ({ page }) => {
+  test(`real skill center capability=${available}, filter, search and conversation handoff`, async ({
+    page,
+  }) => {
     const writes: string[] = [];
     await page.route('**/api/**', async (route) => {
       const req = route.request(),
@@ -43,11 +45,13 @@ for (const available of [true, false]) {
     const center = page.getByRole('region', { name: '技能中心', exact: true });
     await expect(center).toBeVisible();
     await expect(page.getByRole('link', { name: '技能中心', exact: true })).toBeVisible();
-    await page.getByRole('button', { name: '收藏PPT 生成', exact: true }).click();
-    await page.reload();
-    await page.getByRole('tab', { name: '我的技能' }).click();
-    await expect(center.locator('article')).toHaveCount(1);
-    await page.getByRole('tab', { name: '发现技能' }).click();
+    await expect(center.getByRole('button', { name: /^查看.+详情$/ })).toHaveCount(5);
+    await page.getByRole('button', { name: '可使用', exact: true }).click();
+    await expect(center.getByRole('button', { name: /^查看.+详情$/ })).toHaveCount(available ? 1 : 0);
+    await page.getByRole('button', { name: '全部技能', exact: true }).click();
+    await page.getByLabel('搜索技能').fill('看板');
+    await expect(center.getByRole('button', { name: /^查看.+详情$/ })).toHaveCount(1);
+    await page.getByLabel('搜索技能').fill('');
     await page.setViewportSize({ width: 390, height: 844 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
     await page.screenshot({ path: `.local/skills-integration/mobile-${available}.png`, fullPage: true });

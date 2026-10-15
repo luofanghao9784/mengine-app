@@ -35,10 +35,12 @@ export function TenantConsole({
   tenant,
   name,
   support,
+  embedded = false,
 }: {
   tenant: string;
   name: string;
   support?: SupportAccess;
+  embedded?: boolean;
 }) {
   const { session, logout } = useSession();
   const { page: requestedPage, hash } = useAdminRoute('tenant');
@@ -86,6 +88,7 @@ export function TenantConsole({
   };
   return (
     <AdminShell
+      embedded={embedded}
       realm="tenant"
       allowedPages={limited ? limitedPages : undefined}
       name={name}

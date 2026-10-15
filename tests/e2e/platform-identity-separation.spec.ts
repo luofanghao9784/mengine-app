@@ -7,7 +7,7 @@ const account = {
   displayName: '合成统一用户',
 };
 const tenant = '00000000-0000-4000-8000-000000000002';
-test('dedicated platform login shares identity and logout with the client tab', async ({ context, page }) => {
+test('platform login and logout preserve the shared business session', async ({ context, page }) => {
   let signedIn = false;
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
@@ -26,7 +26,9 @@ test('dedicated platform login shares identity and logout with the client tab', 
       signedIn = false;
       return route.fulfill({ status: 204 });
     }
-    if (path === '/api/v1/me' || path.endsWith('/auth/login'))
+    if (path === '/api/v1/me')
+      return route.fulfill({ json: { account: { ...account, id: tenant }, platformAdmin: false, memberships: [] } });
+    if (path === '/api/platform-admin/v1/auth/me' || path.endsWith('/auth/login'))
       return route.fulfill(
         signedIn
           ? { json: { account, platformAdmin: true, memberships: [] } }
@@ -59,7 +61,8 @@ test('dedicated platform login shares identity and logout with the client tab', 
   await expect(customer.getByText('尚未加入企业', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: '退出总台' }).click();
   await expect(page.getByRole('button', { name: '登录总台' })).toBeVisible();
-  await expect(customer.getByLabel('手机号', { exact: true })).toBeVisible();
+  await customer.reload();
+  await expect(customer.getByText('尚未加入企业', { exact: true })).toBeVisible();
   expect(errors).toEqual([]);
 });
 

@@ -1,0 +1,41 @@
+{
+  "name": "mengine-wiki",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "packageManager": "pnpm@11.25.0",
+  "scripts": {
+    "dev": "node --import tsx apps/api/src/index.ts",
+    "start": "node dist/api/index.js",
+    "build": "tsc -p apps/api/tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test apps/api/test/*.test.ts",
+    "seed": "tsx apps/api/src/seed-cli.ts"
+  },
+  "dependencies": {
+    "@fastify/multipart": "10.1.1",
+    "better-sqlite3": "13.0.3",
+    "fastify": "5.12.0",
+    "mammoth": "1.12.1",
+    "mysql2": "^3.24.5",
+    "next": "16.3.1",
+    "pdf-parse": "2.4.5",
+    "pg": "^8.23.1",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "react-markdown": "10.1.0",
+    "remark-gfm": "4.0.1"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "9.6.0",
+    "@types/node": "24.13.3",
+    "@types/pg": "^8.23.1",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4",
+    "tsx": "4.23.12",
+    "typescript": "5.9.3"
+  }
+}

@@ -1,311 +1,211 @@
-import { useEffect, useRef, useState } from 'react';
-import { ArrowRight, FolderOpen, Link2, Search, ShieldCheck, Sparkles, Star, X } from 'lucide-react';
+import { useState } from 'react';
+import { ArrowRight, FolderOpen, Search } from 'lucide-react';
 import { useRemote } from '../shared/admin';
+import { Button, Empty, Modal, PageActions } from '../shared/ui';
+import { LibrarySearch } from '../material/LibraryToolbar';
 import { presentationClient } from '../conversation/presentation-client';
 import { conversationHref } from '../conversation/Conversations';
 import { skills, Preview, iconMap } from './catalog';
-import type { Skill, SkillId } from './catalog';
+import type { Skill } from './catalog';
 import './skill-center.css';
 export const skillsHref = (tenant: string) => '#' + new URLSearchParams({ tenant, view: 'skills' });
-function stored(key: string): SkillId[] {
-  try {
-    const v = JSON.parse(localStorage.getItem(key) || '[]');
-    return Array.isArray(v) ? v.filter((id): id is SkillId => skills.some((s) => s.id === id)) : [];
-  } catch {
-    return [];
-  }
-}
-export function SkillCenter({ tenant, account }: { tenant: string; account: string }) {
-  const [tab, setTab] = useState('discover'),
+const pptSteps = ['选择资料与汇报目标', '核对大纲，调整标题与页序', '确认生成并下载演示文稿'];
+const pptBoundary =
+  '当前支持 1–8 页固定版式，生成 PPTX 与内容源文件。请核对数据口径；模板导入、正文修改和在线预览尚未开放。';
+export function SkillCenter({ tenant }: { tenant: string }) {
+  const [scope, setScope] = useState<'all' | 'ready'>('all'),
     [query, setQuery] = useState(''),
     [detail, setDetail] = useState<Skill | null>(null);
-  const key = `dreamcore:skill-favorites:${account}:${tenant}`;
-  const [favorites, setFavorites] = useState(() => stored(key)),
-    [storageError, setStorageError] = useState(false);
   const capability = useRemote((signal) => presentationClient.capability(tenant, signal), [tenant]);
   const ready = capability.value?.available === true;
-  const dialog = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    if (detail) dialog.current?.showModal();
-    else dialog.current?.close();
-  }, [detail]);
-  const favorite = (id: SkillId) => {
-    const next = favorites.includes(id) ? favorites.filter((v) => v !== id) : [...favorites, id];
-    setFavorites(next);
-    try {
-      localStorage.setItem(key, JSON.stringify(next));
-      setStorageError(false);
-    } catch {
-      setStorageError(true);
-    }
-  };
-  const status = (s: Skill) => (s.id !== 'ppt' ? '接入中' : ready ? '可使用' : '暂未开放');
-  const filtered = skills.filter(
-    (s) => (tab !== 'mine' || favorites.includes(s.id)) && `${s.title}${s.description}`.includes(query),
+  const usable = (s: Skill) => s.id === 'ppt' && ready;
+  const status = (s: Skill) => (s.id !== 'ppt' ? '即将开放' : ready ? '可使用' : '暂未开放');
+  const word = query.trim();
+  const shown = skills.filter(
+    (s) =>
+      (scope === 'all' || usable(s)) && `${s.title}${s.eyebrow}${s.description}${s.output}`.includes(word),
   );
+  const main = shown.filter((s) => s.id === 'ppt'),
+    upcoming = shown.filter((s) => s.id !== 'ppt');
   const start = () => {
-    if (ready) {
-      dialog.current?.close();
-      location.hash = conversationHref(tenant) + '&skill=ppt';
-    }
+    setDetail(null);
+    location.hash = conversationHref(tenant) + '&skill=ppt';
   };
+  const steps = (s: Skill) => (s.id === 'ppt' ? pptSteps : s.steps);
   return (
-    <section className="skill-center" aria-label="技能中心">
-      <div className="page-heading">
-        <div>
-          <div className="overline">YOUR WORK, WITH SUPERPOWERS</div>
-          <h2 className="center-title">让工作，更进一步</h2>
-          <p>从一个想法，到一份可以直接使用的成果。</p>
+    <section className="skill-center skill-ui" aria-label="技能中心">
+      <PageActions>
+        <div className="material-tabs" aria-label="技能范围">
+          <Button variant={scope === 'all' ? 'primary' : 'ghost'} onClick={() => setScope('all')}>
+            全部技能
+          </Button>
+          <Button variant={scope === 'ready' ? 'primary' : 'ghost'} onClick={() => setScope('ready')}>
+            可使用
+          </Button>
         </div>
-        {tab !== 'connections' && (
-          <div className="search-wrap">
-            <Search size={18} />
-            <input
-              aria-label="搜索技能"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="搜索你想完成的工作"
-            />
-            {query && (
-              <button aria-label="清空搜索" onClick={() => setQuery('')}>
-                <X size={16} />
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-      <div className="tab-line">
-        <div className="tabs" role="tablist" aria-label="技能中心栏目">
-          {[
-            ['discover', '发现技能'],
-            ['mine', '我的技能'],
-            ['connections', '账号与连接'],
-          ].map(([id, label]) => (
-            <button
-              role="tab"
-              aria-selected={tab === id}
-              className={tab === id ? 'active' : ''}
-              key={id}
-              onClick={() => {
-                setTab(id);
-                setQuery('');
-              }}
-            >
-              {label}
-              {id === 'mine' && <span>{favorites.length}</span>}
+      </PageActions>
+      <PageActions placement="meta">
+        <LibrarySearch
+          label="搜索技能"
+          query={query}
+          onQuery={setQuery}
+          onSearch={() => {}}
+          onClear={() => setQuery('')}
+        />
+      </PageActions>
+      {main.map((s) => {
+        const Icon = iconMap[s.id];
+        return (
+          <article className="skill-hero" key={s.id}>
+            <button className="skill-hero-art" aria-label={`查看${s.title}详情`} onClick={() => setDetail(s)}>
+              <Preview id={s.id} large />
             </button>
-          ))}
-        </div>
-        <span className="catalog-note">
-          <ShieldCheck size={14} /> 梦擎适配 · 来源可追溯
-        </span>
-      </div>
-      {tab === 'connections' ? (
+            <div className="skill-hero-body">
+              <div className="skill-hero-title">
+                <span className={`skill-icon ${s.color}`}>
+                  <Icon size={20} />
+                </span>
+                <div>
+                  <small>{s.eyebrow}</small>
+                  <h2>{s.title}</h2>
+                </div>
+                <span className={`skill-status ${usable(s) ? 'ready' : ''}`}>{status(s)}</span>
+              </div>
+              <p className="skill-hero-text">{s.description}</p>
+              <dl className="skill-facts">
+                <div>
+                  <dt>准备什么</dt>
+                  <dd>{s.input}</dd>
+                </div>
+                <div>
+                  <dt>你会得到</dt>
+                  <dd>{s.output}</dd>
+                </div>
+                <div>
+                  <dt>怎么进行</dt>
+                  <dd>先确认大纲，再生成文稿</dd>
+                </div>
+              </dl>
+              <div className="skill-hero-actions">
+                <Button variant="primary" disabled={!usable(s)} onClick={start}>
+                  {usable(s) ? '开始使用' : '暂未开放'}
+                  <ArrowRight size={16} />
+                </Button>
+                <Button variant="ghost" onClick={() => setDetail(s)}>
+                  了解详情
+                </Button>
+                <span>{usable(s) ? '进入会话后填写要求，不会立即发送任务' : '当前生成环境暂未开放'}</span>
+              </div>
+            </div>
+          </article>
+        );
+      })}
+      {upcoming.length > 0 && (
         <>
-          <div className="section-heading">
-            <div>
-              <h2>让技能使用你允许的资料</h2>
-              <p>资料范围在每次调用时单独选择。</p>
-            </div>
-          </div>
-          <div className="connection-card">
-            <div className="connection-icon">
-              <FolderOpen />
-            </div>
-            <div>
-              <h3>
-                梦擎空间资料 <span className="tag green-tag">内置来源</span>
-              </h3>
-              <p>遵守当前账号的空间权限，不访问电脑本地文件。</p>
-              <div className="connection-skills">读取资料、保存成果与共享发布分别确认。</div>
-            </div>
-          </div>
-          <div className="empty-connections">
-            <Link2 size={30} />
-            <h3>暂无外部账号连接</h3>
-            <p>
-              首批技能使用空间资料，无需额外连接。
-              <br />
-              外部服务完成接入后，会在这里提供授权入口。
-            </p>
-          </div>
-        </>
-      ) : (
-        <>
-          <div className="featured-heading">
-            <div>
-              <Sparkles size={17} />
-              <h3>{tab === 'mine' ? '你的常用技能' : '把重复的工作，交给技能'}</h3>
-            </div>
-            <span>
-              {tab === 'mine' ? '收藏保存在当前设备，按账号和企业区分' : '首批 5 项 · 按接入进度开放'}
-            </span>
-          </div>
-          {storageError && <p role="status">当前设备无法保存收藏，离开页面后可能丢失。</p>}
-          <div className="skill-grid">
-            {filtered.map((s) => {
+          <h3 className="skill-section">
+            即将开放 <span>{upcoming.length}</span>
+          </h3>
+          <div className="skill-row">
+            {upcoming.map((s) => {
               const Icon = iconMap[s.id];
               return (
-                <article
+                <button
+                  className="skill-tile"
                   key={s.id}
-                  className={`skill-card ${s.color} ${tab === 'discover' && !query && ['ppt', 'dashboard'].includes(s.id) ? 'featured' : ''}`}
+                  aria-label={`查看${s.title}详情`}
+                  onClick={() => setDetail(s)}
                 >
-                  <button
-                    className="art-button"
-                    aria-label={`查看${s.title}详情`}
-                    onClick={() => setDetail(s)}
-                  >
-                    <Preview id={s.id} />
-                  </button>
-                  <div className="skill-card-body">
-                    <div className="card-title">
-                      <div>
-                        <span className={`skill-icon ${s.color}`}>
-                          <Icon size={18} />
-                        </span>
-                        <h3>{s.title}</h3>
-                      </div>
-                      <button
-                        className={`favorite ${favorites.includes(s.id) ? 'saved' : ''}`}
-                        aria-pressed={favorites.includes(s.id)}
-                        aria-label={`${favorites.includes(s.id) ? '取消收藏' : '收藏'}${s.title}`}
-                        onClick={() => favorite(s.id)}
-                      >
-                        <Star size={18} />
-                      </button>
-                    </div>
-                    <p>{s.description}</p>
-                    <div className="card-bottom">
-                      <span className="output-format">{s.output}</span>
-                      <button className="text-button" onClick={() => setDetail(s)}>
-                        查看详情 <ArrowRight size={15} />
-                      </button>
-                    </div>
-                    <div className="availability">
-                      <span className="status-dot" />
-                      {status(s)}
-                      <span>·</span>
-                      <span>
-                        {s.id === 'ppt' && ready ? '先确认大纲，再生成演示文稿' : '开放后可在会话中调用'}
+                  <Preview id={s.id} />
+                  <span className="skill-tile-body">
+                    <span className="skill-tile-title">
+                      <span className={`skill-icon ${s.color}`}>
+                        <Icon size={16} />
                       </span>
-                    </div>
-                  </div>
-                </article>
+                      <b>{s.title}</b>
+                    </span>
+                    <span className="skill-tile-text">{s.description}</span>
+                    <span className="skill-tile-foot">{s.output}</span>
+                  </span>
+                </button>
               );
             })}
           </div>
-          {!filtered.length && (
-            <div className="empty-connections">
-              <Search size={30} />
-              <h3>{query ? '没有找到相关技能' : '还没有收藏技能'}</h3>
-              <p>在发现技能中点击星标，加入常用列表。</p>
-              <button
-                className="secondary"
-                onClick={() => {
-                  setTab('discover');
-                  setQuery('');
-                }}
-              >
-                查看全部技能
-              </button>
-            </div>
-          )}
-          <div className="conversation-tip">
-            <ShieldCheck size={22} />
-            <div>
-              <h3>在会话中继续完成工作</h3>
-              <p>选定技能后填写要求与资料，不会立即发送任务。成果默认私人，分享时另行确认。</p>
-            </div>
-          </div>
         </>
       )}
-      <footer className="page-footer">卡片图片为合成成果示例。具体功能以当前开放状态为准。</footer>
-      <dialog
-        ref={dialog}
-        className="detail-drawer"
-        aria-label={detail ? `${detail.title}详情` : '技能详情'}
-        onCancel={() => setDetail(null)}
-        onClick={(e) => {
-          if (e.target === e.currentTarget) setDetail(null);
-        }}
-      >
-        {detail && (
-          <>
-            <div className="drawer-top">
-              <span>技能详情</span>
-              <button className="icon-button" aria-label="关闭详情" onClick={() => setDetail(null)}>
-                <X size={20} />
-              </button>
-            </div>
-            <div className="drawer-scroll">
-              <Preview id={detail.id} large />
-              <div className="detail-heading">
-                <div>
-                  <span className="overline">{detail.eyebrow}</span>
-                  <h2>{detail.title}</h2>
-                </div>
-                <span className="tag">{status(detail)}</span>
+      {!shown.length && (
+        <Empty
+          icon={Search}
+          title={word ? '没有找到相关技能' : '暂时没有可使用的技能'}
+          text={word ? '换一个说法试试，或查看全部技能。' : '技能开放后会出现在这里。'}
+        >
+          <Button
+            onClick={() => {
+              setScope('all');
+              setQuery('');
+            }}
+          >
+            查看全部技能
+          </Button>
+        </Empty>
+      )}
+      {detail && (
+        <Modal title="技能详情" onClose={() => setDetail(null)} className="skill-detail-modal">
+          <div className="skill-ui skill-detail">
+            <Preview id={detail.id} large />
+            <div className="skill-detail-heading">
+              <div>
+                <small>{detail.eyebrow}</small>
+                <h2>{detail.title}</h2>
               </div>
-              <p className="detail-description">{detail.description}</p>
-              <div className="detail-facts">
-                <div>
-                  <small>准备什么</small>
-                  <p>{detail.input}</p>
-                </div>
-                <div>
-                  <small>你会得到</small>
-                  <p>{detail.output}</p>
-                </div>
-              </div>
-              <h3>{detail.id === 'ppt' ? '使用步骤' : '计划支持的流程'}</h3>
-              <ol className="steps">
-                {(detail.id === 'ppt'
-                  ? ['选择资料与汇报目标', '核对大纲，调整标题与页序', '确认生成并下载演示文稿']
-                  : detail.steps
-                ).map((s, i) => (
-                  <li key={s}>
-                    <span>{i + 1}</span>
-                    {s}
-                  </li>
-                ))}
-              </ol>
-              <h3>资料与连接</h3>
-              <div className="detail-connection">
-                <FolderOpen size={18} />
-                <div>
-                  <b>梦擎空间资料</b>
-                  <small>仅使用本次获准的资料范围</small>
-                </div>
-                <span>无需外部连接</span>
-              </div>
-              <details className="source-info">
-                <summary>能力边界与开源来源</summary>
-                <p>
-                  {detail.id === 'ppt'
-                    ? '当前支持 1–8 页固定版式，生成 PPTX 与内容源文件。请核对数据口径；模板导入、正文修改和在线预览尚未开放。'
-                    : detail.boundary}
-                </p>
-                <a href={detail.url} target="_blank" rel="noreferrer">
-                  {detail.source} ↗
-                </a>
-              </details>
+              <span className={`skill-status ${usable(detail) ? 'ready' : ''}`}>{status(detail)}</span>
             </div>
-            <div className="drawer-footer">
-              <span>
-                {detail.id === 'ppt'
-                  ? ready
-                    ? '不会立即发送任务'
-                    : '当前生成环境暂未开放'
-                  : '完成接入后开放使用'}
-              </span>
-              <button className="primary" disabled={detail.id !== 'ppt' || !ready} onClick={start}>
-                {detail.id === 'ppt' && ready ? '开始使用' : '暂未开放'}
-                <ArrowRight size={16} />
-              </button>
-            </div>
-          </>
-        )}
-      </dialog>
+            <p className="skill-detail-text">{detail.description}</p>
+            <dl className="skill-facts">
+              <div>
+                <dt>准备什么</dt>
+                <dd>{detail.input}</dd>
+              </div>
+              <div>
+                <dt>你会得到</dt>
+                <dd>{detail.output}</dd>
+              </div>
+            </dl>
+            <h3>{detail.id === 'ppt' ? '使用步骤' : '计划支持的流程'}</h3>
+            <ol className="skill-steps">
+              {steps(detail).map((step, i) => (
+                <li key={step}>
+                  <span>{i + 1}</span>
+                  {step}
+                </li>
+              ))}
+            </ol>
+            <p className="skill-scope">
+              <FolderOpen size={16} />
+              使用梦擎空间里的资料，遵守你的空间权限；每次使用时单独选择资料范围，成果默认只有你能看到。
+            </p>
+            <details className="skill-source">
+              <summary>能力边界与开源来源</summary>
+              <p>{detail.id === 'ppt' ? pptBoundary : detail.boundary}</p>
+              <a href={detail.url} target="_blank" rel="noreferrer">
+                {detail.source} ↗
+              </a>
+            </details>
+          </div>
+          <div className="modal-actions skill-detail-actions">
+            <span>
+              {detail.id !== 'ppt'
+                ? '开放后可在会话中使用'
+                : ready
+                  ? '不会立即发送任务'
+                  : '当前生成环境暂未开放'}
+            </span>
+            <Button variant="primary" disabled={!usable(detail)} onClick={start}>
+              {usable(detail) ? '开始使用' : status(detail)}
+              <ArrowRight size={16} />
+            </Button>
+          </div>
+        </Modal>
+      )}
     </section>
   );
 }

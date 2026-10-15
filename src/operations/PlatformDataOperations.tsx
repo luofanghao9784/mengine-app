@@ -124,6 +124,11 @@ export function PlatformDataOperations({ hash, kind }: { hash: string; kind: Dat
       )}
       {tenant ? (
         <Detail key={`${kind}:${tenant}`} tenant={tenant} kind={kind} />
+      ) : kind === 'MATERIALS' ? (
+        <>
+          {!enterpriseList && <p className="admin-note">按企业查看资料处理情况，选择企业后查看该企业的资料与运行详情。</p>}
+          <Directory key={kind} kind={kind} enterpriseList={enterpriseList} href={(id) => href(kind, id)} />
+        </>
       ) : !enterpriseList ? (
         <Archives key={kind} kind={kind} href={(id) => href(kind, id)} />
       ) : (
@@ -249,7 +254,7 @@ function Directory({
       ) : (
         <>
           {!enterpriseList && <Metrics value={data.value.counts} />}
-          {enterpriseList && (
+          {(enterpriseList || kind === 'MATERIALS') && (
             <section className="data-ops-list-card" aria-label="企业监测目录">
               <div className="data-ops-list-columns" aria-hidden="true">
                 <span>企业名称</span>

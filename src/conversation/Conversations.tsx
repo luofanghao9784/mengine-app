@@ -1710,7 +1710,9 @@ export function ConversationComposer({
                 ? '资料准备中'
                 : !enabled && disabledReason
                   ? disabledReason
-                  : busy
+                  : !allowed
+                    ? '请先选择工作空间'
+                    : busy
                     ? '提交中…'
                     : pending
                       ? '重试上次发送'

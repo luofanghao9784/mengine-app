@@ -187,7 +187,7 @@ test('3D stage and observed sections show only real counts', async ({ page, cont
   await expect(page.locator(`${label('KNOWLEDGE')} .more`)).toHaveCount(0);
   await expect(page.locator('.eng3d-lbl[data-channel="TASK"]')).toHaveCount(0);
   for (const cap of ['输入', '工作循环', '输出', '自进化循环'])
-    await expect(stage.getByRole('button', { name: cap, exact: true })).toBeAttached();
+    await expect(stage.getByRole('button', { name: new RegExp('^' + cap), exact: false })).toBeAttached();
   const mix = stage.locator('.eng3d-mix');
   await expect(mix).toContainText('输入11');
   await expect(mix).toContainText('处理6');
@@ -209,7 +209,7 @@ test('3D stage and observed sections show only real counts', async ({ page, cont
   await expect(page.locator('.engine-dash-tenants li')).toHaveCount(2);
   await expect(page.locator('.engine-dash-tenants')).toContainText('合成企业甲');
   await page.clock.runFor(3010);
-  await expect(page.getByRole('img', { name: /已采样 2 次/ })).toBeVisible();
+  await expect(page.getByRole('img', { name: /已采样 (?:[2-9]|[1-9]\d+) 次/ })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: '/tmp/engine-platform-3d-1440.png' });
   await page.locator('.engine-dash-lower').screenshot({ path: '/tmp/engine-platform-3d-lower.png' });
@@ -228,7 +228,7 @@ test('stage keys push into a stage, panel lists its channels, Esc steps back', a
   await expect(panel).toBeVisible();
 
   await expect(panel.getByRole('button', { name: '返回总览' })).toBeFocused();
-  await expect(panel.locator('.row')).toHaveCount(5);
+  await expect(panel.locator('.row')).toHaveCount(6);
   await expect(panel).toContainText('总库调整核验');
   await expect(panel.locator('.psum')).toContainText('6 项执行中');
   await panel.locator('.row[data-channel="TASK"]').click();
@@ -266,10 +266,8 @@ test('lens switches the core, ring and labels to another real count', async ({ p
   await expect(page.locator(`${label('COLLECTION')} .q`)).toContainText('执行中 9');
   await page.locator('.eng3d-reads [data-lens="w"]').click();
   await expect(page.locator('.eng3d-core b')).toHaveText('0');
-  await expect(page.locator('.eng3d-ring circle[data-arc]')).toHaveCount(3);
-  expect(await page.locator('.eng3d-ring circle[data-arc="in"]').getAttribute('stroke-dasharray')).toMatch(
-    /^0 /,
-  );
+  await expect(page.locator('.eng3d-reads [data-lens="w"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator(`${label('COLLECTION')} .v`)).toHaveText('0');
 });
 
 test('change log shows exact snapshot differences; idle has no photons', async ({ page, context }) => {

@@ -19,7 +19,7 @@ export async function signIn(credentials: Credentials): Promise<AuthResult> {
   try {
     const platform = credentials.surface === 'platform';
     const identity = await request(platform ? '/api/platform-admin/v1/auth/login' : '/api/v1/auth/login', 'POST', isIdentity,
-      credentials.surface === 'platform' ? { username: credentials.account.trim(), password: credentials.password } : { phone: phone(credentials.phone), password: credentials.password });
+      credentials.surface === 'platform' ? { username: credentials.account.trim(), password: credentials.password } : /^[a-z]/i.test(credentials.phone.trim()) ? { username: credentials.phone.trim(), password: credentials.password } : { phone: phone(credentials.phone), password: credentials.password });
     if (platform && !identity.platformAdmin) return { ok: false, message: '当前账号没有运营平台访问权限。' };
     if (credentials.surface === 'admin' && !identity.memberships.some(m => m.role === 'TENANT_ADMIN'))
       return { ok: false, message: '当前账号没有企业管理权限，请从梦擎工作空间入口登录。' };

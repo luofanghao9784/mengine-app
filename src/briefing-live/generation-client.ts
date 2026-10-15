@@ -67,7 +67,8 @@ export const generationClient = {
     request(root(tenant), 'POST', batch, body),
   generateSelection: (
     tenant: string,
-    body: { requestId: string; workspaceId?: string; count: number; types: string[] },
+    /** topic is only sent when the server advertises capabilities.TOPIC. */
+    body: { requestId: string; workspaceId?: string; count: number; types: string[]; topic?: string },
   ) =>
     request(
       root(tenant) + '/selection',

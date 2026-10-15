@@ -20,7 +20,7 @@ const SessionContext = createContext<{
 } | null>(null);
 const platformRequest = createIdentityRequest();
 const platformIdentityClient = {
-  me: (signal?: AbortSignal) => platformRequest('/api/v1/me', 'GET', isIdentity, undefined, signal),
+  me: (signal?: AbortSignal) => platformRequest('/api/platform-admin/v1/auth/me', 'GET', isIdentity, undefined, signal),
   login: (username: string, password: string) =>
     platformRequest('/api/platform-admin/v1/auth/login', 'POST', isIdentity, { username, password }),
   logout: () => platformRequest('/api/platform-admin/v1/auth/logout', 'POST', (v): v is null => v === null),
@@ -34,7 +34,7 @@ export function SessionProvider({
   realm?: 'customer' | 'platform';
 }) {
   const client = realm === 'platform' ? platformIdentityClient : identityClient;
-  const CHANGE_KEY = 'dreamcore-session-change';
+  const CHANGE_KEY = realm === 'platform' ? 'dreamcore-platform-session-change' : 'dreamcore-session-change';
   const reconcile = useCallback(
     (identity: Identity | null) => {
       if (realm === 'platform') return;

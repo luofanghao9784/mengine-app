@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication(type = org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication.Type.SERVLET)
 public class IdentityController {
-    public record Login(@Size(max=40) String phone, @Size(max=254) String email, @NotNull @Size(max=128) String password) {}
+    public record Login(@Size(max=40) String username, @Size(max=40) String phone, @Size(max=254) String email, @NotNull @Size(max=128) String password) {}
     public record CreateTenant(@NotNull UUID requestId, @NotNull @Size(max=100) String name, @Size(max=254) String adminEmail, @Size(max=40) String adminPhone, Boolean designateAuthorizationOwner) {}
     public record Invite(@NotNull UUID requestId, @Size(max=254) String email, @Size(max=40) String phone, @Size(max=20) List<UUID> workspaceIds) {}
     public record Accept(@NotNull @Size(max=64) String token, @Size(max=80) String displayName, @Size(max=128) String password) {}
@@ -44,7 +44,9 @@ public class IdentityController {
     }
     @PostMapping("/api/v1/auth/login")
     public IdentityService.Me login(@Valid @RequestBody Login body, HttpServletRequest request, HttpServletResponse response) {
-        var account = identities.login(PhoneNumbers.contact(body.phone(),body.email()),body.password(),request.getRemoteAddr());
+        if ((body.username()!=null?1:0)+(body.phone()!=null?1:0)+(body.email()!=null?1:0)!=1) throw IdentityException.invalid();
+        var account = body.username()!=null ? identities.loginUsername(body.username(),body.password(),request.getRemoteAddr())
+                : identities.login(PhoneNumbers.contact(body.phone(),body.email()),body.password(),request.getRemoteAddr());
         UnifiedLogin.authenticate(identities,account.id(),account.credentialVersion(),"PASSWORD",request,response);
         return identities.me(account.id());
     }

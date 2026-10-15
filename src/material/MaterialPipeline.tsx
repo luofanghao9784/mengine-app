@@ -19,9 +19,12 @@ export function MaterialPipeline({
   );
   const s = data.value;
   return (
-    <section aria-label="资料处理四阶段">
+    <section aria-label="资料处理四阶段" className="mat-pipeline">
       <h3>
-        当前版本处理阶段 <button onClick={() => refresh((n) => n + 1)}>刷新阶段</button>
+        当前版本处理阶段{' '}
+        <button type="button" onClick={() => refresh((n) => n + 1)}>
+          刷新阶段
+        </button>
       </h3>
       {data.error ? (
         <Failure error={data.error} retry={() => refresh((n) => n + 1)} />
@@ -29,7 +32,9 @@ export function MaterialPipeline({
         <Loading />
       ) : (
         <>
-          <p>以下为当前最新 v{s.version} 的独立状态；资料阅读、规则检查和 Wiki 发布分别执行。</p>
+          <p className="perm-note">
+            以下为当前最新 v{s.version} 的独立状态；资料阅读、规则检查和 Wiki 发布分别执行。
+          </p>
           <ol className="material-pipeline">
             <li>
               <strong>数据接入</strong>

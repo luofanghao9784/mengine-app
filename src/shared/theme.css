@@ -49,7 +49,7 @@
 /* DEC-130 客户端 D 克制版：冷色柔光、毛玻璃、单一靛蓝强调色。 */
 :root[data-surface='workspace'] {
   color: var(--ink);
-  --canvas: #f3f4f8;
+  --canvas: #f6f7fa;
   --ink: #191b2e;
   --ink-2: #4f5368;
   --ink-3: #8b8fa3;
@@ -57,22 +57,22 @@
   --muted: var(--ink-2);
   --line: rgb(25 27 46 / 8%);
   --soft: rgb(25 27 46 / 4%);
-  --accent: #5b57d9;
-  --accent-hover: #4a46c4;
-  --accent-soft: rgb(91 87 217 / 8%);
-  --selected: rgb(91 87 217 / 10%);
-  --blue-ink: #4a46c4;
+  --accent: #2f6fe0;
+  --accent-hover: #2459c4;
+  --accent-soft: rgb(47 111 224 / 8%);
+  --selected: rgb(47 111 224 / 10%);
+  --blue-ink: #2459c4;
   --surface: rgb(255 255 255 / 70%);
   --surface-raised: #fff;
   --glass-blur: blur(28px) saturate(1.5);
   --glass-edge: rgb(255 255 255 / 75%);
   --card-edge: var(--glass-edge);
-  --card-shadow: 0 1px 0 rgb(255 255 255 / 90%) inset, 0 8px 30px rgb(40 40 90 / 6%);
+  --card-shadow: 0 1px 0 rgb(255 255 255 / 90%) inset, 0 8px 30px rgb(30 50 90 / 6%);
   --conversation-card-radius: 22px;
   background:
-    radial-gradient(1000px 640px at 4% -6%, rgb(196 190 255 / 45%), transparent 60%),
-    radial-gradient(900px 600px at 100% 0%, rgb(198 226 255 / 50%), transparent 58%),
-    radial-gradient(900px 700px at 80% 110%, rgb(206 200 255 / 28%), transparent 55%), var(--canvas);
+    radial-gradient(1000px 640px at 4% -6%, rgb(188 208 255 / 30%), transparent 60%),
+    radial-gradient(900px 600px at 100% 0%, rgb(198 226 255 / 34%), transparent 58%),
+    radial-gradient(900px 700px at 80% 110%, rgb(198 214 255 / 18%), transparent 55%), var(--canvas);
   background-attachment: fixed;
 }
 * {

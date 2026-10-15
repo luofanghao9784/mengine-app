@@ -1,7 +1,7 @@
 import { LibraryMove } from '../material/Move';
 import { useLibraryPermissionsEnabled } from '../material/Permissions';
 import { useContext, useRef, useState } from 'react';
-import { MoreHorizontal, Trash2 } from 'lucide-react';
+import { MoreHorizontal, Trash2, Eye, FolderOpen, FolderInput, KeyRound } from 'lucide-react';
 import type {
   LifecycleItem,
   LifecycleAction,
@@ -21,6 +21,9 @@ export function MaterialEntryActions({
   kind,
   name,
   changed,
+  canManage = true,
+  onOpen,
+  onPermissions,
 }: {
   tenant: string;
   workspace: string;
@@ -28,6 +31,9 @@ export function MaterialEntryActions({
   kind: MaterialObjectKind;
   name: string;
   changed: () => void;
+  canManage?: boolean;
+  onOpen?: () => void;
+  onPermissions?: () => void;
 }) {
   const anchor = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
@@ -47,8 +53,31 @@ export function MaterialEntryActions({
         />
         {open && (
           <ActionPopover anchor={anchor} label={`资料操作 ${name}`} onClose={() => setOpen(false)}>
-            {permissionEnabled && (
+            {onOpen && (
               <Button
+                icon={kind === 'FOLDER' ? FolderOpen : Eye}
+                onClick={() => {
+                  setOpen(false);
+                  onOpen();
+                }}
+              >
+                打开
+              </Button>
+            )}
+            {onPermissions && (
+              <Button
+                icon={KeyRound}
+                onClick={() => {
+                  setOpen(false);
+                  onPermissions();
+                }}
+              >
+                权限设置
+              </Button>
+            )}
+            {permissionEnabled && canManage && (
+              <Button
+                icon={FolderInput}
                 onClick={() => {
                   setOpen(false);
                   setMove(true);
@@ -57,15 +86,17 @@ export function MaterialEntryActions({
                 移动
               </Button>
             )}
-            <Button
-              icon={Trash2}
-              onClick={() => {
-                setOpen(false);
-                setConfirm(true);
-              }}
-            >
-              删除
-            </Button>
+            {canManage && (
+              <Button
+                icon={Trash2}
+                onClick={() => {
+                  setOpen(false);
+                  setConfirm(true);
+                }}
+              >
+                删除
+              </Button>
+            )}
           </ActionPopover>
         )}
       </div>

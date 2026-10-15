@@ -85,3 +85,18 @@ test('anonymous, forbidden, unavailable and cancelled requests remain distinct w
     (e) => e instanceof IdentityError && e.code === 'CANCELLED',
   );
 });
+
+test('username-only accounts log in through the customer session without platform credentials', async () => {
+  const bodies: unknown[] = [];
+  const named = { ...identity, account: { id, email: null, phone: null, username: 'demo-user', displayName: '演示' } };
+  const client = createIdentityClient(async (path, init) => {
+    if (String(path).endsWith('csrf')) return json({ token: 'test', headerName: 'X-CSRF-TOKEN' });
+    bodies.push(JSON.parse(String(init?.body)));
+    return json(named);
+  });
+  assert.equal((await client.login('demo-user', 'synthetic-password')).account.username, 'demo-user');
+  await client.login('19900001012', 'synthetic-password');
+  assert.deepEqual(bodies, [{ username: 'demo-user', password: 'synthetic-password' }, { phone: '19900001012', password: 'synthetic-password' }]);
+  await assert.rejects(createIdentityClient(async () => json({ ...named, account: { ...named.account, username: 'bad@alias' } })).me(),
+    (e) => e instanceof IdentityError && e.code === 'CONTRACT_MISMATCH');
+});

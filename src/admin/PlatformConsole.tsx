@@ -11,6 +11,7 @@ import { AccountEnterpriseLink } from '../platform/PlatformAccounts';
 import { PlatformSettings } from '../platform/PlatformSettings';
 import { PlatformUsagePage } from '../operations/UsagePanel';
 import { PlatformEngineManagement } from './PlatformEngineManagement';
+import { SceneEnginePanel } from './SceneEnginePanel';
 
 export function PlatformConsole({ logout }: { logout: () => void }) {
   const { session } = useSession();
@@ -39,7 +40,7 @@ export function PlatformConsole({ logout }: { logout: () => void }) {
       ) : page === 'database' || page === 'materials' ? (
         <PlatformDataOperations hash={hash} kind={page === 'materials' ? 'MATERIALS' : 'CONNECTIONS'} />
       ) : page === 'engine' ? (
-        <PlatformEngineDashboard hash={hash} />
+        <><PlatformEngineDashboard hash={hash} /><SceneEnginePanel /></>
       ) : page === 'usage' ? (
         <PlatformUsagePage hash={hash} />
       ) : page === 'capabilities' ? (

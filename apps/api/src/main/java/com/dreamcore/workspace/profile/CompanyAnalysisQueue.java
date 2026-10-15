@@ -26,11 +26,14 @@ public class CompanyAnalysisQueue {
   // Choose a file, not random UUID fragments. Another batch may analyze another file.
   var versions=db.queryForList("SELECT c.version_id FROM company_analysis_items i JOIN company_analysis_current_chunks eligible ON eligible.id=i.chunk_id JOIN knowledge_chunks c ON c.id=i.chunk_id WHERE i.tenant_id=? AND i.state IN ('QUEUED','RETRY_WAIT') AND i.next_attempt_at<=clock_timestamp() AND NOT EXISTS(SELECT 1 FROM company_analysis_items busy JOIN knowledge_chunks bc ON bc.id=busy.chunk_id WHERE bc.version_id=c.version_id AND busy.state='RUNNING') ORDER BY i.next_attempt_at,c.version_id,c.ordinal LIMIT 1",UUID.class,tenant);
   if(versions.isEmpty())return null;
-  var file=db.queryForList("SELECT c.id,c.content,i.state,i.next_attempt_at<=clock_timestamp() AS due FROM knowledge_chunks c JOIN company_analysis_current_chunks eligible ON eligible.id=c.id LEFT JOIN company_analysis_items i ON i.chunk_id=c.id WHERE c.version_id=? ORDER BY c.ordinal,c.id",versions.getFirst());
+  var file=db.queryForList("SELECT c.id,c.content,i.state,i.attempts,i.next_attempt_at<=clock_timestamp() AS due FROM knowledge_chunks c JOIN company_analysis_current_chunks eligible ON eligible.id=c.id LEFT JOIN company_analysis_items i ON i.chunk_id=c.id WHERE c.version_id=? ORDER BY c.ordinal,c.id",versions.getFirst());
+  // Preserve source order and authority, but reduce a confirmed failed batch on retry.
+  int retry=file.stream().filter(p->Set.of("QUEUED","RETRY_WAIT").contains(String.valueOf(p.get("state")))&&Boolean.TRUE.equals(p.get("due"))).mapToInt(p->p.get("attempts") instanceof Number n?n.intValue():0).max().orElse(0);
+  int characterLimit=retry==0?8000:retry==1?4000:2000,chunkLimit=retry==0?64:retry==1?32:16;
   var chunks=new ArrayList<UUID>();var pending=new ArrayList<UUID>();int characters=0;
   for(var part:file){
    int size=((String)part.get("content")).length();
-   if(!chunks.isEmpty()&&(chunks.size()>=64||characters+size>8000)){
+   if(!chunks.isEmpty()&&(chunks.size()>=chunkLimit||characters+size>characterLimit)){
     if(!pending.isEmpty())break;
     chunks.clear();characters=0;
    }

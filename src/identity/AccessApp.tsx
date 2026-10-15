@@ -1,6 +1,7 @@
+import { TenantConsole } from '../admin/TenantConsole';
 import { SkillCenter, skillsHref } from '../skills/SkillCenter';
 import { SuspendedEnterprise } from './SuspendedEnterprise';
-import { TenantConsole } from '../admin/TenantConsole';
+import { TenantScene } from '../admin/TenantScene';
 import { UploadProvider } from '../material/UploadManager';
 import { phoneClient } from './phone-client';
 import { PhoneAuth } from './PhoneAuth';
@@ -20,7 +21,7 @@ import { Documents } from '../documents/Documents';
 import { documentsHref } from '../documents/routes';
 import { Conversations, conversationHref } from '../conversation/Conversations';
 import { LiveBriefing, briefingHref } from '../briefing-live/Briefing';
-import { MessageSquare, LayoutPanelTop, ExternalLink, Grid2X2 } from 'lucide-react';
+import { MessageSquare, LayoutPanelTop, ExternalLink, Puzzle } from 'lucide-react';
 import { ManagementHome } from '../governance/ManagementHome';
 import { Profiles } from '../profile/Profiles';
 import { governanceClient } from '../governance/client';
@@ -135,7 +136,12 @@ export default function AccessApp({
     return (
       <Status title="暂时无法连接服务" detail="当前状态尚未确认，请重新连接。" retry={() => void refresh()} />
     );
-  if (session.phase === 'authenticated' && !session.identity?.account.phone && !phoneConfiguration.value)
+  if (
+    session.phase === 'authenticated' &&
+    !session.identity?.account.phone &&
+    !session.identity?.account.username &&
+    !phoneConfiguration.value
+  )
     return (
       <Status
         title="正在确认账号入口"
@@ -147,7 +153,8 @@ export default function AccessApp({
     session.phase === 'anonymous' ||
     inviting ||
     (!session.identity?.account.phone &&
-      (!legacyAllowed || new URLSearchParams(location.hash.slice(1)).has('bind')))
+      ((!session.identity?.account.username && !legacyAllowed) ||
+        new URLSearchParams(location.hash.slice(1)).has('bind')))
   )
     return (
       <div className="access-auth-layout">
@@ -228,7 +235,7 @@ function GuardedAccessShell({
       : [];
   const eligible =
     surface === 'tenant-admin'
-      ? identity.memberships.filter((m) => management.includes(m.tenantId))
+      ? identity.memberships.filter((m) => m.service?.status !== 'SUSPENDED')
       : identity.memberships;
   const [routeHash, setRouteHash] = useState(location.hash);
   const [briefingMonth, setBriefingMonth] = useState<string | null>(null);
@@ -312,10 +319,23 @@ function GuardedAccessShell({
   };
   if (selected?.service?.status === 'SUSPENDED')
     return <SuspendedEnterprise membership={selected} identity={identity} />;
-  if (surface === 'tenant-admin' && selected && management.includes(tenant))
+  if (surface === 'tenant-admin' && selected)
     return (
       <UploadProvider>
-        <TenantConsole key={tenant} tenant={tenant} name={selected.tenantName} />
+        {new URLSearchParams(location.search).get('view') === 'business' ||
+        ['admin', 'manage', 'tab', 'scope'].some((key) =>
+          new URLSearchParams(location.hash.slice(1)).has(key),
+        ) ? (
+          <TenantConsole key={tenant} tenant={tenant} name={selected.tenantName} />
+        ) : (
+          <TenantScene
+            key={tenant}
+            tenant={tenant}
+            name={selected.tenantName}
+            enterprises={eligible.map((m) => ({ id: m.tenantId, name: m.tenantName }))}
+            onChoose={choose}
+          />
+        )}
       </UploadProvider>
     );
   return (
@@ -352,7 +372,7 @@ function GuardedAccessShell({
                     active: library || documents,
                     href: libraryHref(tenant),
                   },
-                  { label: '技能中心', icon: Grid2X2, active: skills, href: skillsHref(tenant) },
+                  { label: '技能中心', icon: Puzzle, active: skills, href: skillsHref(tenant) },
                 ]}
               />
             ) : (
@@ -380,7 +400,7 @@ function GuardedAccessShell({
         </aside>
         <div className="access-main">
           <PageHeader
-            className={surface === 'workspace' && library ? 'material-topbar' : ''}
+            className={surface === 'workspace' && (library || skills) ? 'material-topbar' : ''}
             heading={
               <>
                 <h1>
@@ -527,11 +547,7 @@ function GuardedAccessShell({
             ) : profiles ? (
               <Profiles tenant={tenant} personalOnly />
             ) : skills ? (
-              <SkillCenter
-                key={`${identity.account.id}:${tenant}`}
-                tenant={tenant}
-                account={identity.account.id}
-              />
+              <SkillCenter key={tenant} tenant={tenant} />
             ) : documents ? (
               <Documents key={tenant} tenant={tenant} />
             ) : briefing || conversations ? (

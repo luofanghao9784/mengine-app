@@ -58,7 +58,7 @@ export function PlatformApp() {
           <ShieldCheck size={32} aria-hidden="true" />
           <h1>梦擎总台</h1>
           <p>使用总台专用账号和密码登录</p>
-          <a href="/workspace/">手机号统一登录</a>
+          <a href="/workspace/">企业端与员工端登录</a>
           {session.phase === 'loading' ? (
             <p role="status">正在检查登录状态…</p>
           ) : session.phase === 'unavailable' ? (

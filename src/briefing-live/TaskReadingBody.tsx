@@ -123,7 +123,7 @@ export function TaskReadingBody({
                           <span>{result.artifacts.length} 份成果</span>
                         ) : undefined
                       }
-                      verification={result.executionClass === 'verification'}
+                      verification={result.executionClass === 'verification' && !result.engineVersion?.startsWith('codex-demo-import-')}
                     />
                   </button>
                 </article>
@@ -136,7 +136,7 @@ export function TaskReadingBody({
   }
   return (
     <>
-      {result.executionClass === 'verification' && (
+      {result.executionClass === 'verification' && !result.engineVersion?.startsWith('codex-demo-import-') && (
         <p className="live-verification-label">联调验证内容 · 未调用真实模型</p>
       )}
       {hasBriefing ? (

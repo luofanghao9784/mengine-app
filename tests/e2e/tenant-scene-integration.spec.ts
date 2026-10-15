@@ -1,0 +1,227 @@
+import { test, expect, type Page } from '@playwright/test';
+import { telemetryChannels } from '../../contracts/public-api/engine-telemetry';
+const tenant = '00000000-0000-4000-8000-000000000001',
+  actor = '00000000-0000-4000-8000-000000000002';
+async function fixture(page: Page) {
+  const requests: string[] = [];
+  let unavailable = false;
+  await page.route('**/api/**', async (route) => {
+    const u = new URL(route.request().url()),
+      p = u.pathname;
+    requests.push(p);
+    const reply = (json: unknown, status = 200) => route.fulfill({ json, status });
+    if (p === '/api/v1/me')
+      return reply({
+        account: { id: actor, email: 'scene@example.test', displayName: '合成管理员' },
+        platformAdmin: false,
+        memberships: [{ tenantId: tenant, tenantName: '合成企业', role: 'TENANT_ADMIN' }],
+      });
+    if (p.endsWith('/csrf')) return reply({ headerName: 'X-CSRF-TOKEN', token: 'synthetic' });
+    if (p.endsWith('/governance'))
+      return reply({
+        tenantId: tenant,
+        ownerId: actor,
+        revision: 0,
+        owner: true,
+        canConfigure: true,
+        canEnterManagement: true,
+        canAcceptInitialResponsibility: false,
+        pendingHandover: null,
+        capabilities: [],
+      });
+    if (p.endsWith('/engine-telemetry'))
+      return reply(
+        unavailable
+          ? { code: 'UNAVAILABLE' }
+          : {
+              tenantId: tenant,
+              checkedAt: new Date().toISOString(),
+              recentSeconds: 300,
+              evolution: 'NOT_CONNECTED',
+              channels: telemetryChannels
+                .filter((code) => code !== 'GENERAL_ADJUSTMENT')
+                .map((code) => ({
+                  code,
+                  running: code === 'TASK' ? 2 : 0,
+                  queued: 0,
+                  waiting: 0,
+                  failed: 0,
+                  unknown: 0,
+                  completedRecent: 0,
+                  lastCompletedAt: null,
+                })),
+            },
+        unavailable ? 503 : 200,
+      );
+    if (p.endsWith('/usage'))
+      return reply({
+        tenantId: tenant,
+        period: u.searchParams.get('period'),
+        timeZone: 'Asia/Shanghai',
+        from: '2026-10-01T00:00:00+08:00',
+        until: '2026-10-15T12:00:00+08:00',
+        checkedAt: '2026-10-15T12:00:00+08:00',
+        groups: [],
+        days: [
+          {
+            date: '2026-10-14',
+            workRequests: 7,
+            maintenanceCalls: 0,
+            unknownMaintenanceRuns: 0,
+            inputTokens: 0,
+            outputTokens: 0,
+          },
+        ],
+        tools: [],
+        storage: { originals: 0, versions: 0, registeredBytes: 0 },
+        coverage: {
+          unmeteredWorkAttempts: 0,
+          legacyToolReceipts: 0,
+          evaluation: 'NOT_CONNECTED',
+          evolution: 'NOT_ENABLED',
+        },
+        quota: { state: 'NOT_CONFIGURED', unit: null, limit: null, remaining: null },
+      });
+    if (p.endsWith('/scene/dispatch')) {
+      const path = u.searchParams.get('path');
+      if (path === '/scene-foundation')
+        return reply({
+          at: new Date().toISOString(),
+          user: { name: '合成管理员', role: 'admin' },
+          tenant: { name: '合成企业' },
+          model: { configured: false, enabled: false, model: '' },
+          items: [],
+          passed: [0, 0, 0, 0, 0],
+          sources: [
+            { name: '外部数据集', count: 0 },
+            { name: '内部资料库', count: 0 },
+            { name: '外网数据集', count: 0 },
+          ],
+          auditValid: true,
+          governance: {
+            attention: 0,
+            isolated: 0,
+            overdue: 0,
+            failed: 0,
+            averageQuality: null,
+            departments: [],
+          },
+          canScan: false,
+        });
+      if (path === '/scene-knowledge')
+        return reply({
+          items: [],
+          relations: [],
+          sourceKind: {},
+          tabs: [],
+          stats: { title: '知识构成', rows: [] },
+          aside: { title: '最近入库', rows: [] },
+          pending: 0,
+          failed: 0,
+          busy: false,
+          available: false,
+          needsGraph: false,
+          scopeRevision: '1',
+          status: '尚无可用知识',
+        });
+      if (path === '/scene-access')
+        return reply({
+          user: {
+            id: actor,
+            name: '合成管理员',
+            role: 'admin',
+            clearance: 3,
+            active: true,
+            tenantId: tenant,
+            departmentId: '',
+          },
+          members: [],
+          roles: { admin: '企业管理员' },
+          departments: [],
+          connections: [],
+          resources: [],
+          proposals: [],
+          pending: 0,
+          canViewAudit: true,
+        });
+    }
+    return reply({ code: 'UNAVAILABLE' }, 404);
+  });
+  return {
+    requests,
+    fail: () => {
+      unavailable = true;
+    },
+  };
+}
+test('新版设计读取真实接口，不把模拟遥测和统计放进企业页面', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  const f = await fixture(page);
+  await page.goto(`/tenant-admin/prototype/?tenant=${tenant}`);
+  const nav = page.getByRole('navigation', { name: '主导航' });
+  // The scene has one active main menu; scope avoids stage labels.
+  await page
+    .locator('.shell-switch button')
+    .filter({ hasText: /^引擎$/ })
+    .click();
+  await expect(page.getByText('7 次工作请求 · 本月')).toBeVisible();
+  await expect(page.getByText('8,584', { exact: false })).toHaveCount(0);
+  await expect(page.getByText('执行中 2 · 排队 0', { exact: false })).toBeVisible();
+  f.fail();
+  await expect(page.locator('.runtime-notice')).toContainText('运行状态暂不可用', { timeout: 10000 });
+  await expect(page.getByText('执行中 2 · 排队 0', { exact: false })).toHaveCount(0);
+  await page.screenshot({ path: '.local/integration-20261015/scene-home.png' });
+  expect(errors).toEqual([]);
+  expect(f.requests.some((p) => p.endsWith('/engine-telemetry'))).toBeTruthy();
+});
+test('业务页保留运行用量、权限与本人输出入口', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  const f = await fixture(page);
+  await page.goto(`/tenant-admin/prototype/?tenant=${tenant}`);
+  await page
+    .locator('.shell-switch button')
+    .filter({ hasText: /^成员与权限$/ })
+    .click();
+  await expect(page.getByRole('button', { name: '数据权限与部门' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '账号、空间与职责交接' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '资源权限', exact: true })).toBeVisible();
+  await page
+    .locator('.shell-switch button')
+    .filter({ hasText: /^用量与运行$/ })
+    .click();
+  await expect.poll(() => f.requests.some((p) => p.endsWith('/usage'))).toBeTruthy();
+  await expect(page.locator('.scene-business-body')).toBeVisible();
+  await page.screenshot({ path: '.local/integration-20261015/scene-usage.png' });
+  await page
+    .locator('.shell-switch button')
+    .filter({ hasText: /^输出$/ })
+    .click();
+  await expect(page.getByRole('link', { name: /会话回复/ })).toHaveAttribute(
+    'href',
+    `/workspace/#tenant=${tenant}&view=conversations`,
+  );
+  await expect(page.getByRole('link', { name: /成果文件/ })).toHaveAttribute('target', '_top');
+  expect(errors).toEqual([]);
+});
+test('直接访问其他企业的场景不读取业务数据', async ({ page }) => {
+  const f = await fixture(page);
+  await page.goto('/tenant-admin/prototype/?tenant=00000000-0000-4000-8000-000000000099');
+  await expect(page.getByText('没有该企业的访问权限')).toBeVisible();
+  expect(f.requests.filter((p) => p.includes('scene/dispatch'))).toEqual([]);
+});
+
+test('企业舞台的用量下钻留在当前企业场景', async ({ page }) => {
+  const f = await fixture(page);
+  await page.goto(`/tenant-admin/prototype/?tenant=${tenant}`);
+  await page
+    .locator('.shell-switch button')
+    .filter({ hasText: /^引擎$/ })
+    .click();
+  await page.locator('.eng3d-lbl[data-channel="RESPONSE"]').dispatchEvent('click');
+  await page.getByRole('link', { name: '查看运行与用量', exact: true }).dispatchEvent('click');
+  await expect(page.locator('.shell')).toHaveAttribute('data-place', 'usage');
+  await expect(page.locator('.scene-business-body')).toBeVisible();
+  expect(f.requests.some((p) => p.startsWith('/api/platform-admin/'))).toBe(false);
+});

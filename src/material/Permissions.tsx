@@ -232,8 +232,15 @@ export function LibraryPermissions({
       setBusy(false);
     }
   };
+  const principal = (g: Grant) =>
+    (g.principalKind === 'ACCOUNT' ? directory?.people : directory?.departments)?.find(
+      (p) => p.id === g.principalId,
+    )?.name || '已停用成员';
+  const readers = explanation?.people.filter((p) => p.mask & 1) || [];
+  const blocked = explanation?.people.filter((p) => !(p.mask & 1)) || [];
+  const editable = !!policy?.effective.canManagePermissions && !!directory;
   return (
-    <Modal title={`权限设置 · ${name}`} onClose={busy ? () => {} : close}>
+    <Modal title={`权限设置 · ${name}`} className="perm-modal" onClose={busy ? () => {} : close}>
       {error && (
         <p role="alert" className="access-alert">
           {error}
@@ -242,42 +249,69 @@ export function LibraryPermissions({
       {!policy ? (
         <Loading />
       ) : (
-        <>
-          <p>
-            本人：{policy.effective.canEdit ? '可编辑' : policy.effective.canRead ? '仅查看' : '不可查看'} ·{' '}
-            {policy.effective.canDownload ? '可下载' : '不可下载'}
-          </p>
-          <p className="muted">
-            管理权限不代表能阅读文件。多个允许授权合并，明确禁止优先；独立范围也不能绕过上级的禁止。派生成果还需拥有来源权限。
+        <div className="perm">
+          <p className="perm-me">
+            <span>本人：</span>
+            <AccessChips
+              mask={
+                (policy.effective.canRead ? 1 : 0) |
+                (policy.effective.canEdit ? 2 : 0) |
+                (policy.effective.canDownload ? 4 : 0)
+              }
+            />
+            {policy.effective.canManagePermissions && <i className="perm-chip manage">可管理授权</i>}
           </p>
           {explanation && (
-            <details>
-              <summary>查看生效权限与授权来源</summary>
-              {explanation.people.length > 0 && (
-                <ul>
-                  {explanation.people.map((p) => (
+            <section className="perm-section">
+              <h3>
+                谁可以访问
+                <small>
+                  {readers.length} 人可查看{blocked.length ? ` · ${blocked.length} 人不可查看` : ''}
+                </small>
+              </h3>
+              {readers.length > 0 ? (
+                <ul className="perm-people">
+                  {readers.map((p) => (
                     <li key={p.id}>
-                      {p.name}：{describeAccess(p.mask)}
+                      <i className="perm-avatar">{p.name.slice(0, 1)}</i>
+                      <b>{p.name}</b>
+                      <AccessChips mask={p.mask} />
                     </li>
                   ))}
                 </ul>
+              ) : (
+                <p className="perm-note">目前没有成员可以查看。</p>
               )}
-              <ul>
-                {explanation.reasons.map((r, i) => (
-                  <li key={i}>
-                    {r.scope} · {r.principal}：
-                    {{ NONE: '不可查看', READ: '仅查看', EDIT: '可编辑' }[r.content] || r.content} /{' '}
-                    {{ ALLOW: '允许下载', DENY: '禁止下载', INHERIT: '未单独授予下载' }[r.download] ||
-                      r.download}
-                    {!r.allowsEffective ? '（上层允许不继承，明确禁止仍生效）' : ''}
-                    {!r.inherit ? ' · 此范围停止继承允许授权' : ''}
-                  </li>
-                ))}
-              </ul>
-            </details>
+              <details className="perm-details">
+                <summary>查看生效权限与授权来源</summary>
+                {blocked.length > 0 && (
+                  <p className="perm-blocked">不可查看：{blocked.map((p) => p.name).join('、')}</p>
+                )}
+                <ul className="perm-reasons">
+                  {explanation.reasons.map((r, i) => (
+                    <li key={i}>
+                      <b>
+                        {r.scope} · {r.principal}
+                      </b>
+                      <span>
+                        {{ NONE: '不可查看', READ: '仅查看', EDIT: '可编辑' }[r.content] || r.content} /{' '}
+                        {{ ALLOW: '允许下载', DENY: '禁止下载', INHERIT: '未单独授予下载' }[r.download] ||
+                          r.download}
+                        {!r.allowsEffective ? '（上层允许不继承，明确禁止仍生效）' : ''}
+                        {!r.inherit ? ' · 此范围停止继承允许授权' : ''}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="perm-note">
+                  管理权限不代表能阅读文件。多个允许授权合并，明确禁止优先；独立范围也不能绕过上级的禁止。派生成果还需拥有来源权限。
+                </p>
+              </details>
+            </section>
           )}
-          {policy.effective.canManagePermissions && directory ? (
-            <>
+          {editable && directory ? (
+            <section className="perm-section">
+              <h3>调整授权</h3>
               <Field label="默认权限">
                 <select
                   disabled={busy}
@@ -292,16 +326,26 @@ export function LibraryPermissions({
                 </select>
               </Field>
               {kind === 'WORKSPACE' && (
-                <p className="muted">空间继承现有空间成员授权；独立范围会停止使用这些默认内容权限。</p>
+                <p className="perm-note">空间继承现有空间成员授权；独立范围会停止使用这些默认内容权限。</p>
               )}
               {grants.map((g, i) => (
-                <fieldset key={g.principalKind + g.principalId} disabled={busy} className="library-grant-row">
+                <fieldset key={g.principalKind + g.principalId} disabled={busy} className="perm-grant">
                   <legend>
-                    {(g.principalKind === 'ACCOUNT' ? directory.people : directory.departments).find(
-                      (p) => p.id === g.principalId,
-                    )?.name || '已停用成员'}{' '}
-                    · {g.principalKind === 'ACCOUNT' ? '成员' : '部门'}
+                    <i className={`perm-avatar ${g.principalKind === 'DEPARTMENT' ? 'team' : ''}`}>
+                      {principal(g).slice(0, 1)}
+                    </i>
+                    {principal(g)} · {g.principalKind === 'ACCOUNT' ? '成员' : '部门'}
                   </legend>
+                  <Button
+                    variant="ghost"
+                    className="perm-remove"
+                    onClick={() => {
+                      setGrants((old) => old.filter((_, j) => j !== i));
+                      setConfirmation(undefined);
+                    }}
+                  >
+                    移除此项授权
+                  </Button>
                   <Field label="内容权限">
                     <select
                       value={g.content}
@@ -327,15 +371,6 @@ export function LibraryPermissions({
                       <option value="DENY">禁止下载（优先）</option>
                     </select>
                   </Field>
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={g.manageFiles}
-                      disabled={g.content === 'NONE'}
-                      onChange={(e) => update(i, { manageFiles: e.target.checked })}
-                    />
-                    明确委派移动、删除资格
-                  </label>
                   {g.principalKind === 'ACCOUNT' && (
                     <Field label="调岗关联">
                       <select
@@ -353,14 +388,15 @@ export function LibraryPermissions({
                       </select>
                     </Field>
                   )}
-                  <Button
-                    onClick={() => {
-                      setGrants((old) => old.filter((_, j) => j !== i));
-                      setConfirmation(undefined);
-                    }}
-                  >
-                    移除此项授权
-                  </Button>
+                  <label className="perm-check">
+                    <input
+                      type="checkbox"
+                      checked={g.manageFiles}
+                      disabled={g.content === 'NONE'}
+                      onChange={(e) => update(i, { manageFiles: e.target.checked })}
+                    />
+                    明确委派移动、删除资格
+                  </label>
                 </fieldset>
               ))}
               <Field label="添加部门或成员">
@@ -398,8 +434,13 @@ export function LibraryPermissions({
                   ))}
                 </select>
               </Field>
-              {confirmation ? (
-                <div role="alert">
+              {confirmation && (
+                <div
+                  role="alert"
+                  className="perm-confirm"
+                  ref={(el) => el?.scrollIntoView({ block: 'center' })}
+                >
+                  <h3>请核对本次变更</h3>
                   <p>
                     将{inherit ? '保留继承' : '停止继承'}，保存以上 {grants.length}{' '}
                     项明确授权。影响该对象及继承它的子目录和文件；不可查看或禁止下载优先。确认后立即生效并留痕。
@@ -409,32 +450,53 @@ export function LibraryPermissions({
                   <ul>
                     {confirmation.changes.map((c, i) => (
                       <li key={i}>
-                        {c.name} · {c.objectName}：{describeAccess(c.beforeMask)} →{' '}
-                        {describeAccess(c.afterMask)}
+                        <b>
+                          {c.name} · {c.objectName}
+                        </b>
+                        <span>
+                          {describeAccess(c.beforeMask)} → {describeAccess(c.afterMask)}
+                        </span>
                       </li>
                     ))}
                   </ul>
-                  <Button disabled={busy} onClick={() => void save()}>
-                    确认保存
-                  </Button>
-                  <Button disabled={busy} onClick={() => setConfirmation(undefined)}>
-                    返回核对
-                  </Button>
                 </div>
-              ) : (
-                <Button disabled={busy} onClick={() => void preview()}>
-                  {busy ? '正在计算影响…' : '核对并保存'}
-                </Button>
               )}
-            </>
+              <div className="modal-actions perm-actions">
+                {confirmation ? (
+                  <>
+                    <Button disabled={busy} onClick={() => setConfirmation(undefined)}>
+                      返回核对
+                    </Button>
+                    <Button variant="primary" disabled={busy} onClick={() => void save()}>
+                      确认保存
+                    </Button>
+                  </>
+                ) : (
+                  <Button variant="primary" disabled={busy} onClick={() => void preview()}>
+                    {busy ? '正在计算影响…' : '核对并保存'}
+                  </Button>
+                )}
+              </div>
+            </section>
           ) : !policy.effective.canManagePermissions ? (
-            <p>你没有此范围的授权管理资格。</p>
+            <p className="perm-note">你没有此范围的授权管理资格。</p>
           ) : (
             <Loading />
           )}
-        </>
+        </div>
       )}
     </Modal>
+  );
+}
+
+function AccessChips({ mask }: { mask: number }) {
+  return !(mask & 1) ? (
+    <i className="perm-chip none">不可查看</i>
+  ) : (
+    <>
+      <i className={`perm-chip ${mask & 2 ? 'edit' : ''}`}>{mask & 2 ? '可编辑' : '仅查看'}</i>
+      <i className={`perm-chip ${mask & 4 ? '' : 'none'}`}>{mask & 4 ? '可下载' : '不可下载'}</i>
+    </>
   );
 }
 
@@ -517,11 +579,18 @@ export function LibraryEvents({
       });
     return () => abort.abort();
   }, [tenant, kind, id, offset, audit]);
+  const outcomes: Record<string, string> = {
+    SUCCESS: '成功',
+    DENIED: '已拒绝',
+    CONFLICT: '状态冲突',
+    FAILED: '失败',
+    CANCELLED: '已取消',
+  };
   return (
-    <section>
+    <section className="mat-events">
       <h3>文件操作记录</h3>
       {canAudit && (
-        <label>
+        <label className="perm-check">
           <input
             type="checkbox"
             checked={audit}
@@ -542,20 +611,21 @@ export function LibraryEvents({
           <ul>
             {events.map((e) => (
               <li key={e.id}>
-                {actionNames[e.action] || e.action} · {e.actorName || (e.actorId ? '历史成员' : '系统')} ·{' '}
-                {{
-                  SUCCESS: '成功',
-                  DENIED: '已拒绝',
-                  CONFLICT: '状态冲突',
-                  FAILED: '失败',
-                  CANCELLED: '已取消',
-                }[e.outcome] || e.outcome}{' '}
-                · {new Date(e.occurredAt).toLocaleString('zh-CN')}
-                {e.executionSource === 'AI'
-                  ? ' · AI 执行'
-                  : e.executionSource === 'SYSTEM'
-                    ? ' · 系统执行'
-                    : ''}
+                <b>
+                  {actionNames[e.action] || e.action}
+                  <i className={`perm-chip ${e.outcome === 'SUCCESS' ? '' : 'edit'}`}>
+                    {outcomes[e.outcome] || e.outcome}
+                  </i>
+                </b>
+                <small>
+                  {e.actorName || (e.actorId ? '历史成员' : '系统')} ·{' '}
+                  {new Date(e.occurredAt).toLocaleString('zh-CN')}
+                  {e.executionSource === 'AI'
+                    ? ' · AI 执行'
+                    : e.executionSource === 'SYSTEM'
+                      ? ' · 系统执行'
+                      : ''}
+                </small>
                 {audit && e.requestId && (
                   <details>
                     <summary>请求核对信息</summary>
@@ -585,13 +655,17 @@ export function LibraryEvents({
               </li>
             ))}
           </ul>
-          {events.length === 0 && <p>暂无操作记录。</p>}
-          <Button disabled={offset === 0} onClick={() => setOffset((n) => Math.max(0, n - 50))}>
-            上一页
-          </Button>
-          <Button disabled={events.length < 50} onClick={() => setOffset((n) => n + 50)}>
-            下一页
-          </Button>
+          {events.length === 0 && <p className="perm-note">暂无操作记录。</p>}
+          {(offset > 0 || events.length >= 50) && (
+            <div className="access-pager">
+              <Button disabled={offset === 0} onClick={() => setOffset((n) => Math.max(0, n - 50))}>
+                上一页
+              </Button>
+              <Button disabled={events.length < 50} onClick={() => setOffset((n) => n + 50)}>
+                下一页
+              </Button>
+            </div>
+          )}
         </>
       )}
     </section>
@@ -605,18 +679,17 @@ export function LibraryDepartments({ tenant }: { tenant: string }) {
 function DepartmentEditor({ tenant }: { tenant: string }) {
   const [data, setData] = useState<Directory>();
   const [selected, setSelected] = useState<Department>();
-  const [exceptions, setExceptions] =
-    useState<
-      {
-        accountId: string;
-        kind: string;
-        id: string;
-        name: string;
-        roleDepartmentId: string | null;
-        content: string;
-        download: string;
-      }[]
-    >();
+  const [exceptions, setExceptions] = useState<
+    {
+      accountId: string;
+      kind: string;
+      id: string;
+      name: string;
+      roleDepartmentId: string | null;
+      content: string;
+      download: string;
+    }[]
+  >();
   const [exceptionError, setExceptionError] = useState('');
   useEffect(() => {
     setExceptions(undefined);

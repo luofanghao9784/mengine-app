@@ -39,8 +39,11 @@ public class CompanyAnalysisWorker {
    else queue.fail(job.id(),failure instanceof IdentityException?"COMPANY_SOURCE_CHANGED":"COMPANY_DISPATCH_FAILED",false,null);
   }
  }
+ private static String diagnosticCode(String code){
+  return code!=null&&Set.of("MODEL_CALL_LIMIT","TOOL_CALL_LIMIT","TIME_LIMIT","MODEL_OUTPUT_LIMIT","INVALID_MODEL_RESPONSE","MODEL_INCOMPLETE","INVALID_TOOL_ARGUMENTS","COMPANY_INPUT_INCOMPLETE","COMPANY_EVIDENCE_INVALID","SOURCE_NOT_GRANTED","PROFILE_NOT_GRANTED","TOOL_OUTPUT_LIMIT","TOOL_FAILED","RUNTIME_FAILED","MODEL_NOT_CONFIGURED","COMPANY_DELIVERY_MISSING").contains(code)?code:"COMPANY_ANALYSIS_FAILED";
+ }
  public void accept(CompanyAnalysisRuntime.Result result){
-  if(!result.outcome().equals("COMPLETE")){queue.fail(result.runId(),result.outcome().equals("CANCELLED")?"COMPANY_SOURCE_CHANGED":"COMPANY_ANALYSIS_FAILED",true,result);return;}
+  if(!result.outcome().equals("COMPLETE")){queue.fail(result.runId(),result.outcome().equals("CANCELLED")?"COMPANY_SOURCE_CHANGED":diagnosticCode(result.code()),true,result);return;}
   try{queue.complete(result);}
   catch(IdentityException changed){queue.fail(result.runId(),changed.status==422||changed.status==400?"COMPANY_EVIDENCE_INVALID":"COMPANY_SOURCE_CHANGED",true,result);}
  }
@@ -52,7 +55,11 @@ public class CompanyAnalysisWorker {
    if(result==null){if(r.expired())runtime.cancel(r.id(),r.lease());return;}
    if(r.expired())queue.fail(r.id(),"COMPANY_LEASE_EXPIRED",true,result);
    else accept(result);
-  }catch(CompanyAnalysisRuntime.Failure unavailable){/* Retry receipt lookup on the next tick; never resend the model request. */}
+  }catch(CompanyAnalysisRuntime.Failure unavailable){
+   // Only a verified missing receipt after lease expiry can release the slot early.
+   // Network errors remain recoverable; neither path resends an uncertain model request.
+   if(r.expired()&&unavailable.code.equals("COMPANY_RESULT_LOST"))queue.fail(r.id(),"COMPANY_RESULT_UNKNOWN",true,null);
+  }
  }
  @PreDestroy public void stop(){pool.shutdownNow();}
 }

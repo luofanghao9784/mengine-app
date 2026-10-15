@@ -1,281 +1,441 @@
+/* Generating more briefings happens inside the grid: one card to ask, one placeholder per card on its way. */
 .briefing-generation,
-.generation-placeholder {
+.generation-pending {
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  margin: 0;
   height: 100%;
-  text-align: left;
+  margin: 0;
+  container-type: inline-size;
 }
-.generation-card-copy {
+.generation-face {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   justify-content: safe center;
+  gap: 10px;
   height: 100%;
   min-height: 0;
-  padding: clamp(16px, 7cqi, 26px);
-  gap: 10px;
+  padding: 20px;
   overflow-y: auto;
+  text-align: center;
+  animation: generation-settle 260ms cubic-bezier(0.2, 0.65, 0.25, 1);
 }
-.generation-card-copy h3 {
+.briefing-generation .generation-face h3,
+.briefing-generation .generation-compose h3 {
   margin: 0;
-  font-size: clamp(16px, 7cqi, 21px);
-  line-height: 1.45;
-  letter-spacing: -0.02em;
+  font-family: var(--font-sans, Inter, 'PingFang SC', 'Microsoft YaHei', sans-serif);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
 }
-.generation-card-copy p {
+.generation-face p {
   margin: 0;
+  max-width: 22em;
+  color: var(--ink-2);
   font-size: 12px;
   line-height: 1.7;
-  color: var(--muted, var(--ink-2));
 }
-.generation-card-copy .button {
+.generation-face small,
+.generation-count small {
+  color: var(--ink-3);
+  font-size: 11px;
+}
+.generation-face .button,
+.generation-submit {
   flex: none;
-  margin-top: 2px;
   gap: 6px;
+  margin-top: 4px;
+  padding: 8px 14px;
+  border-radius: 999px;
   font-size: 13px;
 }
-.generation-eyebrow {
-  font-size: 10px;
-  letter-spacing: 0.15em;
-  color: var(--ink-3);
-}
-.generation-symbol {
-  display: flex;
-  color: var(--ink-3);
-  margin-bottom: 2px;
-}
-.generation-card-copy .generation-result {
-  font-size: 11px;
+.generation-face .button.ghost {
   color: var(--ink-2);
 }
-.generation-card-copy .access-alert {
-  font-size: 11px;
+.generation-actions {
+  display: flex;
+  gap: 6px;
+}
+.generation-face .access-alert,
+.generation-compose .access-alert {
   padding: 6px;
+  font-size: 11px;
 }
-.generation-placeholder {
-  background: var(--accent-soft);
-}
-.generation-placeholder.is-generating::before {
-  content: '';
-  position: absolute;
-  z-index: -1;
-  inset: -60%;
-  background: linear-gradient(
-    115deg,
-    transparent 22%,
-    #dee8ffb3 36%,
-    #f8faffee 49%,
-    #e5e1fb99 62%,
-    transparent 78%
-  );
-  animation: generation-flow 3.6s ease-in-out infinite;
-  pointer-events: none;
-}
-@keyframes generation-flow {
-  0%,
-  100% {
-    transform: translateX(-28%) rotate(-7deg);
-    opacity: 0.65;
-  }
-  50% {
-    transform: translateX(28%) rotate(7deg);
-    opacity: 1;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .generation-placeholder.is-generating::before {
-    animation: none;
-  }
-}
-
-.generation-card-copy {
-  align-items: center;
-  text-align: center;
-  gap: 12px;
-}
-.generation-card-copy h3 {
-  font-family: inherit;
-  font-size: 18px;
-  font-weight: 600;
-}
-.generation-card-copy .generation-icon-button {
+.generation-symbol {
   display: grid;
   place-items: center;
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.generation-symbol.is-done {
+  background: #e6f5ec;
+  color: #23764a;
+  animation: generation-pop 420ms cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+.generation-symbol.is-working svg {
+  animation: generation-twinkle 1.8s ease-in-out infinite;
+}
+.generation-back {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
   padding: 0;
-  margin-top: 4px;
-  border-radius: 50%;
-  color: var(--accent);
-  background: var(--accent-soft);
-  border: 1px solid var(--line);
-}
-.generation-card-copy .generation-icon-button svg {
-  width: 23px;
-  height: 23px;
-  margin: 0;
-  stroke-width: 1.65;
-}
-.generation-card-copy .generation-icon-button:hover:not(:disabled) {
-  background: var(--accent-soft);
-}
-
-/* Keep the stop action visibly framed, including over the animated card wash. */
-.generation-card-copy .generation-icon-button.generation-stop-button {
-  border: 1px solid var(--line);
-  border-radius: 50%;
-  background: var(--accent-soft);
-  color: var(--accent);
-  box-shadow: 0 2px 6px #356fe50a;
-}
-.generation-card-copy .generation-icon-button.generation-stop-button:hover:not(:disabled) {
-  background: var(--accent-soft);
-  border-color: #a8c2ef;
-}
-
-.generation-card-copy.generation-minimal {
-  align-items: center;
-  text-align: center;
-  justify-content: safe center;
-  gap: 14px;
-}
-.generation-minimal .generation-back {
-  position: absolute;
-  top: 14px;
-  left: 14px;
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
   border: 0;
   border-radius: 50%;
-  padding: 0;
   background: transparent;
   color: var(--ink-3);
   cursor: pointer;
 }
-.generation-minimal .generation-back:hover {
-  background: var(--accent-soft);
-}
-.generation-quantity {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-.generation-card-copy.generation-minimal .generation-quantity input {
-  appearance: textfield;
-  -moz-appearance: textfield;
-  width: 76px;
-  height: 68px;
-  min-height: 0;
-  padding: 0;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  box-shadow: none;
+.generation-back:hover {
+  background: var(--soft);
   color: var(--ink);
-  text-align: center;
-  font-family: inherit;
-  font-size: 58px;
-  font-weight: 400;
-  line-height: 1.2;
-  font-variant-numeric: tabular-nums;
 }
-.generation-quantity input::-webkit-inner-spin-button,
-.generation-quantity input::-webkit-outer-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
+.generation-face > .generation-back {
+  position: absolute;
+  top: 10px;
+  right: 10px;
 }
-.generation-quantity .button {
-  width: 36px;
+
+/* Choosing: the card grows to two cells and keeps every choice on one face. */
+.generation-compose {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'head head'
+    'topic topic'
+    'types count'
+    'types submit';
+  gap: 10px 20px;
+  height: 100%;
+  padding: 16px 18px 18px;
+  overflow-y: auto;
+  animation: generation-unfold 320ms cubic-bezier(0.2, 0.65, 0.25, 1);
+}
+.generation-compose > * {
+  animation: generation-rise 360ms cubic-bezier(0.2, 0.65, 0.25, 1) backwards;
+}
+.generation-compose > :nth-child(2) {
+  animation-delay: 40ms;
+}
+.generation-compose > :nth-child(3) {
+  animation-delay: 80ms;
+}
+.generation-compose > :nth-child(n + 4) {
+  animation-delay: 120ms;
+}
+.generation-compose > header {
+  display: flex;
+  grid-area: head;
+  align-items: center;
+  justify-content: space-between;
+  margin: -4px -6px -4px 0;
+}
+.briefing-generation .generation-compose h3 {
+  font-size: 15px;
+}
+.generation-compose input.generation-topic {
+  grid-area: topic;
+  width: 100%;
   height: 36px;
-  padding: 0;
-  border: 0;
+  min-height: 0;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--soft);
+  font-size: 13px;
 }
-.generation-quantity .button svg {
-  width: 20px;
-  height: 20px;
-}
-.generation-card-copy.generation-count,
-.generation-card-copy.generation-types {
-  gap: 12px;
-  padding-top: 32px;
-  padding-bottom: 20px;
-}
-.generation-card-copy.generation-types {
-  gap: 14px;
-}
-.generation-card-copy.generation-count h3,
-.generation-card-copy.generation-types h3 {
-  font-size: 18px;
-  line-height: 1.4;
+.generation-compose input.generation-topic:focus {
+  border-color: var(--accent);
+  background: #fff;
+  outline: none;
 }
 .generation-type-tags {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
-  gap: 12px 10px;
-  width: 100%;
-  max-width: 230px;
-  border: 0;
-  padding: 0;
-  margin: 0;
+  display: flex;
+  grid-area: types;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 8px;
   min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
 }
-.generation-type-tags legend {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-}
-.generation-type {
-  position: relative;
-  cursor: pointer;
+.generation-type-tags legend,
+.generation-count > span {
+  display: block;
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 0;
+  color: var(--ink-3);
+  font-size: 12px;
 }
 .generation-type-tags .magazine-type.generation-type {
-  display: flex;
-  justify-content: center;
+  position: relative;
+  display: inline-flex;
   align-items: center;
-  min-height: 40px;
-  padding: 8px;
   gap: 5px;
-  font-size: 14px;
-  line-height: 20px;
-  border-radius: 7px;
+  min-height: 0;
+  padding: 6px 11px;
+  border-radius: 999px;
+  font-size: 13px;
+  line-height: 18px;
+  cursor: pointer;
+  transition:
+    transform 140ms ease-out,
+    box-shadow 140ms ease-out;
 }
-.generation-type-tags .generation-type svg {
-  width: 16px;
-  height: 16px;
+.generation-type svg {
   flex: none;
-}
-.generation-type-tags .generation-type:has(.generation-type-unavailable) {
-  flex-wrap: wrap;
-  gap: 2px 5px;
-  padding-block: 5px;
-}
-.generation-type-unavailable {
-  flex-basis: 100%;
-  font-size: 10px;
-  line-height: 12px;
 }
 .generation-type input {
   position: absolute;
-  opacity: 0;
   width: 1px;
   height: 1px;
+  opacity: 0;
 }
-.generation-type:has(input:checked) {
-  outline: 1px solid var(--magazine-color);
-  outline-offset: 2px;
+.generation-type-tags .magazine-type.generation-type {
+  outline: 0;
+  box-shadow: none;
+  opacity: 0.72;
+}
+.generation-type-tags .magazine-type.generation-type:has(input:checked) {
+  outline: 2px solid var(--magazine-color, var(--accent));
+  outline-offset: 1px;
+  opacity: 1;
+  transform: translateY(-1px);
 }
 .generation-type:has(input:focus-visible) {
-  outline: 2px solid var(--magazine-color);
+  outline: 2px solid var(--magazine-color, var(--accent));
   outline-offset: 2px;
 }
 .generation-type:has(input:disabled) {
   opacity: 0.45;
   cursor: default;
+}
+.generation-type-unavailable {
+  font-size: 10px;
+}
+.generation-count {
+  grid-area: count;
+  min-width: 132px;
+}
+.generation-quantity {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.generation-compose .generation-quantity input {
+  appearance: textfield;
+  -moz-appearance: textfield;
+  flex: none;
+  width: 48px;
+  max-width: 48px;
+  height: 36px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 26px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.generation-quantity input::-webkit-inner-spin-button,
+.generation-quantity input::-webkit-outer-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+}
+.generation-quantity .button {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+}
+.generation-submit {
+  grid-area: submit;
+  align-self: end;
+  justify-content: center;
+  margin: 0;
+}
+.generation-compose > .access-alert {
+  grid-column: 1 / -1;
+}
+/* One column of the page: the card is two cells tall instead, so the choices stack. */
+@container (max-width: 380px) {
+  .generation-compose {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    grid-template-areas:
+      'head'
+      'topic'
+      'types'
+      'count'
+      'submit';
+    align-content: start;
+    gap: 14px;
+  }
+}
+
+/* A card on its way: its type is known, its text is still being written. */
+.generation-pending {
+  display: flex;
+  flex-direction: column;
+  padding: 18px;
+  animation: generation-rise 360ms cubic-bezier(0.2, 0.65, 0.25, 1);
+}
+.generation-pending header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--ink-3);
+  font-size: 12px;
+}
+.generation-pending-type {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--soft);
+  color: var(--ink-2);
+}
+.generation-pending.is-writing .generation-pending-type {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.generation-pending-lines {
+  display: grid;
+  gap: 10px;
+  margin: auto 0;
+}
+.generation-pending-lines i {
+  height: 10px;
+  border-radius: 5px;
+  background: var(--soft);
+}
+.generation-pending-lines i:first-child {
+  width: 72%;
+  height: 16px;
+  border-radius: 8px;
+}
+.generation-pending-lines i:last-child {
+  width: 54%;
+}
+.generation-pending.is-writing .generation-pending-lines i {
+  background: linear-gradient(
+      100deg,
+      transparent 30%,
+      color-mix(in srgb, var(--accent) 18%, transparent) 50%,
+      transparent 70%
+    )
+    0 0 / 220% 100% var(--soft);
+  animation: generation-write 1.6s linear infinite;
+}
+.generation-pending.is-writing .generation-pending-lines i:nth-child(2) {
+  animation-delay: 160ms;
+}
+.generation-pending.is-writing .generation-pending-lines i:nth-child(3) {
+  animation-delay: 320ms;
+}
+.generation-pending p {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.generation-pending p b {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 550;
+}
+.generation-pending p span {
+  color: var(--ink-3);
+}
+.generation-pending:not(.is-writing) p b {
+  color: var(--ink-2);
+}
+
+/* A finished card takes over from its placeholder. */
+.generation-arrived {
+  height: 100%;
+  animation: generation-arrive 520ms cubic-bezier(0.2, 0.65, 0.25, 1);
+}
+
+@keyframes generation-settle {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+@keyframes generation-unfold {
+  from {
+    clip-path: inset(0 46% 0 0 round 22px);
+  }
+  to {
+    clip-path: inset(0 0 0 0 round 22px);
+  }
+}
+@keyframes generation-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes generation-pop {
+  from {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+}
+@keyframes generation-twinkle {
+  0%,
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 0.75;
+  }
+  50% {
+    transform: scale(1.15) rotate(12deg);
+    opacity: 1;
+  }
+}
+@keyframes generation-write {
+  from {
+    background-position: 120% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+@keyframes generation-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+    filter: blur(4px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .generation-face,
+  .generation-compose,
+  .generation-compose > *,
+  .generation-pending,
+  .generation-arrived,
+  .generation-symbol,
+  .generation-symbol svg,
+  .generation-pending-lines i {
+    animation: none !important;
+  }
 }

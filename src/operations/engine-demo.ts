@@ -1,5 +1,12 @@
-import { telemetryChannels, type EngineTelemetry } from '../../contracts/public-api/engine-telemetry.ts';
+import { telemetryChannels, type EngineTelemetry, type TelemetryChannelCode } from '../../contracts/public-api/engine-telemetry.ts';
 import { changes, sample } from './engine-dashboard-model.ts';
+
+// Keyed by channel so inserting a channel cannot shift another channel's activity.
+const demoRunning: Record<TelemetryChannelCode, number> = {
+  COLLECTION: 9, KNOWLEDGE: 12, RETRIEVAL: 15, TASK: 24, COMPANY: 7,
+  SCENE_KNOWLEDGE: 8, EXPERIENCE: 8, GENERALIZATION: 5,
+  GENERAL_ADJUSTMENT: 4, RESPONSE: 18, EXPORT: 6,
+};
 
 /** Synthetic display data only: never submits jobs or reads customer records. */
 export function busySnapshot(at: number): EngineTelemetry {
@@ -11,7 +18,7 @@ export function busySnapshot(at: number): EngineTelemetry {
     evolution: 'NOT_CONNECTED',
     channels: telemetryChannels.map((code, i) => ({
       code,
-      running: [9, 12, 15, 24, 7, 8, 5, 4, 18, 6][i] + ((step + i * 2) % 5) + (step % 4),
+      running: demoRunning[code] + ((step + i * 2) % 5) + (step % 4),
       queued: 3 + ((step * 3 + i) % 12),
       waiting: i % 3,
       failed: 0,

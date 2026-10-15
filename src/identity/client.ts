@@ -12,6 +12,11 @@ export class IdentityError extends Error {
   readonly status: number;
   constructor(code: string, status = 0) {
     const messages: Record<string, string> = {
+      SCENE_TENANT_NOT_BOUND: '该企业尚未绑定数据来源，请先完成企业接入配置。',
+      SCENE_NOT_CONFIGURED: '企业数据接口尚未配置，请联系部署维护人员。',
+      SCENE_UPSTREAM_UNAVAILABLE: '企业数据服务暂不可用，请稍后重试。',
+      SCENE_UPSTREAM_FAILED: '数据处理未完成，请查看来源状态后重试。',
+      SCENE_TENANT_MISMATCH: '企业来源校验失败，本次同步已停止。',
       PRESENTATION_UNAVAILABLE: 'PPT 生成环境尚未开放，请稍后再试。',
       PRESENTATION_CONFIRMATION_REQUIRED: '请先在大纲卡片中确认内容，再继续生成 PPT。',
       PRESENTATION_OPTIONS_MISMATCH: '生成的大纲与页数或风格设置不一致，请重试。',
@@ -186,9 +191,10 @@ const role = (v: unknown) => v === 'TENANT_ADMIN' || v === 'MEMBER';
 export const isContact = (v: Record<string, unknown>) =>
   (v.phone == null || (typeof v.phone === 'string' && /^\+[1-9][0-9]{7,14}$/.test(v.phone))) &&
   (v.email == null || text(v.email)) &&
-  (text(v.phone) || text(v.email));
-export const contactLabel = (v: { phone?: string | null; email?: string | null }) =>
-  v.phone || v.email || '未绑定手机号';
+  (v.username == null || (typeof v.username === 'string' && /^[a-z][a-z0-9_-]{2,39}$/.test(v.username))) &&
+  (text(v.phone) || text(v.email) || text(v.username));
+export const contactLabel = (v: { phone?: string | null; email?: string | null; username?: string | null }) =>
+  v.username || v.phone || v.email || '未绑定手机号';
 export function isMembership(v: unknown): v is Membership {
   return (
     record(v) &&
@@ -306,7 +312,7 @@ export function createIdentityClient(fetcher: typeof fetch = fetch, timeoutMs = 
   return {
     me: (signal?: AbortSignal) => request('/api/v1/me', 'GET', isIdentity, undefined, signal),
     login: (phone: string, password: string) =>
-      request('/api/v1/auth/login', 'POST', isIdentity, { phone, password }),
+      request('/api/v1/auth/login', 'POST', isIdentity, /^[a-z]/i.test(phone.trim()) ? { username: phone, password } : { phone, password }),
     legacyLogin: (email: string, password: string) =>
       request('/api/v1/auth/login', 'POST', isIdentity, { email, password }),
     logout: () => request('/api/v1/auth/logout', 'POST', (v): v is null => v === null),

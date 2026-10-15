@@ -11,14 +11,14 @@
 :root[data-surface='workspace'] {
   --workspace-glow: conic-gradient(
     from var(--workspace-glow-angle),
-    #8f8bff,
+    #7aa5ff,
     #7cc2ff,
     #c9c6ff,
-    #8f8bff
+    #7aa5ff
   );
   --chart-baseline: #dfe0ea;
   --chart-current: var(--accent);
-  --glass-shadow-hover: 0 1px 0 rgb(255 255 255 / 90%) inset, 0 16px 44px rgb(40 40 90 / 10%);
+  --glass-shadow-hover: 0 1px 0 rgb(255 255 255 / 90%) inset, 0 16px 44px rgb(30 50 90 / 10%);
 }
 
 /* 外壳：去掉整块底色，让柔光背景透出来。 */
@@ -61,7 +61,7 @@
 :root[data-surface='workspace'] .access-sidebar .nav-link.active {
   background: var(--surface-raised);
   color: var(--accent-hover);
-  box-shadow: 0 4px 14px rgb(60 55 160 / 12%);
+  box-shadow: 0 4px 14px rgb(40 80 170 / 12%);
 }
 @media (max-width: 800px) {
   :root[data-surface='workspace'] .access-sidebar {
@@ -114,12 +114,14 @@
   }
 }
 
-/* 画报边缘先柔化，再让内容透明渐隐，露出真实页面背景。 */
-:root[data-surface='workspace'] .workspace-briefing .access-main > .topbar::after {
+/* 标题栏下缘先柔化，再让内容透明渐隐，露出真实页面背景；画报、资料库、技能中心等页面一致。 */
+:root[data-surface='workspace'] .workspace-shell:not(.workspace-conversations) .access-main > .topbar::after {
   background: transparent;
 }
 
-:root[data-surface='workspace'] .workspace-briefing .access-content[data-scrolled-start] {
+:root[data-surface='workspace']
+  .workspace-shell:not(.workspace-conversations)
+  .access-content[data-scrolled-start] {
   -webkit-mask-image: linear-gradient(to bottom, transparent, rgb(0 0 0 / 25%) 10px, rgb(0 0 0 / 80%) 26px, #000 40px);
   mask-image: linear-gradient(to bottom, transparent, rgb(0 0 0 / 25%) 10px, rgb(0 0 0 / 80%) 26px, #000 40px);
 }
@@ -145,7 +147,7 @@
 :root[data-surface='workspace'] .material-tabs .button.primary:hover:not(:disabled) {
   background: var(--surface-raised);
   color: var(--ink);
-  box-shadow: 0 1px 6px rgb(40 40 90 / 10%);
+  box-shadow: 0 1px 6px rgb(30 50 90 / 10%);
 }
 /* 图标分段与范围标签使用同一胶囊材质和选中反馈。 */
 :root[data-surface='workspace'] .library-view-switch .icon-button {
@@ -158,7 +160,7 @@
 :root[data-surface='workspace'] .library-view-switch .icon-button[aria-pressed='true'] {
   background: var(--surface-raised);
   color: var(--ink);
-  box-shadow: 0 1px 6px rgb(40 40 90 / 10%);
+  box-shadow: 0 1px 6px rgb(30 50 90 / 10%);
 }
 :root[data-surface='workspace'] .material-tabs {
   width: auto;
@@ -237,7 +239,7 @@
   background: rgb(255 255 255 / 78%);
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
-  box-shadow: 0 14px 44px rgb(60 55 160 / 12%);
+  box-shadow: 0 14px 44px rgb(40 80 170 / 12%);
 }
 :root[data-surface='workspace'] :is(.workspace-composer, .live-conversations) .live-composer-surface::before {
   content: '';
@@ -259,13 +261,13 @@
 :root[data-surface='workspace'] :is(.workspace-composer, .live-conversations) .live-composer-surface:focus-within {
   border-color: transparent;
   box-shadow:
-    0 14px 44px rgb(60 55 160 / 16%),
-    0 0 0 4px rgb(91 87 217 / 8%);
+    0 14px 44px rgb(40 80 170 / 16%),
+    0 0 0 4px rgb(47 111 224 / 8%);
 }
 :root[data-surface='workspace'] :is(.workspace-composer, .live-conversations) .live-composer-submit:not(:disabled) {
   background: var(--accent);
   color: #fff;
-  box-shadow: 0 4px 12px rgb(91 87 217 / 28%);
+  box-shadow: 0 4px 12px rgb(47 111 224 / 28%);
 }
 :root[data-surface='workspace'] :is(.workspace-composer, .live-conversations) .live-composer-submit:disabled {
   background: var(--accent-soft);
@@ -284,8 +286,8 @@
   border-color: var(--glass-edge);
   box-shadow:
     0 1px 0 rgb(255 255 255 / 90%) inset,
-    -2px 0 10px rgb(40 40 90 / 5%),
-    0 10px 32px rgb(40 40 90 / 7%);
+    -2px 0 10px rgb(30 50 90 / 5%),
+    0 10px 32px rgb(30 50 90 / 7%);
 }
 /* 列表直接呈现在画布上；保留原有层级和几何，仍可被会话覆盖。 */
 :root[data-surface='workspace'] .deck-card.deck-list {

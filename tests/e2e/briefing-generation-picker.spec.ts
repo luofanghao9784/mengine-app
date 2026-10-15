@@ -173,9 +173,8 @@ const picker = (page: Page) => page.getByRole('article', { name: '生成新画�
 async function choose(page: Page, quantity: number) {
   await picker(page).getByRole('button', { name: '生成更多' }).click();
   await picker(page).getByRole('spinbutton', { name: '生成数量' }).fill(String(quantity));
-  await picker(page).getByRole('button', { name: '下一步' }).click();
 }
-test('卡片内数量与多选类型确认后只提交一次，取消整次生成', async ({ page }) => {
+test('卡片内一步选好数量与类型，确认后只提交一次，取消整次生成', async ({ page }) => {
   const { posts, cancelled } = await pickerFixture(page);
   await page.goto(home);
   await choose(page, 3);
@@ -185,37 +184,36 @@ test('卡片内数量与多选类型确认后只提交一次，取消整次生�
   await picker(page).getByRole('button', { name: '生成 3 张' }).click();
   await expect.poll(() => posts.length).toBe(1);
   expect(posts[0]).toMatchObject({ count: 3, types: ['INSIGHT', 'SUGGESTION'] });
+  expect(posts[0]).not.toHaveProperty('topic');
   await expect(picker(page).getByRole('checkbox')).toHaveCount(0);
+  await expect(page.locator('.generation-placeholder')).toHaveCount(3);
   await picker(page).getByRole('button', { name: '取消本次' }).click();
   await expect.poll(() => cancelled.length).toBe(1);
 });
-test('默认由系统决定类型，上一步不提交请求', async ({ page }) => {
+test('默认由系统决定类型，收起后不提交请求并保留已选数量', async ({ page }) => {
   const { posts } = await pickerFixture(page);
   await page.goto(home);
   await choose(page, 2);
   await expect(picker(page).getByRole('checkbox', { name: '默认', exact: true })).toBeChecked();
-  await picker(page).getByRole('button', { name: '上一步' }).click();
+  await picker(page).getByRole('button', { name: '返回生成首页' }).click();
+  expect(posts).toHaveLength(0);
+  await picker(page).getByRole('button', { name: '生成更多' }).click();
   await expect(picker(page).getByRole('spinbutton', { name: '生成数量' })).toHaveValue('2');
-  await picker(page).getByRole('button', { name: '下一步' }).click();
   await picker(page).getByRole('button', { name: '生成 2 张' }).click();
   await expect.poll(() => posts.length).toBe(1);
   expect(posts[0]).toMatchObject({ count: 2, types: [] });
 });
-test('剩余额度限制数量，数量缩小后移除超出的类型', async ({ page }) => {
+test('剩余额度限制数量；多选类型会带动数量，数量缩小后移除超出的类型', async ({ page }) => {
   await pickerFixture(page, 2);
   await page.goto(home);
   await picker(page).getByRole('button', { name: '生成更多' }).click();
   await expect(picker(page).getByRole('spinbutton', { name: '生成数量' })).toHaveAttribute('max', '2');
-  await picker(page).getByRole('button', { name: '增加数量' }).click();
-  await expect(picker(page).getByRole('button', { name: '增加数量' })).toBeDisabled();
-  await picker(page).getByRole('button', { name: '下一步' }).click();
   await picker(page).getByRole('checkbox', { name: '数据', exact: true }).check();
   await picker(page).getByRole('checkbox', { name: '建议', exact: true }).check();
+  await expect(picker(page).getByRole('spinbutton', { name: '生成数量' })).toHaveValue('2');
+  await expect(picker(page).getByRole('button', { name: '增加数量' })).toBeDisabled();
   await expect(picker(page).getByRole('checkbox', { name: '洞察', exact: true })).toBeDisabled();
-  await picker(page).getByRole('button', { name: '上一步' }).click();
-  await picker(page).getByRole('button', { name: '减少数量' }).click();
-  await expect(picker(page).getByRole('button', { name: '减少数量' })).toBeDisabled();
-  await picker(page).getByRole('button', { name: '下一步' }).click();
+  await picker(page).getByRole('spinbutton', { name: '生成数量' }).fill('1');
   await expect(picker(page).getByRole('checkbox', { name: '数据', exact: true })).toBeChecked();
   await expect(picker(page).getByRole('checkbox', { name: '建议', exact: true })).not.toBeChecked();
 });
@@ -230,14 +228,16 @@ test('请求结果不确定时重试沿用数量类型及请求编号', async ({
   expect(posts[1]).toEqual(posts[0]);
 });
 
-test('生成首页保留原入口，数量页只有一个数字，类型复用画报标签', async ({ page }) => {
+test('入口有文字按钮，选择面在同一张卡内展开，类型复用画报标签，未声明主题能力时不出现主题输入', async ({
+  page,
+}) => {
   const { posts } = await pickerFixture(page);
   await page.goto(home);
-  await expect(picker(page).getByRole('heading', { name: '发现新内容' })).toBeVisible();
-  await expect(picker(page).getByRole('button', { name: '生成更多' })).toHaveClass(/generation-icon-button/);
+  await expect(picker(page).getByRole('heading', { name: '再来几张' })).toBeVisible();
+  await expect(picker(page).getByRole('button', { name: '生成更多' })).toHaveText(/生成新画报/);
   await choose(page, 3);
   await expect(picker(page).locator('.magazine-type[data-briefing-type]')).toHaveCount(6);
-  await expect(picker(page).getByRole('button', { name: '生成 3 张' })).toHaveClass(/generation-icon-button/);
+  await expect(picker(page).getByRole('textbox', { name: '想看的主题' })).toHaveCount(0);
   expect(posts).toHaveLength(0);
 });
 
@@ -246,7 +246,7 @@ test('资讯未接入时禁选，默认与其他类型仍可操作', async ({ pa
   await page.goto(home);
   await choose(page, 3);
   await expect(picker(page).getByRole('checkbox', { name: '资讯', exact: true })).toBeDisabled();
-  await expect(picker(page).getByText('未配置', { exact: true })).toBeVisible();
+  await expect(picker(page).getByText('未启用', { exact: true })).toBeVisible();
   await picker(page).getByRole('checkbox', { name: '洞察', exact: true }).check();
   await picker(page).getByRole('button', { name: '生成 3 张' }).click();
   await expect.poll(() => posts.length).toBe(1);
