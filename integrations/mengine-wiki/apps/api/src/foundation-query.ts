@@ -1,5 +1,5 @@
 import {datasetAvailability,canUseCurrentData} from './data-availability.js';
-import {dictionaryFingerprint} from './dictionary-version.js';
+import {dictionaryFingerprint,currentDictionary} from './dictionary-version.js';
 import { Store } from './store.js';
 import { canRead, canUseAI, type User, visibleText } from './domain.js';
 import type { Field } from './foundation.js';
@@ -12,8 +12,8 @@ export function datasetUpdatedAt(store:Store,tenant:string,id:string,fallback:st
 export function readDataset(store:Store,u:User,id:string){
  const d=store.doc(u.tenantId,id),row=store.db.prepare('SELECT data FROM data_sets WHERE id=? AND tenant_id=?').get(id,u.tenantId) as {data:string}|undefined;
  if(!d||!row||!canRead(u,d))throw fail(404,'数据集不存在或无权访问');
- const raw=JSON.parse(row.data);const dict=store.db.prepare('SELECT data FROM data_dictionary WHERE dataset_id=? AND tenant_id=?').get(id,u.tenantId) as {data:string}|undefined;const confirmed=dict?JSON.parse(dict.data).confirmed:null;const valid=confirmed?.fingerprint===dictionaryFingerprint(store,u.tenantId,raw);
- return {document:d,business:valid&&confirmed.origin==='model'?confirmed.definition:null,dictionaryStatus:confirmed?(valid?(confirmed.origin==='model'?'generated':'legacy'):'changed'):'unconfirmed',definition:raw as {fields:Field[];source:string;purpose:string;updatePolicy:string}};
+ const raw=JSON.parse(row.data);const dict=store.db.prepare('SELECT data FROM data_dictionary WHERE dataset_id=? AND tenant_id=?').get(id,u.tenantId) as {data:string}|undefined;const confirmed=dict?JSON.parse(dict.data).confirmed:null;const valid=currentDictionary(store,u.tenantId,raw,confirmed);
+ return {document:d,business:valid?confirmed.definition:null,dictionaryStatus:confirmed?(valid?'generated':'changed'):'unconfirmed',definition:raw as {fields:Field[];source:string;purpose:string;updatePolicy:string}};
 }
 export function listDatasets(store:Store,u:User,selected?:string,search?:string){
  return (store.db.prepare('SELECT id FROM data_sets WHERE tenant_id=? ORDER BY id').all(u.tenantId) as {id:string}[]).filter(r=>!selected||r.id===selected).flatMap(r=>{const d=store.doc(u.tenantId,r.id);if(!d||!canUseCurrentData(store,u,d)||(search&&!`${d.title} ${d.summary}`.toLowerCase().includes(search.toLowerCase())))return [];const {definition,business,dictionaryStatus}=readDataset(store,u,r.id);return [{document:d,definition,business,dictionaryStatus}];}).slice(0,20);

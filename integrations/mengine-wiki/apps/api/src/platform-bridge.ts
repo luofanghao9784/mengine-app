@@ -1,3 +1,4 @@
+import {deploymentContext,importDeployment} from './deployment-governance.js';
 import {canUseCurrentData} from './data-availability.js';
 import { createHmac, randomUUID, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
@@ -13,7 +14,7 @@ export function registerPlatformBridge(app: FastifyInstance, store: Store, secre
     CREATE TABLE IF NOT EXISTS platform_actor_bindings(platform_tenant TEXT NOT NULL,actor_id TEXT NOT NULL,user_id TEXT NOT NULL,PRIMARY KEY(platform_tenant,actor_id),UNIQUE(platform_tenant,user_id));
     CREATE TABLE IF NOT EXISTS platform_bridge_nonces(nonce TEXT PRIMARY KEY,expires INTEGER NOT NULL);`);
   app.post<{Body:{payload:string;signature:string}}>('/api/internal/platform-scene', {
-    schema:{body:{type:'object',additionalProperties:false,required:['payload','signature'],properties:{payload:{type:'string',maxLength:32768},signature:{type:'string',pattern:'^[a-f0-9]{64}$'}}}},
+    schema:{body:{type:'object',additionalProperties:false,required:['payload','signature'],properties:{payload:{type:'string',maxLength:1048576},signature:{type:'string',pattern:'^[a-f0-9]{64}$'}}}},
   }, async (req,reply) => {
     if(secret.length<32)return reply.code(503).send({message:'总台接口未配置'});
     const expected=createHmac('sha256',secret).update(req.body.payload).digest();
@@ -34,16 +35,33 @@ export function registerPlatformBridge(app: FastifyInstance, store: Store, secre
     }
     const u=binding&&mapped&&store.user(mapped.user_id);
     if(!u?.active||u.tenantId!==binding?.source_tenant||(!p.actor.startsWith('customer:')&&!['admin','steward'].includes(u.role)))return reply.code(404).send({message:'该企业尚未绑定数据来源'});
+    if(p.path?.startsWith('/deployment-governance/')){
+      if(p.actor.startsWith('customer:'))return reply.code(403).send({message:'仅部署维护服务可导入治理成果'});
+      if(p.method!=='POST')return reply.code(405).send({message:'仅支持签名部署请求'});
+      if(p.path==='/deployment-governance/source'){
+        const b=p.body??{},operation=b.operation;
+        const path=operation==='create'?'/api/database-connections':
+          ['scan','pull','sync'].includes(operation)&&typeof b.connectionId==='string'&&/^[a-zA-Z0-9-]+$/.test(b.connectionId)?`/api/database-connections/${b.connectionId}/${operation}`:null;
+        if(!path)return reply.code(400).send({message:'非法来源部署操作'});
+        const token=randomBytes(32).toString('hex');store.db.prepare('INSERT INTO sessions VALUES(?,?,?)').run(digest(token),u.id,new Date(Date.now()+300000).toISOString());
+        try{const result=await app.inject({method:'POST',url:path,headers:{cookie:'mengine_session='+token},payload:b.payload??{}});return reply.code(result.statusCode).send(result.json());}
+        finally{store.db.prepare('DELETE FROM sessions WHERE token_hash=?').run(digest(token));}
+      }
+      if(p.path==='/deployment-governance/context')return deploymentContext(store,u,p.body?.ids);
+      if(p.path==='/deployment-governance/preview')return importDeployment(store,u,p.body,true);
+      if(p.path==='/deployment-governance/apply')return importDeployment(store,u,p.body);
+      return reply.code(404).send({message:'未知部署操作'});
+    }
     const get=p.method==='GET'&&/^\/scene-(foundation(?:\/[^/?]+)?|knowledge(?:\/[^/?]+\/source)?)$/.test(p.path);
     const post=p.method==='POST'&&/^\/scene-(foundation(?:\/scan|\/[^/?]+\/actions)|knowledge\/sync)$/.test(p.path);
     if(p.method==='GET'&&p.path==='/scene-export'&&!p.actor.startsWith('customer:')){
       const assets=store.documents(u.tenantId).filter(d=>canUseCurrentData(store,u,d)).map(d=>{
         const base={id:d.id,title:d.title,kind:d.kind,version:d.version,policyVersion:d.policyVersion,tags:d.tags,department:d.department,updatedAt:d.updatedAt};
         if(d.kind!=='数据表')return {...base,content:redactForGovernance(d.content)};
-        const set=readDataset(store,u,d.id),fields=set.definition.fields.filter(f=>!f.sensitive);
+        const set=readDataset(store,u,d.id);if((set.definition as any).provenance?.governanceMode==='deployment'&&set.dictionaryStatus!=='generated')return null;const fields=set.definition.fields.filter(f=>!f.sensitive);
         const rows=(store.db.prepare("SELECT data FROM data_rows WHERE tenant_id=? AND dataset_id=? AND status='ready' ORDER BY id").all(u.tenantId,d.id) as {data:string}[]).map(r=>{const v=JSON.parse(r.data).values;return fields.map(f=>redactForGovernance(String(v[f.name]??'')));});
         return {...base,fields,dictionary:set.dictionaryStatus==='generated'?set.business:null,dictionaryStatus:set.dictionaryStatus,rows};
-      });
+      }).filter(Boolean);
       const revision=digest(JSON.stringify(assets));
       return {contractVersion:'1.0',tenantId:p.tenant,revision,assets};
     }
