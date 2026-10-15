@@ -98,3 +98,14 @@ test('unknown fields and non-additive balances stay outside model aggregation',(
  assert.ok(!(queryDataset(c.store,u,id,{operation:'records'},true).result as any).fields.some((f:any)=>f.name==='amount'));
  assert.ok((queryDataset(c.store,u,id,{operation:'records'},false).result as any).fields.some((f:any)=>f.name==='amount'));
 }));
+
+test('deployed relationships survive target row updates but reject target schema changes',()=>fixture(async(c,u,id,p)=>{
+ const {validateSemantics}=await import('../src/business-queries.js');
+ const target=seedDataset(c.store,u,'关联目标',[{name:'id',label:'编号',type:'text',required:true,unique:true,sensitive:false,description:'稳定编号'}],[{id:'01'}]);
+ p.datasets[0].definition.relations=[{id:'target',name:'合成源外键',targetId:target,keys:[{local:'id',foreign:'id'}],evidence:'合成数据库外键'}];importDeployment(c.store,u,p);
+ const rules=readDataset(c.store,u,id).business;assert.ok(rules.relations[0].targetFingerprint.startsWith('schema:'));
+ const raw=JSON.parse(c.store.db.prepare('SELECT data FROM data_sets WHERE id=?').get(target).data);raw.syncHash='updated-business-rows';raw.updatePolicy='每小时全量同步';seedRows(c.store,target,[{id:'01'},{id:'02'}]);c.store.db.prepare('UPDATE data_sets SET data=? WHERE id=?').run(JSON.stringify(raw),target);
+ assert.doesNotThrow(()=>validateSemantics(c.store,u,id,rules));
+ raw.fields[0].description='changed source definition';c.store.db.prepare('UPDATE data_sets SET data=? WHERE id=?').run(JSON.stringify(raw),target);
+ assert.throws(()=>validateSemantics(c.store,u,id,rules),/结构发生变化/);
+}));

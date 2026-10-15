@@ -1,6 +1,6 @@
 import type {Store} from './store.js';
 import {readDataset,queryDataset,datasetUpdatedAt,beijingTime} from './foundation-query.js';
-import {dictionaryFingerprint} from './dictionary-version.js';
+import {dictionaryFingerprint,dictionarySchemaFingerprint} from './dictionary-version.js';
 import type {User} from './domain.js';
 import type {FastifyInstance,FastifyRequest} from 'fastify';
 const fail=(statusCode:number,message:string)=>Object.assign(Error(message),{statusCode});
@@ -22,7 +22,7 @@ function resolveFilters(filters:Filter[],params:Record<string,string>,validation
 function fieldGuard(def:any,name:string){const f=def.fields.find((f:any)=>f.name===name);if(!f||f.sensitive)throw fail(403,`关联与业务模板不能使用未定义或敏感字段（${name}）`);return f;}
 export function validateSemantics(store:Store,u:User,id:string,b:Semantics,bind=false){
  validateSemanticsShape(b);const source=readDataset(store,u,id);
- for(const r of b.relations||[]){if(r.targetId===id)throw fail(400,'暂不支持自关联');const target=readDataset(store,u,r.targetId);for(const k of r.keys){const a=fieldGuard(source.definition,k.local),z=fieldGuard(target.definition,k.foreign);if(a.type!==z.type)throw fail(400,'关联字段类型必须一致');}const fp=dictionaryFingerprint(store,u.tenantId,target.definition);if(bind)r.targetFingerprint=fp;else if(r.targetFingerprint!==fp)throw fail(409,'关联目标结构发生变化，请重新确认口径');}
+ for(const r of b.relations||[]){if(r.targetId===id)throw fail(400,'暂不支持自关联');const target=readDataset(store,u,r.targetId);for(const k of r.keys){const a=fieldGuard(source.definition,k.local),z=fieldGuard(target.definition,k.foreign);if(a.type!==z.type)throw fail(400,'关联字段类型必须一致');}const fp='schema:'+dictionarySchemaFingerprint(target.definition);if(bind)r.targetFingerprint=fp;else if(r.targetFingerprint!==fp&&r.targetFingerprint!==dictionaryFingerprint(store,u.tenantId,target.definition))throw fail(409,'关联目标结构发生变化，请重新确认口径');}
  for(const t of b.templates||[]){for(const f of t.filters){fieldGuard(source.definition,f.field);if(f.value.startsWith('$')&&fieldGuard(source.definition,f.field).type!=='date')throw fail(400,'日期参数只能用于日期字段');}queryDataset(store,u,id,{operation:t.operation,...(t.field?{field:t.field}:{}),...(t.groupBy?{groupBy:t.groupBy}:{}),filters:resolveFilters(t.filters,{},true),limit:1},true,undefined,true);
  if(t.related){const r=b.relations?.find(r=>r.id===t.related!.relationId);if(!r)throw fail(400,'模板引用的关联不存在');const target=readDataset(store,u,r.targetId);for(const f of t.related.filters)if(f.value.startsWith('$')&&fieldGuard(target.definition,f.field).type!=='date')throw fail(400,'日期参数只能用于日期字段');queryDataset(store,u,r.targetId,{operation:'count',filters:resolveFilters(t.related.filters,{},true)},true,undefined,true);}}
  return b;
