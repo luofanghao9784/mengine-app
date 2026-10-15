@@ -982,3 +982,17 @@ test("business knowledge analyzes governed rows, stores evidence and joins the o
     });
     assert.equal(revoked.statusCode, 409, revoked.body);
   }));
+
+
+test("knowledge progress separates pending datasets from generated article counts", () =>
+  fixture(async (c, login) => {
+    const response = await c.app.inject({ url: "/api/scene-knowledge", headers: await login("admin") });
+    assert.equal(response.statusCode, 200);
+    const snap = response.json();
+    assert.deepEqual(snap.stats.rows.find((r: string[]) => r[0] === "待整理数据集"), ["待整理数据集", String(snap.business.pending)]);
+    assert.deepEqual(snap.stats.rows.find((r: string[]) => r[0] === "业务知识条目"), ["业务知识条目", String(snap.business.learned)]);
+    assert.ok(snap.stats.rows.some((r: string[]) => r[0] === "待学习资料"));
+    const outside = (await c.app.inject({ url: "/api/scene-knowledge", headers: await login("external") })).json();
+    assert.equal(outside.business.pending, 0);
+    assert.equal(outside.items.length, 0);
+  }));

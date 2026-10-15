@@ -176,7 +176,9 @@ export function registerSceneKnowledge(
       stats: {
         title: "知识构成",
         rows: [
-          ["来自业务数据", String(businessItems.length)],
+          ["业务知识条目", String(businessItems.length)],
+          ["待整理数据集", String(structured.pending.length)],
+          ["待学习资料", String(snap.pending)],
           ["来自资料", String(documentItems.length)],
           ["来自会话", "0"],
           ["关联", String(relations.length)],
@@ -197,11 +199,11 @@ export function registerSceneKnowledge(
         withoutFindings: structured.empty.length,
       },
       status: structured.busy
-        ? "正在分析业务数据"
+        ? "数据快照已接入，正在整理业务知识"
         : structured.pending.length
-          ? `${structured.pending.length} 个数据集待分析`
+          ? `数据快照已接入，${structured.pending.length} 个数据集待整理（不是逐条记录）`
           : structured.failed.length
-            ? `${structured.failed.length} 个数据集分析待重试`
+            ? `${structured.failed.length} 个数据集的知识整理失败，已接入快照保留`
             : snap.busy
               ? "知识正在同步"
               : snap.failed
