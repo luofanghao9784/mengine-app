@@ -72,3 +72,5 @@ M7-A1 第七切片：新增 [Model Usage 1.0](engine-api/model-usage.schema.json
 
 
 自动画报来源接续：系统 SELECTED 批次可在 bootstrap 返回 `selectedDatasets`，数据库工具只读取该批固定快照；普通所选文件任务仍拒绝数据库。新快照触发沿既有画报节奏，与取数频率独立。`briefing-text-v1` 的可选 `datasetSource` 现在允许实际已读快照元信息，`datasetBasis` 仍须缺省或 null；文本依据不代表执行汇总计算。原件 DATA 卡继续拒绝数据库来源混用。V67 固定系统选择并覆盖入队前后失效及清理，详见[实施记录](../docs/交接/管理端五批实施记录-2026-10-04.md)。
+
+治理指标执行（2026-10-16）：task_context 的 governedMetrics.items 增加 executionRequest，包含已获权固定快照、metricId/version 及固定 SUMMARY 参数。引擎省略 null 参数后原样调用 compare_dataset，不得自选聚合、分组或日期。治理来源无已发布且人工核实的计划返回 METRIC_DEFINITION_REQUIRED，参数不符返回 METRIC_PLAN_MISMATCH；普通非治理文件不要求指标编号。指标 ID/version 必须成对提供，版本为正整数，计算回执必须回显完全相同请求。DATA 卡片须具备本次任务的指标计算回执。详见 [第三批交接](../docs/交接/治理指标统一执行第三批-2026-10-16.md)。这是后端强制约束，不把模型提供的“已治理”说明视为凭证。

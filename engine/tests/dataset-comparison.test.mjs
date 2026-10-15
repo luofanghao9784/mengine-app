@@ -162,3 +162,17 @@ test('whole-table summary is capability-gated and verifies the empty grouping re
  await assert.rejects(datasetComparisonTool({authorize:async()=>{},invoke:async()=>response,allowSummary:false}).execute(args,new AbortController().signal));
  response.calculation.rows[0].group=['invented'];await assert.rejects(tool.execute(args,new AbortController().signal),{code:'DATASET_RESULT_INVALID'});
 });
+
+test('published metric identity is preserved and substituted or incomplete versions fail closed', async()=>{
+ const args={...request,metricId:id,metricVersion:3};
+ const response=result();response.calculation.request={...args};
+ let calls=0;
+ const tool=datasetComparisonTool({authorize:async()=>{},invoke:async(body)=>{calls++;assert.deepEqual(body,args);return response;}});
+ assertObjectJsonSchema(tool.parameters);
+ await tool.execute(args,new AbortController().signal);
+ response.calculation.request.metricVersion=2;
+ await assert.rejects(tool.execute(args,new AbortController().signal),{code:'DATASET_RESULT_INVALID'});
+ for(const changed of [{metricVersion:undefined},{metricVersion:0},{metricVersion:1.2},{metricId:undefined}])
+  await assert.rejects(tool.execute({...args,...changed},new AbortController().signal),{code:'INVALID_TOOL_ARGUMENTS'});
+ assert.equal(calls,2);
+});

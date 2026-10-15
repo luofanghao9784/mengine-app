@@ -1,4 +1,5 @@
 import {test,expect} from '@playwright/test';
+test.beforeEach(async({page})=>{await page.route('**/auth/csrf',r=>r.fulfill({json:{headerName:'X-CSRF-TOKEN',token:'synthetic-token',parameterName:'_csrf'}}));await page.route('**/scene/metrics/generation',r=>r.fulfill({json:{enabled:true,created_count:0}}));});
 test('platform governance view distinguishes policy freshness, data readiness and inferred evidence',async({page})=>{
  const tenant='11111111-1111-4111-8111-111111111111';
  await page.route('**/api/platform-admin/v1/scene-enterprises',r=>r.fulfill({json:[{tenant_id:tenant,name:'合成测试企业'}]}));
@@ -24,4 +25,22 @@ test('published metric versions and paused sources are readable at headquarters'
  await expect(page.getByRole('button',{name:'保存草稿'})).toHaveCount(0);
  await page.getByText('版本记录',{exact:true}).click();
  await expect(page.getByText('v2 · 保存草稿',{exact:false})).toBeVisible();
+});
+
+test('tenant generated drafts require explicit review before publication and preserve the execution plan',async({page})=>{
+ const tenant='11111111-1111-4111-8111-111111111111';let saved:any=null;
+ const item={id:'22222222-2222-4222-8222-222222222222',source_id:'source',head_version:1,published_version:null,current:true,published_current:false,generation:{origin:'RULE_BASED'},definition:{name:'合成记录数',meaning:'每行一条记录',unit:'条',grain:'源记录',scope:'当前快照全部记录',exclusions:'无',evidence:'合成来源规则',aggregation:'COUNT',valueField:'',execution:{groupColumns:[],dateColumn:'',dateFrom:'',dateTo:'',timeZone:'Asia/Shanghai',reviewed:false}},history:[]};
+ await page.route('**/api/v1/me',r=>r.fulfill({json:{account:{id:tenant,email:'synthetic@example.invalid',displayName:'合成管理员'},platformAdmin:false,memberships:[{tenantId:tenant,tenantName:'合成企业',role:'TENANT_ADMIN'}]}}));
+ await page.route('**/scene/status',r=>r.fulfill({json:{tenantId:tenant,governance:{policy_current:true},assets:[{source_id:'source',kind:'TABLE',metadata:{title:'合成记录'}}],runs:[]}}));
+ await page.route('**/scene/metrics/generation',r=>r.fulfill({json:r.request().method()==='POST'?{created:1,paused:false}:{enabled:true,created_count:1}}));
+ await page.route('**/scene/metrics',async r=>{if(r.request().method()==='POST'){saved=r.request().postDataJSON();item.head_version=2;item.definition=saved.definition;}await r.fulfill({json:{items:[item]}})});
+ await page.goto('/tenant-admin/governance/?surface=tenant');
+ await expect(page.getByRole('button',{name:'确认并发布 v1'})).toBeDisabled();
+ await page.getByRole('button',{name:'生成指标草稿'}).click();
+ await expect(page.getByRole('status')).toContainText('新增 1 项待核实草稿');
+ await page.getByRole('button',{name:'编辑新版本'}).click();
+ await page.getByRole('checkbox').check();
+ await page.getByRole('button',{name:'保存草稿'}).click();
+ await expect(page.getByRole('button',{name:'确认并发布 v2'})).toBeEnabled();
+ expect(saved.definition.execution).toEqual({groupColumns:[],dateColumn:'',dateFrom:'',dateTo:'',timeZone:'Asia/Shanghai',reviewed:true});
 });
