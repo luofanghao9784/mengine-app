@@ -243,3 +243,9 @@ test('optional paging encoding is normalized without accepting fractional or neg
 });
 
 test('Harness exposes cumulative calculator and finishes after search and one verified summary', async (t) => { const {result,actions,tools}=await fixture(t,{datasets:true,summary:true});assert.equal(result.outcome,'COMPLETE');assert.deepEqual(actions,['bootstrap','dataset_search','summary']);assert.ok(tools.includes('compare_dataset')); });
+
+test('dataset context retains bounded published metric definitions as untrusted reference data',()=>{
+ const governedMetrics={items:[{metricId:datasetId,version:1,definition:{name:'合成指标',aggregation:'COUNT',scope:'合成数据'},authority:false}],hasMore:false,automaticExecution:false,usage:'必须使用后端计算结果'};
+ const response={contractVersion:'1.0',action:'dataset_search',referenceOnly:true,result:{items:[{...dataset,governedMetrics}],hasMore:false}};
+ assert.deepEqual(contextResponse(response,'dataset_search').result.items[0].governedMetrics,governedMetrics);
+});

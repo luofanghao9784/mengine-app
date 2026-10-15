@@ -2,6 +2,7 @@ import {useEffect,useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {createIdentityClient,createIdentityRequest} from '../../identity/client';
 import './style.css';
+import {Metrics} from './metrics';
 const request=createIdentityRequest(fetch,240000);
 const object=<T,>(v:unknown):v is T=>v!==null&&typeof v==='object';
 type Field={name:string;label?:string;meaning?:string;unit?:string;rules?:string;evidence?:string};
@@ -37,7 +38,7 @@ function App(){
  <h3>数据关联 · {m.dictionary?.relations?.length??0}</h3>{m.dictionary?.relations?.map((r,i)=><p key={r.id??i}>{r.name??'关联来源'}：{r.evidence??'关联定义已随口径同步。'}</p>)}
  <h3>指标模板 · {m.dictionary?.templates?.length??0}</h3><p>保留来源定义和版本，不因同步而升级为已核实业务指标。</p>{m.dictionary?.templates?.map((t,i)=><p key={t.id??i}>{t.name??'指标模板'}：{t.question??'按来源治理口径计算'}</p>)}
  <details><summary>同步版本</summary><p>平台接收时间：{time(chosen?.updated_at)}</p><p>源口径指纹：{m.dictionaryFingerprint??'未提供'}</p><p>源权限指纹：{m.governance?.policyDigest??'未提供'}</p><p>平台治理版本：{chosen?.revision}</p></details>
- </>:<p>暂无同步资产。</p>}</article></div><details><summary>最近处理记录</summary>{state.runs.map(r=><p key={r.id}>{time(r.finished_at??r.created_at)} · {label(r.operation)} · {label(r.state)}</p>)}</details></>}
+ </>:<p>暂无同步资产。</p>}</article></div><Metrics key={tenant+prefix} tenant={tenant} prefix={prefix} assets={state.assets} platform={platform}/><details><summary>最近处理记录</summary>{state.runs.map(r=><p key={r.id}>{time(r.finished_at??r.created_at)} · {label(r.operation)} · {label(r.state)}</p>)}</details></>}
  </main>;
 }
 createRoot(document.getElementById('root')!).render(<App/>);
