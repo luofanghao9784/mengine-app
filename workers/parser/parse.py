@@ -132,8 +132,8 @@ class TablePassages:
 def parse(path, extension):
     if extension in ('txt', 'md'):
         for i, line in enumerate(decode(path).splitlines(), 1): add(f'第 {i} 行', line)
-    elif extension == 'csv':
-        for i, row in enumerate(csv.reader(io.StringIO(decode(path))), 1):
+    elif extension in ('csv', 'tsv'):
+        for i, row in enumerate(csv.reader(io.StringIO(decode(path)), delimiter='\t' if extension == 'tsv' else ','), 1):
             if any(cell.strip() for cell in row):
                 add(f'第 {i} 行', json.dumps(row, ensure_ascii=False), 'TABLE')
     elif extension == 'docx':
@@ -221,4 +221,8 @@ if __name__ == '__main__':
         notes.add('RESOURCE_LIMIT'); status = 'PARTIAL' if chunks else 'FAILED'
     except Exception:
         notes.add('PARSE_FAILED'); chunks.clear(); status = 'FAILED'
-    print(json.dumps({'parserVersion': VERSION, 'status': status, 'warnings': sorted(notes), 'chunks': chunks}, ensure_ascii=False))
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('structured_table', Path(__file__).with_name('structured_table.py'))
+    module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
+    structured = module.extract(path, extension)
+    print(json.dumps({'structured': structured, 'parserVersion': VERSION, 'status': status, 'warnings': sorted(notes), 'chunks': chunks}, ensure_ascii=False))

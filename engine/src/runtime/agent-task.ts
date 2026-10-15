@@ -1,3 +1,4 @@
+import { useRoutineModel } from './model-routing.js';
 import { analyzeWikiInsight, wikiInsightContext } from './wiki-insight.js';
 import { analyzeWikiGraph, wikiGraphContext } from './wiki-graph.js';
 import { learnWiki, wikiSource } from './wiki-learning.js';
@@ -60,6 +61,7 @@ export interface AgentConfiguration {
   platformBaseUrl: string;
   executionClass: 'live' | 'verification';
   modelName: string;
+  routineModel?: { modelName: string; createModel(): import('./metered-model.js').UsageModel };
   createModel(): import('./metered-model.js').UsageModel;
   /** Only the local verification fixture supplies a sandbox; live code remains disabled. */
   sandbox?: TaskSandbox;
@@ -149,7 +151,9 @@ export class AgentTasks {
         body,
         signal,
         limit,
-        2500,
+        // Context reads and lease checks may wait on the same authorized transaction.
+        // Keep a bounded deadline without treating a short lock wait as revoked access.
+        10000,
       );
     let artifactTransferAvailable: boolean | undefined;
     let presentationAvailable: boolean | undefined;
@@ -418,7 +422,14 @@ export class AgentTasks {
       ]);
       const activated = new Map<string, SkillReceipt>();
       const publicTools = new Set(['public_search', 'read_public_page']);
-      const backend = this.config.createModel();
+      const selectedModel = useRoutineModel({
+        wikiLearning: !!wikiLearning, wikiGraph: !!wikiGraph, wikiInsight: !!wikiInsight,
+        publicResearch: !!publicQuery, plan: !!planAllowed,
+        presentation: !!presentationWorkflow && presentationWorkflow.state !== 'NONE',
+        sandbox: !!this.config.sandbox || !!candidatesAllowed,
+        briefing: !!briefingGeneration, briefingType: briefingRequestedType ?? '',
+      }) ? this.config.routineModel ?? this.config : this.config;
+      const backend = selectedModel.createModel();
       const metered = meteredModel(backend, (action, body, receipt) =>
         receipt
           ? postJson(
@@ -438,7 +449,7 @@ export class AgentTasks {
         await authorize();
         return {contractVersion:'1.5', outcome:'COMPLETE', requiredInput:null, engineVersion:ENGINE_VERSION,
           taskId:task.taskId, attemptId:task.attemptId, mode:'AGENT', executionClass:this.config.executionClass,
-          modelName:this.config.modelName, text:result.text, sourceIds:wikiLearning?.fragments.map(c=>c.id) ?? [],
+          modelName:selectedModel.modelName, text:result.text, sourceIds:wikiLearning?.fragments.map(c=>c.id) ?? [],
           originalIds:[], tools:[], artifacts:[], webSources:[], skills:[], modelCalls:result.modelCalls, usage:backend.usage ?? null};
       }
       const newsBriefing = task.contractVersion === '1.5'  && !!briefingGeneration && !!newsScope;
@@ -1681,7 +1692,7 @@ export class AgentTasks {
         attemptId: task.attemptId,
         mode: 'AGENT',
         executionClass: this.config.executionClass,
-        modelName: this.config.modelName,
+        modelName: selectedModel.modelName,
         text: result.text,
         sourceIds: [...sources.keys()],
         originalIds: originals.ids(),

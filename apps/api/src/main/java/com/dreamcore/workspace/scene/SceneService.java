@@ -13,9 +13,17 @@ import tools.jackson.databind.json.JsonMapper;
 @Service
 public class SceneService {
  private static final JsonMapper JSON=new JsonMapper();
+ private final FileTableSceneService files;
  private final SceneBridgeClient bridge;private final JdbcTemplate db;private final IdentityService identities;private final CollectionDeployment deployment;private final CollectionService collection;private final MaterialService materials;private final TransactionTemplate tx;
- public SceneService(SceneBridgeClient bridge,JdbcTemplate db,IdentityService identities,CollectionDeployment deployment,CollectionService collection,MaterialService materials,TransactionTemplate tx){this.bridge=bridge;this.db=db;this.identities=identities;this.deployment=deployment;this.collection=collection;this.materials=materials;this.tx=tx;}
+ public SceneService(SceneBridgeClient bridge,JdbcTemplate db,IdentityService identities,CollectionDeployment deployment,CollectionService collection,MaterialService materials,TransactionTemplate tx,FileTableSceneService files){this.files=files;this.bridge=bridge;this.db=db;this.identities=identities;this.deployment=deployment;this.collection=collection;this.materials=materials;this.tx=tx;}
  public static JsonNode metadata(JsonNode a){var copy=a.deepCopy();((tools.jackson.databind.node.ObjectNode)copy).remove(List.of("rows","content"));return copy;}
+ public static JsonNode knowledgeMetadata(JsonNode card,int sourceKind){
+  var meta=JSON.createObjectNode();meta.put("title",card.path("name").asText());
+  // A library-wide revision changes when unrelated articles arrive. Only this article's
+  // provenance (including its original source version and knowledge revision) belongs here.
+  meta.set("provenance",card.path("kv").deepCopy());
+  meta.set("tags",JSON.valueToTree(List.of(sourceKind==0?"业务知识":"资料知识","引擎输出")));return meta;
+ }
  public static boolean sameMetadata(JsonNode a,String stored){return metadata(a).equals(JSON.readTree(stored));}
  private UUID id(String key){return UUID.nameUUIDFromBytes(key.getBytes(StandardCharsets.UTF_8));}
  private String trim(String s,int max){return s.length()>max?s.substring(0,max):s;}
@@ -26,7 +34,11 @@ public class SceneService {
   if(platform)access(actor,tenant,true);else identities.member(actor,tenant,false);
   if(!path.matches("/scene-(foundation(?:/[^/?]+(?:/actions)?)?|knowledge(?:/sync|/[^/?]+/source)?|access(?:/audit|/policy|/departments|/members/[^/?]+|/proposals/[^/?]+/(?:resolve|withdraw)|/resources/[^/?]+/inspect)?)"))throw IdentityException.invalid();
   String delegated=platform?actor.toString():"customer:"+actor;
-  if(method.equals("GET")){var result=bridge.call(tenant,delegated,method,path,null);if(platform)access(actor,tenant,true);else identities.member(actor,tenant,false);return result;}
+  if(path.startsWith("/scene-foundation/file-")){
+   if(!method.equals("GET"))throw new IdentityException(409,"SCENE_READ_ONLY");
+   return files.detail(actor,tenant,platform,path.substring("/scene-foundation/".length()));
+  }
+  if(method.equals("GET")){var result=bridge.call(tenant,delegated,method,path,null);if(platform)access(actor,tenant,true);else identities.member(actor,tenant,false);return path.equals("/scene-foundation")?files.merge(actor,tenant,platform,result):result;}
   UUID run=start(actor,tenant,path);
   try{var result=bridge.call(tenant,delegated,method,path,body);if(platform)access(actor,tenant,true);else identities.member(actor,tenant,false);if(path.equals("/scene-knowledge/sync")&&(platform||"admin".equals(bridge.call(tenant,delegated,"GET","/scene-access",null).path("user").path("role").asText())))synchronize(actor,tenant,platform);finish(run,null);return result;}catch(RuntimeException e){finish(run,"SCENE_PROCESSING_FAILED");throw e;}
  }
@@ -44,7 +56,7 @@ public class SceneService {
    UUID workspace=(UUID)binding.get("workspace_id"),connection=(UUID)binding.get("connection_id"),maintainer=(UUID)binding.get("maintainer_id");
    if(sourceRevision.equals(binding.get("source_revision"))){
     var current=collection.detail(maintainer,tenant,connection);
-    if(db.queryForObject("SELECT count(*) FROM scene_asset_links WHERE tenant_id=? AND kind='TABLE' AND active",Integer.class,tenant)>0&&current.currentRun()==null&&(current.lastRun()==null||!"SUCCEEDED".equals(current.lastRun().status())))collection.updateNow(maintainer,tenant,connection,UUID.randomUUID(),current.revision());
+    if(hasActiveTables(connection)&&current.currentRun()==null&&(current.lastRun()==null||!"SUCCEEDED".equals(current.lastRun().status())))collection.updateNow(maintainer,tenant,connection,UUID.randomUUID(),current.revision());
     finish(run,null);return status(actor,tenant,platform);
    }
    var sets=new ArrayList<CollectionDeployment.Dataset>();
@@ -70,7 +82,7 @@ public class SceneService {
      saveMaterial(maintainer,tenant,workspace,source,"DOCUMENT",a.path("title").asText(),a.path("content").asText(),meta);
     }
     for(var k:knowledge.path("items")){
-     var meta=JSON.createObjectNode();meta.put("title",k.path("name").asText());meta.put("scopeRevision",knowledge.path("scopeRevision").asText());meta.set("tags",JSON.valueToTree(List.of(knowledge.path("sourceKind").path(k.path("id").asText()).asInt(1)==0?"业务知识":"资料知识","引擎输出")));
+     var meta=knowledgeMetadata(k,knowledge.path("sourceKind").path(k.path("id").asText()).asInt(1));
      StringBuilder body=new StringBuilder(k.path("verdict").asText());for(var evidence:k.path("kv"))body.append("\n\n").append(evidence.path(0).asText()).append("：").append(evidence.path(1).asText());
      saveMaterial(maintainer,tenant,workspace,k.path("id").asText(),"KNOWLEDGE",k.path("name").asText(),body.toString(),meta);
     }
@@ -78,10 +90,11 @@ public class SceneService {
     db.update("UPDATE scene_bindings SET source_revision=? WHERE tenant_id=?",sourceRevision,tenant);
    });
    var current=collection.detail(maintainer,tenant,connection);
-   if(!sets.isEmpty()&&current.currentRun()==null)collection.updateNow(maintainer,tenant,connection,UUID.randomUUID(),current.revision());
+   if(hasActiveTables(connection)&&current.currentRun()==null)collection.updateNow(maintainer,tenant,connection,UUID.randomUUID(),current.revision());
    finish(run,null);return status(actor,tenant,platform);
   }catch(RuntimeException e){finish(run,"SCENE_SYNC_FAILED");throw e;}
  }
+ private boolean hasActiveTables(UUID connection){return Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM business_datasets WHERE connection_id=? AND status='ACTIVE')",Boolean.class,connection));}
  private void link(UUID tenant,String source,String kind,UUID target,String revision,JsonNode meta){db.update("INSERT INTO scene_asset_links(tenant_id,source_id,kind,target_id,revision,metadata) VALUES (?,?,?,?,?,?::jsonb) ON CONFLICT(tenant_id,source_id,kind) DO UPDATE SET target_id=excluded.target_id,revision=excluded.revision,metadata=excluded.metadata,active=true,updated_at=now()",tenant,source,kind,target,revision,meta.toString());db.update("INSERT INTO scene_asset_revisions(tenant_id,target_id,kind,revision,metadata) VALUES (?,?,?,?,?::jsonb) ON CONFLICT DO NOTHING",tenant,target,kind,revision,meta.toString());}
  private void saveMaterial(UUID actor,UUID tenant,UUID workspace,String source,String kind,String title,String content,JsonNode meta){
   String revision=IdentityService.hash(meta+"\n"+content);var old=db.queryForList("SELECT target_id,revision FROM scene_asset_links WHERE tenant_id=? AND source_id=? AND kind=?",tenant,source,kind);

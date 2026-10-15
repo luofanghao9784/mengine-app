@@ -1,9 +1,11 @@
 import { RuntimeError } from './ports.js';
 import { ChatCompletionsModel } from './chat-completions-model.js';
 
-// Non-thinking text/tool calling snapshots reviewed against the official API docs.
+// Explicit text/tool calling model IDs. Aliases may change upstream; receipts retain the requested ID.
 // This list is an adapter capability boundary, not a claim of live quality acceptance.
 export const BAILIAN_MODELS = Object.freeze([
+  'qwen3.7-plus',
+  'qwen3.7-flash',
   'qwen3.7-plus-2026-05-26',
   'qwen3.7-flash-2026-07-15',
   'qwen3.8-max-0902',

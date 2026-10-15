@@ -313,7 +313,7 @@ test('reduced motion draws no photons while numbers keep updating', async ({ pag
 
 test('unavailable operations summary preserves known task alerts', async ({ page, context }) => {
   await fixture(context, { TASK: { failed: 2 }, RESPONSE: { unknown: 1 } });
-  await context.route('**/api/platform-admin/v1/operations?*', route =>
+  await context.route('**/api/platform-admin/v1/operations?*', (route) =>
     route.fulfill({ status: 503, json: { code: 'UNAVAILABLE' } }),
   );
   await page.goto('/platform-admin/#admin=engine');
@@ -329,7 +329,7 @@ test('revoked telemetry clears stage, trends and prior counts', async ({ page, c
   await page.clock.install();
   await page.goto('/platform-admin/#admin=engine');
   await expect(page.locator('.eng3d-core b')).toHaveText('23');
-  await context.route('**/api/platform-admin/v1/engine-telemetry', route =>
+  await context.route('**/api/platform-admin/v1/engine-telemetry', (route) =>
     route.fulfill({ status: 403, json: { code: 'FORBIDDEN' } }),
   );
   await page.clock.runFor(3010);
@@ -352,4 +352,106 @@ test('WebGL unavailable keeps actual readings and keyboard details accessible', 
   await expect(page.locator('.eng3d-core b')).toHaveText('23');
   await page.keyboard.press('2');
   await expect(page.getByRole('complementary', { name: '处理详情' })).toContainText('6 项执行中');
+});
+
+test('异常明细保留待核对来源并按企业展示治理问题', async ({ page, context }) => {
+  await fixture(context);
+  const requests: string[] = [];
+  await context.route('**/api/platform-admin/v1/engine-telemetry/attention?**', async (route) => {
+    requests.push(route.request().url());
+    await route.fulfill({
+      json: {
+        total: 1,
+        offset: 0,
+        hasMore: false,
+        tenants: [{ id: tenantId(1), name: '合成企业甲' }],
+        items: [
+          {
+            id: tenantId(8),
+            tenantId: tenantId(1),
+            tenantName: '合成企业甲',
+            channel: 'TASK',
+            state: 'RESULT_UNKNOWN',
+            title: '自动画报任务',
+            code: 'TASK_RESULT_UNKNOWN',
+            note: '',
+            at: '2026-10-14T08:00:00Z',
+            sources: [
+              {
+                kind: 'DATASET',
+                id: tenantId(9),
+                name: '寄养记录',
+                version: '快照 V1',
+                relationship: '任务已读取 · 尝试 1',
+                current: false,
+              },
+            ],
+          },
+        ],
+      },
+    });
+  });
+  await context.route('**/scene/dispatch?**', async (route) => {
+    const detail = new URL(route.request().url()).searchParams.get('path')?.endsWith('/boarding');
+    await route.fulfill({
+      json: detail
+        ? {
+            asset: { version: 2, policyVersion: 1, actions: ['recheck'] },
+            findings: [
+              {
+                id: 'finding',
+                title: '关联未匹配记录',
+                detail: '666/1000 条寄养记录没有对应消费记录，需业务核对。',
+                count: 666,
+                status: 'open',
+              },
+            ],
+          }
+        : {
+            items: [
+              { id: 'boarding', title: '寄养记录', version: 2, label: '1 项治理问题', needsAttention: true },
+            ],
+          },
+    });
+  });
+  const retries: Record<string, unknown>[] = [];
+  await context.route('**/api/platform-admin/v1/engine-telemetry/attention/retry', async (route) => {
+    retries.push(route.request().postDataJSON());
+    if (retries.length === 1)
+      await route.fulfill({
+        status: 409,
+        json: { contractVersion: '1.0', code: 'TASK_RECONCILIATION_REQUIRED' },
+      });
+    else await route.fulfill({ json: { id: tenantId(10), state: 'QUEUED', message: '已提交引擎处理。' } });
+  });
+  await page.goto('/platform-admin/#admin=engine');
+  await page.getByText('查看异常与待核对数据', { exact: true }).click();
+  await expect(page.getByText('自动画报任务 · 待核对', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '核对并重试', exact: true }).click();
+  await expect(page.locator('.engine-retry-action').getByRole('status')).toContainText('暂未重新执行');
+  await page.getByRole('button', { name: '核对并重试', exact: true }).click();
+  await expect(page.locator('.engine-retry-action').getByRole('status')).toContainText('已提交引擎处理');
+  await expect(page.getByRole('button', { name: '已提交 / 已核对', exact: true })).toBeDisabled();
+  expect(retries).toHaveLength(2);
+  expect(retries[0]).toMatchObject({
+    tenantId: tenantId(1),
+    id: tenantId(8),
+    channel: 'TASK',
+    expectedState: 'RESULT_UNKNOWN',
+  });
+  expect(retries[0].requestId).toBe(retries[1].requestId);
+  await page.getByText('涉及数据：1 条来源版本记录', { exact: true }).click();
+  await expect(
+    page.getByText('快照 V1 · 任务已读取 · 尝试 1 · 历史版本或已撤下', { exact: true }),
+  ).toBeVisible();
+  await page.getByLabel('异常所属企业').selectOption(tenantId(1));
+  await page.getByLabel('异常状态').selectOption('UNKNOWN');
+  await expect
+    .poll(() => requests.some((u) => u.includes('state=UNKNOWN') && u.includes('tenant=' + tenantId(1))))
+    .toBeTruthy();
+  await page.getByText('该企业的数据治理待核对项', { exact: true }).click();
+  await page.getByText('寄养记录 · V2 · 1 项治理问题', { exact: true }).click();
+  await expect(
+    page.getByText('666/1000 条寄养记录没有对应消费记录，需业务核对。', { exact: true }),
+  ).toBeVisible();
 });

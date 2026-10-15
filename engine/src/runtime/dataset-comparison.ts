@@ -37,7 +37,7 @@ function argumentHint(args: unknown): string {
   if (!isRecord(args)) return 'Pass a JSON object with datasetId and snapshotId returned by dataset_search.';
   if (!uuid(args.datasetId) || !uuid(args.snapshotId)) return 'datasetId and snapshotId must be exact UUIDs returned by dataset_search; names and version numbers are not IDs.';
   if (['SUMMARY','COMPOSITION'].includes(String(args.operation))) {
-    if (!Array.isArray(args.groupColumns) || args.groupColumns.length < 1 || args.groupColumns.length > 3)
+    if (!Array.isArray(args.groupColumns) || args.groupColumns.length > 3)
       return 'SUMMARY requires groupColumns as an array of 1 to 3 exact headers, not groupColumn. A whole-scope total must still use a supported grouping.';
     if (['groupColumn','periodColumn','baseline','current','periodMode'].some(k=>args[k] !== undefined))
       return 'SUMMARY must OMIT groupColumn, periodColumn, baseline, current and periodMode entirely. Use groupColumns (array), one valueColumn for SUM or aggregation COUNT. Date filters use separate dateColumn/dateFrom/dateTo.';
@@ -74,7 +74,7 @@ export function datasetComparisonTool(options: {
       properties: {
         operation: { type: 'string', enum: [...(options.allowSummary === false ? ['COMPARE'] : ['COMPARE','SUMMARY']), ...(options.allowComposition ? ['COMPOSITION'] : [])] },
         ...(options.allowDateRange === false ? {} : {
-        groupColumns: { type: 'array', items: { type: 'string' }, description: 'SUMMARY only: 1..3 distinct exact column names.' },
+        groupColumns: { type: 'array', items: { type: 'string' }, description: 'SUMMARY only: 0..3 distinct exact column names; [] computes a whole-table total.' },
         dateColumn: { type: 'string' },
         dateFrom: { type: 'string', description: 'Inclusive business date YYYY-MM-DD.' },
         dateTo: { type: 'string', description: 'Inclusive business date YYYY-MM-DD; omit for all later snapshot records.' },
@@ -107,7 +107,7 @@ export function datasetComparisonTool(options: {
         !uuid(args.datasetId) ||
         !uuid(args.snapshotId) ||
         (['SUMMARY','COMPOSITION'].includes(String(args.operation))
-          ? !Array.isArray(args.groupColumns) || args.groupColumns.length < 1 || args.groupColumns.length > 3 || new Set(args.groupColumns).size !== args.groupColumns.length || args.groupColumns.some(k => typeof k !== 'string' || !k.trim() || k.length > 160) || (args.aggregation !== 'COUNT' && (typeof args.valueColumn !== 'string' || !args.valueColumn.trim() || args.valueColumn.length > 160)) || ['groupColumn','periodColumn','baseline','current','periodMode'].some(k => args[k] !== undefined)
+          ? !Array.isArray(args.groupColumns) || args.groupColumns.length > 3 || new Set(args.groupColumns).size !== args.groupColumns.length || args.groupColumns.some(k => typeof k !== 'string' || !k.trim() || k.length > 160) || (args.aggregation !== 'COUNT' && (typeof args.valueColumn !== 'string' || !args.valueColumn.trim() || args.valueColumn.length > 160)) || ['groupColumn','periodColumn','baseline','current','periodMode'].some(k => args[k] !== undefined)
           : (args.aggregation === 'COUNT' ? ['groupColumn','periodColumn'] : ['groupColumn','periodColumn','valueColumn']).some(k => typeof args[k] !== 'string' || !(args[k] as string).trim() || (args[k] as string).length > 160) || ['baseline','current'].some(k => typeof args[k] !== 'string' || !(args[k] as string).trim() || (args[k] as string).length > 100) || args.baseline === args.current || args.groupColumns !== undefined) ||
         (args.operation !== undefined && !['COMPARE','SUMMARY','COMPOSITION'].includes(String(args.operation))) ||
         (args.missingDates !== undefined && !['FAIL','EXCLUDE'].includes(String(args.missingDates))) ||

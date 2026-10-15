@@ -24,7 +24,9 @@ export async function* chatFrames(
     if (!response.ok) {
       console.warn(JSON.stringify({ event: 'MODEL_HTTP_REJECTED', status: response.status }));
       throw new RuntimeError(
-        [401, 403, 404].includes(response.status) ? 'REMOTE_ACCESS_DENIED' : 'REMOTE_UNAVAILABLE',
+        [401, 403, 404].includes(response.status) ? 'REMOTE_ACCESS_DENIED'
+          : response.status===408 ? 'MODEL_TIMEOUT' : response.status===429 ? 'MODEL_RATE_LIMITED'
+          : response.status>=500 ? 'MODEL_PROVIDER_UNAVAILABLE' : 'MODEL_REQUEST_REJECTED',
       );
     }
     if (!response.body) throw new RuntimeError('INVALID_REMOTE_RESPONSE');
@@ -84,7 +86,7 @@ export async function* chatFrames(
         code: networkCode && codes.has(networkCode) ? networkCode : 'TRANSPORT_ERROR',
       }),
     );
-    throw new RuntimeError(signal.aborted ? 'CANCELLED' : 'REMOTE_UNAVAILABLE');
+    throw new RuntimeError(signal.aborted ? 'CANCELLED' : timeout.signal.aborted ? 'MODEL_TIMEOUT' : 'MODEL_NETWORK_ERROR');
   } finally {
     // A normal DONE often precedes the HTTP body's EOF by one small tail.
     // Cancelling it immediately destroys keep-alive and reconnects every model round.

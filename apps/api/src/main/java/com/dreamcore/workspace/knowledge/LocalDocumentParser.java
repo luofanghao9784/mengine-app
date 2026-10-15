@@ -38,6 +38,7 @@ public class LocalDocumentParser implements DocumentParser {
             }
             if(total>800_000 || ((result.status().equals("READY") || result.status().equals("PARTIAL")) && result.chunks().isEmpty())) return failed();
             if((result.status().equals("FAILED") || result.status().equals("UNSUPPORTED")) && !result.chunks().isEmpty()) return failed();
+            if(result.structured()!=null && !FileTableService.valid(result.structured())) return failed();
             return result;
         } catch(Exception error) { if(error instanceof InterruptedException) Thread.currentThread().interrupt(); return failed(); }
         finally {

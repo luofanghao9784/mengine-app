@@ -36,6 +36,7 @@ export function meteredModel(
         }
       } catch (error) {
         const codes = new Set([
+          'MODEL_RATE_LIMITED', 'MODEL_PROVIDER_UNAVAILABLE', 'MODEL_REQUEST_REJECTED', 'MODEL_TIMEOUT', 'MODEL_NETWORK_ERROR',
           'REMOTE_ACCESS_DENIED',
           'REMOTE_UNAVAILABLE',
           'INVALID_REMOTE_RESPONSE',

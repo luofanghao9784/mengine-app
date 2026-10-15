@@ -40,19 +40,20 @@ public class CollectionService {
         if(rows.isEmpty())throw new IdentityException(404,"DATA_CONNECTION_NOT_FOUND");return rows.getFirst();
     }
     private boolean visible(UUID actor,UUID tenant,UUID connection){
-        return controls(actor,tenant)||Boolean.TRUE.equals(db.queryForObject("""
+        return (controls(actor,tenant)&&!fileConnection(tenant,connection))||Boolean.TRUE.equals(db.queryForObject("""
             SELECT EXISTS(SELECT 1 FROM business_datasets d JOIN workspace_members g
               ON g.tenant_id=d.tenant_id AND g.workspace_id=d.workspace_id AND g.account_id=headquarters_permission_actor(?,g.tenant_id)
-              WHERE d.tenant_id=? AND d.connection_id=? AND d.status='ACTIVE' AND (library_mask(g.account_id,d.tenant_id,'WORKSPACE',d.workspace_id)&1)=1)
+              WHERE d.tenant_id=? AND d.connection_id=? AND d.status='ACTIVE' AND file_dataset_readable(g.account_id,d.id) AND (library_mask(g.account_id,d.tenant_id,'WORKSPACE',d.workspace_id)&1)=1)
             """,Boolean.class,actor,tenant,connection));
     }
     private Run run(Map<String,Object> row){return new Run((UUID)row.get("id"),(String)row.get("trigger_kind"),(String)row.get("status"),(String)row.get("reason"),instant(row.get("created_at")),instant(row.get("started_at")),instant(row.get("finished_at")));}
     private Run runById(UUID tenant,UUID connection,UUID id){var rows=db.queryForList("SELECT * FROM collection_runs WHERE tenant_id=? AND connection_id=? AND id=?",tenant,connection,id);if(rows.isEmpty())throw new IdentityException(404,"COLLECTION_RUN_NOT_FOUND");return run(rows.getFirst());}
     private Run latest(UUID connection,boolean active){var rows=db.queryForList("SELECT * FROM collection_runs WHERE connection_id=?"+(active?" AND status IN ('QUEUED','RUNNING')":"")+" ORDER BY created_at DESC,id DESC LIMIT 1",connection);return rows.isEmpty()?null:run(rows.getFirst());}
-    private String effectiveStatus(Map<String,Object> c){return "READY".equals(c.get("status"))&&!adapter.available()?"UNCONFIGURED":(String)c.get("status");}
+    private boolean fileConnection(UUID tenant,UUID connection){return Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM file_table_sources f JOIN business_datasets d ON d.id=f.dataset_id WHERE d.tenant_id=? AND d.connection_id=?)",Boolean.class,tenant,connection));}
+    private String effectiveStatus(Map<String,Object> c){if(fileConnection((UUID)c.get("tenant_id"),(UUID)c.get("id")))return Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM business_datasets d WHERE d.connection_id=? AND d.status='ACTIVE' AND NOT d.scrubbed AND file_dataset_current(d.id))",Boolean.class,c.get("id")))?"READY":"UNAVAILABLE";return "READY".equals(c.get("status"))&&!adapter.available()?"UNCONFIGURED":(String)c.get("status");}
     private Connection project(UUID actor,UUID tenant,Map<String,Object> c){
         UUID id=(UUID)c.get("id");String state=effectiveStatus(c);boolean control=controls(actor,tenant);
-        String scope=control?(String)c.get("access_summary"):"当前获权空间："+String.join("、",db.queryForList("SELECT DISTINCT w.name FROM business_datasets d JOIN workspaces w ON w.id=d.workspace_id JOIN workspace_members g ON g.tenant_id=d.tenant_id AND g.workspace_id=d.workspace_id AND g.account_id=headquarters_permission_actor(?,g.tenant_id) WHERE d.tenant_id=? AND d.connection_id=? AND d.status='ACTIVE' AND (library_mask(g.account_id,d.tenant_id,'WORKSPACE',d.workspace_id)&1)=1 AND departure_content_readable(headquarters_permission_actor(?,d.tenant_id),d.tenant_id,d.workspace_id) ORDER BY w.name",String.class,actor,tenant,id,actor));
+        String scope=control?(String)c.get("access_summary"):"当前获权空间："+String.join("、",db.queryForList("SELECT DISTINCT w.name FROM business_datasets d JOIN workspaces w ON w.id=d.workspace_id JOIN workspace_members g ON g.tenant_id=d.tenant_id AND g.workspace_id=d.workspace_id AND g.account_id=headquarters_permission_actor(?,g.tenant_id) WHERE d.tenant_id=? AND d.connection_id=? AND d.status='ACTIVE' AND file_dataset_readable(g.account_id,d.id) AND (library_mask(g.account_id,d.tenant_id,'WORKSPACE',d.workspace_id)&1)=1 AND departure_content_readable(headquarters_permission_actor(?,d.tenant_id),d.tenant_id,d.workspace_id) ORDER BY w.name",String.class,actor,tenant,id,actor));
         Instant success=db.queryForObject("SELECT max(finished_at) FROM collection_runs WHERE connection_id=? AND status='SUCCEEDED'",(r,n)->instant(r.getTimestamp(1)),id);
         return new Connection(id,(String)c.get("name"),(String)c.get("route_label"),scope,state,((Number)c.get("revision")).longValue(),control,
             new Schedule((Boolean)c.get("auto_enabled"),(String)c.get("frequency"),(String)c.get("daily_time"),(String)c.get("time_zone")),"READY".equals(state)?instant(c.get("next_due")):null,success,latest(id,true),latest(id,false));
@@ -62,6 +63,7 @@ public class CollectionService {
     @Transactional public List<Run> runs(UUID actor,UUID tenant,UUID connection,int offset,int limit){detail(actor,tenant,connection);bounds(offset,limit);return db.queryForList("SELECT * FROM collection_runs WHERE tenant_id=? AND connection_id=? ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?",tenant,connection,limit,offset).stream().map(this::run).toList();}
     @Transactional public Connection configure(UUID actor,UUID tenant,UUID id,UUID request,long revision,Schedule schedule){
         member(actor,tenant);governance.require(actor,tenant,GovernanceAccess.Capability.TENANT_CONFIG,null);
+        if(Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM file_table_sources f JOIN business_datasets d ON d.id=f.dataset_id WHERE d.connection_id=? AND d.tenant_id=?)",Boolean.class,id,tenant)))throw new IdentityException(409,"CONNECTION_UNAVAILABLE");
         if(schedule==null||revision<0)throw IdentityException.invalid();
         Instant now=Instant.now(),next=null;
         if(schedule.frequency()!=null)next=CollectionSchedule.next(now,schedule.frequency(),schedule.dailyTime(),schedule.timeZone());
@@ -78,6 +80,7 @@ public class CollectionService {
     @Transactional public Run updateNow(UUID actor,UUID tenant,UUID id,UUID request,long revision){
         departure.requireActiveBusiness(actor,tenant);
         member(actor,tenant);governance.require(actor,tenant,GovernanceAccess.Capability.TENANT_CONFIG,null);
+        if(fileConnection(tenant,id))throw new IdentityException(409,"CONNECTION_UNAVAILABLE");
         String fingerprint=IdentityService.hash(tenant+"\n"+id+"\n"+revision);
         UUID prior=identities.priorRequest(actor,request,"COLLECTION_NOW",fingerprint);var c=connection(tenant,id,true);
         if(prior!=null)return runById(tenant,id,prior);
@@ -169,7 +172,7 @@ public class CollectionService {
         JOIN workspace_members g ON g.tenant_id=w.tenant_id AND g.workspace_id=w.id AND g.account_id=headquarters_permission_actor(?,g.tenant_id)
         LEFT JOIN dataset_snapshots s ON s.dataset_id=d.id AND s.id=d.current_snapshot
         LEFT JOIN LATERAL (SELECT status FROM collection_runs r WHERE r.connection_id=d.connection_id ORDER BY created_at DESC,id DESC LIMIT 1) latest_run ON true
-        WHERE d.tenant_id=? AND d.status='ACTIVE' AND (library_mask(g.account_id,d.tenant_id,'WORKSPACE',d.workspace_id)&1)=1 AND departure_content_readable(headquarters_permission_actor(?,d.tenant_id),d.tenant_id,d.workspace_id)
+        WHERE d.tenant_id=? AND d.status='ACTIVE' AND file_dataset_readable(g.account_id,d.id) AND (library_mask(g.account_id,d.tenant_id,'WORKSPACE',d.workspace_id)&1)=1 AND departure_content_readable(headquarters_permission_actor(?,d.tenant_id),d.tenant_id,d.workspace_id)
         """;
     @Transactional public Summary summary(UUID actor,UUID tenant){
         member(actor,tenant);

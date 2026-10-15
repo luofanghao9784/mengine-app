@@ -8,6 +8,7 @@ const safeFailures = new Map([
   ['CANCELLED', 'cancelled'],
   ['REMOTE_ACCESS_DENIED', 'remote_access_denied'],
   ['REMOTE_UNAVAILABLE', 'remote_unavailable'],
+  ...['MODEL_RATE_LIMITED','MODEL_PROVIDER_UNAVAILABLE','MODEL_REQUEST_REJECTED','MODEL_TIMEOUT','MODEL_NETWORK_ERROR'].map(code=>[code,'remote_unavailable']),
   ['INVALID_REMOTE_RESPONSE', 'invalid_response'],
   ['INVALID_MODEL_RESPONSE', 'invalid_response'],
   ['REMOTE_OUTPUT_LIMIT', 'output_limit'],

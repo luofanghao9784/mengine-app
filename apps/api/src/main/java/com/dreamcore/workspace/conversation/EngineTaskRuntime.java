@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.json.JsonMapper;
 @Component
 public class EngineTaskRuntime implements TaskRuntime {
+    @org.springframework.beans.factory.annotation.Autowired(required=false) private com.dreamcore.workspace.engine.ExecutionReceipts receipts;
     private final String executionClass;private final boolean legacy090;
     private final URI uri;private final String token;private final HttpClient http=HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).followRedirects(HttpClient.Redirect.NEVER).build();
     private final JsonMapper json=new JsonMapper();
@@ -71,10 +72,10 @@ public class EngineTaskRuntime implements TaskRuntime {
 
     public AgentResult executeAgent(UUID task,UUID attempt,String prompt,java.util.function.BooleanSupplier active) {
         if(token.length()<32)throw new IdentityException(503,"TASK_RUNTIME_UNAVAILABLE");
-        CompletableFuture<HttpResponse<byte[]>> future=null;
+        CompletableFuture<HttpResponse<byte[]>> future=null;String expectedVersion=null;
         try {
             if(!active.getAsBoolean())throw new IdentityException(403,"TASK_SOURCE_UNAVAILABLE");
-            var descriptor=compatible(true);String version=descriptor.engineVersion();String protocol=descriptor.protocols().get("agentTask");
+            var descriptor=compatible(true);String version=descriptor.engineVersion();expectedVersion=version;String protocol=descriptor.protocols().get("agentTask");
             if(protocol.equals("1.4") && prompt.length()>2000)throw new IdentityException(503,"TASK_RUNTIME_INCOMPATIBLE");
             var request=HttpRequest.newBuilder(uri.resolve("/internal/v1/agent-results")).timeout(Duration.ofSeconds(60)).header("Authorization","Bearer "+token).header("Content-Type","application/json").header("X-Dreamcore-Engine-Version",version)
                 .POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(Map.of("contractVersion",protocol,"taskId",task,"attemptId",attempt,"prompt",prompt)))).build();
@@ -95,8 +96,20 @@ public class EngineTaskRuntime implements TaskRuntime {
                     return result;
                 }catch(TimeoutException waiting){}
             }
-        }catch(IdentityException error){throw error;}
-        catch(Exception error){if(error instanceof InterruptedException)Thread.currentThread().interrupt();throw new IdentityException(503,future==null?"TASK_RUNTIME_UNAVAILABLE":"TASK_RESULT_UNKNOWN");}
+        }catch(IdentityException error){
+            if("TASK_RESULT_UNKNOWN".equals(error.code) && receipts!=null && active.getAsBoolean()){
+                String saved=receipts.result("AGENT",task,attempt);
+                if(saved!=null){var result=json.readValue(saved,AgentResult.class);if(task.equals(result.taskId())&&attempt.equals(result.attemptId())&&Objects.equals(expectedVersion,result.engineVersion()))return result;}
+            }
+            throw error;
+        }
+        catch(Exception error){
+            if(error instanceof InterruptedException)Thread.currentThread().interrupt();
+            if(future!=null && receipts!=null && active.getAsBoolean()){
+                try{String saved=receipts.result("AGENT",task,attempt);if(saved!=null){var result=json.readValue(saved,AgentResult.class);if(task.equals(result.taskId())&&attempt.equals(result.attemptId())&&Objects.equals(expectedVersion,result.engineVersion()))return result;}}catch(Exception unavailable){}
+            }
+            throw new IdentityException(503,future==null?"TASK_RUNTIME_UNAVAILABLE":"TASK_RESULT_UNKNOWN");
+        }
         finally{if(future!=null && !future.isDone())future.cancel(true);}
     }
 

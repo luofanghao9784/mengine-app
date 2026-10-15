@@ -202,7 +202,7 @@ public class ConversationService {
         if(reconcile){
             if(!Boolean.TRUE.equals(row.get("reconciliation_required")))throw new IdentityException(409,"TASK_STATE_CHANGED");
             // This immutable server-validated allowlist contains no external business writes. User/model assertions are not evidence.
-            boolean safe=Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM conversation_attempts WHERE task_id=? AND attempt_number=? AND execution_policy='READ_ONLY_PRIVATE_V1' AND jsonb_typeof(allowed_tools)='array')",Boolean.class,task,row.get("attempt")));
+            boolean safe=Boolean.TRUE.equals(db.queryForObject("SELECT task_retry_is_safe(?,?)",Boolean.class,task,row.get("attempt")));
             if(!safe)throw new IdentityException(409,"TASK_RECONCILIATION_REQUIRED");
             db.update("UPDATE conversation_attempts SET reconciliation_code='NO_BUSINESS_WRITES',reconciled_at=now() WHERE task_id=? AND attempt_number=?",task,row.get("attempt"));
             next="FAILED";reason="TASK_RESULT_RECONCILED";

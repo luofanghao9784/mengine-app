@@ -26,6 +26,15 @@ class LiveModelBoundaryTest(unittest.TestCase):
             patcher.start()
             self.addCleanup(patcher.stop)
 
+    def test_routine_model_config_preserves_base_and_rejects_unknown(self):
+        value = {**self.value, 'model': 'qwen3.8-max-0902', 'routineModel': live_model.DEFAULT_MODEL}
+        env = live_model.engine_environment(value)
+        self.assertEqual(env['AGENT_MODEL_NAME'], 'qwen3.8-max-0902')
+        self.assertEqual(env['AGENT_ROUTINE_MODEL_NAME'], live_model.DEFAULT_MODEL)
+        self.assertNotIn('AGENT_ROUTINE_MODEL_NAME', live_model.engine_environment(self.value))
+        with self.assertRaises(trial.TrialError):
+            live_model.validate({**value, 'routineModel': 'unknown'})
+
     def save(self):
         live_model.owned_path(self.path, True)
         trial.private_write(self.path, self.value)

@@ -1,3 +1,4 @@
+import { EngineAttention } from './EngineAttention';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { EngineTelemetry, TenantDistribution } from '../../contracts/public-api/engine-telemetry';
 import type { PlatformUsage } from '../../contracts/public-api/usage';
@@ -217,6 +218,7 @@ export function PlatformEngineDashboard({ hash }: { hash: string }) {
                   ))}
                 </ul>
               )}
+              <EngineAttention />
             </section>
             <Week usage={usage.value} error={usage.error} />
             <Intake value={intake.value} error={intake.error} hash={hash} />

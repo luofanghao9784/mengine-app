@@ -31,6 +31,7 @@ public class MaterialCleanupService {
             db.queryForList("SELECT scrub_governance_proposals(?)",material);
             db.queryForList("SELECT scrub_experience_material(?)",material);
             db.queryForList("SELECT scrub_feedback_material(?)",material);
+            db.queryForList("SELECT scrub_file_tables(?)",material);
             db.queryForList("SELECT scrub_adjustment_material(?)",material);
             db.queryForList("SELECT scrub_task_context_material(?)",material);
             db.queryForList("SELECT scrub_export_material(?)",material);

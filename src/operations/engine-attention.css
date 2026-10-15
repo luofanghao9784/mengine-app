@@ -1,0 +1,90 @@
+.engine-attention-detail {
+  margin-top: 16px;
+  border-top: 1px solid var(--border, #e4e2db);
+  padding-top: 12px;
+}
+.engine-attention-detail summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 8px 0;
+}
+.engine-attention-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0;
+}
+.engine-attention-filters select {
+  max-width: 240px;
+  padding: 7px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: white;
+  color: inherit;
+}
+.engine-attention-item {
+  border-top: 1px solid #e4e2db;
+  padding: 14px 0;
+  overflow-wrap: anywhere;
+}
+.engine-attention-item header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.engine-attention-item header span,
+.engine-attention-item small {
+  color: #777;
+  font-size: 12px;
+}
+.engine-attention-item p,
+.engine-attention-item li {
+  font-size: 13px;
+  line-height: 1.65;
+}
+.engine-attention-item li {
+  margin-bottom: 10px;
+}
+.engine-attention-note {
+  white-space: pre-wrap;
+}
+/* Expanded diagnostics use the existing grid width so source names remain readable. */
+.engine-dash-c5:has(.engine-attention-detail[open]) {
+  grid-column: 1 / -1;
+}
+.engine-dash .engine-attention-detail,
+.engine-dash .engine-attention-item {
+  border-color: var(--ed-line);
+}
+.engine-dash .engine-attention-detail .muted,
+.engine-dash .engine-attention-item small,
+.engine-dash .engine-attention-item header span {
+  color: var(--ed-muted);
+}
+.engine-dash .engine-attention-filters select {
+  background: var(--ed-bg);
+  border-color: var(--ed-muted);
+  color: var(--ed-text);
+}
+.engine-dash .engine-attention-filters button {
+  color: var(--ed-text);
+}
+
+.engine-retry-action {
+  margin-top: 12px;
+}
+.engine-retry-action textarea {
+  display: block;
+  width: 100%;
+  min-height: 80px;
+  margin: 8px 0;
+  background: var(--ed-bg);
+  color: var(--ed-text);
+  border: 1px solid var(--ed-line);
+  border-radius: 8px;
+  padding: 8px;
+}
+.engine-attention-item .button.ghost {
+  color: var(--ed-text);
+}

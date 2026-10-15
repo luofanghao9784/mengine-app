@@ -31,7 +31,7 @@ test('ordinary task gets no plan tool and both tool schemas register with actual
   });
   assert.equal(r.status, 'completed');
   assert.equal(r.modelCalls, 1);
-  assert.equal(TASK_RULES_VERSION, '1.4.2');
+  assert.equal(TASK_RULES_VERSION, '1.4.3');
   assert.match(capabilityDirectory(['task_preference']), /explicit current-user/);
 });
 test('invalid schedule and oversized evidence are rejected before calling platform', async () => {

@@ -177,11 +177,16 @@ export class CompanyAnalysis {
       outputTokens = 0,
       knownUsage = true;
     let lastToolFailure: string | undefined;
+    let modelFailure: string | undefined;
+    let repeatedInvalidSubmission = false;
+    let invalidSubmissionCount = 0;
+    const invalidSubmissions = new Map<string, number>();
     let validationHint = "";
     const safeCodes = new Set(['MODEL_CALL_LIMIT', 'TOOL_CALL_LIMIT', 'TIME_LIMIT', 'MODEL_OUTPUT_LIMIT',
       'INVALID_MODEL_RESPONSE', 'MODEL_INCOMPLETE', 'INVALID_TOOL_ARGUMENTS', 'COMPANY_INPUT_INCOMPLETE',
       'COMPANY_EVIDENCE_INVALID', 'SOURCE_NOT_GRANTED', 'PROFILE_NOT_GRANTED', 'TOOL_OUTPUT_LIMIT',
-      'TOOL_FAILED', 'COMPANY_DELIVERY_MISSING', 'RUNTIME_FAILED', 'MODEL_NOT_CONFIGURED']);
+      'TOOL_FAILED', 'COMPANY_DELIVERY_MISSING', 'RUNTIME_FAILED', 'MODEL_NOT_CONFIGURED',
+      'MODEL_RATE_LIMITED', 'MODEL_PROVIDER_UNAVAILABLE', 'MODEL_REQUEST_REJECTED', 'MODEL_TIMEOUT', 'MODEL_NETWORK_ERROR', 'REMOTE_ACCESS_DENIED', 'REMOTE_UNAVAILABLE', 'INVALID_REMOTE_RESPONSE', 'REMOTE_OUTPUT_LIMIT', 'MODEL_INPUT_LIMIT', 'INVALID_MODEL_INPUT']);
     const safeCode = (code: unknown) => typeof code === 'string' && safeCodes.has(code) ? code : 'COMPANY_ANALYSIS_FAILED';
     // Operational metadata only: never source text, quotes, credentials or tool arguments.
     const diagnostic = (event: string, details: Record<string, string | number | boolean | null>) =>
@@ -311,6 +316,11 @@ export class CompanyAnalysis {
             throw new RuntimeError('COMPANY_INPUT_INCOMPLETE');
           const reject = (check: string, hint: string): never => {
             validationHint = hint;
+            const signature = createHash('sha256').update(JSON.stringify(args.candidates)).digest('hex');
+            const repeats = (invalidSubmissions.get(signature) ?? 0) + 1;
+            invalidSubmissions.set(signature, repeats);
+            // Permit a correction, but do not pay for the same rejected delivery indefinitely.
+            repeatedInvalidSubmission = repeats >= 2 || ++invalidSubmissionCount >= 3;
             diagnostic('company_analysis_validation', { check, modelCall: calls });
             throw new RuntimeError('COMPANY_EVIDENCE_INVALID');
           };
@@ -344,7 +354,7 @@ export class CompanyAnalysis {
                 reject('duplicate_evidence', 'Use at most one evidence entry per chunkId in a candidate. Choose one exact supporting quote from that chunk.');
               evidenceChunks.add(e.chunkId as string);
               if (!job.inputs.some(i => i.chunkId === e.chunkId && i.text.includes(e.quote as string)))
-                reject('quote_mismatch', 'Copy a verbatim substring from the text of the specified granted chunkId; do not paraphrase or combine chunks.');
+                reject('quote_mismatch', `Candidate ${args.candidates.indexOf(c) + 1}, chunkId ${e.chunkId}: quote is not a verbatim substring of this source. Read company_input for this exact chunkId and copy a short continuous substring. Do not combine chunks, paraphrase, or invent a replacement source.`);
             }
           }
           validationHint = '';
@@ -357,6 +367,7 @@ export class CompanyAnalysis {
       const backend = this.config.createModel();
       const model: ModelPort = {
         async *generate(args) {
+          if (repeatedInvalidSubmission) throw new RuntimeError('COMPANY_EVIDENCE_INVALID');
           calls++;
           backend.lastUsage = null;
           try {
@@ -364,6 +375,10 @@ export class CompanyAnalysis {
             const messages = [...args.messages, { role: 'system' as const, content: [{ type: 'text' as const,
               text: `本轮后还剩 ${remaining} 次模型调用。已读取 ${read.size}/${job.inputs.length} 个输入；已查看标签组：${[...viewed].join(',') || '无'}。避免重复读取已获得的信息。${remaining <= 2 ? '优先完成 submit_company_candidates；仅当已读取全部输入且确实无相关企业信息时提交空数组。不得为结束而跳过必要证据校验。' : '优先使用 all=true 批量读取。'}这只是执行预算提示，不改变资料权限或证据要求。${validationHint ? ` 上次校验未通过，请修正：${validationHint}` : ""}` }] }];
             yield* backend.generate({ ...args, messages });
+          } catch (error) {
+            modelFailure = safeCode(error instanceof RuntimeError ? error.code : undefined);
+            diagnostic('company_analysis_model_failed', { code: modelFailure, modelCall: calls });
+            throw error;
           } finally {
             const u = backend.lastUsage as UsageModel['lastUsage'];
             if (u && count(u.inputTokens) && count(u.outputTokens)) {
@@ -406,7 +421,7 @@ export class CompanyAnalysis {
         ? receipt('COMPLETE', null)
         : receipt(
             signal.aborted ? 'CANCELLED' : 'FAILED',
-            signal.aborted ? 'CANCELLED' : safeCode(result.code || lastToolFailure || 'COMPANY_DELIVERY_MISSING'),
+            signal.aborted ? 'CANCELLED' : safeCode(repeatedInvalidSubmission ? 'COMPANY_EVIDENCE_INVALID' : modelFailure || result.code || lastToolFailure || 'COMPANY_DELIVERY_MISSING'),
           );
     } catch (error) {
       return receipt(

@@ -21,6 +21,8 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={"dreamcore.collection.enabled=false","dreamcore.auth.ip-attempts=1000","dreamcore.auth.email-attempts=1000"})
 class CollectionIntegrationTest {
     @TestConfiguration static class Config {
+        // This fixture explicitly tests its synthetic collector, not the production scene bridge.
+        @Bean static org.springframework.beans.factory.config.BeanFactoryPostProcessor chooseSyntheticCollector(){return factory->{if(factory.containsBeanDefinition("sceneCollectionAdapter"))factory.getBeanDefinition("sceneCollectionAdapter").setPrimary(false);};}
         @Bean @Primary CollectionAdapter syntheticCollector(){return new CollectionAdapter(){public boolean available(){return true;}public Result collect(Request r){return new Result("1.0",r.datasets().stream().map(d->new Snapshot(d.id(),Instant.parse("2026-01-01T00:00:00Z"),List.of(d.columns().stream().map(c->"synthetic-"+c).toList()))).toList());}};}
     }
     @Autowired DatasetLifecycleService lifecycle;

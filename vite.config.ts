@@ -9,6 +9,7 @@ export default defineConfig({
         'index.html',
         'workspace/index.html',
         'tenant-admin/index.html',
+        'tenant-admin/prototype/index.html',
         'tenant-admin/support/index.html',
         'platform-admin/index.html',
       ],

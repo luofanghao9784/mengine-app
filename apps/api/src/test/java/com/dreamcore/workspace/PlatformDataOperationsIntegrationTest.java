@@ -7,6 +7,8 @@ import org.springframework.jdbc.core.JdbcTemplate;import org.springframework.moc
 import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={"dreamcore.tasks.enabled=false","dreamcore.knowledge.enabled=true","dreamcore.knowledge.initial-delay-ms=3600000","dreamcore.collection.enabled=false"})
 class PlatformDataOperationsIntegrationTest {
+ @Autowired EngineAttentionService attention;
+ @Autowired EngineRetryService retries;
  @Autowired PlatformDataOperationsService service;@Autowired JdbcTemplate db;@Autowired MaterialService materials;@Autowired PasswordEncoder passwords;@LocalServerPort int port;
  UUID tenant,other,operator,member,space;String prefix;static final String SECRET="private-business-content-never-project",PASSWORD="synthetic-data-operations-password";
  @BeforeEach void setup(){tenant=UUID.randomUUID();other=UUID.randomUUID();operator=UUID.randomUUID();member=UUID.randomUUID();space=UUID.randomUUID();prefix="ops-"+tenant;
@@ -14,6 +16,107 @@ class PlatformDataOperationsIntegrationTest {
   db.update("INSERT INTO platform_roles(account_id,role) VALUES (?,'PLATFORM_ADMIN')",operator);db.update("INSERT INTO platform_accounts(account_id,login_name,password_hash) VALUES (?,?,?)",operator,operator+"@example.test",passwords.encode(PASSWORD));
   db.update("INSERT INTO tenants(id,name) VALUES (?,?),(?,?)",tenant,prefix+"-A",other,prefix+"-B");db.update("INSERT INTO tenant_memberships(tenant_id,account_id,role) VALUES (?,?,'TENANT_ADMIN')",tenant,member);
   db.update("INSERT INTO workspaces(id,tenant_id,owner_id,name,kind) VALUES (?,?,?,?,'PERSONAL')",space,tenant,member,SECRET);
+ }
+
+
+ UUID failedParse(){
+  materials.upload(member,tenant,space,null,null,null,UUID.randomUUID(),new MockMultipartFile("file","retry.txt","text/plain","synthetic retry source".getBytes()));
+  UUID run=detail("MATERIALS").items().getFirst().runId();
+  db.update("UPDATE knowledge_runs SET status='FAILED',finished_at=now() WHERE id=?",run);return run;
+ }
+ EngineRetryService.Request retryRequest(UUID run){return new EngineRetryService.Request(UUID.randomUUID(),tenant,"KNOWLEDGE",run,"FAILED",null);}
+ @Test void platformRetryCreatesNewParsePreservesFailureAndReplaysSameReceipt(){
+  UUID run=failedParse();var req=retryRequest(run);
+  var result=retries.retry(operator,req);assertEquals("QUEUED",result.state());assertNotEquals(run,result.id());
+  assertEquals(result.id(),retries.retry(operator,req).id());
+  assertEquals("FAILED",db.queryForObject("SELECT status FROM knowledge_runs WHERE id=?",String.class,run));
+  assertEquals(2,db.queryForObject("SELECT count(*) FROM knowledge_runs WHERE tenant_id=?",Integer.class,tenant));
+  assertEquals(1,db.queryForObject("SELECT count(*) FROM platform_engine_retries WHERE source_id=?",Integer.class,run));
+  assertEquals(1,db.queryForObject("SELECT count(*) FROM identity_audit WHERE actor_id=? AND action='ENGINE_RETRY'",Integer.class,operator));
+  denied(409,()->retries.retry(operator,retryRequest(run)));
+ }
+
+ @Test void concurrentPlatformRetryClicksShareOneNewParse() throws Exception {
+  UUID run=failedParse();var req=retryRequest(run);
+  try(var pool=java.util.concurrent.Executors.newFixedThreadPool(2)){
+   var a=pool.submit(()->retries.retry(operator,req));var b=pool.submit(()->retries.retry(operator,req));
+   assertEquals(a.get(10,java.util.concurrent.TimeUnit.SECONDS).id(),b.get(10,java.util.concurrent.TimeUnit.SECONDS).id());
+  }
+  assertEquals(2,db.queryForObject("SELECT count(*) FROM knowledge_runs WHERE tenant_id=?",Integer.class,tenant));
+ }
+ @Test void fileTableRecheckCreatesFreshValidationAndDoesNotApproveInvalidStructure(){
+  var m=materials.upload(member,tenant,space,null,null,null,UUID.randomUUID(),new MockMultipartFile("file","retry.csv","text/csv","a,a\n1,2".getBytes()));
+  UUID run=detail("MATERIALS").items().getFirst().runId();db.update("UPDATE knowledge_runs SET status='READY',finished_at=now() WHERE id=?",run);
+  var receipt=retries.retry(operator,new EngineRetryService.Request(UUID.randomUUID(),tenant,"FILE_TABLE",m.id(),"V1",null));
+  assertEquals("QUEUED",receipt.state());assertNotEquals(run,receipt.id());
+  assertEquals(0,db.queryForObject("SELECT count(*) FROM business_datasets WHERE tenant_id=?",Integer.class,tenant));
+  assertEquals("READY",db.queryForObject("SELECT status FROM knowledge_runs WHERE id=?",String.class,run));
+ }
+ @Test void platformRetryCannotCrossTenantOrUseBusinessAccount(){
+  UUID run=failedParse();denied(403,()->retries.retry(member,retryRequest(run)));
+  var wrong=new EngineRetryService.Request(UUID.randomUUID(),other,"KNOWLEDGE",run,"FAILED",null);
+  denied(404,()->retries.retry(operator,wrong));
+  assertEquals(1,db.queryForObject("SELECT count(*) FROM knowledge_runs WHERE tenant_id=?",Integer.class,tenant));
+ }
+ @Test void platformRetryRejectsStaleStatusRunningAndSuspendedTenant(){
+  UUID run=failedParse();var req=retryRequest(run);
+  db.update("UPDATE knowledge_runs SET status='RUNNING' WHERE id=?",run);denied(409,()->retries.retry(operator,req));
+  db.update("UPDATE knowledge_runs SET status='FAILED' WHERE id=?",run);
+  db.update("UPDATE tenants SET status='SUSPENDED' WHERE id=?",tenant);denied(409,()->retries.retry(operator,req));
+  assertEquals(0,db.queryForObject("SELECT count(*) FROM platform_engine_retries WHERE source_id=?",Integer.class,run));
+ }
+ @Test void platformRetryRevalidatesOriginalUploaderAccess(){
+  UUID run=failedParse();db.update("UPDATE tenant_memberships SET status='DISABLED' WHERE tenant_id=? AND account_id=?",tenant,member);
+  denied(403,()->retries.retry(operator,retryRequest(run)));
+  assertEquals(1,db.queryForObject("SELECT count(*) FROM knowledge_runs WHERE tenant_id=?",Integer.class,tenant));
+ }
+ @Test void waitingQueueAppearsInAttentionAndRetryDoesNotDuplicateIt(){
+  UUID run=failedParse();db.update("UPDATE knowledge_runs SET status='QUEUED' WHERE id=?",run);
+  assertTrue(attention.read(operator,tenant,"WAITING",0).items().stream().anyMatch(i->i.id().equals(run)));
+  var result=retries.retry(operator,new EngineRetryService.Request(UUID.randomUUID(),tenant,"KNOWLEDGE",run,"QUEUED",null));
+  assertEquals(run,result.id());assertEquals(1,db.queryForObject("SELECT count(*) FROM knowledge_runs WHERE tenant_id=?",Integer.class,tenant));
+ }
+ @Test void attentionRetainsHistoricalFailureWithExactSourceAndTenantIsolation(){
+  var m=materials.upload(member,tenant,space,null,null,null,UUID.randomUUID(),new MockMultipartFile("file","boarding-policy.txt","text/plain","policy body not projected".getBytes()));
+  UUID run=detail("MATERIALS").items().getFirst().runId();
+  db.update("UPDATE knowledge_runs SET status='FAILED',warnings=?,finished_at=now() WHERE id=?",SECRET,run);
+  materials.upload(member,tenant,space,null,m.id(),1,UUID.randomUUID(),new MockMultipartFile("file","boarding-policy.txt","text/plain","new policy".getBytes()));
+  var page=attention.read(operator,tenant,"FAILED",0);assertEquals(1,page.total());
+  var item=page.items().getFirst();assertEquals(run,item.id());assertEquals(tenant,item.tenantId());assertEquals("PARSE_FAILED",item.code());
+  assertEquals(1,item.sources().size());var source=item.sources().getFirst();assertEquals(m.id(),source.id());assertEquals("boarding-policy.txt",source.name());assertEquals("V1",source.version());assertFalse(source.current());
+  assertEquals(0,attention.read(operator,other,"ALL",0).total());assertEquals(0,attention.read(operator,tenant,"UNKNOWN",0).total());
+  assertFalse(new JsonMapper().writeValueAsString(page).contains(SECRET));
+  assertFalse(new JsonMapper().writeValueAsString(page).contains("policy body not projected"));
+  assertEquals("FAILED",db.queryForObject("SELECT status FROM knowledge_runs WHERE id=?",String.class,run));
+  denied(403,()->attention.read(member,tenant,"ALL",0));denied(400,()->attention.read(operator,tenant,"INVALID",0));
+  denied(400,()->attention.read(operator,tenant,"ALL",-1));
+  db.update("DELETE FROM platform_roles WHERE account_id=?",operator);denied(403,()->attention.read(operator,tenant,"ALL",0));
+ }
+ @Test void attentionUnknownTaskShowsPinnedMaterialAndSnapshotWithoutBusinessRows(){
+  var m=materials.upload(member,tenant,space,null,null,null,UUID.randomUUID(),new MockMultipartFile("file","寄养制度.txt","text/plain",SECRET.getBytes()));
+  UUID kr=detail("MATERIALS").items().getFirst().runId();UUID version=db.queryForObject("SELECT version_id FROM knowledge_runs WHERE id=?",UUID.class,kr);
+  UUID cv=UUID.randomUUID(),task=UUID.randomUUID();
+  db.update("INSERT INTO conversations(id,tenant_id,workspace_id,owner_id,title) VALUES (?,?,?,?,?)",cv,tenant,space,member,SECRET);
+  db.update("INSERT INTO conversation_tasks(id,tenant_id,workspace_id,conversation_id,requested_by,prompt,mode,execution_class,status,attempt,error_code) VALUES (?,?,?,?,?,?,'AGENT','live','RESULT_UNKNOWN',1,'TASK_RESULT_UNKNOWN')",task,tenant,space,cv,member,SECRET);
+  db.update("INSERT INTO conversation_attempts(task_id,attempt_number,input,status,provenance) VALUES (?,1,?,'RUNNING','RECORDED')",task,SECRET);
+  db.update("INSERT INTO conversation_task_material_versions(tenant_id,workspace_id,task_id,attempt_id,material_id,version_id,run_id) VALUES (?,?,?,?,?,?,?)",tenant,space,task,UUID.randomUUID(),m.id(),version,kr);
+  UUID c=connection(tenant,"READY"),r=run(tenant,c,"SUCCEEDED",1),d=UUID.randomUUID(),snap=UUID.randomUUID();
+  db.update("UPDATE workspaces SET kind='SHARED' WHERE id=?",space);
+  db.update("INSERT INTO business_datasets(id,tenant_id,connection_id,workspace_id,dataset_key,name,column_names) VALUES (?,?,?,?,?,?,?::jsonb)",d,tenant,c,space,"boarding","寄养记录","[\"amount\"]");
+  db.update("INSERT INTO dataset_snapshots(id,tenant_id,connection_id,dataset_id,run_id,version,data_rows,row_count,collected_at) VALUES (?,?,?,?,?,1,?::jsonb,1,now())",snap,tenant,c,d,r,"[{\"amount\":300000}]");
+  db.update("UPDATE business_datasets SET current_snapshot=? WHERE id=?",snap,d);
+  db.update("INSERT INTO task_dataset_reads(task_id,attempt_number,dataset_id,snapshot_id) VALUES (?,1,?,?)",task,d,snap);
+  var page=attention.read(operator,tenant,"UNKNOWN",0);assertEquals(1,page.total());var item=page.items().getFirst();
+  assertEquals(task,item.id());assertEquals(2,item.sources().size());assertTrue(item.sources().stream().anyMatch(x->x.id().equals(d)&&x.version().contains(snap.toString())&&x.current()));
+  var json=new JsonMapper().writeValueAsString(page);assertFalse(json.contains(SECRET));assertFalse(json.contains("300000"));assertTrue(json.contains("寄养制度.txt"));
+  assertEquals("RESULT_UNKNOWN",db.queryForObject("SELECT status FROM conversation_tasks WHERE id=?",String.class,task));
+ }
+ @Test void attentionPaginatesFailuresWithoutDroppingRecords(){
+  UUID c=connection(tenant,"READY");for(int i=0;i<23;i++)run(tenant,c,"FAILED",i+1);
+  var first=attention.read(operator,tenant,"FAILED",0);var last=attention.read(operator,tenant,"FAILED",20);
+  assertEquals(23,first.total());assertEquals(20,first.items().size());assertTrue(first.hasMore());assertEquals(3,last.items().size());assertFalse(last.hasMore());
+  assertEquals(23,java.util.stream.Stream.concat(first.items().stream(),last.items().stream()).map(EngineAttentionService.Item::id).distinct().count());
+  assertTrue(first.items().stream().allMatch(i->i.sources().size()==1&&i.sources().getFirst().id().equals(c)));
  }
  @AfterEach void cleanup(){db.update("DELETE FROM platform_sessions WHERE account_id=?",operator);db.update("DELETE FROM platform_accounts WHERE account_id=?",operator);db.update("DELETE FROM platform_roles WHERE account_id=?",operator);db.update("UPDATE knowledge_runs SET status='CANCELLED' WHERE tenant_id=? AND status IN ('QUEUED','RUNNING')",tenant);db.update("UPDATE collection_runs SET status='INTERRUPTED' WHERE tenant_id IN (?,?) AND status IN ('QUEUED','RUNNING')",tenant,other);}
  UUID connection(UUID t,String status){UUID c=UUID.randomUUID();db.update("INSERT INTO data_connections(id,tenant_id,name,route_label,access_summary,status,time_zone) VALUES (?,?,?,?,?,?,'UTC')",c,t,SECRET,SECRET,SECRET,status);return c;}
@@ -66,18 +169,19 @@ class PlatformDataOperationsIntegrationTest {
  @Test void scopeChecksBoundsSuspensionAndRevocation(){denied(403,()->service.list(member,"CONNECTIONS","","ALL",0));denied(404,()->service.detail(operator,UUID.randomUUID(),"MATERIALS","ALL",0));for(String k:List.of("FILES","connection",""))denied(400,()->service.list(operator,k,"","ALL",0));denied(400,()->service.list(operator,"CONNECTIONS","","BROKEN",0));denied(400,()->service.list(operator,"CONNECTIONS","x".repeat(181),"ALL",0));denied(400,()->service.detail(operator,tenant,"MATERIALS","ALL",20001));
   db.update("UPDATE tenants SET status='SUSPENDED' WHERE id=?",tenant);assertEquals("SUSPENDED",detail("MATERIALS").tenantStatus());db.update("DELETE FROM platform_roles WHERE account_id=?",operator);denied(403,()->detail("MATERIALS"));
  }
+ // Realms are isolated: a customer cookie is unauthenticated in the platform realm (and vice versa).
  @Test void customerLoginCannotReadPlatformDataEvenForItsOwnTenant()throws Exception{
   db.update("DELETE FROM login_attempts");String base="http://127.0.0.1:"+port;var http=HttpClient.newBuilder().cookieHandler(new CookieManager(null,CookiePolicy.ACCEPT_ALL)).build();var json=new JsonMapper();
   var csrf=json.readTree(http.send(HttpRequest.newBuilder(URI.create(base+"/api/v1/auth/csrf")).GET().build(),HttpResponse.BodyHandlers.ofString()).body());
   var login=HttpRequest.newBuilder(URI.create(base+"/api/v1/auth/login")).header(csrf.get("headerName").asString(),csrf.get("token").asString()).header("Content-Type","application/json").POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(Map.of("email",member+"@example.test","password",PASSWORD)))).build();assertEquals(200,http.send(login,HttpResponse.BodyHandlers.ofString()).statusCode());
-  for(String path:List.of("/api/platform-admin/v1/data-operations","/api/platform-admin/v1/data-operations/archives","/api/platform-admin/v1/tenants/"+tenant+"/data-operations"))assertEquals(403,http.send(HttpRequest.newBuilder(URI.create(base+path)).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
+  for(String path:List.of("/api/platform-admin/v1/engine-telemetry/attention","/api/platform-admin/v1/data-operations","/api/platform-admin/v1/data-operations/archives","/api/platform-admin/v1/tenants/"+tenant+"/data-operations"))assertEquals(401,http.send(HttpRequest.newBuilder(URI.create(base+path)).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
  }
  @Test void independentPlatformHttpReturnsOnlyReadOnlyNoStoreProjection()throws Exception{db.update("DELETE FROM login_attempts");connection(tenant,"UNAVAILABLE");String base="http://127.0.0.1:"+port,path="/api/platform-admin/v1/tenants/"+tenant+"/data-operations";var http=HttpClient.newBuilder().cookieHandler(new CookieManager(null,CookiePolicy.ACCEPT_ALL)).build();var json=new JsonMapper();
   assertEquals(401,http.send(HttpRequest.newBuilder(URI.create(base+path)).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
   var csrf=json.readTree(http.send(HttpRequest.newBuilder(URI.create(base+"/api/platform-admin/v1/auth/csrf")).GET().build(),HttpResponse.BodyHandlers.ofString()).body());
   var login=HttpRequest.newBuilder(URI.create(base+"/api/platform-admin/v1/auth/login")).header(csrf.get("headerName").asString(),csrf.get("token").asString()).header("Content-Type","application/json").POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(Map.of("username",operator+"@example.test","password",PASSWORD)))).build();assertEquals(200,http.send(login,HttpResponse.BodyHandlers.ofString()).statusCode());
   var r=http.send(HttpRequest.newBuilder(URI.create(base+path)).GET().build(),HttpResponse.BodyHandlers.ofString());assertEquals(200,r.statusCode());assertEquals("private, no-store",r.headers().firstValue("Cache-Control").orElseThrow());assertFalse(r.body().contains(SECRET));
-  assertEquals(403,http.send(HttpRequest.newBuilder(URI.create(base+"/api/v1/tenants/"+tenant+"/database/connections")).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
-  db.update("DELETE FROM platform_roles WHERE account_id=?",operator);assertEquals(403,http.send(HttpRequest.newBuilder(URI.create(base+path)).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
+  assertEquals(401,http.send(HttpRequest.newBuilder(URI.create(base+"/api/v1/tenants/"+tenant+"/database/connections")).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
+  db.update("DELETE FROM platform_roles WHERE account_id=?",operator);assertEquals(401,http.send(HttpRequest.newBuilder(URI.create(base+path)).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
  }
 }

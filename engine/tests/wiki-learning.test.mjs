@@ -29,11 +29,11 @@ test('agent task branch keeps normal metering, empty execution policy and final 
   });
   const url=await listen(platform);
   const backend={lastUsage:null,usage:null,async *generate(request){assert.deepEqual(request.tools,[]);yield {type:'text',text:JSON.stringify(article)};this.lastUsage={inputTokens:20,outputTokens:10};this.usage=this.lastUsage;revoked=revoke;yield {type:'finish',reason:'stop'};}};
-  const tasks=new AgentTasks({platformBaseUrl:url,executionClass:'verification',modelName:'fixture',createModel:()=>backend});
+  const tasks=new AgentTasks({platformBaseUrl:url,executionClass:'verification',modelName:'max-fixture',createModel:()=>{throw Error('must use routine route')},routineModel:{modelName:'plus-fixture',createModel:()=>backend}});
   const request={contractVersion:'1.5',taskId:'00000000-0000-4000-8000-000000000011',attemptId:'00000000-0000-4000-8000-000000000012',prompt:'synthetic'};
   try{
    if(revoke)await assert.rejects(()=>tasks.run(request,new AbortController().signal),/TASK_ACCESS_DENIED/);
-   else {const result=await tasks.run(request,new AbortController().signal);assert.deepEqual(result.sourceIds,source.fragments.map(c=>c.id));assert.deepEqual(result.usage,{inputTokens:20,outputTokens:10});assert.equal(result.outcome,'COMPLETE');}
+   else {const result=await tasks.run(request,new AbortController().signal);assert.deepEqual(result.sourceIds,source.fragments.map(c=>c.id));assert.deepEqual(result.usage,{inputTokens:20,outputTokens:10});assert.equal(result.outcome,'COMPLETE');assert.equal(result.modelName,'plus-fixture');}
    assert.deepEqual(actions.find(a=>a.action==='execution/open').input,{contractVersion:'1.5',tools:[]});
    assert.ok(actions.some(a=>a.action==='model-usage/finish'));
    assert.ok(actions.every(a=>['check','model-usage/open','execution/open','model-usage/start','model-usage/finish'].includes(a.action)));

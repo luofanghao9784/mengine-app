@@ -79,6 +79,7 @@ public class IdentityService {
         return Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM accounts WHERE id=? AND status='ACTIVE' AND NOT EXISTS(SELECT 1 FROM unified_identity_links l WHERE l.source_id=accounts.id) AND credential_version=?)",Boolean.class,account,version));
     }
     public Account login(String suppliedEmail, String password, String ip) {
+        if (suppliedEmail != null && suppliedEmail.strip().matches("[a-z][a-z0-9_-]{2,39}")) return loginUsername(suppliedEmail,password,ip);
         boolean byPhone = suppliedEmail != null && !suppliedEmail.contains("@");
         String normalized = byPhone ? PhoneNumbers.normalize(suppliedEmail) : email(suppliedEmail);
         return loginCredential(normalized, byPhone ? "phone=?" : "email=? AND phone IS NULL", password, ip);

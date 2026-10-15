@@ -11,6 +11,7 @@ public class ConversationWorker {
     private final java.util.concurrent.Semaphore slots;
     private final int concurrency;
     private volatile boolean stopping;
+    @org.springframework.beans.factory.annotation.Autowired private AgentReceiptRecovery receiptRecovery;
     @jakarta.annotation.PreDestroy public void stop(){stopping=true;executor.shutdownNow();}
     private final ConversationService service;private final TaskRuntime runtime;private final AgentTaskService agents;
     public ConversationWorker(ConversationService service,TaskRuntime runtime,AgentTaskService agents,
@@ -21,6 +22,7 @@ public class ConversationWorker {
     @Scheduled(fixedDelayString="${dreamcore.tasks.poll-ms:500}",initialDelayString="${dreamcore.tasks.initial-delay-ms:1000}")
     public void tick(){
         if(stopping)return;
+        try{if(receiptRecovery!=null)receiptRecovery.recover();}catch(Exception unavailable){return;}
         for(int i=0;i<concurrency && slots.tryAcquire();i++){
             ConversationService.Job job;
             try{job=service.claim();}catch(Exception error){slots.release();return;}

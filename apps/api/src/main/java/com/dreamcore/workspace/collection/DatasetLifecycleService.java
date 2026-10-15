@@ -18,6 +18,8 @@ public class DatasetLifecycleService {
         this.db=db;this.identities=identities;this.access=access;this.governance=governance;this.departure=departure;this.audit=audit;
     }
     private Map<String,Object> source(UUID tenant,UUID id) {
+        // File-derived tables follow the original material lifecycle, not a second destructive UI/API.
+        if(Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM file_table_sources WHERE tenant_id=? AND dataset_id=?)",Boolean.class,tenant,id)))throw new IdentityException(404,"DATASET_NOT_FOUND");
         var rows=db.queryForList("SELECT * FROM business_datasets WHERE tenant_id=? AND id=?",tenant,id);
         if(rows.isEmpty())throw new IdentityException(404,"DATASET_NOT_FOUND");return rows.getFirst();
     }
@@ -33,7 +35,7 @@ public class DatasetLifecycleService {
     @Transactional public List<Item> records(UUID actor,UUID tenant) {
         identities.member(actor,tenant,false);
         // Scope-filter before returning metadata; do not expose names from other spaces.
-        return db.queryForList("SELECT d.id FROM business_datasets d JOIN workspace_members g ON g.tenant_id=d.tenant_id AND g.workspace_id=d.workspace_id AND g.account_id=headquarters_permission_actor(?,d.tenant_id) WHERE d.tenant_id=? AND d.status='WITHDRAWN' ORDER BY d.id LIMIT 100",UUID.class,actor,tenant).stream().map(id->get(actor,tenant,id)).toList();
+        return db.queryForList("SELECT d.id FROM business_datasets d JOIN workspace_members g ON g.tenant_id=d.tenant_id AND g.workspace_id=d.workspace_id AND g.account_id=headquarters_permission_actor(?,d.tenant_id) WHERE d.tenant_id=? AND d.status='WITHDRAWN' AND NOT EXISTS(SELECT 1 FROM file_table_sources f WHERE f.dataset_id=d.id) ORDER BY d.id LIMIT 100",UUID.class,actor,tenant).stream().map(id->get(actor,tenant,id)).toList();
     }
     @Transactional public Item act(UUID actor,UUID tenant,UUID id,UUID request,long expected,String action,boolean confirmed) {
         if(expected<0||!Set.of("WITHDRAW","PURGE").contains(action)||!confirmed)throw IdentityException.invalid();
