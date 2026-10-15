@@ -14,7 +14,7 @@ public final class BriefingDisplayLabels {
     case "审批状态" -> Map.of("approved","已通过","withdrawn","已撤回","in_progress","审批中","rejected","已驳回");
     case "课时状态" -> Map.of("effective","有效课时","voided","已作废","pending_cross_store_claim","跨店待认领","cross_store_expired_unclaimed","跨店过期未认领");
     case "财务处理" -> Map.of("income_reduction","冲减原收入","refund_expense","退款支出");
-    case "产品类别" -> Map.of("formal","正式课","trial","体验课");
+    case "产品类别" -> Map.of("formal_course","正式课","trial_course","体验课","course_experience_officer","课程体验官");
     default -> Map.<String,String>of();
    };
    return labels;

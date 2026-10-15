@@ -86,4 +86,16 @@ class BriefingFaceAlignmentIntegrationTest extends DatasetCalculationFixture {
   var prose=new BriefingContentService.Request(null,"甲店记录占比为一半","甲店在本次筛选范围内的记录占比为一半。",List.of("仅使用已核验的固定范围内全部记录计算份额。","本次剔除缺少日期的记录，不推断范围外的经营情况。"),"DATA");
   assertDoesNotThrow(()->BriefingEditorialQuality.validate(prose,true,true,true,true));assertEquals("BRIEFING_RATIO_NOT_VERIFIED",assertThrows(IdentityException.class,()->BriefingEditorialQuality.validate(prose,true,true,true,false)).code);
  }
+ @Test void mixedProductAggregationCannotPublishAsFormalCourses(){
+  dataset=UUID.randomUUID();
+  db.update("INSERT INTO business_datasets(id,tenant_id,connection_id,workspace_id,dataset_key,name,column_names) VALUES (?,?,?,?,'ninepop-chain-courses-v1','合成课程','[\"门店\",\"产品类别\",\"课程数\"]'::jsonb)",dataset,tenant,connection,space);
+  snapshot=version(1,List.of(List.of("甲","formal_course","5"),List.of("甲","trial_course","2")));
+  var j=start();var p=new DatasetCalculationService.Request(dataset,snapshot,null,null,"课程数",null,null,null,"Asia/Shanghai","SUM","SUMMARY",List.of("门店"),null,null,null,null);
+  var result=json.valueToTree(agents.compareDataset(j.id(),j.token(),p));receipt(j,2,"compare_dataset","succeeded");receipt(j,3,"deliver_briefing","STARTED");
+  var artifact=UUID.fromString(result.at("/artifact/id").asString());
+  var bad=new BriefingContentService.Request(artifact,"甲店正式课存量为7份","甲店正式课的课程存量为7份，需要跟进。",List.of("本次按门店汇总课程记录数量。","课程记录数量不代表会员人数。"),"DATA");
+  assertEquals("BRIEFING_CATEGORY_SCOPE_MISMATCH",assertThrows(IdentityException.class,()->agents.deliverBriefing(j.id(),j.token(),bad)).code);
+  var good=new BriefingContentService.Request(artifact,"甲店课程记录共7份","甲店的课程记录共7份，需要按产品分类跟进。",List.of("本次包含正式课与体验课的课程记录。","课程记录数量不代表会员人数。"),"DATA");
+  assertEquals("PREPARED",agents.deliverBriefing(j.id(),j.token(),good).get("status"));
+ }
 }
