@@ -1,10 +1,14 @@
 """One-time, hash-pinned cloud release. Run prepare, then activate; rollback preserves data."""
-import hashlib,json,os,pathlib,shutil,sqlite3,subprocess,sys,time,urllib.request,zipfile
+import hashlib,json,os,pathlib,shlex,shutil,sqlite3,subprocess,sys,time,urllib.request,urllib.parse,zipfile
 E=pathlib.Path('/var/lib/dreamcore/deploy-evidence/governance-first-20261016')
 S=E/'stage';A=pathlib.Path('/var/lib/dreamcore/app-check-20261010')
 W=pathlib.Path('/var/lib/dreamcore/wiki-20261015/dist/api');WEB=pathlib.Path('/var/www/dreamcore-app-check-20261010')
 N=pathlib.Path('/etc/nginx/sites-available/ai.9pop.top.conf');NODE='/opt/dreamcore/node-v24.20.0-linux-x64/bin/node'
 PG=['docker','exec','dreamcore-app-check-20261010','psql','-U','dreamcore_migration_check','-d','dreamcore_trial','-At','-v','ON_ERROR_STOP=1','-c']
+bridge_url=next(shlex.split(line.split('=',1)[1])[0] for line in (A/'api.env').read_text().splitlines() if line.startswith('MENGINE_PLATFORM_BRIDGE_URL='))
+bridge=urllib.parse.urlsplit(bridge_url)
+assert bridge.hostname in ['127.0.0.1','localhost','::1'],'Unexpected Wiki endpoint'
+WIKI_HEALTH=urllib.parse.urlunsplit((bridge.scheme,bridge.netloc,'/api/health','',''))
 def run(*args,**kw):return subprocess.run(args,check=True,**kw)
 def query(sql):return subprocess.check_output(PG+[sql],text=True).strip()
 def sha(p):return hashlib.sha256(pathlib.Path(p).read_bytes()).hexdigest()
@@ -102,7 +106,7 @@ def activate():
   dest=WEB/surface/'index.html';body=dest.read_text();assert 'data-governance-link' not in body
   link='<a data-governance-link href="/tenant-admin/governance/?surface='+('platform' if surface=='platform-admin' else 'tenant')+'" style="position:fixed;right:20px;bottom:18px;z-index:10000;padding:9px 16px;border:1px solid #bda77e;border-radius:20px;background:#fffaf0;color:#554426;font:14px system-ui;text-decoration:none">治理成果同步</a>'
   tmp=E/(surface+'-linked.html');tmp.write_text(body.replace('</body>',link+'</body>'));atomic(tmp,dest)
- run('systemctl','start','dreamcore-wiki.service');health('http://127.0.0.1:4400/api/health')
+ run('systemctl','start','dreamcore-wiki.service');health(WIKI_HEALTH)
  run('systemctl','start','dreamcore-app-rehearsal.service');health('http://127.0.0.1:18481/actuator/health')
  assert query("SELECT max(version::int) FROM flyway_schema_history WHERE success AND version IS NOT NULL")=='141'
  assert query('SELECT count(*) FROM flyway_schema_history WHERE NOT success')=='0'
@@ -117,7 +121,7 @@ def rollback():
  atomic(E/('api-rollback.jar' if applied else 'api-before.jar'),A/'release/api.jar')
  for name in ['platform-bridge.js','scene-knowledge.js']:atomic(E/(name+'.before'),W/name)
  for name in ['tenant-admin/index.html','platform-admin/index.html']:atomic(E/(name.replace('/','-')+'.before'),WEB/name)
- run('systemctl','start','dreamcore-wiki');health('http://127.0.0.1:4400/api/health')
+ run('systemctl','start','dreamcore-wiki');health(WIKI_HEALTH)
  run('systemctl','start','dreamcore-app-rehearsal');health('http://127.0.0.1:18481/actuator/health');open_entry()
  print('ROLLED_BACK; database writes preserved, old authorization behavior restored')
 assert os.geteuid()==0
