@@ -268,3 +268,21 @@
   .live-foundation .card.detail { min-height: 620px; }
   .live-foundation .side { overflow: visible; }
 }
+
+.live-foundation .live-dictionary-notices {
+  color: #72551f;
+  background: #f5eddc;
+  border-left: 3px solid #b28a45;
+  border-radius: 6px;
+  padding: 12px 16px;
+  margin: 16px 0;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.live-foundation .live-dictionary-notices h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+.live-foundation .live-dictionary-notices p {
+  margin: 8px 0 0;
+}

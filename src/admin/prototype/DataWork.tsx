@@ -3,6 +3,24 @@ import { api, ACTIONS, date, type Asset, type Detail, type Foundation } from './
 import { GATES } from './world';
 import './foundation-live.css';
 
+function dictionaryNotice(warning: string, fields: { name: string; label: string }[]) {
+  const match = warning.trim().match(/^(?:(.+?)\s*[:：]\s*)?(DEPLOYMENT_INFERRED|UNKNOWN|SOURCE_DOCUMENTED)$/);
+  if (match) {
+    const field = fields.find((item) => item.name === match[1]);
+    const label = field?.label || (field ? field.name : '该字段');
+    const message = {
+      DEPLOYMENT_INFERRED: '当前解释来自部署时的推断，尚待业务依据核实。用于分析前，请确认字段含义和使用范围。',
+      UNKNOWN: '当前缺少足够的字段解释依据。用于分析前，请补充业务含义和使用范围。',
+      SOURCE_DOCUMENTED: '字段解释已有来源依据，使用时请核对适用范围。',
+    }[match[2]];
+    return `${label}：${message}`;
+  }
+  // Unexpected machine codes stay out of user-facing copy; retain ordinary prose notices.
+  return /\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/.test(warning)
+    ? '部分字段口径仍需核实，请查看字段依据并联系数据维护人员确认。'
+    : warning;
+}
+
 export function DataWork({
   picked,
   pick,
@@ -582,6 +600,14 @@ export function DataWork({
                       <p>依据：{f.evidence || '—'}</p>
                     </details>
                   ))}
+                  {dict.warnings.length > 0 && (
+                    <section className="live-dictionary-notices" aria-label="字段口径提示">
+                      <h3>字段口径提示</h3>
+                      {dict.warnings.map((warning, index) => (
+                        <p key={index}>{dictionaryNotice(warning, dict.fields)}</p>
+                      ))}
+                    </section>
+                  )}
                   <h3>数据关联 · {dict.relations.length}</h3>
                   {dict.relations.map((r) => (
                     <div className="live-box" key={r.id}>
@@ -603,11 +629,6 @@ export function DataWork({
                         查看关联资产
                       </button>
                     </div>
-                  ))}
-                  {dict.warnings.map((w, i) => (
-                    <p className="live-error" key={i}>
-                      {w}
-                    </p>
                   ))}
                 </>
               )}
