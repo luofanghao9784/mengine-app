@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 // An HTTP 200 can be an SPA fallback. Require each real entry and its assets.
-for (const entry of ['workspace', 'tenant-admin', 'tenant-admin/prototype', 'tenant-admin/support', 'platform-admin']) {
+for (const entry of ['workspace', 'tenant-admin', 'tenant-admin/prototype', 'tenant-admin/governance', 'tenant-admin/support', 'platform-admin']) {
   const file = resolve('dist', entry, 'index.html');
   assert.ok(existsSync(file), `Missing production entry: ${entry}`);
   const html = readFileSync(file, 'utf8');

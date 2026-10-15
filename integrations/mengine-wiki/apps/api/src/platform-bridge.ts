@@ -6,6 +6,8 @@ import { digest } from './store.js';
 import { canUseAI } from './domain.js';
 import { readDataset } from './foundation-query.js';
 import { redactForGovernance } from './governance-ai.js';
+import { exportGovernance } from './platform-governance.js';
+import {dictionaryFingerprint} from './dictionary-version.js';
 
 // Operator-owned bindings. Browser requests never choose a source tenant or service identity.
 export function registerPlatformBridge(app: FastifyInstance, store: Store, secret: string) {
@@ -38,14 +40,15 @@ export function registerPlatformBridge(app: FastifyInstance, store: Store, secre
     const post=p.method==='POST'&&/^\/scene-(foundation(?:\/scan|\/[^/?]+\/actions)|knowledge\/sync)$/.test(p.path);
     if(p.method==='GET'&&p.path==='/scene-export'&&!p.actor.startsWith('customer:')){
       const assets=store.documents(u.tenantId).filter(d=>canUseCurrentData(store,u,d)).map(d=>{
-        const base={id:d.id,title:d.title,kind:d.kind,version:d.version,policyVersion:d.policyVersion,tags:d.tags,department:d.department,updatedAt:d.updatedAt};
+        const base={id:d.id,title:d.title,kind:d.kind,version:d.version,policyVersion:d.policyVersion,tags:d.tags,department:d.department,updatedAt:d.updatedAt,governance:exportGovernance(store,p.tenant,p.actor,u,d)};
         if(d.kind!=='数据表')return {...base,content:redactForGovernance(d.content)};
         const set=readDataset(store,u,d.id),fields=set.definition.fields.filter(f=>!f.sensitive);
         const rows=(store.db.prepare("SELECT data FROM data_rows WHERE tenant_id=? AND dataset_id=? AND status='ready' ORDER BY id").all(u.tenantId,d.id) as {data:string}[]).map(r=>{const v=JSON.parse(r.data).values;return fields.map(f=>redactForGovernance(String(v[f.name]??'')));});
-        return {...base,fields,dictionary:set.dictionaryStatus==='generated'?set.business:null,dictionaryStatus:set.dictionaryStatus,rows};
+        const dictionaryRow=store.db.prepare('SELECT data FROM data_dictionary WHERE dataset_id=? AND tenant_id=?').get(d.id,u.tenantId) as {data:string}|undefined;
+        return {...base,fields,dictionary:set.dictionaryStatus==='generated'?set.business:null,dictionaryStatus:set.dictionaryStatus,dictionaryRevision:dictionaryRow?JSON.parse(dictionaryRow.data).revision:0,dictionaryFingerprint:dictionaryFingerprint(store,u.tenantId,set.definition),rows};
       });
       const revision=digest(JSON.stringify(assets));
-      return {contractVersion:'1.0',tenantId:p.tenant,revision,assets};
+      return {contractVersion:'1.1',tenantId:p.tenant,revision,assets};
     }
     const access=(p.method==='GET'&&/^\/scene-access(?:\/audit)?$/.test(p.path)) || (p.method==='POST'&&/^\/scene-access\/(?:policy|departments|members\/[^/?]+|proposals\/[^/?]+\/(?:resolve|withdraw)|resources\/[^/?]+\/inspect)$/.test(p.path));
     if(!get&&!post&&!access)return reply.code(404).send({message:'接口未开放'});

@@ -32,6 +32,8 @@ export function registerSceneKnowledge(
   };
   const card = (k: any) => ({
     id: k.id,
+    sourceId: k.sourceId,
+    sourceVersion: k.sourceVersion,
     group: k.department,
     name: k.title,
     why: k.intro,
