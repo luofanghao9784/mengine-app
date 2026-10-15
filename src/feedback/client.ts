@@ -87,7 +87,7 @@ export const isFeedback = (v: unknown): v is Feedback =>
   isAssessment(v.assessment, v.target.kind) &&
   record(v.snapshot) &&
   str(v.snapshot.taskState, 32) &&
-  one(v.snapshot.executionClass, ['live', 'verification', 'none']) &&
+  one(v.snapshot.executionClass, ['live', 'verification', 'external', 'none']) &&
   typeof v.snapshot.contentSha256 === 'string' &&
   /^[0-9a-f]{64}$/.test(v.snapshot.contentSha256) &&
   n(v.snapshot.sourceVersionCount) &&
@@ -106,7 +106,7 @@ export const isAction = (v: unknown): v is FeedbackAction =>
   (v.targetRevision === null || n(v.targetRevision)) &&
   (v.conversationId === null || uuid(v.conversationId)) &&
   str(v.acceptedState, 32) &&
-  one(v.executionClass, ['live', 'verification', 'none']) &&
+  one(v.executionClass, ['live', 'verification', 'external', 'none']) &&
   date(v.createdAt) &&
   (v.kind === 'PREFERENCE'
     ? v.status === 'APPLIED' &&

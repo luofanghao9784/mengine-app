@@ -114,7 +114,7 @@ const task = (v: unknown): v is ConversationTask =>
   (v.mode === 'AGENT' || (!v.publicQuery && v.webSources.length === 0 && v.skills.length === 0)) &&
   nullable(v.reply) &&
   nullable(v.modelName) &&
-  (v.executionClass === null || ['live', 'verification'].includes(String(v.executionClass))) &&
+  (v.executionClass === null || ['live', 'verification', 'external'].includes(String(v.executionClass))) &&
   (v.mode === 'SOURCE_LOOKUP'
     ? v.executionClass === null
     : v.executionClass !== null ||
@@ -332,7 +332,7 @@ export function createConversationClient(fetcher: typeof fetch = fetch) {
               nullable(a.reconciliationCode) &&
               nullable(a.startedAt) &&
               nullable(a.finishedAt) &&
-              ['RECORDED', 'LEGACY_CURRENT_ONLY'].includes(String(a.provenance)) &&
+              ['RECORDED', 'LEGACY_CURRENT_ONLY', 'EXTERNAL_DEPLOYMENT'].includes(String(a.provenance)) &&
               Array.isArray(a.tools) &&
               a.tools.length <= 8 &&
               a.tools.every(

@@ -20,7 +20,7 @@ export interface BriefingCard {
   excerpt: string;
   truncated: boolean;
   completedAt: string;
-  executionClass: 'verification' | 'live';
+  executionClass: 'verification' | 'live' | 'external';
   engineVersion: string;
   artifactCount: number;
   citationCount: number;

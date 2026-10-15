@@ -597,3 +597,7 @@ npm run test:contracts
 ## 2026-10-12 PPT 真实模型验收
 
 使用既有网关完成 4/6/8 页隔离链路，修复成果已交付却标记 PARTIAL，并增加显式验收脚本。4/6 页样本内容通过；8 页客户单位仍待复核，整体质量未全通过，未部署。命令、证据与下一步见 [验收记录](docs/交接/PPT真实模型验收-2026-10-12.md)。
+
+### Codex 首轮画报部署
+
+首轮画报可由宿主机 `java -jar api.jar --bootstrap-briefings` 完成，先预览可信计算，再提交分析正文；`BRIEFING_BOOTSTRAP_PREVIEW` 默认开启。它不启动 HTTP 服务，不伪造服务器模型用量。9POP 八项固定业务链统计由 `NINEPOP_CHAIN_EXPORT_ENABLED=true` 启用，来源仍经过既有权限投影。清单格式、维护接续与回退见 [技术说明](docs/技术/Codex首轮画报与业务链统计.md)。

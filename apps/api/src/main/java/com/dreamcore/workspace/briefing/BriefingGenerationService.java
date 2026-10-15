@@ -141,7 +141,7 @@ public class BriefingGenerationService {
     private int successfulCards(UUID actor,UUID tenant,Instant since,boolean manual){
         return db.queryForObject("""
             SELECT count(*) FROM briefing_generation_batches b JOIN conversation_tasks t ON t.id=b.task_id
-            WHERE b.tenant_id=? AND b.owner_id=? AND b.started_at>=? AND t.status='SUCCEEDED'
+            WHERE b.tenant_id=? AND b.owner_id=? AND b.started_at>=? AND t.status='SUCCEEDED' AND t.execution_class<>'external'
             AND %s=?
             AND EXISTS(SELECT 1 FROM conversation_artifacts a WHERE a.task_id=t.id AND a.attempt_number=t.attempt
                 AND EXISTS(SELECT 1 FROM identity_audit p WHERE p.target_id=a.id AND p.tenant_id=a.tenant_id AND p.action='TASK_BRIEFING_CREATED' AND p.outcome='SUCCESS'))
@@ -274,7 +274,11 @@ public class BriefingGenerationService {
             if(!dailyEnabled||!Boolean.TRUE.equals(enrollment.getFirst().get("enabled"))||!actor.equals(db.queryForObject("SELECT owner_id FROM tenant_governance WHERE tenant_id=?",UUID.class,tenant))){finish((UUID)batch.get("id"),"AUTHORITY_REVOKED","SCHEDULE_AUTHORITY_CHANGED");return;}
             if(instant(batch,"created_at").plusSeconds(900).isBefore(now)){finish((UUID)batch.get("id"),"FAILED","GENERATION_DEADLINE_EXCEEDED");return;}
         }
-        List<Source> sources=enrolled?sources(actor,tenant,space):authorizedSources(actor,tenant);String contextKey=contextKey(actor,tenant,space);
+        List<Source> sources=enrolled?sources(actor,tenant,space):authorizedSources(actor,tenant);
+        var bootstrapKeys=db.queryForList("SELECT dataset_key FROM briefing_bootstrap_scopes WHERE policy_id=?",String.class,id);
+        boolean bootstrapScoped=!bootstrapKeys.isEmpty();
+        if(bootstrapScoped)sources=sources.stream().filter(source->source.dataset()&&bootstrapKeys.contains(db.queryForObject("SELECT dataset_key FROM business_datasets WHERE id=?",String.class,source.materialId()))).toList();
+        String contextKey=contextKey(actor,tenant,space);
         var contentKeys=new HashMap<UUID,String>();
         for(var source:sources)contentKeys.put(source.materialId(),sourceContentKey(source));
         // A fresh collection receipt is not a business change. Keep exact snapshots for execution,
@@ -310,7 +314,7 @@ public class BriefingGenerationService {
                 boolean result=unseen.stream().anyMatch(source->!source.dataset()&&completedPublication(source.versionId()));
                 enqueue(id,p.get("data_key")==null?"INITIALIZATION":goalChanged?"CONTEXT_CHANGED":result?"RESULT_READY":"DATA_READY",goalChanged?"SUGGESTION":result?"RESULT":null,null);
             }
-            else if(newsCapability(tenant).available()&&!newsSource.isBlank()&&agents.publicWebEnabled()&&(now.atZone(ZoneId.of("Asia/Shanghai")).getHour()>=9) && (p.get("info_day")==null||!((java.sql.Date)p.get("info_day")).toLocalDate().equals(now.atZone(ZoneId.of("Asia/Shanghai")).toLocalDate()))){
+            else if(!bootstrapScoped&&newsCapability(tenant).available()&&!newsSource.isBlank()&&agents.publicWebEnabled()&&(now.atZone(ZoneId.of("Asia/Shanghai")).getHour()>=9) && (p.get("info_day")==null||!((java.sql.Date)p.get("info_day")).toLocalDate().equals(now.atZone(ZoneId.of("Asia/Shanghai")).toLocalDate()))){
                 var date=now.atZone(ZoneId.of("Asia/Shanghai")).toLocalDate();
                 boolean exists=db.queryForObject("SELECT EXISTS(SELECT 1 FROM briefing_generation_batches WHERE policy_id=? AND business_type='INFO' AND scheduled_for=?)",Boolean.class,id,time(date.atTime(9,0).atZone(ZoneId.of("Asia/Shanghai")).toInstant()));
                 if(exists)return;enqueue(id,p.get("info_day")==null?"INITIALIZATION":"SCHEDULE","INFO",date.atTime(9,0).atZone(ZoneId.of("Asia/Shanghai")).toInstant());
@@ -339,12 +343,13 @@ public class BriefingGenerationService {
         int executionLimit=manualBatch?dailyLimit:Math.max(1,Math.min(24,automaticDailyLimit));
         int used=successfulCards(actor,tenant,manualBatch?ownerSince:day,manualBatch);
         int concurrent=db.queryForObject("SELECT count(*) FROM briefing_generation_batches b JOIN conversation_tasks t ON t.id=b.task_id WHERE b.tenant_id=? AND b.owner_id=? AND t.status IN ('QUEUED','RUNNING')",Integer.class,tenant,actor);
-        int tenantUsed=db.queryForObject("SELECT count(*) FROM briefing_generation_batches WHERE tenant_id=? AND started_at>=?",Integer.class,tenant,time(day));
+        int tenantUsed=db.queryForObject("SELECT count(*) FROM briefing_generation_batches b JOIN conversation_tasks t ON t.id=b.task_id WHERE b.tenant_id=? AND b.started_at>=? AND t.execution_class<>'external'",Integer.class,tenant,time(day));
         int tenantConcurrent=db.queryForObject("SELECT count(*) FROM briefing_generation_batches b JOIN conversation_tasks t ON t.id=b.task_id WHERE b.tenant_id=? AND t.status IN ('QUEUED','RUNNING')",Integer.class,tenant);
         if(used+categoryExecuting>=executionLimit||concurrent>=5||tenantUsed>=48||tenantConcurrent>=20){waiting(batch,"WAITING_RESOURCE",used+categoryExecuting>=executionLimit?(manualBatch?"DAILY_RUN_LIMIT":"AUTOMATIC_DAILY_LIMIT"):tenantUsed>=48?"TENANT_DAILY_LIMIT":tenantConcurrent>=20?"TENANT_CONCURRENCY_LIMIT":"OWNER_CONCURRENCY_LIMIT");return;}
         // One complete topic per batch. Explicit bounded source selection is visible to the model and reader.
         var order=Comparator.comparing(Source::changedAt,Comparator.reverseOrder()).thenComparing(Source::filename);
         List<Source> selected=selectSources((info||unseen.isEmpty()?sources:unseen).stream().filter(s->Set.of("READY","PARTIAL").contains(s.parseStatus())).filter(s->!"RESULT".equals(type)||!s.dataset()&&completedPublication(s.versionId())).sorted(order).toList(),space);
+        if(bootstrapScoped)selected=selected.stream().limit(1).toList();
         // An unchanged current workbook can ground a new topic; consumption is not a ban on reuse.
         // Keep two unseen documents, the authorized source pool and the three-version bound.
         if((type==null||"DATA".equals(type))&&selected.stream().noneMatch(this::workbook)){
@@ -445,6 +450,16 @@ public class BriefingGenerationService {
         var data=db.queryForMap("SELECT d.name,d.column_names,d.field_definitions,d.description,s.data_rows FROM business_datasets d JOIN dataset_snapshots s ON s.id=? WHERE d.id=?",source.versionId(),source.materialId());
         var rows=new ArrayList<String>();json.readTree(data.get("data_rows").toString()).forEach(row->rows.add(row.toString()));Collections.sort(rows);
         return IdentityService.hash(json.writeValueAsString(List.of(data.get("name").toString(),data.get("column_names").toString(),data.get("field_definitions").toString(),data.get("description").toString(),rows)));
+    }
+    /** Called only by the host deployment service after its ordinary source authorization. */
+    public void seedBootstrapBaseline(UUID policy,UUID batch,UUID dataset,UUID snapshot,boolean maintain){
+        var row=db.queryForMap("SELECT d.name,d.workspace_id,d.dataset_key,s.collected_at FROM business_datasets d JOIN dataset_snapshots s ON s.dataset_id=d.id WHERE d.id=? AND s.id=?",dataset,snapshot);
+        var source=new Source(dataset,snapshot,(String)row.get("name"),"READY",((Timestamp)row.get("collected_at")).toInstant(),"DATASET",(UUID)row.get("workspace_id"));
+        db.update("UPDATE briefing_generation_batches SET source_versions=?::jsonb WHERE id=?",json.writeValueAsString(List.of(selection(source,sourceContentKey(source)))),batch);
+        if(maintain){
+            db.update("INSERT INTO briefing_bootstrap_scopes(policy_id,dataset_key) VALUES (?,?) ON CONFLICT DO NOTHING",policy,row.get("dataset_key"));
+            db.update("UPDATE briefing_generation_policies SET enabled=true,reason='BOOTSTRAP_HANDOFF',revision=revision+1 WHERE id=?",policy);
+        }
     }
     private boolean workbook(Source source){return source.filename().toLowerCase(Locale.ROOT).endsWith(".xlsx");}
     private String contextKey(UUID actor,UUID tenant,UUID space){

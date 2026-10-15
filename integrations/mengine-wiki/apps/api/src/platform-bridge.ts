@@ -1,3 +1,4 @@
+import {ninepopBusinessChains} from './ninepop-business-chains.js';
 import {deploymentContext,importDeployment} from './deployment-governance.js';
 import {canUseCurrentData} from './data-availability.js';
 import { createHmac, randomUUID, randomBytes, timingSafeEqual } from 'node:crypto';
@@ -62,6 +63,7 @@ export function registerPlatformBridge(app: FastifyInstance, store: Store, secre
         const rows=(store.db.prepare("SELECT data FROM data_rows WHERE tenant_id=? AND dataset_id=? AND status='ready' ORDER BY id").all(u.tenantId,d.id) as {data:string}[]).map(r=>{const raw=JSON.parse(r.data),v=raw.values;return fields.map(f=>raw.sourceNullFields?.includes(f.name)?null:redactForGovernance(String(v[f.name]??'')));});
         return {...base,fields,analysisPolicy:set.analysisPolicy,fieldEvidence:set.fieldEvidence,dictionary:set.dictionaryStatus==='generated'?set.business:null,dictionaryStatus:set.dictionaryStatus,rows};
       }).filter(Boolean);
+      if(process.env.NINEPOP_CHAIN_EXPORT_ENABLED==='true')assets.push(...ninepopBusinessChains(assets as any));
       const revision=digest(JSON.stringify(assets));
       return {contractVersion:'1.0',tenantId:p.tenant,revision,assets};
     }
