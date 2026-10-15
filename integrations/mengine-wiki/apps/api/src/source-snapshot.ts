@@ -13,7 +13,7 @@ export function validateSnapshot(result:any,tenant:string){
  const seen=new Set<string>();let cells=0;
  for(const t of result.tables as SourceTable[]){
   if(!t||t.access!==undefined&&t.access!=='owner-only'||typeof t.name!=='string'||!/^[_a-zA-Z0-9]{1,100}$/.test(t.name)||seen.has(t.name)||typeof t.comment!=='string'||!Array.isArray(t.columns)||!t.columns.length||t.columns.length>limits.columns)throw fail();seen.add(t.name);
-  const names=new Set<string>();for(const c of t.columns){if(!c||typeof c.name!=='string'||names.has(c.name)||typeof c.type!=='string'||typeof c.nullable!=='boolean'||typeof c.primary!=='boolean'||typeof c.comment!=='string')throw fail();names.add(c.name);}
+  const names=new Set<string>();for(const c of t.columns){if(!c||c.allowEmpty!==undefined&&typeof c.allowEmpty!=='boolean'||typeof c.name!=='string'||names.has(c.name)||typeof c.type!=='string'||typeof c.nullable!=='boolean'||typeof c.primary!=='boolean'||typeof c.comment!=='string')throw fail();names.add(c.name);}
   const rows=result.rows[t.name];if(!Array.isArray(rows)||rows.length>limits.rows)throw fail();cells+=rows.length*names.size;if(cells>limits.cells)throw fail();
   for(const row of rows)if(!row||typeof row!=='object'||Array.isArray(row)||Object.keys(row).length!==names.size||Object.entries(row).some(([k,v])=>!names.has(k)||(v!==null&&typeof v!=='string')))throw fail();
   if(paged){

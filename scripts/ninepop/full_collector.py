@@ -27,6 +27,7 @@ def projections(value,tenant):
         n=t.get('name','');cols=t.get('columns',[])
         if t.get('access') not in (None,'owner-only'):raise ValueError('Unsupported access policy')
         if not IDENTIFIER.fullmatch(n) or n in seen or not 1<=len(cols)<=100 or len(set(cols))!=len(cols) or any(not isinstance(c,str) or not IDENTIFIER.fullmatch(c) for c in cols):raise ValueError('Invalid fixed projection')
+        if any(c not in cols for c in t.get('allowEmptyColumns',[])):raise ValueError('Unknown empty-string policy column')
         seen.add(n)
     return tables
 
@@ -86,7 +87,7 @@ def assemble(config,tables,items):
             if i%PAGE_SIZE==0:page_counts.append(0)
             page_counts[-1]+=1
         rows[n]=output
-        definitions.append({**({'access':'owner-only'} if t.get('access')=='owner-only' else {}),'name':n,'comment':t.get('description','9POP获准固定投影；全历史只读一致性取数；保留源单位与状态'),'columns':[{'name':c,'type':p['schema'][c]['type'],'nullable':p['schema'][c]['nullable']=='YES','primary':c in p['pk'],'comment':p['schema'][c]['comment']} for c in t['columns']]})
+        definitions.append({**({'access':'owner-only'} if t.get('access')=='owner-only' else {}),'name':n,'comment':t.get('description','9POP获准固定投影；全历史只读一致性取数；保留源单位与状态'),'columns':[{**({'allowEmpty':True} if c in t.get('allowEmptyColumns',[]) else {}),'name':c,'type':p['schema'][c]['type'],'nullable':p['schema'][c]['nullable']=='YES','primary':c in p['pk'],'comment':p['schema'][c]['comment']} for c in t['columns']]})
         proofs[n]={'snapshotId':sid,'expectedRows':p['count'],'pageSize':PAGE_SIZE,'pageCounts':page_counts,'primaryKey':p['pk'],'sha256':hashlib.sha256(json.dumps(output,ensure_ascii=False,separators=(',',':')).encode()).hexdigest()}
     return {'contractVersion':'2.0','tenantId':config['tenantId'],'snapshot':{'id':sid,'readOnly':True,'isolation':'REPEATABLE READ','readAt':items[0]['readAt'],'timeZone':'Asia/Shanghai','coverageThrough':None},'tables':definitions,'rows':rows,'proofs':proofs}
 

@@ -20,5 +20,7 @@ def field(t,source_name,target_name):
  else:meaning='源字段 '+source_name+'；类型及空值约束已核对，具体业务解释尚待核实，不能据此作经营判断。';status='UNKNOWN'
  if source_name in special and t in special[source_name]:meaning=special[source_name][t]
  unit='分（保留源 *_cents 整数单位）' if source_name.endswith('_cents') else '基点（待源规则逐项确认）' if source_name.endswith('_bps') else ''
+ if t=='course_products' and source_name=='payment_methods':
+  status='SOURCE_DOCUMENTED';meaning='支付方案原值。体验课校验明确写入空字符串；体验官系统权益也使用空字符串。正式课解析旧空值时使用全款默认规则。保持原值，合法空字符串与SQL NULL分开。';evidence='9POP 7c1d1788 CourseProductRules.java:174-183、splitPaymentMethods；V94__m20_course_experience_officer.sql:72-88'
  label=labels.get(source_name,source_name)
  return {'name':target_name,'label':label,'meaning':meaning,'unit':unit,'rules':'NULL 不补零；状态保留原值；事实范围为源库现存全历史。'+('此字段含义未确认，禁止推导经营结论。' if status=='UNKNOWN' else ''),'evidence':evidence},{'column':target_name,'status':status,'reference':evidence}

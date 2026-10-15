@@ -16,6 +16,9 @@ class CompleteSource(unittest.TestCase):
  def test_projection_tenant_and_sql_rejection(self):
   for x in [{'tenantId':'other','contractVersion':'1.0','tables':T},{'tenantId':'s','contractVersion':'1.0','tables':[{'name':'x;DROP','columns':['id']}]}]:
    with self.assertRaises(ValueError):m.projections(x,'s')
+ def test_explicit_empty_policy_preserves_null_and_schema(self):
+  t=[{**T[0],'allowEmptyColumns':['amount']}];d=m.assemble({'tenantId':'s'},t,items(1));self.assertTrue(d['tables'][0]['columns'][1]['allowEmpty']);self.assertIsNone(d['rows']['facts'][0]['amount'])
+  with self.assertRaises(ValueError):m.projections({'tenantId':'s','contractVersion':'1.0','tables':[{**T[0],'allowEmptyColumns':['outside']}]},'s')
  def test_empty_and_readonly(self):
   self.assertEqual(m.assemble({'tenantId':'s'},T,items(0))['proofs']['facts']['pageCounts'],[])
   x=items(1);x[0]['readOnly']=0

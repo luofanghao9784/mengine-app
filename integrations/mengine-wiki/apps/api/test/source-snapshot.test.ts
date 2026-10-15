@@ -54,3 +54,12 @@ test('deployment accepts complete high-degree table relationships while retainin
  assert.doesNotThrow(()=>validateSemanticsShape({relations:Array.from({length:11},(_,i)=>relation(i)),templates:[]}));
  assert.throws(()=>validateSemanticsShape({relations:Array.from({length:17},(_,i)=>relation(i)),templates:[]}));
 });
+
+test('declared empty text is valid while SQL NULL remains distinct and required',async()=>{
+ const {recordChecks}=await import('../src/structured-governance.js');
+ const fields:any[]=[{name:'payment_methods',label:'支付方案',type:'text',required:true,unique:false,sensitive:false,description:'体验课为空',allowEmpty:true}];
+ const row:any={id:'r',values:{payment_methods:''},issues:[],status:'ready',version:1,updatedAt:'',actor:''};
+ assert.equal(recordChecks(fields,[row])[0].issues.length,0);
+ assert.equal(recordChecks(fields,[{...row,sourceNullFields:['payment_methods']}])[0].issues.length,1);
+ assert.equal(recordChecks([{...fields[0],allowEmpty:false}],[row])[0].issues.length,1);
+});

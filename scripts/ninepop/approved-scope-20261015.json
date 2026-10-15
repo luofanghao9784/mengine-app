@@ -117,7 +117,10 @@
       "description": "9POP 课程产品与销售规则；仅获准业务字段；全部门店及源库现存历史；金额保留源单位",
       "phase": 1,
       "classification": "A",
-      "module": "02"
+      "module": "02",
+      "allowEmptyColumns": [
+        "payment_methods"
+      ]
     },
     {
       "name": "course_product_versions",

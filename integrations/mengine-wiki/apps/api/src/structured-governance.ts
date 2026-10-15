@@ -8,12 +8,12 @@ function readDataset(s:Store,u:User,id:string){const document=s.doc(u.tenantId,i
 import {validateSemantics,type Semantics} from './business-queries.js';
 import type {Field} from './foundation.js';
 const fail=(statusCode:number,message:string)=>Object.assign(Error(message),{statusCode});
-type RecordRow={id:string;version:number;values:Record<string,string>;issues:string[];status:string;updatedAt:string;actor:string};
+type RecordRow={sourceNullFields?:string[];id:string;version:number;values:Record<string,string>;issues:string[];status:string;updatedAt:string;actor:string};
 type Finding={id:string;datasetId:string;targetId?:string;kind:string;title:string;detail:string;field?:string;count:number;status:'open'|'handling'|'resolved';firstAt:string;lastAt:string;resolvedAt?:string;manualApproval?:string;checkedFingerprint?:string;history:{at:string;actor:string;action:string;note:string}[]};
 function records(s:Store,t:string,id:string){return (s.db.prepare('SELECT data FROM data_rows WHERE tenant_id=? AND dataset_id=?').all(t,id) as {data:string}[]).map(r=>JSON.parse(r.data) as RecordRow);}
 export function recordChecks(fields:Field[],rows:RecordRow[]){
  const counts=new Map<string,Map<string,number>>();for(const f of fields.filter(f=>f.unique)){const m=new Map<string,number>();for(const r of rows){const v=r.values[f.name];if(v)m.set(v,(m.get(v)||0)+1);}counts.set(f.name,m);}
- return rows.map(r=>({row:r,issues:fields.flatMap(f=>{const v=r.values[f.name]||'';let msg='';if(!v)msg=f.required?'必填值缺失':'';else if(f.type==='number'&&!/^-?\d{1,15}(\.\d{1,6})?$/.test(v))msg='数值格式无效';else if(f.type==='date'&&(!/^\d{4}-\d{2}-\d{2}$/.test(v)||!Number.isFinite(Date.parse(v))||new Date(v).toISOString().slice(0,10)!==v))msg='日期格式无效';else if(f.type==='boolean'&&!['true','false'].includes(v))msg='布尔值无效';else if(f.unique&&(counts.get(f.name)?.get(v)||0)>1)msg='唯一值重复';return msg?[{field:f.name,message:`${f.label}：${msg}`}]:[];})}));
+ return rows.map(r=>({row:r,issues:fields.flatMap(f=>{const v=r.values[f.name]||'';let msg='';if(!v)msg=f.required&&(!f.allowEmpty||r.sourceNullFields?.includes(f.name))?'必填值缺失':'';else if(f.type==='number'&&!/^-?\d{1,15}(\.\d{1,6})?$/.test(v))msg='数值格式无效';else if(f.type==='date'&&(!/^\d{4}-\d{2}-\d{2}$/.test(v)||!Number.isFinite(Date.parse(v))||new Date(v).toISOString().slice(0,10)!==v))msg='日期格式无效';else if(f.type==='boolean'&&!['true','false'].includes(v))msg='布尔值无效';else if(f.unique&&(counts.get(f.name)?.get(v)||0)>1)msg='唯一值重复';return msg?[{field:f.name,message:`${f.label}：${msg}`}]:[];})}));
 }
 export function contradictoryFilters(filters:{field:string;operator:string;value:string}[],fields:Field[]){
  for(const f of fields){const rules=filters.filter(x=>x.field===f.name&&!x.value.startsWith('$'));const equals=rules.filter(x=>x.operator==='eq');

@@ -5,7 +5,7 @@ import mysql from 'mysql2/promise';
 import {realpathSync} from 'node:fs';
 import {resolve,basename,sep} from 'node:path';
 export type ConnectionConfig={kind:'sqlite'|'postgres'|'mysql'|'deployed';provider?:string;name:string;host?:string;port?:number;database?:string;username?:string;password?:string;schema?:string;file?:string;ca?:string};
-export type SourceColumn={name:string;type:string;nullable:boolean;primary:boolean;comment:string};
+export type SourceColumn={allowEmpty?:boolean;name:string;type:string;nullable:boolean;primary:boolean;comment:string};
 export type SourceTable={access?:'owner-only';name:string;comment:string;columns:SourceColumn[]};
 const fail=(message:string)=>Object.assign(Error(message),{statusCode:400});
 export function validateConnection(input:unknown):ConnectionConfig{
