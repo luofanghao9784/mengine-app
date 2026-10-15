@@ -94,6 +94,7 @@ def activate():
  run('tar','-tzf',str(E/'private-files-cutover.tar.gz'),stdout=subprocess.DEVNULL)
  with sqlite3.connect('file:/var/lib/dreamcore/wiki-data/mengine.db?mode=ro',uri=True) as src,sqlite3.connect(E/'wiki-cutover.db') as dest:
   src.backup(dest);assert dest.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
+ src.close();dest.execute('PRAGMA wal_checkpoint(TRUNCATE)');dest.execute('PRAGMA journal_mode=DELETE');dest.close()  # Hash a standalone backup, not transient WAL files.
  for service in ['dreamcore-app-rehearsal','dreamcore-wiki','dreamcore-model-engine']:
   (E/(service+'.unit')).write_bytes(subprocess.check_output(['systemctl','cat',service]))
  backup_manifest()
