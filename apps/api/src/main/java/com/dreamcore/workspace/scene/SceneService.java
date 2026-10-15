@@ -71,7 +71,12 @@ public class SceneService {
      for(var e:a.path("fieldEvidence"))if(e.path("column").asText().equals(name)){certainty=e.path("status").asText("UNKNOWN");evidence=e.path("reference").asText(evidence);}
      fields.add(new DatasetField(name,trim(f.path("type").asText("text"),40),trim(description.isBlank()?name:description,300),trim(meaning.path("unit").asText(""),40),trim(evidence,300),certainty));
     }
-    var meta=metadata(a);UUID target=id(tenant+":"+a.path("id").asText()+":"+IdentityService.hash(meta.toString()));
+    var meta=metadata(a);
+    // Keep the active identity across data-only refreshes; a policy/schema change creates a new one.
+    String scope=db.queryForObject("SELECT scene_table_scope(?::jsonb)::text",String.class,meta.toString());
+    var existing=db.queryForList("SELECT d.id,d.field_definitions FROM scene_asset_links l JOIN business_datasets d ON d.id=l.target_id WHERE l.tenant_id=? AND l.source_id=? AND l.kind='TABLE' AND l.active AND d.status='ACTIVE' AND NOT d.scrubbed AND d.connection_id=? AND d.workspace_id=? AND scene_table_scope(l.metadata)=?::jsonb",tenant,a.path("id").asText(),connection,workspace,scope);
+    UUID target=existing.isEmpty()?id(tenant+":"+a.path("id").asText()+":"+IdentityService.hash(scope)):(UUID)existing.getFirst().get("id");
+    if(!existing.isEmpty()) {fields.clear();for(var f:JSON.readTree(existing.getFirst().get("field_definitions").toString()))fields.add(JSON.treeToValue(f,DatasetField.class));}
     sets.add(new CollectionDeployment.Dataset(target,workspace,trim(a.path("id").asText(),160),trim(a.path("title").asText(),160),trim("标签："+a.path("tags")+"；"+a.path("dictionary").path("tableMeaning").asText(""),1000),columns,fields));
    }
    boolean tablesChanged=!new HashSet<>(db.queryForList("SELECT target_id FROM scene_asset_links WHERE tenant_id=? AND kind='TABLE' AND active",UUID.class,tenant)).equals(new HashSet<>(sets.stream().map(CollectionDeployment.Dataset::id).toList()));

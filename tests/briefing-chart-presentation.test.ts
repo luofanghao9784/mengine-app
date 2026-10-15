@@ -102,3 +102,11 @@ test('platform display labels translate graphics only and preserve raw evidence 
  const before=JSON.stringify(doc);const view=toMagazineChart(doc)!;
  assert.deepEqual(view.columns,['财务已确认','已取消']);assert.deepEqual(view.rows.map(r=>r.label),['开课中','unknown']);assert.equal(JSON.stringify(doc),before);assert.equal(doc.content.chart!.rows[0].group,'active');
 });
+
+
+test('business labels supply units and coverage without rewriting calculation evidence',()=>{
+ const doc=structuredClone(document);doc.content.chart!.unit='原数据数值单位';doc.content.chart!.range='全部快照 · 16 行';
+ doc.chartLabels={groups:{},columns:{},unit:'份',range:'数据截至 2026年10月15日 21:00'};
+ const before=JSON.stringify(doc),view=toMagazineChart(doc)!;
+ assert.equal(view.unit,'份');assert.equal(view.period,'数据截至 2026年10月15日 21:00');assert.equal(JSON.stringify(doc),before);
+});

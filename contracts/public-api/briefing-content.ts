@@ -23,7 +23,7 @@ export interface BriefingPresentation {
   }[];
 }
 export interface BriefingDocument {
-  chartLabels?: { groups: Record<string,string>; columns: Record<string,string> } | null;
+  chartLabels?: { groups: Record<string,string>; columns: Record<string,string>; unit?: string | null; range?: string | null } | null;
   cover?: { dataUrl: string; sourceUrl: string; sourceTitle: string } | null;
   artifactId: string;
   sha256: string;

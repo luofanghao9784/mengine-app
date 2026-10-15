@@ -61,6 +61,7 @@ export interface AgentConfiguration {
   platformBaseUrl: string;
   executionClass: 'live' | 'verification';
   modelName: string;
+  briefingUsePrimary?: boolean;
   routineModel?: { modelName: string; createModel(): import('./metered-model.js').UsageModel };
   createModel(): import('./metered-model.js').UsageModel;
   /** Only the local verification fixture supplies a sandbox; live code remains disabled. */
@@ -427,7 +428,7 @@ export class AgentTasks {
         publicResearch: !!publicQuery, plan: !!planAllowed,
         presentation: !!presentationWorkflow && presentationWorkflow.state !== 'NONE',
         sandbox: !!this.config.sandbox || !!candidatesAllowed,
-        briefing: !!briefingGeneration, briefingType: briefingRequestedType ?? '',
+        briefingUsePrimary: this.config.briefingUsePrimary, briefing: !!briefingGeneration, briefingType: briefingRequestedType ?? '',
       }) ? this.config.routineModel ?? this.config : this.config;
       const backend = selectedModel.createModel();
       const metered = meteredModel(backend, (action, body, receipt) =>

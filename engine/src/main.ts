@@ -45,6 +45,7 @@ const agent = model
       executionClass: 'live',
       modelName: model.modelName,
       routineModel: model.routineModel,
+      briefingUsePrimary: process.env.AGENT_BRIEFING_USE_PRIMARY_MODEL === 'true',
       publicWeb,
       presentationRenderer,
       createModel: model.createModel,

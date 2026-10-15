@@ -508,7 +508,7 @@ function Card({
                 : undefined
             }
             verification={card.executionClass === 'verification' && !card.engineVersion.startsWith('codex-demo-import-')}
-            footer={card.executionClass === 'external' ? <span>Codex 首轮生成</span> : card.artifactCount > 0 ? <span>{card.artifactCount} 份成果</span> : undefined}
+            footer={card.executionClass === 'external' ? undefined : card.artifactCount > 0 ? <span>{card.artifactCount} 份成果</span> : undefined}
           />
         </button>
         <SubmitError error={submission.error} uncertain={submission.uncertain} />

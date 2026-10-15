@@ -68,6 +68,10 @@ class SceneBridgeIntegrationTest extends CompanyAnalysisFixture {
   var withTable=db.queryForList("SELECT source_id,target_id,revision FROM scene_asset_links WHERE tenant_id=? ORDER BY source_id",tenant);
   scenes.synchronize(admin,tenant,false);
   assertEquals(withTable,db.queryForList("SELECT source_id,target_id,revision FROM scene_asset_links WHERE tenant_id=? ORDER BY source_id",tenant));
+  input.write("{\"operation\":\"refresh\"}");input.newLine();input.flush();assertEquals("refreshed",output.readLine());
+  scenes.synchronize(admin,tenant,false);
+  assertEquals(dataset.get("target_id"),db.queryForObject("SELECT target_id FROM scene_asset_links WHERE tenant_id=? AND kind='TABLE' AND active",UUID.class,tenant));
+  assertEquals(List.of(List.of("24")),adapter.collect(request).snapshots().getFirst().rows());
   db.update("UPDATE tenant_memberships SET status='DISABLED' WHERE tenant_id=? AND account_id=?",tenant,reader);
   assertEquals(403,assertThrows(IdentityException.class,()->scenes.dispatch(reader,tenant,false,"GET","/scene-access",null)).status);
  }

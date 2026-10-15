@@ -1,5 +1,5 @@
 /** Disposable synthetic bridge fixture. No .env, production data or model access. */
-import { seedDataset } from '../../integrations/mengine-wiki/apps/api/test/helpers/structured-fixture.js';
+import { seedDataset, seedRows } from '../../integrations/mengine-wiki/apps/api/test/helpers/structured-fixture.js';
 import { buildServer } from '../../integrations/mengine-wiki/apps/api/src/server.js';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -15,10 +15,17 @@ const c = await buildServer({
 await c.app.listen({ port: 0, host: '127.0.0.1' });
 console.log(JSON.stringify({ port: (c.app.server.address() as { port: number }).port }));
 const input = createInterface({ input: process.stdin });
+let tableId='';
 for await (const line of input) {
   const { tenant, actor, operation } = JSON.parse(line);
+  if(operation === 'refresh') {
+    seedRows(c.store,tableId,[{amount:'24'}]);
+    const doc=c.store.doc(c.store.user('u-admin')!.tenantId,tableId)!;
+    c.store.saveDoc({...doc,version:doc.version+1,updatedAt:new Date().toISOString()});
+    console.log('refreshed');continue;
+  }
   if (operation === 'table') {
-    seedDataset(
+    tableId=seedDataset(
       c.store,
       c.store.user('u-admin')!,
       '合成业务表',
