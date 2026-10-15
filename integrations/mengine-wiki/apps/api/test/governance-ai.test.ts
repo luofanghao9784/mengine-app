@@ -16,6 +16,7 @@ function answer(input: string) {
 async function fixture(run: (ctx: Context, login: (name: string) => Promise<{ cookie: string }>, dbPath: string) => Promise<void>) {
   const dir = await mkdtemp(join(tmpdir(), "mengine-ai-governance-")), dbPath = join(dir, "db.sqlite");
   const ctx = await buildServer({ demo: true, dbPath, storage: dir, model: { apiKey: "test-placeholder", model: "test-model", baseUrl: "https://example.invalid/v1" } });
+  ctx.store.saveUser({ ...ctx.store.user("u-steward")!, duties: { governance: [{ type: "tenant", id: "mengine-demo" }] } });
   ctx.model.complete = async (_s, input) => ({ text: JSON.stringify(answer(input)), usage: {} });
   const login = async (name: string) => {
     const r = await ctx.app.inject({ method: "POST", url: "/api/auth/login", payload: { email: `${name}@mengine.demo`, password: DEMO_PASSWORD } });
@@ -90,35 +91,31 @@ test("旧报告在资料变化后隐藏，权限撤回后禁止重用报告生�
   const headers = await login("steward"), report = (await analyze(ctx, headers)).json().report;
   const doc = ctx.store.doc("mengine-demo", "doc-2")!; doc.tags.push("新标签"); ctx.store.saveDoc(doc);
   const stale = (await ctx.app.inject({ url: path, headers })).json(); assert.equal(stale.state, "stale"); assert.equal(stale.report, null);
-  assert.equal((await ctx.app.inject({ method: "POST", url: `${path}/${report.id}/proposals`, headers, payload: { action: "organize" } })).statusCode, 409);
+  assert.equal((await ctx.app.inject({ method: "POST", url: `${path}/${report.id}/proposals`, headers, payload: { action: "organize" } })).statusCode, 403);
   doc.status = "quarantined"; ctx.store.saveDoc(doc);
   assert.equal((await ctx.app.inject({ url: path, headers })).json().state, "restricted");
   assert.equal((await ctx.app.inject({ method: "POST", url: `${path}/${report.id}/proposals`, headers, payload: { action: "organize" } })).statusCode, 403);
 }));
 
-test("标签建议复用现有审批，提交幂等且不直接写文档，审批后旧报告失效", async () => fixture(async (ctx, login) => {
-  const headers = await login("steward"), before = ctx.store.doc("mengine-demo", "doc-2")!, report = (await analyze(ctx, headers)).json().report;
-  const send = () => ctx.app.inject({ method: "POST", url: `${path}/${report.id}/proposals`, headers, payload: { action: "organize" } });
-  const first = await send(); assert.equal(first.statusCode, 200, first.body); const p = first.json().proposal;
-  assert.equal(p.status, "pending"); assert.equal((await send()).json().proposal.id, p.id);
-  assert.deepEqual(ctx.store.doc("mengine-demo", "doc-2"), before);
-  const apply = await ctx.app.inject({ method: "POST", url: `/api/proposals/${p.id}/resolve`, headers, payload: { decision: "approve" } });
-  assert.equal(apply.statusCode, 200, apply.body);
-  const after = ctx.store.doc("mengine-demo", "doc-2")!;
-  assert.deepEqual(after.tags, report.tags.values); assert.equal(after.version, 2); assert.equal(after.quality, before.quality); assert.deepEqual(after.grants, before.grants); assert.equal(after.classification, before.classification);
-  assert.equal((await ctx.app.inject({ url: path, headers })).json().state, "stale");
-  assert.ok(ctx.store.auditValid("mengine-demo"));
+test("治理建议不能提交内容修改方案，重复请求不改写资料", async () => fixture(async (ctx, login) => {
+  for (const name of ["steward", "admin"]) {
+    const headers = await login(name), before = ctx.store.doc("mengine-demo", "doc-2")!;
+    const result = await analyze(ctx, headers); assert.equal(result.statusCode, 200, result.body);
+    const url = `${path}/${result.json().report.id}/proposals`;
+    for (const action of ["organize", "summary", "organize"]) {
+      assert.equal((await ctx.app.inject({ method: "POST", url, headers, payload: { action } })).statusCode, 403);
+    }
+    assert.deepEqual(ctx.store.doc("mengine-demo", "doc-2"), before);
+  }
+  assert.equal(ctx.store.proposals("mengine-demo").length, 0);
 }));
 
-test("摘要提案只采用已验证服务端建议，拒绝伪造 patch、权限动作和他人报告", async () => fixture(async (ctx, login) => {
-  const headers = await login("steward"), report = (await analyze(ctx, headers)).json().report;
-  const url = `${path}/${report.id}/proposals`;
-  for (const payload of [{ action: "permissions" }, { action: "summary", patch: { summary: "tamper" } }]) assert.equal((await ctx.app.inject({ method: "POST", url, headers, payload })).statusCode, 400);
-  const adminDoc = ctx.store.doc("mengine-demo", "doc-2")!; adminDoc.grants.push({ subjectType: "user", subjectId: "u-admin", level: "edit" }); ctx.store.saveDoc(adminDoc);
-  assert.equal((await ctx.app.inject({ method: "POST", url, headers: await login("admin"), payload: { action: "summary" } })).statusCode, 404);
-  const fresh = (await analyze(ctx, headers)).json().report;
-  const proposal = (await ctx.app.inject({ method: "POST", url: `${path}/${fresh.id}/proposals`, headers, payload: { action: "summary" } })).json().proposal;
-  assert.deepEqual(proposal.patch, { summary: fresh.summary.text });
+test("治理建议拒绝伪造 patch 和权限动作", async () => fixture(async (ctx, login) => {
+  const headers = await login("steward"), result = await analyze(ctx, headers);
+  assert.equal(result.statusCode, 200, result.body);
+  const url = `${path}/${result.json().report.id}/proposals`;
+  for (const payload of [{ action: "permissions" }, { action: "summary", patch: { summary: "tamper" } }])
+    assert.equal((await ctx.app.inject({ method: "POST", url, headers, payload })).statusCode, 400);
 }));
 
 test("管理与阅读权限不等于编辑权限，管理员只能研判不能越权提交", async () => fixture(async (ctx, login) => {

@@ -538,8 +538,7 @@ export async function buildServer(
         d = docFor(u, req.params.id);
       if (
         !["steward", "admin"].includes(u.role) ||
-        !canManage(u, d) ||
-        u.clearance < d.classification
+        !canGovernResource(u, d)
       )
         throw error(403, "没有治理处理权限");
       if(store.db.prepare('SELECT 1 FROM data_sets WHERE id=? AND tenant_id=?').get(d.id,u.tenantId))throw error(409, '数据表请使用结构化治理复检');

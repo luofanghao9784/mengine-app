@@ -20,6 +20,7 @@ async function fixture(
 ) {
   const dir = await mkdtemp(join(tmpdir(), "mengine-test-"));
   const ctx = await buildServer({ demo: true, storage: dir });
+  ctx.store.saveUser({...ctx.store.user("u-steward")!, duties:{ingest:true,governance:[{type:"tenant",id:"mengine-demo"}]}});
   const login = async (name: string) => {
     const r = await ctx.app.inject({
       method: "POST",
@@ -122,7 +123,7 @@ test("岗位、部门、显式授权与密级同时生效", async () =>
     assert.equal(canRead(user, doc), true);
     assert.equal(canEdit(user, doc), false);
     doc.grants[0].level = "edit";
-    assert.equal(canEdit(user, doc), true);
+    assert.equal(canEdit(user, doc), false);
   }));
 test("成员撤权会撤销已有会话", async () =>
   fixture(async ({ app }, login) => {
@@ -239,7 +240,7 @@ test("权限方案必须双人审批，并阻止普通成员执行", async () =>
       headers: steward,
       payload: {
         documentId: "doc-1",
-        action: "permissions",
+        action: "permissions", documentVersion: 1, policyVersion: 1,
         patch: {
           audience: "organization",
           grants: [{ subjectType: "role", subjectId: "member", level: "read" }],
@@ -251,7 +252,7 @@ test("权限方案必须双人审批，并阻止普通成员执行", async () =>
     const ownList=(await app.inject({url:"/api/proposals",headers:steward})).json().items;
     const otherList=(await app.inject({url:"/api/proposals",headers:admin})).json().items;
     assert.equal(ownList.find((p:any)=>p.id===plan.json().id).canApprove,false);
-    assert.equal(ownList.find((p:any)=>p.id===plan.json().id).canReject,true);
+    assert.equal(ownList.find((p:any)=>p.id===plan.json().id).canReject,false);
     assert.equal(otherList.find((p:any)=>p.id===plan.json().id).canApprove,true);
     const url = `/api/proposals/${plan.json().id}/resolve`;
     assert.equal(
@@ -301,40 +302,15 @@ test("权限方案必须双人审批，并阻止普通成员执行", async () =>
       409,
     );
   }));
-test("旧版本方案不能覆盖更新后的文档", async () =>
-  fixture(async ({ app }, login) => {
-    const headers = await login("steward");
-    const plan = (
-      await app.inject({
-        method: "POST",
-        url: "/api/proposals",
-        headers,
-        payload: {
-          documentId: "doc-1",
-          action: "organize",
-          patch: { tags: ["新标签"] },
-          reason: "整理",
-        },
-      })
-    ).json();
-    await app.inject({
-      method: "PATCH",
-      url: "/api/documents/doc-1",
-      headers,
-      payload: { title: "架构更新" },
-    });
-    assert.equal(
-      (
-        await app.inject({
-          method: "POST",
-          url: `/api/proposals/${plan.id}/resolve`,
-          headers,
-          payload: { decision: "approve" },
-        })
-      ).statusCode,
-      409,
-    );
-  }));
+test("旧版本权限申请不能覆盖更新后的文档", async () => fixture(async ({app,store},login)=>{
+ const headers=await login("steward"), admin=await login("admin");
+ const r=await app.inject({method:"POST",url:"/api/proposals",headers,payload:{documentId:"doc-1",action:"permissions",documentVersion:1,policyVersion:1,patch:{audience:"organization"},reason:"协作"}});
+ assert.equal(r.statusCode,200,r.body);
+ const d=store.doc("mengine-demo","doc-1")!;d.version++;store.saveDoc(d);
+ assert.equal((await app.inject({method:"POST",url:`/api/proposals/${r.json().id}/resolve`,headers:admin,payload:{decision:"approve"}})).statusCode,409);
+ assert.equal(store.proposals("mengine-demo").find(p=>p.id===r.json().id)!.status,"invalidated");
+ assert.equal(store.doc("mengine-demo",d.id)!.policyVersion,1);
+}));
 test("禁止通过方案修改 tenant、角色或跨企业授权成员", async () =>
   fixture(async ({ app }, login) => {
     const headers = await login("steward");
@@ -354,7 +330,7 @@ test("禁止通过方案修改 tenant、角色或跨企业授权成员", async (
             headers,
             payload: {
               documentId: "doc-1",
-              action: "permissions",
+              action: "permissions", documentVersion: 1, policyVersion: 1,
               patch,
               reason: "测试",
             },
@@ -378,11 +354,11 @@ test("审批列表不会向没有内容授权的审计岗位泄露摘要方案",
         reason: "整理",
       },
     });
-    assert.equal(plan.statusCode, 200);
+    assert.equal(plan.statusCode, 400);
     const list = await app.inject({ url: "/api/proposals", headers: auditor });
     assert.ok(!list.body.includes("绝密薪资"));
   }));
-test("敏感资料隔离并可按权限脱敏复核", async () =>
+test("敏感资料复检不修改原文或解除隔离", async () =>
   fixture(async ({ app, store }, login) => {
     const steward = await login("steward");
     assert.equal(
@@ -397,10 +373,9 @@ test("敏感资料隔离并可按权限脱敏复核", async () =>
     });
     assert.equal(result.statusCode, 200);
     const d = store.doc("mengine-demo", "doc-10")!;
-    assert.equal(d.status, "ready");
-    assert.ok(!d.content.includes("13800138000"));
-    assert.ok(d.content.includes("[手机号已脱敏]"));
-    assert.equal(d.version, 2);
+    assert.equal(d.status, "quarantined");
+    assert.ok(d.content.includes("13800138000"));
+    assert.equal(d.version, 1);
   }));
 test("全文检索覆盖长文尾部，上传 SHA 幂等", async () =>
   fixture(async ({ app, processor, store }, login) => {
@@ -447,8 +422,8 @@ test("全文检索覆盖长文尾部，上传 SHA 幂等", async () =>
     const forged = await app.inject({ method: "PATCH", url: `/api/documents/${id}`, headers, payload: { uploadedBy: { id: "u-admin", name: "伪造上传人" } } });
     assert.equal(forged.statusCode, 400);
     const edited = await app.inject({ method: "PATCH", url: `/api/documents/${id}`, headers, payload: { tags: ["更新标签"] } });
-    assert.equal(edited.statusCode, 200);
-    assert.deepEqual(edited.json().uploadedBy, { id: "u-steward", name: "罗方豪" });
+    assert.equal(edited.statusCode, 403);
+    assert.deepEqual(store.doc("mengine-demo",id)!.uploadedBy, { id: "u-steward", name: "罗方豪" });
   }));
 test("处理中任务可在启动恢复，归档后退出检索", async () =>
   fixture(async ({ store, processor, app }, login) => {

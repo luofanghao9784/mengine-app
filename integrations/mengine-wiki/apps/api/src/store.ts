@@ -200,7 +200,7 @@ export class Store {
   proposals(tenant: string): Proposal[] {
     return (
       this.db
-        .prepare("SELECT data FROM proposals WHERE tenant_id=?")
+        .prepare("SELECT data FROM proposals WHERE tenant_id=? ORDER BY rowid DESC")
         .all(tenant) as { data: string }[]
     ).map((r) => JSON.parse(r.data));
   }

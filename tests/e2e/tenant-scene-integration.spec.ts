@@ -225,3 +225,89 @@ test('企业舞台的用量下钻留在当前企业场景', async ({ page }) => 
   await expect(page.locator('.scene-business-body')).toBeVisible();
   expect(f.requests.some((p) => p.startsWith('/api/platform-admin/'))).toBe(false);
 });
+
+async function accessFixture(page: Page, admin = true) {
+  await fixture(page);
+  const writes: { path: string; body: any }[] = [];
+  let conflict = false, unavailable = false;
+  const state = {
+    user: { id: actor, name: '合成测试成员', role: admin ? 'admin' : 'member', clearance: admin ? 3 : 0, active: true, tenantId: tenant, departmentId: 'dept-1' },
+    members: [], roles: { admin: '企业管理员', member: '岗位成员' },
+    departments: [{ id: 'dept-1', name: '研发部', active: 1 }], connections: [],
+    resources: [{ id: 'resource-1', title: '合成业务资料', version: 2, policyVersion: 3, classification: 0, audience: 'private', status: 'ready', canManagePolicy: admin, canInspect: false, canRead: true, grants: [] }],
+    proposals: [], pending: 0, canViewAudit: admin,
+  };
+  await page.route('**/scene/dispatch?*', async route => {
+    const path = new URL(route.request().url()).searchParams.get('path')!;
+    if (!path.startsWith('/scene-access')) return route.fallback();
+    if (route.request().method() === 'GET') return route.fulfill({ status: unavailable ? 503 : 200, json: unavailable ? { message: '合成权限服务不可用' } : state });
+    const body = route.request().postDataJSON(); writes.push({ path, body });
+    if (conflict) { conflict = false; state.resources[0].policyVersion++; return route.fulfill({ status: 409, json: { message: '权限版本已变化，请刷新后重新提交' } }); }
+    if (path === '/scene-access/policy') {
+      if (admin) { state.resources[0].policyVersion++; state.resources[0].audience = body.patch.audience; }
+      return route.fulfill({ json: { status: admin ? 'applied' : 'pending' } });
+    }
+    if (path === '/scene-access/departments') state.departments[0].name = body.name;
+    return route.fulfill({ json: { ok: true } });
+  });
+  await page.goto(`/tenant-admin/prototype/?tenant=${tenant}`);
+  await page.locator('.shell-switch button').filter({ hasText: /^成员与权限$/ }).click();
+  await expect(page.getByLabel('变更原因')).toBeVisible();
+  return { state, writes, conflict: () => { conflict = true; }, fail: () => { unavailable = true; } };
+}
+
+test('权限表单携带双版本，冲突后刷新，部门重命名使用稳定 ID', async ({ page }) => {
+  const f = await accessFixture(page);
+  await page.getByRole('combobox', { name: '访问范围', exact: true }).selectOption('organization');
+  await page.getByLabel('变更原因').fill('跨部门业务协作');
+  f.conflict();
+  await page.getByRole('button', { name: '保存并生效', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('权限版本已变化');
+  await expect(page.getByText('内容 v2 · 权限 v4', { exact: false })).toBeVisible();
+  expect(f.writes[0].body).toMatchObject({ documentId: 'resource-1', documentVersion: 2, policyVersion: 3, patch: { audience: 'organization' } });
+  await page.getByLabel('变更原因').fill('核对新版本后授权');
+  await page.getByRole('button', { name: '保存并生效', exact: true }).click();
+  await expect(page.getByText('操作已完成。')).toBeVisible();
+  expect(f.writes[1].body.policyVersion).toBe(4);
+  await page.getByRole('button', { name: '部门与成员', exact: true }).click();
+  await page.getByLabel('部门名称 研发部').fill('研发中心');
+  await page.getByRole('button', { name: '保存部门名称', exact: true }).click();
+  await expect(page.getByLabel('部门名称 研发中心')).toBeVisible();
+  expect(f.writes[2]).toEqual({ path: '/scene-access/departments', body: { id: 'dept-1', name: '研发中心' } });
+});
+
+test('普通成员仅申请读取权限，刷新失败立即清除可见资源', async ({ page }) => {
+  const f = await accessFixture(page, false);
+  await expect(page.getByRole('button', { name: '部门与成员', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('combobox', { name: '资源密级', exact: true })).toBeDisabled();
+  await page.getByLabel('变更原因').fill('业务协作申请');
+  await page.getByRole('button', { name: '提交审批', exact: true }).click();
+  await expect(page.getByText('申请已提交，生效前不会增加访问权限。')).toBeVisible();
+  expect(f.writes[0].body.patch).not.toHaveProperty('classification');
+  f.fail();
+  await expect(page.getByText('合成权限服务不可用')).toBeVisible({ timeout: 20000 });
+  await expect(page.getByRole('combobox', { name: '访问范围', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '提交审批', exact: true })).toHaveCount(0);
+});
+
+test('隔离检查权限撤回后清除正文，即使内容与权限版本未变', async ({ page }) => {
+  const f = await accessFixture(page);
+  f.state.resources[0].canInspect = true;
+  f.state.resources[0].status = 'quarantined';
+  f.state.resources[0].canRead = false;
+  await page.route('**/scene/dispatch?*', async route => {
+    const path = new URL(route.request().url()).searchParams.get('path');
+    if (!path?.endsWith('/inspect')) return route.fallback();
+    expect(route.request().postDataJSON().reason).toBe('授权质量检查');
+    await route.fulfill({ json: { content: '仅用于隔离检查的合成正文' } });
+  });
+  // Remount to load changed fixture immediately; subsequent revocation uses real polling.
+  await page.locator('.shell-switch button').filter({ hasText: /^输出$/ }).click();
+  await page.locator('.shell-switch button').filter({ hasText: /^成员与权限$/ }).click();
+  await page.getByLabel('变更原因').fill('授权质量检查');
+  await page.getByRole('button', { name: '按填写原因检查隔离内容' }).click();
+  await expect(page.getByText('仅用于隔离检查的合成正文')).toBeVisible();
+  f.state.resources[0].canInspect = false;
+  await expect(page.getByRole('button', { name: '按填写原因检查隔离内容' })).toHaveCount(0, { timeout: 20000 });
+  await expect(page.getByText('仅用于隔离检查的合成正文')).toHaveCount(0);
+});

@@ -1,3 +1,4 @@
+import { seedDataset, seedRows } from './helpers/structured-fixture.js';
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -12,6 +13,8 @@ import { realWorkflow } from "../../web/src/components/flow-stages.js";
 async function fixture(run: (ctx: Awaited<ReturnType<typeof buildServer>>, login: (name: string) => Promise<{ cookie: string }>, dir: string) => Promise<void>) {
   const dir = await mkdtemp(join(tmpdir(), "mengine-flow-"));
   const ctx = await buildServer({ demo: true, storage: dir });
+  ctx.store.saveUser({...ctx.store.user("u-engineer")!, duties:{ingest:true}});
+  ctx.store.saveUser({...ctx.store.user("u-steward")!, duties:{ingest:true,governance:[{type:"tenant",id:"mengine-demo"}]}});
   const login = async (name: string) => {
     const r = await ctx.app.inject({ method: "POST", url: "/api/auth/login", payload: { email: `${name}@mengine.demo`, password: DEMO_PASSWORD } });
     assert.equal(r.statusCode, 200);
@@ -65,21 +68,22 @@ test("真实上传留下接收、解析、治理、发布记录，去重不会�
   assert.equal((await upload(ctx, headers, "duplicate.txt", text)).json().duplicate, true);
   assert.equal(ctx.store.flowEvents("mengine-demo", id).length, 4);
 }));
-test("敏感资料停止发布，只有授权治理人员可处理，复核成功后记录恢复发布", async () => fixture(async (ctx, login) => {
+test("敏感资料停止发布，复检保留原文且不虚构恢复发布", async () => fixture(async (ctx, login) => {
   const member = await login("engineer"), steward = await login("steward");
   const r = await upload(ctx, member, "sensitive.txt", "星环隔离验收，联系人手机号 13800138000。");
   await ctx.processor.close(); const id = r.json().document.id;
-  const task = (await ctx.app.inject({ url: "/api/flow", headers: member })).json().items.find((d: Doc) => d.id === id);
-  assert.equal(task.phase, "quarantined"); assert.equal(task.classification, 2); assert.equal(task.canRead, false); assert.equal(task.canRemediate, false);
+  assert.ok(!(await ctx.app.inject({ url: "/api/flow", headers: member })).json().items.some((d:Doc)=>d.id===id));
+  const task = (await ctx.app.inject({ url: "/api/flow", headers: steward })).json().items.find((d: Doc) => d.id === id);
+  assert.equal(task.phase, "quarantined"); assert.equal(task.classification, 2); assert.equal(task.canRead, false); assert.equal(task.canRemediate, true);
   assert.ok(task.events.every((e: { event: string }) => e.event !== "published"));
   assert.equal((await ctx.app.inject({ method: "POST", url: `/api/governance/${id}/remediate`, headers: member })).statusCode, 403);
   assert.equal((await ctx.app.inject({ method: "POST", url: `/api/governance/${id}/remediate`, headers: steward })).statusCode, 200);
-  assert.equal(ctx.store.flowEvents("mengine-demo", id)[0].event, "remediated");
-  assert.equal(ctx.store.doc("mengine-demo", id)!.status, "ready");
+  assert.equal(ctx.store.flowEvents("mengine-demo", id)[0].event, "rescanned");
+  assert.equal(ctx.store.doc("mengine-demo", id)!.status, "quarantined");
   assert.equal(ctx.store.doc("mengine-demo", id)!.classification, 2);
 }));
 test("失败重试有真实记录，归档中的异步解析失败不能恢复任务", async () => fixture(async (ctx, login) => {
-  const headers = await login("engineer"), r = await upload(ctx, headers, "empty.txt", "   ");
+  const headers = await login("admin"), r = await upload(ctx, headers, "empty.txt", "   ");
   await ctx.processor.close(); const id = r.json().document.id;
   assert.equal(ctx.store.doc("mengine-demo", id)!.status, "failed");
   await writeFile(ctx.store.doc("mengine-demo", id)!.originalPath, "修复后的可解析文件，验证重试流程。");
@@ -94,7 +98,7 @@ test("失败重试有真实记录，归档中的异步解析失败不能恢复�
 }));
 test("权限提案等待审批不会阻断已发布资料，只向有权查看提案的人显示", async () => fixture(async ({ app, store }, login) => {
   const steward = await login("steward"), admin = await login("admin"), member = await login("engineer");
-  const p = (await app.inject({ method: "POST", url: "/api/proposals", headers: steward, payload: { documentId: "doc-1", action: "permissions", patch: { audience: "organization" }, reason: "星环审批验收" } })).json();
+  const p = (await app.inject({ method: "POST", url: "/api/proposals", headers: steward, payload: { documentId: "doc-1", action: "permissions", documentVersion: 1, policyVersion: 1, patch: { audience: "organization" }, reason: "星环审批验收" } })).json();
   const snapshot = (await app.inject({ url: "/api/flow", headers: admin })).json();
   const task = snapshot.items.find((d: Doc) => d.id === "doc-1"); assert.equal(task.phase, "ready"); assert.equal(task.pending[0].id, p.id);
   assert.equal((await app.inject({ url: "/api/flow", headers: member })).json().items.find((d: Doc) => d.id === "doc-1").pending.length, 0);
@@ -123,43 +127,21 @@ test("事件随资料事务回滚并持久化，升级前资料不补造历史�
   finally { restored.close(); await rm(dir, { recursive: true, force: true }); }
 });
 
-test("真实发布主线兼容隔离脱敏与独立审批，保持原有指标与授权", async () => fixture(async (ctx, login) => {
-  const owner = await login("steward"), steward = owner, admin = await login("admin");
-  const uploaded = await upload(ctx, owner, "workflow.txt", "发布主线业务流程验收，联系方式为 13800138000。".repeat(4));
-  await ctx.processor.close(); const id = uploaded.json().document.id;
-  const snapshot = async (headers = admin) => (await ctx.app.inject({ url: "/api/flow", headers })).json();
-  const current = async (headers = admin) => (await snapshot(headers)).items.find((d: Doc) => d.id === id);
-  const before = await snapshot();
-  assert.equal(realWorkflow(await current()).current, "scanning");
-  assert.equal((await ctx.app.inject({ method: "POST", url: `/api/governance/${id}/remediate`, headers: steward })).statusCode, 200);
-  const recovered = await current();
-  assert.equal(realWorkflow(recovered).stages.find(s => s.id === "scanning")?.state, "done");
-  assert.equal(realWorkflow(recovered).current, "published");
-  assert.equal((await snapshot()).stats.visible, before.stats.visible + 1); // Admin can read the newly published enterprise document.
-  const submitted = await ctx.app.inject({ method: "POST", url: "/api/proposals", headers: owner,
-    payload: { documentId: id, action: "permissions", patch: { audience: "organization" }, reason: "发布主线与独立审批" } });
-  assert.equal(submitted.statusCode, 200); const p = submitted.json();
-  assert.equal((await current()).permissionReview.state, "pending");
-  assert.equal(realWorkflow(await current()).current, "published");
-  assert.equal((await current()).phase, "ready");
-  assert.equal((await ctx.app.inject({ method: "POST", url: `/api/proposals/${p.id}/resolve`, headers: admin, payload: { decision: "approve" } })).statusCode, 200);
-  assert.equal((await current()).permissionReview.state, "applied");
-  assert.equal(realWorkflow(await current()).current, "published");
-  assert.equal((await snapshot()).stats.visible, before.stats.visible + 1);
-  assert.equal((await snapshot()).stats.pending, before.stats.pending);
-  // Many later edits cannot erase the proven isolation/remediation history.
-  for (let i = 0; i < 12; i++) ctx.store.saveDoc(ctx.store.doc("mengine-demo", id)!, "edited");
-  const edited = await current();
-  assert.ok(edited.events.every((e: {event: string}) => e.event === "edited"));
-  assert.equal(realWorkflow(edited).stages.find(s => s.id === "scanning")?.state, "done");
-  ctx.store.saveDoc({ ...ctx.store.doc("mengine-demo", id)!, status: "queued" }, "retry");
-  assert.deepEqual(ctx.store.flowMilestones("mengine-demo", id).map(e => e.event), ["retry"]);
+test("复检不能解除敏感隔离，也不能生成待发布权限申请", async () => fixture(async (ctx,login)=>{
+ const headers=await login("steward"), admin=await login("admin");
+ const uploaded=await upload(ctx,headers,"workflow.txt","发布主线验收，联系方式 13800138000。".repeat(4));
+ assert.equal(uploaded.statusCode,201);await ctx.processor.close();const id=uploaded.json().document.id,before=ctx.store.doc("mengine-demo",id)!;
+ assert.equal((await ctx.app.inject({method:"POST",url:`/api/governance/${id}/remediate`,headers})).statusCode,200);
+ const current=(await ctx.app.inject({url:"/api/flow",headers:admin})).json().items.find((d:Doc)=>d.id===id);
+ assert.equal(realWorkflow(current).current,"scanning");assert.equal(realWorkflow(current).stages.find(s=>s.id==='published')!.state,'blocked');
+ assert.equal(ctx.store.doc("mengine-demo",id)!.content,before.content);assert.equal(ctx.store.doc("mengine-demo",id)!.version,before.version);
+ assert.equal((await ctx.app.inject({method:"POST",url:"/api/proposals",headers,payload:{documentId:id,action:"permissions",documentVersion:before.version,policyVersion:before.policyVersion,patch:{audience:"organization"},reason:"尝试发布"}})).statusCode,404);
 }));
 
 test("独立权限提案保留可见性、失效和驳回规则，不改变发布主线", async () => fixture(async ({ app, store }, login) => {
   const admin = await login("admin"), steward = await login("steward"), member = await login("engineer");
   const current = async (headers = admin) => (await app.inject({ url: "/api/flow", headers })).json().items.find((d: Doc) => d.id === "doc-1");
-  const propose = async (action: string, patch: object) => (await app.inject({ method: "POST", url: "/api/proposals", headers: steward, payload: { documentId: "doc-1", action, patch, reason: "权限流程边界验收" } })).json();
+  const propose = async (action: string, patch: object) => (await app.inject({ method: "POST", url: "/api/proposals", headers: steward, payload: { documentId: "doc-1", documentVersion:store.doc("mengine-demo","doc-1")!.version,policyVersion:1, action, patch, reason: "权限流程边界验收" } })).json();
   await propose("organize", { tags: ["测试"] });
   assert.equal((await current()).permissionReview.state, "none");
   const request = await propose("permissions", { audience: "organization" });
@@ -167,19 +149,23 @@ test("独立权限提案保留可见性、失效和驳回规则，不改变发�
   const d = store.doc("mengine-demo", "doc-1")!; d.version++; store.saveDoc(d, "edited");
   assert.equal((await current()).permissionReview.state, "stale");
   assert.equal((await app.inject({ method: "POST", url: `/api/proposals/${request.id}/resolve`, headers: admin, payload: { decision: "approve" } })).statusCode, 409);
-  assert.equal((await app.inject({ method: "POST", url: `/api/proposals/${request.id}/resolve`, headers: admin, payload: { decision: "reject" } })).statusCode, 200);
-  assert.equal((await current()).permissionReview.state, "rejected");
+  assert.equal((await app.inject({ method: "POST", url: `/api/proposals/${request.id}/resolve`, headers: admin, payload: { decision: "reject" } })).statusCode, 409);
+  assert.equal(store.proposals("mengine-demo").find(p=>p.id===request.id)!.status,"invalidated");
+  const fresh=await propose("permissions",{audience:"organization"});
+  assert.equal((await app.inject({method:"POST",url:`/api/proposals/${fresh.id}/resolve`,headers:admin,payload:{decision:"reject"}})).statusCode,200);
+  // Same-millisecond decisions must still show the most recently created request.
+  for(const p of store.proposals("mengine-demo")){p.createdAt="2026-10-15T00:00:00.000Z";p.resolvedAt=p.createdAt;store.proposal(p);}
+  assert.equal((await current()).permissionReview.state,"rejected");
   assert.equal(realWorkflow(await current()).stages.find(s => s.id === "published")?.state, "done");
   assert.equal((await current(member)).permissionReview.state, "none");
 }));
 test('结构化星环依据真实结构、行状态和模型任务事件展示，不伪造已学习状态', async()=>fixture(async({app,store,model},login)=>{
  const headers=await login('admin');
- const r=await app.inject({method:'POST',url:'/api/foundation',headers,payload:{title:'星环结构化验收',department:'企业管理',purpose:'合成测试',source:'合成',updatePolicy:'按需',fields:[{name:'id',label:'编号',type:'text',required:true,unique:true,sensitive:false,description:''}]}});
- assert.equal(r.statusCode,201,r.body);const id=r.json().id;
+ const definition={title:'星环结构化验收',department:'企业管理',purpose:'合成测试',source:'合成',updatePolicy:'按需',fields:[{name:'id',label:'编号',type:'text',required:true,unique:true,sensitive:false,description:''}]};const id=seedDataset(store,store.user('u-admin')!,definition.title,definition.fields as import('../src/foundation.js').Field[]);
  const state=async()=> (await app.inject({url:'/api/flow',headers})).json();
  let item=(await state()).items.find((x:any)=>x.id===id);
  assert.equal(item.structured.total,0);assert.equal(item.structured.dictionary,'waiting');assert.equal(realWorkflow(item).stages[2].state,'waiting');assert.ok(item.events.some((e:any)=>e.event==='structure-stored'));
- await app.inject({method:'POST',url:`/api/foundation/${id}/records`,headers,payload:{values:{id:''},expectedVersion:1,reason:'验收隔离'}});
+ seedRows(store,id,[{id:''}]);
  item=(await state()).items.find((x:any)=>x.id===id);assert.equal(item.structured.isolated,1);assert.equal(realWorkflow(item).stages[1].state,'blocked');assert.ok(item.events.some((e:any)=>e.event==='records-checked'));
  model.config.apiKey='test-only';let release!:()=>void;const hold=new Promise<void>(r=>release=r);
  model.complete=async()=>{await hold;return {text:JSON.stringify({tableMeaning:'合成测试表',usageRules:'仅验收',fields:[{name:'id',label:'编号',meaning:'记录编号',unit:'无',rules:'必填',evidence:'源结构'}],relations:[],templates:[]}),usage:null};};
@@ -197,11 +183,25 @@ test('结构化星环依据真实结构、行状态和模型任务事件展示�
 test('星环分类与搜索在授权过滤后、40项截断前执行，概览指标不随筛选改变',async()=>fixture(async({app,store},login)=>{
  const headers=await login('admin');const source=store.documents('mengine-demo')[0];
  for(let i=0;i<45;i++)store.saveDoc({...source,id:`filter-doc-${i}`,sha:`filter-sha-${i}`,title:`搜索验收文档 ${i}`,updatedAt:'2000-01-01T00:00:00.000Z'});
- const created=await app.inject({method:'POST',url:'/api/foundation',headers,payload:{title:'搜索验收数据表',department:'企业管理',purpose:'合成',source:'合成',updatePolicy:'按需',fields:[{name:'id',label:'编号',type:'text',required:true,unique:true,sensitive:false,description:''}]}});assert.equal(created.statusCode,201,created.body);
+ const definition={title:'搜索验收数据表',department:'企业管理',purpose:'合成',source:'合成',updatePolicy:'按需',fields:[{name:'id',label:'编号',type:'text',required:true,unique:true,sensitive:false,description:''}]};const id=seedDataset(store,store.user('u-admin')!,definition.title,definition.fields as import('../src/foundation.js').Field[]);
  const get=async(q:string)=>(await app.inject({url:'/api/flow'+q,headers})).json();const all=await get('');assert.equal(all.items.length,40);
  const doc=await get('?kind=document&q='+encodeURIComponent('搜索验收文档 44'));assert.equal(doc.matched,1);assert.equal(doc.items[0].id,'filter-doc-44');assert.deepEqual(doc.stats,all.stats);assert.deepEqual(doc.counts,all.counts);
- const table=await get('?kind=table&q='+encodeURIComponent('搜索验收'));assert.equal(table.matched,1);assert.equal(table.items[0].id,created.json().id);assert.equal(table.categories.table,1);
+ const table=await get('?kind=table&q='+encodeURIComponent('搜索验收'));assert.equal(table.matched,1);assert.equal(table.items[0].id,id);assert.equal(table.categories.table,1);
  const none=await get('?kind=table&q='+encodeURIComponent('搜索验收文档'));assert.equal(none.matched,0);assert.deepEqual(none.items,[]);
  const foreign=(await app.inject({url:'/api/flow?q='+encodeURIComponent('搜索验收'),headers:await login('external')})).json();assert.equal(foreign.matched,0);assert.equal(foreign.categories.all,0);
  assert.equal((await app.inject({url:'/api/flow?kind=secret',headers})).statusCode,400);
+}));
+
+test('流程审批信息与审批中心同范围，治理职责不隐含审批资格',()=>fixture(async({app,store},login)=>{
+ const member=await login('engineer');let headers=await login('steward');
+ const r=await app.inject({method:'POST',url:'/api/proposals',headers:member,payload:{documentId:'doc-1',action:'permissions',documentVersion:1,policyVersion:1,patch:{audience:'organization'},reason:'仅向审批人可见'}});
+ assert.equal(r.statusCode,200,r.body);
+ const check=async(expected:number)=>{
+  const flow=(await app.inject({url:'/api/flow',headers})).json(),access=(await app.inject({url:'/api/scene-access',headers})).json();
+  assert.equal(flow.counts.pending,expected);assert.equal(flow.stats.pending,access.pending);
+  assert.equal(flow.items.find((d:Doc)=>d.id==='doc-1').pending.length,expected);
+ };
+ await check(0);
+ const u=store.user('u-steward')!;u.duties={...u.duties,approval:[{type:'resource',id:'doc-1'}]};store.saveUser(u);headers=await login('steward');await check(1);
+ u.duties.approval=[];store.saveUser(u);headers=await login('steward');await check(0);
 }));

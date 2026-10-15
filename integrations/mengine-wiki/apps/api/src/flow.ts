@@ -1,4 +1,5 @@
-import { canGovern, canManage, canRead, now, type Doc, type User } from "./domain.js";
+import { visibleProposals } from './access-control.js';
+import { canGovernResource, canManage, canRead, now, type Doc, type User } from "./domain.js";
 import { dictionaryFingerprint } from "./dictionary-version.js";
 import type { Store } from "./store.js";
 
@@ -17,12 +18,7 @@ export function flowSnapshot(store: Store, user: User, filter: {kind?: "all"|"ta
     const count=canRead(user,d)?store.db.prepare("SELECT COUNT(*) total,COALESCE(SUM(status='ready'),0) ready,COALESCE(SUM(status='quarantined'),0) isolated FROM data_rows WHERE tenant_id=? AND dataset_id=?").get(user.tenantId,d.id) as {total:number;ready:number;isolated:number}:null;
     structured.set(d.id,{total:count?.total??null,ready:count?.ready??null,isolated:count?.isolated??null,fields:definition.fields.length,dictionary:valid?'generated':confirmed?'changed':'waiting',generatedAt:valid?confirmed.at:undefined,warnings:valid?confirmed.warnings?.length||0:0,run:run?.event||'',runAt:run?.at});
   }
-  const byId = new Map(documents.map(d => [d.id, d]));
-  const proposals = store.proposals(user.tenantId).filter(p => {
-    const d = byId.get(p.documentId);
-    return d && (p.authorId === user.id || canGovern(user)) &&
-      (canRead(user, d) || (p.action === "permissions" && canManage(user, d)));
-  });
+  const proposals = visibleProposals(store,user);
   const pending = proposals.filter(p => p.status === "pending");
   const readable = documents.filter(d => canRead(user, d));
   const pendingFor = (d: Doc) => pending.filter(p => p.documentId === d.id);
@@ -68,7 +64,7 @@ export function flowSnapshot(store: Store, user: User, filter: {kind?: "all"|"ta
             (events[0]?.event === "scanning" ? "scanning" : "parsing") : d.status,
           updatedAt: events[0]?.at || d.updatedAt,
           canRead: canRead(user, d), canManage: canManage(user, d),
-          canRemediate: ["admin", "steward"].includes(user.role) && canManage(user, d) && user.clearance >= d.classification,
+          canRemediate: canGovernResource(user, d) && ["ready", "quarantined"].includes(d.status),
           events,
           milestones: store.flowMilestones(user.tenantId, d.id),
           // Same proposal visibility checks as the approval center, without patch/reason data.
