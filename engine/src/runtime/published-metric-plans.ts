@@ -8,6 +8,22 @@ export function publishedMetricPlans() {
   const key = (v: Record<string, unknown>) => [v.metricId, v.metricVersion, v.datasetId, v.snapshotId].join(':');
   return {
     hasPlans: () => plans.size > 0,
+    companions(selection: Record<string, unknown>) {
+      const primary=plans.get(key(selection));
+      if (!primary) throw new RuntimeError('METRIC_DEFINITION_REQUIRED');
+      if (primary.operation !== 'SUMMARY') return [];
+      const scope=['datasetId','snapshotId','operation','groupColumns','dateColumn','dateFrom','dateTo','timeZone','missingDates'];
+      const grain=(p: Record<string,unknown>)=>JSON.stringify(scope.map(k=>p[k]??null));
+      const measure=(p: Record<string,unknown>)=>JSON.stringify([p.aggregation??'SUM',p.valueColumn??null]);
+      const seen=new Set([measure(primary)]), result: Record<string,unknown>[]=[];
+      for (const p of plans.values()) {
+        if (grain(p)!==grain(primary)||seen.has(measure(p))) continue;
+        seen.add(measure(p));
+        result.push(Object.fromEntries(['metricId','metricVersion','datasetId','snapshotId'].map(k=>[k,p[k]])));
+        if(result.length===2)break;
+      }
+      return result;
+    },
     record(response: unknown) {
       if (!isRecord(response) || !['dataset_search','dataset_read'].includes(String(response.action)) || !isRecord(response.result)) return;
       const sources = response.action === 'dataset_search' ? response.result.items : [response.result.source];
