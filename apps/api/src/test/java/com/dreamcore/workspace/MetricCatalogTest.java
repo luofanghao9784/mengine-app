@@ -120,4 +120,28 @@ class MetricCatalogTest extends TaskDatasetFixture {
   generator.generate(owner,tenant,false);assertEquals(106,db.queryForObject("SELECT count(*) FROM scene_metrics WHERE tenant_id=? AND published_version=2",Integer.class,tenant));
   generator.generate(owner,tenant,false);assertEquals(2,db.queryForObject("SELECT max(head_version) FROM scene_metrics WHERE tenant_id=?",Integer.class,tenant));
  }
+
+ @Test void duplicateGovernedBriefingReturnsNoNewContentAndUncoveredMetricsArePrioritized(){
+  UUID metric=save();catalog.transition(owner,tenant,false,metric,new MetricCatalog.Transition(1),true);
+  for(int round=0;round<2;round++){
+   var job=task(null,"AUTHORIZED_LIBRARY");
+   agents.openExecution(job.id(),job.token(),new AgentTaskService.ExecutionOpen("1.5",List.of("task_context","compare_dataset","deliver_briefing")));
+   agents.toolReceipt(job.id(),job.token(),new AgentTaskService.ToolReceipt(1,"task_context","STARTED"));
+   var ctx=call(job,request("dataset_search",null,null,0));
+   var plan=json.treeToValue(ctx.at("/items/0/governedMetrics/items/0/executionRequest"),DatasetCalculationService.Request.class);
+   agents.toolReceipt(job.id(),job.token(),new AgentTaskService.ToolReceipt(1,"task_context","succeeded"));
+   agents.toolReceipt(job.id(),job.token(),new AgentTaskService.ToolReceipt(2,"compare_dataset","STARTED"));
+   var calc=json.valueToTree(agents.compareDataset(job.id(),job.token(),plan));
+   agents.toolReceipt(job.id(),job.token(),new AgentTaskService.ToolReceipt(2,"compare_dataset","succeeded"));
+   agents.toolReceipt(job.id(),job.token(),new AgentTaskService.ToolReceipt(3,"deliver_briefing","STARTED"));
+   var request=new BriefingContentService.Request(UUID.fromString(calc.at("/artifact/id").asText()),"合成数量合计十五件","按已确认的合成口径，固定快照数量合计十五件。",List.of("本次结果使用固定快照内的全部记录，保留来源和口径依据。","该数量仅代表合成样本统计，不用于判断真实业务收入。"));
+   var result=agents.deliverBriefing(job.id(),job.token(),request);
+   assertEquals(round==0?"PREPARED":"NO_NEW_CONTENT",result.get("status"));
+   agents.toolReceipt(job.id(),job.token(),new AgentTaskService.ToolReceipt(3,"deliver_briefing","succeeded"));
+   db.update("UPDATE conversation_tasks SET status='SUCCEEDED',finished_at=now() WHERE id=?",job.id());
+  }
+  UUID fresh=save();catalog.transition(owner,tenant,false,fresh,new MetricCatalog.Transition(1),true);
+  var next=task(null,"AUTHORIZED_LIBRARY");var result=call(next,request("dataset_search",null,null,0));
+  assertEquals(fresh.toString(),result.at("/items/0/governedMetrics/items/0/metricId").asText());
+ }
 }

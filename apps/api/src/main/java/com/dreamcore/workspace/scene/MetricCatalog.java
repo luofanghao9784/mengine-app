@@ -79,7 +79,10 @@ public class MetricCatalog {
    JOIN scene_asset_links l ON l.tenant_id=m.tenant_id AND l.source_id=m.source_id AND l.kind='TABLE' AND l.active
    JOIN task_dataset_reads p ON p.task_id=t.id AND p.attempt_number=t.attempt AND p.dataset_id=l.target_id
    WHERE t.id=? AND l.target_id=? AND scene_table_scope(l.metadata)=v.source_scope AND file_dataset_readable(t.requested_by,l.target_id)
-   ORDER BY CASE WHEN ?<>'' AND strpos(lower(v.definition->>'name'),lower(?))>0 THEN 0 ELSE 1 END,m.id LIMIT 4 FOR SHARE OF m
+   ORDER BY CASE WHEN ?<>'' AND strpos(lower(v.definition->>'name'),lower(?))>0 THEN 0 ELSE 1 END,
+    (SELECT max(cr.created_at) FROM metric_calculation_receipts cr JOIN metric_briefing_receipts br ON br.calculation_artifact_id=cr.artifact_id
+     JOIN conversation_tasks done ON done.id=cr.task_id WHERE cr.metric_id=m.id AND cr.version=v.version AND done.status='SUCCEEDED' AND done.requested_by=t.requested_by) ASC NULLS FIRST,
+    m.id LIMIT 4 FOR SHARE OF m
    """,task,dataset,query,query);
   var result=new ArrayList<Object>();for(var r:rows.stream().limit(3).toList()){
    var definition=JSON.readTree(r.get("definition").toString());

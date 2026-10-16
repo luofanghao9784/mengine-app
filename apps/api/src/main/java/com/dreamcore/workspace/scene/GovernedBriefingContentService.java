@@ -22,7 +22,7 @@ public class GovernedBriefingContentService extends BriefingContentService {
   }
   if(governed&& !Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM metric_calculation_receipts r JOIN conversation_tasks t ON t.id=r.task_id AND t.attempt=r.attempt_number WHERE t.id=? AND r.artifact_id=? AND task_datasets_readable(t.id) AND NOT EXISTS(SELECT 1 FROM task_dataset_fences f WHERE f.task_id=t.id AND f.attempt_number=t.attempt))",Boolean.class,job.id(),request.calculationArtifactId())))throw new IdentityException(422,"METRIC_CALCULATION_REQUIRED");
   var document=super.create(job,request);
-  if(governed)db.update("INSERT INTO metric_briefing_receipts(artifact_id,calculation_artifact_id) VALUES(?,?) ON CONFLICT DO NOTHING",document.artifactId(),request.calculationArtifactId());
+  if(governed&&document!=null)db.update("INSERT INTO metric_briefing_receipts(artifact_id,calculation_artifact_id) VALUES(?,?) ON CONFLICT DO NOTHING",document.artifactId(),request.calculationArtifactId());
   return document;
  }
 }
