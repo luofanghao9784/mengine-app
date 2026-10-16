@@ -1,3 +1,4 @@
+import { governedMetricBundle } from './governed-metric-bundle.js';
 import { publishedMetricPlans } from './published-metric-plans.js';
 import { useRoutineModel } from './model-routing.js';
 import { analyzeWikiInsight, wikiInsightContext } from './wiki-insight.js';
@@ -535,7 +536,7 @@ export class AgentTasks {
                           : deliveryReady
                             ? briefingRequestedType && briefingRequestedType !== 'DATA'
                               ? `A calculation has completed, but the requested type remains ${briefingRequestedType}. Retrieval and calculation are now closed. Deliver the requested text category using authorized evidence; omit calculationArtifactId and do not invent quantitative claims. If no useful requested-type content is supported, use status-only delivery. Never substitute DATA.`
-                              : 'The platform has verified one complete table calculation for this briefing. Retrieval and calculation are now closed. Call deliver_briefing with its existing calculation artifact, preserving its periods, scope and gaps. Write one complete theme; do not compute another range or repeat searches. A duplicate receipt means no new card, never fabricate novelty.'
+                              : 'The platform has verified the selected published metric calculations for this briefing. Use supportingCalculations, when present, to enrich the same business theme while keeping each source, unit and scope distinct. Retrieval and calculation are now closed. Call deliver_briefing with its existing calculation artifact, preserving its periods, scope and gaps. Write one complete theme; do not compute another range or repeat searches. A duplicate receipt means no new card, never fabricate novelty.'
                             : retrievalClosed
                               ? 'Dataset retrieval is complete: a published executable plan is available or the lookup limit was reached. Choose compare_dataset or compare_table using already granted evidence to complete ONE supported calculation, or deliver_briefing for a useful grounded INSIGHT or SUGGESTION with explicit sample limits. If evidence is insufficient, use task_control to state the concrete gap, or a status-only delivery for no useful new content. DATA still requires a successful verified calculation. Do not repeat reads or invent totals, trends or full coverage.'
                               : `System briefing retrieval: ${briefingSearches}/${briefingSearchLimit} internal searches used. The first lookup reads the selected versions; at most two targeted lookups follow. Do not repeat searches to fill the budget. ${
@@ -830,7 +831,7 @@ export class AgentTasks {
           : []),
         ...(datasetComparisonAvailable && task.contractVersion === '1.5'
           ? [
-              datasetComparisonTool({
+              governedMetricBundle(datasetComparisonTool({
                 resolveMetricPlan: metricPlans.resolve,
                 fixedPlanOnly: !!briefingGeneration,
                 allowComposition: datasetCompositionAvailable,
@@ -879,7 +880,7 @@ export class AgentTasks {
                       'DATASET_EMPTY',
                     ],
                   ),
-              }),
+              }), !!briefingGeneration, metricPlans.resolve),
             ]
           : []),
         ...(tablesAvailable && task.contractVersion === '1.5'
