@@ -7,6 +7,7 @@ export function publishedMetricPlans() {
   const uuid = (v: unknown) => typeof v === 'string' && /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(v);
   const key = (v: Record<string, unknown>) => [v.metricId, v.metricVersion, v.datasetId, v.snapshotId].join(':');
   return {
+    hasPlans: () => plans.size > 0,
     record(response: unknown) {
       if (!isRecord(response) || !['dataset_search','dataset_read'].includes(String(response.action)) || !isRecord(response.result)) return;
       const sources = response.action === 'dataset_search' ? response.result.items : [response.result.source];

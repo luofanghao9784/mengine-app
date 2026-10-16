@@ -57,6 +57,7 @@ export function normalizeDatasetArguments(value: unknown): unknown {
   return copy;
 }
 export function datasetComparisonTool(options: {
+  fixedPlanOnly?: boolean;
   resolveMetricPlan?(selection: Record<string, unknown>): Record<string, unknown>;
   allowSummary?: boolean;
   allowComposition?: boolean;
@@ -68,9 +69,13 @@ export function datasetComparisonTool(options: {
   return {
     name: 'compare_dataset',
     normalizeArguments: normalizeDatasetArguments,
-    description: (options.resolveMetricPlan ? '治理数据使用固定指标计划：只提交 metricId、metricVersion、datasetId、snapshotId（来自 task_context）。引擎直接执行所选指标的已发布计划；聚合、分组、日期等参数由计划决定，额外传入的计算字段不改变计划。根据计划范围选题，不能将记录计数解读为人数或收入。' : '') + (options.allowDateRange === false ? 'For governed datasets use the exact published executionRequest returned by task_context, omitting null fields. Do not invent or change metric scope; if none fits, report that an approved definition is needed. Compute only a deterministic two-period SUM or COUNT over all pinned snapshot rows. Use groupColumn, periodColumn, baseline/current and optional periodMode=MONTH for any actual date column with YYYY-MM periods. The backend has not advertised date-range summaries: do not accept cumulative range requests as unfiltered full-history totals. Search exact dataset/snapshot IDs and headers first; never compute totals from sample pages.' :
+    description: options.fixedPlanOnly ? '执行已检索的已发布指标固定计划。只传 task_context 返回的 metricId、metricVersion、datasetId、snapshotId 四项，不能传聚合、分组、字段、日期或自行编写计算。没有适用已发布指标时报告缺口，不猜测编号。返回的 artifact.id 用于交付画报。' : (options.resolveMetricPlan ? '治理数据使用固定指标计划：只提交 metricId、metricVersion、datasetId、snapshotId（来自 task_context）。引擎直接执行所选指标的已发布计划；聚合、分组、日期等参数由计划决定，额外传入的计算字段不改变计划。根据计划范围选题，不能将记录计数解读为人数或收入。' : '') + (options.allowDateRange === false ? 'For governed datasets use the exact published executionRequest returned by task_context, omitting null fields. Do not invent or change metric scope; if none fits, report that an approved definition is needed. Compute only a deterministic two-period SUM or COUNT over all pinned snapshot rows. Use groupColumn, periodColumn, baseline/current and optional periodMode=MONTH for any actual date column with YYYY-MM periods. The backend has not advertised date-range summaries: do not accept cumulative range requests as unfiltered full-history totals. Search exact dataset/snapshot IDs and headers first; never compute totals from sample pages.' :
       'For governed datasets use the exact published executionRequest returned by task_context, omitting null fields. Do not invent or change metric scope; if none fits, report that an approved definition is needed. Calculate over ALL rows in an authorized pinned database snapshot; never total sample pages. Choose exactly one request shape. SUMMARY (only when operation enum includes it): {operation:"SUMMARY",datasetId:<returned UUID>,snapshotId:<returned UUID>,groupColumns:[<exact category header>],aggregation:"SUM",valueColumn:<exact numeric header>}. SUMMARY must OMIT groupColumn, periodColumn, baseline, current and periodMode. COMPARE: {operation:"COMPARE",datasetId:<returned UUID>,snapshotId:<returned UUID>,groupColumn:<exact category header>,periodColumn:<exact period/date header>,baseline:<first period>,current:<second distinct period>,aggregation:"SUM",valueColumn:<exact numeric header>}. COMPARE must OMIT groupColumns. COUNT counts records: omit valueColumn. For dates in COMPARE use periodMode:"MONTH" with YYYY-MM periods and timeZone:"Asia/Shanghai". For a user-specified date filter in either shape, add dateColumn and at least one inclusive YYYY-MM-DD dateFrom/dateTo. Otherwise OMIT ALL date fields, including dateColumn and missingDates. Do not send null optional fields. Missing dates default to failure; missingDates:"EXCLUDE" explicitly excludes blank dates and requires disclosure. Search IDs/headers with task_context dataset_search; read only missing column pages/category values, then calculate. Unknown coverageThrough is not collection-time business coverage. Exact decimal results retain the original column unit: *_cents is 分, not 元; *_grams is 克. Never turn raw cents into yuan without dividing by 100 and clearly disclosing conversion. Do not combine different monetary measures or count records as distinct people. Use artifact.id for a DATA card. SUMMARY supports CURRENT_BAR or TABLE; no baseline or change percentage. No SQL, model-provided rows, formulas, writes or publication.' + (options.allowComposition ? ' COMPOSITION uses the SUMMARY shape with exactly one category groupColumns entry. Use it for shares within one scope, never compare two statuses as periods. All measures must be nonnegative. Platform computes total and sharePercent (6 decimal places; rounded shares may not sum to exactly 100). A zero total has null shares and cannot form a data card. Never submit shares or a denominator.' : '')) ,
-    parameters: {
+    parameters: options.fixedPlanOnly ? {
+      type: 'object',
+      properties: {metricId:{type:'string'},metricVersion:{type:'integer'},datasetId:{type:'string'},snapshotId:{type:'string'}},
+      required:['metricId','metricVersion','datasetId','snapshotId'],additionalProperties:false,
+    } : {
       type: 'object',
       properties: {
         operation: { type: 'string', enum: [...(options.allowSummary === false ? ['COMPARE'] : ['COMPARE','SUMMARY']), ...(options.allowComposition ? ['COMPOSITION'] : [])] },
@@ -102,6 +107,8 @@ export function datasetComparisonTool(options: {
       additionalProperties: false,
     },
     async execute(args, signal) {
+      if (options.fixedPlanOnly && (!options.resolveMetricPlan || !isRecord(args) || !uuid(args.metricId) || !Number.isInteger(args.metricVersion) || Number(args.metricVersion)<1 || !uuid(args.datasetId) || !uuid(args.snapshotId) || Object.keys(args).some(k=>!["metricId","metricVersion","datasetId","snapshotId"].includes(k))))
+        throw new RuntimeError("METRIC_DEFINITION_REQUIRED", "只选择已检索的已发布指标，完整提供四项标识；禁止自由计算参数。");
       if (isRecord(args) && args.metricId !== undefined && options.resolveMetricPlan) {
         await options.authorize();
         args = normalizeDatasetArguments(options.resolveMetricPlan(args));

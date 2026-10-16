@@ -46,7 +46,7 @@ test('automatic briefing retrieves a metric, selects its topic, calculates and d
  const source={datasetId:id,snapshotId:id,version:1,name:'合成订单登记',description:'登记记录数量',columns:['id'],totalColumns:1,columnOffset:0,nextColumnOffset:null,rowCount:2,coverageThrough:null,collectedAt:'2026-10-16T00:00:00Z',authority:false,governedMetrics:response().result.items[0].governedMetrics};
  const server=createServer(async(req,res)=>{
   if(usageFixture(req,res))return;const input=await body(req);
-  if(req.url.endsWith('/check'))return json(res,{allowed:true,executionClass:'live',briefingGeneration:true,briefingContentVersion:'1.0',topicStrategyVersion:'1.0',topicSelectionRecorded:selected,contextVersion:'1.0',datasetContextVersion:'1.0',datasetComparisonVersion:'1.0',datasetAnalysisVersion:'1.0',datasetBriefingSummaryVersion:'1.0'});
+  if(req.url.endsWith('/check'))return json(res,{allowed:true,executionClass:'live',briefingGeneration:true,briefingPresentationVersion:'1.0',briefingContentVersion:'1.0',topicStrategyVersion:'1.0',topicSelectionRecorded:selected,contextVersion:'1.0',datasetContextVersion:'1.0',datasetComparisonVersion:'1.0',datasetAnalysisVersion:'1.0',datasetBriefingSummaryVersion:'1.0'});
   if(req.url.endsWith('/execution/open'))return json(res,{accepted:true,policy:'READ_ONLY_PRIVATE_V1'});
   if(req.url.endsWith('/execution/tool'))return json(res,{accepted:true});
   if(req.url.endsWith('/context'))return json(res,{contractVersion:'1.0',action:input.action,referenceOnly:true,result:input.action==='bootstrap'?{}:{items:[source],hasMore:false}});
@@ -56,10 +56,23 @@ test('automatic briefing retrieves a metric, selects its topic, calculates and d
   return json(res,{},404);
  });
  const url=await listen(server);t.after(()=>close(server));
- const agent=new AgentTasks({platformBaseUrl:url,executionClass:'live',modelName:'synthetic',createModel:()=>({usage:null,async *generate(){
-  calls++;const choices=[['task_context',{action:'dataset_search'}],['select_briefing_topic',{candidates:[{question:'订单登记记录数量是多少？',evidenceNeeded:'已发布记录数指标',requiresCalculation:true,difference:'首次按登记记录口径交付',businessType:'DATA'}],selectedIndex:0}],['compare_dataset',selection],['deliver_briefing',{businessType:'DATA',calculationArtifactId:id,title:'订单登记共有2条记录',summary:'按已发布记录数口径统计，共有2条登记记录。',analysis:['记录数量由固定计划计算得出，共2条。','此数值表示登记记录，不代表有效订单数或客户人数。']}]];
+ const agent=new AgentTasks({platformBaseUrl:url,executionClass:'live',modelName:'synthetic',createModel:()=>({usage:null,async *generate(request){
+  calls++;
+  if(calls===2){assert.equal(request.requiredTool,'select_briefing_topic');assert.ok(!request.tools.some(t=>t.name==='task_context'));}
+  if(calls===3)assert.equal(request.requiredTool,'compare_dataset');
+  if(calls===4){const delivery=request.tools.find(t=>t.name==='deliver_briefing');assert.ok(delivery);assert.equal(delivery.parameters.properties.presentation,undefined);}const choices=[['task_context',{action:'dataset_search'}],['select_briefing_topic',{candidates:[{question:'订单登记记录数量是多少？',evidenceNeeded:'已发布记录数指标',requiresCalculation:true,difference:'首次按登记记录口径交付',businessType:'DATA'}],selectedIndex:0}],['compare_dataset',selection],['deliver_briefing',{businessType:'DATA',calculationArtifactId:id,title:'订单登记共有2条记录',summary:'按已发布记录数口径统计，共有2条登记记录。',analysis:['记录数量由固定计划计算得出，共2条。','此数值表示登记记录，不代表有效订单数或客户人数。']}]];
   assert.ok(calls<=4);const [name,args]=choices[calls-1];yield {type:'tool_call',id:'step-'+calls,name,arguments:JSON.stringify(args)};yield {type:'finish',reason:'tool_calls'};
  }})});
  const result=await agent.run({contractVersion:'1.5',taskId:randomUUID(),attemptId:randomUUID(),prompt:'按已发布指标生成画报'},new AbortController().signal);
  assert.equal(result.outcome,'COMPLETE');assert.ok(delivered);assert.equal(calls,4);assert.deepEqual(steps,['topic','calculation','delivery']);
+});
+
+test('automatic fixed-plan interface exposes only metric selection and rejects free arithmetic',async()=>{
+ const plans=publishedMetricPlans();plans.record(response());let called=0;
+ const tool=datasetComparisonTool({fixedPlanOnly:true,resolveMetricPlan:plans.resolve,authorize:async()=>{},invoke:async b=>{called++;return receipt(b)}});
+ assert.deepEqual(Object.keys(tool.parameters.properties).sort(),['datasetId','metricId','metricVersion','snapshotId']);
+ assert.equal(tool.parameters.required.length,4);
+ await assert.rejects(tool.execute({datasetId:id,snapshotId:id,operation:'SUMMARY'},new AbortController().signal),{code:'METRIC_DEFINITION_REQUIRED'});
+ await assert.rejects(tool.execute({...selection,aggregation:'COUNT'},new AbortController().signal),{code:'METRIC_DEFINITION_REQUIRED'});
+ await tool.execute(selection,new AbortController().signal);assert.equal(called,1);
 });

@@ -481,7 +481,7 @@ export class AgentTasks {
             last = performance.now();
           };
           const deliveryReady = briefingGeneration && briefingCalculationReady;
-          const retrievalClosed = briefingGeneration && briefingDatasetLookups >= 3;
+          const retrievalClosed = briefingGeneration && (briefingDatasetLookups >= 3 || ((!briefingRequestedType || briefingRequestedType === 'DATA') && metricPlans.hasPlans()));
           const topicPhase = briefingPhase(!!deliveryReady, briefingDatasetLookups);
           const nextTopicTool = topicNextTool(
             topicNeedsCalculation,
@@ -537,7 +537,7 @@ export class AgentTasks {
                               ? `A calculation has completed, but the requested type remains ${briefingRequestedType}. Retrieval and calculation are now closed. Deliver the requested text category using authorized evidence; omit calculationArtifactId and do not invent quantitative claims. If no useful requested-type content is supported, use status-only delivery. Never substitute DATA.`
                               : 'The platform has verified one complete table calculation for this briefing. Retrieval and calculation are now closed. Call deliver_briefing with its existing calculation artifact, preserving its periods, scope and gaps. Write one complete theme; do not compute another range or repeat searches. A duplicate receipt means no new card, never fabricate novelty.'
                             : retrievalClosed
-                              ? 'Dataset retrieval is closed after three successful lookups. Choose compare_dataset or compare_table using already granted evidence to complete ONE supported calculation, or deliver_briefing for a useful grounded INSIGHT or SUGGESTION with explicit sample limits. If evidence is insufficient, use task_control to state the concrete gap, or a status-only delivery for no useful new content. DATA still requires a successful verified calculation. Do not repeat reads or invent totals, trends or full coverage.'
+                              ? 'Dataset retrieval is complete: a published executable plan is available or the lookup limit was reached. Choose compare_dataset or compare_table using already granted evidence to complete ONE supported calculation, or deliver_briefing for a useful grounded INSIGHT or SUGGESTION with explicit sample limits. If evidence is insufficient, use task_control to state the concrete gap, or a status-only delivery for no useful new content. DATA still requires a successful verified calculation. Do not repeat reads or invent totals, trends or full coverage.'
                               : `System briefing retrieval: ${briefingSearches}/${briefingSearchLimit} internal searches used. The first lookup reads the selected versions; at most two targeted lookups follow. Do not repeat searches to fill the budget. ${
                                   briefingSearches >= briefingSearchLimit
                                     ? 'Internal search is now closed. Use the existing granted evidence to calculate and deliver one grounded theme. If evidence is insufficient, explain the concrete gap without claiming a card was generated.'
@@ -640,7 +640,7 @@ export class AgentTasks {
                   (t.name !== 'search_sources' ||
                     !briefingGeneration ||
                     briefingSearches < briefingSearchLimit) &&
-                  (t.name !== 'task_context' || !briefingGeneration || briefingDatasetLookups < 3) &&
+                  (t.name !== 'task_context' || !briefingGeneration || !retrievalClosed) &&
                   (!publicTools.has(t.name) || activated.has('public-research')) &&
                   (t.name !== 'read_public_page' || !!web?.snapshot().length) &&
                   (!deliveryReady || t.name === 'deliver_briefing') &&
@@ -810,7 +810,7 @@ export class AgentTasks {
         ...(briefingAvailable && task.contractVersion === '1.5'
           ? [
               briefingDeliveryTool({
-                presentationAvailable: briefingPresentationAvailable,
+                presentationAvailable: briefingPresentationAvailable && !briefingGeneration,
                 isSummaryCalculation: (id) => typeof id === 'string' && summaryCalculations.has(id),
                 requestedType: briefingRequestedType,
                 selectedType: () => selectedBriefingType,
@@ -832,6 +832,7 @@ export class AgentTasks {
           ? [
               datasetComparisonTool({
                 resolveMetricPlan: metricPlans.resolve,
+                fixedPlanOnly: !!briefingGeneration,
                 allowComposition: datasetCompositionAvailable,
                 allowSummary:
                   datasetAnalysisAvailable && (!briefingGeneration || datasetBriefingSummaryAvailable),

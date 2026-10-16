@@ -3,6 +3,9 @@ import { isRecord } from './http-json.js';
 import { RuntimeError, type Json, type TaskTool } from './ports.js';
 /** Protocol guidance only. Placeholder text is never business evidence. */
 export const BRIEFING_EDITORIAL_HINTS: Record<string, string> = {
+  BRIEFING_TEXT_INCOMPLETE: '标题为4–80字；摘要为12–240字；正文为2–4段、每段12–500字。摘要和每段正文均以句号、问号或叹号结束，不以括号或引号结束；保留有依据的内容，不补造事实。',
+  BRIEFING_ANALYSIS_REQUIRED: 'analysis 必须为2–4个完整段落组成的字符串数组，每段12–500字，不是单个字符串。',
+
   BRIEFING_TITLE_TOPIC_ONLY:
     '数据卡卡面不显示摘要。标题只说主题，请改为来源支持的结论，尽量含关键数字或方向，建议不超过28字；不要为了改标题编造事实。',
   BRIEFING_PRESENTATION_INVALID:

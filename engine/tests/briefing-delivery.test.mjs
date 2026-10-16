@@ -231,7 +231,7 @@ test('dataset briefing closes retrieval after three lookups and delivers an hone
         assert.ok(!request.tools.some(tool => tool.name === 'task_context'));
         assert.equal(request.requiredTool, undefined);
         assert.equal(request.requireToolCall, true);
-        assert.match(instructions, /retrieval is closed after three successful lookups/);
+        assert.match(instructions, /retrieval is complete: a published executable plan is available or the lookup limit was reached/);
         name = 'deliver_briefing';
         args = { businessType: 'INSIGHT', title: '收款确认状态值得进一步核对',
           summary: '已读取样本中存在待确认收款，仍需核对其业务依据。',

@@ -30,3 +30,14 @@ test('governed calculation failures survive the agent HTTP boundary with actiona
  code='RAW_PRIVATE_ERROR';
  await assert.rejects(tool.execute(request,new AbortController().signal),e=>e.code==='REMOTE_BAD_REQUEST'&&!JSON.stringify(e).includes('secret'));
 });
+
+test('briefing text shape failures retain actionable codes without exposing response bodies',async t=>{
+ const {BRIEFING_EDITORIAL_HINTS}=await import('../dist/runtime/briefing-delivery.js');
+ let code='BRIEFING_TEXT_INCOMPLETE';
+ const server=createServer((req,res)=>json(res,{code,message:'private-content'},422));
+ const url=await listen(server);t.after(()=>close(server));
+ for(code of ['BRIEFING_TEXT_INCOMPLETE','BRIEFING_ANALYSIS_REQUIRED']){
+  assert.ok(BRIEFING_EDITORIAL_HINTS[code]);
+  await assert.rejects(postJson(new URL('/deliver',url),'synthetic',{},new AbortController().signal,1024,1000,Object.keys(BRIEFING_EDITORIAL_HINTS)),e=>e.code===code&&!e.message.includes('private-content'));
+ }
+});
