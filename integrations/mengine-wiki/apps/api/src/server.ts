@@ -1,3 +1,4 @@
+import {configuredRetrieval} from "./weknora-retrieval.js";
 import { registerAccess, visibleProposals } from "./access-control.js";
 import {registerSceneKnowledge} from './scene-knowledge.js';
 import {registerPlatformBridge} from './platform-bridge.js';
@@ -86,6 +87,9 @@ export async function buildServer(
     store,
     options.storage || ".runtime/test-documents",
   );
+  const knowledgeRetrieval = configuredRetrieval(store);
+  const searchKnowledge = (u: User, docs: Doc[], question: string) => knowledgeRetrieval
+    ? knowledgeRetrieval.search(u, docs, question) : Promise.resolve(retrieve(u, docs, question));
   const conversations = new Conversations(store);
   const pendingConversations = new Set<string>();
   const demo = options.demo === true && !options.production;
@@ -803,9 +807,9 @@ export async function buildServer(
           ? storedTurns.filter(t => t.dependencies.every(d => d.documentId === documentId))
           : storedTurns;
         const history = conversations.context(u, contextTurns);
-        const currentHits = action === "search" ? retrieve(u, docs, question) : [];
+        const currentHits = action === "search" ? await searchKnowledge(u, docs, question) : [];
         const contextualHits = action === "search" && history.previous.length
-          ? retrieve(u, docs, `${question} ${history.previous.map(t => t.question).join(" ")}`)
+          ? await searchKnowledge(u, docs, `${question} ${history.previous.map(t => t.question).join(" ")}`)
           : [];
         const previousHits = history.previous.flatMap(t => t.result.evidence)
           .filter(e => !documentId || e.documentId === documentId);

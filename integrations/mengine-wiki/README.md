@@ -34,3 +34,18 @@ pnpm build
 - 当前业务知识逐批分析由知识库页面激活时驱动；尚未改为独立后台持续生成任务。
 - 数据一致性增强（跨表统一读取点、整批发布、定期对账、独立后台知识更新、CDC）仅为讨论方案，尚未实施。现有机制为定时单表全量同步，单表上限 1 万条，失败保留旧数据。
 - 其他原型板块仍有演示内容。详细验证、交接及限制见 ../../docs/交接/数据基座接入Mengine-2026-10-13.md。
+
+## 可选 WeKnora 检索适配（2026-10-16）
+
+默认关闭，仅作用于 Wiki 已解析资料问答。启用配置、权限边界及尚未完成的真实验收见 [试运行记录](../../docs/交接/WeKnora资料检索适配与试运行-2026-10-16.md)。当前百炼凭据的 embedding 调用被拒绝，因此不能将本模块视为已上线能力。
+
+在本目录运行：
+
+```sh
+npm run build
+node --import tsx --test apps/api/test/weknora-retrieval.test.ts
+# 使用受限环境文件配置 DB_PATH、WEKNORA_* 后，显式索引一份资料：
+node --env-file=/absolute/private/weknora.env dist/api/weknora-index-cli.js TENANT_ID ACTOR_ID DOCUMENT_ID
+```
+
+单资料导入不自动扩展到数据库快照或全企业资料；原始文件解析和画报计算仍由原链路负责。
