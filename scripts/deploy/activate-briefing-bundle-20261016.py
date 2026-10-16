@@ -38,11 +38,11 @@ for n,h in M['files'].items():assert sha(S/n)==h,n
 assert not (E/'agent-task.js.before').exists(),'Existing backup; inspect before retry'
 shutil.copy2(R/'agent-task.js',E/'agent-task.js.before')
 s=(R/'agent-task.js').read_text();needle='datasetComparisonTool({';assert s.count(needle)==1
-start=s.index(needle);end=s.index('\n                    ]',start)
-part=s[start:end];assert part.rstrip().endswith('}),')
+patch_start=s.index(needle);end=s.index('\n                    ]',patch_start)
+part=s[patch_start:end];assert part.rstrip().endswith('}),')
 part=part.replace(needle,'governedMetricBundle(datasetComparisonTool({',1)
 pos=part.rfind('}),');part=part[:pos]+'}), !!briefingGeneration, metricPlans.resolve),'+part[pos+3:]
-s=s[:start]+part+s[end:]
+s=s[:patch_start]+part+s[end:]
 s="import { governedMetricBundle } from './governed-metric-bundle.js';\n"+s
 needle='The platform has verified one complete table calculation for this briefing.';assert s.count(needle)==1
 s=s.replace(needle,'The platform has verified the selected published metric calculations for this briefing. Use supportingCalculations, when present, to enrich the same business theme while keeping each source, unit and scope distinct.')
