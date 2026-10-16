@@ -50,6 +50,13 @@ public final class FusionPlanner {
         }
         return found;
     }
+    /** Automatic briefings choose a theme from the authorized graph, even if the legacy selector chose an isolated view. */
+    public Optional<Recipe> chooseAutomatic(UUID tenant,Set<UUID> selected,List<Source> granted){
+        var preferred=choose(tenant,selected,granted);
+        if(preferred.isPresent())return preferred;
+        var all=new HashSet<UUID>();granted.forEach(s->all.add(s.dataset()));
+        return choose(tenant,all,granted);
+    }
     /** The relation graph determines the table/metric count; delivery pages are budgeted downstream. */
     public Optional<Recipe> choose(UUID tenant,Set<UUID> selected,List<Source> granted){
         if(selected.isEmpty())return Optional.empty();

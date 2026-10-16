@@ -58,7 +58,7 @@ public class GovernedFusionService {
                 var meta=tree(c.get("metadata"));
                 sources.add(new FusionPlanner.Source(c.get("source_id").toString(),(UUID)c.get("id"),(UUID)c.get("snapshot_id"),c.get("name").toString(),meta.path("dictionaryFingerprint").asText(),columns(c.get("column_names")),((Number)c.get("row_count")).intValue(),meta,metrics));
             }
-            var choice=new FusionPlanner().choose(tenant,selected,sources);if(choice.isEmpty())continue;
+            var choice=new FusionPlanner().chooseAutomatic(tenant,selected,sources);if(choice.isEmpty())continue;
             var candidate=choice.get();
             var results=calculate(candidate,actor);
             var recipe=deliveryPage(candidate,results,actor);if(recipe==null)continue;
