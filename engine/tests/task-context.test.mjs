@@ -8,7 +8,7 @@ import { capabilityDirectory } from '../dist/runtime/task-rules.js';
 import { listen, close, body, json } from './fixtures/agent.mjs';
 import { usageFixture } from './fixtures/usage.mjs';
 
-async function fixture(t, { protocol = '1.5', advertised = true, malformed = false, datasets = false, summary = false } = {}) {
+async function fixture(t, { protocol = '1.5', advertised = true, malformed = false, datasets = false, summary = false, governed = false } = {}) {
   const actions = [],
     tools = [];
   const current = 'CURRENT: 今天只写草稿，不发送；旧历史的问题不要重复。';
@@ -30,7 +30,7 @@ async function fixture(t, { protocol = '1.5', advertised = true, malformed = fal
         action: input.action,
         referenceOnly: true,
         result:
-          input.action === 'dataset_search' ? { items: [dataset], hasMore: false } : input.action === 'bootstrap'
+          input.action === 'dataset_search' ? { items: [governed ? {...dataset,governedMetrics:{items:[{metricId:datasetId,version:1,executionRequest:{datasetId,snapshotId,metricId:datasetId,metricVersion:1,operation:"SUMMARY",aggregation:"SUM",groupColumns:["日期"],valueColumn:"金额",dateColumn:"日期",dateFrom:"2026-08-01"}}]}} : dataset], hasMore: false } : input.action === 'bootstrap'
             ? {
                 previousAttempt: {
                   status: 'WAITING_INPUT',
@@ -56,6 +56,7 @@ async function fixture(t, { protocol = '1.5', advertised = true, malformed = fal
     if (req.url.endsWith('/compare-dataset')) {
       actions.push('summary');
       assert.equal(input.operation,'SUMMARY');
+      if(governed){assert.equal(input.metricId,datasetId);assert.equal(input.metricVersion,1);assert.deepEqual(input.groupColumns,['日期']);}
       const sha='a'.repeat(64);
       return json(res,{contractVersion:'1.0',status:'COMPUTED',datasetSource:{...dataset,sha256:sha},calculation:{recipeVersion:'dataset-summary-1',status:'COMPUTED',request:input,inputSha256:sha,matchedRows:1,ignoredRows:0,missingDateRows:0,rows:[{group:['2026-10-01'],value:'100',records:1}],total:'100'},artifact:{id:randomUUID(),filename:'dataset-comparison-'+sha.slice(0,20)+'.json',sha256:sha,bytes:1000}});
     }
@@ -106,7 +107,7 @@ async function fixture(t, { protocol = '1.5', advertised = true, malformed = fal
           };
           yield { type: 'finish', reason: 'tool_calls' };
         } else if (summary && calls===2) {
-          yield {type:'tool_call',id:'summary-1',name:'compare_dataset',arguments:JSON.stringify({datasetId,snapshotId,operation:'SUMMARY',groupColumns:['日期'],valueColumn:'金额',dateColumn:'日期',dateFrom:'2026-08-01'})};
+          yield {type:'tool_call',id:'summary-1',name:'compare_dataset',arguments:JSON.stringify(governed ? {datasetId,snapshotId,metricId:datasetId,metricVersion:1} : {datasetId,snapshotId,operation:'SUMMARY',groupColumns:['日期'],valueColumn:'金额',dateColumn:'日期',dateFrom:'2026-08-01'})};
           yield {type:'finish',reason:'tool_calls'};
         } else {
           yield { type: 'text', text: '仅形成当前草稿；没有执行发送。' };
@@ -249,3 +250,5 @@ test('dataset context retains bounded published metric definitions as untrusted 
  const response={contractVersion:'1.0',action:'dataset_search',referenceOnly:true,result:{items:[{...dataset,governedMetrics}],hasMore:false}};
  assert.deepEqual(contextResponse(response,'dataset_search').result.items[0].governedMetrics,governedMetrics);
 });
+
+test("real Harness resolves a retrieved published metric without model-authored calculation parameters",async t=>{const {result,actions,calls}=await fixture(t,{datasets:true,summary:true,governed:true});assert.equal(result.outcome,"COMPLETE");assert.deepEqual(actions,["bootstrap","dataset_search","summary"]);assert.equal(calls,3);});

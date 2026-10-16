@@ -106,7 +106,7 @@ export function contextResponse(value: unknown, action: string): Json {
 export async function taskBootstrap(invoke: Invoke): Promise<Json> {
   return contextResponse(await invoke('context', { action: 'bootstrap' }, 57344), 'bootstrap');
 }
-export function contextTool(invoke: Invoke, authorize: () => Promise<void>, datasets = false, general = false): TaskTool {
+export function contextTool(invoke: Invoke, authorize: () => Promise<void>, datasets = false, general = false, onValidated?: (result: Json) => void): TaskTool {
   const enabledActions = [...actions, ...(datasets ? ['dataset_search','dataset_read'] : []), ...(general ? generalActions : [])];
   return {
     name: 'task_context',
@@ -205,6 +205,7 @@ export function contextTool(invoke: Invoke, authorize: () => Promise<void>, data
             (result.result.entryId !== args.referenceId || result.result.offset !== (args.offset ?? 0))) ||
             (args.action === 'general_experience_use' && result.result.decision !== args.decision))throw new RuntimeError('INVALID_CONTEXT_RESPONSE');
       }
+      onValidated?.(result);
       return result;
     },
   };

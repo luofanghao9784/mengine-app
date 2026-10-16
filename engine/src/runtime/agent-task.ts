@@ -1,3 +1,4 @@
+import { publishedMetricPlans } from './published-metric-plans.js';
 import { useRoutineModel } from './model-routing.js';
 import { analyzeWikiInsight, wikiInsightContext } from './wiki-insight.js';
 import { analyzeWikiGraph, wikiGraphContext } from './wiki-graph.js';
@@ -798,6 +799,7 @@ export class AgentTasks {
           };
         },
       };
+      const metricPlans = publishedMetricPlans();
       const summaryCalculations = new Set<string>();
       let sequence = 0;
       const tools: TaskTool[] = [
@@ -829,6 +831,7 @@ export class AgentTasks {
         ...(datasetComparisonAvailable && task.contractVersion === '1.5'
           ? [
               datasetComparisonTool({
+                resolveMetricPlan: metricPlans.resolve,
                 allowComposition: datasetCompositionAvailable,
                 allowSummary:
                   datasetAnalysisAvailable && (!briefingGeneration || datasetBriefingSummaryAvailable),
@@ -970,7 +973,7 @@ export class AgentTasks {
         await authorize();
       }
       if (contextEnabled)
-        tools.push(contextTool(invoke, authorize, datasetContextAvailable, generalExperienceAvailable));
+        tools.push(contextTool(invoke, authorize, datasetContextAvailable, generalExperienceAvailable, metricPlans.record));
       if (task.contractVersion === '1.5' && workAvailable)
         tools.push(...workTools(invoke, authorize, !!planAllowed));
       if (web) {
