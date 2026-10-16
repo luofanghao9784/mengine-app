@@ -880,7 +880,7 @@ export class AgentTasks {
                       'DATASET_EMPTY',
                     ],
                   ),
-              }), !!briefingGeneration, metricPlans.resolve, metricPlans.companions),
+              }), !!briefingGeneration, metricPlans.resolve, metricPlans.companions, metricPlans.preferred),
             ]
           : []),
         ...(tablesAvailable && task.contractVersion === '1.5'

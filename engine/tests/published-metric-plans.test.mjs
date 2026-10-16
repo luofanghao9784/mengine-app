@@ -116,3 +116,10 @@ test('automatic companions require identical scope and distinct measures, never 
  plans.record(r);assert.deepEqual(plans.companions(selection),[{...selection,metricId:other}]);
  assert.throws(()=>plans.companions({...selection,snapshotId:other}),{code:'METRIC_DEFINITION_REQUIRED'});
 });
+
+test('recommended primary follows platform coverage order only within identical source scope',()=>{
+ const plans=publishedMetricPlans(),r=response();
+ r.result.items[0].governedMetrics.items.unshift({metricId:other,version:2,executionRequest:{...plan,metricId:other,aggregation:'SUM',valueColumn:'amount'}});
+ plans.record(r);assert.equal(plans.preferred(selection).metricId,other);
+ assert.throws(()=>plans.preferred({...selection,snapshotId:other}),{code:'METRIC_DEFINITION_REQUIRED'});
+});

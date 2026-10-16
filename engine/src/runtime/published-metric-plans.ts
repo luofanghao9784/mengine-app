@@ -8,6 +8,15 @@ export function publishedMetricPlans() {
   const key = (v: Record<string, unknown>) => [v.metricId, v.metricVersion, v.datasetId, v.snapshotId].join(':');
   return {
     hasPlans: () => plans.size > 0,
+    preferred(selection: Record<string,unknown>) {
+      const selected=plans.get(key(selection));
+      if(!selected)throw new RuntimeError('METRIC_DEFINITION_REQUIRED');
+      if(selected.operation!=='SUMMARY')return {...selection};
+      const fields=['datasetId','snapshotId','operation','groupColumns','dateColumn','dateFrom','dateTo','timeZone','missingDates'];
+      // Context order is assigned by the API: relevant, then not yet delivered to this actor.
+      const first=[...plans.values()].find(p=>fields.every(k=>JSON.stringify(p[k]??null)===JSON.stringify(selected[k]??null)))!;
+      return Object.fromEntries(['metricId','metricVersion','datasetId','snapshotId'].map(k=>[k,first[k]]));
+    },
     companions(selection: Record<string, unknown>) {
       const primary=plans.get(key(selection));
       if (!primary) throw new RuntimeError('METRIC_DEFINITION_REQUIRED');
