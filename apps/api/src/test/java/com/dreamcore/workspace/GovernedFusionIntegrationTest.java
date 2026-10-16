@@ -75,6 +75,15 @@ class GovernedFusionIntegrationTest extends TaskDatasetFixture {
   assertEquals("PREPARED",agents.deliverBriefing(job.id(),job.token(),req).get("status"));agents.toolReceipt(job.id(),job.token(),new AgentTaskService.ToolReceipt(3,"deliver_briefing","succeeded"));
   var doc=contents.find(job.id(),1);assertNotNull(doc);assertEquals(2,doc.content().fusion().path("results").size());assertEquals("同一组织",doc.content().chart().rows().getFirst().group());
  }
+ @Test void deliveredGraphDoesNotDowngradeToSingleSource() throws Exception {
+  var job=start();calculate(job);
+  var recipe=json.readValue(db.queryForObject("SELECT recipe::text FROM governed_fusion_task_plans WHERE task_id=?",String.class,taskId),FusionPlanner.Recipe.class);
+  db.update("UPDATE conversation_tasks SET status='SUCCEEDED' WHERE id=?",taskId);
+  var compute=GovernedFusionService.class.getDeclaredMethod("calculate",FusionPlanner.Recipe.class,UUID.class);compute.setAccessible(true);
+  var page=GovernedFusionService.class.getDeclaredMethod("deliveryPage",FusionPlanner.Recipe.class,List.class,UUID.class);page.setAccessible(true);
+  var selected=(FusionPlanner.Recipe)page.invoke(fusion,recipe,compute.invoke(fusion,recipe,owner),owner);
+  assertNotNull(selected);assertEquals(2,selected.measures().size());
+ }
  @Test void revokingAuxiliarySourcePreventsBothCalculationAndDelivery(){
   var job=start();var result=calculate(job);UUID artifact=UUID.fromString(result.at("/artifact/id").asText());
   db.update("UPDATE scene_asset_links SET active=false WHERE tenant_id=? AND target_id=?",tenant,other);

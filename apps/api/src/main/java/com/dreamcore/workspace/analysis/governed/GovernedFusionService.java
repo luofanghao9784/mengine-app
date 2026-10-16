@@ -106,13 +106,14 @@ public class GovernedFusionService {
         var ordered=new ArrayList<FusionCalculator.Metric>();
         for(int round=0;ordered.size()<r.measures().size();round++)for(var group:byBase.values())if(round<group.size())ordered.add(group.get(round));
         var resultById=new HashMap<String,FusionCalculator.Result>();results.forEach(x->resultById.put(x.metricId(),x));
-        var ids=new LinkedHashSet<String>();int bytes=0;
+        var ids=new LinkedHashSet<String>();int bytes=0;FusionPlanner.Recipe firstPage=null;
         for(int index=0;index<=ordered.size();index++){
             var next=index<ordered.size()?ordered.get(index):null;
             int size=next==null?0:json.writeValueAsBytes(resultById.get(next.id())).length;
             if(next==null||(!ids.isEmpty()&&bytes+size>20000)){
                 var page=subset(r,ids);
                 if(page.measures().stream().map(FusionPlanner.Measure::sourceAlias).distinct().count()>=2){
+                    if(firstPage==null)firstPage=page;
                     var proofs=sourceProofs(page);String key=planKey(page,proofs);
                     boolean delivered=Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM governed_fusion_receipts f JOIN conversation_tasks t ON t.id=f.task_id WHERE t.tenant_id=? AND t.requested_by=? AND t.status='SUCCEEDED' AND f.evidence->>'planKey'=?)",Boolean.class,r.calculation().tenant(),actor,key));
                     if(!delivered)return page;
@@ -121,7 +122,9 @@ public class GovernedFusionService {
             }
             if(next!=null){ids.add(next.id());bytes+=size;}
         }
-        return null;
+        // Reuse the verified page when nothing changed; publication dedup then reports no new content,
+        // rather than downgrading the same business graph to an independent single-source card.
+        return firstPage;
     }
 
     private FusionPlanner.Recipe recipe(UUID task){
