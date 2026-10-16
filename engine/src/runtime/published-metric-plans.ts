@@ -41,7 +41,7 @@ export function publishedMetricPlans() {
       if (!isRecord(response) || !['dataset_search','dataset_read'].includes(String(response.action)) || !isRecord(response.result)) return;
       const fusion=response.result.fusionPlan;
       if(isRecord(fusion)){
-        if(fusion.version!=='governed-star-v1'||!Array.isArray(fusion.metrics)||fusion.metrics.length!==2||!Array.isArray(fusion.sources)||fusion.sources.length!==3)throw new RuntimeError('INVALID_CONTEXT_RESPONSE');
+        if(fusion.version!=='governed-graph-v1'||!Array.isArray(fusion.metrics)||fusion.metrics.length<2||!Array.isArray(fusion.sources)||fusion.sources.length<2)throw new RuntimeError('INVALID_CONTEXT_RESPONSE');
         for(const metric of fusion.metrics){
           if(!isRecord(metric)||!uuid(metric.metricId)||!Number.isInteger(metric.version)||!isRecord(metric.executionRequest))throw new RuntimeError('INVALID_CONTEXT_RESPONSE');
           const plan=metric.executionRequest;
@@ -59,7 +59,7 @@ export function publishedMetricPlans() {
           if (!isRecord(metric) || !uuid(metric.metricId) || !Number.isInteger(metric.version) || Number(metric.version)<1 || !isRecord(metric.executionRequest)) continue;
           const plan=metric.executionRequest;
           if (plan.metricId!==metric.metricId || plan.metricVersion!==metric.version || plan.datasetId!==source.datasetId || plan.snapshotId!==source.snapshotId) throw new RuntimeError('INVALID_CONTEXT_RESPONSE');
-          if (plans.size>=64 && !plans.has(key(plan))) throw new RuntimeError('METRIC_PLAN_LIMIT');
+          // Context response byte budget bounds this attempt; business metric count is not capped.
           plans.set(key(plan),structuredClone(plan));
         }
       }

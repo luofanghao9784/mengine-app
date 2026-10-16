@@ -41,7 +41,8 @@ public class FusionPublicationService {
   var results=evidence.path("results");require(results.size()>=2,"FUSION_RESULT_INVALID");
   String prose=request.title()+"\n"+request.summary()+"\n"+String.join("\n",request.analysis());
   // A bundle must be discussed as a bundle, not hidden behind a single-metric paragraph.
-  for(var metric:results)require(prose.contains(metric.path("label").asText()),"FUSION_ANALYSIS_INCOMPLETE");
+  final String narrative=prose;
+  require(results.valueStream().filter(metric->narrative.contains(metric.path("label").asText())).count()>=2,"FUSION_ANALYSIS_INCOMPLETE");
   FusionNarrativeEvidence.validate(prose,evidence);
   var first=results.get(0);var rows=new ArrayList<Row>();var labels=evidence.path("dimensionLabels");
   for(var g:first.path("groups")){
@@ -49,7 +50,7 @@ public class FusionPublicationService {
    if(label.isBlank())label=g.path("dimensions").get(0).isNull()?"未匹配对象":g.path("dimensions").get(0).asText();
    rows.add(new Row(label,null,g.path("value").asText(),null,null,null,null,null));
   }
-  require(!rows.isEmpty()&&rows.size()<=50,"FUSION_RESULT_INVALID");
+  require(!rows.isEmpty(),"FUSION_RESULT_INVALID");
   if(results.valueStream().allMatch(r->r.path("groups").valueStream().allMatch(g->new BigDecimal(g.path("value").asText()).signum()==0)))throw new BriefingContentService.NoUsefulData();
   var chart=new Chart("GROUPED_BAR",first.path("label").asText(),first.path("unit").asText(),"不适用","关联汇总","按已发布口径，分别汇总后对齐",rows,new Row(null,null,first.path("total").asText(),null,null,null,null,null));
   var presentation=request.presentation()==null?new BriefingPresentationPolicy.Presentation("briefing-presentation-v1","EDITORIAL","TABLE",null,null,List.of()):BriefingPresentationPolicy.resolve(request,"DATA",chart);

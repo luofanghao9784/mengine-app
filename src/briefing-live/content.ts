@@ -113,7 +113,7 @@ export function isBriefingDocument(v: unknown): v is BriefingDocument {
     text(ch.range, 1, 32) &&
     Array.isArray(ch.rows) &&
     ch.rows.length > 0 &&
-    ch.rows.length <= 50 &&
+    (c.fusion != null || ch.rows.length <= 50) &&
     ch.rows.every((r) => row(r) && r.group !== null) &&
     row(ch.totals) &&
     (dataset

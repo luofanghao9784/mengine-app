@@ -47,7 +47,7 @@ public final class FusionCalculator {
     private static Set<String> validate(Metric m,Map<String,Snapshot> sources) {
         require(m!=null&&text(m.id())&&text(m.label())&&text(m.unit())&&sources.containsKey(m.base()),"FUSION_METRIC_INVALID");
         require(Set.of("SUM","COUNT","COUNT_DISTINCT").contains(Objects.toString(m.aggregation(),"")),"FUSION_AGGREGATION_INVALID");
-        require(m.joins()!=null&&m.joins().size()<=4&&m.dimensions()!=null&&m.dimensions().size()<=3&&m.filters()!=null&&m.filters().size()<=12,"FUSION_PLAN_LIMIT");
+        require(m.joins()!=null&&m.dimensions()!=null&&m.filters()!=null,"FUSION_PLAN_LIMIT");
         var scope=new LinkedHashSet<String>();scope.add(m.base());
         for(var j:m.joins()){
             require(j!=null&&scope.contains(j.from())&&!scope.contains(j.to())&&sources.containsKey(j.to()),"FUSION_JOIN_PATH_INVALID");
@@ -73,7 +73,7 @@ public final class FusionCalculator {
     }
     public List<Result> calculate(Plan plan,UUID actor,Map<String,Snapshot> sources,Access access) {
         require(plan!=null&&plan.tenant()!=null&&plan.id()!=null&&plan.version()>0&&actor!=null&&access!=null,"FUSION_PLAN_INVALID");
-        require(sources!=null&&!sources.isEmpty()&&sources.size()<=12&&plan.metrics()!=null&&plan.metrics().size()>=2&&plan.metrics().size()<=6,"FUSION_PLAN_LIMIT");
+        require(sources!=null&&!sources.isEmpty()&&plan.metrics()!=null&&!plan.metrics().isEmpty(),"FUSION_PLAN_LIMIT");
         long rows=0;var datasetIds=new HashSet<UUID>();
         for(var e:sources.entrySet()){
             var s=e.getValue();require(text(e.getKey())&&s!=null&&plan.tenant().equals(s.tenant()),"FUSION_TENANT_MISMATCH");
@@ -128,7 +128,7 @@ public final class FusionCalculator {
             for(var d:m.dimensions())dimensions.add(value(row,d.field()));
             // Null is retained as a separate unmatched group, never merged with a real label.
             var k=Collections.unmodifiableList(dimensions);var g=groups.computeIfAbsent(k,unused->new Aggregate());
-            require(groups.size()<=50,"FUSION_GROUP_LIMIT");g.records++;included++;
+            g.records++;included++;
             if(m.aggregation().equals("SUM"))g.sum=g.sum.add(decimal(value(row,m.value())));
             else if(m.aggregation().equals("COUNT"))g.sum=g.sum.add(BigDecimal.ONE);
             else {String v=value(row,m.value());if(v!=null&&!v.isBlank())g.distinct.add(v);}

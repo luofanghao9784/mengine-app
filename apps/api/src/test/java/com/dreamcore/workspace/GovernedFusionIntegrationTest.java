@@ -81,7 +81,7 @@ class GovernedFusionIntegrationTest extends TaskDatasetFixture {
   assertThrows(IdentityException.class,()->new TransactionTemplate(manager).execute(x->fusion.evidence(job.id(),1,artifact)));
  }
  @Test void duplicateDimensionKeysDeclineFusionRatherThanMultiplyAmounts(){
-  UUID saved=dataset;dataset=dimension;version(2,List.of(List.of("s","first"),List.of("s","second")));dataset=saved;plan();
+  UUID saved=dataset;dataset=dimension;version(2,List.of(List.of("s","first"),List.of("s","second")));dataset=saved;assertThrows(IdentityException.class,this::plan);
   assertEquals(0,db.queryForObject("SELECT count(*) FROM governed_fusion_task_plans WHERE task_id=?",Integer.class,taskId));
  }
  @Test void missingAuxiliaryPermissionDoesNotExpandSelection(){

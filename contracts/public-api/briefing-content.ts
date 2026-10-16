@@ -84,7 +84,7 @@ export interface BriefingDocument {
 }
 
 export interface FusionEvidence {
-  version: 'governed-star-v1';
+  version: 'governed-graph-v1';
   sources: { alias:string; name:string; datasetId:string; snapshotId:string; sha256:string; rowCount:number }[];
   relations: {from:string; to:string; id:string; name:string; local:string[]; foreign:string[]; targetFingerprint:string}[];
   results: {metricId:string; label:string; unit:string; total:string; dimensions:string[]; groups:{dimensions:(string|null)[];value:string;records:number}[]; baseRecords:number; includedRecords:number; unmatched:Record<string,number>; datasets:string[]}[];

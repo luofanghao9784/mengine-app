@@ -11,6 +11,7 @@ let main=fs.readFileSync('.local/fusion-stage/main.before.js','utf8');
 function replace(a,b){if(main.split(a).length!==2)throw Error('Baseline guard mismatch: '+a);main=main.replace(a,b)}
 replace('function au({document:e,compact:t=!1}){let n=e.content','function au({document:e,compact:t=!1}){if(e.content.fusion)return(0,W.jsx)(dcFusion,{document:e,compact:t});let n=e.content');
 replace('function Gl({document:e}){let[t,n,r]=Fl(),i=el(e),a=Ol(e);','function Gl({document:e}){let[t,n,r]=Fl(),i=el(e),a=Ol(e);if(e.content.fusion)return(0,W.jsx)(dcFusion,{document:e,compact:!0});');
+replace('n.rows.length<=50','(t.fusion!=null||n.rows.length<=50)');
 replace('if(t.presentation!=null&&!nl(t.presentation,t))','if(t.fusion!=null&&!dcValid(t.fusion))return!1;if(t.presentation!=null&&!nl(t.presentation,t))');
 main=`import {createFusionRenderer,isFusionEvidence as dcValid} from './${moduleName}';\nfunction dcFusion(props){return createFusionRenderer(R)(props)}\n`+main;
 const out='.local/fusion-stage/web';fs.mkdirSync(out+'/assets',{recursive:true});const mainName=`main-fusion-${sha(main).slice(0,12)}.js`;

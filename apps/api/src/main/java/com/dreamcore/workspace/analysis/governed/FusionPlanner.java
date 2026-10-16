@@ -4,7 +4,7 @@ import com.dreamcore.workspace.scene.MetricPlan;
 import java.util.*;
 import tools.jackson.databind.JsonNode;
 
-/** Builds a bounded star from current governed relations, never from similarly named columns. */
+/** Builds a relation graph from governed paths, never from similarly named columns. */
 public final class FusionPlanner {
     public record Source(String sourceId, UUID dataset, UUID snapshot, String name, String fingerprint,
                          Set<String> columns, int rows, JsonNode metadata, List<Published> metrics) {}
@@ -36,53 +36,59 @@ public final class FusionPlanner {
             &&!a.isEmpty()&&a.size()<=3&&new HashSet<>(a).size()==a.size()
             &&new HashSet<>(b).size()==b.size()&&from.columns().containsAll(a)&&to.columns().containsAll(b);
     }
-    /** Caller supplies only ACL-checked sources and source-current, published metric versions. */
+    private record Edge(Source from,Source to,JsonNode relation) {}
+    /** A unique shortest registered path gives an explicit attribution; equal alternatives are ambiguous. */
+    private Map<String,List<Edge>> paths(Source anchor,List<Source> sources,List<Edge> edges){
+        var distance=new HashMap<String,Integer>();distance.put(anchor.sourceId(),0);
+        boolean changed=true;while(changed){changed=false;for(var e:edges){var d=distance.get(e.to().sourceId());if(d!=null&&(distance.getOrDefault(e.from().sourceId(),Integer.MAX_VALUE)>d+1)){distance.put(e.from().sourceId(),d+1);changed=true;}}}
+        var found=new HashMap<String,List<Edge>>();found.put(anchor.sourceId(),List.of());
+        for(int depth=1;depth<=sources.size();depth++)for(var source:sources){
+            if(!Objects.equals(distance.get(source.sourceId()),depth))continue;
+            var options=edges.stream().filter(e->e.from().sourceId().equals(source.sourceId())&&Objects.equals(distance.get(e.to().sourceId()),distance.get(source.sourceId())-1)).toList();
+            if(options.size()!=1||!found.containsKey(options.getFirst().to().sourceId()))continue;
+            var path=new ArrayList<Edge>();path.add(options.getFirst());path.addAll(found.get(options.getFirst().to().sourceId()));found.put(source.sourceId(),List.copyOf(path));
+        }
+        return found;
+    }
+    /** The relation graph determines the table/metric count; delivery pages are budgeted downstream. */
     public Optional<Recipe> choose(UUID tenant,Set<UUID> selected,List<Source> granted){
-        if(selected.isEmpty()||selected.size()>3)return Optional.empty();
+        if(selected.isEmpty())return Optional.empty();
         Recipe best=null;long bestScore=Long.MIN_VALUE;
-        var sources=granted.stream().sorted(Comparator.comparing(Source::sourceId)).toList();
-        for(var dimension:sources){
-            if(dimension.rows()<1||dimension.rows()>49)continue;
-            var facts=new ArrayList<Source>();var relations=new ArrayList<JsonNode>();
-            for(var fact:sources){
-                if(fact.dataset().equals(dimension.dataset())||fact.rows()<1||fact.metrics().stream().noneMatch(this::usable))continue;
-                var matches=new ArrayList<JsonNode>();
-                for(var r:fact.metadata().path("dictionary").path("relations"))if(relation(fact,dimension,r))matches.add(r);
-                // E.g. home store and teaching store are not interchangeable attribution roles.
-                if(matches.size()==1){facts.add(fact);relations.add(matches.getFirst());}
-            }
-            for(int i=0;i<facts.size();i++)for(int j=i+1;j<facts.size();j++){
-                var a=facts.get(i);var b=facts.get(j);var ids=Set.of(a.dataset(),b.dataset(),dimension.dataset());
-                if(Collections.disjoint(ids,selected))continue;
-                // Existing system selections are not removed; the combined scope remains bounded.
-                var union=new HashSet<>(selected);union.addAll(ids);if(union.size()>3)continue;
-                var ra=relations.get(i);var rb=relations.get(j);
-                if(!keys(ra,"foreign").equals(keys(rb,"foreign")))continue;
-                long score=List.of(a,b).stream().filter(f->f.metrics().stream().anyMatch(m->usable(m)&&"SUM".equals(m.definition().path("aggregation").asText()))).count()*1_000_000_000L
-                    +(long)a.rows()+b.rows();
-                if(score<=bestScore)continue;
-                var chosen=List.of(a,b,dimension);var bindings=new ArrayList<Binding>();
-                for(int n=0;n<chosen.size();n++){
-                    var s=chosen.get(n);bindings.add(new Binding("s"+n,s.sourceId(),s.dataset(),s.snapshot(),s.fingerprint(),s.name(),s.metadata()));
+        var sources=granted.stream().filter(s->s.rows()>0).sorted(Comparator.comparing(Source::sourceId)).toList();
+        var edges=new ArrayList<Edge>();
+        for(var source:sources)for(var target:sources)if(!source.dataset().equals(target.dataset()))
+            for(var r:source.metadata().path("dictionary").path("relations"))if(relation(source,target,r))edges.add(new Edge(source,target,r));
+        for(var anchor:sources){
+            var paths=paths(anchor,sources,edges);
+            var facts=sources.stream().filter(f->paths.containsKey(f.sourceId())&&f.metrics().stream().anyMatch(this::usable)).toList();
+            if(facts.size()<2)continue;
+            var used=new LinkedHashSet<Source>();
+            for(var f:facts){used.add(f);for(var e:paths.get(f.sourceId())){used.add(e.from());used.add(e.to());}}
+            if(used.stream().noneMatch(s->selected.contains(s.dataset())))continue;
+            var withPath=facts.stream().filter(f->!paths.get(f.sourceId()).isEmpty()).toList();if(withPath.isEmpty())continue;
+            var common=keys(paths.get(withPath.getFirst().sourceId()).getLast().relation(),"foreign");
+            facts=facts.stream().filter(f->paths.get(f.sourceId()).isEmpty()||keys(paths.get(f.sourceId()).getLast().relation(),"foreign").equals(common)).toList();
+            if(facts.size()<2)continue;
+            used.clear();for(var f:facts){used.add(f);for(var e:paths.get(f.sourceId())){used.add(e.from());used.add(e.to());}}
+            var bindings=new ArrayList<Binding>();var aliases=new HashMap<String,String>();
+            for(var source:used){String alias="s"+bindings.size();aliases.put(source.sourceId(),alias);bindings.add(new Binding(alias,source.sourceId(),source.dataset(),source.snapshot(),source.fingerprint(),source.name(),source.metadata()));}
+            var measures=new ArrayList<Measure>();var computations=new ArrayList<FusionCalculator.Metric>();var links=new LinkedHashMap<String,Relation>();
+            for(var fact:facts){
+                String alias=aliases.get(fact.sourceId());var joins=new ArrayList<FusionCalculator.Join>();
+                for(var edge:paths.get(fact.sourceId())){
+                    var r=edge.relation();String from=aliases.get(edge.from().sourceId()),to=aliases.get(edge.to().sourceId());
+                    joins.add(new FusionCalculator.Join(from,to,keys(r,"local"),keys(r,"foreign")));
+                    links.put(from+":"+r.path("id").asText(),new Relation(from,to,r.path("id").asText(),r.path("name").asText(),keys(r,"local"),keys(r,"foreign"),r.path("targetFingerprint").asText()));
                 }
-                var measures=new ArrayList<Measure>();var computations=new ArrayList<FusionCalculator.Metric>();var links=new ArrayList<Relation>();
-                for(int n=0;n<2;n++){
-                    var fact=chosen.get(n);var r=n==0?ra:rb;String alias="s"+n;
-                    var metric=fact.metrics().stream().filter(this::usable)
-                        .sorted(Comparator.comparingInt((Published x)->"SUM".equals(x.definition().path("aggregation").asText())?0:1).thenComparing(x->x.id().toString())).findFirst().orElseThrow();
-                    var d=metric.definition();var local=keys(r,"local");var foreign=keys(r,"foreign");
-                    var dimensions=new ArrayList<FusionCalculator.Dimension>();
-                    for(String key:foreign)dimensions.add(new FusionCalculator.Dimension(key,new FusionCalculator.Field("s2",key)));
-                    // Identifier grouping is deliberate: equal display names must never merge entities.
-                    computations.add(new FusionCalculator.Metric(metric.id().toString(),d.path("name").asText(),d.path("unit").asText(),alias,d.path("aggregation").asText(),
-                        "SUM".equals(d.path("aggregation").asText())?new FusionCalculator.Field(alias,d.path("valueField").asText()):null,
-                        List.of(new FusionCalculator.Join(alias,"s2",local,foreign)),dimensions,List.of()));
+                for(var metric:fact.metrics().stream().filter(this::usable).sorted(Comparator.comparingInt((Published x)->"SUM".equals(x.definition().path("aggregation").asText())?0:1).thenComparing(x->x.id().toString())).toList()){
+                    var d=metric.definition();var dimensions=common.stream().map(k->new FusionCalculator.Dimension(k,new FusionCalculator.Field(aliases.get(anchor.sourceId()),k))).toList();
+                    computations.add(new FusionCalculator.Metric(metric.id().toString(),d.path("name").asText(),d.path("unit").asText(),alias,d.path("aggregation").asText(),"SUM".equals(d.path("aggregation").asText())?new FusionCalculator.Field(alias,d.path("valueField").asText()):null,List.copyOf(joins),dimensions,List.of()));
                     measures.add(new Measure(metric.id(),metric.version(),alias,d));
-                    links.add(new Relation(alias,"s2",r.path("id").asText(),r.path("name").asText(),local,foreign,dimension.fingerprint()));
                 }
-                bestScore=score;best=new Recipe("governed-star-v1",List.copyOf(bindings),List.copyOf(measures),List.copyOf(links),
-                    new FusionCalculator.Plan(tenant,UUID.randomUUID(),1,List.copyOf(computations)));
             }
+            // Prefer the widest valid business graph; fewer hops reduce ambiguous attribution.
+            long score=(long)facts.size()*1_000_000L+measures.size()*1000L-links.size();
+            if(score>bestScore){bestScore=score;best=new Recipe("governed-graph-v1",List.copyOf(bindings),List.copyOf(measures),List.copyOf(links.values()),new FusionCalculator.Plan(tenant,UUID.randomUUID(),1,List.copyOf(computations)));}
         }
         return Optional.ofNullable(best);
     }
