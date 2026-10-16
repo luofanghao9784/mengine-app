@@ -11,6 +11,7 @@ import tools.jackson.databind.json.JsonMapper;
 /** Retains the deployed calculator's existing source checks, decimal arithmetic and cache validation. */
 @Service @Primary
 public class GovernedDatasetCalculationService extends DatasetCalculationService {
+ @org.springframework.beans.factory.annotation.Autowired(required=false) private com.dreamcore.workspace.analysis.governed.GovernedFusionService fusion;
  private final JdbcTemplate db;private final JsonMapper json=new JsonMapper();
  public GovernedDatasetCalculationService(JdbcTemplate db,MaterialAccess access,IdentityAudit audit){super(db,access,audit);this.db=db;}
  @Override @Transactional public Map<String,Object> calculate(ConversationService.Job job,Request request){
@@ -40,6 +41,6 @@ public class GovernedDatasetCalculationService extends DatasetCalculationService
   String planHash=IdentityService.hash(json.writeValueAsString(request));
   db.update("INSERT INTO metric_calculation_receipts(artifact_id,task_id,attempt_number,metric_id,version,dataset_id,snapshot_id,plan_sha256) SELECT ?,id,attempt,?,?,?,?,? FROM conversation_tasks WHERE id=? ON CONFLICT DO NOTHING",artifact,match.get("id"),match.get("version"),request.datasetId(),request.snapshotId(),planHash,job.id());
   var definition=json.readTree(match.get("definition").toString());result.put("governedMetric",Map.of("id",match.get("id"),"version",match.get("version"),"name",definition.path("name").asText(),"unit",definition.path("unit").asText(),"planSha256",planHash,"scope",definition.path("scope").asText(),"grain",definition.path("grain").asText(),"exclusions",definition.path("exclusions").asText(),"interpretation","仅按此定义解释计算结果；保留源单位、快照范围和统计粒度，不把记录条数当人数，不把原始金额合计当有效收入。","referenceOnly",true));
-  return result;
+  return fusion==null?result:fusion.enrich(job,request,result);
  }
 }

@@ -1,0 +1,19 @@
+import ts from '../../integrations/mengine-wiki/node_modules/typescript/lib/typescript.js';import fs from 'node:fs';import crypto from 'node:crypto';
+const sha=s=>crypto.createHash('sha256').update(s).digest('hex');
+let helpers=fs.readFileSync('src/briefing-live/fusion.ts','utf8').replace(/^import .*;\n/gm,'').replaceAll('export function','function');
+helpers="const record=(x:unknown):x is Record<string,unknown>=>x!==null&&typeof x==='object'&&!Array.isArray(x);const uuid=(x:unknown)=>typeof x==='string'&&/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(x);\n"+helpers;
+const h=ts.transpileModule(helpers,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
+const component=fs.readFileSync('src/briefing-live/FusionBriefing.tsx','utf8').replace(/^import .*;\n/gm,'').replace('export function','function');
+const body=ts.transpileModule(component,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext,jsx:ts.JsxEmit.React}}).outputText;
+const module=h+'\nexport {isFusionEvidence};\nexport function createFusionRenderer(React){\n'+body+'\nreturn FusionBriefing;\n}\n';
+const moduleName=`fusion-${sha(module).slice(0,12)}.js`;
+let main=fs.readFileSync('.local/fusion-stage/main.before.js','utf8');
+function replace(a,b){if(main.split(a).length!==2)throw Error('Baseline guard mismatch: '+a);main=main.replace(a,b)}
+replace('function au({document:e,compact:t=!1}){let n=e.content','function au({document:e,compact:t=!1}){if(e.content.fusion)return(0,W.jsx)(dcFusion,{document:e,compact:t});let n=e.content');
+replace('function Gl({document:e}){let[t,n,r]=Fl(),i=el(e),a=Ol(e);','function Gl({document:e}){let[t,n,r]=Fl(),i=el(e),a=Ol(e);if(e.content.fusion)return(0,W.jsx)(dcFusion,{document:e,compact:!0});');
+replace('if(t.presentation!=null&&!nl(t.presentation,t))','if(t.fusion!=null&&!dcValid(t.fusion))return!1;if(t.presentation!=null&&!nl(t.presentation,t))');
+main=`import {createFusionRenderer,isFusionEvidence as dcValid} from './${moduleName}';\nfunction dcFusion(props){return createFusionRenderer(R)(props)}\n`+main;
+const out='.local/fusion-stage/web';fs.mkdirSync(out+'/assets',{recursive:true});const mainName=`main-fusion-${sha(main).slice(0,12)}.js`;
+fs.writeFileSync(out+'/assets/'+moduleName,module);fs.writeFileSync(out+'/assets/'+mainName,main);
+const css=fs.readFileSync('src/briefing-live/fusion.css','utf8'),cssName=`fusion-${sha(css).slice(0,12)}.css`;fs.writeFileSync(out+'/assets/'+cssName,css);
+fs.writeFileSync('.local/fusion-stage/web-overlay.json',JSON.stringify({baseline:sha(fs.readFileSync('.local/fusion-stage/main.before.js')),mainName,moduleName,cssName},null,2));

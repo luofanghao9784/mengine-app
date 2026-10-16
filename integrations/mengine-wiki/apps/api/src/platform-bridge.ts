@@ -7,7 +7,7 @@ import { canUseAI } from './domain.js';
 import { readDataset } from './foundation-query.js';
 import { redactForGovernance } from './governance-ai.js';
 import { exportGovernance } from './platform-governance.js';
-import {dictionaryFingerprint} from './dictionary-version.js';
+import {dictionaryFingerprint,dictionarySchemaFingerprint} from './dictionary-version.js';
 
 // Operator-owned bindings. Browser requests never choose a source tenant or service identity.
 export function registerPlatformBridge(app: FastifyInstance, store: Store, secret: string) {
@@ -45,7 +45,7 @@ export function registerPlatformBridge(app: FastifyInstance, store: Store, secre
         const set=readDataset(store,u,d.id),fields=set.definition.fields.filter(f=>!f.sensitive);
         const rows=(store.db.prepare("SELECT data FROM data_rows WHERE tenant_id=? AND dataset_id=? AND status='ready' ORDER BY id").all(u.tenantId,d.id) as {data:string}[]).map(r=>{const v=JSON.parse(r.data).values;return fields.map(f=>redactForGovernance(String(v[f.name]??'')));});
         const dictionaryRow=store.db.prepare('SELECT data FROM data_dictionary WHERE dataset_id=? AND tenant_id=?').get(d.id,u.tenantId) as {data:string}|undefined;
-        return {...base,fields,dictionary:set.dictionaryStatus==='generated'?set.business:null,dictionaryStatus:set.dictionaryStatus,dictionaryRevision:dictionaryRow?JSON.parse(dictionaryRow.data).revision:0,dictionaryFingerprint:dictionaryFingerprint(store,u.tenantId,set.definition),rows};
+        return {...base,fields,dictionary:set.dictionaryStatus==='generated'?set.business:null,dictionaryStatus:set.dictionaryStatus,dictionaryRevision:dictionaryRow?JSON.parse(dictionaryRow.data).revision:0,dictionaryFingerprint:dictionaryFingerprint(store,u.tenantId,set.definition),dictionarySchemaFingerprint:'schema:'+dictionarySchemaFingerprint(set.definition),rows};
       });
       const revision=digest(JSON.stringify(assets));
       return {contractVersion:'1.1',tenantId:p.tenant,revision,assets};

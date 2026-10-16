@@ -1,4 +1,5 @@
 import { isPresentation } from './presentation.ts';
+import { isFusionEvidence } from './fusion.ts';
 import type { BriefingDocument, BriefingRow } from '../../contracts/public-api/briefing-content';
 import { createIdentityRequest, record, uuid } from '../identity/client.ts';
 const text = (v: unknown, min: number, max: number): v is string =>
@@ -51,6 +52,7 @@ export function isBriefingDocument(v: unknown): v is BriefingDocument {
     s = c.source,
     ds = c.datasetSource,
     basis = c.datasetBasis;
+  if(c.fusion!=null&&!isFusionEvidence(c.fusion))return false;
   if (c.presentation != null && !isPresentation(c.presentation, c as unknown as BriefingDocument['content']))
     return false;
   const dataset = c.schemaVersion === 'briefing-dataset-v1';

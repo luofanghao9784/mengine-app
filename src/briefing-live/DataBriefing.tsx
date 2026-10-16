@@ -1,4 +1,5 @@
 import { KeyMetric, AnalysisComposition, SourceCover } from './Composition';
+import { FusionBriefing } from './FusionBriefing';
 import { ComparisonVisual } from './ComparisonVisual';
 import { presentationOf } from './presentation';
 import { NewsCover } from './NewsCover';
@@ -42,6 +43,7 @@ export function DataBriefing({
   document: BriefingDocument;
   compact?: boolean;
 }) {
+  if(document.content.fusion)return <FusionBriefing document={document} compact={compact}/>;
   const c = document.content,
     ch = c.chart;
   const summary = c.datasetBasis?.periodMode === 'SUMMARY';

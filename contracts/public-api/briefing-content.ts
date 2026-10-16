@@ -32,6 +32,7 @@ export interface BriefingDocument {
     versions: { source: 'GLOBAL' | 'TENANT' | 'PERSONAL'; target: 'ALL' | 'BRIEFING'; revision: number }[];
   } | null;
   content: {
+    fusion?: FusionEvidence | null;
     schemaVersion: 'briefing-data-v1' | 'briefing-text-v1' | 'briefing-dataset-v1';
     businessType: 'INFO' | 'DATA' | 'INSIGHT' | 'SUGGESTION' | 'RESULT';
     title: string;
@@ -80,4 +81,14 @@ export interface BriefingDocument {
     calculationSha256: string | null;
     generatedAt: string;
   };
+}
+
+export interface FusionEvidence {
+  version: 'governed-star-v1';
+  sources: { alias:string; name:string; datasetId:string; snapshotId:string; sha256:string; rowCount:number }[];
+  relations: {from:string; to:string; id:string; name:string; local:string[]; foreign:string[]; targetFingerprint:string}[];
+  results: {metricId:string; label:string; unit:string; total:string; dimensions:string[]; groups:{dimensions:(string|null)[];value:string;records:number}[]; baseRecords:number; includedRecords:number; unmatched:Record<string,number>; datasets:string[]}[];
+  dimensionName:string;
+  dimensionLabels:Record<string,string>;
+  boundary:string;
 }

@@ -8,9 +8,11 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.transaction.annotation.Transactional;
 @Service @Primary
 public class GovernedBriefingContentService extends BriefingContentService {
+ @org.springframework.beans.factory.annotation.Autowired(required=false) private com.dreamcore.workspace.analysis.governed.FusionPublicationService fusion;
  private final JdbcTemplate db;
  public GovernedBriefingContentService(JdbcTemplate db,IdentityAudit audit){super(db,audit);this.db=db;}
  @Override @Transactional public Document create(ConversationService.Job job,Request request){
+  if(request!=null&&fusion!=null&&fusion.applies(job.id(),request.calculationArtifactId()))return fusion.create(job,request);
   if(request==null)throw IdentityException.invalid();boolean data=request.businessType()==null||request.businessType().equals("DATA");
   boolean governed=false;
   if(data&&request.calculationArtifactId()!=null){

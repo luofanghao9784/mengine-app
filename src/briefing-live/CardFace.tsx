@@ -357,6 +357,7 @@ export function Rows({
 /** The card-face graphic for a verified comparison. The full reading keeps every group and the evidence. */
 export function CardFace({ document }: { document: BriefingDocument }) {
   const [ref, box, bleed] = useFaceBox();
+  if(document.content.fusion)return <FusionBriefing document={document} compact/>;
   const chart = displayChart(document);
   const kind = faceKind(document);
   if (!chart || !kind) return null;
@@ -398,3 +399,4 @@ export function CardFace({ document }: { document: BriefingDocument }) {
     </div>
   );
 }
+import { FusionBriefing } from './FusionBriefing';

@@ -3,6 +3,8 @@ import { isRecord } from './http-json.js';
 import { RuntimeError, type Json, type TaskTool } from './ports.js';
 /** Protocol guidance only. Placeholder text is never business evidence. */
 export const BRIEFING_EDITORIAL_HINTS: Record<string, string> = {
+  FUSION_ANALYSIS_INCOMPLETE: '融合画报需要在正文中同时使用 fusion.results 两项指标的完整 label，并结合共同维度解读；不能只解释主指标。',
+  FUSION_NUMBER_NOT_VERIFIED: '正文只可引用 fusion 中已计算的原始数值；删除自行计算、四舍五入、推断的数字及比率。完整精确表格将自动交付，无需在正文重复数字。',
   BRIEFING_TEXT_INCOMPLETE: '标题为4–80字；摘要为12–240字；正文为2–4段、每段12–500字。摘要和每段正文均以句号、问号或叹号结束，不以括号或引号结束；保留有依据的内容，不补造事实。',
   BRIEFING_ANALYSIS_REQUIRED: 'analysis 必须为2–4个完整段落组成的字符串数组，每段12–500字，不是单个字符串。',
 
