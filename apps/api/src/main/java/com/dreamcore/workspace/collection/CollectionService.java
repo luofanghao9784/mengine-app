@@ -157,7 +157,7 @@ public class CollectionService {
             var columns=definitions.get(s.datasetId()).columns();if(columns.isEmpty()||columns.size()>100||new HashSet<>(columns).size()!=columns.size())return false;
             for(var row:s.rows()){
                 if(row==null||row.size()!=columns.size())return false;
-                totalCells+=row.size();if(totalCells>1000000)return false;
+                totalCells+=row.size();if(totalCells>2000000)return false;
                 for(String cell:row)if(cell!=null&&cell.length()>8192)return false;
             }
         }return true;

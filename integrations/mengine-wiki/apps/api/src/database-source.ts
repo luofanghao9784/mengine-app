@@ -1,23 +1,26 @@
+import {deployedSource} from './deployed-source.js';
 import Database from 'better-sqlite3';
 import {Client,types} from 'pg';
 import mysql from 'mysql2/promise';
 import {realpathSync} from 'node:fs';
 import {resolve,basename,sep} from 'node:path';
-export type ConnectionConfig={kind:'sqlite'|'postgres'|'mysql';name:string;host?:string;port?:number;database?:string;username?:string;password?:string;schema?:string;file?:string;ca?:string};
-export type SourceColumn={name:string;type:string;nullable:boolean;primary:boolean;comment:string};
-export type SourceTable={name:string;comment:string;columns:SourceColumn[]};
+export type ConnectionConfig={kind:'sqlite'|'postgres'|'mysql'|'deployed';provider?:string;name:string;host?:string;port?:number;database?:string;username?:string;password?:string;schema?:string;file?:string;ca?:string};
+export type SourceColumn={allowEmpty?:boolean;name:string;type:string;nullable:boolean;primary:boolean;comment:string};
+export type SourceTable={access?:'owner-only';name:string;comment:string;columns:SourceColumn[]};
 const fail=(message:string)=>Object.assign(Error(message),{statusCode:400});
 export function validateConnection(input:unknown):ConnectionConfig{
  if(!input||typeof input!=='object'||Array.isArray(input))throw fail('连接配置无效');const c=input as ConnectionConfig;
- if(Object.keys(c).some(k=>!['kind','name','host','port','database','username','password','schema','file','ca'].includes(k))||!['sqlite','postgres','mysql'].includes(c.kind)||typeof c.name!=='string'||!c.name.trim()||c.name.length>100)throw fail('请填写连接名称和数据库类型');
+ if(Object.keys(c).some(k=>!['kind','name','host','port','database','username','password','schema','file','ca','provider'].includes(k))||!['sqlite','postgres','mysql','deployed'].includes(c.kind)||typeof c.name!=='string'||!c.name.trim()||c.name.length>100)throw fail('请填写连接名称和数据库类型');
  for(const [key,v] of Object.entries(c))if(key!=='port'&&(typeof v!=='string'||v.length>(key==='ca'?12000:1000)||v.includes('\0')))throw fail('连接字段无效');
- if(c.kind==='sqlite'){if(!c.file||basename(c.file)!==c.file||!c.file.endsWith('.sqlite'))throw fail('SQLite仅接受接入目录中的 .sqlite 文件名');}
+ if(c.kind==='deployed'){if(!c.provider||!/^[-a-zA-Z0-9_]{1,100}$/.test(c.provider)||Object.keys(c).some(k=>!['kind','name','provider'].includes(k)))throw fail('仅接受部署侧已登记的来源编号');}
+ else if(c.kind==='sqlite'){if(!c.file||basename(c.file)!==c.file||!c.file.endsWith('.sqlite'))throw fail('SQLite仅接受接入目录中的 .sqlite 文件名');}
  else {if(!c.host||!c.database||!c.username||!c.password||!Number.isInteger(c.port)||c.port!<1||c.port!>65535||! /^[a-zA-Z0-9.:-]+$/.test(c.host))throw fail('请填写有效主机、端口、库名、账号及密码');}
  return c;
 }
 const pq=(s:string)=>'"'+s.replaceAll('"','""')+'"',mq=(s:string)=>'`'+s.replaceAll('`','``')+'`';
 // All operations are fixed SELECTs, in a read-only transaction. Remote TLS verifies server certificates.
-export async function withSource<T>(c:ConnectionConfig,fn:(adapter:{scan:()=>Promise<SourceTable[]>;rows:(table:SourceTable)=>Promise<Record<string,unknown>[]>})=>Promise<T>,tenant:string):Promise<T>{
+export async function withSource<T>(c:ConnectionConfig,fn:(adapter:{scan:()=>Promise<SourceTable[]>;rows:(table:SourceTable)=>Promise<Record<string,unknown>[]>;limits?:{rows:number;columns:number;bytes:number};receipt?:(table:SourceTable)=>unknown})=>Promise<T>,tenant:string):Promise<T>{
+ if(c.kind==='deployed')return fn(await deployedSource(c.provider!,tenant));
  if(c.kind==='sqlite'){
   if(!/^[a-zA-Z0-9_-]+$/.test(tenant))throw fail('企业目录无效');const root=realpathSync(resolve(process.env.DATABASE_SOURCE_ROOT||'.runtime/database-sources',tenant));const path=realpathSync(resolve(root,c.file!));if(!path.startsWith(root+sep))throw fail('源文件不在企业接入目录');const db=new Database(path,{readonly:true,fileMustExist:true});db.defaultSafeIntegers(true);db.pragma('query_only=ON');db.exec('BEGIN');
   try{return await fn({scan:async()=>{const tables=db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name LIMIT 101").all() as {name:string}[];if(tables.length>100)throw fail('超过100张表，请限定接入库');return tables.map(t=>({name:t.name,comment:'',columns:(db.pragma(`table_info(${pq(t.name)})`) as any[]).map(x=>({name:x.name,type:x.type,nullable:!x.notnull&&!x.pk,primary:!!x.pk,comment:''}))}));},rows:async t=>db.prepare(`SELECT ${t.columns.map(x=>pq(x.name)).join(',')} FROM ${pq(t.name)} LIMIT 10001`).all() as Record<string,unknown>[]});}finally{db.exec('ROLLBACK');db.close();}

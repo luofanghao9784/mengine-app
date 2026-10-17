@@ -55,7 +55,7 @@ export function registerSceneKnowledge(
         k.sourceKind === 0 ? "业务数据统计" : "原文依据",
         "ok",
       ]),
-      ["模型", k.model, `知识 v${k.revision}`, "plain"],
+      [k.origin === "deployment" ? "部署治理" : "模型", k.model, `知识 v${k.revision}`, "plain"],
     ],
     actions: ["查看来源", "重新核验"],
   });

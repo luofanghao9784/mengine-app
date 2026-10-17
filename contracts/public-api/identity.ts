@@ -3,6 +3,7 @@ export type TenantRole = 'TENANT_ADMIN' | 'MEMBER';
 export interface Account {
   id: string;
   email: string | null;
+  username?: string | null;
   phone?: string | null;
   displayName: string;
 }

@@ -16,7 +16,7 @@ export interface RecommendationContent extends DeliveryTarget {
   excerpt: string;
   truncated: boolean;
   createdAt: string;
-  executionClass: 'verification' | 'live' | 'PUBLISHED_COPY';
+  executionClass: 'verification' | 'live' | 'external' | 'PUBLISHED_COPY';
   conversationId: string | null;
   taskRevision: number;
   attempt: number;

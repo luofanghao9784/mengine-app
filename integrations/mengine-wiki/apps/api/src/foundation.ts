@@ -4,7 +4,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { Store } from './store.js';
 import { canRead, canEdit, canIngest, canManage, metadata, now, visibleText, type Doc, type User } from './domain.js';
 const fail=(statusCode:number,message:string)=>Object.assign(new Error(message),{statusCode});
-export type Field={name:string;label:string;type:'text'|'number'|'date'|'boolean';required:boolean;unique:boolean;sensitive:boolean;description:string};
+export type Field={allowEmpty?:boolean;name:string;label:string;type:'text'|'number'|'date'|'boolean';required:boolean;unique:boolean;sensitive:boolean;description:string};
 type Dataset={id:string;fields:Field[];source:string;purpose:string;updatePolicy:string};
 type Row={id:string;version:number;values:Record<string,string>;issues:string[];status:'ready'|'quarantined';updatedAt:string;actor:string};
 const obj=(properties:Record<string,unknown>,required:string[])=>({type:'object',additionalProperties:false,properties,required});

@@ -194,7 +194,7 @@ test("百炼请求实际包含 user/assistant 历史且历史不提升为 system
   } finally { globalThis.fetch = originalFetch; }
 });
 
-test("提炼并写入所选资料时，不把其他文档的历史内容注入摘要", () => fixture(async ctx => {
+test("提炼所选资料不混入其他历史，也不生成已停用的内容修改方案", () => fixture(async ctx => {
   const headers = await login(ctx);
   const id = (await ask(ctx, headers)).json().conversationId;
   ctx.model.answer = async (_q, evidence, history) => {
@@ -205,7 +205,9 @@ test("提炼并写入所选资料时，不把其他文档的历史内容注入�
   };
   const result = await ask(ctx, headers, { conversationId: id, expectedRevision: 1, action: "summarize", documentId: "doc-1" });
   assert.equal(result.statusCode, 200);
-  assert.equal(result.json().proposal.patch.summary, "仅白皮书摘要 [1]");
+  assert.equal(result.json().proposal, undefined);
+  assert.equal(ctx.store.proposals("mengine-demo").length, 0);
+  assert.equal(result.json().text, "仅白皮书摘要 [1]");
 }));
 
 test("生成过程中退出登录，结果不再返回或保存", () => fixture(async ctx => {

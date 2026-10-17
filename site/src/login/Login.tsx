@@ -7,7 +7,7 @@ import { readInvitation, requestResetCode, resetPassword, signIn, type AuthResul
 
 /* 登录页只用产品自己的组件：标志、输入框、按钮、卡片，都来自主仓库。 */
 const copy: Record<Surface, { title: string; hint: string }> = {
-  workspace: { title: '登录', hint: '使用手机号和密码，继续你的工作。' },
+  workspace: { title: '登录', hint: '使用用户名或手机号和密码，继续你的工作。' },
   admin: { title: '登录企业管理端', hint: '和梦擎工作空间是同一个账号，需要有企业的管理权限。' },
   platform: { title: '登录运营平台', hint: '使用平台管理账号登录。' },
 };
@@ -50,7 +50,7 @@ export function Login({ surface: initial }: { surface: Surface }) {
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (mode === 'invite') return void run(() => readInvitation(invitation.trim()));
-    if (customer && !validPhone(phone)) return fail('请填写正确的手机号。海外号码请带上国家区号。');
+    if (customer && !validPhone(phone) && !(mode === 'login' && /^[a-z][a-z0-9_-]{2,39}$/i.test(phone.trim()))) return fail('请填写正确的用户名或手机号。');
     if (password.length < 6) return fail('密码至少 6 位。');
     if (mode === 'reset') return void run(() => resetPassword(phone, code, password));
     void run(() => signIn(surface === 'platform' ? { surface, account: account.trim(), password } : { surface, phone, password }));
@@ -110,8 +110,8 @@ export function Login({ surface: initial }: { surface: Surface }) {
           ) : (
             <>
               {customer ? (
-                <Field label="手机号">
-                  <input type="tel" name="phone" inputMode="tel" autoComplete="tel" placeholder="手机号，海外号码请带国家区号" maxLength={40} required value={phone} onChange={(e) => setPhone(e.target.value)} />
+                <Field label={mode === 'login' ? '用户名或手机号' : '手机号'}>
+                  <input type="text" name="phone" autoComplete="username" placeholder={mode === 'login' ? '用户名或手机号' : '手机号，海外号码请带国家区号'} maxLength={40} required value={phone} onChange={(e) => setPhone(e.target.value)} />
                 </Field>
               ) : (
                 <Field label="管理账号">

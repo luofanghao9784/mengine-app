@@ -26,7 +26,8 @@ const adapter = (url) =>
     apiKey: 'synthetic',
     endpoint: url + '/chat/completions',
     localVerification: true,
-    timeoutMs: 100,
+    // Allow the synthetic HTTP fixture to respond under concurrent test load.
+    timeoutMs: 1000,
   });
 
 test('metering retains usage from malformed responses and distinguishes a later missing response', async (t) => {

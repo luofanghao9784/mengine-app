@@ -60,6 +60,30 @@ class UnifiedIdentityIntegrationTest {
             assertEquals(f.id().toString(),JSON.readTree(result.body()).get("account").get("id").asString());
         }
     }
+    @Test void provisionedUsernameUsesSharedPasswordAndTenantBoundaries() throws Exception {
+        UUID actor=UUID.randomUUID(), tenant=UUID.randomUUID(), foreign=UUID.randomUUID();
+        String username="demo-"+actor.toString().substring(0,8);
+        db.update("INSERT INTO accounts(id,username,display_name,password_hash) VALUES (?,?,'合成演示负责人',?)",actor,username,passwords.encode("synthetic-username-pass"));
+        db.update("INSERT INTO tenants(id,name) VALUES (?,'演示企业'),(?,'其他企业')",tenant,foreign);
+        db.update("INSERT INTO tenant_memberships(tenant_id,account_id,role) VALUES (?,?,'TENANT_ADMIN')",tenant,actor);
+        var b=new Browser();
+        assertEquals(401,b.post("/api/v1/auth/login",Map.of("username",username,"password","wrong")).statusCode());
+        assertEquals(400,b.post("/api/v1/auth/login",Map.of("username",username,"phone","19900001012","password","synthetic-username-pass")).statusCode());
+        var login=b.post("/api/v1/auth/login",Map.of("username"," "+username.toUpperCase(Locale.ROOT)+" ","password","synthetic-username-pass"));
+        assertEquals(200,login.statusCode(),login.body());
+        var me=JSON.readTree(login.body());
+        assertEquals(username,me.get("account").get("username").asString());
+        assertFalse(me.get("platformAdmin").asBoolean());
+        assertEquals(1,me.get("memberships").size());
+        assertEquals(200,b.get("/api/v1/tenants/"+tenant+"/context").statusCode());
+        assertEquals(200,b.get("/api/tenant-admin/v1/tenants/"+tenant+"/invitations").statusCode());
+        assertEquals(403,b.get("/api/v1/tenants/"+foreign+"/context").statusCode());
+        assertEquals(403,b.get("/api/tenant-admin/v1/tenants/"+foreign+"/invitations").statusCode());
+        assertEquals(401,b.get("/api/platform-admin/v1/auth/me").statusCode());
+        db.update("UPDATE accounts SET status='DISABLED' WHERE id=?",actor);
+        assertEquals(401,b.get("/api/v1/me").statusCode());
+        assertEquals(401,new Browser().post("/api/v1/auth/login",Map.of("username",username,"password","synthetic-username-pass")).statusCode());
+    }
     @Test void sameAccountStillRequiresIndependentRealmLogins()throws Exception {
         var f=fixture(true);
         for(boolean dedicated:List.of(false,true)) {

@@ -17,7 +17,7 @@ import {
   type User,
   type Doc,
 } from "./domain.js";
-import { dictionaryFingerprint } from "./dictionary-version.js";
+import { dictionaryFingerprint, currentDictionary } from "./dictionary-version.js";
 import { enqueueDictionary } from "./dictionary-jobs.js";
 import { redactForGovernance } from "./governance-ai.js";
 
@@ -80,9 +80,7 @@ export function registerSceneFoundation(
     const data = r ? JSON.parse(r.data) : null,
       c = data?.confirmed;
     const current =
-      !!c &&
-      c.origin === "model" &&
-      c.fingerprint === dictionaryFingerprint(store, u.tenantId, set);
+      currentDictionary(store,u.tenantId,set,c);
     const job = store.db
       .prepare(
         "SELECT state,attempts,next_at AS nextAt,error FROM dictionary_jobs WHERE tenant_id=? AND dataset_id=?",

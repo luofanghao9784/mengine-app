@@ -1,3 +1,4 @@
+import { TenantConsole } from '../admin/TenantConsole';
 import { SkillCenter, skillsHref } from '../skills/SkillCenter';
 import { SuspendedEnterprise } from './SuspendedEnterprise';
 import { TenantScene } from '../admin/TenantScene';
@@ -135,7 +136,12 @@ export default function AccessApp({
     return (
       <Status title="暂时无法连接服务" detail="当前状态尚未确认，请重新连接。" retry={() => void refresh()} />
     );
-  if (session.phase === 'authenticated' && !session.identity?.account.phone && !phoneConfiguration.value)
+  if (
+    session.phase === 'authenticated' &&
+    !session.identity?.account.phone &&
+    !session.identity?.account.username &&
+    !phoneConfiguration.value
+  )
     return (
       <Status
         title="正在确认账号入口"
@@ -147,7 +153,8 @@ export default function AccessApp({
     session.phase === 'anonymous' ||
     inviting ||
     (!session.identity?.account.phone &&
-      (!legacyAllowed || new URLSearchParams(location.hash.slice(1)).has('bind')))
+      ((!session.identity?.account.username && !legacyAllowed) ||
+        new URLSearchParams(location.hash.slice(1)).has('bind')))
   )
     return (
       <div className="access-auth-layout">
@@ -315,7 +322,20 @@ function GuardedAccessShell({
   if (surface === 'tenant-admin' && selected)
     return (
       <UploadProvider>
-        <TenantScene key={tenant} tenant={tenant} name={selected.tenantName} enterprises={eligible.map(m => ({id:m.tenantId,name:m.tenantName}))} onChoose={choose} />
+        {new URLSearchParams(location.search).get('view') === 'business' ||
+        ['admin', 'manage', 'tab', 'scope'].some((key) =>
+          new URLSearchParams(location.hash.slice(1)).has(key),
+        ) ? (
+          <TenantConsole key={tenant} tenant={tenant} name={selected.tenantName} />
+        ) : (
+          <TenantScene
+            key={tenant}
+            tenant={tenant}
+            name={selected.tenantName}
+            enterprises={eligible.map((m) => ({ id: m.tenantId, name: m.tenantName }))}
+            onChoose={choose}
+          />
+        )}
       </UploadProvider>
     );
   return (

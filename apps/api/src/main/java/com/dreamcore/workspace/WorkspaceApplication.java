@@ -29,6 +29,20 @@ public class WorkspaceApplication {
                 System.err.println("Collection deployment failed; verify the manifest, enterprise scope and host configuration.");
                 System.exit(1);
             }
+        } else if (java.util.Arrays.asList(args).contains("--bootstrap-briefings")) {
+            var application = new SpringApplication(WorkspaceApplication.class);
+            application.setWebApplicationType(WebApplicationType.NONE);
+            try (var context = application.run(args)) {
+                context.getBean(com.dreamcore.workspace.conversation.BriefingBootstrapDeployment.class).run();
+                System.out.println("External briefing validation completed; inspect the private receipt.");
+            } catch (Exception failure) {
+                System.err.println("External briefing deployment failed; no partial batch is published. " + (failure instanceof com.dreamcore.workspace.identity.IdentityException e ? e.code : failure.getClass().getSimpleName()));
+                Throwable cause = failure;
+                while (cause.getCause() != null) cause = cause.getCause();
+                if (cause instanceof java.sql.SQLException sql)
+                    System.err.println("Database validation code: " + sql.getSQLState());
+                System.exit(1);
+            }
         } else {
             SpringApplication.run(WorkspaceApplication.class, args);
         }

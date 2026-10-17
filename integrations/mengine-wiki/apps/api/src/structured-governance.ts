@@ -2,18 +2,18 @@ import {createHash,randomUUID} from 'node:crypto';
 import type {FastifyInstance,FastifyRequest} from 'fastify';
 import type {Store} from './store.js';
 import {canGovern,canManage,canRead,canGovernResource,now,type User} from './domain.js';
-import {dictionaryFingerprint} from './dictionary-version.js';
+import {dictionaryFingerprint,currentDictionary} from './dictionary-version.js';
 // Internal governance inspection does not confer ordinary read or AI access.
-function readDataset(s:Store,u:User,id:string){const document=s.doc(u.tenantId,id);const row=s.db.prepare('SELECT data FROM data_sets WHERE tenant_id=? AND id=?').get(u.tenantId,id) as {data:string}|undefined;if(!document||!row||!canGovernResource(u,document))throw fail(404,'数据集不存在或无治理权限');const definition=JSON.parse(row.data);const dict=s.db.prepare('SELECT data FROM data_dictionary WHERE tenant_id=? AND dataset_id=?').get(u.tenantId,id) as {data:string}|undefined;const confirmed=dict?JSON.parse(dict.data).confirmed:null;const valid=confirmed?.origin==='model'&&confirmed.fingerprint===dictionaryFingerprint(s,u.tenantId,definition);return {document,definition:definition as {fields:Field[]},business:valid?confirmed.definition:null,dictionaryStatus:valid?'generated':'changed'};}
+function readDataset(s:Store,u:User,id:string){const document=s.doc(u.tenantId,id);const row=s.db.prepare('SELECT data FROM data_sets WHERE tenant_id=? AND id=?').get(u.tenantId,id) as {data:string}|undefined;if(!document||!row||!canGovernResource(u,document))throw fail(404,'数据集不存在或无治理权限');const definition=JSON.parse(row.data);const dict=s.db.prepare('SELECT data FROM data_dictionary WHERE tenant_id=? AND dataset_id=?').get(u.tenantId,id) as {data:string}|undefined;const confirmed=dict?JSON.parse(dict.data).confirmed:null;const valid=currentDictionary(s,u.tenantId,definition,confirmed);return {unknownFields:valid?(confirmed.fieldEvidence||[]).filter((e:any)=>e.status==='UNKNOWN').map((e:any)=>e.column):[],document,definition:definition as {fields:Field[]},business:valid?confirmed.definition:null,businessChecks:valid&&confirmed.origin==='deployment'?confirmed.checks||[]:[],dictionaryStatus:valid?'generated':'changed'};}
 import {validateSemantics,type Semantics} from './business-queries.js';
 import type {Field} from './foundation.js';
 const fail=(statusCode:number,message:string)=>Object.assign(Error(message),{statusCode});
-type RecordRow={id:string;version:number;values:Record<string,string>;issues:string[];status:string;updatedAt:string;actor:string};
+type RecordRow={sourceNullFields?:string[];id:string;version:number;values:Record<string,string>;issues:string[];status:string;updatedAt:string;actor:string};
 type Finding={id:string;datasetId:string;targetId?:string;kind:string;title:string;detail:string;field?:string;count:number;status:'open'|'handling'|'resolved';firstAt:string;lastAt:string;resolvedAt?:string;manualApproval?:string;checkedFingerprint?:string;history:{at:string;actor:string;action:string;note:string}[]};
 function records(s:Store,t:string,id:string){return (s.db.prepare('SELECT data FROM data_rows WHERE tenant_id=? AND dataset_id=?').all(t,id) as {data:string}[]).map(r=>JSON.parse(r.data) as RecordRow);}
 export function recordChecks(fields:Field[],rows:RecordRow[]){
  const counts=new Map<string,Map<string,number>>();for(const f of fields.filter(f=>f.unique)){const m=new Map<string,number>();for(const r of rows){const v=r.values[f.name];if(v)m.set(v,(m.get(v)||0)+1);}counts.set(f.name,m);}
- return rows.map(r=>({row:r,issues:fields.flatMap(f=>{const v=r.values[f.name]||'';let msg='';if(!v)msg=f.required?'必填值缺失':'';else if(f.type==='number'&&!/^-?\d{1,15}(\.\d{1,6})?$/.test(v))msg='数值格式无效';else if(f.type==='date'&&(!/^\d{4}-\d{2}-\d{2}$/.test(v)||!Number.isFinite(Date.parse(v))||new Date(v).toISOString().slice(0,10)!==v))msg='日期格式无效';else if(f.type==='boolean'&&!['true','false'].includes(v))msg='布尔值无效';else if(f.unique&&(counts.get(f.name)?.get(v)||0)>1)msg='唯一值重复';return msg?[{field:f.name,message:`${f.label}：${msg}`}]:[];})}));
+ return rows.map(r=>({row:r,issues:fields.flatMap(f=>{const v=r.values[f.name]||'';let msg='';if(!v)msg=f.required&&(!f.allowEmpty||r.sourceNullFields?.includes(f.name))?'必填值缺失':'';else if(f.type==='number'&&!/^-?\d{1,15}(\.\d{1,6})?$/.test(v))msg='数值格式无效';else if(f.type==='date'&&(!/^\d{4}-\d{2}-\d{2}$/.test(v)||!Number.isFinite(Date.parse(v))||new Date(v).toISOString().slice(0,10)!==v))msg='日期格式无效';else if(f.type==='boolean'&&!['true','false'].includes(v))msg='布尔值无效';else if(f.unique&&(counts.get(f.name)?.get(v)||0)>1)msg='唯一值重复';return msg?[{field:f.name,message:`${f.label}：${msg}`}]:[];})}));
 }
 export function contradictoryFilters(filters:{field:string;operator:string;value:string}[],fields:Field[]){
  for(const f of fields){const rules=filters.filter(x=>x.field===f.name&&!x.value.startsWith('$'));const equals=rules.filter(x=>x.operator==='eq');
@@ -36,14 +36,20 @@ function approvalFingerprint(s:Store,u:User,f:Pick<Finding,'id'|'datasetId'|'tar
  }));
  return createHash('sha256').update(JSON.stringify({id:f.id,kind:f.kind,detail:f.detail,count:f.count,snapshots})).digest('hex');
 }
-export function scanStructured(s:Store,u:User){
+export function scanStructured(s:Store,u:User,selected?:Set<string>){
  const at=now(),fresh:Omit<Finding,'status'|'firstAt'|'lastAt'|'history'>[]=[],tables:any[]=[],scope=new Set<string>(),blocked=new Set<string>();
  const add=(datasetId:string,kind:string,key:string,title:string,detail:string,count=1,field?:string,targetId?:string)=>fresh.push({id:createHash('sha256').update([u.tenantId,datasetId,kind,key].join(':')).digest('hex'),datasetId,kind,title,detail,count,field,targetId});
  for(const entry of s.db.prepare('SELECT id FROM data_sets WHERE tenant_id=?').all(u.tenantId) as {id:string}[]){
-  if(!visible(s,u,entry.id))continue;const id=entry.id,{document:d,definition:def,business,dictionaryStatus}=readDataset(s,u,id);scope.add(id);const semantics=business as Semantics|null;
+  if(selected&&!selected.has(entry.id)||!visible(s,u,entry.id))continue;const id=entry.id,{document:d,definition:def,business,businessChecks,unknownFields,dictionaryStatus}=readDataset(s,u,id);scope.add(id);const semantics=business as Semantics|null;
   const rows=records(s,u.tenantId,id),checked=recordChecks(def.fields,rows);const relationReports:any[]=[];
   for(const f of def.fields){if(f.sensitive&&u.clearance<2)continue;const bad=checked.filter(x=>x.issues.some(i=>i.field===f.name));if(bad.length)add(id,'field',f.name,'字段质量异常',`${f.label}存在必填、格式或唯一性问题；请在来源系统修正并同步后重新校验。`,bad.length,f.name);}
   const isolated=rows.filter(r=>r.status==='quarantined').length;if(isolated)add(id,'isolated','rows','隔离记录待处理','隔离记录不进入 Agent 受控查询；更正后重新校验，符合规则才恢复使用。',isolated);
+  if(unknownFields.length)add(id,'semantics','unknown-fields','字段业务含义待核实','未确认含义的字段不参与模型统计，保留原值供部署复核。',unknownFields.length);
+  for(const check of businessChecks){
+   const matching=rows.filter(r=>Object.entries(check.when).every(([k,v])=>r.values[k]===v)&&(!check.positiveField||Number(r.values[check.positiveField])>0));
+   const missing=matching.filter(r=>!r.values[check.requiredField]).length;
+   if(missing)add(id,'field','deployment:'+check.id,'部署业务核对未通过',check.reason,missing,check.requiredField);
+  }
   if(dictionaryStatus!=='generated')add(id,'semantics','dictionary','模型口径尚未生效','后台生成或更新中；模型解释不等于已核实的业务事实。');
   for(const r of semantics?.relations||[]){
    if(!visible(s,u,r.targetId)){blocked.add(id+':'+r.targetId);continue;}

@@ -1,7 +1,192 @@
-.access-work { padding: 20px; height: 100%; overflow: auto; color: #e9e4d8; background: #1a1d1c; line-height: 1.6; }
-.access-work h2 { font-size: 21px; }.access-work h3 { font-size: 17px; }.access-work p { color: #c3c6bf; }
-.access-work nav,.access-inline { display: flex; gap: 10px; flex-wrap: wrap; }
-.access-work button,.access-work input:not([type=checkbox]),.access-work select,.access-work textarea { color: #e9e4d8; background: #292e2b; border: 1px solid #555f55; border-radius: 6px; padding: 8px 12px; font: inherit; }
-.access-work label { display: block; margin: 10px 0; }.access-work label>select,.access-work label>textarea { display: block; min-width: 260px; max-width: 100%; }.access-work textarea { min-height: 70px; width: 100%; }
-.access-work button { cursor: pointer; margin: 4px; }.access-work button:disabled { opacity: .5; cursor: default; }.access-work button[aria-pressed=true] { border-color: #b7cc9b; background: #394736; }
-.access-work article,.access-work fieldset,.access-work details { padding: 12px; margin: 12px 0; border: 1px solid #465145; border-radius: 8px; }.access-work fieldset { max-height: 260px; overflow: auto; }.access-work summary { cursor: pointer; }.access-work pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }.access-work [role=alert] { color: #ffbbad; }.access-work input[type=checkbox] { margin-right: 8px; }
+/* 成员与权限：与其他板块同一套深色扁平玻璃——一张卡，文字页签加金色细线，条目之间用细线分隔。 */
+.access-work {
+  --pearl: #f3f6fa;
+  --ash: #b4bdca;
+  --dim: #838da0;
+  --hair: rgb(255 255 255 / 8%);
+  --champagne: #ecc98a;
+  box-sizing: border-box;
+  height: 100%;
+  overflow: auto;
+  scrollbar-width: none;
+  padding: 18px 22px 22px;
+  border: 1px solid rgb(255 255 255 / 8%);
+  border-radius: 22px;
+  background: rgb(36 43 55 / 32%);
+  backdrop-filter: blur(34px) saturate(1.7);
+  -webkit-backdrop-filter: blur(34px) saturate(1.7);
+  color: var(--pearl);
+  color-scheme: dark;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.access-work header {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.access-work h2 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  color: var(--ash);
+}
+.access-work header p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--dim);
+}
+.access-work h3 {
+  margin: 20px 0 8px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  color: var(--ash);
+}
+.access-work p {
+  color: var(--ash);
+}
+
+/* 栏目页签 */
+.access-work nav {
+  display: flex;
+  gap: 18px;
+  margin: 12px 0 6px;
+  border-bottom: 1px solid var(--hair);
+}
+.access-work nav button,
+.access-work nav button[aria-pressed='true'] {
+  margin: 0;
+  padding: 6px 0 9px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--dim);
+}
+.access-work nav button[aria-pressed='true'] {
+  color: var(--pearl);
+  font-weight: 500;
+  box-shadow: inset 0 -1.5px 0 var(--champagne);
+}
+
+/* 表单控件：只有很淡的底，没有描边 */
+.access-work button,
+.access-work input:not([type='checkbox']),
+.access-work select,
+.access-work textarea {
+  box-sizing: border-box;
+  border: 0;
+  border-radius: 10px;
+  padding: 7px 11px;
+  background: rgb(255 255 255 / 6%);
+  color: var(--pearl);
+  font: inherit;
+  font-size: 12.5px;
+}
+.access-work select option {
+  background: #222936;
+}
+.access-work button {
+  margin: 4px 6px 4px 0;
+  cursor: pointer;
+}
+.access-work button:hover {
+  background: rgb(255 255 255 / 10%);
+}
+.access-work form > button:not([type='button']) {
+  background: rgb(236 201 138 / 14%);
+  color: #f8e7c6;
+}
+.access-work button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.access-work label {
+  display: block;
+  margin: 10px 0;
+  color: var(--ash);
+  font-size: 12px;
+}
+.access-work label > select,
+.access-work label > textarea,
+.access-work label > input:not([type='checkbox']) {
+  display: block;
+  margin-top: 5px;
+  min-width: 260px;
+  max-width: 100%;
+  color: var(--pearl);
+  font-size: 13px;
+}
+.access-work textarea {
+  width: 100%;
+  min-height: 70px;
+}
+.access-work input[type='checkbox'] {
+  margin-right: 8px;
+  accent-color: var(--champagne);
+}
+.access-inline {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* 条目：申请、审计、成员都用细线分隔，不加框 */
+.access-work article,
+.access-work details {
+  margin: 0;
+  padding: 12px 2px;
+  border: 0;
+  border-radius: 0;
+  border-bottom: 1px solid var(--hair);
+}
+.access-work article h3 {
+  margin: 0 0 4px;
+  font-size: 13.5px;
+  letter-spacing: 0;
+  color: var(--pearl);
+}
+.access-work fieldset {
+  max-height: 260px;
+  overflow: auto;
+  margin: 12px 0;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 12px;
+  background: rgb(255 255 255 / 3%);
+}
+.access-work legend {
+  padding: 0;
+  color: var(--ash);
+  font-size: 12px;
+}
+.access-work fieldset label {
+  margin: 4px 0;
+  color: var(--pearl);
+  font-size: 13px;
+}
+.access-work summary {
+  cursor: pointer;
+  font-weight: 450;
+}
+.access-work aside {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgb(255 255 255 / 4%);
+}
+.access-work pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+  color: var(--ash);
+}
+.access-work [role='alert'] {
+  color: #ffb9ad;
+}
+.access-work [role='status'] {
+  color: #93dcb6;
+}

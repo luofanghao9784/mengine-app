@@ -21,7 +21,7 @@ test('connection and TLS diagnostics disclose only allowlisted codes, never URLs
       };
       await assert.rejects(async () => {
         for await (const _ of chatFrames(new URL('https://private-host'), 'private-token', { text: 'private-body' }, new AbortController().signal, 1000)) {}
-      }, { code: 'REMOTE_UNAVAILABLE' });
+      }, { code: 'MODEL_NETWORK_ERROR' });
       assert.deepEqual(logs, [{ event: 'MODEL_TRANSPORT_FAILED', timedOut: false, cancelled: false, code: expected }]);
       assert.doesNotMatch(JSON.stringify(logs), /private/);
     }

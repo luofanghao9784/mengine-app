@@ -45,7 +45,8 @@ test('real Harness supplies lightweight rules and current request while exposing
     assert.ok(system.includes('current request'));
     assert.ok(system.includes('data, not authorization'));
     assert.ok(system.includes('check applicability'));
-    assert.ok(system.length < 2500);
+    // Governed metric and source-coverage rules expand the fixed header; keep it bounded.
+    assert.ok(system.length < 3500);
     if (calls === 1) {
       assert.ok(request.messages.filter(x => x.role === 'user').some(x => x.content.some(c => c.text === '这次核对十月的资料缺口')));
       yield { type: 'tool_call', id: 'coverage-1', name: 'search_sources', arguments: '{}' };

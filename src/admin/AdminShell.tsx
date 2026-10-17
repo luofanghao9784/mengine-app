@@ -72,6 +72,7 @@ export function AdminShell({
   logout,
   customerLinks,
   allowedPages,
+  embedded = false,
   children,
 }: {
   realm: AdminRealm;
@@ -83,6 +84,7 @@ export function AdminShell({
   customerLinks?: ReactNode;
   allowedPages?: readonly AdminPage[];
   children: ReactNode;
+  embedded?: boolean;
 }) {
   const pending = useContext(RequestPending);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -192,6 +194,20 @@ export function AdminShell({
       scrollPositions.current.set(hash, waiting ? saved : element.scrollTop);
     };
   }, [hash, title, name, realm]);
+  if (embedded)
+    return (
+      <PageTitleContext.Provider value={titleTarget}>
+        <PageActionsContext.Provider value={actions}>
+          <div className="scene-business-body admin-control">
+            <header className="scene-business-heading">
+              <div ref={setTitleTarget}>{title}</div>
+              <div ref={setActions} />
+            </header>
+            <main ref={main}>{children}</main>
+          </div>
+        </PageActionsContext.Provider>
+      </PageTitleContext.Provider>
+    );
   return (
     <CustomSelectContext.Provider value={realm === 'platform'}>
       <PageTitleContext.Provider value={titleTarget}>

@@ -1,0 +1,140 @@
+.cards.business-work {
+  display: block;
+  height: calc(100dvh - var(--deck-top) - 92px);
+  min-height: 180px;
+  padding-bottom: 16px;
+}
+.business-work > .card {
+  height: 100%;
+  overflow: auto;
+  padding: 18px;
+  scrollbar-width: thin;
+}
+.business-work .business-tabs {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.business-work .business-tabs button {
+  background: transparent;
+  border: 1px solid var(--hair);
+  border-radius: 16px;
+  padding: 8px 14px;
+}
+.business-work .business-tabs button[aria-pressed='true'] {
+  color: var(--champagne);
+  background: #ffffff0d;
+}
+.scene-business-body {
+  --ink: #f3f6fa;
+  --text: #f3f6fa;
+  --muted: #b4bdca;
+  --text-secondary: #b4bdca;
+  --canvas: transparent;
+  --surface: #222a36;
+  --soft: #ffffff08;
+  --line: #ffffff18;
+  --card-edge: #ffffff18;
+  --accent: #ecc98a;
+  --accent-hover: #f4dba9;
+  --accent-text: #1a202b;
+  --selected: #ecc98a20;
+  --blue-ink: #ecc98a;
+  color: var(--ink);
+  color-scheme: dark;
+}
+.scene-business-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+  font-weight: 600;
+}
+.scene-business-body main {
+  min-width: 0;
+}
+.scene-business-body
+  :is(
+    .admin-dashboard,
+    .access-panel,
+    .admin-card,
+    .admin-section,
+    .empty-state,
+    .admin-detail-panel,
+    .usage-panel,
+    .tenant-panel
+  ) {
+  background: transparent;
+  color: inherit;
+  border-color: var(--line);
+  box-shadow: none;
+}
+.scene-business-body :is(input, select, textarea) {
+  background: #202735;
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+.scene-business-body :is(table, th, td, .button) {
+  color: inherit;
+  border-color: var(--line);
+}
+.scene-business-body :is(.button, .platform-detail-nav a) {
+  background: #ffffff08;
+}
+.scene-business-body a {
+  color: var(--champagne);
+}
+.scene-business-body .admin-table th {
+  background: #ffffff08;
+}
+.output-links {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 24px;
+}
+.output-links a {
+  color: var(--pearl);
+  text-decoration: none;
+  padding: 24px;
+  border: 1px solid var(--hair);
+  border-radius: 16px;
+  background: #ffffff04;
+}
+.output-links p {
+  color: var(--ash);
+}
+.runtime-notice {
+  position: absolute;
+  top: 58px;
+  left: 24px;
+  color: var(--ash);
+  z-index: 4;
+}
+.shell[data-runtime='unavailable']
+  .eng3d
+  :is(
+    .eng3d-lbl .v,
+    .eng3d-lbl .q,
+    .eng3d-cap > strong,
+    .eng3d-panel,
+    .eng3d-core,
+    .eng3d-reads,
+    .eng3d-mix
+  ) {
+  visibility: hidden;
+}
+.scene-login {
+  padding: 40px;
+  color: #eee;
+  background: #171c25;
+  min-height: 100vh;
+}
+@media (max-width: 760px) {
+  .output-links {
+    grid-template-columns: 1fr;
+  }
+  .business-work > .card {
+    padding: 12px;
+  }
+}

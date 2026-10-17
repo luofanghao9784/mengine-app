@@ -68,3 +68,8 @@ test("common website login requests surface selection; dedicated login clears it
  await auth.signIn({surface:"platform",account:"operator",password:"synthetic"});
  assert.equal(pendingSurfaceChoice(),false);
 });
+
+test('provisioned username uses the customer endpoint and keeps admin role checks',async()=>{
+ setup((path,body)=>{assert.equal(path,'/api/v1/auth/login');assert.deepEqual(body,{username:'meizu',password:'synthetic'});return {...identity(true),account:{id,phone:null,email:null,username:'meizu',displayName:'合成'}};});
+ assert.deepEqual(await auth.signIn({surface:'admin',phone:' meizu ',password:'synthetic'}),{ok:true,redirect:'/tenant-admin/'});
+});

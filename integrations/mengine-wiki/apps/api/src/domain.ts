@@ -26,6 +26,8 @@ export type Grant = {
   level: "read" | "edit";
 };
 export type Doc = {
+  /** Deployment-enforced content boundary; an admin role alone never grants access. */
+  restrictedContent?: boolean;
   departmentId?: string;
   aiPaused?: boolean;
   id: string;
@@ -94,8 +96,10 @@ const level = (u: User) => u.role === "admin" ? 3 : u.clearance;
 const scoped = (u: User, d: Doc, scopes: Scope[] = []) => scopes.some(s =>
   s.type === "tenant" ? s.id === u.tenantId : s.type === "resource" ? s.id === d.id : !!d.departmentId && s.id === d.departmentId);
 const boundary = (u: User, d: Doc) => validIdentity(u) && sameTenant(u,d);
+const explicitlyGranted = (u:User,d:Doc) => u.id===d.ownerId || d.grants.some(g=>g.subjectType==='user'?g.subjectId===u.id:g.subjectType==='role'?g.subjectId===u.role:!!u.departmentId&&g.subjectId===u.departmentId);
 export function canReadResource(u: User, d: Doc) {
   if (!boundary(u,d) || d.status !== "ready" || level(u) < d.classification) return false;
+  if(d.restrictedContent)return explicitlyGranted(u,d);
   return u.role === "admin" || d.audience === "organization" || u.id === d.ownerId ||
     (d.audience === "department" && !!u.departmentId && u.departmentId === d.departmentId) ||
     d.grants.some(g => g.subjectType === "user" ? g.subjectId === u.id : g.subjectType === "role" ? g.subjectId === u.role : !!u.departmentId && g.subjectId === u.departmentId);
@@ -111,17 +115,17 @@ export const canManageOrganization = (u: User) => validIdentity(u) && u.role ===
 export const canViewAudit = (u: User) => validIdentity(u) && ["admin","auditor"].includes(u.role);
 export const canViewGovernanceMetadata = (u: User,d: Doc) => boundary(u,d) &&
   (u.role === "admin" || u.role === "steward" && scoped(u,d,u.duties?.governance));
-export const canGovernResource = (u: User,d: Doc) => canViewGovernanceMetadata(u,d) &&
+export const canGovernResource = (u: User,d: Doc) => (!d.restrictedContent||explicitlyGranted(u,d)) && canViewGovernanceMetadata(u,d) &&
   level(u) >= d.classification && !["archived","queued","processing"].includes(d.status);
 export const canInspectQuarantinedContent = (u: User,d: Doc) => boundary(u,d) &&
-  d.status === "quarantined" && level(u) >= d.classification &&
+  (!d.restrictedContent||explicitlyGranted(u,d)) && d.status === "quarantined" && level(u) >= d.classification &&
   (u.role === "admin" || u.role === "steward" && scoped(u,d,u.duties?.inspection));
 export const canRecheck = canGovernResource;
 export const canRegenerateDictionary = (u: User,d: Doc) => canGovernResource(u,d) && canUseAI(u,d);
 export const canViewPolicy = (u: User,d: Doc) => boundary(u,d) && (u.role === "admin" || canRead(u,d) || canViewGovernanceMetadata(u,d));
 export const canRequestAccess = (u: User,d: Doc) => boundary(u,d) && d.status === "ready";
-export const canManagePolicy = (u: User,d: Doc) => boundary(u,d) && u.role === "admin";
-export const canApprovePolicy = (u: User,d: Doc,applicant?:string) => boundary(u,d) &&
+export const canManagePolicy = (u: User,d: Doc) => boundary(u,d) && u.role === "admin" && (!d.restrictedContent||u.id===d.ownerId);
+export const canApprovePolicy = (u: User,d: Doc,applicant?:string) => boundary(u,d) && (!d.restrictedContent||u.id===d.ownerId) &&
   (u.role === "admin" || u.role === "steward" && u.id !== applicant && level(u) >= d.classification && scoped(u,d,u.duties?.approval));
 export const canIngest = (u: User) => validIdentity(u) && u.role !== "auditor" && (u.role === "admin" || u.duties?.ingest === true);
 export const canManageConnection = (u: User, tenant: string, id?: string) => validIdentity(u) && u.tenantId === tenant &&

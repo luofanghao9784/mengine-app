@@ -1,3 +1,4 @@
+import {dictionarySchemaFingerprint,currentDictionary} from './dictionary-version.js';
 import {canUseCurrentData} from './data-availability.js';
 import { createHash } from "node:crypto";
 import type { Store } from "./store.js";
@@ -22,6 +23,7 @@ type Article = {
   department: string;
   createdAt: string;
   model: string;
+  origin?: "model" | "deployment";
   revision: number;
   sourceKind: number;
 };
@@ -33,6 +35,7 @@ export function createBusinessKnowledge(store: Store, model: Model) {
   store.db.exec(
     "CREATE TABLE IF NOT EXISTS business_knowledge(tenant_id TEXT NOT NULL,dataset_id TEXT NOT NULL,fingerprint TEXT NOT NULL,state TEXT NOT NULL,data TEXT NOT NULL,PRIMARY KEY(tenant_id,dataset_id))",
   );
+  store.db.exec('CREATE TABLE IF NOT EXISTS deployment_knowledge(tenant_id TEXT NOT NULL,dataset_id TEXT NOT NULL,schema_fingerprint TEXT NOT NULL,data TEXT NOT NULL,PRIMARY KEY(tenant_id,dataset_id))');
   const running = new Set<string>();
   const context = (u: User, id: string) => {
     const d = store.doc(u.tenantId, id);
@@ -47,6 +50,7 @@ export function createBusinessKnowledge(store: Store, model: Model) {
     if (!rows.length) return null;
     return {
       ...dataset,
+      rows,
       fingerprint: hash([
         "business-profile-v3-business-language",
         d.version,
@@ -102,6 +106,11 @@ export function createBusinessKnowledge(store: Store, model: Model) {
         });
       }
     }
+    for(const row of store.db.prepare('SELECT dataset_id,schema_fingerprint,data FROM deployment_knowledge WHERE tenant_id=?').all(u.tenantId) as {dataset_id:string;schema_fingerprint:string;data:string}[]){
+      const d=store.doc(u.tenantId,row.dataset_id);if(!d||!canUseCurrentData(store,u,d))continue;
+      const set=readDataset(store,u,d.id);if(set.dictionaryStatus!=='generated'||row.schema_fingerprint!==dictionarySchemaFingerprint(set.definition))continue;
+      items.push(...JSON.parse(row.data));
+    }
     return {
       items,
       pending,
@@ -114,6 +123,8 @@ export function createBusinessKnowledge(store: Store, model: Model) {
   const profile = (u: User, id: string) => {
     const c = context(u, id);
     if (!c) throw fail(409, "数据尚未治理完成或当前无权使用");
+    // One synchronous profile uses one immutable row read for all aggregates.
+    const records=c.rows.map(r=>JSON.parse(r.data));
     const facts: Fact[] = [];
     const add = (text: string) =>
       facts.push({
@@ -125,12 +136,13 @@ export function createBusinessKnowledge(store: Store, model: Model) {
       u,
       id,
       { operation: "count" },
-      true,
+      true,undefined,false,records,
     ).result;
     add(
       `本次统计记录数：${count.matchedRecords}。统计对象：${c.document.title}。只代表本次已纳入分析的业务记录。`,
     );
-    const fields = c.definition.fields.filter((f) => !f.sensitive),
+    const unknown=new Set(c.fieldEvidence.filter((e:any)=>e.status==='UNKNOWN').map((e:any)=>e.column));
+    const fields = c.definition.fields.filter((f) => !f.sensitive&&!unknown.has(f.name)&&!c.analysisPolicy.excludeFields.includes(f.name)),
       business = c.business as any;
     for (const f of fields.slice(0, 24)) {
       const info = business?.fields?.find((x: any) => x.name === f.name),
@@ -146,9 +158,9 @@ export function createBusinessKnowledge(store: Store, model: Model) {
         for (const operation of ["min", "max", "sum"] as const) {
           if (
             operation === "sum" &&
-            !/(金额|收入|支出|费用|数量|销量|成本|价格|积分|余额|工时|时长|amount|price|quantity|cost|total|duration)/i.test(
+            (c.analysisPolicy.noSumFields.includes(f.name)||!/(金额|收入|支出|费用|数量|销量|成本|价格|积分|余额|工时|时长|amount|price|quantity|cost|total|duration)/i.test(
               label + " " + f.name,
-            )
+            ))
           )
             continue;
           const result = queryDataset(
@@ -156,7 +168,7 @@ export function createBusinessKnowledge(store: Store, model: Model) {
             u,
             id,
             { operation, field: f.name },
-            true,
+            true,undefined,false,records,
           ).result;
           const r = "groups" in result ? result.groups[0] : undefined;
           if (r && r.value !== null)
@@ -170,7 +182,7 @@ export function createBusinessKnowledge(store: Store, model: Model) {
           u,
           id,
           { operation: "count", groupBy: f.name, limit: 12 },
-          true,
+          true,undefined,false,records,
         ).result;
         if ("groups" in r && r.totalGroups <= 12 && r.totalGroups > 0) {
           add(`${label}共有 ${r.totalGroups} 个分类（含未填写值）。`);
@@ -203,30 +215,10 @@ export function createBusinessKnowledge(store: Store, model: Model) {
       },
     };
   };
-  async function learn(u: User, id: string, fresh: () => User) {
-    if (running.has(u.tenantId)) throw fail(409, "业务知识正在生成");
-    if (!model.status().configured || !model.status().enabled)
-      throw fail(503, "模型未配置或暂停");
-    const { c, input } = profile(u, id),
-      old = saved(u, id);
-    if (old?.fingerprint === c.fingerprint && old.state === "succeeded")
-      return { learned: 0 };
-    running.add(u.tenantId);
-    const save = (state: string, data: unknown) =>
-      store.db
-        .prepare(
-          "INSERT INTO business_knowledge VALUES(?,?,?,?,?) ON CONFLICT(tenant_id,dataset_id) DO UPDATE SET fingerprint=excluded.fingerprint,state=excluded.state,data=excluded.data",
-        )
-        .run(u.tenantId, id, c.fingerprint, state, JSON.stringify(data));
-    save("running", { articles: [] });
-    try {
-      store.audit(u, "wiki.business.started", id, "分析当前合格快照统计");
-      const raw = (
-        await model.complete(instruction, JSON.stringify(input), 3000)
-      ).text;
-      const parsed = JSON.parse(
-        raw.trim().replace(/^```(?:json)?\s*|\s*```$/g, ""),
-      );
+  function publish(u:User,id:string,parsed:any,expectedFingerprint:string,provider:string,strict=true,origin:'model'|'deployment'='model'){
+    const {c,input}=profile(u,id),old=saved(u,id);
+    if(c.fingerprint!==expectedFingerprint)throw fail(409,'来源变化，拒绝发布旧知识');
+    const save=(state:string,data:unknown)=>store.db.prepare('INSERT INTO business_knowledge VALUES(?,?,?,?,?) ON CONFLICT(tenant_id,dataset_id) DO UPDATE SET fingerprint=excluded.fingerprint,state=excluded.state,data=excluded.data').run(u.tenantId,id,c.fingerprint,state,JSON.stringify(data));
       if (
         !parsed ||
         !Array.isArray(parsed.articles) ||
@@ -281,7 +273,8 @@ export function createBusinessKnowledge(store: Store, model: Model) {
                   quote: input.facts.find((f) => f.id === ref)!.text,
                 })),
                 createdAt: now(),
-                model: model.status().model,
+                model: provider,
+                origin,
                 revision: old ? (JSON.parse(old.data).revision || 0) + 1 : 1,
                 sourceKind: 0,
               },
@@ -292,14 +285,15 @@ export function createBusinessKnowledge(store: Store, model: Model) {
           }
         },
       );
+      if (strict && rejected.length) throw fail(422, rejected[0]);
       if (parsed.articles.length && !articles.length)
         throw fail(502, rejected[0] || "业务知识内容校验失败");
-      const user = fresh(),
+      const user = u,
         current = context(user, id);
       if (
         user.tenantId !== u.tenantId ||
         !current ||
-        current.fingerprint !== c.fingerprint
+        current.fingerprint !== expectedFingerprint
       )
         throw fail(409, "生成期间数据或权限变化，结果未发布");
       save("succeeded", {
@@ -315,6 +309,32 @@ export function createBusinessKnowledge(store: Store, model: Model) {
         `发布 ${articles.length} 条有统计依据的业务知识；拦截 ${rejected.length} 条校验未通过的候选`,
       );
       return { learned: articles.length };
+  }
+  async function learn(u: User, id: string, fresh: () => User) {
+    if (running.has(u.tenantId)) throw fail(409, "业务知识正在生成");
+    if (!model.status().configured || !model.status().enabled)
+      throw fail(503, "模型未配置或暂停");
+    const { c, input } = profile(u, id),
+      old = saved(u, id);
+    if (old?.fingerprint === c.fingerprint && old.state === "succeeded")
+      return { learned: 0 };
+    running.add(u.tenantId);
+    const save = (state: string, data: unknown) =>
+      store.db
+        .prepare(
+          "INSERT INTO business_knowledge VALUES(?,?,?,?,?) ON CONFLICT(tenant_id,dataset_id) DO UPDATE SET fingerprint=excluded.fingerprint,state=excluded.state,data=excluded.data",
+        )
+        .run(u.tenantId, id, c.fingerprint, state, JSON.stringify(data));
+    save("running", { articles: [] });
+    try {
+      store.audit(u, "wiki.business.started", id, "分析当前合格快照统计");
+      const raw = (
+        await model.complete(instruction, JSON.stringify(input), 3000)
+      ).text;
+      const parsed = JSON.parse(
+        raw.trim().replace(/^```(?:json)?\s*|\s*```$/g, ""),
+      );
+      return publish(fresh(),id,parsed,c.fingerprint,model.status().model,false);
     } catch (e) {
       save("failed", {
         articles: [],
@@ -336,5 +356,5 @@ export function createBusinessKnowledge(store: Store, model: Model) {
       running.delete(u.tenantId);
     }
   }
-  return { snapshot, learn };
+  return { snapshot, learn, profile, publish };
 }

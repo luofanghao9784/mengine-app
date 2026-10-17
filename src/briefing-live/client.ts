@@ -38,7 +38,7 @@ const card = (v: unknown): v is BriefingCard =>
   typeof v.truncated === 'boolean' &&
   text(v.completedAt) &&
   Number.isFinite(Date.parse(v.completedAt)) &&
-  ['verification', 'live'].includes(String(v.executionClass)) &&
+  ['verification', 'live', 'external'].includes(String(v.executionClass)) &&
   text(v.engineVersion) &&
   v.engineVersion.length <= 64 &&
   count(v.artifactCount) &&

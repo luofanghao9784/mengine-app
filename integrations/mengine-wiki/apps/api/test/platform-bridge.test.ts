@@ -5,6 +5,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildServer } from '../src/server.js';
+import {seedDataset} from './helpers/structured-fixture.js';
 
 test('signed platform bridge isolates sources, rejects replay and preserves data', async () => {
  const storage=await mkdtemp(join(tmpdir(),'platform-bridge-'));
@@ -15,6 +16,7 @@ test('signed platform bridge isolates sources, rejects replay and preserves data
  const call=(payload:ReturnType<typeof envelope>)=>c.app.inject({method:'POST',url:'/api/internal/platform-scene',payload});
  try{
   c.store.db.prepare('INSERT INTO platform_tenant_bindings VALUES(?,?,?)').run('enterprise-a','mengine-demo','u-admin');
+  seedDataset(c.store,c.store.user('u-admin')!,'合成导出字段',[{name:'amount',label:'金额',type:'number',required:false,unique:false,sensitive:false,description:'合成数值'}],[{amount:'12'}]);
   const before=c.store.db.prepare('SELECT count(*) n FROM data_rows').get();
   const signed=envelope('enterprise-a','/scene-foundation');
   const first=await call(signed);assert.equal(first.statusCode,200,first.body);assert.ok(first.json().items.length>0);
@@ -24,6 +26,16 @@ test('signed platform bridge isolates sources, rejects replay and preserves data
   assert.equal((await call(envelope('enterprise-a','/auth/login','POST'))).statusCode,404);
   const exported=await call(envelope('enterprise-a','/scene-export'));assert.equal(exported.statusCode,200,exported.body);assert.equal(exported.json().tenantId,'enterprise-a');
   for(const asset of exported.json().assets)for(const field of asset.fields??[])assert.ok(!field.sensitive);
+  assert.equal(exported.json().contractVersion,'1.1');
+  const table=exported.json().assets.find((a:any)=>a.kind==='数据表'&&a.rows.length>0&&a.fields.length>0);
+  assert.ok(table,'synthetic table must be exported');
+  assert.ok(table.governance);assert.match(table.dictionarySchemaFingerprint,/^schema:/);
+  const row=c.store.db.prepare("SELECT id,data FROM data_rows WHERE dataset_id=? AND status='ready' ORDER BY id LIMIT 1").get(table.id) as {id:string;data:string};
+  const raw=JSON.parse(row.data);raw.sourceNullFields=[table.fields[0].name];
+  c.store.db.prepare('UPDATE data_rows SET data=? WHERE id=?').run(JSON.stringify(raw),row.id);
+  const refreshed=(await call(envelope('enterprise-a','/scene-export'))).json().assets.find((a:any)=>a.id===table.id);
+  assert.equal(refreshed.rows[0][0],null,'source NULL must survive governance export');
+  assert.deepEqual(refreshed.governance.allowedActors,table.governance.allowedActors);
   assert.deepEqual(c.store.db.prepare('SELECT count(*) n FROM data_rows').get(),before);
   const customer=(path:string,identity=true)=>{const payload=Buffer.from(JSON.stringify({tenant:'enterprise-a',path,method:'GET',actor:'customer:new-member',...(identity?{identity:{id:'new-member',name:'企业新成员'}}:{}),nonce:randomUUID(),at:Date.now()})).toString('base64url');return {payload,signature:createHmac('sha256',secret).update(payload).digest('hex')};};
   assert.equal((await call(customer('/scene-access',false))).statusCode,403);

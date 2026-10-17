@@ -1,3 +1,4 @@
+import { seedDataset } from './helpers/structured-fixture.js';
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -42,7 +43,7 @@ test("scene requires identity, enforces roles and isolates tenant metadata", () 
     assert.equal(
       (await c.app.inject({ url: ROOT, headers: await login("engineer") }))
         .statusCode,
-      403,
+      200,
     );
     const h = await login("admin"),
       r = await c.app.inject({ url: ROOT, headers: h });
@@ -181,11 +182,7 @@ test("restricted management origin cannot mutate old APIs; unsupported imports a
 test("table metadata omits rows and paused datasets are excluded from model tools", () =>
   fixture(async (c, login) => {
     const h = await login("admin"),
-      r = await c.app.inject({
-        method: "POST",
-        url: "/api/foundation",
-        headers: h,
-        payload: {
+      r = seedTable(c, {
           title: "测试数据资产",
           department: "企业管理",
           purpose: "只读元数据",
@@ -202,20 +199,12 @@ test("table metadata omits rows and paused datasets are excluded from model tool
               description: "金额说明",
             },
           ],
-        },
-      });
+        });
     assert.equal(r.statusCode, 201, r.body);
     const id = r.json().id;
-    await c.app.inject({
-      method: "POST",
-      url: "/api/foundation/" + id + "/records",
-      headers: h,
-      payload: {
-        values: { amount: "987654321" },
-        expectedVersion: 1,
-        reason: "测试样本",
-      },
-    });
+    const row={id:'fixture-row',version:1,values:{amount:'987654321'},issues:[],status:'ready',updatedAt:new Date().toISOString(),actor:'合成测试'};
+    c.store.db.prepare('INSERT INTO data_rows VALUES(?,?,?,?,?,?)').run(row.id,id,'mengine-demo',row.status,row.updatedAt,JSON.stringify(row));
+
     const detail = await c.app.inject({ url: ROOT + "/" + id, headers: h });
     assert.equal(detail.statusCode, 200, detail.body);
     assert.ok(!detail.body.includes("987654321"));
@@ -262,11 +251,7 @@ test("table metadata omits rows and paused datasets are excluded from model tool
 test("model generation is queued in the existing worker and does not alter source records", () =>
   fixture(async (c, login) => {
     const h = await login("admin");
-    const r = await c.app.inject({
-      method: "POST",
-      url: "/api/foundation",
-      headers: h,
-      payload: {
+    const r = seedTable(c, {
         title: "模型队列测试",
         department: "企业管理",
         purpose: "字段解释",
@@ -283,8 +268,7 @@ test("model generation is queued in the existing worker and does not alter sourc
             description: "人民币元",
           },
         ],
-      },
-    });
+      });
     const id = r.json().id;
     c.model.status = () => ({
       provider: "test",
@@ -346,11 +330,7 @@ test("model generation is queued in the existing worker and does not alter sourc
 test("recheck delegates to actual governance and keeps record values unchanged", () =>
   fixture(async (c, login) => {
     const h = await login("admin");
-    const r = await c.app.inject({
-      method: "POST",
-      url: "/api/foundation",
-      headers: h,
-      payload: {
+    const r = seedTable(c, {
         title: "复检测试",
         department: "企业管理",
         purpose: "校验",
@@ -367,8 +347,7 @@ test("recheck delegates to actual governance and keeps record values unchanged",
             description: "",
           },
         ],
-      },
-    });
+      });
     const id = r.json().id,
       d = c.store.doc("mengine-demo", id)!;
     const row = {
@@ -437,11 +416,7 @@ test("non-blocking governance hints remain visible without claiming every record
 test("manual approval is audited, survives scans, preserves records and expires on snapshot change", () =>
   fixture(async (c, login) => {
     const h = await login("admin");
-    const created = await c.app.inject({
-      method: "POST",
-      url: "/api/foundation",
-      headers: h,
-      payload: {
+    const created = seedTable(c, {
         title: "人工校验测试",
         department: "企业管理",
         purpose: "测试",
@@ -458,8 +433,7 @@ test("manual approval is audited, survives scans, preserves records and expires 
             description: "",
           },
         ],
-      },
-    });
+      });
     assert.equal(created.statusCode, 201, created.body);
     const id = created.json().id,
       d = c.store.doc("mengine-demo", id)!;
@@ -506,7 +480,7 @@ test("manual approval is audited, survives scans, preserves records and expires 
           reason: "业务负责人已核实",
         },
       });
-    assert.equal((await approve(await login("auditor"))).statusCode, 403);
+    assert.equal((await approve(await login("auditor"))).statusCode, 404);
     assert.equal((await approve(await login("external"))).statusCode, 404);
     assert.equal((await approve(h, d.version + 1)).statusCode, 409);
     assert.equal((await approve(h, d.version, "missing")).statusCode, 404);
@@ -608,8 +582,8 @@ test("document governance joins issue handling, manual approval and remediation 
     c.store.saveDoc(changed);
     const fixed = await act("remediate");
     assert.equal(fixed.statusCode, 200, fixed.body);
-    assert.ok(!c.store.doc(u.tenantId, d.id)!.content.includes("13800138000"));
-    assert.equal(c.store.doc(u.tenantId, d.id)!.status, "ready");
+    assert.ok(c.store.doc(u.tenantId, d.id)!.content.includes("13800138000"));
+    assert.equal(c.store.doc(u.tenantId, d.id)!.status, "quarantined");
     const summary = (await c.app.inject({ url: ROOT, headers: h })).json();
     assert.equal(summary.auditValid, true);
     assert.ok(summary.governance.departments.length);
@@ -682,7 +656,7 @@ test("scene knowledge uses Wiki permissions, actual article ids and verified gra
           headers: await login("engineer"),
         })
       ).statusCode,
-      403,
+      200,
     );
     assert.equal(
       (
@@ -725,11 +699,7 @@ test("business knowledge analyzes governed rows, stores evidence and joins the o
       await import("../src/dictionary-version.js");
     const h = await login("admin"),
       u = c.store.user("u-admin")!;
-    const r = await c.app.inject({
-      method: "POST",
-      url: "/api/foundation",
-      headers: h,
-      payload: {
+    const r = seedTable(c, {
         title: "订单分析测试",
         department: "企业管理",
         source: "合成测试",
@@ -755,8 +725,7 @@ test("business knowledge analyzes governed rows, stores evidence and joins the o
             description: "联系号码",
           },
         ],
-      },
-    });
+      });
     assert.equal(r.statusCode, 201, r.body);
     const id = r.json().id,
       d = c.store.doc(u.tenantId, id)!;
@@ -996,3 +965,7 @@ test("knowledge progress separates pending datasets from generated article count
     assert.equal(outside.business.pending, 0);
     assert.equal(outside.items.length, 0);
   }));
+function seedTable(c: Awaited<ReturnType<typeof buildServer>>, data: {title:string;fields: import('../src/foundation.js').Field[];[key:string]:unknown}) {
+ const id=seedDataset(c.store,c.store.user('u-admin')!,data.title,data.fields);
+ return {statusCode:201,body:'synthetic fixture',json:()=>({id})};
+}

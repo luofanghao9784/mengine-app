@@ -60,7 +60,7 @@ export interface ConversationTask {
   webSources: WebSource[];
   skills: TaskSkill[];
   reply: string | null;
-  executionClass: 'live' | 'verification' | null;
+  executionClass: 'live' | 'verification' | 'external' | null;
   modelName: string | null;
   artifacts: TaskArtifact[];
   id: string;
@@ -93,7 +93,7 @@ export interface ConversationTask {
 }
 export interface ConversationPage {
   publicWebEnabled: boolean;
-  agentMode: 'off' | 'verification' | 'live';
+  agentMode: 'off' | 'verification' | 'live' | 'external';
   tenantId: string;
   enabled: boolean;
   items: Conversation[];
@@ -151,7 +151,7 @@ export interface TaskAttempt {
   artifacts: TaskArtifact[];
   startedAt: string | null;
   finishedAt: string | null;
-  provenance: 'RECORDED' | 'LEGACY_CURRENT_ONLY';
+  provenance: 'RECORDED' | 'LEGACY_CURRENT_ONLY' | 'EXTERNAL_DEPLOYMENT';
   reconciliationCode: string | null;
 }
 export interface TaskAttempts {

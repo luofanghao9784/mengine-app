@@ -5,8 +5,9 @@
 export function useRoutineModel(context: {
   wikiLearning: boolean; wikiGraph: boolean; wikiInsight: boolean;
   publicResearch: boolean; plan: boolean; presentation: boolean; sandbox: boolean;
-  briefing: boolean; briefingType: string;
+  briefing: boolean; briefingType: string; briefingUsePrimary?: boolean;
 }) {
+  if (context.briefing && context.briefingUsePrimary) return false;
   if (context.wikiGraph || context.wikiInsight) return false;
   if (context.wikiLearning) return true;
   if (context.publicResearch || context.plan || context.presentation || context.sandbox) return false;

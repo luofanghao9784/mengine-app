@@ -11,7 +11,7 @@
 请先完成启动核查：
 1. 使用本机项目的独立克隆。先读根目录 AGENTS.md、COLLABORATION.md，检查 git status、当前分支与远端。不使用另一位开发者的共享工作目录。
 2. git fetch origin main。工作区干净且能够快进时执行 git pull --ff-only origin main；否则说明差异并安全处理，不 reset、不丢弃修改、不强推。
-3. 阅读 docs/协作/企业首次接入/README.md 和 双方Codex协作约定.md，再读 flow.json 及目标 handoffs/ONB-xx-xx.md。初始任务是核查／候选调整，不是全部已批准开发。现有线上增量部署和本地源码可能不同，先记录实际基线。
+3. 阅读 docs/协作/企业首次接入/README.md 和 双方Codex协作约定.md，再读 flow.json 及目标 handoffs/ONB-xx-xx.md。初始任务是核查／候选调整，不是全部已批准开发。先读 docs/交接/代码基线整合与迁移兼容-2026-10-17.md，记录 git rev-parse HEAD。使用包含该整合记录的最新 origin/main；新库走默认迁移，旧本地库核对历史后才启用 migration-local。V150 起的新迁移只放 migration-common，认领时登记版本号。统一开发基线不代表线上版本已经更新。
 4. 运行：
    python3 docs/协作/企业首次接入/build.py --check
    python3 -m http.server 5197 --bind 127.0.0.1 --directory docs/协作/企业首次接入

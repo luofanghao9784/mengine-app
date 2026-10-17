@@ -131,3 +131,8 @@ test('timeline validates whole-day counts, descending dates, distinct visible ca
   await assert.rejects(createBriefingClient(async () => response({ ...page, date: '2026-09-23', asOf: '2026-09-22T09:00:00Z' }))
     .timelineDay(tenant, '2026-09-23', filter.zone, 3, asOf));
 });
+
+test('external Codex delivery is a supported real card provenance, not a simulated runtime call', async () => {
+ const external = { ...page, items: [{ ...card, executionClass: 'external', engineVersion: 'deployment-1' }] };
+ assert.deepEqual(await createBriefingClient(async () => response(external)).list(tenant, filter), external);
+});

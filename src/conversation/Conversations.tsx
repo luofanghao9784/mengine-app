@@ -1054,7 +1054,7 @@ function AttemptHistory({
             <ChevronRight size={15} className="attempt-chevron" aria-hidden="true" />
             <span>第 {a.number} 次执行</span>
             <span className="attempt-status">{labels[a.status]}</span>
-            {a.provenance === 'LEGACY_CURRENT_ONLY' ? ' · 旧记录仅保留当次事实' : ''}
+            {a.provenance === 'LEGACY_CURRENT_ONLY' ? ' · 旧记录仅保留当次事实' : a.provenance === 'EXTERNAL_DEPLOYMENT' ? ' · Codex 首轮生成' : ''}
           </summary>
           <div className="attempt-content">
             <p className="muted">

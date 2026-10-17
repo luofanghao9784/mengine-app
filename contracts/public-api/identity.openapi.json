@@ -4508,6 +4508,14 @@
             ],
             "pattern": "^\\+[1-9][0-9]{7,14}$",
             "description": "已验证并规范化的手机号；旧账号迁移前为 null。"
+          },
+          "username": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 40,
+            "description": "受控开通的用户名；使用统一账号密码，不授予额外权限。"
           }
         },
         "required": [
@@ -4533,6 +4541,16 @@
             ],
             "properties": {
               "email": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "required": [
+              "username"
+            ],
+            "properties": {
+              "username": {
                 "type": "string"
               }
             }
@@ -4792,6 +4810,10 @@
             "type": "string",
             "maxLength": 40,
             "description": "手机号；中国大陆号码可省略 +86，其他号码须带国家区号。服务端规范化为 E.164。"
+          },
+          "username": {
+            "type": "string",
+            "maxLength": 40
           }
         },
         "required": [
@@ -4804,8 +4826,17 @@
               "phone"
             ],
             "not": {
-              "required": [
-                "email"
+              "anyOf": [
+                {
+                  "required": [
+                    "email"
+                  ]
+                },
+                {
+                  "required": [
+                    "username"
+                  ]
+                }
               ]
             }
           },
@@ -4814,8 +4845,36 @@
               "email"
             ],
             "not": {
-              "required": [
-                "phone"
+              "anyOf": [
+                {
+                  "required": [
+                    "phone"
+                  ]
+                },
+                {
+                  "required": [
+                    "username"
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "required": [
+              "username"
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "phone"
+                  ]
+                },
+                {
+                  "required": [
+                    "email"
+                  ]
+                }
               ]
             }
           }

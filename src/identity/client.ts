@@ -191,9 +191,10 @@ const role = (v: unknown) => v === 'TENANT_ADMIN' || v === 'MEMBER';
 export const isContact = (v: Record<string, unknown>) =>
   (v.phone == null || (typeof v.phone === 'string' && /^\+[1-9][0-9]{7,14}$/.test(v.phone))) &&
   (v.email == null || text(v.email)) &&
-  (text(v.phone) || text(v.email));
-export const contactLabel = (v: { phone?: string | null; email?: string | null }) =>
-  v.phone || v.email || '未绑定手机号';
+  (v.username == null || (typeof v.username === 'string' && /^[a-z][a-z0-9_-]{2,39}$/.test(v.username))) &&
+  (text(v.phone) || text(v.email) || text(v.username));
+export const contactLabel = (v: { phone?: string | null; email?: string | null; username?: string | null }) =>
+  v.username || v.phone || v.email || '未绑定手机号';
 export function isMembership(v: unknown): v is Membership {
   return (
     record(v) &&
@@ -311,7 +312,7 @@ export function createIdentityClient(fetcher: typeof fetch = fetch, timeoutMs = 
   return {
     me: (signal?: AbortSignal) => request('/api/v1/me', 'GET', isIdentity, undefined, signal),
     login: (phone: string, password: string) =>
-      request('/api/v1/auth/login', 'POST', isIdentity, { phone, password }),
+      request('/api/v1/auth/login', 'POST', isIdentity, /^[a-z]/i.test(phone.trim()) ? { username: phone, password } : { phone, password }),
     legacyLogin: (email: string, password: string) =>
       request('/api/v1/auth/login', 'POST', isIdentity, { email, password }),
     logout: () => request('/api/v1/auth/logout', 'POST', (v): v is null => v === null),

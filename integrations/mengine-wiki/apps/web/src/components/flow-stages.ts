@@ -63,7 +63,7 @@ export function realWorkflow(item?: FlowTaskState, live = true) {
   if (ready) {
     current = "published";
     const reviewed = latest("remediated", "rescanned");
-    if (reviewed) set("scanning", "done", "复核已通过", "治理复核已通过，按既有规则恢复或保持发布。脱敏是本阶段的按需处理，不是每份资料的必经步骤。", reviewed.at);
+    if (reviewed) set("scanning", "done", "复核已通过", "治理复核已通过，按既有规则恢复或保持发布。复检不改写来源正文；仍存在敏感问题时保持隔离。", reviewed.at);
   }
   if (failed) {
     current = scan && (!parsed || scan.seq > parsed.seq) ? "scanning" : "parsing";

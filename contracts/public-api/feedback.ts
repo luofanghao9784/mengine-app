@@ -41,7 +41,7 @@ export interface FeedbackAssessment {
 }
 export interface FeedbackSnapshot {
   taskState: string;
-  executionClass: 'live' | 'verification' | 'none';
+  executionClass: 'live' | 'verification' | 'external' | 'none';
   contentSha256: string;
   sourceVersionCount: number;
 }

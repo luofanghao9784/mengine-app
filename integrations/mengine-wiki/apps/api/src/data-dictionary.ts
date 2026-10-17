@@ -1,7 +1,7 @@
 import {enqueueDictionary,startDictionaryWorker} from './dictionary-jobs.js';
 import {inspectSemanticSuggestions,parseSemanticSuggestions} from './semantic-suggestions.js';
 import {validateSemanticsShape,type Semantics} from './business-queries.js';
-import {dictionaryFingerprint} from './dictionary-version.js';
+import {dictionaryFingerprint,currentDictionary} from './dictionary-version.js';
 import type {FastifyInstance,FastifyRequest} from 'fastify';
 import {Store} from './store.js';
 import {Model} from './model.js';
@@ -22,7 +22,7 @@ export function dictionaryState(store:Store,u:User,id:string){
  const row=store.db.prepare('SELECT data FROM data_dictionary WHERE dataset_id=? AND tenant_id=?').get(id,u.tenantId) as {data:string}|undefined;
  const data=row?JSON.parse(row.data):{revision:0,confirmed:null,suggestion:null,history:[]};
  const fingerprint=dictionaryFingerprint(store,u.tenantId,definition);
- const status=data.confirmed?(data.confirmed.fingerprint!==fingerprint?'changed':data.confirmed.origin==='model'?'generated':'legacy'):'unconfirmed';
+ const status=data.confirmed?(currentDictionary(store,u.tenantId,definition,data.confirmed)?'generated':'changed'):'unconfirmed';
  return {document,definition,data,fingerprint,status};
 }
 export function applyDictionary(_store:Store,_u:User,_d:Doc,_p:Proposal){throw fail(410,'人工口径确认已停用，字段与口径由模型自动生成');}
@@ -35,7 +35,9 @@ export function reconcileDictionaryJobs(store:Store){
   // Reuse the original authorized actor, or the dataset owner for pre-queue imports.
   const u=store.user(job?.actor_id||d.ownerId);
   if(!u||!u.active||u.tenantId!==row.tenant_id||!canRegenerateDictionary(u,d))continue;
-  if(dictionaryState(store,u,row.id).status==='generated')continue;
+  const state=dictionaryState(store,u,row.id);
+  if(state.status==='generated')continue;
+  if(state.data.confirmed?.origin==='deployment'||(state.definition as any).provenance?.governanceMode==='deployment')continue;
   enqueueDictionary(store,u,row.id);
  }
 }
@@ -51,10 +53,11 @@ export function registerDictionary(app:FastifyInstance,store:Store,model:Model,s
  app.get<{Params:{id:string}}>('/api/foundation/:id/dictionary',async req=>{
   const u=session(req),s=dictionaryState(store,u,req.params.id);
   const job=store.db.prepare('SELECT state,error,attempts,next_at AS nextAt FROM dictionary_jobs WHERE dataset_id=? AND tenant_id=?').get(req.params.id,u.tenantId) as {state:string;error:string}|undefined;
-  return {...s.data,job,pendingProposal:null,fingerprint:s.fingerprint,status:s.status,mode:'model-only',canGenerate:canRegenerateDictionary(u,s.document),sourceFields:s.definition.fields,source:s.definition.source,busy:running.has(u.tenantId+':'+req.params.id)||['queued','running','retry_wait'].includes(job?.state||'')};
+  return {...s.data,job,pendingProposal:null,fingerprint:s.fingerprint,status:s.status,mode:s.data.confirmed?.origin==='deployment'?'deployment-baseline':'model-only',canGenerate:s.data.confirmed?.origin!=='deployment'&&!(s.definition as any).provenance?.governanceMode&&canRegenerateDictionary(u,s.document),sourceFields:s.definition.fields,source:s.definition.source,busy:running.has(u.tenantId+':'+req.params.id)||['queued','running','retry_wait'].includes(job?.state||'')};
  });
  const generate=async(u:User,id:string,refresh:()=>User)=>{
   const s=dictionaryState(store,u,id);
+  if(s.data.confirmed?.origin==='deployment'||(s.definition as any).provenance?.governanceMode==='deployment')throw fail(409,'部署口径由部署工具维护；结构变化后须重新治理，不自动覆盖');
   if(!canRegenerateDictionary(u,s.document))throw fail(403,'需要口径生成职责和来源使用权限');
   if(s.document.aiPaused)throw fail(409,'此数据集已暂停提供给 AI，请恢复后生成口径');
   if(!model.status().configured||!model.status().enabled)throw fail(503,'模型未配置或暂停');
@@ -101,5 +104,6 @@ export function registerDictionary(app:FastifyInstance,store:Store,model:Model,s
  };
  for(const path of ['generate','infer','infer-semantics'])app.post<{Params:{id:string}}>(`/api/foundation/:id/dictionary/${path}`,async req=>{const result=await generate(session(req),req.params.id,()=>session(req));store.db.prepare("UPDATE dictionary_jobs SET state='succeeded',error='',next_at='',updated_at=? WHERE dataset_id=? AND state IN ('failed','queued','retry_wait')").run(now(),req.params.id);return result;});
  app.post<{Params:{id:string}}>('/api/foundation/:id/dictionary/proposals',async req=>{const u=session(req);dictionaryState(store,u,req.params.id);throw fail(410,'人工口径编辑与审批已停用，请使用模型自动生成');});
- return startDictionaryWorker(store,async(u,id,refresh)=>{if(dictionaryState(store,u,id).status==='generated')return;await generate(u,id,refresh);},()=>reconcileDictionaryJobs(store));
+ return startDictionaryWorker(store,async(u,id,refresh)=>{if(dictionaryState(store,u,id).status==='generated')return;
+ if(dictionaryState(store,u,id).data.confirmed?.origin==='deployment'){store.db.prepare("UPDATE dictionary_jobs SET state='blocked_schema',error='来源结构变化，等待部署重新治理' WHERE dataset_id=?").run(id);return;}await generate(u,id,refresh);},()=>reconcileDictionaryJobs(store));
 }

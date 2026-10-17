@@ -369,7 +369,7 @@ export function PhoneAuth({
               ? '验证手机号后设置新密码。'
               : joining
                 ? `受邀手机号：${preview.maskedPhone}`
-                : '使用手机号和密码，继续你的工作。'}
+                : '使用用户名或手机号和密码，继续你的工作。'}
       </p>
       {legacyAllowed && !inviting && (
         <p className="muted">
@@ -413,7 +413,12 @@ export function PhoneAuth({
                 />
               </Field>
             ) : (
-              !joining && <PhoneField value={phone} change={setPhone} />
+              !joining && (mode === 'login' && !binding ? (
+                <Field label="用户名或手机号">
+                  <input autoComplete="username" required maxLength={40} value={phone}
+                    onChange={(e) => setPhone(e.target.value)} placeholder="用户名或手机号" />
+                </Field>
+              ) : <PhoneField value={phone} change={setPhone} />)
             )}
             {creating && (
               <Field label="你的姓名">

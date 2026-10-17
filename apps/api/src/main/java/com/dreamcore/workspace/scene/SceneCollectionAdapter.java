@@ -23,7 +23,7 @@ public class SceneCollectionAdapter implements CollectionAdapter {
    var link=links.getFirst();boolean found=false;
    for(var a:export.path("assets"))if(a.path("id").asText().equals(link.get("source_id"))){
     if(!SceneService.metadata(a).toString().equals(link.get("metadata").toString()) && !SceneService.sameMetadata(a,link.get("metadata").toString()))throw new IllegalStateException("SCENE_SOURCE_CHANGED");
-    var rows=new ArrayList<List<String>>();for(var row:a.path("rows")){var values=new ArrayList<String>();for(var value:row)values.add(value.asText());rows.add(values);}
+    var rows=new ArrayList<List<String>>();for(var row:a.path("rows")){var values=new ArrayList<String>();for(var value:row)values.add(value.isNull()?null:value.asText());rows.add(values);}
     result.add(new Snapshot(d.id(),Instant.parse(a.path("updatedAt").asText()),rows));found=true;break;
    }
    if(!found)throw new IllegalStateException("SCENE_SOURCE_WITHDRAWN");

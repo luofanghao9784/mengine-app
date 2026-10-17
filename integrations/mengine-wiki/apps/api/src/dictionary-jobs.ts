@@ -9,7 +9,7 @@ export function startDictionaryWorker(store:Store,generate:(u:User,id:string,ref
  store.db.prepare("UPDATE dictionary_jobs SET state='queued' WHERE state IN ('running','failed')").run();
  const tick=()=>{if(stopping||active)return;if(Date.now()-lastReconcile>=15_000){reconcile();lastReconcile=Date.now();}const job=store.db.prepare("SELECT * FROM dictionary_jobs WHERE state IN ('queued','retry_wait') AND next_at<=? ORDER BY next_at,updated_at LIMIT 1").get(now()) as {dataset_id:string;tenant_id:string;actor_id:string;updated_at:string;attempts:number}|undefined;if(!job)return;
  store.db.prepare("UPDATE dictionary_jobs SET state='running' WHERE dataset_id=?").run(job.dataset_id);
- active=(async()=>{try{const fresh=()=>{const u=store.user(job.actor_id);if(!u||!u.active||u.tenantId!==job.tenant_id)throw Error('任务发起账号已停用或不再属于本企业');return u;};await generate(fresh(),job.dataset_id,fresh);store.db.prepare("UPDATE dictionary_jobs SET state='succeeded',updated_at=?,error='',next_at='' WHERE dataset_id=? AND updated_at=?").run(now(),job.dataset_id,job.updated_at);}catch{
+ active=(async()=>{try{const fresh=()=>{const u=store.user(job.actor_id);if(!u||!u.active||u.tenantId!==job.tenant_id)throw Error('任务发起账号已停用或不再属于本企业');return u;};await generate(fresh(),job.dataset_id,fresh);store.db.prepare("UPDATE dictionary_jobs SET state='succeeded',updated_at=?,error='',next_at='' WHERE dataset_id=? AND updated_at=? AND state='running'").run(now(),job.dataset_id,job.updated_at);}catch{
  const attempts=job.attempts+1;
  // Persistent exponential backoff, capped at 15 minutes; never exhaust attempts.
  const nextAt=new Date(Date.now()+Math.min(30_000*2**Math.min(attempts-1,5),900_000)).toISOString();

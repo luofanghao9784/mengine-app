@@ -21,6 +21,38 @@ class RecommendationIntegrationTest {
  RecommendationService.Page list(UUID actor){return recommendations.list(actor,tenant,null,0,20,null);}
  RecommendationService.Target target(RecommendationService.Item item){var c=item.content();return new RecommendationService.Target(c.kind(),c.id(),c.versionKey());}
  DocumentPublicationService.Publication publish(ConversationService.Detail d){var document=documents.create(owner,tenant,d.conversation().id(),d.tasks().getFirst().id(),null,UUID.randomUUID());return publications.publish(owner,tenant,document.document().id(),1,UUID.randomUUID(),shared,null,null,null,"docx",true);}
+ @Test @org.springframework.transaction.annotation.Transactional
+ void cancelledHistoryDoesNotSpendRecommendationAuthorizationBudget(){
+  var delivered=result("可显示的完成成果");
+  var pending=conversations.submit(owner,tenant,null,personal,UUID.randomUUID(),"尚未执行的任务","AGENT");
+  UUID pendingId=pending.tasks().getFirst().id();
+  db.update("UPDATE conversation_tasks SET status='CANCELLED' WHERE id=?",pendingId);
+  var later=result("另一条可显示成果");
+  // An expensive/inaccessible non-candidate must not be traversed by the feed.
+  // DDL and fixture writes roll back together; the real authorization implementation
+  // remains in use for every candidate (including future view predicates).
+  String definition=db.queryForObject("SELECT pg_get_functiondef('library_dispatch_task_readable(uuid)'::regprocedure)",String.class);
+  db.execute(definition.replace("FUNCTION public.library_dispatch_task_readable(","FUNCTION public.recommendation_test_original_readable("));
+  db.execute("CREATE OR REPLACE FUNCTION library_dispatch_task_readable(target uuid) RETURNS boolean LANGUAGE plpgsql STABLE AS $$ BEGIN IF target='"+pendingId+"'::uuid THEN RAISE EXCEPTION 'Non-candidate authorization traversal'; END IF; RETURN recommendation_test_original_readable(target); END $$");
+  assertEquals(Set.of(delivered.tasks().getFirst().id(),later.tasks().getFirst().id()),new HashSet<>(list(owner).items().stream().map(i->i.content().id()).toList()));
+ }
+ @Autowired com.dreamcore.workspace.material.MaterialService materials;
+ @Autowired com.dreamcore.workspace.material.LibraryPermissionService permissions;
+ @Test void enabledFilePermissionRevocationRemovesDependentResult(){
+  db.update("INSERT INTO library_permission_rollouts VALUES (?,true)",tenant);
+  var file=materials.upload(owner,tenant,shared,null,null,null,UUID.randomUUID(),new org.springframework.mock.web.MockMultipartFile("file","source.txt","text/plain","synthetic evidence".getBytes()));
+  UUID version=materials.detail(owner,tenant,shared,file.id(),0,20).versions().getFirst().id();
+  var delivered=result("依赖当前来源权限的结果");UUID task=delivered.tasks().getFirst().id();
+  db.update("INSERT INTO task_context_materials(task_id,attempt_number,version_id) VALUES (?,1,?)",task,version);
+  permissions.save(admin,tenant,"MATERIAL",file.id(),new com.dreamcore.workspace.material.LibraryPermissionService.Change(UUID.randomUUID(),0,true,List.of(new com.dreamcore.workspace.material.LibraryPermissionService.Grant("ACCOUNT",owner,"READ","DENY",false,null))));
+  assertTrue(db.queryForObject("SELECT library_task_sources_allowed(?,?,?,false)",Boolean.class,owner,tenant,task));
+  assertFalse(db.queryForObject("SELECT library_task_sources_allowed(?,?,?,true)",Boolean.class,owner,tenant,task));
+  assertFalse(db.queryForObject("SELECT library_task_sources_allowed(?,?,?,false)",Boolean.class,owner,UUID.randomUUID(),task));
+  assertEquals(List.of(task),list(owner).items().stream().map(i->i.content().id()).toList());
+  permissions.save(admin,tenant,"MATERIAL",file.id(),new com.dreamcore.workspace.material.LibraryPermissionService.Change(UUID.randomUUID(),1,true,List.of(new com.dreamcore.workspace.material.LibraryPermissionService.Grant("ACCOUNT",owner,"NONE","DENY",false,null))));
+  assertTrue(list(owner).items().isEmpty());
+  assertTrue(list(reader).items().isEmpty());
+ }
  @Test void authorizedPoolContainsPrivateOwnerResultsAndIndependentSharedCopyOnly(){var d=result("私人提示不可给其他人");var published=publish(d);assertEquals(2,list(owner).rankedCount());var read=list(reader);assertEquals(1,read.rankedCount());assertEquals("PUBLICATION",read.items().getFirst().content().kind());assertNull(read.items().getFirst().content().conversationId());assertEquals(published.materialVersionId(),read.items().getFirst().content().id());assertEquals(0,list(admin).rankedCount());db.update("UPDATE tenant_memberships SET status='DISABLED' WHERE tenant_id=? AND account_id=?",tenant,owner);assertEquals(1,list(reader).rankedCount());assertEquals("NOT_ASSESSED",read.businessOutcome());}
  @Test void completePoolIsRankedBeforePaginationAndSnapshotsDetectCurrentChanges(){
   var first=result("旧但明确关注的成果");result("新成果");

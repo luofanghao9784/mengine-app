@@ -7,6 +7,15 @@ public final class BriefingEditorialQuality {
  private static final Pattern INTERNAL=Pattern.compile("(?i)\\b(compare_dataset|deliver_briefing|dataset_read|completeDataset|businessType|finance_confirmed|canceled|deposit|DATA|INSIGHT|UUID|JSON|API)\\b|快照ID|(?:收款|订单|会员)ID|[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}");
  private static final Pattern INVENTORY=Pattern.compile("数据集结构|字段清单|结构概览|时间覆盖说明|数据结构与|(?:包含|包括)[0-9一二三四五六七八九十]+个字段");
  private static final Pattern QUANTITY=Pattern.compile("占比|比例|多数|大多数|主要形式|以.{0,12}为主|增长|下降|同比|环比|排名|最高|最低|领先|\\d+(?:\\.\\d+)?[%％]");
+ /** A mixed course total cannot be presented as one product category without category evidence. */
+ public static void validateApprovalScope(BriefingContentService.Request r){
+  for(String sentence:(r.title()+"。"+r.summary()).split("[。！？；\\n]"))if(sentence.matches(".*(效率|耗时|处理速度).*" )&&!sentence.matches(".*(不代表|不能|无法|待核实|需核实).*"))throw new IdentityException(422,"BRIEFING_APPROVAL_EFFICIENCY_NOT_MEASURED");
+ }
+ public static void validateCourseScope(BriefingContentService.Request r,boolean mixed,boolean categoryDimension){
+  if(!mixed||categoryDimension)return;
+  String text=r.title()+"。"+r.summary()+"。"+String.join("。",r.analysis());
+  for(String sentence:text.split("[。！？；\\n]"))if(sentence.matches(".*(正式课|体验课|课程体验官).*" )&&!sentence.matches(".*(不代表|不等于|不能|未区分|包含|包括|未按产品).*"))throw new IdentityException(422,"BRIEFING_CATEGORY_SCOPE_MISMATCH");
+ }
  public static void validate(BriefingContentService.Request r,boolean automatic,boolean datasetEvidence,boolean computed){
   validate(r,automatic,datasetEvidence,computed,false);
  }

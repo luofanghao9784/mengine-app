@@ -72,6 +72,10 @@ public class MetricCatalog {
  }
  /** Invoked after dataset authorization and snapshot pinning, in the task transaction. */
  public static Object context(JdbcTemplate db,UUID task,UUID dataset,String query){
+  return context(db,task,dataset,query,null,null);
+ }
+ /** Exact published definition selection for externally authored bootstrap manifests. */
+ public static Object context(JdbcTemplate db,UUID task,UUID dataset,String query,UUID metricId,Integer version){
   var rows=db.queryForList("""
    SELECT m.id,v.version,v.definition,p.snapshot_id FROM conversation_tasks t
    JOIN scene_metrics m ON m.tenant_id=t.tenant_id
@@ -79,11 +83,12 @@ public class MetricCatalog {
    JOIN scene_asset_links l ON l.tenant_id=m.tenant_id AND l.source_id=m.source_id AND l.kind='TABLE' AND l.active
    JOIN task_dataset_reads p ON p.task_id=t.id AND p.attempt_number=t.attempt AND p.dataset_id=l.target_id
    WHERE t.id=? AND l.target_id=? AND scene_table_scope(l.metadata)=v.source_scope AND file_dataset_readable(t.requested_by,l.target_id)
+    AND (CAST(? AS uuid) IS NULL OR m.id=?) AND (CAST(? AS integer) IS NULL OR v.version=?)
    ORDER BY CASE WHEN ?<>'' AND strpos(lower(v.definition->>'name'),lower(?))>0 THEN 0 ELSE 1 END,
     (SELECT max(cr.created_at) FROM metric_calculation_receipts cr JOIN metric_briefing_receipts br ON br.calculation_artifact_id=cr.artifact_id
      JOIN conversation_tasks done ON done.id=cr.task_id WHERE cr.metric_id=m.id AND cr.version=v.version AND done.status='SUCCEEDED' AND done.requested_by=t.requested_by) ASC NULLS FIRST,
     m.id LIMIT 4 FOR SHARE OF m
-   """,task,dataset,query,query);
+   """,task,dataset,metricId,metricId,version,version,query,query);
   var result=new ArrayList<Object>();for(var r:rows.stream().limit(3).toList()){
    var definition=JSON.readTree(r.get("definition").toString());
    var old=db.queryForList("SELECT version FROM task_metric_reads WHERE task_id=? AND attempt_number=(SELECT attempt FROM conversation_tasks WHERE id=?) AND metric_id=?",Integer.class,task,task,r.get("id"));

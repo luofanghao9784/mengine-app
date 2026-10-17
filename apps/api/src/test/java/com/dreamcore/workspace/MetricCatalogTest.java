@@ -23,6 +23,26 @@ class MetricCatalogTest extends TaskDatasetFixture {
  }
  Map<String,Object> definition(){var d=new HashMap<String,Object>(Map.of("name","合成数量","meaning","样本数量合计","unit","件","grain","每行一个样本","scope","仅合成快照","exclusions","无","evidence","测试业务定义，不代表真实业务","aggregation","SUM","valueField","数量"));d.put("execution",Map.of("groupColumns",List.of(),"dateColumn","","dateFrom","","dateTo","","timeZone","Asia/Shanghai","reviewed",true));return d;}
  UUID save(){return UUID.fromString(json.valueToTree(catalog.save(owner,tenant,false,new MetricCatalog.Change(null,0,"synthetic",definition()))).path("id").asText());}
+ @Autowired BriefingBootstrapDeployment bootstrap;
+ @Test void bootstrapPinsOnlyExplicitPublishedPlanAndRejectsWithdrawnOrAlteredPlan(){
+  UUID id=save();catalog.transition(owner,tenant,false,id,new MetricCatalog.Transition(1),true);
+  // More than the normal context page: exact selection cannot depend on catalog ordering.
+  for(int i=0;i<5;i++){UUID other=save();catalog.transition(owner,tenant,false,other,new MetricCatalog.Transition(1),true);}
+  var plan=MetricPlan.request(json.valueToTree(definition()),dataset,snapshot,id,1);
+  var card=new BriefingBootstrapDeployment.Card("合成指标首轮验证",plan,new BriefingContentService.Request(null,"合成数量口径统计","按已确认的合成口径计算固定快照，不解释真实经营变化。",List.of("计算保留来源与指标版本，所有数据均为合成样本。","不扩大来源授权，不修改已发布计划，不推断真实企业经营表现。"),"DATA"));
+  var m=new BriefingBootstrapDeployment.Manifest("1.0",UUID.randomUUID(),tenant,owner,space,List.of(card));
+  bootstrap.apply(m,true);
+  assertEquals(0,db.queryForObject("SELECT count(*) FROM task_metric_reads r JOIN conversation_tasks t ON t.id=r.task_id WHERE t.tenant_id=?",Integer.class,tenant));
+  bootstrap.apply(m,false);
+  assertEquals(1,db.queryForObject("SELECT count(*) FROM metric_briefing_receipts r JOIN metric_calculation_receipts c ON c.artifact_id=r.calculation_artifact_id JOIN conversation_tasks t ON t.id=c.task_id WHERE t.tenant_id=?",Integer.class,tenant));
+  assertEquals(List.of(id),db.queryForList("SELECT r.metric_id FROM task_metric_reads r JOIN conversation_tasks t ON t.id=r.task_id WHERE t.tenant_id=?",UUID.class,tenant));
+  var changed=new DatasetCalculationService.Request(dataset,snapshot,null,null,null,null,null,null,"Asia/Shanghai","COUNT","SUMMARY",List.of(),null,null,null,null,id,1);
+  var bad=new BriefingBootstrapDeployment.Manifest("1.0",UUID.randomUUID(),tenant,owner,space,List.of(new BriefingBootstrapDeployment.Card("篡改口径",changed,card.content())));
+  assertEquals("METRIC_PLAN_MISMATCH",assertThrows(IdentityException.class,()->bootstrap.apply(bad,true)).code);
+  catalog.transition(owner,tenant,false,id,new MetricCatalog.Transition(1),false);
+  var withdrawn=new BriefingBootstrapDeployment.Manifest("1.0",UUID.randomUUID(),tenant,owner,space,List.of(card));
+  assertEquals("METRIC_DEFINITION_REQUIRED",assertThrows(IdentityException.class,()->bootstrap.apply(withdrawn,true)).code);
+ }
  @Test void publicationRetrievalPinAndWithdrawal(){
   UUID id=save();var task=task(null,"AUTHORIZED_LIBRARY");
   assertEquals(0,call(task,request("dataset_search",null,null,0)).path("items").get(0).path("governedMetrics").path("items").size());

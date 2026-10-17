@@ -63,11 +63,39 @@ class BriefingFaceAlignmentIntegrationTest extends DatasetCalculationFixture {
   var bytes=db.queryForObject("SELECT content FROM conversation_artifacts WHERE id=?",byte[].class,delivered.get("artifactId"));var doc=briefingContent.find(j.id(),1);
   assertEquals("财务已确认",doc.chartLabels().groups().get("finance_confirmed"));assertEquals("定金",doc.chartLabels().columns().get("deposit"));assertFalse(doc.chartLabels().groups().containsKey("unknown"));assertEquals("deposit",doc.content().chart().baseline());assertEquals("finance_confirmed",doc.content().chart().rows().getFirst().group());assertEquals(com.dreamcore.workspace.identity.IdentityService.hash(new String(bytes,java.nio.charset.StandardCharsets.UTF_8)),doc.sha256());assertFalse(new String(bytes,java.nio.charset.StandardCharsets.UTF_8).contains("chartLabels"));
  }
+ @Test void existingCourseEntitlementChartGetsSourceLabelsWithoutChangingItsEvidence(){
+  dataset=UUID.randomUUID();
+  db.update("INSERT INTO business_datasets(id,tenant_id,connection_id,workspace_id,dataset_key,name,column_names) VALUES (?,?,?,?,'ninepop_course_entitlements_v1','会员课程权益',?::jsonb)",dataset,tenant,connection,space,json.writeValueAsString(List.of("课程状态","期间","数量")));
+  var expected=Map.of("active","开课中","on_leave","请假中","frozen","停卡中","finished","已结束","refunded","已退款","canceled","已取消","guarantee_renewal","保底续期","pending_start","待开课","final_payment_pending","尾款限制");
+  var records=new ArrayList<List<String>>();for(String state:expected.keySet())records.add(List.of(state,"本期","1"));records.add(List.of("unknown","本期","1"));
+  snapshot=version(1,records);var j=start();
+  var p=new DatasetCalculationService.Request(dataset,snapshot,null,null,null,null,null,null,"Asia/Shanghai","COUNT","SUMMARY",List.of("课程状态"),null,null,null,null);
+  var result=json.valueToTree(agents.compareDataset(j.id(),j.token(),p));receipt(j,2,"compare_dataset","succeeded");receipt(j,3,"deliver_briefing","STARTED");
+  var delivered=agents.deliverBriefing(j.id(),j.token(),card(UUID.fromString(result.at("/artifact/id").asString()),null));receipt(j,3,"deliver_briefing","succeeded");
+  var bytes=db.queryForObject("SELECT content FROM conversation_artifacts WHERE id=?",byte[].class,delivered.get("artifactId"));var doc=briefingContent.find(j.id(),1);
+  assertEquals(expected,doc.chartLabels().groups());assertTrue(doc.chartLabels().columns().isEmpty());
+  assertEquals(10,doc.content().chart().rows().size());for(var row:doc.content().chart().rows()){assertTrue(expected.containsKey(row.group())||row.group().equals("unknown"));assertEquals("1",row.current());}
+  assertArrayEquals(bytes,db.queryForObject("SELECT content FROM conversation_artifacts WHERE id=?",byte[].class,delivered.get("artifactId")));
+  assertEquals(com.dreamcore.workspace.identity.IdentityService.hash(new String(bytes,java.nio.charset.StandardCharsets.UTF_8)),doc.sha256());
+  assertTrue(BriefingDisplayLabels.dictionary("ninepop_course_entitlements_v1","会员状态").isEmpty());
+ }
  @Test void compositionCountUsesSameDateScopeAndDisclosesExcludedDates(){
   rows(List.of(List.of("甲","2026-09-30T18:00:00Z","not-money"),List.of("乙","2026-10-02","not-money"),List.of("乙","2026-09-30","not-money"),List.of("甲","","not-money")));
   var j=start();var p=new DatasetCalculationService.Request(dataset,snapshot,null,null,null,null,null,null,"Asia/Shanghai","COUNT","COMPOSITION",List.of("门店"),"期间","2026-10-01","2026-10-02","EXCLUDE");var r=json.valueToTree(agents.compareDataset(j.id(),j.token(),p));
   assertEquals("2",r.at("/calculation/total").asString());assertEquals(2,r.at("/calculation/matchedRows").asInt());assertEquals(2,r.at("/calculation/ignoredRows").asInt());assertEquals(1,r.at("/calculation/missingDateRows").asInt());assertEquals("50.000000",r.at("/calculation/rows/0/sharePercent").asString());
   var prose=new BriefingContentService.Request(null,"甲店记录占比为一半","甲店在本次筛选范围内的记录占比为一半。",List.of("仅使用已核验的固定范围内全部记录计算份额。","本次剔除缺少日期的记录，不推断范围外的经营情况。"),"DATA");
   assertDoesNotThrow(()->BriefingEditorialQuality.validate(prose,true,true,true,true));assertEquals("BRIEFING_RATIO_NOT_VERIFIED",assertThrows(IdentityException.class,()->BriefingEditorialQuality.validate(prose,true,true,true,false)).code);
+ }
+ @Test void mixedProductAggregationCannotPublishAsFormalCourses(){
+  dataset=UUID.randomUUID();
+  db.update("INSERT INTO business_datasets(id,tenant_id,connection_id,workspace_id,dataset_key,name,column_names) VALUES (?,?,?,?,'ninepop-chain-courses-v1','合成课程','[\"门店\",\"产品类别\",\"课程数\"]'::jsonb)",dataset,tenant,connection,space);
+  snapshot=version(1,List.of(List.of("甲","formal_course","5"),List.of("甲","trial_course","2")));
+  var j=start();var p=new DatasetCalculationService.Request(dataset,snapshot,null,null,"课程数",null,null,null,"Asia/Shanghai","SUM","SUMMARY",List.of("门店"),null,null,null,null);
+  var result=json.valueToTree(agents.compareDataset(j.id(),j.token(),p));receipt(j,2,"compare_dataset","succeeded");receipt(j,3,"deliver_briefing","STARTED");
+  var artifact=UUID.fromString(result.at("/artifact/id").asString());
+  var bad=new BriefingContentService.Request(artifact,"甲店正式课存量为7份","甲店正式课的课程存量为7份，需要跟进。",List.of("本次按门店汇总课程记录数量。","课程记录数量不代表会员人数。"),"DATA");
+  assertEquals("BRIEFING_CATEGORY_SCOPE_MISMATCH",assertThrows(IdentityException.class,()->agents.deliverBriefing(j.id(),j.token(),bad)).code);
+  var good=new BriefingContentService.Request(artifact,"甲店课程记录共7份","甲店的课程记录共7份，需要按产品分类跟进。",List.of("本次包含正式课与体验课的课程记录。","课程记录数量不代表会员人数。"),"DATA");
+  assertEquals("PREPARED",agents.deliverBriefing(j.id(),j.token(),good).get("status"));
  }
 }
