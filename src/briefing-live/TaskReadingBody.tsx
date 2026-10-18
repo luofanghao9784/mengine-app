@@ -1,3 +1,4 @@
+import { BackgroundTaskEvidence } from '../profile/BackgroundTaskEvidence';
 import { ReplyReferences } from '../conversation/ReplyReferences';
 import { ReadingEvidence } from './ReadingEvidence';
 import { MagazineBody } from './Magazine';
@@ -136,6 +137,7 @@ export function TaskReadingBody({
   }
   return (
     <>
+      {result.mode === 'AGENT' && result.status === 'SUCCEEDED' && <BackgroundTaskEvidence tenant={tenant} conversation={task.conversationId} task={task.taskId}/>}
       {result.executionClass === 'verification' && !result.engineVersion?.startsWith('codex-demo-import-') && (
         <p className="live-verification-label">联调验证内容 · 未调用真实模型</p>
       )}

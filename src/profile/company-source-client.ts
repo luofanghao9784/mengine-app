@@ -18,7 +18,7 @@ export interface BackgroundSource {
   type: 'COMPANY_BACKGROUND';
   state: 'AVAILABLE' | 'NO_READABLE_ENTRIES';
   version: string;
-  knowledgeIntegration: 'PENDING_INTEGRATION';
+  knowledgeIntegration: 'PENDING_INTEGRATION' | 'REFERENCE_READY';
   entries: BackgroundEntry[];
 }
 const entry = (v: unknown): v is BackgroundEntry =>
@@ -38,6 +38,44 @@ const entry = (v: unknown): v is BackgroundEntry =>
 export function createCompanySourceClient(fetcher: typeof fetch = fetch) {
   const request = createIdentityRequest(fetcher);
   return {
+    knowledge(tenant: string, signal?: AbortSignal) {
+      if (!uuid(tenant)) throw new IdentityError('INVALID_REQUEST', 400);
+      return request(
+        `/api/v1/tenants/${tenant}/company-information/source/knowledge`,
+        'GET',
+        (v): v is BackgroundKnowledgePage =>
+          record(v) &&
+          v.tenantId === tenant &&
+          v.mode === 'STRUCTURED_REFERENCE' &&
+          Array.isArray(v.items) &&
+          v.items.length <= 91 &&
+          v.items.every(
+            (k) =>
+              record(k) &&
+              text(k.id) &&
+              uuid(k.sourceEntryId) &&
+              uuid(k.sourceVersionId) &&
+              Number.isSafeInteger(k.revision) &&
+              Number(k.revision) > 0 &&
+              text(k.title) &&
+              typeof k.content === 'string' &&
+              ['NAME', 'INDUSTRY', 'BUSINESS', 'TERM'].includes(String(k.field)) &&
+              ['HUMAN', 'AI'].includes(String(k.origin)) &&
+              k.status === 'REFERENCE_READY' &&
+              Array.isArray(k.methods) &&
+              k.methods.every(
+                (m) =>
+                  record(m) &&
+                  uuid(m.id) &&
+                  Number.isSafeInteger(m.version) &&
+                  text(m.name) &&
+                  ['REFERENCE_CURRENT', 'REVIEW_REQUIRED'].includes(String(m.status)),
+              ),
+          ),
+        undefined,
+        signal,
+      );
+    },
     get(tenant: string, signal?: AbortSignal) {
       if (!uuid(tenant)) throw new IdentityError('INVALID_REQUEST', 400);
       return request(
@@ -50,7 +88,7 @@ export function createCompanySourceClient(fetcher: typeof fetch = fetch) {
           v.type === 'COMPANY_BACKGROUND' &&
           typeof v.version === 'string' &&
           /^[a-f0-9]{64}$/.test(v.version) &&
-          v.knowledgeIntegration === 'PENDING_INTEGRATION' &&
+          ['PENDING_INTEGRATION', 'REFERENCE_READY'].includes(String(v.knowledgeIntegration)) &&
           Array.isArray(v.entries) &&
           v.entries.length <= 91 &&
           v.entries.every(entry) &&
@@ -63,3 +101,20 @@ export function createCompanySourceClient(fetcher: typeof fetch = fetch) {
   };
 }
 export const companySourceClient = createCompanySourceClient();
+
+export interface BackgroundKnowledgePage {
+  tenantId: string;
+  mode: 'STRUCTURED_REFERENCE';
+  items: {
+    id: string;
+    sourceEntryId: string;
+    sourceVersionId: string;
+    revision: number;
+    field: CompanyField;
+    title: string;
+    content: string;
+    origin: 'HUMAN' | 'AI';
+    status: 'REFERENCE_READY';
+    methods: { id: string; version: number; name: string; status: 'REFERENCE_CURRENT' | 'REVIEW_REQUIRED' }[];
+  }[];
+}

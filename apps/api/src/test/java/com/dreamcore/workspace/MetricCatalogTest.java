@@ -24,6 +24,31 @@ class MetricCatalogTest extends TaskDatasetFixture {
  Map<String,Object> definition(){var d=new HashMap<String,Object>(Map.of("name","合成数量","meaning","样本数量合计","unit","件","grain","每行一个样本","scope","仅合成快照","exclusions","无","evidence","测试业务定义，不代表真实业务","aggregation","SUM","valueField","数量"));d.put("execution",Map.of("groupColumns",List.of(),"dateColumn","","dateFrom","","dateTo","","timeZone","Asia/Shanghai","reviewed",true));return d;}
  UUID save(){return UUID.fromString(json.valueToTree(catalog.save(owner,tenant,false,new MetricCatalog.Change(null,0,"synthetic",definition()))).path("id").asText());}
  @Autowired BriefingBootstrapDeployment bootstrap;
+ @Autowired DatasetCalculationService calculator;
+ @Test void controlledSumUsesExactFilterAndConversionAndRejectsMissingAmountOrChangedPlan(){
+  var meta=json.createObjectNode();meta.set("fields",json.valueToTree(List.of(Map.of("name","数量","type","number"),Map.of("name","门店","type","text"))));
+  meta.set("governance",json.valueToTree(Map.of("allowedActors",List.of(owner.toString()),"policyVersion",1)));
+  meta.set("dictionary",json.valueToTree(Map.of("fields",List.of(Map.of("name","数量","unit","分")))));
+  meta.set("analysisPolicy",json.valueToTree(Map.of("excludeFields",List.of(),"noSumFields",List.of("数量"),"conditionalSums",List.of(Map.of("field","数量","equalsFilters",Map.of("门店","SUCCESS"),"conversion","CENTS_TO_YUAN")))));
+  db.update("UPDATE scene_asset_links SET metadata=?::jsonb WHERE tenant_id=?",meta.toString(),tenant);
+  db.update("UPDATE scene_asset_revisions SET metadata=?::jsonb WHERE tenant_id=?",meta.toString(),tenant);
+  snapshot=version(2,List.of(List.of("SUCCESS","100000"),List.of("SUCCESS","200000"),List.of("PENDING","50000"),List.of("FAILED","30000")));
+  var d=definition();d.put("unit","元");var execution=new HashMap<String,Object>((Map<String,Object>)d.get("execution"));execution.put("equalsFilters",Map.of("门店","SUCCESS"));execution.put("conversion","CENTS_TO_YUAN");d.put("execution",execution);
+  UUID id=UUID.fromString(json.valueToTree(catalog.save(owner,tenant,false,new MetricCatalog.Change(null,0,"synthetic",d))).path("id").asText());
+  catalog.transition(owner,tenant,false,id,new MetricCatalog.Transition(1),true);
+  var job=task(null,"AUTHORIZED_LIBRARY");call(job,request("dataset_search",null,null,0));
+  var plan=MetricPlan.request(json.valueToTree(d),dataset,snapshot,id,1);
+  var result=json.valueToTree(calculator.calculate(job,plan));
+  assertEquals("3000.00",result.at("/calculation/total").asText());assertEquals(2,result.at("/calculation/matchedRows").asInt());assertEquals(2,result.at("/calculation/ignoredRows").asInt());
+  var altered=new DatasetCalculationService.Request(dataset,snapshot,null,null,"数量",null,null,null,"Asia/Shanghai","SUM","SUMMARY",List.of(),null,null,null,null,id,1,Map.of("门店","PENDING"),"CENTS_TO_YUAN");
+  assertEquals("METRIC_PLAN_MISMATCH",assertThrows(IdentityException.class,()->calculator.calculate(job,altered)).code);
+  db.update("UPDATE conversation_tasks SET status='CANCELLED' WHERE id=?",job.id());
+  snapshot=version(3,List.of(Arrays.asList("SUCCESS",null),List.of("FAILED","100")));
+  var next=task(null,"AUTHORIZED_LIBRARY");call(next,request("dataset_search",null,null,0));
+  var missing=MetricPlan.request(json.valueToTree(d),dataset,snapshot,id,1);
+  assertEquals("DATASET_AMOUNT_REQUIRED",assertThrows(IdentityException.class,()->calculator.calculate(next,missing)).code);
+  assertEquals(0,db.queryForObject("SELECT count(*) FROM metric_calculation_receipts WHERE task_id=?",Integer.class,next.id()));
+ }
  @Test void bootstrapPinsOnlyExplicitPublishedPlanAndRejectsWithdrawnOrAlteredPlan(){
   UUID id=save();catalog.transition(owner,tenant,false,id,new MetricCatalog.Transition(1),true);
   // More than the normal context page: exact selection cannot depend on catalog ordering.
@@ -98,7 +123,7 @@ class MetricCatalogTest extends TaskDatasetFixture {
   assertEquals("METRIC_DEFINITION_REQUIRED",assertThrows(IdentityException.class,()->agents.compareDataset(job.id(),job.token(),raw)).code);
   var changed=new DatasetCalculationService.Request(dataset,snapshot,null,null,null,null,null,null,"Asia/Shanghai","COUNT","SUMMARY",List.of(),null,null,null,null,id,1);
   assertEquals("METRIC_PLAN_MISMATCH",assertThrows(IdentityException.class,()->agents.compareDataset(job.id(),job.token(),changed)).code);
-  var computed=json.valueToTree(agents.compareDataset(job.id(),job.token(),plan));assertEquals("15",computed.at("/calculation/total").asText());assertEquals(id.toString(),computed.at("/governedMetric/id").asText());
+  var computed=json.valueToTree(calculator.calculate(job,plan));assertEquals("15",computed.at("/calculation/total").asText());assertEquals(id.toString(),computed.at("/governedMetric/id").asText());
   UUID artifact=UUID.fromString(computed.at("/artifact/id").asText());assertEquals(id,db.queryForObject("SELECT metric_id FROM metric_calculation_receipts WHERE artifact_id=?",UUID.class,artifact));
   agents.toolReceipt(job.id(),job.token(),new AgentTaskService.ToolReceipt(2,"compare_dataset","succeeded"));agents.toolReceipt(job.id(),job.token(),new AgentTaskService.ToolReceipt(3,"deliver_briefing","STARTED"));
   var card=new BriefingContentService.Request(artifact,"合成数量口径统计","按已确认的合成口径，当前固定快照的数量合计为十五件。",List.of("该结果由后端读取固定快照全部记录计算，并保留来源与指标版本。","结果只代表合成样本范围，不推断真实企业的经营表现。"));
@@ -151,7 +176,7 @@ class MetricCatalogTest extends TaskDatasetFixture {
    var plan=json.treeToValue(ctx.at("/items/0/governedMetrics/items/0/executionRequest"),DatasetCalculationService.Request.class);
    agents.toolReceipt(job.id(),job.token(),new AgentTaskService.ToolReceipt(1,"task_context","succeeded"));
    agents.toolReceipt(job.id(),job.token(),new AgentTaskService.ToolReceipt(2,"compare_dataset","STARTED"));
-   var calc=json.valueToTree(agents.compareDataset(job.id(),job.token(),plan));
+   var calc=json.valueToTree(calculator.calculate(job,plan));
    agents.toolReceipt(job.id(),job.token(),new AgentTaskService.ToolReceipt(2,"compare_dataset","succeeded"));
    agents.toolReceipt(job.id(),job.token(),new AgentTaskService.ToolReceipt(3,"deliver_briefing","STARTED"));
    var request=new BriefingContentService.Request(UUID.fromString(calc.at("/artifact/id").asText()),"合成数量合计十五件","按已确认的合成口径，固定快照数量合计十五件。",List.of("本次结果使用固定快照内的全部记录，保留来源和口径依据。","该数量仅代表合成样本统计，不用于判断真实业务收入。"));
@@ -163,5 +188,66 @@ class MetricCatalogTest extends TaskDatasetFixture {
   UUID fresh=save();catalog.transition(owner,tenant,false,fresh,new MetricCatalog.Transition(1),true);
   var next=task(null,"AUTHORIZED_LIBRARY");var result=call(next,request("dataset_search",null,null,0));
   assertEquals(fresh.toString(),result.at("/items/0/governedMetrics/items/0/metricId").asText());
+ }
+
+ @Autowired com.dreamcore.workspace.profile.CompanyInformationService company;
+ @Autowired com.dreamcore.workspace.profile.CompanyBackgroundSourceService backgroundSource;
+ @Autowired com.dreamcore.workspace.profile.BackgroundKnowledgeService backgroundKnowledge;
+ @Autowired com.dreamcore.workspace.context.TaskContextGuard contextGuard;
+ UUID addBackground(){return company.change(owner,tenant,new com.dreamcore.workspace.profile.CompanyInformationService.Change(UUID.randomUUID(),com.dreamcore.workspace.profile.CompanyInformationService.Field.TERM,0,"ADD",null,"到账","银行已确认收款")).tagId();}
+ UUID saveWithBackground(UUID version){var d=definition();d.put("backgroundVersionIds",List.of(version.toString()));return UUID.fromString(json.valueToTree(catalog.save(owner,tenant,false,new MetricCatalog.Change(null,0,"synthetic",d))).path("id").asText());}
+ @Test void backgroundKnowledgePinsMethodsAndChangesFenceRunningTasks(){
+  UUID entry=addBackground();var v=backgroundSource.entry(owner,tenant,entry,1);
+  UUID method=saveWithBackground(v.versionId());catalog.transition(owner,tenant,false,method,new MetricCatalog.Transition(1),true);
+  var knowledge=backgroundKnowledge.list(owner,tenant).items().getFirst();assertEquals(v.versionId(),knowledge.sourceVersionId());assertEquals("REFERENCE_CURRENT",knowledge.methods().getFirst().status());
+  var job=task(null,"AUTHORIZED_LIBRARY");agents.openExecution(job.id(),job.token(),new AgentTaskService.ExecutionOpen("1.5",List.of("task_context","compare_dataset")));
+  agents.toolReceipt(job.id(),job.token(),new AgentTaskService.ToolReceipt(1,"task_context","STARTED"));
+  var ctx=call(job,request("dataset_search",null,null,0));assertEquals(1,ctx.at("/items/0/governedMetrics/items").size());
+  var plan=json.treeToValue(ctx.at("/items/0/governedMetrics/items/0/executionRequest"),DatasetCalculationService.Request.class);
+  agents.toolReceipt(job.id(),job.token(),new AgentTaskService.ToolReceipt(1,"task_context","succeeded"));
+  company.change(owner,tenant,new com.dreamcore.workspace.profile.CompanyInformationService.Change(UUID.randomUUID(),com.dreamcore.workspace.profile.CompanyInformationService.Field.TERM,1,"EDIT",entry,"到账","银行确认且财务复核"));
+  assertFalse(db.queryForObject("SELECT metric_background_current(?,1)",Boolean.class,method));
+  assertFalse(db.queryForObject("SELECT task_datasets_readable(?)",Boolean.class,job.id()));
+  assertEquals("REVIEW_REQUIRED",backgroundKnowledge.list(owner,tenant).items().getFirst().methods().getFirst().status());
+  assertThrows(IdentityException.class,()->contextGuard.requireCurrent(job.id()));
+  assertThrows(IdentityException.class,()->calculator.calculate(job,plan));
+  assertEquals("BACKGROUND_REFERENCE_CHANGED",assertThrows(IdentityException.class,()->catalog.transition(owner,tenant,false,method,new MetricCatalog.Transition(1),true)).code);
+  assertThrows(IdentityException.class,()->saveWithBackground(v.versionId()));
+  var current=backgroundSource.entry(owner,tenant,entry,2);var changed=definition();changed.put("backgroundVersionIds",List.of(current.versionId().toString()));
+  catalog.save(owner,tenant,false,new MetricCatalog.Change(method,1,"synthetic",changed));catalog.transition(owner,tenant,false,method,new MetricCatalog.Transition(2),true);
+  assertTrue(db.queryForObject("SELECT metric_background_current(?,2)",Boolean.class,method));
+  assertFalse(db.queryForObject("SELECT task_datasets_readable(?)",Boolean.class,job.id()));
+ }
+ @Test void backgroundBindingsRejectForeignMalformedAndWithdrawnVersions(){
+  UUID entry=addBackground();var v=backgroundSource.entry(owner,tenant,entry,1);UUID method=saveWithBackground(v.versionId());
+  var d=definition();d.put("backgroundVersionIds",List.of("not-a-uuid"));assertThrows(IdentityException.class,()->catalog.save(owner,tenant,false,new MetricCatalog.Change(null,0,"synthetic",d)));
+  assertThrows(IdentityException.class,()->saveWithBackground(UUID.randomUUID()));
+  company.change(owner,tenant,new com.dreamcore.workspace.profile.CompanyInformationService.Change(UUID.randomUUID(),com.dreamcore.workspace.profile.CompanyInformationService.Field.TERM,1,"REMOVE",entry,"",""));
+  assertTrue(backgroundKnowledge.list(owner,tenant).items().isEmpty());assertFalse(db.queryForObject("SELECT metric_background_current(?,1)",Boolean.class,method));
+  assertThrows(IdentityException.class,()->saveWithBackground(v.versionId()));
+ }
+ @Test void backgroundKnowledgeCannotExposeMethodsAfterDatasetRevocation(){
+  UUID entry=addBackground();UUID method=saveWithBackground(backgroundSource.entry(owner,tenant,entry,1).versionId());
+  assertEquals(1,backgroundKnowledge.list(owner,tenant).items().getFirst().methods().size());
+  db.update("UPDATE scene_asset_links SET active=false WHERE tenant_id=?",tenant);
+  assertTrue(backgroundKnowledge.list(owner,tenant).items().getFirst().methods().isEmpty());
+ }
+
+ @Autowired BackgroundEvidenceController backgroundEvidence;
+ @Test void actualCalculationCarriesBackgroundEvidenceAndCannotBeReadCrossTenant(){
+  UUID entry=addBackground();var version=backgroundSource.entry(owner,tenant,entry,1);UUID id=saveWithBackground(version.versionId());
+  catalog.transition(owner,tenant,false,id,new MetricCatalog.Transition(1),true);
+  var job=task(null,"AUTHORIZED_LIBRARY");agents.openExecution(job.id(),job.token(),new AgentTaskService.ExecutionOpen("1.5",List.of("task_context","compare_dataset")));
+  agents.toolReceipt(job.id(),job.token(),new AgentTaskService.ToolReceipt(1,"task_context","STARTED"));
+  var ctx=call(job,request("dataset_search",null,null,0));var plan=json.treeToValue(ctx.at("/items/0/governedMetrics/items/0/executionRequest"),DatasetCalculationService.Request.class);
+  agents.toolReceipt(job.id(),job.token(),new AgentTaskService.ToolReceipt(1,"task_context","succeeded"));agents.toolReceipt(job.id(),job.token(),new AgentTaskService.ToolReceipt(2,"compare_dataset","STARTED"));
+  var calculated=json.valueToTree(calculator.calculate(job,plan));assertEquals(version.versionId().toString(),calculated.path("backgroundVersionIds").get(0).asText());
+  agents.toolReceipt(job.id(),job.token(),new AgentTaskService.ToolReceipt(2,"compare_dataset","succeeded"));finish(job);
+  var auth=new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(owner.toString(),null);
+  var response=new org.springframework.mock.web.MockHttpServletResponse();
+  var proof=json.valueToTree(backgroundEvidence.get(auth,tenant,job.conversation(),job.id(),response));
+  assertEquals(id.toString(),proof.path("calculations").get(0).path("metricId").asText());assertTrue(proof.path("calculations").get(0).path("backgroundVersions").asText().contains(version.versionId().toString()));
+  assertEquals("private, no-store",response.getHeader("Cache-Control"));
+  assertThrows(IdentityException.class,()->backgroundEvidence.get(auth,UUID.randomUUID(),job.conversation(),job.id(),response));
  }
 }

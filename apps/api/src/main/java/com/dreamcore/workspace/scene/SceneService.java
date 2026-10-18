@@ -29,7 +29,30 @@ public class SceneService {
  private String trim(String s,int max){return s.length()>max?s.substring(0,max):s;}
  public void access(UUID actor,UUID tenant,boolean platform){if(platform){identities.platform(actor);if(!Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM tenants WHERE id=? AND status='ACTIVE')",Boolean.class,tenant)))throw new IdentityException(404,"TENANT_NOT_FOUND");}else identities.member(actor,tenant,true);}
  public List<Map<String,Object>> bindings(UUID actor){identities.platform(actor);return db.queryForList("SELECT b.tenant_id,t.name,b.workspace_id,b.connection_id,(SELECT count(*) FROM scene_asset_links a WHERE a.tenant_id=b.tenant_id AND a.kind='TABLE' AND a.active) datasets,(SELECT count(*) FROM scene_asset_links a WHERE a.tenant_id=b.tenant_id AND a.kind<>'TABLE' AND a.active) materials FROM scene_bindings b JOIN tenants t ON t.id=b.tenant_id ORDER BY t.name");}
- public Object status(UUID actor,UUID tenant,boolean platform){access(actor,tenant,platform);if(!platform)requireSceneAdmin(actor,tenant);return Map.of("tenantId",tenant,"governance",db.queryForMap("SELECT source_revision,governance_valid_until,(SELECT status FROM collection_runs c WHERE c.connection_id=scene_bindings.connection_id ORDER BY created_at DESC LIMIT 1) collection_state,coalesce(governance_valid_until>now(),false) policy_current,(SELECT max(finished_at) FROM scene_processing_runs WHERE tenant_id=? AND operation='SYNC_INPUTS' AND state='SUCCEEDED') last_synced_at FROM scene_bindings WHERE tenant_id=?",tenant,tenant),"assets",db.queryForList("SELECT source_id,kind,target_id,revision,metadata,updated_at FROM scene_asset_links WHERE tenant_id=? AND active ORDER BY kind,source_id",tenant).stream().map(r->{var meta=JSON.readTree(r.get("metadata").toString());if(meta.path("governance").isObject())((tools.jackson.databind.node.ObjectNode)meta.path("governance")).remove("allowedActors");r.put("metadata",meta);return r;}).toList(),"runs",db.queryForList("SELECT id,operation,state,created_at,finished_at,error_code FROM scene_processing_runs WHERE tenant_id=? ORDER BY created_at DESC LIMIT 20",tenant));}
+ @org.springframework.beans.factory.annotation.Autowired private com.dreamcore.workspace.material.MaterialAccess materialAccess;
+ @org.springframework.beans.factory.annotation.Autowired private IdentityAudit audit;
+ public Object binding(UUID actor,UUID tenant){
+  access(actor,tenant,false);requireSceneAdmin(actor,tenant);
+  return Map.of("bindings",db.queryForList("SELECT workspace_id,maintainer_id FROM scene_bindings WHERE tenant_id=?",tenant),"workspaces",db.queryForList("SELECT id,name FROM workspaces WHERE tenant_id=? AND kind='SHARED' AND (library_mask(?,tenant_id,'WORKSPACE',id)&3)=3 ORDER BY name,id",tenant,actor));
+ }
+ public Object bind(UUID actor,UUID tenant,UUID workspace){
+  if(workspace==null)throw IdentityException.invalid();
+  access(actor,tenant,false);requireSceneAdmin(actor,tenant);
+  tx.executeWithoutResult(s->{
+   access(actor,tenant,false);
+   db.queryForList("SELECT id FROM tenants WHERE id=? FOR UPDATE",tenant);
+   if(!"SHARED".equals(materialAccess.require(actor,tenant,workspace,true).kind()))throw new IdentityException(422,"SCENE_SHARED_WORKSPACE_REQUIRED");
+   var prior=db.queryForList("SELECT workspace_id FROM scene_bindings WHERE tenant_id=?",tenant);
+   if(!prior.isEmpty()){
+    if(!workspace.equals(prior.getFirst().get("workspace_id")))throw new IdentityException(409,"SCENE_BINDING_ALREADY_CONFIGURED");
+    return;
+   }
+   db.update("INSERT INTO scene_bindings(tenant_id,workspace_id,connection_id,maintainer_id) VALUES(?,?,?,?)",tenant,workspace,UUID.randomUUID(),actor);
+   audit.record(actor,tenant,"SCENE_BIND",workspace,"SUCCESS");
+  });
+  return binding(actor,tenant);
+ }
+ public Object status(UUID actor,UUID tenant,boolean platform){access(actor,tenant,platform);if(!platform)requireSceneAdmin(actor,tenant);if(db.queryForList("SELECT tenant_id FROM scene_bindings WHERE tenant_id=?",tenant).isEmpty())throw new IdentityException(404,"SCENE_TENANT_NOT_BOUND");return Map.of("tenantId",tenant,"governance",db.queryForMap("SELECT source_revision,governance_valid_until,(SELECT status FROM collection_runs c WHERE c.connection_id=scene_bindings.connection_id ORDER BY created_at DESC LIMIT 1) collection_state,coalesce(governance_valid_until>now(),false) policy_current,(SELECT max(finished_at) FROM scene_processing_runs WHERE tenant_id=? AND operation='SYNC_INPUTS' AND state='SUCCEEDED') last_synced_at FROM scene_bindings WHERE tenant_id=?",tenant,tenant),"assets",db.queryForList("SELECT source_id,kind,target_id,revision,metadata,updated_at FROM scene_asset_links WHERE tenant_id=? AND active ORDER BY kind,source_id",tenant).stream().map(r->{var meta=JSON.readTree(r.get("metadata").toString());if(meta.path("governance").isObject())((tools.jackson.databind.node.ObjectNode)meta.path("governance")).remove("allowedActors");r.put("metadata",meta);return r;}).toList(),"runs",db.queryForList("SELECT id,operation,state,created_at,finished_at,error_code FROM scene_processing_runs WHERE tenant_id=? ORDER BY created_at DESC LIMIT 20",tenant));}
  public synchronized JsonNode dispatch(UUID actor,UUID tenant,boolean platform,String method,String path,Object body){
   if(platform)access(actor,tenant,true);else identities.member(actor,tenant,false);
   if(!path.matches("/scene-(foundation(?:/[^/?]+(?:/actions)?)?|knowledge(?:/sync|/[^/?]+/source)?|access(?:/audit|/policy|/departments|/members/[^/?]+|/proposals/[^/?]+/(?:resolve|withdraw)|/resources/[^/?]+/inspect)?)"))throw IdentityException.invalid();

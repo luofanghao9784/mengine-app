@@ -13,8 +13,12 @@ public final class MetricPlan {
   if(plan.isMissingNode()||plan.isNull())return JSON.nullNode();
   if(!plan.isObject())throw IdentityException.invalid();
   var keys=new HashSet<String>();plan.properties().forEach(e->keys.add(e.getKey()));
-  if(!keys.equals(Set.of("groupColumns","dateColumn","dateFrom","dateTo","timeZone","reviewed"))||!plan.path("reviewed").isBoolean())throw IdentityException.invalid();
+  if(!keys.stream().filter(k->!Set.of("equalsFilters","conversion").contains(k)).collect(java.util.stream.Collectors.toSet()).equals(Set.of("groupColumns","dateColumn","dateFrom","dateTo","timeZone","reviewed"))||!plan.path("reviewed").isBoolean())throw IdentityException.invalid();
   var columns=new HashSet<String>();for(var f:meta.path("fields"))columns.add(f.path("name").asText());
+  Map<String,String> filters=null;
+  if(plan.has("equalsFilters")){if(!plan.path("equalsFilters").isObject())throw IdentityException.invalid();filters=new TreeMap<>();for(var e:plan.path("equalsFilters").properties()){if(!e.getValue().isTextual())throw IdentityException.invalid();filters.put(e.getKey(),e.getValue().asText());}}
+  if(plan.has("conversion")&&!plan.path("conversion").isTextual())throw IdentityException.invalid();
+  com.dreamcore.workspace.conversation.CalculationConditions.validate(filters,plan.has("conversion")?plan.path("conversion").asText():null,columns);
   var groups=plan.path("groupColumns");if(!groups.isArray()||groups.size()>3)throw IdentityException.invalid();var distinct=new HashSet<String>();
   for(var g:groups)if(!g.isTextual()||!columns.contains(g.asText())||g.asText().equals(valueField)||!distinct.add(g.asText()))throw new IdentityException(422,"METRIC_PLAN_FIELDS_INVALID");
   for(String key:List.of("dateColumn","dateFrom","dateTo","timeZone"))if(!plan.path(key).isTextual()||plan.path(key).asText().length()>160)throw IdentityException.invalid();
@@ -26,7 +30,7 @@ public final class MetricPlan {
  public static boolean ready(JsonNode definition){return definition.path("execution").path("reviewed").asBoolean()&&"无".equals(definition.path("exclusions").asText());}
  public static DatasetCalculationService.Request request(JsonNode d,UUID dataset,UUID snapshot,UUID metric,int version){
   var p=d.path("execution");List<String> groups=new ArrayList<>();p.path("groupColumns").forEach(g->groups.add(g.asText()));
-  String date=p.path("dateColumn").asText();return new DatasetCalculationService.Request(dataset,snapshot,null,null,"SUM".equals(d.path("aggregation").asText())?d.path("valueField").asText():null,null,null,null,p.path("timeZone").asText("Asia/Shanghai"),d.path("aggregation").asText(),"SUMMARY",groups,date.isEmpty()?null:date,p.path("dateFrom").asText().isEmpty()?null:p.path("dateFrom").asText(),p.path("dateTo").asText().isEmpty()?null:p.path("dateTo").asText(),date.isEmpty()?null:"FAIL",metric,version);
+  String date=p.path("dateColumn").asText();return new DatasetCalculationService.Request(dataset,snapshot,null,null,"SUM".equals(d.path("aggregation").asText())?d.path("valueField").asText():null,null,null,null,p.path("timeZone").asText("Asia/Shanghai"),d.path("aggregation").asText(),"SUMMARY",groups,date.isEmpty()?null:date,p.path("dateFrom").asText().isEmpty()?null:p.path("dateFrom").asText(),p.path("dateTo").asText().isEmpty()?null:p.path("dateTo").asText(),date.isEmpty()?null:"FAIL",metric,version,p.has("equalsFilters")?JSON.convertValue(p.path("equalsFilters"),new tools.jackson.core.type.TypeReference<Map<String,String>>(){}):null,p.has("conversion")?p.path("conversion").asText():null);
  }
  public static boolean matches(DatasetCalculationService.Request actual,DatasetCalculationService.Request expected){
   var a=(tools.jackson.databind.node.ObjectNode)JSON.valueToTree(actual);var b=(tools.jackson.databind.node.ObjectNode)JSON.valueToTree(expected);

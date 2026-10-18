@@ -1,17 +1,36 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, ACTIONS, date, type Asset, type Detail, type Foundation } from './foundation-api';
 import { GATES } from './world';
+import { companySourceClient } from '../../profile/company-source-client';
+import { useRemote } from '../../shared/admin';
+import { useSession } from '../../identity/session';
+import { CompanyBackgroundSource } from '../../profile/CompanyBackgroundSource';
 import { Fold, Stages, Timeline, readouts, useGlide, useSpotlight } from './AssetBits';
 import './foundation-live.css';
 import './glass-surface.css';
 
+function BackgroundSourceCard({ tenant, selected, onSelect }: { tenant: string; selected: boolean; onSelect: () => void }) {
+  const { session } = useSession();
+  const source = useRemote(signal => companySourceClient.get(tenant, signal), [tenant, session.identity]);
+  const entries = source.value?.entries;
+  const updated = entries?.map(e => e.updatedAt).sort().at(-1);
+  return <button type="button" className="background-source-card" aria-label="企业背景来源" aria-pressed={selected} onClick={onSelect}>
+    <strong>企业背景</strong><span>企业信息维护 · 内部来源</span>
+    <span>{source.error ? '暂不可用 · 点击查看原因' : !entries ? '正在读取…' : entries.length ? `可读 ${entries.length} 条背景` : '待完善 · 填写企业背景'}</span>
+    {updated && <small>更新于 {new Date(updated).toLocaleString('zh-CN')}</small>}
+  </button>;
+}
+
 function dictionaryNotice(warning: string, fields: { name: string; label: string }[]) {
-  const match = warning.trim().match(/^(?:(.+?)\s*[:：]\s*)?(DEPLOYMENT_INFERRED|UNKNOWN|SOURCE_DOCUMENTED)$/);
+  const match = warning
+    .trim()
+    .match(/^(?:(.+?)\s*[:：]\s*)?(DEPLOYMENT_INFERRED|UNKNOWN|SOURCE_DOCUMENTED)$/);
   if (match) {
     const field = fields.find((item) => item.name === match[1]);
     const label = field?.label || (field ? field.name : '该字段');
     const message = {
-      DEPLOYMENT_INFERRED: '当前解释来自部署时的推断，尚待业务依据核实。用于分析前，请确认字段含义和使用范围。',
+      DEPLOYMENT_INFERRED:
+        '当前解释来自部署时的推断，尚待业务依据核实。用于分析前，请确认字段含义和使用范围。',
       UNKNOWN: '当前缺少足够的字段解释依据。用于分析前，请补充业务含义和使用范围。',
       SOURCE_DOCUMENTED: '字段解释已有来源依据，使用时请核对适用范围。',
     }[match[2]];
@@ -31,6 +50,8 @@ export function DataWork({
   gate,
   setGate,
   foundation,
+  tenant,
+  onMaintainBackground,
 }: {
   picked: string;
   pick: (id: string) => void;
@@ -39,8 +60,11 @@ export function DataWork({
   gate: number | null;
   setGate: (n: number | null) => void;
   foundation: Foundation;
+  tenant?: string | null;
+  onMaintainBackground?: () => void;
 }) {
   const { data, error, unauthorized, loading, refresh } = foundation;
+  const [background, setBackground] = useState(false);
   const [q, setQ] = useState(''),
     [kind, setKind] = useState('all'),
     [department, setDepartment] = useState(''),
@@ -85,6 +109,8 @@ export function DataWork({
       `${a.title} ${a.source} ${a.department}`.toLocaleLowerCase().includes(q.trim().toLocaleLowerCase()) &&
       (gate === null || (gate === 4 ? a.available : a.gate === gate)),
   );
+  const showBackground = !!tenant && (kind === 'all' || kind === 'document') && tab === 2 && gate === null && !department && '企业背景 企业信息维护 内部来源'.includes(q.trim());
+  useEffect(() => { if (!showBackground) setBackground(false); }, [showBackground, tenant]);
   const risk = (x: Asset) =>
     Number(x.status === 'quarantined' || x.isolated > 0) * 4 +
     Number(x.status === 'failed' || x.sync?.state === 'failed') * 3 +
@@ -149,6 +175,7 @@ export function DataWork({
   }, [selected?.id]);
 
   const choose = (id: string, at: number | null = null) => {
+    setBackground(false);
     if (id === selected?.id) setStep(at);
     else nextStep.current = at;
     pick(id);
@@ -306,7 +333,7 @@ export function DataWork({
               ...new Set(available.filter((x) => x.sourceKind === 0).map((x) => x.source.split(' / ')[0])),
             ].join('、') || '尚未接入数据库'
           : i === 1
-            ? '制度、流程与报告'
+            ? '企业背景、制度、流程与报告'
             : '尚未接入',
       items: available.filter((x) => x.sourceKind === i),
     })),
@@ -355,7 +382,9 @@ export function DataWork({
                   className="src-pick"
                   aria-pressed={kind === c.id}
                   onClick={() => {
+                    setBackground(false);
                     setKind(c.id);
+                    if (c.id === 'document') setFilter(2);
                     setGate(null);
                     reset();
                   }}
@@ -377,6 +406,7 @@ export function DataWork({
                         disabled={n === 0}
                         title={`${c.name}：${i === 4 ? '已到' : '停在'}“${g}”`}
                         onClick={() => {
+                          setBackground(false);
                           setKind(c.id);
                           setGate(on ? null : i);
                           setFilter(2);
@@ -393,6 +423,7 @@ export function DataWork({
             );
           })}
         </div>
+
       </article>
 
       <article className="card list" data-spot>
@@ -596,22 +627,22 @@ export function DataWork({
               style={{ transform: `translateY(${glide.top}px)`, height: glide.height }}
             />
           )}
-          {!rows.length && (
-            <p className="none">
-              {loading ? '正在读取数据…' : error ? error : '当前筛选下没有记录。'}
-            </p>
+          {showBackground && tenant && <BackgroundSourceCard tenant={tenant} selected={background} onSelect={() => setBackground(true)} />}
+          {showBackground && <p className="background-count-note">资产数量与处理进度仅统计资料；背景卡片为维护入口。</p>}
+          {!rows.length && !showBackground && (
+            <p className="none">{loading ? '正在读取数据…' : error ? error : '当前筛选下没有记录。'}</p>
           )}
           {rows.map((x, i) => (
             <div
               className="row"
               key={listKey + x.id}
               data-row={x.id}
-              data-anchor={selected?.id === x.id || undefined}
+              data-anchor={(!background && selected?.id === x.id) || undefined}
               style={{ '--i': Math.min(i, 12) } as React.CSSProperties}
             >
               <button
                 className="live-select"
-                aria-pressed={selected?.id === x.id}
+                aria-pressed={!background && selected?.id === x.id}
                 onClick={() => choose(x.id)}
               >
                 <i className={`tone-${x.tone}`} />
@@ -653,353 +684,361 @@ export function DataWork({
       </article>
 
       {/* 右：一张卡。上面是资产名称与读数、五个环节连成的流程线；点某一环，下面就是这一环的说明、操作和内容。 */}
-      <article className="card asset" aria-live="polite" data-spot>
-        <header className="detail-head">
-          <div>
-            <h2>{a?.title || '数据资产'}</h2>
-            <span>{a ? `${a.source} · ${a.department} · v${a.version}` : '从清单中选择一项'}</span>
+      {background && tenant ? (
+        <article className="card asset background-detail">
+          <div className="card-scroll">
+            <CompanyBackgroundSource tenant={tenant} onMaintain={onMaintainBackground} />
           </div>
+        </article>
+      ) : (
+        <article className="card asset" aria-live="polite" data-spot>
+          <header className="detail-head">
+            <div>
+              <h2>{a?.title || '数据资产'}</h2>
+              <span>{a ? `${a.source} · ${a.department} · v${a.version}` : '从清单中选择一项'}</span>
+            </div>
+            {a && (
+              <dl className="head-nums">
+                {readouts(a).map(([k, v]) => (
+                  <div key={k} data-alert={(k === '隔离' && Number(v) > 0) || undefined}>
+                    <dt>{k}</dt>
+                    <dd className="num">{v}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+          </header>
           {a && (
-            <dl className="head-nums">
-              {readouts(a).map(([k, v]) => (
-                <div key={k} data-alert={(k === '隔离' && Number(v) > 0) || undefined}>
-                  <dt>{k}</dt>
-                  <dd className="num">{v}</dd>
-                </div>
-              ))}
-            </dl>
+            <ol
+              className="pipeline"
+              role="tablist"
+              aria-label="治理流程"
+              style={{ '--at': shownStep } as React.CSSProperties}
+            >
+              {GATES.map((g, i) => {
+                const state = (i === 4 ? a.available : i < a.gate) ? 'done' : i === a.gate ? 'held' : 'wait';
+                return (
+                  <li key={g} data-state={state}>
+                    <button
+                      role="tab"
+                      aria-selected={shownStep === i}
+                      title={stepAt[i] ? `最近一次：${date(stepAt[i])}` : undefined}
+                      onClick={() => setStep(i)}
+                    >
+                      <span className="node" aria-hidden="true" />
+                      <b>{g}</b>
+                      <span className="what">{stepNote(a, i, state)}</span>
+                    </button>
+                  </li>
+                );
+              })}
+              <li className="caret" aria-hidden="true" />
+            </ol>
           )}
-        </header>
-        {a && (
-          <ol
-            className="pipeline"
-            role="tablist"
-            aria-label="治理流程"
-            style={{ '--at': shownStep } as React.CSSProperties}
-          >
-            {GATES.map((g, i) => {
-              const state = (i === 4 ? a.available : i < a.gate) ? 'done' : i === a.gate ? 'held' : 'wait';
-              return (
-                <li key={g} data-state={state}>
-                  <button
-                    role="tab"
-                    aria-selected={shownStep === i}
-                    title={stepAt[i] ? `最近一次：${date(stepAt[i])}` : undefined}
-                    onClick={() => setStep(i)}
-                  >
-                    <span className="node" aria-hidden="true" />
-                    <b>{g}</b>
-                    <span className="what">{stepNote(a, i, state)}</span>
-                  </button>
-                </li>
-              );
-            })}
-            <li className="caret" aria-hidden="true" />
-          </ol>
-        )}
-        {a && (
-          <>
-            <div className="step-bar">
-              <p>{STEP_INTRO[shownStep]}</p>
-              <div className="step-actions">
-                {shownStep === 0 && button('sync', true)}
-                {shownStep === 1 && button('retry', true)}
-                {shownStep === 2 && button('dictionary', true)}
+          {a && (
+            <>
+              <div className="step-bar">
+                <p>{STEP_INTRO[shownStep]}</p>
+                <div className="step-actions">
+                  {shownStep === 0 && button('sync', true)}
+                  {shownStep === 1 && button('retry', true)}
+                  {shownStep === 2 && button('dictionary', true)}
+                  {shownStep === 3 && (
+                    <>
+                      {button('allow', true)}
+                      {button('recheck')}
+                      {button('remediate')}
+                      {button('analyze')}
+                    </>
+                  )}
+                </div>
+              </div>
+              <div
+                className="card-scroll step-body"
+                key={`${a.id}:${shownStep}`}
+                data-dir={shownStep >= lastStep.current ? 'next' : 'prev'}
+                ref={() => {
+                  lastStep.current = shownStep;
+                }}
+              >
+                {!detail && !detailError && <p className="none">正在核对详情…</p>}
+
+                {shownStep === 0 && (
+                  <>
+                    {kv([
+                      [
+                        '取数频率',
+                        a.sync
+                          ? `每 ${a.sync.intervalMinutes} 分钟（${a.sync.enabled ? '运行中' : '已暂停'}）`
+                          : a.updatePolicy,
+                      ],
+                      ['最近成功', date(a.sync?.lastSuccess)],
+                      ['下次尝试', date(a.sync?.nextAt)],
+                      ['最近更新', date(a.updatedAt)],
+                      ['业务标签', a.tags.join('、') || '尚未标注'],
+                      ['密级', `L${a.classification}`],
+                    ])}
+                    {a.sync?.error && <p className="live-error">{a.sync.error}</p>}
+                    <h4>取数批次</h4>
+                    {detail?.batches.length ? (
+                      <Timeline
+                        items={detail.batches.map((b) => ({
+                          at: date(b.at),
+                          text: `${b.operation} · v${b.version} · ${b.actor}`,
+                          note: b.reason,
+                        }))}
+                      />
+                    ) : (
+                      <p className="none">暂无数据批次</p>
+                    )}
+                  </>
+                )}
+
+                {shownStep === 1 && (
+                  <>
+                    {kv([
+                      ['字段', a.kind === 'table' ? `${a.fieldCount} 个` : '正文'],
+                      ['复核日期', a.reviewAt ? date(a.reviewAt) : '未设置'],
+                    ])}
+                    <h4>处理阶段</h4>
+                    {detail?.events.length ? (
+                      <Timeline
+                        items={detail.events.map((e) => ({ at: date(e.at), text: eventName(e.event) }))}
+                      />
+                    ) : (
+                      <p className="none">暂无处理记录</p>
+                    )}
+                  </>
+                )}
+
+                {shownStep === 2 &&
+                  (a.kind !== 'table' ? (
+                    kv([
+                      ['业务标签', a.tags.join('、') || '尚未标注'],
+                      ['密级', `L${a.classification}`],
+                    ])
+                  ) : dict ? (
+                    <>
+                      <div className="lead">
+                        <b>{dict.tableMeaning}</b>
+                        <p>{dict.usageRules}</p>
+                        <small>
+                          {dict.current
+                            ? `第 ${dict.revision} 版 · ${dict.provider} · ${date(dict.at)}`
+                            : '当前口径尚未生效，展示原始字段定义'}
+                          {dict.job &&
+                            ` · 生成任务${
+                              (
+                                {
+                                  queued: '排队中',
+                                  running: '生成中',
+                                  retry_wait: '等待重试',
+                                  succeeded: '已完成',
+                                  failed: '失败',
+                                } as Record<string, string>
+                              )[dict.job.state] || dict.job.state
+                            }${dict.job.nextAt ? `，下次 ${date(dict.job.nextAt)}` : ''}`}
+                        </small>
+                      </div>
+                      <h4>字段 · {dict.fields.length}</h4>
+                      {dict.fields.map((f) => (
+                        <Fold
+                          key={f.name}
+                          title={
+                            <>
+                              {f.label} <code>{f.name}</code>
+                            </>
+                          }
+                          meta={[f.type, f.unit, f.required ? '必填' : '', f.sensitive ? '敏感' : '']
+                            .filter(Boolean)
+                            .join(' · ')}
+                        >
+                          <p>{f.meaning || '尚无业务解释'}</p>
+                          {f.rules && <p>规则：{f.rules}</p>}
+                          {f.evidence && <small>依据：{f.evidence}</small>}
+                        </Fold>
+                      ))}
+                      <h4>数据关联 · {dict.relations.length}</h4>
+                      {dict.relations.map((r) => (
+                        <div className="link-row" key={r.id}>
+                          <span>
+                            <b>{r.target}</b>
+                            <small>{r.keys.map((k) => `${k.local} = ${k.foreign}`).join('；')}</small>
+                          </span>
+                          <button
+                            onClick={() => {
+                              setFilter(2);
+                              setGate(null);
+                              setQ('');
+                              setKind('all');
+                              setDepartment('');
+                              choose(r.targetId);
+                            }}
+                          >
+                            查看
+                          </button>
+                        </div>
+                      ))}
+                      {dict.warnings.map((w, i) => (
+                        <p className="live-error" key={i}>
+                          {dictionaryNotice(w, dict.fields)}
+                        </p>
+                      ))}
+                    </>
+                  ) : null)}
+
                 {shownStep === 3 && (
                   <>
-                    {button('allow', true)}
-                    {button('recheck')}
-                    {button('remediate')}
-                    {button('analyze')}
+                    {detail?.findings.length === 0 && a.issues.length === 0 && (
+                      <p className="none">全部检查通过。</p>
+                    )}
+                    {detail?.findings.map((f, n) => (
+                      <Fold
+                        key={f.id}
+                        open={n === 0 && f.status !== 'resolved'}
+                        tone={f.status === 'resolved' ? 'ok' : a.tone}
+                        title={
+                          <>
+                            {f.title} <span className="badge num">{f.count}</span>
+                          </>
+                        }
+                        meta={
+                          (
+                            {
+                              open: '待处理',
+                              handling: '处理中',
+                              resolved: f.manuallyApproved ? '人工校验通过' : '复检通过',
+                            } as Record<string, string>
+                          )[f.status]
+                        }
+                      >
+                        <p>{f.detail}</p>
+                        {f.field && <small>字段：{f.field}</small>}
+                        {f.status !== 'resolved' && a.actions.includes('recheck') && (
+                          <div className="fold-act">
+                            {finding === f.id && (
+                              <textarea
+                                aria-label={`处理说明：${f.title}`}
+                                maxLength={300}
+                                placeholder="填写处理措施或人工校验依据（可选）"
+                                value={reason}
+                                onChange={(e) => setReason(e.target.value)}
+                              />
+                            )}
+                            <div>
+                              <button
+                                className="gold"
+                                disabled={!!pending}
+                                onClick={() =>
+                                  void act('approve', a, {
+                                    findingId: f.id,
+                                    reason:
+                                      (finding === f.id && reason.trim()) ||
+                                      '已人工核实，确认当前快照中的此问题校验通过',
+                                  })
+                                }
+                              >
+                                人工校验通过
+                              </button>
+                              {finding === f.id ? (
+                                <button
+                                  disabled={!!pending || !reason.trim()}
+                                  onClick={() => void act('handle', a, { findingId: f.id, reason })}
+                                >
+                                  保存处理措施
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => {
+                                    setFinding(f.id);
+                                    setReason('');
+                                  }}
+                                >
+                                  记录处理措施
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        {f.history.length > 0 && (
+                          <Timeline
+                            items={f.history.map((h) => ({
+                              at: date(h.at),
+                              text: `${h.actor} · ${h.action}`,
+                              note: h.note,
+                            }))}
+                          />
+                        )}
+                      </Fold>
+                    ))}
+                    {/* 资料的检查提示在没有对应问题记录时才单独列出，避免与上面重复。 */}
+                    {!detail?.findings.length && a.issues.length > 0 && (
+                      <Fold title="检查提示" meta={`${a.issues.length} 项`} tone={a.tone} open>
+                        {a.issues.map((v, i) => (
+                          <p key={i}>{v}</p>
+                        ))}
+                      </Fold>
+                    )}
+                    {a.kind === 'document' && detail?.analysis?.report && (
+                      <Fold
+                        title="AI 研判"
+                        meta={`${detail.analysis.model} · ${date(detail.analysis.report.createdAt)}`}
+                      >
+                        <p>{detail.analysis.report.overview}</p>
+                        {detail.analysis.report.findings.map((f, i) => (
+                          <p key={i}>
+                            <b>
+                              {f.title} · {{ high: '高', medium: '中', low: '低' }[f.severity] || f.severity}
+                              风险
+                            </b>
+                            <br />
+                            {f.explanation} 处理建议：{f.recommendation}
+                          </p>
+                        ))}
+                      </Fold>
+                    )}
+                    <Fold title="检查规则与处理范围">
+                      <p>资料：手机号、身份证号、邮箱、标签完整性、复核时效、内容信息量。</p>
+                      <p>
+                        数据表：必填、格式、唯一性、隔离记录、字段口径、关联匹配、规则冲突、同步状态与新鲜度。
+                      </p>
+                      <small>
+                        人工校验保留审计，不修改原记录，也不解除记录隔离；来源或口径变化后重新检查。记录维护由来源系统完成。
+                      </small>
+                    </Fold>
+                  </>
+                )}
+
+                {shownStep === 4 && (
+                  <>
+                    {kv([
+                      ['提供范围', a.total === null ? '资料全文' : `${a.ready} 条合格记录`],
+                      ['最近更新', date(a.updatedAt)],
+                    ])}
+                    {!a.available && (
+                      <p className="live-note">
+                        先处理“{GATES[Math.min(a.gate, 3)]}”这一环，通过后自动提供给 AI。
+                      </p>
+                    )}
+                    <h4>管理操作审计</h4>
+                    {detail?.audit.length ? (
+                      <Timeline
+                        items={detail.audit.map((e) => ({
+                          at: date(e.at),
+                          text: `${e.actor} · ${e.action}`,
+                          note: e.detail,
+                        }))}
+                      />
+                    ) : (
+                      <p className="none">暂无管理操作</p>
+                    )}
                   </>
                 )}
               </div>
-            </div>
-            <div
-              className="card-scroll step-body"
-              key={`${a.id}:${shownStep}`}
-              data-dir={shownStep >= lastStep.current ? 'next' : 'prev'}
-              ref={() => {
-                lastStep.current = shownStep;
-              }}
-            >
-              {!detail && !detailError && <p className="none">正在核对详情…</p>}
-
-              {shownStep === 0 && (
-                <>
-                  {kv([
-                    [
-                      '取数频率',
-                      a.sync
-                        ? `每 ${a.sync.intervalMinutes} 分钟（${a.sync.enabled ? '运行中' : '已暂停'}）`
-                        : a.updatePolicy,
-                    ],
-                    ['最近成功', date(a.sync?.lastSuccess)],
-                    ['下次尝试', date(a.sync?.nextAt)],
-                    ['最近更新', date(a.updatedAt)],
-                    ['业务标签', a.tags.join('、') || '尚未标注'],
-                    ['密级', `L${a.classification}`],
-                  ])}
-                  {a.sync?.error && <p className="live-error">{a.sync.error}</p>}
-                  <h4>取数批次</h4>
-                  {detail?.batches.length ? (
-                    <Timeline
-                      items={detail.batches.map((b) => ({
-                        at: date(b.at),
-                        text: `${b.operation} · v${b.version} · ${b.actor}`,
-                        note: b.reason,
-                      }))}
-                    />
-                  ) : (
-                    <p className="none">暂无数据批次</p>
-                  )}
-                </>
-              )}
-
-              {shownStep === 1 && (
-                <>
-                  {kv([
-                    ['字段', a.kind === 'table' ? `${a.fieldCount} 个` : '正文'],
-                    ['复核日期', a.reviewAt ? date(a.reviewAt) : '未设置'],
-                  ])}
-                  <h4>处理阶段</h4>
-                  {detail?.events.length ? (
-                    <Timeline
-                      items={detail.events.map((e) => ({ at: date(e.at), text: eventName(e.event) }))}
-                    />
-                  ) : (
-                    <p className="none">暂无处理记录</p>
-                  )}
-                </>
-              )}
-
-              {shownStep === 2 &&
-                (a.kind !== 'table' ? (
-                  kv([
-                    ['业务标签', a.tags.join('、') || '尚未标注'],
-                    ['密级', `L${a.classification}`],
-                  ])
-                ) : dict ? (
-                  <>
-                    <div className="lead">
-                      <b>{dict.tableMeaning}</b>
-                      <p>{dict.usageRules}</p>
-                      <small>
-                        {dict.current
-                          ? `第 ${dict.revision} 版 · ${dict.provider} · ${date(dict.at)}`
-                          : '当前口径尚未生效，展示原始字段定义'}
-                        {dict.job &&
-                          ` · 生成任务${
-                            (
-                              {
-                                queued: '排队中',
-                                running: '生成中',
-                                retry_wait: '等待重试',
-                                succeeded: '已完成',
-                                failed: '失败',
-                              } as Record<string, string>
-                            )[dict.job.state] || dict.job.state
-                          }${dict.job.nextAt ? `，下次 ${date(dict.job.nextAt)}` : ''}`}
-                      </small>
-                    </div>
-                    <h4>字段 · {dict.fields.length}</h4>
-                    {dict.fields.map((f) => (
-                      <Fold
-                        key={f.name}
-                        title={
-                          <>
-                            {f.label} <code>{f.name}</code>
-                          </>
-                        }
-                        meta={[f.type, f.unit, f.required ? '必填' : '', f.sensitive ? '敏感' : '']
-                          .filter(Boolean)
-                          .join(' · ')}
-                      >
-                        <p>{f.meaning || '尚无业务解释'}</p>
-                        {f.rules && <p>规则：{f.rules}</p>}
-                        {f.evidence && <small>依据：{f.evidence}</small>}
-                      </Fold>
-                    ))}
-                    <h4>数据关联 · {dict.relations.length}</h4>
-                    {dict.relations.map((r) => (
-                      <div className="link-row" key={r.id}>
-                        <span>
-                          <b>{r.target}</b>
-                          <small>{r.keys.map((k) => `${k.local} = ${k.foreign}`).join('；')}</small>
-                        </span>
-                        <button
-                          onClick={() => {
-                            setFilter(2);
-                            setGate(null);
-                            setQ('');
-                            setKind('all');
-                            setDepartment('');
-                            choose(r.targetId);
-                          }}
-                        >
-                          查看
-                        </button>
-                      </div>
-                    ))}
-                    {dict.warnings.map((w, i) => (
-                      <p className="live-error" key={i}>
-                        {dictionaryNotice(w, dict.fields)}
-                      </p>
-                    ))}
-                  </>
-                ) : null)}
-
-              {shownStep === 3 && (
-                <>
-                  {detail?.findings.length === 0 && a.issues.length === 0 && (
-                    <p className="none">全部检查通过。</p>
-                  )}
-                  {detail?.findings.map((f, n) => (
-                    <Fold
-                      key={f.id}
-                      open={n === 0 && f.status !== 'resolved'}
-                      tone={f.status === 'resolved' ? 'ok' : a.tone}
-                      title={
-                        <>
-                          {f.title} <span className="badge num">{f.count}</span>
-                        </>
-                      }
-                      meta={
-                        (
-                          {
-                            open: '待处理',
-                            handling: '处理中',
-                            resolved: f.manuallyApproved ? '人工校验通过' : '复检通过',
-                          } as Record<string, string>
-                        )[f.status]
-                      }
-                    >
-                      <p>{f.detail}</p>
-                      {f.field && <small>字段：{f.field}</small>}
-                      {f.status !== 'resolved' && a.actions.includes('recheck') && (
-                        <div className="fold-act">
-                          {finding === f.id && (
-                            <textarea
-                              aria-label={`处理说明：${f.title}`}
-                              maxLength={300}
-                              placeholder="填写处理措施或人工校验依据（可选）"
-                              value={reason}
-                              onChange={(e) => setReason(e.target.value)}
-                            />
-                          )}
-                          <div>
-                            <button
-                              className="gold"
-                              disabled={!!pending}
-                              onClick={() =>
-                                void act('approve', a, {
-                                  findingId: f.id,
-                                  reason:
-                                    (finding === f.id && reason.trim()) ||
-                                    '已人工核实，确认当前快照中的此问题校验通过',
-                                })
-                              }
-                            >
-                              人工校验通过
-                            </button>
-                            {finding === f.id ? (
-                              <button
-                                disabled={!!pending || !reason.trim()}
-                                onClick={() => void act('handle', a, { findingId: f.id, reason })}
-                              >
-                                保存处理措施
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => {
-                                  setFinding(f.id);
-                                  setReason('');
-                                }}
-                              >
-                                记录处理措施
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                      {f.history.length > 0 && (
-                        <Timeline
-                          items={f.history.map((h) => ({
-                            at: date(h.at),
-                            text: `${h.actor} · ${h.action}`,
-                            note: h.note,
-                          }))}
-                        />
-                      )}
-                    </Fold>
-                  ))}
-                  {/* 资料的检查提示在没有对应问题记录时才单独列出，避免与上面重复。 */}
-                  {!detail?.findings.length && a.issues.length > 0 && (
-                    <Fold title="检查提示" meta={`${a.issues.length} 项`} tone={a.tone} open>
-                      {a.issues.map((v, i) => (
-                        <p key={i}>{v}</p>
-                      ))}
-                    </Fold>
-                  )}
-                  {a.kind === 'document' && detail?.analysis?.report && (
-                    <Fold
-                      title="AI 研判"
-                      meta={`${detail.analysis.model} · ${date(detail.analysis.report.createdAt)}`}
-                    >
-                      <p>{detail.analysis.report.overview}</p>
-                      {detail.analysis.report.findings.map((f, i) => (
-                        <p key={i}>
-                          <b>
-                            {f.title} · {{ high: '高', medium: '中', low: '低' }[f.severity] || f.severity}
-                            风险
-                          </b>
-                          <br />
-                          {f.explanation} 处理建议：{f.recommendation}
-                        </p>
-                      ))}
-                    </Fold>
-                  )}
-                  <Fold title="检查规则与处理范围">
-                    <p>资料：手机号、身份证号、邮箱、标签完整性、复核时效、内容信息量。</p>
-                    <p>
-                      数据表：必填、格式、唯一性、隔离记录、字段口径、关联匹配、规则冲突、同步状态与新鲜度。
-                    </p>
-                    <small>
-                      人工校验保留审计，不修改原记录，也不解除记录隔离；来源或口径变化后重新检查。记录维护由来源系统完成。
-                    </small>
-                  </Fold>
-                </>
-              )}
-
-              {shownStep === 4 && (
-                <>
-                  {kv([
-                    ['提供范围', a.total === null ? '资料全文' : `${a.ready} 条合格记录`],
-                    ['最近更新', date(a.updatedAt)],
-                  ])}
-                  {!a.available && (
-                    <p className="live-note">
-                      先处理“{GATES[Math.min(a.gate, 3)]}”这一环，通过后自动提供给 AI。
-                    </p>
-                  )}
-                  <h4>管理操作审计</h4>
-                  {detail?.audit.length ? (
-                    <Timeline
-                      items={detail.audit.map((e) => ({
-                        at: date(e.at),
-                        text: `${e.actor} · ${e.action}`,
-                        note: e.detail,
-                      }))}
-                    />
-                  ) : (
-                    <p className="none">暂无管理操作</p>
-                  )}
-                </>
-              )}
-            </div>
-          </>
-        )}
-      </article>
+            </>
+          )}
+        </article>
+      )}
     </section>
   );
 }

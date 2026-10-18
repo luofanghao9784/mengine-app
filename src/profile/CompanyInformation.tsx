@@ -150,7 +150,7 @@ export function CompanyInformation({ tenant }: { tenant: string }) {
             close={() => setEdit(null)}
             changed={() => {
               setEdit(null);
-              setNotice('企业信息已更新。背景保存成功不代表知识已更新。');
+              setNotice('企业背景已保存。结构化背景知识随来源更新；关联方法可能需要核对，请查看条目详情中的知识使用情况。');
               setAttempt((n) => n + 1);
             }}
           />

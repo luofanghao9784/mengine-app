@@ -40,7 +40,7 @@ public class CompanyBackgroundSourceService {
         try { version=HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(fingerprint.getBytes(StandardCharsets.UTF_8))); }
         catch(java.security.NoSuchAlgorithmException e) { throw new IllegalStateException(e); }
         return new Source(tenant,"company-background:"+tenant,"COMPANY_BACKGROUND",
-            entries.isEmpty()?"NO_READABLE_ENTRIES":"AVAILABLE",version,"PENDING_INTEGRATION",List.copyOf(entries));
+            entries.isEmpty()?"NO_READABLE_ENTRIES":"AVAILABLE",version,"REFERENCE_READY",List.copyOf(entries));
     }
     @Transactional(isolation=Isolation.REPEATABLE_READ)
     public Entry entry(UUID actor,UUID tenant,UUID id,Integer expectedRevision) {

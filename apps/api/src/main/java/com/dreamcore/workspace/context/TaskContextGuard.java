@@ -17,6 +17,8 @@ public class TaskContextGuard {
   if(!Boolean.TRUE.equals(db.queryForObject("SELECT wiki_graph_current(?) AND wiki_insight_current(?)",Boolean.class,task,task)))throw new IdentityException(409,"TASK_CONTEXT_CHANGED");
   if(briefingFlow!=null)briefingFlow.requireCurrent(task);
   db.queryForList("SELECT m.id FROM task_metric_dependencies(?) r JOIN scene_metrics m ON m.id=r.metric_id ORDER BY m.id FOR SHARE OF m",task);
+  for(var dependency:db.queryForList("SELECT metric_id,version FROM task_metric_dependencies(?)",task))
+   com.dreamcore.workspace.scene.MetricCatalog.lockBackground(db,(UUID)dependency.get("metric_id"),(Integer)dependency.get("version"));
   // Serialize tenant future-use changes even while the default usage row does not exist.
   db.queryForList("SELECT pg_advisory_xact_lock_shared(hashtextextended('general-use:'||tenant_id::text,0)) FROM conversation_tasks WHERE id=?",task);
   // Fence a simultaneous revision/publication through the caller's transaction, including final commit.

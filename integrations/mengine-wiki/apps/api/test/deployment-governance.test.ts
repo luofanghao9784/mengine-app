@@ -109,3 +109,12 @@ test('deployed relationships survive target row updates but reject target schema
  raw.fields[0].description='changed source definition';c.store.db.prepare('UPDATE data_sets SET data=? WHERE id=?').run(JSON.stringify(raw),target);
  assert.throws(()=>validateSemantics(c.store,u,id,rules),/结构发生变化/);
 }));
+
+test('conditional sum requires exact documented fields and never unblocks raw model sums',()=>fixture(async(c,u,id,p)=>{
+ const d=p.datasets[0];d.definition.fields.find((f:any)=>f.name==='amount').unit='分';
+ d.analysisPolicy={excludeFields:[],noSumFields:['amount'],conditionalSums:[{field:'amount',equalsFilters:{id:'01'},conversion:'CENTS_TO_YUAN'}]};
+ const invalid=structuredClone(p);invalid.datasets[0].analysisPolicy.conditionalSums[0].equalsFilters={missing:'01'};
+ assert.throws(()=>importDeployment(c.store,u,invalid),/受控求和条件/);
+ importDeployment(c.store,u,p);assert.equal(readDataset(c.store,u,id).analysisPolicy.conditionalSums[0].conversion,'CENTS_TO_YUAN');
+ assert.throws(()=>queryDataset(c.store,u,id,{operation:'sum',field:'amount'},true),/不能无条件累加/);
+}));

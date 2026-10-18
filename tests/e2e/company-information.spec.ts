@@ -345,7 +345,7 @@ test('background internal source shows real versions, pending knowledge integrat
   );
   await page.getByLabel('标签名称').fill('已更新业务');
   await page.getByRole('button', { name: '保存调整', exact: true }).click();
-  await expect(page.getByText('企业信息已更新。背景保存成功不代表知识已更新。')).toBeVisible();
+  await expect(page.getByText('企业背景已保存。结构化背景知识随来源更新；关联方法可能需要核对，请查看条目详情中的知识使用情况。')).toBeVisible();
   await page.goto(`/tenant-admin/#tenant=${tenant}&admin=database&section=access`);
   await expect(page.getByRole('heading', { name: '企业背景 · 内部来源' })).toBeVisible();
   await expect(page.getByText('可读取 1 条背景', { exact: false })).toBeVisible();

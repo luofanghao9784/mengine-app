@@ -1,3 +1,4 @@
+import { BackgroundKnowledge } from './BackgroundKnowledge';
 import { useState } from 'react';
 import { companySourceClient } from './company-source-client';
 import { companyFields } from './company-client';
@@ -10,10 +11,12 @@ export function CompanyBackgroundSource({
   tenant,
   hash,
   tagId,
+  onMaintain,
 }: {
   tenant: string;
   hash?: string;
   tagId?: string;
+  onMaintain?: () => void;
 }) {
   const { session } = useSession();
   const [attempt, refresh] = useState(0);
@@ -48,7 +51,9 @@ export function CompanyBackgroundSource({
                   : '当前没有可读取的背景条目'}{' '}
                 · 按当前身份权限展示
               </p>
-              <p className="muted">直接读取原背景，无需导入或复制。修改后下次读取生效；不代表知识已更新。</p>
+              <p className="muted">
+                直接读取原背景，无需导入或复制。修改后下次读取生效；关联指标仍需按版本核对。
+              </p>
               <details>
                 <summary>查看来源版本与条目</summary>
                 <p>
@@ -62,16 +67,21 @@ export function CompanyBackgroundSource({
                   ))}
                 </ul>
               </details>
-              <a href={adminHref('tenant', 'company', hash || '')}>
-                维护企业背景 →
-              </a>
+              {onMaintain ? (
+                <Button variant="ghost" onClick={onMaintain}>
+                  维护企业背景 →
+                </Button>
+              ) : (
+                <a href={adminHref('tenant', 'company', hash || '')}>维护企业背景 →</a>
+              )}
             </>
           )}
-          {(!tagId || item) && (
-            <p role="status">
-              知识使用情况待联调：引用与处理状态接口尚未接入，不能据此判断是否已有知识引用。
-            </p>
-          )}
+          {(!tagId || item) &&
+            (source.knowledgeIntegration === 'REFERENCE_READY' ? (
+              <BackgroundKnowledge key={source.version} tenant={tenant} entryId={tagId} onSource={onMaintain} />
+            ) : (
+              <p role="status">知识使用情况待联调：当前后端尚未启用背景引用接口，不能据此判断是否已有知识引用。</p>
+            ))}
           <Button variant="ghost" onClick={() => refresh((n) => n + 1)}>
             刷新来源状态
           </Button>

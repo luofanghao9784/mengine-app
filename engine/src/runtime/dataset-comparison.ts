@@ -52,7 +52,7 @@ function argumentHint(args: unknown): string {
 export function normalizeDatasetArguments(value: unknown): unknown {
   if (!isRecord(value)) return value;
   const copy = { ...value };
-  for (const key of ['operation','aggregation','periodMode','timeZone','groupColumn','periodColumn','valueColumn','baseline','current','groupColumns','dateColumn','dateFrom','dateTo','missingDates','metricId','metricVersion'])
+  for (const key of ['operation','aggregation','periodMode','timeZone','groupColumn','periodColumn','valueColumn','baseline','current','groupColumns','dateColumn','dateFrom','dateTo','missingDates','equalsFilters','conversion','metricId','metricVersion'])
     if (copy[key] === null) delete copy[key];
   return copy;
 }

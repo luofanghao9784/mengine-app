@@ -27,7 +27,7 @@ class CompanyBackgroundSourceIntegrationTest {
  @Test void readThroughSourceKeepsIdentityAndVersionWithoutDuplicateRows(){
   var empty=source.get(member,tenant);assertEquals("NO_READABLE_ENTRIES",empty.state());
   var added=change(0,"ADD",null,"到账");var first=source.get(member,tenant);
-  assertEquals("AVAILABLE",first.state());assertEquals("PENDING_INTEGRATION",first.knowledgeIntegration());
+  assertEquals("AVAILABLE",first.state());assertEquals("REFERENCE_READY",first.knowledgeIntegration());
   var entry=first.entries().getFirst();assertEquals(added.tagId(),entry.id());assertEquals(profiles.get(member,tenant,entry.id(),null).versionId(),entry.versionId());
   assertEquals(first,source.get(member,tenant));assertEquals(first.version(),source.get(admin,tenant).version());
   change(1,"EDIT",entry.id(),"银行确认到账");var updated=source.get(member,tenant);

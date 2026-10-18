@@ -15,7 +15,7 @@ export function publishedMetricPlans() {
       const selected=plans.get(key(selection));
       if(!selected)throw new RuntimeError('METRIC_DEFINITION_REQUIRED');
       if(selected.operation!=='SUMMARY')return {...selection};
-      const fields=['datasetId','snapshotId','operation','groupColumns','dateColumn','dateFrom','dateTo','timeZone','missingDates'];
+      const fields=['datasetId','snapshotId','operation','groupColumns','dateColumn','dateFrom','dateTo','timeZone','missingDates','equalsFilters','conversion'];
       // Context order is assigned by the API: relevant, then not yet delivered to this actor.
       const first=[...plans.values()].find(p=>fields.every(k=>JSON.stringify(p[k]??null)===JSON.stringify(selected[k]??null)))!;
       return Object.fromEntries(['metricId','metricVersion','datasetId','snapshotId'].map(k=>[k,first[k]]));
@@ -25,7 +25,7 @@ export function publishedMetricPlans() {
       const primary=plans.get(key(selection));
       if (!primary) throw new RuntimeError('METRIC_DEFINITION_REQUIRED');
       if (primary.operation !== 'SUMMARY') return [];
-      const scope=['datasetId','snapshotId','operation','groupColumns','dateColumn','dateFrom','dateTo','timeZone','missingDates'];
+      const scope=['datasetId','snapshotId','operation','groupColumns','dateColumn','dateFrom','dateTo','timeZone','missingDates','equalsFilters','conversion'];
       const grain=(p: Record<string,unknown>)=>JSON.stringify(scope.map(k=>p[k]??null));
       const measure=(p: Record<string,unknown>)=>JSON.stringify([p.aggregation??'SUM',p.valueColumn??null]);
       const seen=new Set([measure(primary)]), result: Record<string,unknown>[]=[];

@@ -36,11 +36,15 @@ test('tenant generated drafts require explicit review before publication and pre
  await page.route(/\/scene\/metrics(?:\?.*)?$/,async r=>{if(r.request().method()==='POST'){saved=r.request().postDataJSON();item.head_version=2;item.definition=saved.definition;}await r.fulfill({json:{items:[item]}})});
  await page.goto('/tenant-admin/governance/?surface=tenant');
  await expect(page.getByRole('button',{name:'确认并发布 v1'})).toBeDisabled();
+ await page.route('**/company-information/source',r=>r.fulfill({json:{tenantId:tenant,sourceId:`company-background:${tenant}`,type:'COMPANY_BACKGROUND',state:'AVAILABLE',version:'a'.repeat(64),knowledgeIntegration:'REFERENCE_READY',entries:[{id:tenant,versionId:tenant,revision:1,field:'TERM',label:'合成到账口径',meaning:'银行确认',origin:'HUMAN',humanProtected:true,provenance:'合成测试',updatedAt:'2026-10-18T00:00:00Z'}]}}));
+ await page.reload();
  await page.getByRole('button',{name:'生成指标草稿'}).click();
  await expect(page.getByRole('status')).toContainText('新增 1 项待核实草稿');
  await page.getByRole('button',{name:'编辑新版本'}).click();
- await page.getByRole('checkbox').check();
+ await page.getByLabel('合成到账口径 · v1',{exact:false}).check();
+ await page.getByRole('checkbox',{name:/我已核对业务依据/}).check();
  await page.getByRole('button',{name:'保存草稿'}).click();
+ await expect.poll(()=>saved?.definition?.backgroundVersionIds).toEqual([tenant]);
  await expect(page.getByRole('button',{name:'确认并发布 v2'})).toBeEnabled();
  expect(saved.definition.execution).toEqual({groupColumns:[],dateColumn:'',dateFrom:'',dateTo:'',timeZone:'Asia/Shanghai',reviewed:true});
 });
@@ -54,4 +58,34 @@ test('metric catalog pages and searches the complete server catalog',async({page
  await page.goto('/tenant-admin/governance/?surface=platform');await expect(page.getByText('共 145 项 · 第 1 页')).toBeVisible();
  await page.getByRole('button',{name:'下一页指标'}).click();await expect(page.getByRole('heading',{name:'第13项',exact:true})).toBeVisible();
  await page.getByRole('textbox',{name:'搜索指标'}).fill('目录末尾');await expect(page.getByRole('heading',{name:'目录末尾指标',exact:true})).toBeVisible();await expect(page.getByText('共 1 项 · 第 1 页')).toBeVisible();await expect(page.getByRole('button',{name:'下一页指标'})).toBeDisabled();
+});
+
+test('unbound tenant selects a maintained workspace before synchronization',async({page})=>{
+ const tenant='11111111-1111-4111-8111-111111111111',space='22222222-2222-4222-8222-222222222222';let bound=false;
+ await page.route('**/api/v1/me',r=>r.fulfill({json:{account:{id:tenant,email:'synthetic@example.invalid',displayName:'合成管理员'},platformAdmin:false,memberships:[{tenantId:tenant,tenantName:'合成企业',role:'TENANT_ADMIN'}]}}));
+ await page.route('**/scene/binding',r=>{if(r.request().method()==='POST'){expect(r.request().postDataJSON()).toEqual({workspaceId:space});bound=true;}return r.fulfill({json:{bindings:bound?[{workspace_id:space,maintainer_id:tenant}]:[],workspaces:[{id:space,name:'财务核对'}]}})});
+ await page.route('**/scene/status',r=>r.fulfill(bound?{json:{tenantId:tenant,governance:{policy_current:false},assets:[],runs:[]}}:{status:404,json:{code:'SCENE_TENANT_NOT_BOUND'}}));
+ await page.route(/\/scene\/metrics(?:\?.*)?$/,r=>r.fulfill({json:{items:[]}}));
+ await page.goto('/tenant-admin/governance/?surface=tenant');
+ await expect(page.getByRole('button',{name:'立即同步治理成果'})).toBeDisabled();
+ await page.getByLabel('治理目标空间').selectOption(space);
+ await page.getByRole('button',{name:'建立来源映射'}).click();
+ await expect(page.getByText('治理目标空间：',{exact:false})).toContainText('财务核对');
+ await expect(page.getByRole('button',{name:'立即同步治理成果'})).toBeEnabled();
+});
+
+test('metric form sends explicit equalities and monetary conversion and resets review after changes',async({page})=>{
+ const tenant='11111111-1111-4111-8111-111111111111';let saved:any;
+ await page.route('**/api/v1/me',r=>r.fulfill({json:{account:{id:tenant,email:'synthetic@example.invalid',displayName:'合成管理员'},platformAdmin:false,memberships:[{tenantId:tenant,tenantName:'合成企业',role:'TENANT_ADMIN'}]}}));
+ await page.route('**/scene/binding',r=>r.fulfill({json:{bindings:[{workspace_id:tenant}],workspaces:[{id:tenant,name:'财务核对'}]}}));
+ await page.route('**/scene/status',r=>r.fulfill({json:{tenantId:tenant,governance:{policy_current:true},assets:[{source_id:'source',kind:'TABLE',metadata:{title:'合成收款'}}],runs:[]}}));
+ await page.route(/\/scene\/metrics(?:\?.*)?$/,r=>{if(r.request().method()==='POST')saved=r.request().postDataJSON();return r.fulfill({json:{items:[]}})});
+ await page.goto('/tenant-admin/governance/?surface=tenant');await page.getByLabel('指标来源').selectOption('source');
+ for(const [label,value] of [['指标名称','成功收款'],['业务含义','成功记录求和'],['输出单位（分转元时填写元）','元'],['统计粒度（每行代表什么）','收款事件'],['适用范围与时间口径','合成演示'],['排除项（没有则填写“无”）','无'],['业务依据与来源说明','合成源字典']])await page.getByLabel(label,{exact:true}).fill(value);
+ await page.getByLabel('统计方式',{exact:true}).selectOption('SUM');await page.getByLabel('数值字段（准确列名）').fill('amount_cents');
+ await page.getByRole('button',{name:'添加筛选条件'}).click();await page.getByLabel('筛选字段1').fill('status');await page.getByLabel('筛选值1').fill('SUCCESS');
+ await page.getByLabel('金额单位换算').selectOption('CENTS_TO_YUAN');await page.getByRole('checkbox',{name:/我已核对/}).check();
+ await page.getByLabel('筛选值1').fill('COMPLETED');await expect(page.getByRole('checkbox',{name:/我已核对/})).not.toBeChecked();
+ await page.getByRole('checkbox',{name:/我已核对/}).check();await page.getByRole('button',{name:'保存草稿'}).click();
+ await expect.poll(()=>saved?.definition?.execution?.equalsFilters).toEqual({status:'COMPLETED'});expect(saved.definition.execution.conversion).toBe('CENTS_TO_YUAN');
 });

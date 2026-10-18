@@ -14,7 +14,8 @@ import tools.jackson.databind.json.JsonMapper;
 @Service
 public class DatasetCalculationService {
     public record Request(UUID datasetId, UUID snapshotId, String groupColumn, String periodColumn,
-                          String valueColumn, String baseline, String current, String periodMode, String timeZone, String aggregation, String operation, List<String> groupColumns, String dateColumn, String dateFrom, String dateTo, String missingDates, UUID metricId, Integer metricVersion) {
+                          String valueColumn, String baseline, String current, String periodMode, String timeZone, String aggregation, String operation, List<String> groupColumns, String dateColumn, String dateFrom, String dateTo, String missingDates, UUID metricId, Integer metricVersion, Map<String,String> equalsFilters, String conversion) {
+        public Request(UUID datasetId,UUID snapshotId,String groupColumn,String periodColumn,String valueColumn,String baseline,String current,String periodMode,String timeZone,String aggregation,String operation,List<String> groupColumns,String dateColumn,String dateFrom,String dateTo,String missingDates,UUID metricId,Integer metricVersion){this(datasetId,snapshotId,groupColumn,periodColumn,valueColumn,baseline,current,periodMode,timeZone,aggregation,operation,groupColumns,dateColumn,dateFrom,dateTo,missingDates,metricId,metricVersion,null,null);}
         public Request(UUID datasetId,UUID snapshotId,String groupColumn,String periodColumn,String valueColumn,String baseline,String current,String periodMode,String timeZone,String aggregation,String operation,List<String> groupColumns,String dateColumn,String dateFrom,String dateTo,String missingDates){this(datasetId,snapshotId,groupColumn,periodColumn,valueColumn,baseline,current,periodMode,timeZone,aggregation,operation,groupColumns,dateColumn,dateFrom,dateTo,missingDates,null,null);}
         public Request(UUID datasetId,UUID snapshotId,String groupColumn,String periodColumn,String valueColumn,String baseline,String current,String periodMode,String timeZone,String aggregation){this(datasetId,snapshotId,groupColumn,periodColumn,valueColumn,baseline,current,periodMode,timeZone,aggregation,null,null,null,null,null,null);}
         public Request(UUID datasetId,UUID snapshotId,String groupColumn,String periodColumn,String valueColumn,String baseline,String current){this(datasetId,snapshotId,groupColumn,periodColumn,valueColumn,baseline,current,null,null,null);}
@@ -96,6 +97,8 @@ public class DatasetCalculationService {
         String columnsText=source.get("column_names").toString(),rowsText=source.get("data_rows").toString();
         List<String> columns=json.readValue(columnsText,json.getTypeFactory().constructCollectionType(List.class,String.class));
         boolean countRows="COUNT".equals(request.aggregation());
+        CalculationConditions.validate(request.equalsFilters(),request.conversion(),columns);
+        if(countRows&&request.conversion()!=null&&!"NONE".equals(request.conversion()))invalid("METRIC_CONVERSION_INVALID");
         if(request.aggregation()!=null&&!Set.of("SUM","COUNT").contains(request.aggregation()))invalid("INVALID_REQUEST");
         var requested=summary?request.groupColumns():countRows?Arrays.asList(request.groupColumn(),request.periodColumn()):Arrays.asList(request.groupColumn(),request.periodColumn(),request.valueColumn());
         if(composition && (requested==null||requested.size()!=1))invalid("DATASET_COLUMNS_INVALID");
@@ -110,10 +113,11 @@ public class DatasetCalculationService {
         var semantics=db.queryForList("SELECT metadata FROM scene_asset_revisions WHERE tenant_id=? AND target_id=? AND kind='TABLE' ORDER BY created_at DESC LIMIT 1",String.class,job.tenant(),request.datasetId());
         if(!semantics.isEmpty()){
             var policy=json.readTree(semantics.getFirst()).path("analysisPolicy");
-            if(!countRows)for(var field:policy.path("noSumFields"))if(field.asText().equals(request.valueColumn()))invalid("DATASET_NON_ADDITIVE_FIELD");
-            var used=new HashSet<String>(requested);used.add(request.valueColumn());used.add(request.dateColumn());
+            if(!countRows)CalculationConditions.source(json.readTree(semantics.getFirst()),request.valueColumn(),request.equalsFilters(),request.conversion(),request.metricId()!=null);
+            var used=new HashSet<String>(requested);used.add(request.valueColumn());used.add(request.dateColumn());if(request.equalsFilters()!=null)used.addAll(request.equalsFilters().keySet());
             for(var field:policy.path("excludeFields"))if(used.contains(field.asText()))invalid("DATASET_FIELD_UNCONFIRMED");
         }
+        if(semantics.isEmpty()&&"CENTS_TO_YUAN".equals(request.conversion()))invalid("METRIC_CONVERSION_SOURCE_UNIT_INVALID");
         if(materials!=null&&Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM briefing_flow_tasks WHERE task_id=?)",Boolean.class,job.id()))){
             var reuse=materials.reusable(job.actor(),job.tenant(),request,request.datasetId(),request.snapshotId());
             if(reuse.isPresent()){
@@ -131,6 +135,7 @@ public class DatasetCalculationService {
         BigDecimal summaryTotal=BigDecimal.ZERO;
         for (var record:data) {
             if (!record.isArray() || record.size()!=columns.size()) invalid("DATASET_SHAPE_INVALID");
+            if(!CalculationConditions.matches(record,columns,request.equalsFilters())){ignored++;continue;}
             if(request.dateColumn()!=null){
                 var raw=record.get(columns.indexOf(request.dateColumn()));
                 if(raw.isNull()||(raw.isString()&&raw.asString().isBlank())){
@@ -143,7 +148,7 @@ public class DatasetCalculationService {
             }
             if(summary){
                 var key=new ArrayList<String>();for(String column:requested){var cell=record.get(columns.indexOf(column));if(!cell.isString())invalid("DATASET_LABEL_INVALID");key.add(label(cell.asString()));}
-                BigDecimal number=measure(record,countRows,valueIndex);
+                BigDecimal number=CalculationConditions.convert(measure(record,countRows,valueIndex),request.conversion());
                 if(composition&&number.signum()<0)invalid("DATASET_COMPOSITION_NEGATIVE");
                 var immutable=List.copyOf(key);summaryGroups.merge(immutable,number,BigDecimal::add);records.merge(immutable,1,Integer::sum);summaryTotal=summaryTotal.add(number);matched++;
                 if(summaryGroups.size()>50)invalid("DATASET_GROUP_LIMIT");continue;
@@ -151,7 +156,7 @@ public class DatasetCalculationService {
             var periodCell=record.get(periodIndex);if(!periodCell.isString())invalid("DATASET_LABEL_INVALID");String period=period(periodCell.asString(),mode,zone);
             if (!period.equals(request.baseline()) && !period.equals(request.current())) { ignored++; continue; }
             var groupCell=record.get(groupIndex);if(!groupCell.isString())invalid("DATASET_LABEL_INVALID");String group=label(groupCell.asString());
-            var number=measure(record,countRows,valueIndex);
+            var number=CalculationConditions.convert(measure(record,countRows,valueIndex),request.conversion());
             int p=period.equals(request.baseline())?0:1;var values=groups.computeIfAbsent(group,k->new BigDecimal[2]);values[p]=values[p]==null?number:values[p].add(number);matched++;
             if(groups.size()>50)invalid("DATASET_GROUP_LIMIT");
         }
@@ -188,6 +193,7 @@ public class DatasetCalculationService {
     private BigDecimal measure(tools.jackson.databind.JsonNode record,boolean count,int index){
         if(count)return BigDecimal.ONE;
         var cell=record.get(index);
+        if(cell.isNull()||(cell.isString()&&cell.asString().isBlank()))invalid("DATASET_AMOUNT_REQUIRED");
         if(!cell.isString()||!cell.asString().matches("-?[0-9]{1,30}(?:\\.[0-9]{1,12})?(?:[Ee][+-]?[0-9]{1,2})?"))invalid("DATASET_NUMBER_INVALID");
         var number=new BigDecimal(cell.asString());if(number.abs().compareTo(BigDecimal.TEN.pow(30))>=0||number.scale()>12)invalid("DATASET_NUMBER_LIMIT");return number;
     }

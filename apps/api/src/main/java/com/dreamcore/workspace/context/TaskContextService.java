@@ -100,7 +100,7 @@ public class TaskContextService {
   profileScope(t,v);
   dependencies(t,db.queryForList("SELECT DISTINCT c.version_id FROM company_profile_inferences p JOIN company_inference_inputs i ON i.run_id=p.run_id JOIN knowledge_chunks c ON c.id=i.chunk_id WHERE p.version_id=?",UUID.class,v.versionId()));
   record(t,"PROFILE",v.id(),Integer.toString(v.revision()),v);
-  return map("id",v.id(),"revision",v.revision(),"scope",v.scope(),"subjectId",v.subjectId(),"kind",v.kind(),"key",v.key(),"value",clip(v.value(),limit),"truncated",v.value().length()>limit,"provenance",v.provenance(),"effectiveStatus",v.effectiveStatus(),"expiresAt",v.expiresAt(),"authority",false);
+  return map("backgroundKnowledge",v.key().startsWith("company.")?map("id","background:"+v.id(),"sourceVersionId",v.versionId(),"revision",v.revision(),"mode","STRUCTURED_REFERENCE"):null,"id",v.id(),"revision",v.revision(),"scope",v.scope(),"subjectId",v.subjectId(),"kind",v.kind(),"key",v.key(),"value",clip(v.value(),limit),"truncated",v.value().length()>limit,"provenance",v.provenance(),"effectiveStatus",v.effectiveStatus(),"expiresAt",v.expiresAt(),"authority",false);
  }
  private Object profileList(Task t,Request r){
   ProfileService.Scope scope;try{scope=ProfileService.Scope.valueOf(r.scope());}catch(Exception e){throw IdentityException.invalid();}

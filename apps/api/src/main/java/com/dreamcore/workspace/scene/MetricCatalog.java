@@ -24,13 +24,16 @@ public class MetricCatalog {
  }
  private String text(JsonNode d,String key,int limit,boolean required){var n=d.path(key);if(!n.isTextual()||n.asText().length()>limit||(required&&n.asText().isBlank())||n.asText().codePoints().anyMatch(Character::isISOControl))throw IdentityException.invalid();return n.asText().strip();}
  private JsonNode validate(Map<String,Object> supplied,JsonNode meta){
-  if(supplied==null||!new HashSet<>(supplied.keySet().stream().filter(k->!k.equals("execution")).toList()).equals(Set.of("name","meaning","unit","grain","scope","exclusions","evidence","aggregation","valueField")))throw IdentityException.invalid();
+  if(supplied==null||!new HashSet<>(supplied.keySet().stream().filter(k->!k.equals("execution")&&!k.equals("backgroundVersionIds")).toList()).equals(Set.of("name","meaning","unit","grain","scope","exclusions","evidence","aggregation","valueField")))throw IdentityException.invalid();
   var d=JSON.valueToTree(supplied);var clean=JSON.createObjectNode();
   for(String k:List.of("name","meaning","unit","grain","scope","exclusions","evidence"))clean.put(k,text(d,k,k.equals("name")?100:k.equals("unit")?40:400,true));
   String agg=text(d,"aggregation",10,true),field=text(d,"valueField",160,false);
   if(!Set.of("COUNT","SUM").contains(agg)||agg.equals("COUNT")&&!field.isEmpty())throw IdentityException.invalid();
   if(agg.equals("SUM")){boolean numeric=false;for(var f:meta.path("fields"))if(f.path("name").asText().equals(field)&&f.path("type").asText().equals("number"))numeric=true;if(!numeric)throw new IdentityException(422,"METRIC_NUMERIC_FIELD_REQUIRED");}
-  clean.put("aggregation",agg);clean.put("valueField",field);clean.set("execution",MetricPlan.validate(d.path("execution"),meta,field));return clean;
+  clean.put("aggregation",agg);clean.put("valueField",field);clean.set("execution",MetricPlan.validate(d.path("execution"),meta,field));
+  var refs=d.path("backgroundVersionIds");var ids=new TreeSet<String>();
+  if(!refs.isMissingNode()){if(!refs.isArray()||refs.size()>20)throw IdentityException.invalid();for(var ref:refs){try{if(!ref.isTextual())throw IdentityException.invalid();ids.add(UUID.fromString(ref.asText()).toString());}catch(IllegalArgumentException e){throw IdentityException.invalid();}}}
+  if(!ids.isEmpty())clean.set("backgroundVersionIds",JSON.valueToTree(ids));return clean;
  }
  @Transactional public Object save(UUID actor,UUID tenant,boolean platform,Change request){
   admin(actor,tenant,platform);return saveChecked(actor,tenant,request);
@@ -40,6 +43,11 @@ public class MetricCatalog {
   // Serialize tenant catalog writes and version transitions.
   db.queryForList("SELECT tenant_id FROM scene_bindings WHERE tenant_id=? FOR UPDATE",tenant);
   var src=source(actor,tenant,request.sourceId());var definition=validate(request.definition(),JSON.readTree(src.get("metadata").toString()));
+  for(var ref:definition.path("backgroundVersionIds")){
+   UUID versionId=UUID.fromString(ref.asText());
+   db.queryForList("SELECT e.id FROM profile_entries e JOIN profile_versions v ON v.entry_id=e.id WHERE v.id=? AND e.tenant_id=? FOR SHARE OF e",versionId,tenant);
+   if(!Boolean.TRUE.equals(db.queryForObject("SELECT background_version_current(?,?)",Boolean.class,tenant,versionId)))throw new IdentityException(409,"BACKGROUND_REFERENCE_CHANGED");
+  }
   UUID id=request.id()==null?UUID.randomUUID():request.id();int version=1;
   if(request.id()==null){if(request.expectedVersion()!=0)throw conflict();db.update("INSERT INTO scene_metrics(id,tenant_id,source_id,head_version,created_by) VALUES(?,?,?,1,?)",id,tenant,request.sourceId(),actor);}
   else {var old=db.queryForList("SELECT * FROM scene_metrics WHERE id=? AND tenant_id=? FOR UPDATE",id,tenant);if(old.isEmpty()||!old.getFirst().get("head_version").equals(request.expectedVersion())||!old.getFirst().get("source_id").equals(request.sourceId()))throw conflict();version=request.expectedVersion()+1;db.update("UPDATE scene_metrics SET head_version=?,updated_at=now() WHERE id=?",version,id);}
@@ -54,7 +62,7 @@ public class MetricCatalog {
   db.queryForList("SELECT tenant_id FROM scene_bindings WHERE tenant_id=? FOR UPDATE",tenant);
   var rows=db.queryForList("SELECT m.*,v.source_scope::text scope,v.definition FROM scene_metrics m JOIN scene_metric_versions v ON v.metric_id=m.id AND v.version=m.head_version WHERE m.tenant_id=? AND m.id=? FOR UPDATE OF m",tenant,id);
   if(rows.isEmpty()||!rows.getFirst().get("head_version").equals(request.expectedVersion()))throw conflict();var m=rows.getFirst();
-  if(publish){if(!MetricPlan.ready(JSON.readTree(m.get("definition").toString())))throw new IdentityException(422,"METRIC_PLAN_REVIEW_REQUIRED");var src=source(actor,tenant,m.get("source_id").toString());if(!src.get("scope").equals(m.get("scope")))throw conflict();}
+  if(publish){lockBackground(db,id,request.expectedVersion());if(!Boolean.TRUE.equals(db.queryForObject("SELECT metric_background_current(?,?)",Boolean.class,id,request.expectedVersion())))throw new IdentityException(409,"BACKGROUND_REFERENCE_CHANGED");if(!MetricPlan.ready(JSON.readTree(m.get("definition").toString())))throw new IdentityException(422,"METRIC_PLAN_REVIEW_REQUIRED");var src=source(actor,tenant,m.get("source_id").toString());if(!src.get("scope").equals(m.get("scope")))throw conflict();var definition=JSON.readTree(m.get("definition").toString());var plan=MetricPlan.request(definition,(UUID)src.get("target_id"),null,id,request.expectedVersion());if("SUM".equals(definition.path("aggregation").asText()))com.dreamcore.workspace.conversation.CalculationConditions.source(JSON.readTree(src.get("metadata").toString()),plan.valueColumn(),plan.equalsFilters(),plan.conversion(),true);if("CENTS_TO_YUAN".equals(plan.conversion())&&(!"SUM".equals(definition.path("aggregation").asText())||!"元".equals(definition.path("unit").asText())))throw new IdentityException(422,"METRIC_CONVERSION_INVALID");}
   db.update("UPDATE scene_metrics SET published_version=?,updated_at=now() WHERE id=?",publish?request.expectedVersion():null,id);
   event(actor,tenant,id,request.expectedVersion(),publish?"PUBLISH":"WITHDRAW");return Map.of("id",id,"published",publish);
  }
@@ -67,8 +75,11 @@ public class MetricCatalog {
   String filter="m.tenant_id=? AND (?='' OR strpos(lower(v.definition->>'name'),lower(?))>0 OR strpos(lower(v.definition->>'meaning'),lower(?))>0)";
   long total=db.queryForObject("SELECT count(*) FROM scene_metrics m JOIN scene_metric_versions v ON v.metric_id=m.id AND v.version=m.head_version WHERE "+filter,Long.class,tenant,term,term,term);
   var rows=db.queryForList("SELECT m.id,m.source_id,m.head_version,m.published_version,m.updated_at,v.definition,v.generation,v.source_dataset,coalesce(l.active AND scene_table_scope(l.metadata)=v.source_scope AND b.governance_valid_until>now(),false) current,coalesce(l.active AND scene_table_scope(l.metadata)=pv.source_scope AND b.governance_valid_until>now(),false) published_current FROM scene_metrics m JOIN scene_metric_versions v ON v.metric_id=m.id AND v.version=m.head_version LEFT JOIN scene_metric_versions pv ON pv.metric_id=m.id AND pv.version=m.published_version LEFT JOIN scene_asset_links l ON l.tenant_id=m.tenant_id AND l.source_id=m.source_id AND l.kind='TABLE' LEFT JOIN scene_bindings b ON b.tenant_id=m.tenant_id WHERE "+filter+" ORDER BY m.updated_at DESC,m.id LIMIT ? OFFSET ?",tenant,term,term,term,limit,offset);
-  for(var row:rows){row.put("definition",JSON.readTree(row.get("definition").toString()));row.put("generation",JSON.readTree(row.get("generation").toString()));row.put("calculations",db.queryForMap("SELECT count(*) count,max(created_at) last_calculated_at FROM metric_calculation_receipts WHERE metric_id=?",row.get("id")));row.put("history",db.queryForList("SELECT version,action,created_at FROM scene_metric_events WHERE metric_id=? ORDER BY id DESC LIMIT 10",row.get("id")));}
+  for(var row:rows){row.put("backgroundCurrent",db.queryForObject("SELECT metric_background_current(?,?)",Boolean.class,row.get("id"),row.get("head_version")));row.put("definition",JSON.readTree(row.get("definition").toString()));row.put("generation",JSON.readTree(row.get("generation").toString()));row.put("calculations",db.queryForMap("SELECT count(*) count,max(created_at) last_calculated_at FROM metric_calculation_receipts WHERE metric_id=?",row.get("id")));row.put("history",db.queryForList("SELECT version,action,created_at FROM scene_metric_events WHERE metric_id=? ORDER BY id DESC LIMIT 10",row.get("id")));}
   return Map.of("items",rows,"referenceOnly",true,"total",total,"offset",offset,"limit",limit,"hasMore",(long)offset+rows.size()<total);
+ }
+ public static void lockBackground(JdbcTemplate db,UUID metric,int version){
+  db.queryForList("SELECT e.id FROM scene_metric_versions m CROSS JOIN LATERAL jsonb_array_elements_text(coalesce(m.definition->'backgroundVersionIds','[]'::jsonb)) r(id) JOIN profile_versions v ON v.id=r.id::uuid JOIN profile_entries e ON e.id=v.entry_id WHERE m.metric_id=? AND m.version=? ORDER BY e.id FOR SHARE OF e,v",metric,version);
  }
  /** Invoked after dataset authorization and snapshot pinning, in the task transaction. */
  public static Object context(JdbcTemplate db,UUID task,UUID dataset,String query){
@@ -83,6 +94,7 @@ public class MetricCatalog {
    JOIN scene_asset_links l ON l.tenant_id=m.tenant_id AND l.source_id=m.source_id AND l.kind='TABLE' AND l.active
    JOIN task_dataset_reads p ON p.task_id=t.id AND p.attempt_number=t.attempt AND p.dataset_id=l.target_id
    WHERE t.id=? AND l.target_id=? AND scene_table_scope(l.metadata)=v.source_scope AND file_dataset_readable(t.requested_by,l.target_id)
+    AND metric_background_current(m.id,v.version)
     AND (CAST(? AS uuid) IS NULL OR m.id=?) AND (CAST(? AS integer) IS NULL OR v.version=?)
    ORDER BY CASE WHEN ?<>'' AND strpos(lower(v.definition->>'name'),lower(?))>0 THEN 0 ELSE 1 END,
     (SELECT max(cr.created_at) FROM metric_calculation_receipts cr JOIN metric_briefing_receipts br ON br.calculation_artifact_id=cr.artifact_id
@@ -90,6 +102,8 @@ public class MetricCatalog {
     m.id LIMIT 4 FOR SHARE OF m
    """,task,dataset,metricId,metricId,version,version,query,query);
   var result=new ArrayList<Object>();for(var r:rows.stream().limit(3).toList()){
+   lockBackground(db,(UUID)r.get("id"),(Integer)r.get("version"));
+   if(!Boolean.TRUE.equals(db.queryForObject("SELECT metric_background_current(?,?)",Boolean.class,r.get("id"),r.get("version"))))throw new IdentityException(409,"TASK_CONTEXT_CHANGED");
    var definition=JSON.readTree(r.get("definition").toString());
    var old=db.queryForList("SELECT version FROM task_metric_reads WHERE task_id=? AND attempt_number=(SELECT attempt FROM conversation_tasks WHERE id=?) AND metric_id=?",Integer.class,task,task,r.get("id"));
    if(!old.isEmpty()&&!old.getFirst().equals(r.get("version")))throw new IdentityException(409,"TASK_CONTEXT_CHANGED");

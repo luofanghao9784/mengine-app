@@ -1203,6 +1203,16 @@
 }
 
 /* 来源：卡片之间只留细线，不再是一块块小格；环节数字去掉底色 */
+ .cards.work.data.glass .background-source-card {
+  display: flex; flex-direction: column; gap: 7px; width: 100%; text-align: left;
+  padding: 16px; margin: 8px 0; border: 1px solid var(--hair); border-radius: 12px;
+  color: var(--ash); background: rgba(255,255,255,.025); cursor: pointer;
+}
+.cards.work.data.glass .background-source-card strong { color: var(--ivory); font-size: 14px; }
+.cards.work.data.glass .background-source-card[aria-pressed="true"] { border-color: var(--champagne); background: rgba(236,201,138,.08); }
+.cards.work.data.glass .background-source-card span, .cards.work.data.glass .background-source-card small,
+.cards.work.data.glass .background-count-note { font-size: 11px; line-height: 1.6; }
+.cards.work.data.glass .background-count-note { color: var(--ash); padding: 0 12px; }
 .cards.work.data.glass .src-list {
   gap: 2px;
 }
@@ -1407,4 +1417,34 @@
 /* 边缘的金色流光是拟物的，去掉；只留卡面上一层极淡的随指针的光 */
 .cards.work.data.glass [data-spot]::after {
   display: none;
+}
+
+.cards.work .background-detail {
+  min-height: 0;
+  overflow: auto;
+  padding: 20px;
+}
+.cards.work .background-detail .admin-section {
+  color: inherit;
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+.cards.work .background-detail p {
+  color: var(--ash, #b4bdca);
+  line-height: 1.7;
+}
+.cards.work .background-detail button {
+  color: var(--champagne, #ecc98a);
+}
+.background-knowledge article {
+  padding: 14px 0;
+  border-bottom: 1px solid #8884;
+  overflow-wrap: anywhere;
+}
+.background-knowledge h4 {
+  margin: 0 0 8px;
+}
+.background-knowledge details {
+  margin: 12px 0;
 }

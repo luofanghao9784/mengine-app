@@ -121,6 +121,7 @@ public class BriefingContentService {
         BriefingEditorialQuality.validateCourseScope(request,mixedCourses,categoryDimension);
         boolean countRows="COUNT".equals(calc.request().aggregation());
         String metric=countRows?"记录数":calc.request().valueColumn(),unit=countRows?"条":metric.endsWith("_cents")?"分":metric.endsWith("_grams")?"克":"原数据数值单位";var match=java.util.regex.Pattern.compile("[（(]([^）)]{1,12})[）)]").matcher(metric);if(match.find())unit=match.group(1);
+        if("CENTS_TO_YUAN".equals(calc.request().conversion()))unit="元";
         var chart=new Chart("GROUPED_BAR",metric,unit,summary?"不适用":calc.request().baseline(),summary?"本次汇总":calc.request().current(),calc.request().dateColumn()==null?"全部快照 · "+source.rowCount()+" 行":"日期筛选 · "+calc.matchedRows()+" 行 · 缺日 "+calc.missingDateRows()+" 行",calc.rows(),calc.totals(),shares);
         var presentation=summary&&request.presentation()==null?new BriefingPresentationPolicy.Presentation("briefing-presentation-v1","EDITORIAL","CURRENT_BAR",null,null,List.of()):BriefingPresentationPolicy.resolve(request,"DATA",chart);
         var prior=db.queryForList("SELECT a.id,a.sha256,a.content FROM conversation_artifacts a WHERE task_id=? AND attempt_number=? AND EXISTS(SELECT 1 FROM identity_audit p WHERE p.target_id=a.id AND p.action='TASK_BRIEFING_CREATED' AND p.tenant_id=a.tenant_id)",job.id(),attempt);

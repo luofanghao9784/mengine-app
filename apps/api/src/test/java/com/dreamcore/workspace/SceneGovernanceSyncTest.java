@@ -16,6 +16,17 @@ class SceneGovernanceSyncTest extends CompanyAnalysisFixture {
   db.update("UPDATE knowledge_runs SET status='CANCELLED',lease_token=NULL,lease_until=NULL WHERE tenant_id=? AND status IN('QUEUED','RUNNING')",tenant);
   db.update("UPDATE collection_runs SET status='INTERRUPTED',reason='TEST_FINISHED',finished_at=now(),lease_token=NULL,lease_until=NULL WHERE tenant_id=? AND status IN('QUEUED','RUNNING')",tenant);
  }
+ @Test void bindingRequiresAdminSharedSpaceAndCannotOverwriteExistingScope(){
+  when(bridge.call(eq(tenant),anyString(),eq("GET"),eq("/scene-access"),isNull())).thenReturn(new JsonMapper().readTree("{\"user\":{\"role\":\"admin\"}}"));
+  assertThrows(com.dreamcore.workspace.identity.IdentityException.class,()->scene.bind(reader,tenant,space));
+  assertThrows(com.dreamcore.workspace.identity.IdentityException.class,()->scene.bind(admin,tenant,personal));
+  assertThrows(com.dreamcore.workspace.identity.IdentityException.class,()->scene.bind(admin,tenant,UUID.randomUUID()));
+  scene.bind(admin,tenant,space);scene.bind(admin,tenant,space);
+  assertEquals(1,db.queryForObject("SELECT count(*) FROM scene_bindings WHERE tenant_id=?",Integer.class,tenant));
+  UUID other=UUID.randomUUID();db.update("INSERT INTO workspaces(id,tenant_id,owner_id,name,kind) VALUES (?,?,?,'另一个空间','SHARED')",other,tenant,admin);
+  assertThrows(com.dreamcore.workspace.identity.IdentityException.class,()->scene.bind(admin,tenant,other));
+  assertEquals(space,db.queryForObject("SELECT workspace_id FROM scene_bindings WHERE tenant_id=?",UUID.class,tenant));
+ }
  @Test void unchangedSyncRenewsPolicyWithoutDuplicatingAssetsAndRevocationWithdrawsOldCopies(){
   var json=new JsonMapper();UUID connection=UUID.randomUUID();
   db.update("INSERT INTO scene_bindings(tenant_id,workspace_id,connection_id,maintainer_id) VALUES(?,?,?,?)",tenant,space,connection,admin);

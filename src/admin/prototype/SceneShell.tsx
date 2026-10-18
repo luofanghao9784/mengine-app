@@ -5,6 +5,7 @@ import { BusinessWork, OutputWork } from './BusinessWork';
 import { useSceneRuntime, disconnectedTelemetry, type SceneRuntime } from './runtime';
 import { requestNavigationLocked } from '../../shared/request-guard';
 import type { EngineScene, Focus } from '../../operations/engine-stage/scene';
+import { BackgroundKnowledge } from '../../profile/BackgroundKnowledge';
 import { DataWork } from './DataWork';
 import { AccessWork } from './AccessWork';
 import { useFoundation, asItem, type Foundation } from './foundation-api';
@@ -88,7 +89,7 @@ export function SceneShell() {
   /** 导航里当前板块的实心滑块：位置跟着当前项走，切换时滑过去。 */
   const [pill, setPill] = useState<{ x: number; w: number } | null>(null);
   const scene = useRef<EngineScene | null>(null);
-  const knowledge = useKnowledge(place === 'knowledge');
+  const knowledge = useKnowledge(place === 'knowledge', tenant);
   const world = useMemo(() => new World([], [], [], {}), []);
   useEffect(() => {
     world.setKnowledge(
@@ -552,6 +553,8 @@ export function SceneShell() {
           <Usage />
         ) : place === 'data' ? (
           <DataWork
+            tenant={tenant}
+            onMaintainBackground={() => go('company')}
             foundation={foundation}
             picked={current(place)}
             pick={pick(place)}
@@ -562,6 +565,8 @@ export function SceneShell() {
           />
         ) : work ? (
           <Work
+            tenant={tenant}
+            onBackgroundSource={() => go('company')}
             key={place}
             knowledge={knowledge}
             place={place}
@@ -821,6 +826,8 @@ function Usage() {
 const toneClass = (t: Tone) => `tone-${t}`;
 
 function Work({
+  tenant,
+  onBackgroundSource,
   knowledge,
   place,
   picked,
@@ -830,6 +837,8 @@ function Work({
   gate,
   setGate,
 }: {
+  tenant?: string | null;
+  onBackgroundSource?: () => void;
   knowledge: Knowledge;
   place: Place;
   picked: string;
@@ -851,7 +860,7 @@ function Work({
   const info = places[place],
     side = place === 'knowledge' ? knowledge.stats : stats[place],
     more = place === 'knowledge' ? knowledge.aside : aside[place],
-    tab = workTabs[filter] || workTabs[0],
+    tab = workTabs[filter] || workTabs[0] || { label: '全部', items: [] as Item[] },
     all = workTabs.flatMap((x) => x.items);
   const shown = tab.items.filter(
     (x) => gate === null || (GATE_OF[x.id] === gate && x.tone !== 'ok' && x.tone !== 'run'),
@@ -923,6 +932,7 @@ function Work({
               只看卡在“{GATES[gate]}”的 ×
             </button>
           )}
+          {place === 'knowledge' && knowledge.backgroundError != null && <p role="status">企业背景暂不可用，未计入知识数量。<button onClick={knowledge.refreshBackground}>重试背景读取</button></p>}
           {groups.length === 0 && <p className="none">这一栏里没有符合条件的记录。</p>}
           {groups.map(([name, items]) => (
             <div key={name}>
@@ -950,92 +960,101 @@ function Work({
         </div>
       </article>
 
-      <article className="card detail" aria-live="polite">
-        <header>
-          <h2>{current.name}</h2>
-          <span>
-            {current.group}
-            {current.side && ` · ${current.side}`}
-          </span>
-        </header>
-        <div className="card-scroll">
-          <p className={`verdict ${toneClass(current.tone)}`}>
-            {actionError ||
-              (place === 'knowledge' && (knowledge.error || (knowledge.busy ? '正在同步知识与关联…' : ''))) ||
-              current.verdict}
-          </p>
-          {flow && (
-            <ol className="flow">
-              {flow.map(([text, state], i) => (
-                <li key={i} data-state={state}>
-                  <b>{STEP_NAMES[i]}</b>
-                  <span>{text}</span>
-                </li>
-              ))}
-            </ol>
-          )}
-          {current.kv.length > 0 && (
-            <table>
-              <thead>
-                <tr>
-                  {current.kvHead.map((h) => (
-                    <th key={h}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {current.kv.map(([a, b, c, tone]) => (
-                  <tr key={a}>
-                    <th>{a}</th>
-                    <td>{b}</td>
-                    <td className={`${toneClass(tone)}-text`}>{c}</td>
-                  </tr>
+      {place === 'knowledge' && tenant && current.id === `company-background:${tenant}` ? (
+        <article className="card detail background-detail">
+          <div className="card-scroll">
+            <BackgroundKnowledge tenant={tenant} onSource={onBackgroundSource} onRefresh={knowledge.refreshBackground} />
+          </div>
+        </article>
+      ) : (
+        <article className="card detail" aria-live="polite">
+          <header>
+            <h2>{current.name}</h2>
+            <span>
+              {current.group}
+              {current.side && ` · ${current.side}`}
+            </span>
+          </header>
+          <div className="card-scroll">
+            <p className={`verdict ${toneClass(current.tone)}`}>
+              {actionError ||
+                (place === 'knowledge' &&
+                  (knowledge.error || (knowledge.busy ? '正在同步知识与关联…' : ''))) ||
+                current.verdict}
+            </p>
+            {flow && (
+              <ol className="flow">
+                {flow.map(([text, state], i) => (
+                  <li key={i} data-state={state}>
+                    <b>{STEP_NAMES[i]}</b>
+                    <span>{text}</span>
+                  </li>
                 ))}
-              </tbody>
-            </table>
-          )}
-          {place === 'knowledge' && (
-            <div className="related">
-              <h3>关联知识 {links.length}</h3>
-              {links.map((r) => (
+              </ol>
+            )}
+            {current.kv.length > 0 && (
+              <table>
+                <thead>
+                  <tr>
+                    {current.kvHead.map((h) => (
+                      <th key={h}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {current.kv.map(([a, b, c, tone]) => (
+                    <tr key={a}>
+                      <th>{a}</th>
+                      <td>{b}</td>
+                      <td className={`${toneClass(tone)}-text`}>{c}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+            {place === 'knowledge' && (
+              <div className="related">
+                <h3>关联知识 {links.length}</h3>
+                {links.map((r) => (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => {
+                      setFilter(0);
+                      pick(r.id);
+                    }}
+                  >
+                    <b>{r.name}</b>
+                    <span>{r.why}</span>
+                  </button>
+                ))}
+                {links.length === 0 && (
+                  <p>
+                    {knowledge.data?.needsGraph
+                      ? '关联待模型分析确认，星图暂以独立节点呈现。'
+                      : '这条知识目前没有已验证关联。'}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+          {current.actions.length > 0 && (
+            <footer>
+              {current.actions.map((a, i) => (
                 <button
-                  key={r.id}
+                  key={a}
                   type="button"
-                  onClick={() => {
-                    setFilter(0);
-                    pick(r.id);
-                  }}
+                  disabled={place === 'knowledge' && knowledge.busy}
+                  onClick={place === 'knowledge' ? () => void act(a) : undefined}
+                  className={i === 0 ? 'primary' : undefined}
                 >
-                  <b>{r.name}</b>
-                  <span>{r.why}</span>
+                  {a}
                 </button>
               ))}
-              {links.length === 0 && (
-                <p>
-                  {knowledge.data?.needsGraph
-                    ? '关联待模型分析确认，星图暂以独立节点呈现。'
-                    : '这条知识目前没有已验证关联。'}
-                </p>
-              )}
-            </div>
+            </footer>
           )}
-        </div>
-        {current.actions.length > 0 && (
-          <footer>
-            {current.actions.map((a, i) => (
-              <button
-                key={a}
-                type="button"
-                disabled={place === 'knowledge' && knowledge.busy}
-                onClick={place === 'knowledge' ? () => void act(a) : undefined}
-                className={i === 0 ? 'primary' : undefined}
-              >
-                {a}
-              </button>
-            ))}
-          </footer>
-        )}
-      </article>
+        </article>
+      )}
 
       <div className="side">
         <article className="card facts">
