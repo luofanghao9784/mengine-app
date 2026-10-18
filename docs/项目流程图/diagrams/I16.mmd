@@ -1,0 +1,15 @@
+flowchart TD
+  n_tasks["任务、解析、采集和经验阶段记录"] --> n_telemetry["EngineTelemetryService 聚合各通道"]
+  n_model["模型调用与尝试回执"] --> n_ledger["用量台账：已知、未知和失败记录"]
+  n_telemetry --> n_role{"读取范围"}
+  n_role -->|"总台"| n_global["平台快照与企业分布"]
+  n_role -->|"企业"| n_local["限定企业快照"]
+  n_global --> n_dashboard["PlatformEngineDashboard"]
+  n_local --> n_runtime["useSceneRuntime 定期读取"]
+  n_runtime --> n_stage["3D 动效与本页变化日志"]
+  n_runtime -->|"失败"| n_disconnected["清空旧快照，展示不可用"]
+  n_ledger --> n_usage["UsageController 与用量页面"]
+  n_dashboard --> n_attention["查找异常任务与处理记录"]
+  n_attention --> n_retry["EngineRetryService 校验可重试类型与资格"]
+  n_retry --> n_receipt["生成重试回执并交给对应处理器"]
+  n_receipt --> n_tasks

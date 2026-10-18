@@ -1,0 +1,19 @@
+flowchart TD
+  n_ui["foundation-api.ts 请求场景操作"] --> n_csrf["写请求取得业务 CSRF"]
+  n_csrf --> n_dispatch["SceneController dispatch"]
+  n_dispatch --> n_gate["企业成员、绑定与路径白名单检查"]
+  n_gate --> n_mutation{"权限或治理写操作？"}
+  n_mutation -->|"是"| n_invalidate["先清空 governance_valid_until"]
+  n_mutation -->|"否"| n_signed["SceneBridgeClient 签名请求"]
+  n_invalidate --> n_signed
+  n_signed --> n_upstream["platform-bridge 校验签名、时效和 nonce"]
+  n_upstream --> n_delegate["映射企业与操作者，执行允许的上游接口"]
+  n_delegate --> n_result["返回真实结果，再检查平台访问资格"]
+  n_result --> n_sync["需要时执行 synchronize"]
+  n_sync --> n_export["校验 scene-export 合约与 allowedActors"]
+  n_export --> n_changed{"来源指纹改变？"}
+  n_changed -->|"否"| n_lease["续 5 分钟治理租约，必要时补采集"]
+  n_changed -->|"是"| n_map["更新来源映射、资料版本和数据集"]
+  n_map --> n_collect["发起新快照采集并刷新租约"]
+  n_collect --> n_record["scene_processing_runs 记录成功或失败"]
+  n_lease --> n_record

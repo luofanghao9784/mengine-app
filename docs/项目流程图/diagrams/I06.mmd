@@ -1,0 +1,18 @@
+flowchart TD
+  n_upload["UploadManager 和批量上传队列"] --> n_api["MaterialController"]
+  n_api --> n_access["检查企业、目标空间与写入权限"]
+  n_access --> n_store["保存原件和资料版本"]
+  n_store --> n_run["建立可持久追踪的解析任务"]
+  n_run --> n_worker["KnowledgeWorker claim"]
+  n_worker --> n_verify["重新检查任务与来源可读性"]
+  n_verify --> n_parser["DocumentParser 调用 Python 解析器"]
+  n_parser --> n_type{"文件类型"}
+  n_type -->|"文档或文本"| n_chunks["提取文本、定位与引用片段"]
+  n_type -->|"表格"| n_table["提取表结构与数据；文件表格接入"]
+  n_type -->|"需 OCR"| n_ocr["OCR 提取并标记需要核对"]
+  n_chunks --> n_finish["保存解析状态和固定版本依据"]
+  n_table --> n_finish
+  n_ocr --> n_finish
+  n_finish --> n_retrieval["按当前权限检索与读取引用"]
+  n_parser -->|"失败或超限"| n_error["记录失败或部分结果，允许时重试"]
+  n_access -->|"无权"| n_deny["拒绝上传或读取"]

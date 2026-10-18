@@ -1,0 +1,26 @@
+flowchart TD
+  n_overview["概览：企业、运行与待关注情况"] --> n_engine["引擎仪表盘：通道、队列、失败"]
+  n_engine --> n_abnormal{"发现异常？"}
+  n_abnormal -->|"是"| n_inspect["查看任务或处理记录与错误"]
+  n_inspect --> n_recover["按能力重试、处理配置或人工核查"]
+  n_abnormal -->|"否"| n_observe["继续观测"]
+  n_overview --> n_source["数据库：连接、采集状态与数据集"]
+  n_source --> n_synchronize["选择企业并同步输入"]
+  n_overview --> n_material["资料库：解析状态与处理记录"]
+  n_material --> n_retry["对允许重试的处理重新执行"]
+  n_engine --> n_knowledge["处理知识并收纳输出"]
+  n_overview --> n_usage["用量与成本：按范围和时间查看"]
+  n_usage --> n_reconcile["区分已知用量、未知用量与失败尝试"]
+  n_overview --> n_capability["引擎管理"]
+  n_capability --> n_methods["方法与版本：登记、发布、采用"]
+  n_capability --> n_storage["存储：检查容量与维护事项"]
+  n_capability --> n_expression["默认表达偏好与规则"]
+  n_capability --> n_news["公开资讯来源"]
+  n_overview --> n_experience["通用经验库：版本、停用与调整"]
+  n_recover --> n_engine
+  n_inspect -.-> ossTrace["优先验证：Langfuse 调用链与评测"]:::ossPriority
+  n_source -.-> ossIngest["条件候选：dlt 采集执行"]:::ossConditional
+  n_engine -.-> ossGateway["条件候选：LiteLLM 模型网关"]:::ossConditional
+  classDef ossPriority fill:#e4f6eb,stroke:#2e8052,color:#154b30,stroke-width:2px
+  classDef ossConditional fill:#fff3d9,stroke:#ac7b27,color:#604417,stroke-width:1.5px
+  classDef ossExisting fill:#f0eaff,stroke:#8063ad,color:#4a3672,stroke-width:2px

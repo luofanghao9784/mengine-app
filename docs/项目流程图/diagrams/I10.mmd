@@ -1,0 +1,26 @@
+flowchart TD
+  n_queued["QUEUED 排队"] --> n_running["RUNNING 执行"]
+  n_running --> n_succeeded["SUCCEEDED 成功"]
+  n_running --> n_failed["FAILED 失败"]
+  n_running --> n_input["WAITING_INPUT 待输入"]
+  n_running --> n_partial["PARTIAL 部分结果"]
+  n_queued --> n_capability["WAITING_CAPABILITY 待能力"]
+  n_running --> n_unknown["RESULT_UNKNOWN 结果待核对"]
+  n_queued --> n_pause["PAUSE 请求"]
+  n_running --> n_pause
+  n_pause --> n_paused["PAUSED；实时执行先发送停止请求"]
+  n_paused --> n_resume["RESUME：复核来源、能力和版本"]
+  n_input --> n_supplement["补充输入或 PPT 专用确认"]
+  n_supplement --> n_resume
+  n_partial --> n_resume
+  n_capability --> n_resume
+  n_resume --> n_queued
+  n_queued --> n_cancel["CANCEL：取消并保留历史"]
+  n_running --> n_cancel
+  n_unknown --> n_reconcile["RECONCILE：依据工具回执核对"]
+  n_reconcile --> n_safe{"服务器确认可安全重试？"}
+  n_safe -->|"是"| n_failed
+  n_safe -->|"否"| n_blocked["继续等待核对，不允许盲目重试"]
+  n_failed --> n_retry["RETRY：新尝试，保留旧记录"]
+  n_cancel --> n_retry
+  n_retry --> n_queued

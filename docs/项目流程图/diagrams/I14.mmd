@@ -1,0 +1,17 @@
+flowchart TD
+  n_ui["TenantConsole 成员与空间"] --> n_controller["TenantAdminController 与 GovernanceController"]
+  n_controller --> n_member["邀请、接受、启停企业成员"]
+  n_controller --> n_space["共享空间、负责人及成员授权"]
+  n_controller --> n_duty["分配限定范围的管理职责"]
+  n_duty --> n_handover["创建负责人交接请求"]
+  n_handover --> n_decision{"受让人操作"}
+  n_decision -->|"接受"| n_transfer["事务中切换职责并留痕"]
+  n_decision -->|"拒绝或发起者撤销"| n_keep["保留原职责"]
+  n_member --> n_departure["管理端发起离职或企业退出"]
+  n_departure --> n_preflight["检查权限、未交接职责与迁出条件"]
+  n_preflight --> n_ready{"满足执行条件？"}
+  n_ready -->|"否"| n_block["返回具体阻塞与待处理对象"]
+  n_ready -->|"是"| n_worker["DepartureWorker 执行状态转换"]
+  n_worker --> n_revoke["撤销相关访问与任务资格"]
+  n_worker --> n_archive["按范围生成迁出归档与记录"]
+  n_archive --> n_cleanup["按生命周期执行后续清理"]

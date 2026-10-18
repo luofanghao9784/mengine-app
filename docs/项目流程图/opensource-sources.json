@@ -1,0 +1,380 @@
+[
+  {
+    "repo": "docling-project/docling",
+    "url": "https://github.com/docling-project/docling",
+    "checkedOn": "2026-10-17",
+    "full_name": "docling-project/docling",
+    "default_branch": "main",
+    "archived": false,
+    "pushed_at": "2026-10-16T15:44:42Z",
+    "license": {
+      "key": "mit",
+      "name": "MIT License",
+      "spdx_id": "MIT",
+      "url": "https://api.github.com/licenses/mit",
+      "node_id": "MDc6TGljZW5zZTEz"
+    },
+    "sha": "0e54294231b69bc2cf7a39873235495788f76b57",
+    "commitDate": "2026-10-16T09:00:46Z"
+  },
+  {
+    "repo": "Tencent/WeKnora",
+    "url": "https://github.com/Tencent/WeKnora",
+    "checkedOn": "2026-10-17",
+    "full_name": "Tencent/WeKnora",
+    "default_branch": "main",
+    "archived": false,
+    "pushed_at": "2026-10-17T14:38:59Z",
+    "license": {
+      "key": "other",
+      "name": "Other",
+      "spdx_id": "NOASSERTION",
+      "url": null,
+      "node_id": "MDc6TGljZW5zZTA="
+    },
+    "sha": "e6dc60be3278a598064a667369eb698d6c819eda",
+    "commitDate": "2026-10-17T14:37:58Z"
+  },
+  {
+    "repo": "pgvector/pgvector",
+    "url": "https://github.com/pgvector/pgvector",
+    "checkedOn": "2026-10-17",
+    "full_name": "pgvector/pgvector",
+    "default_branch": "master",
+    "archived": false,
+    "pushed_at": "2026-10-17T02:56:37Z",
+    "license": {
+      "key": "other",
+      "name": "Other",
+      "spdx_id": "NOASSERTION",
+      "url": null,
+      "node_id": "MDc6TGljZW5zZTA="
+    },
+    "sha": "f37c13f68b57d2c3472b2214fbcff699d6d34876",
+    "commitDate": "2026-10-01T17:26:23Z"
+  },
+  {
+    "repo": "dlt-hub/dlt",
+    "url": "https://github.com/dlt-hub/dlt",
+    "checkedOn": "2026-10-17",
+    "full_name": "dlt-hub/dlt",
+    "default_branch": "devel",
+    "archived": false,
+    "pushed_at": "2026-10-17T14:14:08Z",
+    "license": {
+      "key": "apache-2.0",
+      "name": "Apache License 2.0",
+      "spdx_id": "Apache-2.0",
+      "url": "https://api.github.com/licenses/apache-2.0",
+      "node_id": "MDc6TGljZW5zZTI="
+    },
+    "sha": "634b4bb4c0f9eb592daf890d51a583efacd464f8",
+    "commitDate": "2026-10-17T14:12:33Z"
+  },
+  {
+    "repo": "fivetran/great_expectations",
+    "url": "https://github.com/fivetran/great_expectations",
+    "checkedOn": "2026-10-17",
+    "full_name": "fivetran/great_expectations",
+    "default_branch": "develop",
+    "archived": false,
+    "pushed_at": "2026-10-16T13:53:45Z",
+    "license": {
+      "key": "apache-2.0",
+      "name": "Apache License 2.0",
+      "spdx_id": "Apache-2.0",
+      "url": "https://api.github.com/licenses/apache-2.0",
+      "node_id": "MDc6TGljZW5zZTI="
+    },
+    "sha": "15a9ede97b0909e6c3bee516ce4dfc0a71fb2141",
+    "commitDate": "2026-10-16T13:36:16Z"
+  },
+  {
+    "repo": "duckdb/duckdb",
+    "url": "https://github.com/duckdb/duckdb",
+    "checkedOn": "2026-10-17",
+    "full_name": "duckdb/duckdb",
+    "default_branch": "main",
+    "archived": false,
+    "pushed_at": "2026-10-16T16:49:31Z",
+    "license": {
+      "key": "mit",
+      "name": "MIT License",
+      "spdx_id": "MIT",
+      "url": "https://api.github.com/licenses/mit",
+      "node_id": "MDc6TGljZW5zZTEz"
+    },
+    "sha": "1b4c3e54ba3625bac56ad184f0ce642a8d2bfbd5",
+    "commitDate": "2026-10-16T16:16:55Z"
+  },
+  {
+    "repo": "langfuse/langfuse",
+    "url": "https://github.com/langfuse/langfuse",
+    "checkedOn": "2026-10-17",
+    "full_name": "langfuse/langfuse",
+    "default_branch": "main",
+    "archived": false,
+    "pushed_at": "2026-10-17T09:00:18Z",
+    "license": {
+      "key": "other",
+      "name": "Other",
+      "spdx_id": "NOASSERTION",
+      "url": null,
+      "node_id": "MDc6TGljZW5zZTA="
+    },
+    "sha": "e3a2bee2a2c048adf29b8d8a18b29bd4a8bf8ac3",
+    "commitDate": "2026-10-16T21:31:04Z"
+  },
+  {
+    "repo": "apache/echarts",
+    "url": "https://github.com/apache/echarts",
+    "checkedOn": "2026-10-17",
+    "full_name": "apache/echarts",
+    "default_branch": "master",
+    "archived": false,
+    "pushed_at": "2026-10-13T09:27:20Z",
+    "license": {
+      "key": "apache-2.0",
+      "name": "Apache License 2.0",
+      "spdx_id": "Apache-2.0",
+      "url": "https://api.github.com/licenses/apache-2.0",
+      "node_id": "MDc6TGljZW5zZTI="
+    },
+    "sha": "34f4d927eafe251f26f63afd3aeefa30f2feba30",
+    "commitDate": "2026-10-04T10:59:16Z"
+  },
+  {
+    "repo": "ueberdosis/tiptap",
+    "url": "https://github.com/ueberdosis/tiptap",
+    "checkedOn": "2026-10-17",
+    "full_name": "ueberdosis/tiptap",
+    "default_branch": "main",
+    "archived": false,
+    "pushed_at": "2026-10-17T12:20:01Z",
+    "license": {
+      "key": "mit",
+      "name": "MIT License",
+      "spdx_id": "MIT",
+      "url": "https://api.github.com/licenses/mit",
+      "node_id": "MDc6TGljZW5zZTEz"
+    },
+    "sha": "93c377ca97ed2f783c05a7d45e1e99d339f8ac60",
+    "commitDate": "2026-10-16T15:30:53Z"
+  },
+  {
+    "repo": "gitbrent/PptxGenJS",
+    "url": "https://github.com/gitbrent/PptxGenJS",
+    "checkedOn": "2026-10-17",
+    "full_name": "gitbrent/PptxGenJS",
+    "default_branch": "master",
+    "archived": false,
+    "pushed_at": "2025-11-28T20:17:14Z",
+    "license": {
+      "key": "mit",
+      "name": "MIT License",
+      "spdx_id": "MIT",
+      "url": "https://api.github.com/licenses/mit",
+      "node_id": "MDc6TGljZW5zZTEz"
+    },
+    "sha": "3c9ec1b687c174952166f6a34b5e87ebf69fa469",
+    "commitDate": "2025-06-26T00:00:34Z"
+  },
+  {
+    "repo": "keycloak/keycloak",
+    "url": "https://github.com/keycloak/keycloak",
+    "checkedOn": "2026-10-17",
+    "full_name": "keycloak/keycloak",
+    "default_branch": "main",
+    "archived": false,
+    "pushed_at": "2026-10-17T14:28:04Z",
+    "license": {
+      "key": "apache-2.0",
+      "name": "Apache License 2.0",
+      "spdx_id": "Apache-2.0",
+      "url": "https://api.github.com/licenses/apache-2.0",
+      "node_id": "MDc6TGljZW5zZTI="
+    },
+    "sha": "2827b3fa10f96c6795d641636397252a8186115a",
+    "commitDate": "2026-10-17T14:28:04Z"
+  },
+  {
+    "repo": "openfga/openfga",
+    "url": "https://github.com/openfga/openfga",
+    "checkedOn": "2026-10-17",
+    "full_name": "openfga/openfga",
+    "default_branch": "main",
+    "archived": false,
+    "pushed_at": "2026-10-16T19:07:01Z",
+    "license": {
+      "key": "apache-2.0",
+      "name": "Apache License 2.0",
+      "spdx_id": "Apache-2.0",
+      "url": "https://api.github.com/licenses/apache-2.0",
+      "node_id": "MDc6TGljZW5zZTI="
+    },
+    "sha": "fb8e7df866742a0c947e3066919ee59ac9e70eea",
+    "commitDate": "2026-10-15T12:03:49Z"
+  },
+  {
+    "repo": "temporalio/temporal",
+    "url": "https://github.com/temporalio/temporal",
+    "checkedOn": "2026-10-17",
+    "full_name": "temporalio/temporal",
+    "default_branch": "main",
+    "archived": false,
+    "pushed_at": "2026-10-17T12:15:11Z",
+    "license": {
+      "key": "mit",
+      "name": "MIT License",
+      "spdx_id": "MIT",
+      "url": "https://api.github.com/licenses/mit",
+      "node_id": "MDc6TGljZW5zZTEz"
+    },
+    "sha": "48a1e5ff025e55b3d4d0f44247423d4c279ff636",
+    "commitDate": "2026-10-17T04:23:24Z"
+  },
+  {
+    "repo": "debezium/debezium",
+    "url": "https://github.com/debezium/debezium",
+    "checkedOn": "2026-10-17",
+    "full_name": "debezium/debezium",
+    "default_branch": "main",
+    "archived": false,
+    "pushed_at": "2026-10-16T13:43:44Z",
+    "license": {
+      "key": "apache-2.0",
+      "name": "Apache License 2.0",
+      "spdx_id": "Apache-2.0",
+      "url": "https://api.github.com/licenses/apache-2.0",
+      "node_id": "MDc6TGljZW5zZTI="
+    },
+    "sha": "8974b2bed859560cd9bacab5e2e6e85ff42a843f",
+    "commitDate": "2026-10-16T13:43:41Z"
+  },
+  {
+    "repo": "langchain-ai/langgraph",
+    "url": "https://github.com/langchain-ai/langgraph",
+    "checkedOn": "2026-10-17",
+    "full_name": "langchain-ai/langgraph",
+    "default_branch": "main",
+    "archived": false,
+    "pushed_at": "2026-10-17T01:58:44Z",
+    "license": {
+      "key": "mit",
+      "name": "MIT License",
+      "spdx_id": "MIT",
+      "url": "https://api.github.com/licenses/mit",
+      "node_id": "MDc6TGljZW5zZTEz"
+    },
+    "sha": "41c9c22fdc83d68a2859d0c9a2b627c8615a792f",
+    "commitDate": "2026-10-16T22:02:08Z"
+  },
+  {
+    "repo": "BerriAI/litellm",
+    "url": "https://github.com/BerriAI/litellm",
+    "checkedOn": "2026-10-17",
+    "full_name": "BerriAI/litellm",
+    "default_branch": "main",
+    "archived": false,
+    "pushed_at": "2026-10-17T14:37:29Z",
+    "license": {
+      "key": "other",
+      "name": "Other",
+      "spdx_id": "NOASSERTION",
+      "url": null,
+      "node_id": "MDc6TGljZW5zZTA="
+    },
+    "sha": "82ca10cc2de77536900647c70f135148fbb03933",
+    "commitDate": "2026-10-17T14:01:50Z"
+  },
+  {
+    "repo": "infiniflow/ragflow",
+    "url": "https://github.com/infiniflow/ragflow",
+    "checkedOn": "2026-10-17",
+    "full_name": "infiniflow/ragflow",
+    "default_branch": "main",
+    "archived": false,
+    "pushed_at": "2026-10-17T13:11:26Z",
+    "license": {
+      "key": "apache-2.0",
+      "name": "Apache License 2.0",
+      "spdx_id": "Apache-2.0",
+      "url": "https://api.github.com/licenses/apache-2.0",
+      "node_id": "MDc6TGljZW5zZTI="
+    },
+    "sha": "543e16738b4883fcb7e70520e0b5849e7e18c9b7",
+    "commitDate": "2026-10-17T00:23:12Z"
+  },
+  {
+    "repo": "refinedev/refine",
+    "url": "https://github.com/refinedev/refine",
+    "checkedOn": "2026-10-17",
+    "full_name": "refinedev/refine",
+    "default_branch": "main",
+    "archived": false,
+    "pushed_at": "2026-09-10T12:56:35Z",
+    "license": {
+      "key": "mit",
+      "name": "MIT License",
+      "spdx_id": "MIT",
+      "url": "https://api.github.com/licenses/mit",
+      "node_id": "MDc6TGljZW5zZTEz"
+    },
+    "sha": "2352eb5b6539e2f39ad9aef652279ad1dcf2c467",
+    "commitDate": "2026-09-10T12:56:33Z"
+  },
+  {
+    "repo": "langgenius/dify",
+    "url": "https://github.com/langgenius/dify",
+    "checkedOn": "2026-10-17",
+    "full_name": "langgenius/dify",
+    "default_branch": "main",
+    "archived": false,
+    "pushed_at": "2026-10-17T09:18:01Z",
+    "license": {
+      "key": "other",
+      "name": "Other",
+      "spdx_id": "NOASSERTION",
+      "url": null,
+      "node_id": "MDc6TGljZW5zZTA="
+    },
+    "sha": "a5a937a01d11985ca51eb60c204e84dc88239827",
+    "commitDate": "2026-10-17T06:19:32Z"
+  },
+  {
+    "repo": "n8n-io/n8n",
+    "url": "https://github.com/n8n-io/n8n",
+    "checkedOn": "2026-10-17",
+    "full_name": "n8n-io/n8n",
+    "default_branch": "master",
+    "archived": false,
+    "pushed_at": "2026-10-17T14:08:30Z",
+    "license": {
+      "key": "other",
+      "name": "Other",
+      "spdx_id": "NOASSERTION",
+      "url": null,
+      "node_id": "MDc6TGljZW5zZTA="
+    },
+    "sha": "ff975f1b9e2f960da96801ae8f6fad040123c514",
+    "commitDate": "2026-10-17T14:02:07Z"
+  },
+  {
+    "repo": "airbytehq/airbyte",
+    "url": "https://github.com/airbytehq/airbyte",
+    "checkedOn": "2026-10-17",
+    "full_name": "airbytehq/airbyte",
+    "default_branch": "master",
+    "archived": false,
+    "pushed_at": "2026-10-17T12:37:15Z",
+    "license": {
+      "key": "other",
+      "name": "Other",
+      "spdx_id": "NOASSERTION",
+      "url": null,
+      "node_id": "MDc6TGljZW5zZTA="
+    },
+    "sha": "155dae7a7a909c54b0e5a6e4379e4475903541df",
+    "commitDate": "2026-10-17T02:21:04Z"
+  }
+]

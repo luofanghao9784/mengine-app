@@ -1,0 +1,15 @@
+flowchart TD
+  n_result["会话中的获权成果"] --> n_create["DocumentController 创建个人文稿"]
+  n_create --> n_private["DocumentService 保存本人文稿与版本"]
+  n_private --> n_edit["继续编辑并保存新版本"]
+  n_edit --> n_private
+  n_private --> n_export["选择明确版本和导出格式"]
+  n_export --> n_renderer["DocumentRenderer 渲染"]
+  n_renderer --> n_download["返回个人导出文件"]
+  n_private --> n_publish["选择目标共享空间并确认发布"]
+  n_publish --> n_permission{"来源与目标维护权限有效？"}
+  n_permission -->|"否"| n_deny["拒绝发布，保留私人文稿"]
+  n_permission -->|"是"| n_transaction["DocumentPublicationService 创建共享资料版本"]
+  n_transaction --> n_receipt["保存发布关联与活动记录"]
+  n_receipt --> n_shared["其他获权成员读取共享资料"]
+  n_shared --> n_check["每次读取继续复核对象与来源权限"]

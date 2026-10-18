@@ -1,0 +1,15 @@
+flowchart TD
+  n_platform["总台维护通用表达、资讯来源和方法版本"] --> n_versions["配置或方法版本持久化"]
+  n_tenant["企业维护企业信息、偏好和允许采用范围"] --> n_versions
+  n_employee["员工维护个人档案与表达偏好"] --> n_versions
+  n_versions --> n_context["任务上下文按范围读取有效配置"]
+  n_context --> n_execution["本轮执行保留实际使用依据"]
+  n_method["登记或发布方法版本"] --> n_adoption["单独进行允许范围的采用"]
+  n_adoption --> n_context
+  n_entry["featureEntries.ongoingPlans 为 false"] --> n_hidden["首期隐藏计划入口和相关操作"]
+  n_old["数据库中已有有效持续计划"] --> n_worker["PlanWorker 检查到期和运行条件"]
+  n_worker --> n_gate{"权限、计划状态与资源有效？"}
+  n_gate -->|"否"| n_wait["保留等待、暂停或失败原因"]
+  n_gate -->|"是"| n_bridge["PlanTaskBridge 转为普通持久任务"]
+  n_bridge --> n_execution
+  n_entry --> n_others["待办、同事转发也由首期开关隐藏"]

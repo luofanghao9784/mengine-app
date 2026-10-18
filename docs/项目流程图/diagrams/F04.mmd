@@ -1,0 +1,28 @@
+flowchart TD
+  n_enter["选择企业进入场景管理"] --> n_foundation["数据基座：资料与数据表"]
+  n_foundation --> n_filter["按来源、部门、处理阶段筛选"]
+  n_filter --> n_detail["查看资产详情、版本、口径和异常"]
+  n_detail --> n_gate{"当前停在哪一阶段？"}
+  n_gate -->|"等待或解析失败"| n_parse["获权重试解析"]
+  n_gate -->|"字段口径未就绪"| n_dictionary["查看字段解释与口径生成状态"]
+  n_gate -->|"质量或隔离问题"| n_governance["规则治理、AI 研判、记录处理措施"]
+  n_gate -->|"来源更新"| n_collect["连接有权限时立即取数"]
+  n_gate -->|"已就绪"| n_available["可向后续工作提供"]
+  n_parse --> n_detail
+  n_dictionary --> n_detail
+  n_governance --> n_detail
+  n_collect --> n_detail
+  n_available --> n_knowledge["知识库：资料知识与业务数据知识"]
+  n_knowledge --> n_learn["核验来源、补充学习或重试"]
+  n_learn --> n_evidence["阅读知识内容与原始依据"]
+  n_evidence --> n_knowledgeGraph["查看有依据的知识关系与星图"]
+  n_knowledgeGraph --> n_output["打开本人画报、会话或成果"]
+  n_enter --> n_all["全部管理功能"]
+  n_all --> n_old["资料列表、治理、Wiki、业务提案等完整管理页"]
+  n_parse -.-> ossParse["优先验证：Docling 解析内核"]:::ossPriority
+  n_collect -.-> ossCollect["新增来源可用：dlt 采集"]:::ossConditional
+  n_governance -.-> ossQuality["规则扩展可用：GX Core 校验"]:::ossConditional
+  n_learn -.-> ossSearch["优先验证：WeKnora 检索与草稿能力"]:::ossPriority
+  classDef ossPriority fill:#e4f6eb,stroke:#2e8052,color:#154b30,stroke-width:2px
+  classDef ossConditional fill:#fff3d9,stroke:#ac7b27,color:#604417,stroke-width:1.5px
+  classDef ossExisting fill:#f0eaff,stroke:#8063ad,color:#4a3672,stroke-width:2px

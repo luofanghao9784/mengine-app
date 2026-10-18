@@ -1,0 +1,17 @@
+flowchart TD
+  n_skill["SkillCenter 查询 presentation-capability"] --> n_available{"渲染、传输、模型均可用？"}
+  n_available -->|"否"| n_disabled["显示暂未开放"]
+  n_available -->|"是"| n_send["提交 1—8 页、主题、需求与来源"]
+  n_send --> n_workflow["PresentationWorkflow.submit 保存选项"]
+  n_workflow --> n_draft["引擎提出结构化 PPT 草稿"]
+  n_draft --> n_validate["校验结构、页数、主题与来源授权"]
+  n_validate --> n_waiting["保存 DRAFT，任务 WAITING_INPUT"]
+  n_waiting --> n_user["用户核对标题、主题与页序"]
+  n_user --> n_confirm["专用 confirm 接口携带双版本号"]
+  n_confirm --> n_check{"状态、权限、幂等与版本匹配？"}
+  n_check -->|"否"| n_conflict["拒绝旧确认，刷新重新核对"]
+  n_check -->|"是"| n_resume["保存 CONFIRMED 并恢复任务"]
+  n_resume --> n_render["固定 PresentationRenderer 按确认稿生成"]
+  n_render --> n_transfer["上传文件并核对字节数与哈希"]
+  n_transfer --> n_artifact["保存产物与执行回执"]
+  n_artifact --> n_download["用户通过获权下载接口取回文件"]

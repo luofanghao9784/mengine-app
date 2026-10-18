@@ -1,0 +1,16 @@
+flowchart TD
+  allowed["部署确认来源与获准范围"] --> collect["条件候选：dlt 读取与增量游标"]:::ossConditional
+  allowed -.-> cdc["低延迟确有需要：Debezium CDC"]:::ossConditional
+  collect --> snapshot["适配平台数据集 ID 与不可变快照"]
+  cdc -.-> snapshot
+  snapshot --> quality["条件候选：GX 执行确定性质量规则"]:::ossConditional
+  quality --> govern["保留：字段口径、问题隔离与复检审批"]
+  govern --> metric["保留：已发布指标版本与固定计划"]
+  metric --> access["核查全部来源、行范围和治理租约"]
+  access --> compile["可信编译器生成受限查询"]
+  compile --> compute["条件候选：DuckDB 聚合与连接"]:::ossConditional
+  compute --> receipt["精度、粒度、来源与权限再校验"]
+  receipt --> deliver["现有会话或画报收到可信计算回执"]
+  classDef ossPriority fill:#e4f6eb,stroke:#2e8052,color:#154b30,stroke-width:2px
+  classDef ossConditional fill:#fff3d9,stroke:#ac7b27,color:#604417,stroke-width:1.5px
+  classDef ossExisting fill:#f0eaff,stroke:#8063ad,color:#4a3672,stroke-width:2px

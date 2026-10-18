@@ -1,0 +1,20 @@
+flowchart TD
+  n_platform["React 总台"] --> n_api["Spring Boot 平台 API"]
+  n_tenant["React 企业端场景与完整管理页"] --> n_api
+  n_employee["React 员工客户端"] --> n_api
+  n_api --> n_security["身份、企业、空间与对象权限"]
+  n_security --> n_pg[("PostgreSQL：身份、任务、版本与回执")]
+  n_api --> n_workers["后台 Worker：解析、采集、任务、画报等"]
+  n_workers --> n_engine["Node 引擎：AgentTasks 与 Harness"]
+  n_engine --> n_models["已配置模型适配器"]
+  n_engine --> n_internal["平台内部工具与授权接口"]
+  n_internal --> n_pg
+  n_workers --> n_parser["Python 本地文件解析器"]
+  n_parser --> n_objects[("本地原件与文件存储")]
+  n_api --> n_bridge["SceneService 与签名桥接"]
+  n_bridge --> n_wiki["Fastify 数据基座与 Wiki"]
+  n_wiki --> n_sqlite[("Wiki SQLite 与资料文件")]
+  n_wiki --> n_sources["已配置的业务数据库来源"]
+  n_wiki --> n_wikiModel["Wiki 模型与处理器"]
+  n_bridge --> n_sync["来源映射、权限租约与快照同步"]
+  n_sync --> n_pg

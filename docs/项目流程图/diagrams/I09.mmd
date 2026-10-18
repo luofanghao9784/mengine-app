@@ -1,0 +1,19 @@
+flowchart TD
+  n_ui["Conversations 提交 prompt、范围与 requestId"] --> n_controller["ConversationController 分派普通、画报讨论或 PPT"]
+  n_controller --> n_submit["ConversationService 校验身份、来源和幂等"]
+  n_submit --> n_db[("会话、任务与初始状态持久化")]
+  n_db --> n_claim["ConversationWorker 按并发槽位 claim"]
+  n_claim --> n_runtime["EngineTaskRuntime 发送 taskId、attemptId 与 prompt"]
+  n_runtime --> n_agent["AgentTasks 校验任务协议与重复尝试"]
+  n_agent --> n_context["向平台读取获权任务上下文"]
+  n_context --> n_tools["按能力装配检索、计算、文件等工具"]
+  n_tools --> n_harness["Harness 在次数、时间和取消边界内执行"]
+  n_harness --> n_model["计量包装的模型适配器"]
+  n_model --> n_call{"模型需要工具？"}
+  n_call -->|"是"| n_authorize["内部 API 再查任务租约和来源权限"]
+  n_authorize --> n_tool["执行受控工具并记录真实回执"]
+  n_tool --> n_model
+  n_call -->|"否或完成"| n_validate["校验回复、来源、产物和执行回执"]
+  n_validate --> n_finish["平台保存最终任务状态和尝试历史"]
+  n_finish --> n_client["客户端同步最终回复与文件"]
+  n_harness -.-> n_stream["流式文字与过程事件，仍待最终核定"]

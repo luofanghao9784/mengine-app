@@ -1,0 +1,18 @@
+flowchart TD
+  request["现有会话 / PPT / 系统画报请求"] --> business["保留：权限、预算、任务与 requestId"]
+  business --> worker["现有 Worker 领取任务"]
+  worker --> harness["现有 Harness 内部执行循环"]
+  worker -.-> temporal["后置候选：Temporal 接管持久编排"]:::ossConditional
+  harness -.-> langgraph["后置备选：LangGraph 替换内部循环"]:::ossConditional
+  harness --> tool["工具回调继续由平台校验权限"]
+  harness --> gateway["供应商增加时：LiteLLM 统一模型接入"]:::ossConditional
+  gateway --> model["已配置模型"]
+  model --> harness
+  harness --> outcome["保留：真实回执、未知结果与用户确认"]
+  outcome --> product["现有会话、画报、文件与用量页面"]
+  harness -.-> scrub["筛选与脱敏遥测，不默认复制正文"]
+  scrub -.-> trace["优先补强：Langfuse 追踪、评测与诊断"]:::ossPriority
+  trace -.-> operator["内部运维查看；不作为业务成功凭证"]
+  classDef ossPriority fill:#e4f6eb,stroke:#2e8052,color:#154b30,stroke-width:2px
+  classDef ossConditional fill:#fff3d9,stroke:#ac7b27,color:#604417,stroke-width:1.5px
+  classDef ossExisting fill:#f0eaff,stroke:#8063ad,color:#4a3672,stroke-width:2px

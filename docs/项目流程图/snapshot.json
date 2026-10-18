@@ -1,0 +1,8 @@
+{
+  "reviewedOn": "2026-10-17",
+  "integratedOn": "2026-10-18",
+  "timezone": "Asia/Shanghai",
+  "sourceHead": "8dabacf1b2e19044e3141a1c249a683bb94cb0fd",
+  "runtimeHead": "3c618b1a8c983040a7dfa4668f563bad8b1e8fff",
+  "note": "保留首次源码核查和开源调研快照；普通渲染不自动宣称已核查新的代码或开源版本。"
+}

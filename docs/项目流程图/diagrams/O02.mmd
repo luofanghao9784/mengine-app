@@ -1,0 +1,21 @@
+flowchart TD
+  upload["现有上传入口与获权版本"] --> input["平台提供本次允许的原件字节"]
+  input --> parse["候选：Docling 仅处理目标格式"]:::ossPriority
+  parse --> adapt["适配为 locator / chunks / warnings"]
+  adapt --> commit["平台复查权限并保存新解析批次"]
+  commit --> choose{"选择一条检索路线"}
+  choose -->|"服务整合"| weknora["WeKnora 索引、召回与重排"]:::ossPriority
+  choose -->|"复用数据库"| vector["pgvector 向量索引；其余编排自研"]:::ossPriority
+  choose -.->|"对照备选"| rag["RAGFlow 分块与检索"]:::ossConditional
+  query["用户或任务发起检索"] --> scope["平台算出非空获准版本集合"]
+  scope --> retrieval["只向所选检索路线发送获准范围"]
+  weknora --> retrieval
+  vector --> retrieval
+  rag -.-> retrieval
+  retrieval --> check["映射片段并二次校验权限与版本"]
+  check --> result["现有界面展示内容与固定引用"]
+  revoke["来源撤回、删除或权限变更"] --> deny["立即拒绝读取；异步清理或重建索引"]
+  deny -.-> check
+  classDef ossPriority fill:#e4f6eb,stroke:#2e8052,color:#154b30,stroke-width:2px
+  classDef ossConditional fill:#fff3d9,stroke:#ac7b27,color:#604417,stroke-width:1.5px
+  classDef ossExisting fill:#f0eaff,stroke:#8063ad,color:#4a3672,stroke-width:2px

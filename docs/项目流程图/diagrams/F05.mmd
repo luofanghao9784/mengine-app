@@ -1,0 +1,27 @@
+flowchart TD
+  n_members["成员与权限"] --> n_identity["账号、空间与职责交接"]
+  n_members --> n_data["数据权限与部门"]
+  n_identity --> n_invitation["邀请成员并选择初始加入范围"]
+  n_invitation --> n_join["受邀者验证并接受，复用或创建身份"]
+  n_identity --> n_space["创建共享空间、指定负责人"]
+  n_space --> n_grant["调整空间成员与独立管理职责"]
+  n_identity --> n_handover["负责人发起交接"]
+  n_handover --> n_decision{"新负责人接受？"}
+  n_decision -->|"接受"| n_transfer["切换职责并记录结果"]
+  n_decision -->|"拒绝或撤销"| n_keep["原负责人继续负责"]
+  n_data --> n_org["管理部门、成员角色与独立职责"]
+  n_data --> n_resource["选择资源，查看密级与读取授权"]
+  n_resource --> n_policy["填写原因与权限变更"]
+  n_policy --> n_direct{"具备直接管理权限？"}
+  n_direct -->|"是"| n_save["校验版本后生效"]
+  n_direct -->|"否"| n_proposal["提交申请，等待有权人员审批"]
+  n_proposal --> n_review{"批准且版本仍有效？"}
+  n_review -->|"是"| n_save
+  n_review -->|"否"| n_reject["拒绝、撤回或失效，权限不扩大"]
+  n_save --> n_audit["同步权限并记录审计"]
+  n_identity --> n_departure["离职或退出：核查交接、迁出与清理"]
+  n_identity -.-> ossIdentity["有 SSO 需求再接：Keycloak"]:::ossConditional
+  n_resource -.-> ossAuth["复杂关系再评估：OpenFGA 判权"]:::ossConditional
+  classDef ossPriority fill:#e4f6eb,stroke:#2e8052,color:#154b30,stroke-width:2px
+  classDef ossConditional fill:#fff3d9,stroke:#ac7b27,color:#604417,stroke-width:1.5px
+  classDef ossExisting fill:#f0eaff,stroke:#8063ad,color:#4a3672,stroke-width:2px

@@ -1,0 +1,17 @@
+flowchart TD
+  n_deployment["外部部署配置连接与数据范围"] --> n_scheduler["定时或有权用户立即取数"]
+  n_scheduler --> n_adapter["受控数据库适配器读取"]
+  n_adapter --> n_snapshot["保存表结构、记录与来源版本"]
+  n_snapshot --> n_dictionary["字典任务生成或接收字段解释"]
+  n_dictionary --> n_validate["核对字段、单位、关系、证据和指纹"]
+  n_validate --> n_current{"口径当前有效？"}
+  n_current -->|"否"| n_waiting["待解释、待确认或重试"]
+  n_current -->|"是"| n_rules["执行质量、敏感信息与关联规则检查"]
+  n_rules --> n_safe{"允许提供和 AI 使用？"}
+  n_safe -->|"否"| n_quarantine["隔离、暂停或要求治理"]
+  n_quarantine --> n_fix["有权者处理，记录措施并重新校验"]
+  n_fix --> n_rules
+  n_safe -->|"是"| n_export["仅导出就绪且获权的来源"]
+  n_export --> n_platform["平台 CollectionWorker 领取采集任务"]
+  n_platform --> n_datasets["持久化业务数据集与不可变快照"]
+  n_datasets --> n_consumer["知识、指标和会话按固定快照读取"]

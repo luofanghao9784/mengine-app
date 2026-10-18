@@ -1,0 +1,17 @@
+flowchart TD
+  n_trigger["资料事件、首次发现、定时或生成更多"] --> n_service["BriefingGenerationService"]
+  n_service --> n_dedup["请求幂等、事件合并和在途批次去重"]
+  n_dedup --> n_scope["选择当前用户有权的独立空间与来源"]
+  n_scope --> n_gate{"解析、能力、配额与来源可用？"}
+  n_gate -->|"否"| n_waiting["WAITING_DATA、RESOURCE 或 CAPABILITY"]
+  n_gate -->|"是"| n_task["提交 SYSTEM_BRIEFING 任务"]
+  n_task --> n_phase["引擎按选题阶段调用允许的工具"]
+  n_phase --> n_content["资讯检索或数据计算，生成正文"]
+  n_content --> n_evidence["核对引用、计算回执和当前权限"]
+  n_evidence --> n_layout["模型选择表达与布局，服务端验证"]
+  n_layout --> n_valid{"内容和版式合法？"}
+  n_valid -->|"否"| n_failure["保留失败、空结果或等待原因"]
+  n_valid -->|"是"| n_save["保存内容版本、卡片和关联任务"]
+  n_save --> n_feed["推荐接口读取，前端 CardFace 渲染"]
+  n_feed --> n_follow["个人关注板与布局独立保存"]
+  n_feed --> n_discussion["引用固定画报版本继续讨论"]

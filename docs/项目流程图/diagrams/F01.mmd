@@ -1,0 +1,33 @@
+flowchart TD
+  n_platform["总台登录"] --> n_open["创建企业并邀请初始负责人"]
+  n_open --> n_accept{"负责人接受并激活？"}
+  n_accept -->|"否"| n_pending["待激活：重发、撤销或等待"]
+  n_accept -->|"是"| n_tenant["企业正式可用"]
+  n_tenant --> n_people["邀请成员、建立空间、分配职责"]
+  n_tenant --> n_input["部署数据连接或上传获权资料"]
+  n_input --> n_govern["解析、字段口径、质量治理、权限检查"]
+  n_govern --> n_ready{"数据与权限已就绪？"}
+  n_ready -->|"否"| n_handle["核查异常、补配置、治理后重试"]
+  n_handle --> n_govern
+  n_ready -->|"是"| n_sync["同步资料、数据快照和知识"]
+  n_people --> n_employee["员工选择企业进入工作空间"]
+  n_sync --> n_employee
+  n_employee --> n_chat["会话：提出问题与任务"]
+  n_employee --> n_briefing["画报：阅读、关注、讨论"]
+  n_employee --> n_library["资料库：查找、上传、维护"]
+  n_employee --> n_skill["技能中心：PPT 大纲与生成"]
+  n_chat --> n_result["带来源的回复、分析和成果文件"]
+  n_briefing --> n_result
+  n_skill --> n_result
+  n_result --> n_share["核对成果，明确保存或共享"]
+  n_share --> n_feedback["反馈问题与表达偏好"]
+  n_feedback --> n_improve["反馈处理、经验维护和后续工作"]
+  n_platform --> n_observe["观察运行、成本、失败与接入状态"]
+  n_observe -.-> n_handle
+  n_govern -.-> ossParse["优先验证：Docling 解析"]:::ossPriority
+  n_sync -.-> ossRetrieve["优先验证：WeKnora 或 pgvector 检索"]:::ossPriority
+  n_observe -.-> ossTrace["补强：Langfuse 内部诊断"]:::ossPriority
+  n_skill -.-> ossPpt["已使用：PptxGenJS 生成文件"]:::ossExisting
+  classDef ossPriority fill:#e4f6eb,stroke:#2e8052,color:#154b30,stroke-width:2px
+  classDef ossConditional fill:#fff3d9,stroke:#ac7b27,color:#604417,stroke-width:1.5px
+  classDef ossExisting fill:#f0eaff,stroke:#8063ad,color:#4a3672,stroke-width:2px

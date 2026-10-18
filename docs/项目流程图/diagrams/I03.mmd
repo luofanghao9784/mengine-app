@@ -1,0 +1,15 @@
+flowchart TD
+  n_form["PlatformHome 开通表单"] --> n_post["POST platform-admin/v1/tenants"]
+  n_post --> n_check["校验总台资格、投递配置、参数和 requestId"]
+  n_check --> n_repeat{"相同请求已处理？"}
+  n_repeat -->|"是"| n_receipt["返回原有开通结果"]
+  n_repeat -->|"否"| n_create["持久化待激活企业和初始邀请"]
+  n_create --> n_delivery["按配置投递邀请；本地模式显示邀请链接"]
+  n_delivery --> n_user["受邀者核验手机号或既有身份"]
+  n_user --> n_valid{"邀请有效且对象匹配？"}
+  n_valid -->|"否"| n_fail["过期、撤销、身份不符等拒绝"]
+  n_valid -->|"是"| n_accept["明确接受负责人职责"]
+  n_accept --> n_tx["事务内创建或复用账号、成员与职责"]
+  n_tx --> n_activate["企业 ACTIVE 与首位负责人同时生效"]
+  n_activate --> n_audit["记录邀请接受与管理事件"]
+  n_audit --> n_enter["返回可进入的端和企业"]

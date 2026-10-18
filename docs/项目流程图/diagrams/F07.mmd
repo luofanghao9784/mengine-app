@@ -1,0 +1,23 @@
+flowchart TD
+  n_trigger["首次触发、资料变化、定时或生成更多"] --> n_condition{"来源、权限、能力与额度可用？"}
+  n_condition -->|"否"| n_wait["展示等待原因或暂不可用"]
+  n_condition -->|"是"| n_topic["选择内容类型和本轮主题"]
+  n_topic --> n_generate["检索与计算，形成有依据的内容"]
+  n_generate --> n_check{"内容与版式验证通过？"}
+  n_check -->|"否"| n_fail["保留失败或无内容原因"]
+  n_check -->|"是"| n_card["追加新卡，保留已有卡与当时依据"]
+  n_card --> n_feed["推荐：按日期、类型、空间查阅"]
+  n_feed --> n_read["打开正文与来源"]
+  n_read --> n_discuss["带画报上下文继续会话"]
+  n_read --> n_follow["关注到个人关注板"]
+  n_follow --> n_layout["调整位置和大小，保存个人布局"]
+  n_read --> n_feedback["反馈问题或表达调整"]
+  n_feedback --> n_adjust["按本人范围生成调整结果"]
+  n_feed --> n_more["选择类型与数量，确认生成更多"]
+  n_more --> n_condition
+  n_generate -.-> ossCalc["大数据量再评估：DuckDB 计算内核"]:::ossConditional
+  n_read -.-> ossChart["复杂详情图可复用：ECharts"]:::ossConditional
+  n_trigger -.-> ossTimer["长流程再评估：Temporal 调度"]:::ossConditional
+  classDef ossPriority fill:#e4f6eb,stroke:#2e8052,color:#154b30,stroke-width:2px
+  classDef ossConditional fill:#fff3d9,stroke:#ac7b27,color:#604417,stroke-width:1.5px
+  classDef ossExisting fill:#f0eaff,stroke:#8063ad,color:#4a3672,stroke-width:2px

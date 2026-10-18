@@ -1,0 +1,17 @@
+flowchart TD
+  entry["现有三端导航与主题"] --> admin["新增普通管理页"]
+  admin --> refine["候选：Refine 表格、表单与数据请求"]:::ossConditional
+  entry --> briefing["画报详情读取已验证的数据"]
+  briefing --> chart["候选：ECharts 复杂详情图"]:::ossConditional
+  entry --> doc["个人文稿编辑"]
+  doc --> editor["候选：Tiptap 替换编辑输入区"]:::ossConditional
+  entry --> ppt["PPT 需求、大纲与用户确认"]
+  ppt --> renderer["已采用：PptxGenJS 生成 PPTX"]:::ossExisting
+  refine --> api["现有接口：权限、版本与幂等"]
+  editor --> api
+  chart --> read["保留：原始精确值、口径和来源"]
+  renderer --> files["现有成果校验、下载和授权"]
+  api --> publish["保留：私人保存与明确共享发布"]
+  classDef ossPriority fill:#e4f6eb,stroke:#2e8052,color:#154b30,stroke-width:2px
+  classDef ossConditional fill:#fff3d9,stroke:#ac7b27,color:#604417,stroke-width:1.5px
+  classDef ossExisting fill:#f0eaff,stroke:#8063ad,color:#4a3672,stroke-width:2px

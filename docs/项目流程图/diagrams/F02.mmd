@@ -1,0 +1,25 @@
+flowchart TD
+  n_login["总台专用账号密码登录"] --> n_auth{"具备总台资格？"}
+  n_auth -->|"否"| n_refuse["拒绝进入总台"]
+  n_auth -->|"是"| n_list["企业管理：搜索和查看企业"]
+  n_list --> n_create["填写企业名称、初始负责人手机号"]
+  n_create --> n_deliver{"邀请投递已启用？"}
+  n_deliver -->|"否"| n_unavailable["显示未启用，无法开通"]
+  n_deliver -->|"是"| n_invite["创建待激活企业与邀请"]
+  n_invite --> n_owner["受邀者核验身份并接受职责"]
+  n_owner --> n_active["激活企业与首位负责人"]
+  n_invite --> n_replace["查看有效期、撤销或重新邀请"]
+  n_list --> n_detail["企业详情与客户账号"]
+  n_detail --> n_suspend["暂停服务：填写说明和内部备注"]
+  n_suspend --> n_stopped["限制业务访问与任务运行"]
+  n_stopped --> n_resume["恢复企业服务"]
+  n_detail --> n_support["发起有记录的总部支持访问"]
+  n_support --> n_target["按企业权限进入支持上下文"]
+  n_target --> n_exit["退出或到期，结束支持权限"]
+  n_active --> n_detail
+  n_list --> n_staff["设置：平台人员邀请、资格与凭据"]
+  n_login -.-> ossLogin["条件候选：Keycloak 身份认证"]:::ossConditional
+  n_list -.-> ossCrud["新增页面可复用：Refine 表单列表"]:::ossConditional
+  classDef ossPriority fill:#e4f6eb,stroke:#2e8052,color:#154b30,stroke-width:2px
+  classDef ossConditional fill:#fff3d9,stroke:#ac7b27,color:#604417,stroke-width:1.5px
+  classDef ossExisting fill:#f0eaff,stroke:#8063ad,color:#4a3672,stroke-width:2px

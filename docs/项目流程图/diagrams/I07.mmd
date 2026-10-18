@@ -1,0 +1,20 @@
+flowchart TD
+  n_scene["场景知识库读取 scene-knowledge"] --> n_pending{"存在待学习来源且能力可用？"}
+  n_pending -->|"是"| n_sync["调用 scene-knowledge/sync"]
+  n_sync --> n_kind{"来源类型"}
+  n_kind -->|"资料"| n_learn["learned-wiki：基于当前原文生成"]
+  n_kind -->|"业务数据"| n_business["business-knowledge：基于受控统计生成"]
+  n_learn --> n_evidence["核对来源版本与引用证据"]
+  n_business --> n_evidence
+  n_evidence --> n_cards["形成有效知识卡与依据"]
+  n_cards --> n_relations["过滤可见知识关系，展示星图"]
+  n_cards --> n_bridge["平台桥接同步知识与原来源权限"]
+  n_platform["完整管理页选择来源学习"] --> n_task["WikiLearningService 创建本人任务"]
+  n_task --> n_harness["引擎生成并验证学习草稿"]
+  n_harness --> n_draft["本人草稿"]
+  n_draft --> n_publish["有权者明确确认发布"]
+  n_publish --> n_article["WikiArticleService 共享知识版本"]
+  n_article --> n_maintain["校订、下架、恢复与历史"]
+  n_article --> n_knowledgeGraph["WikiGraph 与 WikiInsight 分析"]
+  n_evidence -->|"来源变更或无权"| n_invalidate["旧结果失效或不展示"]
+  n_article -->|"来源变更或无权"| n_invalidate

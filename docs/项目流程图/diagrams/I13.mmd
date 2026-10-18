@@ -1,0 +1,17 @@
+flowchart TD
+  n_feedback["对回复、画报或成果提交反馈"] --> n_record["FeedbackService 保存对象、版本和反馈历史"]
+  n_record --> n_route{"处理范围"}
+  n_route -->|"本人表达调整"| n_adjustment["FeedbackAdjustmentService 创建私人调整任务"]
+  n_adjustment --> n_private["保存本人可见的调整结果"]
+  n_route -->|"问题处理"| n_action["有权者登记处理动作和依据"]
+  n_route -->|"可沉淀经验"| n_intake["ExperienceIntake 发现获准来源"]
+  n_intake --> n_enabled{"经验处理开关与模型可用？"}
+  n_enabled -->|"否"| n_wait["保持待处理或不可用状态"]
+  n_enabled -->|"是"| n_analyze["经验分析任务与证据核对"]
+  n_analyze --> n_admission["按准入规则保存范围内经验版本"]
+  n_admission --> n_use["后续任务按范围读取并记录使用"]
+  n_use --> n_revise["反馈、修订、停止或恢复"]
+  n_admission --> n_general["符合条件的经验进入通用化队列"]
+  n_general --> n_review["通用化结果经独立准入与来源检查"]
+  n_review --> n_platform["总台通用经验库维护"]
+  n_platform --> n_local["企业控制采用与本地调整"]

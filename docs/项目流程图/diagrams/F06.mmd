@@ -1,0 +1,26 @@
+flowchart TD
+  n_enter["进入工作空间并选择企业"] --> n_compose["从会话或画报底部输入需求"]
+  n_compose --> n_source["选择获权资料、原件和工作范围"]
+  n_source --> n_send["提交会话任务"]
+  n_send --> n_accepted{"服务端接受？"}
+  n_accepted -->|"否"| n_correct["保留输入，处理权限、参数或连接问题"]
+  n_correct --> n_send
+  n_accepted -->|"是"| n_queue["显示排队和执行过程"]
+  n_queue --> n_status{"任务进展"}
+  n_status -->|"需要补充"| n_input["补充材料或确认要求"]
+  n_input --> n_queue
+  n_status -->|"用户控制"| n_pause["暂停、恢复或取消"]
+  n_status -->|"失败或结果待核对"| n_failure["查看错误与尝试记录，允许时重试"]
+  n_failure --> n_queue
+  n_status -->|"成功"| n_reply["阅读回复、核对引用与计算依据"]
+  n_reply --> n_next["继续追问"]
+  n_next --> n_source
+  n_reply --> n_artifact["下载成果或保存为个人文稿"]
+  n_artifact --> n_publish["明确发布到获权资料空间"]
+  n_reply --> n_feedback["评价结果，提出问题或调整表达"]
+  n_source -.-> ossSearch["优先验证：WeKnora 或 pgvector 召回"]:::ossPriority
+  n_queue -.-> ossTrace["旁路补强：Langfuse 运行追踪"]:::ossPriority
+  n_pause -.-> ossWorkflow["规模需要再评估：Temporal 编排"]:::ossConditional
+  classDef ossPriority fill:#e4f6eb,stroke:#2e8052,color:#154b30,stroke-width:2px
+  classDef ossConditional fill:#fff3d9,stroke:#ac7b27,color:#604417,stroke-width:1.5px
+  classDef ossExisting fill:#f0eaff,stroke:#8063ad,color:#4a3672,stroke-width:2px

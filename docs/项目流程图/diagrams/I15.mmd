@@ -1,0 +1,16 @@
+flowchart TD
+  n_request["请求原件、片段、快照或派生成果"] --> n_identity["检查当前身份、企业与空间"]
+  n_identity --> n_object["检查对象权限、操作能力与生命周期"]
+  n_object --> n_scene{"来自治理场景？"}
+  n_scene -->|"是"| n_lease["检查治理租约、来源范围和允许用户"]
+  n_scene -->|"否"| n_version["检查固定来源版本与引用"]
+  n_lease --> n_version
+  n_version --> n_dependencies["派生内容检查所有依赖来源的权限交集"]
+  n_dependencies --> n_valid{"仍符合当前授权与语义范围？"}
+  n_valid -->|"否"| n_hidden["拒绝、隐藏旧正文或中止工具执行"]
+  n_valid -->|"是"| n_read["返回获权内容；下载再检查下载资格"]
+  n_mutation["权限、治理、结构或口径发生变化"] --> n_expire["使旧租约或旧分析失效"]
+  n_expire --> n_synchronize["同步新策略和来源版本"]
+  n_synchronize --> n_dependencies
+  n_rows["仅数据刷新且语义与权限范围不变"] --> n_history["保留允许读取的历史快照与结果"]
+  n_history --> n_dependencies

@@ -1,0 +1,16 @@
+flowchart TD
+  login["三端现有登录入口"] --> idp["有企业 SSO 需求：Keycloak 认证"]:::ossConditional
+  idp --> map["映射到现有统一账号"]
+  map --> business["保留：企业状态、成员资格和端会话隔离"]
+  business --> action["用户读取、下载、执行或发布"]
+  action --> relation["关系复杂时：OpenFGA 查询关系权限"]:::ossConditional
+  relation --> policy["保留：企业/空间/对象与行范围约束"]
+  policy --> version["保留：版本、治理租约、来源有效性"]
+  version --> decision{"本次动作是否允许？"}
+  decision -->|"是"| run["执行并保留真实审计"]
+  decision -->|"否或服务不可用"| reject["拒绝；不靠前端隐藏"]
+  revoke["离职、撤权、暂停或来源变化"] --> invalidate["现有业务立即失效并同步外部关系"]
+  invalidate -.-> policy
+  classDef ossPriority fill:#e4f6eb,stroke:#2e8052,color:#154b30,stroke-width:2px
+  classDef ossConditional fill:#fff3d9,stroke:#ac7b27,color:#604417,stroke-width:1.5px
+  classDef ossExisting fill:#f0eaff,stroke:#8063ad,color:#4a3672,stroke-width:2px

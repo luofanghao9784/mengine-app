@@ -1,0 +1,17 @@
+flowchart TD
+  n_root["identity/main.tsx 识别入口"] --> n_realm{"访问哪一端？"}
+  n_realm -->|"总台"| n_platform["PlatformApp 专用账号密码"]
+  n_platform --> n_pa["platform-admin/v1/auth/login"]
+  n_pa --> n_ps["PlatformIdentity 校验资格与凭据"]
+  n_ps --> n_pc["签发独立总台 Cookie；令牌哈希存储"]
+  n_pc --> n_pm["总台 me 与总台 CSRF"]
+  n_realm -->|"企业或员工"| n_phone["PhoneAuth 业务账号登录或邀请流程"]
+  n_phone --> n_ca["业务身份接口与业务会话"]
+  n_ca --> n_cm["查询成员资格与企业状态"]
+  n_cm --> n_choose["按端记忆或选择企业"]
+  n_choose --> n_permitted{"目标入口和操作有权？"}
+  n_permitted -->|"否"| n_deny["拒绝或显示暂停状态"]
+  n_permitted -->|"是"| n_page["渲染工作页并调用获权 API"]
+  n_pm --> n_page
+  n_pc --> n_po["退出总台只结束总台会话"]
+  n_ca --> n_co["退出业务端，两业务入口同步退出"]

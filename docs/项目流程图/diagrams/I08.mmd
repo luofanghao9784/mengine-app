@@ -1,0 +1,20 @@
+flowchart TD
+  n_source["获权且治理租约有效的数据集"] --> n_candidate["MetricDraftGenerator 生成规则候选"]
+  n_candidate --> n_mode{"是否显式委托自动定义？"}
+  n_mode -->|"否"| n_human["有权者核查粒度、单位、范围与排除项"]
+  n_mode -->|"是"| n_auto["MetricAutomaticDefinition 按受限规则定义"]
+  n_human --> n_plan["校验 COUNT 或 SUM 与固定执行计划"]
+  n_auto --> n_plan
+  n_plan --> n_ready{"计划与来源可执行？"}
+  n_ready -->|"否"| n_wait["保留草稿或撤下失效发布版本"]
+  n_ready -->|"是"| n_publish["发布指标编号和版本"]
+  n_publish --> n_task["任务固定数据快照和指标版本"]
+  n_task --> n_compare["compare_dataset 使用原 executionRequest"]
+  n_compare --> n_match{"计划、来源权限和快照匹配？"}
+  n_match -->|"否"| n_reject["拒绝执行，返回口径或权限原因"]
+  n_match -->|"是"| n_calc["确定性计算并保存计算回执"]
+  n_calc --> n_result["会话与数据画报引用同一结果依据"]
+  n_task --> n_fusion["多表分支：受控关系与固定融合计划"]
+  n_fusion --> n_intersection["复核全部来源权限交集和结构身份"]
+  n_intersection --> n_deterministic["FusionCalculator 执行并生成可追溯结果"]
+  n_deterministic --> n_result

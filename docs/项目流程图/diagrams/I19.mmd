@@ -1,0 +1,17 @@
+flowchart TD
+  n_material["选择获权资料"] --> n_governance["MaterialGovernance 检查规则与复核状态"]
+  n_governance --> n_draft["产生标签、摘要或处理建议"]
+  n_draft --> n_choice{"用户选择"}
+  n_choice -->|"只看草稿"| n_private["保持本人草稿"]
+  n_choice -->|"明确提交"| n_proposal["GovernanceProposalService 保存提案"]
+  n_proposal --> n_maintainer["有权维护者查看依据并处理"]
+  n_maintainer --> n_valid{"当前权限和资料版本匹配？"}
+  n_valid -->|"是"| n_apply["应用允许的元数据或新版本变更"]
+  n_valid -->|"否"| n_fail["拒绝、过期或要求重新核对"]
+  n_access["AccessWork 资源权限申请"] --> n_policy["scene-access/policy 保存带双版本的申请"]
+  n_policy --> n_approver["独立审批职责检查，禁止越权自批"]
+  n_approver --> n_decision["批准、拒绝、撤回或失效"]
+  n_decision --> n_synchronize["生效后同步平台来源权限"]
+  n_apply --> n_audit["保存操作依据和历史"]
+  n_fail --> n_audit
+  n_synchronize --> n_audit
