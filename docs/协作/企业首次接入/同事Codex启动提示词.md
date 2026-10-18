@@ -14,12 +14,12 @@
 3. 阅读 docs/协作/企业首次接入/README.md 和 双方Codex协作约定.md，再读 flow.json 及目标 handoffs/ONB-xx-xx.md。初始任务是核查／候选调整，不是全部已批准开发。先读 docs/交接/代码基线整合与迁移兼容-2026-10-17.md，记录 git rev-parse HEAD。使用包含该整合记录的最新 origin/main；新库走默认迁移，旧本地库核对历史后才启用 migration-local。V150 起的新迁移只放 migration-common，认领时登记版本号。统一开发基线不代表线上版本已经更新。
 4. 运行：
    python3 docs/协作/企业首次接入/build.py --check
-   python3 -m http.server 5197 --bind 127.0.0.1 --directory docs/协作/企业首次接入
-   浏览器打开 http://127.0.0.1:5197/ 。端口被占用先确认服务，不要误停；必要时用另一个空闲端口。节点右栏点击“查看开发详情”可查看任务和 handoff 链接。
+   python3 -m http.server 5198 --bind 127.0.0.1 --directory docs
+   浏览器打开 http://127.0.0.1:5198/协作/企业首次接入/index.html#onboarding 。端口被占用先确认服务，不要误停；必要时用另一个空闲端口。节点右栏点击“查看开发详情”可查看任务和 handoff 链接。
 
 认领和执行：
 - 查看远端最新 owner、状态、依赖与共享文件范围；不抢占他人任务。
-- 在对应 handoff 的唯一 JSON 块中填写任务 owner、节点协调人（如适用）、updatedBy、带时区 updatedAt 和真实状态，在正文补本次基线、拟改文件及接口约定。不要改 nodeId 或已有 task id。
+- 在对应 handoff 的唯一 JSON 块中填写 tasks 中的任务 owner、updatedBy、带时区 updatedAt 和真实状态（节点不再设置 owner），在正文补本次基线、拟改文件及接口约定。不要改 nodeId 或已有 task id。
 - 先构建看板，将认领 handoff 与生成 index.html 按明确路径提交并推送；本提示词授权提交和推送本人该任务的认领记录及已授权范围的实现与交接，不授权生产部署。认领推送成功后才开始业务开发。冲突时先读对方记录并协调，不强推或覆盖认领。
 - 先验证当前能力。无缺口标“不需开发”并填写 evidence；需要新增业务规则、权限或尚未确认方案时停在“待确认”，说明具体缺口和建议，不把候选直接当作已确认功能。
 - 已授权任务持续完成实现、必要验证和交接；不要修改不相关代码，不夹带他人未提交文件。

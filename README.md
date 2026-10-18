@@ -1,6 +1,6 @@
 # 梦擎工作空间
 
-开发协作：[企业首次接入流程看板与节点 handoff](docs/协作/企业首次接入/README.md)（Git 维护，流程内容与开发状态分别记录）。
+开发协作：[流程协作看板](docs/协作/企业首次接入/index.html#onboarding) · [节点 handoff 与维护说明](docs/协作/企业首次接入/README.md)（Git 维护，流程内容与开发状态分别记录）。
 
 项目图册：[三端功能与实现流程](docs/项目流程图/index.html) · [开源替代研判](docs/项目流程图/开源替代研判.html) · [图册维护说明](docs/项目流程图/README.md)。
 
