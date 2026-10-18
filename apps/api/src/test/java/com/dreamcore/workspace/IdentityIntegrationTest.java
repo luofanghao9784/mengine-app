@@ -119,12 +119,13 @@ class IdentityIntegrationTest {
         assertEquals(401,user.send("GET","/api/v1/me",null,false).statusCode());
     }
     @Test void rolesNeverGrantCrossTenantOrPrivateWorkspaceAccess() throws Exception {
+        // Platform-only login has no customer session (401); a foreign tenant login is authenticated (403).
         for (Client forbidden : List.of(platform,adminB)) {
-            assertEquals(403,forbidden.send("GET","/api/v1/tenants/"+tenantA+"/context",null,false).statusCode());
-            assertEquals(403,forbidden.send("GET","/api/tenant-admin/v1/tenants/"+tenantA+"/invitations",null,false).statusCode());
+            assertEquals(forbidden==platform?401:403,forbidden.send("GET","/api/v1/tenants/"+tenantA+"/context",null,false).statusCode());
+            assertEquals(forbidden==platform?401:403,forbidden.send("GET","/api/tenant-admin/v1/tenants/"+tenantA+"/invitations",null,false).statusCode());
         }
         assertEquals(403,employee.send("GET","/api/tenant-admin/v1/tenants/"+tenantA+"/invitations",null,false).statusCode());
-        assertEquals(403,adminA.send("GET","/api/platform-admin/v1/tenants",null,false).statusCode());
+        assertEquals(401,adminA.send("GET","/api/platform-admin/v1/tenants",null,false).statusCode());
         var adminSpaces = adminA.ok("GET","/api/v1/tenants/"+tenantA+"/context",null,200).get("workspaces");
         var employeeSpaces = employee.ok("GET","/api/v1/tenants/"+tenantA+"/context",null,200).get("workspaces");
         assertEquals(1,adminSpaces.size()); assertEquals(1,employeeSpaces.size());
@@ -236,7 +237,7 @@ class IdentityIntegrationTest {
         // Restore the shared fixture's session for independent tests.
         employee.login("employee@example.test");
         db.update("DELETE FROM platform_roles WHERE account_id=?",platformId);
-        try { assertEquals(403,platform.send("GET","/api/platform-admin/v1/tenants",null,false).statusCode()); }
+        try { assertEquals(401,platform.send("GET","/api/platform-admin/v1/tenants",null,false).statusCode()); }
         finally { db.update("INSERT INTO platform_roles(account_id,role) VALUES (?,'PLATFORM_ADMIN')",platformId); platform.login("platform@example.test"); }
     }
 
@@ -271,13 +272,13 @@ class IdentityIntegrationTest {
         assertEquals(runtime.get("totalTenants").asLong(),runtime.get("activeTenants").asLong()+runtime.get("suspendedTenants").asLong()+runtime.get("pendingTenants").asLong());
         for(Client forbidden:List.of(adminA,employee)) {
             for(String denied:List.of(path,path+"/records","/api/platform-admin/v1/overview"))
-                assertEquals(403,forbidden.send("GET",denied,null,false).statusCode());
-            assertEquals(403,forbidden.send("POST",path+"/status",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"status","SUSPENDED","internalReason","内部核对-不可给客户","publicReason","合成公开服务说明"),true).statusCode());
-            assertEquals(403,forbidden.send("POST",path+"/initial-admin-invitation",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"email","forbidden@example.test"),true).statusCode());
+                assertEquals(401,forbidden.send("GET",denied,null,false).statusCode());
+            assertEquals(401,forbidden.send("POST",path+"/status",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"status","SUSPENDED","internalReason","内部核对-不可给客户","publicReason","合成公开服务说明"),true).statusCode());
+            assertEquals(401,forbidden.send("POST",path+"/initial-admin-invitation",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"email","forbidden@example.test"),true).statusCode());
         }
         assertEquals(403,platform.send("POST",path+"/status",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"status","SUSPENDED","internalReason","内部核对-不可给客户","publicReason","合成公开服务说明"),false).statusCode());
         assertEquals(404,platform.send("GET","/api/platform-admin/v1/tenants/"+UUID.randomUUID(),null,false).statusCode());
-        assertEquals(403,platform.send("GET","/api/v1/tenants/"+id+"/context",null,false).statusCode());
+        assertEquals(401,platform.send("GET","/api/v1/tenants/"+id+"/context",null,false).statusCode());
         for(String forbidden:List.of("content","conversations","impersonate")) assertEquals(404,platform.send("GET",path+"/"+forbidden,null,false).statusCode());
     }
     @Test void platformSuspensionIsVersionedIdempotentAndTenantScoped() throws Exception {
@@ -333,7 +334,7 @@ class IdentityIntegrationTest {
         String original=created.get("invitation").get("id").asString();
         assertEquals("AWAITING_INVITATION",platform.ok("GET",path,null,200).get("owner").get("state").asString());
         var revoke=Map.of("requestId",UUID.randomUUID(),"expectedVersion",0);
-        assertEquals(403,adminA.send("POST",path+"/initial-admin-invitation/revoke",revoke,true).statusCode());
+        assertEquals(401,adminA.send("POST",path+"/initial-admin-invitation/revoke",revoke,true).statusCode());
         assertEquals(403,platform.send("POST",path+"/initial-admin-invitation/revoke",revoke,false).statusCode());
         var revoked=platform.ok("POST",path+"/initial-admin-invitation/revoke",revoke,200);
         assertEquals("INVITATION_INACTIVE",revoked.get("owner").get("state").asString());
@@ -447,9 +448,9 @@ class IdentityIntegrationTest {
         String id=space.get("id").asString();
         for(Client forbidden:List.of(platform,adminB,member)) {
             for(String route:List.of("/overview","/members","/workspaces","/records","/workspaces/"+id,"/workspaces/"+id+"/members","/invitations"))
-                assertEquals(403,forbidden.send("GET",f.path+route,null,false).statusCode());
-            assertEquals(403,forbidden.send("POST",f.path+"/workspaces",body,true).statusCode());
-            assertEquals(403,forbidden.send("POST",f.path+"/members/"+f.adminId+"/status",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"status","DISABLED"),true).statusCode());
+                assertEquals(forbidden==platform?401:403,forbidden.send("GET",f.path+route,null,false).statusCode());
+            assertEquals(forbidden==platform?401:403,forbidden.send("POST",f.path+"/workspaces",body,true).statusCode());
+            assertEquals(forbidden==platform?401:403,forbidden.send("POST",f.path+"/members/"+f.adminId+"/status",Map.of("requestId",UUID.randomUUID(),"expectedVersion",0,"status","DISABLED"),true).statusCode());
         }
         assertEquals(403,f.admin.send("POST",f.path+"/workspaces",body,false).statusCode());
         assertEquals(400,f.admin.send("POST",f.path+"/workspaces",Map.of("requestId",UUID.randomUUID(),"name","注入","kind","PERSONAL"),true).statusCode());

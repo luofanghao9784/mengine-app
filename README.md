@@ -607,3 +607,8 @@ npm run test:contracts
 ### Codex 首轮画报部署
 
 首轮画报可由宿主机 `java -jar api.jar --bootstrap-briefings` 完成，先预览可信计算，再提交分析正文；`BRIEFING_BOOTSTRAP_PREVIEW` 默认开启。它不启动 HTTP 服务，不伪造服务器模型用量。9POP 八项固定业务链统计由 `NINEPOP_CHAIN_EXPORT_ENABLED=true` 启用，来源仍经过既有权限投影。清单格式、维护接续与回退见 [技术说明](docs/技术/Codex首轮画报与业务链统计.md)。
+
+
+## 第二阶段接入回归（本地模拟验证码）
+
+先运行 `npm run build` 和 `./apps/api/mvnw -B -f apps/api/pom.xml -DskipTests package`，再运行 `npm run test:onboarding-stage2`。脚本使用独立临时 PostgreSQL 和合成账号，自动启动、关闭本轮 API 与浏览器预览，覆盖总台开通、负责人接管、员工加入、范围确认后授权和撤权。不会发送真实短信；结果写入忽略目录 `.local/onboarding-stage2/result.json`，不等于客户或线上验收。详细结果见[第二阶段核查与接续](docs/协作/企业首次接入/第二阶段核查与主流程接续-2026-10-18.md)。

@@ -1172,7 +1172,7 @@ function MemberInviteForm({ tenant, done }: { tenant: string; done: () => void }
         </Field>
         <p>
           可选初始共享空间，加入后获得阅读权限。最多选择 20 个，已选择 {spaces.length}{' '}
-          个。当前邀请仅用于本地验证。
+          个。授权范围尚未确认时，请先不选业务空间；加入后再按确认范围授权。当前邀请仅用于本地验证，不会发送真实短信。
         </p>
         {choices.error ? (
           <Failure error={choices.error} retry={() => window.location.reload()} />

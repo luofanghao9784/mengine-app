@@ -44,7 +44,7 @@ function devDetails(id,stream){
   const tasks=d.tasks.filter(t=>t.workstream===stream);
   return `<div class="dev-full"><p class="dev-muted">节点 ${safe(id)} · ${safe(category.description)}</p>
     <section class="task-category ${stream}"><h3>${safe(category.title)} · ${tasks.length} 项</h3>${tasks.length?`<p>${taskProgress(tasks)}</p>`:''}
-    ${tasks.map(t=>`<div class="dev-task"><b>${safe(t.area)} · ${safe(t.status)}</b><p>${safe(t.title)}</p><small>${safe(t.id)} · 负责人：${safe(t.owner)}</small>${reviewHtml(t,true)}<small>分类依据：${safe(t.classificationReason)}</small><small>依赖：${safe(t.dependsOn.join('、')||'无已登记依赖')}</small><details><summary>验收与证据</summary><p>${safe(t.acceptance)}</p><p>${safe(t.evidence.join('；')||'尚无验证证据')}</p></details></div>`).join('')||`<p class="task-empty">${safe(category.empty)}</p>`}</section>
+    ${tasks.map(t=>`<div class="dev-task"><b>${safe(t.area)} · ${safe(t.status)}</b><p>${safe(t.title)}</p><small>${safe(t.id)} · 负责人：${safe(t.owner)}</small>${reviewHtml(t,true)}<small>阶段安排：${safe(t.kind)}</small><small>分类依据：${safe(t.classificationReason)}</small><small>依赖：${safe(t.dependsOn.join('、')||'无已登记依赖')}</small><details><summary>验收与证据</summary><p>${safe(t.acceptance)}</p><p>${safe(t.evidence.join('；')||'尚无验证证据')}</p></details></div>`).join('')||`<p class="task-empty">${safe(category.empty)}</p>`}</section>
     <p class="dev-muted">记录更新：${safe(d.updatedBy)} · ${safe(d.updatedAt)}</p>
     <p class="dev-muted">本轮改造记录 · 实现：${safe(d.implementation)} · 验证：${safe(d.validation)} · 部署：${safe(d.deployment)}<br>上述记录与已有代码核查分开；不等同于本类任务或客户验收完成。</p>
     ${d.flowRevision!==__REVISION__?'<p>流程已修订，请复核任务范围</p>':''}${d.blockers.length?'<p>节点阻塞：'+d.blockers.map(safe).join('；')+'</p>':''}
@@ -82,6 +82,7 @@ function globalFlow(){
  frame('organization',20,250,500,420);frame('scope',580,250,500,420);
  for(const [id,x] of [['organization',185],['scope',745]])for(let i=1;i<=3;i++){node(id,i,x,310+(i-1)*115);if(i<3)line(`M${x+85} ${402+(i-1)*115} V${425+(i-1)*115}`);}
  line('M975 167 V215 H270 V310');line('M830 215 V310','02 / 03 可并行',550,236);
+ line('M745 586 H355','03.3 确认范围后，02.3 才开放业务空间',550,575,true);
  line('M270 632 V700 H135 V790');line('M830 632 V700 H270');
  frame('foundation',20,735,1060,430);
  node('foundation',1,50,790);node('foundation',2,260,790);node('foundation',3,470,790);node('foundation',4,680,790);
@@ -98,7 +99,7 @@ function globalFlow(){
  line('M975 1377 H1060 V1570 H240 V1655');
  line('M450 1747 V1790 H870 V1747','无需自动工作时跳过 06.3',660,1780,true);
  parts.push('<text x="550" y="1870" text-anchor="middle" fill="#57735f" font-size="15">首批工作可用 → 日常使用与持续维护（后续流程待展开）</text>');
- return heading('企业首次接入','全局流程图','方向已认可 · 细节待确认','draft')+'<p class="intro">30 个节点按操作接续连线；02 / 03、取数与背景整理可并行。06.3 按需配置。点击节点在右侧查看详情，流程图保持在左侧。箭头表示建议操作顺序，不替代开发任务依赖。</p><p class="intro">✓ 开发完成／不需系统开发　·　蓝色 ✓ 代码已有，待验证　·　灰色 ✓ 无系统开发任务（业务工作仍需完成）。无勾表示系统开发尚有待处理项。</p><div class="flow-workbench"><div class="simple-flow"><svg viewBox="0 0 1100 1900" role="img" aria-label="六阶段三十节点接入流程图" xmlns="http://www.w3.org/2000/svg"><defs><marker id="flow-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10Z" fill="#698777"/></marker></defs>'+parts.join('')+edges.join('')+'</svg></div><aside class="flow-detail" aria-label="节点详情" hidden></aside></div>';
+ return heading('企业首次接入','全局流程图','方向已认可 · 细节待确认','draft')+'<div class="notice">本期：使用模拟邀请与验证码跑通主流程。真实手机号验证与正式投递在上线前开发，不阻塞本期；企业隔离与授权仍须执行。</div><p class="intro">30 个节点按操作接续连线；02 / 03 可并行；03.3 确认范围后，02.3 才开放业务空间。取数与背景整理可并行，06.3 按需配置。点击节点在右侧查看详情，流程图保持在左侧。箭头表示建议操作顺序，不替代开发任务依赖。</p><p class="intro">✓ 开发完成／不需系统开发　·　蓝色 ✓ 代码已有，待验证　·　灰色 ✓ 无系统开发任务（业务工作仍需完成）。无勾表示系统开发尚有待处理项。</p><div class="flow-workbench"><div class="simple-flow"><svg viewBox="0 0 1100 1900" role="img" aria-label="六阶段三十节点接入流程图" xmlns="http://www.w3.org/2000/svg"><defs><marker id="flow-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10Z" fill="#698777"/></marker></defs>'+parts.join('')+edges.join('')+'</svg></div><aside class="flow-detail" aria-label="节点详情" hidden></aside></div>';
 }
 let selectedFlowNode=null;
 function showFlowDetail(nid){
@@ -113,7 +114,7 @@ function showFlowDetail(nid){
 function render(){let id=location.hash.slice(1)||'overview';if(id==='implementation'||id==='handoff')id='purpose';if(id==='decisions')id='overview';let s=stages.find(s=>s.id===id);let content='';
 if(id==='global'){content=globalFlow()}
 else if(id==='overview'){content=heading('整体框架','系统怎样运作','大体框架已认可','ok')+'<p class="intro">从左侧选择阶段，按实际操作顺序阅读；现状与技术方案保留在各阶段底部。</p><div class="flow">'+[['onboarding','01','企业接入与准备','明确用途、接入数据、配置业务基础、验证可用并交付维护。'],...extra.map((e,i)=>[e[0],'0'+(i+2),e[1],e[2]])].map(e=>`<a href="#${e[0]}"><small>${e[1]}</small><b>${e[2]}</b><p>${e[3]}</p></a>`).join('')+'</div><h2>当前讨论</h2><div class="output">六阶段方向已认可。各阶段现在按“谁、在哪做什么、系统处理、结果、缺条件谁接续”逐步走读，六阶段按业务了解、企业开通、范围确认、实际接入、工作验证和交付维护重新划分；不以新增工作绑定对象为前提。具体操作细节仍待确认。日常工作闭环暂不展开。</div><p class="subtle" style="margin-top:16px">实现分为输入与维护链、工作执行链、管理与控制链；具体边界逐段确定。</p>'}
-else if(id==='onboarding'){content=heading('企业首次接入','六个接入阶段','流程骨架已认可','ok')+'<p><a href="#global">查看全局流程图 →</a></p><p class="intro">了解业务 → 开通环境 → 明确接入范围 → 实际配置 → 用工作验证 → 交付维护。六阶段是操作分工，不对应六个新页面。02 与 03 可并行；实际接入须有明确范围，交付须有工作验证。</p><div class="step-list">'+stages.map(s=>`<a href="#${s.id}"><span>${s.n}</span><div><b>${s.title}</b><small>${s.sub}</small></div></a>`).join('')+'</div><div class="output">接入完成的依据：首批约定的工作已经可以使用，并明确限制与维护责任。</div>'+reviewOverview()}
+else if(id==='onboarding'){content=heading('企业首次接入','六个接入阶段','流程骨架已认可','ok')+'<p><a href="#global">查看全局流程图 →</a></p><p class="intro">了解业务 → 开通环境 → 明确接入范围 → 实际配置 → 用工作验证 → 交付维护。六阶段是操作分工，不对应六个新页面。02 与 03 可并行；邀请加入可先做，开放业务空间必须先取得 03.3 授权范围。本期使用模拟验证码，真实验证在上线前补齐。实际接入须有明确范围，交付须有工作验证。</p><div class="step-list">'+stages.map(s=>`<a href="#${s.id}"><span>${s.n}</span><div><b>${s.title}</b><small>${s.sub}</small></div></a>`).join('')+'</div><div class="output">接入完成的依据：首批约定的工作已经可以使用，并明确限制与维护责任。</div>'+reviewOverview()}
 else if(s){const w=walkthroughs[s.id];const next=stages[stages.indexOf(s)+1];
 content=heading('企业首次接入 / 阶段 '+s.n,s.title,'方向已认可 · 细节待确认','draft')+'<div class="boundary">下面是建议操作走读，不是当前系统使用手册。页面名称、按钮及状态尚待确认，不能据此认为功能已实现。贯穿示例为“订单、收款与退款差异核对”，不包含真实业务数据。第四阶段逐步区分已有能力与待新增功能；“已有”不代表本次重新验证线上可用。</div>'+`<p class="startline"><strong>从这里开始：</strong>${w.start}</p>`;
 if(s.id==='purpose') content+='<div class="output">本阶段是业务了解与访谈：负责人讲业务与诉求，经办人演示实际工作，部署人员整理记录。明确首批用途是其中一项结果；企业背景录入、数据连接和权限配置在后续阶段落实。</div>';

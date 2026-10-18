@@ -190,7 +190,7 @@ function CreateForm({
       }}
     >
       <p className="muted">
-        填写企业名称和初始负责人手机号。受邀人加入企业并明确接受职责后，成为企业负责人；已有客户账号可直接接受邀请。
+        先核对企业列表，确认没有重复开通，再填写企业名称和初始负责人手机号。受邀人加入企业并明确接受职责后，成为企业负责人；已有客户账号可直接接受邀请。
       </p>
       <fieldset disabled={task.busy || task.uncertain}>
         <Field label="企业名称">

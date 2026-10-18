@@ -105,7 +105,7 @@ test('unified login asks for authorized surface before entering an enterprise', 
     return route.fulfill({ status: 404, json: {} });
   });
   await page.goto('/workspace/');
-  await page.getByLabel('手机号', { exact: true }).fill('19900000001');
+  await page.getByLabel('用户名或手机号', { exact: true }).fill('19900000001');
   await page.getByLabel('密码', { exact: true }).fill('synthetic-password');
   await page.getByRole('button', { name: '登录', exact: true }).click();
   await expect(page.getByRole('heading', { name: '选择进入哪一端' })).toBeVisible();
