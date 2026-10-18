@@ -13,6 +13,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest(properties={"dreamcore.knowledge.enabled=true","dreamcore.knowledge.initial-delay-ms=3600000","dreamcore.tasks.initial-delay-ms=3600000","dreamcore.tasks.agent-mode=verification"})
 class CompanyInferenceIntegrationTest {
+ @Autowired CompanyBackgroundSourceService background;
  @Autowired JdbcTemplate db;@Autowired MaterialService materials;@Autowired CompanyInformationService info;@Autowired CompanyInferenceService inference;@Autowired ProfileService profiles;@Autowired TaskContextService context;@Autowired TaskContextGuard guard;
  UUID tenant,admin,member,space,personal,chunk,version,material;
  final String content="示例企业从事体育教育，主营篮球培训。🏀 转化率是签约人数占有效线索人数的比例。";
@@ -64,7 +65,7 @@ class CompanyInferenceIntegrationTest {
  }
  @Test void revocationHidesInferencesFromCompanyAndGenericProfileReadsAndManualEditsRetainSources(){
   var f=CompanyInformationService.Field.INDUSTRY;complete(candidate(f,null,"体育教育"));var tag=group(f).tags().getFirst();manual(f,1,"EDIT",tag.id(),"人工调整行业");
-  db.update("DELETE FROM workspace_members WHERE workspace_id=? AND account_id=?",space,member);assertTrue(group(f).tags().isEmpty());denied(404,()->profiles.get(admin,tenant,tag.id(),null));denied(404,()->inference.evidence(admin,tenant,tag.id(),1));assertFalse(profiles.history(admin,tenant,tag.id(),0,20).items().getFirst().bodyAvailable());
+  db.update("DELETE FROM workspace_members WHERE workspace_id=? AND account_id=?",space,member);assertTrue(group(f).tags().isEmpty());assertTrue(background.get(admin,tenant).entries().isEmpty());denied(404,()->background.entry(admin,tenant,tag.id(),null));denied(404,()->profiles.get(admin,tenant,tag.id(),null));denied(404,()->inference.evidence(admin,tenant,tag.id(),1));assertFalse(profiles.history(admin,tenant,tag.id(),0,20).items().getFirst().bodyAvailable());
   db.update("INSERT INTO workspace_members(tenant_id,workspace_id,account_id) VALUES (?,?,?)",tenant,space,member);assertTrue(group(f).tags().isEmpty());
   db.update("UPDATE knowledge_chunks SET content='' WHERE id=?",chunk);assertEquals(2,db.queryForObject("SELECT count(*) FROM profile_versions WHERE entry_id=? AND scrubbed AND value=''",Integer.class,tag.id()));assertEquals(0,db.queryForObject("SELECT count(*) FROM company_information_suggestions WHERE tenant_id=? AND NOT scrubbed",Integer.class,tenant));
  }

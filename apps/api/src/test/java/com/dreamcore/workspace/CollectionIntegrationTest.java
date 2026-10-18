@@ -203,6 +203,35 @@ class CollectionIntegrationTest {
         UUID replacement=UUID.randomUUID();deployment.apply(manifest(List.of(new CollectionDeployment.Dataset(replacement,space,"sales","新口径数据","",List.of("门店")))));
         code("DATASET_NOT_FOUND",()->service.preview(reader,tenant,dataset,0,20));assertNull(service.preview(reader,tenant,replacement,0,20).dataset().version());
     }
+    @Test void identicalDeploymentKeepsRunningAndQueuedCollectionsAndUserSchedule() {
+        var definition=new CollectionDeployment.Dataset(dataset,space,"sales","新名称","部署说明",List.of("门店","数量"));
+        var manifest=manifest(List.of(definition));
+        deployment.apply(manifest);
+        service.configure(admin,tenant,connection,UUID.randomUUID(),service.detail(admin,tenant,connection).revision(),hourly(true));
+        start();var claim=service.claim(tenant,connection,Instant.now());
+        var before=db.queryForMap("SELECT * FROM data_connections WHERE id=?",connection);
+        var run=db.queryForMap("SELECT * FROM collection_runs WHERE id=?",claim.runId());
+        deployment.apply(manifest);
+        assertEquals(before,db.queryForMap("SELECT * FROM data_connections WHERE id=?",connection));
+        assertEquals(run,db.queryForMap("SELECT * FROM collection_runs WHERE id=?",claim.runId()));
+        assertTrue(service.complete(claim,result("重复登记仍可完成",null),Instant.now()));
+        var queued=start();
+        deployment.apply(manifest);
+        assertEquals("QUEUED",db.queryForObject("SELECT status FROM collection_runs WHERE id=?",String.class,queued.id()));
+    }
+    @Test void deploymentDatasetOrderIsIrrelevantButRemovalStillFencesWork() {
+        var first=new CollectionDeployment.Dataset(dataset,space,"sales","销售","",List.of("门店","数量"));
+        var second=new CollectionDeployment.Dataset(UUID.randomUUID(),space,"other","其他","",List.of("编号"));
+        deployment.apply(manifest(List.of(first,second)));
+        var before=service.detail(admin,tenant,connection).revision();
+        start();
+        deployment.apply(manifest(List.of(second,first)));
+        assertEquals(before,service.detail(admin,tenant,connection).revision());
+        deployment.apply(manifest(List.of(first)));
+        assertEquals(before+1,service.detail(admin,tenant,connection).revision());
+        assertEquals("WITHDRAWN",db.queryForObject("SELECT status FROM business_datasets WHERE id=?",String.class,second.id()));
+        assertEquals(0,db.queryForObject("SELECT count(*) FROM collection_runs WHERE connection_id=? AND status IN ('QUEUED','RUNNING')",Integer.class,connection));
+    }
     @Test void deployedFieldsAreScopedImmutableAndLegacyCompatible() {
         var fields=List.of(new DatasetField("门店","text","门店名称","","源字典说明","SOURCE_DOCUMENTED"),new DatasetField("数量","integer","含义未明确","","仅有字段名","UNKNOWN"));
         UUID defined=UUID.randomUUID();

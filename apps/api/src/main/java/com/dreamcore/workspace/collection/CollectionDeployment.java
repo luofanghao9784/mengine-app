@@ -37,8 +37,11 @@ public class CollectionDeployment {
         tx.executeWithoutResult(status->{
             if(db.queryForList("SELECT id FROM tenants WHERE id=? FOR UPDATE",m.tenantId()).isEmpty())throw new IllegalArgumentException("Unknown enterprise");
             if(Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM departure_executions WHERE tenant_id=? AND kind='TENANT_EXIT' AND state<>'CANCELLED')",Boolean.class,m.tenantId())))throw new IllegalArgumentException("Enterprise exit blocks collection deployment");
-            var existing=db.queryForList("SELECT tenant_id FROM data_connections WHERE id=? FOR UPDATE",m.connectionId());
+            var existing=db.queryForList("SELECT * FROM data_connections WHERE id=? FOR UPDATE",m.connectionId());
             if(!existing.isEmpty()&&!m.tenantId().equals(existing.getFirst().get("tenant_id")))throw new IllegalArgumentException("Connection belongs to another enterprise");
+            // The schedule (including time_zone) belongs to the user after initial installation.
+            // Replaying the same effective definition must not fence an in-flight collection.
+            if(!existing.isEmpty() && unchanged(m,existing.getFirst()))return;
             if(existing.isEmpty())db.update("INSERT INTO data_connections(id,tenant_id,name,route_label,access_summary,status,time_zone) VALUES (?,?,?,?,?,?,?)",m.connectionId(),m.tenantId(),m.name(),m.routeLabel(),m.accessSummary(),m.status(),m.timeZone());
             else db.update("UPDATE data_connections SET name=?,route_label=?,access_summary=?,status=?,revision=revision+1,execution_epoch=execution_epoch+1,updated_at=now() WHERE id=?",m.name(),m.routeLabel(),m.accessSummary(),m.status(),m.connectionId());
             db.update("UPDATE collection_runs SET status='INTERRUPTED',reason='DEPLOYMENT_CHANGED',finished_at=now(),lease_token=NULL,lease_until=NULL WHERE connection_id=? AND status IN ('QUEUED','RUNNING')",m.connectionId());
@@ -56,4 +59,26 @@ public class CollectionDeployment {
             audit.record(null,m.tenantId(),"COLLECTION_DEPLOY",m.connectionId(),"SUCCESS");
         });
     }
+    private boolean unchanged(Manifest m,Map<String,Object> connection){
+        if(!Objects.equals(m.name(),connection.get("name"))
+            ||!Objects.equals(m.routeLabel(),connection.get("route_label"))
+            ||!Objects.equals(m.accessSummary(),connection.get("access_summary"))
+            ||!Objects.equals(m.status(),connection.get("status")))return false;
+        var active=db.queryForList("SELECT * FROM business_datasets WHERE connection_id=? AND status='ACTIVE'",m.connectionId());
+        if(active.size()!=m.datasets().size())return false;
+        var byId=new HashMap<UUID,Map<String,Object>>();
+        for(var row:active)byId.put((UUID)row.get("id"),row);
+        for(var d:m.datasets()){
+            var row=byId.get(d.id());
+            if(row==null || !Objects.equals(m.tenantId(),row.get("tenant_id"))
+                || !Objects.equals(d.workspaceId(),row.get("workspace_id"))
+                || !Objects.equals(d.key(),row.get("dataset_key"))
+                || !Objects.equals(d.name(),row.get("name"))
+                || !Objects.equals(d.description(),row.get("description"))
+                || !json.readTree(row.get("column_names").toString()).equals(json.valueToTree(d.columns()))
+                || !json.readTree(row.get("field_definitions").toString()).equals(json.valueToTree(d.fieldDefinitions())))return false;
+        }
+        return true;
+    }
+
 }

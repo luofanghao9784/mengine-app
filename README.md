@@ -1,5 +1,7 @@
 # 梦擎工作空间
 
+本地新版联调：已有演示企业可通过 `trial.py start --scene-tenant <企业UUID>` 接通隔离数据服务，保留原账号与空间；[启动命令、验证与边界](docs/协作/企业首次接入/新版本地服务与权限接续-2026-10-18.md)。
+
 开发协作：[流程协作看板](docs/协作/企业首次接入/index.html#onboarding) · [节点 handoff 与维护说明](docs/协作/企业首次接入/README.md)（Git 维护，流程内容与开发状态分别记录）。
 
 项目图册：[三端功能与实现流程](docs/项目流程图/index.html) · [开源替代研判](docs/项目流程图/开源替代研判.html) · [图册维护说明](docs/项目流程图/README.md)。

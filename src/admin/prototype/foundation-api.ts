@@ -155,7 +155,18 @@ export async function api<T>(path: string, body?: unknown, signal?: AbortSignal)
       : {}),
   });
   const data = await r.json().catch(() => ({ message: '数据服务暂不可用' }));
-  if (!r.ok) throw Object.assign(Error(data.message || (data.code === 'SCENE_REVISION_CONFLICT' ? '资源、权限或处理状态已变化，请刷新后重新提交。' : data.code === 'SCENE_OPERATION_FORBIDDEN' ? '当前账号没有此操作权限，非管理员不能审批本人申请。' : data.code === 'SCENE_READ_ONLY' ? '企业内容只读，此操作已停用。' : data.code === 'SCENE_TENANT_NOT_BOUND' ? '该企业尚未绑定数据来源，请联系总台配置。' : ['SCENE_NOT_CONFIGURED', 'SCENE_UPSTREAM_UNAVAILABLE', 'SCENE_UPSTREAM_FAILED'].includes(data.code) ? '企业数据服务暂不可用，请稍后重试。' : '请求失败')), { status: r.status });
+  if (!r.ok) {
+    const messages: Record<string, string> = {
+      SCENE_NOT_CONFIGURED: '数据服务尚未配置，请由部署人员接通服务；成员加入与空间授权仍可在“账号、空间与职责交接”中办理。',
+      SCENE_TENANT_NOT_BOUND: '该企业尚未绑定数据来源，请由部署人员核对企业及人员映射。',
+      SCENE_UPSTREAM_UNAVAILABLE: '数据服务连接失败，请由部署人员检查本地服务运行状态。',
+      SCENE_UPSTREAM_FAILED: '数据服务请求失败，请稍后重试；持续失败请联系部署人员。',
+      SCENE_OPERATION_FORBIDDEN: '当前账号没有此操作权限，请核对数据授权；企业管理身份不自动授予内容访问权。',
+      SCENE_READ_ONLY: '企业内容只读，此操作已停用。',
+    };
+    const message = messages[data.code] || data.message || (data.code === 'SCENE_REVISION_CONFLICT' ? '资源、权限或处理状态已变化，请刷新后重新提交。' : '请求失败');
+    throw Object.assign(Error(message), { status: r.status, code: data.code });
+  }
   return data as T;
 }
 export function useFoundation() {

@@ -15,6 +15,7 @@ import {
 import { profileClient } from './client';
 import { CompanySuggestions } from './CompanySuggestions';
 import './company.css';
+import { CompanyBackgroundSource } from './CompanyBackgroundSource';
 const when = (v: string) => new Date(v).toLocaleString('zh-CN', { hour12: false });
 export function CompanyInformation({ tenant }: { tenant: string }) {
   const { session } = useSession();
@@ -55,6 +56,7 @@ export function CompanyInformation({ tenant }: { tenant: string }) {
             刷新
           </Button>
         </header>
+        <p className="muted">自动整理：从获准资料整理企业背景，不表示知识已使用这些背景。</p>
         <p className="company-analysis muted" role="status">
           {analysis.error
             ? '暂时无法读取自动整理状态，可刷新重试。'
@@ -148,7 +150,7 @@ export function CompanyInformation({ tenant }: { tenant: string }) {
             close={() => setEdit(null)}
             changed={() => {
               setEdit(null);
-              setNotice('企业信息已更新。');
+              setNotice('企业信息已更新。背景保存成功不代表知识已更新。');
               setAttempt((n) => n + 1);
             }}
           />
@@ -225,6 +227,10 @@ function CompanyEditor({
             信息依据
           </Button>
           {evidence && <CompanyEvidence tenant={tenant} tag={tag} />}
+          <details>
+            <summary>知识使用情况</summary>
+            <CompanyBackgroundSource tenant={tenant} tagId={tag.id} />
+          </details>
         </>
       )}
       <form

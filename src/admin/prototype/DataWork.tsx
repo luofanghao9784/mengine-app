@@ -598,7 +598,7 @@ export function DataWork({
           )}
           {!rows.length && (
             <p className="none">
-              {loading ? '正在读取数据…' : error ? '数据暂不可用，请重试。' : '当前筛选下没有记录。'}
+              {loading ? '正在读取数据…' : error ? error : '当前筛选下没有记录。'}
             </p>
           )}
           {rows.map((x, i) => (

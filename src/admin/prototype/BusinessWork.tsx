@@ -8,7 +8,7 @@ import './business-work.css';
 const pages = { experience: 'experience', company: 'company', usage: 'usage', members: 'members' } as const;
 export function BusinessWork({ tenant, place }: { tenant: string; place: keyof typeof pages }) {
   const { session } = useSession();
-  const [access, setAccess] = useState(place === 'members');
+  const [access, setAccess] = useState(false);
   const [ready, setReady] = useState(false);
   useEffect(() => {
     const p = new URLSearchParams(location.hash.slice(1));
@@ -49,6 +49,7 @@ export function BusinessWork({ tenant, place }: { tenant: string; place: keyof t
             </button>
           </nav>
         )}
+        {place === 'members' && <p role="note">先邀请成员加入企业，再在共享空间中授予只读或维护权限。数据资源权限独立核对；加入企业不代表可以读取所有内容。</p>}
         {access && place === 'members' ? (
           <AccessWork />
         ) : (

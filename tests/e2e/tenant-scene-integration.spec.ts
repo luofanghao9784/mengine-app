@@ -186,6 +186,8 @@ test('业务页保留运行用量、权限与本人输出入口', async ({ page 
     .click();
   await expect(page.getByRole('button', { name: '数据权限与部门' })).toBeVisible();
   await expect(page.getByRole('button', { name: '账号、空间与职责交接' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '账号、空间与职责交接' })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: '数据权限与部门', exact: true }).click();
   await expect(page.getByRole('button', { name: '资源权限', exact: true })).toBeVisible();
   await page
     .locator('.shell-switch button')
@@ -252,6 +254,7 @@ async function accessFixture(page: Page, admin = true) {
   });
   await page.goto(`/tenant-admin/prototype/?tenant=${tenant}`);
   await page.locator('.shell-switch button').filter({ hasText: /^成员与权限$/ }).click();
+  await page.getByRole('button', { name: '数据权限与部门', exact: true }).click();
   await expect(page.getByLabel('变更原因')).toBeVisible();
   return { state, writes, conflict: () => { conflict = true; }, fail: () => { unavailable = true; } };
 }
@@ -304,6 +307,7 @@ test('隔离检查权限撤回后清除正文，即使内容与权限版本未�
   // Remount to load changed fixture immediately; subsequent revocation uses real polling.
   await page.locator('.shell-switch button').filter({ hasText: /^输出$/ }).click();
   await page.locator('.shell-switch button').filter({ hasText: /^成员与权限$/ }).click();
+  await page.getByRole('button', { name: '数据权限与部门', exact: true }).click();
   await page.getByLabel('变更原因').fill('授权质量检查');
   await page.getByRole('button', { name: '按填写原因检查隔离内容' }).click();
   await expect(page.getByText('仅用于隔离检查的合成正文')).toBeVisible();
@@ -311,3 +315,16 @@ test('隔离检查权限撤回后清除正文，即使内容与权限版本未�
   await expect(page.getByRole('button', { name: '按填写原因检查隔离内容' })).toHaveCount(0, { timeout: 20000 });
   await expect(page.getByText('仅用于隔离检查的合成正文')).toHaveCount(0);
 });
+
+ test('服务未配置时说明处理人，账号空间入口不被数据服务阻断', async ({page}) => {
+  await fixture(page);
+  await page.route('**/scene/dispatch?*', route => route.fulfill({status:503,json:{code:'SCENE_NOT_CONFIGURED',message:'请求未完成，请检查输入或当前状态。'}}));
+  await page.goto(`/tenant-admin/prototype/?tenant=${tenant}`);
+  await page.locator('.shell-switch button').filter({hasText:/^成员与权限$/}).click();
+  await expect(page.getByRole('button',{name:'账号、空间与职责交接'})).toHaveAttribute('aria-pressed','true');
+  await page.getByRole('button',{name:'数据权限与部门',exact:true}).click();
+  await expect(page.getByRole('status')).toContainText('数据服务尚未配置，请由部署人员接通服务');
+  await page.getByRole('button',{name:'账号、空间与职责交接'}).click();
+  await expect(page.getByRole('button',{name:'账号、空间与职责交接'})).toHaveAttribute('aria-pressed','true');
+  await expect(page.getByText('数据服务尚未配置', {exact:false})).toHaveCount(0);
+ });

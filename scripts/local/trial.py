@@ -85,7 +85,7 @@ def available(port):
 
 
 def clean_environment():
-    prefixes = ('SPRING_', 'DATABASE_', 'INVITATION_', 'PHONE_', 'BOOTSTRAP_', 'API_', 'ENGINE_', 'SERVER_', 'MANAGEMENT_', 'DREAMCORE_', 'MATERIAL_', 'BACKUP_', 'OPERATIONS_', 'KNOWLEDGE_', 'TASK_', 'AGENT_', 'PLATFORM_', 'COMPANY_', 'COLLECTION_', 'EXPERIENCE_', 'GENERAL_EXPERIENCE_', 'BRIEFING_', 'ONGOING_', 'ANALYSIS_', 'PG')
+    prefixes = ('SPRING_', 'DATABASE_', 'INVITATION_', 'PHONE_', 'BOOTSTRAP_', 'API_', 'ENGINE_', 'SERVER_', 'MANAGEMENT_', 'DREAMCORE_', 'MATERIAL_', 'BACKUP_', 'OPERATIONS_', 'KNOWLEDGE_', 'TASK_', 'AGENT_', 'PLATFORM_', 'COMPANY_', 'COLLECTION_', 'EXPERIENCE_', 'GENERAL_EXPERIENCE_', 'BRIEFING_', 'ONGOING_', 'ANALYSIS_', 'PG', 'MENGINE_', 'DASHSCOPE_', 'WEKNORA_')
     return {k: v for k, v in os.environ.items() if not k.startswith(prefixes) and k not in ('JAVA_TOOL_OPTIONS', 'JDK_JAVA_OPTIONS')}
 
 
@@ -310,7 +310,7 @@ def instance_briefing_environment(root):
     return {'BRIEFING_DAILY_ENABLED': str(value['dailyEnabled']).lower()}
 
 
-def start(root, model_config=None, reconnect_live=False, phone_local=False, collection_config=None, enable_live=False, automatic_work=False):
+def start(root, model_config=None, reconnect_live=False, phone_local=False, collection_config=None, enable_live=False, automatic_work=False, scene_tenant=None):
     os.umask(0o077)
     collection_env = instance_collection_environment(root, collection_config)
     analysis_env = instance_analysis_environment(root)
@@ -346,6 +346,16 @@ def start(root, model_config=None, reconnect_live=False, phone_local=False, coll
     if not jar.is_file() or not (WORKSPACE / 'dist/tenant-admin/index.html').is_file() or not (WORKSPACE / 'engine/dist/main.js').is_file():
         raise TrialError('缺少构建产物；先运行 npm run trial:build。')
     verify_api_migrations(jar)
+    scene_path = root / 'scene-private.json'
+    if scene_tenant or scene_path.exists():
+        if mode != 'off':
+            raise TrialError('本地新版数据服务仅用于无真实模型的隔离联调。')
+        if not (WORKSPACE / 'integrations/mengine-wiki/dist/api/server.js').is_file():
+            raise TrialError('先运行 npm --prefix integrations/mengine-wiki run build。')
+        if scene_tenant:
+            scene_tenant = str(uuid.UUID(scene_tenant))
+        if scene_path.exists() and scene_tenant and private_read(scene_path)['tenant'] != scene_tenant:
+            raise TrialError('已有数据服务绑定其他企业；拒绝覆盖。')
     executables = {name: binary(name) for name in ('initdb', 'pg_ctl', 'psql', 'java', 'node')}
     lock_path = root / 'supervisor.lock'
     if lock_path.is_symlink():
@@ -379,6 +389,8 @@ def start(root, model_config=None, reconnect_live=False, phone_local=False, coll
             private_write(root / 'database.json', {'password': secrets.token_urlsafe(32)})
             private_write(root / 'accounts.json', {'platform': {'loginName': 'platform@trial.example.test', 'realm': 'platform', 'password': secrets.token_urlsafe(24)}})
         settings = config(root)
+        if scene_tenant and not scene_path.exists():
+            private_write(scene_path, {'tenant': scene_tenant, 'key': secrets.token_urlsafe(48)})
         # Recheck after locking: a concurrent first start can have created the configuration.
         if restored:
             backup_recovery.require_activation(root)
@@ -446,6 +458,19 @@ def start(root, model_config=None, reconnect_live=False, phone_local=False, coll
                     run([executables['java'], '-jar', str(jar), '--bootstrap-admin'], {**env, 'BOOTSTRAP_EMAIL': login_name, 'BOOTSTRAP_NAME': '本地试用平台管理员', 'BOOTSTRAP_PASSWORD_FILE': str(password_file)}, log)
                 finally:
                     password_file.unlink(missing_ok=True)
+            if scene_path.exists():
+                scene_config = private_read(scene_path)
+                scene_id = str(uuid.UUID(scene_config['tenant']))
+                raw = identity_query("SELECT json_build_object('tenant',t.id,'name',t.name,'owner',g.owner_id,'ownerName',a.display_name)::text FROM tenants t JOIN tenant_governance g ON g.tenant_id=t.id JOIN accounts a ON a.id=g.owner_id JOIN tenant_memberships m ON m.tenant_id=t.id AND m.account_id=a.id WHERE t.id='" + scene_id + "' AND t.status='ACTIVE' AND a.status='ACTIVE' AND m.status='ACTIVE'")
+                if not raw:
+                    raise TrialError('本地演示企业须先开通并由有效负责人接管；没有改动原数据。')
+                private_write(root / 'scene-binding.json', json.loads(raw))
+                scene_port = free_port()
+                scene_env = {**clean_environment(), 'API_PORT':str(scene_port), 'MENGINE_PLATFORM_BRIDGE_KEY':scene_config['key']}
+                scene = subprocess.Popen([executables['node'], 'scripts/local/scene-trial.mjs', str(root)], cwd=WORKSPACE, env=scene_env, stdout=log, stderr=log)
+                children.append(scene)
+                ready(f'http://127.0.0.1:{scene_port}/api/health', scene, stopping)
+                env.update({'MENGINE_PLATFORM_BRIDGE_KEY':scene_config['key'], 'MENGINE_PLATFORM_BRIDGE_URL':f'http://127.0.0.1:{scene_port}/api/internal/platform-scene'})
             engine = subprocess.Popen([executables['node'], 'engine/dist/main.js'], cwd=WORKSPACE, env=engine_env, stdout=log, stderr=log)
             children.append(engine)
             ready(f'http://127.0.0.1:{engine_port}/healthz',engine,stopping)
@@ -530,6 +555,7 @@ def main():
     parser.add_argument('command', choices=['start', 'stop', 'status', 'invitations', 'invitation'])
     parser.add_argument('invitation_id', nargs='?')
     parser.add_argument('--directory', type=Path, default=DEFAULT_DIRECTORY)
+    parser.add_argument('--scene-tenant', help='为已接管的本地演示企业启动隔离新版数据服务；首次绑定后随本实例重启。')
     parser.add_argument('--phone-local', action='store_true', help='在隔离实例启用本地测试短信与邀请预览；真实模型验收同时要求 --enable-live，不发送真实短信。')
     parser.add_argument('--live', action='store_true', help='显式开启真实模型；只适用于 start。')
     parser.add_argument('--model-config', type=Path, help='本工作树 .local/model-private 内的私有模型配置。')
@@ -538,6 +564,8 @@ def main():
     parser.add_argument('--automatic-work', action='store_true', help='显式启用并保存真实模型自动工作循环：企业分析、经验和已配置的计划。')
     parser.add_argument('--collection-config', type=Path, help='部署维护的 0600 采集器配置；不从继承环境读取。')
     args = parser.parse_args()
+    if args.scene_tenant and (args.command != 'start' or args.live):
+        raise TrialError('--scene-tenant 仅用于 start 的无模型本地演示。')
     if args.automatic_work and (args.command != 'start' or not args.live):
         raise TrialError('--automatic-work 仅适用于 start --live。')
     if args.collection_config and args.command != 'start':
@@ -556,7 +584,7 @@ def main():
             from live_model import DEFAULT_CONFIG
             start(root, args.model_config or DEFAULT_CONFIG, args.reconnect_live, phone_local=args.phone_local, collection_config=args.collection_config, enable_live=args.enable_live, automatic_work=args.automatic_work)
         else:
-            start(root, phone_local=args.phone_local, collection_config=args.collection_config)
+            start(root, phone_local=args.phone_local, collection_config=args.collection_config, scene_tenant=args.scene_tenant)
     elif args.command == 'invitation':
         if not args.invitation_id:
             raise TrialError('请提供邀请 ID；可在本地 invitations 目录按手机号或旧邮箱查找对应 JSON 文件。')

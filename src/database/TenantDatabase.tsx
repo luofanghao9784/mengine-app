@@ -13,6 +13,7 @@ import {
   type DataConnection,
 } from './client';
 import './database.css';
+import { CompanyBackgroundSource } from '../profile/CompanyBackgroundSource';
 import '../admin/mengine/mengine.css';
 import { DatasetLifecyclePanel } from './DatasetLifecyclePanel';
 const date = (v: string | null) => (v ? new Date(v).toLocaleString('zh-CN', { hour12: false }) : '尚无记录');
@@ -78,7 +79,7 @@ export function TenantDatabase({ tenant, hash }: { tenant: string; hash: string 
           <h2>梦擎数据基座</h2>
           <p className="admin-note">查看已接入的业务来源与获权数据，为梦擎提供可追溯的输入。</p>
         </div>
-        <span className="input-foundation-label">外部来源 · 只读采集</span>
+        <span className="input-foundation-label">外部只读采集 · 内部企业背景</span>
       </section>
       <nav className="platform-detail-nav" aria-label="数据基座栏目">
         {(
@@ -107,7 +108,10 @@ export function TenantDatabase({ tenant, hash }: { tenant: string; hash: string 
         uuid(connection) ? (
           <ConnectionDetail key={connection} tenant={tenant} id={connection} hash={hash} />
         ) : (
-          <Connections tenant={tenant} hash={hash} />
+          <>
+            <CompanyBackgroundSource tenant={tenant} hash={hash} />
+            <Connections tenant={tenant} hash={hash} />
+          </>
         )
       ) : uuid(dataset) ? (
         <DatasetDetail key={dataset} tenant={tenant} id={dataset} hash={hash} />

@@ -315,3 +315,42 @@ test('source revocation closes an open tag even while other company fields remai
   await expect(page.getByRole('heading', { name: '企业背景信息', exact: true })).toBeVisible();
   await expect(page.getByText('合成依据。', { exact: true })).toHaveCount(0);
 });
+
+test('background internal source shows real versions, pending knowledge integration and returns to the original editor', async ({
+  page,
+  context,
+}) => {
+  const state = await fixture(context);
+  await context.route('**/company-information/source', (route) =>
+    route.fulfill({
+      json: {
+        tenantId: tenant,
+        sourceId: `company-background:${tenant}`,
+        type: 'COMPANY_BACKGROUND',
+        state: 'AVAILABLE',
+        version: 'a'.repeat(64),
+        knowledgeIntegration: 'PENDING_INTEGRATION',
+        entries: state.info.groups.flatMap((g) =>
+          g.tags.map((t) => ({ ...t, field: g.field, versionId: id(50), provenance: '人工调整' })),
+        ),
+      },
+    }),
+  );
+  await page.goto(start);
+  await page.getByRole('button', { name: '合成业务', exact: true }).click();
+  await page.getByText('知识使用情况', { exact: true }).click();
+  await expect(page.getByRole('region', { name: '背景来源与知识使用' })).toContainText('当前可用版本 v1');
+  await expect(page.getByRole('region', { name: '背景来源与知识使用' })).toContainText(
+    '不能据此判断是否已有知识引用',
+  );
+  await page.getByLabel('标签名称').fill('已更新业务');
+  await page.getByRole('button', { name: '保存调整', exact: true }).click();
+  await expect(page.getByText('企业信息已更新。背景保存成功不代表知识已更新。')).toBeVisible();
+  await page.goto(`/tenant-admin/#tenant=${tenant}&admin=database&section=access`);
+  await expect(page.getByRole('heading', { name: '企业背景 · 内部来源' })).toBeVisible();
+  await expect(page.getByText('可读取 1 条背景', { exact: false })).toBeVisible();
+  await page.getByText('查看来源版本与条目').click();
+  await expect(page.getByRole('region', { name: '企业背景内部来源' })).toContainText('已更新业务 · v2');
+  await page.getByRole('link', { name: '维护企业背景 →' }).click();
+  await expect(page.getByRole('heading', { name: '企业背景信息' })).toBeVisible();
+});
