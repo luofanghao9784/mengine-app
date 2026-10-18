@@ -1,4 +1,5 @@
 import { RuntimeError, type ModelPort } from './ports.js';
+import type { TaskObservation } from './observability.js';
 import { isRecord } from './http-json.js';
 
 export type TokenUsage = { inputTokens: number; outputTokens: number };
@@ -8,6 +9,7 @@ export type UsageModel = ModelPort & { lastUsage?: TokenUsage | null; usage?: To
 export function meteredModel(
   backend: UsageModel,
   invoke: (action: string, body: unknown, receipt?: boolean) => Promise<unknown>,
+  observation?: TaskObservation, modelName = 'model',
 ): ModelPort {
   let sequence = 0;
   return {
@@ -28,6 +30,7 @@ export function meteredModel(
         throw new RuntimeError('TASK_RUNTIME_INCOMPATIBLE');
       backend.lastUsage = null;
       let outcome = 'FAILED';
+      const observed = observation?.model(modelName, current);
       try {
         request.signal.throwIfAborted();
         for await (const part of backend.generate(request)) {
@@ -60,6 +63,7 @@ export function meteredModel(
         if (request.signal.aborted) outcome = 'CANCELLED';
         // A fresh bounded signal permits metadata delivery after cancellation. No task/data actions.
         const usage = backend.lastUsage as TokenUsage | null | undefined;
+        observed?.(outcome, usage);
         const receipt = await invoke(
           'model-usage/finish',
           {

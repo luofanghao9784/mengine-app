@@ -21,6 +21,7 @@ import { BRIEFING_WRITING_RULES } from './briefing-writing-rules.js';
 import type { RealtimePort } from './realtime.js';
 import { sourceQueries } from './source-query.js';
 import { planManagementTool } from './plan-management.js';
+import type { Observability } from './observability.js';
 import { meteredModel } from './metered-model.js';
 import { inputCoverage } from './input-coverage.js';
 import {
@@ -60,6 +61,7 @@ export interface AgentRequest {
 }
 type Source = { id: string; filename: string; version: number; locator: string; content: string };
 export interface AgentConfiguration {
+  observability?: Observability;
   platformBaseUrl: string;
   executionClass: 'live' | 'verification';
   modelName: string;
@@ -106,6 +108,7 @@ export class AgentTasks {
       signal = AbortSignal.any([controller.signal, disconnected]);
     this.attempts.set(key, Date.now());
     this.active.set(key, controller);
+    const observation = this.config.observability?.task(task.taskId, task.attemptId);
     const sources = new Map<string, Source>();
     const tableHandles = new Map<string, string>();
     let wikiLearning: ReturnType<typeof wikiSource> | undefined;
@@ -147,7 +150,7 @@ export class AgentTasks {
     let candidateSession: CandidateSession | undefined;
     let candidateUsed = false;
     let recipeFailure: string | undefined;
-    const invoke = async (action: string, body: unknown, limit = 65536) =>
+    const rawInvoke = async (action: string, body: unknown, limit = 65536) =>
       postJson(
         new URL(`/internal/v1/agent-access/${task.taskId}/${action}`, this.platform),
         task.attemptId,
@@ -158,6 +161,8 @@ export class AgentTasks {
         // Keep a bounded deadline without treating a short lock wait as revoked access.
         10000,
       );
+    const invoke = (action: string, body: unknown, limit = 65536) => observation
+      ? observation.call(action, () => rawInvoke(action, body, limit)) : rawInvoke(action, body, limit);
     let artifactTransferAvailable: boolean | undefined;
     let presentationAvailable: boolean | undefined;
     let presentationWorkflow: Record<string, unknown> | undefined;
@@ -444,6 +449,7 @@ export class AgentTasks {
               1500,
             )
           : invoke(action, body, 4096),
+        observation, selectedModel.modelName,
       );
       if (wikiLearning || wikiGraph || wikiInsight) {
         if (task.contractVersion !== '1.5') throw new RuntimeError('TASK_RUNTIME_INCOMPATIBLE');
@@ -1713,6 +1719,7 @@ export class AgentTasks {
         usage: backend.usage ?? null,
       };
     } finally {
+      observation?.end();
       candidateSession?.close();
       originals.close();
       controller.abort();

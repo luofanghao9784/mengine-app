@@ -9,6 +9,7 @@ def profile(job):
     return '(version 1) (deny default) (allow process*) (allow sysctl-read) (allow mach-lookup) (allow file-read-metadata) (allow file-read-data (literal "/")) ' + ' '.join('(allow file-read* (subpath ' + quote(p) + '))' for p in paths) + ' (allow file-read* (literal "/dev/null") (literal "/dev/urandom")) (allow file-write* (literal "/dev/null") (subpath ' + quote(job) + '))'
 
 def run(job, extension, script=None):
+    if script is None and extension == 'docling-pdf': script = ROOT / 'docling_parse.py'
     if sys.platform == 'linux':
         # Java invokes Python with -I, so the script directory is not on sys.path.
         import importlib.util

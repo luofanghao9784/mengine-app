@@ -22,11 +22,12 @@ public class KnowledgeService {
     public record Job(UUID id,UUID tenant,UUID workspace,UUID material,UUID version,UUID actor,UUID token) {}
     public record Input(String filename,byte[] bytes) {}
     private final FileTableService fileTables;
+    private final WeKnoraRetrieval retrieval;
     private final JdbcTemplate db; private final MaterialAccess access; private final IdentityService identities;
     private final IdentityAudit audit; private final ObjectStore store; private final boolean enabled;
     private final tools.jackson.databind.json.JsonMapper json=new tools.jackson.databind.json.JsonMapper();
-    public KnowledgeService(JdbcTemplate db,MaterialAccess access,IdentityService identities,IdentityAudit audit,ObjectStore store,FileTableService fileTables,@Value("${dreamcore.knowledge.enabled:false}") boolean enabled) {
-        this.fileTables=fileTables;this.db=db;this.access=access;this.identities=identities;this.audit=audit;this.store=store;this.enabled=enabled;
+    public KnowledgeService(JdbcTemplate db,MaterialAccess access,IdentityService identities,IdentityAudit audit,ObjectStore store,FileTableService fileTables,WeKnoraRetrieval retrieval,@Value("${dreamcore.knowledge.enabled:false}") boolean enabled) {
+        this.retrieval=retrieval;this.fileTables=fileTables;this.db=db;this.access=access;this.identities=identities;this.audit=audit;this.store=store;this.enabled=enabled;
     }
     private IdentityException missing() { return new IdentityException(404,"KNOWLEDGE_NOT_FOUND"); }
     private void page(int offset,int limit) { if(offset<0 || offset>100000 || limit<1 || limit>50) throw IdentityException.invalid(); }
@@ -114,13 +115,28 @@ public class KnowledgeService {
         if(selectedVersions==null){scope+=" AND (m.in_library OR m.attachment_conversation_id=?::uuid OR requested.version_id=v.id)";args.add(conversation);}
 
         boolean overview=query.isEmpty()&&selectedVersions!=null;
-        String match="SELECT c.*,s.number,s.filename,s.run_created_at,s.selected,"+(overview?"row_number() OVER(PARTITION BY c.version_id ORDER BY c.ordinal,c.id)":"0")+" AS excerpt_round FROM knowledge_chunks c JOIN scoped s ON c.run_id=s.run_id AND c.version_id=s.id AND c.tenant_id=s.tenant_id AND c.workspace_id=s.workspace_id WHERE s.parse_status IN ('READY','PARTIAL')";
-        for(String term:terms){match+=" AND strpos(lower(c.content),lower(?))>0";args.add(term);}
+        List<UUID> ranked=null;
+        if(retrieval.enabled() && !overview){
+            if(offset+limit>100)throw new IdentityException(503,"KNOWLEDGE_SEARCH_SCOPE_LIMIT");
+            ranked=retrieval.search(scope,new ArrayList<>(args),query,Math.min(offset+limit+1,100));
+            // HTTP work can outlive permission changes. Re-read membership and authorization below.
+            identities.member(actor,tenant,false);if(space!=null)access.require(actor,tenant,space,false);
+        }
+        String ranking="0";
+        if(ranked!=null && !ranked.isEmpty()){
+            var order=new StringBuilder("CASE c.id ");
+            for(int i=0;i<ranked.size();i++)order.append("WHEN '").append(ranked.get(i)).append("'::uuid THEN ").append(i).append(' ');
+            ranking=order.append("ELSE 100 END").toString();
+        }
+        String match="SELECT c.*,s.number,s.filename,s.run_created_at,s.selected,"+ranking+" AS retrieval_rank,"+(overview?"row_number() OVER(PARTITION BY c.version_id ORDER BY c.ordinal,c.id)":"0")+" AS excerpt_round FROM knowledge_chunks c JOIN scoped s ON c.run_id=s.run_id AND c.version_id=s.id AND c.tenant_id=s.tenant_id AND c.workspace_id=s.workspace_id WHERE s.parse_status IN ('READY','PARTIAL')";
+        if(ranked==null){for(String term:terms){match+=" AND strpos(lower(c.content),lower(?))>0";args.add(term);}}
+        else if(ranked.isEmpty())match+=" AND false";
+        else {match+=" AND c.id IN ("+String.join(",",Collections.nCopies(ranked.size(),"?"))+")";args.addAll(ranked);}
         args.add(limit+1);args.add(offset);
         // One snapshot covers authorization-filtered totals, the bounded version receipt and the result page.
         // A not-yet-parsed file is scope coverage, never a claim that it is relevant to the query.
         // A selected-file overview visits each version before taking its next excerpt.
-        String sql="WITH scoped AS MATERIALIZED ("+scope+"),matched AS MATERIALIZED ("+match+"), page AS (SELECT * FROM matched ORDER BY selected DESC,excerpt_round,run_created_at DESC,ordinal,id LIMIT ? OFFSET ?) "+"""
+        String sql="WITH scoped AS MATERIALIZED ("+scope+"),matched AS MATERIALIZED ("+match+"), page AS (SELECT * FROM matched ORDER BY selected DESC,retrieval_rank,excerpt_round,run_created_at DESC,ordinal,id LIMIT ? OFFSET ?) "+"""
             SELECT count(*) AS total,
               count(*) FILTER(WHERE parse_status IN ('READY','PARTIAL')) AS searchable,
               count(*) FILTER(WHERE parse_status='PARTIAL') AS partial,
@@ -128,7 +144,7 @@ public class KnowledgeService {
               coalesce((SELECT jsonb_agg(jsonb_build_object(
                 'id',p.id,'tenantId',p.tenant_id,'workspaceId',p.workspace_id,'materialId',p.material_id,
                 'versionId',p.version_id,'runId',p.run_id,'version',p.number,'filename',p.filename,
-                'locator',p.locator,'method',p.method,'content',p.content) ORDER BY p.selected DESC,p.excerpt_round,p.run_created_at DESC,p.ordinal,p.id) FROM page p),'[]') AS items,
+                'locator',p.locator,'method',p.method,'content',p.content) ORDER BY p.selected DESC,p.retrieval_rank,p.excerpt_round,p.run_created_at DESC,p.ordinal,p.id) FROM page p),'[]') AS items,
               coalesce((SELECT jsonb_agg(jsonb_build_object(
                 'materialId',v.material_id,'versionId',v.id,'version',v.number,'runId',v.run_id,'generation',v.generation,
                 'status',v.parse_status,'warnings',CASE WHEN v.warnings='' THEN ARRAY[]::text[] ELSE string_to_array(v.warnings,',') END,

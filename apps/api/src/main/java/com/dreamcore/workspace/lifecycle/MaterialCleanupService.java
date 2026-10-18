@@ -59,6 +59,15 @@ public class MaterialCleanupService {
             db.update("UPDATE materials SET name=? WHERE id=?","已清理-"+material,material);
         }
         db.update("UPDATE material_folders SET name='已清理-'||id::text WHERE id IN (SELECT object_id FROM content_lifecycle WHERE purge_job_id=? AND object_kind='FOLDER')",job.id());
+        // External index copies are part of online content. An unknown create must be reconciled,
+        // never treated as erased merely because the local original/chunks were scrubbed.
+        if(Boolean.TRUE.equals(db.queryForObject("""
+            SELECT EXISTS(SELECT 1 FROM knowledge_remote_index i
+              JOIN content_cleanup_materials m ON m.material_id=i.material_id
+              WHERE m.job_id=? AND i.state<>'DELETED')
+            """,Boolean.class,job.id()))){
+            db.update("UPDATE content_cleanup_jobs SET state='QUEUED',error_code='REMOTE_INDEX_CLEANUP_PENDING',lease_token=NULL,lease_until=NULL WHERE id=?",job.id());return;
+        }
         db.update("UPDATE content_lifecycle SET state='PURGED',revision=revision+1,changed_at=now() WHERE purge_job_id=?",job.id());
         db.update("UPDATE content_cleanup_jobs SET state='COMPLETE',revision=revision+1,completed_at=now(),lease_token=NULL,lease_until=NULL,error_code=NULL WHERE id=?",job.id());
     }

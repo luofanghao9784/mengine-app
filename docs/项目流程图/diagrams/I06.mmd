@@ -13,6 +13,10 @@ flowchart TD
   n_chunks --> n_finish["保存解析状态和固定版本依据"]
   n_table --> n_finish
   n_ocr --> n_finish
-  n_finish --> n_retrieval["按当前权限检索与读取引用"]
+  n_finish --> index["可选：WeKnora 持久化索引队列"]
+  index --> scoped["获准片段映射远端 ID；空范围不请求"]
+  scoped --> hybrid["混合召回与重排；仅接受范围内结果"]
+  hybrid --> n_retrieval["重查当前权限与版本；返回本地原文引用"]
+  n_finish -->|"开关关闭"| legacy["原关键词检索与权限过滤"]
   n_parser -->|"失败或超限"| n_error["记录失败或部分结果，允许时重试"]
   n_access -->|"无权"| n_deny["拒绝上传或读取"]
