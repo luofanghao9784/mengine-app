@@ -18,7 +18,7 @@ flowchart TD
   n_reply --> n_artifact["下载成果或保存为个人文稿"]
   n_artifact --> n_publish["明确发布到获权资料空间"]
   n_reply --> n_feedback["评价结果，提出问题或调整表达"]
-  n_source -.-> ossSearch["优先验证：WeKnora 或 pgvector 召回"]:::ossPriority
+  n_source -.-> ossSearch["已选：WeKnora 召回，服务待联调"]:::ossPriority
   n_queue -.-> ossTrace["旁路补强：Langfuse 运行追踪"]:::ossPriority
   n_pause -.-> ossWorkflow["规模需要再评估：Temporal 编排"]:::ossConditional
   classDef ossPriority fill:#e4f6eb,stroke:#2e8052,color:#154b30,stroke-width:2px

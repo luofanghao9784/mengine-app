@@ -4,7 +4,7 @@ flowchart TD
   inputs --> collector["按需：dlt 采集 / GX 规则校验"]:::ossConditional
   parser --> policy["保留：来源版本、权限与治理门禁"]
   collector --> policy
-  policy --> retrieval["优先比较：WeKnora 或 pgvector"]:::ossPriority
+  policy --> retrieval["已选：WeKnora，服务待联调"]:::ossPriority
   policy --> calculator["按需：DuckDB 计算执行内核"]:::ossConditional
   retrieval --> agent["保留当前 Harness 与受控工具"]
   calculator --> agent

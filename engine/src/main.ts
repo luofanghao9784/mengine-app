@@ -1,3 +1,4 @@
+import { configuredObservability } from './runtime/observability.js';
 import { ExecutionReceipts } from './runtime/execution-receipts.js';
 import { PresentationRenderer } from './runtime/presentation-renderer.js';
 import { createEngineServer } from './server.js';
@@ -39,11 +40,13 @@ const publicWeb = webEnabled
 const presentationRenderer =
   process.env.AGENT_PPT_RENDERER_ENABLED === 'true' ? new PresentationRenderer() : undefined;
 if (presentationRenderer) await presentationRenderer.check();
+const observability = configuredObservability(process.env);
 const agent = model
   ? new AgentTasks({
       platformBaseUrl: process.env.AGENT_PLATFORM_URL ?? '',
       executionClass: 'live',
       modelName: model.modelName,
+      observability,
       routineModel: model.routineModel,
       briefingUsePrimary: process.env.AGENT_BRIEFING_USE_PRIMARY_MODEL === 'true',
       publicWeb,
@@ -89,7 +92,7 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     company?.stop();
     experience?.stop();
     generalization?.stop();
-    server.close(() => process.exit(0));
+    server.close(() => { void (observability?.close() ?? Promise.resolve()).finally(() => process.exit(0)); });
     setTimeout(() => process.exit(1), 5000).unref();
   });
 }

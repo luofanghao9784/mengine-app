@@ -11,7 +11,7 @@
       "group": "功能流程",
       "document": "01-功能流程.md",
       "description": "总台负责企业与平台运营；企业端负责组织、数据和治理；员工端使用获权数据完成工作。三端通过共同身份、权限和任务记录协作。\n\n候选框为本次研判，虚线表示可替换或补强的位置；原实线仍描述当前业务。绿色优先验证，黄色有条件采用，紫色已在使用；蓝色业务步骤由本项目保留。",
-      "mermaid": "flowchart TD\n  n_platform[\"总台登录\"] --> n_open[\"创建企业并邀请初始负责人\"]\n  n_open --> n_accept{\"负责人接受并激活？\"}\n  n_accept -->|\"否\"| n_pending[\"待激活：重发、撤销或等待\"]\n  n_accept -->|\"是\"| n_tenant[\"企业正式可用\"]\n  n_tenant --> n_people[\"邀请成员、建立空间、分配职责\"]\n  n_tenant --> n_input[\"部署数据连接或上传获权资料\"]\n  n_input --> n_govern[\"解析、字段口径、质量治理、权限检查\"]\n  n_govern --> n_ready{\"数据与权限已就绪？\"}\n  n_ready -->|\"否\"| n_handle[\"核查异常、补配置、治理后重试\"]\n  n_handle --> n_govern\n  n_ready -->|\"是\"| n_sync[\"同步资料、数据快照和知识\"]\n  n_people --> n_employee[\"员工选择企业进入工作空间\"]\n  n_sync --> n_employee\n  n_employee --> n_chat[\"会话：提出问题与任务\"]\n  n_employee --> n_briefing[\"画报：阅读、关注、讨论\"]\n  n_employee --> n_library[\"资料库：查找、上传、维护\"]\n  n_employee --> n_skill[\"技能中心：PPT 大纲与生成\"]\n  n_chat --> n_result[\"带来源的回复、分析和成果文件\"]\n  n_briefing --> n_result\n  n_skill --> n_result\n  n_result --> n_share[\"核对成果，明确保存或共享\"]\n  n_share --> n_feedback[\"反馈问题与表达偏好\"]\n  n_feedback --> n_improve[\"反馈处理、经验维护和后续工作\"]\n  n_platform --> n_observe[\"观察运行、成本、失败与接入状态\"]\n  n_observe -.-> n_handle\n  n_govern -.-> ossParse[\"优先验证：Docling 解析\"]:::ossPriority\n  n_sync -.-> ossRetrieve[\"优先验证：WeKnora 或 pgvector 检索\"]:::ossPriority\n  n_observe -.-> ossTrace[\"补强：Langfuse 内部诊断\"]:::ossPriority\n  n_skill -.-> ossPpt[\"已使用：PptxGenJS 生成文件\"]:::ossExisting\n  classDef ossPriority fill:#e4f6eb,stroke:#2e8052,color:#154b30,stroke-width:2px\n  classDef ossConditional fill:#fff3d9,stroke:#ac7b27,color:#604417,stroke-width:1.5px\n  classDef ossExisting fill:#f0eaff,stroke:#8063ad,color:#4a3672,stroke-width:2px\n",
+      "mermaid": "flowchart TD\n  n_platform[\"总台登录\"] --> n_open[\"创建企业并邀请初始负责人\"]\n  n_open --> n_accept{\"负责人接受并激活？\"}\n  n_accept -->|\"否\"| n_pending[\"待激活：重发、撤销或等待\"]\n  n_accept -->|\"是\"| n_tenant[\"企业正式可用\"]\n  n_tenant --> n_people[\"邀请成员、建立空间、分配职责\"]\n  n_tenant --> n_input[\"部署数据连接或上传获权资料\"]\n  n_input --> n_govern[\"解析、字段口径、质量治理、权限检查\"]\n  n_govern --> n_ready{\"数据与权限已就绪？\"}\n  n_ready -->|\"否\"| n_handle[\"核查异常、补配置、治理后重试\"]\n  n_handle --> n_govern\n  n_ready -->|\"是\"| n_sync[\"同步资料、数据快照和知识\"]\n  n_people --> n_employee[\"员工选择企业进入工作空间\"]\n  n_sync --> n_employee\n  n_employee --> n_chat[\"会话：提出问题与任务\"]\n  n_employee --> n_briefing[\"画报：阅读、关注、讨论\"]\n  n_employee --> n_library[\"资料库：查找、上传、维护\"]\n  n_employee --> n_skill[\"技能中心：PPT 大纲与生成\"]\n  n_chat --> n_result[\"带来源的回复、分析和成果文件\"]\n  n_briefing --> n_result\n  n_skill --> n_result\n  n_result --> n_share[\"核对成果，明确保存或共享\"]\n  n_share --> n_feedback[\"反馈问题与表达偏好\"]\n  n_feedback --> n_improve[\"反馈处理、经验维护和后续工作\"]\n  n_platform --> n_observe[\"观察运行、成本、失败与接入状态\"]\n  n_observe -.-> n_handle\n  n_govern -.-> ossParse[\"优先验证：Docling 解析\"]:::ossPriority\n  n_sync -.-> ossRetrieve[\"已选：WeKnora 检索，服务待联调\"]:::ossPriority\n  n_observe -.-> ossTrace[\"补强：Langfuse 内部诊断\"]:::ossPriority\n  n_skill -.-> ossPpt[\"已使用：PptxGenJS 生成文件\"]:::ossExisting\n  classDef ossPriority fill:#e4f6eb,stroke:#2e8052,color:#154b30,stroke-width:2px\n  classDef ossConditional fill:#fff3d9,stroke:#ac7b27,color:#604417,stroke-width:1.5px\n  classDef ossExisting fill:#f0eaff,stroke:#8063ad,color:#4a3672,stroke-width:2px\n",
       "sources": [
         {
           "label": "三端入口",
@@ -82,10 +82,10 @@
             "apps/api/src/main/java/com/dreamcore/workspace/knowledge/KnowledgeService.java",
             "docs/技术/M3-A1本地解析与WeKnora接入边界.md"
           ],
-          "current": "本地检索按授权范围做关键词包含匹配；旧记录只核对过 WeKnora v0.8.0 API，未实机接入。",
+          "current": "已实现 WeKnora v0.8.3 可选适配、索引队列、权限复核和删除检查；HTTP 契约与隔离测试通过，真实服务待联调。",
           "replace": "索引、语义与混合召回、重排等检索服务；其 Wiki 编译可另作知识草稿生成器候选。",
           "retain": "本系统企业/空间/文件版本映射、已授权来源集合、引用身份、Wiki 发布和来源撤回。",
-          "approach": "通过服务端适配器接检索 API，不嵌入其完整前端。先发非空获准版本范围，结果映射后再校验；当日主分支能力与旧 v0.8.0 契约需重新对齐。",
+          "approach": "通过服务端适配器接检索 API，不嵌入其完整前端。先发非空获准版本范围，结果映射后再校验；本轮固定 v0.8.3 契约，默认关闭，真实召回效果待验。",
           "effort": "中至大：索引映射、模型服务和双系统生命周期",
           "gate": "同一批问题与现有检索盲测；跨企业、空授权集合、撤权、删除、旧版本、索引重建必须不泄漏。",
           "licenseNote": "只选择所需组件；模型与可选存储的许可和运维成本另算。",
@@ -172,7 +172,7 @@
           "current": "已有任务回执、模型尝试计量、企业遥测和总台用量页面。",
           "replace": "模型/工具调用链追踪、评测样本、提示词实验与失败诊断，可减少自建调试台工作。",
           "retain": "产品内任务状态、客户可见用量、计费口径、企业隔离、未知结果与业务审计。",
-          "approach": "先只向内部运维实例上报 taskId/attemptId、时延和经脱敏的摘要；选择性记录内容，不能默认复制所有企业正文。",
+          "approach": "已接入可选元数据观测：taskId/attemptId、时延、状态和数值用量；不传正文、提示词、工具参数、结果或原始错误。实际 Langfuse 实例待联调。",
           "effort": "中：独立服务和数据生命周期维护",
           "gate": "验证一轮任务各调用可串联；用量与业务回执能核对，遥测失败不阻断任务；日志内容与删除策略受控。",
           "licenseNote": "ee 目录不属核心 MIT，项目级治理等功能须按当日官方版本边界核验。",
@@ -351,7 +351,7 @@
           "current": "已有任务回执、模型尝试计量、企业遥测和总台用量页面。",
           "replace": "模型/工具调用链追踪、评测样本、提示词实验与失败诊断，可减少自建调试台工作。",
           "retain": "产品内任务状态、客户可见用量、计费口径、企业隔离、未知结果与业务审计。",
-          "approach": "先只向内部运维实例上报 taskId/attemptId、时延和经脱敏的摘要；选择性记录内容，不能默认复制所有企业正文。",
+          "approach": "已接入可选元数据观测：taskId/attemptId、时延、状态和数值用量；不传正文、提示词、工具参数、结果或原始错误。实际 Langfuse 实例待联调。",
           "effort": "中：独立服务和数据生命周期维护",
           "gate": "验证一轮任务各调用可串联；用量与业务回执能核对，遥测失败不阻断任务；日志内容与删除策略受控。",
           "licenseNote": "ee 目录不属核心 MIT，项目级治理等功能须按当日官方版本边界核验。",
@@ -526,10 +526,10 @@
             "apps/api/src/main/java/com/dreamcore/workspace/knowledge/KnowledgeService.java",
             "docs/技术/M3-A1本地解析与WeKnora接入边界.md"
           ],
-          "current": "本地检索按授权范围做关键词包含匹配；旧记录只核对过 WeKnora v0.8.0 API，未实机接入。",
+          "current": "已实现 WeKnora v0.8.3 可选适配、索引队列、权限复核和删除检查；HTTP 契约与隔离测试通过，真实服务待联调。",
           "replace": "索引、语义与混合召回、重排等检索服务；其 Wiki 编译可另作知识草稿生成器候选。",
           "retain": "本系统企业/空间/文件版本映射、已授权来源集合、引用身份、Wiki 发布和来源撤回。",
-          "approach": "通过服务端适配器接检索 API，不嵌入其完整前端。先发非空获准版本范围，结果映射后再校验；当日主分支能力与旧 v0.8.0 契约需重新对齐。",
+          "approach": "通过服务端适配器接检索 API，不嵌入其完整前端。先发非空获准版本范围，结果映射后再校验；本轮固定 v0.8.3 契约，默认关闭，真实召回效果待验。",
           "effort": "中至大：索引映射、模型服务和双系统生命周期",
           "gate": "同一批问题与现有检索盲测；跨企业、空授权集合、撤权、删除、旧版本、索引重建必须不泄漏。",
           "licenseNote": "只选择所需组件；模型与可选存储的许可和运维成本另算。",
@@ -795,7 +795,7 @@
       "group": "功能流程",
       "document": "01-功能流程.md",
       "description": "会话为本人工作记录。提交被服务端接受后进入任务；流式文字和过程展示不是最终完成证明，最终以任务结果和执行回执为准。\n\n候选框为本次研判，虚线表示可替换或补强的位置；原实线仍描述当前业务。绿色优先验证，黄色有条件采用，紫色已在使用；蓝色业务步骤由本项目保留。",
-      "mermaid": "flowchart TD\n  n_enter[\"进入工作空间并选择企业\"] --> n_compose[\"从会话或画报底部输入需求\"]\n  n_compose --> n_source[\"选择获权资料、原件和工作范围\"]\n  n_source --> n_send[\"提交会话任务\"]\n  n_send --> n_accepted{\"服务端接受？\"}\n  n_accepted -->|\"否\"| n_correct[\"保留输入，处理权限、参数或连接问题\"]\n  n_correct --> n_send\n  n_accepted -->|\"是\"| n_queue[\"显示排队和执行过程\"]\n  n_queue --> n_status{\"任务进展\"}\n  n_status -->|\"需要补充\"| n_input[\"补充材料或确认要求\"]\n  n_input --> n_queue\n  n_status -->|\"用户控制\"| n_pause[\"暂停、恢复或取消\"]\n  n_status -->|\"失败或结果待核对\"| n_failure[\"查看错误与尝试记录，允许时重试\"]\n  n_failure --> n_queue\n  n_status -->|\"成功\"| n_reply[\"阅读回复、核对引用与计算依据\"]\n  n_reply --> n_next[\"继续追问\"]\n  n_next --> n_source\n  n_reply --> n_artifact[\"下载成果或保存为个人文稿\"]\n  n_artifact --> n_publish[\"明确发布到获权资料空间\"]\n  n_reply --> n_feedback[\"评价结果，提出问题或调整表达\"]\n  n_source -.-> ossSearch[\"优先验证：WeKnora 或 pgvector 召回\"]:::ossPriority\n  n_queue -.-> ossTrace[\"旁路补强：Langfuse 运行追踪\"]:::ossPriority\n  n_pause -.-> ossWorkflow[\"规模需要再评估：Temporal 编排\"]:::ossConditional\n  classDef ossPriority fill:#e4f6eb,stroke:#2e8052,color:#154b30,stroke-width:2px\n  classDef ossConditional fill:#fff3d9,stroke:#ac7b27,color:#604417,stroke-width:1.5px\n  classDef ossExisting fill:#f0eaff,stroke:#8063ad,color:#4a3672,stroke-width:2px\n",
+      "mermaid": "flowchart TD\n  n_enter[\"进入工作空间并选择企业\"] --> n_compose[\"从会话或画报底部输入需求\"]\n  n_compose --> n_source[\"选择获权资料、原件和工作范围\"]\n  n_source --> n_send[\"提交会话任务\"]\n  n_send --> n_accepted{\"服务端接受？\"}\n  n_accepted -->|\"否\"| n_correct[\"保留输入，处理权限、参数或连接问题\"]\n  n_correct --> n_send\n  n_accepted -->|\"是\"| n_queue[\"显示排队和执行过程\"]\n  n_queue --> n_status{\"任务进展\"}\n  n_status -->|\"需要补充\"| n_input[\"补充材料或确认要求\"]\n  n_input --> n_queue\n  n_status -->|\"用户控制\"| n_pause[\"暂停、恢复或取消\"]\n  n_status -->|\"失败或结果待核对\"| n_failure[\"查看错误与尝试记录，允许时重试\"]\n  n_failure --> n_queue\n  n_status -->|\"成功\"| n_reply[\"阅读回复、核对引用与计算依据\"]\n  n_reply --> n_next[\"继续追问\"]\n  n_next --> n_source\n  n_reply --> n_artifact[\"下载成果或保存为个人文稿\"]\n  n_artifact --> n_publish[\"明确发布到获权资料空间\"]\n  n_reply --> n_feedback[\"评价结果，提出问题或调整表达\"]\n  n_source -.-> ossSearch[\"已选：WeKnora 召回，服务待联调\"]:::ossPriority\n  n_queue -.-> ossTrace[\"旁路补强：Langfuse 运行追踪\"]:::ossPriority\n  n_pause -.-> ossWorkflow[\"规模需要再评估：Temporal 编排\"]:::ossConditional\n  classDef ossPriority fill:#e4f6eb,stroke:#2e8052,color:#154b30,stroke-width:2px\n  classDef ossConditional fill:#fff3d9,stroke:#ac7b27,color:#604417,stroke-width:1.5px\n  classDef ossExisting fill:#f0eaff,stroke:#8063ad,color:#4a3672,stroke-width:2px\n",
       "sources": [
         {
           "label": "会话界面",
@@ -837,10 +837,10 @@
             "apps/api/src/main/java/com/dreamcore/workspace/knowledge/KnowledgeService.java",
             "docs/技术/M3-A1本地解析与WeKnora接入边界.md"
           ],
-          "current": "本地检索按授权范围做关键词包含匹配；旧记录只核对过 WeKnora v0.8.0 API，未实机接入。",
+          "current": "已实现 WeKnora v0.8.3 可选适配、索引队列、权限复核和删除检查；HTTP 契约与隔离测试通过，真实服务待联调。",
           "replace": "索引、语义与混合召回、重排等检索服务；其 Wiki 编译可另作知识草稿生成器候选。",
           "retain": "本系统企业/空间/文件版本映射、已授权来源集合、引用身份、Wiki 发布和来源撤回。",
-          "approach": "通过服务端适配器接检索 API，不嵌入其完整前端。先发非空获准版本范围，结果映射后再校验；当日主分支能力与旧 v0.8.0 契约需重新对齐。",
+          "approach": "通过服务端适配器接检索 API，不嵌入其完整前端。先发非空获准版本范围，结果映射后再校验；本轮固定 v0.8.3 契约，默认关闭，真实召回效果待验。",
           "effort": "中至大：索引映射、模型服务和双系统生命周期",
           "gate": "同一批问题与现有检索盲测；跨企业、空授权集合、撤权、删除、旧版本、索引重建必须不泄漏。",
           "licenseNote": "只选择所需组件；模型与可选存储的许可和运维成本另算。",
@@ -898,7 +898,7 @@
           "current": "已有任务回执、模型尝试计量、企业遥测和总台用量页面。",
           "replace": "模型/工具调用链追踪、评测样本、提示词实验与失败诊断，可减少自建调试台工作。",
           "retain": "产品内任务状态、客户可见用量、计费口径、企业隔离、未知结果与业务审计。",
-          "approach": "先只向内部运维实例上报 taskId/attemptId、时延和经脱敏的摘要；选择性记录内容，不能默认复制所有企业正文。",
+          "approach": "已接入可选元数据观测：taskId/attemptId、时延、状态和数值用量；不传正文、提示词、工具参数、结果或原始错误。实际 Langfuse 实例待联调。",
           "effort": "中：独立服务和数据生命周期维护",
           "gate": "验证一轮任务各调用可串联；用量与业务回执能核对，遥测失败不阻断任务；日志内容与删除策略受控。",
           "licenseNote": "ee 目录不属核心 MIT，项目级治理等功能须按当日官方版本边界核验。",
@@ -1213,10 +1213,10 @@
             "apps/api/src/main/java/com/dreamcore/workspace/knowledge/KnowledgeService.java",
             "docs/技术/M3-A1本地解析与WeKnora接入边界.md"
           ],
-          "current": "本地检索按授权范围做关键词包含匹配；旧记录只核对过 WeKnora v0.8.0 API，未实机接入。",
+          "current": "已实现 WeKnora v0.8.3 可选适配、索引队列、权限复核和删除检查；HTTP 契约与隔离测试通过，真实服务待联调。",
           "replace": "索引、语义与混合召回、重排等检索服务；其 Wiki 编译可另作知识草稿生成器候选。",
           "retain": "本系统企业/空间/文件版本映射、已授权来源集合、引用身份、Wiki 发布和来源撤回。",
-          "approach": "通过服务端适配器接检索 API，不嵌入其完整前端。先发非空获准版本范围，结果映射后再校验；当日主分支能力与旧 v0.8.0 契约需重新对齐。",
+          "approach": "通过服务端适配器接检索 API，不嵌入其完整前端。先发非空获准版本范围，结果映射后再校验；本轮固定 v0.8.3 契约，默认关闭，真实召回效果待验。",
           "effort": "中至大：索引映射、模型服务和双系统生命周期",
           "gate": "同一批问题与现有检索盲测；跨企业、空授权集合、撤权、删除、旧版本、索引重建必须不泄漏。",
           "licenseNote": "只选择所需组件；模型与可选存储的许可和运维成本另算。",
@@ -1313,8 +1313,8 @@
       "title": "哪些能力适合用开源替代",
       "group": "开源替代方案",
       "document": "05-开源替代流程.md",
-      "description": "这是拟议方案总览，不代表已接入。优先做解析与检索的局部验证；同类检索路线先择一。账号、权限、业务口径和成果发布继续由三端业务层管理。",
-      "mermaid": "flowchart TD\n  product[\"保留：三端入口、企业与空间业务\"] --> inputs[\"资料与业务数据进入\"]\n  inputs --> parser[\"优先验证：Docling 复杂文档解析\"]:::ossPriority\n  inputs --> collector[\"按需：dlt 采集 / GX 规则校验\"]:::ossConditional\n  parser --> policy[\"保留：来源版本、权限与治理门禁\"]\n  collector --> policy\n  policy --> retrieval[\"优先比较：WeKnora 或 pgvector\"]:::ossPriority\n  policy --> calculator[\"按需：DuckDB 计算执行内核\"]:::ossConditional\n  retrieval --> agent[\"保留当前 Harness 与受控工具\"]\n  calculator --> agent\n  agent --> delivery[\"保留：画报规则、确认、发布和回执\"]\n  delivery --> chart[\"按需：ECharts 详情图 / Tiptap 编辑区\"]:::ossConditional\n  delivery --> ppt[\"已采用：PptxGenJS 文件生成\"]:::ossExisting\n  agent -.-> trace[\"优先补强：Langfuse 运维追踪\"]:::ossPriority\n  product -.-> later[\"后置条件项：Keycloak / OpenFGA / Temporal\"]:::ossConditional\n  classDef ossPriority fill:#e4f6eb,stroke:#2e8052,color:#154b30,stroke-width:2px\n  classDef ossConditional fill:#fff3d9,stroke:#ac7b27,color:#604417,stroke-width:1.5px\n  classDef ossExisting fill:#f0eaff,stroke:#8063ad,color:#4a3672,stroke-width:2px\n",
+      "description": "这是选型与接入边界总览，不代表已部署。WeKnora 是本轮已选检索路线。账号、权限、业务口径和成果发布继续由三端业务层管理。",
+      "mermaid": "flowchart TD\n  product[\"保留：三端入口、企业与空间业务\"] --> inputs[\"资料与业务数据进入\"]\n  inputs --> parser[\"优先验证：Docling 复杂文档解析\"]:::ossPriority\n  inputs --> collector[\"按需：dlt 采集 / GX 规则校验\"]:::ossConditional\n  parser --> policy[\"保留：来源版本、权限与治理门禁\"]\n  collector --> policy\n  policy --> retrieval[\"已选：WeKnora，服务待联调\"]:::ossPriority\n  policy --> calculator[\"按需：DuckDB 计算执行内核\"]:::ossConditional\n  retrieval --> agent[\"保留当前 Harness 与受控工具\"]\n  calculator --> agent\n  agent --> delivery[\"保留：画报规则、确认、发布和回执\"]\n  delivery --> chart[\"按需：ECharts 详情图 / Tiptap 编辑区\"]:::ossConditional\n  delivery --> ppt[\"已采用：PptxGenJS 文件生成\"]:::ossExisting\n  agent -.-> trace[\"优先补强：Langfuse 运维追踪\"]:::ossPriority\n  product -.-> later[\"后置条件项：Keycloak / OpenFGA / Temporal\"]:::ossConditional\n  classDef ossPriority fill:#e4f6eb,stroke:#2e8052,color:#154b30,stroke-width:2px\n  classDef ossConditional fill:#fff3d9,stroke:#ac7b27,color:#604417,stroke-width:1.5px\n  classDef ossExisting fill:#f0eaff,stroke:#8063ad,color:#4a3672,stroke-width:2px\n",
       "sources": [
         {
           "label": "当前解析边界",
@@ -1326,7 +1326,7 @@
           "label": "既有依赖",
           "path": "engine/package.json",
           "link": "../../engine/package.json",
-          "sha256": "4a88523424ec7e6f4e4229fc29c4a68d8206ced43ba436bd7c09d58bcc9364d0"
+          "sha256": "470ecd20e6213cf4431a833cdaa424dafd7425be7715ea75891b31ccffef96ac"
         },
         {
           "label": "Docling",
@@ -1397,10 +1397,10 @@
             "apps/api/src/main/java/com/dreamcore/workspace/knowledge/KnowledgeService.java",
             "docs/技术/M3-A1本地解析与WeKnora接入边界.md"
           ],
-          "current": "本地检索按授权范围做关键词包含匹配；旧记录只核对过 WeKnora v0.8.0 API，未实机接入。",
+          "current": "已实现 WeKnora v0.8.3 可选适配、索引队列、权限复核和删除检查；HTTP 契约与隔离测试通过，真实服务待联调。",
           "replace": "索引、语义与混合召回、重排等检索服务；其 Wiki 编译可另作知识草稿生成器候选。",
           "retain": "本系统企业/空间/文件版本映射、已授权来源集合、引用身份、Wiki 发布和来源撤回。",
-          "approach": "通过服务端适配器接检索 API，不嵌入其完整前端。先发非空获准版本范围，结果映射后再校验；当日主分支能力与旧 v0.8.0 契约需重新对齐。",
+          "approach": "通过服务端适配器接检索 API，不嵌入其完整前端。先发非空获准版本范围，结果映射后再校验；本轮固定 v0.8.3 契约，默认关闭，真实召回效果待验。",
           "effort": "中至大：索引映射、模型服务和双系统生命周期",
           "gate": "同一批问题与现有检索盲测；跨企业、空授权集合、撤权、删除、旧版本、索引重建必须不泄漏。",
           "licenseNote": "只选择所需组件；模型与可选存储的许可和运维成本另算。",
@@ -1542,7 +1542,7 @@
           "current": "已有任务回执、模型尝试计量、企业遥测和总台用量页面。",
           "replace": "模型/工具调用链追踪、评测样本、提示词实验与失败诊断，可减少自建调试台工作。",
           "retain": "产品内任务状态、客户可见用量、计费口径、企业隔离、未知结果与业务审计。",
-          "approach": "先只向内部运维实例上报 taskId/attemptId、时延和经脱敏的摘要；选择性记录内容，不能默认复制所有企业正文。",
+          "approach": "已接入可选元数据观测：taskId/attemptId、时延、状态和数值用量；不传正文、提示词、工具参数、结果或原始错误。实际 Langfuse 实例待联调。",
           "effort": "中：独立服务和数据生命周期维护",
           "gate": "验证一轮任务各调用可串联；用量与业务回执能核对，遥测失败不阻断任务；日志内容与删除策略受控。",
           "licenseNote": "ee 目录不属核心 MIT，项目级治理等功能须按当日官方版本边界核验。",
@@ -1721,14 +1721,14 @@
       "title": "资料解析与检索：替换执行部分",
       "group": "开源替代方案",
       "document": "05-开源替代流程.md",
-      "description": "Docling 可以只替换复杂 PDF 解析。检索服务路线优先比较 WeKnora 与同库 pgvector；RAGFlow 是备选，不同时装三套。新解析和索引不得改写旧引用或扩大权限。",
-      "mermaid": "flowchart TD\n  upload[\"现有上传入口与获权版本\"] --> input[\"平台提供本次允许的原件字节\"]\n  input --> parse[\"候选：Docling 仅处理目标格式\"]:::ossPriority\n  parse --> adapt[\"适配为 locator / chunks / warnings\"]\n  adapt --> commit[\"平台复查权限并保存新解析批次\"]\n  commit --> choose{\"选择一条检索路线\"}\n  choose -->|\"服务整合\"| weknora[\"WeKnora 索引、召回与重排\"]:::ossPriority\n  choose -->|\"复用数据库\"| vector[\"pgvector 向量索引；其余编排自研\"]:::ossPriority\n  choose -.->|\"对照备选\"| rag[\"RAGFlow 分块与检索\"]:::ossConditional\n  query[\"用户或任务发起检索\"] --> scope[\"平台算出非空获准版本集合\"]\n  scope --> retrieval[\"只向所选检索路线发送获准范围\"]\n  weknora --> retrieval\n  vector --> retrieval\n  rag -.-> retrieval\n  retrieval --> check[\"映射片段并二次校验权限与版本\"]\n  check --> result[\"现有界面展示内容与固定引用\"]\n  revoke[\"来源撤回、删除或权限变更\"] --> deny[\"立即拒绝读取；异步清理或重建索引\"]\n  deny -.-> check\n  classDef ossPriority fill:#e4f6eb,stroke:#2e8052,color:#154b30,stroke-width:2px\n  classDef ossConditional fill:#fff3d9,stroke:#ac7b27,color:#604417,stroke-width:1.5px\n  classDef ossExisting fill:#f0eaff,stroke:#8063ad,color:#4a3672,stroke-width:2px\n",
+      "description": "Docling 可以只替换复杂 PDF 解析。已选择 WeKnora；pgvector、RAGFlow 仅保留为后续备选。WeKnora Wiki 编译只作为草稿生成器候选。新解析和索引不得改写旧引用或扩大权限。",
+      "mermaid": "flowchart TD\n  upload[\"现有上传入口与获权版本\"] --> input[\"平台提供本次允许的原件字节\"]\n  input --> parse[\"可选适配：Docling 仅处理 PDF\"]:::ossPriority\n  parse --> adapt[\"适配为 locator / chunks / warnings\"]\n  adapt --> commit[\"平台复查权限并保存新解析批次\"]\n  commit --> choose{\"WeKnora 开关与企业绑定\"}\n  choose -->|\"已选，待实例联调\"| weknora[\"WeKnora 索引、召回与重排\"]:::ossPriority\n  choose -.->|\"本轮不接\"| vector[\"pgvector 向量索引；其余编排自研\"]:::ossPriority\n  choose -.->|\"对照备选\"| rag[\"RAGFlow 分块与检索\"]:::ossConditional\n  query[\"用户或任务发起检索\"] --> scope[\"平台算出非空获准版本集合\"]\n  scope --> retrieval[\"只向所选检索路线发送获准范围\"]\n  weknora --> retrieval\n  vector -.-> retrieval\n  rag -.-> retrieval\n  retrieval --> check[\"映射片段并二次校验权限与版本\"]\n  check --> result[\"现有界面展示内容与固定引用\"]\n  revoke[\"来源撤回、删除或权限变更\"] --> deny[\"立即拒绝读取；异步清理或重建索引\"]\n  deny -.-> check\n  deny --> cleanup{\"远端副本确认删除？\"}\n  cleanup -->|\"是\"| done[\"永久清理可完成\"]\n  cleanup -->|\"否或创建结果不明\"| pending[\"保持待清理，不重复创建\"]\n  classDef ossPriority fill:#e4f6eb,stroke:#2e8052,color:#154b30,stroke-width:2px\n  classDef ossConditional fill:#fff3d9,stroke:#ac7b27,color:#604417,stroke-width:1.5px\n  classDef ossExisting fill:#f0eaff,stroke:#8063ad,color:#4a3672,stroke-width:2px\n",
       "sources": [
         {
           "label": "知识检索",
           "path": "apps/api/src/main/java/com/dreamcore/workspace/knowledge/KnowledgeService.java",
           "link": "../../apps/api/src/main/java/com/dreamcore/workspace/knowledge/KnowledgeService.java",
-          "sha256": "3533b59ee5abb6928bc5c837f33962086d3517f638a40d8f510883a84bb9bec3"
+          "sha256": "7dbb772f26c8939e17ec98a00f1d9676f414d5037f42427732c93ef1c78901bd"
         },
         {
           "label": "旧核查记录",
@@ -1811,10 +1811,10 @@
             "apps/api/src/main/java/com/dreamcore/workspace/knowledge/KnowledgeService.java",
             "docs/技术/M3-A1本地解析与WeKnora接入边界.md"
           ],
-          "current": "本地检索按授权范围做关键词包含匹配；旧记录只核对过 WeKnora v0.8.0 API，未实机接入。",
+          "current": "已实现 WeKnora v0.8.3 可选适配、索引队列、权限复核和删除检查；HTTP 契约与隔离测试通过，真实服务待联调。",
           "replace": "索引、语义与混合召回、重排等检索服务；其 Wiki 编译可另作知识草稿生成器候选。",
           "retain": "本系统企业/空间/文件版本映射、已授权来源集合、引用身份、Wiki 发布和来源撤回。",
-          "approach": "通过服务端适配器接检索 API，不嵌入其完整前端。先发非空获准版本范围，结果映射后再校验；当日主分支能力与旧 v0.8.0 契约需重新对齐。",
+          "approach": "通过服务端适配器接检索 API，不嵌入其完整前端。先发非空获准版本范围，结果映射后再校验；本轮固定 v0.8.3 契约，默认关闭，真实召回效果待验。",
           "effort": "中至大：索引映射、模型服务和双系统生命周期",
           "gate": "同一批问题与现有检索盲测；跨企业、空授权集合、撤权、删除、旧版本、索引重建必须不泄漏。",
           "licenseNote": "只选择所需组件；模型与可选存储的许可和运维成本另算。",
@@ -2061,7 +2061,7 @@
           "label": "计量",
           "path": "engine/src/runtime/metered-model.ts",
           "link": "../../engine/src/runtime/metered-model.ts",
-          "sha256": "1bbdc3e6d46126c781d6c9b7f95dd35d2d44c0de137c2484e694567b2e9c6dcf"
+          "sha256": "1e7635b0f6d28e20276f5ef4023f737bb228cd6fbacd4fb87d5e539e5c916d74"
         },
         {
           "label": "Langfuse",
@@ -2111,7 +2111,7 @@
           "current": "已有任务回执、模型尝试计量、企业遥测和总台用量页面。",
           "replace": "模型/工具调用链追踪、评测样本、提示词实验与失败诊断，可减少自建调试台工作。",
           "retain": "产品内任务状态、客户可见用量、计费口径、企业隔离、未知结果与业务审计。",
-          "approach": "先只向内部运维实例上报 taskId/attemptId、时延和经脱敏的摘要；选择性记录内容，不能默认复制所有企业正文。",
+          "approach": "已接入可选元数据观测：taskId/attemptId、时延、状态和数值用量；不传正文、提示词、工具参数、结果或原始错误。实际 Langfuse 实例待联调。",
           "effort": "中：独立服务和数据生命周期维护",
           "gate": "验证一轮任务各调用可串联；用量与业务回执能核对，遥测失败不阻断任务；日志内容与删除策略受控。",
           "licenseNote": "ee 目录不属核心 MIT，项目级治理等功能须按当日官方版本边界核验。",
@@ -2220,7 +2220,7 @@
           "label": "对象检索门禁",
           "path": "apps/api/src/main/java/com/dreamcore/workspace/knowledge/KnowledgeService.java",
           "link": "../../apps/api/src/main/java/com/dreamcore/workspace/knowledge/KnowledgeService.java",
-          "sha256": "3533b59ee5abb6928bc5c837f33962086d3517f638a40d8f510883a84bb9bec3"
+          "sha256": "7dbb772f26c8939e17ec98a00f1d9676f414d5037f42427732c93ef1c78901bd"
         },
         {
           "label": "Keycloak",
@@ -2636,7 +2636,7 @@
       "group": "实现流程",
       "document": "02-实现流程.md",
       "description": "原件、资料版本、解析任务和检索片段分别保存。解析器只负责实际提取；无法识别或 OCR 质量不足应显示限制，不能标为已验证业务事实。表格结构化是解析后的专门分支。",
-      "mermaid": "flowchart TD\n  n_upload[\"UploadManager 和批量上传队列\"] --> n_api[\"MaterialController\"]\n  n_api --> n_access[\"检查企业、目标空间与写入权限\"]\n  n_access --> n_store[\"保存原件和资料版本\"]\n  n_store --> n_run[\"建立可持久追踪的解析任务\"]\n  n_run --> n_worker[\"KnowledgeWorker claim\"]\n  n_worker --> n_verify[\"重新检查任务与来源可读性\"]\n  n_verify --> n_parser[\"DocumentParser 调用 Python 解析器\"]\n  n_parser --> n_type{\"文件类型\"}\n  n_type -->|\"文档或文本\"| n_chunks[\"提取文本、定位与引用片段\"]\n  n_type -->|\"表格\"| n_table[\"提取表结构与数据；文件表格接入\"]\n  n_type -->|\"需 OCR\"| n_ocr[\"OCR 提取并标记需要核对\"]\n  n_chunks --> n_finish[\"保存解析状态和固定版本依据\"]\n  n_table --> n_finish\n  n_ocr --> n_finish\n  n_finish --> n_retrieval[\"按当前权限检索与读取引用\"]\n  n_parser -->|\"失败或超限\"| n_error[\"记录失败或部分结果，允许时重试\"]\n  n_access -->|\"无权\"| n_deny[\"拒绝上传或读取\"]\n",
+      "mermaid": "flowchart TD\n  n_upload[\"UploadManager 和批量上传队列\"] --> n_api[\"MaterialController\"]\n  n_api --> n_access[\"检查企业、目标空间与写入权限\"]\n  n_access --> n_store[\"保存原件和资料版本\"]\n  n_store --> n_run[\"建立可持久追踪的解析任务\"]\n  n_run --> n_worker[\"KnowledgeWorker claim\"]\n  n_worker --> n_verify[\"重新检查任务与来源可读性\"]\n  n_verify --> n_parser[\"DocumentParser 调用 Python 解析器\"]\n  n_parser --> n_type{\"文件类型\"}\n  n_type -->|\"文档或文本\"| n_chunks[\"提取文本、定位与引用片段\"]\n  n_type -->|\"表格\"| n_table[\"提取表结构与数据；文件表格接入\"]\n  n_type -->|\"需 OCR\"| n_ocr[\"OCR 提取并标记需要核对\"]\n  n_chunks --> n_finish[\"保存解析状态和固定版本依据\"]\n  n_table --> n_finish\n  n_ocr --> n_finish\n  n_finish --> index[\"可选：WeKnora 持久化索引队列\"]\n  index --> scoped[\"获准片段映射远端 ID；空范围不请求\"]\n  scoped --> hybrid[\"混合召回与重排；仅接受范围内结果\"]\n  hybrid --> n_retrieval[\"重查当前权限与版本；返回本地原文引用\"]\n  n_finish -->|\"开关关闭\"| legacy[\"原关键词检索与权限过滤\"]\n  n_parser -->|\"失败或超限\"| n_error[\"记录失败或部分结果，允许时重试\"]\n  n_access -->|\"无权\"| n_deny[\"拒绝上传或读取\"]\n",
       "sources": [
         {
           "label": "上传管理",
@@ -2783,7 +2783,7 @@
           "label": "AgentTasks",
           "path": "engine/src/runtime/agent-task.ts",
           "link": "../../engine/src/runtime/agent-task.ts",
-          "sha256": "fa4af533d01bb11e826254af5ab6cb6bb7867baa4d3faa91ba22d7c49bb3b85d"
+          "sha256": "046852486e5020c7f5fddf44db8e080aed3784118fa4fdec79ff769b09b5cc84"
         },
         {
           "label": "Harness",

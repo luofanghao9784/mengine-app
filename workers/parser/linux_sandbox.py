@@ -32,11 +32,12 @@ def run_linux(job, extension, script=None):
     unit = 'dreamcore-parser-' + uuid.uuid4().hex + '.service'
     env = {'PATH': '/usr/bin:/bin', 'LANG': 'C.UTF-8', 'XDG_RUNTIME_DIR': str(runtime),
            'DBUS_SESSION_BUS_ADDRESS': 'unix:path=' + str(runtime / 'bus')}
+    docling = extension == 'docling-pdf' and script.name == 'docling_parse.py'
     timeout = 12 if extension == 'table-compare' else 80
     args = ['/usr/bin/systemd-run', '--user', '--quiet', '--wait', '--pipe', '--collect',
             '--service-type=exec', '--unit=' + unit,
-            '-p', 'MemoryMax=536870912', '-p', 'MemorySwapMax=0', '-p', 'TasksMax=32',
-            '-p', 'CPUQuota=50%', '-p', 'RuntimeMaxSec=' + str(timeout - 2),
+            '-p', 'MemoryMax=' + str(2147483648 if docling else 536870912), '-p', 'MemorySwapMax=0', '-p', 'TasksMax=' + ('64' if docling else '32'),
+            '-p', 'CPUQuota=' + ('100%' if docling else '50%'), '-p', 'RuntimeMaxSec=' + str(timeout - 2),
             '-p', 'NoNewPrivileges=yes', '-p', 'KillMode=control-group',
             str(ROOT / '.venv/bin/python'), '-I', '-B', str(ROOT / 'linux_worker.py'),
             str(job), extension, str(script)]

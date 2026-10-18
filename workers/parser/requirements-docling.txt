@@ -1,0 +1,3 @@
+-r requirements.txt
+# Optional PDF recipe; models are prepared offline, never downloaded in a parsing job.
+docling==2.140.0

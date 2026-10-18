@@ -18,6 +18,14 @@ export const processingStatusLabel: Record<string, string> = {
 };
 const warnings: Record<string, string> = {
   OCR_REVIEW_REQUIRED: '文字来自 OCR，可能存在错字或数字识别错误，请核对原件。',
+  DOCLING_LAYOUT_REVIEW_REQUIRED: '已提取版面与表格内容，阅读顺序、数字和表格关系仍需核对原件。',
+  DOCLING_MODELS_NOT_READY: '文档解析模型尚未准备好，请联系维护者。',
+  DOCLING_VERSION_MISMATCH: '文档解析器版本不匹配，请联系维护者。',
+  DOCLING_LOCATION_MISSING: '部分内容缺少页码定位，未纳入检索片段。',
+  DOCLING_CONVERSION_FAILED: '文档转换未完成，请检查文件是否损坏、加密或超过 30 页。',
+  DOCLING_INPUT_LIMIT: '文件超过本轮解析上限。',
+  DOCLING_NO_TEXT: '未提取到可检索文字，请核对原件。',
+  DOCLING_UNAVAILABLE_OR_LIMIT: '文档解析环境不可用或处理超限。',
   PDF_LAYOUT_NOT_INTERPRETED: 'PDF 按页提取文字；图表、复杂布局和文字页内的图片内容未完整解读。',
   OFFICE_NON_BODY_CONTENT: '正文外的页眉页脚、图片或其他对象未完整提取。',
   FORMULAS_NOT_RECALCULATED: '公式未重新计算；仅展示文件中已有的缓存值。',

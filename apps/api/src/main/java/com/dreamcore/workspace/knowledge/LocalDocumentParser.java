@@ -11,6 +11,7 @@ import tools.jackson.databind.json.JsonMapper;
 @Component
 public class LocalDocumentParser implements DocumentParser {
     private final String root;
+    @Value("${dreamcore.knowledge.docling-enabled:false}") private boolean doclingEnabled;
     public LocalDocumentParser(@Value("${dreamcore.knowledge.parser-root:}") String root) { this.root=root; }
     private Result failed() { return new Result("local-3","FAILED",List.of("PARSER_UNAVAILABLE_OR_LIMIT"),List.of()); }
     @Override public Result parse(String filename,byte[] original) {
@@ -22,6 +23,7 @@ public class LocalDocumentParser implements DocumentParser {
             Files.write(job.resolve("input"),original); Files.setPosixFilePermissions(job.resolve("input"),PosixFilePermissions.fromString("r--------"));
             String extension=filename.contains(".")?filename.substring(filename.lastIndexOf('.')+1).toLowerCase(Locale.ROOT):"";
             if(!extension.matches("[a-z0-9]{0,12}")) extension="";
+            if(doclingEnabled && extension.equals("pdf")) extension="docling-pdf";
             var builder=new ProcessBuilder(parser.resolve(".venv/bin/python").toString(),"-I","-B",parser.resolve("sandbox.py").toString(),job.toString(),extension);
             builder.environment().clear();builder.environment().put("PATH","/opt/homebrew/bin:/usr/bin:/bin");
             builder.redirectOutput(job.resolve("launcher-output").toFile()).redirectError(job.resolve("launcher-errors").toFile());
@@ -29,7 +31,7 @@ public class LocalDocumentParser implements DocumentParser {
             if(!process.waitFor(85,TimeUnit.SECONDS) || process.exitValue()!=0) return failed();
             Path output=job.resolve("launcher-output"); if(Files.size(output)>4_000_000) return failed();
             Result result=new JsonMapper().readValue(Files.readAllBytes(output),Result.class);
-            if(!Set.of("READY","PARTIAL","FAILED","UNSUPPORTED").contains(result.status()) || !Set.of("local-1","local-2","local-3").contains(result.parserVersion()) || result.chunks()==null || result.chunks().size()>500 || result.warnings()==null || result.warnings().size()>32) return failed();
+            if(!Set.of("READY","PARTIAL","FAILED","UNSUPPORTED").contains(result.status()) || !Set.of("local-1","local-2","local-3","docling-2.140.0").contains(result.parserVersion()) || result.chunks()==null || result.chunks().size()>500 || result.warnings()==null || result.warnings().size()>32) return failed();
             if(result.warnings().stream().anyMatch(x->x==null || !x.matches("[A-Z][A-Z0-9_]{0,63}"))) return failed();
             int total=0;
             for(var chunk:result.chunks()) {

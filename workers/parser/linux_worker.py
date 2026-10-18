@@ -16,11 +16,12 @@ def command(job, extension, script):
     cgroup = Path('/sys/fs/cgroup') / group.lstrip('/')
     if not cgroup.name.startswith('dreamcore-parser-') or not cgroup.name.endswith('.service'):
         raise RuntimeError('PARSER_CGROUP_REQUIRED')
-    for name, maximum in [('memory.max', 536870912), ('memory.swap.max', 0), ('pids.max', 32)]:
+    docling = extension == 'docling-pdf' and Path(script).resolve() == ROOT / 'docling_parse.py'
+    for name, maximum in [('memory.max', 2147483648 if docling else 536870912), ('memory.swap.max', 0), ('pids.max', 64 if docling else 32)]:
         if int((cgroup / name).read_text().strip()) > maximum:
             raise RuntimeError('PARSER_CGROUP_LIMIT')
     quota, period = (cgroup / 'cpu.max').read_text().split()
-    if int(quota) / int(period) > 0.5:
+    if int(quota) / int(period) > (1 if docling else 0.5):
         raise RuntimeError('PARSER_CPU_LIMIT')
     script = Path(script).resolve(strict=True)
     if ROOT not in script.parents:
@@ -32,7 +33,7 @@ def command(job, extension, script):
         if Path(directory).exists():
             args += ['--ro-bind', directory, directory]
     # No host /home, /run, /etc credentials, API storage, Docker socket or sibling jobs.
-    for path in [ROOT / '.venv', ROOT / '.local/tessdata', script, *([ROOT / 'structured_table.py'] if script.name == 'parse.py' else [])]:
+    for path in [*([ROOT / '.local/docling-artifacts'] if docling else []), ROOT / '.venv', ROOT / '.local/tessdata', script, *([ROOT / 'structured_table.py'] if script.name == 'parse.py' else [])]:
         args += ['--ro-bind', str(path), str(path)]
     if Path('/etc/ld.so.cache').exists():
         args += ['--ro-bind', '/etc/ld.so.cache', '/etc/ld.so.cache']
