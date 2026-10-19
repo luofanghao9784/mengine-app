@@ -26,6 +26,17 @@ class LiveModelBoundaryTest(unittest.TestCase):
             patcher.start()
             self.addCleanup(patcher.stop)
 
+    def test_deepseek_official_config_and_provider_boundaries(self):
+        value = {**self.value, 'provider': 'deepseek', 'model': 'deepseek-flash', 'workspaceId': ''}
+        env = live_model.engine_environment(value)
+        self.assertEqual('deepseek', env['AGENT_MODEL_PROVIDER'])
+        self.assertEqual('deepseek-flash', env['AGENT_MODEL_NAME'])
+        self.assertNotIn('AGENT_BAILIAN_WORKSPACE_ID', env)
+        for change in [{'workspaceId':'foreign'}, {'routineModel': live_model.DEFAULT_MODEL},
+                       {'model': 'DeepSeek-V4.1-Flash-1017'}, {'endpoint':'https://other.example.test'}]:
+            with self.assertRaises(trial.TrialError): live_model.validate({**value, **change})
+        self.assertEqual('deepseek-flash', live_model.engine_environment({**value,'routineModel':'deepseek-flash'})['AGENT_ROUTINE_MODEL_NAME'])
+
     def test_routine_model_config_preserves_base_and_rejects_unknown(self):
         value = {**self.value, 'model': 'qwen3.8-max-0902', 'routineModel': live_model.DEFAULT_MODEL}
         env = live_model.engine_environment(value)

@@ -31,6 +31,17 @@ class AgentUsageIntegrationTest {
     OperationsService.AttemptUsage summary(){return operations.tenant(actor,tenant,7).attemptUsage().getFirst();}
     AgentResult result(ConversationService.Job j,int calls,AgentResult.Usage tokens){return new AgentResult("1.4","0.11.0",j.id(),j.token(),"AGENT","verification","fixture","synthetic reply",List.of(),List.of(),List.of(),calls,tokens,List.of(),List.of(),List.of());}
 
+    @Test void correctiveResponseCountsBothCompleteProviderReturnsWithoutForgivingTransportFailure(){
+        var j=claim();agents.openUsage(j.id(),j.token());start(j,1);receipt(j,1,"RETURNED",10L,3L);
+        start(j,2);receipt(j,2,"RETURNED",7L,2L);
+        denied(502,()->agents.finish(j,result(j,1,new AgentResult.Usage(7,2))));
+        agents.finish(j,result(j,2,new AgentResult.Usage(17,5)));
+        assertEquals("SUCCEEDED",db.queryForObject("SELECT status FROM conversation_tasks WHERE id=?",String.class,j.id()));
+        var interrupted=claim();agents.openUsage(interrupted.id(),interrupted.token());start(interrupted,1);receipt(interrupted,1,"FAILED",null,null);
+        start(interrupted,2);receipt(interrupted,2,"RETURNED",7L,2L);
+        denied(502,()->agents.finish(interrupted,result(interrupted,2,null)));
+    }
+
     @Test void retryRetainsFailedAttemptAndSuccessMustMatchReceipts(){
         var old=claim();agents.openUsage(old.id(),old.token());start(old,1);receipt(old,1,"FAILED",12L,3L);tasks.fail(old,"TASK_MODEL_FAILED");
         action(old,"RETRY");var next=tasks.claim();agents.openUsage(next.id(),next.token());start(next,1);receipt(next,1,"RETURNED",null,null);

@@ -27,6 +27,7 @@ public class BriefingGenerationService {
     public record Quota(int limit,int used,int reserved,int remaining) {}
     public record Capability(boolean available,String reason) {}
     public record State(List<Policy> policies,List<Batch> batches,Quota quota,Map<String,Capability> capabilities,Quota automaticQuota) {}
+    @org.springframework.beans.factory.annotation.Autowired private com.dreamcore.workspace.audience.WorkAudienceService workAudience;
     @org.springframework.beans.factory.annotation.Autowired private IdentityAudit dailyAudit;
     @org.springframework.beans.factory.annotation.Autowired private com.dreamcore.workspace.news.NewsSourceCatalog newsCatalog;
     @org.springframework.beans.factory.annotation.Autowired private com.dreamcore.workspace.news.NewsSearchPolicy newsSearch;
@@ -347,8 +348,14 @@ public class BriefingGenerationService {
         int tenantConcurrent=db.queryForObject("SELECT count(*) FROM briefing_generation_batches b JOIN conversation_tasks t ON t.id=b.task_id WHERE b.tenant_id=? AND t.status IN ('QUEUED','RUNNING')",Integer.class,tenant);
         if(used+categoryExecuting>=executionLimit||concurrent>=5||tenantUsed>=48||tenantConcurrent>=20){waiting(batch,"WAITING_RESOURCE",used+categoryExecuting>=executionLimit?(manualBatch?"DAILY_RUN_LIMIT":"AUTOMATIC_DAILY_LIMIT"):tenantUsed>=48?"TENANT_DAILY_LIMIT":tenantConcurrent>=20?"TENANT_CONCURRENCY_LIMIT":"OWNER_CONCURRENCY_LIMIT");return;}
         // One complete topic per batch. Explicit bounded source selection is visible to the model and reader.
-        var order=Comparator.comparing(Source::changedAt,Comparator.reverseOrder()).thenComparing(Source::filename);
+        var audience=workAudience.current(actor,tenant);
+        var order=Comparator.comparingInt((Source s)->workAudience.sourceScore(audience,s.filename())).reversed().thenComparing(Source::changedAt,Comparator.reverseOrder()).thenComparing(Source::filename);
         List<Source> selected=selectSources((info||unseen.isEmpty()?sources:unseen).stream().filter(s->Set.of("READY","PARTIAL").contains(s.parseStatus())).filter(s->!"RESULT".equals(type)||!s.dataset()&&completedPublication(s.versionId())).sorted(order).toList(),space);
+        // Qualitative briefings can use document evidence without selecting unrelated stale datasets.
+        if("INSIGHT".equals(type)||"SUGGESTION".equals(type)){
+            var documents=sources.stream().filter(s->!s.dataset()&&Set.of("READY","PARTIAL").contains(s.parseStatus())).sorted(Comparator.comparing((Source s)->seenContent.contains(s.materialId()+":"+contentKeys.get(s.materialId()))).thenComparing(order)).toList();
+            if(!documents.isEmpty())selected=selectSources(documents,space);
+        }
         if(bootstrapScoped)selected=selected.stream().limit(1).toList();
         // An unchanged current workbook can ground a new topic; consumption is not a ban on reuse.
         // Keep two unseen documents, the authorized source pool and the three-version bound.
@@ -357,6 +364,13 @@ public class BriefingGenerationService {
             if(reference.isPresent()){
                 var grounded=new ArrayList<Source>();grounded.add(reference.get());grounded.addAll(selected.stream().limit(2).toList());selected=List.copyOf(grounded);
             }
+        }
+        if(enrolled&&type==null&&selected.stream().filter(Source::dataset).anyMatch(source->{
+            Timestamp coverage=db.queryForObject("SELECT coverage_through FROM dataset_snapshots WHERE id=?",Timestamp.class,source.versionId());
+            return coverage==null||coverage.toInstant().isBefore(now.minusSeconds(7200));
+        })){
+            var documents=sources.stream().filter(s->!s.dataset()&&Set.of("READY","PARTIAL").contains(s.parseStatus())).sorted(Comparator.comparing((Source s)->seenContent.contains(s.materialId()+":"+contentKeys.get(s.materialId()))).thenComparing(order)).toList();
+            if(!documents.isEmpty())selected=selectSources(documents,space);
         }
         if(enrolled&&!info)for(var source:selected)if(source.dataset()){
             Timestamp coverage=db.queryForObject("SELECT coverage_through FROM dataset_snapshots WHERE id=?",Timestamp.class,source.versionId());
@@ -385,7 +399,7 @@ public class BriefingGenerationService {
         var detail=tasks.submitBriefing(actor,tenant,space,batch,prompt,info?newsSource:null,selected.stream().filter(s->!s.dataset()).map(s->new TaskOriginals.Selection(s.materialId(),s.versionId())).toList());
         UUID task=detail.tasks().getLast().id();
         if(info&&com.dreamcore.workspace.news.NewsSearchPolicy.QUERY.equals(newsSource))newsSearch.pin(task,tenant);
-        db.update("UPDATE briefing_generation_batches SET task_id=?,status='RUNNING',reason=NULL,source_key=?,context_key=?,source_versions=?::jsonb,started_at=? WHERE id=?",task,key,contextKey,json.writeValueAsString(selected.stream().map(source->selection(source,contentKeys.get(source.materialId()))).toList()),time(now),batch);
+        db.update("UPDATE briefing_generation_batches SET audience_key=work_audience_key(tenant_id,owner_id),task_id=?,status='RUNNING',reason=NULL,source_key=?,context_key=?,source_versions=?::jsonb,started_at=? WHERE id=?",task,key,contextKey,json.writeValueAsString(selected.stream().map(source->selection(source,contentKeys.get(source.materialId()))).toList()),time(now),batch);
         for(var source:selected)if(source.dataset())db.update("INSERT INTO briefing_dataset_selections(task_id,batch_id,dataset_id,snapshot_id) VALUES (?,?,?,?)",task,batch,source.materialId(),source.versionId());
         if(enrolled)db.update("INSERT INTO briefing_flow_tasks(task_id,policy_id,schedule_revision,column_hashes) SELECT ?,?,?,coalesce((SELECT jsonb_object_agg(d.id::text,md5(d.column_names::text)) FROM briefing_dataset_selections x JOIN business_datasets d ON d.id=x.dataset_id WHERE x.task_id=?),'{}'::jsonb)",task,id,enrollment.getFirst().get("revision"),task);
         db.update("UPDATE briefing_generation_policies SET reason=NULL WHERE id=?",id);
@@ -465,7 +479,7 @@ public class BriefingGenerationService {
     private String contextKey(UUID actor,UUID tenant,UUID space){
         var profiles=db.queryForList("SELECT v.id FROM profile_entries e JOIN profile_versions v ON v.entry_id=e.id AND v.revision=e.revision WHERE e.tenant_id=? AND e.kind IN ('GOAL','INFERENCE') AND (e.scope='TENANT' OR e.scope='WORKSPACE' AND e.workspace_id=? OR e.scope='PERSONAL' AND e.account_id=?) AND NOT v.scrubbed AND object_is_active('PROFILE_VERSION',v.id) AND v.status='ACTIVE' AND (v.expires_at IS NULL OR v.expires_at>?) ORDER BY e.id",UUID.class,tenant,space,actor,time(clock.now()));
         var insight=db.queryForList("SELECT t.id FROM conversation_tasks t JOIN conversations c ON c.id=t.conversation_id JOIN LATERAL ("+BriefingContentService.ELIGIBLE+") b ON true WHERE c.tenant_id=? AND c.owner_id=? AND c.workspace_id=? AND t.status='SUCCEEDED' AND convert_from(b.content,'UTF8')::jsonb->>'businessType'='INSIGHT' AND EXISTS(SELECT 1 FROM readable_source_tasks r WHERE r.id=t.id) ORDER BY t.finished_at DESC,t.id DESC LIMIT 1",UUID.class,tenant,actor,space);
-        return IdentityService.hash(json.writeValueAsString(List.of(profiles,insight)));
+        return IdentityService.hash(json.writeValueAsString(List.of(profiles,insight,workAudience.key(actor,tenant))));
     }
     private String recent(UUID actor,UUID tenant,UUID space){
         String text=String.join("\n",db.queryForList("SELECT convert_from(b.content,'UTF8')::jsonb->>'summary' FROM conversation_tasks t JOIN conversations c ON c.id=t.conversation_id JOIN LATERAL ("+BriefingContentService.ELIGIBLE+") b ON true WHERE c.tenant_id=? AND c.owner_id=? AND c.workspace_id=? AND t.status='SUCCEEDED' AND EXISTS(SELECT 1 FROM readable_source_tasks r WHERE r.id=t.id) ORDER BY t.finished_at DESC LIMIT 5",String.class,tenant,actor,space));

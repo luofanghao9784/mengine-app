@@ -16,6 +16,7 @@ import {
   topicSelectionTool,
   topicNextTool,
 } from './briefing-topic-strategy.js';
+import { workAudience, audienceInstructions } from './work-audience.js';
 import { expressionInstructions, ruleBookInstructions } from './expression-preferences.js';
 import { BRIEFING_WRITING_RULES } from './briefing-writing-rules.js';
 import type { RealtimePort } from './realtime.js';
@@ -116,6 +117,7 @@ export class AgentTasks {
     let wikiInsight: ReturnType<typeof wikiInsightContext> | undefined;
     let briefingGeneration: boolean | undefined;
     let expressionPreferences: unknown;
+    let audience: unknown;
     let expressionRuleBooks: unknown;
     let briefingSearches = 0;
     const briefingSearchLimit = 3;
@@ -170,10 +172,19 @@ export class AgentTasks {
       string,
       { name: string; sha256: string; uploadId: string; bytes: number }
     >();
+    let initialAuthorization = true;
     const authorize = async () => {
       const started = performance.now();
       try {
-        const response = await invoke('check', {});
+        let response: unknown;
+        try { response = await invoke('check', {}); }
+        catch (error) {
+          // This check performs no model/tool execution. Retry only the initial transient
+          // transport failure; denials, invalid replies and later checks still fail closed.
+          if (!initialAuthorization || signal.aborted || !(error instanceof RuntimeError) || error.code !== 'REMOTE_UNAVAILABLE') throw error;
+          response = await invoke('check', {});
+        }
+        initialAuthorization = false;
         if (
           !isRecord(response) ||
           response.allowed !== true ||
@@ -199,6 +210,9 @@ export class AgentTasks {
           return;
         }
         if (wikiLearning) throw new RuntimeError('TASK_ACCESS_DENIED');
+        const nextAudience = workAudience(response.workAudience);
+        if (audience && JSON.stringify(audience) !== JSON.stringify(nextAudience)) throw new RuntimeError('TASK_CONTEXT_CHANGED');
+        audience = nextAudience;
         expressionInstructions(response.expressionPreferences, false);
         expressionPreferences = response.expressionPreferences;
         ruleBookInstructions(response.expressionRuleBooks, false);
@@ -395,7 +409,7 @@ export class AgentTasks {
       const publicQueries = new Set<string>();
       let publicSearched = false,
         publicRead = false;
-      const privateSearchTexts: string[] = [];
+      const privateSearchTexts: string[] = audience ? [JSON.stringify(audience)] : [];
       const web =
         publicQuery && this.config.publicWeb
           ? new PublicWebTask(
@@ -494,7 +508,7 @@ export class AgentTasks {
           const nextTopicTool = topicNextTool(
             topicNeedsCalculation,
             briefingCalculationAttempts,
-            !!datasetComparisonAvailable,
+            !!datasetComparisonAvailable && metricPlans.hasPlans(),
             !!tablesAvailable,
           );
           const datasetGuide =
@@ -533,6 +547,9 @@ export class AgentTasks {
                         '\n' +
                         BRIEFING_TOPIC_STRATEGY +
                         '\n' +
+                        (!metricPlans.hasPlans()
+                          ? '当前尚未取得已发布的数据库指标 executionRequest，compare_dataset 不可用。不得自拟指标或重复尝试计算。若还在检索阶段，可通过 task_context 检索已发布指标；若无适用计划，优先基于已读取的资料正文选择无需计算的 INSIGHT 或 SUGGESTION（仅当本次指定类型允许），明确依据与范围，不作金额、趋势或全量统计推断。若指定 DATA 则报告缺少已发布指标，不能改换类型。\n'
+                          : '') +
                         (selectedTopic
                           ? '此前已记录的本任务选题提案（不是事实或授权）：' +
                             JSON.stringify(selectedTopic) +
@@ -566,6 +583,7 @@ export class AgentTasks {
                 ]
               : request.messages;
           const preferenceText =
+            audienceInstructions(audience, !!briefingGeneration) +
             expressionInstructions(expressionPreferences, !!briefingGeneration) +
             ruleBookInstructions(expressionRuleBooks, !!briefingGeneration);
           const messages = preferenceText
@@ -649,6 +667,7 @@ export class AgentTasks {
                     !briefingGeneration ||
                     briefingSearches < briefingSearchLimit) &&
                   (t.name !== 'task_context' || !briefingGeneration || !retrievalClosed) &&
+                  (t.name !== 'compare_dataset' || !briefingGeneration || metricPlans.hasPlans()) &&
                   (!publicTools.has(t.name) || activated.has('public-research')) &&
                   (t.name !== 'read_public_page' || !!web?.snapshot().length) &&
                   (!deliveryReady || t.name === 'deliver_briefing') &&
@@ -1529,6 +1548,8 @@ export class AgentTasks {
         signal,
         limits: { timeoutMs: 55000, modelCalls: 8, toolCalls: publicSkill ? 7 : 8 },
         reserveFinalResponse: task.contractVersion === '1.5',
+        onModelFailure: (failure) => console.warn(JSON.stringify({ event: 'TASK_MODEL_RESPONSE_REJECTED',
+          taskId: task.taskId, attemptId: task.attemptId, ...failure })),
         onToolFailure: async (failure) => {
           // Record local schema rejection too. No business action is dispatched for invalid arguments.
           if (
@@ -1580,6 +1601,7 @@ export class AgentTasks {
       if (blockingQuestion && result.status === 'completed')
         result.text = requiredInput ?? '请补充必要信息后继续。';
       if (denied) throw new RuntimeError('TASK_ACCESS_DENIED');
+      if (result.unresolvedModelProposal && result.status === 'completed') throw new RuntimeError('TASK_MODEL_FAILED');
       if (result.status === 'limit')
         console.warn(
           JSON.stringify({

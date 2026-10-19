@@ -95,7 +95,7 @@ export function TaskInterventionCard({
   const explanation = task.sourcesUnavailable
     ? '相关资料已不可访问，请检查资料权限。'
     : task.reconciliationRequired
-      ? '当前回执不足，请先核对已记录的执行结果。'
+      ? '这次工作还没有得到确认的结果。请先查看已经完成的步骤，核对后再决定是否继续。'
       : waiting
         ? task.requiredInput || '请补充所需信息，或添加相关资料后继续。'
         : task.status === 'WAITING_CAPABILITY'

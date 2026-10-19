@@ -68,7 +68,7 @@ public class BriefingService {
         }
         if(!generatedOnly)range+=" AND t.origin='USER'";
         if(generatedOnly){range+=" AND t.finished_at<=?";args.add(Timestamp.from(asOf));}
-        if(generatedOnly)range+=" AND EXISTS ("+BriefingContentService.ELIGIBLE+")";
+        if(generatedOnly)range+=" AND task_audience_current(t.id) AND EXISTS ("+BriefingContentService.ELIGIBLE+")";
         if(businessType!=null){range+=" AND EXISTS(SELECT 1 FROM ("+BriefingContentService.ELIGIBLE+") classified WHERE convert_from(classified.content,'UTF8')::jsonb->>'businessType'=?)";args.add(businessType);}
         String sql="""
             SELECT c.id AS conversation_id,c.workspace_id,w.name AS workspace_name,coalesce(convert_from(b.content,'UTF8')::jsonb->>'title',CASE WHEN EXISTS(SELECT 1 FROM readable_source_tasks title_source WHERE title_source.id=(SELECT first_task.id FROM conversation_tasks first_task WHERE first_task.conversation_id=c.id ORDER BY first_task.created_at,first_task.id LIMIT 1)) THEN c.title ELSE '会话内容暂不可用' END) AS title,

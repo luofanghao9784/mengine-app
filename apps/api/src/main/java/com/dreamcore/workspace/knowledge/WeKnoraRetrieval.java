@@ -10,6 +10,8 @@ public class WeKnoraRetrieval {
     private final JdbcTemplate db;private final WeKnoraClient client;
     public WeKnoraRetrieval(JdbcTemplate db,WeKnoraClient client){this.db=db;this.client=client;}
     public boolean enabled(){return client.enabled();}
+    public boolean enabled(UUID tenant){return enabled() && Boolean.TRUE.equals(db.queryForObject(
+        "SELECT EXISTS(SELECT 1 FROM knowledge_index_targets WHERE tenant_id=? AND enabled)",Boolean.class,tenant));}
     /** scopeSql/args are built only by KnowledgeService's existing authorization/version gate. */
     public List<UUID> search(String scopeSql,List<Object> args,String query,int count) {
         var rows=db.queryForList("WITH scoped AS MATERIALIZED ("+scopeSql+") "+"""

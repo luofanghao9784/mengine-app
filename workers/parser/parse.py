@@ -11,7 +11,8 @@ VERSION = 'local-3'
 chunks, notes = [], set()
 MAX_CHARS, MAX_CHUNKS = 400_000, 500
 used = 0
-TOOL_ROOT = '/usr/bin' if sys.platform == 'linux' else '/opt/homebrew/bin'
+LOCAL_TOOLS = Path(__file__).resolve().parent / '.local/tools/bin'
+TOOL_ROOT = '/usr/bin' if sys.platform == 'linux' else str(LOCAL_TOOLS) if LOCAL_TOOLS.is_dir() else '/opt/homebrew/bin'
 class Limit(Exception): pass
 
 def add(locator, text, method='TEXT'):

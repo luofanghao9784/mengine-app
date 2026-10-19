@@ -23,7 +23,8 @@ for (const requestedType of ['', 'SUGGESTION']) test(`actual generation gates de
  let selected=false,calls=0;const receipts=[];
  const platform=createServer(async(req,res)=>{
   if(usageFixture(req,res))return;const input=await body(req);
-  if(req.url.endsWith('/check'))return json(res,{allowed:true,executionClass:'live',briefingGeneration:true,briefingContentVersion:'1.0',topicStrategyVersion:'1.0',briefingRequestedType:requestedType,topicSelectionRecorded:selected});
+  if(req.url.endsWith('/check'))return json(res,{allowed:true,executionClass:'live',briefingGeneration:true,briefingContentVersion:'1.0',contextVersion:'1.0',datasetContextVersion:'1.0',datasetComparisonVersion:'1.0',topicStrategyVersion:'1.0',briefingRequestedType:requestedType,topicSelectionRecorded:selected});
+  if(req.url.endsWith('/context'))return json(res,{contractVersion:'1.0',action:input.action,referenceOnly:true,result:{}});
   if(req.url.endsWith('/execution/open'))return json(res,{accepted:true,policy:'READ_ONLY_PRIVATE_V1'});
   if(req.url.endsWith('/execution/tool')){receipts.push(input);return json(res,{accepted:true});}
   if(req.url.endsWith('/select-briefing-topic')){assert.equal(input.candidates[0].businessType,requestedType || 'INSIGHT');selected=true;return json(res,{recorded:true,proposalOnly:true,selectedIndex:0,strategyVersion:'1.0.0'});}
@@ -32,6 +33,7 @@ for (const requestedType of ['', 'SUGGESTION']) test(`actual generation gates de
  });const url=await listen(platform);t.after(()=>close(platform));
  const agent=new AgentTasks({platformBaseUrl:url,executionClass:'live',modelName:'synthetic-topic',createModel:()=>({usage:null,async *generate(request){
   calls++;
+  assert.ok(!request.tools.some(x=>x.name==='compare_dataset'),'no published plan must not advertise dataset calculation');
   if(calls===1){assert.ok(!request.tools.some(x=>x.name==='deliver_briefing'));yield {type:'tool_call',id:'topic',name:'select_briefing_topic',arguments:JSON.stringify({candidates:[{question:'是否有新发现',evidenceNeeded:'需要新增资料',requiresCalculation:false,difference:'当前没有新增证据',businessType:requestedType || 'INSIGHT'}],selectedIndex:0})};}
   else {assert.ok(request.tools.some(x=>x.name==='deliver_briefing'));assert.ok(!request.tools.some(x=>x.name==='select_briefing_topic'));yield {type:'tool_call',id:'end',name:'deliver_briefing',arguments:JSON.stringify({title:'暂无新内容',summary:'本次获权范围暂无新证据。',analysis:['不能断言全部资料已经分析完毕。'],businessType:requestedType || 'INSIGHT'})};}
   yield {type:'finish',reason:'tool_calls'};

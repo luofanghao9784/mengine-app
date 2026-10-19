@@ -1,3 +1,4 @@
+import { collectModelResponse, ModelResponseError, safeModelFailure } from './model-response.js';
 import { BRIEFING_ANALYSIS_ARRAY_HINT, BRIEFING_EDITORIAL_HINTS } from './briefing-delivery.js';
 import type { RealtimePort } from './realtime.js';
 import { randomUUID } from 'node:crypto';
@@ -41,6 +42,7 @@ export async function runHarness(options: {
   limits?: { modelCalls?: number; toolCalls?: number; timeoutMs?: number };
   reserveFinalResponse?: boolean;
   /** Safe diagnostic metadata only; never arguments, outputs or arbitrary error messages. */
+  onModelFailure?: (failure: { diagnostic: string; modelCall: number; correction: boolean }) => void;
   onToolFailure?: (failure: { tool: string; callId: string; code: string; executionStarted: boolean; validationIssues?: string[] }) => void | Promise<void>;
   /** Structured card batches need their time for delivery; their final reply is only a confirmation. */
   finalResponseReserveMs?: number;
@@ -225,23 +227,23 @@ export async function runHarness(options: {
             input.applied = true;
           }
         if (result.modelCalls === 1) await options.realtime?.started?.();
-        const step = result.modelCalls;
+        let step = result.modelCalls;
         let visible = '',
           lastSent = 0,
-          sentText = '';
+          sentText = '', sentState = '';
         let index = 0,
           textOpen = false,
           textBlock = '',
           finished = false;
         const flush = async (state: 'STREAMING' | 'COMPLETE' | 'INTERRUPTED', force = false) => {
           if (
-            options.realtime &&
+            options.realtime && !(sentText === visible && sentState === state) &&
             (force || performance.now() - lastSent >= 250) &&
             (sentText !== visible || state !== 'STREAMING')
           ) {
             await options.realtime.output(step, visible, state);
             lastSent = performance.now();
-            sentText = visible;
+            sentText = visible; sentState = state;
           }
         };
         const generate = () => model.generate({
@@ -252,42 +254,50 @@ export async function runHarness(options: {
           signal: controller.signal,
           maxTokens: 2048,
         });
-        async function* finalText(): AsyncIterable<ModelPart> {
-          for (let attempt = 0; attempt < 2; attempt++) {
-            const buffered: ModelPart[] = [];
-            let finishReason = '', forbiddenTool = false;
-            for await (const part of generate()) {
-              controller.signal.throwIfAborted();
-              const bytes = (v: unknown) => typeof v === 'string' ? Buffer.byteLength(v) : 0;
-              streamBytes += part.type === 'text' ? bytes(part.text) : part.type === 'tool_call'
-                ? bytes(part.id) + bytes(part.name) + bytes(part.arguments) : 0;
-              if (streamBytes > 65536) { abort('MODEL_OUTPUT_LIMIT'); return; }
-              if (part.type === 'finish') {
-                if (!['stop', 'tool_calls', 'length'].includes(part.reason)) throw new RuntimeError('INVALID_MODEL_RESPONSE');
-                finishReason = part.reason;
-                if (part.reason === 'length') { abort('MODEL_OUTPUT_LIMIT'); return; }
-                break;
-              }
-              if (part.type === 'tool_call') forbiddenTool = true;
-              else if (part.type !== 'text' || typeof part.text !== 'string') throw new RuntimeError('INVALID_MODEL_RESPONSE');
-              buffered.push(part);
-            }
-            if (!finishReason) throw new RuntimeError('MODEL_INCOMPLETE');
-            if (!forbiddenTool && finishReason === 'stop') {
-              // Never publish a prefix from a rejected final tool request.
-              yield* buffered;
-              yield { type: 'finish', reason: 'stop' };
+        async function* validated(): AsyncIterable<ModelPart> {
+          let protocolCorrections = 0;
+          while (true) {
+            try {
+              const candidate = await collectModelResponse(generate(), request.tools ?? [], modelCallIds,
+                controller.signal, ordinaryFinal, ordinaryFinal ? undefined : async text => {
+                  visible += text;
+                  await flush('STREAMING');
+                });
+              visible = ''; // Accepted chunks below form the authoritative session message.
+              if (candidate.some(part => part.type === 'tool_call')) result.unresolvedModelProposal = false;
+              yield* candidate;
               return;
+            } catch (error) {
+              const diagnostic = safeModelFailure(error);
+              if (error instanceof ModelResponseError && !ordinaryFinal) result.unresolvedModelProposal = true;
+              if (!ordinaryFinal && visible) {
+                await flush('INTERRUPTED', true);
+              }
+              // Only a fully rejected protocol proposal can be corrected. Network errors,
+              // uncertain receipts, cancellation and exhausted budgets are never replayed.
+              const correction = error instanceof ModelResponseError && error.proposalComplete && protocolCorrections === 0 &&
+                result.modelCalls < maxCalls && !controller.signal.aborted && performance.now() < deadline;
+              options.onModelFailure?.({ diagnostic, modelCall: result.modelCalls, correction });
+              if (!correction) {
+                result.diagnostic = diagnostic;
+                if (diagnostic === 'MODEL_OUTPUT_LIMIT') { abort('MODEL_OUTPUT_LIMIT'); return; }
+                if (ordinaryFinal && error instanceof ModelResponseError) { abort('MODEL_CALL_LIMIT'); return; }
+                throw error;
+              }
+              protocolCorrections++;
+              controller.signal.throwIfAborted();
+              result.modelCalls++;
+              step = result.modelCalls;
+              visible = ''; sentText = ''; sentState = ''; lastSent = 0;
+              messages.unshift({ role: 'system', content: [{ type: 'text', text:
+                ordinaryFinal
+                  ? 'Response correction: the previous proposal was rejected before execution. Return answer text only using recorded results. Tools are unavailable. Do not repeat any completed work or invent results.'
+                  : 'Response correction: the previous proposal was rejected before execution (' + diagnostic + '). ' + (diagnostic === 'REQUIRED_TOOL_COUNT' ? 'This workflow phase requires exactly ONE selected function call. Choose one item, do not batch topics or articles. ' : '') + 'Return only currently advertised tools with unique call IDs and JSON object arguments matching their schemas, or answer text if this phase permits it. Follow the current tool_choice. Do not rename an unavailable tool or repeat any completed action. All recorded results remain authoritative.' }] });
             }
-            if (attempt === 1 || result.modelCalls >= maxCalls) { abort('MODEL_CALL_LIMIT'); return; }
-            controller.signal.throwIfAborted();
-            result.modelCalls++;
-            messages.unshift({ role: 'system', content: [{ type: 'text', text:
-              'Final answer correction: tool calls are unavailable and the previous tool request was not executed. Answer the current user question using only the reference data below. If evidence cannot support a conclusion, explain the exact missing data. Return answer text only; do not announce another search or invent results.' }] });
           }
         }
         try {
-          for await (const part of ordinaryFinal ? finalText() : generate()) {
+          for await (const part of validated()) {
             controller.signal.throwIfAborted();
             // Bound generated payload, not repeated SSE/event envelope overhead.
             // Providers may split identical text into one chunk or thousands of tiny chunks.

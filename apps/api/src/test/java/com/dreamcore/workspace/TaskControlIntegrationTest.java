@@ -34,6 +34,24 @@ class TaskControlIntegrationTest {
  void finish(ConversationService.Job j,String outcome){agents.openExecution(j.id(),j.token(),new AgentTaskService.ExecutionOpen("1.5",List.of("task_control")));record(j,"task_control","succeeded");agents.finish(j,result(j,outcome,"请指定本次截止日期",List.of(new AgentResult.Tool("control","task_control","succeeded"))));}
  @org.springframework.beans.factory.annotation.Autowired com.dreamcore.workspace.engine.ExecutionReceipts executionReceipts;
  @Autowired AgentReceiptRecovery recovery;
+ @Test void acceptedPreflightWithoutModelOrToolCanBeReconciledWithoutFabricatingSuccess(){
+  send();var j=conversations.claim();executionReceipts.claim("AGENT",j.id(),j.token(),new com.dreamcore.workspace.engine.ExecutionReceipts.Claim("e".repeat(64),"0.19.0"));
+  conversations.fail(j,"TASK_RESULT_UNKNOWN");action(j.conversation(),j.id(),"RECONCILE",null);
+  var current=task(detail(j.conversation()));assertEquals("FAILED",current.status());assertFalse(current.reconciliationRequired());assertNull(current.reply());
+  var old=conversations.attempts(owner,tenant,j.conversation(),j.id(),0,10).items().getFirst();assertEquals("RESULT_UNKNOWN",old.status());assertEquals("NO_EXECUTION_STARTED",old.reconciliationCode());
+  action(j.conversation(),j.id(),"RETRY",null);var retry=conversations.claim();assertNotNull(retry);assertNotEquals(j.token(),retry.token());
+ }
+ @Test void openedMeteringOrUnknownRuntimeCannotUseUnstartedPreflightProof(){
+  send();var j=conversations.claim();executionReceipts.claim("AGENT",j.id(),j.token(),new com.dreamcore.workspace.engine.ExecutionReceipts.Claim("f".repeat(64),"0.19.0"));
+  agents.openUsage(j.id(),j.token());conversations.fail(j,"TASK_RESULT_UNKNOWN");denied(409,()->action(j.conversation(),j.id(),"RECONCILE",null));
+  db.update("UPDATE agent_attempt_usage SET metering_enabled=false WHERE task_id=?",j.id());db.update("UPDATE engine_execution_receipts SET engine_version='legacy-unmetered' WHERE task_id=?",j.id());
+  denied(409,()->action(j.conversation(),j.id(),"RECONCILE",null));assertTrue(task(detail(j.conversation())).reconciliationRequired());
+ }
+ @Test void unregisteredToolReceiptStillBlocksUnstartedPreflightReconciliation(){
+  send();var j=conversations.claim();executionReceipts.claim("AGENT",j.id(),j.token(),new com.dreamcore.workspace.engine.ExecutionReceipts.Claim("1".repeat(64),"0.19.0"));
+  db.update("INSERT INTO conversation_tool_receipts(task_id,attempt_number,sequence,name,status) VALUES (?,1,1,'task_preference','STARTED')",j.id());
+  conversations.fail(j,"TASK_RESULT_UNKNOWN");denied(409,()->action(j.conversation(),j.id(),"RECONCILE",null));
+ }
  @Test void recoveredReceiptCannotBypassRevokedAccountAuthority(){
   send();var j=conversations.claim();agents.openExecution(j.id(),j.token(),new AgentTaskService.ExecutionOpen("1.6",List.of("search_sources")));
   executionReceipts.claim("AGENT",j.id(),j.token(),new com.dreamcore.workspace.engine.ExecutionReceipts.Claim("d".repeat(64),"0.11.0"));

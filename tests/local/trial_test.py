@@ -94,6 +94,35 @@ class LocalTrialBoundaryTest(unittest.TestCase):
             self.assertFalse((root / 'supervisor.lock').exists())
 
 
+class PresentationTrialBoundaryTest(unittest.TestCase):
+    def test_fixed_renderer_requires_explicit_private_config_and_stays_off_on_restore(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            with patch.dict(os.environ, {'AGENT_PPT_RENDERER_ENABLED': 'true'}):
+                self.assertEqual(trial.instance_presentation_environment(root), {'AGENT_PPT_RENDERER_ENABLED': 'false'})
+            saved = root / 'presentation-runtime.json'
+            trial.private_write(saved, {'enabled': True})
+            self.assertEqual(trial.instance_presentation_environment(root), {'AGENT_PPT_RENDERER_ENABLED': 'true'})
+            trial.private_write(root / 'restore.json', {})
+            self.assertEqual(trial.instance_presentation_environment(root), {'AGENT_PPT_RENDERER_ENABLED': 'false'})
+
+    def test_renderer_rejects_untrusted_config_and_arbitrary_settings(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            saved = root / 'presentation-runtime.json'
+            for value in [{'enabled': 'true'}, {'enabled': True, 'executable': '/tmp/other'}, {}]:
+                trial.private_write(saved, value)
+                with self.assertRaises(trial.TrialError): trial.instance_presentation_environment(root)
+            trial.private_write(saved, {'enabled': True})
+            saved.chmod(0o644)
+            with self.assertRaises(trial.TrialError): trial.instance_presentation_environment(root)
+            saved.unlink()
+            target = root / 'target.json'
+            trial.private_write(target, {'enabled': True})
+            saved.symlink_to(target)
+            with self.assertRaises(trial.TrialError): trial.instance_presentation_environment(root)
+
+
 class PhoneTrialBoundaryTest(unittest.TestCase):
     def test_phone_simulation_cannot_be_enabled_for_live_or_non_start_commands(self):
         for args in [['trial.py', 'start', '--live', '--phone-local'], ['trial.py', 'status', '--phone-local']]:

@@ -44,7 +44,7 @@ test('metering retains usage from malformed responses and distinguishes a later 
     events = [],
     model = meteredModel(backend, callback(events));
   await assert.rejects(collect(model.generate(request())));
-  assert.deepEqual(events[1].body, { sequence: 1, outcome: 'FAILED', inputTokens: 10, outputTokens: 5 });
+  assert.deepEqual(events[1].body, { sequence: 1, outcome: 'RETURNED', inputTokens: 10, outputTokens: 5 });
   malformed = false;
   await collect(model.generate(request()));
   assert.deepEqual(events[3].body, {
@@ -190,6 +190,18 @@ test('model failure diagnostics exclude arbitrary provider errors and request da
     },
   };
   await assert.rejects(collect(meteredModel(backend, callback(events)).generate(request())));
-  assert.deepEqual(warnings, [{ event: 'TASK_MODEL_REQUEST_FAILED', sequence: 1, code: 'MODEL_ERROR' }]);
+  assert.deepEqual(warnings, [{ event: 'TASK_MODEL_REQUEST_FAILED', sequence: 1, diagnostic: 'RUNTIME_FAILED', code: 'MODEL_ERROR' }]);
   assert.equal(events[1].body.outcome, 'FAILED');
+});
+
+test('completed but rejected protocol response is metered as returned, never as tool success',async()=>{
+  const {ModelResponseError}=await import('../dist/runtime/model-response.js');
+  const events=[];
+  const backend={lastResponseComplete:false,lastUsage:null,async *generate(){
+    this.lastResponseComplete=true;this.lastUsage={inputTokens:9,outputTokens:3};
+    throw new ModelResponseError('UNADVERTISED_TOOL');
+  }};
+  await assert.rejects(collect(meteredModel(backend,callback(events)).generate(request())),{code:'INVALID_MODEL_RESPONSE'});
+  assert.equal(events[1].body.outcome,'RETURNED');assert.equal(events[1].body.inputTokens,9);
+  assert.equal(events[1].body.outputTokens,3);
 });

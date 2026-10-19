@@ -25,6 +25,60 @@ class CollectionIntegrationTest {
         @Bean static org.springframework.beans.factory.config.BeanFactoryPostProcessor chooseSyntheticCollector(){return factory->{if(factory.containsBeanDefinition("sceneCollectionAdapter"))factory.getBeanDefinition("sceneCollectionAdapter").setPrimary(false);};}
         @Bean @Primary CollectionAdapter syntheticCollector(){return new CollectionAdapter(){public boolean available(){return true;}public Result collect(Request r){return new Result("1.0",r.datasets().stream().map(d->new Snapshot(d.id(),Instant.parse("2026-01-01T00:00:00Z"),List.of(d.columns().stream().map(c->"synthetic-"+c).toList()))).toList());}};}
     }
+    @Autowired com.dreamcore.workspace.scene.NativeFoundationService nativeFoundation;
+    @Autowired com.dreamcore.workspace.scene.SceneService scenes;
+    @Autowired com.dreamcore.workspace.scene.FoundationProcessingService processing;
+    @Test void processingShowsActualColumnsRecordsAndRejectsChangedPaginationSnapshot(){
+        start();var claim=service.claim(tenant,connection,Instant.now());
+        var rows=java.util.stream.IntStream.range(0,25).mapToObj(i->List.of("合成门店"+i,String.valueOf(i))).toList();
+        assertTrue(service.complete(claim,new CollectionAdapter.Result("1.0",List.of(new CollectionAdapter.Snapshot(dataset,null,rows))),Instant.now()));
+        var first=processing.read(reader,tenant,"dataset-"+dataset,0,20,null);
+        assertEquals(25,first.recordCount());assertEquals(20,first.records().size());assertTrue(first.hasMore());
+        assertEquals(List.of("门店","数量"),first.fields().stream().map(com.dreamcore.workspace.scene.FoundationProcessingService.Field::name).toList());
+        assertTrue(first.fields().stream().allMatch(f->f.origin().equals("SOURCE_COLUMN")));
+        assertEquals("WAITING",first.stages().get(2).state());assertFalse(first.history().isEmpty());
+        var second=processing.read(reader,tenant,"dataset-"+dataset,20,20,first.revision());
+        assertEquals(5,second.records().size());assertEquals("合成门店20",second.records().getFirst().getFirst());assertFalse(second.hasMore());
+        start();var next=service.claim(tenant,connection,Instant.now());assertTrue(service.complete(next,result("新版本",null),Instant.now()));
+        code("FOUNDATION_VERSION_CHANGED",()->processing.read(reader,tenant,"dataset-"+dataset,20,20,first.revision()));
+        assertEquals(2,processing.read(reader,tenant,"dataset-"+dataset,0,20,null).version());
+    }
+    @Test void processingAndNativeDetailRetainOriginalPermissions(){
+        start();var claim=service.claim(tenant,connection,Instant.now());assertTrue(service.complete(claim,result("可读记录",null),Instant.now()));
+        code("DATASET_NOT_FOUND",()->processing.read(admin,tenant,"dataset-"+dataset,0,20,null));
+        assertThrows(IdentityException.class,()->processing.read(outside,tenant,"dataset-"+dataset,0,20,null));
+        var detail=scenes.dispatch(reader,tenant,false,"GET","/scene-foundation/dataset-"+dataset,null);
+        assertEquals(2,detail.path("dictionary").path("fields").size());
+        assertEquals(5,detail.path("asset").path("stageStates").size());
+        UUID another=UUID.randomUUID();db.update("INSERT INTO tenants(id,name) VALUES (?,'另一企业')",another);
+        db.update("INSERT INTO tenant_memberships(tenant_id,account_id,role,status) VALUES (?,?,'MEMBER','ACTIVE')",another,reader);
+        code("DATASET_NOT_FOUND",()->processing.read(reader,another,"dataset-"+dataset,0,20,null));
+        db.update("DELETE FROM workspace_members WHERE tenant_id=? AND workspace_id=? AND account_id=?",tenant,space,reader);
+        code("DATASET_NOT_FOUND",()->processing.read(reader,tenant,"dataset-"+dataset,0,20,null));
+    }
+    @Test void nativeSceneUsesOriginalContentPermissionsAndDoesNotClaimGovernance() {
+        assertEquals(0,nativeFoundation.snapshot(admin,tenant).path("items").size());
+        var snapshot=nativeFoundation.snapshot(reader,tenant);
+        assertTrue(snapshot.path("nativePlatform").asBoolean());
+        assertEquals(1,snapshot.path("items").size());
+        assertFalse(snapshot.path("items").get(0).path("checksPassed").asBoolean());
+        assertTrue(snapshot.path("governance").path("averageQuality").isNull());
+        assertThrows(IdentityException.class,()->nativeFoundation.snapshot(outside,tenant));
+        assertEquals(snapshot.path("items"),scenes.dispatch(reader,tenant,false,"GET","/scene-foundation",null).path("items"));
+        admins.grant(owner,tenant,space,reader,UUID.randomUUID(),admins.spaceInfo(owner,tenant,space).version(),false);
+        assertEquals(0,nativeFoundation.snapshot(reader,tenant).path("items").size());
+    }
+    @Test void platformListsNativeTenantCountsWithoutContentOrBridgeBinding(){
+        assertThrows(IdentityException.class,()->scenes.bindings(reader));
+        UUID operator=UUID.randomUUID();
+        db.update("INSERT INTO accounts(id,email,display_name,password_hash) VALUES (?,?,'合成总台','unused')",operator,operator+"@native.test");
+        db.update("INSERT INTO platform_roles(account_id,role) VALUES (?,'PLATFORM_ADMIN')",operator);
+        db.update("INSERT INTO platform_accounts(account_id,login_name,password_hash) VALUES (?,?,'unused')",operator,operator+"@native.test");
+        var item=scenes.bindings(operator).stream().filter(r->tenant.equals(r.get("tenant_id"))).findFirst().orElseThrow();
+        assertEquals(true,item.get("native_platform"));assertEquals(1L,((Number)item.get("datasets")).longValue());
+        assertEquals(Set.of("tenant_id","name","workspace_id","connection_id","native_platform","datasets","materials"),item.keySet());
+        assertNull(item.get("connection_id"));
+    }
     @Autowired DatasetLifecycleService lifecycle;
     @Autowired WorkspaceArchiveService archives;
     @Autowired CollectionDeployment deployment;

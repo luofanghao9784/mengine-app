@@ -518,3 +518,19 @@ test('platform model cannot turn adjustment into an unrelated new entry or claim
   assert.equal(result.outcome, 'REJECTED');
   assert.equal(result.candidate, null);
 });
+
+test('failed extraction and verification retain finite stage diagnostics; valid skip is not a failure', async () => {
+  for (const stage of ['extract', 'verify']) {
+    const steps = happy();
+    steps[stage] = [() => { throw new Error('PRIVATE_PROVIDER_RESPONSE'); }];
+    const r = await fixture(steps).engine.run(request());
+    assert.equal(r.outcome, 'FAILED');
+    assert.equal(r.stages.at(-1).stage, stage.toUpperCase());
+    assert.equal(r.stages.at(-1).diagnostic, 'RUNTIME_FAILED');
+    assert.ok(validResult(r), JSON.stringify(validResult.errors));
+    assert.doesNotMatch(JSON.stringify(r), /PRIVATE_PROVIDER_RESPONSE/);
+  }
+  const r = await fixture({extract:[...reads(), tool('skip_experience',{reason:'INSUFFICIENT_EVIDENCE'})]}).engine.run(request());
+  assert.equal(r.outcome,'SKIPPED');assert.equal(r.code,'INSUFFICIENT_EVIDENCE');
+  assert.equal(r.stages[0].diagnostic,undefined);assert.ok(validResult(r));
+});

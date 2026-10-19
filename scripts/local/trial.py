@@ -15,6 +15,7 @@ import sys
 import tempfile
 import time
 import urllib.request
+import urllib.parse
 import uuid
 
 # Helpers import this module too; keep one exception/config identity when launched as a script.
@@ -283,6 +284,30 @@ def instance_collection_environment(root, explicit=None):
 
 
 
+def instance_weknora_environment(root):
+    """Opt-in private service config; restored trials never reconnect automatically."""
+    disabled = {'WEKNORA_ENABLED': 'false'}
+    saved = root / 'weknora-runtime.json'
+    if (root / 'restore.json').exists() or (root / 'restore.json').is_symlink():
+        return disabled
+    if not saved.exists() and not saved.is_symlink():
+        return disabled
+    value = private_read(saved)
+    if set(value) != {'enabled', 'url', 'apiKey', 'rerankModelId'} or type(value['enabled']) is not bool:
+        raise TrialError('WeKnora 配置字段无效。')
+    if not value['enabled']:
+        return disabled
+    if not all(isinstance(value[k], str) and value[k].strip() for k in ('url', 'apiKey', 'rerankModelId')):
+        raise TrialError('WeKnora 服务配置不完整。')
+    url = urllib.parse.urlsplit(value['url'])
+    if (url.username or url.password or url.query or url.fragment or url.path not in ('', '/')
+            or not url.hostname or not (url.scheme == 'https' or
+                (url.scheme == 'http' and url.hostname in ('127.0.0.1', 'localhost', '::1')))):
+        raise TrialError('WeKnora 必须使用 HTTPS 源站或本机回环地址。')
+    return {'WEKNORA_ENABLED': 'true', 'WEKNORA_URL': value['url'],
+            'WEKNORA_API_KEY': value['apiKey'], 'WEKNORA_RERANK_MODEL_ID': value['rerankModelId']}
+
+
 def instance_analysis_environment(root):
     """Explicit per-instance acceptance API; never inherited or activated on restore."""
     disabled = {'ANALYSIS_MATERIAL_API_ENABLED': 'false'}
@@ -310,11 +335,56 @@ def instance_briefing_environment(root):
     return {'BRIEFING_DAILY_ENABLED': str(value['dailyEnabled']).lower()}
 
 
+def instance_extra_environment(root):
+    """Explicit optional services, disabled for restores; never inherit credentials."""
+    api = {'DOCLING_ENABLED': 'false'}
+    engine = {'AGENT_LANGFUSE_ENABLED': 'false'}
+    if (root / 'restore.json').exists() or (root / 'restore.json').is_symlink():
+        return api, engine
+    docling = root / 'docling-runtime.json'
+    if docling.exists():
+        value = private_read(docling)
+        if set(value) != {'enabled'} or type(value['enabled']) is not bool:
+            raise TrialError('Docling 配置必须仅包含 enabled 布尔值。')
+        if value['enabled'] and not (WORKSPACE / 'workers/parser/.local/docling-artifacts/manifest.json').is_file():
+            raise TrialError('Docling 离线模型尚未准备。')
+        api['DOCLING_ENABLED'] = str(value['enabled']).lower()
+    tracing = root / 'langfuse-runtime.json'
+    if tracing.exists():
+        from urllib.parse import urlparse
+        value = private_read(tracing)
+        if set(value) != {'enabled','baseUrl','publicKey','secretKey'} or type(value['enabled']) is not bool:
+            raise TrialError('Langfuse 配置字段无效。')
+        if value['enabled']:
+            u = urlparse(value['baseUrl'])
+            if u.username or u.password or u.query or u.fragment or u.path not in ('','/') or not u.hostname or not (u.scheme == 'https' or u.scheme == 'http' and u.hostname in ('127.0.0.1','localhost','::1')) or not all(isinstance(value[k],str) and value[k].strip() for k in ('publicKey','secretKey')):
+                raise TrialError('Langfuse 地址或项目凭据无效。')
+            engine.update({'AGENT_LANGFUSE_ENABLED':'true','LANGFUSE_BASE_URL':value['baseUrl'],'LANGFUSE_PUBLIC_KEY':value['publicKey'],'LANGFUSE_SECRET_KEY':value['secretKey']})
+    return api, engine
+
+
+def instance_presentation_environment(root):
+    """Trusted fixed PPT renderer only; restore never reactivates saved capabilities."""
+    disabled = {'AGENT_PPT_RENDERER_ENABLED': 'false'}
+    saved = root / 'presentation-runtime.json'
+    if (root / 'restore.json').exists() or (root / 'restore.json').is_symlink():
+        return disabled
+    if not saved.exists() and not saved.is_symlink():
+        return disabled
+    value = private_read(saved)
+    if set(value) != {'enabled'} or type(value['enabled']) is not bool:
+        raise TrialError('PPT 生成配置必须仅包含 enabled 布尔值。')
+    return {'AGENT_PPT_RENDERER_ENABLED': str(value['enabled']).lower()}
+
+
 def start(root, model_config=None, reconnect_live=False, phone_local=False, collection_config=None, enable_live=False, automatic_work=False, scene_tenant=None):
     os.umask(0o077)
     collection_env = instance_collection_environment(root, collection_config)
+    weknora_env = instance_weknora_environment(root)
     analysis_env = instance_analysis_environment(root)
     briefing_env = instance_briefing_environment(root)
+    presentation_env = instance_presentation_environment(root)
+    extra_api_env, extra_engine_env = instance_extra_environment(root)
     model = None
     if model_config is not None:
         import live_model
@@ -415,16 +485,20 @@ def start(root, model_config=None, reconnect_live=False, phone_local=False, coll
             settings['automaticWorkEnabled'] = True
             private_write(root / 'config.json', settings)
         model_api_env, engine_env = model_environments(model, engine_port, engine_token, settings['ports']['api'], settings.get('manualModelAcceptance', False), settings.get('publicSearch'), settings.get('automaticWorkEnabled', False))
+        engine_env.update(presentation_env)
+        engine_env.update(extra_engine_env)
         env = {**clean_environment(), 'TASK_ENABLED':'true', 'TASK_ENGINE_TOKEN':engine_token, 'ENGINE_BASE_URL':f'http://127.0.0.1:{engine_port}', 'DATABASE_URL': f"jdbc:postgresql://127.0.0.1:{settings['ports']['database']}/dreamcore_trial", 'DATABASE_USER': 'dreamcore_trial', 'DATABASE_PASSWORD': secret,
                'KNOWLEDGE_ENABLED': str((WORKSPACE / 'workers/parser/.venv/bin/python').exists()).lower(), 'KNOWLEDGE_PARSER_ROOT': str(WORKSPACE / 'workers/parser'), 'MATERIAL_STORAGE_ROOT': str(root / 'objects'), 'SPRING_PROFILES_ACTIVE': 'local', 'INVITATION_DELIVERY': 'local', 'INVITATION_OUTBOX': str(root / 'invitations'), 'API_HOST': '127.0.0.1', 'API_PORT': str(settings['ports']['api']), 'SERVER_SERVLET_SESSION_COOKIE_NAME': 'DREAMCORE_TRIAL_' + hashlib.sha256(str(root).encode()).hexdigest()[:12]}
         env.update({'PHONE_DELIVERY': 'local' if phone_local else 'disabled', 'PHONE_LOCAL_PREVIEW': str(phone_local).lower(), 'PHONE_OUTBOX': str(root / 'phone-sms')})
         env['PLATFORM_COOKIE_NAME'] = 'DREAMCORE_PLATFORM_TRIAL_' + hashlib.sha256(str(root).encode()).hexdigest()[:12]
         env.update(collection_env)
+        env.update(weknora_env)
         if collection_config is not None:
             private_write(root / 'collection-runtime.json', {'executable': collection_env['DREAMCORE_COLLECTION_EXECUTABLE']})
         env.update(model_api_env)
         env.update(analysis_env)
         env.update(briefing_env)
+        env.update(extra_api_env)
         model_status = {'agentMode': mode, 'model': model['model'] if model else None, 'cloudVerifiedByStartup': False}
         private_write(root / 'runtime.json', {'runId': run_id, 'state': 'starting', 'webUrl': f"http://127.0.0.1:{settings['ports']['web']}", **model_status, 'revision': subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'], cwd=WORKSPACE, text=True).strip(), 'apiSha256': hashlib.sha256(jar.read_bytes()).hexdigest()})
         runtime_started = True

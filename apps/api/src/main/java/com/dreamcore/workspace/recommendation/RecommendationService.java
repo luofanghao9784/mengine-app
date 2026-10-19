@@ -57,7 +57,7 @@ public class RecommendationService {
   var sql="""
    WITH eligible_tasks AS MATERIALIZED (
     SELECT t.id FROM conversation_tasks t WHERE t.tenant_id=? AND t.requested_by=?
-     AND t.status='SUCCEEDED' AND t.mode='AGENT' AND t.reply IS NOT NULL
+     AND t.status='SUCCEEDED' AND t.mode='AGENT' AND t.reply IS NOT NULL AND task_audience_current(t.id)
      AND (NOT ? OR EXISTS (%s))
    ), readable AS MATERIALIZED (
     SELECT id FROM eligible_tasks e WHERE EXISTS(SELECT 1 FROM readable_source_tasks r WHERE r.id=e.id OFFSET 0)

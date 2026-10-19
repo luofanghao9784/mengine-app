@@ -178,6 +178,28 @@ public class ConversationService {
         event(tenant,space,id,task,state,0);db.update("UPDATE conversations SET updated_at=now() WHERE id=?",id);
         identities.remember(actor,key,"CONVERSATION_SEND",fingerprint,id);audit.record(actor,tenant,systemBriefing?"BRIEFING_GENERATION_SUBMIT":"CONVERSATION_SEND",task,"SUCCESS");return detailInternal(actor,tenant,id,0,20,systemBriefing);
     }
+    /** The metered 0.19 runtime cannot call a model or tool before its durable execution gates. */
+    private boolean preflightNotStarted(UUID task,int attempt){
+        db.queryForList("SELECT attempt_id FROM conversation_attempts WHERE task_id=? AND attempt_number=? FOR UPDATE",task,attempt);
+        db.queryForList("SELECT attempt_id FROM agent_attempt_usage WHERE task_id=? AND attempt_number=? FOR UPDATE",task,attempt);
+        db.queryForList("SELECT r.task_id FROM engine_execution_receipts r JOIN conversation_attempts a ON a.task_id=r.task_id AND a.attempt_id=r.attempt_id WHERE r.kind='AGENT' AND a.task_id=? AND a.attempt_number=? FOR UPDATE OF r",task,attempt);
+        return Boolean.TRUE.equals(db.queryForObject("""
+          SELECT EXISTS(SELECT 1 FROM conversation_attempts a
+            JOIN conversation_tasks t ON t.id=a.task_id AND t.attempt=a.attempt_number
+            JOIN agent_attempt_usage u ON u.task_id=a.task_id AND u.attempt_id=a.attempt_id
+            JOIN engine_execution_receipts r ON r.kind='AGENT' AND r.task_id=a.task_id AND r.attempt_id=a.attempt_id
+          WHERE a.task_id=? AND a.attempt_number=? AND a.provenance='RECORDED'
+            AND a.status='RESULT_UNKNOWN' AND a.finished_at IS NOT NULL
+            AND t.status IN ('RESULT_UNKNOWN','CANCELLED') AND t.lease_token IS NULL
+            AND a.execution_policy IS NULL AND a.allowed_tools IS NULL
+            AND NOT u.metering_enabled AND u.status='RESULT_UNKNOWN' AND u.finished_at IS NOT NULL
+            AND r.engine_version='0.19.0' AND r.state='ACCEPTED' AND r.result IS NULL
+            AND NOT EXISTS(SELECT 1 FROM agent_model_requests m WHERE m.task_id=a.task_id AND m.attempt_id=a.attempt_id)
+            AND NOT EXISTS(SELECT 1 FROM conversation_tool_receipts x WHERE x.task_id=a.task_id AND x.attempt_number=a.attempt_number)
+            AND NOT EXISTS(SELECT 1 FROM conversation_artifacts x WHERE x.task_id=a.task_id AND x.attempt_number=a.attempt_number)
+            AND NOT EXISTS(SELECT 1 FROM conversation_live_output x WHERE x.task_id=a.task_id AND x.attempt_number=a.attempt_number))
+          """,Boolean.class,task,attempt));
+    }
     @Transactional public Detail action(UUID actor,UUID tenant,UUID conversation,UUID task,UUID key,int revision,String action) {return action(actor,tenant,conversation,task,key,revision,action,null);}
     @Transactional public Detail action(UUID actor,UUID tenant,UUID conversation,UUID task,UUID key,int revision,String action,String input) {return action(actor,tenant,conversation,task,key,revision,action,input,null);}
     @Transactional public Detail action(UUID actor,UUID tenant,UUID conversation,UUID task,UUID key,int revision,String action,String input,List<TaskOriginals.Selection> additions) {
@@ -203,8 +225,9 @@ public class ConversationService {
             if(!Boolean.TRUE.equals(row.get("reconciliation_required")))throw new IdentityException(409,"TASK_STATE_CHANGED");
             // This immutable server-validated allowlist contains no external business writes. User/model assertions are not evidence.
             boolean safe=Boolean.TRUE.equals(db.queryForObject("SELECT task_retry_is_safe(?,?)",Boolean.class,task,row.get("attempt")));
-            if(!safe)throw new IdentityException(409,"TASK_RECONCILIATION_REQUIRED");
-            db.update("UPDATE conversation_attempts SET reconciliation_code='NO_BUSINESS_WRITES',reconciled_at=now() WHERE task_id=? AND attempt_number=?",task,row.get("attempt"));
+            boolean unstarted=!safe&&preflightNotStarted(task,(Integer)row.get("attempt"));
+            if(!safe&&!unstarted)throw new IdentityException(409,"TASK_RECONCILIATION_REQUIRED");
+            db.update("UPDATE conversation_attempts SET reconciliation_code=?,reconciled_at=now() WHERE task_id=? AND attempt_number=?",unstarted?"NO_EXECUTION_STARTED":"NO_BUSINESS_WRITES",task,row.get("attempt"));
             next="FAILED";reason="TASK_RESULT_RECONCILED";
         }else if(stopping){
             if(!Set.of("QUEUED","RUNNING","WAITING_INPUT","WAITING_CAPABILITY","PARTIAL","PAUSED","RESULT_UNKNOWN").contains(state) || action.equals("PAUSE") && Set.of("PAUSED","RESULT_UNKNOWN").contains(state))throw new IdentityException(409,"TASK_STATE_CHANGED");

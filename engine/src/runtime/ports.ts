@@ -42,6 +42,10 @@ export interface RuntimeResult {
   code?: string;
   /** The last model call was reserved to report bounded progress, not business completion. */
   finalResponseReserved?: boolean;
+  /** Fixed diagnostic codes only; never provider output. */
+  diagnostic?: string;
+  /** Plain text cannot settle a rejected executable proposal without a valid correction. */
+  unresolvedModelProposal?: boolean;
 }
 export class RuntimeError extends Error {
   constructor(readonly code: string, readonly hint?: string) {

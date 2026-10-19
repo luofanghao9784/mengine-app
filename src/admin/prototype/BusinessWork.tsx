@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { TenantConsole } from '../TenantConsole';
+import { WorkRoles } from './WorkRoles';
 import { AccessWork } from './AccessWork';
 import { useSession } from '../../identity/session';
 import { requestNavigationLocked } from '../../shared/request-guard';
@@ -9,6 +10,7 @@ const pages = { experience: 'experience', company: 'company', usage: 'usage', me
 export function BusinessWork({ tenant, place }: { tenant: string; place: keyof typeof pages }) {
   const { session } = useSession();
   const [access, setAccess] = useState(false);
+  const [roles, setRoles] = useState(false);
   const [ready, setReady] = useState(false);
   useEffect(() => {
     const p = new URLSearchParams(location.hash.slice(1));
@@ -32,25 +34,45 @@ export function BusinessWork({ tenant, place }: { tenant: string; place: keyof t
         {place === 'members' && (
           <nav className="business-tabs" aria-label="成员权限管理范围">
             <button
-              aria-pressed={access}
+              aria-pressed={access && !roles}
               onClick={() => {
-                if (!requestNavigationLocked()) setAccess(true);
+                if (!requestNavigationLocked()) {
+                  setRoles(false);
+                  setAccess(true);
+                }
               }}
             >
               数据权限与部门
             </button>
             <button
-              aria-pressed={!access}
+              aria-pressed={!access && !roles}
               onClick={() => {
-                if (!requestNavigationLocked()) setAccess(false);
+                if (!requestNavigationLocked()) {
+                  setRoles(false);
+                  setAccess(false);
+                }
               }}
             >
               账号、空间与职责交接
             </button>
+            <button
+              aria-pressed={roles}
+              onClick={() => {
+                if (!requestNavigationLocked()) setRoles(true);
+              }}
+            >
+              岗位与内容偏好
+            </button>
           </nav>
         )}
-        {place === 'members' && <p role="note">先邀请成员加入企业，再在共享空间中授予只读或维护权限。数据资源权限独立核对；加入企业不代表可以读取所有内容。</p>}
-        {access && place === 'members' ? (
+        {place === 'members' && (
+          <p role="note">
+            先邀请成员加入企业，再在共享空间中授予只读或维护权限。数据资源权限独立核对；加入企业不代表可以读取所有内容。
+          </p>
+        )}
+        {roles && place === 'members' ? (
+          <WorkRoles key={tenant} tenant={tenant} />
+        ) : access && place === 'members' ? (
           <AccessWork />
         ) : (
           ready && <TenantConsole tenant={tenant} name={name} embedded />

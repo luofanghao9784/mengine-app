@@ -66,7 +66,8 @@ public class WeKnoraClient {
     }
     public Document create(String kb,UUID localId,String text) {
         var data=request("POST","/api/v1/knowledge-bases/"+id(kb)+"/knowledge/manual",
-            Map.of("title","mengine-"+localId,"content",text,"channel","mengine"),false).path("data");
+            // Remote publish enables indexing inside the private KB; platform sharing remains separately governed.
+            Map.of("title","mengine-"+localId,"content",text,"channel","mengine","status","publish"),false).path("data");
         if(!kb.equals(data.path("knowledge_base_id").asText()))throw new Unavailable("WEKNORA_SCOPE_MISMATCH");
         return new Document(id(data.path("id").asText()),data.path("parse_status").asText());
     }

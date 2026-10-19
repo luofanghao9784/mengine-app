@@ -9,7 +9,7 @@ import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.TestPropertySource;
 import static org.junit.jupiter.api.Assertions.*;
-@TestPropertySource(properties={"dreamcore.briefing.daily-enabled=true","dreamcore.briefing.automatic-enabled=false","dreamcore.briefing.merge-seconds=0","dreamcore.briefing.initial-delay-ms=3600000"})
+@TestPropertySource(properties={"dreamcore.knowledge.enabled=true","dreamcore.briefing.daily-enabled=true","dreamcore.briefing.automatic-enabled=false","dreamcore.briefing.merge-seconds=0","dreamcore.briefing.initial-delay-ms=3600000"})
 class BriefingDailyIntegrationTest extends DatasetCalculationFixture {
  @Autowired BriefingGenerationService generation;
  @Autowired BriefingFlowGuard guard;
@@ -42,6 +42,30 @@ class BriefingDailyIntegrationTest extends DatasetCalculationFixture {
   assertEquals(db.queryForObject("SELECT version_id FROM briefing_flow_materials WHERE task_id=?",UUID.class,first.id()),db.queryForObject("SELECT version_id FROM briefing_flow_materials WHERE task_id=?",UUID.class,second.id()));
  }
 
+ @Autowired com.dreamcore.workspace.material.MaterialService materials;
+ @Autowired com.dreamcore.workspace.knowledge.KnowledgeService knowledge;
+ void documentEvidence(){
+  var f=materials.uploadReceipt(owner,tenant,space,null,null,null,UUID.randomUUID(),new org.springframework.mock.web.MockMultipartFile("file","procedure.txt","application/octet-stream","synthetic procedure evidence".getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+  var j=knowledge.claim();assertEquals(f.acceptedVersion().id(),j.version());
+  knowledge.finish(j,new com.dreamcore.workspace.knowledge.DocumentParser.Result("synthetic","READY",List.of(),List.of(new com.dreamcore.workspace.knowledge.DocumentParser.Fragment("L1","synthetic procedure evidence","TEXT"))));
+ }
+ void unknownCoverage(){
+  UUID fresh=UUID.randomUUID(),run=UUID.randomUUID();
+  db.update("INSERT INTO collection_runs(id,tenant_id,connection_id,execution_epoch,trigger_kind,status) VALUES (?,?,?,1,'SCHEDULED','SUCCEEDED')",run,tenant,connection);
+  db.update("INSERT INTO dataset_snapshots(id,tenant_id,connection_id,dataset_id,run_id,version,data_rows,row_count,collected_at) SELECT ?,tenant_id,connection_id,dataset_id,?,2,data_rows,row_count,collected_at FROM dataset_snapshots WHERE id=?",fresh,run,snapshot);
+  db.update("UPDATE business_datasets SET current_snapshot=? WHERE id=?",fresh,dataset);
+ }
+ @Test void dailyAutoUsesDocumentsWhenDatasetIsStale(){
+  documentEvidence();unknownCoverage();
+  UUID p=schedule();generation.dispatchDaily(p);generation.tick(p);
+  var b=generation.state(owner,tenant).batches().getFirst();assertEquals("RUNNING",b.status());
+  assertEquals(0,db.queryForObject("SELECT count(*) FROM briefing_dataset_selections WHERE task_id=?",Integer.class,b.taskId()));
+ }
+ @Test void explicitDataStillWaitsEvenWithDocuments(){
+  documentEvidence();unknownCoverage();
+  UUID p=schedule();var b=generation.generate(owner,tenant,UUID.randomUUID(),space,"DATA");generation.tick(p);
+  assertEquals("SOURCE_COVERAGE_TOO_OLD",generation.get(owner,tenant,b.id()).reason());
+ }
  @Test void unknownCoverageWaitsWithoutModelAndNoCatchUpStorm(){UUID p=schedule();UUID old=snapshot;UUID fresh=UUID.randomUUID(),run=UUID.randomUUID();db.update("INSERT INTO collection_runs(id,tenant_id,connection_id,execution_epoch,trigger_kind,status) VALUES (?,?,?,1,'SCHEDULED','SUCCEEDED')",run,tenant,connection);db.update("INSERT INTO dataset_snapshots(id,tenant_id,connection_id,dataset_id,run_id,version,data_rows,row_count,collected_at) SELECT ?,tenant_id,connection_id,dataset_id,?,2,data_rows,row_count,collected_at FROM dataset_snapshots WHERE id=?",fresh,run,old);db.update("UPDATE business_datasets SET current_snapshot=? WHERE id=?",fresh,dataset);generation.dispatchDaily(p);generation.tick(p);assertEquals("SOURCE_COVERAGE_TOO_OLD",generation.state(owner,tenant).batches().getFirst().reason());assertNull(generation.state(owner,tenant).batches().getFirst().taskId());}
  @Test void identicalNewSnapshotDoesNotSpendModelBudgetForDeliveredTopic(){UUID p=schedule();generation.dispatchDaily(p);generation.tick(p);var b=generation.state(owner,tenant).batches().getFirst();db.update("UPDATE conversation_tasks SET status='SUCCEEDED',lease_token=NULL,lease_until=NULL,finished_at=now() WHERE id=?",b.taskId());db.update("UPDATE briefing_generation_batches SET status='SUCCEEDED',finished_at=now() WHERE id=?",b.id());snapshot=version(2,rowsFor("old"));var manual=generation.generate(owner,tenant,UUID.randomUUID(),null,null);generation.tick(p);var result=generation.get(owner,tenant,manual.id());assertEquals("NO_NEW_CONTENT",result.status());assertEquals("SOURCES_UNCHANGED",result.reason());assertNull(result.taskId());}
     @Autowired org.springframework.security.crypto.password.PasswordEncoder passwords;

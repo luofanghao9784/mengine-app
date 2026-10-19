@@ -83,4 +83,12 @@ class ExperienceAnalysisRuntimeTest {
   var r=platformReceipt();var review=new HashMap<>((Map<String,Object>)r.get("review"));review.put("basis","OBSERVED_EXECUTION");r.put("review",review);reject(r);
  }
 
+ @Test void failureStageAcceptsOnlyClosedDiagnosticCodesAndLegacyReceiptsStillWork(){
+  var r=receipt();r.put("outcome","FAILED");r.put("code","EXPERIENCE_ANALYSIS_FAILED");r.put("candidate",null);r.put("review",null);
+  var stage=stage("EXTRACT");stage.put("diagnostic","UNADVERTISED_TOOL");r.put("stages",List.of(stage));
+  response.set(json.writeValueAsString(r));var accepted=runtime.recover(job,"synthetic-v1");assertEquals("UNADVERTISED_TOOL",accepted.stages().getFirst().diagnostic());
+  stage.put("diagnostic","private provider output");reject(r);
+  stage.remove("diagnostic");response.set(json.writeValueAsString(r));assertNull(runtime.recover(job,"synthetic-v1").stages().getFirst().diagnostic());
+ }
+
 }

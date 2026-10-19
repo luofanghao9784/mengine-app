@@ -1,9 +1,10 @@
+import { safeModelFailure, ModelResponseError } from './model-response.js';
 import { RuntimeError, type ModelPort } from './ports.js';
 import type { TaskObservation } from './observability.js';
 import { isRecord } from './http-json.js';
 
 export type TokenUsage = { inputTokens: number; outputTokens: number };
-export type UsageModel = ModelPort & { lastUsage?: TokenUsage | null; usage?: TokenUsage | null };
+export type UsageModel = ModelPort & { lastUsage?: TokenUsage | null; usage?: TokenUsage | null; lastResponseComplete?: boolean };
 
 /** Reserve before dispatch; never replay a provider request after uncertain delivery. */
 export function meteredModel(
@@ -29,6 +30,7 @@ export function meteredModel(
       if (!isRecord(reserved) || reserved.accepted !== true)
         throw new RuntimeError('TASK_RUNTIME_INCOMPATIBLE');
       backend.lastUsage = null;
+      backend.lastResponseComplete = false;
       let outcome = 'FAILED';
       const observed = observation?.model(modelName, current);
       try {
@@ -38,6 +40,10 @@ export function meteredModel(
           yield part;
         }
       } catch (error) {
+        // RETURNED is a transport receipt, never tool acceptance. A fully received
+        // invalid proposal still consumed a real response and belongs in totals.
+        if (error instanceof ModelResponseError && (backend.lastResponseComplete as boolean | undefined) === true)
+          outcome = 'RETURNED';
         const codes = new Set([
           'MODEL_RATE_LIMITED', 'MODEL_PROVIDER_UNAVAILABLE', 'MODEL_REQUEST_REJECTED', 'MODEL_TIMEOUT', 'MODEL_NETWORK_ERROR',
           'REMOTE_ACCESS_DENIED',
@@ -55,6 +61,7 @@ export function meteredModel(
           JSON.stringify({
             event: 'TASK_MODEL_REQUEST_FAILED',
             sequence: current,
+            diagnostic: safeModelFailure(error),
             code: error instanceof RuntimeError && codes.has(error.code) ? error.code : 'MODEL_ERROR',
           }),
         );

@@ -10,6 +10,7 @@ export type Asset = {
   status: string;
   label: string;
   gate: number;
+  stageStates?: string[];
   available: boolean;
   needsAttention: boolean;
   checksPassed: boolean;

@@ -14,6 +14,7 @@ from trial import WORKSPACE, TrialError, binary, directory, private_read, privat
 FORMAT = 'dreamcore-local-model-v1'
 DEFAULT_CONFIG = WORKSPACE / '.local/model-private/bailian.json'
 DEFAULT_MODEL = 'qwen3.7-plus-2026-05-26'
+DEEPSEEK_MODELS = {'deepseek-flash'}
 MODELS = {'qwen3.7-plus', 'qwen3.7-flash', DEFAULT_MODEL, 'qwen3.7-flash-2026-07-15', 'qwen3.8-max-0902'}
 
 
@@ -37,12 +38,17 @@ def validate(value):
     fields = {'format', 'workspace', 'provider', 'model', 'workspaceId', 'apiKey'}
     if not isinstance(value, dict) or set(value) not in (fields, fields | {'routineModel'}) or value['format'] != FORMAT or value['workspace'] != str(WORKSPACE):
         raise TrialError('模型配置格式或工作树归属不匹配，请在当前工作树运行 model:configure。')
-    if value['provider'] != 'bailian' or not isinstance(value['model'], str) or value['model'] not in MODELS:
-        raise TrialError('当前本地真实验收使用百炼已支持模型版本，请检查模型名称。')
-    if not isinstance(value['workspaceId'], str) or not re.fullmatch(r'[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?', value['workspaceId']):
-        raise TrialError('百炼工作空间 ID 无效。')
-    if 'routineModel' in value and (not isinstance(value['routineModel'], str) or value['routineModel'] not in MODELS):
-        raise TrialError('常规任务模型须使用受支持的模型 ID。')
+    provider = value['provider']
+    allowed = MODELS if provider == 'bailian' else DEEPSEEK_MODELS if provider == 'deepseek' else set()
+    if not isinstance(value['model'], str) or value['model'] not in allowed:
+        raise TrialError('模型服务商或模型 ID 未受当前本地适配支持。')
+    if provider == 'bailian':
+        if not isinstance(value['workspaceId'], str) or not re.fullmatch(r'[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?', value['workspaceId']):
+            raise TrialError('百炼工作空间 ID 无效。')
+    elif value['workspaceId'] != '':
+        raise TrialError('DeepSeek 官方接口不使用百炼工作空间 ID。')
+    if 'routineModel' in value and (not isinstance(value['routineModel'], str) or value['routineModel'] not in allowed):
+        raise TrialError('常规任务模型须使用同一服务商受支持的模型 ID。')
     key = value['apiKey']
     if not isinstance(key, str) or not 1 <= len(key) <= 4096 or any(c.isspace() or ord(c) < 33 or ord(c) > 126 for c in key):
         raise TrialError('API Key 为空或包含无效字符，请通过隐藏输入重新配置。')
@@ -61,7 +67,8 @@ def load(path=DEFAULT_CONFIG):
 def engine_environment(value):
     validate(value)
     return {'AGENT_MODEL_PROVIDER': value['provider'], 'AGENT_MODEL_NAME': value['model'],
-            'AGENT_BAILIAN_WORKSPACE_ID': value['workspaceId'], 'AGENT_MODEL_API_KEY': value['apiKey'],
+            'AGENT_MODEL_API_KEY': value['apiKey'],
+            **({'AGENT_BAILIAN_WORKSPACE_ID': value['workspaceId']} if value['provider'] == 'bailian' else {}),
             **({'AGENT_ROUTINE_MODEL_NAME': value['routineModel']} if value.get('routineModel') else {})}
 
 
@@ -94,7 +101,7 @@ def check(value):
     return report
 
 
-def configure(path):
+def configure(path, provider='bailian'):
     if not sys.stdin.isatty() or not sys.stderr.isatty():
         raise TrialError('请在本机交互终端运行 model:configure；不要把密钥写在命令行参数或会话中。')
     path = owned_path(path, True)
@@ -103,10 +110,11 @@ def configure(path):
         # Permit correcting this project's invalid model/key without overwriting foreign files.
         if not isinstance(previous, dict) or previous.get('format') != FORMAT or previous.get('workspace') != str(WORKSPACE):
             raise TrialError('现有配置不属于本工作树，拒绝覆盖。')
-    workspace_id = input('百炼北京工作空间 ID：').strip()
-    model = input(f'模型快照（回车使用 {DEFAULT_MODEL}）：').strip() or DEFAULT_MODEL
+    workspace_id = input('百炼北京工作空间 ID：').strip() if provider == 'bailian' else ''
+    default_model = DEFAULT_MODEL if provider == 'bailian' else 'deepseek-flash'
+    model = input(f'模型 ID（回车使用 {default_model}）：').strip() or default_model
     api_key = getpass.getpass('本项目专用 API Key（隐藏输入）：')
-    value = validate({'format': FORMAT, 'workspace': str(WORKSPACE), 'provider': 'bailian',
+    value = validate({'format': FORMAT, 'workspace': str(WORKSPACE), 'provider': provider,
                       'model': model, 'workspaceId': workspace_id, 'apiKey': api_key})
     check(value)
     private_write(path, value)
@@ -114,15 +122,16 @@ def configure(path):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='本项目百炼私有配置与显式单次真实连接检查。')
+    parser = argparse.ArgumentParser(description='本项目模型私有配置与显式单次真实连接检查。')
     parser.add_argument('command', choices=['configure', 'check', 'smoke'])
+    parser.add_argument('--provider', choices=['bailian','deepseek'], default='bailian', help='configure 使用的服务商；调用地址固定在对应适配器。')
     parser.add_argument('--config', type=Path, default=DEFAULT_CONFIG)
     parser.add_argument('--tools', action='store_true', help='smoke 时额外验证工具回放，最多两次模型请求。')
     args = parser.parse_args()
     if args.tools and args.command != 'smoke':
         raise TrialError('--tools 仅适用于 smoke。')
     if args.command == 'configure':
-        configure(args.config)
+        configure(args.config, args.provider)
         return
     value = load(args.config)
     if args.command == 'check':

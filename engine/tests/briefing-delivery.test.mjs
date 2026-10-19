@@ -216,7 +216,7 @@ test('dataset briefing closes retrieval after three lookups and delivers an hone
   const agent = new AgentTasks({ platformBaseUrl: url, executionClass: 'live', modelName: 'synthetic-dataset-insight',
     createModel: () => ({ usage: null, async *generate(request) {
       calls++;
-      const instructions = request.messages[0].content[0].text;
+      const instructions = request.messages.filter(m=>m.role==='system').flatMap(m=>m.content).filter(b=>b.type==='text').map(b=>b.text).join('\n');
       assert.match(instructions, /compare_dataset/);
       assert.match(instructions, /每张卡回答：发现了什么/);
       assert.match(instructions, /只有来源介绍而没有新业务发现时不凑卡/);
@@ -227,7 +227,7 @@ test('dataset briefing closes retrieval after three lookups and delivers an hone
       else if (calls === 3) args = { action: 'dataset_read', referenceId: datasetId, versionId: snapshotId, columnLimit: 10, offset: 1 };
       else {
         assert.equal(calls, 4);
-        assert.ok(request.tools.some(tool => tool.name === 'compare_dataset'));
+        assert.ok(!request.tools.some(tool => tool.name === 'compare_dataset'), 'no published metric plan was supplied');
         assert.ok(!request.tools.some(tool => tool.name === 'task_context'));
         assert.equal(request.requiredTool, undefined);
         assert.equal(request.requireToolCall, true);

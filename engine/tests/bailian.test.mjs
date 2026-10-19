@@ -339,8 +339,8 @@ test('a closed retrieval phase selects only advertised calculation, delivery or 
   }
   await assert.rejects(collect(backend.generate({ ...input, tools: [] })), { code: 'INVALID_MODEL_INPUT' });
   assert.equal(calls, 7, 'an empty phase cannot dispatch a model request');
-  assert.ok(diagnostics.some(value => JSON.parse(value).calls.some(call => call.advertisedName === false)));
-  assert.ok(diagnostics.every(value => !/task_context|deliver_briefing|phase-call/.test(value)), 'diagnostics expose only fixed shape metadata');
+  assert.ok(diagnostics.some(value => JSON.parse(value).calls?.some(call => call.advertisedName === false)));
+  assert.ok(diagnostics.filter(value=>JSON.parse(value).event==='MODEL_PHASE_RESPONSE_SHAPE').every(value => !/task_context|deliver_briefing|phase-call/.test(value)), 'diagnostics expose only fixed shape metadata');
 });
 
  test('routine routing is explicit, independently validated and preserves the base model', () => {

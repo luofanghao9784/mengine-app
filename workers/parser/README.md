@@ -11,7 +11,7 @@ npm run setup:parser -- --with-tests
 npm run test:parser
 ```
 
-需要已有 `/opt/homebrew/bin/{pdfinfo,pdftotext,pdftoppm,tesseract}` 及 `/usr/bin/sandbox-exec`。安装脚本只从 PyPI 下载固定版本 wheel、从 Tesseract 官方仓库下载校验 SHA-256 的 OCR 文件；不安装系统软件、不产生模型调用费用。运行阶段禁止联网。
+macOS 需要已有 `/opt/homebrew/bin/{pdfinfo,pdftotext,pdftoppm,tesseract}` 及 `/usr/bin/sandbox-exec`。没有 Homebrew 时，可将可信来源的 Poppler / Tesseract 及其动态库安装到执行器自身的 `.local/tools`（例如 conda-forge 环境前缀）；存在 `.local/tools/bin` 时优先使用该目录，四个程序应一起安装。路径固定在原有只读沙箱范围内，不开放任意工具路径或继承环境。Linux 仍使用 `/usr/bin`。安装脚本只从 PyPI 下载固定版本 wheel、从 Tesseract 官方仓库下载校验 SHA-256 的 OCR 文件；不安装系统软件、不产生模型调用费用。运行阶段禁止联网。
 
 OCR 数据锁定 `tessdata_fast` 4.1.0 对应提交 `65727574dfcd264acbb0c3e07860e4e9e9b22185`，下载的 `chi_sim`/`eng` 文件在忽略的 `.local/tessdata`。当前以 `chi_sim` 进行中文优先识别，也可提取英文和数字；识别结果一律标记需核对，不能当作财务计算依据。合成中文样例中“梦”仍可能识别成“药”。
 

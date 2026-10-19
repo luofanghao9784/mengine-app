@@ -18,10 +18,20 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={"dreamcore.tasks.enabled=true","dreamcore.tasks.agent-mode=verification","dreamcore.knowledge.enabled=true","dreamcore.briefing.merge-seconds=0","dreamcore.tasks.public-web-enabled=true"})
 class BriefingGenerationIntegrationTest {
+ @Autowired com.dreamcore.workspace.audience.WorkAudienceService workAudience;
  @Autowired JdbcTemplate db;@Autowired MaterialService materials;@Autowired KnowledgeService knowledge;
  @Autowired ConversationService conversations;@Autowired AgentTaskService agents;@Autowired BriefingContentService contents;
  @Autowired BriefingGenerationService generation;@Autowired BriefingCardService cards;@Autowired BriefingService feed;@Autowired RecommendationService recommendations;
  @Autowired AgentUsageLedger usage;
+ @Test void roleChangeRemovesOldAutomaticCardsFromFeedAndUnreadRecommendations(){
+  db.update("INSERT INTO tenant_governance(tenant_id,owner_id) VALUES (?,?)",tenant,actor);
+  upload("marker 合成岗位画报来源。",true);manual();UUID p=policy();generation.tick(p);var j=conversations.claim();deliver(j,"合成岗位推荐，核对本人应处理的工作。");generation.tick(p);
+  assertTrue(feed.list(actor,tenant,null,"LATEST",null,"Asia/Shanghai",0,20,true).items().stream().anyMatch(c->c.taskId().equals(j.id())));assertTrue(recommendations.hasUnreadBriefing(actor,tenant));
+  workAudience.save(actor,tenant,actor,new com.dreamcore.workspace.audience.WorkAudienceService.Change(UUID.randomUUID(),0,"服务部","美容师","核对预约",List.of("SERVICE")));
+  assertTrue(feed.list(actor,tenant,null,"LATEST",null,"Asia/Shanghai",0,20,true).items().isEmpty());assertFalse(recommendations.hasUnreadBriefing(actor,tenant));
+  // Role relevance changes the feed, not private historical ownership or stored evidence.
+  assertEquals("SUCCEEDED",conversations.taskDetail(actor,tenant,j.conversation(),j.id()).tasks().getFirst().status());
+ }
  @Test void defaultGenerationRotatesReadyAuthorizedSpacesAndReplaysTheSameSelection(){
   upload("marker 财务合成资料",true);UUID finance=space,operations=UUID.randomUUID();
   db.update("INSERT INTO workspaces(id,tenant_id,owner_id,name,kind) VALUES (?,?,?,'运营','SHARED')",operations,tenant,actor);
@@ -71,6 +81,7 @@ class BriefingGenerationIntegrationTest {
  }
  @Test void manualOnlyDeploymentDoesNotDispatchLegacyAutomaticBatchUntilUserRequestsIt(){
   var manualOnly=new BriefingGenerationService(db,conversations,contents,identities,access,departure,new AgentSettings("verification",true,false),new com.dreamcore.workspace.plans.PlanClock(),true,"",0,6);
+  org.springframework.test.util.ReflectionTestUtils.setField(manualOnly,"workAudience",workAudience);
   org.springframework.test.util.ReflectionTestUtils.setField(manualOnly,"automaticEnabled",false);
   upload("marker 合成手动画报资料。",true);UUID p=policy(),batch=UUID.randomUUID();
   db.update("INSERT INTO briefing_generation_batches(id,tenant_id,owner_id,workspace_id,policy_id,policy_epoch,trigger_kind,business_type,status) SELECT ?,tenant_id,owner_id,workspace_id,id,epoch,'INITIALIZATION','INSIGHT','WAITING_CAPABILITY' FROM briefing_generation_policies WHERE id=?",batch,p);
@@ -81,7 +92,7 @@ class BriefingGenerationIntegrationTest {
   assertNotNull(manualOnly.get(actor,tenant,batch).taskId());
   assertEquals(1,db.queryForObject("SELECT count(*) FROM conversation_tasks WHERE tenant_id=?",Integer.class,tenant));
  }
- @AfterEach void cleanup(){db.update("DELETE FROM platform_roles WHERE account_id IN (SELECT account_id FROM platform_accounts WHERE login_name LIKE '%@service-platform.test')");db.update("DELETE FROM tenant_service_changes WHERE actor_id IN (SELECT account_id FROM platform_accounts WHERE login_name LIKE '%@service-platform.test')");db.update("DELETE FROM platform_accounts WHERE login_name LIKE '%@service-platform.test'");db.update("UPDATE conversation_tasks SET status='CANCELLED' WHERE tenant_id=? AND status IN ('QUEUED','RUNNING')",tenant);db.update("UPDATE knowledge_runs SET status='CANCELLED' WHERE tenant_id=? AND status IN ('QUEUED','RUNNING')",tenant);}
+ @AfterEach void cleanup(){db.update("UPDATE briefing_generation_policies SET enabled=false WHERE tenant_id=?",tenant);db.update("UPDATE briefing_generation_batches SET status='CANCELLED' WHERE tenant_id=? AND status IN ('QUEUED','RUNNING','WAITING_DATA','WAITING_RESOURCE','WAITING_CAPABILITY')",tenant);db.update("DELETE FROM platform_roles WHERE account_id IN (SELECT account_id FROM platform_accounts WHERE login_name LIKE '%@service-platform.test')");db.update("DELETE FROM tenant_service_changes WHERE actor_id IN (SELECT account_id FROM platform_accounts WHERE login_name LIKE '%@service-platform.test')");db.update("DELETE FROM platform_accounts WHERE login_name LIKE '%@service-platform.test'");db.update("UPDATE conversation_tasks SET status='CANCELLED' WHERE tenant_id=? AND status IN ('QUEUED','RUNNING')",tenant);db.update("UPDATE knowledge_runs SET status='CANCELLED' WHERE tenant_id=? AND status IN ('QUEUED','RUNNING')",tenant);}
  MaterialService.UploadReceipt upload(String text,boolean ready){
   return upload("evidence.txt",text,ready);
  }
@@ -189,6 +200,7 @@ class BriefingGenerationIntegrationTest {
  @Test void tenBackgroundDeliveriesDoNotCreateUserConversationsAndRemainReadable(){
   upload("marker 后台内容生成合成证据。",true);UUID p=policy();
   var many=new BriefingGenerationService(db,conversations,contents,identities,access,departure,new AgentSettings("verification",true,false),new com.dreamcore.workspace.plans.PlanClock(),true,"",0,24);
+  org.springframework.test.util.ReflectionTestUtils.setField(many,"workAudience",workAudience);
   for(int i=0;i<10;i++){
    var b=many.generate(actor,tenant,UUID.randomUUID(),space,"INSIGHT");many.tick(p);var job=conversations.claim();
    assertEquals("BRIEFING_GENERATION",db.queryForObject("SELECT purpose FROM conversations WHERE id=?",String.class,job.conversation()));
@@ -415,6 +427,7 @@ class BriefingGenerationIntegrationTest {
   var f=upload("marker 本企业经营青少年舞蹈教育，本项目关注课程安全。",true);
   var clock=new com.dreamcore.workspace.plans.PlanClock();
   var news=new BriefingGenerationService(db,conversations,contents,identities,access,departure,new AgentSettings("verification",true,false),clock,true,"https://news.example.org/updates",0,6);
+  org.springframework.test.util.ReflectionTestUtils.setField(news,"workAudience",workAudience);
    var b=news.generate(actor,tenant,UUID.randomUUID(),space,"INFO");news.tick(policy());b=news.get(actor,tenant,b.id());assertEquals("RUNNING",b.status());
    var t=db.queryForMap("SELECT prompt,public_query FROM conversation_tasks WHERE id=?",b.taskId());
    assertEquals("https://news.example.org/updates",t.get("public_query"));assertTrue(t.get("prompt").toString().contains("引擎已预取获权企业"));assertTrue(t.get("prompt").toString().contains("没有相关资讯"));
@@ -452,6 +465,7 @@ class BriefingGenerationIntegrationTest {
   var time=new java.util.concurrent.atomic.AtomicReference<>(scheduled.minusSeconds(60));
   var clock=new com.dreamcore.workspace.plans.PlanClock(){@Override public java.time.Instant now(){return time.get();}};
   var news=new BriefingGenerationService(db,conversations,contents,identities,access,departure,new AgentSettings("verification",true,false),clock,true,"https://news.example.org/updates",0,6);
+  org.springframework.test.util.ReflectionTestUtils.setField(news,"workAudience",workAudience);
   UUID p=policy();news.tick(p);complete(conversations.claim());news.tick(p);news.tick(p);
   assertEquals(1,news.state(actor,tenant).batches().size(),"News must wait until 09:00 Asia/Shanghai");
   time.set(scheduled);news.tick(p);
@@ -483,6 +497,7 @@ class BriefingGenerationIntegrationTest {
   var time=new java.util.concurrent.atomic.AtomicReference<>(java.time.Instant.now().plusSeconds(86400));
   var clock=new com.dreamcore.workspace.plans.PlanClock(){@Override public java.time.Instant now(){return time.get();}};
   var limited=new BriefingGenerationService(db,conversations,contents,identities,access,departure,new AgentSettings("verification",true,false),clock,true,"",0,1);
+  org.springframework.test.util.ReflectionTestUtils.setField(limited,"workAudience",workAudience);
   UUID p=policy();limited.generate(actor,tenant,UUID.randomUUID(),space,"INSIGHT");limited.tick(p);deliver(conversations.claim(),"合成成功出卡后应占用每日额度。");limited.tick(p);
   var more=limited.generate(actor,tenant,UUID.randomUUID(),space,"INSIGHT");limited.tick(p);assertEquals("DAILY_RUN_LIMIT",limited.get(actor,tenant,more.id()).reason());assertNull(limited.get(actor,tenant,more.id()).taskId());
   time.set(time.get().plusSeconds(86400));limited.tick(p);assertEquals("RUNNING",limited.get(actor,tenant,more.id()).status());
@@ -494,6 +509,7 @@ class BriefingGenerationIntegrationTest {
   var time=new java.util.concurrent.atomic.AtomicReference<>(java.time.Instant.now().plusSeconds(86400));
   var clock=new com.dreamcore.workspace.plans.PlanClock(){@Override public java.time.Instant now(){return time.get();}};
   var limited=new BriefingGenerationService(db,conversations,contents,identities,access,departure,new AgentSettings("verification",true,false),clock,true,"",0,1);
+  org.springframework.test.util.ReflectionTestUtils.setField(limited,"workAudience",workAudience);
   UUID p=policy();limited.generate(actor,tenant,UUID.randomUUID(),space,"INSIGHT");limited.tick(p);deliver(conversations.claim(),"合成重置后成功出卡，保留真实历史计次。");limited.tick(p);
   var more=limited.generate(actor,tenant,UUID.randomUUID(),space,"INSIGHT");limited.tick(p);
   assertEquals("DAILY_RUN_LIMIT",limited.get(actor,tenant,more.id()).reason());
@@ -629,6 +645,7 @@ class BriefingGenerationIntegrationTest {
  @Test void scopedAutomaticRunDoesNotEnableOtherOwnersAndStillUsesAutomaticQuota(){
   upload("marker 限定账号自动执行验证",true);UUID p=policy();
   var once=new BriefingGenerationService(db,conversations,contents,identities,access,departure,new AgentSettings("verification",true,false),new com.dreamcore.workspace.plans.PlanClock(),true,"",0,6);
+  org.springframework.test.util.ReflectionTestUtils.setField(once,"workAudience",workAudience);
   org.springframework.test.util.ReflectionTestUtils.setField(once,"automaticEnabled",false);
   assertFalse(once.candidates().contains(p));
   org.springframework.test.util.ReflectionTestUtils.setField(once,"onceTenant",tenant.toString());

@@ -1,3 +1,4 @@
+import { WorkStarters } from './WorkStarters';
 import { PresentationDraft } from './PresentationDraft';
 import { presentationClient } from './presentation-client';
 import type { PresentationOptions } from '../../contracts/public-api/presentation';
@@ -583,6 +584,7 @@ function ConversationView({
                     <h3>
                       有什么想法？<span>我帮你实现。</span>
                     </h3>
+                    <WorkStarters key={tenant} tenant={tenant} choose={(text) => setSuggestion({ text, sequence: Date.now() })} />
                   </section>
                 )}
                 {data.value && !focused && (page > 0 || data.value.hasMore) && (

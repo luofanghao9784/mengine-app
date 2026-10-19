@@ -1,3 +1,4 @@
+import { safeModelFailure } from './model-response.js';
 import { createHash } from 'node:crypto';
 import { ENGINE_VERSION } from '../release.js';
 import { runHarness } from './harness.js';
@@ -68,6 +69,7 @@ type Stage = {
   modelCalls: number;
   inputTokens: number | null;
   outputTokens: number | null;
+  diagnostic?: string;
 };
 export type ExperienceResult = {
   contractVersion: '1.0';
@@ -318,11 +320,16 @@ export class ExperienceAnalysis {
       review: outcome === 'QUALIFIED' || outcome === 'REJECTED' ? (review ?? null) : null,
       stages,
     });
-    const failure = () =>
-      receipt(
+    const failure = (diagnostic = 'MISSING_DECISION') => {
+      const stage = stages.at(-1);
+      if (stage && !stage.diagnostic) stage.diagnostic = diagnostic;
+      console.warn(JSON.stringify({ event: 'EXPERIENCE_ANALYSIS_FAILED', runId: job.id,
+        stage: stage?.stage ?? 'EXTRACT', diagnostic: stage?.diagnostic ?? diagnostic }));
+      return receipt(
         signal.aborted ? 'CANCELLED' : 'FAILED',
         signal.aborted ? 'CANCELLED' : 'EXPERIENCE_ANALYSIS_FAILED',
       );
+    };
     const run = async (
       stage: Stage['stage'],
       tools: TaskTool[],
@@ -362,7 +369,7 @@ export class ExperienceAnalysis {
           }
         },
       };
-      return runHarness({
+      const result = await runHarness({
         model,
         tools,
         signal,
@@ -375,8 +382,13 @@ export class ExperienceAnalysis {
         } as Json,
         limits: { modelCalls: 6, toolCalls: 16, timeoutMs: 45000 },
         finishOnDeliverable: true,
+        onModelFailure: failure => console.warn(JSON.stringify({ event: 'EXPERIENCE_MODEL_RESPONSE_REJECTED',
+          runId: job.id, stage, ...failure })),
         hasCompletedDeliverable: completed,
       });
+      if (result.status !== 'completed') usage.diagnostic = result.diagnostic ??
+        (result.status === 'cancelled' ? 'CANCELLED' : result.status === 'limit' ? 'RUNTIME_LIMIT' : 'RUNTIME_FAILED');
+      return result;
     };
     const readers = () => {
       const read = new Set<string>();
@@ -534,8 +546,8 @@ export class ExperienceAnalysis {
       if (!groundedBasis || !checkNames.every((k) => r.checks[k] === 'PASS'))
         return receipt('REJECTED', 'QUALITY_NOT_ESTABLISHED');
       return receipt('QUALIFIED', null);
-    } catch {
-      return failure();
+    } catch (error) {
+      return failure(safeModelFailure(error));
     }
   }
 }

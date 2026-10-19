@@ -130,13 +130,19 @@ test('unknown tool, ungranted file and malformed arguments cannot execute protec
         request,
         (input) => {
           const tool = input.messages.flatMap((m) => m.content).find((c) => c.type === 'tool_result');
-          assert.equal(tool.isError, true);
-          assert.doesNotMatch(tool.content, /"text":"allowed"/);
+          if (request[0].name === 'run_javascript') {
+            assert.equal(tool, undefined); // Rejected before dispatch, no invented execution receipt.
+            assert.match(JSON.stringify(input.messages), /Response correction/);
+          } else {
+            assert.equal(tool.isError, true);
+            assert.doesNotMatch(tool.content, /"text":"allowed"/);
+          }
           return reply('Cannot complete with these permissions.');
         },
       ]),
     });
-    assert.equal(result.tools[0].status, 'failed');
+    if (result.tools.length) assert.equal(result.tools[0].status, 'failed');
+    else assert.equal(result.modelCalls, 2);
     assert.equal(result.status, 'completed');
   }
 });

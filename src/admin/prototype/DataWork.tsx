@@ -8,6 +8,7 @@ import { CompanyBackgroundSource } from '../../profile/CompanyBackgroundSource';
 import { Fold, Stages, Timeline, readouts, useGlide, useSpotlight } from './AssetBits';
 import './foundation-live.css';
 import './glass-surface.css';
+import { FoundationProcessing } from './FoundationProcessing';
 
 function BackgroundSourceCard({ tenant, selected, onSelect }: { tenant: string; selected: boolean; onSelect: () => void }) {
   const { session } = useSession();
@@ -716,7 +717,8 @@ export function DataWork({
               style={{ '--at': shownStep } as React.CSSProperties}
             >
               {GATES.map((g, i) => {
-                const state = (i === 4 ? a.available : i < a.gate) ? 'done' : i === a.gate ? 'held' : 'wait';
+                const explicit = a.stageStates?.[i];
+                const state = explicit ? (explicit === 'READY' ? 'done' : ['PARTIAL', 'ATTENTION', 'FAILED', 'RUNNING', 'QUEUED'].includes(explicit) ? 'held' : 'wait') : (i === 4 ? a.available : i < a.gate) ? 'done' : i === a.gate ? 'held' : 'wait';
                 return (
                   <li key={g} data-state={state}>
                     <button
@@ -796,6 +798,7 @@ export function DataWork({
 
                 {shownStep === 1 && (
                   <>
+                    {tenant ? <FoundationProcessing key={`${tenant}:${a.id}`} tenant={tenant} asset={a.id} updatedAt={a.updatedAt} /> : <>
                     {kv([
                       ['字段', a.kind === 'table' ? `${a.fieldCount} 个` : '正文'],
                       ['复核日期', a.reviewAt ? date(a.reviewAt) : '未设置'],
@@ -808,6 +811,7 @@ export function DataWork({
                     ) : (
                       <p className="none">暂无处理记录</p>
                     )}
+                    </>}
                   </>
                 )}
 

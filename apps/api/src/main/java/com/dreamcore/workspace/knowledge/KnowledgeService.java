@@ -116,7 +116,7 @@ public class KnowledgeService {
 
         boolean overview=query.isEmpty()&&selectedVersions!=null;
         List<UUID> ranked=null;
-        if(retrieval.enabled() && !overview){
+        if(retrieval.enabled(tenant) && !overview){
             if(offset+limit>100)throw new IdentityException(503,"KNOWLEDGE_SEARCH_SCOPE_LIMIT");
             ranked=retrieval.search(scope,new ArrayList<>(args),query,Math.min(offset+limit+1,100));
             // HTTP work can outlive permission changes. Re-read membership and authorization below.

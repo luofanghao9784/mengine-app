@@ -13,6 +13,8 @@ import tools.jackson.databind.json.JsonMapper;
 @Service
 public class SceneService {
  private static final JsonMapper JSON=new JsonMapper();
+ @org.springframework.beans.factory.annotation.Autowired private NativeFoundationService nativeFoundation;
+ @org.springframework.beans.factory.annotation.Autowired private NativeKnowledgeService nativeKnowledge;
  private final FileTableSceneService files;
  private final SceneBridgeClient bridge;private final JdbcTemplate db;private final IdentityService identities;private final CollectionDeployment deployment;private final CollectionService collection;private final MaterialService materials;private final TransactionTemplate tx;
  public SceneService(SceneBridgeClient bridge,JdbcTemplate db,IdentityService identities,CollectionDeployment deployment,CollectionService collection,MaterialService materials,TransactionTemplate tx,FileTableSceneService files){this.files=files;this.bridge=bridge;this.db=db;this.identities=identities;this.deployment=deployment;this.collection=collection;this.materials=materials;this.tx=tx;}
@@ -28,7 +30,19 @@ public class SceneService {
  private UUID id(String key){return UUID.nameUUIDFromBytes(key.getBytes(StandardCharsets.UTF_8));}
  private String trim(String s,int max){return s.length()>max?s.substring(0,max):s;}
  public void access(UUID actor,UUID tenant,boolean platform){if(platform){identities.platform(actor);if(!Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM tenants WHERE id=? AND status='ACTIVE')",Boolean.class,tenant)))throw new IdentityException(404,"TENANT_NOT_FOUND");}else identities.member(actor,tenant,true);}
- public List<Map<String,Object>> bindings(UUID actor){identities.platform(actor);return db.queryForList("SELECT b.tenant_id,t.name,b.workspace_id,b.connection_id,(SELECT count(*) FROM scene_asset_links a WHERE a.tenant_id=b.tenant_id AND a.kind='TABLE' AND a.active) datasets,(SELECT count(*) FROM scene_asset_links a WHERE a.tenant_id=b.tenant_id AND a.kind<>'TABLE' AND a.active) materials FROM scene_bindings b JOIN tenants t ON t.id=b.tenant_id ORDER BY t.name");}
+ public List<Map<String,Object>> bindings(UUID actor){
+  identities.platform(actor);
+  return db.queryForList("""
+   SELECT t.id tenant_id,t.name,b.workspace_id,b.connection_id,(b.tenant_id IS NULL) native_platform,
+     CASE WHEN b.tenant_id IS NULL THEN (SELECT count(*) FROM business_datasets d WHERE d.tenant_id=t.id AND d.status='ACTIVE' AND NOT d.scrubbed)
+       ELSE (SELECT count(*) FROM scene_asset_links a WHERE a.tenant_id=t.id AND a.kind='TABLE' AND a.active) END datasets,
+     CASE WHEN b.tenant_id IS NULL THEN (SELECT count(*) FROM active_materials m WHERE m.tenant_id=t.id AND m.in_library)
+       ELSE (SELECT count(*) FROM scene_asset_links a WHERE a.tenant_id=t.id AND a.kind<>'TABLE' AND a.active) END materials
+   FROM tenants t LEFT JOIN scene_bindings b ON b.tenant_id=t.id
+   WHERE t.status='ACTIVE' ORDER BY t.name,t.id
+   """);
+ }
+
  @org.springframework.beans.factory.annotation.Autowired private com.dreamcore.workspace.material.MaterialAccess materialAccess;
  @org.springframework.beans.factory.annotation.Autowired private IdentityAudit audit;
  public Object binding(UUID actor,UUID tenant){
@@ -56,6 +70,17 @@ public class SceneService {
  public synchronized JsonNode dispatch(UUID actor,UUID tenant,boolean platform,String method,String path,Object body){
   if(platform)access(actor,tenant,true);else identities.member(actor,tenant,false);
   if(!path.matches("/scene-(foundation(?:/[^/?]+(?:/actions)?)?|knowledge(?:/sync|/[^/?]+/source)?|access(?:/audit|/policy|/departments|/members/[^/?]+|/proposals/[^/?]+/(?:resolve|withdraw)|/resources/[^/?]+/inspect)?)"))throw IdentityException.invalid();
+  if(!platform && path.startsWith("/scene-foundation") && !Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM scene_bindings WHERE tenant_id=?)",Boolean.class,tenant))){
+   if(method.equals("GET") && path.equals("/scene-foundation"))return nativeFoundation.snapshot(actor,tenant);
+   if(method.equals("GET") && path.matches("/scene-foundation/(?:dataset|material)-[0-9a-f-]{36}"))return nativeFoundation.detail(actor,tenant,path.substring("/scene-foundation/".length()));
+   if(!path.startsWith("/scene-foundation/file-"))throw new IdentityException(409,"SCENE_READ_ONLY");
+  }
+  if(!platform && path.startsWith("/scene-knowledge") && !Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM scene_bindings WHERE tenant_id=?)",Boolean.class,tenant))){
+   if(method.equals("GET") && path.equals("/scene-knowledge"))return nativeKnowledge.snapshot(actor,tenant);
+   if(method.equals("GET") && path.endsWith("/source"))return nativeKnowledge.source(actor,tenant,path.substring("/scene-knowledge/".length(),path.length()-"/source".length()));
+   if(method.equals("POST") && path.equals("/scene-knowledge/sync"))return nativeKnowledge.snapshot(actor,tenant);
+   throw IdentityException.invalid();
+  }
   String delegated=platform?actor.toString():"customer:"+actor;
   if(path.startsWith("/scene-foundation/file-")){
    if(!method.equals("GET"))throw new IdentityException(409,"SCENE_READ_ONLY");

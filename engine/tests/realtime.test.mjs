@@ -64,7 +64,7 @@ test('tool fragments are assembled by index only after complete valid stream', a
     res.end('data: [DONE]\n\n');
   });
   const parts = [];
-  for await (const p of model.generate(req)) parts.push(p);
+  for await (const p of model.generate({...req,tools:[{name:'read',description:'synthetic',parameters:{type:'object',properties:{n:{type:'number'}}}}]})) parts.push(p);
   assert.deepEqual(parts, [
     { type: 'tool_call', id: 'a', name: 'read', arguments: '{"n":1}' },
     { type: 'finish', reason: 'tool_calls' },

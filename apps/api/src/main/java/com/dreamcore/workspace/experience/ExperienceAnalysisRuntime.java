@@ -17,7 +17,9 @@ public class ExperienceAnalysisRuntime {
  public record Evidence(UUID inputId,String quote) {}
  public record Candidate(UUID targetVersionId,String title,String summary,List<String> steps,List<String> applicable,List<String> excluded,List<String> tags,List<Evidence> evidence) {}
  public record Review(Map<String,String> checks,String basis,List<Evidence> evidence) {}
- public record Stage(String stage,String modelName,Integer modelCalls,Long inputTokens,Long outputTokens) {}
+ public record Stage(String stage,String modelName,Integer modelCalls,Long inputTokens,Long outputTokens,@com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) String diagnostic) {
+  public Stage(String stage,String modelName,Integer modelCalls,Long inputTokens,Long outputTokens){this(stage,modelName,modelCalls,inputTokens,outputTokens,null);}
+ }
  public record Result(String contractVersion,String engineVersion,String executionClass,UUID runId,UUID lease,UUID source,Boolean admitted,String outcome,String code,Candidate candidate,Review review,List<Stage> stages,@com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) String scope) {
   public Result(String contractVersion,String engineVersion,String executionClass,UUID runId,UUID lease,UUID source,Boolean admitted,String outcome,String code,Candidate candidate,Review review,List<Stage> stages){this(contractVersion,engineVersion,executionClass,runId,lease,source,admitted,outcome,code,candidate,review,stages,null);}
  }
@@ -64,6 +66,7 @@ public class ExperienceAnalysisRuntime {
   catch(Failure f){throw f;}catch(Exception e){if(e instanceof InterruptedException)Thread.currentThread().interrupt();throw new Failure("EXPERIENCE_RESULT_UNKNOWN",true);}
  }
  public void cancel(UUID run,UUID lease){try{send(request("/internal/v1/experience/results/"+run+"/"+lease).DELETE().build());}catch(Exception ignored){if(ignored instanceof InterruptedException)Thread.currentThread().interrupt();}}
+ private static final Set<String> DIAGNOSTICS=Set.of("ENVELOPE","CHOICE","ROLE_OR_REASONING","AFTER_FINISH","TEXT_TYPE","TOOL_LIST","TOOL_INDEX","TOOL_ID","TOOL_TYPE","TOOL_FUNCTION","TOOL_NAME","TOOL_ARGUMENTS_TYPE","TOOL_ARGUMENTS_JSON","FINISH_REASON","REQUIRED_TOOL_MISSING","REQUIRED_TOOL_COUNT","FINISH_TOOL_MISMATCH","DUPLICATE_TOOL_ID","UNADVERTISED_TOOL","WRONG_REQUIRED_TOOL","FINAL_TOOL_FORBIDDEN","MODEL_INCOMPLETE","MODEL_OUTPUT_LIMIT","MODEL_INPUT_LIMIT","MODEL_TIMEOUT","MODEL_NETWORK_ERROR","MODEL_RATE_LIMITED","MODEL_PROVIDER_UNAVAILABLE","MODEL_REQUEST_REJECTED","REMOTE_ACCESS_DENIED","INVALID_MODEL_RESPONSE","CANCELLED","RUNTIME_FAILED","RUNTIME_LIMIT","MISSING_DECISION");
  private static final Set<String> CHECKS=Set.of("grounded","reusable","bounded","privacySafe","novel");
  private static boolean text(String s,int size){return s!=null&&!s.isBlank()&&s.length()<=size;}
  private static boolean texts(List<String> s,int min,int max,int size){return s!=null&&s.size()>=min&&s.size()<=max&&s.stream().allMatch(v->text(v,size))&&new HashSet<>(s).size()==s.size();}
@@ -88,7 +91,7 @@ public class ExperienceAnalysisRuntime {
  private Result validate(byte[] body,Job job,String version){
   try{if(json.readTree(body).has("scope")!=(job.scope()!=null))throw new Failure("EXPERIENCE_RESULT_UNKNOWN",true);var r=json.readValue(body,Result.class);
    if(!"1.0".equals(r.contractVersion())||!job.id().equals(r.runId())||!job.lease().equals(r.lease())||!job.source().equals(r.source())||!Objects.equals(job.scope(),r.scope())||!mode.equals(r.executionClass())||!Objects.equals(version,r.engineVersion())||!Boolean.FALSE.equals(r.admitted())||!Set.of("QUALIFIED","SKIPPED","REJECTED","FAILED","CANCELLED").contains(r.outcome())||r.stages()==null||r.stages().isEmpty()||r.stages().size()>2)throw new Failure("EXPERIENCE_RESULT_UNKNOWN",true);
-   for(int n=0;n<r.stages().size();n++){var s=r.stages().get(n);if(s==null||!Objects.equals(n==0?"EXTRACT":"VERIFY",s.stage())||!text(s.modelName(),200)||s.modelCalls()==null||s.modelCalls()<0||s.modelCalls()>6||(s.inputTokens()==null)!=(s.outputTokens()==null)||s.inputTokens()!=null&&(s.inputTokens()<0||s.outputTokens()<0))throw new Failure("EXPERIENCE_RESULT_UNKNOWN",true);}
+   for(int n=0;n<r.stages().size();n++){var s=r.stages().get(n);if(s==null||!Objects.equals(n==0?"EXTRACT":"VERIFY",s.stage())||!text(s.modelName(),200)||s.modelCalls()==null||s.modelCalls()<0||s.modelCalls()>6||s.diagnostic()!=null&&!DIAGNOSTICS.contains(s.diagnostic())||(s.inputTokens()==null)!=(s.outputTokens()==null)||s.inputTokens()!=null&&(s.inputTokens()<0||s.outputTokens()<0))throw new Failure("EXPERIENCE_RESULT_UNKNOWN",true);}
    if(r.outcome().equals("QUALIFIED")){
     if(r.code()!=null||r.stages().size()!=2||r.stages().stream().anyMatch(s->s.modelCalls()==0)||!candidate(r.candidate(),job)||protectedContent(r.candidate(),job)||!review(r.review(),job)||r.review().checks().values().stream().anyMatch(v->!v.equals("PASS")))throw new Failure("EXPERIENCE_RESULT_UNKNOWN",true);
     boolean observed=r.review().basis().equals("OBSERVED_EXECUTION")&&r.review().evidence().stream().anyMatch(e->job.inputs().stream().anyMatch(i->i.id().equals(e.inputId())&&i.kind().equals("EXECUTION_RECORD")));

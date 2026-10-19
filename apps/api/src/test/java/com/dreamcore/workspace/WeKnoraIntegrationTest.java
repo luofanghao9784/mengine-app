@@ -40,6 +40,8 @@ class WeKnoraIntegrationTest {
                     if(!"synthetic-key".equals(exchange.getRequestHeaders().getFirst("X-API-Key")))throw new IllegalStateException();
                     String path=exchange.getRequestURI().getPath();Object result;int status=200;
                     if(path.endsWith("/knowledge/manual")){
+                        var payload=JSON.readTree(exchange.getRequestBody().readAllBytes());
+                        if(!"publish".equals(payload.path("status").asText()))throw new IllegalStateException("manual knowledge defaults to an unindexed draft");
                         creates.incrementAndGet();String kb=path.split("/")[4];String id=UUID.randomUUID().toString();documents.put(id,kb);
                         if(behavior.equals("create-unknown")){status=503;result=Map.of("success",false);}
                         else result=Map.of("success",true,"data",Map.of("id",id,"knowledge_base_id",kb,"parse_status",behavior.equals("pending")?"processing":"completed"));
@@ -98,6 +100,15 @@ class WeKnoraIntegrationTest {
     @Test void unindexedIsUnavailableAndEmptyScopeMakesNoRequest(){
         assertEquals(0,search().items().size());assertEquals(0,searches.get());
         parsed("尚未索引");denied("KNOWLEDGE_INDEX_NOT_READY",this::search);assertEquals(0,searches.get());
+    }
+    @Test void tenantsNotEnrolledKeepLocalSearchButEnrolledFailuresDoNotFallback(){
+        parsed("本地关键词");
+        db.update("DELETE FROM knowledge_index_targets WHERE tenant_id=?",tenant);
+        assertEquals(1,knowledge.search(reader,tenant,space,"本地关键词",0,20).items().size());
+        assertEquals(0,searches.get());
+        db.update("INSERT INTO knowledge_index_targets(tenant_id,knowledge_base_id,enabled) VALUES (?,?,true)",tenant,kb);
+        denied("KNOWLEDGE_INDEX_NOT_READY",()->knowledge.search(reader,tenant,space,"本地关键词",0,20));
+        assertEquals(0,searches.get());
     }
     @Test void foreignHitsAndMissingRerankFailClosed(){
         parsed("本地");worker.tick();behavior="foreign";denied("WEKNORA_SCOPE_MISMATCH",this::search);

@@ -26,3 +26,23 @@ for(const denied of [false,true])test(`platform authorization ${denied?'still fa
  if(denied){await assert.rejects(run(),{code:'TASK_ACCESS_DENIED'});assert.equal(calls,0);}
  else{const result=await run();assert.equal(result.outcome,'COMPLETE');assert.equal(calls,1);}
 });
+
+for (const recovers of [true,false]) test(`initial authorization transport ${recovers?'recovers once before any execution':'stays blocked after two failures'}`,async t=>{
+ let checks=0,calls=0,opened=false;
+ const server=createServer(async(req,res)=>{
+  if(usageFixture(req,res))return;
+  await body(req);
+  if(req.url.endsWith('/check')){
+   checks++;
+   if(!recovers||checks===1)return json(res,{code:'INTERNAL_ERROR'},503);
+   return json(res,{allowed:true,executionClass:'verification'});
+  }
+  if(req.url.endsWith('/execution/open')){assert.equal(checks,2);opened=true;return json(res,{accepted:true,policy:'READ_ONLY_PRIVATE_V1'});}
+  return json(res,{accepted:true});
+ });
+ const url=await listen(server);t.after(()=>close(server));
+ const agent=new AgentTasks({platformBaseUrl:url,executionClass:'verification',modelName:'synthetic-preflight',createModel:()=>({usage:null,async *generate(){assert.ok(opened);calls++;yield {type:'text',text:'合成核验响应'};yield {type:'finish',reason:'stop'};}})});
+ const run=()=>agent.run({contractVersion:'1.5',taskId:randomUUID(),attemptId:randomUUID(),prompt:'问候'},new AbortController().signal);
+ if(recovers){assert.equal((await run()).outcome,'COMPLETE');assert.equal(calls,1);}
+ else{await assert.rejects(run(),{code:'TASK_ACCESS_DENIED'});assert.equal(checks,2);assert.equal(calls,0);assert.equal(opened,false);}
+});
