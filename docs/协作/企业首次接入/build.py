@@ -62,6 +62,23 @@ def js(v):return json.dumps(v,ensure_ascii=False).replace('<','\\u003c')
 s=(root/'template.html').read_text()
 for token,v in [('__STAGES__',flow['stages']),('__WALKTHROUGHS__',flow['walkthroughs']),('__DEVELOPMENT__',development),('__REVISION__',flow['revision'])]:s=s.replace(token,js(v))
 assert not re.search(r'__(?:STAGES|WALKTHROUGHS|DEVELOPMENT|REVISION)__',s)
+s=s.replace('__DAILY_WORK__',js((root/'daily-work.html').read_text()))
+assert '__DAILY_WORK__' not in s
+review=json.loads((root/'daily-review.json').read_text())
+assert len({row['id'] for row in review['rows']})==len(review['rows'])
+for row in review['rows']:
+    assert 0 <= row['phase'] <= 5
+    for source in row['sources']:
+        path=root.parents[2]/source['path']
+        assert path.is_file() and 1 <= source['line'] <= len(path.read_text().splitlines())
+s=s.replace('__DAILY_REVIEW__',js(review))
+assert '__DAILY_REVIEW__' not in s
+briefing=json.loads((root/'briefing-flow.json').read_text())
+assert len(briefing['nodes'])==7 and len({n['id'] for n in briefing['nodes']})==7
+for n in briefing['nodes']:
+    assert (root.parents[2]/n['source']).is_file()
+s=s.replace('__BRIEFING_FLOW__',js(briefing))
+assert '__BRIEFING_FLOW__' not in s
 out=root/'index.html'
 if args.check:assert out.exists() and out.read_text()==s,'看板已过期，请运行 build.py 并一并提交 index.html'
 else:out.write_text(s)

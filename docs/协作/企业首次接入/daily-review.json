@@ -1,0 +1,239 @@
+{
+  "date": "2026-10-19",
+  "baseline": "1957e3f348af96215af9f83ea0b6f3abff73221c",
+  "boundary": "本地源码与定向合成测试；未检查在用服务版本／开关，未调用真实模型、真实企业数据或部署。已确认流程保持不变，源码差异不是新业务决定。",
+  "tests": [
+    "node --experimental-strip-types --test tests/briefing-conversation-context.test.ts tests/feedback-client.test.ts tests/document-publication-client.test.ts：20/20 通过（本次）",
+    "engine/ 下 npm run build 后 node --test tests/harness.test.mjs tests/task-control.test.mjs：25/25 通过（本次，合成模型／工具）"
+  ],
+  "rows": [
+    {
+      "id": "DW-01-01",
+      "phase": 0,
+      "title": "直接提出需求",
+      "reuse": "共用 ConversationComposer；附件上传／拖入、固定版本选择、selectedOnly、草稿保留及发送后导航已有实现。",
+      "verify": "现有单次最多三份原件；验证实际企业跨空间获权选取、失败恢复、仅文件提示、上传与读取状态。三份上限是当前边界，不自动判为需扩容。",
+      "gap": "",
+      "sources": [
+        {
+          "path": "src/conversation/Conversations.tsx",
+          "line": 1128
+        },
+        {
+          "path": "src/conversation/AttachmentMaterials.tsx",
+          "line": 292
+        },
+        {
+          "path": "apps/api/src/main/java/com/dreamcore/workspace/conversation/ConversationController.java",
+          "line": 15
+        }
+      ]
+    },
+    {
+      "id": "DW-01-02",
+      "phase": 0,
+      "title": "围绕画报",
+      "reuse": "来源任务／版本／尝试次数引用、服务端讨论查询、已有会话标记和上下文回读已实现。",
+      "verify": "验证来源撤回、当前权限、跨用户讨论隔离和关联依据；新开与多段历史讨论的数据能力需核查后适配。",
+      "gap": "ReadingDialog 点击发起后立即导航，并直接使用查询到的 conversationId；需补原处输入后发送、继续／新开及其他讨论选择交互，不能把来源任务当讨论。 新旧画报规则确认后，还需适配话题各期／纠正版提示及用户明确带入原讨论；保留原依据，不静默重绑。",
+      "sources": [
+        {
+          "path": "src/briefing-live/ReadingDialog.tsx",
+          "line": 137
+        },
+        {
+          "path": "src/conversation/briefing-context.ts",
+          "line": 35
+        },
+        {
+          "path": "apps/api/src/main/java/com/dreamcore/workspace/conversation/ConversationService.java",
+          "line": 72
+        }
+      ]
+    },
+    {
+      "id": "DW-01-03",
+      "phase": 0,
+      "title": "从资料开始",
+      "reuse": "资料详情 ContinueWithMaterial 可核对版本并写入新会话草稿，去重、保留原选择；会话内已有多原件选择。",
+      "verify": "核查所有列表入口及跨文件夹选择保持；当前三份上限与多选体验需明确。",
+      "gap": "ContinueWithMaterial 单份添加后立即切换会话；需适配已确认的资料处输入、发送成功再进入会话。列表多选整条旅程仍属待校验，不因未找到就判完全缺失。",
+      "sources": [
+        {
+          "path": "src/conversation/AttachmentMaterials.tsx",
+          "line": 473
+        },
+        {
+          "path": "src/material/Library.tsx",
+          "line": 1235
+        }
+      ]
+    },
+    {
+      "id": "DW-01-04",
+      "phase": 0,
+      "title": "继续已有工作",
+      "reuse": "本人企业会话分页、历史任务、资料补充、执行历史及成果下载已有实现。",
+      "verify": "验证排序、重命名实际入口、等待补充定位、成果指定版本修改、撤权后的历史使用和新旧资料替换。",
+      "gap": "当前会话列表 hook 仅分页，Controller list 仅 offset/limit，无标题或正文查询参数；需补全历史搜索交互和服务端查询，不能仅搜索当前已载入一页。",
+      "sources": [
+        {
+          "path": "src/conversation/useConversationList.tsx",
+          "line": 46
+        },
+        {
+          "path": "apps/api/src/main/java/com/dreamcore/workspace/conversation/ConversationController.java",
+          "line": 27
+        },
+        {
+          "path": "src/conversation/TaskInterventionCard.tsx",
+          "line": 50
+        }
+      ]
+    },
+    {
+      "id": "DW-01-05",
+      "phase": 0,
+      "title": "系统主动提供内容",
+      "reuse": "画报列表、阅读详情、来源、关注、反馈与关联讨论组件已有。",
+      "verify": "实际主动生成启用条件、真实内容质量、数据时间、已读标记、旧内容替代／撤权、阅读不中断及关注不启动新计划需验收。",
+      "gap": "",
+      "sources": [
+        {
+          "path": "src/briefing-live/Briefing.tsx",
+          "line": 30
+        },
+        {
+          "path": "src/briefing-live/ReadingEvidence.tsx",
+          "line": 6
+        },
+        {
+          "path": "src/briefing-live/FollowButton.tsx",
+          "line": 9
+        }
+      ]
+    },
+    {
+      "id": "DW-02",
+      "phase": 1,
+      "title": "理解工作要求",
+      "reuse": "项目 agent-task 在 Harness 工具循环内提供 ask_user（选项／自由输入／阻塞）及 task_control；前端等待输入卡和补充动作已有。",
+      "verify": "真实模型是否少问必要问题、尊重当前要求、区分假设与事实；非阻塞提问只做独立工作，补充后的连贯性需实测。ask_user 每次执行最多一次是现有限制。",
+      "gap": "",
+      "sources": [
+        {
+          "path": "engine/src/runtime/agent-task.ts",
+          "line": 1324
+        },
+        {
+          "path": "engine/src/runtime/task-context.ts",
+          "line": 123
+        },
+        {
+          "path": "src/conversation/TaskInterventionCard.tsx",
+          "line": 100
+        }
+      ]
+    },
+    {
+      "id": "DW-03",
+      "phase": 2,
+      "title": "使用依据与完成工作",
+      "reuse": "获权检索／固定版本／数据快照、上下文与经验工具、流式实际进展、取消及等待能力／输入已有实现。Harness 复用 AgentLoop、Tools、Sessions 等，项目负责授权与业务回执。",
+      "verify": "验证真实权限、仅选资料限制、停止后实际任务结束、离页继续、补充后复用以及工具失败不假报完成；不能用合成测试替代真实模型验收。",
+      "gap": "",
+      "sources": [
+        {
+          "path": "engine/src/runtime/harness.ts",
+          "line": 6
+        },
+        {
+          "path": "engine/src/runtime/agent-task.ts",
+          "line": 715
+        },
+        {
+          "path": "engine/src/runtime/task-context.ts",
+          "line": 12
+        },
+        {
+          "path": "src/conversation/Conversations.tsx",
+          "line": 706
+        }
+      ]
+    },
+    {
+      "id": "DW-04",
+      "phase": 3,
+      "title": "呈现结果与不足",
+      "reuse": "会话 PARTIAL 标签、回复、成果下载、SaveAsDocument、ReplyReferences、来源失效提示和尝试历史已有。工具支持 PARTIAL／WAITING_INPUT／WAITING_CAPABILITY。",
+      "verify": "核验结论到引用的准确对应、事实推断区分、图表口径、成果格式可打开；部分完成说明是否随导出文件保留、替代交付是否如实呈现尚未证明。",
+      "gap": "",
+      "sources": [
+        {
+          "path": "src/conversation/Conversations.tsx",
+          "line": 669
+        },
+        {
+          "path": "src/conversation/ReplyReferences.tsx",
+          "line": 5
+        },
+        {
+          "path": "engine/src/runtime/agent-task.ts",
+          "line": 1368
+        }
+      ]
+    },
+    {
+      "id": "DW-05",
+      "phase": 4,
+      "title": "调整与使用成果",
+      "reuse": "回答／产物可存文稿；DocumentCard 有编辑保存、版本浏览及导出；Publication 支持发布新资料或更新已有企业资料、确认目标及权限。",
+      "verify": "通用文件“修改此成果”的明确目标与版本链、保存去重、另存、所有格式预览／下载、共享传播权限及共享后再次使用需端到端核验。文稿能力不能等同所有文件格式。",
+      "gap": "",
+      "sources": [
+        {
+          "path": "src/conversation/Conversations.tsx",
+          "line": 889
+        },
+        {
+          "path": "src/documents/DocumentCard.tsx",
+          "line": 333
+        },
+        {
+          "path": "src/documents/Publication.tsx",
+          "line": 168
+        }
+      ]
+    },
+    {
+      "id": "DW-06",
+      "phase": 5,
+      "title": "接续与改进",
+      "reuse": "评价修订／撤回、纠正任务、显式长期偏好、经验来源登记／核验准入／停用恢复、资料治理提案已有能力可复用。",
+      "verify": "核查自动积累开关与模型核验质量、来源权限与停用传播；反馈自动转维护及用户处理回执链路尚未证明，先核查适配，不能认定重建整个维护系统。",
+      "gap": "FeedbackService CORRECTION 使用 conversations.submit(...,null,...) 创建独立会话；需对本人原任务纠正适配已确认的原会话接续。共享副本须保留当前用户独立纠正，不能进入发布者私人会话。",
+      "sources": [
+        {
+          "path": "apps/api/src/main/java/com/dreamcore/workspace/feedback/FeedbackService.java",
+          "line": 167
+        },
+        {
+          "path": "engine/src/runtime/task-work.ts",
+          "line": 69
+        },
+        {
+          "path": "apps/api/src/main/java/com/dreamcore/workspace/experience/ExperienceIntakeService.java",
+          "line": 17
+        },
+        {
+          "path": "apps/api/src/main/java/com/dreamcore/workspace/experience/ExperienceAdmissionService.java",
+          "line": 31
+        },
+        {
+          "path": "src/material/GovernanceProposals.tsx",
+          "line": 76
+        }
+      ]
+    }
+  ]
+}
