@@ -52,6 +52,13 @@ def validate(config, request):
             identifier(c['name'])
         if len({c['name'] for c in columns}) != len(columns) or len({c['source'] for c in columns}) != len(columns):
             raise ValueError('duplicate columns')
+        scope = d.get('rowScope')
+        if scope is not None:
+            if not isinstance(scope, dict) or set(scope) != {'column', 'values'}:
+                raise ValueError('row scope')
+            identifier(scope['column'])
+            if not isinstance(scope['values'], list) or not 1 <= len(scope['values']) <= 100 or any(not isinstance(v, str) or not v or len(v) > 160 for v in scope['values']):
+                raise ValueError('row scope values')
         expected.append({'id': d['id'], 'key': d['key'], 'columns': [c['name'] for c in columns]})
     if len({d['id'] for d in expected}) != len(expected) or len({d['key'] for d in expected}) != len(expected):
         raise ValueError('duplicate datasets')
@@ -166,15 +173,19 @@ def collect(request, config):
             quote = '`' if config['kind'] == 'mysql' else '"'
             q = lambda value: identifier(value, quote)
             table = (q(d['schema']) + '.' if d.get('schema') else '') + q(d['table'])
-            # Fixed identifiers only. Row-level restrictions belong in deployed views/read-only accounts.
-            sql = 'SELECT ' + ','.join(q(c['source']) for c in d['columns']) + ' FROM ' + table + f' LIMIT {MAX_ROWS + 1}'
+            # Scope is installed by deployment, never accepted from a task or model.
+            scope = d.get('rowScope')
+            values = scope['values'] if scope else []
+            placeholder = '?' if config['kind'] == 'sqlite' else '%s'
+            where = (' WHERE ' + q(scope['column']) + ' IN (' + ','.join([placeholder] * len(values)) + ')') if scope else ''
+            sql = 'SELECT ' + ','.join(q(c['source']) for c in d['columns']) + ' FROM ' + table + where + f' LIMIT {MAX_ROWS + 1}'
             rows = []
             with contextlib.closing(conn.cursor()) as cur:
                 cur.execute('SELECT * FROM ' + table + ' WHERE 1=0')
                 available = {c[0] for c in cur.description}
-                if any(c['source'] not in available for c in d['columns']):
+                if any(c['source'] not in available for c in d['columns']) or scope and scope['column'] not in available:
                     raise ValueError('source schema changed')
-                cur.execute(sql)
+                cur.execute(sql, values)
                 while True:
                     batch = cur.fetchmany(256)
                     if not batch:

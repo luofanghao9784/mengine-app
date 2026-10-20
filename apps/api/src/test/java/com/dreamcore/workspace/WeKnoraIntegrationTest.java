@@ -67,7 +67,8 @@ class WeKnoraIntegrationTest {
     UUID tenant,owner,reader,space;String kb;
     @BeforeEach void fixture(){
         behavior="normal";duringSearch=()->{};creates.set(0);searches.set(0);documents.clear();
-        // Isolate the global worker queue from previous test fixtures.
+        // Isolate both parser and index worker queues from previous test fixtures.
+        db.update("UPDATE knowledge_runs SET status='FAILED',warnings='TEST_FIXTURE_RESET',finished_at=now(),lease_token=NULL,lease_until=NULL WHERE status IN ('QUEUED','RUNNING')");
         db.update("UPDATE knowledge_index_targets SET enabled=false");
         db.update("UPDATE knowledge_remote_index SET state='DELETED',lease_until=NULL");
         tenant=UUID.randomUUID();owner=UUID.randomUUID();reader=UUID.randomUUID();space=UUID.randomUUID();kb="kb-"+tenant;
@@ -80,7 +81,7 @@ class WeKnoraIntegrationTest {
     }
     UUID parsed(String text){
         var file=materials.upload(owner,tenant,space,null,null,null,UUID.randomUUID(),new MockMultipartFile("file","synthetic.txt","text/plain",text.getBytes(StandardCharsets.UTF_8)));
-        var job=knowledge.claim();assertNotNull(job);
+        var job=knowledge.claim();assertNotNull(job);assertEquals(tenant,job.tenant());
         knowledge.finish(job,new DocumentParser.Result("local-3","READY",List.of(),List.of(new DocumentParser.Fragment("第 1 行",text,"TEXT"))));
         return file.id();
     }

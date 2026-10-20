@@ -252,3 +252,22 @@ test('dataset context retains bounded published metric definitions as untrusted 
 });
 
 test("real Harness resolves a retrieved published metric without model-authored calculation parameters",async t=>{const {result,actions,calls}=await fixture(t,{datasets:true,summary:true,governed:true});assert.equal(result.outcome,"COMPLETE");assert.deepEqual(actions,["bootstrap","dataset_search","summary"]);assert.equal(calls,3);});
+
+test('fixed reconciliation is advertised only for dataset tasks and validates period', async()=>{
+ const calls=[];const tool=contextTool(async(action,body)=>{calls.push(body);return {contractVersion:'1.0',action:body.action,referenceOnly:true,result:{receiptId:'fixed',taskId:randomUUID(),attempt:1}}},async()=>{},true);
+ assert.ok(tool.parameters.properties.action.enum.includes('reconciliation_catalog'));
+ assert.ok(!contextTool(async()=>{},async()=>{},false).parameters.properties.action.enum.includes('reconciliation_execute'));
+ await assert.rejects(()=>tool.execute({action:'reconciliation_execute',storeId:'s',dateFrom:'yesterday',dateTo:'today'}));
+ await tool.execute({action:'reconciliation_execute',storeId:'s',dateFrom:'2026-10-01',dateTo:'2026-10-19'});
+ assert.equal(calls.length,1);
+});
+
+test('monthly plan uses typed scope and keeps both metrics in one server calculation', async()=>{
+ const calls=[];const tool=contextTool(async(_,body)=>{calls.push(body);return {contractVersion:'1.0',action:body.action,referenceOnly:true,result:{plan:{cards:1,chartStyle:'GROUPED_BAR'},evidence:{calculationArtifactId:randomUUID()}}}},async()=>{},true,false,undefined,true);
+ const plan={question:'本月销售和收款是多少',goal:'股东查看经营概况',recipe:'MONTHLY_SALES_RECEIPTS',storeIds:['store-a','store-b'],dateFrom:'2026-10-01',dateTo:'2026-10-19'};
+ assert.ok(tool.parameters.properties.action.enum.includes('briefing_plan'));
+ await tool.execute({action:'briefing_plan',plan});assert.deepEqual(calls[0],{action:'briefing_plan',plan});
+ await assert.rejects(()=>tool.execute({action:'briefing_plan',plan:{...plan,storeIds:['store-a','store-a']}}));
+ await assert.rejects(()=>tool.execute({action:'briefing_plan',plan:{...plan,recipe:'PROFIT'}}));
+ assert.equal(calls.length,1);
+});

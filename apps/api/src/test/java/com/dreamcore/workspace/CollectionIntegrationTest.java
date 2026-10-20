@@ -243,6 +243,16 @@ class CollectionIntegrationTest {
         assertEquals(404,post(browser,root,path+"/connections/"+connection+"/credentials",Map.of("endpoint","https://forbidden.test"),csrf(browser,root)).statusCode());
     }
     CollectionDeployment.Manifest manifest(List<CollectionDeployment.Dataset> datasets){return new CollectionDeployment.Manifest("1.0",tenant,connection,"已部署合成系统","系统只读采集 → 销售空间","部署限定空间和列","READY","UTC",datasets);}
+    @Test void full107TableManifestRegistersAtomicallyAndKeepsBoundedCapacity(){
+        var defs=java.util.stream.IntStream.range(0,107).mapToObj(i->new CollectionDeployment.Dataset(UUID.randomUUID(),space,"table-"+i,"合成表"+i,"",List.of("id"))).toList();
+        deployment.apply(manifest(defs));
+        assertEquals(107,db.queryForObject("SELECT count(*) FROM business_datasets WHERE connection_id=? AND status='ACTIVE'",Integer.class,connection));
+        var revision=service.detail(admin,tenant,connection).revision();deployment.apply(manifest(defs));
+        assertEquals(revision,service.detail(admin,tenant,connection).revision());
+        var excessive=new ArrayList<>(defs);for(int i=107;i<201;i++)excessive.add(new CollectionDeployment.Dataset(UUID.randomUUID(),space,"table-"+i,"合成表"+i,"",List.of("id")));
+        assertThrows(IllegalArgumentException.class,()->deployment.apply(manifest(excessive)));
+        assertEquals(107,db.queryForObject("SELECT count(*) FROM business_datasets WHERE connection_id=? AND status='ACTIVE'",Integer.class,connection));
+    }
     @Test void deploymentPreservesUserScheduleAndRequiresNewDatasetIdentityForScopeOrSchema(){
         service.configure(admin,tenant,connection,UUID.randomUUID(),0,hourly(true));var before=service.detail(admin,tenant,connection);
         start();var claim=service.claim(tenant,connection,Instant.now());

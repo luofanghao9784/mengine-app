@@ -27,9 +27,26 @@ def projections(value,tenant):
         n=t.get('name','');cols=t.get('columns',[])
         if t.get('access') not in (None,'owner-only'):raise ValueError('Unsupported access policy')
         if not IDENTIFIER.fullmatch(n) or n in seen or not 1<=len(cols)<=100 or len(set(cols))!=len(cols) or any(not isinstance(c,str) or not IDENTIFIER.fullmatch(c) for c in cols):raise ValueError('Invalid fixed projection')
+        source=t.get('sourceTable',n)
+        if not isinstance(source,str) or not IDENTIFIER.fullmatch(source):raise ValueError('Invalid source table')
+        scope=t.get('rowScope')
+        if scope is not None:
+            if not isinstance(scope,dict) or set(scope)!={'column','values'} or scope['column'] not in cols or not isinstance(scope['values'],list) or not 1<=len(scope['values'])<=100 or any(not isinstance(v,str) or not v or len(v)>160 for v in scope['values']):raise ValueError('Invalid installed row scope')
+            if not n.endswith('_'+scope_fingerprint(t)):raise ValueError('Scoped projection name must bind its definition')
         if any(c not in cols for c in t.get('allowEmptyColumns',[])):raise ValueError('Unknown empty-string policy column')
         seen.add(n)
     return tables
+
+def scope_fingerprint(t):
+    definition={'source':t.get('sourceTable',t['name']),'columns':t['columns'],'rowScope':t.get('rowScope')}
+    return hashlib.sha256(json.dumps(definition,sort_keys=True,separators=(',',':')).encode()).hexdigest()[:12]
+
+def restriction(t):
+    scope=t.get('rowScope')
+    if scope is None:return ''
+    # The CLI does not bind parameters. Encode UTF-8 bytes as hex literals, never interpolate text.
+    values=','.join("CONVERT(X'"+v.encode('utf-8').hex()+"' USING utf8mb4)" for v in scope['values'])
+    return ' WHERE `'+scope['column']+'` IN ('+values+')'
 
 def query(config,statements):
     def bound_output():resource.setrlimit(resource.RLIMIT_FSIZE,(MAX_BYTES,MAX_BYTES))
@@ -45,8 +62,8 @@ def begin():
     return ["SET SESSION MAX_EXECUTION_TIME=15000","SET SESSION time_zone='+08:00'","SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ","SET SESSION TRANSACTION READ ONLY","START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY","SELECT JSON_OBJECT('kind','snapshot','readOnly',@@session.transaction_read_only,'readAt',DATE_FORMAT(NOW(6),'%Y-%m-%d %H:%i:%s.%f'))"]
 
 def metadata(t):
-    n=t['name'];cols=','.join("'"+c+"'" for c in t['columns'])
-    return [f"SELECT JSON_OBJECT('kind','count','table','{n}','rows',COUNT(*)) FROM `{n}`",f"SELECT JSON_OBJECT('kind','schema','table',c.TABLE_NAME,'column',c.COLUMN_NAME,'type',c.COLUMN_TYPE,'nullable',c.IS_NULLABLE,'comment',c.COLUMN_COMMENT,'key',c.COLUMN_KEY,'engine',t.ENGINE) FROM information_schema.COLUMNS c JOIN information_schema.TABLES t ON t.TABLE_SCHEMA=c.TABLE_SCHEMA AND t.TABLE_NAME=c.TABLE_NAME WHERE c.TABLE_SCHEMA='9pop_v2' AND c.TABLE_NAME='{n}' AND c.COLUMN_NAME IN ({cols}) ORDER BY c.ORDINAL_POSITION"]
+    n=t['name'];source=t.get('sourceTable',n);cols=','.join("'"+c+"'" for c in t['columns'])
+    return [f"SELECT JSON_OBJECT('kind','count','table','{n}','rows',COUNT(*)) FROM `{source}`{restriction(t)}",f"SELECT JSON_OBJECT('kind','schema','table','{n}','column',c.COLUMN_NAME,'type',c.COLUMN_TYPE,'nullable',c.IS_NULLABLE,'comment',c.COLUMN_COMMENT,'key',c.COLUMN_KEY,'engine',t.ENGINE) FROM information_schema.COLUMNS c JOIN information_schema.TABLES t ON t.TABLE_SCHEMA=c.TABLE_SCHEMA AND t.TABLE_NAME=c.TABLE_NAME WHERE c.TABLE_SCHEMA='9pop_v2' AND c.TABLE_NAME='{source}' AND c.COLUMN_NAME IN ({cols}) ORDER BY c.ORDINAL_POSITION"]
 
 def inspect(items,tables):
     if not items or items[0].get('kind')!='snapshot' or items[0].get('readOnly')!=1:raise ValueError('Read-only transaction required')
@@ -70,7 +87,7 @@ def export_sql(tables,plan):
         # remains authoritative. A shrink yields empty trailing pages, not rows.
         for page in range((p['count']+PAGE_SIZE-1)//PAGE_SIZE+1):
             order=','.join('`'+k+'`' for k in p['pk']);values=','.join('CAST(`'+c+'` AS CHAR)' for c in t['columns'])
-            sql.append(f"SELECT JSON_OBJECT('kind','row','table','{n}','page',{page},'values',JSON_ARRAY({values})) FROM `{n}` ORDER BY {order} LIMIT {PAGE_SIZE} OFFSET {page*PAGE_SIZE}")
+            sql.append(f"SELECT JSON_OBJECT('kind','row','table','{n}','page',{page},'values',JSON_ARRAY({values})) FROM `{t.get('sourceTable',n)}`{restriction(t)} ORDER BY {order} LIMIT {PAGE_SIZE} OFFSET {page*PAGE_SIZE}")
     return sql+['ROLLBACK']
 
 def assemble(config,tables,items):
@@ -81,24 +98,29 @@ def assemble(config,tables,items):
         keys=set();page_counts=[];output=[]
         for i,x in enumerate(values):
             if x.get('page')!=i//PAGE_SIZE or len(x['values'])!=len(t['columns']) or any(v is not None and not isinstance(v,str) for v in x['values']):raise ValueError('Invalid page or values')
-            row=dict(zip(t['columns'],x['values']));key=tuple(row[c] for c in p['pk'])
+            row=dict(zip(t['columns'],x['values']));scope=t.get('rowScope')
+            if scope and row[scope['column']] not in scope['values']:raise ValueError('Row outside installed scope')
+            key=tuple(row[c] for c in p['pk'])
             if any(v is None or v=='' for v in key) or key in keys:raise ValueError('Duplicate/missing stable key')
             keys.add(key);output.append(row)
             if i%PAGE_SIZE==0:page_counts.append(0)
             page_counts[-1]+=1
         rows[n]=output
-        definitions.append({**({'access':'owner-only'} if t.get('access')=='owner-only' else {}),'name':n,'comment':t.get('description','9POP获准固定投影；全历史只读一致性取数；保留源单位与状态'),'columns':[{**({'allowEmpty':True} if c in t.get('allowEmptyColumns',[]) else {}),'name':c,'type':p['schema'][c]['type'],'nullable':p['schema'][c]['nullable']=='YES','primary':c in p['pk'],'comment':p['schema'][c]['comment']} for c in t['columns']]})
+        definitions.append({**({'access':'owner-only'} if t.get('access')=='owner-only' or t.get('rowScope') else {}),'name':n,'comment':t.get('description','9POP获准固定投影；全历史只读一致性取数；保留源单位与状态'),'columns':[{**({'allowEmpty':True} if c in t.get('allowEmptyColumns',[]) else {}),'name':c,'type':p['schema'][c]['type'],'nullable':p['schema'][c]['nullable']=='YES','primary':c in p['pk'],'comment':p['schema'][c]['comment']} for c in t['columns']]})
         proofs[n]={'snapshotId':sid,'expectedRows':p['count'],'pageSize':PAGE_SIZE,'pageCounts':page_counts,'primaryKey':p['pk'],'sha256':hashlib.sha256(json.dumps(output,ensure_ascii=False,separators=(',',':')).encode()).hexdigest()}
     return {'contractVersion':'2.0','tenantId':config['tenantId'],'snapshot':{'id':sid,'readOnly':True,'isolation':'REPEATABLE READ','readAt':items[0]['readAt'],'timeZone':'Asia/Shanghai','coverageThrough':None},'tables':definitions,'rows':rows,'proofs':proofs}
 
-def collect(path):
-    c=private(path)
+def collect_config(c, projection):
     if c['host']!='127.0.0.1' or c['database']!='9pop_v2':raise ValueError('Only installed local 9POP source is supported')
-    tables=projections(private(c['projectionFile']),c['tenantId'])
+    tables=projections(projection,c['tenantId'])
     plan_sql=begin()
     for t in tables:plan_sql+=metadata(t)
     plan=inspect(query(c,plan_sql+['ROLLBACK']),tables)
     return assemble(c,tables,query(c,export_sql(tables,plan)))
+
+def collect(path):
+    c=private(path)
+    return collect_config(c,private(c['projectionFile']))
 
 def main():
     p=argparse.ArgumentParser();p.add_argument('--config',required=True);a=p.parse_args()

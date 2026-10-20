@@ -56,13 +56,14 @@ export function DetailChart({ document }: { document: BriefingDocument }) {
   const chart = displayChart(document);
   const kind = faceKind(document);
   if (!chart || !kind) return null;
+  const pairedMetrics = document.content.schemaVersion === 'briefing-chain-v1' && chart.baseline === '订单销售额';
   const summary = document.content.datasetBasis?.periodMode === 'SUMMARY' || document.content.datasetBasis?.periodMode === 'COMPOSITION';
   // A rate of change between two categories is not a change; only periods get one in the readout.
   const periods = isPeriodComparison(document);
   // Inside the article there is no card edge to run to; keep a small inset for the end labels.
   const box = { w: Math.max(0, measured.w - 24), h: slopeHeight, left: 12, right: 12, top: 0, bottom: 0 };
   const slope = slopeEligible(document) && box.w > 0 ? slopeLayout(chart, box, false) : null;
-  const views: View[] = summary
+  const views: View[] = pairedMetrics ? ['PAIR'] : summary
     ? ['RANK']
     : [...(slope ? (['SLOPE'] as View[]) : []), 'PAIR', 'DELTA', 'RANK'];
   const preferred: View = kind === 'TABLE' ? 'PAIR' : kind;
@@ -101,7 +102,7 @@ export function DetailChart({ document }: { document: BriefingDocument }) {
               {sortable && (
                 <Choice
                   label="排序"
-                  options={(Object.keys(sortLabels) as RowSort[]).map((key) => [key, sortLabels[key]])}
+                  options={(Object.keys(sortLabels) as RowSort[]).filter(key=>!pairedMetrics||key!=='CHANGE').map((key) => [key, pairedMetrics&&key==='CURRENT'?'收款高→低':sortLabels[key]])}
                   value={sort}
                   onChange={setSort}
                 />
@@ -122,12 +123,12 @@ export function DetailChart({ document }: { document: BriefingDocument }) {
                 <span>
                   {chart.current} {exact(shown.current, chart)}
                 </span>
-                <span>
+                {!pairedMetrics && <span>
                   差额{' '}
                   {shown.difference === null
                     ? '缺数据'
                     : formatBriefingNumber(signedText(exact(shown.difference, chart).replace(/,/g, '')))}
-                </span>
+                </span>}
                 {periods && <span>变化率 {rate}</span>}
               </>
             )}

@@ -57,6 +57,7 @@ public class BriefingBootstrapDeployment {
     UUID policy=UUID.randomUUID();db.update("INSERT INTO briefing_generation_policies(id,tenant_id,workspace_id,owner_id,enabled) VALUES (?,?,?,?,false) ON CONFLICT(tenant_id,owner_id,workspace_id) DO NOTHING",policy,m.tenantId(),m.workspaceId(),m.ownerId());
     var pol=db.queryForMap("SELECT id,epoch FROM briefing_generation_policies WHERE tenant_id=? AND workspace_id=? AND owner_id=?",m.tenantId(),m.workspaceId(),m.ownerId());UUID batch=UUID.randomUUID();
     db.update("INSERT INTO briefing_generation_batches(id,tenant_id,owner_id,workspace_id,policy_id,policy_epoch,trigger_kind,business_type,status,task_id,started_at) VALUES (?,?,?,?,?,?,'INITIALIZATION','DATA','RUNNING',?,now())",batch,m.tenantId(),m.ownerId(),m.workspaceId(),pol.get("id"),pol.get("epoch"),task);
+    db.update("UPDATE briefing_generation_batches SET audience_key=work_audience_key(tenant_id,owner_id) WHERE id=?",batch);
     db.update("INSERT INTO briefing_dataset_selections(task_id,batch_id,dataset_id,snapshot_id) VALUES (?,?,?,?)",task,batch,card.calculation().datasetId(),card.calculation().snapshotId());
     db.update("UPDATE conversation_tasks SET status='RUNNING',attempt=1,revision=revision+1,lease_token=?,lease_until=now()+interval '10 minutes',wait_reason=NULL WHERE id=?",token,task);
     db.update("INSERT INTO task_dataset_reads(task_id,attempt_number,dataset_id,snapshot_id) VALUES (?,1,?,?)",task,card.calculation().datasetId(),card.calculation().snapshotId());

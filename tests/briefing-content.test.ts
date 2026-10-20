@@ -144,3 +144,10 @@ test('summary evidence accepts a single series without invented baseline or grow
   value.content.presentation = {version:'briefing-presentation-v1',layout:'EDITORIAL',chartStyle:'CURRENT_BAR',focusGroup:null,focusValue:null,sections:[]};
   assert.ok(isBriefingDocument(value));
 });
+
+test('chain chart accepts bounded multi-store rows without pretending to be a single-source table',()=>{
+ const c=structuredClone(doc) as any;c.content.schemaVersion='briefing-chain-v1';c.content.source=null;const r=structuredClone(c.content.chart.rows[0]);
+ c.content.chart.rows=[r,{...r,group:'乙'}];assert.ok(isBriefingDocument(c));
+ c.content.chart.rows=[r];assert.equal(isBriefingDocument(c),false);
+ c.content.chart.rows=[r,{...r,group:'乙'}];c.content.schemaVersion='briefing-data-v1';assert.equal(isBriefingDocument(c),false);
+});

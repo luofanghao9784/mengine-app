@@ -1,5 +1,5 @@
 // Isolated local companion. No .env, seed tenant, external models or production database.
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync, lstatSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { buildServer } from '../../integrations/mengine-wiki/dist/api/server.js';
@@ -8,6 +8,15 @@ const config = JSON.parse(readFileSync(join(root, 'scene-private.json'), 'utf8')
 const binding = JSON.parse(readFileSync(join(root, 'scene-binding.json'), 'utf8'));
 if (!config.key || config.key.length < 32 || binding.tenant !== config.tenant) throw Error('Invalid local scene configuration');
 process.env.MENGINE_PLATFORM_BRIDGE_KEY = config.key;
+const sources = join(root, 'scene-sources.json');
+if (existsSync(sources)) {
+  const stat = lstatSync(sources);
+  if (!stat.isFile() || stat.isSymbolicLink() || (stat.mode & 0o077) || stat.uid !== process.getuid()) throw Error('Local sources require an owned private registry');
+  const registry = JSON.parse(readFileSync(sources, 'utf8'));
+  if (!Array.isArray(registry.sources) || registry.sources.some(s => s.tenantId !== binding.tenant)) throw Error('Local source tenant mismatch');
+  process.env.DATABASE_DEPLOYED_SOURCES = sources;
+}
+
 const { app, store } = await buildServer({ dbPath: join(root, 'scene/mengine.db'), storage: join(root, 'scene/documents'), demo: false, model: {enabled:false,apiKey:'',baseUrl:'http://127.0.0.1:1',model:'disabled'} });
 store.db.transaction(() => {
   const existing = store.db.prepare('SELECT source_tenant,user_id FROM platform_tenant_bindings WHERE platform_tenant=?').get(binding.tenant);

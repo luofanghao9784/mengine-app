@@ -1,3 +1,4 @@
+import {Reconciliation} from './reconciliation';
 import { companySourceClient, type BackgroundEntry } from '../../profile/company-source-client';
 import { useEffect, useState, useRef } from 'react';
 import { createIdentityRequest, IdentityError } from '../../identity/client';
@@ -255,6 +256,7 @@ export function Metrics({
   return (
     <section className="metric-catalog">
       <h2>业务指标目录</h2>
+      {!platform && <Reconciliation key={tenant} tenant={tenant}/>}
       <p>
         企业端维护、总台同步查看。草稿不进入 AI
         上下文；发布来自管理员确认或用户委托的自动定义规则，并不自动核实源数据。口径或权限变化后须重新核对。

@@ -3,6 +3,12 @@ import { isRecord } from './http-json.js';
 import { RuntimeError, type Json, type TaskTool } from './ports.js';
 /** Protocol guidance only. Placeholder text is never business evidence. */
 export const BRIEFING_EDITORIAL_HINTS: Record<string, string> = {
+  BRIEFING_EDITORIAL_PLAN_REQUIRED: '先完成通用整批规划，关联实际岗位目标；不能绕过选题直接交付。',
+  BRIEFING_COMPONENT_MISMATCH: '使用已记录内容形态对应的组件；不得为出图编造计算，不能把观察写成步骤。',
+  BRIEFING_COMPONENT_DATA_MISMATCH: '实际图表行数与规划不符。保留证据缺口，不伪造分组或数值。',
+  BRIEFING_CALCULATION_REQUIRED: '此选题需要真实成功计算回执，不能用模型数字代替。',
+
+  BRIEFING_DESTINATION_MISMATCH: "选题应归知识草案、治理待确认或无输出，不能将业务理解过程发布为画报。结束本次并说明去向；未发布知识不能声称已入库。",
   FUSION_ANALYSIS_INCOMPLETE: '融合画报需要在正文中同时使用 fusion.results 至少两项相关指标的完整 label，并结合共同维度解读；不能只解释主指标。',
   FUSION_NUMBER_NOT_VERIFIED: '正文只可引用 fusion 中已计算的原始数值；删除自行计算、四舍五入、推断的数字及比率。完整精确表格将自动交付，无需在正文重复数字。',
   BRIEFING_TEXT_INCOMPLETE: '标题为4–80字；摘要为12–240字；正文为2–4段、每段12–500字。摘要和每段正文均以句号、问号或叹号结束，不以括号或引号结束；保留有依据的内容，不补造事实。',

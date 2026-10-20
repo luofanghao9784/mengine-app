@@ -1,0 +1,95 @@
+{
+  "format": "ninepop-approved-extension-draft-v1",
+  "businessScopeConfirmed": true,
+  "confirmedAt": "2026-10-19T19:44:54+08:00",
+  "enabled": false,
+  "cloudApplied": false,
+  "realCollectionAllowed": false,
+  "addReaders": false,
+  "originalDownloadAllowed": false,
+  "columnAdditions": {
+    "members": [
+      "name"
+    ],
+    "staffs": [
+      "name"
+    ],
+    "t_course_refund_finance_entry_links": [
+      "effect_type"
+    ],
+    "finance_position_events": [
+      "effect_direction"
+    ],
+    "finance_reconciliation_variance_items": [
+      "reason_type"
+    ],
+    "payroll_commission_payout_transfers": [
+      "from_recipient_coach_id",
+      "to_recipient_coach_id"
+    ],
+    "payment_channel_bill_items": [
+      "provider_transaction_no"
+    ],
+    "payment_gateway_transactions": [
+      "provider_transaction_no"
+    ],
+    "announcement_visibility_scopes": [
+      "id",
+      "owner_type",
+      "owner_id",
+      "store_id"
+    ]
+  },
+  "newTables": [
+    "announcement_visibility_scopes"
+  ],
+  "sourceVersionChange": "new dataset versions required; do not expand existing dataset definitions",
+  "snapshotPolicies": {
+    "member_courses": {
+      "point": "snapshot.asOf",
+      "requiredMetadata": [
+        "snapshot.id",
+        "snapshot.asOf"
+      ],
+      "proofBinding": [
+        "tenantId",
+        "table",
+        "id",
+        "fingerprint",
+        "snapshotId",
+        "snapshotAt",
+        "from",
+        "to",
+        "store",
+        "reviewed",
+        "evidence"
+      ],
+      "missingProof": "deny",
+      "timeZoneForNaiveSourceDates": "Asia/Shanghai",
+      "installed": false
+    },
+    "special_course_entitlements": {
+      "point": "snapshot.asOf",
+      "requiredMetadata": [
+        "snapshot.id",
+        "snapshot.asOf"
+      ],
+      "proofBinding": [
+        "tenantId",
+        "table",
+        "id",
+        "fingerprint",
+        "snapshotId",
+        "snapshotAt",
+        "from",
+        "to",
+        "store",
+        "reviewed",
+        "evidence"
+      ],
+      "missingProof": "deny",
+      "timeZoneForNaiveSourceDates": "Asia/Shanghai",
+      "installed": false
+    }
+  }
+}

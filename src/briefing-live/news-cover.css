@@ -81,3 +81,8 @@
     color: inherit;
   }
 }
+
+/* 横向资讯卡也使用标准一行高度，给摘要和范围留出空间。 */
+.live-briefing-tile[data-size="2×1"] .news-cover.is-compact {
+  --cover-height: 86px;
+}

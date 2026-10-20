@@ -186,6 +186,10 @@ public class CollectionService {
         var rows=db.queryForList(DATASETS+filter+" AND (?='' OR strpos(lower(d.name),lower(?))>0) ORDER BY d.name,d.id LIMIT ? OFFSET ?",actor,tenant,actor,query,query,limit+1,offset);
         return new DataPage(rows.stream().limit(limit).map(this::dataset).toList(),rows.size()>limit);
     }
+    /** Catalog probing must not swallow a transactional access exception and poison the caller transaction. */
+    @Transactional public boolean readable(UUID actor,UUID tenant,UUID id){
+        member(actor,tenant);return !db.queryForList(DATASETS+" AND d.id=?",actor,tenant,actor,id).isEmpty();
+    }
     @Transactional public Preview preview(UUID actor,UUID tenant,UUID id,int offset,int limit){
         member(actor,tenant);bounds(offset,limit);var rows=db.queryForList(DATASETS+" AND d.id=?",actor,tenant,actor,id);
         if(rows.isEmpty())throw new IdentityException(404,"DATASET_NOT_FOUND");var d=rows.getFirst();access.require(actor,tenant,(UUID)d.get("workspace_id"),false);

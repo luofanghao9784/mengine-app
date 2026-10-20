@@ -32,3 +32,10 @@ test('private job responsibilities cannot be copied into a public search',async 
  const agent=new AgentTasks({platformBaseUrl:url,executionClass:'verification',modelName:'synthetic-role-private',publicWeb:{reader:{read:async()=>{throw new Error('unexpected read');}},search:{search:async()=>{searches++;return [];}}},createModel:()=>({usage:null,async *generate(request){calls++;if(calls===1){assert.ok(JSON.stringify(request.messages).includes(privateDuty));yield {type:'tool_call',id:'private-query',name:'public_search',arguments:JSON.stringify({query:privateDuty})};yield {type:'finish',reason:'tool_calls'};return;}yield {type:'text',text:'岗位资料不发送到公开搜索。'};yield {type:'finish',reason:'stop'};}})});t.after(()=>agent.stop());
  await assert.rejects(()=>agent.run({contractVersion:'1.5',taskId:randomUUID(),attemptId:randomUUID(),prompt:'查一下岗位相关公开资料'},new AbortController().signal));assert.ok(calls>0);assert.equal(searches,0);
 });
+
+test('handbook goals distinguish reporting from handoff without inventing metrics',()=>{
+ const goals={governance:'保证课程质量',stage:'本轮核查收款',followUp:'核对进展',formalReporting:'门店创始人',handoff:'郑西',indicators:'',source:'手册2.3'};
+ const text=audienceInstructions({...context('MEMBER'),goals},true);
+ assert.ok(text.includes(JSON.stringify(goals)));assert.match(text,/接续人不替代正式上级/);assert.match(text,/指标为空时不推定/);
+ assert.throws(()=>workAudience({...context('MEMBER'),goals:{...goals,handoff:42}}),{code:'TASK_ACCESS_DENIED'});
+});

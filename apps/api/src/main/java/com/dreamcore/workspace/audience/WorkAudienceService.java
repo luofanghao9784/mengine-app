@@ -23,32 +23,41 @@ public class WorkAudienceService {
   new Focus("TEAM","人员与协作",List.of("员工","岗位","排班","职责","交接","协作","培训"),"人员安排和工作交接有哪些待办？请区分我能直接处理的事情和需要找负责人确认的事情。"),
   new Focus("COMPLIANCE","风险与规范",List.of("风险","安全","制度","规范","权限","隐私","检查","应急"),"与我职责有关的安全或规范要求有哪些？请用日常工作的话说明怎么做。")
  );
- public record Profile(UUID accountId,String name,String systemRole,String department,String jobTitle,String responsibilities,List<String> focus,int revision) {}
+ public record Goals(String governance,String stage,String followUp,String formalReporting,String handoff,String indicators,String source) {
+  public Goals(String governance,String stage,String followUp){this(governance,stage,followUp,"","","","");}
+ }
+ public static final Goals EMPTY_GOALS=new Goals("","","");
+ public record Profile(UUID accountId,String name,String systemRole,String department,String jobTitle,String responsibilities,List<String> focus,int revision,Goals goals) {}
  public record Page(boolean canMaintain,List<Profile> members,List<Focus> choices) {}
- public record Change(UUID requestId,int expectedRevision,String department,String jobTitle,String responsibilities,List<String> focus) {}
- public record Context(String version,String key,String role,String roleLabel,String department,String jobTitle,String responsibilities,List<String> focus,List<String> focusLabels,List<String> starters,boolean configured,boolean authority) {}
+ public record Change(UUID requestId,int expectedRevision,String department,String jobTitle,String responsibilities,List<String> focus,Goals goals) {
+  public Change(UUID requestId,int expectedRevision,String department,String jobTitle,String responsibilities,List<String> focus){this(requestId,expectedRevision,department,jobTitle,responsibilities,focus,null);}
+ }
+ public record Context(String version,String key,String role,String roleLabel,String department,String jobTitle,String responsibilities,List<String> focus,List<String> focusLabels,List<String> starters,boolean configured,boolean authority,Goals goals) {}
  private final JdbcTemplate db;private final IdentityService identities;private final GovernanceAccess governance;private final IdentityAudit audit;private final DepartureAccess departure;
  private final JsonMapper json=new JsonMapper();
  public WorkAudienceService(JdbcTemplate db,IdentityService identities,GovernanceAccess governance,IdentityAudit audit,DepartureAccess departure){this.db=db;this.identities=identities;this.governance=governance;this.audit=audit;this.departure=departure;}
  private void read(UUID actor,UUID tenant){identities.member(actor,tenant,false);departure.requirePrivateRead(actor,tenant);if(identities.supportAccess(actor,tenant))throw new IdentityException(403,"PRIVATE_PREFERENCE_DENIED");}
  private void lock(UUID tenant,UUID actor,boolean write){db.queryForList("SELECT "+(write?"pg_advisory_xact_lock":"pg_advisory_xact_lock_shared")+"(hashtextextended(?,0))","work-audience:"+tenant+":"+actor);db.queryForList("SELECT account_id FROM tenant_memberships WHERE tenant_id=? AND account_id=? FOR SHARE",tenant,actor);db.queryForList("SELECT tenant_id FROM tenant_governance WHERE tenant_id=? FOR SHARE",tenant);}
  private Profile profile(UUID tenant,UUID actor){
-  var rows=db.queryForList("SELECT m.account_id,a.display_name,m.role,g.owner_id,p.department,p.job_title,p.responsibilities,p.focus,p.revision FROM tenant_memberships m JOIN accounts a ON a.id=m.account_id LEFT JOIN tenant_governance g ON g.tenant_id=m.tenant_id LEFT JOIN work_role_profiles p ON p.tenant_id=m.tenant_id AND p.account_id=m.account_id WHERE m.tenant_id=? AND m.account_id=? AND m.status='ACTIVE'",tenant,actor);
+  var rows=db.queryForList("SELECT m.account_id,a.display_name,m.role,g.owner_id,p.department,p.job_title,p.responsibilities,p.focus,p.revision,p.goals FROM tenant_memberships m JOIN accounts a ON a.id=m.account_id LEFT JOIN tenant_governance g ON g.tenant_id=m.tenant_id LEFT JOIN work_role_profiles p ON p.tenant_id=m.tenant_id AND p.account_id=m.account_id WHERE m.tenant_id=? AND m.account_id=? AND m.status='ACTIVE'",tenant,actor);
   if(rows.isEmpty())throw new IdentityException(404,"MEMBER_NOT_FOUND");var r=rows.getFirst();String role=actor.equals(r.get("owner_id"))?"OWNER":r.get("role").toString().equals("TENANT_ADMIN")?"ADMIN":"MEMBER";
-  return new Profile(actor,Objects.toString(r.get("display_name"),""),role,Objects.toString(r.get("department"),""),Objects.toString(r.get("job_title"),""),Objects.toString(r.get("responsibilities"),""),r.get("focus")==null?List.of():List.of(json.readValue(r.get("focus").toString(),String[].class)),r.get("revision")==null?0:(Integer)r.get("revision"));
+  return new Profile(actor,Objects.toString(r.get("display_name"),""),role,Objects.toString(r.get("department"),""),Objects.toString(r.get("job_title"),""),Objects.toString(r.get("responsibilities"),""),r.get("focus")==null?List.of():List.of(json.readValue(r.get("focus").toString(),String[].class)),r.get("revision")==null?0:(Integer)r.get("revision"),r.get("goals")==null?EMPTY_GOALS:json.readValue(r.get("goals").toString(),Goals.class));
  }
  @Transactional public Page list(UUID actor,UUID tenant){read(actor,tenant);boolean manage=governance.allows(actor,tenant,GovernanceAccess.Capability.TENANT_CONFIG,null);var ids=manage?db.queryForList("SELECT account_id FROM tenant_memberships WHERE tenant_id=? AND status='ACTIVE' ORDER BY account_id LIMIT 501",UUID.class,tenant):List.of(actor);if(ids.size()>500)throw new IdentityException(422,"WORK_ROLE_MEMBER_LIMIT");return new Page(manage,ids.stream().map(id->profile(tenant,id)).toList(),FOCUSES);}
  private String text(String v,int max){if(v==null||v.length()>max||v.codePoints().anyMatch(c->Character.isISOControl(c)&&c!=10&&c!=13&&c!=9))throw IdentityException.invalid();return v.strip();}
+ private String goalField(String value,String previous){return text(value==null?Objects.toString(previous,""):value,1200);}
  @Transactional public Profile save(UUID actor,UUID tenant,UUID target,Change c){
   read(actor,tenant);departure.requireActiveBusiness(actor,tenant);governance.require(actor,tenant,GovernanceAccess.Capability.TENANT_CONFIG,null);
   if(c==null||c.requestId()==null||c.expectedRevision()<0||c.focus()==null||c.focus().size()>8||new HashSet<>(c.focus()).size()!=c.focus().size()||c.focus().stream().anyMatch(k->FOCUSES.stream().noneMatch(f->f.key().equals(k))))throw IdentityException.invalid();
   String department=text(c.department(),100),title=text(c.jobTitle(),100),duties=text(c.responsibilities(),1200);var focus=c.focus().stream().sorted().toList();
-  String hash=IdentityService.hash(json.writeValueAsString(Arrays.asList(tenant,target,c.expectedRevision(),department,title,duties,focus)));
-  lock(tenant,target,true);var before=profile(tenant,target);if(identities.priorRequest(actor,c.requestId(),"WORK_ROLE_SAVE",hash)!=null)return before;
+  lock(tenant,target,true);var before=profile(tenant,target);
+  Goals goals=c.goals()==null?before.goals():new Goals(text(c.goals().governance(),1200),text(c.goals().stage(),1200),text(c.goals().followUp(),1200),goalField(c.goals().formalReporting(),before.goals().formalReporting()),goalField(c.goals().handoff(),before.goals().handoff()),goalField(c.goals().indicators(),before.goals().indicators()),goalField(c.goals().source(),before.goals().source()));
+  String hash=IdentityService.hash(json.writeValueAsString(Arrays.asList(tenant,target,c.expectedRevision(),department,title,duties,focus,goals)));
+  if(identities.priorRequest(actor,c.requestId(),"WORK_ROLE_SAVE",hash)!=null)return before;
   if(before.revision()!=c.expectedRevision())throw new IdentityException(409,"WORK_ROLE_CHANGED");
-  if(before.department().equals(department)&&before.jobTitle().equals(title)&&before.responsibilities().equals(duties)&&before.focus().stream().sorted().toList().equals(focus)){identities.remember(actor,c.requestId(),"WORK_ROLE_SAVE",hash,target);return before;}
+  if(before.department().equals(department)&&before.jobTitle().equals(title)&&before.responsibilities().equals(duties)&&before.focus().stream().sorted().toList().equals(focus)&&before.goals().equals(goals)){identities.remember(actor,c.requestId(),"WORK_ROLE_SAVE",hash,target);return before;}
 
-  db.update("INSERT INTO work_role_profiles(tenant_id,account_id,department,job_title,responsibilities,focus,revision,changed_by) VALUES (?,?,?,?,?,?::jsonb,1,?) ON CONFLICT(tenant_id,account_id) DO UPDATE SET department=excluded.department,job_title=excluded.job_title,responsibilities=excluded.responsibilities,focus=excluded.focus,revision=work_role_profiles.revision+1,changed_by=excluded.changed_by,changed_at=clock_timestamp()",tenant,target,department,title,duties,json.writeValueAsString(focus),actor);
+  db.update("INSERT INTO work_role_profiles(tenant_id,account_id,department,job_title,responsibilities,focus,goals,revision,changed_by) VALUES (?,?,?,?,?,?::jsonb,?::jsonb,1,?) ON CONFLICT(tenant_id,account_id) DO UPDATE SET department=excluded.department,job_title=excluded.job_title,responsibilities=excluded.responsibilities,focus=excluded.focus,goals=excluded.goals,revision=work_role_profiles.revision+1,changed_by=excluded.changed_by,changed_at=clock_timestamp()",tenant,target,department,title,duties,json.writeValueAsString(focus),json.writeValueAsString(goals),actor);
   identities.remember(actor,c.requestId(),"WORK_ROLE_SAVE",hash,target);audit.record(actor,tenant,"WORK_ROLE_CHANGED",target,"SUCCESS");return profile(tenant,target);
  }
  @Transactional public Context current(UUID actor,UUID tenant){
@@ -57,7 +66,7 @@ public class WorkAudienceService {
   List<String> focus=!p.focus().isEmpty()?p.focus():!inferred.isEmpty()?inferred:defaults;
   var selected=FOCUSES.stream().filter(f->focus.contains(f.key())).toList();String label=switch(p.systemRole()){case "OWNER"->"企业负责人";case "ADMIN"->"企业管理员";default->"工作人员";};
   var starters=selected.isEmpty()?List.of("根据我能查看的资料，梳理当前工作需要留意的事项。请先确认我负责的工作，不要替我推定岗位。","帮我把选中的资料整理成容易照着做的步骤；不确定的地方请指出来。"):selected.stream().limit(3).map(Focus::starter).toList();
-  return new Context("1.0",key(actor,tenant),p.systemRole(),label,p.department(),p.jobTitle(),p.responsibilities(),focus,selected.stream().map(Focus::label).toList(),starters,!p.jobTitle().isBlank()||!p.responsibilities().isBlank()||!p.focus().isEmpty(),false);
+  return new Context("1.0",key(actor,tenant),p.systemRole(),label,p.department(),p.jobTitle(),p.responsibilities(),focus,selected.stream().map(Focus::label).toList(),starters,!p.jobTitle().isBlank()||!p.responsibilities().isBlank()||!p.focus().isEmpty()||!p.goals().governance().isBlank(),false,p.goals());
  }
  public String key(UUID actor,UUID tenant){return db.queryForObject("SELECT work_audience_key(?,?)",String.class,tenant,actor);}
  /** Ranking applies only AFTER existing source ACL checks. Titles are relevance hints, never authorization. */

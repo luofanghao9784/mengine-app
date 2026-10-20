@@ -220,7 +220,7 @@ test('dataset briefing closes retrieval after three lookups and delivers an hone
       assert.match(instructions, /compare_dataset/);
       assert.match(instructions, /每张卡回答：发现了什么/);
       assert.match(instructions, /只有来源介绍而没有新业务发现时不凑卡/);
-      assert.ok(request.tools.find(t => t.name === 'deliver_briefing').description.includes('智能画报表达规范 1.0.3'));
+      assert.ok(request.tools.find(t => t.name === 'deliver_briefing').description.includes('智能画报表达规范 1.4.0'));
       let name = 'task_context', args;
       if (calls === 1) args = { action: 'dataset_search' };
       else if (calls === 2) args = { action: 'dataset_read', referenceId: datasetId, versionId: snapshotId, columnLimit: 10 };
@@ -310,4 +310,28 @@ test('synthetic model corrects a topic-only title before delivery; long conclusi
   yield {type:'finish',reason:'tool_calls'};
  }}});
  assert.equal(r.status,'completed');assert.equal(calls,2);assert.equal(writes,1);
+});
+
+test('provider Harness uses catalog, topic, typed monthly plan and one delivery',async(t)=>{
+ const calc=randomUUID(),artifact=randomUUID(),actions=[];let step=0,selected=false;
+ const candidate={question:'本月销售与收款分别是多少',goal:'股东经营概况',userValue:'一次看清各店两种口径',destination:'BRIEFING',evidenceNeeded:'获准门店固定计算',requiresCalculation:true,difference:'合并相同期间双指标',businessType:'DATA'};
+ const platform=createServer(async(req,res)=>{
+  if(usageFixture(req,res))return;const input=await body(req);
+  if(req.url.endsWith('/check'))return json(res,{allowed:true,executionClass:'live',briefingContentVersion:'1.0',briefingGeneration:true,briefingRequestedType:'DATA',contextVersion:'1.0',datasetContextVersion:'1.0',briefingBusinessPlanVersion:'1.0',topicStrategyVersion:'1.0',topicSelectionRecorded:selected});
+  if(req.url.endsWith('/context')){actions.push(input.action);return json(res,{contractVersion:'1.0',action:input.action,referenceOnly:true,result:input.action==='bootstrap'?{}:input.action==='reconciliation_catalog'?{stores:[{id:'a'},{id:'b'}]}:{plan:{cards:1,chartStyle:'GROUPED_BAR'},evidence:{calculationArtifactId:calc}}});}
+  if(req.url.endsWith('/select-briefing-topic')){selected=true;return json(res,{recorded:true,proposalOnly:true,selectedIndex:input.selectedIndex,strategyVersion:'1.0.0'});}
+  if(req.url.endsWith('/execution/open')||req.url.endsWith('/execution/tool'))return json(res,{accepted:true,policy:'READ_ONLY_PRIVATE_V1'});
+  if(req.url.endsWith('/deliver-briefing')){actions.push('deliver');assert.equal(input.calculationArtifactId,calc);return json(res,{contractVersion:'1.0',status:'PREPARED',artifactId:artifact,title:input.title,visibility:'PRIVATE_AFTER_TASK_SUCCEEDS'});}
+  json(res,{},404);
+ });const url=await listen(platform);t.after(()=>close(platform));
+ const agent=new AgentTasks({platformBaseUrl:url,executionClass:'live',modelName:'synthetic-monthly-plan',createModel:()=>({usage:null,async *generate(r){
+  step++;let name,args;
+  if(step===1){name='task_context';args={action:'reconciliation_catalog'};}
+  else if(step===2){name='select_briefing_topic';args={candidates:[candidate],selectedIndex:0};}
+  else if(step===3){name='task_context';args={action:'briefing_plan',plan:{question:candidate.question,goal:candidate.goal,recipe:'MONTHLY_SALES_RECEIPTS',storeIds:['a','b'],dateFrom:'2026-10-01',dateTo:'2026-10-19'}};}
+  else{assert.equal(step,4);assert.equal(r.requiredTool,'deliver_briefing');name='deliver_briefing';args={businessType:'DATA',calculationArtifactId:calc,title:'两店销售与收款各100元',summary:'本月1至19日两店销售与收款分别统计。',analysis:['订单销售按订单确认日期统计，收款按收款确认日期统计。','两项合计相同，不代表逐笔一致或已经银行到账。']};}
+  assert.ok(r.tools.some(x=>x.name===name));yield{type:'tool_call',id:'monthly-'+step,name,arguments:JSON.stringify(args)};yield{type:'finish',reason:'tool_calls'};
+ }})});
+ const result=await agent.run({contractVersion:'1.5',taskId:randomUUID(),attemptId:randomUUID(),prompt:'将获准门店本月销售和收款同卡展示'},new AbortController().signal);
+ assert.equal(result.outcome,'COMPLETE');assert.equal(step,4);assert.deepEqual(actions,['bootstrap','reconciliation_catalog','briefing_plan','deliver']);
 });

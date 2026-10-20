@@ -17,6 +17,8 @@ public class TaskContextGuard {
   workAudience.requireCurrent(task);
   db.queryForList("SELECT a.id FROM wiki_graphs g JOIN wiki_graph_inputs i ON i.graph_id=g.id JOIN wiki_articles a ON a.id=i.article_id WHERE g.task_id=? ORDER BY a.id FOR SHARE OF a",task);
   if(!Boolean.TRUE.equals(db.queryForObject("SELECT wiki_graph_current(?) AND wiki_insight_current(?)",Boolean.class,task,task)))throw new IdentityException(409,"TASK_CONTEXT_CHANGED");
+  db.queryForList("SELECT d.id FROM business_datasets d JOIN task_dataset_reads r ON r.dataset_id=d.id JOIN task_reconciliation_receipts c ON c.task_id=r.task_id AND c.attempt_number=r.attempt_number WHERE c.task_id=? ORDER BY d.id FOR SHARE OF d",task);
+  if(Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM task_reconciliation_receipts c JOIN conversation_tasks t ON t.id=c.task_id AND t.attempt=c.attempt_number JOIN task_dataset_reads r ON r.task_id=t.id AND r.attempt_number=t.attempt JOIN business_datasets d ON d.id=r.dataset_id WHERE t.id=? AND d.current_snapshot IS DISTINCT FROM r.snapshot_id)",Boolean.class,task)))throw new IdentityException(409,"TASK_CONTEXT_CHANGED");
   if(briefingFlow!=null)briefingFlow.requireCurrent(task);
   db.queryForList("SELECT m.id FROM task_metric_dependencies(?) r JOIN scene_metrics m ON m.id=r.metric_id ORDER BY m.id FOR SHARE OF m",task);
   for(var dependency:db.queryForList("SELECT metric_id,version FROM task_metric_dependencies(?)",task))

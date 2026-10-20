@@ -1,3 +1,4 @@
+import { groupKnowledgeTopics } from "./knowledge-topics.js";
 import { createBusinessKnowledge } from "./business-knowledge.js";
 import type { Model } from "./model.js";
 import type { FastifyInstance, FastifyRequest } from "fastify";
@@ -34,6 +35,7 @@ export function registerSceneKnowledge(
     id: k.id,
     sourceId: k.sourceId,
     sourceVersion: k.sourceVersion,
+    sources: k.sources,
     group: k.department,
     name: k.title,
     why: k.intro,
@@ -42,14 +44,14 @@ export function registerSceneKnowledge(
     verdict: k.content,
     kvHead: ["项", "内容", "状态"],
     kv: [
-      ["来源", k.sourceTitle, `v${k.sourceVersion}`, "plain"],
+      ...(k.sources ? k.sources.map((s: any) => ["可见来源", s.title, `来源 v${s.version} · 知识 v${s.revision}`, "plain"]) : [["来源", k.sourceTitle, `v${k.sourceVersion}`, "plain"]]),
       [
         "类型",
         k.sourceKind === 0 ? "业务数据知识" : "资料知识",
-        "AI 学习生成",
+        k.origin === "deployment" ? "部署复核发布" : "AI 学习生成",
         "plain",
       ],
-      ...k.evidence.map((e: any, i: number) => [
+      ...[...new Map((k.sources ? k.sources.flatMap((s: any) => s.evidence) : k.evidence).map((e: any) => [e.id + e.quote, e])).values()].map((e: any, i: number) => [
         `依据 ${i + 1}`,
         e.quote,
         k.sourceKind === 0 ? "业务数据统计" : "原文依据",
@@ -63,7 +65,8 @@ export function registerSceneKnowledge(
     const u = auth(req);
     const snap = await call(req, "/api/wiki/knowledge");
     const structured = business.snapshot(u);
-    const businessItems = structured.items.map(card),
+    const visibleKnowledge = (req.query as any)?.view === "sources" ? structured.items : groupKnowledgeTopics(structured.items);
+    const businessItems = visibleKnowledge.map(card),
       documentItems = snap.items.map(card);
     const items = [...businessItems, ...documentItems],
       ids = new Set(items.map((k: any) => k.id));
@@ -86,20 +89,20 @@ export function registerSceneKnowledge(
         : [];
     });
     // Shared evidence is a factual source relationship, not an inferred business dependency.
-    for (let i = 0; i < structured.items.length; i++)
-      for (let j = i + 1; j < structured.items.length; j++) {
-        const a = structured.items[i],
-          b = structured.items[j];
+    for (let i = 0; i < visibleKnowledge.length; i++)
+      for (let j = i + 1; j < visibleKnowledge.length; j++) {
+        const a = visibleKnowledge[i],
+          b = visibleKnowledge[j];
         const common =
           a.sourceId === b.sourceId
-            ? a.evidence.filter((e) => b.evidence.some((v) => v.id === e.id))
+            ? a.evidence.filter((e: any) => b.evidence.some((v: any) => v.id === e.id))
             : [];
         if (common.length)
           relations.push([
             a.id,
             b.id,
             "引用同一业务数据统计：" +
-              common.map((e) => e.quote).join("；"),
+              common.map((e: any) => e.quote).join("；"),
           ]);
       }
     const learnedIds = new Set(snap.items.map((k: any) => k.sourceId));
@@ -187,7 +190,7 @@ export function registerSceneKnowledge(
       },
       aside: {
         title: "最近入库",
-        rows: [...structured.items, ...snap.items]
+        rows: [...visibleKnowledge, ...snap.items]
           .sort((a: any, b: any) => b.createdAt.localeCompare(a.createdAt))
           .slice(0, 3)
           .map((k: any) => [k.title, k.createdAt]),
@@ -220,7 +223,7 @@ export function registerSceneKnowledge(
     async (req) => {
       const u = auth(req),
         snap = await call(req, "/api/wiki/knowledge"),
-        k = [...business.snapshot(u).items, ...snap.items].find(
+        k = [...groupKnowledgeTopics(business.snapshot(u).items), ...business.snapshot(u).items, ...snap.items].find(
           (k: any) => k.id === req.params.id,
         );
       if (!k) throw fail(404, "知识已变化或无权访问");
@@ -229,7 +232,7 @@ export function registerSceneKnowledge(
       if (k.sourceKind === 0)
         return {
           ...card(k),
-          name: d.title,
+          name: k.sources ? k.title + " · 当前可见来源" : d.title,
           verdict:
             "知识依据来自已纳入分析的业务记录。未通过检查的记录及敏感字段不参与统计；尚未同步的新数据不在此次统计范围内。",
           actions: ["返回知识"],

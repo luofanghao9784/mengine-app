@@ -7,6 +7,7 @@ import { Badge, Button, Modal } from '../shared/ui';
 import { Failure, Loading, MutationGate, useRemote } from '../shared/admin';
 import { RequestPending } from '../shared/request-guard';
 import { Confirm, EmergencyStop } from './TenantAdminHome';
+import { WorkRoles } from '../admin/prototype/WorkRoles';
 import { DeparturePanel } from '../departure/DeparturePanel';
 
 export function TenantMemberDetail({
@@ -166,6 +167,7 @@ export function TenantMemberDetail({
           )}
         </>
       )}
+      {remote.value?.member.status === 'ACTIVE' && <WorkRoles tenant={tenant} account={account} />}
     </MutationGate.Provider>
   );
 }

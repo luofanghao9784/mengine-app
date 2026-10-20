@@ -114,3 +114,19 @@ class CollectorTest(unittest.TestCase):
             collector.select_source({'sources': [self.config, self.config]}, self.request)
         with self.assertRaises(ValueError):
             collector.select_source(registry, {**self.request, 'tenantId': str(uuid.uuid4())})
+
+    def test_installed_store_scope_excludes_other_store_and_cannot_be_overridden(self):
+        with sqlite3.connect(self.file) as conn:
+            conn.execute('ALTER TABLE sales ADD COLUMN store_id TEXT')
+            conn.execute("UPDATE sales SET store_id='store-a'")
+            conn.execute("INSERT INTO sales VALUES ('0002','55',NULL,'secret','store-b')")
+            conn.execute("INSERT INTO sales VALUES ('0003','66',NULL,'secret',NULL)")
+        d=self.config['datasets'][0];d['table']='sales';d['rowScope']={'column':'store_id','values':['store-a']}
+        result=collector.collect(self.request,self.config)
+        self.assertEqual([r[0] for r in result['snapshots'][0]['rows']],['0001'])
+        altered=copy.deepcopy(self.request);altered['datasets'][0]['rowScope']={'column':'store_id','values':['store-b']}
+        with self.assertRaises(ValueError):collector.collect(altered,self.config)
+        d['rowScope']['values']=["store-a') OR 1=1 --"]
+        self.assertEqual(collector.collect(self.request,self.config)['snapshots'][0]['rows'],[])
+        d['rowScope']['values']=[]
+        with self.assertRaises(ValueError):collector.collect(self.request,self.config)

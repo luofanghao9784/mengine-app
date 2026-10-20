@@ -2,6 +2,8 @@ import {useEffect,useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {createIdentityClient,createIdentityRequest,IdentityError} from '../../identity/client';
 import './style.css';
+import {Routing} from './routing';
+import {Publication} from './publication';
 import {Metrics} from './metrics';
 const request=createIdentityRequest(fetch,240000);
 const object=<T,>(v:unknown):v is T=>v!==null&&typeof v==='object';
@@ -32,7 +34,9 @@ function App(){
  <div className="toolbar"><select aria-label="企业" value={tenant} disabled={busy} onChange={e=>setTenant(e.target.value)}>{tenants.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select><button onClick={()=>void sync()} disabled={!tenant||busy||!state}>{busy?'同步中…':'立即同步治理成果'}</button></div>
  {error&&<p role="alert">{error}</p>}
  {!platform&&binding&&binding.bindings.length===0&&<section className="summary"><div><h2>设置治理成果的目标空间</h2><p>选择接收数据快照和知识的共享空间。保持原有来源权限与空间权限；不会自动给员工授权。设置后再执行同步。</p><label>目标共享空间 <select aria-label="治理目标空间" value={workspace} disabled={busy} onChange={e=>setWorkspace(e.target.value)}><option value="">请选择空间</option>{binding.workspaces.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select></label><button disabled={busy||!workspace} onClick={()=>void bind()}>建立来源映射</button>{binding.workspaces.length===0&&<p>没有可维护的共享空间，请先由负责人配置空间与维护权限。</p>}</div></section>}
- {binding&&binding.bindings.length>0&&<p className="notice">治理目标空间：{binding.workspaces.find(w=>w.id===binding.bindings[0].workspace_id)?.name??'已配置的共享空间'}。来源映射已建立，数据是否可用以同步和采集结果为准。</p>}
+ {binding&&binding.bindings.length>0&&<p className="notice">治理目标空间：{binding.workspaces.find(w=>w.id===binding.bindings[0].workspace_id)?.name??'已配置的共享空间'}。启用按来源配置后，以完整同步清单为准；数据是否可用以同步和采集结果为准。</p>}
+ {!platform&&binding&&binding.bindings.length>0&&<Publication key={tenant+"publication"} tenant={tenant} onSaved={()=>{void request<NonNullable<typeof binding>>(`/api/tenant-admin/v1/tenants/${tenant}/scene/binding`,'GET',object).then(setBinding);setState(s=>s?{...s,governance:{...s.governance,policy_current:false}}:s);}}/>}
+ {!platform&&binding&&binding.bindings.length>0&&<Routing key={tenant} tenant={tenant} workspaces={binding.workspaces} onSaved={()=>setState(s=>s?{...s,governance:{...s.governance,policy_current:false}}:s)}/>}
  {state&&<><section className="summary"><div><small>权限同步</small><strong>{state.governance.policy_current?'当前有效':'已过期或尚未完成'}</strong></div><div><small>最近完成</small><strong>{time(state.governance.last_synced_at)}</strong></div><div><small>数据快照采集</small><strong>{label(state.governance.collection_state)}</strong></div><div><small>治理资产</small><strong>{state.assets.length} 项</strong></div></section>
  <p className="notice">治理元信息通常每分钟同步；快照采集完成后数据才能用于分析。权限超过五分钟未成功核对时，暂停使用同步副本。通过管理端修改来源权限会先暂停副本，再同步新权限。同步不会扩大原有空间授权。</p>
  <div className="layout"><aside><input aria-label="搜索资产" placeholder="搜索治理资产" value={filter} onChange={e=>setFilter(e.target.value)}/>{assets.map(a=><button className={a===chosen?'selected':''} key={a.kind+a.source_id} onClick={()=>setSelected(a.source_id)}>{a.metadata.title??'未命名资产'}<small>来源 v{a.metadata.version??a.metadata.governance?.sourceVersion??'—'} · 权限 v{a.metadata.governance?.policyVersion??'—'}</small></button>)}</aside><article>{m?<>

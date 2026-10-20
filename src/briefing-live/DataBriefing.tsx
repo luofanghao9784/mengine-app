@@ -26,7 +26,7 @@ export function BriefingChart({
       <figure className="data-briefing-chart briefing-detail-chart">
         <DetailChart document={document} />
         <figcaption>
-          {document.content.chart.unit === '分' ? '金额以元显示，计算依据保留原始单位。' : '按同口径比较。'}
+          {document.content.schemaVersion === 'briefing-chain-v1' && document.content.chart.baseline === '订单销售额' ? '同一期间，订单与收款按各自确认日期分别统计；不作前后期比较。' : document.content.chart.unit === '分' ? '金额以元显示，计算依据保留原始单位。' : '按同口径比较。'}
           具体日期与统计范围见下方依据。
         </figcaption>
       </figure>
@@ -46,6 +46,7 @@ export function DataBriefing({
   if(document.content.fusion)return <FusionBriefing document={document} compact={compact}/>;
   const c = document.content,
     ch = c.chart;
+  const pairedMetrics = c.schemaVersion === 'briefing-chain-v1' && ch?.baseline === '订单销售额';
   const summary = c.datasetBasis?.periodMode === 'SUMMARY';
   const amount = (raw: string | null) => value(displayAmount(raw, ch?.unit ?? ''));
   if (!ch)
@@ -103,7 +104,7 @@ export function DataBriefing({
                     <th>门店 / 分组{ch.unit === '分' ? '（金额：元）' : ''}</th>
                     {!summary && <th>{ch.baseline}</th>}
                     <th>{ch.current}</th>
-                    {!summary && <><th>差额</th><th>变化率</th><th>排名变化</th></>}
+                    {!summary && !pairedMetrics && <><th>差额</th><th>变化率</th><th>排名变化</th></>}
                   </tr>
                 </thead>
                 <tbody>
@@ -112,7 +113,7 @@ export function DataBriefing({
                       <th>{r.group}</th>
                       {!summary && <td>{amount(r.baseline)}</td>}
                       <td>{amount(r.current)}</td>
-                      {!summary && <><td>{amount(r.difference)}</td>
+                      {!summary && !pairedMetrics && <><td>{amount(r.difference)}</td>
                       <td>{r.changePercent === null ? '不可计算' : value(r.changePercent) + '%'}</td>
                       <td>
                         {r.baselineRank === null ? '—' : `${r.baselineRank} → ${r.currentRank ?? '缺数据'}`}
@@ -122,7 +123,7 @@ export function DataBriefing({
                 </tbody>
               </table>
             </div>
-            <p>{summary ? '汇总使用完整固定快照内符合筛选条件的记录，无对照期间，不计算变化率。' : '缺失期间不记为零；非正基期不计算变化率；并列采用相同名次。'}</p>
+            <p>{pairedMetrics ? '两类指标独立统计，合计相同不代表逐笔结清；不据此计算欠款或增长率。' : summary ? '汇总使用完整固定快照内符合筛选条件的记录，无对照期间，不计算变化率。' : '缺失期间不记为零；非正基期不计算变化率；并列采用相同名次。'}</p>
           </details>
           <ReadingEvidence
             title="统计口径与计算依据"

@@ -31,6 +31,7 @@ export function discoverNews(body: string, base: string): NewsCandidate[] {
         u.origin !== new URL(base).origin ||
         u.href === base ||
         title.trim().length < 5 ||
+        /^(无障碍浏览|网站导航|网站地图|联系我们|隐私政策|版权声明)$/.test(title.trim()) ||
         items.some((i) => i.url === u.href)
       )
         return;

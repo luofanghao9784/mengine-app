@@ -36,5 +36,14 @@ class SceneDatasetContinuityIntegrationTest extends TaskDatasetFixture {
   db.update("DELETE FROM workspace_members WHERE workspace_id=? AND account_id=?",space,owner);
   assertFalse(readable(job.id()),"membership withdrawal still applies");
  }
+ @Test void routingRestrictionBlocksExistingTaskEvenWhenSourceAndSpaceStillAllowIt(){
+  db.update("INSERT INTO scene_bindings(tenant_id,workspace_id,connection_id,maintainer_id,governance_valid_until) VALUES(?,?,?,?,now()+interval '5 minutes')",tenant,space,connection,owner);
+  var job=task(null,"AUTHORIZED_LIBRARY");call(job,request("dataset_search",null,null,0));call(job,request("dataset_read",dataset,snapshot,0));finish(job);
+  db.update("INSERT INTO scene_asset_revisions(tenant_id,target_id,kind,revision,metadata) VALUES (?,?,'TABLE','old',?::jsonb)",tenant,dataset,meta(1,1,"数量"));
+  db.update("INSERT INTO scene_asset_links(tenant_id,source_id,kind,target_id,revision,metadata) VALUES (?,'sales','TABLE',?,'new',?::jsonb)",tenant,dataset,meta(1,1,"数量"));
+  assertTrue(readable(job.id()));
+  db.update("UPDATE scene_asset_links SET metadata=jsonb_set(metadata,'{routing}','{\"readers\":[]}') WHERE tenant_id=?",tenant);
+  assertFalse(readable(job.id()),"resource readers narrow otherwise granted source and workspace");
+ }
  boolean readable(UUID task){return Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM readable_source_tasks WHERE id=?)",Boolean.class,task));}
 }

@@ -33,7 +33,7 @@ export interface BriefingDocument {
   } | null;
   content: {
     fusion?: FusionEvidence | null;
-    schemaVersion: 'briefing-data-v1' | 'briefing-text-v1' | 'briefing-dataset-v1';
+    schemaVersion: 'briefing-chain-v1' | 'briefing-data-v1' | 'briefing-text-v1' | 'briefing-dataset-v1';
     businessType: 'INFO' | 'DATA' | 'INSIGHT' | 'SUGGESTION' | 'RESULT';
     title: string;
     summary: string;

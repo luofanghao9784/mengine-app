@@ -395,7 +395,7 @@ export function CardFace({ document }: { document: BriefingDocument }) {
             kind={kind === 'SLOPE' ? 'PAIR' : kind}
             chart={chart}
             box={box}
-            summary={document.content.datasetBasis?.periodMode === 'SUMMARY'}
+            summary={document.content.schemaVersion === 'briefing-chain-v1' || document.content.datasetBasis?.periodMode === 'SUMMARY'}
           />
         ))
       )}

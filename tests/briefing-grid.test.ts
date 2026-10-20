@@ -119,3 +119,15 @@ test('generation control shares the last row and wraps only when its remaining w
  const tall=packMagazineTiles([{id:'tall',size:'1×2',fixed:true},more],3).at(-1)!;
  assert.deepEqual([tall.row,tall.col],[1,1]);
 });
+
+test('compact layout packs fixed large cards first and fills their sides without shrinking', () => {
+  const cards: MagazineTile[] = [
+    ...Array.from({length:7}, (_,i)=>({id:`small-${i}`,size:'1×1' as const,fixed:true})),
+    {id:'chart',size:'2×2',fixed:true}, {id:'steps',size:'2×2',fixed:true},
+  ];
+  const result=packMagazineTiles(cards,4,true);
+  const cells=new Set(result.flatMap(p=>Array.from({length:p.height},(_,y)=>Array.from({length:p.width},(_,x)=>(p.row+y)*4+p.col+x)).flat()));
+  assert.equal(cells.size,15);
+  assert.deepEqual([...cells].sort((a,b)=>a-b),Array.from({length:15},(_,i)=>i));
+  for(const p of result) assert.equal(p.size,cards.find(c=>c.id===p.id)!.size);
+});

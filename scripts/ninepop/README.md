@@ -13,3 +13,14 @@
 验证：`python3 -m unittest discover -s tests/ninepop`。Wiki 的 `source-snapshot.test.ts` 验证超过一万行、失败回滚、只读来源和权限隔离；部署治理测试验证未知字段与禁止求和、字典基线和模型接续。生产回执与真实业务记录仅保留在私有发布证据目录。
 
 源 SQL NOT NULL 与文本非空分开处理。仅经源码核实的 `course_products.payment_methods` 声明 `allowEmptyColumns`；保留空字符串，不替换业务值，真实 NULL 仍按必填校验拒绝。投影元数据修改后重新同步整组来源并重做受影响治理绑定。
+
+
+## 本地首次接入准备
+
+`local_connection.py --config <私有配置> --check`只检查禁用安装；`ssh_reader.py`显式拒绝enabled=false，当前本地实例不注册可运行真实provider。原三表通过full_collector.collect_config复用v2完整分页。history_scope的候选/孤儿/歧义默认隔离，不代替平台权限。详见[本地准备验证](../../docs/协作/企业首次接入/04接入准备本地实现与合成验证-2026-10-19.md)。
+
+## 本地正式服务链合成联调（2026-10-19）
+
+`scoped_scene_export.py`将受信部署规则和授权投影为现有scene-export 1.1，不读网络、不输出未审核原表。输入必须有显式快照版本；规则、内容、来源版本及账号名单共同进入变更指纹。无证据行隔离，不能将旧禁用reference草案自动启用。
+
+`tests/ninepop/scene_fixture.py`仅生成合成数据，供Java正式登记/权限读取集成测试使用，不能用作真实provider。运行命令、验证和未完成边界见[服务链联调](../../docs/协作/企业首次接入/04.03正式登记与权限链路合成联调-2026-10-19.md)。

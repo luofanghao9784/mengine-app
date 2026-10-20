@@ -9,11 +9,13 @@ export type MagazineTile = { id: string; size: CardSize; fixed?: boolean; rows?:
 export type MagazinePlacement = MagazineTile & { row: number; col: number; width: number; height: number };
 
 /** Same first-free-cell packing as the Demo: later cards may fill a gap, never mutate preferences. */
-export function packMagazineTiles(tiles: MagazineTile[], columns: number): MagazinePlacement[] {
+export function packMagazineTiles(tiles: MagazineTile[], columns: number, compact = false): MagazinePlacement[] {
   const pending = tiles.filter((tile) => !tile.atEnd).map((tile) => ({
     ...tile,
     size: (columns === 1 ? `1×${tile.size[2]}` : tile.size) as CardSize,
   }));
+  // Place tall blocks first so small cards can fill their adjacent cells. Sizes stay unchanged.
+  if (compact) pending.sort((a, b) => Number(b.size[2]) - Number(a.size[2]) || Number(b.size[0]) - Number(a.size[0]));
   const occupied = new Set<number>(),
     placed: MagazinePlacement[] = [];
   let cursor = 0;

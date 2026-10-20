@@ -340,6 +340,7 @@ export function generationTiles(
       title: slot.item!.briefing?.content.title ?? slot.item!.content.title,
       summary: slot.item!.briefing?.content.summary ?? slot.item!.content.excerpt,
       chart: !!slot.item!.briefing?.content.chart,
+      news: slot.item!.briefing?.content.businessType === 'INFO',
       render: <div className="generation-arrived">{render(slot.item!)}</div>,
     }));
   const total = Math.max(generation.progress.total, generation.pending.length);

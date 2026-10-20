@@ -55,16 +55,21 @@ export function registerPlatformBridge(app: FastifyInstance, store: Store, secre
       if(p.path==='/deployment-governance/apply')return importDeployment(store,u,p.body);
       return reply.code(404).send({message:'未知部署操作'});
     }
+    const requested=p.body?.restrictedSourceIds;
+    if(requested!==undefined&&(!Array.isArray(requested)||requested.length>100||requested.some((id:unknown)=>typeof id!=='string'||id.length>160)))return reply.code(400).send({message:'受限来源清单无效'});
+    const scoped=new Set<string>(!p.actor.startsWith('customer:')?(requested||[]):[]);
     const get=p.method==='GET'&&/^\/scene-(foundation(?:\/[^/?]+)?|knowledge(?:\/[^/?]+\/source)?)$/.test(p.path);
     const post=p.method==='POST'&&/^\/scene-(foundation(?:\/scan|\/[^/?]+\/actions)|knowledge\/sync)$/.test(p.path);
     if(p.method==='GET'&&p.path==='/scene-export'&&!p.actor.startsWith('customer:')){
-      const assets=store.documents(u.tenantId).filter(d=>!d.restrictedContent&&canUseCurrentData(store,u,d)).map(d=>{
+      const assets=store.documents(u.tenantId).filter(d=>(!d.restrictedContent||scoped.has(d.id))&&canUseCurrentData(store,u,d)).map(d=>{
         const base={id:d.id,title:d.title,kind:d.kind,version:d.version,policyVersion:d.policyVersion,tags:d.tags,department:d.department,updatedAt:d.updatedAt,governance:exportGovernance(store,p.tenant,p.actor,u,d)};
         if(d.kind!=='数据表')return {...base,content:redactForGovernance(d.content)};
         const set=readDataset(store,u,d.id);if((set.definition as any).provenance?.governanceMode==='deployment'&&set.dictionaryStatus!=='generated')return null;const fields=set.definition.fields.filter(f=>!f.sensitive);
         const rows=(store.db.prepare("SELECT data FROM data_rows WHERE tenant_id=? AND dataset_id=? AND status='ready' ORDER BY id").all(u.tenantId,d.id) as {data:string}[]).map(r=>{const raw=JSON.parse(r.data),v=raw.values;return fields.map(f=>raw.sourceNullFields?.includes(f.name)?null:redactForGovernance(String(v[f.name]??'')));});
         const dictionaryRow=store.db.prepare('SELECT data FROM data_dictionary WHERE dataset_id=? AND tenant_id=?').get(d.id,u.tenantId) as {data:string}|undefined;
-        return {...base,fields,analysisPolicy:set.analysisPolicy,fieldEvidence:set.fieldEvidence,dictionary:set.dictionaryStatus==='generated'?set.business:null,dictionaryStatus:set.dictionaryStatus,dictionaryRevision:dictionaryRow?JSON.parse(dictionaryRow.data).revision:0,dictionaryFingerprint:dictionaryFingerprint(store,u.tenantId,set.definition),dictionarySchemaFingerprint:'schema:'+dictionarySchemaFingerprint(set.definition),rows};
+        const batch=store.db.prepare('SELECT data FROM data_batches WHERE tenant_id=? AND dataset_id=? ORDER BY rowid DESC LIMIT 1').get(u.tenantId,d.id) as {data:string}|undefined;
+        const receipt=batch?JSON.parse(batch.data).sourceReceipt:null;
+        return {...base,sourceReadAt:receipt?.snapshot?.readAt??null,coverageThrough:receipt?.snapshot?.coverageThrough??null,fields,analysisPolicy:set.analysisPolicy,fieldEvidence:set.fieldEvidence,dictionary:set.dictionaryStatus==='generated'?set.business:null,dictionaryStatus:set.dictionaryStatus,dictionaryRevision:dictionaryRow?JSON.parse(dictionaryRow.data).revision:0,dictionaryFingerprint:dictionaryFingerprint(store,u.tenantId,set.definition),dictionarySchemaFingerprint:'schema:'+dictionarySchemaFingerprint(set.definition),rows};
       }).filter(Boolean);
       if(process.env.NINEPOP_CHAIN_EXPORT_ENABLED==='true')assets.push(...ninepopBusinessChains(assets as any));
       governDerivedAssets(assets);
@@ -77,12 +82,12 @@ export function registerPlatformBridge(app: FastifyInstance, store: Store, secre
     store.db.prepare('INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)').run(digest(token),u.id,new Date(Date.now()+300000).toISOString());
     try{
       if(p.method==='POST')store.audit(u,'platform.scene.dispatch',p.path,`总台企业 ${p.tenant}；发起人 ${p.actor}`);
-      const result=await app.inject({method:p.method,url:'/api'+p.path,headers:{cookie:'mengine_session='+token},...(p.method==='POST'?{payload:p.body??{}}:{})});
+      const result=await app.inject({method:p.method,url:'/api'+p.path+(p.method==='GET'&&p.path==='/scene-knowledge'&&!p.actor.startsWith('customer:')?'?view=sources':''),headers:{cookie:'mengine_session='+token},...(p.method==='POST'?{payload:p.body??{}}:{})});
       const body=result.json();
       // Central export currently targets a shared scene workspace. Restricted
       // source-derived knowledge must not be flattened into that workspace.
       if(p.method==='GET'&&p.path==='/scene-knowledge'&&!p.actor.startsWith('customer:')&&!p.actor.startsWith('deployment:')){
-        const restricted=store.documents(u.tenantId).filter(d=>d.restrictedContent).map(d=>d.id);
+        const restricted=store.documents(u.tenantId).filter(d=>d.restrictedContent&&!scoped.has(d.id)).map(d=>d.id);
         body.items=(body.items||[]).filter((k:any)=>!restricted.some(id=>k.id.startsWith('business-'+id+'-')||k.id.startsWith('deployment-'+id+'-')));
         const visible=new Set(body.items.map((k:any)=>k.id));body.sourceKind=Object.fromEntries(Object.entries(body.sourceKind||{}).filter(([id])=>visible.has(id)));
         body.relations=(body.relations||[]).filter((r:any)=>visible.has(r[0])&&visible.has(r[1]));

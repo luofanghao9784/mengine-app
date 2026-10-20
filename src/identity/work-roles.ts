@@ -1,4 +1,5 @@
 import { createIdentityRequest } from './client.ts';
+export type WorkGoals = { governance: string; stage: string; followUp: string; formalReporting?: string; handoff?: string; indicators?: string; source?: string };
 export type WorkRole = {
   accountId: string;
   name: string;
@@ -6,6 +7,7 @@ export type WorkRole = {
   department: string;
   jobTitle: string;
   responsibilities: string;
+  goals?: WorkGoals;
   focus: string[];
   revision: number;
 };
@@ -19,6 +21,7 @@ export type WorkAudience = {
   department: string;
   jobTitle: string;
   responsibilities: string;
+  goals?: WorkGoals;
   focus: string[];
   focusLabels: string[];
   starters: string[];
@@ -73,5 +76,6 @@ export const workRoles = {
       jobTitle: member.jobTitle,
       responsibilities: member.responsibilities,
       focus: member.focus,
+      goals: member.goals,
     }),
 };

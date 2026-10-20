@@ -1,0 +1,2 @@
+ALTER TABLE briefing_topic_selections DROP CONSTRAINT briefing_topic_selections_selected_index_check;
+ALTER TABLE briefing_topic_selections ADD CONSTRAINT briefing_topic_selections_selected_index_check CHECK(selected_index BETWEEN 0 AND 9);

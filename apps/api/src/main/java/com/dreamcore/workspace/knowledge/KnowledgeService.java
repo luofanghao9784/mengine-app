@@ -56,6 +56,12 @@ public class KnowledgeService {
     public void onUpload(UUID actor,UUID tenant,UUID space,UUID material,UUID version) {
         if(enabled) { access.requireObject(actor,tenant,space,"MATERIAL",material,true);enqueue(actor,tenant,space,material,version,1); }
     }
+    @org.springframework.beans.factory.annotation.Autowired private com.dreamcore.workspace.scene.ScenePublication scenePublication;
+    /** Only internal scene publication invokes this; ordinary parse requests keep library checks. */
+    @Transactional public void onSceneUpload(UUID actor,UUID tenant,UUID space,UUID material,UUID version) {
+        scenePublication.require(actor,tenant,space);
+        if(enabled) enqueue(actor,tenant,space,material,version,1);
+    }
     private UUID enqueue(UUID actor,UUID tenant,UUID space,UUID material,UUID version,int generation) {
         UUID id=UUID.randomUUID();
         db.update("INSERT INTO knowledge_runs(id,tenant_id,workspace_id,material_id,version_id,generation,requested_by,status) VALUES (?,?,?,?,?,?,?,'QUEUED')",id,tenant,space,material,version,generation,actor);
@@ -188,18 +194,25 @@ public class KnowledgeService {
         db.update("UPDATE knowledge_runs SET status='RUNNING',attempts=attempts+1,lease_token=?,lease_until=now()+interval '120 seconds' WHERE id=?",token,id);
         return new Job(id,(UUID)row.get("tenant_id"),(UUID)row.get("workspace_id"),(UUID)row.get("material_id"),(UUID)row.get("version_id"),(UUID)row.get("requested_by"),token);
     }
+    private void requireParseAccess(Job job) {
+        boolean published=Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM scene_asset_links WHERE tenant_id=? AND target_id=? AND active)",Boolean.class,job.tenant(),job.material()));
+        if(published) {
+            scenePublication.require(job.actor(),job.tenant(),job.workspace());
+            access.requireObject(job.actor(),job.tenant(),job.workspace(),"MATERIAL",job.material(),false);
+        } else access.requireObject(job.actor(),job.tenant(),job.workspace(),"MATERIAL",job.material(),true);
+    }
     private boolean owned(Job job) { return !db.queryForList("SELECT id FROM knowledge_runs WHERE id=? AND status='RUNNING' AND lease_token=? AND lease_until>now() FOR UPDATE",job.id(),job.token()).isEmpty(); }
     @Transactional
     public Input input(Job job) {
         new com.dreamcore.workspace.support.SupportAccess(db).bindObject(job.actor(),job.tenant(),"knowledge_runs",job.id());
-        if(!owned(job)) return null;access.requireObject(job.actor(),job.tenant(),job.workspace(),"MATERIAL",job.material(),true);
+        if(!owned(job)) return null;requireParseAccess(job);
         var v=version(job.tenant(),job.workspace(),job.material(),job.version(),false);
         return new Input((String)v.get("filename"),store.read((UUID)v.get("object_id"),(Long)v.get("size_bytes"),(String)v.get("sha256")));
     }
     @Transactional
     public void finish(Job job,DocumentParser.Result result) {
         new com.dreamcore.workspace.support.SupportAccess(db).bindObject(job.actor(),job.tenant(),"knowledge_runs",job.id());
-        if(!owned(job)) return;access.requireObject(job.actor(),job.tenant(),job.workspace(),"MATERIAL",job.material(),true);
+        if(!owned(job)) return;requireParseAccess(job);
         access.requireVersionActive(job.tenant(),job.workspace(),job.version());
         int ordinal=0;
         for(var c:result.chunks()) db.update("INSERT INTO knowledge_chunks(id,tenant_id,workspace_id,material_id,version_id,run_id,ordinal,locator,method,content) VALUES (?,?,?,?,?,?,?,?,?,?)",UUID.randomUUID(),job.tenant(),job.workspace(),job.material(),job.version(),job.id(),ordinal++,c.locator(),c.method(),c.content());

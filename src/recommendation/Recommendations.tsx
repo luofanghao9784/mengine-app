@@ -90,6 +90,7 @@ export function Recommendations({
       title: item.briefing?.content.title ?? item.content.title,
       summary: item.briefing?.content.summary ?? item.content.excerpt,
       chart: !!item.briefing?.content.chart,
+      news: item.briefing?.content.businessType === 'INFO',
       render: <RecommendationCard tenant={tenant} item={item} />,
     })),
     ...(generation

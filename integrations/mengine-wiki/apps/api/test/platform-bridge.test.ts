@@ -12,7 +12,7 @@ test('signed platform bridge isolates sources, rejects replay and preserves data
  const prior=process.env.MENGINE_PLATFORM_BRIDGE_KEY;
  const secret='test-only-key-'.repeat(4);process.env.MENGINE_PLATFORM_BRIDGE_KEY=secret;
  const c=await buildServer({demo:true,storage});
- const envelope=(tenant:string,path:string,method='GET')=>{const payload=Buffer.from(JSON.stringify({tenant,path,method,actor:'central-operator',nonce:randomUUID(),at:Date.now()})).toString('base64url');return {payload,signature:createHmac('sha256',secret).update(payload).digest('hex')};};
+ const envelope=(tenant:string,path:string,method='GET',body?:unknown)=>{const payload=Buffer.from(JSON.stringify({tenant,path,method,body,actor:'central-operator',nonce:randomUUID(),at:Date.now()})).toString('base64url');return {payload,signature:createHmac('sha256',secret).update(payload).digest('hex')};};
  const call=(payload:ReturnType<typeof envelope>)=>c.app.inject({method:'POST',url:'/api/internal/platform-scene',payload});
  try{
   c.store.db.prepare('INSERT INTO platform_tenant_bindings VALUES(?,?,?)').run('enterprise-a','mengine-demo','u-admin');
@@ -37,6 +37,12 @@ test('signed platform bridge isolates sources, rejects replay and preserves data
   assert.equal(refreshed.rows[0][0],null,'source NULL must survive governance export');
   assert.deepEqual(refreshed.governance.allowedActors,table.governance.allowedActors);
   assert.deepEqual(c.store.db.prepare('SELECT count(*) n FROM data_rows').get(),before);
+  const restricted=c.store.doc('mengine-demo',table.id)!;restricted.restrictedContent=true;restricted.ownerId='u-admin';c.store.saveDoc(restricted);
+  assert.ok(!(await call(envelope('enterprise-a','/scene-export'))).json().assets.some((a:any)=>a.id===table.id));
+  const scoped=(await call(envelope('enterprise-a','/scene-export','GET',{restrictedSourceIds:[table.id]}))).json().assets.find((a:any)=>a.id===table.id);assert.ok(scoped);assert.deepEqual(scoped.governance.allowedActors,table.governance.allowedActors);
+  assert.equal((await call(envelope('enterprise-a','/scene-export','GET',{restrictedSourceIds:'all'}))).statusCode,400);
+  restricted.ownerId='u-other';restricted.grants=[];c.store.saveDoc(restricted);
+  assert.ok(!(await call(envelope('enterprise-a','/scene-export','GET',{restrictedSourceIds:[table.id]}))).json().assets.some((a:any)=>a.id===table.id),'explicit list never bypasses source ACL');
   const customer=(path:string,identity=true)=>{const payload=Buffer.from(JSON.stringify({tenant:'enterprise-a',path,method:'GET',actor:'customer:new-member',...(identity?{identity:{id:'new-member',name:'企业新成员'}}:{}),nonce:randomUUID(),at:Date.now()})).toString('base64url');return {payload,signature:createHmac('sha256',secret).update(payload).digest('hex')};};
   assert.equal((await call(customer('/scene-access',false))).statusCode,403);
   const registered=await call(customer('/scene-access'));assert.equal(registered.statusCode,200,registered.body);

@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { workRoles, type WorkRoles as Page, type WorkRole } from '../../identity/work-roles';
 import './work-roles.css';
 const labels: Record<string, string> = { OWNER: '企业负责人', ADMIN: '企业管理员', MEMBER: '工作人员' };
-export function WorkRoles({ tenant }: { tenant: string }) {
+export function WorkRoles({ tenant, account }: { tenant: string; account?: string }) {
   const [page, setPage] = useState<Page | null>(null),
-    [selected, select] = useState('');
+    [selected, select] = useState(account || '');
   const [draft, setDraft] = useState<WorkRole | null>(null),
     [error, setError] = useState(''),
     [saving, setSaving] = useState(false),
@@ -20,7 +20,7 @@ export function WorkRoles({ tenant }: { tenant: string }) {
       .then((v) => {
         if (controller.signal.aborted) return;
         setPage(v);
-        const item = v.members.find((m) => m.accountId === selected) || v.members[0];
+        const item = v.members.find((m) => m.accountId === (account || selected)) || (!account ? v.members[0] : undefined);
         if (item) {
           select(item.accountId);
           setDraft(item);
@@ -30,7 +30,7 @@ export function WorkRoles({ tenant }: { tenant: string }) {
         if (!controller.signal.aborted) setError('岗位资料暂时无法读取，请重试。');
       });
     return () => controller.abort();
-  }, [tenant, reload]);
+  }, [tenant, account, reload]);
   const save = async () => {
     if (!draft || !page?.canMaintain || saving) return;
     setSaving(true);
@@ -54,8 +54,8 @@ export function WorkRoles({ tenant }: { tenant: string }) {
     }
   };
   return (
-    <section className="work-roles" aria-label="岗位与内容偏好">
-      <h2>岗位与内容偏好</h2>
+    <section className="work-roles" aria-label="成员背景与治理目标">
+      <h2>成员背景与治理目标</h2>
       <p>
         结合企业背景，为每个人安排适合其工作的提问建议和画报。岗位资料只影响内容重点；能看哪些资料，仍按已有权限决定。
       </p>
@@ -77,7 +77,7 @@ export function WorkRoles({ tenant }: { tenant: string }) {
             成员
             <select
               aria-label="岗位成员"
-              disabled={saving}
+              disabled={saving || !!account}
               value={draft.accountId}
               onChange={(e) => {
                 const m = page.members.find((x) => x.accountId === e.target.value);
@@ -126,7 +126,12 @@ export function WorkRoles({ tenant }: { tenant: string }) {
                 onChange={(e) => setDraft({ ...draft, responsibilities: e.target.value })}
               />
             </label>
-            <legend>填写实际职责</legend>
+            <h3>治理目标</h3>
+            <p>持续目标决定长期关注什么；阶段目标明确近期重点。没有确认的指标、期限和异常阈值请留空，不会因此扩大资料权限。</p>
+            {([['governance','长期治理目标','例如：推进对账、跟进异常、形成财务汇报。'],['stage','当前阶段目标','例如：本期优先核查的事项；未确认期限不填写。'],['formalReporting','正式汇报关系','填写已确认的岗位汇报关系；未确认的人名不推定。'],['handoff','本轮接续人','说明本轮事项交给谁，不替代正式上级。'],['followUp','检查与协作方式','说明如何检查进展和协作。'],['indicators','已确认指标、期限与阈值','未确认请留空。'],['source','职责与目标依据','区分员工手册职责、用户确认和据职责制定的目标。']] as const).map(([key,label,hint]) => (
+              <label key={key}>{label}<textarea rows={3} maxLength={1200} placeholder={hint} value={draft.goals?.[key] ?? ''} onChange={e=>setDraft({...draft,goals:{governance:'',stage:'',followUp:'',...draft.goals,[key]:e.target.value}})} /></label>
+            ))}
+            <legend>填写成员背景</legend>
             <p>关注方向（不选时先按岗位职责匹配，再使用身份默认方向）</p>
             <div className="work-focuses">
               {page.choices.map((f) => (
@@ -147,7 +152,7 @@ export function WorkRoles({ tenant }: { tenant: string }) {
                 </label>
               ))}
             </div>
-            <button onClick={save}>{saving ? '正在保存…' : '保存岗位与关注方向'}</button>
+            <button onClick={save}>{saving ? '正在保存…' : '保存成员背景与目标'}</button>
           </fieldset>
           {!page.canMaintain && <p>岗位由企业负责人或管理员维护。如有调整，请联系他们确认。</p>}
         </>

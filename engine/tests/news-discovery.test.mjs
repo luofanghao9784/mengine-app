@@ -25,3 +25,9 @@ test('previous delivered article hash suppresses duplicate while changed body re
  const seen=first.map(({url,sha256})=>({url,sha256}));assert.equal((await new PublicWebTask('https://publisher.example.org/list',reader,undefined,true,seen).find(new AbortController().signal)).length,0);
  body='后续进展正文';assert.equal((await new PublicWebTask('https://publisher.example.org/list',reader,undefined,true,seen).find(new AbortController().signal)).length,1);
 });
+
+test('navigation links do not consume the original-news candidate budget', () => {
+  const result = discoverNews('<a href="/wza/index.htm">无障碍浏览</a><a href="/article.html">体育产业发展报告发布</a>', 'https://example.com/news/');
+  assert.equal(result.length, 1);
+  assert.equal(result[0].url, 'https://example.com/article.html');
+});

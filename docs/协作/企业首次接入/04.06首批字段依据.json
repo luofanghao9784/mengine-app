@@ -1,0 +1,232 @@
+{
+  "full_orders.id": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "本表记录主键；保留原始编号，不将编号解释为金额或人数。",
+    "evidence": "9POP 7c1d1788 backend/src/main/java/com/ninepop/backend/order/entity/FullOrderEntity.java:10"
+  },
+  "full_orders.member_course_id": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "引用 member_courses.id 的关联键；保留空值并单独核对未匹配关系。",
+    "evidence": "9POP线上V118 information_schema.KEY_COLUMN_USAGE full_orders.member_course_id"
+  },
+  "full_orders.store_id": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "引用 stores.id 的关联键；保留空值并单独核对未匹配关系。",
+    "evidence": "9POP线上V118 information_schema.KEY_COLUMN_USAGE full_orders.store_id"
+  },
+  "full_orders.payment_method": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "源数据库说明：付款方式：full / deposit_final。按本表粒度保留原值，不跨表重复累计。",
+    "evidence": "9POP线上V118 information_schema.COLUMNS full_orders.payment_method"
+  },
+  "full_orders.total_amount_cents": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "源数据库说明：订单总额，单位分。按本表粒度保留原值，不跨表重复累计。",
+    "evidence": "9POP线上V118 information_schema.COLUMNS full_orders.total_amount_cents"
+  },
+  "full_orders.paid_amount_cents": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "订单级累计已付口径由收款确认累加或分期重算维护；退款/方案变更可能调整。不能与关联收款行金额相加，也不能无条件要求现存明细合计恒等。",
+    "evidence": "9POP本地源码7c1d1788 order/service/OrderService.java:735-747,1159；order/service/OrderInstallmentService.java:148"
+  },
+  "full_orders.current_receivable_amount_cents": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "分期重算时为下一期应收金额；没有下一期时为0。不是所有剩余期数欠款之和，不能据此推导总欠款。",
+    "evidence": "9POP本地源码7c1d1788 order/service/OrderInstallmentService.java:148-151"
+  },
+  "full_orders.receivable_stage": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "源数据库说明：当前应收阶段：full / deposit / final / none。按本表粒度保留原值，不跨表重复累计。",
+    "evidence": "9POP线上V118 information_schema.COLUMNS full_orders.receivable_stage"
+  },
+  "full_orders.order_status": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "源数据库说明：订单状态：pending_first_payment / pending_voucher / pending_final_payment / completed / canceled。按本表粒度保留原值，不跨表重复累计。",
+    "evidence": "9POP线上V118 information_schema.COLUMNS full_orders.order_status"
+  },
+  "full_orders.confirmed_at": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "源数据库说明：会员确认转正式订单时间。按本表粒度保留原值，不跨表重复累计。",
+    "evidence": "9POP线上V118 information_schema.COLUMNS full_orders.confirmed_at"
+  },
+  "full_orders.deleted_at": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "源数据库说明：软删除时间。按本表粒度保留原值，不跨表重复累计。",
+    "evidence": "9POP线上V118 information_schema.COLUMNS full_orders.deleted_at"
+  },
+  "full_orders.created_at": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "源数据库说明：创建时间。按本表粒度保留原值，不跨表重复累计。",
+    "evidence": "9POP线上V118 information_schema.COLUMNS full_orders.created_at"
+  },
+  "full_orders.updated_at": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "源数据库说明：更新时间。按本表粒度保留原值，不跨表重复累计。",
+    "evidence": "9POP线上V118 information_schema.COLUMNS full_orders.updated_at"
+  },
+  "payment_orders.id": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "本表记录主键；保留原始编号，不将编号解释为金额或人数。",
+    "evidence": "9POP 7c1d1788 backend/src/main/java/com/ninepop/backend/order/entity/PaymentOrderEntity.java:12"
+  },
+  "payment_orders.full_order_id": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "引用 full_orders.id 的关联键；保留空值并单独核对未匹配关系。",
+    "evidence": "9POP线上V118 information_schema.KEY_COLUMN_USAGE payment_orders.full_order_id"
+  },
+  "payment_orders.member_course_id": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "引用 member_courses.id 的关联键；保留空值并单独核对未匹配关系。",
+    "evidence": "9POP线上V118 information_schema.KEY_COLUMN_USAGE payment_orders.member_course_id"
+  },
+  "payment_orders.store_id": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "引用 stores.id 的关联键；保留空值并单独核对未匹配关系。",
+    "evidence": "9POP线上V118 information_schema.KEY_COLUMN_USAGE payment_orders.store_id"
+  },
+  "payment_orders.payment_type": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "源数据库说明：收款类型：full / deposit / final。按本表粒度保留原值，不跨表重复累计。",
+    "evidence": "9POP线上V118 information_schema.COLUMNS payment_orders.payment_type"
+  },
+  "payment_orders.expected_amount_cents": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "源数据库说明：后端计算的应收金额，单位分。按本表粒度保留原值，不跨表重复累计。",
+    "evidence": "9POP线上V118 information_schema.COLUMNS payment_orders.expected_amount_cents"
+  },
+  "payment_orders.paid_amount_cents": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "收款记录已付金额；确认收款流程写入后状态可为confirmed_pending_voucher，不等于凭证已上传、财务已复核或银行已到账。",
+    "evidence": "9POP本地源码7c1d1788 order/service/OrderService.java:735-740"
+  },
+  "payment_orders.channel": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "源数据库说明：收款渠道。按本表粒度保留原值，不跨表重复累计。",
+    "evidence": "9POP线上V118 information_schema.COLUMNS payment_orders.channel"
+  },
+  "payment_orders.confirmation_source": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "确认来源manual或payment_gateway；迁移默认manual是兼容值，不能据此证明每条历史记录确有人工作业。",
+    "evidence": "9POP本地源码7c1d1788 db/migration/V101__m22_online_payment_reconciliation.sql:10-19；order/service/OrderService.java:835"
+  },
+  "payment_orders.channel_reconciliation_status": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "渠道对账状态not_applicable/pending/reconciled/exception；不等同内部财务复核状态，也不单独证明银行到账。",
+    "evidence": "9POP本地源码7c1d1788 db/migration/V101__m22_online_payment_reconciliation.sql:12-19；payment/PaymentReconciliationService.java:357,392"
+  },
+  "payment_orders.status": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "源数据库说明：状态：pending_confirmation / confirmed_pending_voucher / voucher_uploaded / finance_rejected / finance_confirmed / canceled。按本表粒度保留原值，不跨表重复累计。",
+    "evidence": "9POP线上V118 information_schema.COLUMNS payment_orders.status"
+  },
+  "payment_orders.confirmed_at": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "收款确认动作写入时间；与财务复核时间和渠道到账日期分开，已确认收款事件采用此时间；缺失单列，不用创建时间兜底。",
+    "evidence": "9POP本地源码7c1d1788 order/service/OrderService.java:738-740"
+  },
+  "payment_orders.finance_checked_at": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "源数据库说明：财务审核时间。按本表粒度保留原值，不跨表重复累计。",
+    "evidence": "9POP线上V118 information_schema.COLUMNS payment_orders.finance_checked_at"
+  },
+  "payment_orders.created_at": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "源数据库说明：创建时间。按本表粒度保留原值，不跨表重复累计。",
+    "evidence": "9POP线上V118 information_schema.COLUMNS payment_orders.created_at"
+  },
+  "payment_orders.updated_at": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "源数据库说明：更新时间。按本表粒度保留原值，不跨表重复累计。",
+    "evidence": "9POP线上V118 information_schema.COLUMNS payment_orders.updated_at"
+  },
+  "t_course_refund_records.id": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "本表记录主键；保留原始编号，不将编号解释为金额或人数。",
+    "evidence": "9POP 7c1d1788 backend/src/main/java/com/ninepop/backend/approval/ApprovalRefundRecordEntity.java:10"
+  },
+  "t_course_refund_records.approval_request_id": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "引用 approval_requests.id 的关联键；保留空值并单独核对未匹配关系。",
+    "evidence": "9POP线上V118 information_schema.KEY_COLUMN_USAGE t_course_refund_records.approval_request_id"
+  },
+  "t_course_refund_records.member_course_id": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "引用 member_courses.id 的关联键；保留空值并单独核对未匹配关系。",
+    "evidence": "9POP线上V118 information_schema.KEY_COLUMN_USAGE t_course_refund_records.member_course_id"
+  },
+  "t_course_refund_records.store_id": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "退款记录从审批所属门店保存；按本记录门店归属，不按会员当前门店倒推。",
+    "evidence": "9POP本地源码7c1d1788 approval/ApprovalRefundEffectService.java:105"
+  },
+  "t_course_refund_records.selected_refund_strategy": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "申请载荷保存的退款策略选择；需结合锁定计算版本和事实解释，不从策略名推断现金已退或重新套用现行规则。",
+    "evidence": "9POP本地源码7c1d1788 approval/ApprovalRefundEffectService.java:111,369-375"
+  },
+  "t_course_refund_records.paid_amount_cents": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "从退款申请审批载荷保存的已付金额事实；不是本表新收款流水，不与订单或收款表相加。",
+    "evidence": "9POP本地源码7c1d1788 approval/ApprovalRefundEffectService.java:112"
+  },
+  "t_course_refund_records.system_refund_amount_cents": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "申请时保存的系统计算退款金额（分），终态使用其构造结算命令；不是支付回执金额。",
+    "evidence": "9POP本地源码7c1d1788 approval/ApprovalRefundEffectService.java:113,289-301"
+  },
+  "t_course_refund_records.retained_actual_revenue_cents": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "退款方案中保留的实际收入计算值（分），来自申请载荷并用于课程结算；不是企业净收入或利润。",
+    "evidence": "9POP本地源码7c1d1788 approval/ApprovalRefundEffectService.java:114,289-301"
+  },
+  "t_course_refund_records.actual_refund_payout_cents": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "退款出款金额在申请时从审批载荷写入，财务核定也可改写；字段非空或大于0不证明已经付款。需同时核对状态和财务处理方式及终态时间。",
+    "evidence": "9POP本地源码7c1d1788 approval/ApprovalRefundEffectService.java:117；approval/ApprovalRefundAssessmentService.java:86"
+  },
+  "t_course_refund_records.store_expense_impact_cents": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "申请载荷中的门店费用影响值（分）；活动人工核定路径可改写为核定出款金额，不当作所有退款的统一费用凭证或净利润扣减。",
+    "evidence": "9POP本地源码7c1d1788 approval/ApprovalRefundEffectService.java:118；approval/ApprovalRefundAssessmentService.java:86"
+  },
+  "t_course_refund_records.finance_treatment": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "按退款本金分段财务影响汇总：income_reduction冲减原核算期收入；refund_expense将已锁期或历史关闭收款的退款列入退款付款月份费用；两者并存为mixed。其他费用单独处理。V68新增可空字段且明确不回填历史退款；NULL表示缺少该事实，不能推成任何类型，也不能证明未出款。",
+    "evidence": "9POP 7c1d1788 ApprovalRefundTerminalService.java:391-413,807-814；ApprovalRefundEffectService.java:331-337；V68__m9_m12_m13_m16_refund_terminal_settlement.sql:1-9"
+  },
+  "t_course_refund_records.status": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "本地源码生命周期含pending、rejected、withdrawn、applied；applied在终态处理完成写入，不能简单等同发生现金退款。未知状态保留并待核查。",
+    "evidence": "9POP本地源码7c1d1788 approval/ApprovalRefundEffectService.java:40-43,335-340"
+  },
+  "t_course_refund_records.processing_mode": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "处理路径manual或online_original_route；迁移默认manual不证明历史操作人，online状态本身不证明退款成功。",
+    "evidence": "9POP本地源码7c1d1788 db/migration/V101__m22_online_payment_reconciliation.sql:307-312；payment/OnlineRefundService.java:152"
+  },
+  "t_course_refund_records.applied_at": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "退款终态业务处理落地时间，由terminal.settledAt写入；业务退款处理统计按此事件时间，不能统一替代现金出款时间。",
+    "evidence": "9POP本地源码7c1d1788 approval/ApprovalRefundEffectService.java:335-340"
+  },
+  "t_course_refund_records.paid_at": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "系统退款财务效果执行时间，零现金结算明确为空；现金退款统计需同时核验终态与出款金额，不宣称银行实际到账。",
+    "evidence": "9POP本地源码7c1d1788 approval/ApprovalRefundTerminalService.java:210-216；approval/ApprovalRefundEffectService.java:335"
+  },
+  "t_course_refund_records.settled_at": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "活动人工核定路径的结算时间；非该路径未必写入，历史NULL不补造，也不将其作为所有退款的统一日期。",
+    "evidence": "9POP本地源码7c1d1788 approval/ApprovalRefundEffectService.java:336；approval/ApprovalRefundTerminalService.java:210-216"
+  },
+  "t_course_refund_records.created_at": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "创建时间，是记录维护时间，不自动代表业务发生或归属日期。",
+    "evidence": "9POP 7c1d1788 backend/src/main/java/com/ninepop/backend/approval/ApprovalRefundRecordEntity.java:10"
+  },
+  "t_course_refund_records.updated_at": {
+    "status": "SOURCE_DOCUMENTED",
+    "meaning": "更新时间，是记录维护时间，不自动代表业务发生或归属日期。",
+    "evidence": "9POP 7c1d1788 backend/src/main/java/com/ninepop/backend/approval/ApprovalRefundRecordEntity.java:10"
+  }
+}

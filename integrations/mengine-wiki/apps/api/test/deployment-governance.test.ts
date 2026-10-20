@@ -118,3 +118,17 @@ test('conditional sum requires exact documented fields and never unblocks raw mo
  importDeployment(c.store,u,p);assert.equal(readDataset(c.store,u,id).analysisPolicy.conditionalSums[0].conversion,'CENTS_TO_YUAN');
  assert.throws(()=>queryDataset(c.store,u,id,{operation:'sum',field:'amount'},true),/不能无条件累加/);
 }));
+
+test('scene topic detail retains source versions while synchronization exports original source identities',()=>fixture(async(c,u,id,p)=>{
+ const {DEMO_PASSWORD}=await import('../src/seed.js');
+ p.datasets[0].knowledge[0].topicKey='receipts.rules';
+ const invalid=structuredClone(p);invalid.datasets[0].knowledge[0].topicKey='../bad';
+ assert.throws(()=>importDeployment(c.store,u,invalid),/知识点标识/);
+ importDeployment(c.store,u,p);
+ const login=await c.app.inject({method:'POST',url:'/api/auth/login',payload:{email:u.email,password:DEMO_PASSWORD}});
+ assert.equal(login.statusCode,200);const headers={cookie:String(login.headers['set-cookie']).split(';')[0]};
+ const grouped=(await c.app.inject({url:'/api/scene-knowledge',headers})).json();
+ const topic=grouped.items.find((x:any)=>x.id.startsWith('topic-'));assert.ok(topic);assert.equal(topic.sources[0].id,id);
+ const detail=await c.app.inject({url:'/api/scene-knowledge/'+topic.id+'/source',headers});assert.equal(detail.statusCode,200);assert.equal(detail.json().sources[0].version,c.store.doc(u.tenantId,id).version);
+ const raw=(await c.app.inject({url:'/api/scene-knowledge?view=sources',headers})).json();assert.ok(raw.items.some((x:any)=>x.id==='deployment-'+id+'-0'));assert.ok(!raw.items.some((x:any)=>x.id.startsWith('topic-')));
+}));

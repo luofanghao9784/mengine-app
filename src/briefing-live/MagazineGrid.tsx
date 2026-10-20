@@ -10,6 +10,7 @@ export type MagazineGridItem = {
   title: string;
   summary: string;
   chart?: boolean;
+  news?: boolean;
   wide?: boolean;
   fixedSize?: CardSize;
   atEnd?: boolean;
@@ -128,7 +129,7 @@ export function MagazineGrid({
         item.fixedSize ||
         (item.chart
           ? '2×2'
-          : item.wide || item.title.length > 28 || item.summary.length > 110
+          : item.news || item.wide || item.title.length > 28 || item.summary.length > 110
             ? '2×1'
             : '1×1');
       const minimum = item.fixedSize ? undefined : fit[item.id];
@@ -138,12 +139,13 @@ export function MagazineGrid({
         size: (minimum
           ? `${Math.max(Number(preferred[0]), Number(minimum.size[0]))}×${Math.max(Number(preferred[2]), Number(minimum.size[2]))}`
           : preferred) as CardSize,
-        fixed: preserveSpans || item.wide || !!item.fixedSize,
+        fixed: preserveSpans || item.wide || item.news || item.summary.length > 110 || !!item.fixedSize || !!minimum,
         // The magazine supports only the four standard sizes, even for long content.
         rows: minimum ? Math.min(2, Math.max(Number(minimum.size[2]), minimum.rows || 0)) : undefined,
       };
     }),
     metrics.columns,
+    !preserveSpans,
   );
   const previous = useRef(new Map<string, { x: number; y: number }>());
   const previousIdentity = useRef(identity);

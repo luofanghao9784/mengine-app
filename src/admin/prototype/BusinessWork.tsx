@@ -61,7 +61,7 @@ export function BusinessWork({ tenant, place }: { tenant: string; place: keyof t
                 if (!requestNavigationLocked()) setRoles(true);
               }}
             >
-              岗位与内容偏好
+              成员背景与治理目标
             </button>
           </nav>
         )}

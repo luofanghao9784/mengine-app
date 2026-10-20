@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @org.springframework.test.context.TestPropertySource(properties="dreamcore.briefing.merge-seconds=0")
 class BriefingBootstrapIntegrationTest extends DatasetCalculationFixture {
  @Autowired BriefingBootstrapDeployment deployment;
+ @Autowired com.dreamcore.workspace.briefing.BriefingService feed;
  DatasetCalculationService.Request calculation(){return new DatasetCalculationService.Request(dataset,snapshot,"门店","期间","收款（元）","前期","本期");}
  BriefingContentService.Request content(){return new BriefingContentService.Request(null,"门店两期收款变化","门店登记收款有所变化，需要结合业务发生期间逐项核实。",List.of("本次使用完整固定版本计算两期收款，保留原始单位并按门店归集。","收款变化只能说明这两期的登记差异，不能据此认定实际到账或解释经营原因。"),"DATA");}
  BriefingBootstrapDeployment.Manifest manifest(UUID request,List<BriefingBootstrapDeployment.Card> cards){return new BriefingBootstrapDeployment.Manifest("1.0",request,tenant,owner,privateSpace,cards);}
@@ -15,7 +16,8 @@ class BriefingBootstrapIntegrationTest extends DatasetCalculationFixture {
  @Test void previewRollsBackAndApplyIsIdempotentWithExplicitExternalProvenance(){
   var m=manifest(UUID.randomUUID(),List.of(card()));var preview=deployment.apply(m,true);assertEquals(true,preview.get("preview"));
   assertEquals(0,db.queryForObject("SELECT count(*) FROM conversation_tasks WHERE tenant_id=?",Integer.class,tenant));
-  var result=deployment.apply(m,false);assertEquals(json.valueToTree(result),json.valueToTree(deployment.apply(m,false)));
+  var result=deployment.apply(m,false);
+  assertEquals(1,feed.list(owner,tenant,null,"LATEST",null,"Asia/Shanghai",0,20,true).items().size());assertEquals(json.valueToTree(result),json.valueToTree(deployment.apply(m,false)));
   assertEquals(1,db.queryForObject("SELECT count(*) FROM conversation_tasks WHERE tenant_id=? AND status='SUCCEEDED' AND model_name='codex-external' AND model_calls IS NULL AND token_usage IS NULL",Integer.class,tenant));
   assertEquals(1,db.queryForObject("SELECT count(*) FROM conversation_attempts a JOIN conversation_tasks t ON t.id=a.task_id WHERE t.tenant_id=? AND provenance='EXTERNAL_DEPLOYMENT'",Integer.class,tenant));
   assertEquals(2,db.queryForObject("SELECT count(*) FROM conversation_tool_receipts r JOIN conversation_tasks t ON t.id=r.task_id WHERE t.tenant_id=? AND r.status='succeeded'",Integer.class,tenant));
@@ -51,5 +53,19 @@ class BriefingBootstrapIntegrationTest extends DatasetCalculationFixture {
   var selected=db.queryForList("SELECT s.dataset_id FROM briefing_dataset_selections s JOIN conversation_tasks t ON t.id=s.task_id WHERE t.tenant_id=? AND t.execution_class<>'external'",UUID.class,tenant);
   assertEquals(List.of(dataset),selected);
   assertEquals(1,db.queryForObject("SELECT count(*) FROM conversation_tasks WHERE tenant_id=? AND status='QUEUED'",Integer.class,tenant));
+ }
+ @Test void unreadableOldDeliveryDoesNotSuppressFreshAuthorizedSnapshot(){
+  var first=json.valueToTree(deployment.apply(manifest(UUID.randomUUID(),List.of(card())),false));
+  UUID oldTask=UUID.fromString(first.at("/items/0/taskId").asText());
+  UUID oldArtifact=UUID.fromString(first.at("/items/0/artifactId").asText());
+  var same=deployment.apply(manifest(UUID.randomUUID(),List.of(card())),false);
+  assertEquals("NO_NEW_CONTENT",json.valueToTree(same).at("/items/0/state").asText());
+  UUID oldSnapshot=snapshot;snapshot=version(2,"旧版本");
+  db.update("UPDATE dataset_snapshots SET scrubbed=true,data_rows='[]'::jsonb WHERE id=?",oldSnapshot);
+  assertFalse(db.queryForObject("SELECT EXISTS(SELECT 1 FROM readable_source_tasks WHERE id=?)",Boolean.class,oldTask));
+  var next=json.valueToTree(deployment.apply(manifest(UUID.randomUUID(),List.of(card())),false));
+  assertEquals("SUCCEEDED",next.at("/items/0/state").asText());
+  assertNotEquals(oldArtifact.toString(),next.at("/items/0/artifactId").asText());
+  assertEquals(1,db.queryForObject("SELECT count(*) FROM conversation_artifacts WHERE id=?",Integer.class,oldArtifact));
  }
 }

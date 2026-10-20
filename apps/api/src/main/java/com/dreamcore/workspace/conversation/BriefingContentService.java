@@ -70,6 +70,8 @@ public class BriefingContentService {
         int attempt=db.queryForObject("SELECT attempt FROM conversation_tasks WHERE id=? AND lease_token=? FOR UPDATE",Integer.class,job.id(),job.token());
         if(!type.equals("DATA"))return createText(job,request,type,attempt);
         if(request.calculationArtifactId()==null)throw IdentityException.invalid();
+        var chain=db.queryForList("SELECT body::text FROM task_reconciliation_receipts WHERE task_id=? AND attempt_number=? AND body->>'calculationArtifactId'=?",String.class,job.id(),attempt,request.calculationArtifactId().toString());
+        if(chain.size()==1)return createChain(job,request,attempt,json.readTree(chain.getFirst()));
         var input=db.queryForList("SELECT a.sha256,a.content FROM conversation_artifacts a WHERE a.id=? AND a.task_id=? AND a.attempt_number=? AND object_is_active('ARTIFACT',a.id) AND EXISTS(SELECT 1 FROM identity_audit p WHERE p.target_id=a.id AND p.action IN ('TASK_TABLE_COMPUTED','TASK_DATASET_COMPUTED') AND p.outcome='SUCCESS' AND p.tenant_id=a.tenant_id) AND EXISTS(SELECT 1 FROM conversation_tool_receipts r WHERE r.task_id=a.task_id AND r.attempt_number=a.attempt_number AND r.name IN ('compare_table','compare_dataset') AND r.status='succeeded')",request.calculationArtifactId(),job.id(),attempt);
         if(input.size()!=1)throw new IdentityException(403,"BRIEFING_CALCULATION_NOT_GRANTED");
         var item=input.getFirst();byte[] bytes=(byte[])item.get("content");if(!hash(bytes).equals(item.get("sha256")))throw new IdentityException(502,"BRIEFING_CALCULATION_INVALID");
@@ -98,6 +100,27 @@ public class BriefingContentService {
         if(((Number)total.get("n")).intValue()>=8||((Number)total.get("bytes")).longValue()+body.length>65536)throw new IdentityException(413,"BRIEFING_CONTENT_LIMIT");
         UUID id=UUID.randomUUID();String sha=hash(body);db.update("INSERT INTO conversation_artifacts(id,tenant_id,workspace_id,task_id,filename,sha256,content,attempt_number) VALUES (?,?,?,?,?,?,?,?)",id,job.tenant(),job.space(),job.id(),"briefing-data-"+sha.substring(0,20)+".json",sha,body,attempt);
         audit.record(job.actor(),job.tenant(),"TASK_BRIEFING_CREATED",id,"SUCCESS");return new Document(id,sha,content);
+    }
+    private Document createChain(ConversationService.Job job,Request request,int attempt,tools.jackson.databind.JsonNode evidence){
+        var calc=evidence.path("calculation");if(!"reconciliation-chain-v1".equals(calc.path("recipeVersion").asText()))throw IdentityException.invalid();
+        var artifacts=db.queryForList("SELECT content,sha256 FROM conversation_artifacts WHERE id=? AND task_id=? AND tenant_id=? AND attempt_number=? AND object_is_active('ARTIFACT',id)",request.calculationArtifactId(),job.id(),job.tenant(),attempt);
+        if(artifacts.size()!=1)throw new IdentityException(403,"BRIEFING_CALCULATION_NOT_GRANTED");var a=artifacts.getFirst();
+        String sha=hash((byte[])a.get("content"));if(!sha.equals(a.get("sha256"))||!json.readTree((byte[])a.get("content")).equals(calc))throw new IdentityException(409,"CHAIN_EVIDENCE_CHANGED");
+        var rows=new ArrayList<Row>();for(var row:calc.path("rows"))rows.add(json.treeToValue(row,Row.class));
+        if(rows.size()<2||rows.size()>10)throw IdentityException.invalid();
+        // All source reads were pinned by the task; delivery and later reads use the shared guard.
+        boolean paired="salesAndReceipts".equals(calc.path("metric").asText());
+        boolean orders="orderSalesByConfirmationDate".equals(calc.path("metric").asText());
+        var chart=new Chart("GROUPED_BAR",paired?"订单销售与确认收款":orders?"已确认订单金额":"系统确认收款","元",paired?"订单销售额":"不适用",paired?"确认收款":"月内累计",calc.path("from").asText()+"—"+calc.path("to").asText()+" · "+rows.size()+"家店",rows,new Row(null,paired?calc.path("orderTotal").asText():null,calc.path("total").asText(),null,null,null,null,null));
+        // The verified result shape fixes the chart; authors cannot hide one metric or imply a time comparison.
+        var presentation=new BriefingPresentationPolicy.Presentation("briefing-presentation-v1","EDITORIAL",paired?"GROUPED_BAR":"CURRENT_BAR",null,null,List.of());
+        BriefingEditorialQuality.validate(request,true,true,true);
+        var content=new Content("briefing-chain-v1","DATA",request.title(),request.summary(),List.copyOf(request.analysis()),chart,null,request.calculationArtifactId(),sha,Instant.now().toString(),null,null,presentation);
+        var prior=db.queryForList("SELECT id,sha256,content FROM conversation_artifacts a WHERE task_id=? AND attempt_number=? AND EXISTS(SELECT 1 FROM identity_audit p WHERE p.target_id=a.id AND p.action='TASK_BRIEFING_CREATED')",job.id(),attempt);
+        if(!prior.isEmpty()){var old=read(prior.getFirst());if(!old.content().title().equals(content.title())||!old.content().summary().equals(content.summary())||!BriefingPresentationPolicy.same(old.content(),presentation)||!old.content().analysis().equals(content.analysis())||!Objects.equals(old.content().calculationArtifactId(),content.calculationArtifactId()))throw new IdentityException(409,"BRIEFING_ALREADY_CREATED");return old;}
+        if(!hasUsefulData(rows))throw new NoUsefulData();if(!reserve(job,content))return null;
+        byte[] body=json.writeValueAsBytes(content);if(body.length>20000)throw new IdentityException(413,"BRIEFING_CONTENT_LIMIT");UUID id=UUID.randomUUID();String digest=hash(body);
+        db.update("INSERT INTO conversation_artifacts(id,tenant_id,workspace_id,task_id,filename,sha256,content,attempt_number) VALUES(?,?,?,?,?,?,?,?)",id,job.tenant(),job.space(),job.id(),"briefing-chain.json",digest,body,attempt);audit.record(job.actor(),job.tenant(),"TASK_BRIEFING_CREATED",id,"SUCCESS");return new Document(id,digest,content);
     }
     private Document createDataset(ConversationService.Job job,Request request,int attempt,tools.jackson.databind.JsonNode receipt,String calculationHash){
         var source=json.treeToValue(receipt.path("datasetSource"),DatasetCalculationService.Source.class);
@@ -175,11 +198,13 @@ public class BriefingContentService {
     private boolean reserve(ConversationService.Job job,Content content){
         String key=contentKey(content);
         db.queryForList("SELECT pg_advisory_xact_lock(hashtextextended(?,0))","briefing-content:"+job.tenant()+":"+job.actor());
-        for(var legacy:db.queryForList("SELECT t.id,b.* FROM conversation_tasks t JOIN conversations c ON c.id=t.conversation_id JOIN LATERAL ("+ELIGIBLE+") b ON true WHERE c.tenant_id=? AND c.owner_id=? AND t.status='SUCCEEDED' AND EXISTS(SELECT 1 FROM readable_source_tasks r WHERE r.id=t.id) AND NOT EXISTS(SELECT 1 FROM briefing_content_keys k WHERE k.task_id=t.id) ORDER BY t.finished_at DESC LIMIT 1000",job.tenant(),job.actor())){
+        for(var legacy:db.queryForList("SELECT t.id,b.* FROM conversation_tasks t JOIN conversations c ON c.id=t.conversation_id JOIN LATERAL ("+ELIGIBLE+") b ON true WHERE c.tenant_id=? AND c.owner_id=? AND t.status='SUCCEEDED' AND task_audience_current(t.id) AND EXISTS(SELECT 1 FROM readable_source_tasks r WHERE r.id=t.id) AND NOT EXISTS(SELECT 1 FROM briefing_content_keys k WHERE k.task_id=t.id) ORDER BY t.finished_at DESC LIMIT 1000",job.tenant(),job.actor())){
             var old=read(legacy);if(contentKey(old.content()).equals(key))return false;
         }
-        // An unsuccessful prepared artifact cannot monopolize its key forever.
-        db.update("DELETE FROM briefing_content_keys k USING conversation_tasks t WHERE k.task_id=t.id AND k.tenant_id=? AND k.owner_id=? AND k.fingerprint=? AND t.status NOT IN ('SUCCEEDED','RUNNING','QUEUED')",job.tenant(),job.actor(),key);
+        // Retire only the dedup reservation, never historical artifacts. A completed
+        // but no-longer-readable delivery cannot suppress a fresh authorized result.
+        // Running/queued work retains its reservation to prevent concurrent duplicates.
+        db.update("DELETE FROM briefing_content_keys k USING conversation_tasks t WHERE k.task_id=t.id AND k.tenant_id=? AND k.owner_id=? AND k.fingerprint=? AND (t.status NOT IN ('SUCCEEDED','RUNNING','QUEUED') OR (t.status='SUCCEEDED' AND (NOT EXISTS(SELECT 1 FROM readable_source_tasks r WHERE r.id=t.id) OR NOT task_audience_current(t.id) OR NOT EXISTS("+ELIGIBLE+"))))",job.tenant(),job.actor(),key);
         db.update("INSERT INTO briefing_content_keys VALUES(?,?,?,?) ON CONFLICT DO NOTHING",job.tenant(),job.actor(),key,job.id());
         UUID owner=db.queryForObject("SELECT task_id FROM briefing_content_keys WHERE tenant_id=? AND owner_id=? AND fingerprint=?",UUID.class,job.tenant(),job.actor(),key);
         if(!owner.equals(job.id())&&!"SUCCEEDED".equals(db.queryForObject("SELECT status FROM conversation_tasks WHERE id=?",String.class,owner)))throw new IdentityException(409,"BRIEFING_CONTENT_IN_PROGRESS");
@@ -194,11 +219,23 @@ public class BriefingContentService {
     }
     private Document read(Map<String,Object> row){
         byte[] bytes=(byte[])row.get("content");String sha=(String)row.get("sha256");if(!hash(bytes).equals(sha))throw new IdentityException(502,"BRIEFING_CONTENT_INVALID");
-        Content content=json.readValue(bytes,Content.class);if(!Set.of("briefing-data-v1","briefing-text-v1","briefing-dataset-v1").contains(content.schemaVersion()))throw new IdentityException(502,"BRIEFING_CONTENT_INVALID");
+        Content content=json.readValue(bytes,Content.class);if(!Set.of("briefing-chain-v1","briefing-data-v1","briefing-text-v1","briefing-dataset-v1").contains(content.schemaVersion()))throw new IdentityException(502,"BRIEFING_CONTENT_INVALID");
         BriefingDisplayLabels.Labels labels=null;
         if(content.datasetSource()!=null){
             var keys=db.queryForList("SELECT d.dataset_key FROM business_datasets d JOIN conversation_artifacts a ON a.tenant_id=d.tenant_id WHERE a.id=? AND d.id=?",String.class,row.get("id"),content.datasetSource().datasetId());
             if(!keys.isEmpty())labels=BriefingDisplayLabels.forContent(keys.getFirst(),content);
+            // The onboarding receipt identifies the approved source table even when its source key is opaque.
+            var receipts=db.queryForList("SELECT r.body::text FROM task_reconciliation_receipts r JOIN conversation_artifacts a ON a.task_id=r.task_id AND a.attempt_number=r.attempt_number WHERE a.id=?",String.class,row.get("id"));
+            for(String receipt:receipts){
+                var inputs=json.readTree(receipt).path("calculation").path("inputs");
+                String pin=content.datasetSource().datasetId()+":"+content.datasetSource().snapshotId();
+                if(content.chart()!=null&&content.datasetBasis()!=null&&pin.equals(inputs.path("payment_orders").asText())&&"status".equals(content.datasetBasis().groupColumn())){
+                    var groups=new LinkedHashMap<String,String>();var dictionary=BriefingDisplayLabels.dictionary("ninepop_payments_v1","收款状态");
+                    for(var item:content.chart().rows())if(dictionary.containsKey(item.group()))groups.put(item.group(),dictionary.get(item.group()));
+                    labels=new BriefingDisplayLabels.Labels(groups,Map.of(),"笔","本批收款记录 · 非实时进展");
+                }
+            }
+
         }
         return new Document((UUID)row.get("id"),sha,content,ruleTrace((UUID)row.get("id")),content.businessType().equals("INFO")?cover((UUID)row.get("id")):null,labels);
     }

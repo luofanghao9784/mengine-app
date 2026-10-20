@@ -69,4 +69,19 @@ class WorkAudienceIntegrationTest {
   String chosen=db.queryForObject("SELECT string_agg(v.filename,',') FROM conversation_originals o JOIN material_versions v ON v.id=o.version_id WHERE o.task_id=?",String.class,detail.taskId());assertTrue(chosen.contains("美容预约操作"));
   roles.save(owner,tenant,worker,change(UUID.randomUUID(),1,"财务",List.of("FINANCE")));assertFalse(db.queryForObject("SELECT task_audience_current(?)",Boolean.class,detail.taskId()));
  }
+ @Test void governanceGoalsAreVersionedPrivateAndDoNotGrantAccess(){
+  var goals=new WorkAudienceService.Goals("推进对账、检查异常并汇报","","未确认的异常由负责人核对","门店创始人","财务接续","","员工手册");
+  var c=new WorkAudienceService.Change(UUID.randomUUID(),0,"财务","财务","对账",List.of("FINANCE"),goals);
+  assertThrows(IdentityException.class,()->roles.save(worker,tenant,worker,c));
+  roles.save(owner,tenant,worker,c);assertEquals(goals,roles.current(worker,tenant).goals());
+  assertEquals("门店创始人",roles.current(worker,tenant).goals().formalReporting());
+  assertEquals("",roles.current(worker,tenant).goals().indicators());
+  var a=job(worker);agents.check(a.id(),a.token());
+  roles.save(owner,tenant,worker,new WorkAudienceService.Change(UUID.randomUUID(),1,"财务","财务","对账",List.of("FINANCE"),new WorkAudienceService.Goals("推进核对与异常接续","","汇报未解决事项")));
+  assertThrows(IdentityException.class,()->agents.check(a.id(),a.token()));
+  assertEquals("MEMBER",roles.current(worker,tenant).role());
+  assertEquals(1,roles.list(worker,tenant).members().size());
+  var saved=roles.save(owner,tenant,worker,new WorkAudienceService.Change(UUID.randomUUID(),2,"财务","财务","对账",List.of("FINANCE")));
+  assertEquals("推进核对与异常接续",saved.goals().governance());
+ }
 }

@@ -89,3 +89,50 @@ test('metric form sends explicit equalities and monetary conversion and resets r
  await page.getByRole('checkbox',{name:/我已核对/}).check();await page.getByRole('button',{name:'保存草稿'}).click();
  await expect.poll(()=>saved?.definition?.execution?.equalsFilters).toEqual({status:'COMPLETED'});expect(saved.definition.execution.conversion).toBe('CENTS_TO_YUAN');
 });
+
+test('resource routing requires a target and saves an explicit reader list without automatic sync',async({page})=>{
+ const tenant='11111111-1111-4111-8111-111111111111',space='22222222-2222-4222-8222-222222222222',actor='33333333-3333-4333-8333-333333333333';let saved:any;let syncCalls=0;
+ await page.route('**/api/v1/me',r=>r.fulfill({json:{account:{id:actor,email:'test@example.invalid',displayName:'合成管理员'},platformAdmin:false,memberships:[{tenantId:tenant,tenantName:'合成企业',role:'TENANT_ADMIN'}]}}));
+ await page.route('**/scene/binding',r=>r.fulfill({json:{bindings:[{workspace_id:space}],workspaces:[{id:space,name:'样例店'}]}}));
+ await page.route('**/scene/status',r=>r.fulfill({json:{tenantId:tenant,governance:{policy_current:true},assets:[],runs:[]}}));
+ await page.route(/\/scene\/metrics(?:\?.*)?$/,r=>r.fulfill({json:{items:[]}}));
+ await page.route('**/scene/synchronize',r=>{syncCalls++;return r.fulfill({json:{}})});
+ await page.route('**/scene/routes',r=>{
+  if(r.request().method()==='POST'){saved=r.request().postDataJSON();return r.fulfill({json:{revision:1,routes:saved.routes}});}
+  return r.fulfill({json:{revision:saved?1:0,routes:saved?.routes??[],sources:[{id:'salary-a',name:'本店薪酬'}],members:[{id:actor,name:'店长甲'}]}});
+ });
+ await page.goto('/tenant-admin/governance/?surface=tenant');
+ await page.getByText('按来源配置目标空间与读取人员',{exact:true}).click();
+ await page.getByRole('button',{name:'列入同步清单'}).click();
+ await expect(page.getByRole('button',{name:'保存完整同步清单'})).toBeDisabled();
+ await page.getByLabel('来源目标空间').selectOption(space);await page.getByRole('checkbox',{name:'店长甲'}).check();
+ await page.getByRole('button',{name:'保存完整同步清单'}).click();
+ await expect(page.getByRole('status')).toContainText('旧副本已暂停读取');
+ expect(saved).toEqual({revision:0,routes:[{sourceId:'salary-a',workspaceId:space,readers:[actor]}]});expect(syncCalls).toBe(0);
+ await expect(page.getByText('已过期或尚未完成',{exact:true})).toBeVisible();
+});
+
+test('independent publication saves only selected spaces and does not start synchronization',async({page})=>{
+ const tenant='11111111-1111-4111-8111-111111111111',space='22222222-2222-4222-8222-222222222222';let saved:any;let synchronized=0;
+ await page.route('**/api/v1/me',r=>r.fulfill({json:{account:{id:tenant,email:'test@example.invalid',displayName:'合成管理员'},platformAdmin:false,memberships:[{tenantId:tenant,tenantName:'合成企业',role:'TENANT_ADMIN'}]}}));
+ await page.route('**/scene/binding',r=>r.fulfill({json:{bindings:[{workspace_id:space}],workspaces:[{id:space,name:'样例店'}]}}));
+ await page.route('**/scene/status',r=>r.fulfill({json:{tenantId:tenant,governance:{policy_current:true},assets:[],runs:[]}}));
+ await page.route(/\/scene\/metrics(?:\?.*)?$/,r=>r.fulfill({json:{items:[]}}));
+ await page.route('**/scene/routes',r=>r.fulfill({json:{revision:1,routes:[],sources:[],members:[]}}));
+ await page.route('**/scene/synchronize',r=>{synchronized++;return r.fulfill({json:{}})});
+ await page.route('**/scene/publication',r=>{if(r.request().method()==='POST')saved=r.request().postDataJSON();return r.fulfill({json:{revision:saved?2:1,workspaces:saved?.workspaces??[],choices:[{id:space,name:'样例店'}]}})});
+ await page.goto('/tenant-admin/governance/?surface=tenant');await page.getByText('同步发布权限（独立于资料维护）',{exact:true}).click();
+ await page.getByRole('checkbox',{name:'样例店',exact:true}).check();await page.getByRole('button',{name:'保存同步发布权限'}).click();
+ await expect(page.getByRole('status')).toContainText('日常资料权限未改变');expect(saved).toEqual({revision:1,workspaces:[space]});expect(synchronized).toBe(0);
+});
+
+test('fixed reconciliation shows unknown coverage and clears results after input changes',async({page})=>{
+ const tenant='11111111-1111-4111-8111-111111111111';let calls=0;
+ await page.route('**/api/v1/me',r=>r.fulfill({json:{account:{id:tenant,email:'synthetic@example.invalid',displayName:'合成管理员'},platformAdmin:false,memberships:[{tenantId:tenant,tenantName:'合成企业',role:'TENANT_ADMIN'}]}}));
+ await page.route('**/scene/status',r=>r.fulfill({json:{tenantId:tenant,governance:{policy_current:true},assets:[],runs:[]}}));
+ await page.route(/\/scene\/metrics(?:\?.*)?$/,r=>r.fulfill({json:{items:[]}}));
+ await page.route('**/onboarding-reconciliation',r=>{if(r.request().method()==='GET')return r.fulfill({json:{stores:[{id:'store-synthetic',name:'合成门店'}]}});calls++;expect(r.request().postDataJSON()).toEqual({storeId:'store-synthetic',dateFrom:'2026-10-01',dateTo:'2026-10-02'});return r.fulfill({json:{receiptId:'synthetic-receipt',result:{amounts:{cashRefund:{cents:'100',included:1,outside:0,unknown:1}},issues:[]}}})});
+ await page.goto('/tenant-admin/governance/?surface=tenant');await page.getByText('首批三表金额与关联核查',{exact:true}).click();
+ await page.getByLabel('门店',{exact:true}).selectOption('store-synthetic');await page.getByLabel('开始日期',{exact:true}).fill('2026-10-01');await page.getByLabel('结束日期',{exact:true}).fill('2026-10-02');await page.getByRole('button',{name:'运行核查',exact:true}).click();
+ await expect(page.getByText(/回执：synthetic-receipt/)).toBeVisible();expect(calls).toBe(1);await page.getByLabel('结束日期',{exact:true}).fill('2026-10-03');await expect(page.getByText(/回执：synthetic-receipt/)).toHaveCount(0);
+});

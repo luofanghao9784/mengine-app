@@ -93,7 +93,7 @@ export function MagazineBody({
   const content = briefing?.content;
   const presentation = briefing ? presentationOf(briefing) : null;
   const composed =
-    !compact && !!presentation && (presentation.layout !== 'EDITORIAL' || presentation.sections.length > 0);
+    !compact && !!presentation && presentation.layout !== 'EDITORIAL';
   const chart = compact ? undefined : content?.chart;
   const type = content ? briefingTypeLabels[content.businessType] : publication ? '成果' : '会话';
   const Icon = content ? briefingTypeIcons[content.businessType] : publication ? FileCheck2 : MessagesSquare;
@@ -144,12 +144,12 @@ export function MagazineBody({
               {!content && truncated ? '…' : ''}
             </p>
             {!compact && briefing && <SourceCover document={briefing} />}
-            {!compact && briefing && <AnalysisComposition document={briefing} compact />}
+            {!compact && briefing && presentation?.layout !== 'EDITORIAL' && !chart && <AnalysisComposition document={briefing} compact />}
           </div>
         </div>
         <div className="magazine-footer live-magazine-footer">
           <span>
-            {workspace}
+            {content?.schemaVersion === 'briefing-chain-v1' ? '获准门店汇总' : workspace}
             {publication ? ' · 企业副本' : ''}
           </span>
           {footer}

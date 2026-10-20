@@ -17,9 +17,12 @@ import tools.jackson.databind.json.JsonMapper;
 /** Bounded, optional reference reads. Task identity and scope never come from model arguments. */
 @Service
 public class TaskContextService {
- public record Request(String action,String scope,String query,Integer offset,UUID referenceId,UUID versionId,Integer revision,UUID requestId,String decision,String conditions,String adjustments,Integer columnOffset,Integer columnLimit) {
+ public record Request(String action,String scope,String query,Integer offset,UUID referenceId,UUID versionId,Integer revision,UUID requestId,String decision,String conditions,String adjustments,Integer columnOffset,Integer columnLimit,String storeId,String dateFrom,String dateTo,com.dreamcore.workspace.conversation.BriefingBusinessPlan.Request plan) {
+  public Request(String action,String scope,String query,Integer offset,UUID referenceId,UUID versionId,Integer revision,UUID requestId,String decision,String conditions,String adjustments,Integer columnOffset,Integer columnLimit,String storeId,String dateFrom,String dateTo){this(action,scope,query,offset,referenceId,versionId,revision,requestId,decision,conditions,adjustments,columnOffset,columnLimit,storeId,dateFrom,dateTo,null);}
+  public Request(String action,String scope,String query,Integer offset,UUID referenceId,UUID versionId,Integer revision,UUID requestId,String decision,String conditions,String adjustments,Integer columnOffset,Integer columnLimit){this(action,scope,query,offset,referenceId,versionId,revision,requestId,decision,conditions,adjustments,columnOffset,columnLimit,null,null,null);}
   public Request(String action,String scope,String query,Integer offset,UUID referenceId,UUID versionId,Integer revision,UUID requestId,String decision,String conditions,String adjustments){this(action,scope,query,offset,referenceId,versionId,revision,requestId,decision,conditions,adjustments,null,null);}
  }
+ @org.springframework.beans.factory.annotation.Autowired private com.dreamcore.workspace.scene.OnboardingReconciliationService reconciliation;
  private record Task(UUID id,UUID actor,UUID tenant,UUID space,UUID conversation,int attempt) {}
  private final JdbcTemplate db; private final AgentTaskService agents; private final ProfileService profiles;
  private final ExperienceService experiences; private final MaterialAccess materials; private final TaskContextGuard guard;
@@ -36,6 +39,9 @@ public class TaskContextService {
   var t=task(task,token);if(r==null||r.action()==null)throw IdentityException.invalid();
   Object result=switch(r.action()){
    case "bootstrap" -> bootstrap(t);
+   case "reconciliation_catalog" -> reconciliationCatalog(t);
+   case "reconciliation_execute" -> reconcile(t,token,r);
+   case "briefing_plan" -> plan(t,token,r);
    case "dataset_search", "dataset_read" -> datasets.read(task,r);
    case "general_experience_search", "general_experience_read", "general_experience_use" -> general.read(task,r);
    case "profiles" -> profilesSelectedOnly(t)?map("items",List.of(),"hasMore",false,"reason","SELECTED_ONLY"):profileList(t,r);
@@ -50,6 +56,95 @@ public class TaskContextService {
   var response=map("contractVersion","1.0","action",r.action(),"referenceOnly",true,"result",result);
   if(json.writeValueAsString(response).getBytes(StandardCharsets.UTF_8).length>57344)throw new IdentityException(413,"TASK_CONTEXT_LIMIT");
   return response;
+ }
+ private Object reconciliationCatalog(Task t){
+  if(selectedOnly(t))return map("stores",List.of());
+  var result=json.valueToTree(reconciliation.catalog(t.actor(),t.tenant()));var stores=new ArrayList<Object>();
+  String scope=db.queryForObject("SELECT source_scope FROM conversation_tasks WHERE id=?",String.class,t.id());
+  for(var store:result.path("stores")){
+   boolean allowed=true;
+   for(String id:reconciliation.inputs(t.tenant(),store.path("id").asText()).snapshots().keySet())
+    if(!"AUTHORIZED_LIBRARY".equals(scope)&&!t.space().equals(db.queryForObject("SELECT workspace_id FROM business_datasets WHERE id=?",UUID.class,UUID.fromString(id))))allowed=false;
+   if(allowed)stores.add(store);
+  }
+  return map("stores",stores,"ruleVersion",com.dreamcore.workspace.scene.OnboardingReconciliation.VERSION);
+ }
+ private Object reconcile(Task t,UUID token,Request r){
+  if(r.storeId()!=null&&r.storeId().startsWith("chain-"))return reconcileChain(t,token,r);
+  if(profilesSelectedOnly(t))throw new IdentityException(403,"RECONCILIATION_REQUIRES_CONTEXT_SCOPE");
+  var inputs=reconciliation.inputs(t.tenant(),r.storeId());
+  for(var pin:inputs.snapshots().entrySet()){
+   var read=datasets.read(t.id(),new Request("dataset_read",null,null,0,UUID.fromString(pin.getKey()),UUID.fromString(pin.getValue()),null,null,null,null,null,0,1));
+   if(json.valueToTree(read).path("unavailable").asBoolean())throw missing();
+  }
+  var background=new ArrayList<Object>();
+  for(UUID version:inputs.backgrounds()){
+   var rows=db.queryForList("SELECT entry_id,revision FROM profile_versions WHERE id=?",version);
+   if(rows.size()!=1)throw missing();var row=rows.getFirst();
+   var value=profiles.get(t.actor(),t.tenant(),(UUID)row.get("entry_id"),null);
+   if(!version.equals(value.versionId()))throw new IdentityException(409,"TASK_CONTEXT_CHANGED");
+   background.add(profileValue(t,value,1200));
+  }
+  // Separate business concepts: requiring both words drops valid single-topic rules.
+  var receiptsKnowledge=agents.searchResult(t.id(),token,"收款");
+  var refundsKnowledge=agents.searchResult(t.id(),token,"退款");
+  var voucherKnowledge=agents.searchResult(t.id(),token,"凭证");
+  var items=new LinkedHashMap<UUID,AgentTaskService.Input>();
+  receiptsKnowledge.items().forEach(item->items.put(item.id(),item));
+  refundsKnowledge.items().forEach(item->items.put(item.id(),item));
+  voucherKnowledge.items().forEach(item->items.put(item.id(),item));
+  var knowledge=new AgentTaskService.SearchResult(List.copyOf(items.values()),items.isEmpty()?"NO_MATCH":"MATCHED",receiptsKnowledge.coverage(),receiptsKnowledge.hasMore()||refundsKnowledge.hasMore()||voucherKnowledge.hasMore());
+  var calculation=reconciliation.execute(t.actor(),t.tenant(),new com.dreamcore.workspace.scene.OnboardingReconciliationService.Request(r.storeId(),r.dateFrom(),r.dateTo()));
+  String key=IdentityService.hash(t.id()+":"+t.attempt()+":"+json.writeValueAsString(calculation));
+  var result=map("receiptId",key,"taskId",t.id(),"attempt",t.attempt(),"execution","FIXED_SERVER_RULE","generationContract",com.dreamcore.workspace.conversation.BriefingGenerationContract.value(),"calculation",calculation,"background",background,"knowledge",knowledge,"knowledgeRead",!knowledge.items().isEmpty());
+  db.update("INSERT INTO task_reconciliation_receipts(task_id,attempt_number,receipt_id,body) VALUES (?,?,?,?::jsonb) ON CONFLICT (task_id,attempt_number,receipt_id) DO NOTHING",t.id(),t.attempt(),key,json.writeValueAsString(result));
+  return result;
+ }
+ private Object plan(Task t,UUID token,Request r){
+  var plan=com.dreamcore.workspace.conversation.BriefingBusinessPlan.resolve(r.plan());
+  if(!Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM briefing_topic_selections WHERE task_id=?)",Boolean.class,t.id())))throw new IdentityException(422,"BRIEFING_TOPIC_REQUIRED");
+  var selection=json.readTree(db.queryForObject("SELECT (candidates->selected_index)::text FROM briefing_topic_selections WHERE task_id=?",String.class,t.id()));
+  if(!"BRIEFING".equals(selection.path("destination").asText())||!"DATA".equals(selection.path("businessType").asText())||!selection.path("requiresCalculation").asBoolean()||!plan.question().equals(selection.path("question").asText()))throw new IdentityException(422,"BRIEFING_PLAN_TOPIC_MISMATCH");
+  var prior=db.queryForList("SELECT content FROM conversation_artifacts WHERE task_id=? AND attempt_number=? AND filename='business-plan.json'",byte[].class,t.id(),t.attempt());
+  byte[] bytes=json.writeValueAsBytes(plan);
+  if(!prior.isEmpty()&&!Arrays.equals(prior.getFirst(),bytes))throw new IdentityException(409,"BRIEFING_PLAN_CHANGED");
+  if(!prior.isEmpty()){
+   var receipts=db.queryForList("SELECT body::text FROM task_reconciliation_receipts WHERE task_id=? AND attempt_number=? AND body->'calculation'->>'metric'='salesAndReceipts'",String.class,t.id(),t.attempt());
+   if(receipts.size()==1)return map("plan",plan,"evidence",json.readTree(receipts.getFirst()));
+  }
+  if(prior.isEmpty())db.update("INSERT INTO conversation_artifacts(id,tenant_id,workspace_id,task_id,filename,sha256,content,attempt_number) VALUES(?,?,?,?,?,?,?,?)",UUID.randomUUID(),t.tenant(),t.space(),t.id(),"business-plan.json",IdentityService.hash(new String(bytes,StandardCharsets.UTF_8)),bytes,t.attempt());
+  var value=reconcileChain(t,token,new Request("reconciliation_execute",null,null,null,null,null,null,null,null,null,null,null,null,"chain-sales-receipts:"+String.join(",",plan.storeIds()),plan.dateFrom(),plan.dateTo()));
+  return map("plan",plan,"evidence",value);
+ }
+ private Object reconcileChain(Task t,UUID token,Request r){
+  if(!"AUTHORIZED_LIBRARY".equals(db.queryForObject("SELECT source_scope FROM conversation_tasks WHERE id=?",String.class,t.id())))throw new IdentityException(403,"CHAIN_SCOPE_REQUIRED");
+  String[] parts=r.storeId().split(":",2);
+  if(parts.length!=2||!Set.of("chain-orders","chain-receipts","chain-sales-receipts").contains(parts[0]))throw IdentityException.invalid();
+  var ids=List.of(parts[1].split(","));if(ids.size()<2||ids.size()>10||new HashSet<>(ids).size()!=ids.size())throw IdentityException.invalid();
+  var catalog=json.valueToTree(reconciliation.catalog(t.actor(),t.tenant()));var names=new HashMap<String,String>();
+  for(var store:catalog.path("stores"))names.put(store.path("id").asText(),store.path("name").asText());
+  if(!names.keySet().containsAll(ids))throw new IdentityException(403,"CHAIN_SOURCE_NOT_GRANTED");
+  boolean paired=parts[0].equals("chain-sales-receipts");
+  String metric=parts[0].equals("chain-orders")?"orderSalesByConfirmationDate":"businessConfirmed";
+  var proofs=new ArrayList<Object>();var rows=new ArrayList<BriefingContentService.Row>();var total=java.math.BigDecimal.ZERO;var orderTotal=java.math.BigDecimal.ZERO;
+  Object background=null;boolean knowledge=true;
+  for(String id:ids){
+   var evidence=json.valueToTree(reconcile(t,token,new Request("reconciliation_execute",null,null,null,null,null,null,null,null,null,null,null,null,id,r.dateFrom(),r.dateTo())));
+   var amount=evidence.path("calculation").path("result").path("amounts").path(metric);
+   if(amount.path("unknown").asInt()!=0)throw new IdentityException(422,"CHAIN_AMOUNT_INCOMPLETE");
+   var value=new java.math.BigDecimal(amount.path("cents").asText()).movePointLeft(2);total=total.add(value);
+   var orderAmount=evidence.path("calculation").path("result").path("amounts").path("orderSalesByConfirmationDate");
+   if(paired&&orderAmount.path("unknown").asInt()!=0)throw new IdentityException(422,"CHAIN_AMOUNT_INCOMPLETE");
+   var orderValue=new java.math.BigDecimal(orderAmount.path("cents").asText()).movePointLeft(2);orderTotal=orderTotal.add(orderValue);
+   rows.add(new BriefingContentService.Row(names.get(id),paired?orderValue.toPlainString():null,value.toPlainString(),null,null,null,null,null));proofs.add(map("storeId",id,"name",names.get(id),"receiptId",evidence.path("receiptId").asText(),"inputs",evidence.path("calculation").path("inputs"),"amount",amount,"orderAmount",orderAmount));
+   background=evidence.path("background");knowledge &= evidence.path("knowledgeRead").asBoolean();
+  }
+  var body=map("recipeVersion","reconciliation-chain-v1","metric",paired?"salesAndReceipts":metric,"orderTotal",orderTotal.toPlainString(),"from",r.dateFrom(),"to",r.dateTo(),"rows",rows,"total",total.toPlainString(),"proofs",proofs);
+  byte[] bytes=json.writeValueAsBytes(body);String sha=IdentityService.hash(new String(bytes,java.nio.charset.StandardCharsets.UTF_8));UUID artifact=UUID.randomUUID();
+  db.update("INSERT INTO conversation_artifacts(id,tenant_id,workspace_id,task_id,filename,sha256,content,attempt_number) VALUES (?,?,?,?,?,?,?,?)",artifact,t.tenant(),t.space(),t.id(),"chain-calculation.json",sha,bytes,t.attempt());
+  var result=map("receiptId",sha,"taskId",t.id(),"attempt",t.attempt(),"calculationArtifactId",artifact,"calculation",body,"background",background,"knowledgeRead",knowledge);
+  db.update("INSERT INTO task_reconciliation_receipts(task_id,attempt_number,receipt_id,body) VALUES (?,?,?,?::jsonb)",t.id(),t.attempt(),sha,json.writeValueAsString(result));
+  return result;
  }
  private void record(Task t,String kind,UUID ref,String version,Object content){
   var old=db.queryForList("SELECT version_key FROM task_context_reads WHERE task_id=? AND attempt_number=? AND kind=? AND reference_id=?",String.class,t.id(),t.attempt(),kind,ref);

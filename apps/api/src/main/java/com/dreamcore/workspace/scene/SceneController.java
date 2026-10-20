@@ -12,6 +12,10 @@ public class SceneController {
  @GetMapping("/api/platform-admin/v1/scene-enterprises") public Object enterprises(Authentication a){return scene.bindings(actor(a));}
  @GetMapping({"/api/platform-admin/v1/tenants/{tenant}/scene/status","/api/tenant-admin/v1/tenants/{tenant}/scene/status"}) public Object status(Authentication a,@PathVariable UUID tenant,HttpServletRequest r){return scene.status(actor(a),tenant,r.getRequestURI().startsWith("/api/platform-admin/"));}
  @PostMapping({"/api/platform-admin/v1/tenants/{tenant}/scene/synchronize","/api/tenant-admin/v1/tenants/{tenant}/scene/synchronize"}) public Object sync(Authentication a,@PathVariable UUID tenant,HttpServletRequest r){return scene.synchronize(actor(a),tenant,r.getRequestURI().startsWith("/api/platform-admin/"));}
+ @GetMapping("/api/tenant-admin/v1/tenants/{tenant}/scene/routes") public Object routes(Authentication a,@PathVariable UUID tenant){return scene.routes(actor(a),tenant);}
+ @PostMapping("/api/tenant-admin/v1/tenants/{tenant}/scene/routes") public Object routes(Authentication a,@PathVariable UUID tenant,@RequestBody SceneRouting.Change change){return scene.routes(actor(a),tenant,change);}
+ @GetMapping("/api/tenant-admin/v1/tenants/{tenant}/scene/publication") public Object publication(Authentication a,@PathVariable UUID tenant){return scene.publication(actor(a),tenant);}
+ @PostMapping("/api/tenant-admin/v1/tenants/{tenant}/scene/publication") public Object publication(Authentication a,@PathVariable UUID tenant,@RequestBody ScenePublication.Change c){return scene.publication(actor(a),tenant,c);}
  public record BindingRequest(UUID workspaceId){}
  @GetMapping("/api/tenant-admin/v1/tenants/{tenant}/scene/binding") public Object binding(Authentication a,@PathVariable UUID tenant){return scene.binding(actor(a),tenant);}
  @PostMapping("/api/tenant-admin/v1/tenants/{tenant}/scene/binding") public Object bind(Authentication a,@PathVariable UUID tenant,@RequestBody BindingRequest body){return scene.bind(actor(a),tenant,body.workspaceId());}

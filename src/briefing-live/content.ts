@@ -55,6 +55,7 @@ export function isBriefingDocument(v: unknown): v is BriefingDocument {
   if(c.fusion!=null&&!isFusionEvidence(c.fusion))return false;
   if (c.presentation != null && !isPresentation(c.presentation, c as unknown as BriefingDocument['content']))
     return false;
+  const chain = c.schemaVersion === 'briefing-chain-v1';
   const dataset = c.schemaVersion === 'briefing-dataset-v1';
   const datasetSourceValid =
     record(ds) &&
@@ -96,7 +97,7 @@ export function isBriefingDocument(v: unknown): v is BriefingDocument {
       Number.isFinite(Date.parse(c.generatedAt))
     );
   return (
-    (c.schemaVersion === 'briefing-data-v1' || dataset) &&
+    (c.schemaVersion === 'briefing-data-v1' || dataset || chain) &&
     c.businessType === 'DATA' &&
     text(c.title, 4, 80) &&
     text(c.summary, 12, 240) &&
@@ -116,7 +117,7 @@ export function isBriefingDocument(v: unknown): v is BriefingDocument {
     (c.fusion != null || ch.rows.length <= 50) &&
     ch.rows.every((r) => row(r) && r.group !== null) &&
     row(ch.totals) &&
-    (dataset
+    (chain ? s === null && ds == null && basis == null && ch.rows.length >= 2 && ch.rows.length <= 10 : dataset
       ? s === null &&
         record(ds) &&
         record(basis) &&

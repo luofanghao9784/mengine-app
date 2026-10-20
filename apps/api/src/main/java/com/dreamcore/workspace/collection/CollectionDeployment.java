@@ -26,7 +26,7 @@ public class CollectionDeployment {
     }
     private void text(String value,int max){if(value==null||value.isBlank()||value.length()>max||value.codePoints().anyMatch(Character::isISOControl))throw new IllegalArgumentException("Invalid deployment metadata");}
     public void apply(Manifest m){
-        if(m==null||!"1.0".equals(m.contractVersion())||m.tenantId()==null||m.connectionId()==null||m.datasets()==null||m.datasets().size()>100||!Set.of("READY","UNAVAILABLE","UNCONFIGURED").contains(m.status()))throw new IllegalArgumentException("Invalid deployment manifest");
+        if(m==null||!"1.0".equals(m.contractVersion())||m.tenantId()==null||m.connectionId()==null||m.datasets()==null||m.datasets().size()>200||!Set.of("READY","UNAVAILABLE","UNCONFIGURED").contains(m.status()))throw new IllegalArgumentException("Invalid deployment manifest");
         text(m.name(),160);text(m.routeLabel(),500);text(m.accessSummary(),1000);ZoneId.of(m.timeZone());
         var ids=new HashSet<UUID>();var keys=new HashSet<String>();
         for(var d:m.datasets()){

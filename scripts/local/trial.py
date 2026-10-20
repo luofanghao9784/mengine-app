@@ -341,6 +341,10 @@ def instance_extra_environment(root):
     engine = {'AGENT_LANGFUSE_ENABLED': 'false'}
     if (root / 'restore.json').exists() or (root / 'restore.json').is_symlink():
         return api, engine
+    recipe = root / 'onboarding-recipe.json'
+    if recipe.exists():
+        private_read(recipe)  # Enforce local private-file permissions.
+        api['ONBOARDING_RECIPE_FILE'] = str(recipe.resolve())
     docling = root / 'docling-runtime.json'
     if docling.exists():
         value = private_read(docling)
