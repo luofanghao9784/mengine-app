@@ -104,7 +104,7 @@ export function useKnowledge(active: boolean, tenant?: string | null) {
   }, [rawData, background.value, tenant]);
   const empty = {
     id: '',
-    group: '知识库',
+    group: '知识星链',
     name: error ? '知识服务暂不可用' : data?.status || '正在读取知识',
     why: '',
     side: '',

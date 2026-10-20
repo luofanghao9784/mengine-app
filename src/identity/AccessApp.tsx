@@ -332,8 +332,6 @@ function GuardedAccessShell({
             key={tenant}
             tenant={tenant}
             name={selected.tenantName}
-            enterprises={eligible.map((m) => ({ id: m.tenantId, name: m.tenantName }))}
-            onChoose={choose}
           />
         )}
       </UploadProvider>

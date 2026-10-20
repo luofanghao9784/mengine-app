@@ -207,6 +207,37 @@
 .world-label.node.dim {
   opacity: 0.22;
 }
+.world-label.node.arriving {
+  opacity: 0;
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .world-label.node {
+    transition: none;
+  }
+}
+
+/* 卡片靠近顶部时，柔化标题和导航后方的场景，向下自然消退。 */
+.shell-header-haze {
+  position: absolute;
+  z-index: 2;
+  inset: 0 0 auto;
+  height: calc(var(--deck-peek) + 140px);
+  pointer-events: none;
+  background: rgb(9 10 13 / 64%);
+  backdrop-filter: blur(16px) saturate(0.75);
+  -webkit-backdrop-filter: blur(16px) saturate(0.75);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 38%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 38%, transparent 100%);
+  opacity: var(--header-haze, 0);
+  transition: opacity var(--move);
+}
+.shell[data-sheet='moving'] .shell-header-haze {
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .shell-header-haze { transition: none; }
+}
 
 /* ---- 顶部一行：板块名在左，导航独立悬浮在正中，操作在右 ---- */
 .shell-strip {
@@ -245,11 +276,6 @@
   margin-bottom: 12px;
   padding: 5px;
   box-sizing: border-box;
-  border-radius: 15px;
-  background: rgb(36 43 55 / 42%);
-  backdrop-filter: blur(34px) saturate(1.7);
-  -webkit-backdrop-filter: blur(34px) saturate(1.7);
-  box-shadow: 0 0 0 1px rgb(255 255 255 / 8%) inset;
   color: #c9d0da;
   white-space: nowrap;
   max-width: 100%;
@@ -263,7 +289,7 @@
   gap: 8px;
   padding: 0 14px 0 11px;
   border: 0;
-  border-radius: 10px;
+  border-radius: 16px;
   background: transparent;
   font-size: 13.5px;
   letter-spacing: 0.06em;
@@ -312,7 +338,7 @@
   top: 5px;
   bottom: 5px;
   left: 0;
-  border-radius: 10px;
+  border-radius: 16px;
   /* 只用底色强调：引擎的暖金，半透明 */
   background: rgb(230 197 138 / 24%);
   pointer-events: none;
@@ -1309,32 +1335,43 @@
   }
 }
 
-/* 数据基座：模型里选中项到清单卡片之间的细引线 */
-.world-leader {
+/* 企业身份融入场景；无独立栏及导航操作。 */
+.shell-enterprise-name {
   position: absolute;
-  inset: 0;
-  z-index: 4;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.25s;
+  right: 20px;
+  top: 23px;
+  max-width: max(120px, calc((100vw - 880px) / 2 - 28px));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  line-height: 20px;
+  color: #b4bdca;
 }
-.world-leader.on {
-  opacity: 1;
+.shell-strip:has(.shell-enterprise-name) .live-state {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: calc(100vw - 560px);
 }
-.world-leader path {
-  fill: none;
-  stroke: rgb(241 214 160 / 50%);
-  stroke-width: 1;
-  stroke-dasharray: 2 3;
+@media (max-width: 1180px) {
+  .shell-enterprise-name {
+    top: 39px;
+    left: 62px;
+    right: 20px;
+    max-width: none;
+    font-size: 12px;
+    line-height: 16px;
+  }
+  .shell-strip:has(.shell-enterprise-name) .live-state { display: none; }
 }
-.world-leader circle {
-  fill: none;
-  stroke: #f1d6a0;
-  stroke-width: 1;
-}
-.world-leader circle + circle {
-  fill: #f1d6a0;
-  stroke: none;
+
+/* 知识星链：概览在左，清单居中，阅读详情在右。 */
+@media (min-width: 1181px) {
+  .cards.work.knowledge {
+    grid-template-columns: 250px minmax(280px, 1fr) minmax(0, 1.45fr);
+  }
+  .cards.work.knowledge > .side { grid-column: 1; grid-row: 1; }
+  .cards.work.knowledge > .list { grid-column: 2; grid-row: 1; }
+  .cards.work.knowledge > .detail { grid-column: 3; grid-row: 1; }
 }

@@ -34,7 +34,7 @@ const asset = {
   sync: null,
   stageStates: ['READY', 'READY', 'WAITING', 'READY', 'READY'],
 };
-async function fixture(page: Page) {
+async function fixture(page: Page, items: unknown[] = [asset]) {
   let failure = 0;
   const seen: string[] = [];
   await page.route('**/api/**', async (route) => {
@@ -68,7 +68,7 @@ async function fixture(page: Page) {
           user: { name: '合成人员', role: 'admin' },
           tenant: { name: '合成企业' },
           model: { configured: false, enabled: false, model: '' },
-          items: [asset],
+          items,
           passed: [1, 1, 0, 1, 1],
           sources: [
             { name: '外部数据集', count: 1 },
@@ -160,7 +160,7 @@ async function fixture(page: Page) {
     return reply({ code: 'UNAVAILABLE' }, 404);
   });
   await page.goto(`/tenant-admin/prototype/?tenant=${tenant}`);
-  await page.getByRole('tab', { name: /^全部1$/ }).click();
+  await expect(page.getByRole('tab', { name: /^全部\d+$/ })).toHaveAttribute('aria-selected', 'true');
   await page.getByRole('tab', { name: /^解析/ }).click();
   return {
     fail: (status: number) => {
@@ -191,4 +191,91 @@ test('撤权刷新后清除已显示记录', async ({ page }) => {
   await result.getByRole('button', { name: '刷新处理结果' }).click();
   await expect(result.getByRole('alert')).toContainText('没有此来源的读取权限');
   await expect(result.getByText('S001', { exact: true })).toHaveCount(0);
+});
+test('来源统计仅汇总显示，列表进度按实际阶段点亮并与详情一致', async ({ page }) => {
+  await fixture(page);
+  await expect(page.locator('.src-gates')).toHaveCount(1);
+  await expect(page.locator('.src').filter({ has: page.locator('.src-gates') }).locator('.src-name')).toHaveText('全部来源');
+  const bars = page.locator('.live-select .stages i');
+  const states = ['done', 'done', 'wait', 'done', 'done'];
+  for (const [i, state] of states.entries()) {
+    await expect(bars.nth(i)).toHaveAttribute('data-state', state);
+    await expect(page.locator('.pipeline > li').nth(i)).toHaveAttribute('data-state', state);
+  }
+  const colors = await bars.evaluateAll(elements => elements.map(el => getComputedStyle(el).backgroundColor));
+  expect(colors[0]).not.toEqual(colors[2]);
+  expect(colors[4]).toEqual(colors[0]);
+});
+test('默认显示全部，治理状态筛选与定时取数分开，列表无场景引线', async ({ page }) => {
+  await fixture(page, [asset,
+    { ...asset, id: 'pending', title: '待治理资产', available: false, needsAttention: true, stageStates: ['READY', 'READY', 'WAITING', 'ATTENTION', 'WAITING'] },
+    { ...asset, id: 'processing', title: '正在解析资产', available: false, stageStates: ['READY', 'RUNNING', 'WAITING', 'WAITING', 'WAITING'] },
+    { ...asset, id: 'scheduled', title: '定时就绪资产', sync: { state: 'idle', enabled: true, intervalMinutes: 60 }, stageStates: ['READY', 'READY', 'READY', 'READY', 'READY'] },
+  ]);
+  const tabs = page.getByRole('tablist', { name: '治理状态' });
+  await expect(tabs.getByRole('tab')).toHaveText(['全部4', '需处理1', '处理中1', 'AI 可用2']);
+  await expect(tabs.getByRole('tab', { name: '全部4', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('.live-select')).toHaveCount(4);
+  await tabs.getByRole('tab', { name: '需处理1', exact: true }).click();
+  await expect(page.locator('.live-select')).toHaveCount(1);
+  await expect(page.locator('.live-select')).toContainText('待治理资产');
+  await tabs.getByRole('tab', { name: '处理中1', exact: true }).click();
+  await expect(page.locator('.live-select')).toHaveCount(1);
+  await expect(page.locator('.live-select')).toContainText('正在解析资产');
+  await tabs.getByRole('tab', { name: 'AI 可用2', exact: true }).click();
+  await expect(page.locator('.live-select')).toHaveCount(2);
+  await page.getByRole('button', { name: '筛选', exact: true }).click();
+  await page.getByLabel('取数方式', { exact: true }).selectOption('scheduled');
+  await expect(page.locator('.live-select')).toHaveCount(1);
+  await expect(page.locator('.live-select')).toContainText('定时就绪资产');
+  await expect(page.locator('.world-leader')).toHaveCount(0);
+});
+test('同系统的多个导入批次可一起折叠，其他来源独立显示', async ({ page }) => {
+  await fixture(page, [
+    { ...asset, source: 'local-9pop-payslips-20261015 / payslips_lx' },
+    { ...asset, id: 'dividend', title: '分红数据', source: 'local-9pop-dividend_periods-20261015 / dividend_periods_lx' },
+    { ...asset, id: 'orders', title: '订单数据', source: '首批三表本地快照20261019 / full_orders_lx' },
+    { ...asset, id: 'other', title: '另一系统数据', source: '另一管理系统 / records' },
+  ]);
+  const group = page.getByRole('button', { name: /^9POP 管理系统\s*3$/ });
+  await expect(group).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.locator('.live-select')).toHaveCount(4);
+  await group.click();
+  await expect(group).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.locator('.live-select')).toHaveCount(1);
+  await expect(page.locator('.live-select')).toContainText('另一系统数据');
+  await expect(page.locator('.card.asset h2')).toContainText(asset.title);
+  await group.click();
+  await expect(page.locator('.live-select')).toHaveCount(4);
+});
+test('企业名称融入场景，宽屏右上、窄屏标题下方', async ({ page }) => {
+  await fixture(page);
+  const name = page.locator('.shell-enterprise-name');
+  await expect(name).toHaveText('合成企业');
+  const desktop = await name.boundingBox();
+  expect(desktop!.x).toBeGreaterThan(1100);
+  await page.setViewportSize({ width: 1000, height: 852 });
+  const narrow = await name.boundingBox();
+  const title = await page.locator('.shell-strip h1').boundingBox();
+  expect(narrow!.x).toBe(62);
+  expect(narrow!.y).toBeGreaterThan(title!.y);
+  await expect(page.getByRole('combobox', { name: '切换企业' })).toHaveCount(0);
+});
+test('动画只显示三个治理阶段，数量统计当前停留资产', async ({ page }) => {
+  await fixture(page, [asset,
+    { ...asset, id: 'parsing', gate: 1, available: false, title: '解析中' },
+    { ...asset, id: 'annotation', gate: 2, available: false, title: '待标注' },
+    { ...asset, id: 'checking', gate: 3, available: false, title: '待检查' },
+    { ...asset, id: 'checking-two', gate: 3, available: false, title: '检查异常' },
+  ]);
+  const labels = page.locator('.world-labels');
+  await expect(labels.locator('.gate')).toHaveCount(3);
+  await expect(labels.locator('.gate').filter({hasText:'解析'})).toHaveText('1解析');
+  await expect(labels.locator('.gate').filter({hasText:'口径标注'})).toHaveText('1口径标注');
+  await expect(labels.locator('.gate').filter({hasText:'检查'})).toHaveText('2检查');
+  await expect(labels.locator('.stage')).toHaveCount(0);
+});
+test('已可用资产不重复计入动画治理环节', async ({ page }) => {
+  await fixture(page);
+  await expect(page.locator('.world-labels .gate')).toHaveText(['0解析', '0口径标注', '0检查']);
 });

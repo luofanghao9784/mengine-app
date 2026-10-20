@@ -2,6 +2,15 @@ import { useEffect, useLayoutEffect, useState } from 'react';
 import type { Asset } from './foundation-api';
 import { GATES } from './world';
 
+export function stageState(a: Asset, i: number): 'done' | 'held' | 'wait' {
+  const explicit = a.stageStates?.[i];
+  if (explicit) {
+    if (explicit === 'READY') return 'done';
+    return ['PARTIAL', 'ATTENTION', 'FAILED', 'RUNNING', 'QUEUED'].includes(explicit) ? 'held' : 'wait';
+  }
+  return (i === 4 ? a.available : i < a.gate) ? 'done' : i === a.gate ? 'held' : 'wait';
+}
+
 /** 五个环节的分段进度：已过的环节点亮，卡住的那一环标出来。 */
 export function Stages({ a }: { a: Asset }) {
   return (
@@ -9,7 +18,7 @@ export function Stages({ a }: { a: Asset }) {
       {GATES.map((g, i) => (
         <i
           key={g}
-          data-state={(i === 4 ? a.available : i < a.gate) ? 'done' : i === a.gate ? 'held' : 'wait'}
+          data-state={stageState(a, i)}
         />
       ))}
     </span>

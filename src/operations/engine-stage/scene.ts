@@ -391,6 +391,19 @@ export class EngineScene {
   project(p: V3) {
     return this.VP ? this.proj(this.VP, p) : { x: 0, y: 0, w: -1 };
   }
+  coreContains(x: number, y: number) {
+    const center = this.project([0, 0, 0]);
+    const edge = this.project([1.12, 0, 0]);
+    const radius = Math.max(24, Math.hypot(edge.x - center.x, edge.y - center.y));
+    return center.w > 0 && Math.hypot(x - center.x, y - center.y) <= radius;
+  }
+  /** Ignore ambient orbit; report whether the navigation camera has reached its destination. */
+  cameraSettled() {
+    const target = this.camTarget();
+    return !!this.VP && (['e', 'c'] as const).every((axis) =>
+      this.CAM[axis].every((s, i) => Math.abs(s.x - target[axis][i]) < 0.035 && Math.abs(s.v) < 0.08),
+    ) && Math.abs(this.viewK.x - this.viewTarget) < 0.005;
+  }
   setReduced(reduced: boolean) {
     this.reduced = reduced;
     if (reduced) {

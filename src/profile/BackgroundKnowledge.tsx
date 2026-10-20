@@ -4,6 +4,7 @@ import { companyFields } from './company-client';
 import { Failure, Loading, useRemote } from '../shared/admin';
 import { useSession } from '../identity/session';
 import { Button } from '../shared/ui';
+import './background-reading.css';
 
 export function BackgroundKnowledge({
   tenant,
@@ -18,6 +19,7 @@ export function BackgroundKnowledge({
 }) {
   const { session } = useSession();
   const [revision, refresh] = useState(0);
+  const [field, setField] = useState('all');
   const data = useRemote(
     (signal) => companySourceClient.knowledge(tenant, signal),
     [tenant, revision, session.identity],
@@ -28,19 +30,27 @@ export function BackgroundKnowledge({
   return (
     <section aria-label="企业背景知识" className="background-knowledge">
       <h3>企业背景知识</h3>
-      <p>原背景已整理为可引用的结构化知识。这里没有生成 AI 分析文章，也不代表检索索引已完成。</p>
+      <p className="background-reading-intro">按企业信息原版本引用 · {items.length} 项背景</p>
+      <div className="background-reading-filters" role="group" aria-label="背景分类">
+        <button type="button" aria-pressed={field === 'all'} onClick={() => setField('all')}>全部 {items.length}</button>
+        {Object.entries(companyFields).filter(([key]) => items.some(k => k.field === key)).map(([key, label]) =>
+          <button type="button" key={key} aria-pressed={field === key} onClick={() => setField(key)}>{label} {items.filter(k => k.field === key).length}</button>)}
+      </div>
       {!items.length && <p role="status">当前没有可读取的背景知识。</p>}
-      {items.map((k) => (
+      {Object.entries(companyFields).filter(([key]) => (field === 'all' || field === key) && items.some(k => k.field === key)).map(([key, label]) => (
+        <section className="background-reading-group" key={key} aria-label={label}>
+          <h4>{label}<span>{items.filter(k => k.field === key).length} 项</span></h4>
+          {items.filter(k => k.field === key).map((k) => (
         <article key={k.id}>
-          <h4>{k.title}</h4>
-          <p>
-            {companyFields[k.field]} · v{k.revision} ·{' '}
+          <h5>{k.title}</h5>
+          <p className="background-entry-meta">
+            v{k.revision} ·{' '}
             {k.origin === 'HUMAN' ? '人工维护' : 'AI 整理，含义需核实'}
           </p>
-          {k.content && <p>{k.content}</p>}
-          <p role="status">结构化引用已就绪；来源更新后读取新版本。</p>
+          {k.content && <p className="background-entry-content">{k.content}</p>}
           <details>
-            <summary>来源依据与关联方法</summary>
+            <summary>来源与关联指标{k.methods.length ? ` · ${k.methods.length} 项` : ''}</summary>
+            <p>结构化引用已就绪；来源更新后读取新版本。引用就绪不代表 AI 分析或检索索引已完成。</p>
             <p>
               背景条目：{k.sourceEntryId}
               <br />
@@ -64,6 +74,8 @@ export function BackgroundKnowledge({
             )}
           </details>
         </article>
+          ))}
+        </section>
       ))}
       <Button variant="ghost" onClick={() => { refresh((n) => n + 1); onRefresh?.(); }}>
         刷新背景知识

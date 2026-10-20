@@ -1,25 +1,24 @@
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { api, ACTIONS, date, type Asset, type Detail, type Foundation } from './foundation-api';
 import { GATES } from './world';
 import { companySourceClient } from '../../profile/company-source-client';
 import { useRemote } from '../../shared/admin';
 import { useSession } from '../../identity/session';
 import { CompanyBackgroundSource } from '../../profile/CompanyBackgroundSource';
-import { Fold, Stages, Timeline, readouts, useGlide, useSpotlight } from './AssetBits';
+import { Fold, Stages, Timeline, readouts, stageState, useGlide, useSpotlight } from './AssetBits';
 import './foundation-live.css';
 import './glass-surface.css';
 import { FoundationProcessing } from './FoundationProcessing';
+import { assetSourceGroup } from './asset-source-groups';
+import { KnowledgeListRow } from './KnowledgeListRow';
 
 function BackgroundSourceCard({ tenant, selected, onSelect }: { tenant: string; selected: boolean; onSelect: () => void }) {
   const { session } = useSession();
   const source = useRemote(signal => companySourceClient.get(tenant, signal), [tenant, session.identity]);
   const entries = source.value?.entries;
-  const updated = entries?.map(e => e.updatedAt).sort().at(-1);
-  return <button type="button" className="background-source-card" aria-label="企业背景来源" aria-pressed={selected} onClick={onSelect}>
-    <strong>企业背景</strong><span>企业信息维护 · 内部来源</span>
-    <span>{source.error ? '暂不可用 · 点击查看原因' : !entries ? '正在读取…' : entries.length ? `可读 ${entries.length} 条背景` : '待完善 · 填写企业背景'}</span>
-    {updated && <small>更新于 {new Date(updated).toLocaleString('zh-CN')}</small>}
-  </button>;
+  return <KnowledgeListRow name="企业背景" label="企业背景来源" selected={selected} onSelect={onSelect}
+    summary={source.error ? '暂不可用 · 点击查看原因' : !entries ? '正在读取…' : entries.length ? `${entries.length} 项背景 · 引用企业信息原版本` : '待完善 · 填写企业背景'}
+    side="结构化引用" />;
 }
 
 function dictionaryNotice(warning: string, fields: { name: string; label: string }[]) {
@@ -66,10 +65,13 @@ export function DataWork({
 }) {
   const { data, error, unauthorized, loading, refresh } = foundation;
   const [background, setBackground] = useState(false);
+  const [collapsedSources, setCollapsedSources] = useState<Set<string>>(new Set());
+  useEffect(() => setCollapsedSources(new Set()), [tenant]);
   const [q, setQ] = useState(''),
     [kind, setKind] = useState('all'),
     [department, setDepartment] = useState(''),
     [queue, setQueue] = useState('all'),
+    [collection, setCollection] = useState('all'),
     [sort, setSort] = useState('priority'),
     [detail, setDetail] = useState<Detail | null>(null),
     [detailError, setDetailError] = useState(''),
@@ -90,12 +92,14 @@ export function DataWork({
   const seq = useRef(0),
     active = useRef(true),
     lock = useRef(false);
-  const tab = Math.min(2, Math.max(0, filter));
+  const tab = Math.min(3, Math.max(0, filter));
   const available = data?.items || [];
   const inSource = available.filter((x) => kind === 'all' || x.sourceKind === SOURCE_IDS.indexOf(kind));
+  const isProcessing = (a: Asset) => a.stageStates?.some((state) => state === 'RUNNING' || state === 'QUEUED') || ['queued', 'processing'].includes(a.status) || a.sync?.state === 'running' || (!a.stageStates && a.tone === 'run');
   const rows = available.filter(
     (a) =>
-      (tab === 0 ? a.needsAttention : tab === 1 ? !!a.sync : true) &&
+      (tab === 0 ? a.needsAttention : tab === 1 ? isProcessing(a) : tab === 3 ? a.available : true) &&
+      (collection !== 'scheduled' || !!a.sync) &&
       (tab !== 0 ||
         queue === 'all' ||
         (queue === 'isolated'
@@ -110,7 +114,7 @@ export function DataWork({
       `${a.title} ${a.source} ${a.department}`.toLocaleLowerCase().includes(q.trim().toLocaleLowerCase()) &&
       (gate === null || (gate === 4 ? a.available : a.gate === gate)),
   );
-  const showBackground = !!tenant && (kind === 'all' || kind === 'document') && tab === 2 && gate === null && !department && '企业背景 企业信息维护 内部来源'.includes(q.trim());
+  const showBackground = !!tenant && (kind === 'all' || kind === 'document') && tab === 2 && gate === null && !department && collection === 'all' && '企业背景 企业信息维护 内部来源'.includes(q.trim());
   useEffect(() => { if (!showBackground) setBackground(false); }, [showBackground, tenant]);
   const risk = (x: Asset) =>
     Number(x.status === 'quarantined' || x.isolated > 0) * 4 +
@@ -125,16 +129,32 @@ export function DataWork({
         ? y.updatedAt.localeCompare(x.updatedAt)
         : byRisk(x, y),
   );
+  const groups = Array.from(rows.reduce((map, asset) => {
+    const { key, name } = assetSourceGroup(asset);
+    const group = map.get(key) || { key, name, items: [] as Asset[] };
+    group.items.push(asset);
+    map.set(key, group);
+    return map;
+  }, new Map<string, { key: string; name: string; items: Asset[] }>()).values());
+  const visibleRows = groups.flatMap(group => collapsedSources.has(group.key) ? [] : group.items);
+  useEffect(() => {
+    const asset = available.find(item => item.id === picked);
+    if (asset) setCollapsedSources(old => {
+      const next = new Set(old);
+      next.delete(assetSourceGroup(asset).key);
+      return next;
+    });
+  }, [picked]);
   /** 待处理队列：所有需要关注的资产，按风险排；与左侧清单的筛选无关。 */
   const todo = available.filter((x) => x.needsAttention).sort(byRisk);
   const departments = [...new Set(available.map((x) => x.department))].map(
     (d) => [d, available.filter((x) => x.department === d).length] as const,
   );
   const activeFilters =
-    (tab === 0 ? Number(queue !== 'all') : 0) + Number(sort !== 'priority') + Number(!!department);
+    (tab === 0 ? Number(queue !== 'all') : 0) + Number(sort !== 'priority') + Number(!!department) + Number(collection !== 'all');
   const selected = rows.find((a) => a.id === picked) || rows[0];
   // 清单的“组”：视角、来源、筛选变了，就重新播放一次逐条弹入。
-  const listKey = [tab, kind, gate, department, queue, sort, q].join('|');
+  const listKey = [tab, kind, gate, department, queue, collection, sort, q, ...collapsedSources].join('|');
   const glide = useGlide(listBox, selected?.id || '', listKey, rows.length);
   useEffect(() => {
     active.current = true;
@@ -181,12 +201,6 @@ export function DataWork({
     else nextStep.current = at;
     pick(id);
   };
-  const meta = (x: Asset) =>
-    tab === 1
-      ? x.sync
-        ? `每 ${x.sync.intervalMinutes} 分钟 · ${x.sync.state === 'failed' ? '同步失败' : x.sync.enabled ? '已启用同步' : '同步已暂停'}`
-        : x.updatePolicy
-      : `${x.department} · v${x.version}${x.sync ? ` · 每 ${x.sync.intervalMinutes} 分钟同步` : ''}`;
   const reset = () => {
     pick('');
   };
@@ -393,10 +407,10 @@ export function DataWork({
                   <span className="src-name">{c.name}</span>
                   {attention > 0 && <span className="src-alert">需处理 {attention}</span>}
                   <b className="src-count num">{c.items.length}</b>
-                  <span className="src-note">{c.note}</span>
+                  {c.id !== 'all' && <span className="src-note">{c.note}</span>}
                 </button>
-                {/* 这一类资产停在各环节的数量，和 3D 里的五道门对应；点数字只看停在这一环的。 */}
-                <div className="src-gates">
+                {/* 阶段统计仅在全部来源显示，点击数字筛选对应阶段。 */}
+                {c.id === 'all' && <div className="src-gates">
                   {GATES.map((g, i) => {
                     const n = c.items.filter((x) => atGate(x, i)).length,
                       on = kind === c.id && gate === i;
@@ -419,7 +433,7 @@ export function DataWork({
                       </button>
                     );
                   })}
-                </div>
+                </div>}
               </div>
             );
           })}
@@ -527,14 +541,15 @@ export function DataWork({
             </button>
           </span>
         </header>
-        <div className="views" role="tablist" aria-label="查看角度">
+        <div className="views" role="tablist" aria-label="治理状态">
           {(
             [
-              ['需处理', inSource.filter((x) => x.needsAttention).length],
-              ['定时取数', inSource.filter((x) => x.sync).length],
-              ['全部', inSource.length],
+              [2, '全部', inSource.length],
+              [0, '需处理', inSource.filter((x) => x.needsAttention).length],
+              [1, '处理中', inSource.filter(isProcessing).length],
+              [3, 'AI 可用', inSource.filter((x) => x.available).length],
             ] as const
-          ).map(([t, n], i) => (
+          ).map(([i, t, n]) => (
             <button role="tab" aria-selected={tab === i} key={t} onClick={() => open(i)}>
               {t}
               <b className="num">{data ? n : '—'}</b>
@@ -570,6 +585,10 @@ export function DataWork({
                 <option value="priority">按风险优先</option>
                 <option value="quality">按质量评分</option>
                 <option value="updated">按最近更新</option>
+              </select>
+              <select aria-label="取数方式" value={collection} onChange={(e) => { setCollection(e.target.value); reset(); }}>
+                <option value="all">全部取数方式</option>
+                <option value="scheduled">定时取数</option>
               </select>
               {tab === 0 && (
                 <select
@@ -611,10 +630,10 @@ export function DataWork({
           aria-label="数据资产清单，方向键切换"
           onKeyDown={(e) => {
             const n = { ArrowDown: 1, ArrowUp: -1 }[e.key];
-            if (!n || !rows.length) return;
+            if (!n || !visibleRows.length || e.target !== e.currentTarget) return;
             e.preventDefault();
-            const at = rows.findIndex((r) => r.id === selected?.id),
-              next = rows[Math.max(0, Math.min(rows.length - 1, at + n))];
+            const at = visibleRows.findIndex((r) => r.id === selected?.id),
+              next = visibleRows[Math.max(0, Math.min(visibleRows.length - 1, at + n))];
             choose(next.id);
             listBox.current
               ?.querySelector(`[data-row="${CSS.escape(next.id)}"]`)
@@ -629,16 +648,25 @@ export function DataWork({
             />
           )}
           {showBackground && tenant && <BackgroundSourceCard tenant={tenant} selected={background} onSelect={() => setBackground(true)} />}
-          {showBackground && <p className="background-count-note">资产数量与处理进度仅统计资料；背景卡片为维护入口。</p>}
           {!rows.length && !showBackground && (
             <p className="none">{loading ? '正在读取数据…' : error ? error : '当前筛选下没有记录。'}</p>
           )}
-          {rows.map((x, i) => (
+          {groups.map(group => (
+            <Fragment key={group.key}>
+              <button type="button" className="asset-source-toggle" aria-label={`${group.name} ${group.items.length}`} aria-expanded={!collapsedSources.has(group.key)}
+                onClick={() => setCollapsedSources(old => {
+                  const next = new Set(old);
+                  if (next.has(group.key)) next.delete(group.key); else next.add(group.key);
+                  return next;
+                })}>
+                <span aria-hidden="true">{collapsedSources.has(group.key) ? '▸' : '▾'}</span>
+                <span className="source-overview-title"><strong>{group.name}</strong><small>{collapsedSources.has(group.key) ? '展开查看数据资产' : '数据资产 · 点击收起'}</small></span><span className="num">{group.items.length}</span>
+              </button>
+              {!collapsedSources.has(group.key) && group.items.map((x, i) => (
             <div
               className="row"
               key={listKey + x.id}
               data-row={x.id}
-              data-anchor={(!background && selected?.id === x.id) || undefined}
               style={{ '--i': Math.min(i, 12) } as React.CSSProperties}
             >
               <button
@@ -649,7 +677,7 @@ export function DataWork({
                 <i className={`tone-${x.tone}`} />
                 <span className="t">
                   <b>{x.title}</b>
-                  <span>{tab === 1 ? meta(x) : x.label}</span>
+                  <span>{x.label}</span>
                   <small>
                     {x.department} · v{x.version}
                   </small>
@@ -680,6 +708,8 @@ export function DataWork({
                 </span>
               </button>
             </div>
+              ))}
+            </Fragment>
           ))}
         </div>
       </article>
@@ -696,7 +726,7 @@ export function DataWork({
           <header className="detail-head">
             <div>
               <h2>{a?.title || '数据资产'}</h2>
-              <span>{a ? `${a.source} · ${a.department} · v${a.version}` : '从清单中选择一项'}</span>
+              <span>{a ? `${a.department} · v${a.version}` : '从清单中选择一项'}</span>
             </div>
             {a && (
               <dl className="head-nums">
@@ -717,8 +747,7 @@ export function DataWork({
               style={{ '--at': shownStep } as React.CSSProperties}
             >
               {GATES.map((g, i) => {
-                const explicit = a.stageStates?.[i];
-                const state = explicit ? (explicit === 'READY' ? 'done' : ['PARTIAL', 'ATTENTION', 'FAILED', 'RUNNING', 'QUEUED'].includes(explicit) ? 'held' : 'wait') : (i === 4 ? a.available : i < a.gate) ? 'done' : i === a.gate ? 'held' : 'wait';
+                const state = stageState(a, i);
                 return (
                   <li key={g} data-state={state}>
                     <button
@@ -740,7 +769,7 @@ export function DataWork({
           {a && (
             <>
               <div className="step-bar">
-                <p>{STEP_INTRO[shownStep]}</p>
+                {shownStep !== 4 && <p>{STEP_INTRO[shownStep]}</p>}
                 <div className="step-actions">
                   {shownStep === 0 && button('sync', true)}
                   {shownStep === 1 && button('retry', true)}
@@ -876,6 +905,7 @@ export function DataWork({
                               setQ('');
                               setKind('all');
                               setDepartment('');
+                              setCollection('all');
                               choose(r.targetId);
                             }}
                           >

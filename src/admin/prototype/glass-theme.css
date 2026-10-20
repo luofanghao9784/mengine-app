@@ -19,7 +19,8 @@
   color: var(--pearl);
   color-scheme: dark;
 }
-.cards.glass .card {
+.cards.glass .card,
+.shell .shell-switch {
   border: 1px solid rgb(255 255 255 / 8%);
   border-radius: 22px;
   background: rgb(36 43 55 / 32%);

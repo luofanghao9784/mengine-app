@@ -170,6 +170,8 @@ const REGIONS: V3[] = [
 ];
 
 export class World implements SceneExtension {
+  overview = false;
+  onNavigate: (place: 'home' | 'knowledge') => void = () => {};
   view: View = null;
   selected = '';
   gate: number | null = null;
@@ -211,17 +213,17 @@ export class World implements SceneExtension {
     this.hover = '';
     this.buildStars(relations, sourceKind);
   }
-  private passed = ['—', '—', '—', '—', '—'];
+  private stageCounts = ['—', '—', '—', '—', '—'];
   private sourceNotes = ['尚未读取', '尚未读取', '尚未接入'];
   private gates: Record<string, number> = {};
   private origins: Record<string, number> = {};
   setFoundation(
     items: (Item & { gate: number; sourceKind: number })[],
-    passed: number[] | null,
+    stageCounts: number[] | null,
     sources: { count: number }[],
   ) {
     this.data = items;
-    this.passed = passed ? passed.map(String) : ['—', '—', '—', '—', '—'];
+    this.stageCounts = stageCounts ? stageCounts.map(String) : ['—', '—', '—', '—', '—'];
     this.sourceNotes = [0, 1, 2].map((i) =>
       i === 2 ? '尚未接入' : sources[i] ? `${sources[i].count} 项资产` : '尚未读取',
     );
@@ -336,6 +338,9 @@ export class World implements SceneExtension {
   /** 看知识库时引擎自己的一切都隐去；看数据基座时引擎保持原样，只是远远地缩在右端。 */
   engineAlpha() {
     return 1 - this.kKnow;
+  }
+  knowledgeSettled() {
+    return this.kKnow > 0.99;
   }
   /** 引擎的三条输入光流从最后一道门里出发。 */
   inputStart(_index: number, far: V3) {
@@ -536,7 +541,13 @@ export class World implements SceneExtension {
 
   pointer(x: number, y: number, click: boolean) {
     const scene = this.scene;
-    if (!this.view || !scene) return undefined;
+    if (!scene) return undefined;
+    // 概览中的梦核承载知识星链；数据视角中的同一核心是返回引擎概览的入口。
+    if ((this.view === 'data' || this.overview) && scene.coreContains(x, y)) {
+      if (click) this.onNavigate(this.view === 'data' ? 'home' : 'knowledge');
+      return true;
+    }
+    if (!this.view) return undefined;
     this.mx = x / (window.innerWidth || 1) - 0.5;
     let best = '',
       bd = 18 * 18;
@@ -594,28 +605,12 @@ export class World implements SceneExtension {
         out.push({
           key: 'g' + (k + 1),
           kind: 'gate',
-          text: this.passed[k + 1],
+          text: this.stageCounts[k + 1],
           sub: GATES[k + 1],
           p: [x, CY - GR[k] * 1.38 - 0.4, 0],
           on: this.gate === k + 1,
         }),
       );
-      // 接入和 AI 可用不设门：一个标在进第一道门之前，一个标在进梦核之前。
-      out.push({
-        key: 'g0',
-        kind: 'stage',
-        text: this.passed[0],
-        sub: GATES[0],
-        p: [GX[0] - 2.7, CY + GR[0] * 1.08, 0],
-      });
-      out.push({
-        key: 'g4',
-        kind: 'stage',
-        text: this.passed[4],
-        sub: GATES[4],
-        p: [-1.5, CY + 1.75, 0],
-        on: this.gate === 4,
-      });
       for (const id of new Set([this.selected, this.hover])) {
         const it = this.data.find((d) => d.id === id),
           at =

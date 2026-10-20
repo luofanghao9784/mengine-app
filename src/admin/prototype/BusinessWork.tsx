@@ -25,58 +25,34 @@ export function BusinessWork({ tenant, place }: { tenant: string; place: keyof t
     setReady(true);
   }, [tenant, place]);
   const name = session.identity?.memberships.find((m) => m.tenantId === tenant)?.tenantName || '企业管理';
+  const managed = place === 'members' || place === 'company';
+  const sections = [
+    { id: 'people', name: '成员与协作', note: '企业成员、邀请、共享空间与交接' },
+    { id: 'access', name: '数据访问', note: '资源授权、审批、部门与操作审计' },
+    { id: 'roles', name: '岗位与关注', note: '工作职责、背景与 AI 内容重点' },
+  ];
+  const active = roles ? 'roles' : access ? 'access' : 'people';
   return (
-    <section
-      className="cards glass business-work"
-      aria-label={place === 'members' ? '成员与权限' : '业务管理'}
-    >
-      <article className="card">
-        {place === 'members' && (
-          <nav className="business-tabs" aria-label="成员权限管理范围">
-            <button
-              aria-pressed={access && !roles}
-              onClick={() => {
-                if (!requestNavigationLocked()) {
-                  setRoles(false);
-                  setAccess(true);
-                }
-              }}
-            >
-              数据权限与部门
-            </button>
-            <button
-              aria-pressed={!access && !roles}
-              onClick={() => {
-                if (!requestNavigationLocked()) {
-                  setRoles(false);
-                  setAccess(false);
-                }
-              }}
-            >
-              账号、空间与职责交接
-            </button>
-            <button
-              aria-pressed={roles}
-              onClick={() => {
-                if (!requestNavigationLocked()) setRoles(true);
-              }}
-            >
-              成员背景与治理目标
-            </button>
-          </nav>
-        )}
-        {place === 'members' && (
-          <p role="note">
-            先邀请成员加入企业，再在共享空间中授予只读或维护权限。数据资源权限独立核对；加入企业不代表可以读取所有内容。
-          </p>
-        )}
-        {roles && place === 'members' ? (
-          <WorkRoles key={tenant} tenant={tenant} />
-        ) : access && place === 'members' ? (
-          <AccessWork />
-        ) : (
-          ready && <TenantConsole tenant={tenant} name={name} embedded />
-        )}
+    <section className={`cards glass business-work${managed ? ' management-work' : ''} ${place}-work`}
+      aria-label={place === 'members' ? '成员与权限' : '业务管理'}>
+      {place === 'members' && <aside className="card management-nav">
+        <header><h2>成员与权限</h2><p>管理人员协作与数据访问</p></header>
+        <nav aria-label="成员权限管理范围">{sections.map(item =>
+          <button key={item.id} type="button" aria-pressed={active === item.id} onClick={() => {
+            if (requestNavigationLocked()) return;
+            setRoles(item.id === 'roles'); setAccess(item.id === 'access');
+          }}><strong>{item.name}</strong><span>{item.note}</span></button>
+        )}</nav>
+        <p className="management-note">加入企业、空间协作和数据读取分别授权。</p>
+      </aside>}
+      <article className="card management-content">
+        {place === 'members' && <header className="management-heading">
+          <h2>{sections.find(item => item.id === active)?.name}</h2>
+          <p>{sections.find(item => item.id === active)?.note}</p>
+        </header>}
+        {roles && place === 'members' ? <WorkRoles key={tenant} tenant={tenant} />
+          : access && place === 'members' ? <AccessWork />
+          : ready && <TenantConsole tenant={tenant} name={name} embedded />}
       </article>
     </section>
   );

@@ -7,6 +7,8 @@ import { requestNavigationLocked } from '../../shared/request-guard';
 import type { EngineScene, Focus } from '../../operations/engine-stage/scene';
 import { BackgroundKnowledge } from '../../profile/BackgroundKnowledge';
 import { DataWork } from './DataWork';
+import { KnowledgeListRow } from './KnowledgeListRow';
+import { useSession } from '../../identity/session';
 import { AccessWork } from './AccessWork';
 import { useFoundation, asItem, type Foundation } from './foundation-api';
 import { activity, aside, daily, steps, STEP_NAMES, tabs, usage } from './content';
@@ -20,13 +22,13 @@ import './glass-theme.css';
 /**
  * 原型：企业管理端的“场景外壳”。没有侧边栏和页面，整个管理端是一个铺满窗口的 3D 引擎模型，
  * 内容是浮在模型上的一组深色玻璃卡片。
- * - 数据基座、知识库和引擎是同一个模型：切换板块 = 同一台相机移到模型的另一处。
+ * - 数据基座、知识星链和引擎是同一个模型：切换板块 = 同一台相机移到模型的另一处。
  * - 卡片组有三档：升到顶（专心处理）、半屏、降到底（3D 全屏）。上下滚动自然地在三档之间过渡（没有拖动拉手）。
  * - 导航是一条独立的深色栏，挂在卡片组上方，跟着卡片一起上下滑动；卡片升到顶时它正好在最顶部。
  */
-const SCENE: Place[] = ['home', 'data', 'knowledge', 'experience', 'output'];
+const SCENE: Place[] = ['home', 'data', 'knowledge', 'experience'];
 const SETTINGS: Place[] = ['members', 'usage', 'company'];
-const SHORTCUT: Partial<Record<Place, string>> = { data: '1', knowledge: '2', output: '3', experience: '4' };
+const SHORTCUT: Partial<Record<Place, string>> = { data: '1', knowledge: '2', experience: '4' };
 type Sheet = 'peek' | 'half' | 'full';
 const ORDER: Sheet[] = ['peek', 'half', 'full'];
 const press = (key: string) =>
@@ -48,7 +50,9 @@ function useReduced() {
 }
 
 export function SceneShell() {
+  const { session } = useSession();
   const tenant = new URLSearchParams(location.search).get('tenant');
+  const enterpriseName = session.identity?.memberships.find(m => m.tenantId === tenant)?.tenantName;
   const runtime = useSceneRuntime(tenant);
   const reduced = useReduced();
   const foundation = useFoundation();
@@ -84,7 +88,6 @@ export function SceneShell() {
   const stage = useRef<HTMLDivElement>(null);
   const shell = useRef<HTMLDivElement>(null);
   const labels = useRef<HTMLDivElement>(null);
-  const leader = useRef<SVGSVGElement>(null);
   const nav = useRef<HTMLElement>(null);
   /** 导航里当前板块的实心滑块：位置跟着当前项走，切换时滑过去。 */
   const [pill, setPill] = useState<{ x: number; w: number } | null>(null);
@@ -102,7 +105,7 @@ export function SceneShell() {
   useEffect(() => {
     world.setFoundation(
       (foundation.data?.items || []).map((a) => ({ ...asItem(a), gate: a.gate, sourceKind: a.sourceKind })),
-      foundation.data?.passed || null,
+      foundation.data ? GATES.map((_, stage) => foundation.data!.items.filter(a => a.gate === stage).length) : null,
       foundation.data?.sources || [],
     );
   }, [world, foundation.data]);
@@ -142,6 +145,7 @@ export function SceneShell() {
         : (tabs[p][filter[p] ?? 0]?.items ?? places[p].items)[0]?.id || '');
   const pick = (p: Place) => (id: string) => setPicked((old) => ({ ...old, [p]: id }));
   world.view = place === 'data' || place === 'knowledge' ? place : null;
+  world.overview = place === 'home';
   world.selected = world.view ? current(place) : '';
   world.gate = place === 'data' ? gate : null;
   world.onPick = (id) => {
@@ -150,14 +154,14 @@ export function SceneShell() {
   };
   world.onGate = (next) => {
     setGate(next);
-    setFilter((old) => ({ ...old, data: next === 4 ? 2 : 0 }));
+    setFilter((old) => ({ ...old, data: 2 }));
     setPicked((old) => ({ ...old, data: '' }));
   };
 
   const sceneFocus = () =>
     (stage.current?.querySelector('.eng3d')?.getAttribute('data-focus') || null) as Focus;
   const go = (next: Place, id?: string) => {
-    if (requestNavigationLocked()) return;
+    if (next === 'output' || requestNavigationLocked()) return;
     if (id) {
       setPicked((old) => ({ ...old, [next]: id }));
       if (next === 'knowledge') setFilter((old) => ({ ...old, knowledge: 0 }));
@@ -184,7 +188,8 @@ export function SceneShell() {
   };
   const goRef = useRef(go);
   goRef.current = go;
-  // 在引擎舞台里直接点某一段也算一次切换：点输入车道 = 去数据基座；点输出、自进化轨道 = 去对应板块。
+  world.onNavigate = (next) => goRef.current(next);
+  // 在引擎舞台里直接点某一段也算一次切换：点输入车道 = 去数据基座；点自进化轨道 = 去经验库；输出板块暂不展示。
   useEffect(() => {
     const el = stage.current?.querySelector('.eng3d');
     if (!el) return;
@@ -192,7 +197,6 @@ export function SceneShell() {
       const f = el.getAttribute('data-focus') as Focus;
       const at = state.current.place;
       if (f === 'in') goRef.current('data');
-      else if (f === 'out' && at !== 'output') setPlace('output');
       else if (f === 'evo' && at !== 'experience') setPlace('experience');
       else if (!f && places[at].focus) setPlace('home');
     });
@@ -200,7 +204,7 @@ export function SceneShell() {
     return () => observer.disconnect();
   }, []);
   useEffect(() => {
-    // 抢在舞台自己的快捷键之前：1、2 去数据基座和知识库（舞台原本会把它们当作“输入”“处理”）。
+    // 抢在舞台自己的快捷键之前：1、2 去数据基座和知识星链（舞台原本会把它们当作“输入”“处理”）。
     const key = (e: KeyboardEvent) => {
       if (!e.isTrusted) return;
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
@@ -291,12 +295,21 @@ export function SceneShell() {
   // 模型里的文字标注（空间名、选中的记录名）每帧跟着相机投影。
   useEffect(() => {
     let raf = 0;
+    let lastView = world.view;
+    let knowledgeLabelsReady = false;
     const pool = new Map<string, HTMLElement>();
     const frame = () => {
       raf = requestAnimationFrame(frame);
       const box = labels.current,
         sc = scene.current;
       if (!box || !sc) return;
+      if (lastView !== world.view) {
+        lastView = world.view;
+        knowledgeLabelsReady = false;
+      }
+      if (world.view === 'knowledge' && !knowledgeLabelsReady) {
+        knowledgeLabelsReady = world.knowledgeSettled() && sc.cameraSettled();
+      }
       const seen = new Set<string>();
       for (const l of world.labels()) {
         const p = sc.project(l.p);
@@ -308,7 +321,7 @@ export function SceneShell() {
           pool.set(l.key, el);
           box.appendChild(el);
         }
-        el.className = `world-label ${l.kind}${l.on ? ' on' : ''}${l.dim ? ' dim' : ''}`;
+        el.className = `world-label ${l.kind}${l.on ? ' on' : ''}${l.dim ? ' dim' : ''}${l.kind === 'node' && !knowledgeLabelsReady ? ' arriving' : ''}`;
         const html = JSON.stringify([l.text, l.sub]);
         if (el.dataset.html !== html) {
           el.dataset.html = html;
@@ -328,60 +341,7 @@ export function SceneShell() {
           el.remove();
           pool.delete(key);
         }
-      // 数据基座：从模型里选中项的位置牵一条细线到清单里正对着的那张卡。
-      const svg = leader.current;
-      if (svg) {
-        const f = world.focus(),
-          card =
-            f && state.current.sheet !== 'peek' && state.current.live === null
-              ? shell.current?.querySelector('.deck [data-anchor]')
-              : null,
-          p = f ? sc.project(f) : null;
-        const r = card?.getBoundingClientRect(),
-          host = card?.closest('.card-scroll, .deck3d')?.getBoundingClientRect();
-        // 卡片在选中点的左右两侧时接到卡片侧边中点，在下方时接到卡片顶边。
-        let end: { x: number; y: number; side: boolean } | null = null;
-        if (
-          p &&
-          r &&
-          p.w > 0 &&
-          host &&
-          r.bottom > host.top &&
-          r.top < host.bottom &&
-          r.top < window.innerHeight - 48
-        ) {
-          const cy = Math.min(Math.max(r.top + r.height / 2, host.top + 12), host.bottom - 12);
-          if (p.x > r.right + 24) end = { x: r.right, y: cy, side: true };
-          else if (p.x < r.left - 24) end = { x: r.left, y: cy, side: true };
-          else if (p.y < r.top - 24)
-            end = {
-              x: Math.min(Math.max(p.x, r.left + 28), r.right - 28),
-              y: Math.max(r.top, host.top),
-              side: false,
-            };
-        }
-        svg.classList.toggle('on', !!end);
-        if (end) {
-          const x2 = end.x,
-            y2 = end.y,
-            f = (v: number) => v.toFixed(1),
-            mx = (p!.x + x2) / 2,
-            my = (p!.y + y2) / 2;
-          svg
-            .querySelector('path')!
-            .setAttribute(
-              'd',
-              end.side
-                ? `M${f(p!.x)} ${f(p!.y)} C${f(mx)} ${f(p!.y)} ${f(mx)} ${f(y2)} ${f(x2)} ${f(y2)}`
-                : `M${f(p!.x)} ${f(p!.y)} C${f(p!.x)} ${f(my)} ${f(x2)} ${f(my)} ${f(x2)} ${f(y2)}`,
-            );
-          const [a, b] = svg.querySelectorAll('circle');
-          a.setAttribute('cx', p!.x.toFixed(1));
-          a.setAttribute('cy', p!.y.toFixed(1));
-          b.setAttribute('cx', x2.toFixed(1));
-          b.setAttribute('cy', y2.toFixed(1));
-        }
-      }
+
     };
     frame();
     return () => {
@@ -409,6 +369,7 @@ export function SceneShell() {
         {
           '--deck-top': `${top}px`,
           '--deck-peek': `${stops.peek}px`,
+          '--header-haze': Math.max(0, Math.min(1, 1 - (top - stops.peek) / 160)),
         } as React.CSSProperties
       }
     >
@@ -453,7 +414,9 @@ export function SceneShell() {
         <div className="world-labels" ref={labels} aria-hidden="true" />
       </div>
 
+      <div className="shell-header-haze" aria-hidden="true" />
       <header className="shell-strip">
+        {enterpriseName && <span className="shell-enterprise-name" title={enterpriseName}>{enterpriseName}</span>}
         <span className="mark" aria-hidden="true">
           <svg width="26" height="26" viewBox="0 0 30 30">
             <ellipse
@@ -480,18 +443,18 @@ export function SceneShell() {
             <circle cx="15" cy="15" r="2.4" fill="#f1d6a0" />
           </svg>
         </span>
-        <h1>{work ? info.name : '引擎'}</h1>
+        <h1>{work ? info.name : '引擎概览'}</h1>
         <span className="live-state">
           {place === 'data'
             ? foundation.data
               ? `资产 ${foundation.data.items.length} · 待处理 ${foundation.data.governance.attention} · 隔离 ${foundation.data.governance.isolated} 项 · 平均质量 ${foundation.data.governance.averageQuality ?? '—'}`
               : '数据基座 · 等待连接'
             : place === 'knowledge'
-              ? '知识库 · ' +
+              ? '知识星链 · ' +
                 (knowledge.error || (knowledge.busy ? '正在同步' : knowledge.data?.status || '等待连接'))
               : tenant
                 ? '当前企业 · 按实际权限与运行记录展示'
-                : '引擎与其他板块为演示 · 数据基座与知识库已接入'}
+                : '引擎与其他板块为演示 · 数据基座与知识星链已接入'}
         </span>
       </header>
 
@@ -558,7 +521,7 @@ export function SceneShell() {
             foundation={foundation}
             picked={current(place)}
             pick={pick(place)}
-            filter={filter[place] ?? 0}
+            filter={filter[place] ?? 2}
             setFilter={(i) => setFilter((old) => ({ ...old, [place]: i }))}
             gate={gate}
             setGate={setGate}
@@ -587,11 +550,6 @@ export function SceneShell() {
         )}
       </div>
 
-      <svg className="world-leader" ref={leader} aria-hidden="true">
-        <path />
-        <circle r="3.5" />
-        <circle r="2" />
-      </svg>
 
       {palette && (
         <Palette knowledge={knowledge} foundation={foundation} go={go} close={() => setPalette(false)} />
@@ -647,7 +605,7 @@ function Home({
     .filter((x) => x.needsAttention)
     .slice(0, 8)
     .map((x) => ({ id: x.id, title: x.title, sub: x.label, place: 'data' as Place, act: '查看' }));
-  const cards = homeCards.map((c) =>
+  const cards = homeCards.filter(c => c.place !== 'output').map((c) =>
     c.place === 'data'
       ? {
           ...c,
@@ -848,7 +806,15 @@ function Work({
   gate: number | null;
   setGate: (gate: number | null) => void;
 }) {
-  const workTabs = place === 'knowledge' ? knowledge.tabs : tabs[place];
+  const workTabs = place === 'knowledge' ? knowledge.tabs.filter((t, i) => i === 0 || /^(需要留意|需处理)\s/.test(t.label)).map(t => ({
+    ...t, label: t.label.replace('需要留意', '需处理'),
+  })) : tabs[place];
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  useEffect(() => setCollapsedGroups(new Set()), [tenant, place, filter]);
+  const groupName = (x: Item) => place !== 'knowledge' ? x.group
+    : x.id.startsWith('company-background:') ? '企业背景'
+    : !knowledge.data?.items.some(item => item.id === x.id) ? '待处理来源'
+    : ['业务数据知识', '资料知识', '会话知识'][knowledge.data?.sourceKind[x.id] ?? -1] || '其他知识';
   const [source, setSource] = useState<Item | null>(null),
     [actionError, setActionError] = useState('');
   const selection = useRef(picked);
@@ -872,9 +838,9 @@ function Work({
       : all.find((x) => x.id === picked) || shown[0] || tab.items[0]) ||
     knowledge.empty;
   const groups = shown.reduce<[string, Item[]][]>((acc, x) => {
-    const g = acc.find(([name]) => name === x.group);
+    const g = acc.find(([name]) => name === groupName(x));
     if (g) g[1].push(x);
-    else acc.push([x.group, [x]]);
+    else acc.push([groupName(x), [x]]);
     return acc;
   }, []);
   const list = useRef<HTMLDivElement>(null);
@@ -885,8 +851,9 @@ function Work({
   const move = (e: React.KeyboardEvent) => {
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
     e.preventDefault();
-    const i = shown.findIndex((x) => x.id === current.id);
-    const next = shown[Math.max(0, Math.min(shown.length - 1, i + (e.key === 'ArrowDown' ? 1 : -1)))];
+    const visible = shown.filter(x => !collapsedGroups.has(groupName(x)));
+    const i = visible.findIndex((x) => x.id === current.id);
+    const next = visible[Math.max(0, Math.min(visible.length - 1, i + (e.key === 'ArrowDown' ? 1 : -1)))];
     if (!next) return;
     pick(next.id);
     requestAnimationFrame(() => list.current?.querySelector<HTMLElement>('[aria-pressed="true"]')?.focus());
@@ -908,7 +875,7 @@ function Work({
     }
   }
   return (
-    <section className="cards work glass" aria-label={info.name}>
+    <section className={`cards work glass${place === 'knowledge' ? ' knowledge' : ''}`} aria-label={info.name}>
       <article className="card list">
         <div className="tabs" role="tablist" aria-label={`${info.name}栏目`}>
           {workTabs.map((f, i) => (
@@ -934,29 +901,29 @@ function Work({
           )}
           {place === 'knowledge' && knowledge.backgroundError != null && <p role="status">企业背景暂不可用，未计入知识数量。<button onClick={knowledge.refreshBackground}>重试背景读取</button></p>}
           {groups.length === 0 && <p className="none">这一栏里没有符合条件的记录。</p>}
-          {groups.map(([name, items]) => (
-            <div key={name}>
-              <h3>
-                {name} <span>{items.length}</span>
-              </h3>
-              {items.map((x) => (
-                <button
-                  key={x.id}
-                  type="button"
-                  className="row"
-                  aria-pressed={x.id === current.id}
-                  onClick={() => pick(x.id)}
-                >
-                  <i className={toneClass(x.tone)} />
-                  <span className="t">
-                    <b>{x.name}</b>
-                    <span className={x.tone === 'bad' ? 'tone-bad-text' : undefined}>{x.why}</span>
-                  </span>
-                  <span className="s">{x.side}</span>
+          {groups.map(([name, items]) => {
+            const background = place === 'knowledge' && name === '企业背景';
+            const collapsed = collapsedGroups.has(name);
+            return <div key={name} className={background ? 'knowledge-background-overview' : 'knowledge-group'}>
+              {place === 'knowledge' ? !background && (
+                <button type="button" className="asset-source-toggle" aria-expanded={!collapsed}
+                  aria-label={`${name} ${items.length}`} onClick={() => setCollapsedGroups(old => {
+                    const next = new Set(old);
+                    if (next.has(name)) next.delete(name); else next.add(name);
+                    return next;
+                  })}>
+                  <span aria-hidden="true">{collapsed ? '▸' : '▾'}</span>
+                  <span className="source-overview-title"><strong>{name}</strong><small>{collapsed ? '点击展开' : '点击收起'}</small></span>
+                  <span className="num">{items.length}</span>
                 </button>
+              ) : <h3>{name} <span>{items.length}</span></h3>}
+              {!collapsed && items.map((x) => (
+                <KnowledgeListRow key={x.id} name={x.name} summary={x.why}
+                  side={place === 'knowledge' ? undefined : x.side}
+                  tone={x.tone} selected={x.id === current.id} onSelect={() => pick(x.id)} />
               ))}
-            </div>
-          ))}
+            </div>;
+          })}
         </div>
       </article>
 
@@ -1114,13 +1081,13 @@ function Palette({
   const [at, setAt] = useState(0);
   const all = useMemo(
     () => [
-      ...(Object.keys(places) as Place[]).map((p) => ({
+      ...(Object.keys(places) as Place[]).filter(p => p !== 'output').map((p) => ({
         place: p,
         id: undefined as string | undefined,
         label: places[p].name,
         sub: '前往',
       })),
-      ...(Object.keys(places) as Place[]).flatMap((p) =>
+      ...(Object.keys(places) as Place[]).filter(p => p !== 'output').flatMap((p) =>
         (p === 'data'
           ? (foundation.data?.items || []).map(asItem)
           : p === 'knowledge'

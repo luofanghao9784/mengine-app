@@ -163,7 +163,7 @@ test('新版设计读取真实接口，不把模拟遥测和统计放进企业�
   // The scene has one active main menu; scope avoids stage labels.
   await page
     .locator('.shell-switch button')
-    .filter({ hasText: /^引擎$/ })
+    .filter({ hasText: /^引擎概览$/ })
     .click();
   await expect(page.getByText('7 次工作请求 · 本月')).toBeVisible();
   await expect(page.getByText('8,584', { exact: false })).toHaveCount(0);
@@ -175,7 +175,7 @@ test('新版设计读取真实接口，不把模拟遥测和统计放进企业�
   expect(errors).toEqual([]);
   expect(f.requests.some((p) => p.endsWith('/engine-telemetry'))).toBeTruthy();
 });
-test('业务页保留运行用量、权限与本人输出入口', async ({ page }) => {
+test('业务页保留运行用量与权限入口，暂时隐藏输出', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   const f = await fixture(page);
@@ -184,10 +184,10 @@ test('业务页保留运行用量、权限与本人输出入口', async ({ page 
     .locator('.shell-switch button')
     .filter({ hasText: /^成员与权限$/ })
     .click();
-  await expect(page.getByRole('button', { name: '数据权限与部门' })).toBeVisible();
-  await expect(page.getByRole('button', { name: '账号、空间与职责交接' })).toBeVisible();
-  await expect(page.getByRole('button', { name: '账号、空间与职责交接' })).toHaveAttribute('aria-pressed', 'true');
-  await page.getByRole('button', { name: '数据权限与部门', exact: true }).click();
+  await expect(page.getByRole('button', { name: /^数据访问/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^成员与协作/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^成员与协作/ })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: /^数据访问/, exact: true }).click();
   await expect(page.getByRole('button', { name: '资源权限', exact: true })).toBeVisible();
   await page
     .locator('.shell-switch button')
@@ -196,15 +196,7 @@ test('业务页保留运行用量、权限与本人输出入口', async ({ page 
   await expect.poll(() => f.requests.some((p) => p.endsWith('/usage'))).toBeTruthy();
   await expect(page.locator('.scene-business-body')).toBeVisible();
   await page.screenshot({ path: '.local/integration-20261015/scene-usage.png' });
-  await page
-    .locator('.shell-switch button')
-    .filter({ hasText: /^输出$/ })
-    .click();
-  await expect(page.getByRole('link', { name: /会话回复/ })).toHaveAttribute(
-    'href',
-    `/workspace/#tenant=${tenant}&view=conversations`,
-  );
-  await expect(page.getByRole('link', { name: /成果文件/ })).toHaveAttribute('target', '_top');
+  await expect(page.locator('.shell-switch button').filter({ hasText: /^输出$/ })).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 test('直接访问其他企业的场景不读取业务数据', async ({ page }) => {
@@ -219,7 +211,7 @@ test('企业舞台的用量下钻留在当前企业场景', async ({ page }) => 
   await page.goto(`/tenant-admin/prototype/?tenant=${tenant}`);
   await page
     .locator('.shell-switch button')
-    .filter({ hasText: /^引擎$/ })
+    .filter({ hasText: /^引擎概览$/ })
     .click();
   await page.locator('.eng3d-lbl[data-channel="RESPONSE"]').dispatchEvent('click');
   await page.getByRole('link', { name: '查看运行与用量', exact: true }).dispatchEvent('click');
@@ -254,7 +246,7 @@ async function accessFixture(page: Page, admin = true) {
   });
   await page.goto(`/tenant-admin/prototype/?tenant=${tenant}`);
   await page.locator('.shell-switch button').filter({ hasText: /^成员与权限$/ }).click();
-  await page.getByRole('button', { name: '数据权限与部门', exact: true }).click();
+  await page.getByRole('button', { name: /^数据访问/, exact: true }).click();
   await expect(page.getByLabel('变更原因')).toBeVisible();
   return { state, writes, conflict: () => { conflict = true; }, fail: () => { unavailable = true; } };
 }
@@ -305,9 +297,9 @@ test('隔离检查权限撤回后清除正文，即使内容与权限版本未�
     await route.fulfill({ json: { content: '仅用于隔离检查的合成正文' } });
   });
   // Remount to load changed fixture immediately; subsequent revocation uses real polling.
-  await page.locator('.shell-switch button').filter({ hasText: /^输出$/ }).click();
+  await page.locator('.shell-switch button').filter({ hasText: /^数据基座$/ }).click();
   await page.locator('.shell-switch button').filter({ hasText: /^成员与权限$/ }).click();
-  await page.getByRole('button', { name: '数据权限与部门', exact: true }).click();
+  await page.getByRole('button', { name: /^数据访问/, exact: true }).click();
   await page.getByLabel('变更原因').fill('授权质量检查');
   await page.getByRole('button', { name: '按填写原因检查隔离内容' }).click();
   await expect(page.getByText('仅用于隔离检查的合成正文')).toBeVisible();
@@ -321,11 +313,11 @@ test('隔离检查权限撤回后清除正文，即使内容与权限版本未�
   await page.route('**/scene/dispatch?*', route => route.fulfill({status:503,json:{code:'SCENE_NOT_CONFIGURED',message:'请求未完成，请检查输入或当前状态。'}}));
   await page.goto(`/tenant-admin/prototype/?tenant=${tenant}`);
   await page.locator('.shell-switch button').filter({hasText:/^成员与权限$/}).click();
-  await expect(page.getByRole('button',{name:'账号、空间与职责交接'})).toHaveAttribute('aria-pressed','true');
-  await page.getByRole('button',{name:'数据权限与部门',exact:true}).click();
+  await expect(page.getByRole('button',{name:/^成员与协作/})).toHaveAttribute('aria-pressed','true');
+  await page.getByRole('button',{name:/^数据访问/,exact:true}).click();
   await expect(page.getByRole('status')).toContainText('数据服务尚未配置，请由部署人员接通服务');
-  await page.getByRole('button',{name:'账号、空间与职责交接'}).click();
-  await expect(page.getByRole('button',{name:'账号、空间与职责交接'})).toHaveAttribute('aria-pressed','true');
+  await page.getByRole('button',{name:/^成员与协作/}).click();
+  await expect(page.getByRole('button',{name:/^成员与协作/})).toHaveAttribute('aria-pressed','true');
   await expect(page.getByText('数据服务尚未配置', {exact:false})).toHaveCount(0);
  });
 
@@ -339,16 +331,16 @@ test('新版背景来源、知识与方法状态衔接，维护留在新版且�
   await page.locator('.shell-switch button').filter({hasText:/^数据基座$/}).click();
   await expect(page.getByRole('button',{name:'企业背景 · 内部来源 →'})).toHaveCount(0);
   await page.locator('.src-pick').filter({hasText:/^内部资料库/}).click();
-  await expect(page.getByRole('button',{name:'企业背景来源'})).toContainText('可读 1 条背景');
+  await expect(page.getByRole('button',{name:'企业背景来源'})).toContainText('1 项背景');
   await page.getByRole('button',{name:'企业背景来源'}).click();
   const source=page.locator('.background-detail');
   await expect(source.getByText('可读取 1 条背景',{exact:false})).toBeVisible();
   await expect(source.getByRole('heading',{name:'企业背景知识',exact:true})).toBeVisible();
-  await source.getByText('来源依据与关联方法').click();
+  await source.getByText('来源与关联指标',{exact:false}).click();
   await expect(source.getByText('合成收款汇总 · v1 · 背景依据有效')).toBeVisible();
   changed=true;
   await source.getByRole('button',{name:'刷新背景知识'}).click();
-  await source.getByText('来源依据与关联方法').click();
+  await source.getByText('来源与关联指标',{exact:false}).click();
   await expect(source.getByText('背景已变化，需核对并发布新方法版本',{exact:false})).toBeVisible();
   await page.screenshot({path:'.local/background-integration-desktop.png'});
   await page.setViewportSize({width:980,height:800});
@@ -356,7 +348,7 @@ test('新版背景来源、知识与方法状态衔接，维护留在新版且�
   await expect(page.getByRole('region',{name:'业务管理',exact:true})).toBeVisible();
   await expect(page).toHaveURL(/admin=company/);
   expect(new URL(page.url()).searchParams.get('view')).not.toBe('business');
-  await page.locator('.shell-switch button').filter({hasText:/^知识库$/}).click();
+  await page.locator('.shell-switch button').filter({hasText:/^知识星链$/}).click();
   await expect(page.getByRole('tab',{name:'全部 1',exact:true})).toBeVisible();
   await expect(page.getByRole('button',{name:'企业背景知识',exact:true})).toHaveCount(0);
   await page.locator('.card.list .row').filter({hasText:'企业背景'}).click();
@@ -375,13 +367,144 @@ test('四项背景合计一条知识，空背景不计数', async ({page}) => {
   const items = ['NAME','INDUSTRY','BUSINESS','TERM'].map((field,i)=>({id:`background:${i}`,sourceEntryId:actor,sourceVersionId:actor,revision:1,field,title:`合成背景${i}`,content:'合成内容',origin:'HUMAN',status:'REFERENCE_READY',methods:[]}));
   await page.route('**/company-information/source/knowledge', r=>r.fulfill({json:{tenantId:tenant,mode:'STRUCTURED_REFERENCE',items:populated?items:[]}}));
   await page.goto(`/tenant-admin/prototype/?tenant=${tenant}`);
-  await page.locator('.shell-switch button').filter({hasText:/^知识库$/}).click();
+  await page.locator('.shell-switch button').filter({hasText:/^知识星链$/}).click();
   await expect(page.getByRole('tab',{name:'全部 1',exact:true})).toBeVisible();
   await expect(page.locator('.card.list .row')).toHaveCount(1);
   await expect(page.locator('.card.list .row')).toContainText('4 项背景');
   await expect(page.getByRole('heading',{name:'企业背景知识',exact:true})).toBeVisible();
+  const categories = page.getByRole('group', {name:'背景分类'});
+  await categories.getByRole('button', {name:'业务术语 1', exact:true}).click();
+  await expect(page.locator('.background-reading-group article')).toHaveCount(1);
+  await expect(page.locator('.background-reading-group')).toContainText('合成背景3');
+  await categories.getByRole('button', {name:'全部 4', exact:true}).click();
+  await expect(page.locator('.background-reading-group article')).toHaveCount(4);
   populated=false;
   await page.getByRole('button',{name:'刷新背景知识'}).click();
   await expect(page.getByRole('tab',{name:'全部 0',exact:true})).toBeVisible();
   await expect(page.locator('.card.list .row')).toHaveCount(0);
+});
+
+test('知识星链标题等待镜头到位，快速往返后仍重新等待', async ({ page }) => {
+  await fixture(page);
+  await page.route('**/company-information/source/knowledge', r => r.fulfill({json: {
+    tenantId: tenant, mode: 'STRUCTURED_REFERENCE', items: [{id: `background:${actor}`, sourceEntryId: actor,
+      sourceVersionId: actor, revision: 1, field: 'BUSINESS', title: '合成背景', content: '合成内容',
+      origin: 'HUMAN', status: 'REFERENCE_READY', methods: []}],
+  }}));
+  await page.goto(`/tenant-admin/prototype/?tenant=${tenant}`);
+  const data = page.locator('.shell-switch button').filter({hasText:/^数据基座$/});
+  const knowledge = page.locator('.shell-switch button').filter({hasText:/^知识星链$/});
+  const label = page.locator('.world-label.node').first();
+  await data.click();
+  await page.waitForTimeout(2500);
+  await knowledge.click();
+  await expect(label).toHaveClass(/arriving/);
+  await expect(label).toHaveCSS('opacity', '0');
+  await expect(label).not.toHaveClass(/arriving/, {timeout: 10000});
+  await expect(label).toHaveCSS('opacity', '1');
+  await data.click();
+  await page.waitForTimeout(350);
+  await knowledge.click();
+  await expect(label).toHaveClass(/arriving/);
+  await expect(label).not.toHaveClass(/arriving/, {timeout: 10000});
+  await expect(label).toHaveCSS('opacity', '1');
+});
+
+test('知识列表按真实来源折叠，待处理来源不混入知识总数', async ({page}) => {
+  await fixture(page);
+  const items = [0, 1, 2].map(kind => ({id:`k${kind}`,name:`合成知识${kind}`, group:'企业管理',why:'合成摘要',side:'企业管理',tone:'ok',verdict:'合成内容',kvHead:[],kv:[],actions:[]}));
+  const pending = {...items[0], id:'pending',name:'合成待整理资料',tone:'warn'};
+  await page.route('**/scene/dispatch?path=%2Fscene-knowledge', r => r.fulfill({json:{items, relations:[], sourceKind:{k0:0,k1:1,k2:2},
+    tabs:[{label:'全部 3',items},{label:'需要留意 1',items:[pending]},{label:'来自业务数据 1',items:[items[0]]}],
+    stats:{title:'知识构成',rows:[]},aside:{title:'最近入库',rows:[]}, pending:0,failed:0,busy:false,available:false,needsGraph:false,status:'已读取',scopeRevision:'1'}}));
+  await page.goto(`/tenant-admin/prototype/?tenant=${tenant}`);
+  await page.locator('.shell-switch button').filter({hasText:/^知识星链$/}).click();
+  await expect(page.getByRole('tab')).toHaveCount(2);
+  await expect(page.getByRole('tab',{name:'全部 3',exact:true})).toBeVisible();
+  for (const name of ['业务数据知识 1','资料知识 1','会话知识 1']) await expect(page.getByRole('button',{name,exact:true})).toBeVisible();
+  const group = page.getByRole('button',{name:'业务数据知识 1',exact:true});
+  await group.click();
+  await expect(group).toHaveAttribute('aria-expanded','false');
+  await expect(page.locator('.card.list .row').filter({hasText:'合成知识0'})).toHaveCount(0);
+  await group.click();
+  await page.locator('.card.list .row').filter({hasText:'合成知识0'}).click();
+  await expect(page.locator('.card.detail')).toContainText('合成内容');
+  await page.getByRole('tab',{name:'需处理 1',exact:true}).click();
+  await expect(page.getByRole('button',{name:'待处理来源 1',exact:true})).toBeVisible();
+  await expect(page.locator('.card.list .row')).toHaveCount(1);
+  await page.getByRole('tab',{name:'全部 3',exact:true}).click();
+  await expect(page.locator('.card.list .row')).toHaveCount(3);
+});
+
+test('动画核心串联数据基座、引擎概览和知识星链，拖动不触发导航', async ({page}) => {
+  await fixture(page);
+  await page.emulateMedia({reducedMotion:'reduce'});
+  await page.goto(`/tenant-admin/prototype/?tenant=${tenant}`);
+  const nav = page.locator('.shell-switch');
+  await nav.getByRole('button',{name:'数据基座',exact:true}).click();
+  const corePoint = async () => page.locator('.eng3d-halowrap').evaluate(el => {
+    const r = el.parentElement!.getBoundingClientRect();
+    const matrix = new DOMMatrix((el as HTMLElement).style.transform);
+    return {x:r.x + matrix.m41,y:r.y + matrix.m42};
+  });
+  await page.waitForTimeout(250);
+  let p = await corePoint();
+  await page.mouse.move(p.x,p.y);
+  await page.mouse.down();
+  await page.mouse.move(p.x + 45,p.y + 20,{steps:5});
+  await page.mouse.up();
+  await expect(nav.getByRole('button',{name:'数据基座',exact:true})).toHaveAttribute('aria-current','page');
+  p = await corePoint();
+  await page.mouse.click(p.x,p.y);
+  await expect(nav.getByRole('button',{name:'引擎概览',exact:true})).toHaveAttribute('aria-current','page');
+  await page.waitForTimeout(250);
+  p = await corePoint();
+  await page.mouse.click(p.x,p.y);
+  await expect(nav.getByRole('button',{name:'知识星链',exact:true})).toHaveAttribute('aria-current','page');
+  await expect(page.getByRole('tablist',{name:'知识星链栏目'})).toBeVisible();
+});
+
+
+test('管理页分类、企业信息导航与窄屏布局', async ({page}) => {
+  const errors: string[] = [];
+  page.on('pageerror', e => errors.push(e.message));
+  await fixture(page);
+  await page.goto(`/tenant-admin/prototype/?tenant=${tenant}`);
+  await page.locator('.shell-switch').getByRole('button',{name:'成员与权限',exact:true}).click();
+  const menu = page.getByRole('navigation',{name:'成员权限管理范围'});
+  await expect(menu.getByRole('button',{name:/成员与协作/})).toHaveAttribute('aria-pressed','true');
+  await menu.getByRole('button',{name:/数据访问/}).click();
+  await expect(page.getByRole('button',{name:'资源权限',exact:true})).toBeVisible();
+  await menu.getByRole('button',{name:/岗位与关注/}).click();
+  await expect(page.locator('.work-roles')).toBeVisible();
+  await page.locator('.shell-switch').getByRole('button',{name:'企业信息',exact:true}).click();
+  const company = page.getByRole('navigation',{name:'企业信息栏目'});
+  await expect(company.getByRole('link',{name:/企业背景/})).toBeVisible();
+  await company.getByRole('link',{name:/AI内容偏好/}).click();
+  await expect(page).toHaveURL(/detail=preferences/);
+  await page.setViewportSize({width:760,height:900});
+  await expect(company).toBeVisible();
+  const fits = await page.locator('.management-content').evaluate(el => el.scrollWidth <= el.clientWidth + 2);
+  expect(fits).toBeTruthy();
+  expect(errors).toEqual([]);
+});
+
+test('共享空间列表在深色管理页中保持可读的普通、悬停与键盘状态', async ({page}) => {
+  await fixture(page);
+  await page.route('**/tenants/*/overview', r => r.fulfill({json:{tenantId:tenant,name:'合成企业',version:1,activeMemberCount:1,disabledMemberCount:0,sharedWorkspaceCount:1,invitationDelivery:'LOCAL'}}));
+  await page.route('**/workspaces?*', r => r.fulfill({json:[{id:actor,tenantId:tenant,name:'合成共享空间',kind:'SHARED',version:1,memberCount:3,ownerId:actor,ownerName:'合成负责人',description:''}]}));
+  await page.goto(`/tenant-admin/prototype/?tenant=${tenant}`);
+  await page.locator('.shell-switch').getByRole('button',{name:'成员与权限',exact:true}).click();
+  await page.getByRole('link',{name:'共享空间',exact:true}).click();
+  const row = page.getByRole('button',{name:'管理空间 合成共享空间',exact:true});
+  await expect(row).toBeVisible();
+  await expect(row).toHaveCSS('background-color','rgba(0, 0, 0, 0)');
+  await expect(row).toHaveCSS('color','rgb(243, 246, 250)');
+  await row.hover();
+  await expect(row).toHaveCSS('background-color','rgba(255, 255, 255, 0.06)');
+  await row.focus();
+  await expect(row).toBeFocused();
+  await page.setViewportSize({width:760,height:900});
+  await expect(row).toBeVisible();
+  expect(await page.locator('.management-content').evaluate(el => el.scrollWidth <= el.clientWidth + 2)).toBeTruthy();
 });

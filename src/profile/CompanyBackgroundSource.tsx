@@ -27,7 +27,7 @@ export function CompanyBackgroundSource({
   const source = data.value;
   const item = tagId ? source?.entries.find((e) => e.id === tagId) : null;
   return (
-    <section className="admin-section" aria-label={tagId ? '背景来源与知识使用' : '企业背景内部来源'}>
+    <section className="admin-section background-source" aria-label={tagId ? '背景来源与知识使用' : '企业背景内部来源'}>
       <h3>{tagId ? '背景来源与知识使用' : '企业背景 · 内部来源'}</h3>
       {data.error ? (
         <Failure error={data.error} retry={() => refresh((n) => n + 1)} />
@@ -51,11 +51,9 @@ export function CompanyBackgroundSource({
                   : '当前没有可读取的背景条目'}{' '}
                 · 按当前身份权限展示
               </p>
-              <p className="muted">
-                直接读取原背景，无需导入或复制。修改后下次读取生效；关联指标仍需按版本核对。
-              </p>
               <details>
                 <summary>查看来源版本与条目</summary>
+                <p>直接读取原背景，无需导入或复制。修改后下次读取生效；关联指标仍需按版本核对。</p>
                 <p>
                   当前可读内容版本：<code style={{ overflowWrap: 'anywhere' }}>{source.version}</code>
                 </p>

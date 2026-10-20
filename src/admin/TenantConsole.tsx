@@ -279,7 +279,8 @@ export function TenantConsole({
                   if (requestNavigationLocked()) event.preventDefault();
                 }}
               >
-                {label}
+                <span>{label}</span>
+                {embedded && <small>{({ background: '名称、行业、业务与术语', settings: '基础设置与企业配置', preferences: '表达方式与内容重点', news: '资讯渠道与订阅范围', records: '操作历史与管理审计', retention: '数据保留与退出管理' } as Record<string, string>)[key]}</small>}
               </a>
             ))}
           </nav>

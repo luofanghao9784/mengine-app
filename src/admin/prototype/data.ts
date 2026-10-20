@@ -40,7 +40,7 @@ const FIELD: [string, string, string] = ['字段', '含义', '依据'];
 const FACT: [string, string, string] = ['项', '内容', '状态'];
 
 export const places: Record<Place, PlaceInfo> = {
-  home: { name: '引擎', focus: null, status: '', filters: [], items: [] },
+  home: { name: '引擎概览', focus: null, status: '', filters: [], items: [] },
   data: {
     name: '数据基座',
     focus: null,
@@ -198,7 +198,7 @@ export const places: Record<Place, PlaceInfo> = {
     ],
   },
   knowledge: {
-    name: '知识库',
+    name: '知识星链',
     focus: null,
     status: '28 条知识，29 条关联；3 条需要留意',
     filters: ['全部 28', '来自业务数据 8', '来自资料 19', '来自会话 1'],
@@ -576,7 +576,7 @@ export const homeCards: {
   },
   {
     place: 'knowledge',
-    label: '知识库',
+    label: '知识星链',
     value: '28',
     unit: '条',
     note: '29 条关联，3 条需要留意',
