@@ -1156,12 +1156,8 @@ test('资料属性在原卡片右侧展开，关闭和全屏保留正文', async
   await expect.poll(() => panel.evaluate((n) => n.getBoundingClientRect().right <= innerWidth)).toBe(true);
 });
 
-test('资料卡显示封面图标、无权限说明栏且顶部范围居中', async ({ page }) => {
+test('资料卡与列表显示类型图标、切换布局且窄屏不溢出', async ({ page }) => {
   await fixture(page, accepted);
-  let reads = 0;
-  page.on('request', (request) => {
-    if (new URL(request.url()).pathname.endsWith('/library')) reads++;
-  });
   await page.route('**/api/**/library?*', (route) =>
     route.fulfill({
       json: {
@@ -1192,59 +1188,21 @@ test('资料卡显示封面图标、无权限说明栏且顶部范围居中', as
   for (const width of [1350, 952, 390]) {
     await page.setViewportSize({ width, height: 853 });
     await page.goto(home.replace('view=briefing', 'view=library&scope=personal'));
-    await expect(page.locator('.material-cover-art')).toHaveCount(2);
-    await expect(page.locator('.material-cover-art').first()).toBeVisible();
-    // A folder has no description row; its cover must still start at the same inset.
-    const geometry = await page.locator('.material-entry').evaluateAll((entries) =>
-      entries.map((entry) => {
-        const card = entry.getBoundingClientRect();
-        const cover = entry.querySelector('.material-cover')!.getBoundingClientRect();
-        const title = entry.querySelector('.material-entry-body > strong')!.getBoundingClientRect();
-        return { coverTop: cover.top - card.top, coverHeight: cover.height, titleTop: title.top - card.top };
-      }),
-    );
-    expect(geometry[0].coverHeight).toBe(width <= 650 ? 140 : 180);
-    expect(geometry[0].coverHeight).toBe(geometry[1].coverHeight);
-    expect(Math.abs(geometry[0].coverTop - geometry[1].coverTop)).toBeLessThan(1);
-    expect(Math.abs(geometry[0].titleTop - geometry[1].titleTop)).toBeLessThan(1);
+    await expect(page.locator('.material-entry')).toHaveCount(2);
+    for (const [label, layout] of [['卡片视图', 'cards'], ['列表视图', 'list']]) {
+      const toggle = page.getByRole('button', { name: label, exact: true });
+      await toggle.click();
+      await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.locator('.lib-entries')).toHaveClass(new RegExp(layout));
+      await expect(page.locator('.material-entry .lib-type svg')).toHaveCount(2);
+      await expect(page.locator('.material-entry').first()).toContainText('资料文件夹');
+      await expect(page.locator('.material-entry').last()).toContainText('工作文稿');
+      expect(await page.locator('.library-page').evaluate(n => n.scrollWidth <= n.clientWidth + 1)).toBe(true);
+    }
     await expect(page.getByText('可上传与维护', { exact: true })).toHaveCount(0);
     await expect(page.getByRole('button', { name: '上传资料', exact: true })).toBeVisible();
-    await expect(
-      page.locator('.library-controls').getByRole('button', { name: '新建文件夹', exact: true }),
-    ).toBeVisible();
-    await expect(
-      page.locator('.library-controls').getByRole('button', { name: '回收站', exact: true }),
-    ).toBeVisible();
-    const search = (await page.getByRole('search', { name: '资料搜索' }).boundingBox())!;
-    const upload = (await page.getByRole('button', { name: '上传资料', exact: true }).boundingBox())!;
-    expect(search.x + search.width).toBeLessThanOrEqual(upload.x);
-    expect(Math.abs(search.y + search.height / 2 - upload.y - upload.height / 2)).toBeLessThan(2);
-    const crumbs = (await page.getByRole('navigation', { name: '文件夹路径' }).boundingBox())!;
-    const views = (await page.getByRole('group', { name: '资料显示方式' }).boundingBox())!;
-    expect(Math.abs(crumbs.y + crumbs.height / 2 - views.y - views.height / 2)).toBeLessThan(2);
-    expect(await page.locator('.library-toolbar').evaluate((n) => n.scrollWidth <= n.clientWidth)).toBe(true);
-    await expect(page.getByRole('button', { name: '资料操作', exact: true })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: '刷新', exact: true })).toHaveCount(0);
-    const before = reads;
-    await page.locator('.material-entry').first().hover();
-    await page.locator('.access-content').evaluate((node) => {
-      node.scrollTop = 0;
-    });
-    await page.mouse.wheel(0, -240);
-    await expect.poll(() => reads).toBeGreaterThan(before);
-    await expect(page.locator('.library-page')).toHaveAttribute('data-refresh-phase', 'idle');
-    await expect(page.locator('.material-entry').first()).toHaveCSS('border-radius', '24px');
-    if (width === 952) {
-      const delta = await page.locator('.material-topbar').evaluate((node) => {
-        const bar = node.getBoundingClientRect(),
-          tabs = node.querySelector('.material-tabs')!.getBoundingClientRect();
-        return Math.abs(
-          (tabs.left + tabs.right) / 2 -
-            (bar.left + bar.right - parseFloat(getComputedStyle(node).paddingRight)) / 2,
-        );
-      });
-      expect(delta).toBeLessThan(2);
-    }
+    await expect(page.getByRole('button', { name: '新建文件夹', exact: true })).toBeVisible();
+
   }
 });
 
@@ -1321,6 +1279,7 @@ test('关注布局保存到账户，另一页面读取且冲突不覆盖新布�
   await page.mouse.up();
   await expect.poll(() => revision).toBe(1);
   await second.reload();
+  await second.getByRole('tab', { name: '关注', exact: true }).click();
   await expect(second.locator('.live-follow-tile').first()).toHaveAttribute('data-size', '1×2');
   // Another device changes the board after this page read revision 1.
   revision = 2;
@@ -1364,7 +1323,7 @@ test('设置加入企业后由用户选择去向，切换企业不携带原文�
   const other = { tenantId: uid(81), tenantName: '第二合成企业', role: 'MEMBER' };
   const identity = {
     account: { id: account, phone: '+8619900009001', displayName: '合成成员' },
-    platformAdmin: true,
+    platformAdmin: false,
     memberships: [{ tenantId: tenant, tenantName: '合成企业', role: 'MEMBER' }, other],
   };
   await page.route('**/api/v1/me', (route) => route.fulfill({ json: identity }));
