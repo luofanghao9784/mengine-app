@@ -8,23 +8,24 @@ import { hasPreparedBriefing, hasTerminalBriefing } from '../dist/runtime/briefi
 import { listen, close, body, json } from './fixtures/agent.mjs';
 import { usageFixture } from './fixtures/usage.mjs';
 
-async function generationFixture(t, { generation = true, missing = false, revoke = false, ignore = false, data = false, calculationLoop = false, ignoreCalculation = false, malformedDelivery = false, noUsefulContent = false } = {}) {
+async function generationFixture(t, { generation = true, missing = false, revoke = false, ignore = false, data = false, calculationLoop = false, ignoreCalculation = false, malformedDelivery = false, noUsefulContent = false, supplement = false, revokeSupplement = false } = {}) {
   const queries = [], receipts = [], deliveries = [];
   const sourceId = randomUUID(), artifactId = randomUUID(), calculationId = randomUUID();
-  let calls = 0, calculations = 0, attemptedDelivery = false;
+  let calls = 0, calculations = 0, attemptedDelivery = false, supplementalCalls = 0;
   const platform = createServer(async (req, res) => {
     if (usageFixture(req, res)) return;
     const input = await body(req);
     if (req.url.endsWith('/check'))
       return json(res, {
-        allowed: !(revoke && queries.length === 3), executionClass: 'live',
+        allowed: !(revoke && queries.length === 3) && !(revokeSupplement && supplementalCalls > 2), executionClass: 'live',
+        ...(supplement ? {briefingEvidenceSupplementVersion:'1.0'} : {}),
         contextVersion: '1.0', briefingContentVersion: '1.0', briefingGeneration: generation,
         ...(data ? { tableComparisonVersion: '1.0' } : {}),
       });
     if (req.url.endsWith('/context'))
       return json(res, {
-        contractVersion: '1.0', action: 'bootstrap', referenceOnly: true,
-        result: { sourceScope: 'SELECTED', selectedMaterials: [{ filename: 'selected.txt', version: 1 }] },
+        contractVersion: '1.0', action: input.action, referenceOnly: true,
+        result: input.action==='profiles'?{items:[],hasMore:false}:{ sourceScope: 'SELECTED', selectedMaterials: [{ filename: 'selected.txt', version: 1 }] },
       });
     if (req.url.endsWith('/execution/open'))
       return json(res, { accepted: true, policy: 'READ_ONLY_PRIVATE_V1' });
@@ -65,7 +66,14 @@ async function generationFixture(t, { generation = true, missing = false, revoke
     createModel: () => ({ usage: null, async *generate(request) {
       calls++;
       const searchAvailable = request.tools.some((tool) => tool.name === 'search_sources');
-      if ((searchAvailable && (generation || calls < 5)) || (ignore && calls === 4)) {
+      if (supplement && calculations > 0 && supplementalCalls < 3) {
+        assert.ok(!request.tools.some(tool => tool.name === 'compare_table'));
+        const name=supplementalCalls===0?'request_briefing_evidence':'task_context';
+        assert.ok(request.tools.some(tool=>tool.name===name));
+        yield {type:'tool_call',id:`supplement-${calls}`,name,arguments:JSON.stringify(supplementalCalls===0?{reason:'缺少业务确认与银行到账的解释边界'}:{action:'profiles',scope:'TENANT'})};
+        supplementalCalls++;
+        yield {type:'finish',reason:'tool_calls'};
+      } else if ((searchAvailable && (generation || calls < 5)) || (ignore && calls === 4)) {
         yield { type: 'tool_call', id: `search-${calls}`, name: 'search_sources',
           arguments: JSON.stringify({ query: `客户 ${calls}` }) };
         yield { type: 'finish', reason: 'tool_calls' };
@@ -263,3 +271,15 @@ for (const mode of ['prepared', 'duplicate', 'missing', 'forbidden'])
     assert.equal(result.status, mode === 'forbidden' ? 'limit' : 'completed');
     assert.equal(result.finalResponseReserved, true);
   });
+
+test('negotiated supplement reopens exactly two reads after calculation and then delivers within eight calls', async t => {
+  const f=await generationFixture(t,{data:true,supplement:true});
+  const result=await f.run();
+  assert.equal(result.outcome,'COMPLETE');assert.equal(f.calls(),8);assert.equal(f.calculations(),1);
+  assert.deepEqual(f.receipts.filter(r=>r.status==='succeeded').map(r=>r.name),['search_sources','search_sources','search_sources','compare_table','request_briefing_evidence','task_context','task_context','deliver_briefing']);
+});
+
+test('source revocation during supplemental reads prevents delivery', async t => {
+ const f=await generationFixture(t,{data:true,supplement:true,revokeSupplement:true});
+ await assert.rejects(f.run(), e=>e.code==='TASK_ACCESS_DENIED');assert.equal(f.deliveries.length,0);assert.equal(f.calculations(),1);
+});

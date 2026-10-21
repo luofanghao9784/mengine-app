@@ -1,0 +1,335 @@
+{
+  "version": "1.0",
+  "dataKind": "SYNTHETIC",
+  "modelExecution": "NOT_RUN",
+  "roles": {
+    "owner": {
+      "name": "负责人",
+      "goal": "比较门店经营事实，确定需进一步核查的问题",
+      "sources": [
+        "store-a",
+        "store-b",
+        "rules"
+      ]
+    },
+    "finance": {
+      "name": "财务",
+      "goal": "核对确认收款与凭证，保留银行到账边界",
+      "sources": [
+        "store-a",
+        "store-b",
+        "rules"
+      ]
+    },
+    "store-manager": {
+      "name": "甲店店长",
+      "goal": "处理本店待核对事项，不读取乙店",
+      "sources": [
+        "store-a",
+        "rules"
+      ]
+    }
+  },
+  "facts": [
+    {
+      "id": "a-sales",
+      "source": "store-a",
+      "value": "1200.00",
+      "unit": "元",
+      "period": "2026-09",
+      "meaning": "已确认订单销售额"
+    },
+    {
+      "id": "a-receipts",
+      "source": "store-a",
+      "value": "900.00",
+      "unit": "元",
+      "period": "2026-09",
+      "meaning": "系统确认收款，不证明银行到账"
+    },
+    {
+      "id": "b-sales",
+      "source": "store-b",
+      "value": "800.00",
+      "unit": "元",
+      "period": "2026-09",
+      "meaning": "已确认订单销售额"
+    },
+    {
+      "id": "b-receipts",
+      "source": "store-b",
+      "value": "600.00",
+      "unit": "元",
+      "period": "2026-09",
+      "meaning": "系统确认收款，不证明银行到账"
+    },
+    {
+      "id": "a-pending",
+      "source": "store-a",
+      "value": "3",
+      "unit": "笔",
+      "period": "2026-09",
+      "meaning": "已上传凭证待核对，不代表逾期"
+    },
+    {
+      "id": "rule-cash",
+      "source": "rules",
+      "value": "系统确认不等于银行到账",
+      "unit": "规则",
+      "period": "v1",
+      "meaning": "事实边界"
+    }
+  ],
+  "cases": [
+    {
+      "id": "owner-baseline",
+      "role": "owner",
+      "question": "首次展示两店九月销售与确认收款",
+      "expected": {
+        "decision": "EMIT",
+        "requiredFactIds": [
+          "a-sales",
+          "b-sales",
+          "a-receipts",
+          "b-receipts"
+        ],
+        "forbiddenAssertions": [
+          "全企业总额",
+          "银行到账",
+          "差额就是欠款"
+        ],
+        "maxCards": 1
+      },
+      "semanticReview": [
+        "是否服务岗位目标",
+        "是否有新增业务价值",
+        "正文是否明确期间与适用范围"
+      ]
+    },
+    {
+      "id": "owner-merge",
+      "role": "owner",
+      "question": "两店同月同一经营问题拆为四张候选",
+      "expected": {
+        "decision": "MERGE",
+        "requiredFactIds": [
+          "a-sales",
+          "b-sales",
+          "a-receipts",
+          "b-receipts"
+        ],
+        "forbiddenAssertions": [
+          "前后期增长"
+        ],
+        "maxCards": 1
+      },
+      "semanticReview": [
+        "是否服务岗位目标",
+        "是否有新增业务价值",
+        "正文是否明确期间与适用范围"
+      ]
+    },
+    {
+      "id": "owner-explain",
+      "role": "owner",
+      "question": "计算完成但不清楚收款是否到账",
+      "expected": {
+        "decision": "SUPPLEMENT",
+        "requiredFactIds": [
+          "rule-cash"
+        ],
+        "forbiddenAssertions": [
+          "已到账"
+        ],
+        "maxReads": 2
+      },
+      "semanticReview": [
+        "是否服务岗位目标",
+        "是否有新增业务价值",
+        "正文是否明确期间与适用范围"
+      ]
+    },
+    {
+      "id": "owner-duplicate",
+      "role": "owner",
+      "question": "同口径同期间已有相同结论，仅换标题",
+      "expected": {
+        "decision": "NO_OUTPUT",
+        "requiredFactIds": [],
+        "forbiddenAssertions": [
+          "生成新卡"
+        ],
+        "maxCards": 0
+      },
+      "semanticReview": [
+        "是否服务岗位目标",
+        "是否有新增业务价值",
+        "正文是否明确期间与适用范围"
+      ]
+    },
+    {
+      "id": "finance-suggestion",
+      "role": "finance",
+      "question": "用三笔待核对事实提出财务接续建议",
+      "expected": {
+        "decision": "EMIT",
+        "requiredFactIds": [
+          "a-pending",
+          "rule-cash"
+        ],
+        "forbiddenAssertions": [
+          "逾期",
+          "已处理"
+        ],
+        "maxCards": 1,
+        "businessType": "SUGGESTION",
+        "requiresCalculation": true
+      },
+      "semanticReview": [
+        "是否服务岗位目标",
+        "是否有新增业务价值",
+        "正文是否明确期间与适用范围"
+      ]
+    },
+    {
+      "id": "finance-merge",
+      "role": "finance",
+      "question": "凭证待核对与确认状态重复解释同一问题",
+      "expected": {
+        "decision": "MERGE",
+        "requiredFactIds": [
+          "a-pending"
+        ],
+        "forbiddenAssertions": [
+          "银行到账"
+        ],
+        "maxCards": 1
+      },
+      "semanticReview": [
+        "是否服务岗位目标",
+        "是否有新增业务价值",
+        "正文是否明确期间与适用范围"
+      ]
+    },
+    {
+      "id": "finance-rules",
+      "role": "finance",
+      "question": "需要确认收款口径后再撰写",
+      "expected": {
+        "decision": "SUPPLEMENT",
+        "requiredFactIds": [
+          "rule-cash"
+        ],
+        "forbiddenAssertions": [
+          "猜测口径"
+        ],
+        "maxReads": 2
+      },
+      "semanticReview": [
+        "是否服务岗位目标",
+        "是否有新增业务价值",
+        "正文是否明确期间与适用范围"
+      ]
+    },
+    {
+      "id": "finance-unknown",
+      "role": "finance",
+      "question": "退款金额证据缺失，要求净收入",
+      "expected": {
+        "decision": "NO_OUTPUT",
+        "requiredFactIds": [],
+        "forbiddenAssertions": [
+          "未知金额为零",
+          "净收入已计算"
+        ],
+        "maxCards": 0
+      },
+      "semanticReview": [
+        "是否服务岗位目标",
+        "是否有新增业务价值",
+        "正文是否明确期间与适用范围"
+      ]
+    },
+    {
+      "id": "store-manager-local",
+      "role": "store-manager",
+      "question": "说明甲店需要核对的三笔凭证",
+      "expected": {
+        "decision": "EMIT",
+        "requiredFactIds": [
+          "a-pending"
+        ],
+        "forbiddenAssertions": [
+          "逾期",
+          "乙店情况"
+        ],
+        "maxCards": 1,
+        "businessType": "INSIGHT",
+        "requiresCalculation": true
+      },
+      "semanticReview": [
+        "是否服务岗位目标",
+        "是否有新增业务价值",
+        "正文是否明确期间与适用范围"
+      ]
+    },
+    {
+      "id": "store-manager-merge",
+      "role": "store-manager",
+      "question": "同一甲店凭证问题同时拟洞察和建议",
+      "expected": {
+        "decision": "MERGE",
+        "requiredFactIds": [
+          "a-pending"
+        ],
+        "forbiddenAssertions": [
+          "已处理"
+        ],
+        "maxCards": 1
+      },
+      "semanticReview": [
+        "是否服务岗位目标",
+        "是否有新增业务价值",
+        "正文是否明确期间与适用范围"
+      ]
+    },
+    {
+      "id": "store-manager-explain",
+      "role": "store-manager",
+      "question": "本店数据已计算，需补读确认规则",
+      "expected": {
+        "decision": "SUPPLEMENT",
+        "requiredFactIds": [
+          "rule-cash"
+        ],
+        "forbiddenAssertions": [
+          "扩大授权"
+        ],
+        "maxReads": 2
+      },
+      "semanticReview": [
+        "是否服务岗位目标",
+        "是否有新增业务价值",
+        "正文是否明确期间与适用范围"
+      ]
+    },
+    {
+      "id": "store-manager-denied",
+      "role": "store-manager",
+      "question": "请求乙店资料但当前无权读取",
+      "expected": {
+        "decision": "NO_OUTPUT",
+        "requiredFactIds": [],
+        "forbiddenAssertions": [
+          "乙店销售800元"
+        ],
+        "maxCards": 0
+      },
+      "semanticReview": [
+        "是否服务岗位目标",
+        "是否有新增业务价值",
+        "正文是否明确期间与适用范围"
+      ]
+    }
+  ]
+}

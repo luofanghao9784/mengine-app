@@ -40,7 +40,9 @@
               "manage_plan",
               "ask_user",
               "read_skill_resource",
-              "render_presentation"
+              "render_presentation",
+              "select_briefing_topic",
+              "request_briefing_evidence"
             ]
           }
         }
@@ -126,7 +128,9 @@
             "manage_plan",
             "ask_user",
             "read_skill_resource",
-            "render_presentation"
+            "render_presentation",
+            "select_briefing_topic",
+            "request_briefing_evidence"
           ]
         },
         "status": {

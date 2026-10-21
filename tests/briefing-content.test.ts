@@ -151,3 +151,12 @@ test('chain chart accepts bounded multi-store rows without pretending to be a si
  c.content.chart.rows=[r];assert.equal(isBriefingDocument(c),false);
  c.content.chart.rows=[r,{...r,group:'乙'}];c.content.schemaVersion='briefing-data-v1';assert.equal(isBriefingDocument(c),false);
 });
+
+test('verified text calculation keeps evidence but never becomes a chart or news', () => {
+  const doc = JSON.parse(readFileSync(new URL('../contracts/fixtures/dataset-briefing.json', import.meta.url), 'utf8'));
+  doc.content.schemaVersion='briefing-text-v1';doc.content.businessType='SUGGESTION';doc.content.chart=null;doc.content.presentation=null;
+  assert.ok(isBriefingDocument(doc));
+  for(const change of [{calculationSha256:null},{calculationArtifactId:null},{businessType:'INFO'},{datasetBasis:{...doc.content.datasetBasis,ignoredRows:999}}]){
+    const bad=structuredClone(doc);Object.assign(bad.content,change);assert.equal(isBriefingDocument(bad),false);
+  }
+});

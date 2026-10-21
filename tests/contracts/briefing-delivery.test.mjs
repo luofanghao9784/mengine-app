@@ -28,3 +28,11 @@ test('model submits prose and receipt identity, never authoritative chart values
   ])
     assert.equal(check(bad), false);
 });
+
+test('text types may attach calculation evidence; INFO and model-authored chart values remain rejected', () => {
+ const check=ajv.compile({$ref:schema.$id+'#/$defs/request'});
+ const card={title:'两店收款需要核对',summary:'本次确认收款保留原统计范围，建议核对凭证。',analysis:['建议按已核验的期间与门店核对凭证。','系统确认不等于银行到账，仍需后续核查。'],calculationArtifactId:'00000000-0000-4000-8000-000000000001'};
+ for(const businessType of ['INSIGHT','SUGGESTION','RESULT'])assert.ok(check({...card,businessType}));
+ assert.equal(check({...card,businessType:'INFO'}),false);
+ assert.equal(check({...card,businessType:'SUGGESTION',chart:{current:999}}),false);
+});

@@ -66,9 +66,10 @@ public class BriefingContentService {
         request.analysis().forEach(s->text(s,12,500,true));
         boolean automatic=Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM briefing_generation_batches WHERE task_id=?)",Boolean.class,job.id()));
         boolean datasetSample=Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM task_dataset_reads WHERE task_id=?)",Boolean.class,job.id()));
-        if(!type.equals("DATA"))BriefingEditorialQuality.validate(request,automatic,datasetSample,false);
+        if(!type.equals("DATA")&&request.calculationArtifactId()==null)BriefingEditorialQuality.validate(request,automatic,datasetSample,false);
         int attempt=db.queryForObject("SELECT attempt FROM conversation_tasks WHERE id=? AND lease_token=? FOR UPDATE",Integer.class,job.id(),job.token());
-        if(!type.equals("DATA"))return createText(job,request,type,attempt);
+        if(!type.equals("DATA")&&request.calculationArtifactId()==null)return createText(job,request,type,attempt);
+        if(type.equals("INFO"))throw new IdentityException(422,"BRIEFING_TYPE_MISMATCH");
         if(request.calculationArtifactId()==null)throw IdentityException.invalid();
         var chain=db.queryForList("SELECT body::text FROM task_reconciliation_receipts WHERE task_id=? AND attempt_number=? AND body->>'calculationArtifactId'=?",String.class,job.id(),attempt,request.calculationArtifactId().toString());
         if(chain.size()==1)return createChain(job,request,attempt,json.readTree(chain.getFirst()));
@@ -85,21 +86,25 @@ public class BriefingContentService {
         String header=calc.path("headers").path(params.path("valueColumn").asText()).asText().split("\\n")[0];
         String unit="原表数值单位";var match=java.util.regex.Pattern.compile("[（(]([^）)]{1,12})[）)]").matcher(header);if(match.find())unit=match.group(1);
         var chart=new Chart("GROUPED_BAR",header,unit,params.path("baseline").asText(),params.path("current").asText(),params.path("range").asText(),List.copyOf(rows),json.treeToValue(calc.path("totals"),Row.class));
-        var presentation=BriefingPresentationPolicy.resolve(request,"DATA",chart);
+        var presentation=calculationPresentation(request,chart);
         var prior=db.queryForList("SELECT a.id,a.sha256,a.content FROM conversation_artifacts a WHERE task_id=? AND attempt_number=? AND EXISTS(SELECT 1 FROM identity_audit p WHERE p.target_id=a.id AND p.action='TASK_BRIEFING_CREATED' AND p.tenant_id=a.tenant_id)",job.id(),attempt);
         if(!prior.isEmpty()){
             var doc=read(prior.getFirst());var old=doc.content();
-            if(!old.calculationArtifactId().equals(request.calculationArtifactId())||!old.title().equals(request.title().strip())||!old.summary().equals(request.summary().strip())||!old.analysis().equals(request.analysis())||!BriefingPresentationPolicy.same(old,presentation))throw new IdentityException(409,"BRIEFING_ALREADY_CREATED");
+            if(!old.businessType().equals(type(request))||!old.calculationArtifactId().equals(request.calculationArtifactId())||!old.title().equals(request.title().strip())||!old.summary().equals(request.summary().strip())||!old.analysis().equals(request.analysis())||!BriefingPresentationPolicy.same(old,presentation))throw new IdentityException(409,"BRIEFING_ALREADY_CREATED");
             return doc;
         }
         if(!hasUsefulData(rows))throw new NoUsefulData();
-        var content=new Content("briefing-data-v1","DATA",request.title().strip(),request.summary().strip(),List.copyOf(request.analysis()),chart,source,request.calculationArtifactId(),(String)item.get("sha256"),Instant.now().toString(),null,null,presentation);
+        var content=new Content("DATA".equals(type(request))?"briefing-data-v1":"briefing-text-v1",type(request),request.title().strip(),request.summary().strip(),List.copyOf(request.analysis()),"DATA".equals(type(request))?chart:null,source,request.calculationArtifactId(),(String)item.get("sha256"),Instant.now().toString(),null,null,presentation);
         if(!reserve(job,content))return null;
         byte[] body=json.writeValueAsBytes(content);if(body.length>20000)throw new IdentityException(413,"BRIEFING_CONTENT_LIMIT");
         var total=db.queryForMap("SELECT count(*) n,coalesce(sum(octet_length(content)),0) bytes FROM conversation_artifacts WHERE task_id=? AND attempt_number=?",job.id(),attempt);
         if(((Number)total.get("n")).intValue()>=8||((Number)total.get("bytes")).longValue()+body.length>65536)throw new IdentityException(413,"BRIEFING_CONTENT_LIMIT");
         UUID id=UUID.randomUUID();String sha=hash(body);db.update("INSERT INTO conversation_artifacts(id,tenant_id,workspace_id,task_id,filename,sha256,content,attempt_number) VALUES (?,?,?,?,?,?,?,?)",id,job.tenant(),job.space(),job.id(),"briefing-data-"+sha.substring(0,20)+".json",sha,body,attempt);
         audit.record(job.actor(),job.tenant(),"TASK_BRIEFING_CREATED",id,"SUCCESS");return new Document(id,sha,content);
+    }
+    private static String type(Request request){return request.businessType()==null?"DATA":request.businessType();}
+    private BriefingPresentationPolicy.Presentation calculationPresentation(Request request,Chart chart){
+        return BriefingPresentationPolicy.resolve(request,type(request),"DATA".equals(type(request))?chart:null);
     }
     private Document createChain(ConversationService.Job job,Request request,int attempt,tools.jackson.databind.JsonNode evidence){
         var calc=evidence.path("calculation");if(!"reconciliation-chain-v1".equals(calc.path("recipeVersion").asText()))throw IdentityException.invalid();
@@ -113,11 +118,11 @@ public class BriefingContentService {
         boolean orders="orderSalesByConfirmationDate".equals(calc.path("metric").asText());
         var chart=new Chart("GROUPED_BAR",paired?"订单销售与确认收款":orders?"已确认订单金额":"系统确认收款","元",paired?"订单销售额":"不适用",paired?"确认收款":"月内累计",calc.path("from").asText()+"—"+calc.path("to").asText()+" · "+rows.size()+"家店",rows,new Row(null,paired?calc.path("orderTotal").asText():null,calc.path("total").asText(),null,null,null,null,null));
         // The verified result shape fixes the chart; authors cannot hide one metric or imply a time comparison.
-        var presentation=new BriefingPresentationPolicy.Presentation("briefing-presentation-v1","EDITORIAL",paired?"GROUPED_BAR":"CURRENT_BAR",null,null,List.of());
+        var presentation="DATA".equals(type(request))?new BriefingPresentationPolicy.Presentation("briefing-presentation-v1","EDITORIAL",paired?"GROUPED_BAR":"CURRENT_BAR",null,null,List.of()):calculationPresentation(request,chart);
         BriefingEditorialQuality.validate(request,true,true,true);
-        var content=new Content("briefing-chain-v1","DATA",request.title(),request.summary(),List.copyOf(request.analysis()),chart,null,request.calculationArtifactId(),sha,Instant.now().toString(),null,null,presentation);
+        var content=new Content("DATA".equals(type(request))?"briefing-chain-v1":"briefing-text-v1",type(request),request.title(),request.summary(),List.copyOf(request.analysis()),"DATA".equals(type(request))?chart:null,null,request.calculationArtifactId(),sha,Instant.now().toString(),null,null,presentation);
         var prior=db.queryForList("SELECT id,sha256,content FROM conversation_artifacts a WHERE task_id=? AND attempt_number=? AND EXISTS(SELECT 1 FROM identity_audit p WHERE p.target_id=a.id AND p.action='TASK_BRIEFING_CREATED')",job.id(),attempt);
-        if(!prior.isEmpty()){var old=read(prior.getFirst());if(!old.content().title().equals(content.title())||!old.content().summary().equals(content.summary())||!BriefingPresentationPolicy.same(old.content(),presentation)||!old.content().analysis().equals(content.analysis())||!Objects.equals(old.content().calculationArtifactId(),content.calculationArtifactId()))throw new IdentityException(409,"BRIEFING_ALREADY_CREATED");return old;}
+        if(!prior.isEmpty()){var old=read(prior.getFirst());if(!old.content().businessType().equals(content.businessType())||!old.content().title().equals(content.title())||!old.content().summary().equals(content.summary())||!BriefingPresentationPolicy.same(old.content(),presentation)||!old.content().analysis().equals(content.analysis())||!Objects.equals(old.content().calculationArtifactId(),content.calculationArtifactId()))throw new IdentityException(409,"BRIEFING_ALREADY_CREATED");return old;}
         if(!hasUsefulData(rows))throw new NoUsefulData();if(!reserve(job,content))return null;
         byte[] body=json.writeValueAsBytes(content);if(body.length>20000)throw new IdentityException(413,"BRIEFING_CONTENT_LIMIT");UUID id=UUID.randomUUID();String digest=hash(body);
         db.update("INSERT INTO conversation_artifacts(id,tenant_id,workspace_id,task_id,filename,sha256,content,attempt_number) VALUES(?,?,?,?,?,?,?,?)",id,job.tenant(),job.space(),job.id(),"briefing-chain.json",digest,body,attempt);audit.record(job.actor(),job.tenant(),"TASK_BRIEFING_CREATED",id,"SUCCESS");return new Document(id,digest,content);
@@ -146,11 +151,11 @@ public class BriefingContentService {
         String metric=countRows?"记录数":calc.request().valueColumn(),unit=countRows?"条":metric.endsWith("_cents")?"分":metric.endsWith("_grams")?"克":"原数据数值单位";var match=java.util.regex.Pattern.compile("[（(]([^）)]{1,12})[）)]").matcher(metric);if(match.find())unit=match.group(1);
         if("CENTS_TO_YUAN".equals(calc.request().conversion()))unit="元";
         var chart=new Chart("GROUPED_BAR",metric,unit,summary?"不适用":calc.request().baseline(),summary?"本次汇总":calc.request().current(),calc.request().dateColumn()==null?"全部快照 · "+source.rowCount()+" 行":"日期筛选 · "+calc.matchedRows()+" 行 · 缺日 "+calc.missingDateRows()+" 行",calc.rows(),calc.totals(),shares);
-        var presentation=summary&&request.presentation()==null?new BriefingPresentationPolicy.Presentation("briefing-presentation-v1","EDITORIAL","CURRENT_BAR",null,null,List.of()):BriefingPresentationPolicy.resolve(request,"DATA",chart);
+        var presentation="DATA".equals(type(request))&&summary&&request.presentation()==null?new BriefingPresentationPolicy.Presentation("briefing-presentation-v1","EDITORIAL","CURRENT_BAR",null,null,List.of()):calculationPresentation(request,chart);
         var prior=db.queryForList("SELECT a.id,a.sha256,a.content FROM conversation_artifacts a WHERE task_id=? AND attempt_number=? AND EXISTS(SELECT 1 FROM identity_audit p WHERE p.target_id=a.id AND p.action='TASK_BRIEFING_CREATED' AND p.tenant_id=a.tenant_id)",job.id(),attempt);
-        if(!prior.isEmpty()){var doc=read(prior.getFirst());var old=doc.content();if(!Objects.equals(old.calculationArtifactId(),request.calculationArtifactId()) || !old.title().equals(request.title().strip()) || !old.summary().equals(request.summary().strip()) || !old.analysis().equals(request.analysis())||!BriefingPresentationPolicy.same(old,presentation))throw new IdentityException(409,"BRIEFING_ALREADY_CREATED");return doc;}
+        if(!prior.isEmpty()){var doc=read(prior.getFirst());var old=doc.content();if(!old.businessType().equals(type(request))||!Objects.equals(old.calculationArtifactId(),request.calculationArtifactId()) || !old.title().equals(request.title().strip()) || !old.summary().equals(request.summary().strip()) || !old.analysis().equals(request.analysis())||!BriefingPresentationPolicy.same(old,presentation))throw new IdentityException(409,"BRIEFING_ALREADY_CREATED");return doc;}
         if(!hasUsefulData(calc.rows()))throw new NoUsefulData();
-        var content=new Content("briefing-dataset-v1","DATA",request.title().strip(),request.summary().strip(),List.copyOf(request.analysis()),chart,null,request.calculationArtifactId(),calculationHash,Instant.now().toString(),source,new DatasetBasis(summary?(calc.request().groupColumns().isEmpty()?"全部记录":String.join(" / ",calc.request().groupColumns())):calc.request().groupColumn(),summary?"不适用":calc.request().periodColumn(),calc.matchedRows(),calc.ignoredRows(),composition?"COMPOSITION":summary?"SUMMARY":calc.request().periodMode()==null?"EXACT":calc.request().periodMode(),calc.request().timeZone()==null?"Asia/Shanghai":calc.request().timeZone()),presentation);
+        var content=new Content("DATA".equals(type(request))?"briefing-dataset-v1":"briefing-text-v1",type(request),request.title().strip(),request.summary().strip(),List.copyOf(request.analysis()),"DATA".equals(type(request))?chart:null,null,request.calculationArtifactId(),calculationHash,Instant.now().toString(),source,new DatasetBasis(summary?(calc.request().groupColumns().isEmpty()?"全部记录":String.join(" / ",calc.request().groupColumns())):calc.request().groupColumn(),summary?"不适用":calc.request().periodColumn(),calc.matchedRows(),calc.ignoredRows(),composition?"COMPOSITION":summary?"SUMMARY":calc.request().periodMode()==null?"EXACT":calc.request().periodMode(),calc.request().timeZone()==null?"Asia/Shanghai":calc.request().timeZone()),presentation);
         if(!reserve(job,content))return null;
         byte[] body=json.writeValueAsBytes(content);var size=db.queryForMap("SELECT count(*) n,coalesce(sum(octet_length(content)),0) bytes FROM conversation_artifacts WHERE task_id=? AND attempt_number=?",job.id(),attempt);
         if(body.length>20000 || ((Number)size.get("n")).intValue()>=8 || ((Number)size.get("bytes")).longValue()+body.length>65536)throw new IdentityException(413,"BRIEFING_CONTENT_LIMIT");
@@ -182,7 +187,7 @@ public class BriefingContentService {
         Source source=null;if(!sources.isEmpty()){var r=sources.getFirst();source=new Source((UUID)r.get("id"),(UUID)r.get("material_id"),(UUID)r.get("version_id"),(Integer)r.get("number"),(String)r.get("filename"),(String)r.get("sha256"),(String)r.get("content"));}
         var presentation=BriefingPresentationPolicy.resolve(request,type,null);
         var prior=db.queryForList("SELECT a.id,a.sha256,a.content FROM conversation_artifacts a WHERE task_id=? AND attempt_number=? AND EXISTS(SELECT 1 FROM identity_audit p WHERE p.target_id=a.id AND p.action='TASK_BRIEFING_CREATED' AND p.tenant_id=a.tenant_id)",job.id(),attempt);
-        if(!prior.isEmpty()){var doc=read(prior.getFirst());if(!doc.content().businessType().equals(type)||!doc.content().title().equals(request.title().strip())||!doc.content().summary().equals(request.summary().strip())||!doc.content().analysis().equals(request.analysis())||!BriefingPresentationPolicy.same(doc.content(),presentation))throw new IdentityException(409,"BRIEFING_ALREADY_CREATED");return doc;}
+        if(!prior.isEmpty()){var doc=read(prior.getFirst());if(doc.content().calculationArtifactId()!=null||!doc.content().businessType().equals(type)||!doc.content().title().equals(request.title().strip())||!doc.content().summary().equals(request.summary().strip())||!doc.content().analysis().equals(request.analysis())||!BriefingPresentationPolicy.same(doc.content(),presentation))throw new IdentityException(409,"BRIEFING_ALREADY_CREATED");return doc;}
         var content=new Content("briefing-text-v1",type,request.title().strip(),request.summary().strip(),List.copyOf(request.analysis()),null,source,null,null,Instant.now().toString(),datasetSource,null,presentation);
         if(!reserve(job,content))return null;
         byte[] body=json.writeValueAsBytes(content);var total=db.queryForMap("SELECT count(*) n,coalesce(sum(octet_length(content)),0) bytes FROM conversation_artifacts WHERE task_id=? AND attempt_number=?",job.id(),attempt);

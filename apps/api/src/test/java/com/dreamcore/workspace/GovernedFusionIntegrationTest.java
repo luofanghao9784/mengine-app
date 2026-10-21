@@ -42,6 +42,7 @@ class GovernedFusionIntegrationTest extends TaskDatasetFixture {
   UUID id=UUID.fromString(json.valueToTree(catalog.save(owner,tenant,false,new MetricCatalog.Change(null,0,source,d))).path("id").asText());catalog.transition(owner,tenant,false,id,new MetricCatalog.Transition(1),true);return id;
  }
  @BeforeEach void prepare(){
+  db.update("INSERT INTO work_role_profiles(tenant_id,account_id,responsibilities,revision,changed_by) VALUES (?,?,'核对订单和收款',1,?)",tenant,owner,owner);
   db.update("UPDATE tenant_memberships SET role='TENANT_ADMIN' WHERE tenant_id=?",tenant);
   db.update("INSERT INTO scene_bindings(tenant_id,workspace_id,connection_id,maintainer_id,governance_valid_until) VALUES(?,?,?,?,now()+interval '10 minutes')",tenant,space,connection,owner);
   when(bridge.call(eq(tenant),anyString(),eq("GET"),eq("/scene-access"),isNull())).thenReturn(json.readTree("{\"user\":{\"role\":\"admin\"}}"));
@@ -55,10 +56,12 @@ class GovernedFusionIntegrationTest extends TaskDatasetFixture {
   var submitted=conversations.submit(owner,tenant,null,space,UUID.randomUUID(),"根据已发布指标执行关联分析","AGENT");taskId=submitted.tasks().getLast().id();
   db.update("UPDATE conversation_tasks SET source_scope='SELECTED' WHERE id=?",taskId);
   db.update("INSERT INTO briefing_generation_batches(id,tenant_id,owner_id,workspace_id,policy_id,policy_epoch,trigger_kind,business_type,status,task_id) VALUES(?,?,?,?,?,1,'INITIALIZATION','DATA','QUEUED',?)",batch,tenant,owner,space,policy,taskId);
+  db.update("UPDATE briefing_generation_batches SET audience_key=work_audience_key(tenant_id,owner_id) WHERE id=?",batch);
   db.update("INSERT INTO briefing_dataset_selections(task_id,batch_id,dataset_id,snapshot_id) VALUES(?,?,?,?)",taskId,batch,dataset,snapshot);
  }
  void plan(){new TransactionTemplate(manager).executeWithoutResult(x->fusion.prepareQueued(policy));}
- ConversationService.Job start(){plan();assertEquals(1,db.queryForObject("SELECT count(*) FROM governed_fusion_task_plans WHERE task_id=?",Integer.class,taskId));var job=conversations.claim();assertEquals(taskId,job.id());agents.openExecution(job.id(),job.token(),new AgentTaskService.ExecutionOpen("1.5",List.of("task_context","compare_dataset","deliver_briefing")));return job;}
+ ConversationService.Job start(){return start("DATA");}
+ ConversationService.Job start(String type){plan();db.update("UPDATE briefing_generation_batches SET business_type=? WHERE id=?",type,batch);assertEquals(1,db.queryForObject("SELECT count(*) FROM governed_fusion_task_plans WHERE task_id=?",Integer.class,taskId));var job=conversations.claim();assertEquals(taskId,job.id());agents.openExecution(job.id(),job.token(),new AgentTaskService.ExecutionOpen("1.5",List.of("task_context","compare_dataset","deliver_briefing","select_briefing_topic")));BriefingP0TestPlanning.select(agents,job,type,true);return job;}
  tools.jackson.databind.JsonNode calculate(ConversationService.Job job){
   agents.toolReceipt(job.id(),job.token(),new AgentTaskService.ToolReceipt(1,"task_context","STARTED"));var ctx=call(job,request("dataset_search",null,null,0));assertTrue(ctx.has("fusionPlan"));
   var request=json.treeToValue(ctx.at("/fusionPlan/metrics/0/executionRequest"),DatasetCalculationService.Request.class);
@@ -71,9 +74,18 @@ class GovernedFusionIntegrationTest extends TaskDatasetFixture {
   assertEquals("s",result.at("/fusion/results/0/groups/0/dimensions/0").asText());
   UUID artifact=UUID.fromString(result.at("/artifact/id").asText());
   agents.toolReceipt(job.id(),job.token(),new AgentTaskService.ToolReceipt(3,"deliver_briefing","STARTED"));
-  var req=new BriefingContentService.Request(artifact,"订单与收款的关联汇总","按相同组织关联维度，核对订单登记金额与收款登记金额。",List.of("订单登记金额来自订单事实独立汇总，不能按多笔收款重复累计。","收款登记金额来自收款事实独立汇总，两项金额相同不代表订单逐笔完成结算。"));
+  var req=new BriefingContentService.Request(artifact,"订单与收款的关联汇总","按相同组织关联维度，核对订单登记金额与收款登记金额。",List.of("订单登记金额来自订单事实独立汇总，不能按多笔收款重复累计。","收款登记金额来自收款事实独立汇总，两项金额相同不代表订单逐笔完成结算。"),"DATA",new BriefingPresentationPolicy.Presentation("briefing-presentation-v1","EDITORIAL","TABLE",null,null,List.of()));
   assertEquals("PREPARED",agents.deliverBriefing(job.id(),job.token(),req).get("status"));agents.toolReceipt(job.id(),job.token(),new AgentTaskService.ToolReceipt(3,"deliver_briefing","succeeded"));
   var doc=contents.find(job.id(),1);assertNotNull(doc);assertEquals(2,doc.content().fusion().path("results").size());assertEquals("同一组织",doc.content().chart().rows().getFirst().group());
+ }
+ @Test void fusionCalculationCanGroundSuggestionWithoutChangingTypeOrNumbers(){
+  var job=start("SUGGESTION");var result=calculate(job);UUID calculation=UUID.fromString(result.at("/artifact/id").asText());
+  agents.toolReceipt(job.id(),job.token(),new AgentTaskService.ToolReceipt(3,"deliver_briefing","STARTED"));
+  var request=new BriefingContentService.Request(calculation,"核对同一组织的订单与收款","订单登记金额与收款登记金额应分别核对，不能视为到账。",List.of("订单登记金额按订单事实汇总，应保持原始业务口径。","收款登记金额按收款事实汇总，建议继续核对银行凭证。"),"SUGGESTION",new BriefingPresentationPolicy.Presentation("briefing-presentation-v1","EDITORIAL",null,null,null,List.of()));
+  var delivered=agents.deliverBriefing(job.id(),job.token(),request);assertEquals("PREPARED",delivered.get("status"));
+  assertEquals(delivered,agents.deliverBriefing(job.id(),job.token(),request));
+  var body=json.readTree(db.queryForObject("SELECT content FROM conversation_artifacts WHERE id=?",byte[].class,delivered.get("artifactId")));
+  assertEquals("SUGGESTION",body.path("businessType").asText());assertTrue(body.path("chart").isNull());assertEquals("30.30",body.at("/fusion/results/0/total").asText());
  }
  @Test void deliveredGraphDoesNotDowngradeToSingleSource() throws Exception {
   var job=start();calculate(job);

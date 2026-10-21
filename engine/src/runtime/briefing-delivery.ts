@@ -19,7 +19,7 @@ export const BRIEFING_EDITORIAL_HINTS: Record<string, string> = {
   BRIEFING_PRESENTATION_INVALID:
     'Choose a supported presentation layout/chartStyle; sections must reference distinct existing analysis paragraph indices (0-based). STEPS only for SUGGESTION with ACTION/CAUTION; COMPARISON only INSIGHT/SUGGESTION with at least two OPTION sections. DATA only EDITORIAL/KEY_METRIC, chartStyle required. focusGroup must exactly match a verified calculation group and is only allowed for KEY_METRIC. Do not submit numbers, URLs, HTML, CSS or code.',
   BRIEFING_TYPE_MISMATCH:
-    'Keep businessType equal to the platform requested or selected-topic briefing type. A completed calculation does not change the requested type. For SUGGESTION deliver evidence-grounded actions, omit calculationArtifactId and avoid unsupported quantitative claims. If no useful content of the requested type is supported, use the status-only receipt; do not substitute DATA.',
+    'Keep businessType equal to the platform requested or selected-topic briefing type. A completed calculation does not change the requested type. For SUGGESTION deliver evidence-grounded actions, attach calculationArtifactId only when a successful calculation supports the statements, and avoid unsupported quantitative claims. If no useful content of the requested type is supported, use the status-only receipt; do not substitute DATA.',
   BRIEFING_INTERNAL_LANGUAGE:
     'Rewrite user-visible title, summary and paragraphs in business Chinese. Remove tool names, raw IDs and raw status codes; e.g. deposit means 定金, canceled means 已取消, finance_confirmed means 财务已确认, never proof of refund or cash receipt.',
   BRIEFING_NO_BUSINESS_INSIGHT:
@@ -55,6 +55,7 @@ export function normalizeBriefingArguments(value: unknown): unknown {
 
 export function briefingDeliveryTool(options: {
   presentationAvailable?: boolean;
+  textCalculationAvailable?: boolean;
   isSummaryCalculation?(artifactId: unknown): boolean;
   requestedType?: string;
   selectedType?(): string | undefined;
@@ -80,7 +81,7 @@ export function briefingDeliveryTool(options: {
       return copy;
     },
     description:
-      'Create a real private briefing card on 智能画报. Set businessType to INFO (资讯), DATA (数据), INSIGHT (洞察), SUGGESTION (建议), or RESULT (成果). For text categories omit calculationArtifactId and use actual granted evidence; only DATA requires the calculation below. Do not create cards for greetings or routine status replies; create for a complete useful theme or an explicit user request. Only DATA requires compare_table (XLSX) or compare_dataset (collected database snapshot) and its artifact.id; INFO, INSIGHT, SUGGESTION and RESULT use granted evidence without a calculation. Write a short editorial title, summary and 2–4 analysis paragraphs grounded in that calculation and source scope. Summary and each paragraph must be complete sentences ending in punctuation. Distinguish observed changes from unverified causes. Chart values, periods, units and provenance are taken by the platform from the verified calculation, never from model-supplied numbers. One immutable card per task attempt, private to the current user, visible only after successful task delivery. After PREPARED, finish with a short confirmation; NO_NEW_CONTENT means duplicate or empty verified data was suppressed, so report no new card; do not repeat raw IDs, hashes or the entire report. This is not enterprise publication or a scheduled plan.' +
+      'Create a real private briefing card on 智能画报. Set businessType to INFO (资讯), DATA (数据), INSIGHT (洞察), SUGGESTION (建议), or RESULT (成果). For INSIGHT/SUGGESTION/RESULT optionally attach calculationArtifactId from a verified calculation as evidence; keep the text type and layout without chartStyle. INFO omits calculationArtifactId and uses verified sources. Do not create cards for greetings or routine status replies; create for a complete useful theme or an explicit user request. Only DATA requires compare_table (XLSX) or compare_dataset (collected database snapshot) and its artifact.id; INSIGHT/SUGGESTION/RESULT may use the same verified calculation receipts without becoming DATA. Write a short editorial title, summary and 2–4 analysis paragraphs grounded in that calculation and source scope. Summary and each paragraph must be complete sentences ending in punctuation. Distinguish observed changes from unverified causes. Chart values, periods, units and provenance are taken by the platform from the verified calculation, never from model-supplied numbers. One immutable card per task attempt, private to the current user, visible only after successful task delivery. After PREPARED, finish with a short confirmation; NO_NEW_CONTENT means duplicate or empty verified data was suppressed, so report no new card; do not repeat raw IDs, hashes or the entire report. This is not enterprise publication or a scheduled plan.' +
       '\n' +
       BRIEFING_WRITING_RULES +
       '\n' +
@@ -150,7 +151,7 @@ export function briefingDeliveryTool(options: {
         },
         calculationArtifactId: {
           type: 'string',
-          description: 'artifact.id from this attempt’s successful compare_table or compare_dataset',
+          description: 'artifact.id from this attempt’s successful compare_table, compare_dataset or installed briefing_plan; required for DATA or a topic requiring calculation',
         },
         title: {
           type: 'string',
@@ -180,6 +181,9 @@ export function briefingDeliveryTool(options: {
       const requiredType = options.requestedType || options.selectedType?.();
       if (requiredType && (!isRecord(args) || args.businessType !== requiredType))
         throw new RuntimeError('BRIEFING_TYPE_MISMATCH');
+      if (isRecord(args) && args.calculationArtifactId != null && args.businessType && args.businessType !== 'DATA' &&
+          (args.businessType === 'INFO' || options.textCalculationAvailable === false))
+        throw new RuntimeError('BRIEFING_TEXT_CALCULATION_UNAVAILABLE');
       await options.authorize();
       if (isRecord(args) && (args.businessType === 'DATA' || requiredType === 'DATA') &&
           typeof args.title === 'string' && /(?:分析|分布|情况)[。！!]?$/u.test(args.title.trim()) &&

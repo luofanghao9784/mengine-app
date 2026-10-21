@@ -27,7 +27,7 @@ public final class BriefingEditorialPlan {
     var target=plan.items().get(p.mergeInto());
     if(target==null||!"EMIT".equals(target.decision())||!Objects.equals(target.scope(),p.scope())||!Objects.equals(target.period(),p.period()))throw error("BRIEFING_MERGE_INVALID");
    }else if(p.mergeInto()!=null&&p.mergeInto()!=-1)throw error("BRIEFING_MERGE_INVALID");
-   if("COMPARISON".equals(p.shape())||"SINGLE_FACT".equals(p.shape())){if(!c.requiresCalculation())throw error("BRIEFING_CALCULATION_REQUIRED");}
+   if("COMPARISON".equals(p.shape())||"SINGLE_FACT".equals(p.shape())){if(!c.requiresCalculation())throw error("BRIEFING_CALCULATION_REQUIRED");if(!"DATA".equals(c.businessType()))throw error("BRIEFING_COMPONENT_MISMATCH");}
    if("STEPS".equals(p.shape())&&!"SUGGESTION".equals(c.businessType())||"NEWS".equals(p.shape())&&!"INFO".equals(c.businessType())||"OPTIONS".equals(p.shape())&&!Set.of("INSIGHT","SUGGESTION").contains(c.businessType()))throw error("BRIEFING_COMPONENT_MISMATCH");
   }
   if("MERGE".equals(plan.items().get(selected).decision())||"SKIP".equals(plan.items().get(selected).decision())&&"BRIEFING".equals(candidates.get(selected).destination()))throw error("BRIEFING_TOPIC_NOT_DELIVERABLE");

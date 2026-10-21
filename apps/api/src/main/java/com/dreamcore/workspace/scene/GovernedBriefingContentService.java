@@ -13,9 +13,9 @@ public class GovernedBriefingContentService extends BriefingContentService {
  public GovernedBriefingContentService(JdbcTemplate db,IdentityAudit audit){super(db,audit);this.db=db;}
  @Override @Transactional public Document create(ConversationService.Job job,Request request){
   if(request!=null&&fusion!=null&&fusion.applies(job.id(),request.calculationArtifactId()))return fusion.create(job,request);
-  if(request==null)throw IdentityException.invalid();boolean data=request.businessType()==null||request.businessType().equals("DATA");
+  if(request==null)throw IdentityException.invalid();
   boolean governed=false;
-  if(data&&request.calculationArtifactId()!=null){
+  if(request.calculationArtifactId()!=null){
    var bodies=db.queryForList("SELECT content FROM conversation_artifacts WHERE id=? AND task_id=? AND tenant_id=? AND attempt_number=(SELECT attempt FROM conversation_tasks WHERE id=?)",byte[].class,request.calculationArtifactId(),job.id(),job.tenant(),job.id());
    if(!bodies.isEmpty()){
     var payload=new tools.jackson.databind.json.JsonMapper().readTree(bodies.getFirst());String dataset=payload.path("datasetSource").path("datasetId").asText();

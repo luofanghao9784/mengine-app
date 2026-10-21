@@ -72,7 +72,13 @@ export function isBriefingDocument(v: unknown): v is BriefingDocument {
     Number.isFinite(Date.parse(ds.collectedAt)) &&
     (ds.coverageThrough === null ||
       (typeof ds.coverageThrough === 'string' && Number.isFinite(Date.parse(ds.coverageThrough))));
-  if (!dataset && basis !== undefined && basis !== null) return false;
+  const textCalculation = c.schemaVersion === 'briefing-text-v1' && c.businessType !== 'INFO' && uuid(c.calculationArtifactId) && hash(c.calculationSha256);
+  const basisValid = basis == null || record(basis) && datasetSourceValid &&
+    text(basis.groupColumn, 1, 160) && text(basis.periodColumn, 1, 160) &&
+    Number.isSafeInteger(basis.matchedRows) && Number(basis.matchedRows) > 0 &&
+    Number.isSafeInteger(basis.ignoredRows) && Number(basis.ignoredRows) >= 0 &&
+    Number(basis.matchedRows) + Number(basis.ignoredRows) === Number((ds as Record<string, unknown>).rowCount);
+  if (!dataset && basis != null && !(textCalculation && basisValid)) return false;
   if (c.schemaVersion === 'briefing-data-v1' && ds !== undefined && ds !== null) return false;
   if (c.schemaVersion === 'briefing-text-v1')
     return (
@@ -85,8 +91,7 @@ export function isBriefingDocument(v: unknown): v is BriefingDocument {
       c.analysis.length <= 4 &&
       c.analysis.every((p) => text(p, 12, 500)) &&
       c.chart === null &&
-      c.calculationArtifactId === null &&
-      c.calculationSha256 === null &&
+      ((c.calculationArtifactId === null && c.calculationSha256 === null) || textCalculation) &&
       (c.source === null ||
         (record(c.source) &&
           uuid(c.source.id) &&
