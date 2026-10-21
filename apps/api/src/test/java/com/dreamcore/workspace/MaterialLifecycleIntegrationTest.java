@@ -32,7 +32,9 @@ class MaterialLifecycleIntegrationTest {
  void purgeGrant(){db.update("INSERT INTO governance_capabilities(tenant_id,account_id,workspace_id,capability,granted_by) VALUES (?,?,?,'LIFECYCLE_PURGE',?)",tenant,owner,space,admin);}
  @Test void recycleBlocksEveryMaterialReadAndRestoreKeepsVersionAndStopsOldParser(){
   var file=upload(space,null,"sensitive.txt");UUID v=version(space,file.id());var job=knowledge.claim();assertEquals(v,job.version());
+  assertEquals(List.of(file.id()),materials.list(owner,tenant,personal,null,"",0,20,true).items().stream().map(MaterialService.Entry::id).toList());
   var receipt=act(space,"MATERIAL",file.id(),"TRASH");assertEquals("TRASHED",receipt.resultingState());
+  assertTrue(materials.list(owner,tenant,personal,null,"",0,20,true).items().isEmpty());
   denied(()->materials.download(owner,tenant,space,file.id(),v));denied(()->materials.detail(reader,tenant,space,file.id(),0,50));
   assertTrue(materials.list(reader,tenant,space,null,"",0,50).items().isEmpty());assertEquals(0,knowledge.search(reader,tenant,space,"synthetic",0,10).coverage().totalVersions());
   assertNull(knowledge.input(job));

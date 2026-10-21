@@ -18,8 +18,8 @@ import org.springframework.web.multipart.MultipartFile;
 public class MaterialService {
     public record Crumb(UUID id, String name) {}
     public record Entry(UUID id, UUID tenantId, UUID workspaceId, String workspaceName, UUID folderId, String kind,
-                        String name, int version, Long sizeBytes, Instant updatedAt, List<String> path, boolean canMaintain, boolean canDownload, boolean canManageFiles, boolean canManagePermissions) {
-        public Entry(UUID id,UUID tenantId,UUID workspaceId,String workspaceName,UUID folderId,String kind,String name,int version,Long sizeBytes,Instant updatedAt,List<String> path,boolean canMaintain){this(id,tenantId,workspaceId,workspaceName,folderId,kind,name,version,sizeBytes,updatedAt,path,canMaintain,true,false,false);}
+                        String name, int version, Long sizeBytes, Instant updatedAt, List<String> path, boolean canMaintain, boolean canDownload, boolean canManageFiles, boolean canManagePermissions, UUID uploadedBy, String uploadedByName) {
+        public Entry(UUID id,UUID tenantId,UUID workspaceId,String workspaceName,UUID folderId,String kind,String name,int version,Long sizeBytes,Instant updatedAt,List<String> path,boolean canMaintain){this(id,tenantId,workspaceId,workspaceName,folderId,kind,name,version,sizeBytes,updatedAt,path,canMaintain,true,false,false,null,null);}
     }
     public record Page(UUID tenantId, UUID workspaceId, UUID folderId, List<Crumb> trail, boolean canMaintain,
                        long maxUploadBytes, List<Entry> items, boolean hasMore) {}
@@ -28,14 +28,14 @@ public class MaterialService {
     /** Top-level entry is the accepted version when known; currentVersion is read at replay time. */
     public record UploadReceipt(UUID id, UUID tenantId, UUID workspaceId, String workspaceName, UUID folderId, String kind,
                                 String name, int version, Long sizeBytes, Instant updatedAt, List<String> path, boolean canMaintain,
-                                String receiptStatus, Version acceptedVersion, int currentVersion, boolean canDownload, boolean canManageFiles, boolean canManagePermissions) {
+                                String receiptStatus, Version acceptedVersion, int currentVersion, boolean canDownload, boolean canManageFiles, boolean canManagePermissions, UUID uploadedBy, String uploadedByName) {
         UploadReceipt(Entry current,Version accepted) {
             this(current.id(),current.tenantId(),current.workspaceId(),current.workspaceName(),current.folderId(),current.kind(),
                 current.name(),accepted==null?current.version():accepted.number(),accepted==null?current.sizeBytes():accepted.sizeBytes(),
                 accepted==null?current.updatedAt():accepted.createdAt(),current.path(),current.canMaintain(),
-                accepted==null?"HISTORICAL_UNKNOWN":"EXACT",accepted,current.version(),current.canDownload(),current.canManageFiles(),current.canManagePermissions());
+                accepted==null?"HISTORICAL_UNKNOWN":"EXACT",accepted,current.version(),current.canDownload(),current.canManageFiles(),current.canManagePermissions(),current.uploadedBy(),current.uploadedByName());
         }
-        public Entry entry(){return new Entry(id,tenantId,workspaceId,workspaceName,folderId,kind,name,version,sizeBytes,updatedAt,path,canMaintain,canDownload,canManageFiles,canManagePermissions);}
+        public Entry entry(){return new Entry(id,tenantId,workspaceId,workspaceName,folderId,kind,name,version,sizeBytes,updatedAt,path,canMaintain,canDownload,canManageFiles,canManagePermissions,uploadedBy,uploadedByName);}
     }
     public record Download(String filename, byte[] bytes) {}
     private final JdbcTemplate db; private final IdentityService identities; private final IdentityAudit audit;
@@ -73,34 +73,41 @@ public class MaterialService {
             for(var c:trail(tenant,workspace,folder))if((access.mask(actor,tenant,"FOLDER",c.id())&1)!=0)path.add(c.name());
             path.add(r.getString("name"));
             return new Entry(r.getObject("id",UUID.class),tenant,workspace,rootVisible?r.getString("workspace_name"):"共享资料",folder,r.getString("kind"),
-                r.getString("name"),r.getInt("version"),(Long)r.getObject("size_bytes"),r.getTimestamp("updated_at").toInstant(),path,kind.equals("DRAFT")?r.getBoolean("can_maintain"):(mask&2)!=0,(mask&4)!=0,(mask&1)!=0&&((mask&8)!=0||access.manages(actor,tenant,workspace)),access.manages(actor,tenant,workspace)&&Boolean.TRUE.equals(db.queryForObject("SELECT library_permissions_enabled(?)",Boolean.class,tenant)));
+                r.getString("name"),r.getInt("version"),(Long)r.getObject("size_bytes"),r.getTimestamp("updated_at").toInstant(),path,kind.equals("DRAFT")?r.getBoolean("can_maintain"):(mask&2)!=0,(mask&4)!=0,(mask&1)!=0&&((mask&8)!=0||access.manages(actor,tenant,workspace)),access.manages(actor,tenant,workspace)&&Boolean.TRUE.equals(db.queryForObject("SELECT library_permissions_enabled(?)",Boolean.class,tenant)),kind.equals("DOCUMENT")?r.getObject("created_by",UUID.class):null,kind.equals("DOCUMENT")?r.getString("uploader_name"):null);
         };
     }
     private static final String ENTRIES="""
         WITH entries AS (
-          SELECT f.id,f.tenant_id,f.workspace_id,f.parent_id,'FOLDER' AS kind,f.name,0 AS version,NULL::bigint AS size_bytes,f.created_at AS updated_at
+          SELECT f.id,f.tenant_id,f.workspace_id,f.parent_id,'FOLDER' AS kind,f.name,0 AS version,NULL::bigint AS size_bytes,f.created_at AS updated_at,f.created_by
           FROM active_material_folders f
           UNION ALL
-          SELECT m.id,m.tenant_id,m.workspace_id,m.folder_id,'DOCUMENT',m.name,m.current_version,v.size_bytes,m.updated_at
+          SELECT m.id,m.tenant_id,m.workspace_id,m.folder_id,'DOCUMENT',m.name,m.current_version,v.size_bytes,m.updated_at,m.created_by
           FROM active_materials m JOIN material_versions v ON v.tenant_id=m.tenant_id AND v.workspace_id=m.workspace_id AND v.material_id=m.id AND v.number=m.current_version
           UNION ALL
-          SELECT d.id,d.tenant_id,d.workspace_id,NULL::uuid,'DRAFT',v.title,d.revision,octet_length(v.body)::bigint,d.updated_at
+          SELECT d.id,d.tenant_id,d.workspace_id,NULL::uuid,'DRAFT',v.title,d.revision,octet_length(v.body)::bigint,d.updated_at,d.owner_id
           FROM private_documents d JOIN private_document_versions v ON v.document_id=d.id AND v.number=d.revision
           JOIN workspaces source ON source.id=d.source_workspace_id AND source.tenant_id=d.tenant_id
           WHERE object_is_active('DOCUMENT',d.id) AND (d.source_artifact_id IS NULL OR object_is_active('ARTIFACT',d.source_artifact_id))
             AND EXISTS(SELECT 1 FROM readable_source_tasks rt WHERE rt.id=d.source_task_id)
             AND ((source.kind='PERSONAL' AND source.owner_id=d.owner_id) OR EXISTS(SELECT 1 FROM workspace_members g WHERE g.tenant_id=d.tenant_id AND g.workspace_id=d.source_workspace_id AND g.account_id=d.owner_id))
         )
-        SELECT e.*,w.name AS workspace_name,((w.kind='PERSONAL' OR coalesce(g.can_maintain,false)) AND NOT EXISTS(SELECT 1 FROM departure_executions d WHERE d.tenant_id=w.tenant_id AND d.kind='TENANT_EXIT' AND d.state<>'CANCELLED')) AS can_maintain
+        SELECT e.*,u.display_name AS uploader_name,w.name AS workspace_name,((w.kind='PERSONAL' OR coalesce(g.can_maintain,false)) AND NOT EXISTS(SELECT 1 FROM departure_executions d WHERE d.tenant_id=w.tenant_id AND d.kind='TENANT_EXIT' AND d.state<>'CANCELLED')) AS can_maintain
         FROM entries e JOIN workspaces w ON w.tenant_id=e.tenant_id AND w.id=e.workspace_id
+        LEFT JOIN accounts u ON u.id=e.created_by
         LEFT JOIN workspace_members g ON g.tenant_id=w.tenant_id AND g.workspace_id=w.id AND g.account_id=headquarters_permission_actor(?,w.tenant_id)
         WHERE e.tenant_id=? AND (CASE WHEN e.kind='DRAFT' THEN (w.kind='PERSONAL' AND w.owner_id=headquarters_permission_actor(?,w.tenant_id)) ELSE (library_mask(headquarters_permission_actor(?,w.tenant_id),w.tenant_id,CASE WHEN e.kind='DOCUMENT' THEN 'MATERIAL' ELSE e.kind END,e.id)&1)=1 END)
         """;
     @Transactional
     public Page list(UUID actor,UUID tenant,UUID workspace,UUID folder,String q,int offset,int limit) {
+        return list(actor,tenant,workspace,folder,q,offset,limit,false);
+    }
+    @Transactional
+    public Page list(UUID actor,UUID tenant,UUID workspace,UUID folder,String q,int offset,int limit,boolean includeUploads) {
         paging(offset,limit); if(q.length()>180 || (workspace==null && folder!=null)) throw IdentityException.invalid();
         identities.member(actor,tenant,false);
         var space=workspace==null ? null : access.requireObject(actor,tenant,workspace,folder==null?"WORKSPACE":"FOLDER",folder==null?workspace:folder,false);
+        // A personal-root view of the original files, never a copy or an access grant.
+        if(includeUploads && (space==null || !space.kind().equals("PERSONAL") || folder!=null)) throw IdentityException.invalid();
         var crumbs=workspace==null ? List.<Crumb>of() : trail(tenant,workspace,folder).stream().filter(c->(access.mask(actor,tenant,"FOLDER",c.id())&1)!=0).toList();
         String query=q.strip();
         // Restrict search to the selected directory subtree; match filename or the latest parsed body.
@@ -108,8 +115,12 @@ public class MaterialService {
         var args=new ArrayList<Object>(List.of(actor,tenant,actor,actor));
         String filter=workspace==null?"w.kind='SHARED' AND e.kind='DOCUMENT'":"e.workspace_id=?";
         if(workspace!=null)args.add(workspace);
+        if(includeUploads) {
+            filter="(("+filter+(query.isEmpty()?" AND e.parent_id IS NULL":"")+") OR (w.kind='SHARED' AND e.kind='DOCUMENT' AND e.created_by=headquarters_permission_actor(?,w.tenant_id)))";
+            args.add(actor);
+        }
         filter+=" AND (e.kind IN ('FOLDER','DRAFT') OR EXISTS(SELECT 1 FROM materials m WHERE m.id=e.id AND m.in_library))";
-        if(query.isEmpty()) { if(workspace!=null){filter+=" AND e.parent_id IS NOT DISTINCT FROM ?::uuid";args.add(folder);} }
+        if(query.isEmpty()) { if(workspace!=null && !includeUploads){filter+=" AND e.parent_id IS NOT DISTINCT FROM ?::uuid";args.add(folder);} }
         else {
             filter+=" AND ("+within+")";
             if(folder!=null)args.addAll(List.of(folder,tenant,workspace,tenant,workspace));

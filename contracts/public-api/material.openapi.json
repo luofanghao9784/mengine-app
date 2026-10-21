@@ -304,6 +304,15 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "includeUploads",
+            "in": "query",
+            "description": "Only for the authenticated actor’s personal workspace root. Includes their readable enterprise uploads as references with original workspace IDs. Does not grant access.",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
           }
         ]
       }
@@ -1191,6 +1200,29 @@
           },
           "canMaintain": {
             "type": "boolean"
+          },
+          "uploadedBy": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Original uploader of this material; later versions retain their own contributors."
+          },
+          "uploadedByName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "canDownload": {
+            "type": "boolean"
+          },
+          "canManageFiles": {
+            "type": "boolean"
+          },
+          "canManagePermissions": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -1265,6 +1297,12 @@
               "DOCUMENT_PUBLICATION"
             ],
             "description": "版本写入方式；不包含私人文稿、会话或源空间标识。"
+          },
+          "createdByName": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
@@ -1542,6 +1580,29 @@
           "currentVersion": {
             "type": "integer",
             "minimum": 1
+          },
+          "uploadedBy": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Original uploader of this material; later versions retain their own contributors."
+          },
+          "uploadedByName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "canDownload": {
+            "type": "boolean"
+          },
+          "canManageFiles": {
+            "type": "boolean"
+          },
+          "canManagePermissions": {
+            "type": "boolean"
           }
         },
         "required": [

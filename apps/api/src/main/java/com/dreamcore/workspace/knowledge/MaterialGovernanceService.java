@@ -16,7 +16,7 @@ import tools.jackson.databind.ObjectMapper;
 public class MaterialGovernanceService {
  public record Change(UUID requestId,int expectedVersion,int expectedRevision,List<String> tags,LocalDate reviewAt) {}
  public record Item(UUID id,UUID workspaceId,String workspaceName,String name,int version,int revision,boolean canEdit,
-  boolean canRedact,String source,Integer quality,List<String> issues,List<String> tags,LocalDate reviewAt,Instant checkedAt) {}
+  boolean canRedact,String source,Integer quality,List<String> issues,List<String> tags,LocalDate reviewAt,Instant checkedAt,UUID uploadedBy,String uploadedByName) {}
  public record Summary(long total,long checked,long attention,long sensitive,Double average) {}
  public record Page(UUID tenantId,Summary summary,long filteredTotal,List<Item> items,boolean hasMore) {}
  public record Result(UUID reportId,int version,int revision,String source,List<String> issues,List<String> tags,LocalDate reviewAt,boolean redacted) {}
@@ -34,7 +34,7 @@ public class MaterialGovernanceService {
  public static String redact(String text){return EMAIL.matcher(IDENTITY.matcher(PHONE.matcher(text).replaceAll("[手机号已脱敏]")).replaceAll("[身份证号已脱敏]")).replaceAll("[邮箱已脱敏]");}
  private static final String SOURCE="""
  WITH base AS MATERIALIZED (
- SELECT m.id,m.workspace_id "workspaceId",m.name,m.current_version version,
+ SELECT m.id,m.workspace_id "workspaceId",m.name,m.current_version version,m.created_by "uploadedBy",u.display_name "uploadedByName",
   CASE WHEN (library_mask(?,m.tenant_id,'WORKSPACE',w.id)&1)=1 THEN w.name ELSE '共享资料' END "workspaceName",
   (library_mask(?,m.tenant_id,'MATERIAL',m.id)&2)=2 "canEdit",
   coalesce((SELECT max(revision) FROM material_governance_reports allg WHERE allg.tenant_id=m.tenant_id AND allg.material_id=m.id),0) revision,
@@ -42,13 +42,14 @@ public class MaterialGovernanceService {
   CASE WHEN g.id IS NULL THEN ARRAY[]::text[] ELSE array_remove(g.issues,'review') || CASE WHEN g.review_at IS NULL OR g.review_at<(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Shanghai')::date THEN ARRAY['review'] ELSE ARRAY[]::text[] END END issues,
   lower(v.filename) ~ '[.](txt|md|markdown)$' AS text_file
  FROM active_materials m JOIN workspaces w ON w.tenant_id=m.tenant_id AND w.id=m.workspace_id
+ LEFT JOIN accounts u ON u.id=m.created_by
  JOIN material_versions v ON v.tenant_id=m.tenant_id AND v.material_id=m.id AND v.number=m.current_version
  LEFT JOIN LATERAL(SELECT * FROM knowledge_runs r WHERE r.version_id=v.id ORDER BY generation DESC LIMIT 1) r ON true
  LEFT JOIN LATERAL(SELECT * FROM material_governance_reports g WHERE g.tenant_id=m.tenant_id AND g.material_id=m.id ORDER BY revision DESC LIMIT 1) g
    ON g.version_id=v.id AND (g.source='ORIGINAL_TEXT' OR (g.run_id IS NOT DISTINCT FROM r.id AND g.parse_status IS NOT DISTINCT FROM r.status))
  WHERE m.tenant_id=? AND m.in_library AND w.kind='SHARED' AND NOT w.archived AND (library_mask(?,m.tenant_id,'MATERIAL',m.id)&1)=1
  ), visible AS (
- SELECT id,"workspaceId","workspaceName",name,version,revision,"canEdit",
+ SELECT id,"workspaceId","workspaceName",name,version,revision,"canEdit","uploadedBy","uploadedByName",
   ("canEdit" AND text_file AND source='ORIGINAL_TEXT' AND issues && ARRAY['phone','identity','email']) "canRedact",
   coalesce(source,'NOT_CHECKED') source,
   CASE WHEN source IN('ORIGINAL_TEXT','PARSED_TEXT') THEN greatest(20,100-16*cardinality(issues)) ELSE NULL END quality,

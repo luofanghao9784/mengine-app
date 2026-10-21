@@ -187,6 +187,7 @@ function Governance({ tenant }: { tenant: string }) {
                           <small>
                             {item.workspaceName} · v{item.version}
                           </small>
+                          <small>上传人：{item.uploadedByName || '未记录'}</small>
                         </td>
                         <td>{sourceLabels[item.source]}</td>
                         <td>{item.quality ?? '—'}</td>

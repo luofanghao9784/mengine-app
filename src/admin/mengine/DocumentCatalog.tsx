@@ -80,6 +80,7 @@ export function DocumentCatalog({ tenant, hash }: { tenant: string; hash: string
                   <tr>
                     <th>资料</th>
                     <th>所属空间</th>
+                    <th>上传人</th>
                     <th>业务标签</th>
                     <th>质量</th>
                     <th>复核日期</th>
@@ -95,6 +96,7 @@ export function DocumentCatalog({ tenant, hash }: { tenant: string; hash: string
                         <small>{x.canEdit ? '可维护' : '只读'}</small>
                       </td>
                       <td>{x.workspaceName}</td>
+                      <td>{x.uploadedByName || '未记录'}</td>
                       <td>{x.tags.join(' · ') || '未填写'}</td>
                       <td>
                         {x.quality === null ? '尚未检查' : `${x.quality} / 100`}

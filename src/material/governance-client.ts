@@ -15,6 +15,8 @@ export const isGovernanceItem = (v: unknown): v is GovernanceItem =>
   uuid(v.workspaceId) &&
   typeof v.name === 'string' &&
   typeof v.workspaceName === 'string' &&
+  (v.uploadedBy === undefined || v.uploadedBy === null || uuid(v.uploadedBy)) &&
+  (v.uploadedByName === undefined || v.uploadedByName === null || typeof v.uploadedByName === 'string') &&
   count(v.version) &&
   v.version > 0 &&
   count(v.revision) &&
