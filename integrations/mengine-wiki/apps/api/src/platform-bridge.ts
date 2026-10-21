@@ -56,7 +56,7 @@ export function registerPlatformBridge(app: FastifyInstance, store: Store, secre
       return reply.code(404).send({message:'未知部署操作'});
     }
     const requested=p.body?.restrictedSourceIds;
-    if(requested!==undefined&&(!Array.isArray(requested)||requested.length>100||requested.some((id:unknown)=>typeof id!=='string'||id.length>160)))return reply.code(400).send({message:'受限来源清单无效'});
+    if(requested!==undefined&&(!Array.isArray(requested)||requested.length>1024||requested.some((id:unknown)=>typeof id!=='string'||id.length>160)))return reply.code(400).send({message:'受限来源清单无效'});
     const scoped=new Set<string>(!p.actor.startsWith('customer:')?(requested||[]):[]);
     const get=p.method==='GET'&&/^\/scene-(foundation(?:\/[^/?]+)?|knowledge(?:\/[^/?]+\/source)?)$/.test(p.path);
     const post=p.method==='POST'&&/^\/scene-(foundation(?:\/scan|\/[^/?]+\/actions)|knowledge\/sync)$/.test(p.path);

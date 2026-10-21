@@ -1,3 +1,4 @@
+import { legacyEditorialLayout, verificationEditionSize } from './editorial-policy';
 import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import type { CardSize } from '../briefing';
 import { magazineGap, magazineGridMetrics, packMagazineTiles } from '../briefingGrid';
@@ -125,21 +126,23 @@ export function MagazineGrid({
   );
   const placements = packMagazineTiles(
     items.map((item) => {
+      // User-selected sizes for the two historical follow-up recommendations.
+      const fixedSize = item.fixedSize ?? verificationEditionSize(item.title) ?? legacyEditorialLayout(item.title);
       const preferred: CardSize =
-        item.fixedSize ||
+        fixedSize ||
         (item.chart
           ? '2×2'
           : item.news || item.wide || item.title.length > 28 || item.summary.length > 110
             ? '2×1'
             : '1×1');
-      const minimum = item.fixedSize ? undefined : fit[item.id];
+      const minimum = fixedSize ? undefined : fit[item.id];
       return {
         id: item.id,
         atEnd: item.atEnd,
         size: (minimum
           ? `${Math.max(Number(preferred[0]), Number(minimum.size[0]))}×${Math.max(Number(preferred[2]), Number(minimum.size[2]))}`
           : preferred) as CardSize,
-        fixed: preserveSpans || item.wide || item.news || item.summary.length > 110 || !!item.fixedSize || !!minimum,
+        fixed: preserveSpans || item.wide || item.news || item.summary.length > 110 || !!fixedSize || !!minimum,
         // The magazine supports only the four standard sizes, even for long content.
         rows: minimum ? Math.min(2, Math.max(Number(minimum.size[2]), minimum.rows || 0)) : undefined,
       };

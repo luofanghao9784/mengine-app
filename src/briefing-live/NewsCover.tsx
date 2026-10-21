@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { BriefingDocument } from '../../contracts/public-api/briefing-content';
+import { relatedNewsImages } from './related-news-images';
 import { coverSeed } from './cover-seed';
 import './news-cover.css';
 
@@ -30,24 +31,26 @@ export function NewsCover({
   seed?: string;
   compact?: boolean;
 }) {
-  const [failed, setFailed] = useState(false);
-  if (failed) cover = null;
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const related = !cover ? relatedNewsImages[seed] : undefined;
+  const src = cover?.dataUrl ?? related?.src;
+  const available = !!src && failedSrc !== src;
   return (
-    <figure className={'news-cover' + (compact ? ' is-compact' : '') + (cover ? '' : ' is-texture')}>
+    <figure className={'news-cover' + (compact ? ' is-compact' : '') + (available ? '' : ' is-texture')}>
       <div className="news-cover-layer">
-        {cover ? (
+        {available ? (
           <img
-            src={cover.dataUrl}
-            alt="资讯原文配图"
+            src={src}
+            alt={related?.alt ?? '资讯原文配图'}
             loading="lazy"
             decoding="async"
-            onError={() => setFailed(true)}
+            onError={() => setFailedSrc(src!)}
           />
         ) : (
           <Texture seed={coverSeed(seed)} />
         )}
       </div>
-      {!compact && cover && (
+      {!compact && available && cover && (
         <figcaption>
           图片来自
           <a href={cover.sourceUrl} target="_blank" rel="noopener noreferrer">
@@ -55,7 +58,22 @@ export function NewsCover({
           </a>
         </figcaption>
       )}
-      {!compact && !cover && <figcaption>主题纹理 · 非新闻现场图片</figcaption>}
+      {!compact && available && related && (
+        <figcaption>
+          {related.caption}
+          <br />
+          摄影：
+          <a href={related.sourceUrl} target="_blank" rel="noopener noreferrer">
+            {related.author} / Wikimedia Commons
+          </a>
+          {' · '}
+          <a href={related.licenseUrl} target="_blank" rel="noopener noreferrer">
+            {related.license}
+          </a>
+          {' · 原图未修改，展示随版面裁切'}
+        </figcaption>
+      )}
+      {!compact && !available && <figcaption>主题纹理 · 非新闻现场图片</figcaption>}
     </figure>
   );
 }

@@ -11,6 +11,10 @@ public final class BriefingPresentationPolicy {
     private static final Set<String> CHARTS=Set.of("GROUPED_BAR","DUMBBELL","DELTA_BAR","CURRENT_BAR","TABLE");
     private static final Set<String> ROLES=Set.of("OBSERVATION","INTERPRETATION","ACTION","OPTION","CAUTION");
     private static IdentityException invalid(){return new IdentityException(422,"BRIEFING_PRESENTATION_INVALID");}
+    public static Presentation fixedChain(BriefingContentService.Request request,BriefingContentService.Chart chart,boolean paired){
+        var validated=resolve(request,"DATA",chart);
+        return new Presentation("briefing-presentation-v1","EDITORIAL",paired?"GROUPED_BAR":"CURRENT_BAR",null,null,validated.sections());
+    }
     public static Presentation resolve(BriefingContentService.Request request,String type,BriefingContentService.Chart chart){
         var p=request.presentation();
         if(p==null)return new Presentation("briefing-presentation-v1","EDITORIAL",chart==null?null:"GROUPED_BAR",null,null,List.of());

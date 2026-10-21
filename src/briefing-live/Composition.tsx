@@ -1,3 +1,4 @@
+import { isSignalReading, SignalReading } from './SignalReading';
 import { displayChart } from './display-labels.ts';
 import { FileText } from 'lucide-react';
 import type { BriefingDocument } from '../../contracts/public-api/briefing-content';
@@ -54,6 +55,7 @@ export function AnalysisComposition({
 }) {
   const p = presentationOf(document),
     c = document.content;
+  if (!compact && isSignalReading(document)) return <SignalReading document={document} />;
   const sections = p?.sections ?? [];
   if (!sections.length)
     return compact ? null : (
@@ -68,6 +70,7 @@ export function AnalysisComposition({
       ? sections.filter((section) => section.role === 'OBSERVATION').slice(0, 1)
       : sections.slice(0, 2)
     : sections;
+  const remaining = sections.filter((s) => !selected.includes(s) && s.role !== 'CAUTION').length;
   const layout = p?.layout ?? 'EDITORIAL';
   const Tag = layout === 'STEPS' ? 'ol' : 'div';
   const Block = layout === 'STEPS' ? 'li' : 'div';
@@ -80,17 +83,16 @@ export function AnalysisComposition({
         {selected.map((section, i) => (
           <Block key={section.paragraphIndex} className="briefing-section">
             <span className="briefing-section-label">
-              {layout === 'STEPS' ? `${i + 1} · ` : ''}
               {sectionLabels[section.role]}
-              {section.role === 'OPTION' ? ` ${i + 1}` : ''}
+              {section.role === 'OPTION' && layout !== 'STEPS' ? ` ${i + 1}` : ''}
             </span>
             <p>{c.analysis[section.paragraphIndex]}</p>
           </Block>
         ))}
       </Tag>
-      {compact && sections.length > selected.length && (
+      {compact && remaining > 0 && (
         <small className="briefing-composition-note">
-          另有 {sections.length - selected.length} 项，详情查看完整内容
+          另有 {remaining} 项，详情查看完整内容
         </small>
       )}
       {!compact && (
@@ -105,7 +107,7 @@ export function AnalysisComposition({
 }
 
 export function SourceCover({ document }: { document: BriefingDocument }) {
-  if (presentationOf(document)?.layout !== 'SOURCE') return null;
+  if (document.content.businessType === 'INFO' || presentationOf(document)?.layout !== 'SOURCE') return null;
   const source = document.content.source,
     dataset = document.content.datasetSource;
   if (!source && !dataset) return null;

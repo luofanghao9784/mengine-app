@@ -28,7 +28,7 @@ public class SceneRouting {
   db.queryForList("SELECT id FROM tenants WHERE id=? FOR UPDATE",tenant);
   var binding=db.queryForList("SELECT maintainer_id FROM scene_bindings WHERE tenant_id=?",tenant);
   if(binding.isEmpty())throw new IdentityException(409,"SCENE_TENANT_NOT_BOUND");
-  if(change==null||change.routes()==null||change.routes().size()>100)throw IdentityException.invalid();
+  if(change==null||change.routes()==null||change.routes().size()>com.dreamcore.workspace.collection.CollectionDeployment.MAX_DATASETS)throw IdentityException.invalid();
   var old=snapshot(tenant);if(change.revision()!=(old.isNull()?0:old.path("revision").asInt()))throw new IdentityException(409,"SCENE_ROUTING_CHANGED");
   var ids=new HashSet<String>();var canonical=new ArrayList<Route>();
   for(var r:change.routes()){

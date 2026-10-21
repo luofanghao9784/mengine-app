@@ -76,6 +76,37 @@ class SceneRoutingIntegrationTest extends CompanyAnalysisFixture {
   scene.routes(admin,tenant,new SceneRouting.Change(2,List.of()));scene.synchronize(admin,tenant,false);
   assertEquals(0,db.queryForObject("SELECT count(*) FROM scene_asset_links WHERE tenant_id=? AND active",Integer.class,tenant));
  }
+ @Test void moreThanTwoHundredSourcesReachCollectionAndKeepPermissions() throws Exception {
+  var export=(tools.jackson.databind.node.ObjectNode)bridge.call(tenant,"x","GET","/scene-export",null).deepCopy();
+  var prototype=export.path("assets").get(0);var assets=json.createArrayNode();var routes=new ArrayList<SceneRouting.Route>();
+  for(int i=0;i<201;i++){
+   var a=(tools.jackson.databind.node.ObjectNode)prototype.deepCopy();a.put("id","bulk-"+i);
+   a.set("governance",json.readTree("{\"sourceVersion\":1,\"allowedActors\":[\"%s\"]}".formatted(admin)));
+   assets.add(a);routes.add(route("bulk-"+i,space,admin,reader));
+  }
+  export.set("assets",assets);
+  when(bridge.call(eq(tenant),anyString(),eq("GET"),eq("/scene-export"),any())).thenReturn(export);
+  when(bridge.call(eq(tenant),anyString(),eq("GET"),eq("/scene-knowledge"),any())).thenReturn(json.readTree("{\"scopeRevision\":\"empty\",\"items\":[]}"));
+  scene.routes(admin,tenant,new SceneRouting.Change(0,routes));scene.synchronize(admin,tenant,false);completeProjection();
+  assertEquals(201,db.queryForObject("SELECT count(*) FROM scene_asset_links WHERE tenant_id=? AND kind='TABLE' AND active",Integer.class,tenant));
+  assertEquals(List.of(List.of("100")),processing.read(admin,tenant,"dataset-"+target("bulk-200"),0,20,null).records());
+  assertThrows(IdentityException.class,()->processing.read(reader,tenant,"dataset-"+target("bulk-200"),0,20,null));
+ }
+ @Test void expandedRoutesRetainSourceAclAndRejectOverflowAtomically(){
+  var routes=new ArrayList<SceneRouting.Route>();
+  for(int i=0;i<1023;i++)routes.add(route("unlisted-"+i,space,admin));
+  routes.add(route("dividend",space,reader));
+  scene.routes(admin,tenant,new SceneRouting.Change(0,routes));
+  assertEquals(1024,routing.snapshot(tenant).path("routes").size());
+  var overflow=new ArrayList<>(routes);overflow.add(route("overflow",space,admin));
+  assertThrows(IdentityException.class,()->scene.routes(admin,tenant,new SceneRouting.Change(1,overflow)));
+  assertEquals(1,routing.snapshot(tenant).path("revision").asInt());
+  assertEquals(1024,routing.snapshot(tenant).path("routes").size());
+  scene.synchronize(admin,tenant,false);
+  assertFalse(readable(admin,target("dividend")));
+  assertTrue(readable(reader,target("dividend")));
+  verify(bridge).call(eq(tenant),anyString(),eq("GET"),eq("/scene-export"),argThat(body->body!=null&&json.valueToTree(body).path("restrictedSourceIds").size()==1024));
+ }
  @Test void staleForeignAndNonAdminConfigurationsFailWithoutChangingPolicy(){
   var change=new SceneRouting.Change(0,List.of(route("salary",space,admin)));
   assertThrows(IdentityException.class,()->scene.routes(reader,tenant,change));

@@ -1,0 +1,18 @@
+.disclosure { margin: 16px 0; min-width: 0; font: 14px/1.7 system-ui; color: var(--ink-2, #4b5065); }
+.disclosure > summary { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 10px 12px; border-radius: 8px; cursor: pointer; list-style: none; user-select: none; transition: background-color .15s; }
+.disclosure > summary::-webkit-details-marker { display: none; }
+.disclosure > summary::marker { content: ''; }
+.disclosure > summary:hover { background: var(--hover-bg, rgba(105,110,140,.06)); }
+.disclosure > summary:focus-visible { outline: 2px solid var(--accent, #6278ed); outline-offset: 2px; }
+.disclosure-chevron { flex: none; transition: transform .15s; color: var(--ink-3, #80869a); }
+.disclosure[open] > summary .disclosure-chevron { transform: rotate(90deg); }
+.disclosure-heading { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.disclosure-title { font-weight: 600; color: var(--ink-2, #4b5065); }
+.disclosure-description { font-size: 12px; font-weight: 400; color: var(--ink-3, #80869a); }
+.disclosure-count { margin-left: 8px; font-size: 12px; font-weight: 400; color: var(--ink-3, #80869a); }
+.disclosure-state { font-size: 12px; color: var(--ink-3, #80869a); }
+.disclosure-content { padding: 4px 12px 12px 40px; overflow-wrap: anywhere; }
+.disclosure-content > .disclosure { margin-left: -12px; }
+.disclosure-content > .disclosure > summary { min-height: 44px; }
+@media (max-width: 560px) { .disclosure-content { padding-left: 20px; } }
+@media (prefers-reduced-motion: reduce) { .disclosure-chevron, .disclosure > summary { transition: none; } }

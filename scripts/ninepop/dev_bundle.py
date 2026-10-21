@@ -2,7 +2,7 @@
 """Private, frozen 9POP developer handoff. Not a production backup or cloud connector.
 Export only after stopping trial.py. Restore only into a NEW local directory.
 """
-import argparse, hashlib, json, os, pathlib, secrets, shutil, sqlite3, subprocess, sys, tarfile, tempfile, uuid
+import datetime, argparse, hashlib, json, os, pathlib, secrets, shutil, sqlite3, subprocess, sys, tarfile, tempfile, uuid
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / 'local'))
 import trial, backup, backup_recovery
 P = pathlib.Path
@@ -83,6 +83,10 @@ def export(root, output):
         target.execute('DELETE FROM sessions');target.execute('DELETE FROM platform_bridge_nonces');target.execute('DELETE FROM source_leases')
         for ident,data in target.execute('SELECT id,data FROM database_connections').fetchall():
             clean=scrub_connection(json.loads(data));target.execute('UPDATE database_connections SET data=? WHERE id=?',(json.dumps(clean,ensure_ascii=False),ident))
+        for ident,data in target.execute('SELECT id,data FROM database_sync_jobs').fetchall():
+            clean=scrub_connection(json.loads(data));clean['enabled']=False
+            target.execute('UPDATE database_sync_jobs SET data=? WHERE id=?',(json.dumps(clean,ensure_ascii=False),ident))
+        target.execute("UPDATE dictionary_jobs SET state='blocked_schema',error='DEVELOPER_HANDOFF: automatic generation disabled',next_at='' WHERE state IN ('queued','running','retry_wait')")
         target.commit();target.execute('VACUUM');target.close()
         if any(f.is_symlink() for f in (root/'objects').rglob('*')):raise RuntimeError('Object symlinks rejected')
         shutil.copytree(root/'objects',payload/'objects')
@@ -90,7 +94,7 @@ def export(root, output):
             dest=payload/f;dest.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(root/f,dest)
         counts={t:int(sql(root,scratch,'SELECT count(*) FROM '+t)) for t in ['accounts','workspaces','business_datasets','dataset_snapshots','conversation_tasks','scene_asset_links']}
         files={str(f.relative_to(payload)):digest(f) for f in payload.rglob('*') if f.is_file()}
-        write(payload/'manifest.json',{'format':'ninepop-dev-v1','tenantId':TENANT,'counts':counts,'files':files,'cloudConnectionsEnabled':False,'credentialsIncluded':False,'dataCutoff':'2026-10-19','note':'Private authorized business data; no cloud fetch. Original permissions retained.'})
+        write(payload/'manifest.json',{'format':'ninepop-dev-v1','tenantId':TENANT,'counts':counts,'files':files,'cloudConnectionsEnabled':False,'credentialsIncluded':False,'exportedAt':datetime.datetime.now(datetime.timezone.utc).isoformat(),'dataCutoff':'Mixed source snapshots; see original batch receipts','note':'Private authorized business data; no cloud fetch. Original permissions retained.'})
         with tarfile.open(output,'w:gz') as tar:
             for f in sorted(payload.rglob('*')):
                 if f.is_symlink():raise RuntimeError('Symlink rejected')

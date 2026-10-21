@@ -34,6 +34,16 @@ class BriefingPresentationPolicyTest {
         assertEquals(options,BriefingPresentationPolicy.resolve(request("INSIGHT",options),"INSIGHT",null));
         assertThrows(IdentityException.class,()->BriefingPresentationPolicy.resolve(request("SUGGESTION",p("COMPARISON",null,null,null,steps.sections())),"SUGGESTION",null));
     }
+    @Test void fixedChainPreservesValidatedRolesWithoutChangingChartContract(){
+        var sections=List.of(new BriefingPresentationPolicy.Section("OBSERVATION",0),new BriefingPresentationPolicy.Section("ACTION",1));
+        var req=request("DATA",p("KEY_METRIC","TABLE","甲","CURRENT",sections));
+        var resolved=BriefingPresentationPolicy.fixedChain(req,chart,true);
+        assertEquals(sections,resolved.sections());assertEquals("EDITORIAL",resolved.layout());
+        assertEquals("GROUPED_BAR",resolved.chartStyle());assertNull(resolved.focusGroup());
+        assertEquals("CURRENT_BAR",BriefingPresentationPolicy.fixedChain(req,chart,false).chartStyle());
+        var invalid=request("DATA",p("EDITORIAL","TABLE",null,null,List.of(new BriefingPresentationPolicy.Section("ACTION",5))));
+        assertThrows(IdentityException.class,()->BriefingPresentationPolicy.fixedChain(invalid,chart,true));
+    }
     @Test void legacyDeliveryDefaultsToTheExistingPresentation(){
         var old=new BriefingContentService.Content("briefing-data-v1","DATA","标题","摘要",prose,chart,null,null,null,"2026-10-06T00:00:00Z");
         var defaults=BriefingPresentationPolicy.resolve(request("DATA",null),"DATA",chart);

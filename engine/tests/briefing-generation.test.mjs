@@ -65,6 +65,17 @@ async function generationFixture(t, { generation = true, missing = false, revoke
     platformBaseUrl: url, executionClass: 'live', modelName: 'synthetic-briefing-search-loop',
     createModel: () => ({ usage: null, async *generate(request) {
       calls++;
+      if (generation && calls === 1) {
+        assert.match(JSON.stringify(request.messages), /正文与执行说明分离/);
+        for (const rule of ['同一事实不要拆成多张卡', '主题覆盖优先于数量', '证据不足少生成', '不以泛泛建议、职责介绍、资料缺口卡'])
+          assert.ok(JSON.stringify(request.messages).includes(rule), `generation prompt includes ${rule}`);
+        for (const rule of ['通用详情分区与读者语言', '不依赖样例标题', '不把推断当事实', '卡面信息优先级', '资讯正文分区', '建议卡表达', '详情组织', '禁止使用AI生成图片']) {
+          assert.ok(JSON.stringify(request.messages).includes(rule));
+          assert.ok(request.tools.find(tool => tool.name === 'deliver_briefing').description.includes(rule));
+        }
+        assert.match(request.tools.find(tool => tool.name === 'deliver_briefing').description, /不因移除系统过程而隐瞒证据不足/);
+        assert.match(request.tools.find(tool => tool.name === 'deliver_briefing').description, /同一事实不要拆成多张卡/);
+      }
       const searchAvailable = request.tools.some((tool) => tool.name === 'search_sources');
       if (supplement && calculations > 0 && supplementalCalls < 3) {
         assert.ok(!request.tools.some(tool => tool.name === 'compare_table'));

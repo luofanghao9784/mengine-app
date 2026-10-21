@@ -41,6 +41,10 @@ test('signed platform bridge isolates sources, rejects replay and preserves data
   assert.ok(!(await call(envelope('enterprise-a','/scene-export'))).json().assets.some((a:any)=>a.id===table.id));
   const scoped=(await call(envelope('enterprise-a','/scene-export','GET',{restrictedSourceIds:[table.id]}))).json().assets.find((a:any)=>a.id===table.id);assert.ok(scoped);assert.deepEqual(scoped.governance.allowedActors,table.governance.allowedActors);
   assert.equal((await call(envelope('enterprise-a','/scene-export','GET',{restrictedSourceIds:'all'}))).statusCode,400);
+  const many=Array.from({length:1024},(_,i)=>i===1023?table.id:`unlisted-${i}`);
+  const expanded=await call(envelope('enterprise-a','/scene-export','GET',{restrictedSourceIds:many}));
+  assert.equal(expanded.statusCode,200);assert.ok(expanded.json().assets.some((a:any)=>a.id===table.id));
+  assert.equal((await call(envelope('enterprise-a','/scene-export','GET',{restrictedSourceIds:[...many,'overflow']}))).statusCode,400);
   restricted.ownerId='u-other';restricted.grants=[];c.store.saveDoc(restricted);
   assert.ok(!(await call(envelope('enterprise-a','/scene-export','GET',{restrictedSourceIds:[table.id]}))).json().assets.some((a:any)=>a.id===table.id),'explicit list never bypasses source ACL');
   const customer=(path:string,identity=true)=>{const payload=Buffer.from(JSON.stringify({tenant:'enterprise-a',path,method:'GET',actor:'customer:new-member',...(identity?{identity:{id:'new-member',name:'企业新成员'}}:{}),nonce:randomUUID(),at:Date.now()})).toString('base64url');return {payload,signature:createHmac('sha256',secret).update(payload).digest('hex')};};

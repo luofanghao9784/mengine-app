@@ -118,7 +118,7 @@ public class BriefingContentService {
         boolean orders="orderSalesByConfirmationDate".equals(calc.path("metric").asText());
         var chart=new Chart("GROUPED_BAR",paired?"订单销售与确认收款":orders?"已确认订单金额":"系统确认收款","元",paired?"订单销售额":"不适用",paired?"确认收款":"月内累计",calc.path("from").asText()+"—"+calc.path("to").asText()+" · "+rows.size()+"家店",rows,new Row(null,paired?calc.path("orderTotal").asText():null,calc.path("total").asText(),null,null,null,null,null));
         // The verified result shape fixes the chart; authors cannot hide one metric or imply a time comparison.
-        var presentation="DATA".equals(type(request))?new BriefingPresentationPolicy.Presentation("briefing-presentation-v1","EDITORIAL",paired?"GROUPED_BAR":"CURRENT_BAR",null,null,List.of()):calculationPresentation(request,chart);
+        var presentation="DATA".equals(type(request))?BriefingPresentationPolicy.fixedChain(request,chart,paired):calculationPresentation(request,chart);
         BriefingEditorialQuality.validate(request,true,true,true);
         var content=new Content("DATA".equals(type(request))?"briefing-chain-v1":"briefing-text-v1",type(request),request.title(),request.summary(),List.copyOf(request.analysis()),"DATA".equals(type(request))?chart:null,null,request.calculationArtifactId(),sha,Instant.now().toString(),null,null,presentation);
         var prior=db.queryForList("SELECT id,sha256,content FROM conversation_artifacts a WHERE task_id=? AND attempt_number=? AND EXISTS(SELECT 1 FROM identity_audit p WHERE p.target_id=a.id AND p.action='TASK_BRIEFING_CREATED')",job.id(),attempt);

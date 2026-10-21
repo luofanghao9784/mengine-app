@@ -11,6 +11,7 @@ import tools.jackson.databind.json.JsonMapper;
 /** Invoked only by the host CLI, with operator DB configuration. No public deployment endpoint. */
 @Component
 public class CollectionDeployment {
+    public static final int MAX_DATASETS = 1024;
     public record Dataset(UUID id,UUID workspaceId,String key,String name,String description,List<String> columns,List<DatasetField> fieldDefinitions){
         public Dataset(UUID id,UUID workspaceId,String key,String name,String description,List<String> columns){this(id,workspaceId,key,name,description,columns,List.of());}
         public Dataset {fieldDefinitions=fieldDefinitions==null?List.of():List.copyOf(fieldDefinitions);}
@@ -26,7 +27,7 @@ public class CollectionDeployment {
     }
     private void text(String value,int max){if(value==null||value.isBlank()||value.length()>max||value.codePoints().anyMatch(Character::isISOControl))throw new IllegalArgumentException("Invalid deployment metadata");}
     public void apply(Manifest m){
-        if(m==null||!"1.0".equals(m.contractVersion())||m.tenantId()==null||m.connectionId()==null||m.datasets()==null||m.datasets().size()>200||!Set.of("READY","UNAVAILABLE","UNCONFIGURED").contains(m.status()))throw new IllegalArgumentException("Invalid deployment manifest");
+        if(m==null||!"1.0".equals(m.contractVersion())||m.tenantId()==null||m.connectionId()==null||m.datasets()==null||m.datasets().size()>MAX_DATASETS||!Set.of("READY","UNAVAILABLE","UNCONFIGURED").contains(m.status()))throw new IllegalArgumentException("Invalid deployment manifest");
         text(m.name(),160);text(m.routeLabel(),500);text(m.accessSummary(),1000);ZoneId.of(m.timeZone());
         var ids=new HashSet<UUID>();var keys=new HashSet<String>();
         for(var d:m.datasets()){

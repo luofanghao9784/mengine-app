@@ -194,3 +194,21 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* 两步退款建议竖卡：利用纵向空间展开每步，保留完整动作边界。 */
+.live-briefing-tile[data-size='1×2'] .magazine-refund-portrait .briefing-sections.is-compact p {
+  -webkit-line-clamp: 6;
+}
+
+/* 两步复核横卡并列呈现，序号由列表统一提供。 */
+.live-briefing-tile[data-size='2×1'] .magazine-followup-landscape .briefing-sections.layout-steps {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin: 8px 0 4px;
+}
+.live-briefing-tile[data-size='2×1'] .magazine-followup-landscape .briefing-section {
+  padding-left: 26px;
+}
+.live-briefing-tile[data-size='2×1'] .magazine-followup-landscape .briefing-sections.is-compact p {
+  -webkit-line-clamp: 4;
+}

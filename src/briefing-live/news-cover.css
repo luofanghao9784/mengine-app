@@ -86,3 +86,35 @@
 .live-briefing-tile[data-size="2×1"] .news-cover.is-compact {
   --cover-height: 86px;
 }
+
+/* Wide, shallow cards read as a small editorial spread, not a cropped banner. */
+@container live-briefing-tile (min-width: 380px) {
+  .live-briefing-tile[data-size='2×1'] .magazine-with-cover {
+    padding-right: 39%;
+  }
+  .live-briefing-tile[data-size='2×1'] .news-cover.is-compact {
+    display: block;
+    height: 0;
+    margin: 0;
+  }
+  .live-briefing-tile[data-size='2×1'] .news-cover.is-compact .news-cover-layer {
+    inset: 0 0 0 65%;
+    height: auto;
+    border-radius: 0 23px 23px 0;
+  }
+  .live-briefing-tile[data-size='2×1'] .magazine-with-cover .magazine-eyebrow {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .live-briefing-tile[data-size='2×1'] .magazine-with-cover .magazine-eyebrow time {
+    background: none;
+    padding: 0;
+  }
+  .live-briefing-tile[data-size='2×1'] .magazine-with-cover h3 {
+    font-size: clamp(18px, 4cqw, 24px);
+    line-height: 1.35;
+  }
+  .live-briefing-tile[data-size='2×1'] .magazine-with-cover .magazine-footer {
+    padding-right: 0;
+  }
+}

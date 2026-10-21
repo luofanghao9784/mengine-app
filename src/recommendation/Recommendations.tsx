@@ -337,7 +337,6 @@ function RecommendationCard({ tenant, item }: { tenant: string; item: Recommenda
             pinned={pinned}
             feedback={item.feedbackTarget ? { tenant, target: item.feedbackTarget } : undefined}
             discussion={item.briefing && c.kind === 'TASK' && c.conversationId ? { tenant, source: { conversationId: c.conversationId, taskId: c.id, taskRevision: c.taskRevision!, attempt: c.attempt! } } : undefined}
-            verification={c.executionClass === 'verification' && tenant !== '9093e4a0-959e-4ef8-88fe-13276744941e'}
             footer={c.kind === 'PUBLICATION' ? <span>v{c.materialVersion}</span> : undefined}
           />
         </button>

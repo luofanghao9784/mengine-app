@@ -22,3 +22,46 @@
 .reading-evidence-content > a {
   font-size: 12px;
 }
+
+.reading-evidence-group {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border, #e5e7eb);
+  font-family: system-ui;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.reading-evidence-group > summary {
+  cursor: pointer;
+  color: var(--text-secondary, #62677c);
+}
+.reading-evidence-group > details {
+  margin-top: 16px;
+}
+
+/* 阅读详情统一采用原生折叠，依据内部只做文字分组。 */
+.live-reading-article .reading-evidence-group,
+.live-reading-article .data-briefing-table {
+  border: 0;
+  padding: 0;
+  margin: 24px 0 0;
+  font: 14px/1.7 system-ui;
+}
+.reading-evidence-group .reading-evidence,
+.reading-evidence-group .reply-reference-library { margin: 16px 0; }
+.live-reading-article .reading-evidence h4,
+.reading-evidence-group h3,
+.reading-evidence-group h4 { margin: 12px 0 6px; font: 600 14px/1.7 system-ui; }
+.live-reading-article .reading-evidence-content { padding: 0; }
+.reading-evidence-group .reply-reference-file,
+.reading-evidence-group .reply-reference-file > header,
+.reading-evidence-group .reply-reference-fragment,
+.reading-evidence-group .reply-reference-excerpt { background: none; border: 0; border-radius: 0; padding: 0; }
+.reading-evidence-group .reply-reference-file { margin: 12px 0; }
+.reading-evidence-group .reply-reference-fragment { margin: 8px 0; }
+.reading-evidence-group p { font: inherit; }
+
+.reading-evidence-group .disclosure-content > .reading-evidence:first-child h4 { margin-top: 4px; }
+.reading-evidence-group .reading-evidence { margin: 16px 0 24px; }
+.reading-evidence-group .reading-evidence-content > p { margin: 10px 0; line-height: 1.8; }
+.reading-evidence-group .reading-evidence-content pre { color: var(--ink-2); line-height: 1.8; }

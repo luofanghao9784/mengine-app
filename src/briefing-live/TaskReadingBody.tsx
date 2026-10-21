@@ -1,9 +1,12 @@
+import { isInternalBriefingArtifact } from './editorial-policy';
+import { Disclosure } from '../components/Disclosure';
+import { editorialEvidence } from './editorial-evidence';
 import { BackgroundTaskEvidence } from '../profile/BackgroundTaskEvidence';
 import { ReplyReferences } from '../conversation/ReplyReferences';
 import { ReadingEvidence } from './ReadingEvidence';
 import { MagazineBody } from './Magazine';
 import { MagazineGrid } from './MagazineGrid';
-import { DataBriefing } from './DataBriefing';
+import { DataBriefing, DataBriefingEvidence } from './DataBriefing';
 import { readBriefing } from './content';
 import { useEffect, useRef, useState } from 'react';
 import { DocumentText, Button } from '../shared/ui';
@@ -125,7 +128,6 @@ export function TaskReadingBody({
                           <span>{result.artifacts.length} 份成果</span>
                         ) : undefined
                       }
-                      verification={result.executionClass === 'verification' && !result.engineVersion?.startsWith('codex-demo-import-')}
                     />
                   </button>
                 </article>
@@ -136,12 +138,26 @@ export function TaskReadingBody({
       </div>
     );
   }
+  const artifacts = result.artifacts.filter((item, index, all) => all.findIndex((other) => other.id === item.id) === index);
+  const attachments = artifacts.filter((item) => !isInternalBriefingArtifact(item.filename));
+  const executionNotes = (
+    <>
+      {result.executionClass === 'verification' &&
+        !result.engineVersion?.startsWith('codex-demo-import-') && (
+          <p className="live-verification-label">联调验证内容 · 未调用真实模型</p>
+        )}
+      {generated.value && editorialEvidence(generated.value).notes.map((note) => <p key={note}>{note}</p>)}
+      {artifacts.filter((item) => isInternalBriefingArtifact(item.filename)).length > 0 && (
+        <section className="reading-evidence">
+          <h4>技术文件</h4>
+          <ul>{artifacts.filter((item) => isInternalBriefingArtifact(item.filename)).map((item) => <li key={item.id}>{item.filename}</li>)}</ul>
+          <a href={conversationHref(tenant, task.conversationId) + '&task=' + encodeURIComponent(task.taskId)}>在会话中查看与下载</a>
+        </section>
+      )}
+    </>
+  );
   return (
     <>
-      {result.mode === 'AGENT' && result.status === 'SUCCEEDED' && <BackgroundTaskEvidence tenant={tenant} conversation={task.conversationId} task={task.taskId}/>}
-      {result.executionClass === 'verification' && !result.engineVersion?.startsWith('codex-demo-import-') && (
-        <p className="live-verification-label">联调验证内容 · 未调用真实模型</p>
-      )}
       {hasBriefing ? (
         generated.error ? (
           <Failure error={generated.error} retry={() => setAttempt((n) => n + 1)} />
@@ -153,59 +169,93 @@ export function TaskReadingBody({
       ) : (
         <DocumentText text={result.reply || ''} />
       )}
-      <ReplyReferences
-        sources={result.sources}
-        citation={
-          onSource
-            ? (id) => {
-                const source = result.sources.find((s) => s.id === id)!;
-                onSource(id, source.filename + ' · v' + source.version);
+      <Disclosure className="reading-evidence-group" title="查看依据" description="资料来源、统计范围与计算口径">
+        {generated.value && (
+          <DataBriefingEvidence
+            document={generated.value}
+            sourceInReferences={result.sources.some(
+              (source) =>
+                source.materialId === generated.value?.content.source?.materialId &&
+                source.versionId === generated.value?.content.source?.versionId,
+            )}
+          />
+        )}
+        <ReplyReferences
+          flat
+          sources={result.sources.filter(
+            (source, index, all) => all.findIndex((other) => other.id === source.id) === index,
+          )}
+          scopeSource={generated.value?.content.source}
+          citation={
+            onSource
+              ? (id) => {
+                  const source = result.sources.find((s) => s.id === id)!;
+                  onSource(id, source.filename + ' · v' + source.version);
+                }
+              : undefined
+          }
+        />
+        {result.sources.length > 0 && !onSource && (
+          <p className="reading-source-link">
+            <a
+              href={
+                conversationHref(tenant, task.conversationId) + '&task=' + encodeURIComponent(task.taskId)
               }
-            : undefined
-        }
-      />
-      {result.sources.length > 0 && !onSource && (
-        <p className="reading-source-link"><a href={conversationHref(tenant, task.conversationId) + '&task=' + encodeURIComponent(task.taskId)}>在会话中查看来源</a></p>
-      )}
-      {result.webSources.map((s) => (
-        <ReadingEvidence key={s.id} title="网络来源" filename={s.title}>
-          <a href={s.url} target="_blank" rel="noopener noreferrer">
-            查看原文
-          </a>
-          <p>
-            {s.publishedAt
-              ? `发布于 ${new Date(s.publishedAt).toLocaleDateString('zh-CN')}`
-              : '发布日期未核实'}{' '}
-            · 检索于 {new Date(s.retrievedAt).toLocaleDateString('zh-CN')}
+            >
+              在会话中查看来源
+            </a>
           </p>
-        </ReadingEvidence>
-      ))}
-      {result.originals
-        .filter((s) => !result.sources.some((source) => source.versionId === s.versionId))
-        .map((s) => (
-          <ReadingEvidence key={s.versionId} title="原始资料" filename={s.filename} version={s.version}>
-            <a
-              href={
-                conversationHref(tenant, task.conversationId) + '&task=' + encodeURIComponent(task.taskId)
-              }
-            >
-              在会话中查看原件
+        )}
+        {result.webSources.map((s) => (
+          <ReadingEvidence key={s.id} title="网络来源" filename={s.title}>
+            <a href={s.url} target="_blank" rel="noopener noreferrer">
+              查看原文
             </a>
+            <p>
+              {s.publishedAt
+                ? `发布于 ${new Date(s.publishedAt).toLocaleDateString('zh-CN')}`
+                : '发布日期未核实'}{' '}
+              · 检索于 {new Date(s.retrievedAt).toLocaleDateString('zh-CN')}
+            </p>
           </ReadingEvidence>
         ))}
-      {result.artifacts
-        .filter((s) => !/^(briefing-(data|text|dataset)-|dataset-comparison-)/.test(s.filename))
-        .map((s) => (
-          <ReadingEvidence key={s.id} title="成果附件" filename={s.filename}>
-            <a
-              href={
-                conversationHref(tenant, task.conversationId) + '&task=' + encodeURIComponent(task.taskId)
-              }
-            >
-              在会话中查看与下载
-            </a>
-          </ReadingEvidence>
-        ))}
+        {result.originals
+          .filter(
+            (s, i, all) =>
+              all.findIndex((other) => other.versionId === s.versionId) === i &&
+              s.versionId !== generated.value?.content.source?.versionId &&
+              !result.sources.some((source) => source.versionId === s.versionId),
+          )
+          .map((s) => (
+            <ReadingEvidence key={s.versionId} title="原始资料" filename={s.filename} version={s.version}>
+              <a
+                href={
+                  conversationHref(tenant, task.conversationId) + '&task=' + encodeURIComponent(task.taskId)
+                }
+              >
+                在会话中查看原件
+              </a>
+            </ReadingEvidence>
+          ))}
+        {result.mode === 'AGENT' && result.status === 'SUCCEEDED' ? (
+          <BackgroundTaskEvidence tenant={tenant} conversation={task.conversationId} task={task.taskId}>
+            {executionNotes}
+          </BackgroundTaskEvidence>
+        ) : (
+          <Disclosure title="详细执行记录" description="生成说明与技术记录">{executionNotes}</Disclosure>
+        )}
+      </Disclosure>
+      {attachments.length > 0 && (
+        <Disclosure className="reading-evidence-group" title="成果附件" description="查看或下载本次成果文件" count={attachments.length}>
+          {attachments.map((s) => (
+            <ReadingEvidence key={s.id} title="" filename={s.filename}>
+              <a href={conversationHref(tenant, task.conversationId) + '&task=' + encodeURIComponent(task.taskId)}>
+                在会话中查看与下载
+              </a>
+            </ReadingEvidence>
+          ))}
+        </Disclosure>
+      )}
     </>
   );
 }
