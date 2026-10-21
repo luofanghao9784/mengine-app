@@ -322,6 +322,20 @@ def instance_analysis_environment(root):
     return {'ANALYSIS_MATERIAL_API_ENABLED': str(value['materialApiEnabled']).lower()}
 
 
+def instance_experience_environment(root):
+    """Explicit experience-only enablement, never activated on restore."""
+    saved = root / 'experience-runtime.json'
+    if (root / 'restore.json').exists() or (root / 'restore.json').is_symlink() or not saved.exists():
+        return {}
+    value = private_read(saved)
+    fields = {'intakeEnabled': 'EXPERIENCE_INTAKE_ENABLED',
+              'analysisEnabled': 'EXPERIENCE_ANALYSIS_ENABLED',
+              'generalizationEnabled': 'EXPERIENCE_GENERALIZATION_ENABLED'}
+    if set(value) != set(fields) or any(type(value[k]) is not bool for k in fields):
+        raise TrialError('经验运行配置必须包含三项布尔开关。')
+    return {env: str(value[key]).lower() for key, env in fields.items()}
+
+
 def instance_briefing_environment(root):
     disabled = {'BRIEFING_DAILY_ENABLED': 'false'}
     saved = root / 'briefing-runtime.json'
@@ -500,6 +514,7 @@ def start(root, model_config=None, reconnect_live=False, phone_local=False, coll
         if collection_config is not None:
             private_write(root / 'collection-runtime.json', {'executable': collection_env['DREAMCORE_COLLECTION_EXECUTABLE']})
         env.update(model_api_env)
+        env.update(instance_experience_environment(root))
         env.update(analysis_env)
         env.update(briefing_env)
         env.update(extra_api_env)

@@ -29,6 +29,19 @@ class LibraryPermissionIntegrationTest {
  }
  LibraryPermissionService.Grant grant(UUID member,String content,String download){return new LibraryPermissionService.Grant("ACCOUNT",member,content,download,false,null);}
  LibraryPermissionService.Policy save(String kind,UUID id,boolean inherit,List<LibraryPermissionService.Grant> grants){return permissions.save(admin,tenant,kind,id,new LibraryPermissionService.Change(UUID.randomUUID(),permissions.policy(admin,tenant,kind,id).revision(),inherit,grants));}
+ @Test void personalUploadReferenceRespectsFilePolicyAndDoesNotIncludeOthersUploads(){
+  UUID personal=UUID.randomUUID(),readerPersonal=UUID.randomUUID();
+  db.update("INSERT INTO workspaces(id,tenant_id,owner_id,name,kind) VALUES (?,?,?,'个人','PERSONAL'),(?,?,?,'读者个人','PERSONAL')",personal,tenant,editor,readerPersonal,tenant,reader);
+  assertEquals(List.of(file),materials.list(editor,tenant,personal,null,"",0,20,true).items().stream().map(MaterialService.Entry::id).toList());
+  assertTrue(materials.list(reader,tenant,readerPersonal,null,"",0,20,true).items().isEmpty());
+  save("MATERIAL",file,false,List.of(grant(editor,"READ","DENY")));
+  var ref=materials.list(editor,tenant,personal,null,"",0,20,true).items().getFirst();
+  assertEquals(file,ref.id());assertFalse(ref.canMaintain());assertFalse(ref.canDownload());
+  assertThrows(IdentityException.class,()->materials.download(editor,tenant,space,file,materials.detail(editor,tenant,space,file,0,20).versions().getFirst().id()));
+  save("MATERIAL",file,false,List.of(grant(reader,"READ","ALLOW")));
+  assertTrue(materials.list(editor,tenant,personal,null,"",0,20,true).items().isEmpty());
+  assertThrows(IdentityException.class,()->materials.detail(editor,tenant,space,file,0,20));
+ }
  @Test void administratorDoesNotReadAndEditorDoesNotDelete(){
   var e=permissions.effective(editor,tenant,"MATERIAL",file);assertTrue(e.canEdit());assertTrue(e.canDownload());assertFalse(e.canManageFiles());
   assertFalse(permissions.policy(admin,tenant,"MATERIAL",file).effective().canRead());

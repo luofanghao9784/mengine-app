@@ -207,3 +207,28 @@ test('editable text and pipeline receipts are bound to the requested material', 
       (e) => e instanceof IdentityError && e.code === 'CONTRACT_MISMATCH',
     );
 });
+
+test('personal upload references preserve source workspace and reject foreign or malformed entries', async () => {
+  const reference = { ...entry, workspaceId: id, uploadedBy: space, uploadedByName: '合成上传者' };
+  let requested = '';
+  const client = createMaterialClient(async (url) => {
+    requested = String(url);
+    return response({ ...page, items: [reference] });
+  });
+  const result = await client.list(tenant, space, null, '', 0, undefined, true);
+  assert.equal(new URL(requested, 'https://local.test').searchParams.get('includeUploads'), 'true');
+  assert.equal(result.items[0].workspaceId, id);
+  for (const invalid of [
+    { ...reference, tenantId: id },
+    { ...reference, uploadedBy: 'invalid' },
+    { ...reference, uploadedByName: 123 },
+    { ...reference, kind: 'FOLDER', version: 0, sizeBytes: null },
+  ]) {
+    const bad = createMaterialClient(async () => response({ ...page, items: [invalid] }));
+    await assert.rejects(
+      bad.list(tenant, space, null, '', 0, undefined, true),
+      (e) => e instanceof IdentityError && e.code === 'CONTRACT_MISMATCH',
+    );
+  }
+  assert.throws(() => client.list(tenant, space, id, '', 0, undefined, true), IdentityError);
+});

@@ -12,6 +12,9 @@ export interface MaterialEntry {
   updatedAt: string;
   path: string[];
   canMaintain: boolean;
+  /** Original uploader; later version contributors are recorded on MaterialVersion. */
+  uploadedBy?: string | null;
+  uploadedByName?: string | null;
   canDownload?: boolean;
   canManageFiles?: boolean;
   canManagePermissions?: boolean;

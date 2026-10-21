@@ -64,7 +64,7 @@
   font-weight: 550;
   line-height: 1.5;
 }
-.lib-entry-main :is(.lib-kind, .lib-place, .lib-size, time) {
+.lib-entry-main :is(.lib-kind, .lib-place, .lib-uploader, .lib-size, time) {
   overflow: hidden;
   color: var(--ink-3);
   font-size: 12px;
@@ -116,6 +116,7 @@
     'type kind kind'
     'name name name'
     'place place place'
+    'uploader uploader uploader'
     'time time size';
   align-items: center;
   gap: 4px 12px;
@@ -144,6 +145,23 @@
   min-height: 18px;
   color: var(--ink-2);
 }
+.lib-uploader {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+.lib-uploader svg {
+  flex-shrink: 0;
+}
+.lib-uploader span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lib-entries.cards .lib-uploader {
+  grid-area: uploader;
+  min-height: 18px;
+}
 .lib-entries.cards time {
   grid-area: time;
   margin-top: 8px;
@@ -170,7 +188,7 @@
 .lib-columns,
 .lib-entries.list .lib-entry-main {
   display: grid;
-  grid-template-columns: 38px minmax(0, 1.4fr) minmax(0, 1fr) 88px 104px;
+  grid-template-columns: 38px minmax(0, 1.4fr) minmax(0, 1fr) minmax(80px, 0.65fr) 72px 90px;
   align-items: center;
   gap: 14px;
   padding: 0 60px 0 16px;
@@ -255,7 +273,8 @@
     grid-template-columns: 34px minmax(0, 1fr) auto;
     grid-template-areas:
       'type name name'
-      'type place time';
+      'type place time'
+      'type uploader uploader';
     gap: 2px 12px;
     padding: 10px 52px 10px 14px;
   }
@@ -267,6 +286,9 @@
   }
   .lib-entries.list .lib-place {
     grid-area: place;
+  }
+  .lib-entries.list .lib-uploader {
+    grid-area: uploader;
   }
   .lib-entries.list time {
     grid-area: time;

@@ -30,8 +30,9 @@ public class MaterialController {
     }
     @GetMapping("/workspaces/{workspace}/library")
     public MaterialService.Page list(Authentication auth,@PathVariable UUID tenant,@PathVariable UUID workspace,@RequestParam(required=false) UUID folder,
-            @RequestParam(defaultValue="") String q,@RequestParam(defaultValue="0") int offset,@RequestParam(defaultValue="50") int limit) {
-        return service.list(actor(auth),tenant,workspace,folder,q,offset,limit);
+            @RequestParam(defaultValue="") String q,@RequestParam(defaultValue="0") int offset,@RequestParam(defaultValue="50") int limit,
+            @RequestParam(defaultValue="false") boolean includeUploads) {
+        return service.list(actor(auth),tenant,workspace,folder,q,offset,limit,includeUploads);
     }
     @PostMapping("/workspaces/{workspace}/folders") @ResponseStatus(HttpStatus.CREATED)
     public MaterialService.Crumb folder(Authentication auth,@PathVariable UUID tenant,@PathVariable UUID workspace,@Valid @RequestBody FolderRequest body) {

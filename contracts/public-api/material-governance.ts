@@ -3,6 +3,8 @@ export type GovernanceItem = {
   workspaceId: string;
   workspaceName: string;
   name: string;
+  uploadedBy?: string | null;
+  uploadedByName?: string | null;
   version: number;
   revision: number;
   canEdit: boolean;

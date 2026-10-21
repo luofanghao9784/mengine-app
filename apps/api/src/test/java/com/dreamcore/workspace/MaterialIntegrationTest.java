@@ -110,6 +110,33 @@ class MaterialIntegrationTest {
         var search=viewer.ok("GET",base(space)+"/library?q="+URLEncoder.encode("统计",StandardCharsets.UTF_8),null,200);
         assertEquals(1,search.get("items").size()); assertEquals(4,search.get("items").get(0).get("path").size());
     }
+    @Test void personalRootIncludesOwnEnterpriseUploadsWithOriginalIdentityAndPagination() throws Exception {
+        UUID space=shared();String prefix="personal-reference-"+UUID.randomUUID();
+        var folder=writer.ok("POST",base(space)+"/folders",Map.of("requestId",UUID.randomUUID(),"name","企业子目录"),201);
+        var upload=writer.upload(base(space)+"/materials",Map.of("requestId",UUID.randomUUID(),"folderId",folder.get("id").asString()),prefix+"-shared.txt","synthetic".getBytes(StandardCharsets.UTF_8),true);
+        assertEquals(201,upload.statusCode());var sharedFile=json(upload);
+        assertEquals(owner.toString(),sharedFile.get("uploadedBy").asString());assertEquals("合成维护者",sharedFile.get("uploadedByName").asString());
+        put(personal,prefix+"-private.txt","private");
+        String path=base(personal)+"/library?q="+prefix;
+        assertEquals(1,writer.ok("GET",path,null,200).get("items").size());
+        var combined=writer.ok("GET",path+"&includeUploads=true",null,200);
+        assertEquals(2,combined.get("items").size());
+        var reference=java.util.stream.StreamSupport.stream(combined.get("items").spliterator(),false).filter(x->x.get("id").asString().equals(sharedFile.get("id").asString())).findFirst().orElseThrow();
+        assertEquals(space.toString(),reference.get("workspaceId").asString());assertEquals(folder.get("id").asString(),reference.get("folderId").asString());
+        assertEquals("合成维护者",reference.get("uploadedByName").asString());
+        var first=writer.ok("GET",path+"&includeUploads=true&limit=1",null,200);var second=writer.ok("GET",path+"&includeUploads=true&limit=1&offset=1",null,200);
+        assertTrue(first.get("hasMore").asBoolean());assertFalse(second.get("hasMore").asBoolean());assertNotEquals(first.get("items").get(0).get("id"),second.get("items").get(0).get("id"));
+        db.update("UPDATE workspace_members SET can_maintain=true WHERE workspace_id=? AND account_id=?",space,reader);
+        assertEquals(201,viewer.upload(base(space)+"/materials/"+sharedFile.get("id").asString()+"/versions",Map.of("requestId",UUID.randomUUID(),"expectedVersion",1),"revised.txt","revision".getBytes(StandardCharsets.UTF_8),true).statusCode());
+        var latest=detail(writer,space,sharedFile.get("id").asString());assertEquals(owner.toString(),latest.get("document").get("uploadedBy").asString());assertEquals(reader.toString(),latest.get("versions").get(0).get("createdBy").asString());
+        assertEquals(404,viewer.send("GET",path+"&includeUploads=true",null).statusCode());assertEquals(403,outsider.send("GET",path+"&includeUploads=true",null).statusCode());
+        assertEquals(400,writer.send("GET",base(space)+"/library?includeUploads=true",null).statusCode());
+        var personalFolder=writer.ok("POST",base(personal)+"/folders",Map.of("requestId",UUID.randomUUID(),"name","个人子目录"),201);
+        assertEquals(400,writer.send("GET",base(personal)+"/library?includeUploads=true&folder="+personalFolder.get("id").asString(),null).statusCode());
+        db.update("DELETE FROM workspace_members WHERE workspace_id=? AND account_id=?",space,owner);
+        assertEquals(1,writer.ok("GET",path+"&includeUploads=true",null,200).get("items").size());
+        assertEquals(404,writer.send("GET",base(space)+"/materials/"+sharedFile.get("id").asString(),null).statusCode());
+    }
     @Test void readAndMaintenanceAreSeparateAndAdminsCannotReadUnassignedContent() throws Exception {
         UUID space=shared();var doc=put(space,"original.txt","synthetic");var info=detail(viewer,space,doc.get("id").asString());
         assertFalse(info.get("document").get("canMaintain").asBoolean());

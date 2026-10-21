@@ -320,11 +320,13 @@ function LibraryListing({
       (!!v && typeof v === 'object' && 'id' in v && 'workspaceId' in v && uuid(v.id) && uuid(v.workspaceId)),
   );
   const [notice, setNotice] = useState('');
-  const data = useRemote(
-    (signal) => api.list(tenant, workspace, folder, q, page * 24, signal),
-    [tenant, workspace, folder, q, page, attempt, context],
-  );
   const current = context.workspaces.find((s) => s.id === workspace);
+  const personal = current?.kind === 'PERSONAL';
+  const includeUploads = personal && !folder;
+  const data = useRemote(
+    (signal) => api.list(tenant, workspace, folder, q, page * 24, signal, includeUploads),
+    [tenant, workspace, folder, q, page, attempt, context, includeUploads],
+  );
   const [uploadTarget, setUploadTarget] = useState(workspace || '');
   const refresh = () => setAttempt((x) => x + 1);
   const completed = (text: string) => {
@@ -375,7 +377,6 @@ function LibraryListing({
         refresh();
       }),
   });
-  const personal = current?.kind === 'PERSONAL';
   const recycleHref = (view: 'TRASH' | 'RECORDS') =>
     href(tenant, personal ? 'personal' : workspace!, folder || undefined) + '&recycle=' + view.toLowerCase();
   const returnScroll = useRef<number | null>(null);
@@ -620,7 +621,8 @@ function LibraryListing({
             {layout === 'list' && data.value.items.length > 0 && (
               <div className="lib-columns" aria-hidden="true">
                 <span>名称</span>
-                <span>{q || !workspace ? '位置' : '版本'}</span>
+                <span>{q || !workspace || includeUploads ? '位置' : '版本'}</span>
+                <span>上传人</span>
                 <span>大小</span>
                 <span>更新时间</span>
               </div>
@@ -641,13 +643,31 @@ function LibraryListing({
                       <type.icon size={18} strokeWidth={1.7} />
                     </span>
                     <strong>{item.name}</strong>
-                    <span className="lib-kind">{type.label}</span>
+                    <span className="lib-kind">
+                      {type.label}
+                      {personal && item.workspaceId !== workspace ? ' · 企业资料' : ''}
+                    </span>
                     <span className="lib-place">
-                      {q || !workspace
-                        ? item.path.slice(0, -1).join(' / ')
+                      {q || !workspace || includeUploads
+                        ? `${personal && item.workspaceId !== workspace ? '企业资料 · ' : ''}${item.path.slice(0, -1).join(' / ') || item.workspaceName}`
                         : item.kind === 'DOCUMENT'
                           ? `v${item.version}`
                           : ''}
+                    </span>
+                    <span
+                      className="lib-uploader"
+                      title={
+                        item.kind === 'DOCUMENT' ? `上传人：${item.uploadedByName || '未记录'}` : undefined
+                      }
+                    >
+                      {item.kind === 'DOCUMENT' ? (
+                        <>
+                          <Users size={13} aria-hidden="true" />
+                          <span>{item.uploadedByName || '未记录'}</span>
+                        </>
+                      ) : (
+                        '—'
+                      )}
                     </span>
                     <span className="lib-size">{item.sizeBytes == null ? '' : size(item.sizeBytes)}</span>
                     <time dateTime={item.updatedAt}>
@@ -1121,6 +1141,8 @@ export function DocumentDialog({
                           <dl className="live-material-properties">
                             <dt>位置</dt>
                             <dd>{data.value.document.path.slice(0, -1).join(' / ') || '—'}</dd>
+                            <dt>上传人</dt>
+                            <dd>{data.value.document.uploadedByName || '未记录'}</dd>
                             <dt>阅读版本</dt>
                             <dd>
                               v{selectedVersion?.number}

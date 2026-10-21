@@ -26,6 +26,8 @@ export const isEntry = (v: unknown): v is MaterialEntry =>
   v.path.length > 0 &&
   v.path.every(text) &&
   typeof v.canMaintain === 'boolean' &&
+  (v.uploadedBy === undefined || nullableId(v.uploadedBy)) &&
+  (v.uploadedByName === undefined || v.uploadedByName === null || text(v.uploadedByName)) &&
   ['canDownload', 'canManageFiles', 'canManagePermissions'].every(
     (key) => v[key] === undefined || typeof v[key] === 'boolean',
   );
@@ -112,8 +114,11 @@ export function createMaterialClient(fetcher: typeof fetch = fetch) {
       q: string,
       offset: number,
       signal?: AbortSignal,
+      includeUploads = false,
     ) {
+      if (includeUploads && (!space || folder)) throw new IdentityError('INVALID_REQUEST', 400);
       const query = new URLSearchParams({ q, offset: String(offset), limit: '24' });
+      if (includeUploads) query.set('includeUploads', 'true');
       if (folder) query.set('folder', id(folder));
       return request(
         (space ? root(tenant, space) : `/api/v1/tenants/${id(tenant)}`) + '/library?' + query,
@@ -123,7 +128,13 @@ export function createMaterialClient(fetcher: typeof fetch = fetch) {
           v.tenantId === tenant &&
           v.workspaceId === space &&
           v.folderId === folder &&
-          v.items.every((x) => x.tenantId === tenant && (!space || x.workspaceId === space)),
+          v.items.every(
+            (x) =>
+              x.tenantId === tenant &&
+              (!space ||
+                x.workspaceId === space ||
+                (includeUploads && x.kind === 'DOCUMENT' && uuid(x.uploadedBy))),
+          ),
         undefined,
         signal,
       );
