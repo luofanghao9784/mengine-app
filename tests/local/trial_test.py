@@ -13,6 +13,13 @@ spec.loader.exec_module(trial)
 
 
 class LocalTrialBoundaryTest(unittest.TestCase):
+    def test_explicit_live_scene_binding_is_forwarded_to_supervisor(self):
+        tenant = '11111111-1111-4111-8111-111111111111'
+        with patch('sys.argv', ['trial.py', 'start', '--live', '--enable-live', '--scene-tenant', tenant]), patch.object(trial, 'start') as start:
+            trial.main()
+            self.assertEqual(start.call_args.kwargs['scene_tenant'], tenant)
+            self.assertTrue(start.call_args.kwargs['enable_live'])
+
     def test_independent_platform_initialization_ignores_legacy_customer_roles(self):
         seen=[]
         def query(statement):
@@ -92,6 +99,33 @@ class LocalTrialBoundaryTest(unittest.TestCase):
                 trial.stop(root)
             self.assertFalse((root / 'stop-request.json').exists())
             self.assertFalse((root / 'supervisor.lock').exists())
+
+
+class BriefingTrialBoundaryTest(unittest.TestCase):
+    def test_automatic_generation_requires_explicit_private_config(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            with patch.dict(os.environ, {'BRIEFING_AUTOMATIC_ENABLED': 'true'}):
+                self.assertNotIn('BRIEFING_AUTOMATIC_ENABLED', trial.instance_briefing_environment(root))
+            saved = root / 'briefing-runtime.json'
+            trial.private_write(saved, {'dailyEnabled': True})
+            self.assertEqual(trial.instance_briefing_environment(root), {'BRIEFING_DAILY_ENABLED': 'true'})
+            for enabled in (True, False):
+                trial.private_write(saved, {'dailyEnabled': True, 'automaticEnabled': enabled})
+                self.assertEqual(trial.instance_briefing_environment(root), {'BRIEFING_DAILY_ENABLED': 'true', 'BRIEFING_AUTOMATIC_ENABLED': str(enabled).lower()})
+            trial.private_write(root / 'restore.json', {})
+            self.assertEqual(trial.instance_briefing_environment(root), {'BRIEFING_DAILY_ENABLED': 'false'})
+
+    def test_automatic_generation_rejects_invalid_or_public_config(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            saved = root / 'briefing-runtime.json'
+            for value in [{'automaticEnabled': True}, {'dailyEnabled': True, 'automaticEnabled': 'true'}, {'dailyEnabled': True, 'other': True}]:
+                trial.private_write(saved, value)
+                with self.assertRaises(trial.TrialError): trial.instance_briefing_environment(root)
+            trial.private_write(saved, {'dailyEnabled': True, 'automaticEnabled': True})
+            saved.chmod(0o644)
+            with self.assertRaises(trial.TrialError): trial.instance_briefing_environment(root)
 
 
 class PresentationTrialBoundaryTest(unittest.TestCase):

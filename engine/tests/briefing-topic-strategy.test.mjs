@@ -70,3 +70,60 @@ test('general editorial tool carries mixed-type whole batch without imposing req
  await tool.execute({candidates,selectedIndex:1,editorialPlan},new AbortController().signal);assert.deepEqual(saved.editorialPlan,editorialPlan);
  await assert.rejects(tool.execute({candidates,selectedIndex:1},new AbortController().signal));
 });
+
+
+test('authorized reader version is bound by runtime, without changing model business proposals', async () => {
+ const key='a'.repeat(32); let saved,selected=false;
+ const tool=topicSelectionTool(async body=>{saved=body;return {recorded:true,proposalOnly:true,selectedIndex:0,strategyVersion:'1.0.0'};},()=>{selected=true;},'',true,'',key);
+ assert.ok(!tool.parameters.properties.editorialPlan.required.includes('audienceKey'));
+ const candidate={question:'核查已确认事项',goal:'核对进展',userValue:'安排接续',destination:'BRIEFING',evidenceNeeded:'实际资料',difference:'新事项',requiresCalculation:false,businessType:'INSIGHT'};
+ const plan={batchId:randomUUID(),audienceKey:'model-copied-wrong-key',items:[{goalRef:'governance',questionKey:'follow-up',scope:'授权范围',period:'资料覆盖期间',shape:'NARRATIVE',decision:'EMIT',mergeInto:-1,reason:'新业务发现'}]};
+ await tool.execute({candidates:[candidate],selectedIndex:0,editorialPlan:plan},new AbortController().signal);
+ assert.equal(saved.editorialPlan.audienceKey,key);assert.equal(plan.audienceKey,'model-copied-wrong-key');
+ assert.equal(saved.editorialPlan.batchId,plan.batchId);assert.deepEqual(saved.editorialPlan.items,plan.items);assert.deepEqual(saved.candidates,[candidate]);assert.ok(selected);
+ selected=false;
+ const denied=topicSelectionTool(async()=>{throw Object.assign(new Error('denied'),{code:'REMOTE_ACCESS_DENIED'});},()=>{selected=true;},'',true,'',key);
+ await assert.rejects(denied.execute({candidates:[candidate],selectedIndex:0,editorialPlan:plan},new AbortController().signal),{code:'REMOTE_ACCESS_DENIED'});
+ assert.equal(selected,false);
+});
+
+
+test('automatic editorial generation can deliver its planned STEPS layout with platform reader binding',async t=>{
+ const key='b'.repeat(32), artifact=randomUUID();let selected=false,delivered=false,calls=0;
+ const server=createServer(async(req,res)=>{
+  if(usageFixture(req,res))return;const input=await body(req);
+  if(req.url.endsWith('/check'))return json(res,{allowed:true,executionClass:'live',briefingGeneration:true,briefingContentVersion:'1.0',briefingPresentationVersion:'1.0',topicStrategyVersion:'1.0',editorialPlanVersion:'1.0',topicSelectionRecorded:selected,workAudience:{version:'1.0',key,role:'OWNER',roleLabel:'负责人',department:'合成部门',jobTitle:'负责人',responsibilities:'核对进展',focus:[],focusLabels:[],starters:[],configured:true,authority:false,goals:{governance:'推进接续',stage:'',followUp:''}}});
+  if(req.url.endsWith('/execution/open'))return json(res,{accepted:true,policy:'READ_ONLY_PRIVATE_V1'});
+  if(req.url.endsWith('/execution/tool'))return json(res,{accepted:true});
+  if(req.url.endsWith('/select-briefing-topic')){assert.equal(input.editorialPlan.audienceKey,key);selected=true;return json(res,{recorded:true,proposalOnly:true,selectedIndex:0,strategyVersion:'1.0.0'});}
+  if(req.url.endsWith('/deliver-briefing')){assert.equal(input.presentation.layout,'STEPS');assert.equal(input.presentation.sections.length,2);delivered=true;return json(res,{contractVersion:'1.0',status:'PREPARED',artifactId:artifact,title:input.title,visibility:'PRIVATE_AFTER_TASK_SUCCEEDS'});}
+  return json(res,{},404);
+ });const url=await listen(server);t.after(()=>close(server));
+ const agent=new AgentTasks({platformBaseUrl:url,executionClass:'live',modelName:'synthetic-editorial-layout',createModel:()=>({usage:null,async *generate(request){
+  calls++;
+  if(!selected)yield {type:'tool_call',id:'topic',name:'select_briefing_topic',arguments:JSON.stringify({candidates:[{question:'已核对事项如何接续',goal:'推进接续',userValue:'完成下一步核对',destination:'BRIEFING',evidenceNeeded:'获权依据',difference:'新的接续事项',requiresCalculation:false,businessType:'SUGGESTION'}],selectedIndex:0,editorialPlan:{batchId:randomUUID(),audienceKey:'incorrect-model-copy',items:[{goalRef:'governance',questionKey:'follow-up',scope:'授权范围',period:'本轮',shape:'STEPS',decision:'EMIT',mergeInto:-1,reason:'已有实际接续事项'}]}})};
+  else {
+   const tool=request.tools.find(x=>x.name==='deliver_briefing');assert.ok(tool.parameters.properties.presentation,'automatic tasks need the same layout protocol as backend editorial validation');
+   yield {type:'tool_call',id:'deliver',name:'deliver_briefing',arguments:JSON.stringify({businessType:'SUGGESTION',title:'请先核对凭证再接续处理',summary:'请依据现有的核对记录安排下一步接续。',analysis:['先核对原始凭证与已有记录是否一致。','再将仍有疑问的事项交给负责人接续处理。'],presentation:{version:'briefing-presentation-v1',layout:'STEPS',chartStyle:null,focusGroup:null,focusValue:null,sections:[{paragraphIndex:0,role:'ACTION'},{paragraphIndex:1,role:'ACTION'}]}})};
+  }
+  yield {type:'finish',reason:'tool_calls'};
+ }})});
+ const result=await agent.run({contractVersion:'1.5',taskId:randomUUID(),attemptId:randomUUID(),prompt:'合成自动画报协议验证'},new AbortController().signal);
+ assert.equal(result.outcome,'COMPLETE');assert.ok(delivered);assert.equal(calls,2);
+});
+
+
+test('planned layout errors identify the repair and never rewrite content or dispatch invalid sections',async()=>{
+ let writes=0;
+ const tool=briefingDeliveryTool({presentationAvailable:true,selectedType:()=> 'SUGGESTION',selectedShape:()=> 'STEPS',authorize:async()=>{},invoke:async()=>{writes++;return {contractVersion:'1.0',status:'NO_NEW_CONTENT',reason:'NO_USEFUL_CONTENT'};}});
+ const good={businessType:'SUGGESTION',title:'核对凭证后接续处理',summary:'先按现有证据核对，再交接剩余问题。',analysis:['先核对原始凭证与已有记录是否一致。','再将仍有疑问的事项交给负责人接续处理。'],presentation:{version:'briefing-presentation-v1',layout:'STEPS',chartStyle:null,focusGroup:null,focusValue:null,sections:[{paragraphIndex:0,role:'ACTION'},{paragraphIndex:1,role:'ACTION'}]}};
+ for(const [patch,hint] of [
+  [{layout:'EDITORIAL'},/必须为 STEPS/],
+  [{focusValue:'CURRENT'},/全部为 null/],
+  [{sections:[{paragraphIndex:1,role:'ACTION'},{paragraphIndex:2,role:'ACTION'}]},/0 到 1/],
+  [{sections:[{paragraphIndex:0,role:'OBSERVATION'},{paragraphIndex:1,role:'ACTION'}]},/背景观察段落保留/],
+ ])await assert.rejects(tool.execute({...good,presentation:{...good.presentation,...patch}},new AbortController().signal),e=>hint.test(e.hint));
+ assert.equal(writes,0);const before=JSON.stringify(good);await tool.execute(good,new AbortController().signal);assert.equal(writes,1);assert.equal(JSON.stringify(good),before);
+ // No-output receipts do not publish a layout and remain possible after a planned topic.
+ await tool.execute({...good,title:'暂无新内容',presentation:{...good.presentation,layout:'EDITORIAL',sections:[]}},new AbortController().signal);assert.equal(writes,2);
+});

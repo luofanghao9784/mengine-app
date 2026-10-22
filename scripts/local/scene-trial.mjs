@@ -1,4 +1,5 @@
-// Isolated local companion. No .env, seed tenant, external models or production database.
+// Local companion. No .env, seed tenant or production database; model opt-in comes from supervisor.
+import { sceneModel } from './scene-model.mjs';
 import { readFileSync, existsSync, lstatSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { randomBytes, randomUUID } from 'node:crypto';
@@ -17,7 +18,8 @@ if (existsSync(sources)) {
   process.env.DATABASE_DEPLOYED_SOURCES = sources;
 }
 
-const { app, store } = await buildServer({ dbPath: join(root, 'scene/mengine.db'), storage: join(root, 'scene/documents'), demo: false, model: {enabled:false,apiKey:'',baseUrl:'http://127.0.0.1:1',model:'disabled'} });
+const model = sceneModel(process.env);
+const { app, store } = await buildServer({ dbPath: join(root, 'scene/mengine.db'), storage: join(root, 'scene/documents'), demo: false, model });
 store.db.transaction(() => {
   const existing = store.db.prepare('SELECT source_tenant,user_id FROM platform_tenant_bindings WHERE platform_tenant=?').get(binding.tenant);
   if (existing) {
@@ -33,5 +35,5 @@ store.db.transaction(() => {
   store.db.prepare('INSERT INTO platform_actor_bindings VALUES(?,?,?)').run(binding.tenant,binding.owner,id);
 })();
 await app.listen({host:'127.0.0.1',port:Number(process.env.API_PORT)});
-console.log('Local scene service ready; model disabled; existing grants preserved.');
+console.log(`Local scene service ready; model ${model.enabled ? model.model : 'disabled'}; existing grants preserved.`);
 for (const signal of ['SIGINT','SIGTERM']) process.on(signal,()=>void app.close().then(()=>process.exit(0)));

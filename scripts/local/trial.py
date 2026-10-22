@@ -344,9 +344,14 @@ def instance_briefing_environment(root):
     if not saved.exists() and not saved.is_symlink():
         return disabled
     value = private_read(saved)
-    if set(value) != {'dailyEnabled'} or type(value['dailyEnabled']) is not bool:
-        raise TrialError('定时画报配置必须仅包含 dailyEnabled 布尔值。')
-    return {'BRIEFING_DAILY_ENABLED': str(value['dailyEnabled']).lower()}
+    if (set(value) not in ({'dailyEnabled'}, {'dailyEnabled', 'automaticEnabled'})
+            or type(value.get('dailyEnabled')) is not bool
+            or 'automaticEnabled' in value and type(value['automaticEnabled']) is not bool):
+        raise TrialError('画报配置须包含 dailyEnabled，可选 automaticEnabled，均为布尔值。')
+    result = {'BRIEFING_DAILY_ENABLED': str(value['dailyEnabled']).lower()}
+    if 'automaticEnabled' in value:
+        result['BRIEFING_AUTOMATIC_ENABLED'] = str(value['automaticEnabled']).lower()
+    return result
 
 
 def instance_extra_environment(root):
@@ -436,8 +441,6 @@ def start(root, model_config=None, reconnect_live=False, phone_local=False, coll
     verify_api_migrations(jar)
     scene_path = root / 'scene-private.json'
     if scene_tenant or scene_path.exists():
-        if mode != 'off':
-            raise TrialError('本地新版数据服务仅用于无真实模型的隔离联调。')
         if not (WORKSPACE / 'integrations/mengine-wiki/dist/api/server.js').is_file():
             raise TrialError('先运行 npm --prefix integrations/mengine-wiki run build。')
         if scene_tenant:
@@ -560,6 +563,8 @@ def start(root, model_config=None, reconnect_live=False, phone_local=False, coll
                 private_write(root / 'scene-binding.json', json.loads(raw))
                 scene_port = free_port()
                 scene_env = {**clean_environment(), 'API_PORT':str(scene_port), 'MENGINE_PLATFORM_BRIDGE_KEY':scene_config['key']}
+                if model:
+                    scene_env.update(live_model.engine_environment(model))
                 scene = subprocess.Popen([executables['node'], 'scripts/local/scene-trial.mjs', str(root)], cwd=WORKSPACE, env=scene_env, stdout=log, stderr=log)
                 children.append(scene)
                 ready(f'http://127.0.0.1:{scene_port}/api/health', scene, stopping)
@@ -657,8 +662,8 @@ def main():
     parser.add_argument('--automatic-work', action='store_true', help='显式启用并保存真实模型自动工作循环：企业分析、经验和已配置的计划。')
     parser.add_argument('--collection-config', type=Path, help='部署维护的 0600 采集器配置；不从继承环境读取。')
     args = parser.parse_args()
-    if args.scene_tenant and (args.command != 'start' or args.live):
-        raise TrialError('--scene-tenant 仅用于 start 的无模型本地演示。')
+    if args.scene_tenant and args.command != 'start':
+        raise TrialError('--scene-tenant 仅用于 start。')
     if args.automatic_work and (args.command != 'start' or not args.live):
         raise TrialError('--automatic-work 仅适用于 start --live。')
     if args.collection_config and args.command != 'start':
@@ -675,7 +680,7 @@ def main():
     if args.command == 'start':
         if args.live:
             from live_model import DEFAULT_CONFIG
-            start(root, args.model_config or DEFAULT_CONFIG, args.reconnect_live, phone_local=args.phone_local, collection_config=args.collection_config, enable_live=args.enable_live, automatic_work=args.automatic_work)
+            start(root, args.model_config or DEFAULT_CONFIG, args.reconnect_live, phone_local=args.phone_local, collection_config=args.collection_config, enable_live=args.enable_live, automatic_work=args.automatic_work, scene_tenant=args.scene_tenant)
         else:
             start(root, phone_local=args.phone_local, collection_config=args.collection_config, scene_tenant=args.scene_tenant)
     elif args.command == 'invitation':

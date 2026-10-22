@@ -153,6 +153,7 @@ export class AgentTasks {
     let editorialBatchContext = '';
     let topicSelected = false;
     let selectedBriefingType: string | undefined;
+    let selectedBriefingShape: string | undefined;
     let topicNeedsCalculation = false;
     let briefingRequestedType: string | undefined;
     let briefingCalculationAttempts = 0;
@@ -575,6 +576,7 @@ export class AgentTasks {
                         (selectedTopic
                           ? '此前已记录的本任务选题提案（不是事实或授权）：' +
                             JSON.stringify(selectedTopic) +
+                            (selectedBriefingShape ? '\n已登记的内容形态为 ' + selectedBriefingShape + '，交付版式必须匹配该形态。STEPS 仅标注真正的行动/注意事项段落，paragraphIndex 从 0 开始；观察背景段落保留在 analysis 中，无需放进 sections。' : '') +
                             '\n若所选destination不是BRIEFING，停止生成正文，使用标题“暂无新内容”的状态回执说明应归知识草案或待确认；未实际写入知识库不得声称已发布。否则继续核验并执行所选问题，不另换主题。deliver_briefing.businessType 必须与所选候选 businessType 完全相同；不能把数据主题改成洞察。\n'
                           : '') +
                         (newsBriefing
@@ -863,11 +865,12 @@ export class AgentTasks {
         ...(briefingAvailable && task.contractVersion === '1.5'
           ? [
               briefingDeliveryTool({
-                presentationAvailable: briefingPresentationAvailable && !briefingGeneration,
+                presentationAvailable: briefingPresentationAvailable,
                 textCalculationAvailable,
                 isSummaryCalculation: (id) => typeof id === 'string' && summaryCalculations.has(id),
                 requestedType: briefingRequestedType,
                 selectedType: () => selectedBriefingType,
+                selectedShape: () => selectedBriefingShape,
                 authorize,
                 invoke: (body, executionSignal) =>
                   postJson(
@@ -1460,11 +1463,12 @@ export class AgentTasks {
                   toolSignal,
                   8192,
                   5000,
-                  ['BRIEFING_TYPE_MISMATCH'],
+                  ['INVALID_REQUEST', 'BRIEFING_TYPE_MISMATCH', 'BRIEFING_BATCH_ID_REQUIRED', 'BRIEFING_EDITORIAL_PLAN_REQUIRED', 'BRIEFING_EDITORIAL_PLAN_INVALID', 'BRIEFING_GOAL_UNAVAILABLE', 'BRIEFING_COMPONENT_MISMATCH', 'BRIEFING_OVERLAPPING_TOPICS', 'BRIEFING_MERGE_INVALID', 'BRIEFING_CALCULATION_REQUIRED', 'BRIEFING_TOPIC_NOT_DELIVERABLE'],
                 );
               },
-              (candidate) => {
+              (candidate, editorialItem) => {
                 topicSelected = true;
+                selectedBriefingShape = isRecord(editorialItem) ? String(editorialItem.shape) : undefined;
                 selectedBriefingType = isRecord(candidate) ? String(candidate.businessType) : undefined;
                 selectedTopic = { candidates: [candidate], selectedIndex: 0 };
                 topicNeedsCalculation = isRecord(candidate) && candidate.requiresCalculation === true;
@@ -1472,6 +1476,7 @@ export class AgentTasks {
               briefingRequestedType,
               editorialPlanAvailable,
               editorialBatchContext,
+              workAudience(audience)?.key,
             ),
           );
         if (briefingGeneration && evidenceSupplementAvailable && !newsBriefing) tools.push({

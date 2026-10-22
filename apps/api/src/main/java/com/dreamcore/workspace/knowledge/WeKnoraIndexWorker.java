@@ -53,7 +53,9 @@ public class WeKnoraIndexWorker {
         if(!active(job.id()))return null;
         var rows=db.queryForList("SELECT c.*,r.requested_by FROM knowledge_chunks c JOIN knowledge_runs r ON r.id=c.run_id WHERE c.id=?",job.chunk());
         if(rows.isEmpty())return null;var c=rows.getFirst();
-        access.requireObject((UUID)c.get("requested_by"),(UUID)c.get("tenant_id"),(UUID)c.get("workspace_id"),"MATERIAL",(UUID)c.get("material_id"),true);
+        // Deployment-enabled indexing reads an already parsed source; it does not edit it.
+        // Scene-synchronized sources intentionally remain read-only even to their requester.
+        access.requireObject((UUID)c.get("requested_by"),(UUID)c.get("tenant_id"),(UUID)c.get("workspace_id"),"MATERIAL",(UUID)c.get("material_id"),false);
         access.requireVersionActive((UUID)c.get("tenant_id"),(UUID)c.get("workspace_id"),(UUID)c.get("version_id"));
         return (String)c.get("content");
     }

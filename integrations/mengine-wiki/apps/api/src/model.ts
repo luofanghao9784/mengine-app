@@ -1,6 +1,7 @@
 import type { Evidence } from "./domain.js";
 import type { ChatMessage } from "./conversations.js";
 export type ModelConfig = {
+  provider?: 'bailian' | 'deepseek';
   apiKey: string;
   baseUrl: string;
   model: string;
@@ -11,6 +12,11 @@ export type ToolMessage = { role: "system" | "user" | "assistant" | "tool"; cont
 export type ToolDefinition = { type: "function"; function: { name: string; description: string; parameters: Record<string, unknown> } };
 export class Model {
   constructor(public config: ModelConfig) {}
+  private modeParameters() {
+    return this.config.provider === 'deepseek'
+      ? { thinking: { type: 'disabled' } }
+      : { enable_thinking: false };
+  }
   async complete(system: string, input: string, maxTokens = 1400, history: ChatMessage[] = [], timeoutMs = 45000) {
     if (this.config.enabled === false)
       throw new Error("模型调用已暂停，授权后可在服务端启用");
@@ -34,7 +40,7 @@ export class Model {
           ],
           temperature: 0.2,
           max_tokens: maxTokens,
-          enable_thinking: false,
+          ...this.modeParameters(),
         }),
         signal: AbortSignal.timeout(timeoutMs),
       },
@@ -44,7 +50,7 @@ export class Model {
         response.status === 401
           ? "模型凭证校验未通过"
           : response.status === 403
-            ? "百炼未授权当前模型，请在业务空间开通模型权限或配置已授权的模型 ID"
+            ? "模型服务未授权当前模型，请核对模型权限和模型 ID"
             : response.status === 429
               ? "模型服务额度或频率受限"
               : `模型服务返回 ${response.status}`,
@@ -62,7 +68,7 @@ export class Model {
     if (new URL(this.config.baseUrl).protocol !== "https:") throw new Error("模型服务需要 HTTPS");
     const response = await fetch(`${this.config.baseUrl.replace(/\/$/, "")}/chat/completions`, {
       method: "POST", headers: { Authorization: `Bearer ${this.config.apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: this.config.model, messages, ...(tools.length?{tools,tool_choice:toolChoice,parallel_tool_calls:false}:{}), temperature: .2, max_tokens: 2200, enable_thinking: false }), signal,
+      body: JSON.stringify({ model: this.config.model, messages, ...(tools.length?{tools,tool_choice:toolChoice,parallel_tool_calls:false}:{}), temperature: .2, max_tokens: 2200, ...this.modeParameters() }), signal,
     });
     if (!response.ok) throw Object.assign(new Error(`模型调用失败（${response.status}）`), { retryable: response.status === 429 || response.status >= 500 });
     const data = await response.json() as { choices?: { message?: ToolMessage }[] };
@@ -90,7 +96,7 @@ export class Model {
   }
   status() {
     return {
-      provider: "阿里云百炼",
+      provider: this.config.provider === 'deepseek' ? 'DeepSeek' : '阿里云百炼',
       model: this.config.model,
       configured: !!this.config.apiKey,
       enabled: this.config.enabled !== false,

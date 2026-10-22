@@ -98,6 +98,20 @@ class WeKnoraIntegrationTest {
         assertTrue(lastSearch.path("skip_context_enrichment").asBoolean());
         worker.tick();assertEquals(1,creates.get());
     }
+    @Test void readOnlySourceRequesterCanIndexButCannotEditSource(){
+        UUID material=parsed("只读来源仍可建立检索索引");
+        db.update("UPDATE knowledge_runs SET requested_by=? WHERE tenant_id=?",reader,tenant);
+        int mask=db.queryForObject("SELECT library_mask(?,?,'MATERIAL',?)",Integer.class,reader,tenant,material);
+        assertEquals(1,mask&1);assertEquals(0,mask&2);
+        worker.tick();assertEquals("READY",state());assertEquals(1,search().items().size());
+        assertEquals(mask,db.queryForObject("SELECT library_mask(?,?,'MATERIAL',?)",Integer.class,reader,tenant,material));
+    }
+    @Test void revokedSourceRequesterCannotCreateRemoteIndex(){
+        parsed("撤权后不得发送原文");
+        db.update("UPDATE knowledge_runs SET requested_by=? WHERE tenant_id=?",reader,tenant);
+        db.update("DELETE FROM workspace_members WHERE workspace_id=? AND account_id=?",space,reader);
+        worker.tick();assertEquals("FAILED",state());assertEquals(0,creates.get());
+    }
     @Test void unindexedIsUnavailableAndEmptyScopeMakesNoRequest(){
         assertEquals(0,search().items().size());assertEquals(0,searches.get());
         parsed("尚未索引");denied("KNOWLEDGE_INDEX_NOT_READY",this::search);assertEquals(0,searches.get());

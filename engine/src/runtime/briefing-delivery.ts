@@ -59,6 +59,7 @@ export function briefingDeliveryTool(options: {
   isSummaryCalculation?(artifactId: unknown): boolean;
   requestedType?: string;
   selectedType?(): string | undefined;
+  selectedShape?(): string | undefined;
   authorize(): Promise<void>;
   invoke(body: unknown, signal: AbortSignal): Promise<unknown>;
 }): TaskTool {
@@ -185,6 +186,29 @@ export function briefingDeliveryTool(options: {
           (args.businessType === 'INFO' || options.textCalculationAvailable === false))
         throw new RuntimeError('BRIEFING_TEXT_CALCULATION_UNAVAILABLE');
       await options.authorize();
+      // Match the backend's cross-field constraints before a remote write, with
+      // precise repair guidance. Never relabel paragraphs or rewrite business text.
+      const statusOnly = isRecord(args) && typeof args.title === 'string' && /^(?:(?:暂无|没有|无)(?:新的?|新增)?(?:内容|画报|卡片|结果)[。.!！]*|no new (?:content|briefing|cards?)[.!]*)$/i.test(args.title.trim());
+      if (!statusOnly && options.presentationAvailable && isRecord(args) && isRecord(args.presentation)) {
+        const p = args.presentation, shape = options.selectedShape?.();
+        const expected = shape ? ({STEPS:'STEPS', OPTIONS:'COMPARISON', NEWS:'SOURCE', SINGLE_FACT:'KEY_METRIC'}[shape] ?? 'EDITORIAL') : undefined;
+        if (expected && p.layout !== expected)
+          throw new RuntimeError('BRIEFING_COMPONENT_MISMATCH', `已登记形态为 ${shape}，presentation.layout 必须为 ${expected}；保留已有证据与选题，不切换版式来绕过校验。`);
+        if (args.businessType !== 'DATA' && [p.chartStyle,p.focusGroup,p.focusValue].some(v=>v != null))
+          throw new RuntimeError('BRIEFING_PRESENTATION_INVALID', '文字画报的 chartStyle、focusGroup、focusValue 必须全部为 null，不要填写空字符串或 CURRENT。');
+        if (Array.isArray(args.analysis) && Array.isArray(p.sections)) {
+          const count=args.analysis.length, indices=new Set();
+          for (const section of p.sections) {
+            if (!isRecord(section) || !Number.isInteger(section.paragraphIndex) || Number(section.paragraphIndex)<0 || Number(section.paragraphIndex)>=count || indices.has(section.paragraphIndex))
+              throw new RuntimeError('BRIEFING_PRESENTATION_INVALID', `analysis 共有 ${count} 段，paragraphIndex 只能使用 0 到 ${count-1}，且不可重复。无需为每段设置 section；保留原文，只修正实际段落索引。`);
+            indices.add(section.paragraphIndex);
+          }
+          if (p.layout==='STEPS' && (p.sections.length<2 || p.sections.some(s=>!isRecord(s)||!['ACTION','CAUTION'].includes(String(s.role)))))
+            throw new RuntimeError('BRIEFING_PRESENTATION_INVALID', 'STEPS 至少选择两个真实行动或注意事项段落，role 仅允许 ACTION 或 CAUTION。背景观察段落保留在 analysis，不加入 sections；不要把观察伪装成行动。');
+          if (p.layout==='COMPARISON' && p.sections.filter(s=>isRecord(s)&&s.role==='OPTION').length<2)
+            throw new RuntimeError('BRIEFING_PRESENTATION_INVALID', 'COMPARISON 至少标注两个有依据的不同方案段落为 OPTION，不编造方案。');
+        }
+      }
       if (isRecord(args) && (args.businessType === 'DATA' || requiredType === 'DATA') &&
           typeof args.title === 'string' && /(?:分析|分布|情况)[。！!]?$/u.test(args.title.trim()) &&
           !/(?:增长|增加|减少|下降|上升|高于|低于|最多|最少|领先|落后|翻倍|持平|为零)/u.test(args.title))

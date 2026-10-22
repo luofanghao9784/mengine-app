@@ -16,10 +16,11 @@ import { isRecord } from './http-json.js';
 import { RuntimeError, type TaskTool } from './ports.js';
 export function topicSelectionTool(
   invoke: (body: unknown, signal: AbortSignal) => Promise<unknown>,
-  selected: (candidate: import('./ports.js').Json) => void,
+  selected: (candidate: import('./ports.js').Json, editorialItem?: import('./ports.js').Json) => void,
   requestedType = '',
   editorialRequired = false,
   batchContext = '',
+  audienceKey?: string,
 ): TaskTool {
   const text = { type: 'string', description: 'Nonempty text, at most 500 characters' };
   return {
@@ -55,7 +56,7 @@ export function topicSelectionTool(
         ...(editorialRequired ? { editorialPlan: {
           type:'object', properties:{
             batchId:{type:'string',description:'Fresh UUID for a new batch, reuse identical plan for its other card tasks'},
-            audienceKey:{type:'string',description:'Exact workAudience.key from task context'},
+            audienceKey:{type:'string',description:audienceKey ? 'Optional; the runtime binds the authorized reader version. Do not invent or copy a key.' : 'Exact workAudience.key from task context'},
             items:{type:'array',description:'Exactly one item per candidate, in matching order. Plan all topics before calculation.',items:{type:'object',properties:{
               goalRef:{type:'string',enum:['governance','stage','responsibilities']},
               questionKey:{type:'string',description:'Stable business question identity, same for overlapping questions, not a card title'},
@@ -64,7 +65,7 @@ export function topicSelectionTool(
               decision:{type:'string',enum:['EMIT','MERGE','SKIP']},
               mergeInto:{type:'integer',description:'Index of EMIT target for MERGE; -1 otherwise'},reason:text
             },required:['goalRef','questionKey','scope','period','shape','decision','mergeInto','reason'],additionalProperties:false}}
-          },required:['batchId','audienceKey','items'],additionalProperties:false
+          },required:['batchId',...(audienceKey ? [] : ['audienceKey']),'items'],additionalProperties:false
         }} : {}),
       },
       required: ['candidates', 'selectedIndex', ...(editorialRequired ? ['editorialPlan'] : [])],
@@ -96,7 +97,12 @@ export function topicSelectionTool(
       const chosen = args.candidates[Number(args.selectedIndex)];
       if (requestedType && isRecord(chosen) && chosen.businessType !== requestedType)
         throw new RuntimeError('BRIEFING_TYPE_MISMATCH');
-      const result = await invoke(args, signal);
+      // Use the authorized platform recipient/version, never a model-generated key.
+      // Backend validation of current audience and source permissions still applies.
+      const body = editorialRequired && audienceKey && isRecord(args.editorialPlan)
+        ? { ...args, editorialPlan: { ...args.editorialPlan, audienceKey } }
+        : args;
+      const result = await invoke(body, signal);
       if (
         !isRecord(result) ||
         result.recorded !== true ||
@@ -105,7 +111,8 @@ export function topicSelectionTool(
         result.strategyVersion !== BRIEFING_TOPIC_STRATEGY_VERSION
       )
         throw new RuntimeError('INVALID_REMOTE_RESPONSE');
-      selected(args.candidates[Number(args.selectedIndex)] as import('./ports.js').Json);
+      const item = isRecord(args.editorialPlan) && Array.isArray(args.editorialPlan.items) ? args.editorialPlan.items[Number(args.selectedIndex)] : undefined;
+      selected(args.candidates[Number(args.selectedIndex)] as import('./ports.js').Json, item as import('./ports.js').Json | undefined);
       return { ...result, selectedCandidate: args.candidates[Number(args.selectedIndex)] };
     },
   };

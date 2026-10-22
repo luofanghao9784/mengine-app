@@ -716,7 +716,7 @@ export async function buildServer(
     const started = Date.now();
     try {
       await model.complete("只回复连接正常", "连接检查", 16);
-      store.audit(u, "model.test", "阿里云百炼", "模型连接成功");
+      store.audit(u, "model.test", model.status().provider, "模型连接成功");
       return { ok: true, latency: Date.now() - started, ...model.status() };
     } catch (e) {
       return {
