@@ -227,7 +227,8 @@ def public_search_environments(value):
 def model_environments(model, engine_port, engine_token, api_port, manual_acceptance=False, public_search=None, automatic_work=False):
     engine_env = {'PATH': os.environ.get('PATH', '/usr/bin:/bin'), 'ENGINE_HOST': '127.0.0.1',
                   'ENGINE_PORT': str(engine_port), 'TASK_ENGINE_TOKEN': engine_token}
-    api_env = {'AGENT_TASK_MODE': 'off'}
+    # No model means no automatic discovery/dispatch; manual external verification remains available.
+    api_env = {'AGENT_TASK_MODE': 'off', 'DREAMCORE_BRIEFING_ENABLED': str(bool(model)).lower()}
     if model:
         import live_model
         engine_env.update(live_model.engine_environment(model))
@@ -236,13 +237,13 @@ def model_environments(model, engine_port, engine_token, api_port, manual_accept
     if manual_acceptance:
         api_env.update({'COMPANY_INFORMATION_ENABLED': 'false', 'EXPERIENCE_INTAKE_ENABLED': 'false',
                         'EXPERIENCE_ANALYSIS_ENABLED': 'false', 'EXPERIENCE_GENERALIZATION_ENABLED': 'false',
-                        'BRIEFING_AUTOMATIC_ENABLED': 'false', 'ONGOING_PLANS_ENABLED': 'false'})
+                        'BRIEFING_AUTOMATIC_ENABLED': 'false', 'DREAMCORE_BRIEFING_ENABLED': 'false', 'ONGOING_PLANS_ENABLED': 'false'})
     if automatic_work:
         if not model:
             raise TrialError('自动业务流程需要真实模型配置。')
         api_env.update({k: 'true' for k in ('COMPANY_INFORMATION_ENABLED', 'EXPERIENCE_INTAKE_ENABLED',
             'EXPERIENCE_ANALYSIS_ENABLED', 'EXPERIENCE_GENERALIZATION_ENABLED',
-            'BRIEFING_AUTOMATIC_ENABLED', 'ONGOING_PLANS_ENABLED')})
+            'BRIEFING_AUTOMATIC_ENABLED', 'DREAMCORE_BRIEFING_ENABLED', 'ONGOING_PLANS_ENABLED')})
     search_api, search_engine = public_search_environments(public_search)
     api_env.update(search_api)
     engine_env.update(search_engine)

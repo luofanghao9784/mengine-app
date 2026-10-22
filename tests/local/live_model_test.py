@@ -96,10 +96,11 @@ class LiveModelBoundaryTest(unittest.TestCase):
                      'AGENT_PLATFORM_URL': 'https://other-project.invalid', 'PATH': '/local-bin'}
         with patch.dict(os.environ, inherited, clear=True):
             off_api, off_engine = trial.model_environments(None, 23001, 'synthetic-service-token', 23002)
-            self.assertEqual(off_api, {'AGENT_TASK_MODE': 'off'})
+            self.assertEqual(off_api['DREAMCORE_BRIEFING_ENABLED'], 'false')
+            self.assertEqual(off_api, {'AGENT_TASK_MODE': 'off', 'DREAMCORE_BRIEFING_ENABLED': 'false'})
             self.assertNotIn('AGENT_MODEL_API_KEY', off_engine)
             api, engine = trial.model_environments(self.value, 23001, 'synthetic-service-token', 23002)
-            self.assertEqual(api, {'AGENT_TASK_MODE': 'live'})
+            self.assertEqual(api, {'AGENT_TASK_MODE': 'live', 'DREAMCORE_BRIEFING_ENABLED': 'true'})
             self.assertEqual(engine['AGENT_MODEL_API_KEY'], self.value['apiKey'])
             self.assertEqual(engine['AGENT_PLATFORM_URL'], 'http://127.0.0.1:23002')
             self.assertNotIn('AGENT_PUBLIC_WEB_ENABLED', engine)
