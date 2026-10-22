@@ -220,7 +220,13 @@ test('dataset briefing closes retrieval after three lookups and delivers an hone
       assert.match(instructions, /compare_dataset/);
       assert.match(instructions, /每张卡回答：发现了什么/);
       assert.match(instructions, /只有来源介绍而没有新业务发现时不凑卡/);
-      assert.ok(request.tools.find(t => t.name === 'deliver_briefing').description.includes('智能画报表达规范 1.5.5'));
+      assert.ok(request.tools.find(t => t.name === 'deliver_briefing').description.includes('智能画报表达规范 1.5.7'));
+      assert.match(instructions, /先明确接收人的真实岗位/);
+      assert.match(instructions, /卡面预览与详情使用同一组方案、行动和编号/);
+      assert.match(request.tools.find(t => t.name === 'deliver_briefing').description, /卡面只截取完整文字行，详情保留全文/);
+      assert.match(instructions, /关联必须核实同一对象/);
+      assert.match(instructions, /未见到课、购课或沟通记录不等于/);
+      assert.match(request.tools.find(t => t.name === 'deliver_briefing').description, /不绑定示例人物、门店、日期、标题/);
       let name = 'task_context', args;
       if (calls === 1) args = { action: 'dataset_search' };
       else if (calls === 2) args = { action: 'dataset_read', referenceId: datasetId, versionId: snapshotId, columnLimit: 10 };

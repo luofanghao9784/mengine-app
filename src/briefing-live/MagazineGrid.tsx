@@ -139,6 +139,11 @@ export function MagazineGrid({
       return {
         id: item.id,
         atEnd: item.atEnd,
+        // An automatic horizontal text card can use the same area vertically to
+        // fill a one-column gap. The fit observer still checks its actual text.
+        alternativeSize: !preserveSpans && !fixedSize && !item.chart && !item.news && !item.wide &&
+          Number(preferred[2]) === 1 && (!minimum || Number(minimum.size[2]) === 1) &&
+          (preferred[0] === '2' || minimum?.size[0] === '2') ? '1×2' as CardSize : undefined,
         size: (minimum
           ? `${Math.max(Number(preferred[0]), Number(minimum.size[0]))}×${Math.max(Number(preferred[2]), Number(minimum.size[2]))}`
           : preferred) as CardSize,

@@ -4,7 +4,10 @@ import { readingGroups } from './reading-groups';
 import './news-reading.css';
 
 export function isSignalReading(document: BriefingDocument) {
-  return readingGroups(document.content.analysis, presentationOf(document)?.sections).structured;
+  const presentation = presentationOf(document);
+  // Keep the card's named options/actions intact when opening its full text.
+  if (presentation?.layout === 'COMPARISON' || presentation?.layout === 'STEPS') return false;
+  return readingGroups(document.content.analysis, presentation?.sections).structured;
 }
 export function SignalReading({ document }: { document: BriefingDocument }) {
   const groups = readingGroups(document.content.analysis, presentationOf(document)?.sections);

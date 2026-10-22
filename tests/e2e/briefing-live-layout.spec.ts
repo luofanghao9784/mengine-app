@@ -45,3 +45,33 @@ test('正式画报混合长标题和图表在不同列数下自动补空位且�
       await page.screenshot({ path: `test-results/live-layout-${width}.png`, fullPage: true });
   }
 });
+
+
+test('分区预览仅裁整行，展开后保留方案和行动的结构与全文', async ({ page }) => {
+  await page.goto('/tests/fixtures/live-magazine/?section-lines');
+  for (const width of [1348, 952, 760, 540, 390, 1348]) {
+    await page.setViewportSize({ width, height: 852 });
+    await expect.poll(() => page.locator('.briefing-sections.is-compact .briefing-section').evaluateAll(sections => sections.filter(section => {
+      if (getComputedStyle(section).visibility === 'hidden') return false;
+      const p = section.querySelector('p')!;
+      const rect = p.getBoundingClientRect();
+      const line = parseFloat(getComputedStyle(p).lineHeight);
+      const bottom = section.closest('.magazine-main')!.getBoundingClientRect().bottom;
+      return rect.bottom > bottom + 1 || Math.abs(rect.height / line - Math.round(rect.height / line)) > 0.02;
+    }).length)).toBe(0);
+  }
+  for (const layout of ['COMPARISON', 'STEPS']) {
+    const card = page.getByRole('button', { name: `阅读：合成长标题用于验证卡片分区完整显示与详情对应 · ${layout}` });
+    const preview = await card.locator('.briefing-section p').allTextContents();
+    expect(preview).toHaveLength(2);
+    await card.click();
+    const details = page.locator('dialog .briefing-sections');
+    await expect(details).toHaveAttribute('data-composition', layout);
+    expect(await details.locator('p').allTextContents()).toEqual(preview);
+    if (layout === 'COMPARISON') expect(await details.locator('.briefing-section-label').allTextContents()).toEqual(['方案 1', '方案 2']);
+    for (const paragraph of await details.locator('p').all()) {
+      expect(await paragraph.evaluate(p => p.scrollHeight <= p.clientHeight + 1)).toBe(true);
+    }
+    await page.keyboard.press('Escape');
+  }
+});

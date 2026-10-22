@@ -65,7 +65,8 @@
 }
 .briefing-sections.is-compact p {
   display: -webkit-box;
-  -webkit-line-clamp: 3;
+  --section-max-lines: 3;
+  -webkit-line-clamp: var(--section-max-lines);
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -197,7 +198,7 @@
 
 /* 两步退款建议竖卡：利用纵向空间展开每步，保留完整动作边界。 */
 .live-briefing-tile[data-size='1×2'] .magazine-refund-portrait .briefing-sections.is-compact p {
-  -webkit-line-clamp: 6;
+  --section-max-lines: 6;
 }
 
 /* 两步复核横卡并列呈现，序号由列表统一提供。 */
@@ -210,5 +211,23 @@
   padding-left: 26px;
 }
 .live-briefing-tile[data-size='2×1'] .magazine-followup-landscape .briefing-sections.is-compact p {
-  -webkit-line-clamp: 4;
+  --section-max-lines: 4;
+}
+
+/* Allocate the remaining card height before clamping whole text lines. */
+.live-magazine .briefing-sections.is-compact {
+  flex: 0 1 auto;
+  min-height: 0;
+  grid-auto-rows: minmax(0, 1fr);
+}
+.live-magazine .briefing-sections.is-compact .briefing-section {
+  min-height: 0;
+}
+.live-magazine .briefing-composition-note {
+  flex-shrink: 0;
+}
+
+/* Background and cautions frame the paired options without taking an option column. */
+.briefing-sections.layout-comparison:not(.is-compact) .briefing-section:not([data-section-role='OPTION']) {
+  grid-column: 1 / -1;
 }

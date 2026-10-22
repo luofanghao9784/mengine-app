@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef } from 'react';
 import { isSignalReading, SignalReading } from './SignalReading';
 import { displayChart } from './display-labels.ts';
 import { FileText } from 'lucide-react';
@@ -53,6 +54,42 @@ export function AnalysisComposition({
   document: BriefingDocument;
   compact?: boolean;
 }) {
+  const sectionsRef = useRef<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    const root = sectionsRef.current;
+    if (!compact || !root) return;
+    const measure = () => {
+      // Restore the CSS limit before measuring so a previous small layout cannot ratchet down.
+      for (const paragraph of root.querySelectorAll<HTMLElement>('p')) paragraph.style.removeProperty('-webkit-line-clamp');
+      const bottom = root.closest('.magazine-main')?.getBoundingClientRect().bottom ?? Infinity;
+      for (const section of root.querySelectorAll<HTMLElement>('.briefing-section')) {
+        const paragraph = section.querySelector<HTMLElement>('p');
+        if (!paragraph) continue;
+        const style = getComputedStyle(paragraph);
+        const lineHeight = parseFloat(style.lineHeight);
+        const padding = parseFloat(getComputedStyle(section).paddingBottom) || 0;
+        const available = Math.min(bottom, section.getBoundingClientRect().bottom) - padding - paragraph.getBoundingClientRect().top;
+        const cap = parseInt(style.getPropertyValue('--section-max-lines')) || 3;
+        const lines = Math.min(cap, Math.max(0, Math.floor((available + 0.1) / lineHeight)));
+        paragraph.style.webkitLineClamp = String(Math.max(1, lines));
+        // Do not expose a label or half a line when no complete line fits.
+        section.style.visibility = lines ? '' : 'hidden';
+      }
+    };
+    const observer = new ResizeObserver(measure);
+    observer.observe(root);
+    const copy = root.closest('.magazine-copy');
+    if (copy) for (const child of copy.children) observer.observe(child);
+    for (const label of root.querySelectorAll('.briefing-section-label')) observer.observe(label);
+    measure();
+    let active = true;
+    void documentFontsReady();
+    async function documentFontsReady() {
+      await window.document.fonts.ready;
+      if (active) measure();
+    }
+    return () => { active = false; observer.disconnect(); };
+  }, [compact, document]);
   const p = presentationOf(document),
     c = document.content;
   if (!compact && isSignalReading(document)) return <SignalReading document={document} />;
@@ -66,25 +103,28 @@ export function AnalysisComposition({
       </div>
     );
   const selected = compact
-    ? c.businessType === 'INFO'
+    ? p?.layout === 'COMPARISON'
+      ? sections.filter((section) => section.role === 'OPTION').slice(0, 2)
+      : c.businessType === 'INFO'
       ? sections.filter((section) => section.role === 'OBSERVATION').slice(0, 1)
       : sections.slice(0, 2)
     : sections;
-  const remaining = sections.filter((s) => !selected.includes(s) && s.role !== 'CAUTION').length;
+  const remaining = sections.filter((s) => !selected.includes(s) && s.role !== 'CAUTION' && (p?.layout !== 'COMPARISON' || s.role === 'OPTION')).length;
   const layout = p?.layout ?? 'EDITORIAL';
   const Tag = layout === 'STEPS' ? 'ol' : 'div';
   const Block = layout === 'STEPS' ? 'li' : 'div';
   return (
     <>
       <Tag
+        ref={(element: HTMLDivElement | HTMLOListElement | null) => { sectionsRef.current = element; }}
         className={`briefing-sections layout-${layout.toLowerCase()}${compact ? ' is-compact' : ''}`}
         data-composition={layout}
       >
-        {selected.map((section, i) => (
-          <Block key={section.paragraphIndex} className="briefing-section">
+        {selected.map((section) => (
+          <Block key={section.paragraphIndex} className="briefing-section" data-section-role={section.role}>
             <span className="briefing-section-label">
               {sectionLabels[section.role]}
-              {section.role === 'OPTION' && layout !== 'STEPS' ? ` ${i + 1}` : ''}
+              {section.role === 'OPTION' && layout !== 'STEPS' ? ` ${sections.filter((item) => item.role === 'OPTION').indexOf(section) + 1}` : ''}
             </span>
             <p>{c.analysis[section.paragraphIndex]}</p>
           </Block>

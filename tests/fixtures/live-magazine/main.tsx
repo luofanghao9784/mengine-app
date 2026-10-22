@@ -354,6 +354,19 @@ function ReadButton({ onClick, ...props }: ComponentProps<'button'>) {
     />
   );
 }
+// Long composed cards reproduce parent clipping and preserve section identity in details.
+if (location.search.includes('section-lines')) {
+  documents.splice(0);
+  for (const layout of ['COMPARISON', 'STEPS'] as const) {
+    const doc = structuredClone(longTitle);
+    doc.content.businessType = 'SUGGESTION';
+    doc.content.title = `合成长标题用于验证卡片分区完整显示与详情对应 · ${layout}`;
+    doc.content.analysis = ['第一项合成内容，保留完整原文供详情阅读。'.repeat(8), '第二项合成内容，与外卡使用同一段文字和顺序。'.repeat(8)];
+    doc.content.presentation = { version: 'briefing-presentation-v1', layout, chartStyle: null, focusGroup: null, focusValue: null,
+      sections: [0, 1].map(paragraphIndex => ({ role: layout === 'COMPARISON' ? 'OPTION' : 'ACTION', paragraphIndex })) };
+    documents.push(doc);
+  }
+}
 function Fixture() {
   const [reading, setReading] = useState<BriefingDocument>();
   return (
