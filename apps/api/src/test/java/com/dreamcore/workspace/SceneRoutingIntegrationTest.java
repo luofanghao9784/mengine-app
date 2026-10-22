@@ -91,6 +91,31 @@ class SceneRoutingIntegrationTest extends CompanyAnalysisFixture {
   assertEquals(201,db.queryForObject("SELECT count(*) FROM scene_asset_links WHERE tenant_id=? AND kind='TABLE' AND active",Integer.class,tenant));
   assertEquals(List.of(List.of("100")),processing.read(admin,tenant,"dataset-"+target("bulk-200"),0,20,null).records());
   assertThrows(IdentityException.class,()->processing.read(reader,tenant,"dataset-"+target("bulk-200"),0,20,null));
+  // Whole-list permission checks must stay bounded with hundreds of routed sources.
+  new org.springframework.transaction.support.TransactionTemplate(
+    new org.springframework.jdbc.datasource.DataSourceTransactionManager(db.getDataSource())).execute(status->{
+   db.execute("SET LOCAL statement_timeout='2s'");
+   assertEquals(201,db.queryForObject("SELECT count(*) FROM scene_asset_links WHERE tenant_id=? AND active AND scene_asset_readable(?,target_id)",Integer.class,tenant,admin));
+   assertEquals(0,db.queryForObject("SELECT count(*) FROM scene_asset_links WHERE tenant_id=? AND active AND scene_asset_readable(?,target_id)",Integer.class,tenant,reader));
+   return null;
+  });
+ }
+ @Test void optimizedPermissionMatchesV154AcrossRoutingMembershipAndExpiry() throws Exception {
+  try(var input=getClass().getResourceAsStream("/db/migration-common/V154__scene_resource_routing.sql")){
+   String original=new String(Objects.requireNonNull(input).readAllBytes(),java.nio.charset.StandardCharsets.UTF_8);
+   db.execute(original.substring(original.indexOf("CREATE OR REPLACE FUNCTION")).replace("FUNCTION scene_asset_readable(","FUNCTION test_scene_asset_readable_v154("));
+  }
+  scene.routes(admin,tenant,new SceneRouting.Change(0,List.of(route("salary",space,admin,reader),route("dividend",space,admin),route("document",second,reader))));
+  scene.synchronize(admin,tenant,false);
+  var targets=new ArrayList<>(db.queryForList("SELECT target_id FROM scene_asset_revisions WHERE tenant_id=?",UUID.class,tenant));targets.add(UUID.randomUUID());
+  var actors=List.of(admin,reader,UUID.randomUUID());
+  for(int phase=0;phase<4;phase++){
+   for(var actor:actors)for(var id:targets)
+    assertEquals(db.queryForObject("SELECT test_scene_asset_readable_v154(?,?)",Boolean.class,actor,id),readable(actor,id),"phase "+phase);
+   if(phase==0)db.update("UPDATE tenant_memberships SET status='DISABLED' WHERE tenant_id=? AND account_id=?",tenant,reader);
+   if(phase==1)db.update("UPDATE scene_bindings SET governance_valid_until=now()-interval '1 second' WHERE tenant_id=?",tenant);
+   if(phase==2)db.update("UPDATE scene_asset_links SET active=false WHERE tenant_id=?",tenant);
+  }
  }
  @Test void expandedRoutesRetainSourceAclAndRejectOverflowAtomically(){
   var routes=new ArrayList<SceneRouting.Route>();

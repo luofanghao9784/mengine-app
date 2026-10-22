@@ -196,6 +196,21 @@ class MetricCatalogTest extends TaskDatasetFixture {
  @Autowired com.dreamcore.workspace.context.TaskContextGuard contextGuard;
  UUID addBackground(){return company.change(owner,tenant,new com.dreamcore.workspace.profile.CompanyInformationService.Change(UUID.randomUUID(),com.dreamcore.workspace.profile.CompanyInformationService.Field.TERM,0,"ADD",null,"到账","银行已确认收款")).tagId();}
  UUID saveWithBackground(UUID version){var d=definition();d.put("backgroundVersionIds",List.of(version.toString()));return UUID.fromString(json.valueToTree(catalog.save(owner,tenant,false,new MetricCatalog.Change(null,0,"synthetic",d))).path("id").asText());}
+ @Test void backgroundBatchKeepsIndependentLimitsAndSharedDependencies(){
+  UUID first=addBackground();
+  UUID second=company.change(owner,tenant,new com.dreamcore.workspace.profile.CompanyInformationService.Change(UUID.randomUUID(),com.dreamcore.workspace.profile.CompanyInformationService.Field.TERM,1,"ADD",null,"退款","退款依据")).tagId();
+  var firstVersion=backgroundSource.entry(owner,tenant,first,1).versionId();
+  var secondVersion=backgroundSource.entry(owner,tenant,second,1).versionId();
+  for(int i=0;i<23;i++)saveWithBackground(firstVersion);
+  var definition=definition();definition.put("backgroundVersionIds",List.of(firstVersion.toString(),secondVersion.toString()));
+  UUID shared=UUID.fromString(json.valueToTree(catalog.save(owner,tenant,false,new MetricCatalog.Change(null,0,"synthetic",definition))).path("id").asText());
+  var items=backgroundKnowledge.list(owner,tenant).items();
+  assertEquals(21,items.stream().filter(i->i.sourceEntryId().equals(first)).findFirst().orElseThrow().methods().size());
+  var methods=items.stream().filter(i->i.sourceEntryId().equals(second)).findFirst().orElseThrow().methods();
+  assertEquals(List.of(shared),methods.stream().map(com.dreamcore.workspace.profile.BackgroundKnowledgeService.Method::id).toList());
+  db.update("UPDATE scene_asset_links SET metadata=jsonb_set(metadata,'{governance,allowedActors}','[]') WHERE tenant_id=?",tenant);
+  assertTrue(backgroundKnowledge.list(owner,tenant).items().stream().allMatch(i->i.methods().isEmpty()));
+ }
  @Test void backgroundKnowledgePinsMethodsAndChangesFenceRunningTasks(){
   UUID entry=addBackground();var v=backgroundSource.entry(owner,tenant,entry,1);
   UUID method=saveWithBackground(v.versionId());catalog.transition(owner,tenant,false,method,new MetricCatalog.Transition(1),true);
