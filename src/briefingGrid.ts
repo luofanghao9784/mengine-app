@@ -5,7 +5,7 @@ export function magazineGridMetrics(width: number) {
   const columns = width >= 1210 ? 5 : width >= 966 ? 4 : width >= 722 ? 3 : width >= 478 ? 2 : 1;
   return { columns, unit: (width - (columns - 1) * magazineGap) / columns };
 }
-export type MagazineTile = { id: string; size: CardSize; fixed?: boolean; rows?: number; atEnd?: boolean };
+export type MagazineTile = { id: string; size: CardSize; fixed?: boolean; alternativeSize?: CardSize; rows?: number; atEnd?: boolean };
 export type MagazinePlacement = MagazineTile & { row: number; col: number; width: number; height: number };
 
 /** Same first-free-cell packing as the Demo: later cards may fill a gap, never mutate preferences. */
@@ -38,6 +38,12 @@ export function packMagazineTiles(tiles: MagazineTile[], columns: number, compac
     }
     let index = pending.findIndex((tile) => fits(tile, tile.size));
     let size: CardSize | undefined = pending[index]?.size;
+    if (index < 0 && compact)
+      index = pending.findIndex((tile) => {
+        if (!tile.alternativeSize || !fits(tile, tile.alternativeSize)) return false;
+        size = tile.alternativeSize;
+        return true;
+      });
     if (index < 0)
       index = pending.findIndex((tile) => {
         if (tile.fixed) return false;

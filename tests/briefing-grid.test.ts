@@ -131,3 +131,29 @@ test('compact layout packs fixed large cards first and fills their sides without
   assert.deepEqual([...cells].sort((a,b)=>a-b),Array.from({length:15},(_,i)=>i));
   for(const p of result) assert.equal(p.size,cards.find(c=>c.id===p.id)!.size);
 });
+
+
+test('compact odd-column packing uses an allowed portrait alternative without shrinking content area', () => {
+  const cards: MagazineTile[] = [
+    { id: 'chart-a', size: '2×2', fixed: true },
+    { id: 'chart-b', size: '2×2', fixed: true },
+    { id: 'portrait', size: '1×2', fixed: true },
+    ...Array.from({length: 4}, (_, i): MagazineTile => ({id: `text-${i}`, size: '2×1', fixed: true, alternativeSize: '1×2'})),
+  ];
+  const before = structuredClone(cards);
+  const result = packMagazineTiles(cards, 5, true);
+  const occupied = new Set(result.flatMap(p => Array.from({length: p.height}, (_, y) =>
+    Array.from({length: p.width}, (_, x) => (p.row + y) * 5 + p.col + x)).flat()));
+  const lastStart = Math.max(...result.map(p => p.row * 5 + p.col));
+  for (let i = 0; i <= lastStart; i++) assert.ok(occupied.has(i), `gap at ${i}`);
+  assert.equal(occupied.size, 18);
+  assert.equal(result.length, cards.length);
+  assert.ok(result.some(p => p.id.startsWith('text') && p.size === '1×2'));
+  for (const p of result) {
+    const original = cards.find(c => c.id === p.id)!;
+    assert.equal(p.width * p.height, Number(original.size[0]) * Number(original.size[2]));
+    if (!original.alternativeSize) assert.equal(p.size, original.size);
+  }
+  assert.deepEqual(cards, before);
+  assert.ok(packMagazineTiles(cards, 5, false).filter(p => p.id.startsWith('text')).every(p => p.size === '2×1'));
+});
