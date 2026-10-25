@@ -129,6 +129,25 @@ class BriefingTrialBoundaryTest(unittest.TestCase):
 
 
 class PresentationTrialBoundaryTest(unittest.TestCase):
+    def test_platform_capabilities_are_private_explicit_and_quarantined_on_restore(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            with patch.dict(os.environ, {'DREAMCORE_TASKS_PPT_RENDERER_ENABLED': 'true'}):
+                self.assertEqual(set(trial.instance_platform_capabilities(root).values()), {'false'})
+            saved = root / 'capabilities-runtime.json'
+            trial.private_write(saved, {'presentationEnabled': True, 'governanceDispatchEnabled': False})
+            self.assertEqual(trial.instance_platform_capabilities(root), {
+                'DREAMCORE_TASKS_PPT_RENDERER_ENABLED': 'true',
+                'DREAMCORE_TASKS_ARTIFACT_TRANSFER_ENABLED': 'true',
+                'DREAMCORE_GOVERNANCE_DISPATCH_ENABLED': 'false'})
+            saved.chmod(0o644)
+            with self.assertRaises(trial.TrialError): trial.instance_platform_capabilities(root)
+            saved.chmod(0o600)
+            trial.private_write(saved, {'presentationEnabled': True, 'governanceDispatchEnabled': 'true'})
+            with self.assertRaises(trial.TrialError): trial.instance_platform_capabilities(root)
+            trial.private_write(root / 'restore.json', {})
+            self.assertEqual(set(trial.instance_platform_capabilities(root).values()), {'false'})
+
     def test_fixed_renderer_requires_explicit_private_config_and_stays_off_on_restore(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)

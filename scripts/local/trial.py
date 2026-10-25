@@ -401,6 +401,21 @@ def instance_presentation_environment(root):
     return {'AGENT_PPT_RENDERER_ENABLED': str(value['enabled']).lower()}
 
 
+def instance_platform_capabilities(root):
+    """Private local opt-in for implemented platform capabilities; never restored implicitly."""
+    fields = {'presentationEnabled': ('DREAMCORE_TASKS_PPT_RENDERER_ENABLED',
+                                      'DREAMCORE_TASKS_ARTIFACT_TRANSFER_ENABLED'),
+              'governanceDispatchEnabled': ('DREAMCORE_GOVERNANCE_DISPATCH_ENABLED',)}
+    disabled = {name: 'false' for names in fields.values() for name in names}
+    saved = root / 'capabilities-runtime.json'
+    if (root / 'restore.json').exists() or (root / 'restore.json').is_symlink() or not saved.exists():
+        return disabled
+    value = private_read(saved)
+    if not isinstance(value, dict) or set(value) != set(fields) or any(type(v) is not bool for v in value.values()):
+        raise TrialError('平台能力配置须包含 presentationEnabled 和 governanceDispatchEnabled 两项布尔值。')
+    return {name: str(value[key]).lower() for key, names in fields.items() for name in names}
+
+
 def start(root, model_config=None, reconnect_live=False, phone_local=False, collection_config=None, enable_live=False, automatic_work=False, scene_tenant=None):
     os.umask(0o077)
     collection_env = instance_collection_environment(root, collection_config)
@@ -408,6 +423,7 @@ def start(root, model_config=None, reconnect_live=False, phone_local=False, coll
     analysis_env = instance_analysis_environment(root)
     briefing_env = instance_briefing_environment(root)
     presentation_env = instance_presentation_environment(root)
+    platform_capabilities = instance_platform_capabilities(root)
     extra_api_env, extra_engine_env = instance_extra_environment(root)
     model = None
     if model_config is not None:
@@ -522,6 +538,7 @@ def start(root, model_config=None, reconnect_live=False, phone_local=False, coll
         env.update(analysis_env)
         env.update(briefing_env)
         env.update(extra_api_env)
+        env.update(platform_capabilities)
         model_status = {'agentMode': mode, 'model': model['model'] if model else None, 'cloudVerifiedByStartup': False}
         private_write(root / 'runtime.json', {'runId': run_id, 'state': 'starting', 'webUrl': f"http://127.0.0.1:{settings['ports']['web']}", **model_status, 'revision': subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'], cwd=WORKSPACE, text=True).strip(), 'apiSha256': hashlib.sha256(jar.read_bytes()).hexdigest()})
         runtime_started = True

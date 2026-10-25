@@ -1,4 +1,4 @@
-import { PublicReader, loopbackProxyRequest, publicAddress, publicUrl } from './public-web.js';
+import { PublicReader, loopbackProxyRequest, publicAddress, publicUrl, type PinnedRequest } from './public-web.js';
 import { RuntimeError } from './ports.js';
 import { isRecord } from './http-json.js';
 /** Optional public DNS resolution has its own bounded, TLS-verified bootstrap route. No private names may enter it. */
@@ -40,9 +40,20 @@ export function publicDnsResolver(bootstrap: PublicReader) {
     return records.map((x) => ({ address: (x as { data: string }).data, family: 4 }));
   };
 }
+/** Google DoH must bootstrap without consulting the DNS route it replaces.
+ * Keep TLS/SNI on dns.google; only its documented public resolver IP is pinned.
+ */
+export function publicDnsBootstrap(transport?: PinnedRequest) {
+  return new PublicReader(async (host) => {
+    if (host !== 'dns.google') throw new RuntimeError('PUBLIC_DNS_FAILED');
+    return [{ address: '8.8.8.8', family: 4 }];
+  }, transport);
+}
+
 export function configuredPublicReader(proxy?: string, dns = 'system') {
   if (!['system', 'google'].includes(dns)) throw new RuntimeError('INVALID_PUBLIC_DNS');
   const transport = proxy ? loopbackProxyRequest(proxy) : undefined;
-  const bootstrap = new PublicReader(undefined, transport);
-  return dns === 'google' ? new PublicReader(publicDnsResolver(bootstrap), transport) : bootstrap;
+  return dns === 'google'
+    ? new PublicReader(publicDnsResolver(publicDnsBootstrap(transport)), transport)
+    : new PublicReader(undefined, transport);
 }
