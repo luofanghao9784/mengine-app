@@ -1,0 +1,1 @@
+CREATE TABLE governance_model_input_history (job_id uuid NOT NULL REFERENCES governance_model_jobs(id), revision integer NOT NULL, input jsonb NOT NULL, basis_hash text NOT NULL, archived_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(job_id,revision));
