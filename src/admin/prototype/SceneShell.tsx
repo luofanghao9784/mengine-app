@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { EngineStage3D } from '../../operations/engine-stage/EngineStage3D';
 import { busyDemo } from '../../operations/engine-demo';
 import { BusinessWork, OutputWork } from './BusinessWork';
@@ -7,6 +7,7 @@ import { requestNavigationLocked } from '../../shared/request-guard';
 import type { EngineScene, Focus } from '../../operations/engine-stage/scene';
 import { BackgroundKnowledge } from '../../profile/BackgroundKnowledge';
 import { DataWork } from './DataWork';
+import { revealInList, useProgressive } from './AssetBits';
 import { KnowledgeListRow } from './KnowledgeListRow';
 import { useSession } from '../../identity/session';
 import { AccessWork } from './AccessWork';
@@ -15,7 +16,8 @@ import { activity, aside, daily, steps, STEP_NAMES, tabs, usage } from './conten
 import { homeCards, places, stats, type Item, type Place, type Tone } from './data';
 import { useKnowledge, type Knowledge } from './knowledge-api';
 import { api } from './foundation-api';
-import { GATES, GATE_OF, World } from './world';
+import { GATES, GATE_OF, World, type WorldLabel } from './world';
+import { LabelLayout, type LabelBox } from './label-layout';
 import './scene-shell.css';
 import './glass-theme.css';
 
@@ -26,6 +28,9 @@ import './glass-theme.css';
  * - 卡片组有三档：升到顶（专心处理）、半屏、降到底（3D 全屏）。上下滚动自然地在三档之间过渡（没有拖动拉手）。
  * - 导航是一条独立的深色栏，挂在卡片组上方，跟着卡片一起上下滑动；卡片升到顶时它正好在最顶部。
  */
+const MemoDataWork = memo(DataWork);
+const MemoBusinessWork = memo(BusinessWork);
+const MemoWork = memo(Work);
 const SCENE: Place[] = ['home', 'data', 'knowledge', 'experience'];
 const SETTINGS: Place[] = ['members', 'usage', 'company'];
 const SHORTCUT: Partial<Record<Place, string>> = { data: '1', knowledge: '2', experience: '4' };
@@ -57,10 +62,12 @@ export function SceneShell() {
   const reduced = useReduced();
   const foundation = useFoundation();
   const [now, setNow] = useState(() => Date.now());
+  // 时钟只驱动无企业时的演示数据；接入企业后不再每 3 秒重绘整页。
   useEffect(() => {
+    if (tenant) return;
     const t = window.setInterval(() => setNow(Date.now()), 3000);
     return () => window.clearInterval(t);
-  }, []);
+  }, [tenant]);
   const sim = useMemo(
     () =>
       tenant
@@ -88,6 +95,8 @@ export function SceneShell() {
   const stage = useRef<HTMLDivElement>(null);
   const shell = useRef<HTMLDivElement>(null);
   const labels = useRef<HTMLDivElement>(null);
+  /** 顶部标题栏：标注不能排到它下面去。 */
+  const strip = useRef<HTMLElement>(null);
   const nav = useRef<HTMLElement>(null);
   /** 导航里当前板块的实心滑块：位置跟着当前项走，切换时滑过去。 */
   const [pill, setPill] = useState<{ x: number; w: number } | null>(null);
@@ -133,6 +142,25 @@ export function SceneShell() {
     window.addEventListener('resize', on);
     return () => window.removeEventListener('resize', on);
   }, []);
+  // 卡片组顶边的位置直接写进样式变量：滚动过程中逐帧更新它，不让整页随每个滚轮事件重绘。
+  const paintTop = (y: number) => {
+    const el = shell.current;
+    if (!el) return;
+    el.style.setProperty('--deck-top', `${y}px`);
+    el.style.setProperty(
+      '--header-haze',
+      String(Math.max(0, Math.min(1, 1 - (y - state.current.stops.peek) / 160))),
+    );
+  };
+  // 卡片组升到顶时 3D 整个被盖住：停掉 3D 渲染和标注投影，只留最后一帧。
+  const paused = live === null && sheet === 'peek';
+  const pausedRef = useRef(paused);
+  pausedRef.current = paused;
+  useEffect(() => scene.current?.setPaused(paused), [paused]);
+  const paintTopRef = useRef(paintTop);
+  paintTopRef.current = paintTop;
+  // live 从数值回到 null（一次滑动结束）时也要重写一次，免得停在最后一帧手动写入的位置。
+  useLayoutEffect(() => paintTop(top), [top, live, stops.peek]);
   // 画布始终铺满窗口，卡片盖住下半部分；告诉场景“可见的是上面这一截”，它会把画面收进去，不用重建画布。
   useEffect(() => scene.current?.setViewport(top / height, live !== null), [top, height, live]);
 
@@ -189,6 +217,11 @@ export function SceneShell() {
   const goRef = useRef(go);
   goRef.current = go;
   world.onNavigate = (next) => goRef.current(next);
+  // 传给工作卡片的回调保持同一个引用，运行状态轮询重绘外壳时，清单和详情不跟着重算。
+  const goStable = useCallback((next: Place, id?: string) => goRef.current(next, id), []);
+  const toCompany = useCallback(() => goRef.current('company'), []);
+  const pickHere = useMemo(() => pick(place), [place]);
+  const setFilterHere = useCallback((i: number) => setFilter((old) => ({ ...old, [place]: i })), [place]);
   // 在引擎舞台里直接点某一段也算一次切换：点输入车道 = 去数据基座；点自进化轨道 = 去经验库；输出板块暂不展示。
   useEffect(() => {
     const el = stage.current?.querySelector('.eng3d');
@@ -270,18 +303,23 @@ export function SceneShell() {
         gesture = 'sheet';
       }
       e.preventDefault();
+      const moving = at !== null || s.live !== null;
       at = Math.max(min, Math.min(max, cur - e.deltaY));
-      setLive(at);
+      // 只在一次滑动开始时进入“移动中”状态；之后逐帧直接改样式和场景视口。
+      if (!moving) setLive(at);
+      else {
+        paintTopRef.current(at);
+        scene.current?.setViewport(at / window.innerHeight, true);
+      }
       window.clearTimeout(timer);
       timer = window.setTimeout(() => {
         const y = at!,
           latest = state.current;
         at = null;
-        setSheet(
-          latest.allowed.reduce((a, b) =>
-            Math.abs(latest.stops[b] - y) < Math.abs(latest.stops[a] - y) ? b : a,
-          ),
+        const snap = latest.allowed.reduce((a, b) =>
+          Math.abs(latest.stops[b] - y) < Math.abs(latest.stops[a] - y) ? b : a,
         );
+        setSheet(snap);
         setLive(null);
       }, 160);
     };
@@ -297,23 +335,45 @@ export function SceneShell() {
     let raf = 0;
     let lastView = world.view;
     let knowledgeLabelsReady = false;
+    /** 标注开始淡入的时刻：此后一小段时间内新出现的标注按重要程度依次错开淡入。 */
+    let arrivedAt = 0;
     const pool = new Map<string, HTMLElement>();
+    // 每个标注上一次写入的内容和位置：没变就不碰 DOM，免得每帧都触发样式重算。
+    const written = new Map<string, { cls: string; x: number; y: number }>();
+    const sizes = new Map<string, { sig: string; w: number; h: number }>();
+    const layout = new LabelLayout();
+    // 标题栏的下沿：只在尺寸变化时量一次，不在每帧里读布局。
+    let titleBottom = 52;
+    const measureTitle = () => {
+      const el = strip.current;
+      if (el) titleBottom = el.getBoundingClientRect().bottom + 8;
+    };
+    measureTitle();
+    const titleObserver = new ResizeObserver(measureTitle);
+    if (strip.current) titleObserver.observe(strip.current);
+    window.addEventListener('resize', measureTitle);
     const frame = () => {
       raf = requestAnimationFrame(frame);
       const box = labels.current,
         sc = scene.current;
-      if (!box || !sc) return;
+      if (!box || !sc || pausedRef.current) return;
+      // 被卡片组盖住或在窗口外的标注不画：知识节点多时，只排看得见的那些。
+      const deckTop = parseFloat(shell.current?.style.getPropertyValue('--deck-top') || '') || window.innerHeight;
+      const right = window.innerWidth + 80;
       if (lastView !== world.view) {
         lastView = world.view;
         knowledgeLabelsReady = false;
+        layout.reset();
       }
       if (world.view === 'knowledge' && !knowledgeLabelsReady) {
-        knowledgeLabelsReady = world.knowledgeSettled() && sc.cameraSettled();
+        knowledgeLabelsReady = world.knowledgeSettled();
+        if (knowledgeLabelsReady) arrivedAt = performance.now();
       }
       const seen = new Set<string>();
+      const nodes: { l: WorldLabel; el: HTMLElement; x: number; y: number; cls: string }[] = [];
       for (const l of world.labels()) {
         const p = sc.project(l.p);
-        if (p.w <= 0) continue;
+        if (p.w <= 0 || p.x < -80 || p.x > right || p.y < -40 || p.y > deckTop) continue;
         seen.add(l.key);
         let el = pool.get(l.key);
         if (!el) {
@@ -321,8 +381,9 @@ export function SceneShell() {
           pool.set(l.key, el);
           box.appendChild(el);
         }
-        el.className = `world-label ${l.kind}${l.on ? ' on' : ''}${l.dim ? ' dim' : ''}${l.kind === 'node' && !knowledgeLabelsReady ? ' arriving' : ''}`;
-        const html = JSON.stringify([l.text, l.sub]);
+        const before = written.get(l.key);
+        const cls = `world-label ${l.kind}${l.on ? ' on' : ''}${l.dim ? ' dim' : ''}${l.kind === 'node' && !knowledgeLabelsReady ? ' arriving' : ''}`;
+        const html = l.sub ? `${l.text}\u0000${l.sub}` : l.text;
         if (el.dataset.html !== html) {
           el.dataset.html = html;
           const title = document.createElement('b');
@@ -334,12 +395,69 @@ export function SceneShell() {
             el.appendChild(sub);
           }
         }
-        el.style.transform = `translate3d(${p.x.toFixed(1)}px,${p.y.toFixed(1)}px,0)`;
+        // 知识节点先收集起来统一排位；其他标注照原样跟着光点走。
+        if (l.kind === 'node') {
+          nodes.push({ l, el, x: p.x, y: p.y, cls });
+          continue;
+        }
+        if (before?.cls !== cls) el.className = cls;
+        const moved = !before || Math.abs(before.x - p.x) >= 0.3 || Math.abs(before.y - p.y) >= 0.3;
+        if (moved) el.style.transform = `translate3d(${p.x.toFixed(1)}px,${p.y.toFixed(1)}px,0)`;
+        written.set(l.key, { cls, x: moved ? p.x : before.x, y: moved ? p.y : before.y });
+      }
+      if (nodes.length) {
+        // 先写好文字和样式，再一次性量尺寸（只量变过的），最后排位。
+        for (const n of nodes) {
+          const prev = written.get(n.l.key);
+          // 新出现的标注先藏着，等排好位再淡入。
+          const want = n.cls + (!prev || prev.cls.endsWith(' off') ? ' off' : '');
+          if (n.el.className !== want) n.el.className = want;
+        }
+        const boxes: LabelBox[] = [];
+        for (const n of nodes) {
+          if (n.l.hidden) continue;
+          const sig = n.cls + '|' + (n.el.dataset.html || '');
+          let size = sizes.get(n.l.key);
+          if (size?.sig !== sig) {
+            size = { sig, w: n.el.offsetWidth, h: n.el.offsetHeight };
+            sizes.set(n.l.key, size);
+          }
+          boxes.push({ key: n.l.key, x: n.x, y: n.y, w: size.w, h: size.h, rank: n.l.rank ?? 0 });
+        }
+        // 密度上限：除选中、悬停外，大约每 4.5 万平方像素一个标注（与焦点相连的优先）。
+        const area = window.innerWidth * Math.max(0, deckTop - titleBottom);
+        const placed = layout.place(
+          boxes,
+          { left: 4, top: titleBottom, right: window.innerWidth - 4, bottom: deckTop - 4 },
+          Math.max(6, Math.round(area / 45000)),
+        );
+        // 刚到达时按重要程度依次淡入，而不是一起冒出来。
+        const staggering = performance.now() - arrivedAt < 1200;
+        let order = 0;
+        if (staggering) nodes.sort((a, b) => (b.l.rank ?? 0) - (a.l.rank ?? 0));
+        for (const n of nodes) {
+          const at = n.l.hidden ? null : placed.get(n.l.key);
+          const cls = n.cls + (at ? '' : ' off');
+          const before = written.get(n.l.key);
+          if (before?.cls !== cls) {
+            const appearing =
+              !!at && (!before || before.cls.endsWith(' off') || before.cls.includes(' arriving'));
+            n.el.style.transitionDelay = appearing && staggering ? `${Math.min(order++ * 45, 600)}ms` : '';
+            n.el.className = cls;
+          }
+          if (at) {
+            const moved = !before || Math.abs(before.x - at.left) >= 0.3 || Math.abs(before.y - at.top) >= 0.3;
+            if (moved) n.el.style.transform = `translate3d(${at.left.toFixed(1)}px,${at.top.toFixed(1)}px,0)`;
+            written.set(n.l.key, { cls, x: moved ? at.left : before.x, y: moved ? at.top : before.y });
+          } else written.set(n.l.key, { cls, x: before?.x ?? -1e4, y: before?.y ?? -1e4 });
+        }
       }
       for (const [key, el] of pool)
         if (!seen.has(key)) {
           el.remove();
           pool.delete(key);
+          written.delete(key);
+          sizes.delete(key);
         }
 
     };
@@ -347,6 +465,9 @@ export function SceneShell() {
     return () => {
       cancelAnimationFrame(raf);
       pool.forEach((el) => el.remove());
+      written.clear();
+      titleObserver.disconnect();
+      window.removeEventListener('resize', measureTitle);
     };
   }, [world]);
 
@@ -365,13 +486,7 @@ export function SceneShell() {
       data-place={place}
       data-sheet={live === null ? sheet : 'moving'}
       data-own={world.view || undefined}
-      style={
-        {
-          '--deck-top': `${top}px`,
-          '--deck-peek': `${stops.peek}px`,
-          '--header-haze': Math.max(0, Math.min(1, 1 - (top - stops.peek) / 160)),
-        } as React.CSSProperties
-      }
+      style={{ '--deck-peek': `${stops.peek}px` } as React.CSSProperties}
     >
       <div
         className="shell-stage"
@@ -404,6 +519,7 @@ export function SceneShell() {
             scene.current = s;
             world.attach(s);
             s?.setViewport(stops[sheet] / height, true);
+            s?.setPaused(pausedRef.current);
           }}
         />
         {tenant && !runtime.value && (
@@ -415,7 +531,7 @@ export function SceneShell() {
       </div>
 
       <div className="shell-header-haze" aria-hidden="true" />
-      <header className="shell-strip">
+      <header className="shell-strip" ref={strip}>
         {enterpriseName && <span className="shell-enterprise-name" title={enterpriseName}>{enterpriseName}</span>}
         <span className="mark" aria-hidden="true">
           <svg width="26" height="26" viewBox="0 0 30 30">
@@ -453,7 +569,7 @@ export function SceneShell() {
               ? '知识星链 · ' +
                 (knowledge.error || (knowledge.busy ? '正在同步' : knowledge.data?.status || '等待连接'))
               : tenant
-                ? '当前企业 · 按实际权限与运行记录展示'
+                ? ''
                 : '引擎与其他板块为演示 · 数据基座与知识星链已接入'}
         </span>
       </header>
@@ -503,7 +619,7 @@ export function SceneShell() {
           </button>
         </nav>
         {tenant && ['members', 'usage', 'company', 'experience'].includes(place) ? (
-          <BusinessWork
+          <MemoBusinessWork
             key={place}
             tenant={tenant}
             place={place as 'members' | 'usage' | 'company' | 'experience'}
@@ -515,34 +631,34 @@ export function SceneShell() {
         ) : place === 'usage' ? (
           <Usage />
         ) : place === 'data' ? (
-          <DataWork
+          <MemoDataWork
             tenant={tenant}
-            onMaintainBackground={() => go('company')}
+            onMaintainBackground={toCompany}
             foundation={foundation}
             picked={current(place)}
-            pick={pick(place)}
+            pick={pickHere}
             filter={filter[place] ?? 2}
-            setFilter={(i) => setFilter((old) => ({ ...old, [place]: i }))}
+            setFilter={setFilterHere}
             gate={gate}
             setGate={setGate}
           />
         ) : work ? (
-          <Work
+          <MemoWork
             tenant={tenant}
-            onBackgroundSource={() => go('company')}
+            onBackgroundSource={toCompany}
             key={place}
             knowledge={knowledge}
             place={place}
             picked={current(place)}
-            pick={pick(place)}
+            pick={pickHere}
             filter={filter[place] ?? 0}
-            setFilter={(i) => setFilter((old) => ({ ...old, [place]: i }))}
+            setFilter={setFilterHere}
             gate={null}
             setGate={setGate}
           />
         ) : (
           <Home
-            go={go}
+            go={goStable}
             foundation={foundation}
             knowledge={knowledge}
             runtime={tenant ? runtime : undefined}
@@ -813,7 +929,7 @@ function Work({
   useEffect(() => setCollapsedGroups(new Set()), [tenant, place, filter]);
   const groupName = (x: Item) => place !== 'knowledge' ? x.group
     : x.id.startsWith('company-background:') ? '企业背景'
-    : !knowledge.data?.items.some(item => item.id === x.id) ? '待处理来源'
+    : !knowledge.ids.has(x.id) ? '待处理来源'
     : ['业务数据知识', '资料知识', '会话知识'][knowledge.data?.sourceKind[x.id] ?? -1] || '其他知识';
   const [source, setSource] = useState<Item | null>(null),
     [actionError, setActionError] = useState('');
@@ -837,15 +953,24 @@ function Work({
       ? shown.find((x) => x.id === picked) || shown[0]
       : all.find((x) => x.id === picked) || shown[0] || tab.items[0]) ||
     knowledge.empty;
-  const groups = shown.reduce<[string, Item[]][]>((acc, x) => {
-    const g = acc.find(([name]) => name === groupName(x));
-    if (g) g[1].push(x);
-    else acc.push([groupName(x), [x]]);
-    return acc;
-  }, []);
+  const groupMap = new Map<string, Item[]>();
+  for (const x of shown) {
+    const name = groupName(x);
+    const list = groupMap.get(name);
+    if (list) list.push(x);
+    else groupMap.set(name, [x]);
+  }
+  const groups = [...groupMap];
   const list = useRef<HTMLDivElement>(null);
+  const visibleItems = groups.flatMap(([name, items]) => (collapsedGroups.has(name) ? [] : items));
+  const shownRows = useProgressive(
+    list,
+    [place, filter, gate, ...collapsedGroups].join('|'),
+    visibleItems.length,
+    visibleItems.findIndex((x) => x.id === current?.id),
+  );
   useEffect(() => {
-    list.current?.querySelector('[aria-pressed="true"]')?.scrollIntoView({ block: 'nearest' });
+    revealInList(list.current, list.current?.querySelector('[aria-pressed="true"]'));
   }, [current?.id]);
   // ↑↓ 在清单里换行，不离开键盘。
   const move = (e: React.KeyboardEvent) => {
@@ -856,7 +981,7 @@ function Work({
     const next = visible[Math.max(0, Math.min(visible.length - 1, i + (e.key === 'ArrowDown' ? 1 : -1)))];
     if (!next) return;
     pick(next.id);
-    requestAnimationFrame(() => list.current?.querySelector<HTMLElement>('[aria-pressed="true"]')?.focus());
+    requestAnimationFrame(() => list.current?.querySelector<HTMLElement>('[aria-pressed="true"]')?.focus({ preventScroll: true }));
   };
   const flow = place === 'data' ? steps[current.id] : undefined;
   const links = place === 'knowledge' ? knowledge.related(current.id) : [];
@@ -901,9 +1026,15 @@ function Work({
           )}
           {place === 'knowledge' && knowledge.backgroundError != null && <p role="status">企业背景暂不可用，未计入知识数量。<button onClick={knowledge.refreshBackground}>重试背景读取</button></p>}
           {groups.length === 0 && <p className="none">这一栏里没有符合条件的记录。</p>}
-          {groups.map(([name, items]) => {
+          {groups.map(([name, items], index) => {
             const background = place === 'knowledge' && name === '企业背景';
             const collapsed = collapsedGroups.has(name);
+            // 分段渲染：这一段的行数用完后，后面的组等滚到底部再画。
+            const before = groups
+              .slice(0, index)
+              .reduce((n, [g, list]) => n + (collapsedGroups.has(g) ? 0 : list.length), 0);
+            if (index > 0 && before >= shownRows && shownRows < visibleItems.length) return null;
+            const rows = items.slice(0, Math.max(0, shownRows - before));
             return <div key={name} className={background ? 'knowledge-background-overview' : 'knowledge-group'}>
               {place === 'knowledge' ? !background && (
                 <button type="button" className="asset-source-toggle" aria-expanded={!collapsed}
@@ -917,13 +1048,16 @@ function Work({
                   <span className="num">{items.length}</span>
                 </button>
               ) : <h3>{name} <span>{items.length}</span></h3>}
-              {!collapsed && items.map((x) => (
+              {!collapsed && rows.map((x) => (
                 <KnowledgeListRow key={x.id} name={x.name} summary={x.why}
                   side={place === 'knowledge' ? undefined : x.side}
                   tone={x.tone} selected={x.id === current.id} onSelect={() => pick(x.id)} />
               ))}
             </div>;
           })}
+          {shownRows < visibleItems.length && (
+            <p className="none">还有 {visibleItems.length - shownRows} 条，继续向下滚动加载</p>
+          )}
         </div>
       </article>
 
@@ -1031,7 +1165,7 @@ function Work({
           {side.rows.map(([label, value, note], i) =>
             place === 'data' && note ? (
               <button
-                key={label}
+                key={`${label}-${i}`}
                 type="button"
                 className="fact"
                 aria-pressed={gate === i}
@@ -1042,7 +1176,7 @@ function Work({
                 <small>{note}</small>
               </button>
             ) : (
-              <div key={label} className="fact">
+              <div key={`${label}-${i}`} className="fact">
                 <span>{label}</span>
                 <b>{value}</b>
                 {note && <small>{note}</small>}
@@ -1054,8 +1188,8 @@ function Work({
           <header>
             <h2>{more.title}</h2>
           </header>
-          {more.rows.map(([label, value, tone]) => (
-            <div key={label} className="fact line">
+          {more.rows.map(([label, value, tone], i) => (
+            <div key={`${label}-${i}`} className="fact line">
               <span>{label}</span>
               <small className={tone ? `tone-${tone}-text` : undefined}>{value}</small>
             </div>

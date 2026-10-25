@@ -1,7 +1,8 @@
 import { requestSurfaceChoice } from './surface-choice';
 import { useRequestLock } from '../shared/request-guard';
-import { useEffect, useState } from 'react';
-import type { FormEvent } from 'react';
+import { useEffect, useId, useState } from 'react';
+import type { FormEvent, ReactNode } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 import type { Identity, Membership } from '../../contracts/public-api/identity';
 import { Button, Field } from '../shared/ui';
 import { IdentityError, contactLabel } from './client';
@@ -24,37 +25,55 @@ export function PasswordField({
   change,
   label = '密码',
   creating = false,
+  action,
 }: {
   value: string;
   change: (v: string) => void;
   label?: string;
   creating?: boolean;
+  /** A link beside the label, such as “忘记密码”; kept outside the label so it does not focus the input. */
+  action?: ReactNode;
 }) {
   const [visible, setVisible] = useState(false);
+  const id = useId();
+  const control = (
+    <div className="phone-password">
+      <input
+        id={id}
+        aria-label={label}
+        type={visible ? 'text' : 'password'}
+        name={creating ? 'new-password' : 'password'}
+        autoComplete={creating ? 'new-password' : 'current-password'}
+        minLength={creating ? 6 : undefined}
+        maxLength={128}
+        required
+        value={value}
+        onChange={(e) => change(e.target.value)}
+      />
+      <button
+        type="button"
+        aria-label={visible ? '隐藏密码' : '显示密码'}
+        aria-pressed={visible}
+        onClick={() => setVisible(!visible)}
+      >
+        {visible ? <EyeOff size={18} strokeWidth={1.7} /> : <Eye size={18} strokeWidth={1.7} />}
+      </button>
+    </div>
+  );
+  if (!action)
+    return (
+      <Field label={label} hint={creating ? '至少 6 位，可使用更长密码。' : undefined}>
+        {control}
+      </Field>
+    );
   return (
-    <Field label={label} hint={creating ? '至少 6 位，可使用更长密码。' : undefined}>
-      <div className="phone-password">
-        <input
-          aria-label={label}
-          type={visible ? 'text' : 'password'}
-          name={creating ? 'new-password' : 'password'}
-          autoComplete={creating ? 'new-password' : 'current-password'}
-          minLength={creating ? 6 : undefined}
-          maxLength={128}
-          required
-          value={value}
-          onChange={(e) => change(e.target.value)}
-        />
-        <button
-          type="button"
-          aria-label={visible ? '隐藏密码' : '显示密码'}
-          aria-pressed={visible}
-          onClick={() => setVisible(!visible)}
-        >
-          {visible ? '隐藏' : '显示'}
-        </button>
+    <div className="field">
+      <div className="field-head">
+        <label htmlFor={id}>{label}</label>
+        {action}
       </div>
-    </Field>
+      {control}
+    </div>
   );
 }
 function PhoneField({ value, change }: { value: string; change: (v: string) => void }) {
@@ -181,6 +200,8 @@ export function PhoneAuth({
   inviting,
   identity,
   legacyAllowed = false,
+  legacyEntry = false,
+  welcome = '欢迎回来，登录后继续你的工作。',
   onJoined,
   onCancel,
   onInvite,
@@ -189,6 +210,9 @@ export function PhoneAuth({
   inviting: boolean;
   identity: Identity | null;
   legacyAllowed?: boolean;
+  /** Only the platform console still offers the original email-account path. */
+  legacyEntry?: boolean;
+  welcome?: string;
   onJoined: (m: Membership) => void;
   onCancel: () => void;
   onInvite: () => void;
@@ -369,9 +393,9 @@ export function PhoneAuth({
               ? '验证手机号后设置新密码。'
               : joining
                 ? `受邀手机号：${preview.maskedPhone}`
-                : '使用用户名或手机号和密码，继续你的工作。'}
+                : welcome}
       </p>
-      {legacyAllowed && !inviting && (
+      {legacyEntry && legacyAllowed && !inviting && (
         <p className="muted">
           短信验证暂未启用，原账号可继续使用邮箱和密码登录。手机号绑定将在短信开通后完成。
         </p>
@@ -413,12 +437,21 @@ export function PhoneAuth({
                 />
               </Field>
             ) : (
-              !joining && (mode === 'login' && !binding ? (
+              !joining &&
+              (mode === 'login' && !binding ? (
                 <Field label="用户名或手机号">
-                  <input autoComplete="username" required maxLength={40} value={phone}
-                    onChange={(e) => setPhone(e.target.value)} placeholder="用户名或手机号" />
+                  <input
+                    autoComplete="username"
+                    required
+                    maxLength={40}
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="请输入用户名或手机号"
+                  />
                 </Field>
-              ) : <PhoneField value={phone} change={setPhone} />)
+              ) : (
+                <PhoneField value={phone} change={setPhone} />
+              ))
             )}
             {creating && (
               <Field label="你的姓名">
@@ -447,6 +480,13 @@ export function PhoneAuth({
               <PasswordField
                 value={password}
                 change={setPassword}
+                action={
+                  mode === 'login' && !binding && !creating ? (
+                    <button type="button" className="field-link" onClick={() => switchMode('reset')}>
+                      忘记密码
+                    </button>
+                  ) : undefined
+                }
                 label={
                   binding
                     ? legacyPlatform
@@ -515,12 +555,7 @@ export function PhoneAuth({
               </Button>
             ) : (
               <>
-                {!creating && !confirming && !switching && (
-                  <Button variant="ghost" onClick={() => switchMode('reset')}>
-                    忘记密码
-                  </Button>
-                )}
-                {!identity && (
+                {legacyEntry && !identity && (
                   <Button variant="ghost" onClick={() => switchMode('legacy')}>
                     {legacyAllowed ? '原邮箱账号登录' : '原邮箱账号迁移'}
                   </Button>
@@ -531,7 +566,7 @@ export function PhoneAuth({
                   </Button>
                 ) : (
                   <Button variant="ghost" onClick={onInvite}>
-                    我收到企业邀请
+                    使用邀请加入企业
                   </Button>
                 )}
               </>
@@ -539,7 +574,6 @@ export function PhoneAuth({
           </>
         )}
       </div>
-      {creating && <p className="muted">如已有邮箱账号，请先迁移原账号，保留已有资料。</p>}
     </>
   );
 }

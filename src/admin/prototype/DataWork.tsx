@@ -5,7 +5,7 @@ import { companySourceClient } from '../../profile/company-source-client';
 import { useRemote } from '../../shared/admin';
 import { useSession } from '../../identity/session';
 import { CompanyBackgroundSource } from '../../profile/CompanyBackgroundSource';
-import { Fold, Stages, Timeline, readouts, stageState, useGlide, useSpotlight } from './AssetBits';
+import { Fold, Stages, Timeline, readouts, revealInList, stageState, useGlide, useProgressive, useSpotlight } from './AssetBits';
 import './foundation-live.css';
 import './glass-surface.css';
 import { FoundationProcessing } from './FoundationProcessing';
@@ -83,7 +83,14 @@ export function DataWork({
     [reason, setReason] = useState(''),
     [finding, setFinding] = useState(''),
     [filtersOpen, setFiltersOpen] = useState(false),
-    [searchOpen, setSearchOpen] = useState(false);
+    [searchOpen, setSearchOpen] = useState(false),
+    [detailTick, setDetailTick] = useState(0),
+    [query, setQuery] = useState('');
+  // 搜索框即时显示输入，清单在输入停顿 200ms 后再筛选，免得每个字都重排清单、重读详情。
+  useEffect(() => {
+    const t = window.setTimeout(() => setQuery(q), 200);
+    return () => window.clearTimeout(t);
+  }, [q]);
   const nextStep = useRef<number | null>(null),
     section = useRef<HTMLElement>(null),
     listBox = useRef<HTMLDivElement>(null),
@@ -96,6 +103,8 @@ export function DataWork({
   const available = data?.items || [];
   const inSource = available.filter((x) => kind === 'all' || x.sourceKind === SOURCE_IDS.indexOf(kind));
   const isProcessing = (a: Asset) => a.stageStates?.some((state) => state === 'RUNNING' || state === 'QUEUED') || ['queued', 'processing'].includes(a.status) || a.sync?.state === 'running' || (!a.stageStates && a.tone === 'run');
+  const needle = query.trim().toLocaleLowerCase();
+  const now = Date.now();
   const rows = available.filter(
     (a) =>
       (tab === 0 ? a.needsAttention : tab === 1 ? isProcessing(a) : tab === 3 ? a.available : true) &&
@@ -105,13 +114,13 @@ export function DataWork({
         (queue === 'isolated'
           ? a.status === 'quarantined' || a.isolated > 0
           : queue === 'overdue'
-            ? Date.parse(a.reviewAt) < Date.now()
+            ? Date.parse(a.reviewAt) < now
             : queue === 'failed'
               ? a.status === 'failed' || a.sync?.state === 'failed'
               : a.quality < 90)) &&
       (kind === 'all' || a.sourceKind === SOURCE_IDS.indexOf(kind)) &&
       (!department || a.department === department) &&
-      `${a.title} ${a.source} ${a.department}`.toLocaleLowerCase().includes(q.trim().toLocaleLowerCase()) &&
+      (!needle || `${a.title} ${a.source} ${a.department}`.toLocaleLowerCase().includes(needle)) &&
       (gate === null || (gate === 4 ? a.available : a.gate === gate)),
   );
   const showBackground = !!tenant && (kind === 'all' || kind === 'document') && tab === 2 && gate === null && !department && collection === 'all' && '企业背景 企业信息维护 内部来源'.includes(q.trim());
@@ -147,15 +156,21 @@ export function DataWork({
   }, [picked]);
   /** 待处理队列：所有需要关注的资产，按风险排；与左侧清单的筛选无关。 */
   const todo = available.filter((x) => x.needsAttention).sort(byRisk);
-  const departments = [...new Set(available.map((x) => x.department))].map(
-    (d) => [d, available.filter((x) => x.department === d).length] as const,
-  );
+  const departments = [
+    ...available.reduce((map, x) => map.set(x.department, (map.get(x.department) || 0) + 1), new Map<string, number>()),
+  ] as (readonly [string, number])[];
   const activeFilters =
     (tab === 0 ? Number(queue !== 'all') : 0) + Number(sort !== 'priority') + Number(!!department) + Number(collection !== 'all');
   const selected = rows.find((a) => a.id === picked) || rows[0];
   // 清单的“组”：视角、来源、筛选变了，就重新播放一次逐条弹入。
-  const listKey = [tab, kind, gate, department, queue, collection, sort, q, ...collapsedSources].join('|');
-  const glide = useGlide(listBox, selected?.id || '', listKey, rows.length);
+  const listKey = [tab, kind, gate, department, queue, collection, sort, query, ...collapsedSources].join('|');
+  const shownRows = useProgressive(
+    listBox,
+    listKey,
+    visibleRows.length,
+    visibleRows.findIndex((r) => r.id === selected?.id),
+  );
+  const glide = useGlide(listBox, selected?.id || '', listKey, rows.length, shownRows);
   useEffect(() => {
     active.current = true;
     return () => {
@@ -166,19 +181,32 @@ export function DataWork({
   useEffect(() => {
     if (selected && selected.id !== picked) pick(selected.id);
   }, [selected?.id, picked]);
+  // 换一项资产才清空详情；同一项在后台刷新或操作后静默重读，正在看的内容不闪。
+  const detailOf = useRef(''),
+    loadFailed = useRef(false);
   useEffect(() => {
-    setDetail(null);
-    setDetailError('');
+    if (detailOf.current !== (selected?.id || '')) {
+      detailOf.current = selected?.id || '';
+      setDetail(null);
+      setDetailError('');
+    }
     const n = ++seq.current;
     if (!selected || !data) return;
     const controller = new AbortController();
     api<Detail>('/scene-foundation/' + encodeURIComponent(selected.id), undefined, controller.signal)
       .then((v) => {
-        if (active.current && seq.current === n) setDetail(v);
+        if (active.current && seq.current === n) {
+          setDetail(v);
+          // 只清掉“读取失败”的提示；操作失败的原因留给用户看。
+          if (loadFailed.current) setDetailError('');
+          loadFailed.current = false;
+        }
       })
       .catch((e) => {
+        // 临时读取失败保留详情；权限或资源失效不能继续显示旧内容。
         if (active.current && seq.current === n && e.name !== 'AbortError') {
-          setDetail(null);
+          if ([401, 403, 404, 410].includes(e.status ?? 0)) setDetail(null);
+          loadFailed.current = true;
           setDetailError(e.message);
         }
       });
@@ -186,7 +214,7 @@ export function DataWork({
       controller.abort();
       seq.current++;
     };
-  }, [selected?.id, data?.at]);
+  }, [selected?.id, data?.at, detailTick]);
   useEffect(() => {
     setReason('');
     setFinding('');
@@ -227,7 +255,11 @@ export function DataWork({
       await refresh();
     } finally {
       lock.current = false;
-      if (active.current) setPending('');
+      if (active.current) {
+        setPending('');
+        // 列表快照可能没变，但这一项的处理记录变了：单独重读一次详情。
+        setDetailTick((n) => n + 1);
+      }
     }
   }
   async function login(e: React.FormEvent) {
@@ -261,6 +293,7 @@ export function DataWork({
     } finally {
       lock.current = false;
       setPending('');
+      setDetailTick((n) => n + 1);
     }
   }
   if (unauthorized && new URLSearchParams(window.location.search).has('tenant'))
@@ -635,9 +668,10 @@ export function DataWork({
             const at = visibleRows.findIndex((r) => r.id === selected?.id),
               next = visibleRows[Math.max(0, Math.min(visibleRows.length - 1, at + n))];
             choose(next.id);
-            listBox.current
-              ?.querySelector(`[data-row="${CSS.escape(next.id)}"]`)
-              ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            // 下一行可能在下一段里，等它渲染出来再滚过去。
+            requestAnimationFrame(() =>
+              revealInList(listBox.current, listBox.current?.querySelector(`[data-row="${CSS.escape(next.id)}"]`), true),
+            );
           }}
         >
           {glide && (
@@ -651,7 +685,14 @@ export function DataWork({
           {!rows.length && !showBackground && (
             <p className="none">{loading ? '正在读取数据…' : error ? error : '当前筛选下没有记录。'}</p>
           )}
-          {groups.map(group => (
+          {groups.map((group, index) => {
+            // 分段渲染：前面的组已用完这一段的行数，后面的组先不画。
+            const before = groups
+              .slice(0, index)
+              .reduce((n, g) => n + (collapsedSources.has(g.key) ? 0 : g.items.length), 0);
+            if (index > 0 && before >= shownRows && shownRows < visibleRows.length) return null;
+            const items = collapsedSources.has(group.key) ? [] : group.items.slice(0, Math.max(0, shownRows - before));
+            return (
             <Fragment key={group.key}>
               <button type="button" className="asset-source-toggle" aria-label={`${group.name} ${group.items.length}`} aria-expanded={!collapsedSources.has(group.key)}
                 onClick={() => setCollapsedSources(old => {
@@ -662,7 +703,7 @@ export function DataWork({
                 <span aria-hidden="true">{collapsedSources.has(group.key) ? '▸' : '▾'}</span>
                 <span className="source-overview-title"><strong>{group.name}</strong><small>{collapsedSources.has(group.key) ? '展开查看数据资产' : '数据资产 · 点击收起'}</small></span><span className="num">{group.items.length}</span>
               </button>
-              {!collapsedSources.has(group.key) && group.items.map((x, i) => (
+              {items.map((x, i) => (
             <div
               className="row"
               key={listKey + x.id}
@@ -710,7 +751,11 @@ export function DataWork({
             </div>
               ))}
             </Fragment>
-          ))}
+            );
+          })}
+          {shownRows < visibleRows.length && (
+            <p className="none">还有 {visibleRows.length - shownRows} 项，继续向下滚动加载</p>
+          )}
         </div>
       </article>
 

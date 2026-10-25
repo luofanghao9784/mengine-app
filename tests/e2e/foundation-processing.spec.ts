@@ -192,6 +192,79 @@ test('撤权刷新后清除已显示记录', async ({ page }) => {
   await expect(result.getByRole('alert')).toContainText('没有此来源的读取权限');
   await expect(result.getByText('S001', { exact: true })).toHaveCount(0);
 });
+
+async function refreshVisibleSnapshot(page: Page, operation: string, status: number) {
+  const refreshed = page.waitForResponse((response) => {
+    const url = new URL(response.url());
+    return url.pathname.endsWith('/scene/dispatch') &&
+      url.searchParams.get('path') === operation && response.status() === status;
+  });
+  // Exercise the same refresh path used when a user returns to a visible tab.
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  await refreshed;
+}
+
+test('资产权限快照：503保留已读列表和详情，403清除全部旧内容', async ({ page }) => {
+  await fixture(page);
+  await expect(page.getByText('S001', { exact: true })).toBeVisible();
+  let status = 503;
+  await page.route('**/scene/dispatch?path=%2Fscene-foundation', (route) => route.fulfill({
+    status,
+    json: { code: status === 503 ? 'SCENE_UPSTREAM_UNAVAILABLE' : 'SCENE_OPERATION_FORBIDDEN' },
+  }));
+
+  await refreshVisibleSnapshot(page, '/scene-foundation', 503);
+  await expect(page.getByRole('alert')).toContainText('数据服务连接失败');
+  await expect(page.locator('.live-select').filter({ hasText: asset.title })).toHaveCount(1);
+  await expect(page.getByText('S001', { exact: true })).toBeVisible();
+
+  status = 403;
+  await refreshVisibleSnapshot(page, '/scene-foundation', 403);
+  await expect(page.getByText(asset.title, { exact: true })).toHaveCount(0);
+  await expect(page.getByText('S001', { exact: true })).toHaveCount(0);
+  await expect(page.locator('.live-select')).toHaveCount(0);
+});
+
+for (const denied of [401, 403]) {
+  test(`知识权限快照：503保留已读内容，${denied}清除列表和详情`, async ({ page }) => {
+    await fixture(page);
+    const item = {
+      id: 'synthetic-private-knowledge', name: '合成受限知识', group: '资料知识',
+      why: '合成受限摘要', side: '合成空间', tone: 'ok', verdict: '合成验证结论',
+      kvHead: ['项目', '内容', '状态'], kv: [['规则', '合成受限知识正文', '已核验']], actions: [],
+    };
+    let status = 200;
+    await page.route('**/scene/dispatch?path=%2Fscene-knowledge', (route) => route.fulfill({
+      status,
+      json: status !== 200
+        ? { code: status === 503 ? 'SCENE_UPSTREAM_UNAVAILABLE' : 'SCENE_OPERATION_FORBIDDEN' }
+        : {
+            items: [item], relations: [], sourceKind: { [item.id]: 1 },
+            tabs: [{ label: '全部 1', items: [item] }],
+            stats: { title: '知识构成', rows: [] }, aside: { title: '最近入库', rows: [] },
+            pending: 0, failed: 0, busy: false, available: false, needsGraph: false,
+            scopeRevision: 'synthetic-scope-1', status: '已读取合成知识',
+          },
+    }));
+    await page.locator('.shell-switch').getByRole('button', { name: '知识星链', exact: true }).click();
+    const row = page.locator('.card.list .row').filter({ hasText: item.name });
+    await expect(row).toHaveCount(1);
+    await expect(page.getByText('合成受限知识正文', { exact: true })).toBeVisible();
+
+    status = 503;
+    await refreshVisibleSnapshot(page, '/scene-knowledge', 503);
+    await expect(page.locator('.card.detail .verdict')).toContainText('数据服务连接失败');
+    await expect(row).toHaveCount(1);
+    await expect(page.getByText('合成受限知识正文', { exact: true })).toBeVisible();
+
+    status = denied;
+    await refreshVisibleSnapshot(page, '/scene-knowledge', denied);
+    await expect(row).toHaveCount(0);
+    await expect(page.getByText(item.name, { exact: true })).toHaveCount(0);
+    await expect(page.getByText('合成受限知识正文', { exact: true })).toHaveCount(0);
+  });
+}
+
 test('来源统计仅汇总显示，列表进度按实际阶段点亮并与详情一致', async ({ page }) => {
   await fixture(page);
   await expect(page.locator('.src-gates')).toHaveCount(1);

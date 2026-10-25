@@ -181,7 +181,7 @@ try {
     await expect(page.getByRole('button', { name, exact: true })).toBeVisible();
   await screenshot(page, 'surface-choice');
   await page.getByRole('button', { name: '客户端', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '选择要进入的企业' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '选择企业', exact: true })).toBeVisible();
   await page.getByRole('button', { name: '合成企业甲', exact: true }).click();
   await expect(page.getByRole('link', { name: '梦擎工作空间', exact: true })).toHaveAttribute(
     'href',

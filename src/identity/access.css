@@ -1,29 +1,33 @@
+/* Entry flow (login, surface choice, enterprise choice): one quiet centered card. */
 .access-auth-layout {
   min-height: 100dvh;
   display: flex;
   align-items: center;
   flex-direction: column;
-  padding: 56px 24px 32px;
+  padding: 56px 16px 32px;
 }
 .access-wordmark {
-  margin: 8px 0 38px;
+  margin: auto 0 36px;
 }
 .access-auth-card {
-  width: min(100%, 440px);
+  width: min(100%, 400px);
   border: 1px solid var(--card-edge);
   background: #fff;
   border-radius: 24px;
-  box-shadow: var(--card-shadow);
-  padding: 32px;
+  box-shadow:
+    var(--card-shadow),
+    0 24px 60px rgb(30 50 90 / 6%);
+  padding: 40px;
 }
 .access-auth-card h1 {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 .access-auth-card > p {
-  margin-bottom: 26px;
+  color: var(--ink-2);
+  margin-bottom: 28px;
 }
 .access-auth-card form {
-  margin-top: 26px;
+  margin-top: 0;
 }
 .access-auth-card fieldset {
   border: 0;
@@ -31,25 +35,169 @@
   margin: 0;
   min-width: 0;
 }
+.access-auth-card .field > span,
+.access-auth-card .field-head label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+}
+.access-auth-card .field input {
+  min-height: 44px;
+  border-radius: 12px;
+  border-color: rgb(25 27 46 / 12%);
+  background: #fbfcfe;
+  padding-inline: 14px;
+}
+.access-auth-card .field input:focus {
+  outline: 0;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgb(47 111 224 / 14%);
+}
 .access-auth-card .button {
-  min-height: 42px;
+  min-height: 44px;
+  border-radius: 12px;
+}
+.access-auth-card .button.primary.full {
+  min-height: 46px;
+  margin-top: 6px;
+  font-size: 15px;
+  font-weight: 500;
+  box-shadow: 0 6px 16px rgb(47 111 224 / 24%);
+}
+.field-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+.field-link {
+  color: var(--accent);
+  font-size: 13px;
+  padding: 0;
+}
+.field-link:hover {
+  color: var(--accent-hover);
 }
 .access-auth-links {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  margin-top: 18px;
+  margin-top: 14px;
   gap: 4px;
 }
-.access-auth-links .button {
-  font-size: var(--font-caption);
-  padding-inline: 8px;
+.access-auth-card .access-auth-links .button,
+.access-quiet-link {
+  display: block;
+  min-height: 0;
+  margin: 18px auto 0;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink-3);
+  font-size: 13px;
+  font-weight: 400;
+  box-shadow: none;
+}
+.access-auth-card .access-auth-links .button {
+  margin: 0;
+}
+.access-auth-card .access-auth-links .button:hover:not(:disabled),
+.access-quiet-link:hover {
+  background: transparent;
+  color: var(--accent);
 }
 .access-auth-note {
   font-size: var(--font-caption);
-  color: var(--muted);
-  margin-top: 24px;
+  color: var(--ink-3);
+  margin-top: auto;
+  padding-top: 40px;
   text-align: center;
+}
+.access-choices {
+  display: grid;
+  gap: 12px;
+}
+.access-choice {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid rgb(25 27 46 / 10%);
+  border-radius: 16px;
+  background: #fff;
+  color: var(--ink);
+  text-align: left;
+  transition:
+    border-color 0.15s,
+    background-color 0.15s;
+}
+.access-choice:hover {
+  border-color: rgb(47 111 224 / 45%);
+  background: #f7faff;
+}
+.access-choice-mark {
+  flex: 0 0 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  font-size: 17px;
+  font-weight: 600;
+}
+.access-choice-mark.round {
+  border-radius: 50%;
+}
+.access-choice-mark.accent {
+  background: rgb(47 111 224 / 10%);
+  color: var(--accent);
+}
+.access-choice-mark.gold {
+  background: rgb(184 137 46 / 12%);
+  color: #8a6420;
+}
+.access-choice-mark.plain {
+  background: #eef1f7;
+  color: var(--ink-2);
+}
+.access-choice:hover .access-choice-mark.plain {
+  background: var(--accent);
+  color: #fff;
+}
+.access-choice-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.access-choice-text strong {
+  font-size: 15px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.access-choice-text span {
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.access-choice-arrow {
+  color: var(--ink-3);
+}
+.access-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: -8px 0 14px -6px;
+  padding: 6px;
+  border-radius: 6px;
+  color: var(--ink-2);
+  font-size: 13px;
+}
+.access-back:hover {
+  color: var(--accent);
 }
 .access-alert {
   color: #a43e42;
@@ -277,18 +425,41 @@
 }
 @media (max-width: 440px) {
   .access-auth-layout {
-    padding: 28px 16px;
+    padding: 48px 16px 24px;
   }
   .access-auth-card {
-    padding: 26px 22px;
-    border-radius: 20px;
+    padding: 28px 22px;
+    border-radius: 22px;
   }
   .access-wordmark {
-    margin-bottom: 28px;
+    margin: 16px 0 28px;
   }
 }
 
 /* Phone onboarding shares the existing quiet auth card. */
+.phone-password {
+  position: relative;
+}
+.phone-password input {
+  padding-right: 48px !important;
+}
+.phone-password button {
+  position: absolute;
+  right: 1px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--ink-3, #8b8fa3);
+  cursor: pointer;
+}
+.phone-password button:hover {
+  color: var(--ink-2, #4f5368);
+}
 .phone-password,
 .phone-code {
   display: flex;
@@ -301,7 +472,6 @@
   min-width: 0;
   flex: 1;
 }
-.phone-password button,
 .phone-local-note button {
   border: 0;
   background: transparent;

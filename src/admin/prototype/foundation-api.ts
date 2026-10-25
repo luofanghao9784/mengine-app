@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Tone, Item } from './data';
 export type Asset = {
   id: string;
@@ -176,21 +176,32 @@ export function useFoundation() {
     [unauthorized, setUnauthorized] = useState(false),
     [loading, setLoading] = useState(true);
   const ticket = useRef(0),
-    mounted = useRef(true);
+    mounted = useRef(true),
+    last = useRef('');
   const refresh = useCallback(async () => {
     const seq = ++ticket.current;
     try {
       const value = await api<Snapshot>('/scene-foundation');
       if (mounted.current && seq === ticket.current) {
-        setData(value);
+        // 内容没变就沿用旧对象：不重建 3D 世界，也不让清单和详情重算。
+        const text = JSON.stringify({ ...value, at: '' });
+        if (text !== last.current) {
+          last.current = text;
+          setData(value);
+        }
         setError('');
         setUnauthorized(false);
       }
     } catch (e) {
       if (mounted.current && seq === ticket.current) {
-        setData(null);
+        const status = (e as { status?: number }).status;
+        // 网络抖动保留快照；登录、权限或资源失效时立即清空。
+        if ([401, 403, 404, 410].includes(status ?? 0)) {
+          last.current = '';
+          setData(null);
+        }
         setError((e as Error).message);
-        setUnauthorized((e as { status?: number }).status === 401);
+        setUnauthorized(status === 401);
       }
     } finally {
       if (mounted.current && seq === ticket.current) setLoading(false);
@@ -199,14 +210,24 @@ export function useFoundation() {
   useEffect(() => {
     mounted.current = true;
     void refresh();
-    const t = setInterval(() => void refresh(), 15000);
+    const t = setInterval(() => {
+      if (document.visibilityState !== 'hidden') void refresh();
+    }, 15000);
+    const visible = () => {
+      if (document.visibilityState === 'visible') void refresh();
+    };
+    document.addEventListener('visibilitychange', visible);
     return () => {
       mounted.current = false;
       ticket.current++;
       clearInterval(t);
+      document.removeEventListener('visibilitychange', visible);
     };
   }, [refresh]);
-  return { data, error, unauthorized, loading, refresh };
+  return useMemo(
+    () => ({ data, error, unauthorized, loading, refresh }),
+    [data, error, unauthorized, loading, refresh],
+  );
 }
 export type Foundation = ReturnType<typeof useFoundation>;
 export function asItem(a: Asset): Item {

@@ -3,7 +3,8 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useSession } from './session';
 import { governanceClient } from '../governance/client';
 import { useRemote, Loading, Failure } from '../shared/admin';
-import { Button } from '../shared/ui';
+import { EntryChoice, EntryFrame } from './EntryFrame';
+import { Building2, LayoutPanelTop, ShieldCheck, type LucideIcon } from 'lucide-react';
 import { requestNavigationLocked } from '../shared/request-guard';
 import type { Identity, Membership } from '../../contracts/public-api/identity';
 
@@ -12,6 +13,21 @@ const labels: Record<Surface, string> = {
   workspace: '客户端',
   'tenant-admin': '企业管理端',
   'platform-admin': '总台端',
+};
+const details: Record<Surface, string> = {
+  workspace: '阅读画报、会话、资料库与技能',
+  'tenant-admin': '管理成员、资料权限与企业配置',
+  'platform-admin': '平台运营、企业开通与系统设置',
+};
+const icons: Record<Surface, LucideIcon> = {
+  workspace: LayoutPanelTop,
+  'tenant-admin': Building2,
+  'platform-admin': ShieldCheck,
+};
+const tones: Record<Surface, 'accent' | 'gold' | 'plain'> = {
+  workspace: 'accent',
+  'tenant-admin': 'gold',
+  'platform-admin': 'plain',
 };
 function useManagement(identity: Identity | null) {
   return useRemote(
@@ -60,6 +76,7 @@ function ChooseSurface({
   children: ReactNode;
 }) {
   const data = useManagement(identity);
+  const { logout } = useSession();
   const [chosen, setChosen] = useState(false);
   const options = data.value?.account === identity.account.id ? surfaces(identity, data.value.members) : [];
   const choose = (target: Surface) => {
@@ -78,25 +95,32 @@ function ChooseSurface({
   }, [data.value]);
   if (chosen) return children;
   return (
-    <main className="access-auth-layout">
-      <section className="access-auth-card">
-        <h1>选择进入哪一端</h1>
-        <p>{identity.account.displayName}，请选择本次使用的入口。</p>
-        {data.error ? (
-          <Failure error={data.error} retry={() => window.location.reload()} />
-        ) : !data.value ? (
-          <Loading />
-        ) : (
-          <div style={{ display: 'grid', gap: 12, marginTop: 24 }}>
-            {options.map((target) => (
-              <Button key={target} variant="primary" onClick={() => choose(target)}>
-                {labels[target]}
-              </Button>
-            ))}
-          </div>
-        )}
-      </section>
-    </main>
+    <EntryFrame label="选择进入哪一端">
+      <h1>选择进入哪一端</h1>
+      <p>{identity.account.displayName}，欢迎回来。这次要进入哪里？</p>
+      {data.error ? (
+        <Failure error={data.error} retry={() => window.location.reload()} />
+      ) : !data.value ? (
+        <Loading />
+      ) : (
+        <div className="access-choices">
+          {[...options].reverse().map((target) => (
+            <EntryChoice
+              key={target}
+              id={target}
+              name={labels[target]}
+              detail={details[target]}
+              icon={icons[target]}
+              tone={tones[target]}
+              onClick={() => choose(target)}
+            />
+          ))}
+        </div>
+      )}
+      <button type="button" className="access-quiet-link" onClick={() => void logout()}>
+        退出登录
+      </button>
+    </EntryFrame>
   );
 }
 

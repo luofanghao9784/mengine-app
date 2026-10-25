@@ -16,6 +16,9 @@
   position: fixed;
   inset: 0;
   overflow: hidden;
+  /* 不允许被滚动：清单里“滚到选中行”之类的调用会顺带滚动祖先容器，
+     外壳一滚，跟着它走的 3D 标注就和固定不动的画布错位。 */
+  overflow: clip;
   background: #0b0a09;
   color: var(--pearl);
   color-scheme: dark;
@@ -84,8 +87,12 @@
 .shell[data-mode='work'][data-sheet='peek'] .eng3d > :not(canvas) * {
   pointer-events: none !important;
 }
-/* 半屏高度下只保留舞台的主体读数，日志和操作提示让位；3D 全屏时恢复。 */
-.shell:not([data-sheet='full']) .shell-stage :is(.eng3d-log, .eng3d-hint, .eng3d-lens-cap) {
+/* 半屏高度下只保留舞台的主体读数，日志让位；3D 全屏时恢复。 */
+.shell:not([data-sheet='full']) .shell-stage .eng3d-log {
+  display: none;
+}
+/* 说明性小字（光流含义、操作提示）在企业管理端一律不显示，画面只留读数。总台的舞台不受影响。 */
+.shell .shell-stage :is(.eng3d-hint, .eng3d-lens-cap) {
   display: none;
 }
 
@@ -187,14 +194,16 @@
   color: rgb(236 234 228 / 72%);
 }
 .world-label.node {
-  translate: -50% 9px;
+  /* 位置由防遮挡排位直接算到左上角（见 label-layout.ts），不再用居中偏移。 */
   max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: 11.5px;
   color: rgb(236 234 228 / 78%);
   text-align: center;
   text-shadow: 0 1px 5px #000;
   transition:
-    opacity 0.2s,
+    opacity 0.45s ease,
     font-size 0.15s,
     color 0.15s;
 }
@@ -206,6 +215,9 @@
 }
 .world-label.node.dim {
   opacity: 0.22;
+}
+.world-label.node.off {
+  opacity: 0;
 }
 .world-label.node.arriving {
   opacity: 0;

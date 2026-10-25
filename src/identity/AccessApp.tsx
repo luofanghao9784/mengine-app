@@ -21,7 +21,7 @@ import { Documents } from '../documents/Documents';
 import { documentsHref } from '../documents/routes';
 import { Conversations, conversationHref } from '../conversation/Conversations';
 import { LiveBriefing, briefingHref } from '../briefing-live/Briefing';
-import { MessageSquare, LayoutPanelTop, ExternalLink, Puzzle } from 'lucide-react';
+import { MessageSquare, LayoutPanelTop, ExternalLink, Puzzle, ChevronLeft } from 'lucide-react';
 import { ManagementHome } from '../governance/ManagementHome';
 import { Profiles } from '../profile/Profiles';
 import { governanceClient } from '../governance/client';
@@ -42,8 +42,10 @@ import {
   ShieldCheck,
   WifiOff,
 } from 'lucide-react';
-import type { Identity } from '../../contracts/public-api/identity';
+import type { Identity, Membership } from '../../contracts/public-api/identity';
 import { DreamcoreLogo } from '../components/DreamcoreLogo';
+import { EntryChoice, EntryFrame } from './EntryFrame';
+import { requestSurfaceChoice } from './surface-choice';
 import { Button, Badge, Empty } from '../shared/ui';
 import { NavigationButton, PageHeader } from '../shared/layout';
 import { IdentityError } from './client';
@@ -157,25 +159,21 @@ export default function AccessApp({
         new URLSearchParams(location.hash.slice(1)).has('bind')))
   )
     return (
-      <div className="access-auth-layout">
-        <a className="access-wordmark" href={entryHref('workspace')}>
-          <DreamcoreLogo wordmark />
-        </a>
-        <section className="access-auth-card" aria-label="账号登录与邀请">
-          <PhoneAuth
-            token={token}
-            inviting={inviting}
-            identity={session.identity}
-            legacyAllowed={legacyAllowed}
-            onJoined={(membership) => {
-              cancelInvitation(membership.tenantId);
-            }}
-            onCancel={() => cancelInvitation()}
-            onInvite={() => setInviting(true)}
-          />
-        </section>
-        <p className="access-auth-note">邀请制使用 · 企业成员身份由所属企业授予</p>
-      </div>
+      <EntryFrame label="账号登录与邀请" home={entryHref('workspace')}>
+        <PhoneAuth
+          token={token}
+          inviting={inviting}
+          identity={session.identity}
+          legacyAllowed={legacyAllowed}
+          legacyEntry={surface === 'platform-admin'}
+          welcome={surface === 'workspace' ? '欢迎回来，今天的画报已经在等你了。' : undefined}
+          onJoined={(membership) => {
+            cancelInvitation(membership.tenantId);
+          }}
+          onCancel={() => cancelInvitation()}
+          onInvite={() => setInviting(true)}
+        />
+      </EntryFrame>
     );
   return (
     <AccessShell
@@ -319,6 +317,14 @@ function GuardedAccessShell({
   };
   if (selected?.service?.status === 'SUSPENDED')
     return <SuspendedEnterprise membership={selected} identity={identity} />;
+  if (surface !== 'platform-admin' && !allowed && !tenant && eligible.length > 1)
+    return (
+      <ChooseTenant
+        memberships={eligible}
+        canSwitchSurface={identity.platformAdmin || management.length > 0}
+        onChoose={choose}
+      />
+    );
   if (surface === 'tenant-admin' && selected)
     return (
       <UploadProvider>
@@ -328,11 +334,7 @@ function GuardedAccessShell({
         ) ? (
           <TenantConsole key={tenant} tenant={tenant} name={selected.tenantName} />
         ) : (
-          <TenantScene
-            key={tenant}
-            tenant={tenant}
-            name={selected.tenantName}
-          />
+          <TenantScene key={tenant} tenant={tenant} name={selected.tenantName} />
         )}
       </UploadProvider>
     );
@@ -481,17 +483,7 @@ function GuardedAccessShell({
               </p>
             )}
             {allowed && surface !== 'platform-admin' && tenant && <DepartureStatus tenant={tenant} />}
-            {!allowed && !tenant && eligible.length > 1 ? (
-              <section className="access-panel">
-                <h2>选择要进入的企业</h2>
-                <p>下次将回到你最近使用的企业。</p>
-                {eligible.map((m) => (
-                  <Button key={m.tenantId} onClick={() => choose(m.tenantId)}>
-                    {m.tenantName}
-                  </Button>
-                ))}
-              </section>
-            ) : !allowed ? (
+            {!allowed ? (
               <section className="access-panel">
                 <Empty
                   icon={ShieldX}
@@ -591,6 +583,50 @@ function GuardedAccessShell({
         )}
       </div>
     </UploadShell>
+  );
+}
+
+/** Enterprise choice before entering; the same card as login, not the workspace shell. */
+function ChooseTenant({
+  memberships,
+  canSwitchSurface,
+  onChoose,
+}: {
+  memberships: Membership[];
+  canSwitchSurface: boolean;
+  onChoose: (id: string) => void;
+}) {
+  return (
+    <EntryFrame label="选择企业">
+      {canSwitchSurface && (
+        <button
+          type="button"
+          className="access-back"
+          onClick={() => {
+            requestSurfaceChoice();
+            location.reload();
+          }}
+        >
+          <ChevronLeft size={16} strokeWidth={1.8} aria-hidden="true" />
+          返回选择入口
+        </button>
+      )}
+      <h1>选择企业</h1>
+      <p>你已加入 {memberships.length} 家企业，选择本次要进入的一家。</p>
+      <div className="access-choices">
+        {memberships.map((m) => (
+          <EntryChoice
+            key={m.tenantId}
+            id={m.tenantId}
+            name={m.tenantName}
+            detail={m.role === 'TENANT_ADMIN' ? '企业管理员' : '成员'}
+            mark={Array.from(m.tenantName.trim())[0] ?? '企'}
+            tone="plain"
+            onClick={() => onChoose(m.tenantId)}
+          />
+        ))}
+      </div>
+    </EntryFrame>
   );
 }
 

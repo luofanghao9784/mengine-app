@@ -1,4 +1,5 @@
 import type { EngineScene, SceneExtension, V3 } from '../../operations/engine-stage/scene';
+import { FORCED, LINKED } from './label-layout';
 import type { Item } from './data';
 
 /**
@@ -19,6 +20,9 @@ export interface WorldLabel {
   kind: 'stage' | 'gate' | 'source' | 'link' | 'name' | 'node';
   on?: boolean;
   dim?: boolean;
+  /** 知识节点：排位优先级（越大越先摆）；hidden 表示这次悬停与它无关，先收起。 */
+  rank?: number;
+  hidden?: boolean;
 }
 
 const CHAMPAGNE: V3 = [1, 0.84, 0.6],
@@ -160,6 +164,48 @@ type Mote = {
 
 /* ---------- 知识库：梦核内部的星链 ---------- */
 const INNER_R = 0.8;
+/** 节点不多时逐对计算斥力；超过这个数改按近邻计算（斥力随距离三次方衰减，远处可忽略），计算量从平方降到线性。 */
+const EXACT_REPULSION = 240;
+const REPULSION_CUTOFF = 0.32;
+function repel(p: V3[], f: V3[], strength: number) {
+  const push = (i: number, j: number) => {
+    const a = p[i],
+      b = p[j],
+      dx = a[0] - b[0],
+      dy = a[1] - b[1],
+      dz = a[2] - b[2],
+      l = Math.max(0.05, Math.sqrt(dx * dx + dy * dy + dz * dz)),
+      k = strength / (l * l * l),
+      fi = f[i],
+      fj = f[j];
+    fi[0] += dx * k;
+    fi[1] += dy * k;
+    fi[2] += dz * k;
+    fj[0] -= dx * k;
+    fj[1] -= dy * k;
+    fj[2] -= dz * k;
+  };
+  if (p.length <= EXACT_REPULSION) {
+    for (let i = 0; i < p.length; i++) for (let j = i + 1; j < p.length; j++) push(i, j);
+    return;
+  }
+  const cells = p.map((q) => q.map((v) => Math.floor(v / REPULSION_CUTOFF) + 64));
+  const key = (x: number, y: number, z: number) => (x * 128 + y) * 128 + z;
+  const grid = new Map<number, number[]>();
+  cells.forEach(([x, y, z], i) => {
+    const list = grid.get(key(x, y, z));
+    if (list) list.push(i);
+    else grid.set(key(x, y, z), [i]);
+  });
+  cells.forEach(([x, y, z], i) => {
+    for (let dx = -1; dx <= 1; dx++)
+      for (let dy = -1; dy <= 1; dy++)
+        for (let dz = -1; dz <= 1; dz++) {
+          const list = grid.get(key(x + dx, y + dy, z + dz));
+          if (list) for (const j of list) if (j > i) push(i, j);
+        }
+  });
+}
 const SPACE_NAMES = ['销售与客户', '财务与经营分析', '产品与研发', '人事与行政', '公司公共资料'];
 const REGIONS: V3[] = [
   [-0.7, 0.45, 0.4],
@@ -304,14 +350,7 @@ export class World implements SceneExtension {
       .filter(([a, b]) => a !== undefined && b !== undefined);
     for (let step = 0; step < 320; step++) {
       const f = p.map(() => [0, 0, 0] as V3);
-      for (let i = 0; i < p.length; i++)
-        for (let j = i + 1; j < p.length; j++) {
-          const d: V3 = [p[i][0] - p[j][0], p[i][1] - p[j][1], p[i][2] - p[j][2]],
-            l = Math.max(0.05, Math.hypot(...d)),
-            k = 0.0045 / (l * l * l);
-          f[i] = add(f[i], mul(d, k));
-          f[j] = add(f[j], mul(d, -k));
-        }
+      repel(p, f, 0.0045);
       this.links.forEach(([i, j]) => {
         const d: V3 = [p[j][0] - p[i][0], p[j][1] - p[i][1], p[j][2] - p[i][2]],
           l = Math.hypot(...d) || 1,
@@ -328,7 +367,11 @@ export class World implements SceneExtension {
       });
     }
     this.nodes = this.knowledge.map((x, i) => ({ id: x.id, o: p[i], kind: sourceKind[x.id] ?? 1, at: p[i] }));
-    this.degree = this.nodes.map((_, i) => this.links.filter(([a, b]) => a === i || b === i).length);
+    this.degree = this.nodes.map(() => 0);
+    this.links.forEach(([a, b]) => {
+      this.degree[a]++;
+      if (b !== a) this.degree[b]++;
+    });
   }
   attach(scene: EngineScene | null) {
     this.scene?.setExtension(null);
@@ -339,8 +382,9 @@ export class World implements SceneExtension {
   engineAlpha() {
     return 1 - this.kKnow;
   }
+  /** 镜头基本推进到位：知识标注可以开始淡入（它们每帧跟着光点走，镜头最后的微调不会错位）。 */
   knowledgeSettled() {
-    return this.kKnow > 0.99;
+    return this.kKnow > 0.9;
   }
   /** 引擎的三条输入光流从最后一道门里出发。 */
   inputStart(_index: number, far: V3) {
@@ -373,8 +417,9 @@ export class World implements SceneExtension {
     const ease = (v: number, to: number) => (reduced ? to : v + (to - v) * Math.min(1, dt * 5));
     this.kData = ease(this.kData, this.view === 'data' ? 1 : 0);
     this.kKnow = ease(this.kKnow, this.view === 'knowledge' ? 1 : 0);
-    // 不在本视角时只留很淡的一层，提示它们一直在模型里，又不改动引擎首页原本的样子。
-    const A = 0.14 + 0.86 * this.kData,
+    // 不在本视角时只留很淡的一层，提示它们一直在模型里，又不改动引擎首页原本的样子；
+    // 看知识星链时数据基座的星尘、星门整片隐去，不和星链抢画面。
+    const A = 0.14 * (1 - this.kKnow) + 0.86 * this.kData,
       B = 0.1 + 0.9 * this.kKnow;
     const ring = (at: V3, rad: number, alpha: number) => {
       for (let i = 0; i < 28; i++) {
@@ -533,8 +578,9 @@ export class World implements SceneExtension {
         hot = i === hov;
       this.grow[i] = ease(this.grow[i] ?? 0, hot ? 1 : 0);
       const bright = on || hot || linked.has(i) || hov < 0;
-      const size = (0.022 + Math.min(this.degree[i], 6) * 0.012) * (1 + 0.4 * this.grow[i]) * (on ? 1.15 : 1);
-      pt(n.at, kc[n.kind], (bright ? 0.5 : 0.18) * B, size);
+      // 发光收敛：光点小一号、亮度压低，被关联得多的仍然更大；悬停和选中的再提亮，焦点依然醒目。
+      const size = (0.016 + Math.min(this.degree[i], 6) * 0.006) * (1 + 0.5 * this.grow[i]) * (on ? 1.25 : 1);
+      pt(n.at, kc[n.kind], (on || hot ? 0.6 : bright ? 0.32 : 0.12) * B, size);
       if (on) ring(n.at, size + 0.02 + 0.006 * Math.sin(t * 2.2), 0.6 * B);
     });
   }
@@ -627,17 +673,20 @@ export class World implements SceneExtension {
     } else if (this.view === 'knowledge') {
       const sel = this.nodes.findIndex((n) => n.id === this.selected),
         hov = this.nodes.findIndex((n) => n.id === this.hover);
+      // 选中、悬停的总是显示；其次是与当前焦点相连的；再按被关联的次数（与光点大小一致）。
+      // 悬停时与它无关的标注收起，不只是调淡，免得还占着位置挡字。
       this.nodes.forEach((n, i) => {
         const name = this.knowledge[i]?.name || '',
           full = i === sel || i === hov,
-          bright = full || hov < 0 || this.near.has(i);
+          linked = this.near.has(i);
         out.push({
           key: 'n' + i,
           kind: 'node',
           text: full ? name : brief(name),
           p: n.at,
           on: full,
-          dim: !bright,
+          rank: full ? FORCED : (linked ? LINKED : 0) + (this.degree[i] ?? 0) * 10 + 1 / (i + 2),
+          hidden: hov >= 0 && !full && !linked,
         });
       });
     }

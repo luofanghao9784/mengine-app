@@ -133,6 +133,41 @@ export function useSpotlight(root: React.RefObject<HTMLElement | null>, reach = 
   }, [root, reach]);
 }
 
+/**
+ * 长清单分段渲染：先画前一段，滚到接近底部再接着画下一段；筛选条件变了就回到第一段。
+ * 选中的那一行（例如键盘切换到后面）总会被包含进来。
+ */
+export const PAGE_ROWS = 120;
+export function useProgressive(
+  list: React.RefObject<HTMLElement | null>,
+  resetKey: string,
+  total: number,
+  selectedIndex: number,
+) {
+  const [limit, setLimit] = useState(PAGE_ROWS);
+  useEffect(() => setLimit(PAGE_ROWS), [resetKey]);
+  useEffect(() => {
+    const el = list.current;
+    if (!el) return;
+    const grow = () => {
+      if (el.scrollTop + el.clientHeight >= el.scrollHeight - 600)
+        setLimit((n) => (n < total ? n + PAGE_ROWS : n));
+    };
+    el.addEventListener('scroll', grow, { passive: true });
+    return () => el.removeEventListener('scroll', grow);
+  }, [list, total]);
+  return Math.min(total, Math.max(limit, Math.ceil((selectedIndex + 1) / PAGE_ROWS) * PAGE_ROWS));
+}
+
+/** 把清单里的某一行滚进清单自己的可见区域；只滚这个清单，不碰外层容器（scrollIntoView 会连带滚动祖先）。 */
+export function revealInList(list: HTMLElement | null, row: Element | null | undefined, smooth = false) {
+  if (!list || !(row instanceof HTMLElement)) return;
+  const box = list.getBoundingClientRect(),
+    r = row.getBoundingClientRect();
+  const delta = r.top < box.top ? r.top - box.top : r.bottom > box.bottom ? r.bottom - box.bottom : 0;
+  if (delta) list.scrollBy({ top: delta, behavior: smooth ? 'smooth' : 'auto' });
+}
+
 /** 列表里选中框的位置：选中项变了，选中框从旧位置滑到新位置，而不是直接跳过去。 */
 export function useGlide(list: React.RefObject<HTMLElement | null>, selected: string, ...deps: unknown[]) {
   const [box, setBox] = useState<{ top: number; height: number } | null>(null);

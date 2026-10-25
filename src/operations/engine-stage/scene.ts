@@ -299,6 +299,7 @@ export class EngineScene {
   private last = performance.now();
   private t0 = performance.now();
   private raf = 0;
+  private paused = false;
   private CORE_PX = 100;
   private CORE_UV: [number, number] = [0.5, 0.5];
   private VP: number[] | null = null;
@@ -396,6 +397,10 @@ export class EngineScene {
     const edge = this.project([1.12, 0, 0]);
     const radius = Math.max(24, Math.hypot(edge.x - center.x, edge.y - center.y));
     return center.w > 0 && Math.hypot(x - center.x, y - center.y) <= radius;
+  }
+  /** The host has covered the whole canvas: stop drawing until it is uncovered (the last frame stays on screen). */
+  setPaused(paused: boolean) {
+    this.paused = paused;
   }
   /** Ignore ambient orbit; report whether the navigation camera has reached its destination. */
   cameraSettled() {
@@ -712,7 +717,7 @@ export class EngineScene {
   }
   private frame = (now: number) => {
     this.raf = requestAnimationFrame(this.frame);
-    if (!this.W || document.visibilityState === 'hidden') {
+    if (!this.W || document.visibilityState === 'hidden' || this.paused) {
       this.last = now;
       return;
     }
