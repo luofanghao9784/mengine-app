@@ -39,10 +39,15 @@ public class DatasetTaskContext {
         db.update("INSERT INTO task_dataset_reads(task_id,attempt_number,dataset_id,snapshot_id) VALUES (?,?,?,?) ON CONFLICT DO NOTHING",t.get("id"),t.get("attempt"),d.get("id"),d.get("snapshot_id"));
     }
     private Object time(Object v){return v==null?null:((Timestamp)v).toInstant();}
-    private Map<String,Object> metadata(UUID task,Map<String,Object> d,int columnOffset,int columnLimit,String query){
+    private Map<String,Object> metadata(Map<String,Object> t,Map<String,Object> d,int columnOffset,int columnLimit,String query,boolean briefing){
+        UUID task=(UUID)t.get("id");
         List<String> columns=json.readValue(d.get("column_names").toString(),json.getTypeFactory().constructCollectionType(List.class,String.class));
         if(columnOffset>=columns.size())throw IdentityException.invalid();int end=Math.min(columns.size(),columnOffset+columnLimit);
-        return map("datasetId",d.get("id"),"snapshotId",d.get("snapshot_id"),"version",d.get("version"),"name",d.get("name"),"description",d.get("description"),"columns",columns.subList(columnOffset,end),"fieldDefinitions",com.dreamcore.workspace.collection.DatasetField.read(d.get("field_definitions")).stream().filter(f->columns.subList(columnOffset,end).contains(f.column())).toList(),"calculationCapabilities",Map.of("operations",List.of("COMPARE","SUMMARY","COMPOSITION"),"aggregations",List.of("SUM","COUNT"),"crossDatasetJoin",false,"derivedExpressions",false,"maxGroups",50,"summaryGroupColumns",List.of(0,1,2,3),"compositionGroupColumns",1,"requiresPinnedSnapshot",true),"definitionOrigin","DEPLOYMENT","columnOffset",columnOffset,"nextColumnOffset",end<columns.size()?end:null,"totalColumns",columns.size(),"rowCount",d.get("row_count"),"coverageThrough",time(d.get("coverage_through")),"collectedAt",time(d.get("collected_at")),"authority",false,"governedMetrics",com.dreamcore.workspace.scene.MetricCatalog.context(db,task,(UUID)d.get("id"),query),"sourceSemantics",sourceSemantics((UUID)d.get("id")),"businessReading",columns.contains("收款状态")&&columns.contains("收款类型")?Map.of("statusLabels",Map.of("finance_confirmed","财务已确认（不能据此认定到账）","canceled","已取消（不能据此认定已退款）"),"typeLabels",Map.of("deposit","定金"),"money","列名明确标注（分）的金额，展示给读者时换算为元；保留原数值用于计算。","scope","样本仅支持样本观察，原始状态含义未知时说明尚待核实，不推断定金比例。", "dateComparison","可用 compare_dataset 的 periodMode=MONTH 将日期按业务时区归月，月份必须为 YYYY-MM；缺失或格式不明的日期会拒绝计算。") : Map.of());
+        List<String> visible=columns.subList(columnOffset,end);
+        var context=map("datasetId",d.get("id"),"snapshotId",d.get("snapshot_id"),"version",d.get("version"),"name",d.get("name"),"description",d.get("description"),"columns",visible,"fieldDefinitions",com.dreamcore.workspace.collection.DatasetField.read(d.get("field_definitions")).stream().filter(f->visible.contains(f.column())).toList(),"calculationCapabilities",Map.of("operations",List.of("COMPARE","SUMMARY","COMPOSITION"),"aggregations",List.of("SUM","COUNT"),"crossDatasetJoin",false,"derivedExpressions",false,"maxGroups",50,"summaryGroupColumns",List.of(0,1,2,3),"compositionGroupColumns",1,"requiresPinnedSnapshot",true),"definitionOrigin","DEPLOYMENT","columnOffset",columnOffset,"nextColumnOffset",end<columns.size()?end:null,"totalColumns",columns.size(),"rowCount",d.get("row_count"),"coverageThrough",time(d.get("coverage_through")),"collectedAt",time(d.get("collected_at")),"authority",false,"governedMetrics",com.dreamcore.workspace.scene.MetricCatalog.context(db,task,(UUID)d.get("id"),query),"sourceSemantics",sourceSemantics((UUID)d.get("id")),"businessReading",columns.contains("收款状态")&&columns.contains("收款类型")?Map.of("statusLabels",Map.of("finance_confirmed","财务已确认（不能据此认定到账）","canceled","已取消（不能据此认定已退款）"),"typeLabels",Map.of("deposit","定金"),"money","列名明确标注（分）的金额，展示给读者时换算为元；保留原数值用于计算。","scope","样本仅支持样本观察，原始状态含义未知时说明尚待核实，不推断定金比例。", "dateComparison","可用 compare_dataset 的 periodMode=MONTH 将日期按业务时区归月，月份必须为 YYYY-MM；缺失或格式不明的日期会拒绝计算。") : Map.of());
+        // Briefings only: tell the model what each column was confirmed to mean. Advisory, never enforced.
+        if(briefing)context.put("governedFields",GovernedFieldContext.load(db,(UUID)t.get("tenant_id"),(UUID)t.get("requested_by"),(UUID)d.get("id"),visible));
+        return context;
     }
     private Object sourceSemantics(UUID dataset){
         var file=db.queryForList("SELECT v.number,v.sha256,v.created_at,f.checked_at FROM file_table_sources f JOIN material_versions v ON v.id=f.version_id WHERE f.dataset_id=?",dataset);
@@ -52,12 +57,14 @@ public class DatasetTaskContext {
     }
     public Object read(UUID task,TaskContextService.Request r){
         db.queryForList("SELECT id FROM conversation_tasks WHERE id=? FOR UPDATE",task);var t=task(task);
+        // Only briefing runs receive the governed field wording; conversation payloads stay byte-identical.
+        boolean briefing=Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM briefing_generation_batches WHERE task_id=?)",Boolean.class,task));
         if("SELECTED".equals(t.get("source_scope")) && db.queryForObject("SELECT count(*) FROM briefing_dataset_selections WHERE task_id=? AND NOT invalidated",Integer.class,task)==0)return r.action().equals("dataset_search")?map("items",List.of(),"hasMore",false,"reason","SELECTED_ONLY"):map("unavailable",true,"reason","SELECTED_ONLY");
         int offset=r.offset()==null?0:r.offset();if(offset<0||offset>100000)throw IdentityException.invalid();
         if(r.action().equals("dataset_search")){
             String query=r.query()==null?"":r.query().strip();if(query.length()>200)throw IdentityException.invalid();
             var found=rows(t,null,null,query,offset,4);var out=new ArrayList<Object>();
-            for(var d:found.stream().limit(3).toList()){pin(t,d);out.add(metadata(task,d,0,5,query));}
+            for(var d:found.stream().limit(3).toList()){pin(t,d);out.add(metadata(t,d,0,5,query,briefing));}
             return map("items",out,"hasMore",found.size()>3,"scope",t.get("source_scope"));
         }
         if(r.referenceId()==null||r.versionId()==null)throw IdentityException.invalid();
@@ -65,7 +72,7 @@ public class DatasetTaskContext {
         var data=db.queryForList("SELECT item::text FROM dataset_snapshots s CROSS JOIN LATERAL jsonb_array_elements(s.data_rows) WITH ORDINALITY AS r(item,position) WHERE s.id=? ORDER BY position LIMIT 6 OFFSET ?",String.class,d.get("snapshot_id"),offset);
         int columnOffset=r.columnOffset()==null?0:r.columnOffset(),columnLimit=r.columnLimit()==null?5:r.columnLimit();
         if(columnOffset<0||columnOffset>99||columnLimit<1||columnLimit>10)throw IdentityException.invalid();
-        var source=metadata(task,d,columnOffset,columnLimit,"");var page=new ArrayList<Object>();int bytes=json.writeValueAsBytes(source).length;
+        var source=metadata(t,d,columnOffset,columnLimit,"",briefing);var page=new ArrayList<Object>();int bytes=json.writeValueAsBytes(source).length;
         for(String row:data.stream().limit(5).toList()){
             var original=json.readTree(row);var value=new ArrayList<Object>();
             for(int c=columnOffset;c<Math.min(original.size(),columnOffset+columnLimit);c++)value.add(original.get(c).isNull()?null:original.get(c).asString());
