@@ -15,7 +15,7 @@
 
 1. **一次只做一件事。** 多个改动分开做、分开提交。
 2. **先读后写。** 不确定现有实现时先看代码，不猜、不臆造接口。
-3. **不碰线上。** 服务器 `121.40.44.117` 上任何写操作，必须用户明确说"改服务器"才执行。
+3. **不对生产写操作。** 服务器 `121.40.44.117`、生产数据库与生产配置上的写操作（部署、改配置、改数据、重启服务），只在用户明确说"改服务器"时执行，并由部署负责人操作。只读核验（日志、状态、目录清单）经授权可做，不输出凭据内容。
 4. **密钥不进对话。** 凭据只提路径（`.local/model-private/`、`.local/trial/accounts.json`、SSH 接入包），不输出内容、不写入会提交的文件。
 5. **说清验证方式。** 每次改动都要告诉用户"怎么确认它真的生效"。
 
@@ -28,19 +28,22 @@
 
 ## 两人协作
 
-两位维护者都不写代码、主要靠 AI，**只有当前用户持有线上部署权**。详见 `docs/协作/协同规范.md`。
+两位维护者都不写代码、主要靠 AI，**线上部署权只在 `luofanghao9784`（部署负责人）一方**。详见 `docs/协作/协同规范.md`。
 
-1. **先认领再动手**：超过"看看代码"的改动，先在 `docs/协作/任务看板.md` 加一行并推送，推送成功才算认领。
+1. **先查重，再认领**：先在 GitHub Issues 搜有没有人认领同一功能，确认无重叠后再开 Issue 认领（标题「认领：<任务>」，assignee 指派自己，正文写涉及范围），开出并指派成功才算认领。
 2. **不直接推 `main`**：开任务分支（`feat/xxx`、`fix/xxx`），推送后开 PR，由对方合并。
 3. **`main` 必须随时能跑**：合并前构建通过 + 关键路径本地验证。
 4. **各自独立克隆**，不共用目录、不共用 `.local/`，模型 Key 各人各一把。
-5. **部署只由用户本人执行**，AI 不得连接服务器做写操作。
+5. **部署只由部署负责人（`luofanghao9784`）执行**；代理不做生产写操作，只读核验也需先获授权。
 
 ## 常用命令
 
+首次本地启动（工具链、构建、模型配置、故障排查）见 **[本地启动指南](docs/交接/本地启动指南.md)**。
+
 ```bash
-# 本地实例（本地 trial，端口 54029）
-/Users/luofanghao/Desktop/mengine/run-trial.sh \
+# 本地实例（本地 trial，端口 54029）。run-trial.sh 在工作区根目录（本仓库上一级，仓库外），
+# 克隆仓库后需另行从工作区获取；路径按各自机器调整。
+../run-trial.sh \
   --live --model-config .local/model-private/deepseek.json --phone-local --enable-live
 
 # 构建
@@ -54,10 +57,10 @@ npm run test:api         # 后端集成测试
 npm run trial:status     # 本地实例状态
 ```
 
-工具链在 `../tools/`（JDK 21、Node 24、Python 3.12、PostgreSQL 18）。`node`/`java` 不在系统 PATH，需自行加：
+工具链在 `../tools/`（JDK 21、Node 24、Python 3.12、PostgreSQL 18），同样在工作区根目录（仓库外）。`node`/`java` 不在系统 PATH，需自行加：
 
 ```bash
-export PATH="/Users/luofanghao/Desktop/mengine/tools/node-v24.20.0-darwin-arm64/bin:/Users/luofanghao/Desktop/mengine/tools/jdk-21.0.13+9/Contents/Home/bin:$PATH"
+export PATH="$HOME/Desktop/mengine/tools/node-v24.20.0-darwin-arm64/bin:$HOME/Desktop/mengine/tools/jdk-21.0.13+9/Contents/Home/bin:$PATH"
 ```
 
 ## 提交

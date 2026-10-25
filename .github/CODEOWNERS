@@ -1,6 +1,7 @@
-# 目前仅登记已确认存在的仓库维护账号；后续按实际成员拆分责任区。
-# 平台/引擎共享契约仍需双方审查，本文件不强制两个团队同时批准。
-* @dimmm1125-coder
-/.github/ @dimmm1125-coder
-/.githooks/ @dimmm1125-coder
-/COLLABORATION.md @dimmm1125-coder
+# 双方维护账号均登记；CODEOWNERS 只表明"谁有资格审查"，
+# 不强制两人同时批准——审查按"一名非作者批准"执行（见 docs/协作/协同规范.md）。
+# 平台/引擎共享契约仍需双方评审结论。
+* @dimmm1125-coder @luofanghao9784
+/.github/ @dimmm1125-coder @luofanghao9784
+/.githooks/ @dimmm1125-coder @luofanghao9784
+/COLLABORATION.md @dimmm1125-coder @luofanghao9784
