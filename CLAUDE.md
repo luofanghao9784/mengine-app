@@ -1,81 +1,111 @@
-# 梦擎工作空间 · AI 协作规则
+# CLAUDE.md
 
-企业内部 AI 工作台。代码仓库 `dreamcore-workspace/`，另有两份说明文档在上一级目录。
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## 必读
+梦擎（DreamCore）是企业内部 AI 工作台：员工上传资料、与 AI 对话、生成画报；企业管理员管人和权限；平台方管企业本身。
 
-| 场景 | 先读 |
-|---|---|
-| 任何会话开始 | `../续接说明.md`（现状、缺口、路径） |
-| 开发流程 | `docs/协作/VIBE-CODING-工作流程.md` |
-| 仓库规则 | `AGENTS.md`、`COLLABORATION.md` |
-| 业务/架构 | `../梦擎功能全景-非技术版.html`、`../梦擎架构与数据流程.html` |
+## 架构总览
 
-## 五条硬规则
+四个运行时进程 + 一套契约，全部在本仓库内：
 
-1. **一次只做一件事。** 多个改动分开做、分开提交。
-2. **先读后写。** 不确定现有实现时先看代码，不猜、不臆造接口。
-3. **不对生产写操作。** 服务器 `121.40.44.117`、生产数据库与生产配置上的写操作（部署、改配置、改数据、重启服务），只在用户明确说"改服务器"时执行，并由部署负责人操作。只读核验（日志、状态、目录清单）经授权可做，不输出凭据内容。
-4. **密钥不进对话。** 凭据只提路径（`.local/model-private/`、`.local/trial/accounts.json`、SSH 接入包），不输出内容、不写入会提交的文件。
-5. **说清验证方式。** 每次改动都要告诉用户"怎么确认它真的生效"。
+| 部分 | 位置 | 职责 |
+|---|---|---|
+| 平台 API | `apps/api`（Spring Boot / Java 21 / Maven） | 身份、权限、业务规则、状态机；唯一能访问数据库的一方 |
+| 引擎 | `engine/`（Node 24 / TypeScript） | 任务编排、模型调用、工具循环；**没有数据库账号** |
+| 前端 | `src/` + `workspace/` `tenant-admin/` `platform-admin/` `site/`（Vite + React） | 三个入口共用一套构建产物，按路径区分身份域 |
+| 解析器 | `workers/parser`（Python，`sandbox-exec` 内运行） | 文档解析与 OCR；只读解析器目录与当次任务目录 |
+| 契约 | `contracts/`（OpenAPI + JSON Schema） | 平台↔引擎↔前端的接口事实来源 |
 
-## 风险分级
+### 两条主链路
 
-- **L0 只读**：随时可做
-- **L1 本地改动**：说清目的即可动手，必须本地验证
-- **L2 部署**：必须用户明确要求，且先说清回滚方案
-- **L3 数据/权限/密钥**：单独确认，先备份
+**资料接入**（上传 → 可检索）
 
-## 两人协作
+```
+上传 → 对象存储(原件) + material_versions(sha256) → knowledge_runs(PENDING)
+     → 后台 worker 领取 → 沙箱解析(parse.py / docling_parse.py)
+     → knowledge_chunks(带 locator 出处) → [可选] WeKnora 索引
+```
 
-两位维护者都不写代码、主要靠 AI，**线上部署权只在 `luofanghao9784`（部署负责人）一方**。详见 `docs/协作/协同规范.md`。
+**会话执行**（提问 → 回答）
 
-1. **先查重，再认领**：先在 GitHub Issues 搜有没有人认领同一功能，确认无重叠后再开 Issue 认领（标题「认领：<任务>」，assignee 指派自己，正文写涉及范围），开出并指派成功才算认领。
-2. **不直接推 `main`**：开任务分支（`feat/xxx`、`fix/xxx`），推送后开 PR，由对方合并。
-3. **`main` 必须随时能跑**：合并前构建通过 + 关键路径本地验证。
-4. **各自独立克隆**，不共用目录、不共用 `.local/`，模型 Key 各人各一把。
-5. **部署只由部署负责人（`luofanghao9784`）执行**；代理不做生产写操作，只读核验也需先获授权。
+```
+POST /conversations → conversation_tasks(状态机) → AgentTaskService(组装已授权上下文)
+  → EngineGateway(HTTP) → engine /internal/v1/agent-results → harness 循环
+      ↘ 需要资料时：引擎带任务令牌回调平台 /internal/v1/agent-access/{task}/…
+                   平台用授权 SQL 圈出可读分块 → 返回 → 模型继续
+  → conversation_tool_receipts(逐次回执) → 回复 + 引用
+```
+
+### 平台内部分层
+
+- **两套身份域**：客户域 `/api/v1/auth`、总台域 `/api/platform-admin/v1/auth`，独立 Cookie，互不代入
+- **权限在 SQL 里**：`library_mask`、`file_dataset_readable`、`headquarters_permission_actor` 等函数在查询时求值，不在 Java 里做可见性分支
+- **状态机**：`conversation_tasks`、`knowledge_runs`、`briefing_generation_batches` 各自有状态与重试；`PARTIAL` 是正常终态
+- **幂等**：写接口普遍带 `requestId`，重复提交返回首次结果
+
+### 改代码前必须知道的不变式
+
+1. **可见性由数据库函数决定**，接口层再校验一次；不要在 Java 里另写一套范围判断
+2. **引擎不直连数据库**，只能通过 `/internal/v1/agent-access/{task}/…` 回调，令牌绑定单个任务
+3. **解析器不可信输入隔离**：禁网、限 CPU/文件大小/输出大小；上传文件永远当可疑物处理
+4. **状态以数据库为准**，模型自述"完成"不算；回执与产物哈希才是依据
+5. **治理数据集强制固定计划**：画报任务里 `fixedPlanOnly` 为真，只能用 `scene_metrics` 已发布指标的 executionRequest，不能自行改聚合/分组/日期
+6. **画报有三道闸**：证据预算（数据集查找 ≤3 次）、数字必须服务端算（`compare_dataset` 产出 `calculationArtifactId` + sha256）、编辑质量校验（不合格直接 422 打回）
+
+### 数据库
+
+- Flyway 迁移在 `apps/api/src/main/resources/db/migration-common/`，**只增不改**；新版本号先到认领 Issue 登记，避免两人撞号
+- 集成测试用一次性 PG 集群（`scripts/with-test-postgres.py`），不碰任何已有数据库
 
 ## 常用命令
 
 首次本地启动（工具链、构建、模型配置、故障排查）见 **[本地启动指南](docs/交接/本地启动指南.md)**。
 
 ```bash
-# 本地实例（本地 trial，端口 54029）。run-trial.sh 在工作区根目录（本仓库上一级，仓库外），
-# 克隆仓库后需另行从工作区获取；路径按各自机器调整。
-../run-trial.sh \
-  --live --model-config .local/model-private/deepseek.json --phone-local --enable-live
-
 # 构建
-npm run build            # 前端 + 类型检查
-npm run build:engine     # 引擎
-./apps/api/mvnw -B -f apps/api/pom.xml -DskipTests package   # 后端
+npm run build                 # 前端 + tsc 类型检查
+npm run build:engine          # 引擎
+./apps/api/mvnw -B -f apps/api/pom.xml -DskipTests package    # 后端 jar
 
-# 检查
-npm test                 # 单元测试
-npm run test:api         # 后端集成测试
-npm run trial:status     # 本地实例状态
+# 测试
+npm test                      # 前端/脚本单测（node --test）
+npm run test:contracts        # 契约测试
+npm run test:engine           # 引擎测试
+npm run test:api              # 后端全部测试（自带一次性 PG）
+
+# 单个后端测试（同样走一次性 PG）
+export POSTGRES_BIN=/path/to/postgresql-18/bin
+python3 scripts/with-test-postgres.py ./apps/api/mvnw -B -f apps/api/pom.xml test -Dtest=ClassName
+
+# 本地实例（端口 54029；工作区根目录另有 run-trial.sh 打包了同样参数）
+export JAVA_HOME=/path/to/jdk-21
+export PATH="$JAVA_HOME/bin:/path/to/node-24/bin:$PATH"
+export POSTGRES_BIN=/path/to/postgresql-18/bin
+npm run trial:start -- --live --model-config .local/model-private/deepseek.json --phone-local --enable-live
+npm run trial:status
+
+# 模型连通性自检（会产生一次真实调用）
+npm run model:smoke -- --config .local/model-private/deepseek.json
 ```
 
-工具链在 `../tools/`（JDK 21、Node 24、Python 3.12、PostgreSQL 18），同样在工作区根目录（仓库外）。`node`/`java` 不在系统 PATH，需自行加：
+工具链不在仓库内；没有时按启动指南自行准备。
 
-```bash
-export PATH="$HOME/Desktop/mengine/tools/node-v24.20.0-darwin-arm64/bin:$HOME/Desktop/mengine/tools/jdk-21.0.13+9/Contents/Home/bin:$PATH"
-```
+## 协作规则
 
-## 提交
+两位维护者都不写代码、主要靠 AI，部署权只在 `luofanghao9784` 一方。
 
-- 一次一件事，类型用 `feat`/`fix`/`docs`/`refactor`/`chore`
-- 说明**为什么**改，不只是改了什么
-- 不提交 `.local/`、密钥、构建产物
-- 单主线 `main`，不并行开 worktree（除非用户明确要求）
+- **权威规则**：[docs/协作/协同规范.md](docs/协作/协同规范.md)（`AGENTS.md` 给 Codex、`CLAUDE.md` 给 Claude Code，三处需同步）
+- **认领**：先到 GitHub Issues 搜重，再开「认领：<任务>」Issue 并指派自己，开出才算认领
+- **不直接推 `main`**：开任务分支 → PR（链上 Issue）→ 对方审阅后合并 → 关 Issue、删分支
+- **`main` 必须随时能跑**：合并前构建通过 + 关键路径本地验证
+- **生产只读可、写不可**：部署、改配置、改数据、重启服务只由部署负责人执行；只读核验需先获授权，且不输出凭据内容
+- **密钥不进对话**：只提路径（`.local/model-private/`、`.local/trial/accounts.json`、SSH 接入包），不写入会提交的文件
+- **一次只做一件事**，完成后在 `docs/变更记录/` 写一条（模板 `_模板.md`）
 
-## 完成后
+## 容易踩的坑
 
-在 `docs/变更记录/` 写一条记录（模板 `_模板.md`），涉及现状变化时同步更新 `../续接说明.md`。
-
-## 已知缺口（不要当成 bug 去修）
-
-- 治理版本未接入画报计算（两条平行链）
-- 经验库、联网搜索、WeKnora 语义检索默认关闭
-- PDF 未嵌入字体的场景可能抽取失败
+- `npm run build` 会跑 `tsc --noEmit`，前端类型错误会直接挡住构建；构建后还有 `verify-built-entries.mjs` 检查产物入口
+- 后端测试必须走 `with-test-postgres.py`，直接 `mvn test` 没有 `DATABASE_URL` 会失败
+- 本地 `.local/` 全是私有运行数据与密钥，已被 `.gitignore` 覆盖；提交前确认 `git status` 里没有它
+- 端口：首次启动时自动分配并写入 `.local/trial/config.json`（本机当前 Web 54029 / API 54028 / DB 54027），重启不变；**引擎端口每次启动随机**
+- PDF 未嵌入字体时可能抽不出文字；docling 单页约 13 秒，沙箱单次解析上限 75 秒
