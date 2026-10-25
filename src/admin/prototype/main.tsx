@@ -29,7 +29,7 @@ function Entry() {
         ) : (
           <>
             <p>请登录企业管理端后继续。</p>
-            <a target="_top" href="/tenant-admin/">
+            <a href="/tenant-admin/">
               返回登录
             </a>
             <button onClick={() => void refresh()}>重试</button>
@@ -42,7 +42,7 @@ function Entry() {
   return (
     <RequestGuard>
       <UploadProvider>
-        <SceneShell key={tenant} />
+        <SceneShell key={tenant} tenant={tenant} />
       </UploadProvider>
     </RequestGuard>
   );

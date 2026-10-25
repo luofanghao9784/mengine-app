@@ -11,6 +11,7 @@ import './glass-surface.css';
 import { FoundationProcessing } from './FoundationProcessing';
 import { assetSourceGroup } from './asset-source-groups';
 import { KnowledgeListRow } from './KnowledgeListRow';
+import { sceneTenant } from './scene-route';
 
 function BackgroundSourceCard({ tenant, selected, onSelect }: { tenant: string; selected: boolean; onSelect: () => void }) {
   const { session } = useSession();
@@ -296,7 +297,7 @@ export function DataWork({
       setDetailTick((n) => n + 1);
     }
   }
-  if (unauthorized && new URLSearchParams(window.location.search).has('tenant'))
+  if (unauthorized && sceneTenant())
     return (
       <section className="cards work data live-foundation">
         <article className="card live-login">

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Tone, Item } from './data';
+import { sceneTenant } from './scene-route';
 export type Asset = {
   id: string;
   title: string;
@@ -139,7 +140,7 @@ export const ACTIONS: Record<string, string> = {
   handle: '记录处理措施',
 };
 export async function api<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
-  const tenant = new URLSearchParams(location.search).get('tenant');
+  const tenant = sceneTenant();
   const headers: Record<string,string> = {};
   if (tenant && body !== undefined) {
     const csrf = await fetch('/api/v1/auth/csrf', { credentials:'same-origin', signal });

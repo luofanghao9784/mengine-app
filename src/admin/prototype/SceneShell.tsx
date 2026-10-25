@@ -18,6 +18,7 @@ import { useKnowledge, type Knowledge } from './knowledge-api';
 import { api } from './foundation-api';
 import { GATES, GATE_OF, World, type WorldLabel } from './world';
 import { LabelLayout, type LabelBox } from './label-layout';
+import { scenePlace, sceneTenant, setSceneTenant, writeScenePlace } from './scene-route';
 import './scene-shell.css';
 import './glass-theme.css';
 
@@ -41,6 +42,28 @@ const press = (key: string) =>
 const typing = (e: Event) =>
   !!(e.target as HTMLElement | null)?.closest?.('input,textarea,select,[contenteditable]');
 
+/** 知识同步是写操作，只在这里手动开始：有待整理的资料或待确认的关联时才出现。 */
+function KnowledgeSync({ knowledge }: { knowledge: Knowledge }) {
+  const d = knowledge.data;
+  if (!d?.available) return null;
+  const waiting = d.pending + d.failed;
+  if (!knowledge.busy && !d.busy && !waiting && !d.needsGraph) return null;
+  return (
+    <p className="knowledge-sync" role="status">
+      <span>
+        {knowledge.busy || d.busy
+          ? '正在同步知识与关联…'
+          : [d.pending && `${d.pending} 份资料待整理`, d.failed && `${d.failed} 份上次失败`, d.needsGraph && '关联待分析']
+              .filter(Boolean)
+              .join(' · ')}
+      </span>
+      <button type="button" disabled={knowledge.busy || d.busy} onClick={() => void knowledge.sync(d.failed > 0)}>
+        开始同步
+      </button>
+    </p>
+  );
+}
+
 function useReduced() {
   const q = '(prefers-reduced-motion: reduce)';
   const [v, set] = useState(() => !!window.matchMedia?.(q).matches);
@@ -54,9 +77,9 @@ function useReduced() {
   return v;
 }
 
-export function SceneShell() {
+export function SceneShell({ tenant = null }: { tenant?: string | null }) {
   const { session } = useSession();
-  const tenant = new URLSearchParams(location.search).get('tenant');
+  setSceneTenant(tenant);
   const enterpriseName = session.identity?.memberships.find(m => m.tenantId === tenant)?.tenantName;
   const runtime = useSceneRuntime(tenant);
   const reduced = useReduced();
@@ -80,10 +103,9 @@ export function SceneShell() {
     [tenant, runtime.value, runtime.samples, runtime.log, now],
   );
 
-  const [place, setPlace] = useState<Place>(() =>
-    new URLSearchParams(window.location.search).has('tenant') ? 'data' : 'home',
-  );
-  const [sheet, setSheet] = useState<Sheet>('half');
+  // 当前板块以地址里的 place 为准：刷新回原处；没写时接入企业默认进数据基座。
+  const [place, setPlace] = useState<Place>(() => scenePlace() ?? (tenant ? 'data' : 'home'));
+  const [sheet, setSheet] = useState<Sheet>(() => (SCENE.includes(place) ? 'half' : 'peek'));
   const [picked, setPicked] = useState<Partial<Record<Place, string>>>({});
   const [filter, setFilter] = useState<Partial<Record<Place, number>>>({});
   const [gate, setGate] = useState<number | null>(null);
@@ -216,6 +238,30 @@ export function SceneShell() {
   };
   const goRef = useRef(go);
   goRef.current = go;
+  // 板块写进地址：首次打开只补上 place，不新增历史记录；之后每次切换算一条，浏览器后退可用。
+  const routed = useRef(false);
+  useEffect(() => {
+    writeScenePlace(place, !routed.current);
+    routed.current = true;
+  }, [place]);
+  // 标签页标题跟着板块走（嵌在板块里的旧版管理台会改标题，离开后要改回来）。
+  useEffect(() => {
+    if (tenant) document.title = `${places[place].name} · ${enterpriseName || ''}企业管理`;
+  }, [tenant, place, enterpriseName]);
+  // 后退、前进或手动改地址：按地址里的板块切过去。
+  useEffect(() => {
+    const change = () => {
+      const next = scenePlace();
+      if (next && next !== state.current.place) goRef.current(next);
+    };
+    window.addEventListener('hashchange', change);
+    return () => window.removeEventListener('hashchange', change);
+  }, []);
+  // 刷新时直接落在经验库这类要聚焦 3D 某一段的板块：让舞台也转过去。
+  useEffect(() => {
+    const at = state.current.place;
+    if (places[at].focus && sceneFocus() !== places[at].focus) press(SHORTCUT[at]!);
+  }, []);
   world.onNavigate = (next) => goRef.current(next);
   // 传给工作卡片的回调保持同一个引用，运行状态轮询重绘外壳时，清单和详情不跟着重算。
   const goStable = useCallback((next: Place, id?: string) => goRef.current(next, id), []);
@@ -993,7 +1039,7 @@ function Work({
         const id = picked;
         const result = await api<Item>('/scene-knowledge/' + encodeURIComponent(current.id) + '/source');
         if (selection.current === id) setSource(result);
-      } else if (label === '重新核验') await knowledge.refresh(true);
+      } else if (label === '重新核验') await knowledge.sync(true);
     } catch (e) {
       setSource(null);
       setActionError((e as Error).message);
@@ -1025,6 +1071,7 @@ function Work({
             </button>
           )}
           {place === 'knowledge' && knowledge.backgroundError != null && <p role="status">企业背景暂不可用，未计入知识数量。<button onClick={knowledge.refreshBackground}>重试背景读取</button></p>}
+          {place === 'knowledge' && <KnowledgeSync knowledge={knowledge} />}
           {groups.length === 0 && <p className="none">这一栏里没有符合条件的记录。</p>}
           {groups.map(([name, items], index) => {
             const background = place === 'knowledge' && name === '企业背景';
@@ -1226,7 +1273,7 @@ function Palette({
           ? (foundation.data?.items || []).map(asItem)
           : p === 'knowledge'
             ? knowledge.data?.items || []
-            : new URLSearchParams(location.search).has('tenant')
+            : sceneTenant()
               ? []
               : places[p].items
         ).map((x) => ({

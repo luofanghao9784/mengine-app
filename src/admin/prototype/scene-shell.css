@@ -665,6 +665,30 @@
   margin: 18px 12px;
   color: var(--ash);
 }
+.card.list .knowledge-sync {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 6px 10px 0;
+  padding: 6px 6px 6px 12px;
+  border-radius: 10px;
+  background: rgb(241 214 160 / 9%);
+  color: var(--ash);
+  font-size: 12.5px;
+}
+.card.list .knowledge-sync button {
+  flex: none;
+  min-height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: rgb(241 214 160 / 18%);
+  color: var(--champagne);
+}
+.card.list .knowledge-sync button:disabled {
+  opacity: 0.5;
+}
 .card.detail h2 {
   font: 600 18px/1.4 inherit;
   font-family: inherit;

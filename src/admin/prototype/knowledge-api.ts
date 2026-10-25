@@ -29,11 +29,10 @@ export function useKnowledge(active: boolean, tenant?: string | null) {
     [busy, setBusy] = useState(false);
   const alive = useRef(false),
     working = useRef(false),
-    enabled = useRef(active),
-    stopped = useRef(false),
+    syncing = useRef(false),
+    again = useRef(false),
     epoch = useRef(0),
     last = useRef('');
-  enabled.current = active;
   // 内容没变就沿用旧对象，3D 星图和清单不重建。
   const setData = (next: KnowledgeSnapshot | null) => {
     const text = next ? JSON.stringify(next) : '';
@@ -43,52 +42,57 @@ export function useKnowledge(active: boolean, tenant?: string | null) {
   };
   const refreshRef = useRef(refresh);
   refreshRef.current = refresh;
-  async function refresh(retry = false) {
-    if (working.current) return;
+  const syncRef = useRef(sync);
+  syncRef.current = sync;
+  /** 只读刷新：打开知识星链、定时轮询都只读，不触发同步。 */
+  async function refresh() {
+    // 正在读时又要读（比如刚同步完）：等这次读完再读一次，免得显示同步前的状态。
+    if (working.current) {
+      again.current = true;
+      return;
+    }
     working.current = true;
     const ticket = epoch.current;
     const valid = () => alive.current && ticket === epoch.current;
     try {
-      if (retry) stopped.current = false;
-      let next = await api<KnowledgeSnapshot>('/scene-knowledge');
+      const next = await api<KnowledgeSnapshot>('/scene-knowledge');
       if (!valid()) return;
       setData(next);
       setError('');
-      if (
-        enabled.current &&
-        !stopped.current &&
-        next.available &&
-        !next.busy &&
-        (next.pending || (retry && next.failed) || next.needsGraph)
-      ) {
-        setBusy(true);
-        await api('/scene-knowledge/sync', { retry });
-        if (!valid()) return;
-        next = await api<KnowledgeSnapshot>('/scene-knowledge');
-        if (valid()) setData(next);
-      }
     } catch (e) {
       if (valid()) {
-        stopped.current = true;
+        if ([401, 403, 404, 410].includes((e as { status?: number }).status ?? 0)) setData(null);
         setError((e as Error).message);
-        if ([401, 403, 404, 410].includes((e as { status?: number }).status ?? 0)) {
-          setData(null);
-          return;
-        }
-        try {
-          const latest = await api<KnowledgeSnapshot>('/scene-knowledge');
-          if (valid()) {
-            setData(latest);
-            stopped.current = !(latest.business && latest.business.pending > 0);
-          }
-        } catch (retryError) {
-          // 仅临时读取失败保留知识；权限或资源失效必须清空。
-          if ([401, 403, 404, 410].includes((retryError as { status?: number }).status ?? 0)) setData(null);
-        }
       }
     } finally {
       working.current = false;
+      if (again.current && valid()) {
+        again.current = false;
+        void refreshRef.current();
+      }
+    }
+  }
+  /** 同步（写操作）：只由界面上的按钮触发；retry 为真时连同失败项一起重试。 */
+  async function sync(retry = false) {
+    if (syncing.current) return;
+    syncing.current = true;
+    const ticket = epoch.current;
+    const valid = () => alive.current && ticket === epoch.current;
+    setBusy(true);
+    try {
+      await api('/scene-knowledge/sync', { retry });
+      if (!valid()) return;
+      setError('');
+    } catch (e) {
+      if (valid()) {
+        if ([401, 403, 404, 410].includes((e as { status?: number }).status ?? 0)) setData(null);
+        setError((e as Error).message);
+      }
+    } finally {
+      syncing.current = false;
       if (valid()) setBusy(false);
+      // 无论成败都再读一次，显示同步后的实际状态。
+      if (valid()) void refreshRef.current();
     }
   }
   useEffect(() => {
@@ -124,7 +128,8 @@ export function useKnowledge(active: boolean, tenant?: string | null) {
       status: `共 ${rawData.items.length + 1} 条知识（含 1 条企业背景）`,
       stats: {...rawData.stats, rows: [['知识总数', String(rawData.items.length + 1)], ['企业背景', '1'], ...rawData.stats.rows] as [string,string,string?][] } };
   }, [rawData, background.value, tenant]);
-  const stableRefresh = useCallback((retry?: boolean) => refreshRef.current(retry), []);
+  const stableRefresh = useCallback(() => refreshRef.current(), []);
+  const stableSync = useCallback((retry?: boolean) => syncRef.current(retry), []);
   const stableRefreshBackground = useCallback(() => refreshBackground((n) => n + 1), []);
   // 返回同一个对象，直到知识、错误或同步状态真的变了；知识按编号建索引，关联查询不再逐条遍历。
   return useMemo(() => {
@@ -158,6 +163,7 @@ export function useKnowledge(active: boolean, tenant?: string | null) {
       error,
       busy,
       refresh: stableRefresh,
+      sync: stableSync,
       empty,
       tabs:
         data?.tabs ||
@@ -172,6 +178,6 @@ export function useKnowledge(active: boolean, tenant?: string | null) {
       },
       related: (id: string) => links.get(id) || [],
     };
-  }, [data, error, busy, background.error, stableRefresh, stableRefreshBackground]);
+  }, [data, error, busy, background.error, stableRefresh, stableSync, stableRefreshBackground]);
 }
 export type Knowledge = ReturnType<typeof useKnowledge>;

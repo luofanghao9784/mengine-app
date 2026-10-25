@@ -21,7 +21,8 @@ export function BusinessWork({ tenant, place }: { tenant: string; place: keyof t
       p.delete('member');
     }
     p.set('tenant', tenant);
-    location.hash = p.toString();
+    // 只是补上旧版管理台要的参数，不算一次切换：替换当前记录，免得浏览器后退停在原地。
+    history.replaceState(history.state, '', '#' + p);
     setReady(true);
   }, [tenant, place]);
   const name = session.identity?.memberships.find((m) => m.tenantId === tenant)?.tenantName || '企业管理';

@@ -329,12 +329,14 @@ function GuardedAccessShell({
     return (
       <UploadProvider>
         {new URLSearchParams(location.search).get('view') === 'business' ||
-        ['admin', 'manage', 'tab', 'scope'].some((key) =>
-          new URLSearchParams(location.hash.slice(1)).has(key),
-        ) ? (
+        // 地址里有 place 时是场景外壳（它的板块里会嵌旧版管理台、带上 admin/tab 等参数）；否则按旧链接打开旧版管理台。
+        (!new URLSearchParams(location.hash.slice(1)).has('place') &&
+          ['admin', 'manage', 'tab', 'scope'].some((key) =>
+            new URLSearchParams(location.hash.slice(1)).has(key),
+          )) ? (
           <TenantConsole key={tenant} tenant={tenant} name={selected.tenantName} />
         ) : (
-          <TenantScene key={tenant} tenant={tenant} name={selected.tenantName} />
+          <TenantScene key={tenant} tenant={tenant} />
         )}
       </UploadProvider>
     );
