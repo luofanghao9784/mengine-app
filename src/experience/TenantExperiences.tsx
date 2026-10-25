@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { BookOpen, RefreshCw } from 'lucide-react';
 import { IdentityError, uuid } from '../identity/client';
 import { useSession } from '../identity/session';
@@ -13,7 +13,7 @@ import { GeneralExperienceLibrary } from './GeneralExperienceLibrary';
 import type { LocalExperienceSelection } from './GeneralSuggestionPanel';
 import { ExperienceAdjustmentPanel } from './ExperienceAdjustmentPanel';
 const stamp = (date: string) => new Date(date).toLocaleString('zh-CN', { hour12: false });
-type Selection = { id: string; version: string | null; space: string };
+export type Selection = { id: string; version: string | null; space: string };
 const isSelection = (v: unknown): v is Selection | null =>
   v === null ||
   (!!v &&
@@ -432,13 +432,15 @@ function EnterpriseExperiences({
     </div>
   );
 }
-function ExperienceDrawer({
+/** 经验详情：管理台里以弹窗打开；企业管理端的经验库把它直接放进详情卡（inline）。 */
+export function ExperienceDrawer({
   tenant,
   selection,
   close,
   chooseVersion,
   changed,
   lock,
+  inline = false,
 }: {
   tenant: string;
   selection: Selection;
@@ -446,6 +448,7 @@ function ExperienceDrawer({
   chooseVersion: (version: string) => void;
   changed: () => void;
   lock: (value: boolean) => void;
+  inline?: boolean;
 }) {
   type Action = { intent: 'stop' | 'restore'; expectedRevision: number; versionId: string };
   const [action, setAction] = useState<Action | null>(null);
@@ -504,9 +507,8 @@ function ExperienceDrawer({
       ? submission.error
       : undefined);
   return (
-    <Modal
-      title="经验详情"
-      className="experience-management-drawer"
+    <DrawerShell
+      inline={inline}
       onClose={() => {
         if (!blocked) close();
       }}
@@ -719,6 +721,15 @@ function ExperienceDrawer({
           </details>
         </article>
       )}
+    </DrawerShell>
+  );
+}
+function DrawerShell({ inline, onClose, children }: { inline: boolean; onClose: () => void; children: ReactNode }) {
+  return inline ? (
+    <div className="experience-inline">{children}</div>
+  ) : (
+    <Modal title="经验详情" className="experience-management-drawer" onClose={onClose}>
+      {children}
     </Modal>
   );
 }

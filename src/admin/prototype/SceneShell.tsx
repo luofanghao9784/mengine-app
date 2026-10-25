@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { EngineStage3D } from '../../operations/engine-stage/EngineStage3D';
 import { busyDemo } from '../../operations/engine-demo';
-import { BusinessWork, OutputWork } from './BusinessWork';
+import { OutputWork } from './BusinessWork';
 import { useSceneRuntime, disconnectedTelemetry, type SceneRuntime } from './runtime';
 import { requestNavigationLocked } from '../../shared/request-guard';
 import type { EngineScene, Focus } from '../../operations/engine-stage/scene';
@@ -18,6 +18,10 @@ import { useKnowledge, type Knowledge } from './knowledge-api';
 import { api } from './foundation-api';
 import { GATES, GATE_OF, World, type WorldLabel } from './world';
 import { LabelLayout, type LabelBox } from './label-layout';
+import { MembersWork } from './MembersWork';
+import { UsageWork } from './UsageWork';
+import { CompanyWork } from './CompanyWork';
+import { ExperienceWork } from './ExperienceWork';
 import { scenePlace, sceneTenant, setSceneTenant, writeScenePlace } from './scene-route';
 import './scene-shell.css';
 import './glass-theme.css';
@@ -30,7 +34,10 @@ import './glass-theme.css';
  * - 导航是一条独立的深色栏，挂在卡片组上方，跟着卡片一起上下滑动；卡片升到顶时它正好在最顶部。
  */
 const MemoDataWork = memo(DataWork);
-const MemoBusinessWork = memo(BusinessWork);
+const MemoMembersWork = memo(MembersWork);
+const MemoUsageWork = memo(UsageWork);
+const MemoCompanyWork = memo(CompanyWork);
+const MemoExperienceWork = memo(ExperienceWork);
 const MemoWork = memo(Work);
 const SCENE: Place[] = ['home', 'data', 'knowledge', 'experience'];
 const SETTINGS: Place[] = ['members', 'usage', 'company'];
@@ -664,12 +671,14 @@ export function SceneShell({ tenant = null }: { tenant?: string | null }) {
             <Icon name="search" />
           </button>
         </nav>
-        {tenant && ['members', 'usage', 'company', 'experience'].includes(place) ? (
-          <MemoBusinessWork
-            key={place}
-            tenant={tenant}
-            place={place as 'members' | 'usage' | 'company' | 'experience'}
-          />
+        {tenant && place === 'members' ? (
+          <MemoMembersWork key={tenant} tenant={tenant} />
+        ) : tenant && place === 'usage' ? (
+          <MemoUsageWork key={tenant} tenant={tenant} />
+        ) : tenant && place === 'company' ? (
+          <MemoCompanyWork key={tenant} tenant={tenant} />
+        ) : tenant && place === 'experience' ? (
+          <MemoExperienceWork key={tenant} tenant={tenant} />
         ) : tenant && place === 'output' ? (
           <OutputWork tenant={tenant} />
         ) : place === 'members' ? (

@@ -730,7 +730,7 @@ export function Confirm({
     </div>
   );
 }
-function SpaceDetail({ tenant, id, onChange }: { tenant: string; id: string; onChange: () => void }) {
+export function SpaceDetail({ tenant, id, onChange }: { tenant: string; id: string; onChange: () => void }) {
   const [attempt, setAttempt] = useState(0);
   const data = useRemote(
     async (signal) => {
@@ -1149,7 +1149,7 @@ function SpaceOwnerRecords({ tenant, space }: { tenant: string; space: string })
   );
 }
 
-function MemberInviteForm({ tenant, done }: { tenant: string; done: () => void }) {
+export function MemberInviteForm({ tenant, done }: { tenant: string; done: () => void }) {
   const [phone, setPhone] = useState(''),
     [spaces, setSpaces] = useState<string[]>([]);
   const [page, setPage] = useState(0);

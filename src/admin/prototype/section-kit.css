@@ -1,0 +1,601 @@
+/*
+ * 成员与权限、用量与运行、企业信息、经验库：沿用工作卡片三栏（清单 / 详情 / 概况），
+ * 这里只补清单卡标题行、底部动作、宽卡模式，以及嵌入旧组件时的深色玻璃皮肤。
+ */
+.cards.work.section-work .card.list,
+.cards.work.section-work .card.wide-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.cards.work.section-work .list-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 28px;
+  padding: 12px 16px 6px;
+}
+.cards.work.section-work .list-head h2 {
+  margin: 0;
+  font: 500 12px/1.3 inherit;
+  font-family: inherit;
+  letter-spacing: 0.16em;
+  color: var(--ash);
+}
+.cards.work.section-work .head-search {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 9px;
+  background: rgb(255 255 255 / 7%);
+  color: var(--pearl);
+  font: inherit;
+  font-size: 13px;
+}
+.cards.work.section-work .head-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+.cards.work.section-work .head-tools select {
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 9px;
+  background: rgb(255 255 255 / 6%);
+  color: var(--ash);
+  font: inherit;
+  font-size: 12px;
+}
+.cards.work.section-work .head-tools select option {
+  background: #222a36;
+  color: #f3f6fa;
+}
+.cards.work.section-work .head-tools .icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ash);
+}
+.cards.work.section-work .head-tools .icon:hover {
+  background: rgb(255 255 255 / 9%);
+  color: var(--pearl);
+}
+.cards.work.section-work .head-tools svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+}
+.cards.work.section-work .tabs .num {
+  color: var(--dim);
+}
+.cards.work.section-work .card.list .card-scroll,
+.cards.work.section-work .card.wide-card .card-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.cards.work.section-work .chip.more-rows {
+  display: block;
+  margin: 8px auto 4px;
+}
+.cards.work.section-work .views {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 2px 16px 6px;
+}
+.cards.work.section-work .views button {
+  min-height: 26px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--dim);
+  font-size: 12px;
+}
+.cards.work.section-work .views button[aria-pressed='true'] {
+  background: rgb(236 201 138 / 14%);
+  color: var(--champagne);
+}
+.cards.work.section-work .list-foot {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px 14px;
+  border-top: 1px solid var(--hair);
+}
+.cards.work.section-work .list-foot button {
+  min-height: 34px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 10px;
+  background: rgb(236 201 138 / 14%);
+  color: #f8e7c6;
+}
+.cards.work.section-work .list-foot button:disabled {
+  opacity: 0.5;
+}
+.cards.work.section-work .list-foot small {
+  color: var(--dim);
+  font-size: 12px;
+}
+.cards.work.section-work .card.detail .note,
+.cards.work.section-work .notice {
+  margin: 10px 0 0;
+  color: var(--ash);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.cards.work.section-work .notice[role='alert'] {
+  color: #ffb9ad;
+}
+.cards.work.section-work .card.detail .related p {
+  margin: 4px 0 0;
+  color: var(--dim);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+.cards.work.section-work .card.detail footer button:disabled {
+  opacity: 0.45;
+}
+.cards.work.section-work .card.detail footer button.danger {
+  background: rgb(255 132 116 / 12%);
+  color: #ffc2b8;
+}
+.cards.work.section-work .fact b.num {
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+}
+.cards.work.section-work .facts .none {
+  margin: 6px 16px 12px;
+  color: var(--dim);
+  font-size: 12px;
+}
+
+/* 宽卡：内容本身是一整块（表单、记录），横跨清单和详情两栏 */
+.cards.work.section-work.wide .card.wide-card {
+  grid-column: span 2;
+}
+.cards.work.section-work .card-scroll.embedded {
+  padding: 12px 18px 16px;
+}
+
+/*
+ * 嵌入旧组件的深色玻璃皮肤：旧组件按主题变量取色，这里把变量换成场景外壳的颜色，
+ * 再压住少数写死白底、大字号的地方。只作用在 .legacy-skin 里面。
+ */
+.legacy-skin,
+body:has(.shell[data-place]) dialog.modal {
+  --ink: #eceae4;
+  --ink-2: #ada89e;
+  --ink-3: #8a8478;
+  --text: #eceae4;
+  --muted: #ada89e;
+  --text-secondary: #ada89e;
+  --canvas: transparent;
+  --surface: rgb(255 255 255 / 4%);
+  --surface-raised: #23221e;
+  --soft: rgb(255 255 255 / 5%);
+  --wash: rgb(255 255 255 / 6%);
+  --line: rgb(236 234 228 / 13%);
+  --card-edge: rgb(236 234 228 / 13%);
+  --glass-edge: rgb(236 234 228 / 13%);
+  --card-shadow: none;
+  --accent: #ecc98a;
+  --accent-hover: #f4dba9;
+  --accent-text: #1a150c;
+  --accent-soft: rgb(236 201 138 / 12%);
+  --selected: rgb(236 201 138 / 14%);
+  --blue-ink: #ecc98a;
+  --font-display: 17px;
+  --font-heading: 14px;
+  --font-body: 13px;
+  color: #eceae4;
+  color-scheme: dark;
+  font-size: 13px;
+  line-height: 1.65;
+}
+body:has(.shell[data-place]) dialog.modal {
+  border: 1px solid rgb(236 234 228 / 13%);
+  background: #1d1c19;
+}
+body:has(.shell[data-place]) dialog.modal::backdrop {
+  background: rgb(0 0 0 / 55%);
+}
+.legacy-skin
+  :is(
+    .admin-dashboard,
+    .access-panel,
+    .admin-card,
+    .admin-section,
+    .admin-panel,
+    .tenant-panel,
+    .usage-panel,
+    .empty-state,
+    .admin-detail-panel,
+    .governance-panel,
+    .platform-form,
+    .company-information,
+    .company-group
+  ) {
+  background: transparent;
+  color: inherit;
+  border-color: var(--line);
+  box-shadow: none;
+}
+.legacy-skin :is(.admin-section, .admin-card, .admin-panel, .tenant-panel, .company-group) {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgb(255 255 255 / 2.5%);
+}
+.legacy-skin :is(h1, h2) {
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--ink);
+}
+.legacy-skin h3 {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--ink);
+}
+.legacy-skin :is(.eyebrow, .admin-note, .muted, small, .platform-help) {
+  color: var(--ink-2);
+}
+.legacy-skin
+  :is(input:not([type='checkbox'], [type='radio']), select, textarea),
+body:has(.shell[data-place]) dialog.modal :is(input:not([type='checkbox'], [type='radio']), select, textarea) {
+  box-sizing: border-box;
+  max-width: 100%;
+  border: 0;
+  border-radius: 9px;
+  background: rgb(255 255 255 / 6%);
+  color: var(--ink);
+  font: inherit;
+}
+.legacy-skin select option,
+body:has(.shell[data-place]) dialog.modal select option {
+  background: #23221e;
+  color: #eceae4;
+}
+.legacy-skin :is(.button, button:not(.icon, .row)),
+body:has(.shell[data-place]) dialog.modal :is(.button, button) {
+  border: 0;
+  border-radius: 10px;
+  background: rgb(255 255 255 / 6%);
+  color: var(--ink);
+  box-shadow: none;
+}
+.legacy-skin :is(.button.primary, button.primary),
+body:has(.shell[data-place]) dialog.modal :is(.button.primary, button.primary) {
+  background: rgb(236 201 138 / 16%);
+  color: #f8e7c6;
+}
+.legacy-skin :is(.button.danger, button.danger),
+body:has(.shell[data-place]) dialog.modal :is(.button.danger, button.danger) {
+  background: rgb(255 132 116 / 14%);
+  color: #ffc2b8;
+}
+.legacy-skin :is(table, th, td) {
+  color: inherit;
+  border-color: var(--line);
+  background: transparent;
+}
+.legacy-skin th {
+  color: var(--ink-2);
+  font-weight: 400;
+}
+.legacy-skin a {
+  color: var(--accent);
+}
+.legacy-skin .badge {
+  border: 0;
+  background: rgb(255 255 255 / 7%);
+  color: #d6d2c8;
+}
+.legacy-skin .badge.blue {
+  background: rgb(159 224 194 / 12%);
+  color: #a8e3c6;
+}
+.legacy-skin [role='alert'],
+.legacy-skin .access-alert {
+  color: #ffb9ad;
+  background: transparent;
+}
+.legacy-skin .access-success {
+  color: #a8e3c6;
+  background: transparent;
+}
+.legacy-skin :is(details, fieldset) {
+  border-color: var(--line);
+}
+/* 旧版共享空间整行按钮、平台目录写死了白底 */
+.legacy-skin .platform-tenant-row {
+  background: transparent;
+  color: inherit;
+}
+/* 旧版数据访问、岗位与关注自带外框和标题，放进卡片后去掉 */
+.legacy-skin :is(.access-work, .work-roles) {
+  max-width: none;
+  height: auto;
+  overflow: visible;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  color: var(--ink);
+}
+.legacy-skin .work-roles > h2,
+.legacy-skin .work-roles > label:first-of-type,
+.legacy-skin .work-roles legend {
+  display: none;
+}
+.legacy-skin .work-roles p {
+  margin: 6px 0;
+  color: var(--ink-3);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+.legacy-skin .work-roles h3 {
+  margin: 16px 0 4px;
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  color: var(--ink-2);
+}
+.legacy-skin .work-roles label {
+  gap: 6px;
+  margin: 12px 0;
+  color: var(--ink-2);
+  font-size: 12.5px;
+}
+.legacy-skin .work-roles :is(input:not([type='checkbox']), textarea) {
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+.legacy-skin .work-roles fieldset {
+  margin: 8px 0 0;
+  padding: 0;
+  border: 0;
+}
+.legacy-skin input[type='checkbox'] {
+  accent-color: #ecc98a;
+}
+.legacy-skin .work-roles button {
+  margin-top: 6px;
+  min-height: 36px;
+  padding: 0 16px;
+  background: rgb(236 201 138 / 14%);
+  color: #f8e7c6;
+}
+.legacy-skin .access-work form {
+  display: grid;
+  gap: 10px;
+}
+.legacy-skin .access-work label {
+  display: grid;
+  gap: 6px;
+  color: var(--ink-2);
+  font-size: 12.5px;
+}
+.legacy-skin .access-work :is(select, textarea, input:not([type='checkbox'])) {
+  width: min(100%, 620px);
+  padding: 7px 10px;
+}
+.legacy-skin .access-work fieldset {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.legacy-skin .access-work fieldset label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.legacy-skin .access-work button {
+  justify-self: start;
+  min-height: 34px;
+  padding: 0 14px;
+}
+body:has(.shell[data-place]) dialog.modal > header {
+  border-bottom: 1px solid rgb(236 234 228 / 13%);
+  background: transparent;
+  color: #eceae4;
+}
+body:has(.shell[data-place]) dialog.modal > header h2 {
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: #eceae4;
+}
+body:has(.shell[data-place]) dialog.modal > header button {
+  background: transparent;
+  color: #ada89e;
+}
+body:has(.shell[data-place]) dialog.modal .modal-content {
+  background: transparent;
+  color: #eceae4;
+}
+body:has(.shell[data-place]) dialog.modal :is(p, label, small, .muted) {
+  color: #ada89e;
+}
+
+/* ---- 用量与运行 ---- */
+.cards.work.section-work .metric-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+.cards.work.section-work .metric-tiles > div {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgb(255 255 255 / 3.5%);
+}
+.cards.work.section-work .metric-tiles dt {
+  font-size: 12px;
+  color: var(--ash);
+}
+.cards.work.section-work .metric-tiles dd {
+  margin: 4px 0 2px;
+  font-family: inherit;
+  font-size: 22px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--pearl);
+}
+.cards.work.section-work .metric-tiles small {
+  font-size: 11.5px;
+  color: var(--dim);
+}
+.cards.work.section-work td.num {
+  font-variant-numeric: tabular-nums;
+  color: var(--pearl);
+}
+.usage-work .usage-chart {
+  flex: none;
+  padding: 8px 18px 12px;
+  border-top: 1px solid var(--hair);
+}
+.usage-work .usage-chart .bars {
+  height: 96px;
+  display: flex;
+  align-items: stretch;
+  gap: 3px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--hair);
+  background-image: linear-gradient(var(--hair) 1px, transparent 1px);
+  background-size: 100% 33.4%;
+}
+.usage-work .usage-chart button {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 1px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px 4px 0 0;
+  background: transparent;
+  cursor: pointer;
+}
+.usage-work .usage-chart button:hover,
+.usage-work .usage-chart button[aria-pressed='true'] {
+  background: rgb(255 255 255 / 5%);
+}
+.usage-work .usage-chart i {
+  display: block;
+  width: min(7px, 45%);
+  min-height: 1px;
+  border-radius: 2px 2px 0 0;
+  background: rgb(236 201 138 / 55%);
+}
+.usage-work .usage-chart i.maintenance {
+  background: rgb(214 226 238 / 35%);
+}
+.usage-work .usage-chart button[aria-pressed='true'] i:not(.maintenance) {
+  background: var(--champagne);
+}
+.usage-work .usage-chart em {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -17px;
+  font-style: normal;
+  font-size: 10px;
+  color: var(--dim);
+  text-align: center;
+}
+.usage-work .usage-chart p {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--dim);
+}
+.usage-work .usage-chart p i {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin: 0 2px 0 6px;
+  border-radius: 2px;
+}
+.usage-work .usage-chart p i:first-child {
+  margin-left: 0;
+}
+.usage-work .usage-details .usage-section {
+  margin: 10px 0 0;
+  padding: 12px 14px;
+}
+.cards.work.section-work .fact b.text {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--ash);
+}
+
+/* ---- 企业信息 ---- */
+.company-work .tag-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+}
+.company-work .tag-list button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 12px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: rgb(255 255 255 / 3.5%);
+  color: var(--pearl);
+  text-align: left;
+  cursor: pointer;
+}
+.company-work .tag-list button:hover {
+  background: rgb(255 255 255 / 7%);
+}
+.company-work .tag-list b {
+  font-weight: 500;
+}
+.company-work .tag-list span {
+  grid-column: 1;
+  font-size: 12.5px;
+  color: var(--ash);
+}
+.company-work .tag-list small {
+  grid-column: 2;
+  grid-row: 1;
+  font-size: 11.5px;
+  color: var(--dim);
+}
+.cards.work.section-work .section-note {
+  margin: 0 0 10px;
+  color: var(--dim);
+  font-size: 12px;
+}

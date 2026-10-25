@@ -6,9 +6,8 @@ import type { Place } from './data';
  * - 当前企业由外壳传入；数据接口 api() 从这里取，不再读地址栏的 ?tenant=。
  */
 const PLACES: Place[] = ['home', 'data', 'knowledge', 'experience', 'members', 'usage', 'company'];
-/** 这几个板块里嵌着旧版管理台，它自己在 hash 里记 admin/detail/tab 等参数；离开时一并清掉。 */
-const BUSINESS: Place[] = ['members', 'usage', 'company', 'experience'];
-const BUSINESS_KEYS = ['admin', 'detail', 'tab', 'member', 'period', 'section'];
+/** 板块自己在 hash 里记的栏目、选中项等参数（含旧版管理台的 admin/detail 等）；换板块时一并清掉。 */
+const SECTION_KEYS = ['admin', 'detail', 'tab', 'member', 'period', 'section', 'item', 'flow', 'space', 'view', 'version', 'experience', 'scope'];
 
 export function scenePlace(hash = location.hash): Place | null {
   const p = new URLSearchParams(hash.replace(/^#/, '')).get('place');
@@ -21,7 +20,7 @@ export function writeScenePlace(place: Place, replace = false) {
   if (params.get('place') === place) return;
   const leaving = params.get('place');
   params.set('place', place);
-  if (leaving && !BUSINESS.includes(place)) for (const key of BUSINESS_KEYS) params.delete(key);
+  if (leaving) for (const key of SECTION_KEYS) params.delete(key);
   if (replace) history.replaceState(history.state, '', '#' + params);
   else location.hash = params.toString();
 }

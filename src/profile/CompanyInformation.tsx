@@ -158,7 +158,7 @@ export function CompanyInformation({ tenant }: { tenant: string }) {
     </div>
   );
 }
-function analysisSummary(status: CompanyAnalysisStatus) {
+export function analysisSummary(status: CompanyAnalysisStatus) {
   const labels = {
     DISABLED: '自动整理未启用',
     PROCESSING: '正在自动整理企业信息',
@@ -177,7 +177,7 @@ function analysisSummary(status: CompanyAnalysisStatus) {
     '。人工调整优先保留。'
   );
 }
-function CompanyEditor({
+export function CompanyEditor({
   tenant,
   group,
   tag,

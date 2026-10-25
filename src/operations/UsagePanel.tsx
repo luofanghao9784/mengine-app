@@ -18,20 +18,20 @@ import { uuid } from '../identity/client';
 import { usageClient as api } from './usage-client';
 import { usageTrendState } from './usage-presentation';
 import './usage.css';
-const numbers = (v: number | null) => (v === null ? '未知' : v.toLocaleString('zh-CN'));
+export const numbers = (v: number | null) => (v === null ? '未知' : v.toLocaleString('zh-CN'));
 const names: Record<UsageClass, string> = {
   live: '正式执行',
   verification: '合成验证',
   unknown: '执行类别未知',
 };
-const periods: Record<UsagePeriod, string> = {
+export const periods: Record<UsagePeriod, string> = {
   THIS_MONTH: '本月',
   LAST_MONTH: '上月',
   LAST_30_DAYS: '近 30 天',
 };
-const time = (s: string, zone: string) =>
+export const time = (s: string, zone: string) =>
   new Date(s).toLocaleString('zh-CN', { timeZone: zone, hour12: false });
-const byte = (n: number) =>
+export const byte = (n: number) =>
   n < 1024
     ? `${n} B`
     : n < 1024 ** 2
@@ -183,8 +183,8 @@ function ScopedUsage({
     </div>
   );
 }
-function CompactUsageFacts({ value: v, cost }: { value: UsageOverview; cost?: UsageCost }) {
-  const overall = v.tenantId === null;
+/** 正式执行的汇总口径：企业管理端的用量卡片与这里的紧凑版共用。 */
+export function summarizeUsage(v: UsageOverview) {
   const work = v.groups.find((g) => g.purpose === 'WORK' && g.executionClass === 'live');
   const maintenance = v.groups.find((g) => g.purpose === 'MAINTENANCE' && g.executionClass === 'live');
   const live = v.groups.filter((g) => g.executionClass === 'live');
@@ -199,6 +199,11 @@ function CompactUsageFacts({ value: v, cost }: { value: UsageOverview; cost?: Us
     (g) => g.reportedUnits < g.units || g.inputTokens === null || g.outputTokens === null,
   );
   const tools = v.tools.find((t) => t.executionClass === 'live');
+  return { work, maintenance, input, output, tokens, incomplete, tools };
+}
+function CompactUsageFacts({ value: v, cost }: { value: UsageOverview; cost?: UsageCost }) {
+  const overall = v.tenantId === null;
+  const { work, maintenance, input, output, tokens, incomplete, tools } = summarizeUsage(v);
   return (
     <>
       <dl className="usage-metrics">
@@ -282,7 +287,7 @@ function CompactUsageFacts({ value: v, cost }: { value: UsageOverview; cost?: Us
     </>
   );
 }
-function UsageFacts({
+export function UsageFacts({
   value: v,
   cost,
   detailedOnly = false,
@@ -498,7 +503,7 @@ function CostSummary({ cost }: { cost: UsageCost }) {
     </section>
   );
 }
-function Trend({
+export function Trend({
   days,
   platform,
   showDailyValues = true,
