@@ -149,3 +149,66 @@ export function syntheticNativeEvents(start = Date.UTC(2026, 9, 27, 1, 0, 0)): N
     }),
   ];
 }
+
+/** Synthetic long-task progress (batch two): goal, to-dos, background job, sub-task, workflow, plan review. */
+export function syntheticWorkEvents(afterSeq: number, start = Date.UTC(2026, 9, 27, 1, 10, 0)): NativeEvent[] {
+  let seq = afterSeq;
+  const e = (type: string, minutes: number, data: unknown): NativeEvent => ({
+    type,
+    seq: ++seq,
+    time: start + minutes * 60_000,
+    data,
+  });
+  return [
+    e('goal/change', 0, {
+      kind: 'goal/change',
+      version: 1,
+      operation: 'create',
+      roundsStarted: 1,
+      goal: { objective: '十月底前把荔星中心店的收款差异全部核清', phase: 'active', maxGoalRounds: 8 },
+    }),
+    e('todo/write', 0, {
+      todos: [
+        { content: '核对 3 笔已上传凭证的收款', status: 'completed' },
+        { content: '联系郑西补齐 10月19日 800 元的凭证', status: 'in_progress' },
+        { content: '整理给店长的最终说明', status: 'pending' },
+      ],
+    }),
+    e('job/registered', 1, { jobId: 'job-1', owner: 's1', kind: 'bash', label: '汇总十月收款明细表', startedAt: start + 60_000 }),
+    e('job/settled', 3, {
+      jobId: 'job-1',
+      owner: 's1',
+      kind: 'bash',
+      label: '汇总十月收款明细表',
+      startedAt: start + 60_000,
+      finishedAt: start + 180_000,
+      status: 'completed',
+      cause: 'exit',
+      producerReported: true,
+    }),
+    e('job/registered', 4, { jobId: 'job-2', owner: 's1', kind: 'bash', label: '比对财务确认台账', startedAt: start + 240_000 }),
+    e('subagent/catalog', 4, { childId: 'child-1', childCreatedAt: start + 240_000, version: 1, mode: 'continuable', label: '凭证核对助手' }),
+    e('tool-workflow/run-start', 5, { runId: 'wf-1', name: '五店收款对账' }),
+    e('tool-workflow/agent-start', 5, { runId: 'wf-1', seq: 1, label: '梵华里店', phase: '对账' }),
+    e('tool-workflow/agent-end', 6, { runId: 'wf-1', seq: 1, outcome: 'completed' }),
+    e('tool-workflow/agent-start', 6, { runId: 'wf-1', seq: 2, label: '荔星中心店', phase: '对账' }),
+    e('plan/mode', 7, { active: true }),
+    e('tool/call', 7, {
+      turn: 2,
+      step: 2,
+      callId: 'plan-1',
+      name: 'ask_user_question',
+      arguments: JSON.stringify({
+        questions: [
+          {
+            id: 'plan',
+            header: '计划审阅',
+            question: '计划：1. 先补齐缺失凭证；2. 再请财务复核 3 笔待确认收款；3. 最后更新给店长的说明。是否按此执行？',
+            options: [{ label: '按计划执行' }, { label: '需要修改' }],
+            intent: { kind: 'plan-review', approve: '按计划执行', callId: 'plan-1' },
+          },
+        ],
+      }),
+    }),
+  ];
+}

@@ -4,6 +4,7 @@ import {
   Download,
   ExternalLink,
   FolderCog,
+  ListChecks,
   Pause,
   Play,
   RefreshCw,
@@ -25,6 +26,8 @@ import { nativeSessionTitle } from './labels';
 import { NativeChat } from './chat/NativeChat';
 import { useNativeFeed } from './chat/useNativeFeed';
 import { buildTranscript } from './chat/transcript.ts';
+import { buildWorkState, hasWork } from './chat/work.ts';
+import { NativeWorkPanel, workSummary } from './chat/NativeWorkPanel';
 import './native-conversation.css';
 
 const oldConversationHref = (tenant: string, id: string) =>
@@ -93,8 +96,22 @@ export function NativeConversationView({
   // 平台接通事件转发（B1）后，会话直接在这张卡片里进行；在此之前保持“执行与成果”的现有布局。
   const feed = useNativeFeed(tenant, id);
   const transcript = useMemo(() => (feed ? buildTranscript(feed.events) : null), [feed]);
+  const work = useMemo(() => (feed ? buildWorkState(feed.events) : null), [feed]);
+  useEffect(() => {
+    // ⌘/Ctrl + Shift + O opens a new native session (one of the four agreed shortcuts).
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'o' && !isNew) {
+        e.preventDefault();
+        location.hash = nativeHref(tenant, 'new');
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [tenant, isNew]);
   const [manageOpen, setManageOpen] = useState(true);
+  const [workOpen, setWorkOpen] = useState(true);
   const chat = !!(feed && transcript && session);
+  const showWork = chat && !!work && hasWork(work);
   const title = isNew
     ? '新建原生会话'
     : transcript?.title || (session ? nativeSessionTitle(session, titles) : '原生会话');
@@ -129,27 +146,48 @@ export function NativeConversationView({
         </>
       }
       headerActions={
-        chat && !manageOpen ? (
-          <IconButton icon={FolderCog} label="执行与成果" onClick={() => setManageOpen(true)} />
+        chat && (!manageOpen || (showWork && !workOpen)) ? (
+          <>
+            {showWork && !workOpen && (
+              <IconButton icon={ListChecks} label="任务进展" onClick={() => setWorkOpen(true)} />
+            )}
+            {!manageOpen && (
+              <IconButton icon={FolderCog} label="执行与成果" onClick={() => setManageOpen(true)} />
+            )}
+          </>
         ) : undefined
       }
       onClose={() => {
         location.hash = '#tenant=' + tenant + '&view=briefing';
       }}
-      cards={
-        chat && manageOpen
+      cards={[
+        ...(showWork && workOpen && work
+          ? [
+              {
+                id: 'native-work',
+                kind: 'file' as const,
+                tag: '进展' as const,
+                title: '任务进展',
+                label: '任务进展',
+                content: <NativeWorkPanel work={work} />,
+                close: () => setWorkOpen(false),
+              },
+            ]
+          : []),
+        ...(chat && manageOpen
           ? [
               {
                 id: 'native-manage',
-                kind: 'file',
+                kind: 'file' as const,
+                tag: '成果' as const,
                 title: '执行与成果',
                 label: '执行与成果',
                 content: <div className="native-reader-body">{detail}</div>,
                 close: () => setManageOpen(false),
               },
             ]
-          : []
-      }
+          : []),
+      ]}
     >
       <section className="conversation-reader native-reader">
         <header className="deck-card-header live-card-heading">
@@ -166,7 +204,13 @@ export function NativeConversationView({
                 预览数据：用于在本地查看界面，不是真实会话，操作不会发送到服务器。
               </p>
             )}
-            <NativeChat transcript={transcript} status={feed.status} actions={feed.actions} />
+            <NativeChat
+              transcript={transcript}
+              status={feed.status}
+              actions={feed.actions}
+              summary={work ? workSummary(work) : ''}
+              skills={feed.skills}
+            />
           </>
         ) : (
           <div className="native-reader-body">

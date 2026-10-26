@@ -38,6 +38,8 @@ export type CompanionCard = {
   expand?: () => void;
   title: string;
   label: string;
+  /** Type label on the card header; defaults by kind. */
+  tag?: '资料' | '画报' | '进展' | '成果';
   content: ReactNode;
   close: () => void;
 };
@@ -552,7 +554,7 @@ export function LiveConversationDeck({
             >
               <header className="deck-card-header live-card-heading">
                 <div>
-                  <CardTypeTag type={card.kind === 'source' ? '画报' : '资料'} />
+                  <CardTypeTag type={card.tag ?? (card.kind === 'source' ? '画报' : '资料')} />
                   <h2 title={card.title}>{card.title}</h2>
                 </div>
                 <div className="live-card-actions">

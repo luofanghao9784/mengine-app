@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import type { NativeEvent } from './events.ts';
-import type { NativeChatActions, NativeStatus } from './NativeChat';
+import type { NativeChatActions, NativeSkill, NativeStatus } from './NativeChat';
 
 export type NativeFeed = {
   events: NativeEvent[];
   status?: NativeStatus;
   actions: NativeChatActions;
+  /** Skills the employee may call with `/`; supplied by the platform's skill list (B5). */
+  skills?: NativeSkill[];
   /** Synthetic development data; the page labels it so it is never mistaken for a real session. */
   preview: boolean;
 };

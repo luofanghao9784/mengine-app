@@ -6,8 +6,10 @@ import {
   CircleAlert,
   CircleStop,
   FileText,
+  ListChecks,
   Loader2,
   ShieldQuestion,
+  Sparkles,
   ThumbsDown,
   ThumbsUp,
   Wrench,
@@ -17,6 +19,7 @@ import { ReplyText } from '../../conversation/ReplyText';
 import type { QuestionAnswer, QuestionItem } from './events.ts';
 import type { Item, ToolItem, Transcript, Turn } from './transcript.ts';
 import { toolLabel, toolSummary } from './tools.ts';
+import { maskSecrets } from './secrets.ts';
 import './native-chat.css';
 
 /** Budget and run state come from the platform (B3); absent fields are simply not shown. */
@@ -37,6 +40,9 @@ export type NativeChatActions = {
   feedback?: (messageKey: string, value: 'up' | 'down') => Promise<void>;
 };
 
+/** A skill the employee can call from the composer by typing `/`. */
+export type NativeSkill = { name: string; description?: string };
+
 const unavailable = '运行环境接通后可用';
 const failure = (e: unknown) => (e instanceof Error ? e.message : '操作未完成，请稍后重试。');
 
@@ -44,10 +50,15 @@ export function NativeChat({
   transcript,
   status,
   actions,
+  summary = '',
+  skills = [],
 }: {
   transcript: Transcript;
   status?: NativeStatus;
   actions: NativeChatActions;
+  /** One-line long-task progress, e.g. "待办 1/3 · 后台 1 个进行中". */
+  summary?: string;
+  skills?: NativeSkill[];
 }) {
   const running = status?.running ?? transcript.running;
   const scroll = useRef<HTMLDivElement>(null);
@@ -57,8 +68,23 @@ export function NativeChat({
     if (el && el.scrollHeight - el.scrollTop - el.clientHeight < 160) el.scrollTop = el.scrollHeight;
   }, [transcript.lastSeq]);
   return (
-    <div className="native-chat">
-      <NativeStatusBar running={running} status={status} maintenance={transcript.maintenance} />
+    <div
+      className="native-chat"
+      onKeyDown={(e) => {
+        // Esc stops the current round, like the official window; it never closes the page.
+        if (e.key === 'Escape' && running && actions.stop && !e.defaultPrevented) {
+          e.preventDefault();
+          void actions.stop().catch(() => undefined);
+        }
+      }}
+    >
+      <NativeStatusBar
+        running={running}
+        status={status}
+        maintenance={transcript.maintenance}
+        pending={transcript.pending}
+        summary={summary}
+      />
       <div className="native-chat-scroll conversation-messages" ref={scroll} aria-live="polite">
         {!transcript.turns.length && (
           <p className="native-empty">在下面输入你想处理的工作，原生会话会在这里展开。</p>
@@ -67,7 +93,7 @@ export function NativeChat({
           <NativeTurn key={`${turn.turn}:${index}`} turn={turn} actions={actions} />
         ))}
       </div>
-      <NativeComposer running={running} actions={actions} />
+      <NativeComposer running={running} actions={actions} skills={skills} />
     </div>
   );
 }
@@ -76,11 +102,16 @@ function NativeStatusBar({
   running,
   status,
   maintenance,
+  pending,
+  summary,
 }: {
   running: boolean;
   status?: NativeStatus;
   maintenance: Transcript['maintenance'];
+  pending: Transcript['pending'];
+  summary: string;
 }) {
+  const waiting = pending.approvals + pending.questions;
   const budget = status?.budget;
   const level = budget
     ? budget.usedYuan >= budget.hardYuan
@@ -104,6 +135,17 @@ function NativeStatusBar({
           {maintenance === 'compacting' ? '正在整理上下文…' : '模型重试中…'}
         </span>
       )}
+      {waiting > 0 && (
+        <span className="native-waiting">
+          {pending.planReview ? '计划等你审阅' : `${waiting} 项等你处理`}
+        </span>
+      )}
+      {summary && (
+        <span className="native-progress">
+          <ListChecks size={13} aria-hidden="true" />
+          {summary}
+        </span>
+      )}
       {budget && (
         <span className={`native-budget is-${level}`} title="本任务已用费用；软阈值提醒，硬上限暂停">
           已用 ¥{budget.usedYuan.toFixed(2)} · 提醒 ¥{budget.softYuan} · 上限 ¥{budget.hardYuan}
@@ -120,7 +162,7 @@ function NativeTurn({ turn, actions }: { turn: Turn; actions: NativeChatActions 
     <article className="conversation-turn native-turn">
       {turn.prompts.map((p) => (
         <p key={p.id} className="conversation-user">
-          {p.text}
+          {maskSecrets(p.text)}
           {p.attachments > 0 && <small className="native-attachments">附件 {p.attachments} 个</small>}
         </p>
       ))}
@@ -358,12 +400,24 @@ function NativeQuestionCard({
       return { ...p, [q.id]: next };
     });
   const ready = item.questions.every((q) => (picked[q.id]?.length ?? 0) > 0 || custom[q.id]?.trim());
+  const plan = item.questions.some((q) => q.intent?.kind === 'plan-review');
   return (
-    <div className={`native-card native-question ${item.answered ? 'is-settled' : 'is-pending'}`}>
+    <div
+      className={`native-card native-question ${plan ? 'is-plan' : ''} ${item.answered ? 'is-settled' : 'is-pending'}`}
+    >
       <header>
-        <ShieldQuestion size={15} aria-hidden="true" />
-        {item.answered ? '已回答' : 'AI 在等你回答'}
+        {plan ? <ListChecks size={15} aria-hidden="true" /> : <ShieldQuestion size={15} aria-hidden="true" />}
+        {plan
+          ? item.answered
+            ? '计划已审阅'
+            : 'AI 拟好了执行计划，等你审阅'
+          : item.answered
+            ? '已回答'
+            : 'AI 在等你回答'}
       </header>
+      {plan && !item.answered && (
+        <p className="native-muted">选择按计划执行，或写下需要调整的地方；在你确认之前不会开始执行。</p>
+      )}
       {item.answered ? (
         <p className="native-muted">{item.answer || '已提交回答。'}</p>
       ) : (
@@ -389,7 +443,7 @@ function NativeQuestionCard({
               ))}
               <input
                 className="native-custom"
-                placeholder="其他回答（可选）"
+                placeholder={q.intent?.kind === 'plan-review' ? '需要调整的地方（可选）' : '其他回答（可选）'}
                 value={custom[q.id] ?? ''}
                 onChange={(e) => setCustom((c) => ({ ...c, [q.id]: e.target.value }))}
               />
@@ -402,11 +456,13 @@ function NativeQuestionCard({
               title={actions.answer ? undefined : unavailable}
               onClick={() => submit(false)}
             >
-              提交回答
+              {plan ? '提交审阅' : '提交回答'}
             </Button>
-            <Button variant="ghost" onClick={() => submit(true)}>
-              跳过
-            </Button>
+            {!plan && (
+              <Button variant="ghost" onClick={() => submit(true)}>
+                跳过
+              </Button>
+            )}
           </div>
         </fieldset>
       )}
@@ -445,11 +501,33 @@ function NativeFeedback({ messageKey, actions }: { messageKey: string; actions: 
   );
 }
 
-function NativeComposer({ running, actions }: { running: boolean; actions: NativeChatActions }) {
+function NativeComposer({
+  running,
+  actions,
+  skills,
+}: {
+  running: boolean;
+  actions: NativeChatActions;
+  skills: NativeSkill[];
+}) {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [active, setActive] = useState(0);
+  const [dismissed, setDismissed] = useState(false);
   const composing = useRef(false);
+  const input = useRef<HTMLTextAreaElement>(null);
+  // `/` at the start of the box opens the skill list; the typed word filters it.
+  const slash = /^\/(\S*)$/.exec(text);
+  const matches = slash
+    ? skills.filter((k) => k.name.toLowerCase().includes(slash[1].toLowerCase())).slice(0, 8)
+    : [];
+  const menu = !dismissed && !!slash && skills.length > 0;
+  const pick = (skill: NativeSkill) => {
+    setText(`/${skill.name} `);
+    setActive(0);
+    input.current?.focus();
+  };
   const send = async () => {
     if (!actions.send || !text.trim() || busy) return;
     setBusy(true);
@@ -476,18 +554,77 @@ function NativeComposer({ running, actions }: { running: boolean; actions: Nativ
           {error}
         </p>
       )}
+      {menu && (
+        <ul className="native-skill-menu" role="listbox" id="native-skill-menu" aria-label="技能">
+          {matches.length ? (
+            matches.map((skill, i) => (
+              <li
+                key={skill.name}
+                role="option"
+                id={`native-skill-${i}`}
+                aria-selected={i === active}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  pick(skill);
+                }}
+                onMouseEnter={() => setActive(i)}
+              >
+                <Sparkles size={14} aria-hidden="true" />
+                <span>
+                  {skill.name}
+                  {skill.description && <small>{skill.description}</small>}
+                </span>
+              </li>
+            ))
+          ) : (
+            <li className="native-muted">没有匹配的技能</li>
+          )}
+        </ul>
+      )}
       <div className="native-composer-box">
         <textarea
+          ref={input}
           aria-label="工作要求"
+          aria-controls={menu ? 'native-skill-menu' : undefined}
+          aria-activedescendant={menu && matches.length ? `native-skill-${active}` : undefined}
           rows={1}
           maxLength={8000}
           value={text}
           disabled={!actions.send}
-          placeholder={actions.send ? '告诉我你想处理的工作' : `${unavailable}；目前请在官方会话窗口里发送`}
-          onChange={(e) => setText(e.target.value)}
+          placeholder={
+            actions.send
+              ? skills.length
+                ? '告诉我你想处理的工作，输入 / 调用技能'
+                : '告诉我你想处理的工作'
+              : `${unavailable}；目前请在官方会话窗口里发送`
+          }
+          onChange={(e) => {
+            setText(e.target.value);
+            setActive(0);
+            setDismissed(false);
+          }}
           onCompositionStart={() => (composing.current = true)}
           onCompositionEnd={() => (composing.current = false)}
           onKeyDown={(e) => {
+            if (menu && !composing.current && !e.nativeEvent.isComposing) {
+              if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (matches.length)
+                  setActive((i) => (i + (e.key === 'ArrowDown' ? 1 : matches.length - 1)) % matches.length);
+                return;
+              }
+              if ((e.key === 'Enter' || e.key === 'Tab') && matches[active]) {
+                e.preventDefault();
+                pick(matches[active]);
+                return;
+              }
+              if (e.key === 'Escape') {
+                // Close the list only; Esc to stop the round applies when no list is open.
+                e.preventDefault();
+                setDismissed(true);
+                return;
+              }
+            }
             if (e.key === 'Enter' && !e.shiftKey && !composing.current && !e.nativeEvent.isComposing) {
               e.preventDefault();
               void send();
