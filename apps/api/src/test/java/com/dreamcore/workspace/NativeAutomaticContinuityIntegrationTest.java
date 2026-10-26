@@ -163,13 +163,14 @@ class NativeAutomaticContinuityIntegrationTest extends TaskDatasetFixture {
         assertEquals(release,releases.currentFor(owner,tenant,dataset).getFirst().releaseId());
         assertFalse(foundation.detail(owner,tenant,"dataset-"+dataset).path("asset").path("checksPassed").asBoolean());
     }
-    @Test void confirmedContractAutomaticallyPublishesAndReusesDefinitionsWithoutModelJobs() throws Exception {
-        var entries=declaredFields.stream().map(f -> Map.of("datasetId",dataset.toString(),"column",f.get("column"),"declaredUnit",f.get("unit"),"definitionScope","BUSINESS_DEFINITION","sourceMetadata",Map.of("definition",f.get("meaning")),"proof",List.of(Map.of("snippet",f.get("evidence"))))).toList();
+    @Test void modelContractWithoutEvidenceAutomaticallyPublishesAndReusesDefinitionsWithoutModelJobs() throws Exception {
+        var entries=declaredFields.stream().map(f -> Map.of("datasetId",dataset.toString(),"column",f.get("column"),"declaredUnit",f.get("unit"),"definitionScope","BUSINESS_DEFINITION","sourceMetadata",Map.of("definition",f.get("meaning")),"status","MODEL_DETERMINED")).toList();
+        schema=schema.stream().map(r -> {var copy=new HashMap<String,Object>(r);copy.remove("evidence");return (Map<String,Object>)copy;}).toList();
         String body=json.writeValueAsString(Map.of("columns",columns(),"scopeHash","a".repeat(64),"entries",entries,"schema",schema));
         var contract=new com.dreamcore.workspace.collection.CollectionAdapter.SourceContract("1.0",tenant,dataset,1,IdentityService.hash(body),body);
         var approved=new ArrayList<>(schema);
         approved.add(Map.of("kind","source-contract","datasetId",dataset.toString(),"definitionVersion",1,"definitionSha256",contract.definitionSha256()));
-        Files.writeString(evidence,json.writeValueAsString(Map.of("tenantId",tenant.toString(),"entries",entries,"schema",approved)));
+        Files.writeString(evidence,json.writeValueAsString(Map.of("tenantId",tenant.toString(),"entries",List.of(),"schema",List.of())));
         snapshot=version(2,List.of(List.of("合成门店","12.50")));receipt(snapshot,"a".repeat(64));
         db.update("UPDATE collection_snapshot_receipts SET source_contract=?::jsonb WHERE snapshot_id=?",json.writeValueAsString(contract),snapshot);
         assertTrue(sourcePublication.reconcile(owner,tenant,dataset));
@@ -184,6 +185,11 @@ class NativeAutomaticContinuityIntegrationTest extends TaskDatasetFixture {
         assertTrue(governance.analysisReadiness(owner,tenant,dataset).ready());
         datasetKnowledge.reconcile(owner,tenant,dataset);
         assertEquals(1,db.queryForObject("SELECT count(*) FROM dataset_knowledge_publications WHERE tenant_id=? AND state='PUBLISHED'",Integer.class,tenant));
+        String changedBody=body.replace(declaredFields.getFirst().get("meaning").toString(), "修订后的来源业务定义");
+        var changed=new com.dreamcore.workspace.collection.CollectionAdapter.SourceContract("1.0",tenant,dataset,2,IdentityService.hash(changedBody),changedBody);
+        db.update("UPDATE collection_snapshot_receipts SET source_contract=?::jsonb WHERE snapshot_id=?",json.writeValueAsString(changed),snapshot);
+        assertTrue(releases.currentFor(owner,tenant,dataset).isEmpty(),"transported meaning changes invalidate previous publication without local pins");
+        db.update("UPDATE collection_snapshot_receipts SET source_contract=?::jsonb WHERE snapshot_id=?",json.writeValueAsString(contract),snapshot);
         snapshot=version(3,List.of(List.of("合成门店","invalid")));receipt(snapshot,"a".repeat(64));
         db.update("UPDATE collection_snapshot_receipts SET source_contract=?::jsonb WHERE snapshot_id=?",json.writeValueAsString(contract),snapshot);
         assertFalse(sourcePublication.reconcile(owner,tenant,dataset));
@@ -201,14 +207,12 @@ class NativeAutomaticContinuityIntegrationTest extends TaskDatasetFixture {
         // Opting into delivery does not invalidate an unchanged published definition; it does require a fresh receipt.
         assertEquals(release,releases.currentFor(owner,tenant,dataset).getFirst().releaseId());
         var missing=foundation.detail(owner,tenant,"dataset-"+dataset).path("asset");
-        assertFalse(missing.path("automaticAnalysisReady").asBoolean());
-        assertTrue(missing.toString().contains("当前批次未附带已认可的来源定义"));
-        assertEquals("GOVERNANCE_SOURCE_CONTRACT_REQUIRED",assertThrows(IdentityException.class,()->governance.execute(owner,tenant,new GovernanceModelService.Execute(UUID.randomUUID(),"DATASET",dataset,"SYSTEM_MODEL"))).code);
+        assertTrue(missing.path("automaticAnalysisReady").asBoolean(),"legacy local pins no longer impose an approval gate");
         snapshot=version(2,List.of(List.of("合成门店","12.50")));receipt(snapshot,"a".repeat(64));
         db.update("UPDATE collection_snapshot_receipts SET source_contract=?::jsonb WHERE snapshot_id=?",json.writeValueAsString(contract),snapshot);
         assertTrue(governance.analysisReadiness(owner,tenant,dataset).ready());
         assertEquals(release,releases.currentFor(owner,tenant,dataset).getFirst().releaseId());
-        assertFalse(governance.analysisReadiness(owner,tenant,dataset,oldSnapshot).ready());
+        assertTrue(governance.analysisReadiness(owner,tenant,dataset,oldSnapshot).ready());
         snapshot=version(3,List.of(List.of("合成门店","invalid-decimal")));receipt(snapshot,"a".repeat(64));
         db.update("UPDATE collection_snapshot_receipts SET source_contract=?::jsonb WHERE snapshot_id=?",json.writeValueAsString(contract),snapshot);
         assertEquals("SOURCE_VALIDATION_FAILED",governance.analysisReadiness(owner,tenant,dataset).reason());

@@ -27,9 +27,9 @@ final class GovernedFieldContext {
     private static final int BLOCK_LIMIT = 3000;
 
     private static final String GOVERNED_USAGE =
-        "人工发布后确认的字段口径，仅用于解读，不改变计算规则。status=SOURCE_DOCUMENTED 表示已核对；"
+        "已发布字段口径，可直接用于解读，不改变计算规则。MODEL_DETERMINED 表示采集端模型判定，SOURCE_DOCUMENTED 表示来源有据；"
             + "UNKNOWN 表示口径未确认，不得据列名推断金额、单位或业务状态，也不得因此拒绝计算。"
-            + "记录粒度、主键与唯一性同样须有来源依据；不要把一行自动解释成一张账单、一次交易或一个客户。按源字段计算后保留这些限制。";
+            + "记录粒度按已发布定义使用，主键与唯一性按实际声明规则检查。";
     private static final String UNGOVERNED_USAGE =
         "该数据集尚未发布治理口径；字段含义与单位以部署定义为准，不得据列名推断金额或业务状态。";
 
@@ -72,7 +72,7 @@ final class GovernedFieldContext {
                         "column", column,
                         "meaning", truncate(meaning),
                         "unit", truncate(field.path("unit").asText("").strip()),
-                        "status", "UNKNOWN".equals(field.path("status").asText("")) ? "UNKNOWN" : "SOURCE_DOCUMENTED");
+                        "status", field.path("status").asText("UNKNOWN"));
                     used += column.length() + String.valueOf(entry.get("meaning")).length() + String.valueOf(entry.get("unit")).length();
                     if (used > BLOCK_LIMIT) break;
                     fields.add(entry);

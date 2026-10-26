@@ -42,7 +42,7 @@ public class DatasetKnowledgeService {
         var current=releases.currentFor(actor,tenant,dataset);
         if(current.isEmpty()) { stale(tenant,dataset,"SOURCE_GOVERNANCE_REQUIRED"); return; }
         var release=current.getFirst();
-        if(release.fields().isEmpty() || release.fields().stream().anyMatch(f -> !"SOURCE_DOCUMENTED".equals(f.status()) || f.meaning().isBlank() || f.evidence().isBlank())) {
+        if(release.fields().isEmpty() || release.fields().stream().anyMatch(f -> "UNKNOWN".equals(f.status()) || f.meaning().isBlank())) {
             stale(tenant,dataset,"SOURCE_FIELDS_UNCONFIRMED"); return;
         }
         var readiness=governance.analysisReadiness(actor,tenant,dataset);

@@ -223,7 +223,7 @@ public class GovernanceModelService {
       Map<String,Object> values = DeclaredValueChecks.check(columns, rows, schema);
       if (!Set.of("CHECKED", "NOT_CONFIGURED").contains(contract.get("state"))) {
          return Map.of("state", "SOURCE_CONTRACT_REQUIRED", "sourceContract", contract, "exportValidation", export,
-             "scope", "当前快照缺少已认可版本的来源定义，或定义与部署认可版本不一致；保留原始记录，暂停自动分析");
+             "scope", "当前快照的来源定义与身份、字段、范围或内容摘要不一致；保留原始记录，暂停自动分析");
       }
       if (schema.stream().noneMatch(e -> Set.of("column", "constraint", "value-rule").contains(e.getOrDefault("kind", "")))) {
          return Map.of("state", "NO_SOURCE_CONSTRAINTS", "sourceContract", contract, "exportValidation", export,
@@ -385,11 +385,12 @@ public class GovernanceModelService {
       boolean configured = !this.sourceEvidence(tenant, dataset, data.get("name").toString(), "schema").isEmpty()
           || !this.sourceEvidence(tenant, dataset, data.get("name").toString(), "entries").isEmpty()
           || Boolean.TRUE.equals(this.db.queryForObject("SELECT EXISTS(SELECT 1 FROM governance_model_jobs WHERE tenant_id=? AND kind='DATASET' AND source_id=? UNION ALL SELECT 1 FROM native_governance_releases WHERE tenant_id=? AND EXISTS(SELECT 1 FROM jsonb_array_elements(package->'items') i WHERE i->>'datasetId'=?))", Boolean.class, tenant, dataset, tenant, dataset.toString()));
+      configured = configured || Boolean.TRUE.equals(this.db.queryForObject("SELECT EXISTS(SELECT 1 FROM collection_snapshot_receipts WHERE tenant_id=? AND dataset_id=? AND source_contract IS NOT NULL)", Boolean.class, tenant, dataset));
       if (!configured) return new AnalysisReadiness("DEPLOYMENT_SOURCE", null);
       var definitions = snapshot == null ? this.releases.currentFor(actor, tenant, dataset) : this.releases.currentForSnapshot(actor, tenant, dataset, snapshot);
       if (definitions.isEmpty()) return new AnalysisReadiness("GOVERNANCE_REQUIRED", "SOURCE_GOVERNANCE_REQUIRED");
       var release = definitions.getFirst();
-      if (release.fields().stream().anyMatch(f -> !"SOURCE_DOCUMENTED".equals(f.status())))
+      if (release.fields().stream().anyMatch(f -> "UNKNOWN".equals(f.status())))
          return new AnalysisReadiness(release.releaseId()+":FIELDS_UNKNOWN", "SOURCE_FIELDS_UNCONFIRMED");
       var currentSource = this.source(actor, tenant, "DATASET", dataset, snapshot);
       var checks = this.json.valueToTree(currentSource.get("checks"));

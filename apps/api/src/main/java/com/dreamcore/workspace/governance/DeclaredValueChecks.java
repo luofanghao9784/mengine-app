@@ -17,7 +17,7 @@ public final class DeclaredValueChecks {
             int index=columns.indexOf(rule.get("column"));
             String type=Objects.toString(rule.get("type"),"");
             if(index<0 || !Set.of("TEXT","DECIMAL","DATE","ENUM","PREFIX_DECIMAL","ORDINAL").contains(type)
-                || !(rule.get("id") instanceof String) || !(rule.get("evidence") instanceof String proof) || proof.isBlank()
+                || !(rule.get("id") instanceof String)
                 || !(rule.get("nullable") instanceof Boolean)) throw new IdentityException(503,"GOVERNANCE_RULES_INVALID");
             var allowed=rule.get("values") instanceof List<?> values?values:List.of();
             if(type.equals("ENUM") && (allowed.isEmpty() || allowed.size()>100)) throw new IdentityException(503,"GOVERNANCE_RULES_INVALID");
@@ -41,7 +41,7 @@ public final class DeclaredValueChecks {
                 if(!valid) failed++;
             }
             violations+=failed;
-            results.add(Map.of("id",rule.get("id"),"column",rule.get("column"),"type",type,"state",failed==0?"CHECKED":"VIOLATIONS", "examined",examined,"violations",failed,"evidence",proof));
+            results.add(Map.of("id",rule.get("id"),"column",rule.get("column"),"type",type,"state",failed==0?"CHECKED":"VIOLATIONS", "examined",examined,"violations",failed,"evidence",Objects.toString(rule.get("evidence"),"采集端声明规则" )));
         }
         return Map.of("state",violations==0?"CHECKED":"VIOLATIONS","rules",results,"violations",violations,
             "scope","仅已声明的字段类型、值域及格式；未声明的跨表、金额勾稽和到账规则不视为已检查");

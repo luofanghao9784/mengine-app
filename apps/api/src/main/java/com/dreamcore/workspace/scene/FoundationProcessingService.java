@@ -189,7 +189,7 @@ public class FoundationProcessingService {
    }
 
    static List<String> datasetStageStates(boolean collected, List<DatasetField> fields) {
-      boolean explained = collected && !fields.isEmpty() && fields.stream().allMatch(f -> "SOURCE_DOCUMENTED".equals(f.status()));
+      boolean explained = collected && !fields.isEmpty() && fields.stream().allMatch(f -> !"UNKNOWN".equals(f.status()));
       return List.of(
          collected ? "READY" : "WAITING",
          collected ? "READY" : "WAITING",

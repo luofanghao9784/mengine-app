@@ -8,7 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.*;
 import tools.jackson.databind.json.JsonMapper;
 
-/** Publishes only installed, approved source definitions; never infers missing business facts. */
+/** Publishes collector definitions after independent current-batch checks. */
 @Service
 public class SourceContractPublicationService {
     private final JdbcTemplate db;
@@ -20,6 +20,8 @@ public class SourceContractPublicationService {
     }
     @Transactional(isolation=Isolation.REPEATABLE_READ)
     public boolean reconcile(UUID actor,UUID tenant,UUID dataset) {
+        // Match governance publication/briefing lock order: tenant before any dataset row.
+        if(db.queryForList("SELECT id FROM tenants WHERE id=? AND status='ACTIVE' FOR UPDATE",tenant).isEmpty()) return false;
         if(!db.queryForList("SELECT dataset_id FROM collection_delivery_waits WHERE tenant_id=? AND dataset_id=?",tenant,dataset).isEmpty()) return false;
         var source=json.valueToTree(governance.currentDatasetSource(actor,tenant,dataset));
         var checks=source.path("checks");
@@ -34,9 +36,9 @@ public class SourceContractPublicationService {
         if(!"READY".equals(SourceBusinessPreflight.check(new CollectionAdapter.Snapshot(dataset,null,values,null,contract),columns))) return false;
         var fields=fields(contract,columns);
         // Reuse a current fully documented release; currentFor also checks definition/background drift.
-        if(releases.currentFor(actor,tenant,dataset).stream().anyMatch(p -> !p.fields().isEmpty() && p.fields().stream().allMatch(f -> "SOURCE_DOCUMENTED".equals(f.status())))) return true;
+        if(releases.currentFor(actor,tenant,dataset).stream().anyMatch(p -> !p.fields().isEmpty() && p.fields().stream().allMatch(f -> Set.of("SOURCE_DOCUMENTED","MODEL_DETERMINED","DEPLOYMENT_INFERRED").contains(f.status())))) return true;
         var context=releases.definitionContext(actor,tenant,List.of(dataset));
-        var item=new NativeGovernanceDeployment.Item(dataset,context.sources().getFirst().token(),fields,"",List.of("已认可来源定义第 "+contract.definitionVersion()+" 版；本批导出接收及已声明规则独立核验通过"));
+        var item=new NativeGovernanceDeployment.Item(dataset,context.sources().getFirst().token(),fields,"",List.of("采集端来源定义第 "+contract.definitionVersion()+" 版；本批导出接收及已声明规则独立核验通过"));
         var identity=json.writeValueAsString(List.of(tenant,actor,context.backgroundVersion(),item));
         UUID id=UUID.nameUUIDFromBytes(identity.getBytes(StandardCharsets.UTF_8));
         releases.submit(new NativeGovernanceDeployment.Package("1.2",id,tenant,actor,context.backgroundVersion(),List.of(item)),true);
@@ -64,7 +66,7 @@ public class SourceContractPublicationService {
                 String value=proof.path("snippet").asText(proof.path("locator").asText());
                 if(!value.isBlank() && value.length()<=300) {evidence=value;break;}
             }
-            fields.add(new DatasetField(column,type,meaning,entry.path("declaredUnit").asText(),evidence,"SOURCE_DOCUMENTED"));
+            fields.add(new DatasetField(column,type,meaning,entry.path("declaredUnit").asText(),evidence,"MODEL_DETERMINED".equals(entry.path("status").asText()) ? "MODEL_DETERMINED" : evidence.isBlank() ? "DEPLOYMENT_INFERRED" : "SOURCE_DOCUMENTED"));
         }
         DatasetField.validate(columns,fields);
         return List.copyOf(fields);

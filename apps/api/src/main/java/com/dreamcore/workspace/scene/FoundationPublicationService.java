@@ -71,7 +71,7 @@ public class FoundationPublicationService {
 
          for (Map.Entry<String, Map.Entry<UUID, List<DatasetField>>> c : candidates.entrySet()) {
             if (c.getValue().getKey().equals(r.get("id"))) {
-               List<String> unknown = c.getValue().getValue().stream().filter(f -> !"SOURCE_DOCUMENTED".equals(f.status())).map(DatasetField::column).toList();
+               List<String> unknown = c.getValue().getValue().stream().filter(f -> "UNKNOWN".equals(f.status())).map(DatasetField::column).toList();
                String parsing = "MATERIAL".equals(r.get("kind")) ? input.path("parserStatus").asText() : "READY";
                ArrayList<String> warnings = new ArrayList<>();
                ArrayList<String> limitations = new ArrayList<>();

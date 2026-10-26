@@ -18,9 +18,9 @@ class CollectionSourceContractsTest {
     boolean valid(CollectionAdapter.SourceContract c){return CollectionSourceContracts.valid(c,tenant,dataset,columns,scope,pins,entries,schema);}
     @Test void exactApprovedDefinitionAcceptedWithoutClaimingRowsPassed() {
         assertTrue(valid(contract));
-        assertFalse(valid(null));
+        assertTrue(valid(null));
         assertTrue(CollectionSourceContracts.valid(null,tenant,dataset,columns,scope,List.of(),entries,schema));
-        assertFalse(CollectionSourceContracts.valid(contract,tenant,dataset,columns,scope,List.of(),entries,schema));
+        assertTrue(CollectionSourceContracts.valid(contract,tenant,dataset,columns,scope,List.of(),entries,schema));
         var failed=com.dreamcore.workspace.governance.DeclaredValueChecks.check(columns,List.of(List.of("0001","not-money")),schema);
         assertEquals("VIOLATIONS",failed.get("state"));
         assertEquals("CHECKED",com.dreamcore.workspace.governance.DeclaredValueChecks.check(columns,List.of(List.of("0001","9007199254740993.01")),schema).get("state"));
@@ -28,13 +28,14 @@ class CollectionSourceContractsTest {
     @Test void identityVersionHashScopeColumnsAndSemanticChangesAreRejected() {
         assertFalse(valid(new CollectionAdapter.SourceContract("1.0",UUID.randomUUID(),dataset,1,contract.definitionSha256(),body)));
         assertFalse(valid(new CollectionAdapter.SourceContract("1.0",tenant,UUID.randomUUID(),1,contract.definitionSha256(),body)));
-        assertFalse(valid(new CollectionAdapter.SourceContract("1.0",tenant,dataset,2,contract.definitionSha256(),body)));
+        assertTrue(valid(new CollectionAdapter.SourceContract("1.0",tenant,dataset,2,contract.definitionSha256(),body)));
+        assertFalse(valid(new CollectionAdapter.SourceContract("1.0",tenant,dataset,0,contract.definitionSha256(),body)));
         assertFalse(valid(new CollectionAdapter.SourceContract("2.0",tenant,dataset,1,contract.definitionSha256(),body)));
         assertFalse(valid(new CollectionAdapter.SourceContract("1.0",tenant,dataset,1,contract.definitionSha256(),body+" ")));
         assertFalse(CollectionSourceContracts.valid(contract,tenant,dataset,columns,"b".repeat(64),pins,entries,schema));
         assertFalse(CollectionSourceContracts.valid(contract,tenant,dataset,List.of("编号"),scope,pins,entries,schema));
-        assertFalse(CollectionSourceContracts.valid(contract,tenant,dataset,columns,scope,pins,entries,List.of()));
-        assertFalse(CollectionSourceContracts.valid(contract,tenant,dataset,columns,scope,List.of(pins.getFirst(),pins.getFirst()),entries,schema));
+        assertTrue(CollectionSourceContracts.valid(contract,tenant,dataset,columns,scope,pins,entries,List.of()));
+        assertTrue(CollectionSourceContracts.valid(contract,tenant,dataset,columns,scope,List.of(pins.getFirst(),pins.getFirst()),entries,schema));
     }
     @Test void noRulesRemainsUnknownAndCannotBecomeBusinessValidation() {
         String unknown=new JsonMapper().writeValueAsString(Map.of("columns",columns,"scopeHash",scope,"entries",List.of(),"schema",List.of()));

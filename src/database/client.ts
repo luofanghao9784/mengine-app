@@ -78,7 +78,7 @@ const dataset = (v: unknown): v is BusinessDataset =>
           text(f.meaning) &&
           typeof f.unit === 'string' &&
           text(f.evidence) &&
-          ['SOURCE_DOCUMENTED', 'DEPLOYMENT_INFERRED', 'UNKNOWN'].includes(String(f.status)),
+          ['SOURCE_DOCUMENTED', 'DEPLOYMENT_INFERRED', 'MODEL_DETERMINED', 'UNKNOWN'].includes(String(f.status)),
       )));
 import type { DatasetLifecycle } from '../../contracts/public-api/collection.ts';
 export type { DatasetLifecycle } from '../../contracts/public-api/collection.ts';

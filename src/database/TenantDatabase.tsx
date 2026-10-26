@@ -414,6 +414,7 @@ function DatasetDetail({ tenant, id, hash }: { tenant: string; id: string; hash:
                           {
                             {
                               SOURCE_DOCUMENTED: '来源有据',
+                              MODEL_DETERMINED: '模型判定',
                               DEPLOYMENT_INFERRED: '部署推断',
                               UNKNOWN: '尚不明确',
                             }[f.status]

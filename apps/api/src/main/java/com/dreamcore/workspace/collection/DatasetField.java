@@ -18,8 +18,8 @@ public record DatasetField(String column,String type,String meaning,String unit,
         if(fields.size()!=columns.size()||JSON.writeValueAsString(fields).length()>24000)throw new IllegalArgumentException("Field definitions must cover deployed columns within bounds");
         for(int i=0;i<fields.size();i++) {
             var f=fields.get(i);
-            if(f==null||!columns.get(i).equals(f.column())||f.status()==null||!Set.of("SOURCE_DOCUMENTED","DEPLOYMENT_INFERRED","UNKNOWN").contains(f.status()))throw new IllegalArgumentException("Invalid deployed field scope");
-            text(f.type(),40,true);text(f.meaning(),300,true);text(f.unit(),40,false);text(f.evidence(),300,true);
+            if(f==null||!columns.get(i).equals(f.column())||f.status()==null||!Set.of("SOURCE_DOCUMENTED","DEPLOYMENT_INFERRED","MODEL_DETERMINED","UNKNOWN").contains(f.status()))throw new IllegalArgumentException("Invalid deployed field scope");
+            text(f.type(),40,true);text(f.meaning(),300,true);text(f.unit(),40,false);text(f.evidence(),300,false);
         }
     }
 }

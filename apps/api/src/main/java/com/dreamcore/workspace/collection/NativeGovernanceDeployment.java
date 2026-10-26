@@ -36,6 +36,7 @@ public class NativeGovernanceDeployment {
    private final Environment env;
    @Autowired
    private NativeMaterialGovernance materialGovernance;
+   @Autowired private CollectionSourceContracts sourceContracts;
    private final JsonMapper json = new JsonMapper();
    @org.springframework.beans.factory.annotation.Value("${dreamcore.governance.source-evidence:}")
    private String evidencePath = "";
@@ -142,8 +143,8 @@ public class NativeGovernanceDeployment {
    private String definitionEvidence(UUID tenant, UUID dataset, Map<String,Object> row) {
       String name = row.get("name").toString();
       boolean unique = this.db.queryForObject("SELECT count(*) FROM business_datasets WHERE tenant_id=? AND name=? AND status='ACTIVE' AND NOT scrubbed", Integer.class, tenant, name) == 1;
-      var entries = GovernanceSourceEvidence.read(evidencePath, tenant, dataset, name, "entries", unique);
-      var schema = GovernanceSourceEvidence.read(evidencePath, tenant, dataset, name, "schema", unique).stream()
+      var entries = sourceContracts.section(evidencePath, tenant, dataset, (UUID)row.get("current_snapshot"), "entries");
+      var schema = sourceContracts.section(evidencePath, tenant, dataset, (UUID)row.get("current_snapshot"), "schema").stream()
           .filter(item -> !Set.of("export-validation", "source-contract").contains(item.getOrDefault("kind", ""))).toList();
       return IdentityService.hash(this.json.writeValueAsString(canonical(List.of(row.get("connection_id"), row.get("dataset_key"), name,
           Objects.toString(row.get("description"), ""), this.sourceScope(tenant, dataset, row), entries, schema))));

@@ -43,7 +43,7 @@ public final class NativeAnalysisPlans {
                         !execution.path("dateFrom").asText().isEmpty()||!execution.path("dateTo").asText().isEmpty()||
                         execution.path("dateColumn").asText().isEmpty())throw new IllegalArgumentException();
                     String dateColumn=execution.path("dateColumn").asText();
-                    if(fields.stream().noneMatch(f->f.column().equals(dateColumn)&&"SOURCE_DOCUMENTED".equals(f.status())&&Set.of("date","datetime","timestamp").contains(f.type().toLowerCase(Locale.ROOT))))throw new IllegalArgumentException();
+                    if(fields.stream().noneMatch(f->f.column().equals(dateColumn)&&!"UNKNOWN".equals(f.status())&&Set.of("date","datetime","timestamp").contains(f.type().toLowerCase(Locale.ROOT))))throw new IllegalArgumentException();
                     YearMonth month=YearMonth.from(taskCreatedAt.atZone(ZoneId.of("Asia/Shanghai")));
                     if("PREVIOUS_MONTH".equals(window))month=month.minusMonths(1);
                     var fixed=(tools.jackson.databind.node.ObjectNode)execution.deepCopy();
@@ -55,7 +55,7 @@ public final class NativeAnalysisPlans {
                 var used=new HashSet<String>();plan.path("groupColumns").forEach(c->used.add(c.asText()));
                 if(sum)used.add(value);if(!plan.path("dateColumn").asText().isEmpty())used.add(plan.path("dateColumn").asText());
                 plan.path("equalsFilters").properties().forEach(e->used.add(e.getKey()));
-                for(String column:used)if(!columns.contains(column)||fields.stream().noneMatch(f->f.column().equals(column)&&"SOURCE_DOCUMENTED".equals(f.status())))throw new IllegalArgumentException();
+                for(String column:used)if(!columns.contains(column)||fields.stream().noneMatch(f->f.column().equals(column)&&!"UNKNOWN".equals(f.status())))throw new IllegalArgumentException();
                 if(sum&&fields.stream().noneMatch(f->f.column().equals(value)&&Set.of("decimal","numeric","number","integer").contains(f.type().toLowerCase(Locale.ROOT))&&f.unit().equals(d.path("unit").asText())))throw new IllegalArgumentException();
                 var definition=resolved;definition.set("execution",plan);
                 var req=MetricPlan.request(definition,dataset,snapshot,null,1);

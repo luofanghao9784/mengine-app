@@ -166,7 +166,7 @@ public class BriefingContentService {
         if("CENTS_TO_YUAN".equals(calc.request().conversion()))unit="元";
         else if(!countRows && nativeGovernance!=null && calc.request().metricId()==null) {
             for(var publication:nativeGovernance.currentForSnapshot(job.actor(),job.tenant(),source.datasetId(),source.snapshotId()))
-                for(var field:publication.fields())if(field.column().equals(calc.request().valueColumn())&&"SOURCE_DOCUMENTED".equals(field.status())&&!field.unit().isBlank())unit=field.unit();
+                for(var field:publication.fields())if(field.column().equals(calc.request().valueColumn())&&!"UNKNOWN".equals(field.status())&&!field.unit().isBlank())unit=field.unit();
         }
         var chart=new Chart("GROUPED_BAR",metric,unit,summary?"不适用":calc.request().baseline(),summary?"本次汇总":calc.request().current(),calc.request().dateColumn()==null?"全部快照 · "+source.rowCount()+" 行":"日期筛选 · "+calc.matchedRows()+" 行 · 缺日 "+calc.missingDateRows()+" 行",calc.rows(),calc.totals(),shares);
         if(calc.matchedRows()==0)throw new NoUsefulData();

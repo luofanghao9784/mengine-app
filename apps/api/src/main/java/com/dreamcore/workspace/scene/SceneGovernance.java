@@ -17,7 +17,7 @@ public final class SceneGovernance {
   for(var source:asset.path("fieldEvidence"))if(source.path("column").asText().equals(name)){
    status=source.path("status").asText("UNKNOWN");evidence=source.path("reference").asText(evidence);
   }
-  if(!Set.of("SOURCE_DOCUMENTED","DEPLOYMENT_INFERRED","UNKNOWN").contains(status))status="generated".equals(asset.path("dictionaryStatus").asText())?"DEPLOYMENT_INFERRED":"UNKNOWN";
+  if(!Set.of("SOURCE_DOCUMENTED","DEPLOYMENT_INFERRED","MODEL_DETERMINED","UNKNOWN").contains(status))status="generated".equals(asset.path("dictionaryStatus").asText())?"DEPLOYMENT_INFERRED":"UNKNOWN";
   // An explicit UNKNOWN/INFERRED marker always defeats an optimistic status.
   if(evidence.contains("DEPLOYMENT_INFERRED"))status="DEPLOYMENT_INFERRED";
   else if(evidence.equals("UNKNOWN")||evidence.isBlank())status="UNKNOWN";

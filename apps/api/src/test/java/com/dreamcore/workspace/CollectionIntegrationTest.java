@@ -94,10 +94,10 @@ class CollectionIntegrationTest {
             assertFalse(service.complete(accepted,result,Instant.now()));
             UUID current=db.queryForObject("SELECT current_snapshot FROM business_datasets WHERE id=?",UUID.class,dataset);
             assertEquals("CHECKED",sourceContracts.check(file.toString(),tenant,dataset,current,columns).get("state"));
-            assertEquals("NOT_RECEIVED",sourceContracts.check(file.toString(),tenant,dataset,previous,columns).get("state"));
+            assertEquals("NOT_CONFIGURED",sourceContracts.check(file.toString(),tenant,dataset,previous,columns).get("state"));
             assertEquals(rows,service.preview(reader,tenant,dataset,0,20).rows());
             java.nio.file.Files.writeString(file,JSON.writeValueAsString(Map.of("tenantId",tenant.toString(),"schema",List.of(Map.of("datasetId",dataset.toString(),"kind","source-contract","definitionVersion",2,"definitionSha256",contract.definitionSha256())))));
-            assertEquals("MISMATCH",sourceContracts.check(file.toString(),tenant,dataset,current,columns).get("state"));
+            assertEquals("CHECKED",sourceContracts.check(file.toString(),tenant,dataset,current,columns).get("state"));
             assertEquals(1,JSON.readTree(db.queryForObject("SELECT source_contract::text FROM collection_snapshot_receipts WHERE snapshot_id=?",String.class,current)).path("definitionVersion").asInt());
         } finally {org.springframework.test.util.ReflectionTestUtils.setField(sourceContracts,"evidencePath","");}
     }

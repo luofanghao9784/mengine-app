@@ -17,6 +17,15 @@ class SourceBusinessPreflightTest {
         assertEquals("WAITING_SOURCE_DEFINITION",SourceBusinessPreflight.check(snapshot(List.of(),rules(),List.of(List.of("001"))),columns));
         assertEquals("WAITING_SOURCE_DEFINITION",SourceBusinessPreflight.check(snapshot(entries(),List.of(),List.of(List.of("001"))),columns));
     }
+    @Test void modelDefinitionsWithoutSourceProofCanPublishButBadRowsStillFail() {
+        var entry=new HashMap<>(entries().getFirst());entry.remove("proof");entry.put("status","MODEL_DETERMINED");
+        var rule=new HashMap<>(rules().getFirst());rule.remove("evidence");
+        var snapshot=snapshot(List.of(entry),List.of(rule),List.of(List.of("001")));
+        assertEquals("READY",SourceBusinessPreflight.check(snapshot,columns));
+        var field=SourceContractPublicationService.fields(snapshot.sourceContract(),columns).getFirst();
+        assertEquals("MODEL_DETERMINED",field.status());assertEquals("",field.evidence());
+        assertEquals("SOURCE_DATA_REQUIRES_REVIEW",SourceBusinessPreflight.check(snapshot(List.of(entry),List.of(rule),List.of(List.of("003"))),columns));
+    }
     @Test void currentRowsAreValidatedIndependently(){
         assertEquals("SOURCE_DATA_REQUIRES_REVIEW",SourceBusinessPreflight.check(snapshot(entries(),rules(),List.of(List.of("003"))),columns));
         var pk=new ArrayList<>(rules());pk.add(Map.of("kind","column","name","编号","key","PRI"));

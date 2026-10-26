@@ -16,8 +16,7 @@ public final class SourceBusinessPreflight {
             var schema=(List<Map<String,Object>>)body.get("schema");
             var known=new HashSet<String>();
             for(var e:entries) if("BUSINESS_DEFINITION".equals(e.get("definitionScope"))
-                    && e.get("sourceMetadata") instanceof Map<?,?> m && m.get("definition") instanceof String definition && !definition.isBlank()
-                    && e.get("proof") instanceof List<?> proofs && proofs.stream().anyMatch(p -> p instanceof Map<?,?> m2 && (m2.get("snippet") instanceof String s && !s.isBlank() || m2.get("locator") instanceof String l && !l.isBlank()))) known.add((String)e.get("column"));
+                    && e.get("sourceMetadata") instanceof Map<?,?> m && m.get("definition") instanceof String definition && !definition.isBlank()) known.add((String)e.get("column"));
             var covered=new HashSet<String>();
             for(var r:schema) if("value-rule".equals(r.get("kind"))) covered.add((String)r.get("column"));
             if(!known.equals(new HashSet<>(columns)) || !covered.equals(new HashSet<>(columns))) return "WAITING_SOURCE_DEFINITION";

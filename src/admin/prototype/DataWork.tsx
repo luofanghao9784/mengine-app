@@ -26,7 +26,7 @@ function BackgroundSourceCard({ tenant, selected, onSelect }: { tenant: string; 
 function dictionaryNotice(warning: string, fields: { name: string; label: string }[]) {
   const match = warning
     .trim()
-    .match(/^(?:(.+?)\s*[:：]\s*)?(DEPLOYMENT_INFERRED|UNKNOWN|SOURCE_DOCUMENTED)$/);
+    .match(/^(?:(.+?)\s*[:：]\s*)?(DEPLOYMENT_INFERRED|MODEL_DETERMINED|UNKNOWN|SOURCE_DOCUMENTED)$/);
   if (match) {
     const field = fields.find((item) => item.name === match[1]);
     const label = field?.label || (field ? field.name : '该字段');
@@ -35,6 +35,7 @@ function dictionaryNotice(warning: string, fields: { name: string; label: string
         '当前解释来自部署时的推断，尚待业务依据核实。用于分析前，请确认字段含义和使用范围。',
       UNKNOWN: '当前缺少足够的字段解释依据。用于分析前，请补充业务含义和使用范围。',
       SOURCE_DOCUMENTED: '字段解释已有来源依据，使用时请核对适用范围。',
+      MODEL_DETERMINED: '字段含义与规则由采集端模型判定，可直接使用。',
     }[match[2]];
     return `${label}：${message}`;
   }
@@ -421,7 +422,7 @@ export function DataWork({
     '数据从来源系统进入数据基座：取数频率、最近一次取数和每次取数留下的批次。',
     '把来源内容拆成结构化记录与字段，并记录每个处理阶段。',
     a?.kind === 'table'
-      ? '采集端在交付前核对字段业务含义、单位和规则；梦擎按已认可的来源定义独立复核。缺少依据时在采集端继续补证。'
+      ? '采集端在交付前核对字段业务含义、单位和规则；梦擎按本批携带的来源定义独立复核，无需预先认可版本。缺少依据时在采集端继续补证。'
       : '资料由输入模型自动生成标签与摘要，不需要字段口径。',
     a?.nativeGovernance ? '检查说明：口径不变时沿用已发布版本；每批独立核对来源定义、已声明规则及导出接收依据。缺少依据、版本不符与规则异常分别提示。' : '检查必填、格式、敏感信息和口径冲突；有问题的记录被隔离，不影响其他记录使用。',
     a?.nativeGovernance ? '当前快照检查通过后，按已发布口径提供给 AI；记录规则检查不代表银行到账、利润或真实逾期本金已核实。' : '通过检查的记录提供给 AI 查询；隔离记录不参与。',

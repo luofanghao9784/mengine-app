@@ -56,7 +56,7 @@ public class DatasetTaskContext {
                 context.put("fieldDefinitions", current.fields().stream().filter(f -> visible.contains(f.column())).toList());
                 context.put("definitionOrigin", "PUBLISHED_GOVERNANCE");
                 var units = new LinkedHashMap<String,String>();
-                current.fields().stream().filter(f -> columns.contains(f.column()) && "SOURCE_DOCUMENTED".equals(f.status()) && !f.unit().isBlank())
+                current.fields().stream().filter(f -> columns.contains(f.column()) && !"UNKNOWN".equals(f.status()) && !f.unit().isBlank())
                     .limit(40).forEach(f -> units.put(f.column(), f.unit()));
                 context.put("publishedFieldUnits", units);
                 boolean legacy=Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM scene_asset_revisions WHERE tenant_id=? AND target_id=? AND kind='TABLE')",Boolean.class,t.get("tenant_id"),d.get("id")));
