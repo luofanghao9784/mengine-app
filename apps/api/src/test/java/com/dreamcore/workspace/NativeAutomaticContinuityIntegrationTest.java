@@ -128,6 +128,22 @@ class NativeAutomaticContinuityIntegrationTest extends TaskDatasetFixture {
         assertTrue(datasetKnowledge.current(owner,tenant).isEmpty());
     }
 
+    @Test void unavailableHistoricalReleaseDoesNotRollbackCurrentKnowledgePage() {
+        UUID release=publish();
+        datasetKnowledge.reconcile(owner,tenant,dataset);
+        var historical=json.readTree(db.queryForObject("SELECT package::text FROM native_governance_releases WHERE id=?",String.class,release));
+        UUID oldRelease=UUID.randomUUID();
+        ((tools.jackson.databind.node.ObjectNode)historical).put("id",oldRelease.toString());
+        ((tools.jackson.databind.node.ObjectNode)historical.path("items").get(0)).put("datasetId",UUID.randomUUID().toString());
+        db.update("INSERT INTO native_governance_releases(id,tenant_id,recipient_id,fingerprint,package) VALUES (?,?,?,?,?::jsonb)",oldRelease,tenant,owner,IdentityService.hash(historical.toString()),historical.toString());
+        var page=knowledgeScene.snapshot(owner,tenant);
+        assertEquals(1,page.path("items").size());
+        assertEquals(0,page.path("pending").asInt());
+        // Removing the remaining current source must produce an empty page, not a 500.
+        db.update("UPDATE business_datasets SET status='WITHDRAWN' WHERE id=?",dataset);
+        assertEquals(0,knowledgeScene.snapshot(owner,tenant).path("items").size());
+    }
+
     @Test void changedBackgroundImmediatelyHidesOldKnowledge() {
         publish();datasetKnowledge.reconcile(owner,tenant,dataset);
         company.change(owner,tenant,new CompanyInformationService.Change(UUID.randomUUID(),CompanyInformationService.Field.BUSINESS,0,"ADD",null,"新版合成业务",""));

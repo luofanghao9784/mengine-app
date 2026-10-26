@@ -251,32 +251,33 @@ public class NativeGovernanceDeployment {
    }
 
    public Object read(UUID actor, UUID tenant, UUID id) {
-      return this.tx
-         .execute(
-            t -> {
-               List<Map<String, Object>> rows = this.db
-                  .queryForList(
-                     "SELECT package FROM native_governance_releases WHERE id=? AND tenant_id=? AND recipient_id=headquarters_permission_actor(?,?)",
-                     new Object[]{id, tenant, actor, tenant}
-                  );
-               if (rows.isEmpty()) {
-                  throw new IdentityException(404, "GOVERNANCE_RELEASE_NOT_FOUND");
-               }
+      return this.tx.execute(t -> this.readInside(actor, tenant, id));
+   }
 
-               NativeGovernanceDeployment.Package p = (NativeGovernanceDeployment.Package)this.json
-                  .readValue(rows.getFirst().get("package").toString(), NativeGovernanceDeployment.Package.class);
-               NativeGovernanceDeployment.Context ctx = this.contextInside(
-                  actor, tenant, p.items().stream().map(NativeGovernanceDeployment.Item::datasetId).toList(), null, "1.2".equals(p.contractVersion())
-               );
-               boolean valid = ctx.backgroundVersion().equals(p.backgroundVersion()) && this.materialsCurrent(actor, tenant, p);
-
-               for (int i = 0; i < p.items().size(); i++) {
-                  valid &= ctx.sources().get(i).token().equals(p.items().get(i).token());
-               }
-
-               return valid ? Map.of("state", "CURRENT", "release", p) : Map.of("state", "STALE", "id", id);
-            }
+   // Call within an existing transaction when an unavailable historical source is expected.
+   // Catching outside TransactionTemplate would leave the shared transaction rollback-only.
+   private Object readInside(UUID actor, UUID tenant, UUID id) {
+      List<Map<String, Object>> rows = this.db
+         .queryForList(
+            "SELECT package FROM native_governance_releases WHERE id=? AND tenant_id=? AND recipient_id=headquarters_permission_actor(?,?)",
+            new Object[]{id, tenant, actor, tenant}
          );
+      if (rows.isEmpty()) {
+         throw new IdentityException(404, "GOVERNANCE_RELEASE_NOT_FOUND");
+      }
+
+      NativeGovernanceDeployment.Package p = (NativeGovernanceDeployment.Package)this.json
+         .readValue(rows.getFirst().get("package").toString(), NativeGovernanceDeployment.Package.class);
+      NativeGovernanceDeployment.Context ctx = this.contextInside(
+         actor, tenant, p.items().stream().map(NativeGovernanceDeployment.Item::datasetId).toList(), null, "1.2".equals(p.contractVersion())
+      );
+      boolean valid = ctx.backgroundVersion().equals(p.backgroundVersion()) && this.materialsCurrent(actor, tenant, p);
+
+      for (int i = 0; i < p.items().size(); i++) {
+         valid &= ctx.sources().get(i).token().equals(p.items().get(i).token());
+      }
+
+      return valid ? Map.of("state", "CURRENT", "release", p) : Map.of("state", "STALE", "id", id);
    }
 
    private boolean materialsCurrent(UUID actor, UUID tenant, NativeGovernanceDeployment.Package p) {
@@ -374,7 +375,7 @@ public class NativeGovernanceDeployment {
                   boolean fresh = false;
 
                   try {
-                     fresh = "CURRENT".equals(((Map)this.read(actor, tenant, id)).get("state"));
+                     fresh = "CURRENT".equals(((Map)this.readInside(actor, tenant, id)).get("state"));
                   } catch (IdentityException e) {
                      continue;
                   }
