@@ -70,8 +70,10 @@ public class NativeFoundationService {
 
       ObjectNode a = (ObjectNode)asset.deepCopy();
       a.put("fieldCount", result.fields().size());
-      a.set("stageStates", this.json.valueToTree(result.stages().stream().limit(5L).map(FoundationProcessingService.Stage::state).toList()));
-      this.governanceStages(a);
+      if(!a.has("sourceDelivery")) {
+         a.set("stageStates", this.json.valueToTree(result.stages().stream().limit(5L).map(FoundationProcessingService.Stage::state).toList()));
+         this.governanceStages(a);
+      }
       ObjectNode out = this.json.createObjectNode();
       out.set("asset", a);
       out.putNull("analysis");
@@ -105,10 +107,10 @@ public class NativeFoundationService {
       } else {
          ObjectNode d = this.json.createObjectNode();
          d.put("status", a.path("dictionaryStatus").asText("waiting"));
-         d.put("current", a.has("publicationId") || result.stages().get(2).state().equals("READY"));
+         d.put("current", !a.has("sourceDelivery") && (a.has("publicationId") || result.stages().get(2).state().equals("READY")));
          d.put("revision", result.version());
          d.set("at", a.path("publishedAt").isMissingNode() ? this.json.nullNode() : a.path("publishedAt"));
-         d.put("provider", a.has("publicationId") ? "已发布原生治理任务" : "来源字段定义");
+         d.put("provider", a.has("sourceDelivery") ? "历史版本；新批次在采集端核验" : a.has("publicationId") ? "已发布原生治理任务" : "来源字段定义");
          d.put("tableMeaning", result.name());
          String usage = a.path("unknownFieldCount").asInt() > 0 || !a.has("publicationId")
              ? "按来源字段和已保存说明使用；未知业务含义仍需核实。"
@@ -309,11 +311,30 @@ public class NativeFoundationService {
                   for (JsonNode item : items) {
                      ObjectNode a = (ObjectNode)item;
                      this.publications.apply(a, published.get(a.path("id").asText()));
+                     if(a.has("publicationId") && db.queryForObject("SELECT count(*) FROM source_contract_publications WHERE tenant_id=? AND release_id=?",Integer.class,tenant,UUID.fromString(a.path("publicationId").asText()))>0) {
+                        a.putObject("nativeGovernance").put("state","PUBLISHED").put("message","已确认来源口径自动发布；当前批次独立检查").put("canRun",false);
+                     }
                      if(a.has("publicationId") && a.path("nativeGovernance").isObject() && a.path("publicationId").asText().equals(a.path("nativeGovernance").path("jobId").asText())) {
                         ObjectNode status=(ObjectNode)a.path("nativeGovernance");status.put("state","PUBLISHED");
                         status.put("message",a.path("checksPassed").asBoolean()?"字段口径已发布，当前快照检查通过":"字段口径已发布；当前快照检查尚需处理");
                      }
                      JsonNode stages = a.path("stageStates");
+                     if(a.path("id").asText().startsWith("dataset-")) {
+                        var holds=this.db.queryForList("SELECT reason FROM collection_delivery_waits WHERE tenant_id=? AND dataset_id=?",String.class,tenant,UUID.fromString(a.path("id").asText().substring(8)));
+                        if(!holds.isEmpty()) {
+                           boolean missing=!"SOURCE_DATA_REQUIRES_REVIEW".equals(holds.getFirst());
+                           String message="SOURCE_COLLECTION_PENDING".equals(holds.getFirst())?"采集端尚未取得本批可核验数据；等待来源取数完成":missing?"采集端正在核对字段业务含义与规则；尚未交付新版本":"采集端发现记录不符合已确认规则；新版本待处理";
+                           a.put("available",false);a.put("automaticAnalysisReady",false);a.put("checksPassed",false);
+                           boolean previous=a.path("version").asInt()>0;
+                           a.put("needsAttention",!missing);a.put("gate",previous?2:0);a.put("label",message);a.put("status","waiting-source");
+                           a.put("availabilityScope","历史版本保留；等待采集端交付核验通过的新版本");
+                           a.putObject("sourceDelivery").put("state",holds.getFirst()).put("message",message).put("previousSnapshotRetained",previous);
+                           a.set("stageStates",this.json.valueToTree(List.of(previous?"READY":"WAITING_SOURCE",previous?"READY":"WAITING_SOURCE",missing?"WAITING_SOURCE":"READY",missing?"WAITING_SOURCE":"FAILED","WAITING")));
+                           a.set("issues",this.json.valueToTree(List.of(message)));
+                           if(a.path("nativeGovernance").isObject())((ObjectNode)a.path("nativeGovernance")).put("message",message);
+                           stages=a.path("stageStates");
+                        }
+                     }
                      if ("READY".equals(stages.path(1).asText())) {
                         parsed++;
                      }

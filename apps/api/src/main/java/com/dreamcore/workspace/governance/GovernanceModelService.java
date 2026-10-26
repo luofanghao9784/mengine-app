@@ -377,6 +377,8 @@ public class GovernanceModelService {
    public AnalysisReadiness analysisReadiness(UUID actor, UUID tenant, UUID dataset, UUID snapshot) {
       this.identities.member(actor, tenant, false);
       if (!this.collections.readable(actor, tenant, dataset)) throw this.error(404, "DATASET_NOT_FOUND");
+      var deliveryWait = this.db.queryForList("SELECT reason FROM collection_delivery_waits WHERE tenant_id=? AND dataset_id=?",String.class,tenant,dataset);
+      if(!deliveryWait.isEmpty()) return new AnalysisReadiness("SOURCE_DELIVERY_WAITING",deliveryWait.getFirst());
       if (Boolean.TRUE.equals(this.db.queryForObject("SELECT EXISTS(SELECT 1 FROM scene_asset_revisions WHERE tenant_id=? AND target_id=? AND kind='TABLE')", Boolean.class, tenant, dataset)))
          return new AnalysisReadiness("LEGACY_GOVERNANCE", null);
       var data = this.db.queryForMap("SELECT name FROM business_datasets WHERE id=? AND tenant_id=?", dataset, tenant);

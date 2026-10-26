@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Tone, Item } from './data';
 import { sceneTenant } from './scene-route';
 export type Asset = {
+  sourceDelivery?: {state: string; message: string; previousSnapshotRetained: boolean};
   nativeGovernance?: { state: string; message: string; canRun: boolean; jobId?: string; revision?: number; errorCode?: string };
   id: string;
   title: string;

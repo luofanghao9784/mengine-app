@@ -13,7 +13,11 @@ public interface CollectionAdapter {
         public Snapshot(UUID datasetId,Instant coverageThrough,List<List<String>> rows,ExportReceipt exportReceipt){this(datasetId,coverageThrough,rows,exportReceipt,null);}
         public Snapshot(UUID datasetId,Instant coverageThrough,List<List<String>> rows){this(datasetId,coverageThrough,rows,null);}
     }
-    record Result(String contractVersion,List<Snapshot> snapshots) {}
+    record Pending(UUID datasetId,String reason) {}
+    record Result(String contractVersion,List<Snapshot> snapshots,List<Pending> pending) {
+        public Result { pending=pending==null?List.of():List.copyOf(pending); }
+        public Result(String contractVersion,List<Snapshot> snapshots){this(contractVersion,snapshots,List.of());}
+    }
     boolean available();
     Result collect(Request request) throws Exception;
     default Result collect(Request request,java.util.function.BooleanSupplier active) throws Exception {

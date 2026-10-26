@@ -61,6 +61,8 @@ public class FoundationPublicationService {
                + ")",
             args.toArray()
          );
+      rows = new ArrayList<>(rows);
+      rows.addAll(db.queryForList("SELECT d.id,d.recipient_id actor_id,'DATASET' kind,'{}' input,'{}' output,d.created_at published_at FROM source_contract_publications p JOIN native_governance_releases d ON d.id=p.release_id WHERE p.tenant_id=? AND d.id IN (" + String.join(",", Collections.nCopies(ids.size(), "?")) + ")",args.toArray()));
       LinkedHashMap<String, FoundationPublicationService.Entry> result = new LinkedHashMap<>();
 
       for (Map<String, Object> r : rows) {

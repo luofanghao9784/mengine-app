@@ -362,6 +362,15 @@ def instance_extra_environment(root):
     if (root / 'restore.json').exists() or (root / 'restore.json').is_symlink():
         return api, engine
     recipe = root / 'onboarding-recipe.json'
+    preflight = root / 'collection-business-preflight.json'
+    if preflight.exists() or preflight.is_symlink():
+        value = private_read(preflight)
+        if not isinstance(value, dict) or set(value) != {'tenantIds'} or not isinstance(value['tenantIds'], list) or len(value['tenantIds']) > 100:
+            raise TrialError('采集业务核验配置须为 tenantIds 列表。')
+        try:
+            api['COLLECTION_BUSINESS_PREFLIGHT_TENANTS'] = ','.join(str(uuid.UUID(v)) for v in value['tenantIds'])
+        except (ValueError, TypeError, AttributeError):
+            raise TrialError('采集业务核验企业标识无效。') from None
     knowledge = root / 'automatic-dataset-knowledge.json'
     if knowledge.exists() or knowledge.is_symlink():
         value = private_read(knowledge)

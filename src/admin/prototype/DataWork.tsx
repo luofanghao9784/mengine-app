@@ -398,6 +398,7 @@ export function DataWork({
       .pop(),
   );
   const stepNote = (x: Asset, i: number, state: string) => {
+    if (x.sourceDelivery && i >= 2) return i === 4 ? '等待采集端交付核验通过的版本' : x.sourceDelivery.message;
     if (i === 4 && x.available && x.ready === null && x.kind === 'table') return '按已发布口径使用';
     if (x.nativeGovernance && i === x.gate && !x.available) return x.nativeGovernance.message;
     if (x.nativeGovernance?.state === 'DRAFT_READY' && i === 2) return '草稿已生成，待发布';
@@ -420,7 +421,7 @@ export function DataWork({
     '数据从来源系统进入数据基座：取数频率、最近一次取数和每次取数留下的批次。',
     '把来源内容拆成结构化记录与字段，并记录每个处理阶段。',
     a?.kind === 'table'
-      ? '模型为表和字段写出业务含义、单位、规则和关联。模型解释不代表已核实的业务事实。'
+      ? '采集端在交付前核对字段业务含义、单位和规则；梦擎按已认可的来源定义独立复核。缺少依据时在采集端继续补证。'
       : '资料由输入模型自动生成标签与摘要，不需要字段口径。',
     a?.nativeGovernance ? '检查说明：口径不变时沿用已发布版本；每批独立核对来源定义、已声明规则及导出接收依据。缺少依据、版本不符与规则异常分别提示。' : '检查必填、格式、敏感信息和口径冲突；有问题的记录被隔离，不影响其他记录使用。',
     a?.nativeGovernance ? '当前快照检查通过后，按已发布口径提供给 AI；记录规则检查不代表银行到账、利润或真实逾期本金已核实。' : '通过检查的记录提供给 AI 查询；隔离记录不参与。',

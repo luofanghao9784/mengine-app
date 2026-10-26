@@ -148,17 +148,27 @@ public class CollectionService {
                 terminal(claim.runId(),"FAILED","COLLECTION_SOURCE_CONTRACT_INVALID",now);return false;
             }
         }
+        var waiting=new ArrayList<>(result.pending());
+        boolean preflight=Arrays.stream(businessPreflightTenants.split(",")).anyMatch(t -> t.trim().equals(claim.tenantId().toString()));
         for(var snapshot:result.snapshots()){
+            if(preflight) {
+                var columns=claim.request().datasets().stream().filter(d -> d.id().equals(snapshot.datasetId())).findFirst().orElseThrow().columns();
+                String state=SourceBusinessPreflight.check(snapshot,columns);
+                if(!"READY".equals(state)) { waiting.add(new CollectionAdapter.Pending(snapshot.datasetId(),state)); continue; }
+            }
             UUID id=UUID.randomUUID();Integer version=db.queryForObject("SELECT coalesce(max(version),0)+1 FROM dataset_snapshots WHERE dataset_id=?",Integer.class,snapshot.datasetId());
             db.update("INSERT INTO dataset_snapshots(id,tenant_id,connection_id,dataset_id,run_id,version,data_rows,row_count,coverage_through,collected_at) VALUES (?,?,?,?,?,?,CAST(? AS jsonb),?,?,?)",id,claim.tenantId(),claim.connectionId(),snapshot.datasetId(),claim.runId(),version,json.writeValueAsString(snapshot.rows()),snapshot.rows().size(),stamp(snapshot.coverageThrough()),stamp(now));
             if(snapshot.exportReceipt()!=null)db.update("INSERT INTO collection_snapshot_receipts(snapshot_id,tenant_id,dataset_id,receipt,received_at) VALUES (?,?,?,?::jsonb,?)",id,claim.tenantId(),snapshot.datasetId(),CollectionReceiptChecks.stored(snapshot.exportReceipt(),id),stamp(now));
             if(snapshot.sourceContract()!=null)db.update("UPDATE collection_snapshot_receipts SET source_contract=?::jsonb WHERE snapshot_id=?",json.writeValueAsString(snapshot.sourceContract()),id);
             db.update("UPDATE business_datasets SET current_snapshot=? WHERE id=? AND tenant_id=? AND connection_id=? AND status='ACTIVE'",id,snapshot.datasetId(),claim.tenantId(),claim.connectionId());
+            db.update("DELETE FROM collection_delivery_waits WHERE tenant_id=? AND dataset_id=?",claim.tenantId(),snapshot.datasetId());
         }
-        terminal(claim.runId(),"SUCCEEDED",null,now);return true;
+        for(var pending:waiting) db.update("INSERT INTO collection_delivery_waits(tenant_id,dataset_id,run_id,reason,checked_at) VALUES (?,?,?,?,?) ON CONFLICT(tenant_id,dataset_id) DO UPDATE SET run_id=excluded.run_id,reason=excluded.reason,checked_at=excluded.checked_at",claim.tenantId(),pending.datasetId(),claim.runId(),pending.reason(),stamp(now));
+        terminal(claim.runId(),"SUCCEEDED",waiting.isEmpty()?null:"SOURCE_TABLES_WAITING",now);return true;
     }
+    @org.springframework.beans.factory.annotation.Value("${dreamcore.collection.business-preflight-tenants:}") private String businessPreflightTenants="";
     private boolean valid(Claim claim,CollectionAdapter.Result result,Instant now){
-        if(result==null||!"1.0".equals(result.contractVersion())||result.snapshots()==null||result.snapshots().size()!=claim.request().datasets().size())return false;
+        if(result==null||!"1.0".equals(result.contractVersion())||result.snapshots()==null||result.snapshots().size()+result.pending().size()!=claim.request().datasets().size())return false;
         var definitions=new HashMap<UUID,CollectionAdapter.Dataset>();claim.request().datasets().forEach(d->definitions.put(d.id(),d));
         var ids=new HashSet<UUID>();long totalCells=0;
         for(var s:result.snapshots()){
@@ -170,7 +180,10 @@ public class CollectionService {
                 for(String cell:row)if(cell!=null&&cell.length()>8192)return false;
             }
             if(!CollectionReceiptChecks.valid(s,columns,now))return false;
-        }return true;
+        }
+        for(var pending:result.pending()) if(pending==null || pending.reason()==null || !ids.add(pending.datasetId()) || !definitions.containsKey(pending.datasetId())
+                || !Set.of("WAITING_SOURCE_DEFINITION","SOURCE_DATA_REQUIRES_REVIEW","SOURCE_COLLECTION_PENDING").contains(pending.reason())) return false;
+        return true;
     }
     public List<Map<String,Object>> candidates(){return db.queryForList("SELECT c.tenant_id,c.id FROM data_connections c JOIN tenants t ON t.id=c.tenant_id WHERE t.status='ACTIVE' AND NOT EXISTS(SELECT 1 FROM departure_executions e WHERE e.tenant_id=c.tenant_id AND e.kind='TENANT_EXIT' AND e.state<>'CANCELLED') AND ((c.status='READY' AND c.auto_enabled AND c.next_due<=now()) OR EXISTS(SELECT 1 FROM collection_runs r WHERE r.connection_id=c.id AND (r.status='QUEUED' OR (r.status='RUNNING' AND r.lease_until<=now())))) ORDER BY c.next_due NULLS LAST,c.id LIMIT 100");}
     private Dataset dataset(Map<String,Object> d){

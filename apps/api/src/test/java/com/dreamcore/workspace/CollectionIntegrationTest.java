@@ -29,6 +29,43 @@ class CollectionIntegrationTest {
     @Autowired com.dreamcore.workspace.scene.SceneService scenes;
     @Autowired com.dreamcore.workspace.scene.FoundationProcessingService processing;
     @Autowired CollectionSourceContracts sourceContracts;
+    @Test void pendingSourcesRetainTheirSnapshotAndDoNotBlockOtherTables() {
+        start();assertTrue(service.complete(service.claim(tenant,connection,Instant.now()),result("原版本",null),Instant.now()));
+        UUID previous=db.queryForObject("SELECT current_snapshot FROM business_datasets WHERE id=?",UUID.class,dataset);
+        UUID second=UUID.randomUUID();
+        db.update("INSERT INTO business_datasets(id,tenant_id,connection_id,workspace_id,dataset_key,name,column_names) VALUES (?,?,?,?,'ready-other','已就绪表','[\"门店\",\"数量\"]'::jsonb)",second,tenant,connection,space);
+        start();var claim=service.claim(tenant,connection,Instant.now());
+        assertTrue(service.complete(claim,new CollectionAdapter.Result("1.0",List.of(new CollectionAdapter.Snapshot(second,null,List.of(List.of("新店","2")))),List.of(new CollectionAdapter.Pending(dataset,"WAITING_SOURCE_DEFINITION"))),Instant.now()));
+        assertEquals(previous,db.queryForObject("SELECT current_snapshot FROM business_datasets WHERE id=?",UUID.class,dataset));
+        assertNotNull(db.queryForObject("SELECT current_snapshot FROM business_datasets WHERE id=?",UUID.class,second));
+        assertEquals("SOURCE_TABLES_WAITING",db.queryForObject("SELECT reason FROM collection_runs WHERE id=?",String.class,claim.runId()));
+        var asset=nativeFoundation.detail(reader,tenant,"dataset-"+dataset).path("asset");
+        assertEquals("WAITING_SOURCE",asset.path("stageStates").get(2).asText());
+        assertFalse(asset.path("available").asBoolean());assertFalse(asset.path("needsAttention").asBoolean());
+        start();var next=service.claim(tenant,connection,Instant.now());
+        assertTrue(service.complete(next,new CollectionAdapter.Result("1.0",List.of(new CollectionAdapter.Snapshot(dataset,null,List.of(List.of("已补齐","3"))),new CollectionAdapter.Snapshot(second,null,List.of(List.of("新店","2"))))),Instant.now()));
+        assertEquals(0,db.queryForObject("SELECT count(*) FROM collection_delivery_waits WHERE tenant_id=?",Integer.class,tenant));
+    }
+    @Test void pendingPartitionCannotHideOmittedOrDuplicateOrForeignDatasets() {
+        start();var first=service.claim(tenant,connection,Instant.now());
+        assertFalse(service.complete(first,new CollectionAdapter.Result("1.0",List.of(),List.of()),Instant.now()));
+        start();var second=service.claim(tenant,connection,Instant.now());
+        assertFalse(service.complete(second,new CollectionAdapter.Result("1.0",List.of(),List.of(new CollectionAdapter.Pending(UUID.randomUUID(),"WAITING_SOURCE_DEFINITION"))),Instant.now()));
+        start();var third=service.claim(tenant,connection,Instant.now());
+        assertFalse(service.complete(third,new CollectionAdapter.Result("1.0",result("x",null).snapshots(),List.of(new CollectionAdapter.Pending(dataset,"WAITING_SOURCE_DEFINITION"))),Instant.now()));
+    }
+    @Test void serverPreflightIndependentlyHoldsUnconfirmedIncomingRows() {
+        org.springframework.test.util.ReflectionTestUtils.setField(service,"businessPreflightTenants",tenant.toString());
+        try {
+            start();var claim=service.claim(tenant,connection,Instant.now());
+            assertTrue(service.complete(claim,result("没有规则的记录",null),Instant.now()));
+            assertNull(db.queryForObject("SELECT current_snapshot FROM business_datasets WHERE id=?",UUID.class,dataset));
+            assertEquals("WAITING_SOURCE_DEFINITION",db.queryForObject("SELECT reason FROM collection_delivery_waits WHERE tenant_id=? AND dataset_id=?",String.class,tenant,dataset));
+            var asset=nativeFoundation.detail(reader,tenant,"dataset-"+dataset).path("asset");
+            assertEquals("WAITING_SOURCE",asset.path("stageStates").get(0).asText());
+            assertFalse(asset.path("sourceDelivery").path("previousSnapshotRetained").asBoolean());
+        } finally {org.springframework.test.util.ReflectionTestUtils.setField(service,"businessPreflightTenants","");}
+    }
     @Test void sourceContractsArePinnedPerSnapshotAndRejectWholeBatchBeforeReplacingData(@org.junit.jupiter.api.io.TempDir java.nio.file.Path temp) throws Exception {
         start();var baseline=service.claim(tenant,connection,Instant.now());
         assertTrue(service.complete(baseline,result("保留的上一批",null),Instant.now()));

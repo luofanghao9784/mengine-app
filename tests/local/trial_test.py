@@ -102,6 +102,19 @@ class LocalTrialBoundaryTest(unittest.TestCase):
 
 
 class BriefingTrialBoundaryTest(unittest.TestCase):
+    def test_business_preflight_requires_private_tenant_configuration(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            tenant = '00000000-0000-4000-8000-000000000001'
+            self.assertNotIn('COLLECTION_BUSINESS_PREFLIGHT_TENANTS', trial.instance_extra_environment(root)[0])
+            saved = root / 'collection-business-preflight.json'
+            trial.private_write(saved, {'tenantIds': [tenant]})
+            self.assertEqual(tenant, trial.instance_extra_environment(root)[0]['COLLECTION_BUSINESS_PREFLIGHT_TENANTS'])
+            saved.chmod(0o644)
+            with self.assertRaises(trial.TrialError): trial.instance_extra_environment(root)
+            trial.private_write(root / 'restore.json', {})
+            self.assertNotIn('COLLECTION_BUSINESS_PREFLIGHT_TENANTS', trial.instance_extra_environment(root)[0])
+
     def test_automatic_dataset_knowledge_is_explicit_private_and_disabled_on_restore(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
