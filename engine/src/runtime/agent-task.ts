@@ -553,7 +553,7 @@ export class AgentTasks {
             !deliveryReady && datasetComparisonAvailable
               ? [
                   briefingDatasetLookups >= 3
-                    ? ' Dataset retrieval is now closed after three successful lookups. Select compare_dataset for a supported DATA calculation, deliver_briefing for a grounded INSIGHT or SUGGESTION with explicit sample limits, or task_control to report a concrete evidence gap. Without an explicit evidence supplement, only task_context action briefing_plan remains available for the installed monthly sales/receipts recipe; no further source paging. Never invent totals or claims of full coverage.'
+                    ? ' Dataset retrieval is now closed after three successful lookups. Select compare_dataset for a supported DATA calculation, deliver_briefing for a grounded INSIGHT or SUGGESTION with explicit sample limits, or task_control to report a concrete evidence gap. Without an explicit evidence supplement, only task_context actions reconciliation_catalog and briefing_plan remain available for the installed monthly sales/receipts recipe; no further source paging. Never invent totals or claims of full coverage.'
                     : ` Dataset retrieval: ${briefingDatasetLookups}/3 lookups used. Choose one business question; for monthly multi-store sales/receipts use reconciliation_catalog then select_briefing_topic and briefing_plan, not one card per dataset.`,
                   'Use dataset_search for exact IDs and columns, then dataset_read with columnLimit 10 to inspect required columns and actual period values.',
                   `Successful dataset_read calls so far: ${briefingDatasetReads}. Read only the pages needed to establish the calculation parameters.`,
@@ -644,7 +644,12 @@ export class AgentTasks {
                 supplement(tool.name) || tool.name === 'select_briefing_topic' ||
                 (businessPlanAvailable && !deliveryReady && tool.name === 'task_context') ||
                 briefingPhaseAllows(topicPhase, tool.name),
-          );
+          ).map(tool => tool.name === 'task_context' && briefingGeneration && briefingDatasetLookups >= 3 && businessPlanAvailable && !deliveryReady && !evidenceBudget.open
+            ? { ...tool, parameters: { ...tool.parameters, properties: {
+                ...(tool.parameters.properties as Record<string, Json>),
+                action: { type: 'string', enum: ['reconciliation_catalog', 'briefing_plan'] },
+              } } }
+            : tool);
           for await (const part of metered.generate({
             ...request,
             messages: webMode
@@ -1561,7 +1566,7 @@ export class AgentTasks {
                 throw new RuntimeError('BRIEFING_DELIVERY_REQUIRED');
               if (briefingGeneration && evidenceSupplementAvailable && !newsBriefing && briefingCalculationReady && !supplementalRead && ['task_context','search_sources','read_source'].includes(tool.name))
                 throw new RuntimeError('BRIEFING_RETRIEVAL_LIMIT');
-              if (briefingGeneration && tool.name === 'task_context' && briefingDatasetLookups >= 3 && !supplementalRead && !(isRecord(args)&&args.action==='briefing_plan'))
+              if (briefingGeneration && tool.name === 'task_context' && briefingDatasetLookups >= 3 && !supplementalRead && !(isRecord(args) && (args.action === 'briefing_plan' || businessPlanAvailable && args.action === 'reconciliation_catalog')))
                 throw new RuntimeError('BRIEFING_RETRIEVAL_LIMIT');
               if (briefingGeneration && ['compare_table', 'compare_dataset'].includes(tool.name))
                 briefingCalculationAttempts++;
