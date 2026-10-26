@@ -30,8 +30,24 @@ public class CollectionWorker {
         }
     }
     public void execute(CollectionService.Claim claim){
-        try{service.complete(claim,adapter.collect(claim.request(),()->service.active(claim)),Instant.now());}
+        try{
+            var result=adapter.collect(claim.request(),()->service.active(claim));
+            for(int attempt=0;;attempt++) {
+                try { service.complete(claim,result,Instant.now()); break; }
+                catch(RuntimeException failed) {
+                    // complete is transactional: retry only after its transaction rolled back.
+                    // Keep the same lease and adapter result; do not re-read or regenerate source data.
+                    if(attempt>=2 || !transactionConflict(failed))throw failed;
+                    Thread.sleep(100L*(attempt+1));
+                }
+            }
+        }
         catch(Exception e){service.fail(claim,e instanceof TimeoutException?"COLLECTION_TIMEOUT":"COLLECTION_ADAPTER_FAILED",Instant.now());}
+    }
+    private boolean transactionConflict(Throwable failure) {
+        for(Throwable cause=failure;cause!=null;cause=cause.getCause())
+            if(cause instanceof java.sql.SQLException sql && java.util.Set.of("40P01","40001").contains(sql.getSQLState()))return true;
+        return false;
     }
     @PreDestroy public void stop(){executor.shutdownNow();}
 }

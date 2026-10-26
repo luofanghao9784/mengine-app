@@ -513,7 +513,8 @@ class CollectionIntegrationTest {
         var field=new DatasetField("门店","text","门店名称","","源字典说明","SOURCE_DOCUMENTED");
         assertThrows(IllegalArgumentException.class,()->DatasetField.validate(List.of("门店","数量"),List.of(field)));
         assertThrows(IllegalArgumentException.class,()->DatasetField.validate(List.of("另一列"),List.of(field)));
-        assertThrows(IllegalArgumentException.class,()->DatasetField.validate(List.of("门店"),List.of(new DatasetField("门店","text","意义","","","UNKNOWN"))));
+        assertDoesNotThrow(()->DatasetField.validate(List.of("门店"),List.of(new DatasetField("门店","text","意义","","","UNKNOWN"))));
+        assertThrows(IllegalArgumentException.class,()->DatasetField.validate(List.of("门店"),List.of(new DatasetField("门店","text","意义","","","INVALID"))));
         UUID defined=UUID.randomUUID();deployment.apply(manifest(List.of(new CollectionDeployment.Dataset(defined,space,"defined","部署说明","",List.of("门店"),List.of(field)))));
         admins.grant(owner,tenant,space,admin,UUID.randomUUID(),admins.spaceInfo(owner,tenant,space).version(),true);
         db.update("INSERT INTO governance_capabilities(tenant_id,account_id,workspace_id,capability,granted_by) VALUES (?,?,?,'LIFECYCLE_PURGE',?)",tenant,admin,space,admin);
