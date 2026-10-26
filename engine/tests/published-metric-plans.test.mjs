@@ -60,7 +60,7 @@ test('automatic briefing retrieves a metric, selects its topic, calculates and d
   calls++;
   if(calls===2){assert.equal(request.requiredTool,'select_briefing_topic');assert.ok(!request.tools.some(t=>t.name==='task_context'));}
   if(calls===3)assert.equal(request.requiredTool,'compare_dataset');
-  if(calls===4){const delivery=request.tools.find(t=>t.name==='deliver_briefing');assert.ok(delivery);assert.equal(delivery.parameters.properties.presentation,undefined);}const choices=[['task_context',{action:'dataset_search'}],['select_briefing_topic',{candidates:[{question:'订单登记记录数量是多少？',goal:'建立订单登记基线',userValue:'按登记口径核对记录完整性',destination:'BRIEFING',evidenceNeeded:'已发布记录数指标',requiresCalculation:true,difference:'首次按登记记录口径交付',businessType:'DATA'}],selectedIndex:0}],['compare_dataset',selection],['deliver_briefing',{businessType:'DATA',calculationArtifactId:id,title:'订单登记共有2条记录',summary:'按已发布记录数口径统计，共有2条登记记录。',analysis:['记录数量由固定计划计算得出，共2条。','此数值表示登记记录，不代表有效订单数或客户人数。']}]];
+  if(calls===4){const delivery=request.tools.find(t=>t.name==='deliver_briefing');assert.ok(delivery);assert.ok(delivery.parameters.properties.presentation);}const choices=[['task_context',{action:'dataset_search'}],['select_briefing_topic',{candidates:[{question:'订单登记记录数量是多少？',goal:'建立订单登记基线',userValue:'按登记口径核对记录完整性',destination:'BRIEFING',evidenceNeeded:'已发布记录数指标',requiresCalculation:true,difference:'首次按登记记录口径交付',businessType:'DATA'}],selectedIndex:0}],['compare_dataset',selection],['deliver_briefing',{businessType:'DATA',calculationArtifactId:id,title:'订单登记共有2条记录',summary:'按已发布记录数口径统计，共有2条登记记录。',analysis:['记录数量由固定计划计算得出，共2条。','此数值表示登记记录，不代表有效订单数或客户人数。']}]];
   assert.ok(calls<=4);const [name,args]=choices[calls-1];yield {type:'tool_call',id:'step-'+calls,name,arguments:JSON.stringify(args)};yield {type:'finish',reason:'tool_calls'};
  }})});
  const result=await agent.run({contractVersion:'1.5',taskId:randomUUID(),attemptId:randomUUID(),prompt:'按已发布指标生成画报'},new AbortController().signal);
@@ -100,7 +100,7 @@ test('automatic briefing calculates two verified metrics in one tool turn before
   calls++;
   if(calls===2){assert.equal(request.requiredTool,'select_briefing_topic');assert.ok(!request.tools.some(t=>t.name==='task_context'));}
   if(calls===3)assert.equal(request.requiredTool,'compare_dataset');
-  if(calls===4){const delivery=request.tools.find(t=>t.name==='deliver_briefing');assert.ok(delivery);assert.equal(delivery.parameters.properties.presentation,undefined);}const choices=[['task_context',{action:'dataset_search'}],['select_briefing_topic',{candidates:[{question:'订单登记记录数量是多少？',goal:'建立订单登记基线',userValue:'按登记口径核对记录完整性',destination:'BRIEFING',evidenceNeeded:'已发布记录数指标',requiresCalculation:true,difference:'首次按登记记录口径交付',businessType:'DATA'}],selectedIndex:0}],['compare_dataset',{...selection,supportingMetrics:[{...selection,metricId:other}]}],['deliver_briefing',{businessType:'DATA',calculationArtifactId:id,title:'订单登记共有2条记录',summary:'按已发布记录数口径统计，共有2条登记记录。',analysis:['记录数量由固定计划计算得出，共2条。','此数值表示登记记录，不代表有效订单数或客户人数。']}]];
+  if(calls===4){const delivery=request.tools.find(t=>t.name==='deliver_briefing');assert.ok(delivery);assert.ok(delivery.parameters.properties.presentation);}const choices=[['task_context',{action:'dataset_search'}],['select_briefing_topic',{candidates:[{question:'订单登记记录数量是多少？',goal:'建立订单登记基线',userValue:'按登记口径核对记录完整性',destination:'BRIEFING',evidenceNeeded:'已发布记录数指标',requiresCalculation:true,difference:'首次按登记记录口径交付',businessType:'DATA'}],selectedIndex:0}],['compare_dataset',{...selection,supportingMetrics:[{...selection,metricId:other}]}],['deliver_briefing',{businessType:'DATA',calculationArtifactId:id,title:'订单登记共有2条记录',summary:'按已发布记录数口径统计，共有2条登记记录。',analysis:['记录数量由固定计划计算得出，共2条。','此数值表示登记记录，不代表有效订单数或客户人数。']}]];
   assert.ok(calls<=4);const [name,args]=choices[calls-1];yield {type:'tool_call',id:'step-'+calls,name,arguments:JSON.stringify(args)};yield {type:'finish',reason:'tool_calls'};
  }})});
  const result=await agent.run({contractVersion:'1.5',taskId:randomUUID(),attemptId:randomUUID(),prompt:'按已发布指标生成画报'},new AbortController().signal);
@@ -122,4 +122,62 @@ test('recommended primary follows platform coverage order only within identical 
  r.result.items[0].governedMetrics.items.unshift({metricId:other,version:2,executionRequest:{...plan,metricId:other,aggregation:'SUM',valueColumn:'amount'}});
  plans.record(r);assert.equal(plans.preferred(selection).metricId,other);
  assert.throws(()=>plans.preferred({...selection,snapshotId:other}),{code:'METRIC_DEFINITION_REQUIRED'});
+});
+
+
+test('native installed methods unlock automatic briefing calculation without legacy metric IDs',async t=>{
+ const {createServer}=await import('node:http');const {randomUUID}=await import('node:crypto');
+ const {AgentTasks}=await import('../dist/runtime/agent-task.js');
+ const {listen,close,body,json}=await import('./fixtures/agent.mjs');const {usageFixture}=await import('./fixtures/usage.mjs');
+ let selected=false,calculated=false,delivered=false,calls=0;const steps=[];
+ const source={datasetId:id,snapshotId:id,version:1,name:'合成订单登记',description:'登记记录数量',columns:['id'],totalColumns:1,columnOffset:0,nextColumnOffset:null,rowCount:2,coverageThrough:null,collectedAt:'2026-10-16T00:00:00Z',authority:false,governedMetrics:response().result.items[0].governedMetrics};
+ source.governedMetrics={items:[]};source.definitionOrigin='PUBLISHED_GOVERNANCE';
+ source.nativeAnalysisPlans={authority:false,items:[id,other].map(metricId=>{const executionRequest=structuredClone(plan);delete executionRequest.metricId;delete executionRequest.metricVersion;return {methodId:metricId,version:2,authority:false,selection:{...selection,metricId},definition:{name:'合成登记数量',unit:'条',grain:'登记记录',scope:'当前固定快照',exclusions:'无',execution:{reviewed:true}},executionRequest};})};
+ const server=createServer(async(req,res)=>{
+  if(usageFixture(req,res))return;const input=await body(req);
+  if(req.url.endsWith('/check'))return json(res,{allowed:true,executionClass:'live',briefingGeneration:true,briefingPresentationVersion:'1.0',briefingContentVersion:'1.0',topicStrategyVersion:'1.0',topicSelectionRecorded:selected,contextVersion:'1.0',datasetContextVersion:'1.0',datasetComparisonVersion:'1.0',datasetAnalysisVersion:'1.0',datasetBriefingSummaryVersion:'1.0'});
+  if(req.url.endsWith('/execution/open'))return json(res,{accepted:true,policy:'READ_ONLY_PRIVATE_V1'});
+  if(req.url.endsWith('/execution/tool'))return json(res,{accepted:true});
+  if(req.url.endsWith('/context'))return json(res,{contractVersion:'1.0',action:input.action,referenceOnly:true,result:input.action==='bootstrap'?{}:{items:[source],hasMore:false}});
+  if(req.url.endsWith('/select-briefing-topic')){selected=true;steps.push('topic');return json(res,{recorded:true,proposalOnly:true,selectedIndex:0,strategyVersion:'1.0.0'});}
+  if(req.url.endsWith('/compare-dataset')){assert.ok(selected);const raw=structuredClone(plan);delete raw.metricId;delete raw.metricVersion;assert.deepEqual(input,normalizeDatasetArguments(raw));assert.equal(input.metricId,undefined);calculated=true;steps.push('calculation');return json(res,receipt(input));}
+  if(req.url.endsWith('/deliver-briefing')){assert.ok(calculated);assert.equal(input.calculationArtifactId,id);delivered=true;steps.push('delivery');return json(res,{contractVersion:'1.0',status:'PREPARED',artifactId:other,title:input.title,visibility:'PRIVATE_AFTER_TASK_SUCCEEDS'});}
+  return json(res,{},404);
+ });
+ const url=await listen(server);t.after(()=>close(server));
+ const agent=new AgentTasks({platformBaseUrl:url,executionClass:'live',modelName:'synthetic',createModel:()=>({usage:null,async *generate(request){
+  calls++;
+  if(calls===2){assert.equal(request.requiredTool,'select_briefing_topic');assert.ok(!request.tools.some(t=>t.name==='task_context'));}
+  if(calls===3)assert.equal(request.requiredTool,'compare_dataset');
+  if(calls===4){const delivery=request.tools.find(t=>t.name==='deliver_briefing');assert.ok(delivery);}const choices=[['task_context',{action:'dataset_search'}],['select_briefing_topic',{candidates:[{question:'订单登记记录数量是多少？',goal:'建立订单登记基线',userValue:'按登记口径核对记录完整性',destination:'BRIEFING',evidenceNeeded:'已发布记录数指标',requiresCalculation:true,difference:'首次按登记记录口径交付',businessType:'DATA'}],selectedIndex:0}],['compare_dataset',{...selection,supportingMetrics:[{...selection,metricId:other}]}],['deliver_briefing',{businessType:'DATA',calculationArtifactId:id,title:'订单登记共有2条记录',summary:'按已发布记录数口径统计，共有2条登记记录。',analysis:['记录数量由固定计划计算得出，共2条。','此数值表示登记记录，不代表有效订单数或客户人数。']}]];
+  assert.ok(calls<=4);const [name,args]=choices[calls-1];yield {type:'tool_call',id:'step-'+calls,name,arguments:JSON.stringify(args)};yield {type:'finish',reason:'tool_calls'};
+ }})});
+ const result=await agent.run({contractVersion:'1.5',taskId:randomUUID(),attemptId:randomUUID(),prompt:'按已发布指标生成画报'},new AbortController().signal);
+ assert.equal(result.outcome,'COMPLETE');assert.ok(delivered);assert.equal(calls,4);assert.deepEqual(steps,['topic','calculation','calculation','delivery']);
+});
+
+test('native selections are bound to the retrieved source and reject snapshot substitution',()=>{
+ const p=publishedMetricPlans();const req={datasetId:id,snapshotId:id,operation:'SUMMARY',aggregation:'COUNT',groupColumns:[]};
+ const r={action:'dataset_search',result:{items:[{datasetId:id,snapshotId:id,definitionOrigin:'PUBLISHED_GOVERNANCE',nativeAnalysisPlans:{authority:false,items:[{methodId:id,version:2,authority:false,selection,definition:{name:'count',unit:'条',exclusions:'无',execution:{reviewed:true}},executionRequest:req}]}}]}};
+ const sumSelection={...selection,metricId:other};
+ r.result.items[0].nativeAnalysisPlans.items.push({methodId:other,version:2,authority:false,selection:sumSelection,definition:{name:'amountSum',unit:'人民币元',exclusions:'无',execution:{reviewed:true}},executionRequest:{...req,aggregation:'SUM',valueColumn:'amount'}});
+ p.record(r);assert.equal(p.hasPlans(),true);assert.deepEqual(p.resolve(selection),req);assert.equal(p.describe(selection).kind,'NATIVE_SOURCE_METHOD');
+ assert.deepEqual(p.preferred(sumSelection),sumSelection);assert.equal(p.resolve(sumSelection).aggregation,'SUM');
+ assert.throws(()=>p.resolve({...selection,snapshotId:other}),{code:'METRIC_DEFINITION_REQUIRED'});
+ r.result.items[0].nativeAnalysisPlans.items[0].executionRequest.snapshotId=other;
+ assert.throws(()=>publishedMetricPlans().record(r),{code:'INVALID_CONTEXT_RESPONSE'});
+});
+
+test('native verified dimension cardinalities include headquarters and every source category',async()=>{
+ const req={datasetId:id,snapshotId:id,operation:'SUMMARY',aggregation:'COUNT',groupColumns:['店面'],timeZone:'Asia/Shanghai'};
+ const tool=datasetComparisonTool({fixedPlanOnly:true,resolveMetricPlan:()=>req,describeMetricPlan:()=>({kind:'NATIVE_SOURCE_METHOD',name:'计数',unit:'张'}),authorize:async()=>{},invoke:async body=>{const r=receipt(body);r.calculation.rows=[{group:['总部店'],value:'1',records:1},{group:['甲店'],value:'1',records:1}];return r;}});
+ const out=await tool.execute(selection,new AbortController().signal);
+ assert.equal(out.nativeAnalysisMethod.dimensionCardinalities['店面'],2);assert.equal(out.calculation.total,'2');assert.ok(out.nativeAnalysisMethod.interpretation.includes('总部'));
+});
+
+test('native dimension rollups retain signed decimals beyond floating-point precision',async()=>{
+ const req={datasetId:id,snapshotId:id,operation:'SUMMARY',aggregation:'SUM',valueColumn:'金额',groupColumns:['店面','方向'],timeZone:'Asia/Shanghai'};
+ const tool=datasetComparisonTool({fixedPlanOnly:true,resolveMetricPlan:()=>req,describeMetricPlan:()=>({kind:'NATIVE_SOURCE_METHOD',unit:'人民币元'}),authorize:async()=>{},invoke:async body=>{const r=receipt(body);r.calculation.rows=[{group:['总部店','收'],value:'9007199254740993.0000001',records:1},{group:['甲店','收'],value:'-9007199254740992.0000000',records:1}];r.calculation.total='1.0000001';return r;}});
+ const out=await tool.execute(selection,new AbortController().signal);
+ assert.equal(out.nativeAnalysisMethod.dimensionTotals[1].rows[0].value,'1.0000001');assert.equal(out.nativeAnalysisMethod.dimensionTotals[1].unit,'人民币元');
 });

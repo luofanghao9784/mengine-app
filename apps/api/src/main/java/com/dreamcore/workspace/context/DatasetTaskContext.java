@@ -14,6 +14,7 @@ public class DatasetTaskContext {
     private final JdbcTemplate db; private final MaterialAccess access; private final com.dreamcore.workspace.collection.NativeGovernanceDeployment governance; private final JsonMapper json=new JsonMapper();
     public DatasetTaskContext(JdbcTemplate db,MaterialAccess access,com.dreamcore.workspace.collection.NativeGovernanceDeployment governance){this.db=db;this.access=access;this.governance=governance;}
     private Map<String,Object> map(Object... values){var m=new LinkedHashMap<String,Object>();for(int i=0;i<values.length;i+=2)m.put((String)values[i],values[i+1]);return m;}
+    @org.springframework.beans.factory.annotation.Value("${dreamcore.governance.source-evidence:}") private String evidencePath="";
     private IdentityException missing(){return new IdentityException(404,"TASK_DATASET_NOT_FOUND");}
     private Map<String,Object> task(UUID id){return db.queryForMap("SELECT * FROM conversation_tasks WHERE id=?",id);}
     private List<Map<String,Object>> rows(Map<String,Object> t,UUID dataset,UUID snapshot,String q,int offset,int limit){
@@ -57,6 +58,12 @@ public class DatasetTaskContext {
                 current.fields().stream().filter(f -> columns.contains(f.column()) && "SOURCE_DOCUMENTED".equals(f.status()) && !f.unit().isBlank())
                     .limit(40).forEach(f -> units.put(f.column(), f.unit()));
                 context.put("publishedFieldUnits", units);
+                boolean legacy=Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM scene_asset_revisions WHERE tenant_id=? AND target_id=? AND kind='TABLE')",Boolean.class,t.get("tenant_id"),d.get("id")));
+                if (!legacy) {
+                    var plans=NativeAnalysisPlans.load(evidencePath,(UUID)t.get("tenant_id"),(UUID)d.get("id"),(UUID)d.get("snapshot_id"),d.get("name").toString(),columns,current.fields());
+                    context.put("nativeAnalysisPlans",plans);
+                    context.put("governedMetrics",Map.of("items",List.of(),"hasMore",false,"usage","这是原生来源，不使用旧版指标目录；优先执行 nativeAnalysisPlans 中的部署固定方法。没有适用计划时仅可用已发布字段口径和已提供计算能力做有界源值核验，不推定营业额、到账或利润。","automaticExecution",false));
+                }
             }
         }
         context.put("governedFields",GovernedFieldContext.loadCurrent(db,(UUID)t.get("tenant_id"),(UUID)t.get("requested_by"),(UUID)d.get("id"),visible,release));

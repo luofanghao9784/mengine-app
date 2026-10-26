@@ -889,6 +889,7 @@ export class AgentTasks {
           ? [
               governedMetricBundle(datasetComparisonTool({
                 resolveMetricPlan: metricPlans.resolve,
+                describeMetricPlan: metricPlans.describe,
                 fixedPlanOnly: !!briefingGeneration,
                 allowComposition: datasetCompositionAvailable,
                 allowSummary:

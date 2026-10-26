@@ -30,6 +30,7 @@ public class BriefingContentService {
     public record RuleVersion(String source,String target,int revision) {}
     public record RuleTrace(String status,List<RuleVersion> versions) {}
     public record Document(UUID artifactId,String sha256,Content content,RuleTrace ruleTrace,NewsImage.Cover cover,BriefingDisplayLabels.Labels chartLabels) {public Document(UUID artifactId,String sha256,Content content,RuleTrace ruleTrace,NewsImage.Cover cover){this(artifactId,sha256,content,ruleTrace,cover,null);}public Document(UUID artifactId,String sha256,Content content,RuleTrace ruleTrace){this(artifactId,sha256,content,ruleTrace,null);}public Document(UUID artifactId,String sha256,Content content){this(artifactId,sha256,content,null);}}
+    @org.springframework.beans.factory.annotation.Autowired(required=false) private com.dreamcore.workspace.collection.NativeGovernanceDeployment nativeGovernance;
     private final JdbcTemplate db;private final IdentityAudit audit;private final JsonMapper json=new JsonMapper();
     public BriefingContentService(JdbcTemplate db,IdentityAudit audit){this.db=db;this.audit=audit;}
     public boolean statusOnly(Request request){return request!=null&&request.title()!=null&&request.title().strip().matches("(?i)^(暂无|没有|无)(新的?|新增)?(内容|画报|卡片|结果)[。.!！]*$|^no new (content|briefing|cards?)[.!]*$");}
@@ -150,6 +151,10 @@ public class BriefingContentService {
         boolean countRows="COUNT".equals(calc.request().aggregation());
         String metric=countRows?"记录数":calc.request().valueColumn(),unit=countRows?"条":metric.endsWith("_cents")?"分":metric.endsWith("_grams")?"克":"原数据数值单位";var match=java.util.regex.Pattern.compile("[（(]([^）)]{1,12})[）)]").matcher(metric);if(match.find())unit=match.group(1);
         if("CENTS_TO_YUAN".equals(calc.request().conversion()))unit="元";
+        else if(!countRows && nativeGovernance!=null && calc.request().metricId()==null && Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM business_datasets WHERE tenant_id=? AND id=? AND current_snapshot=?)",Boolean.class,job.tenant(),source.datasetId(),source.snapshotId()))) {
+            for(var publication:nativeGovernance.currentFor(job.actor(),job.tenant(),source.datasetId()))
+                for(var field:publication.fields())if(field.column().equals(calc.request().valueColumn())&&"SOURCE_DOCUMENTED".equals(field.status())&&!field.unit().isBlank())unit=field.unit();
+        }
         var chart=new Chart("GROUPED_BAR",metric,unit,summary?"不适用":calc.request().baseline(),summary?"本次汇总":calc.request().current(),calc.request().dateColumn()==null?"全部快照 · "+source.rowCount()+" 行":"日期筛选 · "+calc.matchedRows()+" 行 · 缺日 "+calc.missingDateRows()+" 行",calc.rows(),calc.totals(),shares);
         var presentation="DATA".equals(type(request))&&summary&&request.presentation()==null?new BriefingPresentationPolicy.Presentation("briefing-presentation-v1","EDITORIAL","CURRENT_BAR",null,null,List.of()):calculationPresentation(request,chart);
         var prior=db.queryForList("SELECT a.id,a.sha256,a.content FROM conversation_artifacts a WHERE task_id=? AND attempt_number=? AND EXISTS(SELECT 1 FROM identity_audit p WHERE p.target_id=a.id AND p.action='TASK_BRIEFING_CREATED' AND p.tenant_id=a.tenant_id)",job.id(),attempt);
