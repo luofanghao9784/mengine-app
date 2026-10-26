@@ -26,6 +26,7 @@ public class CollectionService {
     public record Claim(UUID tenantId,UUID connectionId,UUID runId,UUID token,long epoch,CollectionAdapter.Request request) {}
     private final JdbcTemplate db;private final IdentityService identities;private final IdentityAudit audit;
     private final GovernanceAccess governance;private final MaterialAccess access;private final DepartureAccess departure;
+    @org.springframework.beans.factory.annotation.Value("${dreamcore.collection.max-cells:4000000}") private long maxCells=4000000;
     private final CollectionAdapter adapter;private final JsonMapper json=new JsonMapper();
     @org.springframework.beans.factory.annotation.Autowired private CollectionSourceContracts sourceContracts;
     public CollectionService(JdbcTemplate db,IdentityService identities,IdentityAudit audit,GovernanceAccess governance,MaterialAccess access,DepartureAccess departure,CollectionAdapter adapter) {
@@ -148,6 +149,10 @@ public class CollectionService {
                 terminal(claim.runId(),"FAILED","COLLECTION_SOURCE_CONTRACT_INVALID",now);return false;
             }
         }
+        // Readers take shared dataset locks in database UUID order. Lock the whole
+        // connection in that same order before inserting snapshots or updating pointers;
+        // adapter response order must not become transaction lock order.
+        db.queryForList("SELECT id FROM business_datasets WHERE tenant_id=? AND connection_id=? AND status='ACTIVE' ORDER BY id FOR UPDATE",claim.tenantId(),claim.connectionId());
         var waiting=new ArrayList<>(result.pending());
         boolean preflight=Arrays.stream(businessPreflightTenants.split(",")).anyMatch(t -> t.trim().equals(claim.tenantId().toString()));
         for(var snapshot:result.snapshots()){
@@ -176,7 +181,7 @@ public class CollectionService {
             var columns=definitions.get(s.datasetId()).columns();if(columns.isEmpty()||columns.size()>100||new HashSet<>(columns).size()!=columns.size())return false;
             for(var row:s.rows()){
                 if(row==null||row.size()!=columns.size())return false;
-                totalCells+=row.size();if(totalCells>2000000)return false;
+                totalCells+=row.size();if(totalCells>Math.max(1,Math.min(10000000,maxCells)))return false;
                 for(String cell:row)if(cell!=null&&cell.length()>8192)return false;
             }
             if(!CollectionReceiptChecks.valid(s,columns,now))return false;

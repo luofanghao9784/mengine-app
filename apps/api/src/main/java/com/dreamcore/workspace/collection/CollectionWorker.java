@@ -42,7 +42,15 @@ public class CollectionWorker {
                 }
             }
         }
-        catch(Exception e){service.fail(claim,e instanceof TimeoutException?"COLLECTION_TIMEOUT":"COLLECTION_ADAPTER_FAILED",Instant.now());}
+        catch(Exception e){
+            // Diagnostic types only: never log exception messages, SQL, credentials or source rows.
+            String sqlState="";
+            for(Throwable t=e;t!=null;t=t.getCause()) if(t instanceof java.sql.SQLException sql) {
+                String code=sql.getSQLState();if(code!=null&&code.matches("[A-Z0-9]{5}"))sqlState=code;
+            }
+            org.slf4j.LoggerFactory.getLogger(getClass()).warn("Collection failed: run={} exception={} sqlState={}",claim.runId(),e.getClass().getSimpleName(),sqlState);
+            service.fail(claim,e instanceof TimeoutException?"COLLECTION_TIMEOUT":"COLLECTION_ADAPTER_FAILED",Instant.now());
+        }
     }
     private boolean transactionConflict(Throwable failure) {
         for(Throwable cause=failure;cause!=null;cause=cause.getCause())

@@ -13,7 +13,7 @@ public class ProcessCollectionAdapter implements CollectionAdapter {
     private final JsonMapper json=new JsonMapper();
     public ProcessCollectionAdapter(@Value("${dreamcore.collection.executable:}") String executable,
         @Value("${dreamcore.collection.timeout-seconds:120}") int timeoutSeconds,
-        @Value("${dreamcore.collection.max-response-bytes:20971520}") int maxBytes) {
+        @Value("${dreamcore.collection.max-response-bytes:41943040}") int maxBytes) {
         this.executable=executable;this.timeoutSeconds=Math.max(1,Math.min(600,timeoutSeconds));this.maxBytes=Math.max(1024,Math.min(104857600,maxBytes));
     }
     public boolean available(){return !executable.isBlank()&&Path.of(executable).isAbsolute()&&Files.isRegularFile(Path.of(executable))&&Files.isExecutable(Path.of(executable));}

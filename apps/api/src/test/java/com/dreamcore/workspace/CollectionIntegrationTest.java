@@ -29,6 +29,37 @@ class CollectionIntegrationTest {
     @Autowired com.dreamcore.workspace.scene.SceneService scenes;
     @Autowired com.dreamcore.workspace.scene.FoundationProcessingService processing;
     @Autowired CollectionSourceContracts sourceContracts;
+    @Test void explicitCellBudgetIsEnforcedAtItsBoundary() {
+        try {
+            org.springframework.test.util.ReflectionTestUtils.setField(service,"maxCells",1L);
+            start();assertFalse(service.complete(service.claim(tenant,connection,Instant.now()),result("合成",null),Instant.now()));
+            org.springframework.test.util.ReflectionTestUtils.setField(service,"maxCells",2L);
+            start();assertTrue(service.complete(service.claim(tenant,connection,Instant.now()),result("合成",null),Instant.now()));
+        } finally {org.springframework.test.util.ReflectionTestUtils.setField(service,"maxCells",4000000L);}
+    }
+
+    @Autowired org.springframework.transaction.PlatformTransactionManager transactionManager;
+    @Test void reversedAdapterRowsDoNotDeadlockOrderedKnowledgeReaders() throws Exception {
+        UUID second=UUID.randomUUID();
+        db.update("INSERT INTO business_datasets(id,tenant_id,connection_id,workspace_id,dataset_key,name,column_names) VALUES (?,?,?,?,'lock-second','合成第二表','[\"门店\",\"数量\"]'::jsonb)",second,tenant,connection,space);
+        var ordered=db.queryForList("SELECT id FROM business_datasets WHERE tenant_id=? AND connection_id=? ORDER BY id",UUID.class,tenant,connection);
+        start();var claim=service.claim(tenant,connection,Instant.now());
+        var input=new CollectionAdapter.Result("1.0",List.of(
+            new CollectionAdapter.Snapshot(ordered.get(1),null,List.of(List.of("合成","2"))),
+            new CollectionAdapter.Snapshot(ordered.getFirst(),null,List.of(List.of("合成","1")))));
+        var locked=new java.util.concurrent.CountDownLatch(1);var writerStarted=new java.util.concurrent.CountDownLatch(1);
+        try(var executor=java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+            var reader=executor.submit(()->new org.springframework.transaction.support.TransactionTemplate(transactionManager).execute(status->{
+                db.queryForList("SELECT id FROM business_datasets WHERE id=? FOR SHARE",ordered.getFirst());locked.countDown();
+                try {assertTrue(writerStarted.await(3,java.util.concurrent.TimeUnit.SECONDS));Thread.sleep(250);} catch(InterruptedException e){throw new RuntimeException(e);}
+                db.queryForList("SELECT id FROM business_datasets WHERE id=? FOR SHARE",ordered.get(1));return true;
+            }));
+            assertTrue(locked.await(3,java.util.concurrent.TimeUnit.SECONDS));
+            var writer=executor.submit(()->{writerStarted.countDown();return service.complete(claim,input,Instant.now());});
+            assertTrue(reader.get(10,java.util.concurrent.TimeUnit.SECONDS));assertTrue(writer.get(10,java.util.concurrent.TimeUnit.SECONDS));
+        }
+    }
+
     @Test void pendingSourcesRetainTheirSnapshotAndDoNotBlockOtherTables() {
         start();assertTrue(service.complete(service.claim(tenant,connection,Instant.now()),result("原版本",null),Instant.now()));
         UUID previous=db.queryForObject("SELECT current_snapshot FROM business_datasets WHERE id=?",UUID.class,dataset);
