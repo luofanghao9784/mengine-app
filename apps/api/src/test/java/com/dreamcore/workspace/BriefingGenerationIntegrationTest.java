@@ -420,6 +420,22 @@ class BriefingGenerationIntegrationTest {
   assertEquals(2,recommendations.list(actor,tenant,space,0,20,null,true).items().size());
   assertThrows(IdentityException.class,()->cards.get(reader,tenant,j.id()));
  }
+ @Test void serverConfirmedDuplicateSettlesPartialBatchWithoutTrustingModelProse(){
+  upload("marker 合成重复交付依据。",true);
+  manual();UUID p=policy();generation.tick(p);deliver(conversations.claim(),"同一份合成依据支持的重复结论，不应再次出卡。");generation.tick(p);
+  var next=manual();generation.tick(p);var j=conversations.claim();
+  assertEquals("NO_NEW_CONTENT",deliver(j,"同一份合成依据支持的重复结论，不应再次出卡。").get("status"));
+  db.update("UPDATE conversation_tasks SET status='PARTIAL' WHERE id=?",j.id());
+  generation.tick(p);
+  assertEquals("NO_NEW_CONTENT",generation.get(actor,tenant,next.id()).status());
+  assertEquals("DUPLICATE_CONTENT",generation.get(actor,tenant,next.id()).reason());
+  assertEquals("PARTIAL",db.queryForObject("SELECT status FROM conversation_tasks WHERE id=?",String.class,j.id()));
+  var unsupported=manual();generation.tick(p);var noReceipt=conversations.claim();complete(noReceipt);
+  db.update("UPDATE conversation_tasks SET status='PARTIAL',reply='模型声称没有新内容' WHERE id=?",noReceipt.id());
+  db.update("INSERT INTO identity_audit(actor_id,tenant_id,action,target_id,outcome) VALUES (?,?,'TASK_BRIEFING_DUPLICATE',?,'SUCCESS')",actor,tenant,UUID.randomUUID());
+  generation.tick(p);assertEquals("FAILED",generation.get(actor,tenant,unsupported.id()).status());
+ }
+
  @Test void identicalContentIsNotPublishedAgainEvenWithNewTask(){
   upload("marker 相同来源。",true);
   var b=manual();UUID p=policy();generation.tick(p);deliver(conversations.claim(),"这是不应该重复发布的同一条有据结论。");generation.tick(p);

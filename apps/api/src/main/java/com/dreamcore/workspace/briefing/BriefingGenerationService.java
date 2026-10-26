@@ -546,6 +546,22 @@ public class BriefingGenerationService {
         if(!p.get("epoch").equals(b.get("policy_epoch"))){tasks.interruptTasks(tenant,List.of(task),"BRIEFING_AUTHORITY_CHANGED");finish(batch,"AUTHORITY_REVOKED","AUTHORITY_CHANGED");return;}
         var t=db.queryForMap("SELECT status,attempt,error_code FROM conversation_tasks WHERE id=?",task);String status=(String)t.get("status");
         if(Set.of("QUEUED","RUNNING").contains(status))return;
+        // A checked duplicate delivery is a completed empty batch even if earlier
+        // recoverable tool calls left the task partial. Model prose is not evidence.
+        if(status.equals("PARTIAL") && t.get("error_code")==null && Boolean.TRUE.equals(db.queryForObject("""
+            SELECT EXISTS(SELECT 1 FROM conversation_attempts a
+              JOIN conversation_tasks t ON t.id=a.task_id
+              JOIN identity_audit i ON i.target_id=a.attempt_id AND i.tenant_id=t.tenant_id AND i.actor_id=t.requested_by
+              WHERE a.task_id=? AND a.attempt_number=? AND i.action='TASK_BRIEFING_DUPLICATE' AND i.outcome='SUCCESS'
+              AND NOT t.reconciliation_required
+              AND EXISTS(SELECT 1 FROM conversation_tool_receipts r WHERE r.task_id=a.task_id
+                AND r.attempt_number=a.attempt_number AND r.name='deliver_briefing' AND r.status='succeeded'))
+            """,Boolean.class,task,t.get("attempt")))) {
+            finish(batch,"NO_NEW_CONTENT","DUPLICATE_CONTENT");
+            if("INFO".equals(b.get("business_type")))db.update("UPDATE briefing_generation_policies SET info_day=? WHERE id=?",java.sql.Date.valueOf(clock.now().atZone(ZoneId.of("Asia/Shanghai")).toLocalDate()),p.get("id"));
+            else db.update("UPDATE briefing_generation_policies SET data_key=?,context_key=? WHERE id=?",b.get("source_key"),b.get("context_key"),p.get("id"));
+            return;
+        }
         // A bounded news search with no readable article is a completed empty result, not a generation error.
         if(status.equals("PARTIAL")&&"INFO".equals(b.get("business_type"))&&emptyNewsSearch(task,(Integer)t.get("attempt"))){
             finish(batch,"NO_NEW_CONTENT","NEWS_NO_NEW_CONTENT");

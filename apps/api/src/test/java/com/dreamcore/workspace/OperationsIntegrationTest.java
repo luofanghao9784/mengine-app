@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={"dreamcore.tasks.enabled=true","dreamcore.tasks.initial-delay-ms=3600000","dreamcore.knowledge.enabled=true","dreamcore.knowledge.initial-delay-ms=3600000"})
 class OperationsIntegrationTest {
     @Autowired OperationsService operations; @Autowired EngineTelemetryService telemetry; @Autowired ConversationService conversations; @Autowired MaterialService materials;
-    @Autowired JdbcTemplate db; @Autowired PasswordEncoder passwords; @LocalServerPort int port;
+    @Autowired EngineAttentionService attention; @Autowired JdbcTemplate db; @Autowired PasswordEncoder passwords; @LocalServerPort int port;
     UUID tenant,other,admin,member,operator,space,foreign;
     static final String PASSWORD="synthetic-operations-password",SECRET="private-content-never-project";
     @BeforeEach void fixture(){
@@ -114,6 +114,28 @@ class OperationsIntegrationTest {
         var serialized=new JsonMapper().writeValueAsString(s);for(String forbidden:List.of(SECRET,connection.toString(),member.toString(),"workspaceId","prompt","filename"))assertFalse(serialized.contains(forbidden));
         db.update("UPDATE collection_runs SET status='SUCCEEDED',finished_at=now() WHERE connection_id=?",connection);assertEquals(1,channel(telemetry.read(admin,tenant,false),"COLLECTION").completedRecent());
     }
+    @Test void collectionDiagnosticArchivePreservesFailureAndNewFailuresRemainVisible(){
+        UUID connection=UUID.randomUUID(),run=UUID.randomUUID();
+        db.update("INSERT INTO data_connections(id,tenant_id,name,route_label,access_summary,status,time_zone) VALUES (?,?,?,?,?,'READY','UTC')",connection,tenant,SECRET,SECRET,SECRET);
+        db.update("INSERT INTO collection_runs(id,tenant_id,connection_id,execution_epoch,trigger_kind,status,reason,finished_at) VALUES (?,?,?,0,'SCHEDULED','FAILED','COLLECTION_ADAPTER_FAILED',now())",run,tenant,connection);
+        assertEquals(1,channel(telemetry.read(admin,tenant,false),"COLLECTION").failed());
+        db.update("INSERT INTO engine_diagnostic_archives(tenant_id,record_kind,record_id,record_stamp,operation_id,reason) SELECT ?,'COLLECTION',id,jsonb_build_array(status,reason,finished_at)::text,?,'synthetic wrong scope' FROM collection_runs WHERE id=?",other,UUID.randomUUID(),run);
+        assertEquals(1,channel(telemetry.read(admin,tenant,false),"COLLECTION").failed());
+        db.update("INSERT INTO engine_diagnostic_archives(tenant_id,record_kind,record_id,record_stamp,operation_id,reason) SELECT tenant_id,'COLLECTION',id,jsonb_build_array(status,reason,finished_at)::text,?,'synthetic successful replacement' FROM collection_runs WHERE id=?",UUID.randomUUID(),run);
+        assertEquals(0,channel(telemetry.read(admin,tenant,false),"COLLECTION").failed());
+        assertEquals(0,attention.read(operator,tenant,"FAILED",0).total());
+        assertEquals("FAILED",db.queryForObject("SELECT status FROM collection_runs WHERE id=?",String.class,run));
+        assertEquals(0,db.queryForObject("SELECT count(*) FROM engine_unarchived_collections WHERE id=?",Integer.class,run));
+        UUID later=UUID.randomUUID();
+        db.update("INSERT INTO collection_runs(id,tenant_id,connection_id,execution_epoch,trigger_kind,status,reason,finished_at) VALUES (?,?,?,0,'SCHEDULED','FAILED','COLLECTION_TIMEOUT',now())",later,tenant,connection);
+        assertEquals(1,channel(telemetry.read(admin,tenant,false),"COLLECTION").failed());
+        assertEquals(1,db.queryForObject("SELECT count(*) FROM engine_unarchived_collections WHERE id=?",Integer.class,later));
+        // Even a changed diagnostic stamp on the same row is visible again.
+        db.update("UPDATE collection_runs SET reason='COLLECTION_TIMEOUT' WHERE id=?",run);
+        assertEquals(2,channel(telemetry.read(admin,tenant,false),"COLLECTION").failed());
+        assertEquals(0,db.queryForObject("SELECT count(*) FROM engine_unarchived_collections WHERE tenant_id=?",Integer.class,other));
+    }
+
     @Test void emptySnapshotKeepsUnknownModelUsageDistinctFromZero(){
         var r=operations.tenant(admin,tenant,7);assertEquals(0,r.tasks().total());assertEquals(0,r.storage().originalBytes());assertTrue(r.models().isEmpty());assertTrue(r.errors().isEmpty());assertEquals(7*86400,r.checkedAt().getEpochSecond()-r.from().getEpochSecond());
     }
