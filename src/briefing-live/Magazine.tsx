@@ -107,7 +107,9 @@ export function MagazineBody({
     if (!copy || !paragraph || chart || compact || composed) return;
     const measure = () => {
       const lineHeight = parseFloat(getComputedStyle(paragraph).lineHeight);
-      const available = copy.getBoundingClientRect().bottom - paragraph.getBoundingClientRect().top;
+      // DOM rectangles include the mobile grid zoom; CSS line-height does not.
+      const scale = copy.offsetHeight ? copy.getBoundingClientRect().height / copy.offsetHeight : 1;
+      const available = (copy.getBoundingClientRect().bottom - paragraph.getBoundingClientRect().top) / scale;
       const lines = Math.max(1, Math.floor((available + 0.5) / lineHeight));
       paragraph.style.webkitLineClamp = String(lines);
     };

@@ -40,7 +40,9 @@ test('真实关注网格保留拖动缩放与刷新恢复，移除恢复和撤�
   await handle.press('ArrowDown');
   await expect(tile).toHaveAttribute('data-size', '2×2');
   await page.setViewportSize({ width: 390, height: 900 });
-  await expect(tile).toHaveAttribute('data-size', '1×2');
+  // Mobile keeps the two-column design size and scales the card instead of narrowing it.
+  await expect(tile).toHaveAttribute('data-size', '2×2');
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   await page.setViewportSize({ width: 1280, height: 900 });
   await expect(tile).toHaveAttribute('data-size', '2×2');
   await expect(page.getByRole('button', { name: '撤销', exact: true })).toHaveCount(0);

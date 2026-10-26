@@ -1,0 +1,5 @@
+{
+  "source": "https://registry.npmjs.org/node-addon-require-builtin-win32-arm64-msvc/-/node-addon-require-builtin-win32-arm64-msvc-0.1.9.tgz",
+  "integrity": "sha512-FOQuzNe8B1BANu886rJgdbQuRxPGUQmewkykw87wSr32U0ibQ3AWGuUM/Gh7LG4RekjFaifj7gEI/tq2+6GU6g==",
+  "entry": "package/LICENSE"
+}

@@ -38,14 +38,14 @@ public class IdentitySecurity {
     @Bean SecurityFilterChain apiSecurity(HttpSecurity http, IdentityService identities,
                                           HttpSessionSecurityContextRepository contexts, HttpSessionCsrfTokenRepository csrf) throws Exception {
         http.securityContext(c -> c.securityContextRepository(contexts).requireExplicitSave(true))
-            .csrf(c -> c.csrfTokenRepository(csrf).ignoringRequestMatchers("/internal/v1/agent-access/**", "/internal/v1/engine-receipts/**"))
+            .csrf(c -> c.csrfTokenRepository(csrf).ignoringRequestMatchers("/internal/v1/agent-access/**", "/internal/v1/engine-receipts/**", "/internal/v1/native-conversations/**"))
             .requestCache(c -> c.disable()).formLogin(c -> c.disable()).httpBasic(c -> c.disable()).logout(c -> c.disable())
             .authorizeHttpRequests(a -> a
                 .dispatcherTypeMatchers(jakarta.servlet.DispatcherType.ERROR).permitAll()
                 .requestMatchers("/api/v1/system/info", "/actuator/health", "/api/v1/auth/csrf", "/api/v1/auth/login", "/api/v1/auth/invitations/accept").permitAll()
                 .requestMatchers("/api/v1/auth/phone/configuration", "/api/v1/auth/phone/invitation", "/api/v1/auth/phone/switch-account", "/api/v1/auth/phone/challenges", "/api/v1/auth/phone/accept", "/api/v1/auth/phone/reset", "/api/v1/auth/phone/local-code/*").permitAll()
                 .requestMatchers("/api/platform-admin/v1/auth/csrf", "/api/platform-admin/v1/auth/login", "/api/platform-admin/v1/auth/invitation/preview", "/api/platform-admin/v1/auth/invitation/challenge", "/api/platform-admin/v1/auth/invitation/accept").permitAll()
-                .requestMatchers("/internal/v1/agent-access/**", "/internal/v1/engine-receipts/**").permitAll() // Every operation validates a running task attempt capability.
+                .requestMatchers("/internal/v1/agent-access/**", "/internal/v1/engine-receipts/**", "/internal/v1/native-conversations/**").permitAll() // Every operation validates a running task attempt capability.
                 .anyRequest().authenticated())
             .exceptionHandling(e -> e
                 .authenticationEntryPoint((request,response,error) -> writeError(response,401,"AUTHENTICATION_REQUIRED"))

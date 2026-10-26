@@ -9,7 +9,7 @@ import { Session, type SessionId } from '@deepseek-ai/dsh-session';
 import { brandString } from '@deepseek-ai/dsh-brand';
 import { SessionTitleProviderId } from '@deepseek-ai/dsh-session-title';
 import {
-  generateSessionTitleWithLlm,
+  executeSessionTitleLlm,
   resolveSessionTitleLlmConfig,
 } from '@deepseek-ai/dsh-session-title-llm';
 import { RuntimeError, type ModelBlock } from './ports.js';
@@ -53,7 +53,7 @@ export async function generateTitle(
             ],
           },
           ...request.messages.map((message) => ({
-            role: message.role,
+            role: message.role === 'developer' ? 'system' : message.role === 'tool' ? 'user' : message.role,
             content: message.content.flatMap((block): ModelBlock[] =>
               block.type === 'text' ? [{ type: 'text', text: block.text }] : [],
             ),
@@ -91,11 +91,9 @@ export async function generateTitle(
       { surfaceOp: 'append' },
     );
     const messages = [{ seq: event.seq, text: prompt }];
-    const result = await generateSessionTitleWithLlm(
+    const result = await executeSessionTitleLlm(
       ctx,
       resolveSessionTitleLlmConfig({
-        targetWords: 6,
-        targetCjkCharacters: 14,
         maxInputBytes: 12000,
         maxOutputTokens: 128,
         timeoutMs: 12000,
@@ -103,11 +101,14 @@ export async function generateTitle(
         model: 'configured-port',
       }),
       { session, messages, signal },
-      messages,
       SessionTitleProviderId('dreamcore-first-work-title'),
+      { system: 'Write a concise title for this business-work conversation.', input: prompt,
+        messageSeqs: [event.seq], selectReasoningEffort: () => undefined },
     );
     signal.throwIfAborted();
-    const title = result.title.replace(/^["“”'「」]+|["“”'「」]+$/g, '').trim();
+    if (result.finish.kind !== 'stop' || result.blocks.some(block => block.type !== 'text'))
+      throw new RuntimeError('INVALID_TITLE');
+    const title = result.blocks.map(block => block.type === 'text' ? block.text : '').join('').replace(/^["“”'「」]+|["“”'「」]+$/g, '').trim();
     if (!validTitle(title)) throw new RuntimeError('INVALID_TITLE');
     return title;
   } finally {

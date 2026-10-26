@@ -1,0 +1,27 @@
+# DH 0.2.1-rc.2 full Web profile. Preserve the upstream agent and UI;
+# enterprise data/identity and model-budget bridges are installed separately.
+# No customer content or plugin inventory may leave through upstream telemetry.
+- id: session-log-deepseek
+  disabled: true
+- id: session-telemetry-otel
+  disabled: true
+- id: plugin-package-inventory-deepseek
+  disabled: true
+- id: desktop-product-telemetry
+  disabled: true
+- id: product-analytics
+  disabled: true
+- id: llm-deepseek-account
+  disabled: true
+- id: deepseek-account
+  disabled: true
+# Shared host code is deployment-owned. Agent skills/tools execute in their
+# workspace; they must not mutate the host plugin installation.
+- id: plugin-manager
+  disabled: true
+- id: hmr
+  disabled: true
+- id: account-controller
+  disabled: true
+- id: ui-settings-account
+  disabled: true

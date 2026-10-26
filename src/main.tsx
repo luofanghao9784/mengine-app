@@ -6,4 +6,10 @@ import './briefingDesign.css';
 import './briefingFeedback.css';
 import './library.css';
 import './briefingMagazine.css';
-createRoot(document.getElementById('root')!).render(<DemoBootstrap />);
+if (window.location.pathname === '/native-conversations') {
+  void import('./native-conversation/NativeConversations').then(({ NativeConversations }) => {
+    createRoot(document.getElementById('root')!).render(<NativeConversations />);
+  });
+} else {
+  createRoot(document.getElementById('root')!).render(<DemoBootstrap />);
+}

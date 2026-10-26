@@ -16,7 +16,6 @@ import Sessions, { type SessionId } from '@deepseek-ai/dsh-session';
 import Projections from '@deepseek-ai/dsh-session-projection';
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt';
 import Tools, { assertObjectJsonSchema, validateJsonSchemaValue } from '@deepseek-ai/dsh-tools';
-import Invariants from '@deepseek-ai/dsh-invariants';
 import { brandString } from '@deepseek-ai/dsh-brand';
 import { TASK_RULES, TASK_RULES_VERSION, capabilityDirectory } from './task-rules.js';
 import {
@@ -135,7 +134,7 @@ export async function runHarness(options: {
       }, 400);
   };
   try {
-    for (const plugin of [Llm, Agents, Sessions, Projections, Invariants]) ctx.plugin(plugin);
+    for (const plugin of [Llm, Agents, Sessions, Projections]) ctx.plugin(plugin);
     ctx.plugin(SystemPrompt, { includeHarnessIdentity: false, includeRuntimeContext: false });
     ctx.plugin(Tools, { mode: 'native' });
     ctx.plugin(AgentLoop, { agents: [], maxParallelToolCalls: 1 });
@@ -167,24 +166,23 @@ export async function runHarness(options: {
         const finalDelivery = finalResponse && options.finishOnDeliverable === true &&
           !completedDeliverable && toolCalls < maxTools;
         if (finalResponse) result.finalResponseReserved = true;
-        const messages = request.messages.map((message) => ({
-          role: message.role,
-          content: message.content.flatMap((block): ModelBlock[] => {
-            if (block.type === 'text') return [{ type: 'text', text: block.text }];
-            if (block.type === 'tool-call')
-              return [{ type: 'tool_call', id: block.id, name: block.name, arguments: block.arguments }];
-            if (block.type === 'tool-result')
-              return [
-                {
-                  type: 'tool_result',
-                  id: block.toolCallId,
-                  content: JSON.stringify(block.content),
-                  isError: block.isError ?? false,
-                },
-              ];
-            throw new RuntimeError('UNSUPPORTED_MODEL_CONTENT');
-          }),
-        }));
+        const messages: Parameters<ModelPort['generate']>[0]['messages'] = request.messages.map((message) => {
+          if (message.role === 'tool') return {
+            role: 'user', content: [{ type: 'tool_result', id: message.toolCallId,
+              content: JSON.stringify(message.content), isError: message.isError ?? false }],
+          };
+          return {
+            role: message.role === 'developer' ? 'system' : message.role,
+            content: message.content.flatMap((block): ModelBlock[] => {
+              if (block.type === 'text') return [{ type: 'text', text: block.text }];
+              if (block.type === 'tool-call')
+                return [{ type: 'tool_call', id: block.id, name: block.name, arguments: block.arguments }];
+              // This bridge serves the existing text-only platform workflows. Native
+              // sessions use the full DH provider protocol rather than this projection.
+              throw new RuntimeError('UNSUPPORTED_MODEL_CONTENT');
+            }),
+          };
+        });
         const ordinaryFinal = finalResponse && options.finishOnDeliverable !== true;
         if (ordinaryFinal) {
           // Keep authorized model projections, not raw tool outputs. Remove pending
@@ -508,9 +506,9 @@ export async function runHarness(options: {
         receipts.set(event.data.callId, receipt);
       }
       if (event.type === 'tool/result') {
-        const receipt = receipts.get(event.data.message.content[0].toolCallId);
+        const receipt = receipts.get(event.data.message.toolCallId);
         if (receipt) {
-          receipt.status = event.data.message.content[0].isError ? 'failed' : 'succeeded';
+          receipt.status = event.data.message.isError ? 'failed' : 'succeeded';
           if (receipt.status === 'succeeded' && toolOutputs.has(receipt.callId))
             receipt.output = toolOutputs.get(receipt.callId);
         }

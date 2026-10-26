@@ -12,7 +12,16 @@ text +=
 text += '| Package | Version | Declared license |\n| --- | --- | --- |\n';
 for (const [path, entry] of Object.entries(lock.packages).sort(([a], [b]) => a.localeCompare(b))) {
   if (!path || entry.dev) continue;
-  const metadata = JSON.parse(await readFile(join(root, path, 'package.json'), 'utf8'));
+  let metadata;
+  try {
+    metadata = JSON.parse(await readFile(join(root, path, 'package.json'), 'utf8'));
+  } catch (error) {
+    if (error.code !== 'ENOENT' || !entry.optional || !entry.license) throw error;
+    // npm omits foreign-platform native binaries. Still include their locked
+    // license, verified from the integrity-pinned registry tarball and vendored
+    // below, so notices/checks are identical on macOS, Windows and Linux.
+    metadata = { name: path.split('node_modules/').at(-1), version: entry.version, license: entry.license };
+  }
   if (metadata.version !== entry.version) throw new Error(`Install differs from lock: ${path}`);
   let license;
   for (const filename of ['LICENSE', 'LICENSE.txt', 'LICENSE.md', 'LICENSE.markdown', 'license.md']) {
