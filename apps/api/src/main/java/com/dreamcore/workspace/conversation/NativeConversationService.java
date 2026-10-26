@@ -50,6 +50,17 @@ public class NativeConversationService {
   }
   return s;
  }
+ @Transactional public Session require(UUID actor,UUID tenant,UUID id,boolean execution){return authorize(actor,tenant,id,execution);}
+ public record Reference(UUID materialId,UUID versionId) {}
+ @Transactional public void references(UUID actor,UUID tenant,UUID id,List<Reference> refs){
+  authorize(actor,tenant,id,true);
+  if(refs==null||refs.size()>20)throw IdentityException.invalid();
+  for(var ref:refs){
+   if(ref==null||ref.materialId()==null||ref.versionId()==null)throw IdentityException.invalid();
+   if(!Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM material_versions WHERE id=? AND material_id=? AND tenant_id=?)",Boolean.class,ref.versionId(),ref.materialId(),tenant)))throw denied();
+   access.requireVersion(actor,tenant,ref.versionId(),false);remember(id,ref.versionId(),false);
+  }
+ }
  @Transactional public Session open(UUID actor,UUID tenant,Open input){
   if(input==null||input.requestId()==null||input.workspaceId()==null)throw IdentityException.invalid();
   access.require(actor,tenant,input.workspaceId(),false);departure.requireActiveBusiness(actor,tenant);

@@ -10,7 +10,7 @@ COPY profiles/ ./profiles/
 COPY tests/native-wire-usage.test.mjs tests/native-model-gateway.test.mjs tests/native-budget.test.mjs tests/native-budget-stream.test.mjs tests/native-runtime.test.mjs tests/native-profile.test.mjs ./tests/
 COPY tests/fixtures/native-model.mjs ./tests/fixtures/
 COPY tests/integration/native-shell.mjs ./tests/integration/
-COPY scripts/native-web-upgrade.mjs scripts/native-web-host.mjs scripts/native-web-runtime.mjs scripts/native-web-bridge.mjs ./scripts/
+COPY scripts/native-sdk-plugin.mjs scripts/native-sdk-runtime.mjs scripts/native-stream-store.mjs scripts/native-web-upgrade.mjs scripts/native-web-host.mjs scripts/native-web-runtime.mjs scripts/native-web-bridge.mjs ./scripts/
 RUN npm run build
 USER 1000:1000
 ENV HOME=/tmp/dh-home NARB_DISABLE_NATIVE_CACHE=1

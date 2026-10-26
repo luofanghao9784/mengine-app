@@ -112,7 +112,7 @@
 3. Codex：B4、B5、B6、B7；Claude：第二批前端与管理端开关、技能上架、缺技能需求处理。
 4. 新的企业插件后期单独规划。
 
-## 附录 A：B1 事件约定（前端契约提案）
+## 附录 A：B1 事件约定（分组保留，平台定稿见附录 C）
 
 转发内容即 DH `dsh-session` 的 `SessionEvent` 原样数据（0.2.1-rc.2 共 62 种，以 `KNOWN_SESSION_EVENT_TYPES` 为准），平台只做鉴权、按会话过滤与去除内部字段，不改写语义。前端第一批按以下分组渲染，其余类型在界面上忽略但不丢弃：
 
@@ -129,9 +129,9 @@
 | 反馈 | `feedback/*` | 回复评价 |
 | 维护 | `compaction/*` `llm/retry*` `image/offload` | 显示“正在整理上下文 / 重试中”提示 |
 
-另需 `session.status`（整个智能体运行 / 空闲）与断线续传：前端带上最后收到的事件序号重连，平台从该序号之后补发。AI 向用户提问的事件类型以 `dsh-user-questions` 实际定义为准，B1 定稿时补入本表。
+另需 `session.status`（整个智能体运行 / 空闲）与断线续传：前端带上最后收到的事件序号重连，平台从该序号之后补发。AI 提问以真实工具事件及附录 C 的 `question/asked`、`question/deadline`、`question/closed` 适配通知呈现；不虚构 DH SessionEvent 类型。
 
-## 附录 B：第一批前端已就绪的调用约定（B1–B3 提案，待 Codex 定稿）
+## 附录 B：第一批前端调用约定（B1–B3，后端差异已在附录 C 定稿）
 
 前端第一批界面（`src/native-conversation/chat/`）已按下列形状实现，后端定稿时如有调整，前端随之修改。所有写操作都带 `requestId` 以便重试去重，并由平台按员工身份与会话授权核对后再转给运行时。
 
@@ -146,3 +146,41 @@
 | 回复评价（B2） | `POST …/{id}/feedback` | `{requestId, messageKey, value: 'up' \| 'down'}` |
 
 前端在某个接口未提供时，对应按钮保持可见但不可用并说明原因，不模拟成功。
+
+## 附录 C：B1–B3 后端定稿（2026-10-26，#120）
+
+本节覆盖附录 A、B 中的提案差异；上述用户业务决定不变。本轮只实施 B1–B3 的第二节范围与附录 B，B4–B8 未因此完成。主线已合入前端 #139、#141；仍需按本节差异接线验收。实现、启动和验证见[后端记录](../变更记录/2026-10-26-DH原生会话B1-B3.md)。
+
+### B1：持久事件与重连
+
+- `GET …/{id}/events?after=0` 为 SSE。普通事件为 `event: message`，预算状态为 `event: status`；两者的 `data` 都是 `{type, seq, time, data, sessionId?, nativeSeq?, surfaceOp?, sourceEventSeqs?, ignorable?}`。
+- `seq` 是平台按会话合并的游标，从 1 开始；根会话、子会话、交互及预算共同排序。原 DH 序号单独放 `nativeSeq`，不能拿子会话自己的序号重连。`time` 保留 DH 毫秒数，平台状态/交互使用 ISO 时间；前端须兼容两种格式。DH 的 `data`、`surfaceOp`、`sourceEventSeqs` 保留；内部 `request/header`、`system/message`、`developer/message` 的 `data` 为 `{redacted:true}`。
+- 同时支持 `Last-Event-ID`，取其与 `after` 的较大值；每批最多 200 条，按序补齐。连接 25 秒后结束，由 EventSource 自动重连；每个账号最多 4 条连接。每批读取重新检查企业、本人、空间、既有资料来源与旧会话权限。
+- `GET …/{id}/history?after=0&limit=200` 返回 `{items,hasMore}`，上限 500。这是平台数据库冷读取，停止运行环境后仍可读，不会启动模型。已撤权来源使历史也不可读。
+- SDK 的 `session.status`、`subagent.started`、`subagent.finished` 独立保留。`session.status.data.status` 为 `running|idle`。
+- `dsh-user-questions` 没有附录 A 假定的独立 SessionEvent 类型。保留真实 `tool/call`、`tool/result` 与迟到回答的 `user/message`，另由平台适配提供 `question/asked`（`callId,questions,timed`）、`question/deadline`（`callId,remainingMs,deadline`）、`question/closed`（`callId,outcome`）。`ASK_TIMED_OUT` 表示超时后仍可迟到作答，不代表跳过或批准。计划请求使用 `questions[].intent.kind='plan-review'`。
+- 事件先写隔离桥接层持久 outbox，再镜像到平台；按 receipt key 去重。后端读取的是实际接收到的事件，不补造既有独立 Web 会话从未镜像的历史。
+
+### B2：操作与回执
+
+附录 B 的发送、停止、回答、审批路径与请求保留，补充如下：
+
+| 操作 | 定稿 |
+|---|---|
+| 计划审阅 | `POST …/{id}/plans/{callId}/review`，`{requestId,decision:'APPROVE'|'REVISE',comment?}`；按运行时请求的具名批准选项映射，不能用普通消息冒充批准 |
+| 操作成功 | `{accepted:true,messageId?}` 只表示运行时接收；工作是否完成仍看事件和成果回执 |
+| 幂等 | requestId 为 UUID，在同一会话全部操作间唯一；同请求回放原回执，不同正文返回 `409 NATIVE_REQUEST_CONFLICT`；派发后超时/断连等不明结果返回 `409 NATIVE_OPERATION_OUTCOME_UNKNOWN`，不自动重派，先核对历史。不能换新 requestId 盲目重试 |
+| 引用资料 | materials 最多 20 项；平台核对 materialId/versionId 对应关系及当前阅读权限，记录为后续授权依赖；运行时仍通过企业工具读资料，引用不授予下载权 |
+| 回答/审批 | 只允许真实待处理 callId/approvalId；重复已结束交互不再执行。选项按原问题校验；`selected:[]` 且无 custom 才是跳过。审批仅一次允许/拒绝，不改变策略 |
+| 评价 | `POST …/{id}/feedback` 同附录 B；messageKey 使用平台 **assistant/message 的 seq 十进制字符串**，不是 SDK 随机消息 ID。写入既有 feedback_entries/feedback_versions，kind=NATIVE，up/down 映射 ACHIEVED/NOT_ACHIEVED；不伪造旧任务。`GET …/{id}/feedback` 读取本会话评价。原任务反馈后续动作不能直接套用于 NATIVE |
+
+SDK 0.2.1-rc.2 原生协议不包含回答/审批/停止方法。适配器使用官方 HarnessClient / HarnessSdkJsonRpcServer，扩展固定 `enterprise/*` 操作，调用同版本 agent.cancel、approval/request 和 userQuestions 服务；没有通用 RPC 透传。SDK profile 默认没有提问工具，适配器显式加载官方 timed ask_user_question。审批策略仍由部署 profile 决定，员工 API 不接受模型、工作目录或权限档位。
+
+### B3：状态与预算
+
+- `GET …/{id}/status` 返回 `{available,state,running?,budget?,executionClass?,seq?,time?,reason?}`；无运行回执时 `available:false, reason:'NO_RUNTIME_RECEIPT'`，不伪造费用 0。最后回执超过 10 秒或会话 STOPPED 时 `available:false`，保留最后观测值供说明，不当作当前状态。
+- SSE `status.data` 为 `{running,executionClass,budget}`，桥接层每 2 秒更新。前端也须按 time 检查 10 秒新鲜度，并处理 SSE 断开；不能无限显示最后一次 running 为当前事实。
+- `usedYuan` 是已结算费用；`reservedYuan` 包括在途与用量未知的保守预留；`occupiedYuan=usedYuan+reservedYuan` 才用于预算进度。软/硬成本阈值分别为 `softYuan/hardYuan`；日占用及上限为 `dailyUsedYuan/dailyHardYuan`。
+- `elapsedMinutes` 为桥接层观测的当前/最近一轮耗时，空闲后冻结；`budgetElapsedMinutes` 为预算台账从首次预留开始的累计墙钟时间，继续会话不重置。时间软/硬上限为 `softMinutes/hardMinutes`。`blocked` 保留台账阻断原因。
+- 预算只读取运行容器外的 SQLite 台账；员工和模型不能覆盖状态/预算消息。`executionClass=SYNTHETIC` 的模型不产生供应商账单，不用它证明真实费用结算。
+- 当前授权最长 30 分钟，延续既有会话生命周期；自动唤醒与长期租约刷新属于 B4。本轮不自动部署或开启真实收费模型。

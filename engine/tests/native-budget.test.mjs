@@ -23,11 +23,11 @@ test('reservation is shared by independent connections and survives restart/unkn
   assert.throws(()=>b.reserve(scope,'second',500_000,1,price),{code:'TASK_COST_BUDGET'});
   a.settle(scope,'first',null); a.close(); b.close();
   const c=new LongTaskBudget(path);
-  assert.equal(c.snapshot(scope).task,4_000_000);
+  assert.equal(c.snapshot(scope).task,4_000_000);assert.equal(c.snapshot(scope).settled,0);assert.equal(c.snapshot(scope).held,4_000_000);
   assert.throws(()=>c.reserve(scope,'first',1,1,price),{code:'MODEL_CALL_ALREADY_RESERVED'});
   c.settle(scope,'first',{inputTokens:10,outputTokens:10});
   c.settle(scope,'first',{inputTokens:10,outputTokens:10});
-  assert.equal(c.snapshot(scope).task,20);
+  assert.equal(c.snapshot(scope).task,20);assert.equal(c.snapshot(scope).settled,20);assert.equal(c.snapshot(scope).held,0);
   assert.throws(()=>c.settle(scope,'first',{inputTokens:20,outputTokens:10}),{code:'BUDGET_RECEIPT_CONFLICT'});
   assert.throws(()=>c.settle({...scope,tenant:'tenant-b'},'first',null),{code:'BUDGET_ACCESS_DENIED'});
   c.close();

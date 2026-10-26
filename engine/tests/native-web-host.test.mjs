@@ -25,7 +25,7 @@ test('reopening with a new grant preserves the running root; concurrent invalid 
   const second=await launch('second');assert.equal(second.status,303);
   assert.equal(second.headers.get('set-cookie'),first.headers.get('set-cookie'));
   const calls=(await readFile(join(dir,'calls'),'utf8')).trim().split('\n').map(JSON.parse);
-  assert.equal(calls.filter(a=>a[0]==='run'&&a.includes('-d')).length,1);
+  assert.equal(calls.filter(a=>a[0]==='create'&&a.includes('scripts/native-web-runtime.mjs')).length,1);
   assert.equal(calls.filter(a=>a[0]==='rm').length,0);
  }finally{
   if(child&&child.exitCode===null){child.kill('SIGTERM');await once(child,'exit');}

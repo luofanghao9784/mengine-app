@@ -125,7 +125,8 @@ export class LongTaskBudget {
     const id = key(scope), now = this.now();
     return this.transaction(() => {
       const task = this.db.prepare('SELECT * FROM dh_budget_tasks WHERE id=?').get(id);
-      return { ...this.totals(scope, id, now), startedMs: task ? Number(task.started_ms) : null,
+      const amounts = this.db.prepare(`SELECT coalesce(sum(actual),0) AS settled, coalesce(sum(CASE WHEN actual IS NULL THEN reservation ELSE 0 END),0) AS held FROM dh_budget_calls WHERE task_id=?`).get(id)!;
+      return { ...this.totals(scope, id, now), settled: Number(amounts.settled), held: Number(amounts.held), startedMs: task ? Number(task.started_ms) : null,
         blocked: task?.blocked ?? null, day: day(now), policy: LONG_TASK_POLICY };
     });
   }
