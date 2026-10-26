@@ -102,6 +102,22 @@ class LocalTrialBoundaryTest(unittest.TestCase):
 
 
 class BriefingTrialBoundaryTest(unittest.TestCase):
+    def test_automatic_dataset_knowledge_is_explicit_private_and_disabled_on_restore(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            saved = root / 'automatic-dataset-knowledge.json'
+            self.assertNotIn('AUTOMATIC_DATASET_KNOWLEDGE_TENANTS', trial.instance_extra_environment(root)[0])
+            tenant = '00000000-0000-4000-8000-000000000001'
+            trial.private_write(saved, {'tenantIds': [tenant]})
+            self.assertEqual(tenant, trial.instance_extra_environment(root)[0]['AUTOMATIC_DATASET_KNOWLEDGE_TENANTS'])
+            trial.private_write(saved, {'tenantIds': ['invalid']})
+            with self.assertRaises(trial.TrialError): trial.instance_extra_environment(root)
+            trial.private_write(saved, {'tenantIds': [tenant]})
+            saved.chmod(0o644)
+            with self.assertRaises(trial.TrialError): trial.instance_extra_environment(root)
+            trial.private_write(root / 'restore.json', {})
+            self.assertNotIn('AUTOMATIC_DATASET_KNOWLEDGE_TENANTS', trial.instance_extra_environment(root)[0])
+
     def test_source_evidence_is_private_explicit_and_disabled_on_restore(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)

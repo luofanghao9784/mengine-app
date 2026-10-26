@@ -25,6 +25,8 @@ class NativeAutomaticContinuityIntegrationTest extends TaskDatasetFixture {
     @Autowired NativeFoundationService foundation;
     @Autowired BriefingGenerationService generation;
     @Autowired com.dreamcore.workspace.context.DatasetTaskContext datasetContext;
+    @Autowired com.dreamcore.workspace.knowledge.DatasetKnowledgeService datasetKnowledge;
+    @Autowired com.dreamcore.workspace.scene.NativeKnowledgeService knowledgeScene;
     @TempDir Path directory;
     Path evidence;
     List<Map<String,Object>> schema;
@@ -87,6 +89,63 @@ class NativeAutomaticContinuityIntegrationTest extends TaskDatasetFixture {
         throw new AssertionError("Fixture policy not discovered");
     }
     int dispatched(){return db.queryForObject("SELECT count(*) FROM briefing_generation_batches WHERE tenant_id=? AND task_id IS NOT NULL AND coalesce(business_type,'AUTO')<>'INFO'",Integer.class,tenant);}
+
+    @Test void confirmedDefinitionsAutomaticallyPublishKnowledgeAndRepeatWithoutDuplicates() {
+        UUID release=publish();
+        new com.dreamcore.workspace.knowledge.DatasetKnowledgeWorker(db,datasetKnowledge,tenant.toString()).tick();
+        datasetKnowledge.reconcile(owner,tenant,dataset);
+        var items=datasetKnowledge.current(owner,tenant);
+        assertEquals(1,items.size());assertEquals(release,items.getFirst().releaseId());
+        assertTrue(items.getFirst().content().contains("来源登记数量"));
+        assertTrue(items.getFirst().content().contains("合成来源定义：数量按件登记"));
+        assertFalse(items.getFirst().content().contains("999"));
+        assertEquals(1,db.queryForObject("SELECT count(*) FROM dataset_knowledge_publications WHERE tenant_id=?",Integer.class,tenant));
+        assertTrue(knowledgeScene.snapshot(owner,tenant).path("items").toString().contains("数据口径知识"));
+        snapshot=version(2,List.of(List.of("新店","12.50")));receipt(snapshot,"a".repeat(64));
+        datasetKnowledge.reconcile(owner,tenant,dataset);
+        assertEquals(items.getFirst().id(),datasetKnowledge.current(owner,tenant).getFirst().id());
+    }
+
+    @Test void knowledgeRechecksNewBatchesBeforeWorkerAndResumesSameVersion() {
+        publish();datasetKnowledge.reconcile(owner,tenant,dataset);
+        UUID article=datasetKnowledge.current(owner,tenant).getFirst().id();
+        snapshot=version(2,List.of(List.of("新店","bad-decimal")));receipt(snapshot,"a".repeat(64));
+        assertTrue(datasetKnowledge.current(owner,tenant).isEmpty());
+        datasetKnowledge.reconcile(owner,tenant,dataset);
+        assertEquals("STALE",db.queryForObject("SELECT state FROM dataset_knowledge_publications WHERE id=?",String.class,article));
+        snapshot=version(3,List.of(List.of("新店","12.50")));receipt(snapshot,"a".repeat(64));
+        datasetKnowledge.reconcile(owner,tenant,dataset);
+        assertEquals(article,datasetKnowledge.current(owner,tenant).getFirst().id());
+    }
+
+    @Test void knowledgeRejectsUnpublishedSourcesAndRevokedOrCrossTenantReaders() {
+        datasetKnowledge.reconcile(owner,tenant,dataset);
+        assertTrue(datasetKnowledge.current(owner,tenant).isEmpty());
+        publish();datasetKnowledge.reconcile(owner,tenant,dataset);
+        assertThrows(IdentityException.class,()->datasetKnowledge.current(owner,UUID.randomUUID()));
+        db.update("DELETE FROM workspace_members WHERE tenant_id=? AND workspace_id=? AND account_id=?",tenant,space,owner);
+        assertTrue(datasetKnowledge.current(owner,tenant).isEmpty());
+    }
+
+    @Test void changedBackgroundImmediatelyHidesOldKnowledge() {
+        publish();datasetKnowledge.reconcile(owner,tenant,dataset);
+        company.change(owner,tenant,new CompanyInformationService.Change(UUID.randomUUID(),CompanyInformationService.Field.BUSINESS,0,"ADD",null,"新版合成业务",""));
+        assertTrue(datasetKnowledge.current(owner,tenant).isEmpty());
+        datasetKnowledge.reconcile(owner,tenant,dataset);
+        assertEquals("STALE",db.queryForObject("SELECT state FROM dataset_knowledge_publications WHERE tenant_id=?",String.class,tenant));
+    }
+
+    @Test void sourceReaderCanReadCompiledKnowledgeButCannotPublishIt() {
+        publish();datasetKnowledge.reconcile(owner,tenant,dataset);
+        UUID reader=UUID.randomUUID();
+        db.update("INSERT INTO accounts(id,email,display_name,password_hash) VALUES (?,?,'合成知识读者','unused')",reader,reader+"@knowledge.test");
+        db.update("INSERT INTO tenant_memberships(tenant_id,account_id,role) VALUES (?,?,'MEMBER')",tenant,reader);
+        db.update("INSERT INTO workspace_members(tenant_id,workspace_id,account_id,can_maintain) VALUES (?,?,?,false)",tenant,space,reader);
+        assertEquals(1,datasetKnowledge.current(reader,tenant).size());
+        assertEquals("DATASET_KNOWLEDGE_PUBLISH_FORBIDDEN",assertThrows(IdentityException.class,()->datasetKnowledge.reconcile(reader,tenant,dataset)).code);
+        db.update("DELETE FROM workspace_members WHERE tenant_id=? AND workspace_id=? AND account_id=?",tenant,space,reader);
+        assertTrue(datasetKnowledge.current(reader,tenant).isEmpty());
+    }
 
     @Test void refreshedRowsKeepDefinitionsButRecheckEverySnapshotAndDoNotCallModel() {
         UUID release=publish();String key=governance.analysisReadiness(owner,tenant,dataset).key();

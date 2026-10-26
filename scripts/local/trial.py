@@ -362,6 +362,15 @@ def instance_extra_environment(root):
     if (root / 'restore.json').exists() or (root / 'restore.json').is_symlink():
         return api, engine
     recipe = root / 'onboarding-recipe.json'
+    knowledge = root / 'automatic-dataset-knowledge.json'
+    if knowledge.exists() or knowledge.is_symlink():
+        value = private_read(knowledge)
+        if not isinstance(value, dict) or set(value) != {'tenantIds'} or not isinstance(value['tenantIds'], list) or len(value['tenantIds']) > 100:
+            raise TrialError('自动数据知识配置须为 tenantIds 列表。')
+        try:
+            api['AUTOMATIC_DATASET_KNOWLEDGE_TENANTS'] = ','.join(str(uuid.UUID(v)) for v in value['tenantIds'])
+        except (ValueError, TypeError, AttributeError):
+            raise TrialError('自动数据知识企业标识无效。') from None
     if recipe.exists():
         private_read(recipe)  # Enforce local private-file permissions.
         api['ONBOARDING_RECIPE_FILE'] = str(recipe.resolve())

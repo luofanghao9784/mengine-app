@@ -26,6 +26,8 @@ public class NativeKnowledgeService {
    private NativeGovernanceDeployment governance;
    @Autowired
    private NativeMaterialGovernance materialGovernance;
+   @Autowired
+   private com.dreamcore.workspace.knowledge.DatasetKnowledgeService datasetKnowledge;
    private final MaterialService materials;
    private final WikiArticleService articles;
    private final IdentityService identities;
@@ -151,6 +153,13 @@ public class NativeKnowledgeService {
          );
       }
 
+      var automatic = this.datasetKnowledge.current(actor, tenant);
+      for (var article : automatic) {
+         items.add(this.card("deployment-auto-" + article.id(), article.title(), "数据口径知识",
+            "已确认口径自动整理；来源与权限持续核验", article.content(),
+            List.of(List.of("依据", "已发布数据口径 " + article.releaseId(), "当前有效", "plain")), List.of()));
+      }
+
       List<MaterialService.Entry> sourceList = this.sources(actor, tenant);
 
       for (MaterialService.Entry s : sourceList) {
@@ -199,7 +208,7 @@ public class NativeKnowledgeService {
                      "items",
                      items.stream().filter(i -> !i.get("id").toString().startsWith("deployment-")).toList()
                   ),
-                  Map.of("label", "来自数据 " + governed.size(), "items", items.stream().filter(i -> i.get("id").toString().startsWith("deployment-")).toList())
+                  Map.of("label", "来自数据 " + (governed.size() + automatic.size()), "items", items.stream().filter(i -> i.get("id").toString().startsWith("deployment-")).toList())
                )
             )
       );
@@ -221,7 +230,7 @@ public class NativeKnowledgeService {
       );
       out.set(
          "aside",
-         this.json.valueToTree(Map.of("title", "当前服务", "rows", List.<List<String>>of(List.of("数据来源", "平台原生资料与已发布知识"), List.of("核验", "刷新权限和版本；不自动学习或发布"))))
+         this.json.valueToTree(Map.of("title", "当前服务", "rows", List.<List<String>>of(List.of("数据来源", "平台原生资料、已发布知识与已确认数据口径"), List.of("核验", "已启用企业由后台自动整理数据口径知识；本页刷新权限和版本"))))
       );
       out.put("status", items.size() + " 条已发布知识 · " + waiting.size() + " 份资料待发布 · " + pendingReview + " 项数据成果待复核");
       return out;
