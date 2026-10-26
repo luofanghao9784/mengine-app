@@ -112,6 +112,10 @@ public class NativeFoundationService {
          d.put("usageRules", "按来源字段和已保存说明使用；未知业务含义仍需核实。");
          d.putNull("job");
          d.set("warnings", a.path("issues").deepCopy());
+         if (!a.path("exportValidationSummary").asText().isBlank()) {
+            d.put("usageRules", a.path("exportValidationSummary").asText()
+                + "。按来源字段和已保存说明使用；未知业务含义仍需核实。");
+         }
          d.set("relations", this.json.createArrayNode());
          ArrayNode fields = this.json.createArrayNode();
 

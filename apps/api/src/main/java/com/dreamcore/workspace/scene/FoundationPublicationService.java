@@ -10,6 +10,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -85,7 +86,20 @@ public class FoundationPublicationService {
 
                JsonNode checks = input.path("checks");
                if ("DATASET".equals(r.get("kind")) && !"CHECKED".equals(checks.path("state").asText())) {
-                  warnings.add("来源结构约束检查范围不完整；不能判定全部记录合格");
+                  warnings.add("CHECKED".equals(checks.path("exportValidation").path("state").asText())
+                      ? "导出与接收已核验；源系统业务约束未声明，不能判定全部记录业务合格"
+                      : "来源结构约束检查范围不完整；不能判定全部记录合格");
+               }
+               JsonNode export = checks.path("exportValidation");
+               String exportSummary = "";
+               if ("CHECKED".equals(export.path("state").asText())) {
+                  exportSummary = "已核验导出接收：" + export.path("rowCount").asLong() + " 条、"
+                      + export.path("columnCount").asInt() + " 列逐值摘要一致；采集候选键缺失 "
+                      + export.path("missingKeys").asLong() + "、重复 " + export.path("duplicateKeys").asLong()
+                      + "；不等同源系统主键或财务正确性";
+                  limitations.add(exportSummary);
+               } else if (Set.of("MISMATCH", "STALE", "VIOLATIONS").contains(export.path("state").asText())) {
+                  warnings.add("导出接收检查未通过或依据已过期；不能采用旧核验结论");
                }
 
                if (checks.path("nonNullViolations").asLong() > 0L || checks.path("duplicatePrimaryKeys").asLong() > 0L) {
@@ -120,7 +134,8 @@ public class FoundationPublicationService {
                         parsing,
                         unknown,
                         List.copyOf(warnings),
-                        List.copyOf(limitations)
+                        List.copyOf(limitations),
+                        exportSummary
                      )
                   );
                }
@@ -142,6 +157,7 @@ public class FoundationPublicationService {
          asset.put("unknownFieldCount", p.unknown().size());
          asset.set("unknownFields", this.json.valueToTree(p.unknown()));
          asset.set("limitations", this.json.valueToTree(p.limitations()));
+         asset.put("exportValidationSummary", p.exportSummary());
          asset.set("issues", this.json.valueToTree(p.warnings()));
          asset.set("stageStates", this.json.valueToTree(p.stages()));
          asset.put("gate", 4);
@@ -228,7 +244,8 @@ public class FoundationPublicationService {
       String parsing,
       List<String> unknown,
       List<String> warnings,
-      List<String> limitations
+      List<String> limitations,
+      String exportSummary
    ) {
       public List<String> stages() {
          return List.of("READY", this.parsing, this.unknown.isEmpty() ? "READY" : "PARTIAL", this.warnings.isEmpty() ? "READY" : "ATTENTION", "READY");

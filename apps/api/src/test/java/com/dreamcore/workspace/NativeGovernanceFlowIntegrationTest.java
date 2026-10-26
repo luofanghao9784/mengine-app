@@ -49,6 +49,41 @@ class NativeGovernanceFlowIntegrationTest {
  }
  void background() { company.change(owner,tenant,new CompanyInformationService.Change(UUID.randomUUID(),CompanyInformationService.Field.NAME,0,"ADD",null,"合成治理企业","")); }
  @SuppressWarnings("unchecked")
+ @Test void exportReceiptIsVisibleToGovernanceWithoutInventingSourceConstraints(@org.junit.jupiter.api.io.TempDir java.nio.file.Path directory) throws Exception {
+  background();
+  UUID snapshot=db.queryForObject("SELECT current_snapshot FROM business_datasets WHERE id=?",UUID.class,dataset);
+  String rowsHash=com.dreamcore.workspace.identity.IdentityService.hash("[[\"001\"]]");
+  String technical="采集端将导出编号保存为文本，不证明业务标识含义";
+  var evidence=Map.of("tenantId",tenant.toString(),"entries",List.of(Map.of("datasetId",dataset.toString(),"column","编号",
+      "definitionScope","TECHNICAL_ONLY","sourceMetadata",Map.of("description",technical))),"schema",List.of(Map.of(
+      "datasetId",dataset.toString(),"kind","export-validation","snapshotId",snapshot.toString(),
+      "columns",List.of("编号"),"rowsSha256",rowsHash,"rowCount",1,"candidateKeyColumns",List.of("编号"))));
+  var file=directory.resolve("evidence.json");java.nio.file.Files.writeString(file,new JsonMapper().writeValueAsString(evidence));
+  ReflectionTestUtils.setField(jobs,"evidencePath",file.toString());
+  try {
+   var job=jobs.execute(owner,tenant,new GovernanceModelService.Execute(UUID.randomUUID(),"DATASET",dataset,"SYSTEM_MODEL"));
+   var req=(Map<String,Object>)job.get("request");var context=(Map<String,Object>)req.get("context");
+   var checks=(Map<String,Object>)context.get("checks");
+   assertEquals("NO_SOURCE_CONSTRAINTS",checks.get("state"));
+   assertEquals("CHECKED",((Map<?,?>)checks.get("exportValidation")).get("state"));
+   assertFalse(context.containsKey("rows"));
+   var output=Map.<String,Object>of("title","合成核验","summary","导出已核验，业务定义仍未知","limitations",List.of("不是源数据库主键证明"),
+       "fields",List.of(Map.of("column","编号","decision","UNKNOWN","meaning","缺少业务定义","unit","","evidence","导出候选键不证明业务含义")),"evidence",List.of(),"knowledge",List.of());
+   UUID id=(UUID)job.get("id");
+   var unsupported=new LinkedHashMap<String,Object>(output);
+   unsupported.put("fields",List.of(Map.of("column","编号","decision","REVISE","meaning","已核实业务编号","unit","","evidence",technical)));
+   var rejected=jobs.engineAnswer(owner,tenant,id,new GovernanceModelService.Answer(UUID.randomUUID(),1,req.get("inputHash").toString(),"SYSTEM_MODEL",unsupported));
+   assertEquals("FAILED",rejected.get("state"));assertEquals("GOVERNANCE_EVIDENCE_INVALID",rejected.get("error_code"));
+   jobs.engineAnswer(owner,tenant,id,new GovernanceModelService.Answer(UUID.randomUUID(),2,req.get("inputHash").toString(),"SYSTEM_MODEL",output));
+   db.update("UPDATE governance_model_dispatch SET state='SUCCEEDED' WHERE job_id=?",id);
+   jobs.publish(owner,tenant,id,new GovernanceModelService.Publish(3,req.get("inputHash").toString()));
+   var asset=foundation.detail(owner,tenant,"dataset-"+dataset).path("asset");
+   assertTrue(asset.path("available").asBoolean());assertTrue(asset.path("needsAttention").asBoolean());
+   assertTrue(asset.path("issues").toString().contains("导出与接收已核验"));
+   assertTrue(asset.path("limitations").toString().contains("1 条、1 列逐值摘要一致"));
+  } finally { ReflectionTestUtils.setField(jobs,"evidencePath",""); }
+ }
+ @SuppressWarnings("unchecked")
  @Test void sourceBoundDraftShowsRealProgressAndNeverGrantsReadersGovernanceRights() {
   assertEquals("BACKGROUND_REQUIRED",jobs.datasetStatus(owner,tenant,dataset).get("state"));
   assertEquals("READ_ONLY",jobs.datasetStatus(reader,tenant,dataset).get("state"));

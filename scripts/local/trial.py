@@ -365,6 +365,16 @@ def instance_extra_environment(root):
     if recipe.exists():
         private_read(recipe)  # Enforce local private-file permissions.
         api['ONBOARDING_RECIPE_FILE'] = str(recipe.resolve())
+    evidence = root / 'governance-evidence.json'
+    if evidence.exists() or evidence.is_symlink():
+        value = private_read(evidence)
+        if not isinstance(value, dict) or set(value) - {'tenantId', 'entries', 'schema'} or not isinstance(value.get('tenantId'), str) or not isinstance(value.get('entries'), list) or not isinstance(value.get('schema', []), list):
+            raise TrialError('治理来源证据必须包含 tenantId、entries，可选 schema。')
+        try:
+            uuid.UUID(value['tenantId'])
+        except (ValueError, TypeError, KeyError):
+            raise TrialError('治理来源证据企业标识无效。') from None
+        api['GOVERNANCE_SOURCE_EVIDENCE'] = str(evidence.resolve())
     docling = root / 'docling-runtime.json'
     if docling.exists():
         value = private_read(docling)

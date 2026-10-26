@@ -102,6 +102,28 @@ class LocalTrialBoundaryTest(unittest.TestCase):
 
 
 class BriefingTrialBoundaryTest(unittest.TestCase):
+    def test_source_evidence_is_private_explicit_and_disabled_on_restore(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            saved = root / 'governance-evidence.json'
+            self.assertNotIn('GOVERNANCE_SOURCE_EVIDENCE', trial.instance_extra_environment(root)[0])
+            trial.private_write(saved, {'tenantId': '00000000-0000-4000-8000-000000000001', 'entries': [], 'schema': []})
+            self.assertEqual(str(saved.resolve()), trial.instance_extra_environment(root)[0]['GOVERNANCE_SOURCE_EVIDENCE'])
+            saved.chmod(0o644)
+            with self.assertRaises(trial.TrialError): trial.instance_extra_environment(root)
+            saved.chmod(0o600)
+            saved.unlink()
+            target = root / 'other-evidence.json'
+            trial.private_write(target, {'tenantId': '00000000-0000-4000-8000-000000000001', 'entries': []})
+            saved.symlink_to(target)
+            with self.assertRaises(trial.TrialError): trial.instance_extra_environment(root)
+            saved.unlink()
+            for invalid in [{'tenantId': 'not-a-tenant', 'entries': []}, {'tenantId': '00000000-0000-4000-8000-000000000001', 'entries': 'wrong'}]:
+                trial.private_write(saved, invalid)
+                with self.assertRaises(trial.TrialError): trial.instance_extra_environment(root)
+            trial.private_write(root / 'restore.json', {})
+            self.assertNotIn('GOVERNANCE_SOURCE_EVIDENCE', trial.instance_extra_environment(root)[0])
+
     def test_automatic_generation_requires_explicit_private_config(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
