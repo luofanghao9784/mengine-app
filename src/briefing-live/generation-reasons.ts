@@ -4,6 +4,7 @@ export const businessReadinessReasons: Record<string, string> = {
   SOURCE_GOVERNANCE_REQUIRED: '来源口径尚未发布或已经变化，请先完成治理确认。',
   SOURCE_FIELDS_UNCONFIRMED: '来源仍有字段口径待确认，请在数据基座核对字段依据。',
   SOURCE_CONSTRAINTS_REQUIRED: '缺少来源约束，请补齐检查范围后继续。',
+  SOURCE_DEFINITION_REQUIRED: '来源定义缺失或版本不符，等待采集端交付已认可版本。',
   SOURCE_RECEIPT_REQUIRED: '缺少当前批次的有效采集核验，请等待来源重新采集。',
   SOURCE_VALIDATION_FAILED: '当前批次未通过来源规则检查，请在数据基座查看问题。',
   SOURCE_RELATION_UNVERIFIED: '来源关联尚未通过核验，请先核对关联数据。',

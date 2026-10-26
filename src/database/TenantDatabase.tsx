@@ -41,6 +41,7 @@ const reasons: Record<string, string> = {
   COLLECTION_TIMEOUT: '外部读取超时',
   COLLECTION_ADAPTER_FAILED: '采集执行失败，请联系部署维护人员核对',
   COLLECTION_INVALID_RESULT: '返回的数据未通过结构与范围校验',
+  COLLECTION_SOURCE_CONTRACT_INVALID: '来源定义缺失或与部署认可版本不符；上一批数据已保留',
   COLLECTION_LEASE_EXPIRED: '执行超时，未接受迟到结果',
   TENANT_EXITING: '企业正在退出，取数已停止',
   TENANT_SERVICE_SUSPENDED: '企业服务已暂停',

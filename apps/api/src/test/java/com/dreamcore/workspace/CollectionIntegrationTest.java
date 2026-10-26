@@ -28,6 +28,42 @@ class CollectionIntegrationTest {
     @Autowired com.dreamcore.workspace.scene.NativeFoundationService nativeFoundation;
     @Autowired com.dreamcore.workspace.scene.SceneService scenes;
     @Autowired com.dreamcore.workspace.scene.FoundationProcessingService processing;
+    @Autowired CollectionSourceContracts sourceContracts;
+    @Test void sourceContractsArePinnedPerSnapshotAndRejectWholeBatchBeforeReplacingData(@org.junit.jupiter.api.io.TempDir java.nio.file.Path temp) throws Exception {
+        start();var baseline=service.claim(tenant,connection,Instant.now());
+        assertTrue(service.complete(baseline,result("保留的上一批",null),Instant.now()));
+        UUID previous=db.queryForObject("SELECT current_snapshot FROM business_datasets WHERE id=?",UUID.class,dataset);
+        UUID second=UUID.randomUUID();
+        db.update("INSERT INTO business_datasets(id,tenant_id,connection_id,workspace_id,dataset_key,name,column_names) VALUES (?,?,?,?,'other','另一合成表','[\"门店\",\"数量\"]'::jsonb)",second,tenant,connection,space);
+        var columns=List.of("门店","数量");var rows=List.of(List.of("0001","9007199254740993.01"));
+        String body=JSON.writeValueAsString(Map.of("columns",columns,"scopeHash","a".repeat(64),"entries",List.of(),"schema",List.of()));
+        var contract=new CollectionAdapter.SourceContract("1.0",tenant,dataset,1,IdentityService.hash(body),body);
+        var pin=Map.of("datasetId",dataset.toString(),"kind","source-contract","definitionVersion",1,"definitionSha256",contract.definitionSha256());
+        var file=temp.resolve("evidence.json");
+        java.nio.file.Files.writeString(file,JSON.writeValueAsString(Map.of("tenantId",tenant.toString(),"entries",List.of(),"schema",List.of(pin))));
+        org.springframework.test.util.ReflectionTestUtils.setField(sourceContracts,"evidencePath",file.toString());
+        try {
+            var receipt=new CollectionAdapter.ExportReceipt("1.0",UUID.randomUUID(),Instant.now().minusSeconds(60),Instant.now().minusSeconds(10),"a".repeat(64),true,1,columns,List.of("门店"),IdentityService.hash(JSON.writeValueAsString(rows)));
+            var first=new CollectionAdapter.Snapshot(dataset,null,rows,receipt,contract);
+            // Another dataset cannot borrow the first dataset's otherwise correct definition.
+            start();var rejected=service.claim(tenant,connection,Instant.now());
+            assertFalse(service.complete(rejected,new CollectionAdapter.Result("1.0",List.of(first,new CollectionAdapter.Snapshot(second,null,rows,receipt,contract))),Instant.now()));
+            assertEquals("COLLECTION_SOURCE_CONTRACT_INVALID",service.runs(admin,tenant,connection,0,1).getFirst().reason());
+            assertEquals(previous,db.queryForObject("SELECT current_snapshot FROM business_datasets WHERE id=?",UUID.class,dataset));
+            assertEquals(0,db.queryForObject("SELECT count(*) FROM dataset_snapshots WHERE dataset_id=?",Integer.class,second));
+            start();var accepted=service.claim(tenant,connection,Instant.now());
+            var result=new CollectionAdapter.Result("1.0",List.of(first,new CollectionAdapter.Snapshot(second,null,rows,receipt)));
+            assertTrue(service.complete(accepted,result,Instant.now()));
+            assertFalse(service.complete(accepted,result,Instant.now()));
+            UUID current=db.queryForObject("SELECT current_snapshot FROM business_datasets WHERE id=?",UUID.class,dataset);
+            assertEquals("CHECKED",sourceContracts.check(file.toString(),tenant,dataset,current,columns).get("state"));
+            assertEquals("NOT_RECEIVED",sourceContracts.check(file.toString(),tenant,dataset,previous,columns).get("state"));
+            assertEquals(rows,service.preview(reader,tenant,dataset,0,20).rows());
+            java.nio.file.Files.writeString(file,JSON.writeValueAsString(Map.of("tenantId",tenant.toString(),"schema",List.of(Map.of("datasetId",dataset.toString(),"kind","source-contract","definitionVersion",2,"definitionSha256",contract.definitionSha256())))));
+            assertEquals("MISMATCH",sourceContracts.check(file.toString(),tenant,dataset,current,columns).get("state"));
+            assertEquals(1,JSON.readTree(db.queryForObject("SELECT source_contract::text FROM collection_snapshot_receipts WHERE snapshot_id=?",String.class,current)).path("definitionVersion").asInt());
+        } finally {org.springframework.test.util.ReflectionTestUtils.setField(sourceContracts,"evidencePath","");}
+    }
     @Test void collectedRowsAreNotGovernedOrPublishedAndSummaryMatchesDetail(){
         var before=nativeFoundation.snapshot(reader,tenant);
         assertFalse(before.path("items").get(0).path("available").asBoolean());

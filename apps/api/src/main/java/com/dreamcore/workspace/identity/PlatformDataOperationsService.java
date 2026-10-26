@@ -29,7 +29,7 @@ public class PlatformDataOperationsService {
     (SELECT count(*) FROM business_datasets d WHERE d.connection_id=c.id AND d.status='ACTIVE' AND file_dataset_current(d.id)) dataset_count,
     (SELECT coalesce(sum(s.row_count),0) FROM business_datasets d JOIN dataset_snapshots s ON s.id=d.current_snapshot WHERE d.connection_id=c.id AND d.status='ACTIVE' AND file_dataset_current(d.id)) row_count,
     CASE WHEN c.effective_status='UNAVAILABLE' THEN 'CONNECTION_UNAVAILABLE' WHEN c.effective_status='UNCONFIGURED' THEN 'CONNECTION_UNCONFIGURED'
-     WHEN r.status IN('FAILED','INTERRUPTED') THEN CASE WHEN r.reason IN('COLLECTION_TIMEOUT','COLLECTION_INVALID_RESULT','COLLECTION_ADAPTER_FAILED','COLLECTION_INTERRUPTED') THEN r.reason ELSE 'OTHER' END ELSE NULL END diagnostic,
+     WHEN r.status IN('FAILED','INTERRUPTED') THEN CASE WHEN r.reason IN('COLLECTION_TIMEOUT','COLLECTION_INVALID_RESULT','COLLECTION_SOURCE_CONTRACT_INVALID','COLLECTION_ADAPTER_FAILED','COLLECTION_INTERRUPTED') THEN r.reason ELSE 'OTHER' END ELSE NULL END diagnostic,
     coalesce(r.created_at,c.created_at) created_at,r.finished_at,
     (SELECT max(done.finished_at) FROM collection_runs done WHERE done.connection_id=c.id AND done.status='SUCCEEDED' AND done.finished_at<=statement_timestamp()) last_success_at
    FROM (SELECT c0.*,CASE WHEN EXISTS(SELECT 1 FROM file_table_sources f JOIN business_datasets d ON d.id=f.dataset_id WHERE d.connection_id=c0.id)

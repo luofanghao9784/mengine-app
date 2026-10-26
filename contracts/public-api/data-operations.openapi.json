@@ -405,6 +405,7 @@
               "CONNECTION_UNCONFIGURED",
               "COLLECTION_TIMEOUT",
               "COLLECTION_INVALID_RESULT",
+            "COLLECTION_SOURCE_CONTRACT_INVALID",
               "COLLECTION_ADAPTER_FAILED",
               "COLLECTION_INTERRUPTED",
               "OTHER",

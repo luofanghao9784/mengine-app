@@ -89,10 +89,19 @@ public class FoundationPublicationService {
                    ? this.json.valueToTree(this.governance.currentDatasetSource(actor, tenant, UUID.fromString(c.getKey().substring(8)))) : input;
                JsonNode checks = currentSource.path("checks");
                if ("DATASET".equals(r.get("kind")) && !"CHECKED".equals(checks.path("state").asText())) {
-                  warnings.add("CHECKED".equals(checks.path("exportValidation").path("state").asText())
-                      ? "导出与接收已核验；源系统业务约束未声明，不能判定全部记录业务合格"
-                      : "来源结构约束检查范围不完整；不能判定全部记录合格");
+                  warnings.add(switch(checks.path("state").asText()) {
+                      case "SOURCE_CONTRACT_REQUIRED" -> "MISMATCH".equals(checks.path("sourceContract").path("state").asText())
+                          ? "来源定义版本与部署认可版本不一致；需重新核对并采集，自动分析暂停"
+                          : "当前批次未附带已认可的来源定义；等待采集端补齐后重新采集";
+                      case "NO_SOURCE_CONSTRAINTS" -> "CHECKED".equals(checks.path("exportValidation").path("state").asText())
+                          ? "导出与接收已核验；尚无已确认业务规则，待补充来源声明后逐批检查"
+                          : "尚无已确认业务规则；导出接收依据也待补齐";
+                      default -> "来源检查未完成；请核对具体检查项与依据";
+                  });
                }
+               if ("CHECKED".equals(checks.path("sourceContract").path("state").asText()))
+                  limitations.add("本批已接收并核对来源定义第 " + checks.path("sourceContract").path("definitionVersion").asInt()
+                      + " 版；业务规则由梦擎对当前记录独立复核，定义接收不代表全部记录合格");
                JsonNode export = checks.path("exportValidation");
                String exportSummary = "";
                if ("CHECKED".equals(export.path("state").asText())) {

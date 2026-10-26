@@ -43,6 +43,7 @@ public class GovernanceModelService {
    private NativeMaterialGovernance materialReleases;
    private final JsonMapper json = new JsonMapper();
    @Autowired private com.dreamcore.workspace.plans.PlanClock analysisClock;
+   @Autowired private com.dreamcore.workspace.collection.CollectionSourceContracts sourceContracts;
    @Value("${dreamcore.governance.dispatch-enabled:false}")
    private boolean dispatchEnabled;
 
@@ -153,7 +154,7 @@ public class GovernanceModelService {
          out.put("nullCounts", nulls);
          out.put("contentHash", IdentityService.hash(r.get("data_rows").toString()));
          out.put("coverageThrough", Objects.toString(r.get("coverage_through"), ""));
-         out.put("sourceEvidence", this.sourceEvidence(tenant, id, r.get("name").toString(), "entries"));
+         out.put("sourceEvidence", this.sourceContracts.section(evidencePath, tenant, id, (UUID)r.get("snapshot_id"), "entries"));
          out.put("checks", this.checks(actor, tenant, id, (UUID)r.get("snapshot_id"), r.get("name").toString(), columns, rows));
          out.put("coverage", "完整当前快照的行数和逐列NULL计数；仅元数据送入模型，不包含原始个人数据。结构检查不是业务正确性或发布证明。");
       } else {
@@ -209,7 +210,8 @@ public class GovernanceModelService {
    }
 
    private Map<String, Object> checks(UUID actor, UUID tenant, UUID dataset, UUID snapshot, String table, List<?> columns, List<?> rows) {
-      List<Map<String, Object>> schema = this.sourceEvidence(tenant, dataset, table, "schema");
+      List<Map<String, Object>> schema = this.sourceContracts.section(evidencePath, tenant, dataset, snapshot, "schema");
+      Map<String,Object> contract = this.sourceContracts.check(evidencePath, tenant, dataset, snapshot, columns);
       // The adapter receipt is bound to this accepted platform snapshot, never a stale deployment sample.
       var received = this.db.queryForList("SELECT receipt::text FROM collection_snapshot_receipts WHERE snapshot_id=? AND tenant_id=? AND dataset_id=?", String.class, snapshot, tenant, dataset);
       var exportEvidence = new ArrayList<Map<String,Object>>(schema);
@@ -219,8 +221,12 @@ public class GovernanceModelService {
       }
       Map<String,Object> export = ExportSnapshotChecks.check(snapshot, columns, rows, exportEvidence);
       Map<String,Object> values = DeclaredValueChecks.check(columns, rows, schema);
+      if (!Set.of("CHECKED", "NOT_CONFIGURED").contains(contract.get("state"))) {
+         return Map.of("state", "SOURCE_CONTRACT_REQUIRED", "sourceContract", contract, "exportValidation", export,
+             "scope", "当前快照缺少已认可版本的来源定义，或定义与部署认可版本不一致；保留原始记录，暂停自动分析");
+      }
       if (schema.stream().noneMatch(e -> Set.of("column", "constraint", "value-rule").contains(e.getOrDefault("kind", "")))) {
-         return Map.of("state", "NO_SOURCE_CONSTRAINTS", "exportValidation", export,
+         return Map.of("state", "NO_SOURCE_CONSTRAINTS", "sourceContract", contract, "exportValidation", export,
              "scope", "仅来源明确声明的结构约束可作合格判断；导出、接收及采集候选键检查另列，不假定源数据库主键、非空或外键");
       }
 
@@ -333,6 +339,7 @@ public class GovernanceModelService {
       return Map.of(
          "state",
          "CHECKED",
+         "sourceContract", contract,
          "primaryKeyColumns",
          pk.stream().map(columns::get).toList(),
          "duplicatePrimaryKeys",
@@ -385,7 +392,8 @@ public class GovernanceModelService {
       var currentSource = this.source(actor, tenant, "DATASET", dataset, snapshot);
       var checks = this.json.valueToTree(currentSource.get("checks"));
       String reason = null;
-      if (!"CHECKED".equals(checks.path("state").asText())) reason = "SOURCE_CONSTRAINTS_REQUIRED";
+      if ("SOURCE_CONTRACT_REQUIRED".equals(checks.path("state").asText())) reason = "SOURCE_DEFINITION_REQUIRED";
+      else if (!"CHECKED".equals(checks.path("state").asText())) reason = "SOURCE_CONSTRAINTS_REQUIRED";
       else if (!"CHECKED".equals(checks.path("exportValidation").path("state").asText())) reason = "SOURCE_RECEIPT_REQUIRED";
       else if (checks.path("duplicatePrimaryKeys").asLong()>0 || checks.path("nonNullViolations").asLong()>0
           || "VIOLATIONS".equals(checks.path("valueValidation").path("state").asText())) reason = "SOURCE_VALIDATION_FAILED";
@@ -403,6 +411,11 @@ public class GovernanceModelService {
           .anyMatch(item -> item.get("definition") instanceof Map<?,?> definition && Set.of("CURRENT_MONTH","PREVIOUS_MONTH").contains(Objects.toString(definition.get("calendarWindow"),"")));
       String month = rollingMonth ? ":"+java.time.YearMonth.from(analysisClock.now().atZone(java.time.ZoneId.of("Asia/Shanghai"))) : "";
       return new AnalysisReadiness(release.releaseId()+":"+Objects.toString(reason,"CHECKED")+month, reason);
+   }
+
+   private void requireSourceContract(Map<String,Object> source) {
+      if ("SOURCE_CONTRACT_REQUIRED".equals(this.json.valueToTree(source).path("checks").path("state").asText()))
+         throw this.error(409, "GOVERNANCE_SOURCE_CONTRACT_REQUIRED");
    }
 
    private Object canonical(Object v) {
@@ -531,6 +544,7 @@ public class GovernanceModelService {
          }
 
          Map<String, Object> ctx = (Map<String, Object>)req.get("context");
+         this.requireSourceContract(ctx);
          Map out = GovernanceReferencePolicy.output((Map<String, Object>)this.json.readValue(r.get("output").toString(), Map.class), ctx);
          this.validateKnowledge(out, ctx);
          List<Map<String, Object>> knowledge = (List<Map<String, Object>>)out.get("knowledge");
@@ -662,6 +676,7 @@ public class GovernanceModelService {
             }
 
             Map<String, Object> basis = this.plain(this.source(actor, tenant, b.kind(), b.sourceId()));
+            this.requireSourceContract(basis);
             UUID id = UUID.randomUUID();
             String basisHash = this.hash(basis);
             LinkedHashMap<String, Object> request = new LinkedHashMap<>();
@@ -832,6 +847,7 @@ public class GovernanceModelService {
 
       if (b != null && b.revision() == ((Number)r.get("revision")).intValue() && Set.of("WAITING_MODEL", "FAILED", "STALE").contains(r.get("state"))) {
          Map<String, Object> basis = this.plain(this.source(actor, tenant, r.get("kind").toString(), (UUID)r.get("source_id")));
+         this.requireSourceContract(basis);
          String nextHash = this.hash(basis);
          if (nextHash.equals(r.get("basis_hash")) && "WAITING_MODEL".equals(r.get("state"))) {
             return this.view(r, true);

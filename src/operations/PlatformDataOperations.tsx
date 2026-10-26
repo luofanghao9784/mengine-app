@@ -39,6 +39,7 @@ const diagnostics: Record<DataOperationDiagnostic, string> = {
   CONNECTION_UNCONFIGURED: '尚未完成接入部署。',
   COLLECTION_TIMEOUT: '取数超过执行时间限制。',
   COLLECTION_INVALID_RESULT: '取数结果不符合约定格式。',
+  COLLECTION_SOURCE_CONTRACT_INVALID: '来源定义缺失或版本未获认可，整批接收已拒绝。',
   COLLECTION_ADAPTER_FAILED: '现场采集适配器执行未完成。',
   COLLECTION_INTERRUPTED: '取数执行中断。',
   OTHER: '处理未完成，详细技术原因尚未确认。',

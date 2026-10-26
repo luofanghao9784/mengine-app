@@ -8,6 +8,7 @@ const errors: Record<string, string> = {
   GOVERNANCE_BACKGROUND_REQUIRED: '请先在企业信息登记企业背景，再开始治理。',
   GOVERNANCE_DISPATCH_DISABLED: '治理执行尚未开启，请联系部署维护者。',
   GOVERNANCE_SOURCE_CHANGED: '来源或背景已变化，请重新生成草稿。',
+  GOVERNANCE_SOURCE_CONTRACT_REQUIRED: '来源定义缺失或版本不符，请先由采集端补齐已认可版本，再生成治理草稿。',
   GOVERNANCE_JOB_BUSY: '已有治理任务正在处理，请等待结果。',
   GOVERNANCE_STATE_CHANGED: '任务状态已变化，请刷新后继续。',
   GOVERNANCE_DRAFT_NOT_READY: '草稿尚未通过检查，不能发布。',

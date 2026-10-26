@@ -8,7 +8,9 @@ public interface CollectionAdapter {
     record Request(String contractVersion,UUID tenantId,UUID connectionId,UUID runId,List<Dataset> datasets) {}
     record ExportReceipt(String contractVersion,UUID sourceSnapshotId,Instant sourceCollectedAt,Instant sourceVerifiedAt,
         String scopeHash,boolean completeSnapshot,long rowCount,List<String> columns,List<String> candidateKeyColumns,String rowsSha256) {}
-    record Snapshot(UUID datasetId,Instant coverageThrough,List<List<String>> rows,ExportReceipt exportReceipt) {
+    record SourceContract(String contractVersion,UUID tenantId,UUID datasetId,int definitionVersion,String definitionSha256,String definitionJson) {}
+    record Snapshot(UUID datasetId,Instant coverageThrough,List<List<String>> rows,ExportReceipt exportReceipt,SourceContract sourceContract) {
+        public Snapshot(UUID datasetId,Instant coverageThrough,List<List<String>> rows,ExportReceipt exportReceipt){this(datasetId,coverageThrough,rows,exportReceipt,null);}
         public Snapshot(UUID datasetId,Instant coverageThrough,List<List<String>> rows){this(datasetId,coverageThrough,rows,null);}
     }
     record Result(String contractVersion,List<Snapshot> snapshots) {}

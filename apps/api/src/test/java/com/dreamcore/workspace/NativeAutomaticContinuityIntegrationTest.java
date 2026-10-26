@@ -103,6 +103,33 @@ class NativeAutomaticContinuityIntegrationTest extends TaskDatasetFixture {
         assertEquals(release,releases.currentFor(owner,tenant,dataset).getFirst().releaseId());
         assertFalse(foundation.detail(owner,tenant,"dataset-"+dataset).path("asset").path("checksPassed").asBoolean());
     }
+    @Test void transportedDefinitionsReusePublishedMeaningButNeverCarryForwardRowSuccess() throws Exception {
+        UUID release=publish(), oldSnapshot=snapshot;
+        String body=json.writeValueAsString(Map.of("columns",columns(),"scopeHash","a".repeat(64),
+            "entries",json.readValue(Files.readString(evidence),Map.class).get("entries"),"schema",schema));
+        var contract=new com.dreamcore.workspace.collection.CollectionAdapter.SourceContract("1.0",tenant,dataset,1,IdentityService.hash(body),body);
+        var approved=new ArrayList<>(schema);
+        approved.add(Map.of("kind","source-contract","datasetId",dataset.toString(),"definitionVersion",1,"definitionSha256",contract.definitionSha256()));
+        writeEvidence(approved);
+        // Opting into delivery does not invalidate an unchanged published definition; it does require a fresh receipt.
+        assertEquals(release,releases.currentFor(owner,tenant,dataset).getFirst().releaseId());
+        var missing=foundation.detail(owner,tenant,"dataset-"+dataset).path("asset");
+        assertFalse(missing.path("automaticAnalysisReady").asBoolean());
+        assertTrue(missing.toString().contains("当前批次未附带已认可的来源定义"));
+        assertEquals("GOVERNANCE_SOURCE_CONTRACT_REQUIRED",assertThrows(IdentityException.class,()->governance.execute(owner,tenant,new GovernanceModelService.Execute(UUID.randomUUID(),"DATASET",dataset,"SYSTEM_MODEL"))).code);
+        snapshot=version(2,List.of(List.of("合成门店","12.50")));receipt(snapshot,"a".repeat(64));
+        db.update("UPDATE collection_snapshot_receipts SET source_contract=?::jsonb WHERE snapshot_id=?",json.writeValueAsString(contract),snapshot);
+        assertTrue(governance.analysisReadiness(owner,tenant,dataset).ready());
+        assertEquals(release,releases.currentFor(owner,tenant,dataset).getFirst().releaseId());
+        assertFalse(governance.analysisReadiness(owner,tenant,dataset,oldSnapshot).ready());
+        snapshot=version(3,List.of(List.of("合成门店","invalid-decimal")));receipt(snapshot,"a".repeat(64));
+        db.update("UPDATE collection_snapshot_receipts SET source_contract=?::jsonb WHERE snapshot_id=?",json.writeValueAsString(contract),snapshot);
+        assertEquals("SOURCE_VALIDATION_FAILED",governance.analysisReadiness(owner,tenant,dataset).reason());
+        var failed=foundation.detail(owner,tenant,"dataset-"+dataset).path("asset");
+        assertTrue(failed.toString().contains("已声明字段规则存在异常"));
+        assertFalse(failed.toString().contains("尚无已确认业务规则"));
+        assertEquals(1,db.queryForObject("SELECT count(*) FROM governance_model_jobs WHERE tenant_id=?",Integer.class,tenant));
+    }
     @Test void displayedSummaryUsesFrozenCountsRatherThanModelArithmetic() {
         UUID release=publish();
         var displayed=json.valueToTree(governance.detail(owner,tenant,release)).path("output").path("summary").asString();

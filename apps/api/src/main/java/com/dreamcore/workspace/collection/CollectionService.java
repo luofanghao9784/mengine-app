@@ -27,6 +27,7 @@ public class CollectionService {
     private final JdbcTemplate db;private final IdentityService identities;private final IdentityAudit audit;
     private final GovernanceAccess governance;private final MaterialAccess access;private final DepartureAccess departure;
     private final CollectionAdapter adapter;private final JsonMapper json=new JsonMapper();
+    @org.springframework.beans.factory.annotation.Autowired private CollectionSourceContracts sourceContracts;
     public CollectionService(JdbcTemplate db,IdentityService identities,IdentityAudit audit,GovernanceAccess governance,MaterialAccess access,DepartureAccess departure,CollectionAdapter adapter) {
         this.db=db;this.identities=identities;this.audit=audit;this.governance=governance;this.access=access;this.departure=departure;this.adapter=adapter;
     }
@@ -141,10 +142,17 @@ public class CollectionService {
     @Transactional public boolean complete(Claim claim,CollectionAdapter.Result result,Instant now){
         if(!current(claim,now))return false;
         if(!valid(claim,result,now)){terminal(claim.runId(),"FAILED","COLLECTION_INVALID_RESULT",now);return false;}
+        for(var snapshot:result.snapshots()) {
+            var columns=claim.request().datasets().stream().filter(d->d.id().equals(snapshot.datasetId())).findFirst().orElseThrow().columns();
+            if(!sourceContracts.valid(claim.tenantId(),snapshot,columns)) {
+                terminal(claim.runId(),"FAILED","COLLECTION_SOURCE_CONTRACT_INVALID",now);return false;
+            }
+        }
         for(var snapshot:result.snapshots()){
             UUID id=UUID.randomUUID();Integer version=db.queryForObject("SELECT coalesce(max(version),0)+1 FROM dataset_snapshots WHERE dataset_id=?",Integer.class,snapshot.datasetId());
             db.update("INSERT INTO dataset_snapshots(id,tenant_id,connection_id,dataset_id,run_id,version,data_rows,row_count,coverage_through,collected_at) VALUES (?,?,?,?,?,?,CAST(? AS jsonb),?,?,?)",id,claim.tenantId(),claim.connectionId(),snapshot.datasetId(),claim.runId(),version,json.writeValueAsString(snapshot.rows()),snapshot.rows().size(),stamp(snapshot.coverageThrough()),stamp(now));
             if(snapshot.exportReceipt()!=null)db.update("INSERT INTO collection_snapshot_receipts(snapshot_id,tenant_id,dataset_id,receipt,received_at) VALUES (?,?,?,?::jsonb,?)",id,claim.tenantId(),snapshot.datasetId(),CollectionReceiptChecks.stored(snapshot.exportReceipt(),id),stamp(now));
+            if(snapshot.sourceContract()!=null)db.update("UPDATE collection_snapshot_receipts SET source_contract=?::jsonb WHERE snapshot_id=?",json.writeValueAsString(snapshot.sourceContract()),id);
             db.update("UPDATE business_datasets SET current_snapshot=? WHERE id=? AND tenant_id=? AND connection_id=? AND status='ACTIVE'",id,snapshot.datasetId(),claim.tenantId(),claim.connectionId());
         }
         terminal(claim.runId(),"SUCCEEDED",null,now);return true;
