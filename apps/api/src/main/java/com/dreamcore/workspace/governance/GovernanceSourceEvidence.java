@@ -18,6 +18,11 @@ public final class GovernanceSourceEvidence {
    }
 
    public static List<Map<String, Object>> read(String configured, UUID tenant, String table, String section) {
+      return read(configured, tenant, null, table, section, true);
+   }
+
+   /** Dataset identity is authoritative across connectors; a display name is only a legacy fallback. */
+   public static List<Map<String, Object>> read(String configured, UUID tenant, UUID dataset, String table, String section, boolean uniqueLegacyName) {
       if (configured != null && !configured.isBlank()) {
          if (tenant != null && table != null && Set.of("entries", "schema").contains(section)) {
             try {
@@ -36,7 +41,9 @@ public final class GovernanceSourceEvidence {
                               throw new IllegalStateException("Invalid evidence entry");
                            }
 
-                           if (table.equals(map.get("table"))) {
+                           if (map.containsKey("datasetId")
+                              ? dataset != null && dataset.toString().equals(map.get("datasetId"))
+                              : uniqueLegacyName && table.equals(map.get("table"))) {
                               result.add(map);
                            }
                         }

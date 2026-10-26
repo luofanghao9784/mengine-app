@@ -41,6 +41,8 @@ public class NativeFoundationService {
    private NativeMaterialGovernance materialGovernance;
    @Autowired
    private FoundationPublicationService publications;
+   @Autowired
+   private com.dreamcore.workspace.governance.GovernanceModelService governanceJobs;
    private final JsonMapper json = new JsonMapper();
 
    public NativeFoundationService(CollectionService collections, MaterialService materials, IdentityService identities) {
@@ -68,6 +70,7 @@ public class NativeFoundationService {
       ObjectNode a = (ObjectNode)asset.deepCopy();
       a.put("fieldCount", result.fields().size());
       a.set("stageStates", this.json.valueToTree(result.stages().stream().limit(5L).map(FoundationProcessingService.Stage::state).toList()));
+      this.governanceStages(a);
       ObjectNode out = this.json.createObjectNode();
       out.set("asset", a);
       out.putNull("analysis");
@@ -152,6 +155,7 @@ public class NativeFoundationService {
       int checked = 0;
       int usable = 0;
       int offset = 0;
+      Map<UUID, String> connectionNames = new java.util.HashMap<>();
 
       while (true) {
          CollectionService.DataPage page = this.collections.datasets(actor, tenant, "", offset, 100);
@@ -187,7 +191,13 @@ public class NativeFoundationService {
                a.putNull("ready");
                a.put("fieldCount", d.columns().size());
                a.put("dictionaryStatus", d.fieldDefinitions().isEmpty() ? "waiting" : (explained ? "source-defined" : "partial"));
-               a.put("source", "企业业务数据");
+               // Resolve only connections reached through already-authorized datasets.
+               a.put("source", connectionNames.computeIfAbsent(d.connectionId(), connectionId ->
+                  this.db.queryForObject("SELECT name FROM data_connections WHERE tenant_id=? AND id=?", String.class, tenant, connectionId)));
+               if (collected) {
+                  a.set("nativeGovernance", this.json.valueToTree(this.governanceJobs.datasetStatus(actor, tenant, d.id())));
+                  this.governanceStages(a);
+               }
                items.add(a);
                datasets++;
             }
@@ -364,6 +374,22 @@ public class NativeFoundationService {
       }
    }
 
+   private void governanceStages(ObjectNode a) {
+      if (!a.has("nativeGovernance") || a.has("publicationId")) return;
+      String state = a.path("nativeGovernance").path("state").asText();
+      a.put("label", a.path("nativeGovernance").path("message").asText());
+      if ("PUBLISHED".equals(state)) return;
+      var stages = (ArrayNode)a.path("stageStates").deepCopy();
+      a.put("gate", 2);
+      switch (state) {
+         case "WAITING_MODEL", "VALIDATING": stages.set(2, this.json.valueToTree("RUNNING")); a.put("tone", "run"); break;
+         case "DRAFT_READY": stages.set(2, this.json.valueToTree("READY")); stages.set(3, this.json.valueToTree("PARTIAL")); a.put("gate", 3); break;
+         case "FAILED": stages.set(2, this.json.valueToTree("FAILED")); break;
+         default: stages.set(2, this.json.valueToTree("WAITING"));
+      }
+      a.set("stageStates", stages);
+   }
+
    private boolean searchReady(UUID tenant, UUID material) {
       boolean remote = (Boolean)this.environment.getProperty("dreamcore.weknora.enabled", Boolean.class, false)
          && Boolean.TRUE
@@ -447,13 +473,13 @@ public class NativeFoundationService {
       a.put("policyVersion", 0);
       a.put("updatedAt", at);
       a.putNull("reviewAt");
-      a.put("quality", 0);
+      a.putNull("quality");
       a.put("classification", 0);
       a.set("issues", this.json.createArrayNode());
       a.set("tags", this.json.createArrayNode());
       a.putNull("total");
       a.putNull("ready");
-      a.put("isolated", 0);
+      a.putNull("isolated");
       a.put("fieldCount", 0);
       a.putNull("dictionaryStatus");
       a.set("actions", this.json.createArrayNode());

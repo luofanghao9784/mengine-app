@@ -31,11 +31,11 @@ export function readouts(a: Asset): [string, string | number][] {
     ? [
         ['记录', a.total ?? '—'],
         ['可用', a.ready ?? '—'],
-        ['隔离', a.isolated],
-        ['质量', a.quality],
+        ['隔离', a.isolated ?? '—'],
+        ['质量', a.quality ?? '—'],
       ]
     : [
-        ['质量', a.quality],
+        ['质量', a.quality ?? '—'],
         ['密级', `L${a.classification}`],
         ['版本', `v${a.version}`],
         ['标签', a.tags.length],

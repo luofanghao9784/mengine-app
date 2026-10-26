@@ -8,6 +8,7 @@ import { RuntimeError } from './runtime/ports.js';
 import type { CompanyAnalysis } from './runtime/company-analysis.js';
 import type { ExperienceGeneralization } from './runtime/experience-generalization.js';
 import type { ExperienceAnalysis } from './runtime/experience-analysis.js';
+import { GovernanceModel } from './runtime/governance-model.js';
 const uuid = (v: unknown): v is string =>
   typeof v === 'string' && /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(v);
 /** Authenticated internal task transport. Agent execution requires an explicitly supplied runtime. */
@@ -22,6 +23,8 @@ export function createEngineServer(
   } = {},
 ) {
   const titles = options.agent ? new ConversationTitleTasks(options.agent.config.routineModel ?? options.agent.config) : undefined;
+  const governance = options.agent && options.agent.config.executionClass === 'live'
+    ? new GovernanceModel(options.agent.config.routineModel ?? options.agent.config) : undefined;
   const enabled = !!options.token && options.token.length >= 32;
   return createServer(async (request, response) => {
     response.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -34,6 +37,24 @@ export function createEngineServer(
     const expected = Buffer.from(`Bearer ${options.token}`);
     const provided = Buffer.from(request.headers.authorization || '');
     const authorized = enabled && provided.length === expected.length && timingSafeEqual(provided, expected);
+    if (request.url === '/internal/v1/governance-model') {
+      if (!authorized) return send(401, { code: 'UNAUTHORIZED' });
+      if (request.method !== 'POST') return send(405, { code: 'METHOD_NOT_ALLOWED' });
+      if (!governance) return send(503, { code: 'MODEL_NOT_CONFIGURED' });
+      try {
+        const parts: Buffer[] = []; let bytes = 0;
+        for await (const part of request) {
+          bytes += part.length;
+          if (bytes > 524288) { request.resume(); return send(413, { code: 'TOO_LARGE' }); }
+          parts.push(part);
+        }
+        return send(200, await governance.run(JSON.parse(Buffer.concat(parts).toString('utf8'))));
+      } catch (error) {
+        const code = error instanceof RuntimeError ? error.code : 'INVALID_GOVERNANCE_REQUEST';
+        return send(code === 'ENGINE_BUSY' ? 429 : code === 'GOVERNANCE_INPUT_MISMATCH' ? 409
+          : code === 'GOVERNANCE_MODEL_FAILED' ? 503 : 422, { code });
+      }
+    }
     const feature = request.url?.startsWith('/internal/v1/experience-generalization')
       ? {
           path: '/internal/v1/experience-generalization',

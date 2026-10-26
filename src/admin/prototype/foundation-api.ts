@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Tone, Item } from './data';
 import { sceneTenant } from './scene-route';
 export type Asset = {
+  nativeGovernance?: { state: string; message: string; canRun: boolean; jobId?: string; revision?: number; errorCode?: string };
   id: string;
   title: string;
   department: string;
@@ -20,13 +21,13 @@ export type Asset = {
   policyVersion: number;
   updatedAt: string;
   reviewAt: string;
-  quality: number;
+  quality: number | null;
   classification: number;
   issues: string[];
   tags: string[];
   total: number | null;
   ready: number | null;
-  isolated: number;
+  isolated: number | null;
   fieldCount: number;
   dictionaryStatus: string | null;
   actions: string[];
@@ -50,7 +51,7 @@ export type Snapshot = {
   items: Asset[];
   passed: number[];
   sources: { name: string; count: number }[];
-  auditValid: boolean;
+  auditValid: boolean | null;
   governance: {
     attention: number;
     isolated: number;

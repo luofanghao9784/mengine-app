@@ -34,7 +34,7 @@ const asset = {
   sync: null,
   stageStates: ['READY', 'READY', 'WAITING', 'READY', 'READY'],
 };
-async function fixture(page: Page, items: unknown[] = [asset]) {
+async function fixture(page: Page, items: unknown[] = [asset], auditValid: boolean | null = true) {
   let failure = 0;
   const seen: string[] = [];
   await page.route('**/api/**', async (route) => {
@@ -75,7 +75,7 @@ async function fixture(page: Page, items: unknown[] = [asset]) {
             { name: '内部资料库', count: 0 },
             { name: '外网数据集', count: 0 },
           ],
-          auditValid: true,
+          auditValid,
           governance: {
             attention: 0,
             isolated: 0,
@@ -88,7 +88,7 @@ async function fixture(page: Page, items: unknown[] = [asset]) {
         });
       if (operation === '/scene-foundation/' + asset.id)
         return reply({
-          asset,
+          asset: items.find(x => (x as typeof asset).id === asset.id) || asset,
           analysis: null,
           dictionary: null,
           audit: [],
@@ -191,6 +191,24 @@ test('撤权刷新后清除已显示记录', async ({ page }) => {
   await result.getByRole('button', { name: '刷新处理结果' }).click();
   await expect(result.getByRole('alert')).toContainText('没有此来源的读取权限');
   await expect(result.getByText('S001', { exact: true })).toHaveCount(0);
+});
+
+test('未核验审计不显示异常，已失败审计仍保留警示', async ({ page }) => {
+  await fixture(page, [asset], null);
+  await expect(page.locator('.updated')).toContainText('审计未核验');
+  await expect(page.locator('.updated')).not.toContainText('审计异常');
+  await page.unroute('**/api/**');
+  await fixture(page, [asset], false);
+  await expect(page.locator('.updated')).toContainText('审计异常');
+});
+
+test('不同连接按来源名称分组，保留业务表名', async ({ page }) => {
+  await fixture(page, [{ ...asset, source: '合成租赁系统' }, {
+    ...asset, id: 'dataset-00000000-0000-4000-8000-000000000004', title: '合成房东合同', source: '合成合同系统',
+  }]);
+  await expect(page.getByRole('button', { name: '合成租赁系统 1', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '合成合同系统 1', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: /合成服务预约 来源快照已保存/ })).toBeVisible();
 });
 
 async function refreshVisibleSnapshot(page: Page, operation: string, status: number) {
@@ -351,4 +369,60 @@ test('动画只显示三个治理阶段，数量统计当前停留资产', async
 test('已可用资产不重复计入动画治理环节', async ({ page }) => {
   await fixture(page);
   await expect(page.locator('.world-labels .gate')).toHaveText(['0解析', '0口径标注', '0检查']);
+});
+test('原生治理明确提示缺少企业背景，不显示可执行按钮', async ({ page }) => {
+  const blocked = { ...asset, available: false, gate: 2, stageStates: ['READY', 'READY', 'WAITING', 'WAITING', 'WAITING'],
+    nativeGovernance: { state: 'BACKGROUND_REQUIRED', message: '尚未开始：请先在企业信息登记企业背景', canRun: false } };
+  await fixture(page, [blocked]);
+  await page.getByRole('tab', { name: /^口径标注/ }).click();
+  const panel = page.getByRole('region', { name: '本表治理处理' });
+  await expect(panel).toContainText('请先在企业信息登记企业背景');
+  await expect(panel.getByRole('button', { name: '完善企业背景' })).toBeVisible();
+  await expect(panel.getByRole('button', { name: '生成治理草稿' })).toHaveCount(0);
+});
+test('发布治理但未核验记录质量时显示未知，不伪造可用行数', async ({ page }) => {
+  await fixture(page, [{ ...asset, ready: null, quality: null, isolated: null,
+    stageStates: ['READY', 'READY', 'PARTIAL', 'ATTENTION', 'READY'],
+    nativeGovernance: { state: 'PUBLISHED', message: '治理结果已发布，仍有待核实项', canRun: true } }]);
+  await expect(page.locator('.head-nums dd')).toHaveText(['41', '—', '—', '—']);
+  await expect(page.getByRole('tab', { name: 'AI 可用 按已发布口径使用', exact: true })).toBeVisible();
+  await expect(page.locator('.card.asset')).not.toContainText('null 条可用');
+  await page.getByRole('tab', { name: 'AI 可用 按已发布口径使用', exact: true }).click();
+  await expect(page.locator('.card.asset')).toContainText('按已发布口径查询（合格记录数未核验）');
+  await expect(page.locator('.card.asset')).not.toContainText('null 条合格记录');
+});
+test('原生治理生成草稿后必须核对再显式发布', async ({ page }) => {
+  const native = { ...asset, available: false, gate: 2, stageStates: ['READY', 'READY', 'WAITING', 'WAITING', 'WAITING'],
+    nativeGovernance: { state: 'NOT_STARTED', message: '尚未开始口径治理', canRun: true, jobId: '', revision: 1 } };
+  await fixture(page, [native]);
+  let publishes = 0;
+  await page.route('**/governance-jobs**', async route => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith('/execute')) {
+      expect(route.request().postDataJSON()).toMatchObject({ kind: 'DATASET', executor: 'SYSTEM_MODEL', sourceId: asset.id.slice(8) });
+      native.nativeGovernance = { state: 'DRAFT_READY', message: '治理草稿已生成，待核对并发布', canRun: true, jobId: 'synthetic-job', revision: 2 };
+      native.gate = 3; native.stageStates = ['READY', 'READY', 'READY', 'PARTIAL', 'WAITING'];
+      return route.fulfill({ json: {} });
+    }
+    if (path.endsWith('/publish')) {
+      publishes++; expect(route.request().postDataJSON()).toEqual({ revision: 2, inputHash: 'synthetic-hash' });
+      native.available = true; native.gate = 4;
+      native.nativeGovernance.state = 'PUBLISHED';native.nativeGovernance.message = '治理结果已发布';
+      native.stageStates = ['READY', 'READY', 'READY', 'READY', 'READY'];
+      return route.fulfill({ json: {} });
+    }
+    return route.fulfill({ json: { revision: 2, sourceCurrent: true, request: { inputHash: 'synthetic-hash' },
+      output: { summary: '合成检查，仅元数据', limitations: ['金额单位未知'], fields: [{ column: '编号', decision: 'UNKNOWN', meaning: '待核实', unit: '', evidence: '缺少依据' }] } } });
+  });
+  await page.getByRole('tab', { name: /^口径标注/ }).click();
+  await page.getByRole('button', { name: '生成治理草稿' }).click();
+  await expect(page.getByText('待发布的治理草稿', { exact: true })).toBeVisible();
+  expect(publishes).toBe(0);
+  await expect(page.getByRole('region', { name: '本表治理处理' })).toContainText('金额单位未知');
+  // This prototype opens the card deck halfway down; use its normal scroll gesture to lift it.
+  await page.mouse.move(1400, 300);
+  await page.mouse.wheel(0, 900);
+  await page.getByRole('button', { name: '核对后发布治理结果' }).click();
+  await expect(page.getByRole('region', { name: '本表治理处理' })).toContainText('治理结果已发布');
+  expect(publishes).toBe(1);
 });

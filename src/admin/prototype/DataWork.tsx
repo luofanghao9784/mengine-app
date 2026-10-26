@@ -12,6 +12,7 @@ import { FoundationProcessing } from './FoundationProcessing';
 import { assetSourceGroup } from './asset-source-groups';
 import { KnowledgeListRow } from './KnowledgeListRow';
 import { sceneTenant } from './scene-route';
+import { NativeGovernance } from './NativeGovernance';
 
 function BackgroundSourceCard({ tenant, selected, onSelect }: { tenant: string; selected: boolean; onSelect: () => void }) {
   const { session } = useSession();
@@ -113,12 +114,12 @@ export function DataWork({
       (tab !== 0 ||
         queue === 'all' ||
         (queue === 'isolated'
-          ? a.status === 'quarantined' || a.isolated > 0
+          ? a.status === 'quarantined' || (a.isolated ?? 0) > 0
           : queue === 'overdue'
             ? Date.parse(a.reviewAt) < now
             : queue === 'failed'
               ? a.status === 'failed' || a.sync?.state === 'failed'
-              : a.quality < 90)) &&
+              : a.quality !== null && a.quality < 90)) &&
       (kind === 'all' || a.sourceKind === SOURCE_IDS.indexOf(kind)) &&
       (!department || a.department === department) &&
       (!needle || `${a.title} ${a.source} ${a.department}`.toLocaleLowerCase().includes(needle)) &&
@@ -127,14 +128,14 @@ export function DataWork({
   const showBackground = !!tenant && (kind === 'all' || kind === 'document') && tab === 2 && gate === null && !department && collection === 'all' && '企业背景 企业信息维护 内部来源'.includes(q.trim());
   useEffect(() => { if (!showBackground) setBackground(false); }, [showBackground, tenant]);
   const risk = (x: Asset) =>
-    Number(x.status === 'quarantined' || x.isolated > 0) * 4 +
+    Number(x.status === 'quarantined' || (x.isolated ?? 0) > 0) * 4 +
     Number(x.status === 'failed' || x.sync?.state === 'failed') * 3 +
     Number(Date.parse(x.reviewAt) < Date.now()) * 2 +
     Number(x.needsAttention);
-  const byRisk = (x: Asset, y: Asset) => risk(y) - risk(x) || x.quality - y.quality;
+  const byRisk = (x: Asset, y: Asset) => risk(y) - risk(x) || (x.quality ?? 101) - (y.quality ?? 101);
   rows.sort((x, y) =>
     sort === 'quality'
-      ? x.quality - y.quality
+      ? (x.quality ?? 101) - (y.quality ?? 101)
       : sort === 'updated'
         ? y.updatedAt.localeCompare(x.updatedAt)
         : byRisk(x, y),
@@ -397,6 +398,9 @@ export function DataWork({
       .pop(),
   );
   const stepNote = (x: Asset, i: number, state: string) => {
+    if (i === 4 && x.available && x.ready === null && x.kind === 'table') return '按已发布口径使用';
+    if (x.nativeGovernance && i === x.gate && !x.available) return x.nativeGovernance.message;
+    if (x.nativeGovernance?.state === 'DRAFT_READY' && i === 2) return '草稿已生成，待发布';
     if (state === 'held') return x.label;
     if (state === 'wait') return i === 4 ? '尚未可用' : '等待上一环';
     return [
@@ -413,7 +417,7 @@ export function DataWork({
     a?.kind === 'table'
       ? '模型为表和字段写出业务含义、单位、规则和关联。模型解释不代表已核实的业务事实。'
       : '资料由输入模型自动生成标签与摘要，不需要字段口径。',
-    '检查必填、格式、敏感信息和口径冲突；有问题的记录被隔离，不影响其他记录使用。',
+    a?.nativeGovernance ? '核对治理草稿、字段依据和检查范围；没有来源约束的检查项不会视为通过。' : '检查必填、格式、敏感信息和口径冲突；有问题的记录被隔离，不影响其他记录使用。',
     '通过检查的记录提供给 AI 查询；隔离记录不参与。',
   ];
   return (
@@ -504,10 +508,10 @@ export function DataWork({
               {data && (
                 <span
                   className="updated"
-                  title={`更新于 ${date(data.at)} · 审计链${data.auditValid ? '正常' : '异常'}`}
+                  title={`更新于 ${date(data.at)} · ${data.auditValid === true ? '审计链正常' : data.auditValid === false ? '审计链异常' : '审计未核验'}`}
                 >
                   {new Date(data.at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
-                  {!data.auditValid && ' · 审计异常'}
+                  {data.auditValid === false ? ' · 审计异常' : data.auditValid == null ? ' · 审计未核验' : ''}
                 </span>
               )}
             </>
@@ -729,7 +733,7 @@ export function DataWork({
                   <span className="ov-nums">
                     {x.kind === 'table' ? (
                       <>
-                        {x.isolated > 0 && (
+                        {(x.isolated ?? 0) > 0 && (
                           <span data-alert>
                             <b className="num">{x.isolated}</b>
                             <em>隔离</em>
@@ -742,7 +746,7 @@ export function DataWork({
                       </>
                     ) : (
                       <span>
-                        <b className="num">{x.quality}</b>
+                        <b className="num">{x.quality ?? '—'}</b>
                         <em>质量</em>
                       </span>
                     )}
@@ -839,6 +843,9 @@ export function DataWork({
                 }}
               >
                 {!detail && !detailError && <p className="none">正在核对详情…</p>}
+                {a.nativeGovernance && tenant && [2, 3].includes(shownStep) && <NativeGovernance
+                  key={a.id} asset={a} tenant={tenant} maintainBackground={onMaintainBackground}
+                  refresh={async () => { await refresh(); setDetailTick(n => n + 1); }} />}
 
                 {shownStep === 0 && (
                   <>
@@ -1092,7 +1099,9 @@ export function DataWork({
                 {shownStep === 4 && (
                   <>
                     {kv([
-                      ['提供范围', a.total === null ? '资料全文' : `${a.ready} 条合格记录`],
+                      ['提供范围', a.kind !== 'table' ? '资料全文' : a.ready !== null
+                        ? `${a.ready} 条合格记录`
+                        : a.available ? '按已发布口径查询（合格记录数未核验）' : '尚未提供给 AI'],
                       ['最近更新', date(a.updatedAt)],
                     ])}
                     {!a.available && (

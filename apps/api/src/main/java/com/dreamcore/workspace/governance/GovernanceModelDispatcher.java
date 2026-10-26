@@ -72,10 +72,12 @@ public class GovernanceModelDispatcher {
 
    public boolean once() {
       if (this.token != null && this.token.length() >= 32) {
+         // A process crash may lose the reply of a paid call. Do not replay an expired execution lease.
+         this.db.update("WITH uncertain AS (UPDATE governance_model_dispatch SET state='FAILED',error_code='EXECUTION_OUTCOME_UNKNOWN',lease_token=NULL,lease_until=NULL,updated_at=now() WHERE state='RUNNING' AND lease_until<now() RETURNING job_id) UPDATE governance_model_jobs SET state='FAILED',error_code='EXECUTION_OUTCOME_UNKNOWN',revision=revision+1,updated_at=now() WHERE state='WAITING_MODEL' AND id IN (SELECT job_id FROM uncertain)");
          UUID lease = UUID.randomUUID();
          List<Map<String, Object>> rows = this.db
             .queryForList(
-               "UPDATE governance_model_dispatch SET state='RUNNING',lease_token=?,lease_until=now()+interval '90 seconds',attempts=attempts+1,updated_at=now() WHERE job_id=(SELECT job_id FROM governance_model_dispatch WHERE state IN ('PENDING','WAITING_MODEL','RUNNING') AND next_attempt<=now() AND (lease_until IS NULL OR lease_until<now()) ORDER BY next_attempt,created_at FOR UPDATE SKIP LOCKED LIMIT 1) RETURNING job_id",
+               "UPDATE governance_model_dispatch SET state='RUNNING',lease_token=?,lease_until=now()+interval '90 seconds',attempts=attempts+1,updated_at=now() WHERE job_id=(SELECT job_id FROM governance_model_dispatch WHERE state IN ('PENDING','WAITING_MODEL') AND next_attempt<=now() AND (lease_until IS NULL OR lease_until<now()) ORDER BY next_attempt,created_at FOR UPDATE SKIP LOCKED LIMIT 1) RETURNING job_id",
                new Object[]{lease}
             );
          if (rows.isEmpty()) {
@@ -105,11 +107,13 @@ public class GovernanceModelDispatcher {
             }
 
             Map<String, Object> input = (Map<String, Object>)job.get("request");
+            Map<String, Object> envelope = new java.util.LinkedHashMap<>(input);
+            envelope.put("attempt", job.get("revision"));
             HttpRequest request = HttpRequest.newBuilder(URI.create(this.base + "/internal/v1/governance-model"))
                .timeout(Duration.ofSeconds(65L))
                .header("Authorization", "Bearer " + this.token)
                .header("Content-Type", "application/json")
-               .POST(BodyPublishers.ofString(this.json.writeValueAsString(input)))
+               .POST(BodyPublishers.ofString(this.json.writeValueAsString(envelope)))
                .build();
             HttpResponse<String> response = this.http.send(request, BodyHandlers.ofString());
             if (response.statusCode() == 202) {
@@ -164,9 +168,10 @@ public class GovernanceModelDispatcher {
             this.finish(id, lease, e.status == 409 ? "STALE" : "FAILED", e.code, null);
          } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            this.finish(id, lease, "WAITING_MODEL", "TRANSPORT_INTERRUPTED", null);
+            this.finish(id, lease, "FAILED", "TRANSPORT_INTERRUPTED", null);
          } catch (IOException e) {
-            this.finish(id, lease, "WAITING_MODEL", "TRANSPORT_UNAVAILABLE", null);
+            // The paid call may have completed. Require an explicit retry, never silently call again.
+            this.finish(id, lease, "FAILED", "TRANSPORT_UNAVAILABLE", null);
          } catch (Exception e) {
             this.finish(id, lease, "FAILED", "DISPATCH_FAILED", null);
          }

@@ -35,6 +35,8 @@ public class FoundationProcessingService {
    private NativeMaterialGovernance materialGovernance;
    @Autowired
    private FoundationPublicationService publications;
+   @Autowired
+   private com.dreamcore.workspace.governance.GovernanceModelService governanceJobs;
    private final Environment environment;
 
    public FoundationProcessingService(
@@ -273,6 +275,21 @@ public class FoundationProcessingService {
          this.stage("checks", "治理检查", states.get(3), null, "采集结构校验不等于治理检查；尚无当前快照的治理检查回执", List.of(), List.of()),
          this.stage("available", "治理后 AI 可用", states.get(4), null, "原始快照可按权限读取；尚无通过治理检查并发布的记录范围，不计入治理后AI可用", List.of(), List.of())
       );
+      if (ready && published == null) {
+         var status = this.governanceJobs.datasetStatus(actor, tenant, id);
+         String state = status.get("state").toString();
+         String dictionaryState = switch (state) {
+            case "WAITING_MODEL", "VALIDATING" -> "RUNNING";
+            case "DRAFT_READY" -> "READY";
+            case "FAILED" -> "FAILED";
+            default -> "WAITING";
+         };
+         var updated = new ArrayList<>(stages);
+         updated.set(2, this.stage("dictionary", "字段口径", dictionaryState, null, status.get("message").toString(), List.of(), d.columns()));
+         if ("DRAFT_READY".equals(state)) updated.set(3, this.stage("checks", "治理检查", "PARTIAL", null,
+            "草稿格式和引用已检查，仍待核对并发布；没有来源约束的检查项与未知字段不能视为已通过", List.of("治理草稿"), List.of()));
+         stages = List.copyOf(updated);
+      }
       return this.publications
          .apply(
             new FoundationProcessingService.Result(
