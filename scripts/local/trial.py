@@ -371,6 +371,16 @@ def instance_extra_environment(root):
             api['COLLECTION_BUSINESS_PREFLIGHT_TENANTS'] = ','.join(str(uuid.UUID(v)) for v in value['tenantIds'])
         except (ValueError, TypeError, AttributeError):
             raise TrialError('采集业务核验企业标识无效。') from None
+    insights = root / 'dataset-business-knowledge.json'
+    if insights.exists() or insights.is_symlink():
+        value = private_read(insights)
+        if not isinstance(value, dict) or set(value) != {'tenantIds'} or not isinstance(value['tenantIds'], list) or len(value['tenantIds']) > 100:
+            raise TrialError('经营知识配置仅接受 tenantIds 列表。')
+        try:
+            identifiers = [str(uuid.UUID(item)) for item in value['tenantIds']]
+        except (ValueError, TypeError, AttributeError):
+            raise TrialError('经营知识企业 ID 无效。') from None
+        api['DATASET_INSIGHT_TENANTS'] = ','.join(identifiers)
     knowledge = root / 'automatic-dataset-knowledge.json'
     if knowledge.exists() or knowledge.is_symlink():
         value = private_read(knowledge)

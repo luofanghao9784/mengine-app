@@ -49,6 +49,8 @@ public class AgentTaskService {
    private WikiGraphService wikiGraph;
    @Autowired
    private WikiInsightService wikiInsight;
+   @org.springframework.beans.factory.annotation.Autowired
+   private com.dreamcore.workspace.knowledge.DatasetBusinessKnowledgeService datasetInsight;
    private final JdbcTemplate db;
    private final ConversationService conversations;
    private final KnowledgeService knowledge;
@@ -229,6 +231,9 @@ public class AgentTaskService {
    @Transactional
    public Map<String, Object> check(UUID task, UUID attempt) {
       ConversationService.Job preferenceJob = this.authorized(task, attempt);
+      if (this.datasetInsight.ownsTask(task)) {
+         return Map.of("allowed", true, "executionClass", this.settings.mode(), "datasetInsight", this.datasetInsight.context(preferenceJob));
+      }
       if (this.wikiInsight.ownsTask(task)) {
          return Map.of("allowed", true, "executionClass", this.settings.mode(), "wikiInsight", this.wikiInsight.context(preferenceJob));
       }
@@ -516,12 +521,12 @@ public class AgentTaskService {
       if (body == null
          || !Set.of("1.5", "1.6").contains(body.contractVersion() == null ? "" : body.contractVersion())
          || body.tools() == null
-         || body.tools().isEmpty() && !this.wikiLearning.ownsTask(task) && !this.wikiGraph.ownsTask(task) && !this.wikiInsight.ownsTask(task)
+         || body.tools().isEmpty() && !this.wikiLearning.ownsTask(task) && !this.wikiGraph.ownsTask(task) && !this.wikiInsight.ownsTask(task) && !this.datasetInsight.ownsTask(task)
          || body.tools().size() > 20
          || new HashSet<>(body.tools()).size() != body.tools().size()
          || body.tools().stream().anyMatch(t -> t == null || !REGISTERED_TOOLS.contains(t))) {
          throw new IdentityException(502, "TASK_RUNTIME_INCOMPATIBLE");
-      } else if ((this.wikiLearning.ownsTask(task) || this.wikiGraph.ownsTask(task) || this.wikiInsight.ownsTask(task)) && !body.tools().isEmpty()) {
+      } else if ((this.wikiLearning.ownsTask(task) || this.wikiGraph.ownsTask(task) || this.wikiInsight.ownsTask(task) || this.datasetInsight.ownsTask(task)) && !body.tools().isEmpty()) {
          throw this.denied();
       } else if (!this.settings.mode().equals("verification")
          && body.tools().stream().anyMatch(t -> Set.of("candidate_tool", "run_javascript", "list_originals", "read_original", "process_original").contains(t))) {
@@ -1221,6 +1226,7 @@ public class AgentTaskService {
          this.wikiLearning.validateResult(job, r);
          this.wikiGraph.validateResult(job, r);
          this.wikiInsight.validateResult(job, r);
+         this.datasetInsight.validateResult(job, r);
          this.usage.validateResult(job.id(), job.token(), r.modelCalls(), r.usage());
          HashSet<String> calls = new HashSet<>();
          boolean code = false;

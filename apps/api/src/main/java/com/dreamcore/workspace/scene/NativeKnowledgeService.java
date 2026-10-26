@@ -28,6 +28,8 @@ public class NativeKnowledgeService {
    private NativeMaterialGovernance materialGovernance;
    @Autowired
    private com.dreamcore.workspace.knowledge.DatasetKnowledgeService datasetKnowledge;
+   @Autowired
+   private com.dreamcore.workspace.knowledge.DatasetBusinessKnowledgeService businessKnowledge;
    private final MaterialService materials;
    private final WikiArticleService articles;
    private final IdentityService identities;
@@ -153,6 +155,12 @@ public class NativeKnowledgeService {
          );
       }
 
+      var businessArticles=this.businessKnowledge.current(actor,tenant);
+      for(var article:businessArticles) {
+         items.add(this.card("deployment-business-"+article.id(),article.title(),"AI 经营知识",
+            "覆盖当前获权数据集；计算事实、AI 解读与建议分开展示",article.content(),List.of(),List.of()));
+      }
+
       var automatic = this.datasetKnowledge.current(actor, tenant);
       for (var article : automatic) {
          items.add(this.card("deployment-auto-" + article.id(), article.title(), "数据口径知识",
@@ -208,7 +216,7 @@ public class NativeKnowledgeService {
                      "items",
                      items.stream().filter(i -> !i.get("id").toString().startsWith("deployment-")).toList()
                   ),
-                  Map.of("label", "来自数据 " + (governed.size() + automatic.size()), "items", items.stream().filter(i -> i.get("id").toString().startsWith("deployment-")).toList())
+                  Map.of("label", "来自数据 " + (governed.size() + automatic.size() + businessArticles.size()), "items", items.stream().filter(i -> i.get("id").toString().startsWith("deployment-")).toList())
                )
             )
       );

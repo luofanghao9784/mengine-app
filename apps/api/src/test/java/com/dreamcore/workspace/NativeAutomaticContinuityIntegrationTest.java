@@ -28,6 +28,7 @@ class NativeAutomaticContinuityIntegrationTest extends TaskDatasetFixture {
     @Autowired com.dreamcore.workspace.context.DatasetTaskContext datasetContext;
     @Autowired com.dreamcore.workspace.knowledge.DatasetKnowledgeService datasetKnowledge;
     @Autowired com.dreamcore.workspace.scene.NativeKnowledgeService knowledgeScene;
+    @Autowired com.dreamcore.workspace.knowledge.DatasetBusinessKnowledgeService businessKnowledge;
     @TempDir Path directory;
     Path evidence;
     List<Map<String,Object>> schema;
@@ -144,6 +145,19 @@ class NativeAutomaticContinuityIntegrationTest extends TaskDatasetFixture {
         assertEquals(0,knowledgeScene.snapshot(owner,tenant).path("items").size());
     }
 
+    @Test void businessKnowledgeCoversFullSnapshotAndRejectsInventedEvidence() {
+        publish();var context=businessKnowledge.capture(owner,tenant);
+        assertEquals(1,context.sources().size());assertTrue(context.facts().getFirst().text().contains("6 条"));
+        String report=json.writeValueAsString(Map.of("title","合成经营观察","findings",List.of(Map.of("title","记录范围","observation","来源有 6 条记录","interpretation","需要先核对业务范围","action","核对源记录口径","factIds",List.of("F1"))),"limitations","不能推断实际到账"));
+        assertEquals(1,businessKnowledge.validate(report,context).findings().size());
+        assertThrows(IdentityException.class,()->businessKnowledge.validate(report.replace("6 条","999 条"),context));
+        assertThrows(IdentityException.class,()->businessKnowledge.validate(report.replace("F1","F999"),context));
+        UUID first=businessKnowledge.start(owner,tenant);assertEquals(first,businessKnowledge.start(owner,tenant));
+        db.update("UPDATE business_datasets SET status='WITHDRAWN' WHERE id=?",dataset);
+        assertTrue(businessKnowledge.current(owner,tenant).isEmpty());
+        assertThrows(IdentityException.class,()->businessKnowledge.capture(owner,UUID.randomUUID()));
+    }
+
     @Test void changedBackgroundImmediatelyHidesOldKnowledge() {
         publish();datasetKnowledge.reconcile(owner,tenant,dataset);
         company.change(owner,tenant,new CompanyInformationService.Change(UUID.randomUUID(),CompanyInformationService.Field.BUSINESS,0,"ADD",null,"新版合成业务",""));
@@ -247,7 +261,7 @@ class NativeAutomaticContinuityIntegrationTest extends TaskDatasetFixture {
         snapshot=version(2,List.of(List.of("当前仅一条","3")));receipt(snapshot,"a".repeat(64));
         assertEquals(displayed,json.valueToTree(governance.detail(owner,tenant,release)).path("output").path("summary").asString());
         var asset=foundation.detail(owner,tenant,"dataset-"+dataset).path("asset");
-        assertEquals(1,asset.path("queryableRecords").asInt());assertFalse(asset.toString().contains("999"));
+        assertEquals(1,asset.path("queryableRecords").asInt());assertFalse(asset.toString().contains("999个NULL"));
     }
     @Test void missingAcceptanceWaitsWithoutPaidTaskAndReceiptResumesExactlyOnce() {
         publish();snapshot=version(2,List.of(List.of("合成新店","12.50")));

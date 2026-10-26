@@ -1,3 +1,4 @@
+import {analyzeDatasetInsight,datasetInsightContext} from './dataset-insight.js';
 import { BriefingEvidenceBudget } from './briefing-evidence-budget.js';
 import { bindSupportingCalculations, governedMetricBundle } from './governed-metric-bundle.js';
 import { publishedMetricPlans } from './published-metric-plans.js';
@@ -118,6 +119,7 @@ export class AgentTasks {
     const tableHandles = new Map<string, string>();
     let wikiLearning: ReturnType<typeof wikiSource> | undefined;
     let wikiGraph: ReturnType<typeof wikiGraphContext> | undefined;
+    let datasetInsight: ReturnType<typeof datasetInsightContext> | undefined;
     let wikiInsight: ReturnType<typeof wikiInsightContext> | undefined;
     let briefingGeneration: boolean | undefined;
     let expressionPreferences: unknown;
@@ -205,6 +207,12 @@ export class AgentTasks {
           response.executionClass !== this.config.executionClass
         )
           throw new RuntimeError('TASK_ACCESS_DENIED');
+        if (response.datasetInsight !== undefined) {
+          const next=datasetInsightContext(response.datasetInsight);
+          if(wikiLearning||wikiGraph||wikiInsight||(datasetInsight&&JSON.stringify(next)!==JSON.stringify(datasetInsight)))throw new RuntimeError('TASK_ACCESS_DENIED');
+          datasetInsight=next;return;
+        }
+        if(datasetInsight)throw new RuntimeError('TASK_ACCESS_DENIED');
         if (response.wikiInsight !== undefined) {
           const next = wikiInsightContext(response.wikiInsight);
           if(wikiLearning || wikiGraph || (wikiInsight && JSON.stringify(next)!==JSON.stringify(wikiInsight))) throw new RuntimeError('TASK_ACCESS_DENIED');
@@ -467,7 +475,7 @@ export class AgentTasks {
       const activated = new Map<string, SkillReceipt>();
       const publicTools = new Set(['public_search', 'read_public_page']);
       const standardModel = useRoutineModel({
-        wikiLearning: !!wikiLearning, wikiGraph: !!wikiGraph, wikiInsight: !!wikiInsight,
+        wikiLearning: !!wikiLearning, wikiGraph: !!wikiGraph, wikiInsight: !!wikiInsight || !!datasetInsight,
         publicResearch: !!publicQuery, plan: !!planAllowed,
         presentation: !!presentationWorkflow && presentationWorkflow.state !== 'NONE',
         sandbox: !!this.config.sandbox || !!candidatesAllowed,
@@ -490,10 +498,10 @@ export class AgentTasks {
           : invoke(action, body, 4096),
         observation, selectedModel.modelName,
       );
-      if (wikiLearning || wikiGraph || wikiInsight) {
+      if (wikiLearning || wikiGraph || wikiInsight || datasetInsight) {
         if (task.contractVersion !== '1.5') throw new RuntimeError('TASK_RUNTIME_INCOMPATIBLE');
         await invoke('execution/open', {contractVersion:'1.5', tools:[]});
-        const result = wikiInsight ? await analyzeWikiInsight(wikiInsight, metered, signal) : wikiGraph ? await analyzeWikiGraph(wikiGraph, metered, signal) : await learnWiki(wikiLearning!, metered, signal);
+        const result = datasetInsight ? await analyzeDatasetInsight(datasetInsight, metered, signal) : wikiInsight ? await analyzeWikiInsight(wikiInsight, metered, signal) : wikiGraph ? await analyzeWikiGraph(wikiGraph, metered, signal) : await learnWiki(wikiLearning!, metered, signal);
         await authorize();
         return {contractVersion:'1.5', outcome:'COMPLETE', requiredInput:null, engineVersion:ENGINE_VERSION,
           taskId:task.taskId, attemptId:task.attemptId, mode:'AGENT', executionClass:this.config.executionClass,
