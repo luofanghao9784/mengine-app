@@ -49,6 +49,29 @@ class NativeGovernanceFlowIntegrationTest {
  }
  void background() { company.change(owner,tenant,new CompanyInformationService.Change(UUID.randomUUID(),CompanyInformationService.Field.NAME,0,"ADD",null,"合成治理企业","")); }
  @SuppressWarnings("unchecked")
+ @ParameterizedTest @ValueSource(booleans={false,true})
+ void declaredBusinessRulesAreActuallyCheckedBeforeShowingPublishedReadiness(boolean violation,@org.junit.jupiter.api.io.TempDir java.nio.file.Path directory) throws Exception {
+  background();String proof="合成企业负责人确认：编号是本业务导出的唯一标识，按文本保存。";
+  var rule=Map.of("datasetId",dataset.toString(),"kind","value-rule","id","known-id","column","编号","type","ENUM","nullable",false,"values",List.of(violation?"other":"001"),"evidence",proof);
+  var column=Map.of("datasetId",dataset.toString(),"kind","column","name","编号","type","text","key","PRI","nullable","NO");
+  var evidence=Map.of("tenantId",tenant.toString(),"entries",List.of(Map.of("datasetId",dataset.toString(),"column","编号","sourceMetadata",Map.of("definition",proof))),"schema",List.of(column,rule));
+  var file=directory.resolve("business.json");java.nio.file.Files.writeString(file,new JsonMapper().writeValueAsString(evidence));
+  ReflectionTestUtils.setField(jobs,"evidencePath",file.toString());
+  try {
+   var job=jobs.execute(owner,tenant,new GovernanceModelService.Execute(UUID.randomUUID(),"DATASET",dataset,"SYSTEM_MODEL"));UUID id=(UUID)job.get("id");
+   var req=(Map<String,Object>)job.get("request");var context=(Map<String,Object>)req.get("context");
+   var checks=(Map<String,Object>)context.get("checks");assertEquals("CHECKED",checks.get("state"));
+   assertEquals(violation?"VIOLATIONS":"CHECKED",((Map<?,?>)checks.get("valueValidation")).get("state"));
+   var output=Map.<String,Object>of("title","有依据的业务口径","summary","只对声明规则进行检查","limitations",List.of("不代表银行到账或跨表对账"),"fields",List.of(Map.of("column","编号","decision","REVISE","meaning","企业账单唯一标识，按文本保存","unit","","evidence",proof)),"evidence",List.of(),"knowledge",List.of());
+   jobs.engineAnswer(owner,tenant,id,new GovernanceModelService.Answer(UUID.randomUUID(),1,req.get("inputHash").toString(),"SYSTEM_MODEL",output));
+   db.update("UPDATE governance_model_dispatch SET state='SUCCEEDED' WHERE job_id=?",id);jobs.publish(owner,tenant,id,new GovernanceModelService.Publish(2,req.get("inputHash").toString()));
+   var detail=foundation.detail(owner,tenant,"dataset-"+dataset);var asset=detail.path("asset");
+   assertEquals(0,asset.path("unknownFieldCount").asInt());assertEquals(violation,asset.path("needsAttention").asBoolean());
+   assertEquals(!violation,asset.path("checksPassed").asBoolean());
+   assertFalse(detail.path("dictionary").path("usageRules").asText().contains("未知业务含义仍需核实"));
+  } finally {ReflectionTestUtils.setField(jobs,"evidencePath","");}
+ }
+ @SuppressWarnings("unchecked")
  @Test void exportReceiptIsVisibleToGovernanceWithoutInventingSourceConstraints(@org.junit.jupiter.api.io.TempDir java.nio.file.Path directory) throws Exception {
   background();
   UUID snapshot=db.queryForObject("SELECT current_snapshot FROM business_datasets WHERE id=?",UUID.class,dataset);

@@ -109,12 +109,14 @@ public class NativeFoundationService {
          d.set("at", a.path("publishedAt").isMissingNode() ? this.json.nullNode() : a.path("publishedAt"));
          d.put("provider", a.has("publicationId") ? "已发布原生治理任务" : "来源字段定义");
          d.put("tableMeaning", result.name());
-         d.put("usageRules", "按来源字段和已保存说明使用；未知业务含义仍需核实。");
+         String usage = a.path("unknownFieldCount").asInt() > 0 || !a.has("publicationId")
+             ? "按来源字段和已保存说明使用；未知业务含义仍需核实。"
+             : "字段口径已发布；按已声明的字段、值域与格式规则使用，不等同银行到账或未声明跨表勾稽已核验。";
+         d.put("usageRules", usage);
          d.putNull("job");
          d.set("warnings", a.path("issues").deepCopy());
          if (!a.path("exportValidationSummary").asText().isBlank()) {
-            d.put("usageRules", a.path("exportValidationSummary").asText()
-                + "。按来源字段和已保存说明使用；未知业务含义仍需核实。");
+            d.put("usageRules", a.path("exportValidationSummary").asText() + "。" + usage);
          }
          d.set("relations", this.json.createArrayNode());
          ArrayNode fields = this.json.createArrayNode();

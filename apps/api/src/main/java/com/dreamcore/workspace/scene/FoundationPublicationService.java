@@ -105,6 +105,15 @@ public class FoundationPublicationService {
                if (checks.path("nonNullViolations").asLong() > 0L || checks.path("duplicatePrimaryKeys").asLong() > 0L) {
                   warnings.add("结构检查存在非空或主键异常；未将原始记录判定全部合格");
                }
+               JsonNode valueChecks = checks.path("valueValidation");
+               if ("VIOLATIONS".equals(valueChecks.path("state").asText())) {
+                  warnings.add("已声明字段规则存在异常：" + valueChecks.path("violations").asLong() + " 项，需按检查结果处理");
+               }
+               if (!valueChecks.isMissingNode() && !"NOT_PROVIDED".equals(valueChecks.path("state").asText())) {
+                  exportSummary += (exportSummary.isEmpty() ? "已核验来源约束：" : "；") + "已声明字段规则 " + valueChecks.path("rules").size() + " 项，异常 " + valueChecks.path("violations").asLong()
+                      + "；声明主键重复 " + checks.path("duplicatePrimaryKeys").asLong() + "，必填缺失 " + checks.path("nonNullViolations").asLong();
+                  limitations.add("检查范围：字段类型、已声明分类/状态格式和部署声明的唯一键；未核验银行到账或未声明的跨表勾稽。");
+               }
 
                for (JsonNode fk : checks.path("foreignKeys")) {
                   if (fk.path("unmatched").asLong() > 0L) {
