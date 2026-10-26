@@ -50,9 +50,9 @@ export function newsSearchScope(value: unknown): NewsSearchScope | undefined {
 }
 /** Public RSS search is a replaceable adapter, not a paid API or a promised upstream SLA. */
 export class BingNewsSearch implements PublicSearch {
-  constructor(private readonly reader = new PublicReader()) {}
+  constructor(private readonly reader = new PublicReader(), private readonly mode: 'news' | 'web' = 'news') {}
   async search(query: string, signal: AbortSignal): Promise<WebSource[]> {
-    const endpoint = new URL('https://www.bing.com/news/search');
+    const endpoint = new URL(this.mode === 'web' ? 'https://www.bing.com/search' : 'https://www.bing.com/news/search');
     endpoint.search = new URLSearchParams({
       q: query,
       format: 'rss',
@@ -86,7 +86,7 @@ export class BingNewsSearch implements PublicSearch {
       }
       if (found.some((s) => s.url === url.href)) continue;
       const date = publicationDate(row.pubDate);
-      if (date && Date.parse(date) < Date.now() - 30 * 86400000) continue;
+      if (this.mode === 'news' && date && Date.parse(date) < Date.now() - 30 * 86400000) continue;
       // Feed markup is never treated as tool instructions; the original is read before delivery.
       const excerpt = String(row.description ?? '')
         .replace(/<[^>]*>/g, ' ')

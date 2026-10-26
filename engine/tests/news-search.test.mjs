@@ -129,3 +129,17 @@ test('four warmed candidates deliver only explicitly read sources and retain the
  await task.read(all[3].id,signal());assert.equal(task.deliverySources().length,1);
  await task.read(all[0].id,signal());await task.read(all[1].id,signal());await assert.rejects(task.read(all[2].id,signal()),{code:'PUBLIC_SOURCE_SELECTION_LIMIT'});assert.equal(task.deliverySources().length,3);
 });
+
+
+test('existing Bing web RSS keeps general search and old public references without weakening private URL filtering', async () => {
+ const calls=[];
+ const reader=new PublicReader(async()=>[{address:'8.8.8.8',family:4}],async u=>{
+  calls.push(u);
+  return {status:200,headers:{'content-type':'application/rss+xml'},bytes:Buffer.from('<rss><channel><item><title>长期有效资料</title><link>https://publisher.example.org/reference</link><pubDate>2020-01-01T00:00:00Z</pubDate></item><item><title>私网</title><link>http://127.0.0.1/private</link></item></channel></rss>')};
+ });
+ const web=await new BingNewsSearch(reader,'web').search('公开资料',signal());
+ assert.equal(calls[0].pathname,'/search');assert.equal(calls[0].searchParams.get('format'),'rss');
+ assert.equal(web.length,1);assert.equal(web[0].url,'https://publisher.example.org/reference');
+ const news=await new BingNewsSearch(reader).search('近期资讯',signal());
+ assert.equal(calls[1].pathname,'/news/search');assert.equal(news.length,0);
+});

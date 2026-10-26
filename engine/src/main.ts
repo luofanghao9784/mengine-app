@@ -27,15 +27,15 @@ const searchEndpoint = process.env.AGENT_SEARCH_ENDPOINT;
 const proxyEndpoint = process.env.AGENT_PUBLIC_WEB_PROXY;
 const reader = configuredPublicReader(proxyEndpoint, process.env.AGENT_PUBLIC_WEB_DNS ?? 'system');
 const newsProvider = process.env.AGENT_NEWS_SEARCH_PROVIDER ?? 'off';
-if (!['off', 'bing-rss', 'searx'].includes(newsProvider)) throw new Error('INVALID_NEWS_SEARCH_PROVIDER');
+if (!['off', 'bing-rss', 'bing-web-rss', 'searx'].includes(newsProvider)) throw new Error('INVALID_NEWS_SEARCH_PROVIDER');
 if (newsProvider === 'searx' && !searchEndpoint) throw new Error('PUBLIC_SEARCH_NOT_CONFIGURED');
 const publicWeb = webEnabled
   ? {
       reader,
       ...(searchEndpoint
         ? { search: new SearxSearch(searchEndpoint, reader) }
-        : newsProvider === 'bing-rss'
-          ? { search: new BingNewsSearch(reader) }
+        : newsProvider === 'bing-rss' || newsProvider === 'bing-web-rss'
+          ? { search: new BingNewsSearch(reader, newsProvider === 'bing-web-rss' ? 'web' : 'news') }
           : {}),
     }
   : undefined;
