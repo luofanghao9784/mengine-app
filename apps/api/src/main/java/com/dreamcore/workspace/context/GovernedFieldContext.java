@@ -53,11 +53,11 @@ final class GovernedFieldContext {
                 """
                 SELECT r.package::text AS package,r.created_at
                 FROM native_governance_releases r
-                WHERE r.tenant_id=? AND r.recipient_id=headquarters_permission_actor(?,?) AND (?::uuid IS NULL OR r.id=?)
+                WHERE r.tenant_id=? AND (r.recipient_id=headquarters_permission_actor(?,?) OR (?::uuid IS NOT NULL AND r.package->>'contractVersion'='1.2' AND file_dataset_readable(?,?))) AND (?::uuid IS NULL OR r.id=?)
                   AND EXISTS(SELECT 1 FROM jsonb_array_elements(r.package->'items') i WHERE i->>'datasetId'=?)
                 ORDER BY r.created_at DESC,r.id DESC LIMIT 1
                 """,
-                tenant, actor, tenant, release, release, dataset.toString());
+                tenant, actor, tenant, release, actor, dataset, release, release, dataset.toString());
             if (rows.isEmpty()) return ungoverned();
             JsonNode items = JSON.readTree((String) rows.getFirst().get("package")).path("items");
             List<Map<String, Object>> fields = new ArrayList<>();

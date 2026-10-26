@@ -30,6 +30,8 @@ import static org.junit.jupiter.api.Assertions.*;
         properties = {"dreamcore.auth.ip-attempts=1000", "dreamcore.auth.email-attempts=20"})
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class IdentityIntegrationTest {
+ @org.springframework.test.context.DynamicPropertySource
+ static void isolateGlobalState(org.springframework.test.context.DynamicPropertyRegistry registry){IsolatedTestDatabase.register(registry);}
     private static final String PASSWORD = "synthetic-only-password-2026";
     private static final JsonMapper JSON = new JsonMapper();
     @LocalServerPort int port;

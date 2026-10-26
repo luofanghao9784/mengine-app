@@ -349,6 +349,11 @@ export function UsageFacts({
       <section className="admin-section usage-section" aria-label="用途与计量覆盖">
         <h2>用途与计量覆盖</h2>
         <p className="admin-note">Token 只累计已上报部分；未上报和未收到回执的消耗不能当作零。</p>
+        <p className="admin-note">
+          {v.coverage.legacyGovernanceJobs === undefined
+            ? '平台尚未提供历史治理计量覆盖统计。'
+            : `历史治理计量（全历史，不随期间筛选变化）：${numbers(v.coverage.legacyGovernanceJobs)} 个任务缺少可核验的调用开始时间；调用次数和 Token 未知，未纳入所选期间统计。`}
+        </p>
         {v.groups.length ? (
           <div className="usage-groups">
             {v.groups.map((g) => (
@@ -392,7 +397,7 @@ export function UsageFacts({
               日常工作：按请求登记时间归集，包含会话、画报、失败、取消与重试；登记请求不保证已被供应商接收。
             </p>
             <p>
-              基础维护：企业信息、经验提炼与核验、通用经验处理。按运行开始时间归集回执；尚未收到或未记录的回执不可推算，历史类别未知单列。
+              基础维护：企业信息、数据治理、经验提炼与核验、通用经验处理。按运行开始时间归集回执；尚未收到或未记录的回执不可推算，历史类别未知单列。
             </p>
             <p>评测：尚未接入独立计量。自进化：未启用。合成验证不计作正式执行或实际费用。</p>
             {!platform && (

@@ -16,6 +16,50 @@ class UsageIntegrationTest {
  ConversationService.Job start(){tasks.submit(actor,tenant,null,space,UUID.randomUUID(),PRIVATE,"AGENT");return tasks.claim();}
  UsageService.Overview read(){return usage.tenant(actor,tenant,"THIS_MONTH");}
  void model(ConversationService.Job j,int n,String outcome,Long in,Long out){agents.startUsage(j.id(),j.token(),new AgentUsageLedger.Start(n,2048));ledger.finish(j.id(),j.token(),new AgentUsageLedger.Receipt(n,outcome,in,out));}
+ @Autowired com.dreamcore.workspace.governance.GovernanceUsageLedger governanceUsage;
+ @Test void undatedLegacyGovernanceRemainsVisibleAcrossPeriodsWithoutInventingCallDates(){
+  UUID job=UUID.randomUUID();long platformBefore=usage.platform(operator,null,"THIS_MONTH").usage().coverage().legacyGovernanceJobs();
+  assertEquals(0,read().coverage().legacyGovernanceJobs());
+  db.update("INSERT INTO governance_model_jobs(id,tenant_id,actor_id,kind,source_id,request_id,source_name,basis_hash,input,state,created_at) VALUES (?,?,?,'DATASET',?,?,'历史合成来源','basis','{}','DRAFT_READY',date_trunc('month',now())-interval '1 month')",job,tenant,actor,UUID.randomUUID(),UUID.randomUUID());
+  // Created last month, retried/completed this month; neither timestamp proves the historical call start.
+  db.update("INSERT INTO governance_model_dispatch(job_id,executor,state,attempts,updated_at) VALUES (?,'SYSTEM_MODEL','SUCCEEDED',2,now())",job);
+  try {
+   for(int revision:List.of(1,2))db.update("INSERT INTO governance_model_usage(job_id,revision,tenant_id,execution_class,state,started_at,reported_at) VALUES (?,?,?,'live','UNKNOWN',NULL,now())",job,revision,tenant);
+   for(String period:List.of("THIS_MONTH","LAST_MONTH","LAST_30_DAYS")) {
+    var report=usage.tenant(actor,tenant,period);assertEquals(1,report.coverage().legacyGovernanceJobs());
+    assertTrue(report.groups().isEmpty());
+    assertTrue(report.days().stream().allMatch(d->Long.valueOf(0).equals(d.maintenanceCalls())&&d.unknownMaintenanceRuns()==0&&d.inputTokens()==null&&d.outputTokens()==null));
+    assertEquals(1,usage.platform(operator,tenant,period).usage().coverage().legacyGovernanceJobs());
+   }
+   assertEquals(platformBefore+1,usage.platform(operator,null,"THIS_MONTH").usage().coverage().legacyGovernanceJobs());
+   // A newly metered retry keeps its real timestamp and does enter this month's totals.
+   governanceUsage.start(job,3,UUID.randomUUID());governanceUsage.returned(job,3,Map.of("modelCalls",1,"inputTokens",12L,"outputTokens",3L));
+   assertNotNull(db.queryForObject("SELECT started_at FROM governance_model_usage WHERE job_id=? AND revision=3",Timestamp.class,job));
+   assertEquals(1,read().groups().getFirst().modelCalls());assertEquals(12,read().groups().getFirst().inputTokens());
+   assertEquals(1,read().coverage().legacyGovernanceJobs());assertTrue(usage.tenant(actor,tenant,"LAST_MONTH").groups().isEmpty());
+  } finally {db.update("DELETE FROM governance_model_usage WHERE job_id=?",job);db.update("DELETE FROM governance_model_dispatch WHERE job_id=?",job);db.update("DELETE FROM governance_model_jobs WHERE id=?",job);}
+ }
+ @Test void governanceCallsRetainTokensUnknownOutcomesAndRetryWithoutDoubleCounting(){
+  UUID job=UUID.randomUUID(),lease=UUID.randomUUID(),retryLease=UUID.randomUUID();
+  db.update("INSERT INTO governance_model_jobs(id,tenant_id,actor_id,kind,source_id,request_id,source_name,basis_hash,input,state) VALUES (?,?,?,'DATASET',?,?,'合成来源','basis','{}','FAILED')",job,tenant,actor,UUID.randomUUID(),UUID.randomUUID());
+  db.update("INSERT INTO governance_model_dispatch(job_id,executor,state) VALUES (?,'SYSTEM_MODEL','FAILED')",job);
+  try {
+   governanceUsage.start(job,1,lease);governanceUsage.start(job,1,lease);
+   assertEquals(1,read().groups().getFirst().pendingUnits());
+   governanceUsage.returned(job,1,Map.of("modelName","synthetic-model","modelCalls",1,"inputTokens",123L,"outputTokens",45L));
+   governanceUsage.returned(job,1,Map.of("modelCalls",99,"inputTokens",999L,"outputTokens",999L));
+   governanceUsage.unknown(job,lease);
+   var first=read().groups().getFirst();assertEquals("MAINTENANCE",first.purpose());assertEquals("live",first.executionClass());
+   assertEquals(1,first.units());assertEquals(1,first.modelCalls());assertEquals(123,first.inputTokens());assertEquals(45,first.outputTokens());
+   governanceUsage.start(job,2,retryLease);governanceUsage.unknown(job,lease);
+   assertEquals(1,read().groups().getFirst().pendingUnits());governanceUsage.unknown(job,retryLease);
+   var second=read().groups().getFirst();assertEquals(2,second.units());assertEquals(1,second.unknownCallUnits());assertEquals(123,second.inputTokens());
+   assertEquals(1,read().days().stream().mapToLong(UsageService.Day::unknownMaintenanceRuns).sum());
+   db.update("UPDATE governance_model_usage SET started_at=now()-interval '2 months' WHERE job_id=? AND revision=1",job);
+   assertNull(read().groups().getFirst().modelCalls());
+   assertFalse(new JsonMapper().writeValueAsString(read()).contains("合成来源"));
+  } finally {db.update("DELETE FROM governance_model_usage WHERE job_id=?",job);db.update("DELETE FROM governance_model_dispatch WHERE job_id=?",job);db.update("DELETE FROM governance_model_jobs WHERE id=?",job);}
+ }
  @Test void requestTimesNotTaskOrAttemptStartChooseWindowAndIncludeFailedRetryUsage(){
   var j=start();agents.openUsage(j.id(),j.token());model(j,1,"FAILED",12L,3L);model(j,2,"RETURNED",null,null);agents.startUsage(j.id(),j.token(),new AgentUsageLedger.Start(3,2048));
   db.update("UPDATE agent_attempt_usage SET started_at=now()-interval '2 months' WHERE attempt_id=?",j.token());
@@ -64,7 +108,16 @@ class UsageIntegrationTest {
  HttpClient login(boolean platform)throws Exception{db.update("DELETE FROM login_attempts");var http=HttpClient.newBuilder().cookieHandler(new CookieManager(null,CookiePolicy.ACCEPT_ALL)).build();String base="http://127.0.0.1:"+port+(platform?"/api/platform-admin/v1/auth":"/api/v1/auth");var json=new JsonMapper();var csrf=json.readTree(http.send(HttpRequest.newBuilder(URI.create(base+"/csrf")).GET().build(),HttpResponse.BodyHandlers.ofString()).body());var req=HttpRequest.newBuilder(URI.create(base+"/login")).header(csrf.get("headerName").asString(),csrf.get("token").asString()).header("Content-Type","application/json").POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(Map.of(platform?"username":"email",(platform?operator:actor)+"@example.test","password",PASSWORD)))).build();assertEquals(200,http.send(req,HttpResponse.BodyHandlers.ofString()).statusCode());return http;}
  HttpResponse<String> get(HttpClient http,String path)throws Exception{return http.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+path)).GET().build(),HttpResponse.BodyHandlers.ofString());}
  @Test void httpScopesAndCostProjectionAreSeparateAndRevocationApplies()throws Exception{
-  var customer=login(false);String platformPath="/api/platform-admin/v1/tenants/"+tenant+"/usage",tenantPath="/api/tenant-admin/v1/tenants/"+tenant+"/usage";assertEquals(403,get(customer,platformPath).statusCode());var r=get(customer,tenantPath);assertEquals(200,r.statusCode());assertFalse(r.body().contains("cost"));assertEquals("private, no-store",r.headers().firstValue("Cache-Control").orElseThrow());
-  var platform=login(true);assertEquals(403,get(platform,tenantPath).statusCode());r=get(platform,platformPath);assertEquals(200,r.statusCode());assertTrue(r.body().contains("NOT_CONNECTED"));db.update("DELETE FROM platform_roles WHERE account_id=?",operator);assertEquals(403,get(platform,platformPath).statusCode());db.update("UPDATE tenant_memberships SET role='MEMBER' WHERE tenant_id=? AND account_id=?",tenant,actor);assertEquals(403,get(customer,tenantPath).statusCode());
+  var customer=login(false);String platformPath="/api/platform-admin/v1/tenants/"+tenant+"/usage",tenantPath="/api/tenant-admin/v1/tenants/"+tenant+"/usage";
+  // Each realm requires its own authenticated cookie; a customer session is not a platform principal.
+  var denied=get(customer,platformPath);assertEquals(401,denied.statusCode());assertEquals("AUTHENTICATION_REQUIRED",new JsonMapper().readTree(denied.body()).get("code").asString());
+  var r=get(customer,tenantPath);assertEquals(200,r.statusCode());assertFalse(r.body().contains("cost"));assertEquals("private, no-store",r.headers().firstValue("Cache-Control").orElseThrow());
+  var platform=login(true);assertEquals(401,get(platform,tenantPath).statusCode());r=get(platform,platformPath);assertEquals(200,r.statusCode());assertTrue(r.body().contains("NOT_CONNECTED"));
+  db.update("DELETE FROM platform_roles WHERE account_id=?",operator);assertEquals(401,get(platform,platformPath).statusCode());
+  db.update("INSERT INTO platform_roles(account_id,role) VALUES (?,'PLATFORM_ADMIN')",operator);
+  assertEquals(401,get(platform,platformPath).statusCode(),"Regranting the role must not revive a revoked session");
+  assertEquals(200,get(login(true),platformPath).statusCode());
+  db.update("UPDATE tenant_memberships SET role='MEMBER' WHERE tenant_id=? AND account_id=?",tenant,actor);
+  assertEquals(200,get(customer,"/api/v1/me").statusCode());assertEquals(403,get(customer,tenantPath).statusCode());
  }
 }

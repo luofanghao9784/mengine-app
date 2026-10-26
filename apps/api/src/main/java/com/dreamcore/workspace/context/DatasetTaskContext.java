@@ -15,6 +15,7 @@ public class DatasetTaskContext {
     public DatasetTaskContext(JdbcTemplate db,MaterialAccess access,com.dreamcore.workspace.collection.NativeGovernanceDeployment governance){this.db=db;this.access=access;this.governance=governance;}
     private Map<String,Object> map(Object... values){var m=new LinkedHashMap<String,Object>();for(int i=0;i<values.length;i+=2)m.put((String)values[i],values[i+1]);return m;}
     @org.springframework.beans.factory.annotation.Value("${dreamcore.governance.source-evidence:}") private String evidencePath="";
+    @org.springframework.beans.factory.annotation.Autowired private com.dreamcore.workspace.governance.GovernanceModelService governanceChecks;
     private IdentityException missing(){return new IdentityException(404,"TASK_DATASET_NOT_FOUND");}
     private Map<String,Object> task(UUID id){return db.queryForMap("SELECT * FROM conversation_tasks WHERE id=?",id);}
     private List<Map<String,Object>> rows(Map<String,Object> t,UUID dataset,UUID snapshot,String q,int offset,int limit){
@@ -46,10 +47,10 @@ public class DatasetTaskContext {
         if(columnOffset>=columns.size())throw IdentityException.invalid();int end=Math.min(columns.size(),columnOffset+columnLimit);
         List<String> visible=columns.subList(columnOffset,end);
         var context=map("datasetId",d.get("id"),"snapshotId",d.get("snapshot_id"),"version",d.get("version"),"name",d.get("name"),"description",d.get("description"),"columns",visible,"fieldDefinitions",com.dreamcore.workspace.collection.DatasetField.read(d.get("field_definitions")).stream().filter(f->visible.contains(f.column())).toList(),"calculationCapabilities",Map.of("operations",List.of("COMPARE","SUMMARY","COMPOSITION"),"aggregations",List.of("SUM","COUNT"),"crossDatasetJoin",false,"derivedExpressions",false,"maxGroups",50,"summaryGroupColumns",List.of(0,1,2,3),"compositionGroupColumns",1,"requiresPinnedSnapshot",true),"definitionOrigin","DEPLOYMENT","columnOffset",columnOffset,"nextColumnOffset",end<columns.size()?end:null,"totalColumns",columns.size(),"rowCount",d.get("row_count"),"coverageThrough",time(d.get("coverage_through")),"collectedAt",time(d.get("collected_at")),"authority",false,"governedMetrics",com.dreamcore.workspace.scene.MetricCatalog.context(db,task,(UUID)d.get("id"),query),"sourceSemantics",sourceSemantics((UUID)d.get("id")),"businessReading",columns.contains("收款状态")&&columns.contains("收款类型")?Map.of("statusLabels",Map.of("finance_confirmed","财务已确认（不能据此认定到账）","canceled","已取消（不能据此认定已退款）"),"typeLabels",Map.of("deposit","定金"),"money","列名明确标注（分）的金额，展示给读者时换算为元；保留原数值用于计算。","scope","样本仅支持样本观察，原始状态含义未知时说明尚待核实，不推断定金比例。", "dateComparison","可用 compare_dataset 的 periodMode=MONTH 将日期按业务时区归月，月份必须为 YYYY-MM；缺失或格式不明的日期会拒绝计算。") : Map.of());
-        // Conversations and briefings use the same current, authorized governance wording.
+        // Stable 1.2 definitions follow the task's checked snapshot across later collections.
         UUID release = null;
-        if (Objects.equals(d.get("snapshot_id"), d.get("current_snapshot"))) {
-            var published = governance.currentFor((UUID)t.get("requested_by"), (UUID)t.get("tenant_id"), (UUID)d.get("id"));
+        {
+            var published = governance.currentForSnapshot((UUID)t.get("requested_by"), (UUID)t.get("tenant_id"), (UUID)d.get("id"), (UUID)d.get("snapshot_id"));
             if (!published.isEmpty()) {
                 var current = published.getFirst(); release = current.releaseId();
                 context.put("fieldDefinitions", current.fields().stream().filter(f -> visible.contains(f.column())).toList());
@@ -60,7 +61,10 @@ public class DatasetTaskContext {
                 context.put("publishedFieldUnits", units);
                 boolean legacy=Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM scene_asset_revisions WHERE tenant_id=? AND target_id=? AND kind='TABLE')",Boolean.class,t.get("tenant_id"),d.get("id")));
                 if (!legacy) {
-                    var plans=NativeAnalysisPlans.load(evidencePath,(UUID)t.get("tenant_id"),(UUID)d.get("id"),(UUID)d.get("snapshot_id"),d.get("name").toString(),columns,current.fields());
+                    var ready=governanceChecks.analysisReadiness((UUID)t.get("requested_by"),(UUID)t.get("tenant_id"),(UUID)d.get("id"),(UUID)d.get("snapshot_id"));
+                    context.put("analysisReadiness",Map.of("ready",ready.ready(),"reason",Objects.toString(ready.reason(),"CHECKED")));
+                    var plans=ready.ready()?NativeAnalysisPlans.load(evidencePath,(UUID)t.get("tenant_id"),(UUID)d.get("id"),(UUID)d.get("snapshot_id"),d.get("name").toString(),columns,current.fields(),((Timestamp)t.get("created_at")).toInstant())
+                        : Map.of("items",List.of(),"usage","当前来源检查尚未通过；保留已发布字段口径用于查阅，但不执行经营统计。原因："+ready.reason(),"authority",false);
                     context.put("nativeAnalysisPlans",plans);
                     context.put("governedMetrics",Map.of("items",List.of(),"hasMore",false,"usage","这是原生来源，不使用旧版指标目录；优先执行 nativeAnalysisPlans 中的部署固定方法。没有适用计划时仅可用已发布字段口径和已提供计算能力做有界源值核验，不推定营业额、到账或利润。","automaticExecution",false));
                 }

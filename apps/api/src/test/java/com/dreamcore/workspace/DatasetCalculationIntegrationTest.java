@@ -38,6 +38,31 @@ class DatasetCalculationIntegrationTest extends DatasetCalculationFixture {
   denied(()->agents.compareDataset(j.id(),j.token(),new DatasetCalculationService.Request(dataset,newer,"门店","期间","收款（元）","前期","本期")));
   db.update("DELETE FROM workspace_members WHERE workspace_id=? AND account_id=?",space,owner);db.update("INSERT INTO workspace_members(tenant_id,workspace_id,account_id) VALUES (?,?,?)",tenant,space,owner);denied(()->agents.compareDataset(j.id(),j.token(),parameters()));
  }
+ @Test void persistedCardFactsCannotSwapGroupsOrRepeatModelInventedTotals(){
+  rows(List.of(List.of("甲店","前期","80.00"),List.of("乙店","前期","10.00"),List.of("甲店","本期","100.00"),List.of("乙店","本期","20.00")));
+  var j=start();var computed=json.valueToTree(agents.compareDataset(j.id(),j.token(),parameters()));UUID calculation=UUID.fromString(computed.at("/artifact/id").asText());
+  receipt(j,2,"compare_dataset","succeeded");receipt(j,3,"deliver_briefing","STARTED");
+  var request=new BriefingContentService.Request(calculation,"乙店收入999元，远超甲店","乙店登记100元，甲店登记20元，合计999元。",List.of("乙店排名最高，甲店排名最低，收入已经银行到账。","建议核对各门店原始账单与登记凭据。"));
+  var result=agents.deliverBriefing(j.id(),j.token(),request);assertEquals(result,agents.deliverBriefing(j.id(),j.token(),request));
+  byte[] body=db.queryForObject("SELECT content FROM conversation_artifacts WHERE task_id=? AND filename LIKE 'briefing-dataset-%'",byte[].class,j.id());
+  var card=json.readTree(body);String text=card.path("title").asText()+card.path("summary").asText()+card.path("analysis");
+  assertFalse(text.contains("999"));assertFalse(text.contains("乙店排名最高"));assertTrue(text.contains("本期合计 120.00 元"));assertTrue(text.contains("最大为 100.00 元，对应「甲店」"));
+  assertEquals(calculation.toString(),card.path("calculationArtifactId").asText());assertEquals(snapshot.toString(),card.path("datasetSource").path("snapshotId").asText());
+ }
+ DatasetCalculationService.Request wholeSummary(){return new DatasetCalculationService.Request(dataset,snapshot,null,null,"收款（元）",null,null,null,"Asia/Shanghai","SUM","SUMMARY",List.of("门店"),null,null,null,null);}
+ @Test void measuredZeroWithActualRowsIsDeliverableRatherThanNoUsefulData(){
+  rows(List.of(List.of("甲店","本期","0.00"),List.of("乙店","本期","0.00")));var j=start();
+  var computed=json.valueToTree(agents.compareDataset(j.id(),j.token(),wholeSummary()));assertEquals("0.00",computed.at("/calculation/total").asText());assertEquals(2,computed.at("/calculation/matchedRows").asInt());
+  receipt(j,2,"compare_dataset","succeeded");receipt(j,3,"deliver_briefing","STARTED");
+  var result=agents.deliverBriefing(j.id(),j.token(),card(UUID.fromString(computed.at("/artifact/id").asText())));assertEquals("PREPARED",result.get("status"));
+  var saved=json.readTree(db.queryForObject("SELECT content FROM conversation_artifacts WHERE task_id=? AND filename LIKE 'briefing-dataset-%'",byte[].class,j.id()));assertTrue(saved.path("summary").asText().contains("0.00 元"));assertEquals(2,saved.path("datasetBasis").path("matchedRows").asInt());
+ }
+ @Test void emptyAndNullAreRejectedInsteadOfBecomingMeasuredZero(){
+  rows(List.of());var j=start();var empty=assertThrows(IdentityException.class,()->agents.compareDataset(j.id(),j.token(),wholeSummary()));assertEquals("DATASET_NO_MATCHING_DATA",empty.code);
+  assertEquals(0,db.queryForObject("SELECT count(*) FROM conversation_artifacts WHERE task_id=?",Integer.class,j.id()));
+  rows(List.of(Arrays.asList("甲店","本期",null)));var other=start();var missing=assertThrows(IdentityException.class,()->agents.compareDataset(other.id(),other.token(),wholeSummary()));assertEquals("DATASET_AMOUNT_REQUIRED",missing.code);
+  assertEquals(0,db.queryForObject("SELECT count(*) FROM conversation_artifacts WHERE task_id=?",Integer.class,other.id()));
+ }
  @Test void missingPeriodsAndNonPositiveBaselineAreGapsNotZeroOrPercent(){
   rows(List.of(List.of("甲","前期","0"),List.of("甲","本期","10"),List.of("乙","本期","3")));
   var j=start();var r=json.valueToTree(agents.compareDataset(j.id(),j.token(),parameters())).path("calculation");

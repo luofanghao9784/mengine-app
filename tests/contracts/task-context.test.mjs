@@ -41,6 +41,8 @@ test('legacy check payload stays valid while only known context versions can adv
   };
   assert.ok(check(base));
   assert.ok(check({ ...base, contextVersion: '1.0' }));
+  assert.ok(check({ ...base, contextVersion: '1.0', contextRejectionVersion: '1.0' }));
+  assert.ok(!check({ ...base, contextVersion: '1.0', contextRejectionVersion: '2.0' }));
   assert.ok(check({ ...base, contextVersion: '1.0', datasetContextVersion: '1.0' }));
   assert.ok(!check({ ...base, contextVersion: '1.0', datasetContextVersion: '2.0' }));
   assert.ok(!check({ ...base, contextVersion: '2.0' }));

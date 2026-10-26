@@ -16,6 +16,10 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,
  properties={"dreamcore.auth.ip-attempts=1000","dreamcore.auth.email-attempts=1000"})
 class PlatformStaffIntegrationTest {
+    @org.springframework.test.context.DynamicPropertySource
+    static void isolatedDatabase(org.springframework.test.context.DynamicPropertyRegistry registry) {
+        IsolatedTestDatabase.register(registry);
+    }
     @Autowired PlatformStaffService staff;
     @Autowired PlatformDirectoryService directory;
     @Autowired IdentityService identities;
@@ -120,8 +124,16 @@ class PlatformStaffIntegrationTest {
         assertEquals(200,accepted.statusCode(),accepted.body());
         UUID id=UUID.fromString(JSON.readTree(accepted.body()).get("account").get("id").asString());fixtures.add(id);
         assertEquals(200,recipient.send("GET",BASE+"/staff",null,null).statusCode());
-        assertEquals(200,recipient.send("GET","/api/v1/me",null,null).statusCode());
+        assertEquals(existingUnified,id,"The verified existing account accepts the invitation without creating another identity");
+        assertEquals(401,recipient.send("GET","/api/v1/me",null,null).statusCode(),"Accepting a platform invitation must not create a customer session");
+        String customerCsrf=JSON.readTree(recipient.send("GET","/api/v1/auth/csrf",null,null).body()).get("token").asString();
+        var customerLogin=recipient.send("POST","/api/v1/auth/login",Map.of("phone",phone,"password",PWD),customerCsrf);
+        assertEquals(200,customerLogin.statusCode(),customerLogin.body());
+        assertEquals(existingUnified.toString(),JSON.readTree(customerLogin.body()).get("account").get("id").asString());
+        assertEquals(200,recipient.send("GET",BASE+"/staff",null,null).statusCode());
         assertEquals(204,browser.post("/staff/"+id+"/revoke",Map.of("requestId",UUID.randomUUID(),"expectedVersion",1)).statusCode());
-        assertEquals(403,recipient.send("GET",BASE+"/staff",null,null).statusCode());
+        var revoked=recipient.send("GET",BASE+"/staff",null,null);assertEquals(401,revoked.statusCode());
+        assertEquals("AUTHENTICATION_REQUIRED",JSON.readTree(revoked.body()).get("code").asString());
+        assertEquals(existingUnified.toString(),JSON.readTree(recipient.send("GET","/api/v1/me",null,null).body()).get("account").get("id").asString());
     }
 }

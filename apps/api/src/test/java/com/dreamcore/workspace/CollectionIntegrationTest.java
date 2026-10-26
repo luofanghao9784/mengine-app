@@ -284,6 +284,28 @@ class CollectionIntegrationTest {
         start();claim=service.claim(tenant,connection,Instant.now());assertFalse(service.complete(claim,new CollectionAdapter.Result("1.0",List.of()),Instant.now()));
         assertEquals(0,db.queryForObject("SELECT count(*) FROM dataset_snapshots WHERE dataset_id=?",Integer.class,dataset));
     }
+    @Test void exportReceiptsAreValidatedForTheWholeBatchBeforeAnySnapshotIsPublished(){
+        UUID second=UUID.randomUUID();
+        db.update("INSERT INTO business_datasets(id,tenant_id,connection_id,workspace_id,dataset_key,name,column_names) VALUES (?,?,?,?,'other','另一合成表','[\"门店\",\"数量\"]'::jsonb)",second,tenant,connection,space);
+        var now=Instant.now();var collected=now.minusSeconds(600);var verified=now.minusSeconds(60);
+        var columns=List.of("门店","数量");var rows=List.of(List.of("0001","-123456789012345.12"));
+        var receipt=new CollectionAdapter.ExportReceipt("1.0",UUID.randomUUID(),collected,verified,"a".repeat(64),true,1,columns,List.of("门店"),IdentityService.hash(JSON.writeValueAsString(rows)));
+        var first=new CollectionAdapter.Snapshot(dataset,null,rows,receipt);
+        var tampered=new CollectionAdapter.Snapshot(second,null,List.of(List.of("0001","0")),receipt);
+        start();var rejected=service.claim(tenant,connection,Instant.now());
+        assertFalse(service.complete(rejected,new CollectionAdapter.Result("1.0",List.of(first,tampered)),Instant.now()));
+        assertEquals(0,db.queryForObject("SELECT count(*) FROM dataset_snapshots WHERE tenant_id=?",Integer.class,tenant));
+        assertEquals(0,db.queryForObject("SELECT count(*) FROM collection_snapshot_receipts WHERE tenant_id=?",Integer.class,tenant));
+        start();var accepted=service.claim(tenant,connection,Instant.now());
+        assertTrue(service.complete(accepted,new CollectionAdapter.Result("1.0",List.of(first,new CollectionAdapter.Snapshot(second,null,rows,receipt))),Instant.now()));
+        assertFalse(service.complete(accepted,new CollectionAdapter.Result("1.0",List.of(first,new CollectionAdapter.Snapshot(second,null,rows,receipt))),Instant.now()));
+        assertEquals(2,db.queryForObject("SELECT count(*) FROM collection_snapshot_receipts WHERE tenant_id=?",Integer.class,tenant));
+        var stored=JSON.readTree(db.queryForObject("SELECT receipt::text FROM collection_snapshot_receipts WHERE tenant_id=? AND dataset_id=?",String.class,tenant,dataset));
+        assertEquals(collected,Instant.parse(stored.path("sourceCollectedAt").asText()));
+        assertEquals(verified,Instant.parse(stored.path("sourceVerifiedAt").asText()));
+        assertEquals(db.queryForObject("SELECT current_snapshot::text FROM business_datasets WHERE id=?",String.class,dataset),stored.path("snapshotId").asText());
+        assertEquals(rows,service.preview(reader,tenant,dataset,0,20).rows());
+    }
     @Test void servicePauseAndRestoreFenceOldResultsAndScheduleOnlyFuture(){
         service.configure(admin,tenant,connection,UUID.randomUUID(),0,hourly(true));start();var claim=service.claim(tenant,connection,Instant.now());
         db.update("UPDATE tenants SET status='SUSPENDED' WHERE id=?",tenant);assertFalse(service.complete(claim,result("禁止旧结果",null),Instant.now()));

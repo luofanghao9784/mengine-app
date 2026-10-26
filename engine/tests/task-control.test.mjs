@@ -104,6 +104,7 @@ test('failed actual tool remains failed and yields partial delivery rather than 
   assert.equal(warnings[0].tool, 'search_sources');
   assert.equal(warnings[0].code, 'INVALID_QUERY');
   assert.equal(warnings[0].callId, 'call-1');
+  assert.equal(warnings[0].executionStarted, true);
   assert.match(warnings[0].taskId, /^[0-9a-f-]{36}$/);
   assert.match(warnings[0].attemptId, /^[0-9a-f-]{36}$/);
   assert.deepEqual(Object.keys(warnings[0]).sort(), [
@@ -111,11 +112,13 @@ test('failed actual tool remains failed and yields partial delivery rather than 
     'callId',
     'code',
     'event',
+    'executionStarted',
     'taskId',
     'tool',
   ]);
   assert.equal(result.outcome, 'PARTIAL');
   assert.equal(result.tools[0].status, 'failed');
+  assert.equal(result.tools[0].rejection, undefined);
   assert.deepEqual(
     receipts.map((r) => r.status),
     ['STARTED', 'failed'],

@@ -144,6 +144,7 @@ public class CollectionService {
         for(var snapshot:result.snapshots()){
             UUID id=UUID.randomUUID();Integer version=db.queryForObject("SELECT coalesce(max(version),0)+1 FROM dataset_snapshots WHERE dataset_id=?",Integer.class,snapshot.datasetId());
             db.update("INSERT INTO dataset_snapshots(id,tenant_id,connection_id,dataset_id,run_id,version,data_rows,row_count,coverage_through,collected_at) VALUES (?,?,?,?,?,?,CAST(? AS jsonb),?,?,?)",id,claim.tenantId(),claim.connectionId(),snapshot.datasetId(),claim.runId(),version,json.writeValueAsString(snapshot.rows()),snapshot.rows().size(),stamp(snapshot.coverageThrough()),stamp(now));
+            if(snapshot.exportReceipt()!=null)db.update("INSERT INTO collection_snapshot_receipts(snapshot_id,tenant_id,dataset_id,receipt,received_at) VALUES (?,?,?,?::jsonb,?)",id,claim.tenantId(),snapshot.datasetId(),CollectionReceiptChecks.stored(snapshot.exportReceipt(),id),stamp(now));
             db.update("UPDATE business_datasets SET current_snapshot=? WHERE id=? AND tenant_id=? AND connection_id=? AND status='ACTIVE'",id,snapshot.datasetId(),claim.tenantId(),claim.connectionId());
         }
         terminal(claim.runId(),"SUCCEEDED",null,now);return true;
@@ -160,6 +161,7 @@ public class CollectionService {
                 totalCells+=row.size();if(totalCells>2000000)return false;
                 for(String cell:row)if(cell!=null&&cell.length()>8192)return false;
             }
+            if(!CollectionReceiptChecks.valid(s,columns,now))return false;
         }return true;
     }
     public List<Map<String,Object>> candidates(){return db.queryForList("SELECT c.tenant_id,c.id FROM data_connections c JOIN tenants t ON t.id=c.tenant_id WHERE t.status='ACTIVE' AND NOT EXISTS(SELECT 1 FROM departure_executions e WHERE e.tenant_id=c.tenant_id AND e.kind='TENANT_EXIT' AND e.state<>'CANCELLED') AND ((c.status='READY' AND c.auto_enabled AND c.next_due<=now()) OR EXISTS(SELECT 1 FROM collection_runs r WHERE r.connection_id=c.id AND (r.status='QUEUED' OR (r.status='RUNNING' AND r.lease_until<=now())))) ORDER BY c.next_due NULLS LAST,c.id LIMIT 100");}

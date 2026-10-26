@@ -67,10 +67,25 @@ M7-A1 第七切片：新增 [Model Usage 1.0](engine-api/model-usage.schema.json
 
 企业信息自动整理：`engine-api/company-analysis.schema.json` 定义独立可选 `1.0` 协议的固定任务输入、运行描述及结构化结果；读取与取消回执必须携带服务间认证。模型候选不能直接改写企业信息，由平台按当前权限、固定原文及人工保护核验。`public-api/profile.openapi.json` 1.3.0 增加客户域只读 `/company-information/analysis`，输出当前企业的持久计数和真实完成时间，不返回原始资料或模型内容。部署未启用、未知调用用量及结果不明分别表达，不将其替换为成功或零费用。失败恢复和限制见[五批实施记录](../docs/交接/管理端五批实施记录-2026-10-04.md)。
 
+治理计量：`public-api/usage.ts` / `usage.openapi.json` 的 `coverage.legacyGovernanceJobs` 是全历史范围内缺少可信调用开始时间的治理任务数，按任务去重，不随期间筛选变化，也不代表调用次数。旧调用的开始时间保留为空，不用任务创建或更新时间代填，因此不进入月份调用数与 Token 合计；新派发仍记录真实开始时间。该字段可省略以兼容旧平台，省略表示覆盖未知，客户端不能按零显示。
+
 
 数据快照比较：可选 `datasetComparisonVersion:1.0` 在已有 `datasetContextVersion:1.0` 基础上启用 `compare_dataset`；[计算契约](engine-api/dataset-comparison.schema.json)规定当前尝试固定快照、实际列名与平台完整十进制结果。调用前须有已授权读取记录。`briefing-delivery` 增加 `briefing-dataset-v1`，必需 `datasetSource` 与 `datasetBasis`，材料来源 `source` 为 null；旧文件/文本卡允许这两个字段缺省或 null。来源行数与比较纳入/排除行数必须相符，采集时间不替代业务覆盖时间。无新迁移，旧平台不声明能力时新引擎隐藏该工具；自动生成的数据库选数不在本切片完成范围。
+
+2026-10-26 事实交付补强：新发布的数据快照、文件表、固定对账链及跨表融合画报，事实标题、摘要和分析由服务端从同一份获权计算回执确定性生成。模型负责选择业务问题、已发布方法和兼容版式，不能将另一个合法数字换到错误分组或指标，也不能自行换算、漏计分组或推断经营优劣；交付回执中的 `title` 是实际保存标题。模型的后续建议只用于选择“账单核对、日期、状态、门店或逾期依据”等固定行动主题，发布文案由平台生成，不直接拼入模型文字，避免数字拼写或换标签绕过事实绑定。旧卡字节不重写。实际纳入记录的零值可以交付；没有匹配记录、NULL 金额、缺少必需日期仍分别拒绝，不能统称零值。
+
+原生部署方法可显式声明 `definition.calendarWindow` 为 `CURRENT_MONTH` 或 `PREVIOUS_MONTH`。此时 `execution.dateColumn` 必须是已确认日期字段，时区为 `Asia/Shanghai`，原始 `dateFrom`/`dateTo` 留空；服务端以任务持久化 `created_at` 解析完整自然月边界，返回 `definition.resolvedCalendarMonth` 与固定执行日期。重试和跨月恢复沿同一任务月份，不使用读取时的“今天”改写口径。月份只描述选定日期字段的归属；例如“应收付日”月份的登记金额不代表实际到账月份、利润或当前逾期本金，业务覆盖截止日继续由来源独立声明。
 
 
 自动画报来源接续：系统 SELECTED 批次可在 bootstrap 返回 `selectedDatasets`，数据库工具只读取该批固定快照；普通所选文件任务仍拒绝数据库。新快照触发沿既有画报节奏，与取数频率独立。`briefing-text-v1` 的可选 `datasetSource` 现在允许实际已读快照元信息，`datasetBasis` 仍须缺省或 null；文本依据不代表执行汇总计算。原件 DATA 卡继续拒绝数据库来源混用。V67 固定系统选择并覆盖入队前后失效及清理，详见[实施记录](../docs/交接/管理端五批实施记录-2026-10-04.md)。
 
 治理指标执行（2026-10-16）：task_context 的 governedMetrics.items 增加 executionRequest，包含已获权固定快照、metricId/version 及固定 SUMMARY 参数。引擎省略 null 参数后原样调用 compare_dataset，不得自选聚合、分组或日期。治理来源无已发布且人工核实的计划返回 METRIC_DEFINITION_REQUIRED，参数不符返回 METRIC_PLAN_MISMATCH；普通非治理文件不要求指标编号。指标 ID/version 必须成对提供，版本为正整数，计算回执必须回显完全相同请求。DATA 卡片须具备本次任务的指标计算回执。详见 [第三批交接](../docs/交接/治理指标统一执行第三批-2026-10-16.md)。这是后端强制约束，不把模型提供的“已治理”说明视为凭证。
+
+
+采集适配器 1.0 的每个 snapshot 可选 `exportReceipt`：`contractVersion:1.0`、来源 UUID `sourceSnapshotId`、`sourceCollectedAt/sourceVerifiedAt`、SHA-256 `scopeHash/rowsSha256`、`completeSnapshot:true`、`rowCount/columns/candidateKeyColumns`。行摘要为 UTF-8 紧凑 JSON 原始字符串/NULL 二维数组，不排序行列、不进行数字转换。平台验证字段、数量、键、摘要和时间顺序后整批写入，在回执上追加平台 snapshotId。未提供回执只保留旧适配器兼容，不代表导出完整性已核验；新回执不能授权额外来源或空间。
+
+
+原生画报参数纠正（2026-10-26）：平台 `/check` 可选声明 `contextRejectionVersion:1.0`，允许引擎在 `task_context` 的 `failed` 执行回执中附 `rejection:CONTEXT_ARGUMENTS`。标记只能来自引擎自身在读取调用前的参数校验错误实例或 JSON Schema 拒绝，不能由远程错误码、模型文本、授权失败或无效响应推定。失败记录不删除；只有同一尝试后续成功执行 `task_context`、最后平台核验的真实交付凭据和原生生成批次同时具备，才可恢复完整交付。其他读取失败仍阻止 COMPLETE。旧回执没有该证据，旧平台未声明能力时也维持 PARTIAL；不为过去失败任务补写成功。
+
+
+辅助计算交付（2026-10-26，表达规则 1.5.9）：`briefingSupportingCalculationsVersion:1.0` 协商后，引擎从本次成功计算 bundle 绑定最多两项 `supportingCalculationArtifactIds`；该字段不开放给模型生成。服务端逐项核验任务、尝试、固定快照、计算成功审计和哈希，保存 `supportingCalculations` 的完整原计算回执、单位和 artifact/sha256，并从这些凭据确定性生成分项正文。各月份及指标保留独立期间、范围与结果，不相加或推定变化率。主图相同但有新的辅助事实可以交付；去重基于完整业务计算，忽略辅助顺序、artifact、快照版本及接收时间差异。单主画报沿旧 key，旧卡字节不改写。读取仍检查任务全部来源权限，辅助 artifact 撤回或清理使整卡不可读；旧平台缺少该能力时不发送新字段，也不静默丢掉已计算的辅助事实。

@@ -6,7 +6,11 @@ import java.util.UUID;
 public interface CollectionAdapter {
     record Dataset(UUID id,String key,List<String> columns) {}
     record Request(String contractVersion,UUID tenantId,UUID connectionId,UUID runId,List<Dataset> datasets) {}
-    record Snapshot(UUID datasetId,Instant coverageThrough,List<List<String>> rows) {}
+    record ExportReceipt(String contractVersion,UUID sourceSnapshotId,Instant sourceCollectedAt,Instant sourceVerifiedAt,
+        String scopeHash,boolean completeSnapshot,long rowCount,List<String> columns,List<String> candidateKeyColumns,String rowsSha256) {}
+    record Snapshot(UUID datasetId,Instant coverageThrough,List<List<String>> rows,ExportReceipt exportReceipt) {
+        public Snapshot(UUID datasetId,Instant coverageThrough,List<List<String>> rows){this(datasetId,coverageThrough,rows,null);}
+    }
     record Result(String contractVersion,List<Snapshot> snapshots) {}
     boolean available();
     Result collect(Request request) throws Exception;

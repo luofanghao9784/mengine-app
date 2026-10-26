@@ -21,6 +21,10 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,
  properties={"dreamcore.auth.ip-attempts=1000","dreamcore.auth.email-attempts=1000","dreamcore.platform.cookie-name=DREAMCORE_PLATFORM_SYNTHETIC"})
 class PlatformIdentityIntegrationTest {
+    @org.springframework.test.context.DynamicPropertySource
+    static void isolatedDatabase(org.springframework.test.context.DynamicPropertyRegistry registry) {
+        IsolatedTestDatabase.register(registry);
+    }
     private static final JsonMapper JSON=new JsonMapper();
     private static final String PLATFORM="/api/platform-admin/v1/auth";
     private static final String CUSTOMER="/api/v1/auth";

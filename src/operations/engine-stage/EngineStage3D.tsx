@@ -22,6 +22,7 @@ import './engine-stage.css';
 /** Hosts may relabel channels: the tenant scene shell names the input lanes after their data sources. */
 type ChannelNameMap = Partial<Record<TelemetryChannelCode, string>>;
 const NO_NAMES: ChannelNameMap = {};
+const maintenanceCodes = new Set<TelemetryChannelCode>(['EXPERIENCE','GENERALIZATION','GENERAL_ADJUSTMENT']);
 const ChannelNames = createContext<ChannelNameMap>(NO_NAMES);
 const useChannelName = () => {
   const names = useContext(ChannelNames);
@@ -128,6 +129,9 @@ export function EngineStage3D({
   const channels = value.channels;
   const byCode = new Map(channels.map((c) => [c.code, c]));
   const stList = (st: Stage) => channels.filter((c) => channelInfo[c.code].stage === st);
+  const maintenance = channels.filter(c => maintenanceCodes.has(c.code));
+  const maintenanceTotals = sumOf(maintenance);
+  const maintenanceStatus = maintenanceTotals.r ? `执行中 ${n(maintenanceTotals.r)}` : maintenanceTotals.q ? `排队 ${n(maintenanceTotals.q)}` : maintenanceTotals.w || maintenanceTotals.u ? '有待处理事项' : '等待新经验';
   const focusStage = (st: Stage | 'evo', code: TelemetryChannelCode | null = null) => {
     setFocus((was) => {
       if (!was) requestAnimationFrame(() => closer.current?.focus({ preventScroll: true }));
@@ -349,11 +353,11 @@ export function EngineStage3D({
               onMouseEnter={() => scene.current?.hoverLabel(st)}
               onMouseLeave={() => scene.current?.hoverLabel(null)}
             >
-              {STAGES[st].cap}
+              {st === 'evo' && !demo ? '经验维护' : STAGES[st].cap}
               {st === 'evo' && (
                 <small className="eng3d-evolution-status">
                   {demo ? '演示 · ' : ''}
-                  {evolutionPhase}
+                  {demo ? evolutionPhase : maintenanceStatus}
                 </small>
               )}
             </button>
@@ -437,7 +441,7 @@ export function EngineStage3D({
           data-side={focus === 'in' ? 'left' : undefined}
           aria-hidden={focus ? undefined : true}
           inert={focus ? undefined : true}
-          aria-label={focus ? `${STAGES[focus].name}详情` : undefined}
+          aria-label={focus ? `${focus === 'evo' && !demo ? '经验维护' : STAGES[focus].name}详情` : undefined}
         >
           {focus && (
             <Panel
@@ -446,7 +450,7 @@ export function EngineStage3D({
               focus={focus}
               sel={sel}
               setSel={setSel}
-              list={focus === 'evo' ? [] : stList(focus)}
+              list={focus === 'evo' ? maintenance : stList(focus)}
               samples={samples}
               close={goHome}
               closer={closer}
@@ -548,14 +552,14 @@ function Tip({
     body = (
       <>
         <h3>
-          自进化循环<small>自进化</small>
+          {demo ? '自进化循环' : '经验维护'}<small>{demo ? '自进化' : '真实运行'}</small>
         </h3>
         <p className="lead">
           {demo
             ? `${evolutionPhase}演示：展示局部扫描与候选调整，不修改真实系统。`
-            : '独立执行器尚未接入，巡核卫星停驻待命，不执行真实修复。'}
+            : `经验提炼与清洗：执行中 ${n(sumOf(all.filter(c => maintenanceCodes.has(c.code))).r)}，排队 ${n(sumOf(all.filter(c => maintenanceCodes.has(c.code))).q)}。` }
         </p>
-        <p>点击查看自进化阶段</p>
+        <p>{demo ? '点击查看自进化阶段' : '点击查看经验处理记录'}</p>
       </>
     );
   } else if (tip) {
@@ -612,7 +616,7 @@ function Panel({
   hash: string;
 }) {
   const nameOf = useChannelName();
-  const info = STAGES[focus];
+  const info = focus === 'evo' && !demo ? { name:'经验维护', small:'真实运行', cap:'经验维护', sum:'从获准任务和反馈提炼经验，清洗与核验后按既有权限采用。这里显示实际处理记录；独立修改系统代码的自进化执行器不在此流程内。' } : STAGES[focus];
   const head = (
     <div className="ph">
       <div>
@@ -624,7 +628,7 @@ function Panel({
       </button>
     </div>
   );
-  if (focus === 'evo')
+  if (focus === 'evo' && demo)
     return (
       <>
         {head}
@@ -702,7 +706,7 @@ function Panel({
           );
         })}
       </div>
-      {selected && <Detail c={selected} stage={focus} samples={samples} hash={hash} />}
+      {selected && <Detail c={selected} stage={focus === 'evo' ? 'pr' : focus} samples={samples} hash={hash} />}
       <p className="foot">处理完成不等于业务成功或内容合格；保留异常可能包含已重试的历史尝试。</p>
     </>
   );

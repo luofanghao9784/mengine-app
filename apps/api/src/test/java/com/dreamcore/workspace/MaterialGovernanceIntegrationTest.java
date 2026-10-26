@@ -27,12 +27,14 @@ class MaterialGovernanceIntegrationTest {
  @Test void nativeCountsUseCurrentVersionAndDoNotTreatCheckedAsPassed(){
   assertEquals("[1,0,0,0,0]",nativeFoundation.snapshot(reader,tenant).path("passed").toString());
   governance.change(reader,tenant,file,change(1,0),false);
-  assertEquals("[1,0,0,1,0]",nativeFoundation.snapshot(reader,tenant).path("passed").toString());
+  // Manual metadata completes annotation, not native checks or publication.
+  assertEquals("[1,0,1,0,0]",nativeFoundation.snapshot(reader,tenant).path("passed").toString());
   assertFalse(nativeFoundation.snapshot(reader,tenant).path("items").get(0).path("checksPassed").asBoolean());
   UUID version=db.queryForObject("SELECT id FROM material_versions WHERE material_id=? AND number=1",UUID.class,file),run=UUID.randomUUID();
   db.update("INSERT INTO knowledge_runs(id,tenant_id,workspace_id,material_id,version_id,generation,requested_by,status) VALUES (?,?,?,?,?,1,?,'READY')",run,tenant,space,file,version,reader);
   db.update("INSERT INTO knowledge_chunks(id,tenant_id,workspace_id,material_id,version_id,run_id,ordinal,locator,method,content) VALUES (?,?,?,?,?,?,0,'L1','TEXT','synthetic')",UUID.randomUUID(),tenant,space,file,version,run);
-  assertEquals("[1,1,0,1,1]",nativeFoundation.snapshot(reader,tenant).path("passed").toString());
+  assertEquals("[1,1,1,0,0]",nativeFoundation.snapshot(reader,tenant).path("passed").toString());
+  assertFalse(nativeFoundation.snapshot(reader,tenant).path("items").get(0).path("available").asBoolean());
   materials.storeGenerated(reader,tenant,space,null,file,1,"预算说明.txt","new contents".getBytes());
   assertEquals("[1,0,0,0,0]",nativeFoundation.snapshot(reader,tenant).path("passed").toString());
   grant(reader,"NONE");assertEquals("[0,0,0,0,0]",nativeFoundation.snapshot(reader,tenant).path("passed").toString());

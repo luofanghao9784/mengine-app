@@ -16,7 +16,7 @@ public class UsageService {
  public record Day(String date,long workRequests,Long maintenanceCalls,long unknownMaintenanceRuns,Long inputTokens,Long outputTokens) {}
  public record ToolGroup(String executionClass,long starts,long succeeded,long failed,long pending,long timed,Long elapsedMillis) {}
  public record Storage(long originals,long versions,long registeredBytes) {}
- public record Coverage(long unmeteredWorkAttempts,long legacyToolReceipts,String evaluation,String evolution) {}
+ public record Coverage(long unmeteredWorkAttempts,long legacyToolReceipts,long legacyGovernanceJobs,String evaluation,String evolution) {}
  public record Quota(String state,String unit,Long limit,Long remaining) {}
  public record Overview(UUID tenantId,String period,String timeZone,Instant from,Instant until,Instant checkedAt,List<ModelGroup> groups,List<Day> days,List<ToolGroup> tools,Storage storage,Coverage coverage,Quota quota) {}
  public record Cost(String state,String currency,Long verifiedMinor,Long estimatedMinor,String sharedAllocation) {}
@@ -56,9 +56,11 @@ public class UsageService {
     ) totals ON true WHERE m.created_at>=b.start_at AND m.created_at<b.end_at AND (b.tenant IS NULL OR m.tenant_id=b.tenant)
     UNION ALL SELECT a.tenant_id,a.execution_class,a.created_at,a.state,a.model_calls::bigint,a.input_tokens,a.output_tokens,a.input_tokens IS NOT NULL
      FROM company_analysis_attempts a CROSS JOIN bounds b WHERE a.created_at>=b.start_at AND a.created_at<b.end_at AND (b.tenant IS NULL OR a.tenant_id=b.tenant)
+    UNION ALL SELECT g.tenant_id,g.execution_class,g.started_at,g.state,g.model_calls,g.input_tokens,g.output_tokens,g.input_tokens IS NOT NULL
+     FROM governance_model_usage g CROSS JOIN bounds b WHERE g.started_at>=b.start_at AND g.started_at<b.end_at AND (b.tenant IS NULL OR g.tenant_id=b.tenant)
    ), units AS MATERIALIZED (
     SELECT 'WORK' purpose,execution_class,'REQUEST_STARTED' basis,started_at,calls,input_tokens,output_tokens,input_tokens IS NOT NULL complete,outcome='PENDING' pending FROM work
-    UNION ALL SELECT 'MAINTENANCE',coalesce(execution_class,'unknown'),'RUN_STARTED',started_at,calls,input_tokens,output_tokens,complete,state IN ('CLAIMED','DISPATCHED','UNKNOWN') FROM maintenance
+    UNION ALL SELECT 'MAINTENANCE',coalesce(execution_class,'unknown'),'RUN_STARTED',started_at,calls,input_tokens,output_tokens,complete,state IN ('CLAIMED','DISPATCHED','UNKNOWN','PENDING') FROM maintenance
    ), grouped AS (
     SELECT purpose,execution_class AS "executionClass",basis,count(*) units,count(*) FILTER(WHERE complete) AS "reportedUnits",count(*) FILTER(WHERE calls IS NULL) AS "unknownCallUnits",count(*) FILTER(WHERE pending) AS "pendingUnits",
      sum(calls) AS "modelCalls",sum(input_tokens) AS "inputTokens",sum(output_tokens) AS "outputTokens" FROM units GROUP BY purpose,execution_class,basis
@@ -86,10 +88,11 @@ public class UsageService {
    SELECT coalesce((SELECT jsonb_agg(to_jsonb(g) ORDER BY purpose,"executionClass") FROM grouped g),'[]') groups,
     coalesce((SELECT jsonb_agg(to_jsonb(d) ORDER BY date) FROM days d),'[]') days,coalesce((SELECT jsonb_agg(to_jsonb(t) ORDER BY "executionClass") FROM tools t),'[]') tools,storage.*,
     (SELECT count(*) FROM agent_attempt_usage a CROSS JOIN bounds b WHERE a.started_at>=b.start_at AND a.started_at<b.end_at AND NOT a.metering_enabled AND (b.tenant IS NULL OR a.tenant_id=b.tenant)) unmetered,
-    (SELECT count(*) FROM conversation_tool_receipts r JOIN conversation_tasks t ON t.id=r.task_id CROSS JOIN bounds b WHERE r.started_at IS NULL AND r.received_at>=b.start_at AND r.received_at<b.end_at AND (b.tenant IS NULL OR t.tenant_id=b.tenant)) legacy_tools
+    (SELECT count(*) FROM conversation_tool_receipts r JOIN conversation_tasks t ON t.id=r.task_id CROSS JOIN bounds b WHERE r.started_at IS NULL AND r.received_at>=b.start_at AND r.received_at<b.end_at AND (b.tenant IS NULL OR t.tenant_id=b.tenant)) legacy_tools,
+    (SELECT count(DISTINCT g.job_id) FROM governance_model_usage g CROSS JOIN bounds b WHERE g.started_at IS NULL AND (b.tenant IS NULL OR g.tenant_id=b.tenant)) legacy_governance
    FROM storage
    """,(r,n)->new Overview(tenant,period,w.zone(),w.from(),w.end(),checked,
     Arrays.asList(json.readValue(r.getString("groups"),ModelGroup[].class)),Arrays.asList(json.readValue(r.getString("days"),Day[].class)),Arrays.asList(json.readValue(r.getString("tools"),ToolGroup[].class)),
-    new Storage(r.getLong("originals"),r.getLong("versions"),r.getLong("bytes")),new Coverage(r.getLong("unmetered"),r.getLong("legacy_tools"),"NOT_CONNECTED","NOT_ENABLED"),new Quota("NOT_CONFIGURED",null,null,null)),Timestamp.from(w.from()),Timestamp.from(w.end()),tenant,w.zone());
+    new Storage(r.getLong("originals"),r.getLong("versions"),r.getLong("bytes")),new Coverage(r.getLong("unmetered"),r.getLong("legacy_tools"),r.getLong("legacy_governance"),"NOT_CONNECTED","NOT_ENABLED"),new Quota("NOT_CONFIGURED",null,null,null)),Timestamp.from(w.from()),Timestamp.from(w.end()),tenant,w.zone());
  }
 }

@@ -28,6 +28,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -265,6 +266,7 @@ public class AgentTaskService {
             this.db.queryForObject("SELECT EXISTS(SELECT 1 FROM ongoing_plan_runs WHERE task_id=?)", Boolean.class, new Object[]{task})
          )
       );
+      response.put("contextRejectionVersion", "1.0");
       response.put("artifactTransferVersion", this.artifactTransfers.available() ? "1.0" : "");
       response.put("presentationRendererVersion", this.artifactTransfers.presentationAvailable() ? "1.0" : "");
       if (this.artifactTransfers.presentationAvailable()) {
@@ -293,6 +295,7 @@ public class AgentTaskService {
       response.put("editorialPlanVersion", "1.0");
       response.put("briefingEvidenceSupplementVersion", "1.0");
       response.put("briefingTextCalculationVersion", "1.0");
+      response.put("briefingSupportingCalculationsVersion", "1.0");
       response.put(
          "editorialBatchId",
          this.db
@@ -562,10 +565,11 @@ public class AgentTaskService {
          && body.sequence() <= 8
          && body.name() != null
          && body.status() != null
-         && Set.of("STARTED", "succeeded", "failed").contains(body.status())) {
+         && Set.of("STARTED", "succeeded", "failed").contains(body.status())
+         && (body.rejection() == null || "CONTEXT_ARGUMENTS".equals(body.rejection()) && "task_context".equals(body.name()) && "failed".equals(body.status()))) {
          Map<String, Object> row = this.db
             .queryForMap(
-               "SELECT attempt_number,allowed_tools FROM conversation_attempts WHERE task_id=? AND attempt_id=? AND execution_policy IN ('READ_ONLY_PRIVATE_V1','SCOPED_PRIVATE_V2')",
+               "SELECT attempt_number,allowed_tools,execution_policy FROM conversation_attempts WHERE task_id=? AND attempt_id=? AND execution_policy IN ('READ_ONLY_PRIVATE_V1','SCOPED_PRIVATE_V2')",
                new Object[]{task, attempt}
             );
          if (!Arrays.asList((String[])this.json.readValue(row.get("allowed_tools").toString(), String[].class)).contains(body.name())) {
@@ -574,7 +578,7 @@ public class AgentTaskService {
 
          List<Map<String, Object>> found = this.db
             .queryForList(
-               "SELECT name,status FROM conversation_tool_receipts WHERE task_id=? AND attempt_number=? AND sequence=?",
+               "SELECT name,status,rejection FROM conversation_tool_receipts WHERE task_id=? AND attempt_number=? AND sequence=?",
                new Object[]{task, row.get("attempt_number"), body.sequence()}
             );
          if (found.isEmpty()) {
@@ -607,15 +611,16 @@ public class AgentTaskService {
                );
          } else {
             Map<String, Object> prior = found.getFirst();
-            if (!body.name().equals(prior.get("name")) || !body.status().equals(prior.get("status")) && !"STARTED".equals(prior.get("status"))) {
+            if (!body.name().equals(prior.get("name")) || !body.status().equals(prior.get("status")) && !"STARTED".equals(prior.get("status"))
+               || body.status().equals(prior.get("status")) && !Objects.equals(body.rejection(), prior.get("rejection"))) {
                throw new IdentityException(409, "TASK_STATE_CHANGED");
             }
 
             if (!body.status().equals(prior.get("status"))) {
                this.db
                   .update(
-                     "UPDATE conversation_tool_receipts SET status=?,received_at=clock_timestamp(),finished_at=greatest(clock_timestamp(),started_at) WHERE task_id=? AND attempt_number=? AND sequence=?",
-                     new Object[]{body.status(), task, row.get("attempt_number"), body.sequence()}
+                     "UPDATE conversation_tool_receipts SET status=?,rejection=?,received_at=clock_timestamp(),finished_at=greatest(clock_timestamp(),started_at) WHERE task_id=? AND attempt_number=? AND sequence=?",
+                     new Object[]{body.status(), body.rejection(), task, row.get("attempt_number"), body.sequence()}
                   );
             }
          }
@@ -1154,9 +1159,10 @@ public class AgentTaskService {
                         new Object[]{job.id(), job.id()}
                      )
                )
+            && this.recoverableNativeToolFailures(job.id())
             && r.tools()
                .stream()
-               .allMatch(t -> t != null && ("succeeded".equals(t.status()) || "deliver_briefing".equals(t.name()) && "failed".equals(t.status())));
+               .allMatch(t -> t != null && ("succeeded".equals(t.status()) || ("deliver_briefing".equals(t.name()) || "task_context".equals(t.name())) && "failed".equals(t.status())));
          if ("COMPLETE".equals(outcome) && r.tools().stream().anyMatch(t -> t != null && !"succeeded".equals(t.status())) && !recoveredDelivery) {
             this.incompatible();
          }
@@ -1650,7 +1656,25 @@ public class AgentTaskService {
    public record SearchResult(List<AgentTaskService.Input> items, String matchStatus, KnowledgeService.Coverage coverage, boolean hasMore) {
    }
 
-   public record ToolReceipt(Integer sequence, String name, String status) {
+   /** Only persisted engine receipts can classify a pre-invocation argument rejection. */
+   private boolean recoverableNativeToolFailures(UUID task) {
+      var receipts = this.db.queryForList("SELECT x.name,x.status,x.rejection FROM conversation_tool_receipts x JOIN conversation_tasks t ON t.id=x.task_id AND t.attempt=x.attempt_number WHERE x.task_id=? ORDER BY x.sequence", task);
+      for (int i = 0; i < receipts.size(); i++) {
+         var failed = receipts.get(i);
+         if ("succeeded".equals(failed.get("status"))) continue;
+         if (!"failed".equals(failed.get("status"))) return false;
+         if ("deliver_briefing".equals(failed.get("name"))) continue;
+         if (!"task_context".equals(failed.get("name")) || !"CONTEXT_ARGUMENTS".equals(failed.get("rejection"))) return false;
+         boolean corrected = false;
+         for (int next = i + 1; next < receipts.size(); next++)
+            if ("task_context".equals(receipts.get(next).get("name")) && "succeeded".equals(receipts.get(next).get("status"))) { corrected = true; break; }
+         if (!corrected) return false;
+      }
+      return true;
+   }
+
+   public record ToolReceipt(Integer sequence, String name, String status, String rejection) {
+      public ToolReceipt(Integer sequence, String name, String status) { this(sequence, name, status, null); }
    }
 
    public record TopicCandidate(

@@ -9,6 +9,7 @@ import { Button } from '../shared/ui';
 import type { MagazineGridItem } from './MagazineGrid';
 import { generationOpen, type BriefingGeneration, type GenerationSlot } from './useBriefingGeneration';
 import './generation.css';
+import { businessReadinessReasons } from './generation-reasons';
 
 const label: Record<string, string> = {
   QUEUED: '正在准备新画报',
@@ -23,6 +24,7 @@ const label: Record<string, string> = {
   AUTHORITY_REVOKED: '资料权限已变化',
 };
 const reasons: Record<string, string> = {
+  ...businessReadinessReasons,
   TENANT_SERVICE_SUSPENDED: '企业服务暂停时，本次生成未完成；已发生的任务结果保留，恢复后可按需重新生成。',
   NEWS_SOURCE_UNAVAILABLE: '资讯联网搜索暂不可用，请选择其他类型。',
   PUBLIC_NEWS_READ_FAILED: '候选资讯的原文读取失败，请稍后重试。',

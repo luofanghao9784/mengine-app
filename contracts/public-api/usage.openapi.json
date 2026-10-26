@@ -464,6 +464,12 @@
             "minimum": 0,
             "maximum": 9007199254740991
           },
+          "legacyGovernanceJobs": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "全历史范围内无法核验调用开始时间的治理任务数，按任务去重，不随期间筛选变化；不代表调用次数，不纳入月份统计。旧平台可省略，此时覆盖范围未知。"
+          },
           "evaluation": {
             "const": "NOT_CONNECTED"
           },

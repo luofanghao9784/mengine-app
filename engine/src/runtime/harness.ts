@@ -1,3 +1,4 @@
+import { ContextRequestError } from './task-context.js';
 import { collectModelResponse, ModelResponseError, safeModelFailure } from './model-response.js';
 import { BRIEFING_ANALYSIS_ARRAY_HINT, BRIEFING_EDITORIAL_HINTS } from './briefing-delivery.js';
 import type { RealtimePort } from './realtime.js';
@@ -44,7 +45,7 @@ export async function runHarness(options: {
   reserveFinalResponse?: boolean;
   /** Safe diagnostic metadata only; never arguments, outputs or arbitrary error messages. */
   onModelFailure?: (failure: { diagnostic: string; modelCall: number; correction: boolean }) => void;
-  onToolFailure?: (failure: { tool: string; callId: string; code: string; executionStarted: boolean; validationIssues?: string[] }) => void | Promise<void>;
+  onToolFailure?: (failure: { tool: string; callId: string; code: string; executionStarted: boolean; rejection?: 'CONTEXT_ARGUMENTS'; validationIssues?: string[] }) => void | Promise<void>;
   /** Structured card batches need their time for delivery; their final reply is only a confirmation. */
   finalResponseReserveMs?: number;
   finishOnDeliverable?: boolean;
@@ -467,8 +468,15 @@ export async function runHarness(options: {
                   error instanceof RuntimeError && /^[A-Z_]{1,64}$/.test(error.code)
                     ? error.code
                     : 'TOOL_FAILED';
+                // Only an owned local validation error proves that context retrieval was never dispatched.
+                // Remote errors with the same code, failed authorization and malformed responses do not qualify.
+                const rejection = tool.name === 'task_context' &&
+                  (error instanceof ContextRequestError || (!executionStarted && code === 'INVALID_TOOL_ARGUMENTS'))
+                  ? 'CONTEXT_ARGUMENTS' as const : undefined;
+                const receipt = receipts.get(execution.callId);
+                if (receipt && rejection) receipt.rejection = rejection;
                 await options.onToolFailure?.({ tool: tool.name, callId: execution.callId, code, executionStarted,
-                  ...(validationIssues ? { validationIssues } : {}) });
+                  ...(rejection ? { rejection } : {}), ...(validationIssues ? { validationIssues } : {}) });
                 if (tool.name === 'deliver_briefing' && validationIssues && invalidDeliveryLimit) {
                   const signature = JSON.stringify(validationIssues);
                   const repeats = (invalidDeliveries.get(signature) ?? 0) + 1;

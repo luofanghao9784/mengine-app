@@ -38,7 +38,7 @@ export interface RuntimeResult {
   /** A completed turn is not evidence that a business task succeeded. */
   text: string;
   modelCalls: number;
-  tools: { callId: string; name: string; status: 'succeeded' | 'failed'; output?: Json }[];
+  tools: { callId: string; name: string; status: 'succeeded' | 'failed'; output?: Json; rejection?: 'CONTEXT_ARGUMENTS' }[];
   code?: string;
   /** The last model call was reserved to report bounded progress, not business completion. */
   finalResponseReserved?: boolean;

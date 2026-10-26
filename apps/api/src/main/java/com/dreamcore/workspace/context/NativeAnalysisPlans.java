@@ -6,6 +6,9 @@ import com.dreamcore.workspace.identity.IdentityException;
 import com.dreamcore.workspace.identity.IdentityService;
 import com.dreamcore.workspace.scene.MetricPlan;
 import java.util.*;
+import java.time.Instant;
+import java.time.YearMonth;
+import java.time.ZoneId;
 import tools.jackson.databind.json.JsonMapper;
 
 /** Deployment-reviewed source summaries; no new calculation or content authority. */
@@ -13,6 +16,10 @@ public final class NativeAnalysisPlans {
     private static final JsonMapper JSON=new JsonMapper();
     private NativeAnalysisPlans() {}
     public static Map<String,Object> load(String path,UUID tenant,UUID dataset,UUID snapshot,String name,List<String> columns,List<DatasetField> fields) {
+        return load(path,tenant,dataset,snapshot,name,columns,fields,null);
+    }
+    /** A task's persisted creation time anchors rolling calendar windows across retries and month changes. */
+    public static Map<String,Object> load(String path,UUID tenant,UUID dataset,UUID snapshot,String name,List<String> columns,List<DatasetField> fields,Instant taskCreatedAt) {
         var records=GovernanceSourceEvidence.read(path,tenant,dataset,name,"schema",false).stream()
             .filter(r->"analysis-plan".equals(r.get("kind"))).toList();
         if(records.size()>8)throw new IdentityException(503,"NATIVE_ANALYSIS_PLANS_INVALID");
@@ -27,14 +34,30 @@ public final class NativeAnalysisPlans {
                     if(!d.path(key).isTextual()||d.path(key).asText().isBlank()||d.path(key).asText().length()>400)throw new IllegalArgumentException();
                 String value=d.path("valueField").asText();boolean sum="SUM".equals(d.path("aggregation").asText());
                 if(!sum&&!value.isEmpty())throw new IllegalArgumentException();
-                var plan=MetricPlan.validate(d.path("execution"),metadata,value);
+                var resolved=(tools.jackson.databind.node.ObjectNode)d.deepCopy();
+                if(d.has("calendarWindow")) {
+                    String window=d.path("calendarWindow").asText();
+                    var execution=d.path("execution");
+                    if(!Set.of("CURRENT_MONTH","PREVIOUS_MONTH").contains(window)||taskCreatedAt==null||
+                        !"Asia/Shanghai".equals(execution.path("timeZone").asText())||
+                        !execution.path("dateFrom").asText().isEmpty()||!execution.path("dateTo").asText().isEmpty()||
+                        execution.path("dateColumn").asText().isEmpty())throw new IllegalArgumentException();
+                    String dateColumn=execution.path("dateColumn").asText();
+                    if(fields.stream().noneMatch(f->f.column().equals(dateColumn)&&"SOURCE_DOCUMENTED".equals(f.status())&&Set.of("date","datetime","timestamp").contains(f.type().toLowerCase(Locale.ROOT))))throw new IllegalArgumentException();
+                    YearMonth month=YearMonth.from(taskCreatedAt.atZone(ZoneId.of("Asia/Shanghai")));
+                    if("PREVIOUS_MONTH".equals(window))month=month.minusMonths(1);
+                    var fixed=(tools.jackson.databind.node.ObjectNode)execution.deepCopy();
+                    fixed.put("dateFrom",month.atDay(1).toString());fixed.put("dateTo",month.atEndOfMonth().toString());
+                    resolved.set("execution",fixed);resolved.put("resolvedCalendarMonth",month.toString());
+                }
+                var plan=MetricPlan.validate(resolved.path("execution"),metadata,value);
                 if(!plan.path("reviewed").asBoolean()||!Set.of("NONE","").contains(plan.path("conversion").asText()))throw new IllegalArgumentException();
                 var used=new HashSet<String>();plan.path("groupColumns").forEach(c->used.add(c.asText()));
                 if(sum)used.add(value);if(!plan.path("dateColumn").asText().isEmpty())used.add(plan.path("dateColumn").asText());
                 plan.path("equalsFilters").properties().forEach(e->used.add(e.getKey()));
                 for(String column:used)if(!columns.contains(column)||fields.stream().noneMatch(f->f.column().equals(column)&&"SOURCE_DOCUMENTED".equals(f.status())))throw new IllegalArgumentException();
                 if(sum&&fields.stream().noneMatch(f->f.column().equals(value)&&Set.of("decimal","numeric","number","integer").contains(f.type().toLowerCase(Locale.ROOT))&&f.unit().equals(d.path("unit").asText())))throw new IllegalArgumentException();
-                var definition=(tools.jackson.databind.node.ObjectNode)d.deepCopy();definition.set("execution",plan);
+                var definition=resolved;definition.set("execution",plan);
                 var req=MetricPlan.request(definition,dataset,snapshot,null,1);
                 var execution=(tools.jackson.databind.node.ObjectNode)JSON.valueToTree(req);execution.remove("metricId");execution.remove("metricVersion");
                 // Omitted nulls are documented calculator defaults, never repaired business predicates.

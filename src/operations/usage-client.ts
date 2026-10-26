@@ -37,9 +37,11 @@ export function isUsage(v: unknown): v is UsageOverview {
   if (
     !exact(s, 'originals versions registeredBytes') ||
     !Object.values(s).every(n) ||
-    !exact(c, 'unmeteredWorkAttempts legacyToolReceipts evaluation evolution') ||
+    !(exact(c, 'unmeteredWorkAttempts legacyToolReceipts evaluation evolution') ||
+      exact(c, 'unmeteredWorkAttempts legacyToolReceipts legacyGovernanceJobs evaluation evolution')) ||
     !n(c.unmeteredWorkAttempts) ||
     !n(c.legacyToolReceipts) ||
+    ('legacyGovernanceJobs' in c && !n(c.legacyGovernanceJobs)) ||
     c.evaluation !== 'NOT_CONNECTED' ||
     c.evolution !== 'NOT_ENABLED' ||
     !exact(q, 'state unit limit remaining') ||

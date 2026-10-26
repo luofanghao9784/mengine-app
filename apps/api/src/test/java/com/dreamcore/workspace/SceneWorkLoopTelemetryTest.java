@@ -7,6 +7,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SceneWorkLoopTelemetryTest extends CompanyAnalysisFixture {
+ @org.springframework.test.context.DynamicPropertySource
+ static void isolateQueue(org.springframework.test.context.DynamicPropertyRegistry registry){IsolatedTestDatabase.register(registry);}
  @Autowired EngineTelemetryService telemetry;
  EngineTelemetryService.Channel channel(String code){return telemetry.read(admin,tenant,false).channels().stream().filter(c->c.code().equals(code)).findFirst().orElseThrow();}
  @Test void actualSceneJobsEnterProcessingWithoutCountingNoChangeSyncs(){

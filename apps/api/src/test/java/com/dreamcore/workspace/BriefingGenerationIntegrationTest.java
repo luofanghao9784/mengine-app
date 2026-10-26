@@ -16,18 +16,21 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={"dreamcore.tasks.enabled=true","dreamcore.tasks.agent-mode=verification","dreamcore.knowledge.enabled=true","dreamcore.briefing.merge-seconds=0","dreamcore.tasks.public-web-enabled=true"})
+@SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={"dreamcore.tasks.enabled=true","dreamcore.tasks.agent-mode=verification","dreamcore.tasks.initial-delay-ms=3600000","dreamcore.knowledge.enabled=true","dreamcore.knowledge.initial-delay-ms=3600000","dreamcore.briefing.merge-seconds=0","dreamcore.tasks.public-web-enabled=true"})
 class BriefingGenerationIntegrationTest {
+ @org.springframework.test.context.DynamicPropertySource
+ static void isolateQueue(org.springframework.test.context.DynamicPropertyRegistry registry){IsolatedTestDatabase.register(registry);}
  @Autowired com.dreamcore.workspace.audience.WorkAudienceService workAudience;
  @Autowired JdbcTemplate db;@Autowired MaterialService materials;@Autowired KnowledgeService knowledge;
  @Autowired ConversationService conversations;@Autowired AgentTaskService agents;@Autowired BriefingContentService contents;
  @Autowired BriefingGenerationService generation;@Autowired BriefingCardService cards;@Autowired BriefingService feed;@Autowired RecommendationService recommendations;
  @Autowired AgentUsageLedger usage;
+ @Autowired com.dreamcore.workspace.context.TaskContextService taskContexts;
  @Test void roleChangeRemovesOldAutomaticCardsFromFeedAndUnreadRecommendations(){
   db.update("INSERT INTO tenant_governance(tenant_id,owner_id) VALUES (?,?)",tenant,actor);
   upload("marker 合成岗位画报来源。",true);manual();UUID p=policy();generation.tick(p);var j=conversations.claim();deliver(j,"合成岗位推荐，核对本人应处理的工作。");generation.tick(p);
   assertTrue(feed.list(actor,tenant,null,"LATEST",null,"Asia/Shanghai",0,20,true).items().stream().anyMatch(c->c.taskId().equals(j.id())));assertTrue(recommendations.hasUnreadBriefing(actor,tenant));
-  workAudience.save(actor,tenant,actor,new com.dreamcore.workspace.audience.WorkAudienceService.Change(UUID.randomUUID(),0,"服务部","美容师","核对预约",List.of("SERVICE")));
+  workAudience.save(actor,tenant,actor,new com.dreamcore.workspace.audience.WorkAudienceService.Change(UUID.randomUUID(),1,"服务部","美容师","核对预约",List.of("SERVICE")));
   assertTrue(feed.list(actor,tenant,null,"LATEST",null,"Asia/Shanghai",0,20,true).items().isEmpty());assertFalse(recommendations.hasUnreadBriefing(actor,tenant));
   // Role relevance changes the feed, not private historical ownership or stored evidence.
   assertEquals("SUCCEEDED",conversations.taskDetail(actor,tenant,j.conversation(),j.id()).tasks().getFirst().status());
@@ -78,6 +81,7 @@ class BriefingGenerationIntegrationTest {
   for(UUID id:List.of(actor,reader)){db.update("INSERT INTO accounts(id,email,display_name,password_hash) VALUES (?,?,'合成用户','unused')",id,id+"@example.test");db.update("INSERT INTO tenant_memberships(tenant_id,account_id,role) VALUES (?,?,'MEMBER')",tenant,id);}
   db.update("INSERT INTO workspaces(id,tenant_id,owner_id,name,kind) VALUES (?,?,?,'合成共享空间','SHARED')",space,tenant,actor);
   for(UUID id:List.of(actor,reader))db.update("INSERT INTO workspace_members(tenant_id,workspace_id,account_id,can_maintain) VALUES (?,?,?,true)",tenant,space,id);
+  for(UUID id:List.of(actor,reader))db.update("INSERT INTO work_role_profiles(tenant_id,account_id,responsibilities,revision,changed_by) VALUES (?,?,'核对当前获权工作资料与待办',1,?)",tenant,id,id);
  }
  @Test void manualOnlyDeploymentDoesNotDispatchLegacyAutomaticBatchUntilUserRequestsIt(){
   var manualOnly=new BriefingGenerationService(db,conversations,contents,identities,access,departure,new AgentSettings("verification",true,false),new com.dreamcore.workspace.plans.PlanClock(),true,"",0,6);
@@ -104,12 +108,27 @@ class BriefingGenerationIntegrationTest {
  BriefingGenerationService.Batch manual(){return generation.generate(actor,tenant,UUID.randomUUID(),space,"INSIGHT");}
  void complete(ConversationService.Job j){db.update("UPDATE conversation_tasks SET status='SUCCEEDED',reply='合成完成结果，仅用于验证真实服务。',finished_at=now(),engine_version='synthetic',lease_token=NULL,lease_until=NULL WHERE id=?",j.id());}
  Map<String,Object> deliver(ConversationService.Job j,String summary){
-  var sources=agents.search(j.id(),j.token(),"marker");agents.openExecution(j.id(),j.token(),new AgentTaskService.ExecutionOpen("1.6",List.of("deliver_briefing")));
+  return deliver(j,"合成证据洞察画报",summary);
+ }
+ Map<String,Object> deliver(ConversationService.Job j,String title,String summary){
+  var sources=agents.search(j.id(),j.token(),"marker");agents.openExecution(j.id(),j.token(),new AgentTaskService.ExecutionOpen("1.6",List.of("select_briefing_topic","deliver_briefing")));planIfAutomatic(j);
   agents.toolReceipt(j.id(),j.token(),new AgentTaskService.ToolReceipt(1,"deliver_briefing","STARTED"));
-  var receipt=agents.deliverBriefing(j.id(),j.token(),new BriefingContentService.Request(null,"合成证据洞察画报",summary,List.of("这是有合成来源支持的第一段完整分析。","这是用于验证交付和历史保留的第二段分析。"),"INSIGHT"));
+  var receipt=agents.deliverBriefing(j.id(),j.token(),new BriefingContentService.Request(null,title,summary,List.of("这是有合成来源支持的第一段完整分析。","这是用于验证交付和历史保留的第二段分析。"),"INSIGHT",editorial()));
   agents.toolReceipt(j.id(),j.token(),new AgentTaskService.ToolReceipt(1,"deliver_briefing","succeeded"));
   agents.openUsage(j.id(),j.token());agents.startUsage(j.id(),j.token(),new AgentUsageLedger.Start(1,2048));usage.finish(j.id(),j.token(),new AgentUsageLedger.Receipt(1,"RETURNED",100L,50L));
   agents.finish(j,new AgentResult("1.5","0.15.4",j.id(),j.token(),"AGENT","verification","synthetic","合成系统交付确认。",sources.stream().map(AgentTaskService.Input::id).toList(),List.of(new AgentResult.Tool("delivery","deliver_briefing","succeeded")),List.of(),1,new AgentResult.Usage(100,50),List.of(),List.of(),List.of(),"COMPLETE",null));return receipt;
+ }
+ @Test void recentReferenceKeepsSavedMonthlyTitleAndSummaryWithinExistingPermissions(){
+  upload("marker 合成2026-10登记范围，作为月度画报依据。",true);manual();UUID p=policy();generation.tick(p);var first=conversations.claim();
+  deliver(first,"2026-10 登记收付观察","合成登记金额合计已由来源核验，仍需按登记范围解读。");generation.tick(p);
+  db.update("UPDATE conversation_tasks SET prompt='旧会话误称全历史范围' WHERE id=?",first.id());
+  var next=manual();generation.tick(p);UUID nextTask=generation.get(actor,tenant,next.id()).taskId();assertNotNull(nextTask);
+  String prompt=db.queryForObject("SELECT prompt FROM conversation_tasks WHERE id=?",String.class,nextTask);
+  assertTrue(prompt.contains("2026-10 登记收付观察 — 合成登记金额合计"));assertFalse(prompt.contains("旧会话误称全历史范围"));
+  assertTrue(prompt.contains("仅用于避免重复，不作为新事实"));assertTrue(prompt.length()<=2000);
+  assertEquals("",org.springframework.test.util.ReflectionTestUtils.invokeMethod(generation,"recent",reader,tenant,space));
+  db.update("DELETE FROM workspace_members WHERE tenant_id=? AND workspace_id=? AND account_id=?",tenant,space,actor);
+  assertEquals("",org.springframework.test.util.ReflectionTestUtils.invokeMethod(generation,"recent",actor,tenant,space));
  }
  UUID serviceOperator(){
   UUID id=UUID.randomUUID();db.update("INSERT INTO accounts(id,email,display_name,password_hash) VALUES (?,?,'合成平台','unused')",id,id+"@service-platform.test");
@@ -146,7 +165,9 @@ class BriefingGenerationIntegrationTest {
   assertFalse(db.queryForObject("SELECT enabled FROM briefing_generation_policies WHERE id=?",Boolean.class,readerPolicy));
   assertEquals("SUCCEEDED",generation.get(actor,tenant,batch.id()).status());
  }
- BriefingContentService.Request content(String title,String type){return new BriefingContentService.Request(null,title,"合成资料支持这一条独立且完整的分析结论。",List.of("这是有合成来源支持的第一段完整分析。","这是用于验证交付和历史保留的第二段分析。"),type);}
+ BriefingPresentationPolicy.Presentation editorial(){return new BriefingPresentationPolicy.Presentation("briefing-presentation-v1","EDITORIAL",null,null,null,List.of());}
+ void planIfAutomatic(ConversationService.Job j){if(db.queryForObject("SELECT EXISTS(SELECT 1 FROM briefing_generation_batches WHERE task_id=?)",Boolean.class,j.id()))BriefingP0TestPlanning.select(agents,j,"INSIGHT",false);}
+ BriefingContentService.Request content(String title,String type){return new BriefingContentService.Request(null,title,"合成资料支持这一条独立且完整的分析结论。",List.of("这是有合成来源支持的第一段完整分析。","这是用于验证交付和历史保留的第二段分析。"),type,editorial());}
  void record(ConversationService.Job j,int sequence,String name,String status){agents.toolReceipt(j.id(),j.token(),new AgentTaskService.ToolReceipt(sequence,name,status));}
  AgentResult terminal(ConversationService.Job j,List<AgentResult.Tool> tools){
   agents.openUsage(j.id(),j.token());agents.startUsage(j.id(),j.token(),new AgentUsageLedger.Start(1,2048));usage.finish(j.id(),j.token(),new AgentUsageLedger.Receipt(1,"RETURNED",100L,50L));
@@ -155,7 +176,7 @@ class BriefingGenerationIntegrationTest {
  }
  @Test void correctedNativeDeliveryKeepsFailedReceiptAndFinishesOnlyWithVerifiedArtifact(){
   upload("marker 合成参数恢复证据。",true);var b=manual();UUID p=policy();generation.tick(p);var j=conversations.claim();agents.search(j.id(),j.token(),"marker");
-  agents.openExecution(j.id(),j.token(),new AgentTaskService.ExecutionOpen("1.6",List.of("deliver_briefing")));
+  agents.openExecution(j.id(),j.token(),new AgentTaskService.ExecutionOpen("1.6",List.of("select_briefing_topic","deliver_briefing")));planIfAutomatic(j);
   record(j,1,"deliver_briefing","STARTED");
   assertThrows(IdentityException.class,()->agents.deliverBriefing(j.id(),j.token(),new BriefingContentService.Request(null,"合成参数恢复画报","合成资料支持完整的分析结论。",null,"INSIGHT")));
   record(j,1,"deliver_briefing","failed");record(j,2,"deliver_briefing","STARTED");
@@ -163,6 +184,58 @@ class BriefingGenerationIntegrationTest {
   agents.finish(j,terminal(j,List.of(new AgentResult.Tool("bad","deliver_briefing","failed"),new AgentResult.Tool("corrected","deliver_briefing","succeeded"))));generation.tick(p);
   assertEquals("SUCCEEDED",generation.get(actor,tenant,b.id()).status());assertEquals(1,feed.list(actor,tenant,space,"LATEST",null,"Asia/Shanghai",0,20,true).items().size());
   assertEquals(List.of("failed","succeeded"),db.queryForList("SELECT status FROM conversation_tool_receipts WHERE task_id=? ORDER BY sequence",String.class,j.id()));
+ }
+ void successfulContext(ConversationService.Job j,int sequence){
+  record(j,sequence,"task_context","STARTED");
+  taskContexts.context(j.id(),j.token(),new com.dreamcore.workspace.context.TaskContextService.Request("bootstrap",null,null,0,null,null,null,null,null,null,null));
+  record(j,sequence,"task_context","succeeded");
+ }
+ @Test void nativeContextArgumentsRecoverOnlyAfterSuccessfulContextAndVerifiedDelivery(){
+  upload("marker 合成本地参数纠正证据。",true);var b=manual();UUID p=policy();generation.tick(p);var j=conversations.claim();agents.search(j.id(),j.token(),"marker");
+  assertEquals("1.0",agents.check(j.id(),j.token()).get("contextRejectionVersion"));
+  agents.openExecution(j.id(),j.token(),new AgentTaskService.ExecutionOpen("1.6",List.of("task_context","select_briefing_topic","deliver_briefing")));planIfAutomatic(j);
+  record(j,1,"task_context","STARTED");
+  agents.toolReceipt(j.id(),j.token(),new AgentTaskService.ToolReceipt(1,"task_context","failed","CONTEXT_ARGUMENTS"));
+  // Terminal classification is immutable: a retry cannot erase or change the failed receipt.
+  agents.toolReceipt(j.id(),j.token(),new AgentTaskService.ToolReceipt(1,"task_context","failed","CONTEXT_ARGUMENTS"));
+  assertThrows(IdentityException.class,()->record(j,1,"task_context","failed"));
+  successfulContext(j,2);record(j,3,"deliver_briefing","STARTED");
+  assertEquals("PREPARED",agents.deliverBriefing(j.id(),j.token(),content("合成纠正参数后交付","INSIGHT")).get("status"));record(j,3,"deliver_briefing","succeeded");
+  agents.finish(j,terminal(j,List.of(new AgentResult.Tool("bad","task_context","failed"),new AgentResult.Tool("fixed","task_context","succeeded"),new AgentResult.Tool("delivered","deliver_briefing","succeeded"))));generation.tick(p);
+  assertEquals("SUCCEEDED",generation.get(actor,tenant,b.id()).status());
+  assertEquals("failed",db.queryForObject("SELECT status FROM conversation_tool_receipts WHERE task_id=? AND sequence=1",String.class,j.id()));
+  assertEquals("CONTEXT_ARGUMENTS",db.queryForObject("SELECT rejection FROM conversation_tool_receipts WHERE task_id=? AND sequence=1",String.class,j.id()));
+ }
+ @Test void contextRejectionCannotHideRemoteFailureMissingCorrectionOrForgedDelivery(){
+  for(String scenario:List.of("REMOTE","MISSING_CORRECTION","EARLIER_CORRECTION","FORGED_DELIVERY")){
+   upload("marker 合成参数恢复反例 "+scenario,true);manual();generation.tick(policy());var j=conversations.claim();agents.search(j.id(),j.token(),"marker");
+   agents.openExecution(j.id(),j.token(),new AgentTaskService.ExecutionOpen("1.6",List.of("task_context","select_briefing_topic","deliver_briefing")));planIfAutomatic(j);
+   var tools=new ArrayList<AgentResult.Tool>();int sequence=1;
+   if("EARLIER_CORRECTION".equals(scenario)){successfulContext(j,sequence++);tools.add(new AgentResult.Tool("earlier","task_context","succeeded"));}
+   record(j,sequence,"task_context","STARTED");
+   agents.toolReceipt(j.id(),j.token(),new AgentTaskService.ToolReceipt(sequence++,"task_context","failed","REMOTE".equals(scenario)?null:"CONTEXT_ARGUMENTS"));tools.add(new AgentResult.Tool("failed","task_context","failed"));
+   if(Set.of("REMOTE","FORGED_DELIVERY").contains(scenario)){successfulContext(j,sequence++);tools.add(new AgentResult.Tool("later","task_context","succeeded"));}
+   record(j,sequence,"deliver_briefing","STARTED");
+   if(!"FORGED_DELIVERY".equals(scenario))agents.deliverBriefing(j.id(),j.token(),content("合成恢复反例 "+scenario,"INSIGHT"));
+   record(j,sequence,"deliver_briefing","succeeded");tools.add(new AgentResult.Tool("delivery","deliver_briefing","succeeded"));
+   assertEquals("TASK_RUNTIME_INCOMPATIBLE",assertThrows(IdentityException.class,()->agents.finish(j,terminal(j,tools))).code,scenario);
+   db.update("UPDATE conversation_tasks SET status='FAILED',lease_token=NULL,lease_until=NULL WHERE id=?",j.id());generation.tick(policy());
+  }
+ }
+ @Test void receiptRejectsUnknownClassificationWrongToolAndNonFailure(){
+  upload("marker 合成参数分类边界。",true);manual();generation.tick(policy());var j=conversations.claim();
+  agents.openExecution(j.id(),j.token(),new AgentTaskService.ExecutionOpen("1.5",List.of("task_context","search_sources")));
+  record(j,1,"task_context","STARTED");
+  assertThrows(IdentityException.class,()->agents.toolReceipt(j.id(),j.token(),new AgentTaskService.ToolReceipt(1,"task_context","failed","REMOTE")));
+  assertThrows(IdentityException.class,()->agents.toolReceipt(j.id(),j.token(),new AgentTaskService.ToolReceipt(1,"task_context","succeeded","CONTEXT_ARGUMENTS")));
+  assertThrows(IdentityException.class,()->agents.toolReceipt(j.id(),j.token(),new AgentTaskService.ToolReceipt(1,"search_sources","failed","CONTEXT_ARGUMENTS")));
+  assertEquals("STARTED",db.queryForObject("SELECT status FROM conversation_tool_receipts WHERE task_id=? AND sequence=1",String.class,j.id()));
+  // The current engine's read-only policy also supports the negotiated classification.
+  agents.toolReceipt(j.id(),j.token(),new AgentTaskService.ToolReceipt(1,"task_context","failed","CONTEXT_ARGUMENTS"));
+  assertEquals("CONTEXT_ARGUMENTS",db.queryForObject("SELECT rejection FROM conversation_tool_receipts WHERE task_id=? AND sequence=1",String.class,j.id()));
+  record(j,2,"task_context","STARTED");record(j,2,"task_context","failed");
+  assertThrows(IdentityException.class,()->agents.toolReceipt(j.id(),j.token(),new AgentTaskService.ToolReceipt(2,"task_context","failed","CONTEXT_ARGUMENTS")));
+  assertNull(db.queryForObject("SELECT rejection FROM conversation_tool_receipts WHERE task_id=? AND sequence=2",String.class,j.id()));
  }
  @Test void nativeStatusOnlyReturnsAuditedNoNewContentWithoutAnArtifact(){
   upload("marker 合成无新主题证据。",true);var b=manual();UUID p=policy();generation.tick(p);var j=conversations.claim();
@@ -177,7 +250,7 @@ class BriefingGenerationIntegrationTest {
  }
  @Test void nativeAutoCannotPublishAnInfoCard(){
   upload("marker 合成默认类型证据。",true);generation.generate(actor,tenant,UUID.randomUUID(),space,null);generation.tick(policy());var j=conversations.claim();agents.search(j.id(),j.token(),"marker");
-  agents.openExecution(j.id(),j.token(),new AgentTaskService.ExecutionOpen("1.6",List.of("deliver_briefing")));record(j,1,"deliver_briefing","STARTED");
+  agents.openExecution(j.id(),j.token(),new AgentTaskService.ExecutionOpen("1.6",List.of("select_briefing_topic","deliver_briefing")));planIfAutomatic(j);record(j,1,"deliver_briefing","STARTED");
   assertEquals("BRIEFING_TYPE_MISMATCH",assertThrows(IdentityException.class,()->agents.deliverBriefing(j.id(),j.token(),content("合成资讯类型画报","INFO"))).code);
  }
  @Test void ordinaryStatusOnlyIsRejectedAndDeliveryFailureCannotBecomeComplete(){
@@ -190,7 +263,7 @@ class BriefingGenerationIntegrationTest {
  @Test void nativeRecoveryCannotConcealFailedRetrievalOrUnverifiedDelivery(){
   for(boolean forged:List.of(false,true)){
    upload("marker 合成失败边界 "+forged,true);manual();generation.tick(policy());var j=conversations.claim();agents.search(j.id(),j.token(),"marker");
-   agents.openExecution(j.id(),j.token(),new AgentTaskService.ExecutionOpen("1.6",List.of("deliver_briefing","search_sources")));
+   agents.openExecution(j.id(),j.token(),new AgentTaskService.ExecutionOpen("1.6",List.of("select_briefing_topic","deliver_briefing","search_sources")));planIfAutomatic(j);
    String failed=forged?"deliver_briefing":"search_sources";record(j,1,failed,"STARTED");record(j,1,failed,"failed");record(j,2,"deliver_briefing","STARTED");
    if(!forged)agents.deliverBriefing(j.id(),j.token(),content("合成未完成检索画报","INSIGHT"));record(j,2,"deliver_briefing","succeeded");
    assertEquals("TASK_RUNTIME_INCOMPATIBLE",assertThrows(IdentityException.class,()->agents.finish(j,terminal(j,List.of(new AgentResult.Tool("bad",failed,"failed"),new AgentResult.Tool("last","deliver_briefing","succeeded"))))).code);
@@ -430,7 +503,7 @@ class BriefingGenerationIntegrationTest {
   org.springframework.test.util.ReflectionTestUtils.setField(news,"workAudience",workAudience);
    var b=news.generate(actor,tenant,UUID.randomUUID(),space,"INFO");news.tick(policy());b=news.get(actor,tenant,b.id());assertEquals("RUNNING",b.status());
    var t=db.queryForMap("SELECT prompt,public_query FROM conversation_tasks WHERE id=?",b.taskId());
-   assertEquals("https://news.example.org/updates",t.get("public_query"));assertTrue(t.get("prompt").toString().contains("引擎已预取获权企业"));assertTrue(t.get("prompt").toString().contains("没有相关资讯"));
+   assertEquals("https://news.example.org/updates",t.get("public_query"));assertTrue(t.get("prompt").toString().contains("public_search 后 read_public_page 核验原文"));assertTrue(t.get("prompt").toString().contains("没有相关原文时不凑卡"));
    assertEquals(f.acceptedVersion().id(),db.queryForObject("SELECT version_id FROM conversation_originals WHERE task_id=?",UUID.class,b.taskId()));
    var j=conversations.claim();agents.search(j.id(),j.token(),"marker");
    assertThrows(IdentityException.class,()->contents.create(j,new BriefingContentService.Request(null,"资讯缺少公开来源","仅有内部资料不得冒充外部资讯已经核实。",List.of("这段合成说明用于检查资讯的真实来源要求。","缺少公开网页读取回执就不能成功创建资讯。"),"INFO")));
@@ -593,10 +666,10 @@ class BriefingGenerationIntegrationTest {
 
  @Test void topicSelectionIsAnImmutableProposalBoundToTheAuthorizedBriefingTask(){
   upload("marker 合成选题依据。",true);manual();generation.tick(policy());var j=conversations.claim();assertNotNull(j);
-  var request=new AgentTaskService.TopicSelection(List.of(new AgentTaskService.TopicCandidate("合成业务问题","获权资料及必要计算",false,"区别于近期主题","INSIGHT")),0);
+  var request=BriefingP0TestPlanning.request(agents,j,"INSIGHT",false);
   assertEquals(true,agents.selectTopic(j.id(),j.token(),request).get("proposalOnly"));agents.selectTopic(j.id(),j.token(),request);
   assertEquals(1,db.queryForObject("SELECT count(*) FROM briefing_topic_selections WHERE task_id=?",Integer.class,j.id()));
-  var changed=new AgentTaskService.TopicSelection(List.of(new AgentTaskService.TopicCandidate("另一问题","依据",false,"区别","INSIGHT")),0);
+  var changed=new AgentTaskService.TopicSelection(List.of(new AgentTaskService.TopicCandidate("另一问题","依据",false,"区别","INSIGHT","核对资料","BRIEFING","协助工作")),0,request.editorialPlan());
   assertEquals(409,assertThrows(IdentityException.class,()->agents.selectTopic(j.id(),j.token(),changed)).status);
   assertEquals(403,assertThrows(IdentityException.class,()->agents.selectTopic(j.id(),UUID.randomUUID(),request)).status);
   assertEquals(true,agents.check(j.id(),j.token()).get("topicSelectionRecorded"));
@@ -607,7 +680,7 @@ class BriefingGenerationIntegrationTest {
   var wrong=new AgentTaskService.TopicSelection(List.of(new AgentTaskService.TopicCandidate("合成数据问题","需要计算",true,"新问题","DATA")),0);
   assertEquals(422,assertThrows(IdentityException.class,()->agents.selectTopic(j.id(),j.token(),wrong)).status);
   assertEquals(0,db.queryForObject("SELECT count(*) FROM briefing_topic_selections WHERE task_id=?",Integer.class,j.id()));
-  var valid=new AgentTaskService.TopicSelection(List.of(new AgentTaskService.TopicCandidate("合成建议问题","已有获权依据",false,"可执行措施","SUGGESTION")),0);
+  var valid=BriefingP0TestPlanning.request(agents,j,"SUGGESTION",false);
   assertEquals(true,agents.selectTopic(j.id(),j.token(),valid).get("recorded"));
  }
 
@@ -672,9 +745,10 @@ class BriefingGenerationIntegrationTest {
   }
  }
 
- @Test void samePolicyDispatchesFiveAndSixthWaitsWithoutOverspending(){
+ @Test void independentSelectionsDispatchFiveAndSixthWaitsWithoutOverspending(){
   upload("marker 合成并行资料。",true);UUID p=policy();
-  var batches=generation.generateSelection(actor,tenant,UUID.randomUUID(),space,6,List.of("INSIGHT"));
+  // One editorial selection is sequential; independent requests still share the owner concurrency budget.
+  for(int i=0;i<6;i++)generation.generateSelection(actor,tenant,UUID.randomUUID(),space,1,List.of("INSIGHT"));
   for(int i=0;i<6;i++)generation.tick(p);
   assertEquals(5,db.queryForObject("SELECT count(*) FROM briefing_generation_batches WHERE policy_id=? AND task_id IS NOT NULL",Integer.class,p));
   assertEquals(1,db.queryForObject("SELECT count(*) FROM briefing_generation_batches WHERE policy_id=? AND task_id IS NULL AND status='WAITING_RESOURCE'",Integer.class,p));

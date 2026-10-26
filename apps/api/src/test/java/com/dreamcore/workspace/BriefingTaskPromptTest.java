@@ -11,4 +11,8 @@ class BriefingTaskPromptTest {
   }
  }
  @Test void emptyHistoryDoesNotInventCoverage(){String p=BriefingTaskPrompt.compose("INITIALIZATION",null,List.of(),"");assertTrue(p.contains("当前范围没有可用近期摘要"));assertTrue(p.contains("不代表全部企业资料"));}
+ @Test void monthlyTitleSurvivesLongSourceNamesWithoutBecomingANewFact(){
+  String p=BriefingTaskPrompt.compose("DATA_READY","DATA",List.of("来源文件".repeat(500)),"2026-10 登记收付观察 — 登记金额合计来自固定月份。\n"+"更早画报摘要。".repeat(150));
+  assertTrue(p.contains("2026-10 登记收付观察 — 登记金额合计来自固定月份。"));assertTrue(p.contains("不作为新事实"));assertTrue(p.length()<=2000);
+ }
 }

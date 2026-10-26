@@ -54,6 +54,9 @@ class NativeGovernanceFlowIntegrationTest {
   background();String proof="合成企业负责人确认：编号是本业务导出的唯一标识，按文本保存。";
   var rule=Map.of("datasetId",dataset.toString(),"kind","value-rule","id","known-id","column","编号","type","ENUM","nullable",false,"values",List.of(violation?"other":"001"),"evidence",proof);
   var column=Map.of("datasetId",dataset.toString(),"kind","column","name","编号","type","text","key","PRI","nullable","NO");
+  UUID current=db.queryForObject("SELECT current_snapshot FROM business_datasets WHERE id=?",UUID.class,dataset);
+  var export=Map.of("scopeHash","a".repeat(64),"kind","export-validation","snapshotId",current.toString(),"rowCount",1,"columns",List.of("编号"),"candidateKeyColumns",List.of("编号"),"rowsSha256",com.dreamcore.workspace.identity.IdentityService.hash(new JsonMapper().writeValueAsString(List.of(List.of("001")))));
+  db.update("INSERT INTO collection_snapshot_receipts(snapshot_id,tenant_id,dataset_id,receipt) VALUES (?,?,?,?::jsonb)",current,tenant,dataset,new JsonMapper().writeValueAsString(export));
   var evidence=Map.of("tenantId",tenant.toString(),"entries",List.of(Map.of("datasetId",dataset.toString(),"column","编号","sourceMetadata",Map.of("definition",proof))),"schema",List.of(column,rule));
   var file=directory.resolve("business.json");java.nio.file.Files.writeString(file,new JsonMapper().writeValueAsString(evidence));
   ReflectionTestUtils.setField(jobs,"evidencePath",file.toString());

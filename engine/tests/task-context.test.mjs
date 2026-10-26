@@ -271,3 +271,17 @@ test('monthly plan uses typed scope and keeps both metrics in one server calcula
  await assert.rejects(()=>tool.execute({action:'briefing_plan',plan:{...plan,recipe:'PROFIT'}}));
  assert.equal(calls.length,1);
 });
+
+
+test('native dataset context never advertises the disabled chain monthly-plan action', () => {
+  const invoke = async () => { throw new Error('not called'); };
+  const native = contextTool(invoke, async () => {}, true);
+  assert.ok(!native.description.includes('MONTHLY_SALES_RECEIPTS'));
+  assert.ok(!native.description.includes('then briefing_plan'));
+  assert.ok(!native.parameters.properties.action.enum.includes('briefing_plan'));
+  assert.equal(native.parameters.properties.plan, undefined);
+  const chain = contextTool(invoke, async () => {}, true, false, undefined, true);
+  assert.ok(chain.description.includes('MONTHLY_SALES_RECEIPTS'));
+  assert.ok(chain.parameters.properties.action.enum.includes('briefing_plan'));
+  assert.ok(chain.parameters.properties.plan);
+});

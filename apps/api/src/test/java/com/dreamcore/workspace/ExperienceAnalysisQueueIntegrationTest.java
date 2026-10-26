@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.*;import static org.mockito.Mocki
 
 @SpringBootTest(properties={"dreamcore.tasks.enabled=false","dreamcore.experience-intake.enabled=false","dreamcore.experience-analysis.enabled=false"})
 class ExperienceAnalysisQueueIntegrationTest {
+ @org.springframework.test.context.DynamicPropertySource
+ static void isolateQueue(org.springframework.test.context.DynamicPropertyRegistry registry){IsolatedTestDatabase.register(registry);}
  @Autowired ExperienceAdmissionService admission;@Autowired JdbcTemplate db;@Autowired ExperienceAnalysisQueue queue;@Autowired ExperienceIntakeService intake;@Autowired FeedbackService feedback;
  UUID tenant,owner,space,task;
  @BeforeEach void fixture(){

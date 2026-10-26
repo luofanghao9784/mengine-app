@@ -24,6 +24,7 @@ public class FoundationPublicationService {
    private final NativeMaterialGovernance materials;
    private final JdbcTemplate db;
    private final JsonMapper json = new JsonMapper();
+   @org.springframework.beans.factory.annotation.Autowired private com.dreamcore.workspace.governance.GovernanceModelService governance;
 
    public FoundationPublicationService(NativeGovernanceDeployment datasets, NativeMaterialGovernance materials, JdbcTemplate db) {
       this.datasets = datasets;
@@ -55,7 +56,7 @@ public class FoundationPublicationService {
       args.addAll(ids);
       List<Map<String, Object>> rows = this.db
          .queryForList(
-            "SELECT j.id,j.kind,j.input::text,j.output::text,coalesce(d.created_at,m.created_at) published_at FROM governance_model_jobs j JOIN governance_model_dispatch x ON x.job_id=j.id LEFT JOIN native_governance_releases d ON d.id=j.id LEFT JOIN native_material_releases m ON m.id=j.id WHERE j.tenant_id=? AND j.state='DRAFT_READY' AND x.state='SUCCEEDED' AND j.input->>'contractVersion'='2.0' AND j.id IN ("
+            "SELECT j.id,j.actor_id,j.kind,j.input::text,j.output::text,coalesce(d.created_at,m.created_at) published_at FROM governance_model_jobs j JOIN governance_model_dispatch x ON x.job_id=j.id LEFT JOIN native_governance_releases d ON d.id=j.id LEFT JOIN native_material_releases m ON m.id=j.id WHERE j.tenant_id=? AND j.state='DRAFT_READY' AND x.state='SUCCEEDED' AND j.input->>'contractVersion'='2.0' AND j.id IN ("
                + String.join(",", Collections.nCopies(ids.size(), "?"))
                + ")",
             args.toArray()
@@ -84,7 +85,9 @@ public class FoundationPublicationService {
                   }
                }
 
-               JsonNode checks = input.path("checks");
+               JsonNode currentSource = "DATASET".equals(r.get("kind"))
+                   ? this.json.valueToTree(this.governance.currentDatasetSource(actor, tenant, UUID.fromString(c.getKey().substring(8)))) : input;
+               JsonNode checks = currentSource.path("checks");
                if ("DATASET".equals(r.get("kind")) && !"CHECKED".equals(checks.path("state").asText())) {
                   warnings.add("CHECKED".equals(checks.path("exportValidation").path("state").asText())
                       ? "导出与接收已核验；源系统业务约束未声明，不能判定全部记录业务合格"
@@ -100,6 +103,8 @@ public class FoundationPublicationService {
                   limitations.add(exportSummary);
                } else if (Set.of("MISMATCH", "STALE", "VIOLATIONS").contains(export.path("state").asText())) {
                   warnings.add("导出接收检查未通过或依据已过期；不能采用旧核验结论");
+               } else if ("DATASET".equals(r.get("kind"))) {
+                  warnings.add("缺少当前快照导出接收依据；自动分析等待采集核验，已发布字段口径保留");
                }
 
                if (checks.path("nonNullViolations").asLong() > 0L || checks.path("duplicatePrimaryKeys").asLong() > 0L) {
@@ -125,9 +130,10 @@ public class FoundationPublicationService {
                   }
                }
 
-               for (JsonNode limit : output.path("limitations")) {
-                  limitations.add(limit.asText());
-               }
+               // A published definition is shared with source readers; its author's private model draft is not.
+               UUID subject = this.db.queryForObject("SELECT headquarters_permission_actor(?,?)",UUID.class,actor,tenant);
+               if (!"DATASET".equals(r.get("kind")) || subject.equals(r.get("actor_id")))
+                  for (JsonNode limit : output.path("limitations")) limitations.add(limit.asText());
 
                int count = output.path("knowledge").size();
                if (GovernanceReferencePolicy.hasPublication(count, r)) {
@@ -145,7 +151,7 @@ public class FoundationPublicationService {
                         List.copyOf(warnings),
                         List.copyOf(limitations),
                         exportSummary,
-                        "DATASET".equals(r.get("kind")) && input.path("rowCount").canConvertToLong() ? input.path("rowCount").asLong() : null,
+                        "DATASET".equals(r.get("kind")) && currentSource.path("rowCount").canConvertToLong() ? currentSource.path("rowCount").asLong() : null,
                         valueChecks.path("rules").isArray() && valueChecks.path("rules").size() > 0 ? valueChecks.path("rules").size() : null,
                         valueChecks.path("rules").isArray() && valueChecks.path("rules").size() > 0
                             ? (int)java.util.stream.StreamSupport.stream(valueChecks.path("rules").spliterator(), false).filter(rule -> "CHECKED".equals(rule.path("state").asText())).count() : null,
@@ -177,6 +183,7 @@ public class FoundationPublicationService {
          asset.put("gate", 4);
          asset.put("needsAttention", !p.warnings().isEmpty());
          asset.put("checksPassed", p.warnings().isEmpty());
+         asset.put("automaticAnalysisReady", "DATASET".equals(p.kind()) && p.warnings().isEmpty());
          asset.put("label", "已发布治理知识" + (p.warnings().isEmpty() ? "" : " · 保留待核实项与解析限制"));
          if (p.queryableRecords() != null) asset.put("queryableRecords", p.queryableRecords());
          if (p.declaredRules() != null) {

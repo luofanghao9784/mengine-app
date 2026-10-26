@@ -75,7 +75,10 @@ class ExperienceManagementIntegrationTest {
   assertEquals(401,http.send(java.net.http.HttpRequest.newBuilder(java.net.URI.create(base+path)).GET().build(),java.net.http.HttpResponse.BodyHandlers.ofString()).statusCode());var csrf=json.readTree(http.send(java.net.http.HttpRequest.newBuilder(java.net.URI.create(base+"/api/v1/auth/csrf")).GET().build(),java.net.http.HttpResponse.BodyHandlers.ofString()).body());
   assertEquals(200,http.send(java.net.http.HttpRequest.newBuilder(java.net.URI.create(base+"/api/v1/auth/login")).header(csrf.get("headerName").asString(),csrf.get("token").asString()).header("Content-Type","application/json").POST(java.net.http.HttpRequest.BodyPublishers.ofString(json.writeValueAsString(Map.of("email",admin+"@management.test","password","synthetic-management-password")))).build(),java.net.http.HttpResponse.BodyHandlers.ofString()).statusCode());
   for(String suffix:List.of("","/processing")){var response=http.send(java.net.http.HttpRequest.newBuilder(java.net.URI.create(base+path+suffix)).GET().build(),java.net.http.HttpResponse.BodyHandlers.ofString());assertEquals(200,response.statusCode(),response.body());assertTrue(response.headers().firstValue("cache-control").orElseThrow().contains("no-store"));assertFalse(response.body().contains("private-"));}
-  assertEquals(403,http.send(java.net.http.HttpRequest.newBuilder(java.net.URI.create(base+"/api/platform-admin/v1/overview")).GET().build(),java.net.http.HttpResponse.BodyHandlers.ofString()).statusCode());
+  // Customer authentication does not establish the independent platform session.
+  var denied=http.send(java.net.http.HttpRequest.newBuilder(java.net.URI.create(base+"/api/platform-admin/v1/overview")).GET().build(),java.net.http.HttpResponse.BodyHandlers.ofString());
+  assertEquals(401,denied.statusCode());assertEquals("AUTHENTICATION_REQUIRED",json.readTree(denied.body()).path("code").asText());
+  assertEquals(200,http.send(java.net.http.HttpRequest.newBuilder(java.net.URI.create(base+path)).GET().build(),java.net.http.HttpResponse.BodyHandlers.ofString()).statusCode());
  }
 
  @Test void historyContainsOnlyReadablePublishedVersionsAndNeverCandidates(){

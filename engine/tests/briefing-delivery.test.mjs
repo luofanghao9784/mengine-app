@@ -220,7 +220,13 @@ test('dataset briefing closes retrieval after three lookups and delivers an hone
       assert.match(instructions, /compare_dataset/);
       assert.match(instructions, /每张卡回答：发现了什么/);
       assert.match(instructions, /只有来源介绍而没有新业务发现时不凑卡/);
-      assert.ok(request.tools.find(t => t.name === 'deliver_briefing').description.includes('智能画报表达规范 1.5.7'));
+      for (const text of [instructions, request.tools.find(t => t.name === 'deliver_briefing').description]) {
+        assert.match(text, /实际匹配记录中的有效零值可以交付为有价值业务基线/);
+        assert.match(text, /没有匹配记录、必需数值为NULL或缺失时不能补零/);
+        assert.match(text, /交付后采用平台核对并保存的事实内容/);
+        assert.doesNotMatch(text, /核验计算所有组的两列数值全部为0或缺失时不交付/);
+      }
+      assert.ok(request.tools.find(t => t.name === 'deliver_briefing').description.includes('智能画报表达规范 1.5.9'));
       assert.match(instructions, /先明确接收人的真实岗位/);
       assert.match(instructions, /卡面预览与详情使用同一组方案、行动和编号/);
       assert.match(request.tools.find(t => t.name === 'deliver_briefing').description, /卡面只截取完整文字行，详情保留全文/);
@@ -316,6 +322,16 @@ test('synthetic model corrects a topic-only title before delivery; long conclusi
   yield {type:'finish',reason:'tool_calls'};
  }}});
  assert.equal(r.status,'completed');assert.equal(calls,2);assert.equal(writes,1);
+});
+
+test('verified calculation delivery accepts a business topic and returns the platform factual title',async()=>{
+ const factualTitle='2026-10 · 应收付金额合计 -120.00 人民币元';let writes=0;
+ const tool=briefingDeliveryTool({requestedType:'DATA',authorize:async()=>{},invoke:async body=>{
+  writes++;assert.equal(body.title,'月度门店登记金额分析');
+  return {contractVersion:'1.0',status:'PREPARED',artifactId:randomUUID(),title:factualTitle,visibility:'PRIVATE_AFTER_TASK_SUCCEEDS'};
+ }});
+ const r=await tool.execute({businessType:'DATA',calculationArtifactId:randomUUID(),title:'月度门店登记金额分析',summary:'按已发布账单日期口径核对登记金额。',analysis:['建议核对各门店原始账单与登记凭据。','来源覆盖范围依照本次固定快照说明。']},new AbortController().signal);
+ assert.equal(writes,1);assert.equal(r.title,factualTitle);
 });
 
 test('provider Harness uses catalog, topic, typed monthly plan and one delivery',async(t)=>{

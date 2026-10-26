@@ -17,6 +17,7 @@ class TaskDatasetIntegrationTest extends TaskDatasetFixture {
  @Autowired com.dreamcore.workspace.collection.NativeGovernanceDeployment governance;
  @Autowired com.dreamcore.workspace.profile.CompanyInformationService company;
  @Autowired DatasetTaskContext datasetContext;
+ @Autowired com.dreamcore.workspace.governance.GovernanceModelService governanceChecks;
  @Autowired DatasetCalculationService calculations;
  @Autowired BriefingContentService briefings;
  @Test void ordinaryConversationReceivesOnlyCurrentPublishedDefinitionsAndOldPinnedSnapshotsDoNot(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
@@ -26,7 +27,10 @@ class TaskDatasetIntegrationTest extends TaskDatasetFixture {
   var fields=List.of(new com.dreamcore.workspace.collection.DatasetField("门店","text","来源门店名称","","合成负责人确认","SOURCE_DOCUMENTED"),new com.dreamcore.workspace.collection.DatasetField("数量","decimal","来源计数，单位件","件","合成负责人确认","SOURCE_DOCUMENTED"));
   governance.submit(new com.dreamcore.workspace.collection.NativeGovernanceDeployment.Package("1.0",UUID.randomUUID(),tenant,owner,c.backgroundVersion(),List.of(new com.dreamcore.workspace.collection.NativeGovernanceDeployment.Item(dataset,c.sources().getFirst().token(),fields,"",List.of("合成负责人确认")))),true);
   var plan=Map.of("name","合成门店数量","meaning","来源数量，不推断销售额","unit","件","grain","来源记录","scope","全部当前快照","exclusions","无","evidence","合成负责人已核对","aggregation","SUM","valueField","数量","execution",Map.of("groupColumns",List.of("门店"),"dateColumn","","dateFrom","","dateTo","","timeZone","Asia/Shanghai","reviewed",true));
-  var file=dir.resolve("plans.json");java.nio.file.Files.writeString(file,json.writeValueAsString(Map.of("tenantId",tenant.toString(),"schema",List.of(Map.of("datasetId",dataset.toString(),"kind","analysis-plan","definition",plan)))));
+  var sourceRule=Map.of("datasetId",dataset.toString(),"kind","column","name","门店","type","text","key","PRI","nullable","NO");
+  var export=Map.of("datasetId",dataset.toString(),"kind","export-validation","snapshotId",snapshot.toString(),"rowCount",rowsFor("旧版本").size(),"columns",columns(),"candidateKeyColumns",List.of("门店"),"rowsSha256",com.dreamcore.workspace.identity.IdentityService.hash(json.writeValueAsString(rowsFor("旧版本"))));
+  var file=dir.resolve("plans.json");java.nio.file.Files.writeString(file,json.writeValueAsString(Map.of("tenantId",tenant.toString(),"schema",List.of(Map.of("datasetId",dataset.toString(),"kind","analysis-plan","definition",plan),sourceRule,export))));
+  org.springframework.test.util.ReflectionTestUtils.setField(governanceChecks,"evidencePath",file.toString());
   org.springframework.test.util.ReflectionTestUtils.setField(datasetContext,"evidencePath",file.toString());
   try {
   var t=task(null,"AUTHORIZED_LIBRARY");var read=call(t,request("dataset_read",dataset,snapshot,0));
@@ -46,7 +50,7 @@ class TaskDatasetIntegrationTest extends TaskDatasetFixture {
   assertEquals("NONE",old.at("/source/governedFields/source").asString());assertTrue(old.at("/source/nativeAnalysisPlans").isMissingNode());
   db.update("DELETE FROM workspace_members WHERE tenant_id=? AND workspace_id=? AND account_id=?",tenant,space,owner);
   denied(()->call(t,request("dataset_read",dataset,snapshot,0)));
-  } finally {org.springframework.test.util.ReflectionTestUtils.setField(datasetContext,"evidencePath","");}
+  } finally {org.springframework.test.util.ReflectionTestUtils.setField(datasetContext,"evidencePath","");org.springframework.test.util.ReflectionTestUtils.setField(governanceChecks,"evidencePath","");}
  }
  @Test void searchAndReadPinExactVersionAndClearlyBoundThePage(){
   var t=task(null,"AUTHORIZED_LIBRARY");assertEquals("1.0",agents.check(t.id(),t.token()).get("datasetContextVersion"));var found=call(t,request("dataset_search",null,null,0));assertEquals(1,found.get("items").size());assertFalse(found.toString().contains("部署路径"));assertFalse(found.toString().contains("部署权限说明"));

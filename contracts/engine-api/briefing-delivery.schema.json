@@ -44,6 +44,16 @@
             "SUGGESTION",
             "RESULT"
           ]
+        },
+        "supportingCalculationArtifactIds": {
+          "type": "array",
+          "maxItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": "Trusted runtime binds verified supporting calculations; requires briefingSupportingCalculationsVersion=1.0. Not a model-authored tool argument. Each artifact must belong to this attempt and retain its own scope."
         }
       },
       "allOf": [
@@ -89,6 +99,18 @@
                 "calculationArtifactId"
               ]
             }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "supportingCalculationArtifactIds"
+            ]
+          },
+          "then": {
+            "required": [
+              "calculationArtifactId"
+            ]
           }
         }
       ]
@@ -879,6 +901,13 @@
                       "$ref": "#/$defs/fusionEvidence"
                     }
                   ]
+                },
+                "supportingCalculations": {
+                  "type": "array",
+                  "maxItems": 2,
+                  "items": {
+                    "$ref": "#/$defs/supportingCalculation"
+                  }
                 }
               },
               "allOf": [
@@ -1433,6 +1462,13 @@
                       "$ref": "#/$defs/fusionEvidence"
                     }
                   ]
+                },
+                "supportingCalculations": {
+                  "type": "array",
+                  "maxItems": 2,
+                  "items": {
+                    "$ref": "#/$defs/supportingCalculation"
+                  }
                 }
               }
             }
@@ -1755,6 +1791,153 @@
         "boundary"
       ],
       "additionalProperties": true
+    },
+    "supportingCalculation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifactId",
+        "sha256",
+        "unit",
+        "receipt"
+      ],
+      "properties": {
+        "artifactId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "receipt": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "datasetSource",
+            "calculation"
+          ],
+          "properties": {
+            "datasetSource": {
+              "type": "object",
+              "properties": {
+                "datasetId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "snapshotId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "version": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "rowCount": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100000
+                },
+                "collectedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "coverageThrough": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "datasetId",
+                "snapshotId",
+                "version",
+                "name",
+                "sha256",
+                "rowCount",
+                "collectedAt",
+                "coverageThrough"
+              ],
+              "additionalProperties": false
+            },
+            "calculation": {
+              "type": "object",
+              "required": [
+                "recipeVersion",
+                "status",
+                "request",
+                "inputSha256",
+                "matchedRows",
+                "ignoredRows",
+                "rows"
+              ],
+              "properties": {
+                "recipeVersion": {
+                  "enum": [
+                    "dataset-summary-1",
+                    "dataset-composition-1",
+                    "dataset-compare-1",
+                    "dataset-compare-month-1"
+                  ]
+                },
+                "status": {
+                  "const": "COMPUTED"
+                },
+                "request": {
+                  "type": "object"
+                },
+                "inputSha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "matchedRows": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "ignoredRows": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "rows": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 50,
+                  "items": {
+                    "type": "object"
+                  }
+                },
+                "total": {
+                  "type": "string",
+                  "pattern": "^-?\\d{1,64}(?:\\.\\d{1,12})?$"
+                },
+                "totals": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

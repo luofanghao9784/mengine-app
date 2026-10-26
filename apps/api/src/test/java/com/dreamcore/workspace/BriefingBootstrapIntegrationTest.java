@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import static org.junit.jupiter.api.Assertions.*;
 @org.springframework.test.context.TestPropertySource(properties="dreamcore.briefing.merge-seconds=0")
 class BriefingBootstrapIntegrationTest extends DatasetCalculationFixture {
+ @BeforeEach void configureWork(){db.update("INSERT INTO work_role_profiles(tenant_id,account_id,responsibilities,revision,changed_by) VALUES (?,?,'核对门店收款登记',1,?)",tenant,owner,owner);}
  @Autowired BriefingBootstrapDeployment deployment;
  @Autowired com.dreamcore.workspace.briefing.BriefingService feed;
  DatasetCalculationService.Request calculation(){return new DatasetCalculationService.Request(dataset,snapshot,"门店","期间","收款（元）","前期","本期");}

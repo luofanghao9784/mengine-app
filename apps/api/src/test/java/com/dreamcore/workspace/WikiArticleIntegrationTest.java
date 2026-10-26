@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @org.springframework.context.annotation.Import(CollectionIntegrationTest.Config.class)
 class WikiArticleIntegrationTest {
     @DynamicPropertySource static void paths(DynamicPropertyRegistry registry) {
+        IsolatedTestDatabase.register(registry);
         Path root=Path.of("").toAbsolutePath();if(root.endsWith("api"))root=root.getParent().getParent();
         String parser=root.resolve("workers/parser").toString();registry.add("dreamcore.knowledge.parser-root",()->parser);
     }

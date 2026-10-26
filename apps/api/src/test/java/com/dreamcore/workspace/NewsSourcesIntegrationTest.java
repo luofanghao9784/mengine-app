@@ -19,6 +19,7 @@ class NewsSourcesIntegrationTest {
   for(UUID id:List.of(tenant,other))db.update("INSERT INTO tenants(id,name) VALUES(?,'合成资讯企业')",id);
   db.update("INSERT INTO tenant_memberships(tenant_id,account_id,role) VALUES(?,?,'TENANT_ADMIN')",tenant,actor);
   db.update("INSERT INTO tenant_memberships(tenant_id,account_id,role) VALUES(?,?,'MEMBER')",tenant,reader);
+  db.update("INSERT INTO work_role_profiles(tenant_id,account_id,responsibilities,revision,changed_by) VALUES (?,?,'核对与本职工作相关的公开行业资讯',1,?)",tenant,actor,actor);
   db.update("INSERT INTO workspaces(id,tenant_id,owner_id,name,kind) VALUES(?,?,?,'合成资讯空间','PERSONAL')",space,tenant,actor);
  }
  NewsSourceCatalog.Source create(){return catalog.save(platform,new NewsSourceCatalog.Change(UUID.randomUUID(),0,"合成官方来源","https://publisher.example.org/"+UUID.randomUUID(),"PAGE","健身","中国",true));}

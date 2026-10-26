@@ -11,6 +11,11 @@ import static org.junit.jupiter.api.Assertions.*;
 @TestPropertySource(properties={"dreamcore.briefing.merge-seconds=0"})
 class BriefingDatasetGenerationIntegrationTest extends DatasetCalculationFixture {
  @Autowired BriefingGenerationService generation;
+ @Autowired com.dreamcore.workspace.collection.NativeGovernanceDeployment nativeGovernance;
+ @Autowired com.dreamcore.workspace.governance.GovernanceModelService governanceChecks;
+ @Autowired com.dreamcore.workspace.context.DatasetTaskContext datasetContext;
+ @Autowired com.dreamcore.workspace.profile.CompanyInformationService company;
+ @BeforeEach void configureWork(){db.update("INSERT INTO work_role_profiles(tenant_id,account_id,responsibilities,revision,changed_by) VALUES (?,?,'核对各店收款与凭证，按一致期间比较变化',1,?)",tenant,owner,owner);}
  UUID policy(){for(int i=0;i<50;i++){generation.discover();var policies=generation.state(owner,tenant).policies().stream().filter(p->p.workspaceId().equals(space)).toList();if(!policies.isEmpty())return policies.getFirst().id();}throw new AssertionError("Fixture policy not discovered");}
  BriefingGenerationService.Batch first(UUID p){generation.tick(p);return generation.state(owner,tenant).batches().stream().filter(b->b.workspaceId().equals(space)).findFirst().orElseThrow();}
  void succeeded(UUID task){db.update("UPDATE conversation_tasks SET status='SUCCEEDED',reply='合成调度完成，仅用于状态验证。',finished_at=now(),lease_token=NULL,lease_until=NULL WHERE id=?",task);}
@@ -123,8 +128,10 @@ class BriefingDatasetGenerationIntegrationTest extends DatasetCalculationFixture
  }
  @Test void textInsightCanUsePinnedDatasetEvidenceWithoutInventingFileSource(){
   UUID p=policy();first(p);var j=conversations.claim();call(j,request("dataset_read",dataset,snapshot,0));
-  agents.openExecution(j.id(),j.token(),new AgentTaskService.ExecutionOpen("1.5",List.of("deliver_briefing")));agents.toolReceipt(j.id(),j.token(),new AgentTaskService.ToolReceipt(1,"deliver_briefing","STARTED"));
-  agents.deliverBriefing(j.id(),j.token(),new BriefingContentService.Request(null,"固定数据来源观察","当前数据存在多个期间，分析时需要保持统计口径一致。",List.of("该观察基于任务读取的固定数据版本，尚未执行全部记录的汇总计算。","后续比较应选择完整且一致的期间，缺失值不能直接当作零值。"),"INSIGHT"));
+  agents.openExecution(j.id(),j.token(),new AgentTaskService.ExecutionOpen("1.5",List.of("select_briefing_topic","deliver_briefing")));
+  agents.toolReceipt(j.id(),j.token(),new AgentTaskService.ToolReceipt(1,"select_briefing_topic","STARTED"));BriefingP0TestPlanning.select(agents,j,"INSIGHT",false);agents.toolReceipt(j.id(),j.token(),new AgentTaskService.ToolReceipt(1,"select_briefing_topic","succeeded"));
+  agents.toolReceipt(j.id(),j.token(),new AgentTaskService.ToolReceipt(2,"deliver_briefing","STARTED"));
+  agents.deliverBriefing(j.id(),j.token(),new BriefingContentService.Request(null,"收款比较需先选定期间","当前记录存在多个期间，比较收款时需要先选定一致的范围。",List.of("该观察基于本次读取的记录，尚未执行全部记录的汇总计算。","后续比较应选择完整且一致的期间，缺失值不能直接当作零值。"),"INSIGHT",new BriefingPresentationPolicy.Presentation("briefing-presentation-v1","EDITORIAL",null,null,null,List.of())));
   var raw=db.queryForObject("SELECT convert_from(content,'UTF8') FROM conversation_artifacts WHERE task_id=? AND filename LIKE 'briefing-text-%'",String.class,j.id());var content=json.readTree(raw);
   assertEquals(snapshot.toString(),content.at("/datasetSource/snapshotId").asString());assertTrue(content.path("source").isNull());assertTrue(content.path("chart").isNull());
  }
@@ -166,15 +173,33 @@ class BriefingDatasetGenerationIntegrationTest extends DatasetCalculationFixture
   var next=generation.state(owner,tenant).batches().stream().filter(x->!x.id().equals(b.id())).findFirst().orElseThrow();assertEquals(1,db.queryForObject("SELECT count(*) FROM briefing_dataset_selections WHERE task_id=?",Integer.class,next.taskId()));
   assertEquals(4,db.queryForObject("SELECT count(DISTINCT snapshot_id) FROM briefing_dataset_selections WHERE batch_id IN (SELECT id FROM briefing_generation_batches WHERE policy_id=?)",Integer.class,p));
  }
- @Test void automaticDatasetBatchRunsActualHarnessAndPublishesPrivateCard() throws Exception {
+ void publishSyntheticCurrentPeriodMethod(java.nio.file.Path dir) throws Exception {
+  db.update("INSERT INTO tenant_governance(tenant_id,owner_id) VALUES (?,?)",tenant,owner);
+  company.change(owner,tenant,new com.dreamcore.workspace.profile.CompanyInformationService.Change(UUID.randomUUID(),com.dreamcore.workspace.profile.CompanyInformationService.Field.NAME,0,"ADD",null,"合成收款企业",""));
+  var fields=List.of(new com.dreamcore.workspace.collection.DatasetField("门店","text","来源门店","","合成业务确认","SOURCE_DOCUMENTED"),new com.dreamcore.workspace.collection.DatasetField("期间","text","来源登记期间","","合成业务确认","SOURCE_DOCUMENTED"),new com.dreamcore.workspace.collection.DatasetField("收款（元）","decimal","来源登记金额，不代表银行到账","元","合成业务确认","SOURCE_DOCUMENTED"));
+  var execution=new LinkedHashMap<String,Object>(Map.of("groupColumns",List.of("门店"),"dateColumn","","dateFrom","","dateTo","","timeZone","Asia/Shanghai","reviewed",true));execution.put("equalsFilters",Map.of("期间","本期"));
+  var plan=Map.of("name","合成本期门店收款","meaning","按门店核对本期来源登记金额","unit","元","grain","来源记录","scope","本期","exclusions","无","evidence","合成负责人已确认本期登记口径","aggregation","SUM","valueField","收款（元）","execution",execution);
+  var schema=new ArrayList<Map<String,Object>>();schema.add(Map.of("datasetId",dataset.toString(),"kind","analysis-plan","definition",plan));
+  for(String column:columns())schema.add(Map.of("datasetId",dataset.toString(),"kind","column","name",column,"type",column.equals("收款（元）")?"decimal":"text","key","","nullable","NO"));
+  schema.add(Map.of("datasetId",dataset.toString(),"kind","export-validation","snapshotId",snapshot.toString(),"rowCount",6,"columns",columns(),"candidateKeyColumns",columns(),"rowsSha256",com.dreamcore.workspace.identity.IdentityService.hash(json.writeValueAsString(rowsFor("旧版本")))));
+  var file=dir.resolve("synthetic-plans.json");java.nio.file.Files.writeString(file,json.writeValueAsString(Map.of("tenantId",tenant.toString(),"schema",schema)));
+  org.springframework.test.util.ReflectionTestUtils.setField(governanceChecks,"evidencePath",file.toString());org.springframework.test.util.ReflectionTestUtils.setField(datasetContext,"evidencePath",file.toString());
+  var c=nativeGovernance.context(owner,tenant,List.of(dataset));
+  nativeGovernance.submit(new com.dreamcore.workspace.collection.NativeGovernanceDeployment.Package("1.0",UUID.randomUUID(),tenant,owner,c.backgroundVersion(),List.of(new com.dreamcore.workspace.collection.NativeGovernanceDeployment.Item(dataset,c.sources().getFirst().token(),fields,"",List.of("合成业务确认")))),true);
+ }
+ @Test void automaticDatasetBatchRunsActualHarnessAndPublishesPrivateCard(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+  publishSyntheticCurrentPeriodMethod(dir);
+  try {
   UUID p=policy();var b=first(p);var job=conversations.claim();
   var root=java.nio.file.Path.of("").toAbsolutePath();if(root.endsWith("api"))root=root.getParent().getParent();String token="synthetic-auto-dataset-012345678901234567890";
-  var engine=new ProcessBuilder("node",root.resolve("engine/tests/fixtures/dataset-briefing-server.mjs").toString(),"http://127.0.0.1:"+port,token).redirectError(ProcessBuilder.Redirect.INHERIT).start();
+  var audience=(com.dreamcore.workspace.audience.WorkAudienceService.Context)agents.check(job.id(),job.token()).get("workAudience");
+  var engine=new ProcessBuilder("node",root.resolve("engine/tests/fixtures/dataset-briefing-server.mjs").toString(),"http://127.0.0.1:"+port,token,"",audience.key()).redirectError(ProcessBuilder.Redirect.INHERIT).start();
   try(var pool=java.util.concurrent.Executors.newSingleThreadExecutor();var lines=new java.io.BufferedReader(new java.io.InputStreamReader(engine.getInputStream()))){
    String endpoint=pool.submit(lines::readLine).get(5,java.util.concurrent.TimeUnit.SECONDS);var runtime=new EngineTaskRuntime(endpoint,token,"verification",false);
    var result=runtime.executeAgent(job.id(),job.token(),job.prompt(),()->agents.active(job));assertEquals("COMPLETE",result.outcome());agents.finish(job,result);generation.tick(p);
    var complete=generation.get(owner,tenant,b.id());assertEquals("SUCCEEDED",complete.status());assertEquals(List.of(job.id()),complete.cardIds());
    var t=conversations.taskDetail(owner,tenant,job.conversation(),job.id()).tasks().getFirst();var card=agents.briefing(owner,tenant,job.conversation(),job.id(),t.revision(),1);assertEquals(snapshot,card.content().datasetSource().snapshotId());assertEquals("1.20",card.content().chart().totals().current());
   }finally{engine.destroyForcibly();engine.waitFor();}
+  }finally{org.springframework.test.util.ReflectionTestUtils.setField(governanceChecks,"evidencePath","");org.springframework.test.util.ReflectionTestUtils.setField(datasetContext,"evidencePath","");}
  }
 }

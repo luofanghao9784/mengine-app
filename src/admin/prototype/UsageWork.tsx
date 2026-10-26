@@ -202,6 +202,11 @@ export function UsageWork({ tenant }: { tenant: string }) {
           <div className="fact line">
             <span>未接入、未上报的消耗不计为零。</span>
           </div>
+          {v && <div className="fact line">
+            <span>{v.coverage.legacyGovernanceJobs === undefined
+              ? '平台尚未提供历史治理计量覆盖统计。'
+              : `全历史另有 ${numbers(v.coverage.legacyGovernanceJobs)} 个治理任务的调用时间未核验；调用次数与 Token 未知，不计入所选月份或日期。`}</span>
+          </div>}
           {v && (
             <div className="fact line">
               <span>读取于</span>

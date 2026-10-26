@@ -109,6 +109,16 @@ class TableCalculationIntegrationTest {
         String forged=json.writeValueAsString(request(source)).replace("}",",\"path\":\"/etc/private\"}");var r=http.send(HttpRequest.newBuilder(uri).header("Authorization","Bearer "+j.token()).header("Content-Type","application/json").POST(HttpRequest.BodyPublishers.ofString(forged)).build(),HttpResponse.BodyHandlers.ofString());assertEquals(400,r.statusCode());
     }
     BriefingContentService.Request cardRequest(UUID id){return new BriefingContentService.Request(id,"两期收款变化与门店表现","本期甲店收款增加，已按相同范围计算并核对排名。",List.of("甲店本期收款为零点六元，比前期零点三元增长百分之一百。","数据仅支持观察已发生的收款变化，具体经营原因仍需进一步核实。"));}
+    static final String FACT_TITLE="金额本期合计 1.10 原表数值单位";
+    void assertCalculatedFacts(BriefingContentService.Content content,UUID calculation) {
+        assertEquals(FACT_TITLE,content.title());
+        assertEquals("0.70",content.chart().totals().baseline());assertEquals("1.10",content.chart().totals().current());assertEquals("0.40",content.chart().totals().difference());
+        assertTrue(content.summary().contains("0.70 原表数值单位"));assertTrue(content.summary().contains("1.10 原表数值单位"));
+        assertTrue(String.join("\n",content.analysis()).contains("未核验的银行到账"));
+        String persisted=json.writeValueAsString(content);var proposed=cardRequest(calculation);
+        assertFalse(persisted.contains(proposed.title()),"The model's topic title must not be persisted as calculated fact");
+        assertFalse(persisted.contains(proposed.summary()));assertFalse(persisted.contains(proposed.analysis().getFirst()));
+    }
     UUID computed(ConversationService.Job j,UUID source){var result=agents.compareTable(j.id(),j.token(),request(source));agents.toolReceipt(j.id(),j.token(),new AgentTaskService.ToolReceipt(2,"compare_table","succeeded"));agents.toolReceipt(j.id(),j.token(),new AgentTaskService.ToolReceipt(3,"deliver_briefing","STARTED"));return UUID.fromString(json.valueToTree(result).path("artifact").path("id").asText());}
     void finishCard(ConversationService.Job j,UUID source){agents.toolReceipt(j.id(),j.token(),new AgentTaskService.ToolReceipt(3,"deliver_briefing","succeeded"));agents.finish(j,new AgentResult("1.5","0.13.0",j.id(),j.token(),"AGENT","live","synthetic-recipe","画报已生成。",List.of(source),List.of(new AgentResult.Tool("s","search_sources","succeeded"),new AgentResult.Tool("c","compare_table","succeeded"),new AgentResult.Tool("b","deliver_briefing","succeeded")),List.of(),4,null,List.of(),List.of(),List.of(),"COMPLETE",null));}
     @Test void generatedCardIsIndependentFromReplyWithExactChartAndPrivateVersionedRead(){
@@ -116,8 +126,8 @@ class TableCalculationIntegrationTest {
         var made=agents.deliverBriefing(j.id(),j.token(),request);assertEquals("PREPARED",made.get("status"));assertEquals(made,agents.deliverBriefing(j.id(),j.token(),request));assertEquals(2,artifacts(j));
         assertTrue(recommendations.list(owner,tenant,null,0,20,null,true).items().isEmpty());denied(409,()->agents.briefing(owner,tenant,j.conversation(),j.id(),1,1));
         finishCard(j,source);var task=conversations.taskDetail(owner,tenant,j.conversation(),j.id()).tasks().getFirst();var doc=agents.briefing(owner,tenant,j.conversation(),j.id(),task.revision(),1);
-        assertEquals(request.title(),doc.content().title());assertEquals("0.60",doc.content().chart().rows().getFirst().current());assertEquals(2,doc.content().chart().rows().getFirst().baselineRank());assertEquals(1,doc.content().chart().rows().getFirst().currentRank());assertEquals(calculation,doc.content().calculationArtifactId());
-        var page=recommendations.list(owner,tenant,null,0,20,null,true);assertEquals(1,page.items().size());assertEquals(request.title(),page.items().getFirst().content().title());assertEquals(doc,page.items().getFirst().briefing());assertNotEquals(task.reply(),page.items().getFirst().content().excerpt());
+        assertCalculatedFacts(doc.content(),calculation);assertEquals("0.60",doc.content().chart().rows().getFirst().current());assertEquals(2,doc.content().chart().rows().getFirst().baselineRank());assertEquals(1,doc.content().chart().rows().getFirst().currentRank());assertEquals(calculation,doc.content().calculationArtifactId());
+        var page=recommendations.list(owner,tenant,null,0,20,null,true);assertEquals(1,page.items().size());assertEquals(FACT_TITLE,page.items().getFirst().content().title());assertEquals(doc,page.items().getFirst().briefing());assertNotEquals(task.reply(),page.items().getFirst().content().excerpt());
         assertEquals(doc,briefingPage.list(owner,tenant,null,"LATEST",null,"Asia/Shanghai",0,20,true).items().getFirst().briefing());
         denied(404,()->agents.briefing(reader,tenant,j.conversation(),j.id(),task.revision(),1));denied(409,()->agents.briefing(owner,tenant,j.conversation(),j.id(),task.revision()+1,1));
         db.update("DELETE FROM workspace_members WHERE workspace_id=? AND account_id=?",space,owner);assertTrue(recommendations.list(owner,tenant,null,0,20,null,true).items().isEmpty());denied(404,()->agents.briefing(owner,tenant,j.conversation(),j.id(),task.revision(),1));
@@ -142,8 +152,9 @@ class TableCalculationIntegrationTest {
     @Test void cardDiscussionIsPreparedOnceAndUsesCardWithoutGenerationHistory(){
         upload(space,null,null,"0.60",false);var j=start(space);UUID source=grant(j),calc=computed(j,source);agents.deliverBriefing(j.id(),j.token(),cardRequest(calc));finishCard(j,source);
         var original=conversations.taskDetail(owner,tenant,j.conversation(),j.id()).tasks().getFirst();
+        var persisted=agents.briefing(owner,tenant,j.conversation(),j.id(),original.revision(),original.attempt());assertCalculatedFacts(persisted.content(),calc);
         var discussion=agents.discussion(owner,tenant,j.conversation(),j.id(),original.revision(),original.attempt());
-        assertNull(discussion.conversationId());assertEquals(cardRequest(calc).title(),discussion.title());assertEquals(j.id(),discussion.briefingContext().taskId());
+        assertNull(discussion.conversationId());assertEquals(FACT_TITLE,discussion.title());assertEquals(j.id(),discussion.briefingContext().taskId());
         assertNull(agents.discussion(owner,tenant,j.conversation(),j.id(),original.revision(),original.attempt()).conversationId());
         denied(404,()->agents.discussion(reader,tenant,j.conversation(),j.id(),original.revision(),original.attempt()));
         denied(409,()->agents.discussion(owner,tenant,j.conversation(),j.id(),original.revision()+1,original.attempt()));
@@ -151,7 +162,8 @@ class TableCalculationIntegrationTest {
         assertEquals(sent.conversation().id(),agents.discussion(owner,tenant,j.conversation(),j.id(),original.revision(),original.attempt()).conversationId());
         var request=new com.dreamcore.workspace.context.TaskContextService.Request("bootstrap",null,null,null,null,null,null,null,null,null,null);
         var result=json.valueToTree(context.context(next.id(),next.token(),request)).path("result").path("latestBriefing");
-        assertEquals(cardRequest(calc).title(),result.path("title").asText());assertEquals("0.60",result.path("chart").path("rows").get(0).path("current").asText());
+        assertEquals(FACT_TITLE,result.path("title").asText());assertEquals("0.60",result.path("chart").path("rows").get(0).path("current").asText());
+        assertEquals(persisted.content().summary(),result.path("summary").asText());assertEquals(json.valueToTree(persisted.content().analysis()),result.path("analysis"));
         var history=new com.dreamcore.workspace.context.TaskContextService.Request("history",null,"",0,null,null,null,null,null,null,null);
         assertEquals(0,json.valueToTree(context.context(next.id(),next.token(),history)).path("result").path("items").size());
         assertEquals(1,conversations.detail(owner,tenant,j.conversation(),0,20).tasks().size());
@@ -162,10 +174,13 @@ class TableCalculationIntegrationTest {
 
     @Test void continuationReceivesActualGeneratedContentAndTracksSourceRevocation(){
         upload(space,null,null,"0.60",false);var j=start(space);UUID source=grant(j),calc=computed(j,source);agents.deliverBriefing(j.id(),j.token(),cardRequest(calc));finishCard(j,source);
+        var original=conversations.taskDetail(owner,tenant,j.conversation(),j.id()).tasks().getFirst();
+        var persisted=agents.briefing(owner,tenant,j.conversation(),j.id(),original.revision(),original.attempt());assertCalculatedFacts(persisted.content(),calc);
         conversations.submit(owner,tenant,j.conversation(),space,UUID.randomUUID(),"继续解释画报变化","AGENT");var next=conversations.claim();
         var request=new com.dreamcore.workspace.context.TaskContextService.Request("bootstrap",null,null,null,null,null,null,null,null,null,null);
         var result=json.valueToTree(context.context(next.id(),next.token(),request)).path("result").path("latestBriefing");
-        assertEquals(cardRequest(calc).title(),result.path("title").asText());assertEquals("0.60",result.path("chart").path("rows").get(0).path("current").asText());
+        assertEquals(FACT_TITLE,result.path("title").asText());assertEquals("0.60",result.path("chart").path("rows").get(0).path("current").asText());
+        assertEquals(persisted.content().summary(),result.path("summary").asText());assertEquals(json.valueToTree(persisted.content().analysis()),result.path("analysis"));
         assertEquals(1,db.queryForObject("SELECT count(*) FROM task_context_materials WHERE task_id=?",Integer.class,next.id()));
         assertEquals(1,recommendations.list(owner,tenant,null,0,20,null,true).items().size());
         db.update("DELETE FROM workspace_members WHERE workspace_id=? AND account_id=?",space,owner);

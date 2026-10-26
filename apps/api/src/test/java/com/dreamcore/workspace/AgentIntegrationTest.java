@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={"dreamcore.tasks.enabled=true","dreamcore.tasks.agent-mode=verification","dreamcore.tasks.public-web-enabled=true","dreamcore.tasks.candidate-trials-enabled=true","dreamcore.tasks.initial-delay-ms=3600000","dreamcore.knowledge.enabled=true","dreamcore.knowledge.initial-delay-ms=3600000"})
 class AgentIntegrationTest {
-    @DynamicPropertySource static void paths(DynamicPropertyRegistry r){Path root=Path.of("").toAbsolutePath();if(root.endsWith("api"))root=root.getParent().getParent();String parser=root.resolve("workers/parser").toString();r.add("dreamcore.knowledge.parser-root",()->parser);}
+    @DynamicPropertySource static void paths(DynamicPropertyRegistry r){IsolatedTestDatabase.register(r);Path root=Path.of("").toAbsolutePath();if(root.endsWith("api"))root=root.getParent().getParent();String parser=root.resolve("workers/parser").toString();r.add("dreamcore.knowledge.parser-root",()->parser);}
     @Autowired AgentTaskService agents;@Autowired JdbcTemplate db;@Autowired ConversationService conversations;@Autowired KnowledgeService knowledge;@Autowired MaterialService materials;@Autowired DocumentParser parser;@Autowired PasswordEncoder passwords;
     @LocalServerPort int port;
     UUID tenant,other,owner,reader,admin,space,personal;

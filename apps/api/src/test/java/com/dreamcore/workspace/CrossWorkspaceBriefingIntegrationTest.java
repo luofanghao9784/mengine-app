@@ -14,6 +14,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={"dreamcore.tasks.enabled=true","dreamcore.tasks.agent-mode=verification","dreamcore.tasks.initial-delay-ms=3600000","dreamcore.collection.enabled=false","dreamcore.knowledge.enabled=true","dreamcore.knowledge.initial-delay-ms=3600000","dreamcore.briefing.merge-seconds=0"})
 class CrossWorkspaceBriefingIntegrationTest extends TaskDatasetFixture {
+ @org.springframework.test.context.DynamicPropertySource
+ static void isolateQueue(org.springframework.test.context.DynamicPropertyRegistry registry){IsolatedTestDatabase.register(registry);}
+ @BeforeEach void configureWork(){db.update("INSERT INTO work_role_profiles(tenant_id,account_id,responsibilities,revision,changed_by) VALUES (?,?,'核对获权业务资料与服务规范',1,?)",tenant,owner,owner);}
  @Autowired BriefingGenerationService generation;
  @Autowired MaterialService materials;
  @Autowired KnowledgeService knowledge;

@@ -52,6 +52,11 @@ class OperationsIntegrationTest {
     }
     UUID task(String status){return row(tenant,space,status,"SOURCE_LOOKUP",null,null,status.equals("QUEUED")?0:1,0,null);}
     void denied(int status,Runnable work){assertEquals(status,assertThrows(IdentityException.class,work::run).status);}
+    void platformUnauthenticated(HttpClient http,String path) throws Exception {
+        var response=http.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+path)).GET().build(),HttpResponse.BodyHandlers.ofString());
+        assertEquals(401,response.statusCode());assertEquals("AUTHENTICATION_REQUIRED",new JsonMapper().readTree(response.body()).path("code").asText());
+        assertTrue(response.headers().firstValue("Cache-Control").orElseThrow().contains("no-store"));assertFalse(response.body().contains(SECRET));
+    }
     EngineTelemetryService.Channel channel(EngineTelemetryService.Snapshot s,String code){return s.channels().stream().filter(c->c.code().equals(code)).findFirst().orElseThrow();}
     @Test void telemetryCountsCurrentJobsBeyondTheWindowAndMovesStreamingWithoutDuplication(){
         UUID task=row(tenant,space,"RUNNING","AGENT","live",null,1,40,null);
@@ -94,7 +99,10 @@ class OperationsIntegrationTest {
         UUID old=task("SUCCEEDED");db.update("UPDATE conversation_tasks SET finished_at=now()-interval '6 minutes' WHERE id=?",old);
         UUID future=task("SUCCEEDED");db.update("UPDATE conversation_tasks SET finished_at=now()+interval '1 hour' WHERE id=?",future);
         var s=telemetry.read(admin,tenant,false);var input=channel(s,"RETRIEVAL");assertEquals(1,input.queued());assertEquals(2,input.waiting());assertEquals(1,input.unknown());assertEquals(1,input.failed());assertEquals(1,input.completedRecent());assertTrue(input.lastCompletedAt().isBefore(s.checkedAt()));
-        assertEquals(9,s.channels().size());assertEquals(10,telemetry.read(operator,null,true).channels().size());
+        var tenantCodes=Set.of("COLLECTION","KNOWLEDGE","RETRIEVAL","TASK","COMPANY","SCENE_KNOWLEDGE","EXPERIENCE","GENERALIZATION","RESPONSE","EXPORT");
+        assertEquals(tenantCodes,s.channels().stream().map(EngineTelemetryService.Channel::code).collect(java.util.stream.Collectors.toSet()));
+        var platformCodes=new HashSet<>(tenantCodes);platformCodes.add("GENERAL_ADJUSTMENT");
+        assertEquals(platformCodes,telemetry.read(operator,null,true).channels().stream().map(EngineTelemetryService.Channel::code).collect(java.util.stream.Collectors.toSet()));
         denied(403,()->telemetry.read(member,tenant,false));denied(403,()->telemetry.read(admin,other,false));denied(403,()->telemetry.read(admin,null,true));
         db.update("UPDATE tenant_memberships SET role='MEMBER' WHERE tenant_id=? AND account_id=?",tenant,admin);denied(403,()->telemetry.read(admin,tenant,false));
     }
@@ -196,23 +204,29 @@ class OperationsIntegrationTest {
         var r=http.send(HttpRequest.newBuilder(URI.create(base+path)).GET().build(),HttpResponse.BodyHandlers.ofString());assertEquals(200,r.statusCode());assertEquals("private, no-store",r.headers().firstValue("Cache-Control").orElseThrow());
         for(String secret:List.of(SECRET,member.toString(),space.toString(),"prompt","filename","conversationId","modelName","@example.test"))assertFalse(r.body().contains(secret));
         var monitor=http.send(HttpRequest.newBuilder(URI.create(base+"/api/tenant-admin/v1/tenants/"+tenant+"/engine-telemetry")).GET().build(),HttpResponse.BodyHandlers.ofString());assertEquals(200,monitor.statusCode());assertEquals("private, no-store",monitor.headers().firstValue("Cache-Control").orElseThrow());assertFalse(monitor.body().contains(SECRET));
-        assertEquals(403,http.send(HttpRequest.newBuilder(URI.create(base+"/api/platform-admin/v1/engine-telemetry")).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
-        assertEquals(403,http.send(HttpRequest.newBuilder(URI.create(base+"/api/platform-admin/v1/engine-telemetry/tenants")).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
+        platformUnauthenticated(http,"/api/platform-admin/v1/engine-telemetry");
+        platformUnauthenticated(http,"/api/platform-admin/v1/engine-telemetry/tenants");
         assertEquals(404,http.send(HttpRequest.newBuilder(URI.create(base+"/api/tenant-admin/v1/tenants/"+tenant+"/engine-telemetry/tenants")).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
         db.update("INSERT INTO platform_accounts(account_id,login_name,password_hash) VALUES (?,?,?)",operator,operator+"@example.test",passwords.encode(PASSWORD));
         var platformCsrf=json.readTree(http.send(HttpRequest.newBuilder(URI.create(base+"/api/platform-admin/v1/auth/csrf")).GET().build(),HttpResponse.BodyHandlers.ofString()).body());
-        var platformLogin=HttpRequest.newBuilder(URI.create(base+"/api/platform-admin/v1/auth/login")).header(platformCsrf.get("headerName").asString(),platformCsrf.get("token").asString()).header("Content-Type","application/json").POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(Map.of("username",operator+"@example.test","password",PASSWORD)))).build();
-        assertEquals(200,http.send(platformLogin,HttpResponse.BodyHandlers.ofString()).statusCode());
+        var platformLogin=HttpRequest.newBuilder(URI.create(base+"/api/platform-admin/v1/auth/login")).header("Content-Type","application/json").POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(Map.of("username",operator+"@example.test","password",PASSWORD))));
+        assertEquals(403,http.send(platformLogin.build(),HttpResponse.BodyHandlers.ofString()).statusCode());
+        platformLogin.header(platformCsrf.get("headerName").asString(),platformCsrf.get("token").asString());
+        assertEquals(200,http.send(platformLogin.build(),HttpResponse.BodyHandlers.ofString()).statusCode());
+        // Signing into the platform realm must preserve the same browser's customer session.
+        assertEquals(admin.toString(),json.readTree(http.send(HttpRequest.newBuilder(URI.create(base+"/api/v1/me")).GET().build(),HttpResponse.BodyHandlers.ofString()).body()).path("account").path("id").asText());
         var platformMonitor=http.send(HttpRequest.newBuilder(URI.create(base+"/api/platform-admin/v1/engine-telemetry")).GET().build(),HttpResponse.BodyHandlers.ofString());assertEquals(200,platformMonitor.statusCode());assertEquals("private, no-store",platformMonitor.headers().firstValue("Cache-Control").orElseThrow());assertFalse(platformMonitor.body().contains(SECRET));
         var distribution=http.send(HttpRequest.newBuilder(URI.create(base+"/api/platform-admin/v1/engine-telemetry/tenants")).GET().build(),HttpResponse.BodyHandlers.ofString());assertEquals(200,distribution.statusCode());assertEquals("private, no-store",distribution.headers().firstValue("Cache-Control").orElseThrow());
         assertEquals(Set.of("checkedAt","tenants","otherTenants","otherRunning"),new HashSet<>(json.readTree(distribution.body()).propertyNames()));
         for(String secret:List.of(member.toString(),space.toString(),"prompt","filename","@example.test"))assertFalse(distribution.body().contains(secret));
         db.update("DELETE FROM platform_roles WHERE account_id=?",operator);
-        assertEquals(403,http.send(HttpRequest.newBuilder(URI.create(base+"/api/platform-admin/v1/engine-telemetry")).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
-        assertEquals(403,http.send(HttpRequest.newBuilder(URI.create(base+"/api/platform-admin/v1/engine-telemetry/tenants")).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
-        var customerCsrf=json.readTree(http.send(HttpRequest.newBuilder(URI.create(base+"/api/v1/auth/csrf")).GET().build(),HttpResponse.BodyHandlers.ofString()).body());
-        assertEquals(200,http.send(HttpRequest.newBuilder(URI.create(base+"/api/v1/auth/login")).header(customerCsrf.get("headerName").asString(),customerCsrf.get("token").asString()).header("Content-Type","application/json").POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(Map.of("email",admin+"@example.test","password",PASSWORD)))).build(),HttpResponse.BodyHandlers.ofString()).statusCode());
+        platformUnauthenticated(http,"/api/platform-admin/v1/engine-telemetry");
+        platformUnauthenticated(http,"/api/platform-admin/v1/engine-telemetry/tenants");
+        db.update("INSERT INTO platform_roles(account_id,role) VALUES (?,'PLATFORM_ADMIN')",operator);
+        platformUnauthenticated(http,"/api/platform-admin/v1/engine-telemetry");
+        assertEquals(200,http.send(HttpRequest.newBuilder(URI.create(base+path)).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
+        assertEquals(admin.toString(),json.readTree(http.send(HttpRequest.newBuilder(URI.create(base+"/api/v1/me")).GET().build(),HttpResponse.BodyHandlers.ofString()).body()).path("account").path("id").asText());
         assertEquals(400,http.send(HttpRequest.newBuilder(URI.create(base+path+"?days=8")).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
-        assertEquals(403,http.send(HttpRequest.newBuilder(URI.create(base+"/api/platform-admin/v1/operations")).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
+        platformUnauthenticated(http,"/api/platform-admin/v1/operations");
     }
 }

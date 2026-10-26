@@ -11,9 +11,11 @@ import org.springframework.test.context.TestPropertySource;
 import static org.junit.jupiter.api.Assertions.*;
 @TestPropertySource(properties={"dreamcore.knowledge.enabled=true","dreamcore.briefing.daily-enabled=true","dreamcore.briefing.automatic-enabled=false","dreamcore.briefing.merge-seconds=0","dreamcore.briefing.initial-delay-ms=3600000"})
 class BriefingDailyIntegrationTest extends DatasetCalculationFixture {
+ @org.springframework.test.context.DynamicPropertySource
+ static void isolateDailyQueue(org.springframework.test.context.DynamicPropertyRegistry registry){IsolatedTestDatabase.register(registry);}
  @Autowired BriefingGenerationService generation;
  @Autowired BriefingFlowGuard guard;
- @BeforeEach void owner(){db.update("INSERT INTO tenant_governance(tenant_id,owner_id) VALUES (?,?) ON CONFLICT(tenant_id) DO UPDATE SET owner_id=excluded.owner_id",tenant,owner);}
+ @BeforeEach void owner(){db.update("INSERT INTO tenant_governance(tenant_id,owner_id) VALUES (?,?) ON CONFLICT(tenant_id) DO UPDATE SET owner_id=excluded.owner_id",tenant,owner);db.update("INSERT INTO work_role_profiles(tenant_id,account_id,responsibilities,revision,changed_by) VALUES (?,?,'核对每日收款与凭证',1,?)",tenant,owner,owner);}
  @Override UUID version(int n,List<?> rows){UUID id=UUID.randomUUID(),run=UUID.randomUUID();db.update("INSERT INTO collection_runs(id,tenant_id,connection_id,execution_epoch,trigger_kind,status) VALUES (?,?,?,1,'SCHEDULED','SUCCEEDED')",run,tenant,connection);db.update("INSERT INTO dataset_snapshots(id,tenant_id,connection_id,dataset_id,run_id,version,data_rows,row_count,collected_at,coverage_through) VALUES (?,?,?,?,?,?,?::jsonb,?,now(),now())",id,tenant,connection,dataset,run,n,json.writeValueAsString(rows),rows.size());db.update("UPDATE business_datasets SET current_snapshot=? WHERE id=?",id,dataset);return id;}
  UUID schedule(){generation.configureDaily(owner,tenant,space,0,true,null);UUID p=generation.state(owner,tenant).policies().getFirst().id();db.update("UPDATE briefing_daily_schedules SET next_due=now()-interval '1 second' WHERE policy_id=?",p);return p;}
  @Test void timerIsDurableOncePerLocalDayAndNextNine(){UUID p=schedule();generation.dispatchDaily(p);generation.dispatchDaily(p);assertEquals(1,db.queryForObject("SELECT count(*) FROM briefing_daily_runs WHERE policy_id=?",Integer.class,p));var daily=generation.daily(owner,tenant,space);assertEquals(LocalTime.of(9,0),daily.nextDue().atZone(ZoneId.of("Asia/Shanghai")).toLocalTime());assertTrue(daily.nextDue().isAfter(Instant.now()));generation.tick(p);var b=generation.state(owner,tenant).batches().getFirst();assertEquals("SCHEDULE",b.trigger());assertEquals("RUNNING",b.status());assertTrue(generation.candidates().contains(p));assertEquals(1,db.queryForObject("SELECT count(*) FROM briefing_flow_tasks WHERE task_id=?",Integer.class,b.taskId()));}
@@ -98,13 +100,14 @@ class BriefingDailyIntegrationTest extends DatasetCalculationFixture {
 
  @Test void summaryCalculationDeliversSingleSeriesCardAndRetainsEvidence(){
   UUID p=schedule();generation.dispatchDaily(p);generation.tick(p);var j=conversations.claim();
-  agents.openExecution(j.id(),j.token(),new AgentTaskService.ExecutionOpen("1.5",List.of("task_context","compare_dataset","deliver_briefing")));
+  agents.openExecution(j.id(),j.token(),new AgentTaskService.ExecutionOpen("1.5",List.of("task_context","compare_dataset","select_briefing_topic","deliver_briefing")));
+  BriefingP0TestPlanning.select(agents,j,"DATA",true);
   agents.toolReceipt(j.id(),j.token(),new AgentTaskService.ToolReceipt(1,"task_context","STARTED"));call(j,request("dataset_search",null,null,0));agents.toolReceipt(j.id(),j.token(),new AgentTaskService.ToolReceipt(1,"task_context","succeeded"));
   agents.toolReceipt(j.id(),j.token(),new AgentTaskService.ToolReceipt(2,"compare_dataset","STARTED"));
   var result=json.valueToTree(agents.compareDataset(j.id(),j.token(),new DatasetCalculationService.Request(dataset,snapshot,null,null,null,null,null,null,null,"COUNT","SUMMARY",List.of("门店"),null,null,null,null)));
   agents.toolReceipt(j.id(),j.token(),new AgentTaskService.ToolReceipt(2,"compare_dataset","succeeded"));
   agents.toolReceipt(j.id(),j.token(),new AgentTaskService.ToolReceipt(3,"deliver_briefing","STARTED"));
-  agents.deliverBriefing(j.id(),j.token(),new BriefingContentService.Request(UUID.fromString(result.at("/artifact/id").asString()),"甲店当前记录数量高于乙店","本次完整快照共有六条记录，其中甲店四条，乙店两条。",List.of("这一结果统计记录条数，不代表去重会员数量或实际收入。","后续可结合记录状态核实差异原因，当前数据不能证明经营效率存在差异。"),"DATA"));
+  agents.deliverBriefing(j.id(),j.token(),new BriefingContentService.Request(UUID.fromString(result.at("/artifact/id").asString()),"甲店当前记录数量高于乙店","本次完整快照共有六条记录，其中甲店四条，乙店两条。",List.of("这一结果统计记录条数，不代表去重会员数量或实际收入。","后续可结合记录状态核实差异原因，当前数据不能证明经营效率存在差异。"),"DATA",new BriefingPresentationPolicy.Presentation("briefing-presentation-v1","EDITORIAL","CURRENT_BAR",null,null,List.of())));
   agents.toolReceipt(j.id(),j.token(),new AgentTaskService.ToolReceipt(3,"deliver_briefing","succeeded"));
   agents.finish(j,new AgentResult("1.5","0.16.0",j.id(),j.token(),"AGENT","verification","synthetic-summary","画报已经交付。",List.of(),List.of(new AgentResult.Tool("s","task_context","succeeded"),new AgentResult.Tool("c","compare_dataset","succeeded"),new AgentResult.Tool("d","deliver_briefing","succeeded")),List.of(),3,null,List.of(),List.of(),List.of(),"COMPLETE",null));
   generation.tick(p);assertEquals("SUCCEEDED",generation.state(owner,tenant).batches().getFirst().status());

@@ -19,11 +19,13 @@ class BriefingFaceAlignmentIntegrationTest extends DatasetCalculationFixture {
   assertEquals("COMPOSITION",content.at("/datasetBasis/periodMode").asString());assertEquals("CURRENT_BAR",content.at("/presentation/chartStyle").asString());assertEquals("66.666667",content.at("/chart/composition/rows/0/sharePercent").asString());
   db.update("DELETE FROM workspace_members WHERE workspace_id=? AND account_id=?",space,owner);denied(()->agents.deliverBriefing(j.id(),j.token(),card(id,null)));
  }
- @Test void zeroCalculationReturnsNoNewContentWithoutArtifactOrDedupReservation(){
+ @Test void zeroCalculationWithMatchedRowsPublishesMeasuredZeroOnce(){
   rows(List.of(List.of("甲","前期","0"),List.of("甲","本期","0")));var j=start();var result=json.valueToTree(agents.compareDataset(j.id(),j.token(),parameters("COMPOSITION")));
   assertTrue(result.at("/calculation/rows/0/sharePercent").isMissingNode());receipt(j,2,"compare_dataset","succeeded");receipt(j,3,"deliver_briefing","STARTED");var r=card(UUID.fromString(result.at("/artifact/id").asString()),null);
-  for(int n=0;n<2;n++){var skip=agents.deliverBriefing(j.id(),j.token(),r);assertEquals("NO_NEW_CONTENT",skip.get("status"));assertEquals("NO_USEFUL_CONTENT",skip.get("reason"));}
-  assertEquals(1,db.queryForObject("SELECT count(*) FROM conversation_artifacts WHERE task_id=?",Integer.class,j.id()));assertEquals(0,db.queryForObject("SELECT count(*) FROM briefing_content_keys WHERE task_id=?",Integer.class,j.id()));
+  var first=agents.deliverBriefing(j.id(),j.token(),r);assertEquals("PREPARED",first.get("status"));assertEquals(first,agents.deliverBriefing(j.id(),j.token(),r));
+  var content=json.readTree(db.queryForObject("SELECT content FROM conversation_artifacts WHERE id=?",byte[].class,first.get("artifactId")));
+  assertEquals(2,content.at("/datasetBasis/matchedRows").asInt());assertEquals(0,new java.math.BigDecimal(content.at("/chart/totals/current").asString()).signum());
+  assertEquals(2,db.queryForObject("SELECT count(*) FROM conversation_artifacts WHERE task_id=?",Integer.class,j.id()));assertEquals(1,db.queryForObject("SELECT count(*) FROM briefing_content_keys WHERE task_id=?",Integer.class,j.id()));
  }
  @Test void negativeCompositionFailsButOffsettingSummaryIsStillUseful(){
   rows(List.of(List.of("甲","本期","2"),List.of("乙","本期","-2")));var j=start();assertEquals("DATASET_COMPOSITION_NEGATIVE",assertThrows(IdentityException.class,()->agents.compareDataset(j.id(),j.token(),parameters("COMPOSITION"))).code);
@@ -41,15 +43,16 @@ class BriefingFaceAlignmentIntegrationTest extends DatasetCalculationFixture {
  @Test void missingValuesDoNotInventZerosAndSingleNonzeroGroupSurvives(){
   assertFalse(BriefingContentService.hasUsefulData(List.of(new BriefingContentService.Row("甲",null,null,null,null,null,null,"MISSING_PERIOD"))));assertTrue(BriefingContentService.hasUsefulData(List.of(new BriefingContentService.Row("甲",null,"-1",null,null,null,null,"MISSING_PERIOD"))));
  }
- @Test void actualHttpHarnessDeliversCompositionAndSkipsAllZeroComparison() throws Exception {
+ @Test void actualHttpHarnessDeliversCompositionAndMeasuredZeroComparison() throws Exception {
   for(String mode:List.of("composition","zero")){
    rows(List.of(List.of("甲","前期",mode.equals("zero")?"0":"2"),List.of("甲","本期",mode.equals("zero")?"0":"1"),List.of("乙","本期",mode.equals("zero")?"0":"1")));
    var root=java.nio.file.Path.of("").toAbsolutePath();if(root.endsWith("api"))root=root.getParent().getParent();String token="synthetic-face-alignment-012345678901234567890";
    var engine=new ProcessBuilder("node",root.resolve("engine/tests/fixtures/dataset-briefing-server.mjs").toString(),"http://127.0.0.1:"+port,token,mode).redirectError(ProcessBuilder.Redirect.INHERIT).start();
    try(var pool=java.util.concurrent.Executors.newSingleThreadExecutor();var lines=new java.io.BufferedReader(new java.io.InputStreamReader(engine.getInputStream()))){
     String endpoint=pool.submit(lines::readLine).get(5,java.util.concurrent.TimeUnit.SECONDS);var j=task(null,"AUTHORIZED_LIBRARY");var runtime=new EngineTaskRuntime(endpoint,token,"verification",false);var result=runtime.executeAgent(j.id(),j.token(),j.prompt(),()->agents.active(j));assertEquals("COMPLETE",result.outcome());assertTrue(result.tools().stream().allMatch(t->t.status().equals("succeeded")));agents.finish(j,result);
-    int n=db.queryForObject("SELECT count(*) FROM conversation_artifacts WHERE task_id=? AND filename LIKE 'briefing-%'",Integer.class,j.id());assertEquals(mode.equals("zero")?0:1,n);
+    int n=db.queryForObject("SELECT count(*) FROM conversation_artifacts WHERE task_id=? AND filename LIKE 'briefing-%'",Integer.class,j.id());assertEquals(1,n);
     if(mode.equals("composition")){var t=conversations.taskDetail(owner,tenant,j.conversation(),j.id()).tasks().getFirst();var doc=agents.briefing(owner,tenant,j.conversation(),j.id(),t.revision(),1);assertEquals("CURRENT_BAR",doc.content().presentation().chartStyle());assertEquals("75.000000",doc.content().chart().composition().rows().getFirst().sharePercent());}
+    else {var t=conversations.taskDetail(owner,tenant,j.conversation(),j.id()).tasks().getFirst();var doc=agents.briefing(owner,tenant,j.conversation(),j.id(),t.revision(),1);assertEquals(3,doc.content().datasetBasis().matchedRows());assertEquals(0,new java.math.BigDecimal(doc.content().chart().totals().current()).signum());}
    }finally{engine.destroyForcibly();engine.waitFor();}
   }
  }

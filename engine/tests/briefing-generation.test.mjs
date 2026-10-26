@@ -8,9 +8,10 @@ import { hasPreparedBriefing, hasTerminalBriefing } from '../dist/runtime/briefi
 import { listen, close, body, json } from './fixtures/agent.mjs';
 import { usageFixture } from './fixtures/usage.mjs';
 
-async function generationFixture(t, { generation = true, missing = false, revoke = false, ignore = false, data = false, calculationLoop = false, ignoreCalculation = false, malformedDelivery = false, noUsefulContent = false, supplement = false, revokeSupplement = false } = {}) {
+async function generationFixture(t, { generation = true, missing = false, revoke = false, ignore = false, data = false, calculationLoop = false, ignoreCalculation = false, malformedDelivery = false, noUsefulContent = false, supplement = false, revokeSupplement = false, contextFailure = null, contextRecovery = true } = {}) {
   const queries = [], receipts = [], deliveries = [];
   const sourceId = randomUUID(), artifactId = randomUUID(), calculationId = randomUUID();
+  let contextReads = 0;
   let calls = 0, calculations = 0, attemptedDelivery = false, supplementalCalls = 0;
   const platform = createServer(async (req, res) => {
     if (usageFixture(req, res)) return;
@@ -19,14 +20,23 @@ async function generationFixture(t, { generation = true, missing = false, revoke
       return json(res, {
         allowed: !(revoke && queries.length === 3) && !(revokeSupplement && supplementalCalls > 2), executionClass: 'live',
         ...(supplement ? {briefingEvidenceSupplementVersion:'1.0'} : {}),
+        ...(contextRecovery ? {contextRejectionVersion:'1.0'} : {}),
         contextVersion: '1.0', briefingContentVersion: '1.0', briefingGeneration: generation,
         ...(data ? { tableComparisonVersion: '1.0' } : {}),
       });
-    if (req.url.endsWith('/context'))
+    if (req.url.endsWith('/context')) {
+      if (input.action === 'profiles') {
+        contextReads++;
+        if (contextReads === 1 && contextFailure === 'remote')
+          return json(res, { code: 'INVALID_CONTEXT_REQUEST' }, 400);
+        if (contextReads === 1 && contextFailure === 'response')
+          return json(res, { contractVersion: '1.0', action: 'profiles', referenceOnly: false, result: {} });
+      }
       return json(res, {
         contractVersion: '1.0', action: input.action, referenceOnly: true,
         result: input.action==='profiles'?{items:[],hasMore:false}:{ sourceScope: 'SELECTED', selectedMaterials: [{ filename: 'selected.txt', version: 1 }] },
       });
+    }
     if (req.url.endsWith('/execution/open'))
       return json(res, { accepted: true, policy: 'READ_ONLY_PRIVATE_V1' });
     if (req.url.endsWith('/execution/tool')) {
@@ -76,6 +86,19 @@ async function generationFixture(t, { generation = true, missing = false, revoke
         assert.match(request.tools.find(tool => tool.name === 'deliver_briefing').description, /不因移除系统过程而隐瞒证据不足/);
         assert.match(request.tools.find(tool => tool.name === 'deliver_briefing').description, /同一事实不要拆成多张卡/);
       }
+      if (contextFailure && calls <= 2) {
+        const args = calls === 1 && contextFailure === 'schema' ? { action: 'invented_action' }
+          : calls === 1 && contextFailure === 'local' ? { action: 'profiles' }
+          : { action: 'profiles', scope: 'TENANT' };
+        yield { type: 'tool_call', id: `context-${calls}`, name: 'task_context', arguments: JSON.stringify(args) };
+        yield { type: 'finish', reason: 'tool_calls' };
+        return;
+      }
+      if (contextFailure && deliveries.length) {
+        yield { type: 'text', text: '已保留阶段结果，前面的读取失败仍未完成。' };
+        yield { type: 'finish', reason: 'stop' };
+        return;
+      }
       const searchAvailable = request.tools.some((tool) => tool.name === 'search_sources');
       if (supplement && calculations > 0 && supplementalCalls < 3) {
         assert.ok(!request.tools.some(tool => tool.name === 'compare_table'));
@@ -118,7 +141,7 @@ async function generationFixture(t, { generation = true, missing = false, revoke
   });
   const run = () => agent.run({ contractVersion: '1.5', taskId: randomUUID(), attemptId: randomUUID(),
     prompt: '系统智能画报生成：读取所选资料，生成一个有依据的新主题。' }, new AbortController().signal);
-  return { run, queries, receipts, deliveries, calls: () => calls, calculations: () => calculations };
+  return { run, queries, receipts, deliveries, calls: () => calls, calculations: () => calculations, contextReads: () => contextReads };
 }
 
 test('system generation ends a repeated-search loop and delivers within the existing eight-call budget', async (t) => {
@@ -170,6 +193,33 @@ test('native delivery recovers rejected arguments with matching failed and succe
     result.tools.map((r) => `${r.name}/${r.status}`));
 });
 
+for (const contextFailure of ['local', 'schema', 'remote', 'response']) {
+  test(`native context repair requires trusted pre-dispatch proof: ${contextFailure}`, async (t) => {
+    t.mock.method(console, 'warn', () => {});
+    const f = await generationFixture(t, { data: true, contextFailure });
+    const result = await f.run();
+    const recoverable = ['local', 'schema'].includes(contextFailure);
+    assert.equal(f.contextReads(), recoverable ? 1 : 2, 'invalid local arguments never reach the context endpoint');
+    const rejected = f.receipts.filter(r => r.name === 'task_context' && r.status === 'failed');
+    assert.equal(rejected.length, 1);
+    assert.equal(rejected[0].rejection, recoverable ? 'CONTEXT_ARGUMENTS' : undefined);
+    assert.equal(result.tools[0].status, 'failed', 'repair must retain the failed audit event');
+    assert.equal(result.tools[1].name, 'task_context');
+    assert.equal(result.tools[1].status, 'succeeded');
+    assert.equal(result.outcome, recoverable ? 'COMPLETE' : 'PARTIAL');
+    assert.equal(f.deliveries.length, 1);
+  });
+}
+
+test('an old platform without context rejection negotiation keeps the repaired attempt partial', async (t) => {
+  t.mock.method(console, 'warn', () => {});
+  const f = await generationFixture(t, { data: true, contextFailure: 'local', contextRecovery: false });
+  const result = await f.run();
+  assert.equal(result.outcome, 'PARTIAL');
+  assert.ok(f.receipts.every(r => !Object.hasOwn(r, 'rejection')));
+  assert.equal(f.contextReads(), 1);
+});
+
 test('no useful content ends native generation without claiming a newly published card', async (t) => {
   const f = await generationFixture(t, { noUsefulContent: true });
   const result = await f.run();
@@ -186,6 +236,14 @@ test('terminal receipt cannot conceal failed retrieval, invalid proof, or ordina
   assert.equal(hasTerminalBriefing([{ name: 'deliver_briefing', status: 'failed' },
     { ...prepared, output: { status: 'PREPARED' } }]), false);
   assert.equal(hasPreparedBriefing([{ name: 'deliver_briefing', status: 'failed' }, prepared]), false);
+  const rejected = {name:'task_context',status:'failed',rejection:'CONTEXT_ARGUMENTS'};
+  const read = {name:'task_context',status:'succeeded'};
+  assert.equal(hasTerminalBriefing([rejected, read, prepared]), true);
+  assert.equal(hasTerminalBriefing([rejected, prepared]), false, 'a later context success is required');
+  assert.equal(hasTerminalBriefing([read, rejected, prepared]), false, 'an earlier read does not repair a later rejection');
+  assert.equal(hasTerminalBriefing([rejected, read, {name:'task_context',status:'failed'}, prepared]), false);
+  assert.equal(hasTerminalBriefing([{...rejected,name:'search_sources'}, read, prepared]), false);
+  assert.equal(hasPreparedBriefing([rejected, read, prepared]), false, 'ordinary tasks cannot use native recovery');
 });
 
 test('a stale fourth search reports closure and still permits grounded DATA delivery', async (t) => {

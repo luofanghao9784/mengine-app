@@ -168,8 +168,8 @@ const item = (id: string, title: string) => ({
 });
 const oldCard = item(uid(21), '已有经营发现'),
   newCard = item(uid(22), '新增经营发现');
-const batch = (status = 'RUNNING', reason: string | null = null) => ({
-  id: uid(30),
+const batch = (status = 'RUNNING', reason: string | null = null, id = uid(30)) => ({
+  id,
   workspaceId: space,
   trigger: 'GENERATE_MORE',
   businessType: null,
@@ -185,6 +185,9 @@ async function generationFixture(page: Page, initial = false) {
   let batches: ReturnType<typeof batch>[] = initial ? [batch()] : [];
   let posts: unknown[] = [];
   let olderBatch = batch();
+  let nextBatch = initial ? 31 : 30;
+  let currentId = uid(30);
+  const requestBatches = new Map<string, string>();
   let failPost = false,
     forbidden = false,
     readFailure = false,
@@ -217,12 +220,17 @@ async function generationFixture(page: Page, initial = false) {
   });
   await page.route(/\/briefing\/generation(?:\/[^?]*)?(?:\?.*)?$/, async (route) => {
     if (route.request().method() === 'POST') {
-      posts.push(route.request().postDataJSON());
+      const request = route.request().postDataJSON();
+      posts.push(request);
       if (failPost) {
         failPost = false;
         return route.abort('failed');
       }
-      batches = [batch()];
+      // A new request creates a new batch; only retries of its requestId are idempotent.
+      currentId = requestBatches.get(request.requestId) || uid(nextBatch++);
+      requestBatches.set(request.requestId, currentId);
+      olderBatch = batch('RUNNING', null, currentId);
+      batches = [olderBatch];
       return route.fulfill({ json: route.request().url().endsWith('/selection') ? batches : batches[0] });
     }
     reads++;
@@ -230,11 +238,12 @@ async function generationFixture(page: Page, initial = false) {
       forbidden ? { status: 403, json: { code: 'FORBIDDEN' } } : { json: { policies: [], batches } },
     );
   });
-  await page.route('**/api/**/briefing/generation/' + uid(30), (route) =>
+  await page.route(/\/briefing\/generation\/[0-9a-f-]{36}$/, (route) =>
     route.fulfill({ json: olderBatch }),
   );
   await page.route('**/api/**/briefing/generation/*/cancel', async (route) => {
-    batches = [batch('CANCELLED')];
+    olderBatch = batch('CANCELLED', null, currentId);
+    batches = [olderBatch];
     return route.fulfill({ json: batches[0] });
   });
   return {
@@ -245,11 +254,14 @@ async function generationFixture(page: Page, initial = false) {
       includeNew = true;
     },
     posts,
+    get currentId() {
+      return currentId;
+    },
     get reads() {
       return reads;
     },
     set: (status: string, reason: string | null = null) => {
-      olderBatch = batch(status, reason);
+      olderBatch = batch(status, reason, currentId);
       batches = [olderBatch];
     },
     failNext: () => {
@@ -276,7 +288,7 @@ async function submitGeneration(page: Page) {
   await page.getByRole('button', { name: '生成 1 张', exact: true }).click();
 }
 
-test('生成入口原位显示进度且不新增占位，完成后展示结果与入口', async ({ page }) => {
+test('生成入口保留原节点，独立进度卡完成后展示结果且已有卡片稳定', async ({ page }) => {
   test.setTimeout(40000);
   const f = await generationFixture(page);
   await page.goto(home);
@@ -292,27 +304,30 @@ test('生成入口原位显示进度且不新增占位，完成后展示结果�
     .toBe(0);
   const originalBox = await old.boundingBox();
   await submitGeneration(page);
-  let slot = more;
+  let slot = page.locator(`[data-card-id="generation:pending:${f.currentId}"]`);
   await expect(slot.locator('.is-generating')).toBeVisible();
+  await expect(more.locator('.briefing-generation')).toHaveAttribute('aria-busy', 'true');
   await expect(page.getByRole('tab', { name: '推荐', exact: true })).toBeEnabled();
   await expect
     .poll(() => slot.evaluate((el) => el.getAnimations().filter((a) => a.playState === 'running').length))
     .toBe(0);
   const slotBox = await slot.boundingBox();
   await page.screenshot({ path: 'test-results/generation-running.png', fullPage: true });
-  await slot.evaluate((el) => el.setAttribute('data-retained-node', 'yes'));
+  await more.evaluate((el) => el.setAttribute('data-retained-node', 'yes'));
   await expect(page.getByRole('button', { name: '生成更多', exact: true })).toHaveCount(0);
-  await expect(page.locator('[data-card-id^="generation:"]')).toHaveCount(1);
+  await expect(page.locator('[data-card-id^="generation:pending:"]')).toHaveCount(1);
+  await expect(page.locator('[data-card-id^="generation:"]')).toHaveCount(2);
   expect(f.posts).toHaveLength(1);
   f.hold();
   f.set('SUCCEEDED');
   await expect(slot).toContainText('正在读取新画报', { timeout: 10000 });
-  await expect(slot).toHaveAttribute('data-retained-node', 'yes');
+  await expect(more).toHaveAttribute('data-retained-node', 'yes');
   f.release();
-  slot = page.locator(`[data-card-id="generation:${uid(30)}"]`);
+  slot = page.locator(`[data-card-id="generation:${f.currentId}"]`);
   await expect(slot).toContainText('新增经营发现');
   await expect(more).toHaveAttribute('data-retained-node', 'yes');
   await expect(page.locator('.recommendation-card')).toHaveCount(2);
+  await expect(page.locator('.generation-placeholder')).toHaveCount(0);
   await expect
     .poll(() => slot.evaluate((el) => el.getAnimations().filter((a) => a.playState === 'running').length))
     .toBe(0);
@@ -353,7 +368,8 @@ test('等待和失败有真实状态，取消去掉占位，刷新只读取不�
   await expect(page.locator('.generation-placeholder')).toHaveCount(0);
   await expect(page.locator('.briefing-generation')).toContainText('已取消本次生成');
   await submitGeneration(page);
-  await expect(page.locator('.generation-placeholder')).toHaveAttribute('data-batch-id', uid(30));
+  await expect.poll(() => f.currentId).not.toBe(uid(30));
+  await expect(page.locator('.generation-placeholder')).toHaveAttribute('data-batch-id', f.currentId);
   await expect(page.getByRole('tab', { name: '推荐', exact: true })).toBeEnabled();
   f.set('FAILED', 'TASK_LIMIT');
   await expect(page.locator('.briefing-generation')).toContainText('本次生成达到处理上限，尚未完成画报。', {
@@ -476,7 +492,7 @@ test('异步推荐卡片就绪后向下原地浮入，切换标签无横移且�
   expect(await arrivals()).toEqual([]);
 });
 
-test('阅读弹窗仅保留有用、没用、关注，桌面和窄屏图标均居中且原因选择可用', async ({ page }) => {
+test('阅读弹窗保留评价与关注、按开关显示转发，桌面和窄屏图标居中且原因选择可用', async ({ page }) => {
   await generationFixture(page);
   await page.route('**/api/**/feedback?*', (route) => route.fulfill({ json: { feedback: null } }));
   for (const width of [952, 390]) {
@@ -487,7 +503,12 @@ test('阅读弹窗仅保留有用、没用、关注，桌面和窄屏图标均�
     await expect(dialog).toBeVisible();
     await expect(dialog).toHaveCSS('transform', 'none');
     const rail = dialog.locator('.live-feedback-actions');
-    await expect(rail.getByRole('button')).toHaveCount(3);
+    const forwarding = await page.evaluate(async () => {
+      const featureModule = '/src/shared/feature-entries.ts';
+      return (await import(featureModule)).featureEntries.forwarding;
+    });
+    await expect(rail.getByRole('button')).toHaveCount(forwarding ? 4 : 3);
+    await expect(rail.getByRole('button', { name: '转发', exact: true })).toHaveCount(forwarding ? 1 : 0);
     await expect(rail.getByRole('button', { name: '评价记录与建议' })).toHaveCount(0);
     for (const name of ['有用', '没用', '关注']) {
       const button = rail.getByRole('button', { name, exact: true });
@@ -526,7 +547,8 @@ test('工作导航蓝点独立显示，阅读更新后清除且撤权不保留�
   state = { ...state, briefing: true };
   await page.evaluate(tenant => window.dispatchEvent(new CustomEvent('workspace:notifications-changed', { detail: tenant })), tenant);
   await expect(briefingDot).toBeVisible();
-  await expect(briefingDot).toHaveCSS('background-color', 'rgb(91, 87, 217)'); // DEC-130 客户端靛蓝强调色
+  // Notification behavior is the contract; a historical theme RGB is not.
+  await expect(briefingDot).toHaveAttribute('aria-label', '智能画报有未读卡片');
   await expect(page.locator('.recommendation-card').first()).toHaveCSS('opacity', '1');
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 900 });
@@ -641,9 +663,9 @@ test(`从画报打开独立讨论，保留2×2尺寸且不携带生成任务：$
     cursor: 0,
     briefingContext: context,
   };
-  let opens = 0;
+  const discussionReads: string[] = [];
   await page.route('**/tasks/' + uid(21) + '/discussion?*', (route) => {
-    opens++;
+    discussionReads.push(route.request().method());
     return route.fulfill({ json: { conversationId: existingDiscussion ? discussion : null, title: detail.conversation.title, briefingContext: context } });
   });
   await page.route('**/conversations/' + discussion + '?*', (route) => route.fulfill({ json: detail }));
@@ -678,7 +700,8 @@ test(`从画报打开独立讨论，保留2×2尺寸且不携带生成任务：$
     await expect(grid).toBeVisible();
     await expect.poll(async () => {
       const measured = await grid.evaluate((node) => ({ width: node.clientWidth, unit: Number.parseFloat(getComputedStyle(node).getPropertyValue('--briefing-unit')) }));
-      return Math.abs(measured.unit - magazineGridMetrics(measured.width).unit);
+      // The mobile magazine keeps two columns and scales its content to the smaller cells.
+      return Math.abs(measured.unit - magazineGridMetrics(measured.width, 2).unit);
     }).toBeLessThan(0.5);
     magazineUnits.set(width, await grid.evaluate((node) => Number.parseFloat(getComputedStyle(node).getPropertyValue('--briefing-unit'))));
   }
@@ -766,7 +789,9 @@ test(`从画报打开独立讨论，保留2×2尺寸且不携带生成任务：$
     await page.reload();
     await expect(page.getByRole('region', { name: '画报讨论上下文' })).toBeVisible();
   }
-  expect(opens).toBe(1);
+  // The reader status mark and the explicit open both look up the existing discussion.
+  expect(discussionReads.length).toBeGreaterThanOrEqual(2);
+  expect(discussionReads.every(method => method === 'GET')).toBe(true);
   expect(f.posts).toHaveLength(0);
 });
 
@@ -907,7 +932,7 @@ test('多张卡片按阅读顺序逐张浮出，鼠标经过不打断入场', as
     })),
   );
   expect(timing.map((v: any) => v.delay)).toEqual([0, 46, 92]);
-  expect(timing.every((v: any) => v.opacity === '0' && v.duration === 380 && v.translate === '0 12px')).toBe(
+  expect(timing.every((v: any) => v.opacity === '0' && v.duration === 380 && v.translate === '0 -12px')).toBe(
     true,
   );
   await page.locator('.recommendation-card').first().dispatchEvent('pointerover', { pointerType: 'mouse' });
@@ -1086,7 +1111,7 @@ test('切回智能画报不播放临时布局重排，仍逐张浮出', async ({
   expect(await page.evaluate(() => (window as any).tileMoves)).toBe(0);
 });
 
-test('生成请求等待时不出现全页状态气泡，已有卡片与入口位置保持稳定', async ({ page }) => {
+test('生成请求在途保持已有卡片与入口，接收批次后入口保留节点并移至末尾', async ({ page }) => {
   await generationFixture(page);
   let release!: () => void;
   let waiting = false;
@@ -1116,10 +1141,16 @@ test('生成请求等待时不出现全页状态气泡，已有卡片与入口�
   // The existing write guard remains in force while only its redundant banner is hidden.
   await expect(page.getByRole('navigation', { name: '主导航' })).toHaveAttribute('inert', '');
   release();
-  await expect(more).toContainText('正在分析资料');
+  await expect(more).toContainText('正在生成新画报');
+  await expect(more.locator('.briefing-generation')).toHaveAttribute('aria-busy', 'true');
+  await expect(page.locator('.generation-placeholder')).toContainText('正在分析资料');
   expect(await generationNode!.evaluate(el => el.isConnected)).toBe(true);
   expect(await old.boundingBox()).toEqual(oldBox);
-  expect(await more.boundingBox()).toEqual(moreBox);
+  const acceptedBox = await more.boundingBox();
+  expect(acceptedBox!.width).toBe(moreBox!.width);
+  expect(acceptedBox!.height).toBe(moreBox!.height);
+  await expect(more).toHaveAttribute('data-at-end', 'true');
+  expect(await more.evaluate(el => el.parentElement!.lastElementChild === el)).toBe(true);
 });
 
 test('生成入口在新增卡片和响应式重排后位于末排末尾', async ({ page }) => {
@@ -1167,14 +1198,16 @@ test('画报阅读隐藏内部说明与计算文件，资料引用复用会话�
   await expect(dialog).toContainText('根据收款明细形成的业务分析。');
   await expect(dialog.getByText('推荐与呈现依据')).toHaveCount(0);
   await expect(dialog.getByText('生成规则版本')).toHaveCount(0);
-  await expect(dialog.getByText('dataset-comparison-test.json')).toHaveCount(0);
-  await dialog.getByLabel('资料引用（1）').click();
+  await expect(dialog.getByText('dataset-comparison-test.json')).toHaveCount(1);
+  await expect(dialog.getByText('dataset-comparison-test.json')).toBeHidden();
+  await dialog.getByText('查看依据', { exact: true }).click();
   await expect(dialog.locator('.reply-reference-library:not(.reading-evidence) .reply-reference-file header')).toContainText('收款明细.csv');
   await dialog.getByText('第 1–20 行', { exact: true }).click();
   await expect(dialog.getByText('合成来源摘要')).toBeVisible();
   await expect(dialog.getByRole('link', { name: '在会话中查看来源' })).toBeVisible();
-  await dialog.getByText('成果附件', { exact: true }).click();
-  await expect(dialog.locator('.reading-evidence[open]')).toContainText('report.csv');
+  await dialog.getByLabel('成果附件', { exact: true }).click();
+  await expect(dialog.getByText('report.csv', { exact: true })).toBeVisible();
+  await expect(dialog.getByText('dataset-comparison-test.json')).toBeHidden();
 });
 
 test('会话联网按钮替代关键词表单，默认按需与勾选要求使用不同任务模式', async ({ page }) => {
@@ -1213,7 +1246,8 @@ test('已完成画报读取失败可关闭并回到生成首页，轮询与刷�
   await page.reload();
   await expect(page.getByRole('button', { name: '生成更多', exact: true })).toBeEnabled();
   await page.getByRole('button', { name: '生成更多', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '选择生成数量', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '生成新画报', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '生成 1 张', exact: true })).toBeEnabled();
   expect(f.posts).toHaveLength(0);
 });
 

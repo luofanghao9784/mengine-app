@@ -44,6 +44,8 @@ export interface UsageOverview {
   coverage: {
     unmeteredWorkAttempts: number;
     legacyToolReceipts: number;
+    /** All-history jobs with unverified governance call times; excluded from period totals. Omitted by older platforms. */
+    legacyGovernanceJobs?: number;
     evaluation: 'NOT_CONNECTED';
     evolution: 'NOT_ENABLED';
   };

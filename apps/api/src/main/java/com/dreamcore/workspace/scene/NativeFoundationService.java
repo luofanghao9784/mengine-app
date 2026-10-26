@@ -43,6 +43,7 @@ public class NativeFoundationService {
    private FoundationPublicationService publications;
    @Autowired
    private com.dreamcore.workspace.governance.GovernanceModelService governanceJobs;
+   @Autowired private com.dreamcore.workspace.conversation.AgentSettings agentSettings;
    private final JsonMapper json = new JsonMapper();
 
    public NativeFoundationService(CollectionService collections, MaterialService materials, IdentityService identities) {
@@ -196,12 +197,28 @@ public class NativeFoundationService {
                a.put("total", d.rowCount() == null ? 0 : d.rowCount());
                a.putNull("ready");
                a.put("fieldCount", d.columns().size());
+               var metricScope=this.json.createArrayNode();
+               for(var entry:com.dreamcore.workspace.governance.GovernanceSourceEvidence.read(this.environment.getProperty("dreamcore.governance.source-evidence",""),tenant,d.id(),d.name(),"schema",false)) {
+                  if(!"business-metric-scope".equals(entry.get("kind")) || !(entry.get("items") instanceof List<?> values))continue;
+                  for(Object value:values.stream().limit(12).toList()) {
+                     if(!(value instanceof Map<?,?> m) || !(m.get("name") instanceof String name) || !(m.get("reason") instanceof String reason) || name.length()>80 || reason.length()>300 || !(m.get("state") instanceof String state) || !Set.of("SUPPORTED","UNAVAILABLE").contains(state))continue;
+                     metricScope.addObject().put("name",name).put("state",m.get("state").toString()).put("reason",reason);
+                  }
+               }
+               a.set("businessMetrics",metricScope);
                a.put("dictionaryStatus", d.fieldDefinitions().isEmpty() ? "waiting" : (explained ? "source-defined" : "partial"));
                // Resolve only connections reached through already-authorized datasets.
                a.put("source", connectionNames.computeIfAbsent(d.connectionId(), connectionId ->
                   this.db.queryForObject("SELECT name FROM data_connections WHERE tenant_id=? AND id=?", String.class, tenant, connectionId)));
                if (collected) {
                   a.set("nativeGovernance", this.json.valueToTree(this.governanceJobs.datasetStatus(actor, tenant, d.id())));
+                  var receipts = this.db.queryForList("SELECT r.receipt::text FROM collection_snapshot_receipts r JOIN business_datasets d ON d.current_snapshot=r.snapshot_id WHERE d.id=? AND d.tenant_id=?",String.class,d.id(),tenant);
+                  a.put("receivedAt",d.collectedAt().toString());
+                  if (!receipts.isEmpty()) {
+                     var receipt=this.json.readTree(receipts.getFirst());
+                     a.set("sourceCollectedAt",receipt.path("sourceCollectedAt"));a.set("sourceVerifiedAt",receipt.path("sourceVerifiedAt"));
+                  }
+                  if(d.coverageThrough()!=null)a.put("coverageThrough",d.coverageThrough().toString());
                   this.governanceStages(a);
                }
                items.add(a);
@@ -292,6 +309,10 @@ public class NativeFoundationService {
                   for (JsonNode item : items) {
                      ObjectNode a = (ObjectNode)item;
                      this.publications.apply(a, published.get(a.path("id").asText()));
+                     if(a.has("publicationId") && a.path("nativeGovernance").isObject() && a.path("publicationId").asText().equals(a.path("nativeGovernance").path("jobId").asText())) {
+                        ObjectNode status=(ObjectNode)a.path("nativeGovernance");status.put("state","PUBLISHED");
+                        status.put("message",a.path("checksPassed").asBoolean()?"字段口径已发布，当前快照检查通过":"字段口径已发布；当前快照检查尚需处理");
+                     }
                      JsonNode stages = a.path("stageStates");
                      if ("READY".equals(stages.path(1).asText())) {
                         parsed++;
@@ -316,7 +337,7 @@ public class NativeFoundationService {
                   out.set("items", items);
                   out.set("user", this.json.valueToTree(Map.of("name", "当前企业成员", "role", "member")));
                   out.set("tenant", this.json.valueToTree(Map.of("name", "企业数据基座")));
-                  out.set("model", this.json.valueToTree(Map.of("configured", false, "enabled", false, "model", "")));
+                  out.set("model", this.json.valueToTree(Map.of("configured", this.agentSettings.enabled(), "enabled", this.agentSettings.enabled() && this.environment.getProperty("dreamcore.tasks.enabled",Boolean.class,false), "model", "")));
                   out.set("passed", this.json.valueToTree(List.of(items.size(), parsed, annotated, checked, usable)));
                   out.set(
                      "sources",

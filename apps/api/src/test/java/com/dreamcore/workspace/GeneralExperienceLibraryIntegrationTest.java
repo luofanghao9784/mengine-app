@@ -189,18 +189,19 @@ class GeneralExperienceLibraryIntegrationTest {
   final java.net.http.HttpClient http=java.net.http.HttpClient.newBuilder().cookieHandler(new java.net.CookieManager(null,java.net.CookiePolicy.ACCEPT_ALL)).build();
   final tools.jackson.databind.json.JsonMapper json=new tools.jackson.databind.json.JsonMapper();
   java.net.http.HttpResponse<String> get(String path)throws Exception{return http.send(java.net.http.HttpRequest.newBuilder(java.net.URI.create("http://127.0.0.1:"+port+path)).GET().build(),java.net.http.HttpResponse.BodyHandlers.ofString());}
+  void unauthenticated(String path)throws Exception{var response=get(path);assertEquals(401,response.statusCode());var body=json.readTree(response.body());assertEquals("AUTHENTICATION_REQUIRED",body.path("code").asText());assertEquals(Set.of("contractVersion","code","message","retryable"),new HashSet<>(body.propertyNames()));assertTrue(response.headers().firstValue("cache-control").orElseThrow().contains("no-store"));}
   void login(String realm,Map<String,String> body)throws Exception{String path=realm.equals("platform")?"/api/platform-admin/v1/auth":"/api/v1/auth";var csrf=json.readTree(get(path+"/csrf").body());var response=http.send(java.net.http.HttpRequest.newBuilder(java.net.URI.create("http://127.0.0.1:"+port+path+"/login")).header("Content-Type","application/json").header(csrf.get("headerName").asString(),csrf.get("token").asString()).POST(java.net.http.HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body))).build(),java.net.http.HttpResponse.BodyHandlers.ofString());assertEquals(200,response.statusCode(),response.body());}
  }
  @Test void actualHttpSeparatesPermissionsAndNeverCachesBodies()throws Exception{
   seed();var r=publish(method());grant();db.update("UPDATE accounts SET password_hash=? WHERE id=?",passwords.encode("synthetic-customer-123"),owner);
   String publicPath="/api/v1/tenants/"+tenant+"/general-experiences",platformPath="/api/platform-admin/v1/experience-library";
-  var customer=new Browser();assertEquals(401,customer.get(publicPath).statusCode());customer.login("customer",Map.of("email",owner+"@dispatch.test","password","synthetic-customer-123"));assertEquals(403,customer.get(platformPath).statusCode());assertEquals(403,customer.get(platformPath+"/processing").statusCode());
-  var admin=new Browser();admin.login("platform",Map.of("username",platform+"@platform.test","password","synthetic-platform-456"));assertEquals(403,admin.get(publicPath).statusCode());
+  var customer=new Browser();customer.unauthenticated(publicPath);customer.login("customer",Map.of("email",owner+"@dispatch.test","password","synthetic-customer-123"));customer.unauthenticated(platformPath);customer.unauthenticated(platformPath+"/processing");
+  var admin=new Browser();admin.login("platform",Map.of("username",platform+"@platform.test","password","synthetic-platform-456"));admin.unauthenticated(publicPath);
   for(var response:List.of(customer.get(publicPath),customer.get(publicPath+"/"+r.entryId()+"?version="+r.versionId()),admin.get(platformPath),admin.get(platformPath+"/processing"),admin.get(platformPath+"/"+r.entryId()+"?version="+r.versionId()))){assertEquals(200,response.statusCode(),response.body());assertTrue(response.headers().firstValue("cache-control").orElseThrow().contains("no-store"));}
   assertEquals(400,admin.get(platformPath+"/"+r.entryId()).statusCode());
   for(String suffix:List.of("/versions?current="+r.versionId(),"/history?current="+r.versionId()+"&version="+r.versionId(),"/activity?current="+r.versionId()+"&version="+r.versionId())){
    for(var response:List.of(customer.get(publicPath+"/"+r.entryId()+suffix),admin.get(platformPath+"/"+r.entryId()+suffix))){assertEquals(200,response.statusCode(),response.body());assertTrue(response.headers().firstValue("cache-control").orElseThrow().contains("no-store"));}
-   assertEquals(403,customer.get(platformPath+"/"+r.entryId()+suffix).statusCode());assertEquals(403,admin.get(publicPath+"/"+r.entryId()+suffix).statusCode());
+   customer.unauthenticated(platformPath+"/"+r.entryId()+suffix);admin.unauthenticated(publicPath+"/"+r.entryId()+suffix);
   }
   assertEquals(400,admin.get(platformPath+"/"+r.entryId()+"/history?version="+r.versionId()).statusCode());
   db.queryForList("SELECT scrub_lifecycle_object('TASK',?)",task);assertEquals(404,admin.get(platformPath+"/"+r.entryId()+"?version="+r.versionId()).statusCode());assertEquals(404,customer.get(publicPath+"/"+r.entryId()+"?version="+r.versionId()).statusCode());
@@ -247,7 +248,7 @@ class GeneralExperienceLibraryIntegrationTest {
   var response=customer.http.send(builder.build(),java.net.http.HttpResponse.BodyHandlers.ofString());assertEquals(200,response.statusCode(),response.body());assertTrue(response.headers().firstValue("cache-control").orElseThrow().contains("no-store"));
   assertEquals(response.body(),customer.http.send(builder.build(),java.net.http.HttpResponse.BodyHandlers.ofString()).body());
   assertEquals(200,customer.get(path+"?version="+r.versionId()).statusCode());
-  var adminBrowser=new Browser();adminBrowser.login("platform",Map.of("username",platform+"@platform.test","password","synthetic-platform-456"));assertEquals(403,adminBrowser.get(path+"?version="+r.versionId()).statusCode());
+  var adminBrowser=new Browser();adminBrowser.login("platform",Map.of("username",platform+"@platform.test","password","synthetic-platform-456"));adminBrowser.unauthenticated(path+"?version="+r.versionId());
  }
 
  @Autowired GeneralExperienceManagement management;
@@ -308,7 +309,7 @@ class GeneralExperienceLibraryIntegrationTest {
  @Test void platformManagementHttpRequiresRoleCsrfAndNoStore()throws Exception{
   seed();var r=publish(method());grant();db.update("UPDATE accounts SET password_hash=? WHERE id=?",passwords.encode("synthetic-customer-123"),owner);
   String path="/api/platform-admin/v1/experience-library/"+r.entryId()+"/availability";
-  var customer=new Browser();customer.login("customer",Map.of("email",owner+"@dispatch.test","password","synthetic-customer-123"));assertEquals(403,customer.get(path+"?version="+r.versionId()).statusCode());
+  var customer=new Browser();customer.login("customer",Map.of("email",owner+"@dispatch.test","password","synthetic-customer-123"));customer.unauthenticated(path+"?version="+r.versionId());
   var adminBrowser=new Browser();adminBrowser.login("platform",Map.of("username",platform+"@platform.test","password","synthetic-platform-456"));
   var state=adminBrowser.get(path+"?version="+r.versionId());assertEquals(200,state.statusCode(),state.body());assertTrue(state.headers().firstValue("cache-control").orElseThrow().contains("no-store"));
   var change=globalChange(r,1,"STOPPED","合成 HTTP 操作原因");var builder=java.net.http.HttpRequest.newBuilder(java.net.URI.create("http://127.0.0.1:"+port+path)).header("Content-Type","application/json").POST(java.net.http.HttpRequest.BodyPublishers.ofString(adminBrowser.json.writeValueAsString(change)));

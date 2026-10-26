@@ -28,6 +28,7 @@ import tools.jackson.databind.json.JsonMapper;
 public class GovernanceModelDispatcher {
    private final JdbcTemplate db;
    private final GovernanceModelService jobs;
+   private final GovernanceUsageLedger usage;
    private final JsonMapper json = new JsonMapper();
    private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5L)).build();
    @Value("${dreamcore.governance.dispatch-enabled:false}")
@@ -43,9 +44,10 @@ public class GovernanceModelDispatcher {
    });
    private final AtomicBoolean busy = new AtomicBoolean();
 
-   public GovernanceModelDispatcher(JdbcTemplate db, GovernanceModelService jobs) {
+   public GovernanceModelDispatcher(JdbcTemplate db, GovernanceModelService jobs, GovernanceUsageLedger usage) {
       this.db = db;
       this.jobs = jobs;
+      this.usage = usage;
    }
 
    @PreDestroy
@@ -74,6 +76,7 @@ public class GovernanceModelDispatcher {
       if (this.token != null && this.token.length() >= 32) {
          // A process crash may lose the reply of a paid call. Do not replay an expired execution lease.
          this.db.update("WITH uncertain AS (UPDATE governance_model_dispatch SET state='FAILED',error_code='EXECUTION_OUTCOME_UNKNOWN',lease_token=NULL,lease_until=NULL,updated_at=now() WHERE state='RUNNING' AND lease_until<now() RETURNING job_id) UPDATE governance_model_jobs SET state='FAILED',error_code='EXECUTION_OUTCOME_UNKNOWN',revision=revision+1,updated_at=now() WHERE state='WAITING_MODEL' AND id IN (SELECT job_id FROM uncertain)");
+         this.usage.expire();
          UUID lease = UUID.randomUUID();
          List<Map<String, Object>> rows = this.db
             .queryForList(
@@ -115,6 +118,7 @@ public class GovernanceModelDispatcher {
                .header("Content-Type", "application/json")
                .POST(BodyPublishers.ofString(this.json.writeValueAsString(envelope)))
                .build();
+            this.usage.start(id, ((Number)job.get("revision")).intValue(), lease);
             HttpResponse<String> response = this.http.send(request, BodyHandlers.ofString());
             if (response.statusCode() == 202) {
                this.finish(id, lease, "WAITING_MODEL", null, null);
@@ -144,6 +148,7 @@ public class GovernanceModelDispatcher {
                return true;
             }
 
+            this.usage.returned(id, ((Number)job.get("revision")).intValue(), result);
             Map<String, Object> saved = this.jobs
                .engineAnswer(
                   actor,
@@ -189,6 +194,7 @@ public class GovernanceModelDispatcher {
             new Object[]{state, code, model, id, lease}
          );
       if (changed == 1 && Set.of("FAILED", "STALE").contains(state)) {
+         this.usage.unknown(id, lease);
          this.db
             .update(
                "UPDATE governance_model_jobs SET state=?,error_code=?,revision=revision+1,updated_at=now() WHERE id=? AND state='WAITING_MODEL'",

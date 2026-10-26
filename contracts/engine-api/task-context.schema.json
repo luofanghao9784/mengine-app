@@ -474,6 +474,14 @@
         },
         "generalExperienceVersion": {
           "const": "1.0"
+        },
+        "contextRejectionVersion": {
+          "const": "1.0",
+          "description": "Platform persists local argument rejection receipts. Absent: engine must not recover failed task_context calls as complete."
+        },
+        "briefingSupportingCalculationsVersion": {
+          "const": "1.0",
+          "description": "Supports immutable auxiliary calculation bindings. Missing capability must not silently discard computed supporting facts."
         }
       }
     },

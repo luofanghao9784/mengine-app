@@ -82,7 +82,7 @@ export function briefingDeliveryTool(options: {
       return copy;
     },
     description:
-      'Create a real private briefing card on 智能画报. Set businessType to INFO (资讯), DATA (数据), INSIGHT (洞察), SUGGESTION (建议), or RESULT (成果). For INSIGHT/SUGGESTION/RESULT optionally attach calculationArtifactId from a verified calculation as evidence; keep the text type and layout without chartStyle. INFO omits calculationArtifactId and uses verified sources. Do not create cards for greetings or routine status replies; create for a complete useful theme or an explicit user request. Only DATA requires compare_table (XLSX) or compare_dataset (collected database snapshot) and its artifact.id; INSIGHT/SUGGESTION/RESULT may use the same verified calculation receipts without becoming DATA. Write a short editorial title, summary and 2–4 analysis paragraphs grounded in that calculation and source scope. Summary and each paragraph must be complete sentences ending in punctuation. Distinguish observed changes from unverified causes. Chart values, periods, units and provenance are taken by the platform from the verified calculation, never from model-supplied numbers. One immutable card per task attempt, private to the current user, visible only after successful task delivery. After PREPARED, finish with a short confirmation; NO_NEW_CONTENT means duplicate or empty verified data was suppressed, so report no new card; do not repeat raw IDs, hashes or the entire report. This is not enterprise publication or a scheduled plan.' +
+      'Create a real private briefing card on 智能画报. Set businessType to INFO (资讯), DATA (数据), INSIGHT (洞察), SUGGESTION (建议), or RESULT (成果). For INSIGHT/SUGGESTION/RESULT optionally attach calculationArtifactId from a verified calculation as evidence; keep the text type and layout without chartStyle. INFO omits calculationArtifactId and uses verified sources. Do not create cards for greetings or routine status replies; create for a complete useful theme or an explicit user request. Only DATA requires compare_table (XLSX) or compare_dataset (collected database snapshot) and its artifact.id; INSIGHT/SUGGESTION/RESULT may use the same verified calculation receipts without becoming DATA. Write a short editorial title, summary and 2–4 analysis paragraphs grounded in that calculation and source scope. Summary and each paragraph must be complete sentences ending in punctuation. Distinguish observed changes from unverified causes. For a collected dataset, file table or fixed reconciliation calculation, the platform deterministically renders the factual title, totals, group comparisons and coverage from the complete authorized receipt, replacing model-authored factual prose. A prospective paragraph beginning 建议 may select a follow-up theme such as checking dates, statuses or store records; the platform renders that action from a fixed safe template rather than publishing model text. Choose the business question and verified calculation, never manually recompute or swap labels and values. Use the returned title as the delivery title. Chart values, periods, units and provenance also come from the verified calculation. One immutable card per task attempt, private to the current user, visible only after successful task delivery. After PREPARED, finish with a short confirmation without adding new numbers or conclusions; NO_NEW_CONTENT means duplicate or empty verified data was suppressed, so report no new card; do not repeat raw IDs, hashes or the entire report. This is not enterprise publication or a scheduled plan.' +
       '\n' +
       BRIEFING_WRITING_RULES +
       '\n' +
@@ -209,7 +209,7 @@ export function briefingDeliveryTool(options: {
             throw new RuntimeError('BRIEFING_PRESENTATION_INVALID', 'COMPARISON 至少标注两个有依据的不同方案段落为 OPTION，不编造方案。');
         }
       }
-      if (isRecord(args) && (args.businessType === 'DATA' || requiredType === 'DATA') &&
+      if (isRecord(args) && args.calculationArtifactId == null && (args.businessType === 'DATA' || requiredType === 'DATA') &&
           typeof args.title === 'string' && /(?:分析|分布|情况)[。！!]?$/u.test(args.title.trim()) &&
           !/(?:增长|增加|减少|下降|上升|高于|低于|最多|最少|领先|落后|翻倍|持平|为零)/u.test(args.title))
         throw new RuntimeError('BRIEFING_TITLE_TOPIC_ONLY', BRIEFING_EDITORIAL_HINTS.BRIEFING_TITLE_TOPIC_ONLY);
@@ -235,7 +235,7 @@ export function briefingDeliveryTool(options: {
 
 /** A persisted deliverable is evidence; elapsed time and model prose are not. */
 export function hasPreparedBriefing(
-  tools: readonly { name: string; status: string; output?: unknown }[],
+  tools: readonly { name: string; status: string; output?: unknown; rejection?: 'CONTEXT_ARGUMENTS' }[],
 ): boolean {
   const last = tools.at(-1);
   const r = last?.output;
@@ -253,8 +253,9 @@ export function hasPreparedBriefing(
   );
 }
 
-/** Native card delivery can recover earlier rejected delivery arguments; other failed work remains partial. */
-export function hasTerminalBriefing(tools: Parameters<typeof hasPreparedBriefing>[0]): boolean {
+/** Native delivery may recover an owned, pre-dispatch context rejection only after a later successful context read.
+ * Failed retrieval/authorization/response validation remain partial, even if the model subsequently submits a card. */
+export function hasTerminalBriefing(tools: Parameters<typeof hasPreparedBriefing>[0], contextRejectionRecovery = true): boolean {
   const last = tools.at(-1);
   return (
     !!last &&
@@ -262,8 +263,10 @@ export function hasTerminalBriefing(tools: Parameters<typeof hasPreparedBriefing
     tools
       .slice(0, -1)
       .every(
-        (tool) =>
-          tool.status === 'succeeded' || (tool.name === 'deliver_briefing' && tool.status === 'failed'),
+        (tool, index) =>
+          tool.status === 'succeeded' || (tool.name === 'deliver_briefing' && tool.status === 'failed') ||
+          (contextRejectionRecovery && tool.name === 'task_context' && tool.status === 'failed' && tool.rejection === 'CONTEXT_ARGUMENTS' &&
+            tools.slice(index + 1, -1).some(next => next.name === 'task_context' && next.status === 'succeeded')),
       )
   );
 }

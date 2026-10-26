@@ -422,8 +422,8 @@ export function DataWork({
     a?.kind === 'table'
       ? '模型为表和字段写出业务含义、单位、规则和关联。模型解释不代表已核实的业务事实。'
       : '资料由输入模型自动生成标签与摘要，不需要字段口径。',
-    a?.nativeGovernance ? '核对治理草稿、字段依据和检查范围；没有来源约束的检查项不会视为通过。' : '检查必填、格式、敏感信息和口径冲突；有问题的记录被隔离，不影响其他记录使用。',
-    '通过检查的记录提供给 AI 查询；隔离记录不参与。',
+    a?.nativeGovernance ? '已发布口径在来源定义不变时复用；每批数据重新核对已声明规则和导出接收依据，缺少依据不视为通过。' : '检查必填、格式、敏感信息和口径冲突；有问题的记录被隔离，不影响其他记录使用。',
+    a?.nativeGovernance ? '当前快照检查通过后，按已发布口径提供给 AI；记录规则检查不代表银行到账、利润或真实逾期本金已核实。' : '通过检查的记录提供给 AI 查询；隔离记录不参与。',
   ];
   return (
     <section ref={section} className="cards work data live-foundation glass" aria-label="数据基座">
@@ -863,7 +863,10 @@ export function DataWork({
                       ],
                       ['最近成功', date(a.sync?.lastSuccess)],
                       ['下次尝试', date(a.sync?.nextAt)],
-                      ['最近更新', date(a.updatedAt)],
+                      ['源数据采集', a.sourceCollectedAt ? date(a.sourceCollectedAt) : '未提供来源采集时间'],
+                      ['源端最近核验', a.sourceVerifiedAt ? date(a.sourceVerifiedAt) : '未提供来源核验时间'],
+                      ['平台接收', date(a.receivedAt || a.updatedAt)],
+                      ['业务覆盖截止', a.coverageThrough ? date(a.coverageThrough) : '来源未声明，不能以采集时间代替'],
                       ['业务标签', a.tags.join('、') || '尚未标注'],
                       ['密级', `L${a.classification}`],
                     ])}
@@ -1090,9 +1093,9 @@ export function DataWork({
                       </Fold>
                     )}
                     <Fold title="检查规则与处理范围">
-                      <p>{a.availabilityKind === 'PUBLISHED_KNOWLEDGE' ? '已核对原生任务输出格式、来源引用与当前发布版本；没有据此新增记录隔离、质量评分或敏感信息扫描。' : '资料：手机号、身份证号、邮箱、标签完整性、复核时效、内容信息量。'}</p>
+                      <p>{a.availabilityKind?.startsWith('PUBLISHED_') ? '字段口径发布与本批数据检查分别记录；当前检查覆盖已声明的类型、值域、主键和导出接收摘要。未计算综合质量评分，也未自动修正或隔离原始记录。' : '资料：手机号、身份证号、邮箱、标签完整性、复核时效、内容信息量。'}</p>
                       <p>
-                        {a.availabilityKind === 'PUBLISHED_KNOWLEDGE' ? '字段未知、解析限制及结构异常继续展示；发布不会修正原始记录。' : '数据表：必填、格式、唯一性、隔离记录、字段口径、关联匹配、规则冲突、同步状态与新鲜度。'}
+                        {a.availabilityKind?.startsWith('PUBLISHED_') ? '字段未知、解析限制及结构异常继续展示；发布不会修正原始记录。' : '数据表：必填、格式、唯一性、隔离记录、字段口径、关联匹配、规则冲突、同步状态与新鲜度。'}
                       </p>
                       <small>
                         人工校验保留审计，不修改原记录，也不解除记录隔离；来源或口径变化后重新检查。记录维护由来源系统完成。
@@ -1108,7 +1111,10 @@ export function DataWork({
                         ? `按已发布口径可查询 ${a.queryableRecords} 条记录` : a.ready !== null
                         ? `${a.ready} 条合格记录`
                         : a.available ? '按已发布口径查询（合格记录数未核验）' : '尚未提供给 AI'],
-                      ['最近更新', date(a.updatedAt)],
+                      ['源数据采集', a.sourceCollectedAt ? date(a.sourceCollectedAt) : '未提供来源采集时间'],
+                      ['源端最近核验', a.sourceVerifiedAt ? date(a.sourceVerifiedAt) : '未提供来源核验时间'],
+                      ['平台接收', date(a.receivedAt || a.updatedAt)],
+                      ['业务覆盖截止', a.coverageThrough ? date(a.coverageThrough) : '来源未声明，不能以采集时间代替'],
                     ])}
                     {a.queryableRecords !== undefined && (
                       <p className="live-note">{a.ruleStats
@@ -1120,6 +1126,9 @@ export function DataWork({
                         先完成“{GATES[Math.min(a.gate, 3)]}”，并核实当前版本的检查与发布结果。
                       </p>
                     )}
+                    {!!a.businessMetrics?.length && <Fold title="经营指标范围">
+                      {a.businessMetrics.map(metric => <p key={metric.name}><b>{metric.name} · {metric.state === 'SUPPORTED' ? '已有统计口径' : '暂不能计算'}</b><br />{metric.reason}</p>)}
+                    </Fold>}
                     <h4>管理操作审计</h4>
                     {detail?.audit.length ? (
                       <Timeline

@@ -160,3 +160,15 @@ test('verified text calculation keeps evidence but never becomes a chart or news
     const bad=structuredClone(doc);Object.assign(bad.content,change);assert.equal(isBriefingDocument(bad),false);
   }
 });
+
+
+test('supporting facts retain separate snapshot requests and reject malformed or unrelated identities', () => {
+ const doc=JSON.parse(readFileSync(new URL('../contracts/fixtures/dataset-briefing.json',import.meta.url),'utf8'));
+ const source=structuredClone(doc.content.datasetSource);
+ const support={artifactId:'00000000-0000-4000-8000-000000000099',sha256:'d'.repeat(64),unit:'元',receipt:{datasetSource:source,calculation:{recipeVersion:'dataset-summary-1',status:'COMPUTED',request:{datasetId:source.datasetId,snapshotId:source.snapshotId,dateColumn:'应收付日',dateFrom:'2026-09-01',dateTo:'2026-09-30'},inputSha256:source.sha256,matchedRows:2,ignoredRows:4,rows:[{group:['甲'],value:'0',records:2}],total:'0'}}};
+ doc.content.supportingCalculations=[support];assert.ok(isBriefingDocument(doc));
+ for(const patch of [{artifactId:doc.content.calculationArtifactId},{sha256:'bad'},{unit:''},{receipt:{...support.receipt,calculation:{...support.receipt.calculation,total:null}}},{receipt:{...support.receipt,calculation:{...support.receipt.calculation,request:{...support.receipt.calculation.request,snapshotId:'00000000-0000-4000-8000-000000000098'}}}}]){
+  const changed=structuredClone(doc);Object.assign(changed.content.supportingCalculations[0],patch);assert.equal(isBriefingDocument(changed),false);
+ }
+ const duplicate=structuredClone(doc);duplicate.content.supportingCalculations.push(support);assert.equal(isBriefingDocument(duplicate),false);
+});

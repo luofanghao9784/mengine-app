@@ -33,6 +33,11 @@ export interface BriefingDocument {
   } | null;
   content: {
     fusion?: FusionEvidence | null;
+    /** Immutable copies of separately verified calculation receipts; never add independent periods/metrics. */
+    supportingCalculations?: {artifactId:string;sha256:string;unit:string;receipt:{
+      datasetSource:NonNullable<BriefingDocument['content']['datasetSource']>;
+      calculation:Record<string,unknown>;
+    }}[];
     schemaVersion: 'briefing-chain-v1' | 'briefing-data-v1' | 'briefing-text-v1' | 'briefing-dataset-v1';
     businessType: 'INFO' | 'DATA' | 'INSIGHT' | 'SUGGESTION' | 'RESULT';
     title: string;

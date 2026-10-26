@@ -15,16 +15,20 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest(properties={"dreamcore.lifecycle.enabled=false","dreamcore.knowledge.enabled=true","dreamcore.knowledge.initial-delay-ms=3600000"})
 class MaterialLifecycleIntegrationTest {
+ @org.springframework.test.context.DynamicPropertySource
+ static void isolateQueue(org.springframework.test.context.DynamicPropertyRegistry registry){IsolatedTestDatabase.register(registry);}
  @Autowired com.dreamcore.workspace.retention.RetentionService retention;@Autowired JdbcTemplate db;@Autowired MaterialService materials;@Autowired MaterialLifecycleService lifecycle;@Autowired MaterialCleanupService cleanup;@Autowired KnowledgeService knowledge;@Autowired SourceService sources;@Autowired ObjectStore store;
  UUID tenant,owner,reader,admin,space,personal;
+ Set<UUID> fixtureTenants;
  @BeforeEach void fixture(){
   tenant=UUID.randomUUID();owner=UUID.randomUUID();reader=UUID.randomUUID();admin=UUID.randomUUID();space=UUID.randomUUID();personal=UUID.randomUUID();
+  fixtureTenants=new HashSet<>(Set.of(tenant));
   db.update("INSERT INTO tenants(id,name) VALUES (?,'合成生命周期企业')",tenant);
   for(UUID id:List.of(owner,reader,admin)){db.update("INSERT INTO accounts(id,email,display_name,password_hash) VALUES (?,?,?,'not-used')",id,id+"@lifecycle.test","合成成员");db.update("INSERT INTO tenant_memberships(tenant_id,account_id,role) VALUES (?,?,?)",tenant,id,id.equals(admin)?"TENANT_ADMIN":"MEMBER");}
   db.update("INSERT INTO workspaces(id,tenant_id,owner_id,name,kind) VALUES (?,?,?,'共享','SHARED'),(?,?,?,'私人','PERSONAL')",space,tenant,admin,personal,tenant,owner);
   db.update("INSERT INTO workspace_members(tenant_id,workspace_id,account_id,can_maintain) VALUES (?,?,?,true),(?,?,?,false)",tenant,space,owner,tenant,space,reader);
  }
- @AfterEach void after(){db.update("UPDATE knowledge_runs SET status='CANCELLED' WHERE tenant_id=? AND status IN ('QUEUED','RUNNING')",tenant);db.update("UPDATE content_lifecycle SET purge_after=now()+interval '30 days' WHERE tenant_id=? AND state='TRASHED'",tenant);}
+ @AfterEach void after(){for(UUID fixtureTenant:fixtureTenants){db.update("UPDATE knowledge_runs SET status='CANCELLED' WHERE tenant_id=? AND status IN ('QUEUED','RUNNING')",fixtureTenant);db.update("UPDATE content_lifecycle SET purge_after=now()+interval '30 days' WHERE tenant_id=? AND state='TRASHED'",fixtureTenant);}}
  MaterialService.Entry upload(UUID w,UUID folder,String name){return materials.upload(owner,tenant,w,folder,null,null,UUID.randomUUID(),new MockMultipartFile("file",name,"text/plain","retained synthetic body".getBytes()));}
  UUID version(UUID w,UUID id){return materials.detail(owner,tenant,w,id,0,50).versions().getFirst().id();}
  MaterialLifecycleService.Receipt act(UUID w,String kind,UUID id,String action){int revision=lifecycle.preview(owner,tenant,w,kind,id).item().revision();return lifecycle.act(owner,tenant,w,kind,id,UUID.randomUUID(),revision,action);}
@@ -72,7 +76,7 @@ class MaterialLifecycleIntegrationTest {
 
  @Test void failedDescendantDoesNotStarveAnotherTenantsExpiredContent(){
   UUID folder=materials.createFolder(owner,tenant,personal,null,"待清理父目录",UUID.randomUUID()).id();var child=upload(personal,folder,"child.txt");act(personal,"MATERIAL",child.id(),"TRASH");act(personal,"MATERIAL",child.id(),"PURGE");var failed=cleanup.claim();cleanup.fail(failed);act(personal,"FOLDER",folder,"TRASH");db.update("UPDATE content_lifecycle SET purge_after=now()-interval '2 days' WHERE object_id=?",folder);
-  UUID other=UUID.randomUUID(),otherSpace=UUID.randomUUID();db.update("INSERT INTO tenants(id,name) VALUES (?,'另一合成企业')",other);db.update("INSERT INTO tenant_memberships(tenant_id,account_id,role) VALUES (?,?,'MEMBER')",other,owner);db.update("INSERT INTO workspaces(id,tenant_id,owner_id,name,kind) VALUES (?,?,?,'个人','PERSONAL')",otherSpace,other,owner);
+  UUID other=UUID.randomUUID(),otherSpace=UUID.randomUUID();fixtureTenants.add(other);db.update("INSERT INTO tenants(id,name) VALUES (?,'另一合成企业')",other);db.update("INSERT INTO tenant_memberships(tenant_id,account_id,role) VALUES (?,?,'MEMBER')",other,owner);db.update("INSERT INTO workspaces(id,tenant_id,owner_id,name,kind) VALUES (?,?,?,'个人','PERSONAL')",otherSpace,other,owner);
   var file=materials.upload(owner,other,otherSpace,null,null,null,UUID.randomUUID(),new MockMultipartFile("file","unblocked.txt","text/plain","other tenant".getBytes()));lifecycle.act(owner,other,otherSpace,"MATERIAL",file.id(),UUID.randomUUID(),0,"TRASH");db.update("UPDATE content_lifecycle SET purge_after=now()-interval '1 day' WHERE object_id=?",file.id());
   assertTrue(lifecycle.enqueueDue());assertEquals("PURGING",lifecycle.preview(owner,other,otherSpace,"MATERIAL",file.id()).item().state());assertEquals("TRASHED",lifecycle.preview(owner,tenant,personal,"FOLDER",folder).item().state());
   var job=cleanup.claim();assertEquals(other,job.tenant());for(UUID object:cleanup.pending(job)){cleanup.remove(object);cleanup.removed(job,object);}cleanup.finish(job);

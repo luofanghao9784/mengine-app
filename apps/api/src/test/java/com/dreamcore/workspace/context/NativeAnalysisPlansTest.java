@@ -2,6 +2,7 @@ package com.dreamcore.workspace.context;
 import com.dreamcore.workspace.collection.DatasetField;
 import com.dreamcore.workspace.identity.IdentityException;
 import java.nio.file.*;import java.util.*;
+import java.time.Instant;
 import org.junit.jupiter.api.Test;import org.junit.jupiter.api.io.TempDir;
 import tools.jackson.databind.json.JsonMapper;
 import static org.junit.jupiter.api.Assertions.*;
@@ -25,5 +26,18 @@ class NativeAnalysisPlansTest {
  }
  @Test void tenantAndDatasetIdentityCannotBorrowAnotherInstalledMethod()throws Exception{
   String path=config(definition());assertTrue(((List<?>)NativeAnalysisPlans.load(path,UUID.randomUUID(),dataset,snapshot,"表",List.of("门店","金额"),fields).get("items")).isEmpty());assertTrue(((List<?>)NativeAnalysisPlans.load(path,tenant,UUID.randomUUID(),snapshot,"表",List.of("门店","金额"),fields).get("items")).isEmpty());
+ }
+ Map<String,Object> monthly(String window){var d=definition();d.put("calendarWindow",window);d.put("execution",Map.of("groupColumns",List.of("门店"),"dateColumn","应收付日","dateFrom","","dateTo","","timeZone","Asia/Shanghai","reviewed",true));return d;}
+ List<DatasetField> dated(){var result=new ArrayList<>(fields);result.add(new DatasetField("应收付日","date","账单应收付日期，不是实际到账日期","","合成来源","SOURCE_DOCUMENTED"));return result;}
+ tools.jackson.databind.JsonNode resolved(String path,Instant at){return new JsonMapper().valueToTree(((List<?>)NativeAnalysisPlans.load(path,tenant,dataset,snapshot,"合成表",List.of("门店","金额","应收付日"),dated(),at).get("items")).getFirst());}
+ @Test void calendarWindowUsesPersistedTaskTimeInShanghaiAndRetainsLeapYearAndYearBoundary()throws Exception{
+  String path=config(monthly("CURRENT_MONTH"));var item=resolved(path,Instant.parse("2024-01-31T16:00:00Z"));assertEquals("2024-02",item.at("/definition/resolvedCalendarMonth").asText());assertEquals("2024-02-01",item.at("/executionRequest/dateFrom").asText());assertEquals("2024-02-29",item.at("/executionRequest/dateTo").asText());assertEquals("应收付日",item.at("/executionRequest/dateColumn").asText());assertEquals("FAIL",item.at("/executionRequest/missingDates").asText());
+  assertEquals(item,resolved(path,Instant.parse("2024-01-31T16:00:00Z")));assertNotEquals(item.at("/selection/metricId"),resolved(path,Instant.parse("2024-03-01T00:00:00Z")).at("/selection/metricId"));
+  path=config(monthly("PREVIOUS_MONTH"));item=resolved(path,Instant.parse("2026-01-01T00:00:00Z"));assertEquals("2025-12-01",item.at("/executionRequest/dateFrom").asText());assertEquals("2025-12-31",item.at("/executionRequest/dateTo").asText());assertFalse(item.toString().contains("coverageThrough"));
+ }
+ @Test void rollingWindowRequiresExplicitTaskAnchorConfirmedDateAndNoConflictingFixedRange()throws Exception{
+  String path=config(monthly("CURRENT_MONTH"));assertThrows(IdentityException.class,()->NativeAnalysisPlans.load(path,tenant,dataset,snapshot,"表",List.of("门店","金额","应收付日"),dated()));
+  var wrong=new ArrayList<>(fields);wrong.add(new DatasetField("应收付日","text","未知日期","","无","UNKNOWN"));assertThrows(IdentityException.class,()->NativeAnalysisPlans.load(path,tenant,dataset,snapshot,"表",List.of("门店","金额","应收付日"),wrong,Instant.parse("2026-10-26T00:00:00Z")));
+  for(String window:List.of("LAST_30_DAYS","CURRENT_MONTH")){var d=monthly(window);if(window.equals("CURRENT_MONTH")){var execution=new LinkedHashMap<>((Map<String,Object>)d.get("execution"));execution.put("dateFrom","2026-01-01");d.put("execution",execution);}String invalid=config(d);assertThrows(IdentityException.class,()->resolved(invalid,Instant.parse("2026-10-26T00:00:00Z")));}
  }
 }

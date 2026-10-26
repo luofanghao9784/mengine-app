@@ -15,7 +15,7 @@ export type Asset = {
   gate: number;
   stageStates?: string[];
   available: boolean;
-  availabilityKind?: "PUBLISHED_KNOWLEDGE";
+  availabilityKind?: "PUBLISHED_KNOWLEDGE" | "PUBLISHED_GOVERNANCE";
   availableKnowledgeCount?: number;
   availabilityScope?: string;
   unknownFieldCount?: number;
@@ -28,6 +28,10 @@ export type Asset = {
   version: number;
   policyVersion: number;
   updatedAt: string;
+  sourceCollectedAt?: string;
+  sourceVerifiedAt?: string;
+  receivedAt?: string;
+  coverageThrough?: string;
   reviewAt: string;
   quality: number | null;
   classification: number;
@@ -35,6 +39,8 @@ export type Asset = {
   tags: string[];
   total: number | null;
   queryableRecords?: number;
+  automaticAnalysisReady?: boolean;
+  businessMetrics?: { name: string; state: 'SUPPORTED' | 'UNAVAILABLE'; reason: string }[];
   ruleStats?: { total: number; passed: number; violations: number; scope: string };
   ready: number | null;
   isolated: number | null;

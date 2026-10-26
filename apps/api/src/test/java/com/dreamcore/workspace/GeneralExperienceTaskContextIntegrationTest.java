@@ -7,6 +7,8 @@ import static org.junit.jupiter.api.Assertions.*;import static org.mockito.Mocki
 
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={"dreamcore.tasks.enabled=true","dreamcore.tasks.agent-mode=verification","dreamcore.tasks.initial-delay-ms=3600000","dreamcore.experience-intake.enabled=false","dreamcore.experience-analysis.enabled=false"})
 class GeneralExperienceTaskContextIntegrationTest {
+ @org.springframework.test.context.DynamicPropertySource
+ static void isolateQueue(org.springframework.test.context.DynamicPropertyRegistry registry){IsolatedTestDatabase.register(registry);}
  @Autowired ExperienceService experiences;@Autowired ExperienceAdmissionService admission;@Autowired JdbcTemplate db;@Autowired ExperienceAnalysisQueue queue;@Autowired ExperienceIntakeService intake;@Autowired FeedbackService feedback;
  @Autowired com.dreamcore.workspace.material.MaterialService materials;
  @Autowired ExperienceGeneralizationQueue generalization;@Autowired GeneralExperienceAdmissionService generalAdmission;
@@ -160,16 +162,25 @@ class GeneralExperienceTaskContextIntegrationTest {
   localUse(r,1,true);assertFalse(agents.active(inherited));assertEquals(1,search(fresh).get("items").size());assertNotNull(read(fresh,r,0));
  }
  @Test void localStopUsesSharedTaskFenceEvenBeforeUsageRowExists()throws Exception{
-  seed();var r=publish(method());var job=working();read(job,r,0);
+  seed();var r=publish(method());
+  // Establish the actor's role before the task pins its work-audience context.
   db.update("UPDATE tenant_memberships SET role='TENANT_ADMIN' WHERE tenant_id=? AND account_id=?",clientTenant,clientActor);
-  var locked=new CountDownLatch(1);var release=new CountDownLatch(1);var started=new CountDownLatch(1);
+  var job=working();read(job,r,0);
+  assertTrue(db.queryForObject("SELECT task_audience_current(?)",Boolean.class,job.id()));
+  assertEquals(0,db.queryForObject("SELECT count(*) FROM tenant_general_experience_usage WHERE tenant_id=? AND entry_id=?",Integer.class,clientTenant,r.entryId()));
+  var locked=new CompletableFuture<Void>();var release=new CountDownLatch(1);var started=new CountDownLatch(1);
   try(var pool=Executors.newFixedThreadPool(2)){
-   var reader=pool.submit(()->new org.springframework.transaction.support.TransactionTemplate(transactionManager).execute(status->{guard.requireCurrent(job.id());locked.countDown();try{assertTrue(release.await(10,TimeUnit.SECONDS));}catch(InterruptedException e){throw new RuntimeException(e);}return true;}));
-   assertTrue(locked.await(10,TimeUnit.SECONDS));
+   var reader=pool.submit(()->{
+    try{return new org.springframework.transaction.support.TransactionTemplate(transactionManager).execute(status->{guard.requireCurrent(job.id());locked.complete(null);try{assertTrue(release.await(10,TimeUnit.SECONDS));}catch(InterruptedException e){Thread.currentThread().interrupt();throw new RuntimeException(e);}return true;});}
+    catch(RuntimeException|Error failure){locked.completeExceptionally(failure);throw failure;}
+   });
+   try{
+   locked.get(10,TimeUnit.SECONDS);
    var writer=pool.submit(()->{started.countDown();return usage.change(clientActor,clientTenant,r.entryId(),new TenantGeneralExperienceUsage.Change(UUID.randomUUID(),r.versionId(),0,false));});
    assertTrue(started.await(10,TimeUnit.SECONDS));try{assertThrows(TimeoutException.class,()->writer.get(200,TimeUnit.MILLISECONDS));}finally{release.countDown();}
    assertTrue(reader.get(10,TimeUnit.SECONDS));assertFalse(writer.get(10,TimeUnit.SECONDS).enabled());
-  }finally{release.countDown();}
+   }finally{release.countDown();}
+  }
   assertFalse(agents.active(job));localUse(r,1,true);assertFalse(agents.active(job));
  }
 

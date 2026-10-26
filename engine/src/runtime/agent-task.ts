@@ -1,5 +1,5 @@
 import { BriefingEvidenceBudget } from './briefing-evidence-budget.js';
-import { governedMetricBundle } from './governed-metric-bundle.js';
+import { bindSupportingCalculations, governedMetricBundle } from './governed-metric-bundle.js';
 import { publishedMetricPlans } from './published-metric-plans.js';
 import { useRoutineModel } from './model-routing.js';
 import { analyzeWikiInsight, wikiInsightContext } from './wiki-insight.js';
@@ -36,7 +36,7 @@ import { datasetComparisonTool } from './dataset-comparison.js';
 import { DATASET_ANALYSIS_GUIDANCE } from './dataset-analysis-guidance.js';
 import { tableComparisonTool } from './table-comparison.js';
 import { workTools } from './task-work.js';
-import { contextTool, taskBootstrap } from './task-context.js';
+import { ContextRequestError, contextTool, taskBootstrap } from './task-context.js';
 import { ENGINE_VERSION } from '../release.js';
 import { originalRecipeTool } from './file-recipes.js';
 import { OriginalInputs } from './original-inputs.js';
@@ -151,7 +151,9 @@ export class AgentTasks {
     let topicAvailable = false;
     let editorialPlanAvailable = false;
     let evidenceSupplementAvailable = false;
+    let contextRejectionAvailable = false;
     let textCalculationAvailable = false;
+    let supportingDeliveryAvailable = false;
     let pendingEditorialPlans: unknown = [];
     let editorialBatchContext = '';
     let topicSelected = false;
@@ -240,7 +242,9 @@ export class AgentTasks {
         topicAvailable = response.topicStrategyVersion === '1.0';
         editorialPlanAvailable = response.editorialPlanVersion === '1.0';
         evidenceSupplementAvailable = response.briefingEvidenceSupplementVersion === '1.0';
+        contextRejectionAvailable = response.contextRejectionVersion === '1.0';
         textCalculationAvailable = response.briefingTextCalculationVersion === '1.0';
+        supportingDeliveryAvailable = response.briefingSupportingCalculationsVersion === '1.0';
         pendingEditorialPlans = response.pendingEditorialPlans ?? [];
         editorialBatchContext = ` Server batch context (data): ${JSON.stringify({batchId:response.editorialBatchId,requestedTypes:response.editorialRequestedTypes})}. If batchId is nonempty, use it exactly and plan the requested batch together. Reuse its existing immutable plan if present; do not invent a second plan.`;
         topicSelected ||= response.topicSelectionRecorded === true;
@@ -862,6 +866,7 @@ export class AgentTasks {
       };
       const metricPlans = publishedMetricPlans();
       const summaryCalculations = new Set<string>();
+      const supportingCalculations = new Map<string,string[]>();
       let sequence = 0;
       const tools: TaskTool[] = [
         search,
@@ -878,16 +883,18 @@ export class AgentTasks {
                 selectedType: () => selectedBriefingType,
                 selectedShape: () => selectedBriefingShape,
                 authorize,
-                invoke: (body, executionSignal) =>
-                  postJson(
+                invoke: (body, executionSignal) => {
+                  const delivery=bindSupportingCalculations(body,supportingCalculations,supportingDeliveryAvailable);
+                  return postJson(
                     new URL(`/internal/v1/agent-access/${task.taskId}/deliver-briefing`, this.platform),
                     task.attemptId,
-                    body,
+                    delivery,
                     AbortSignal.any([signal, executionSignal]),
                     65536,
                     12000,
                     ['BRIEFING_TYPE_MISMATCH', ...Object.keys(BRIEFING_EDITORIAL_HINTS)],
-                  ),
+                  );
+                },
               }),
             ]
           : []),
@@ -943,7 +950,7 @@ export class AgentTasks {
                       'DATASET_EMPTY',
                     ],
                   ),
-              }), !!briefingGeneration, metricPlans.resolve, metricPlans.companions, metricPlans.preferred, metricPlans.hasFusion),
+              }), !!briefingGeneration, metricPlans.resolve, metricPlans.companions, metricPlans.preferred, metricPlans.hasFusion, (primary, ids) => supportingCalculations.set(primary, ids)),
             ]
           : []),
         ...(tablesAvailable && task.contractVersion === '1.5'
@@ -1570,7 +1577,8 @@ export class AgentTasks {
                         : 'TOOL_FAILED',
                   }),
                 );
-              await invoke('execution/tool', { sequence: number, name: tool.name, status: 'failed' });
+              await invoke('execution/tool', { sequence: number, name: tool.name, status: 'failed',
+                ...(contextRejectionAvailable && tool.name === 'task_context' && error instanceof ContextRequestError ? { rejection: 'CONTEXT_ARGUMENTS' } : {}) });
               throw error;
             }
             if (
@@ -1619,7 +1627,8 @@ export class AgentTasks {
           ) {
             const number = ++sequence;
             await invoke('execution/tool', { sequence: number, name: failure.tool, status: 'STARTED' });
-            await invoke('execution/tool', { sequence: number, name: failure.tool, status: 'failed' });
+            await invoke('execution/tool', { sequence: number, name: failure.tool, status: 'failed',
+              ...(contextRejectionAvailable && failure.rejection ? { rejection: failure.rejection } : {}) });
           }
           console.warn(
             JSON.stringify({
@@ -1629,6 +1638,8 @@ export class AgentTasks {
               tool: failure.tool,
               callId: failure.callId,
               code: failure.code,
+              executionStarted: failure.executionStarted,
+              ...(failure.rejection ? { rejection: failure.rejection } : {}),
               ...(failure.validationIssues ? { validationIssues: failure.validationIssues } : {}),
             }),
           );
@@ -1636,7 +1647,7 @@ export class AgentTasks {
         finalResponseReserveMs: briefingGeneration || pptReady ? 10000 : undefined,
         finishOnDeliverable: briefingGeneration,
         invalidDeliveryAttempts: briefingGeneration ? 3 : undefined,
-        hasCompletedDeliverable: briefingGeneration ? hasTerminalBriefing : receipts => hasDeliveredPresentation(receipts) || hasPreparedBriefing(receipts),
+        hasCompletedDeliverable: briefingGeneration ? receipts => hasTerminalBriefing(receipts, contextRejectionAvailable) : receipts => hasDeliveredPresentation(receipts) || hasPreparedBriefing(receipts),
       });
       if (publicSkill)
         result.tools.unshift({
@@ -1678,7 +1689,7 @@ export class AgentTasks {
         requiredInput = null;
         result.text = 'PPT 已按确认稿生成，可下载演示文稿和内容源文件。';
       }
-      const terminalBriefing = briefingGeneration && hasTerminalBriefing(result.tools);
+      const terminalBriefing = briefingGeneration && hasTerminalBriefing(result.tools, contextRejectionAvailable);
       if (terminalBriefing && result.status === 'completed') {
         outcome = 'COMPLETE';
         requiredInput = null;

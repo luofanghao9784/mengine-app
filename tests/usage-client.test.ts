@@ -87,3 +87,14 @@ test('usage client rejects wrong realm, tenant and period responses before displ
   assert.throws(() => api.read('tenant', null, 'THIS_MONTH'));
   assert.throws(() => api.read('tenant', 'invalid', 'THIS_MONTH'));
 });
+test('legacy governance coverage is optional for older platforms but strictly validates supplied counts', () => {
+  assert.ok(isUsage(usage));
+  for (const legacyGovernanceJobs of [0, 3]) {
+    const updated = { ...usage, coverage: { ...usage.coverage, legacyGovernanceJobs } };
+    assert.ok(isUsage(updated));
+    assert.ok(isPlatformUsage({ usage: updated, cost }));
+  }
+  for (const legacyGovernanceJobs of [undefined, null, -1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1, '3'])
+    assert.equal(isUsage({ ...usage, coverage: { ...usage.coverage, legacyGovernanceJobs } }), false);
+  assert.equal(isUsage({ ...usage, coverage: { ...usage.coverage, legacyGovernanceJobs: 1, callCost: 0 } }), false);
+});

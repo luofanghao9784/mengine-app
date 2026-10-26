@@ -2,7 +2,7 @@ import { isRecord } from './http-json.js';
 import { RuntimeError, type Json, type TaskTool } from './ports.js';
 
 /** One bounded selection of published plans; each calculation retains its own grain and receipt. */
-export function governedMetricBundle(tool: TaskTool, enabled: boolean, resolve: (selection: Record<string, unknown>) => unknown, companions?: (selection: Record<string,unknown>) => Record<string,unknown>[], preferred?: (selection: Record<string,unknown>) => Record<string,unknown>, hasFusion?:()=>boolean): TaskTool {
+export function governedMetricBundle(tool: TaskTool, enabled: boolean, resolve: (selection: Record<string, unknown>) => unknown, companions?: (selection: Record<string,unknown>) => Record<string,unknown>[], preferred?: (selection: Record<string,unknown>) => Record<string,unknown>, hasFusion?:()=>boolean, onVerifiedBundle?:(primaryId:string,supportingIds:string[])=>void): TaskTool {
   if (!enabled) return tool;
   const selection = {
     type: 'object', properties: { metricId: {type:'string'}, metricVersion: {type:'integer'}, datasetId: {type:'string'}, snapshotId: {type:'string'} },
@@ -38,7 +38,22 @@ export function governedMetricBundle(tool: TaskTool, enabled: boolean, resolve: 
       }
       if (!isRecord(receipts[0])) throw new RuntimeError('DATASET_RESULT_INVALID');
       if(isRecord(receipts[0].fusion))return {...receipts[0], requiredMetricMentions: Array.isArray(receipts[0].fusion.results) ? receipts[0].fusion.results.slice(0,2).map(r=>isRecord(r)?r.label:null) : [], analysisBoundary:'这是后端已固定并校验的跨表融合计划。fusion.results 为各事实表分别关联共同维度后汇总的完整结果，不是样本。请将 requiredMetricMentions 中的两项名称逐字复制到两段正文中，确保引用明确；不要在正文写 UUID、原始关联键、工具名称或 DATA 等内部标记。正文可以不重复数字，完整精确数值由表格交付。随后立即 deliver_briefing，不再检索或计算。必须在解读正文中分别写出至少两项相关结果的完整 label，结合共同维度讨论分布、差异与行动；表格与数值由后端交付，不需要 AI 重新汇总。保留每项单位、来源范围和未匹配记录，不编造转化率、因果或跨指标合计。使用现有主 artifact.id 调用 deliver_briefing。'} as Json;
-      return { ...receipts[0], supportingCalculations: receipts.slice(1), analysisBoundary: '主图指标以本返回的 governedMetric 或 nativeAnalysisMethod 及主 artifact 为准，标题应与其一致。各指标独立计算，来源、期间、筛选与单位分别保留。只解读已计算事实；不能据此认定跨表逐行匹配、因果、转化率或收款完成率。交付主计算 artifact.id，正文注明各指标业务范围；不要把辅助指标数值误画到主图。' } as Json;
+      if(isRecord(receipts[0].artifact)&&typeof receipts[0].artifact.id==='string') {
+        const supportingIds=receipts.slice(1).map(r=>isRecord(r)&&isRecord(r.artifact)&&typeof r.artifact.id==='string'?r.artifact.id:null);
+        if(supportingIds.some(id=>id===null))throw new RuntimeError('DATASET_RESULT_INVALID');
+        onVerifiedBundle?.(receipts[0].artifact.id,supportingIds as string[]);
+      }
+      return { ...receipts[0], supportingCalculations: receipts.slice(1), analysisBoundary: '主图指标以本返回的 governedMetric 或 nativeAnalysisMethod 及主 artifact 为准，标题应与其一致。各指标独立计算，来源、期间、筛选与单位分别保留。只解读已计算事实；不能据此认定跨表逐行匹配、因果、转化率或收款完成率。交付主计算 artifact.id；运行时自动绑定本次辅助计算，平台从其凭据保存各项独立事实，正文注明各指标业务范围；不要把辅助指标数值误画到主图。' } as Json;
     },
   };
+}
+
+/** The caller owns the verified bundle map; model-supplied auxiliary identities are never accepted. */
+export function bindSupportingCalculations(body: unknown, bindings: ReadonlyMap<string,string[]>, available: boolean): unknown {
+  if(!isRecord(body))return body;
+  if(Object.hasOwn(body,'supportingCalculationArtifactIds'))throw new RuntimeError('INVALID_TOOL_ARGUMENTS');
+  const ids=typeof body.calculationArtifactId==='string'?bindings.get(body.calculationArtifactId):undefined;
+  if(!ids?.length)return body;
+  if(!available)throw new RuntimeError('BRIEFING_SUPPORTING_UNAVAILABLE');
+  return {...body,supportingCalculationArtifactIds:[...ids]};
 }

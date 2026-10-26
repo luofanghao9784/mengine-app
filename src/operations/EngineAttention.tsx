@@ -3,6 +3,7 @@ import { createIdentityRequest, record, IdentityError } from '../identity/client
 import { useSession } from '../identity/session';
 import { Failure, Loading } from '../shared/admin';
 import './engine-attention.css';
+import { businessReadinessReasons } from '../briefing-live/generation-reasons';
 
 type Source = {
   kind: string;
@@ -51,6 +52,7 @@ const states: Record<string, string> = {
   WAITING_CAPABILITY: '等待能力 / 重试',
 };
 const reasons: Record<string, string> = {
+  ...businessReadinessReasons,
   TENANT_DAILY_LIMIT: '企业当日执行额度已用完，等待额度恢复；重试不会绕过额度限制。',
   TENANT_CONCURRENCY_LIMIT: '企业当前执行名额已占满，等待运行中的任务结束。',
   OWNER_CONCURRENCY_LIMIT: '该用户当前执行名额已占满，等待运行中的任务结束。',

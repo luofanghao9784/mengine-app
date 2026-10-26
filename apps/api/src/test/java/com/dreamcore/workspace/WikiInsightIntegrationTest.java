@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={"dreamcore.tasks.enabled=true","dreamcore.tasks.agent-mode=verification","dreamcore.tasks.initial-delay-ms=3600000","dreamcore.knowledge.enabled=true","dreamcore.knowledge.initial-delay-ms=3600000"})
 class WikiInsightIntegrationTest {
     @DynamicPropertySource static void paths(DynamicPropertyRegistry registry) {
+        IsolatedTestDatabase.register(registry);
         Path root=Path.of("").toAbsolutePath();if(root.endsWith("api"))root=root.getParent().getParent();
         String parser=root.resolve("workers/parser").toString();registry.add("dreamcore.knowledge.parser-root",()->parser);
     }

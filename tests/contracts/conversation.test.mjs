@@ -230,4 +230,8 @@ test('execution evidence registers a bounded read-only allowlist without identit
   assert.ok(receipt({ sequence: 1, name: 'search_sources', status: 'STARTED' }));
   assert.equal(receipt({ sequence: 9, name: 'search_sources', status: 'succeeded' }), false);
   assert.equal(receipt({ sequence: 1, name: 'task_control', status: 'BUSINESS_DONE' }), false);
+  const rejected = {sequence:1,name:'task_context',status:'failed',rejection:'CONTEXT_ARGUMENTS'};
+  assert.ok(receipt(rejected));
+  for (const patch of [{name:'search_sources'}, {status:'succeeded'}, {status:'STARTED'}, {rejection:'REMOTE_TIMEOUT'}, {rejection:null}])
+    assert.equal(receipt({...rejected,...patch}), false);
 });

@@ -8,10 +8,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.json.JsonMapper;
 
-/** A model-authored, immutable private publication. Chart values come only from a verified calculation. */
+/** Immutable private publication. Calculated facts and chart values come from the same verified receipt. */
 @Service
 public class BriefingContentService {
-    public record Request(UUID calculationArtifactId,String title,String summary,List<String> analysis,String businessType,BriefingPresentationPolicy.Presentation presentation) {
+    public record Request(UUID calculationArtifactId,String title,String summary,List<String> analysis,String businessType,BriefingPresentationPolicy.Presentation presentation,List<UUID> supportingCalculationArtifactIds) {
+        public Request(UUID calculationArtifactId,String title,String summary,List<String> analysis,String businessType,BriefingPresentationPolicy.Presentation presentation){this(calculationArtifactId,title,summary,analysis,businessType,presentation,null);}
         public Request(UUID calculationArtifactId,String title,String summary,List<String> analysis,String businessType){this(calculationArtifactId,title,summary,analysis,businessType,null);}
         public Request(UUID calculationArtifactId,String title,String summary,List<String> analysis){this(calculationArtifactId,title,summary,analysis,"DATA");}
     }
@@ -22,7 +23,9 @@ public class BriefingContentService {
     }
     public record Source(UUID id,UUID materialId,UUID versionId,int version,String filename,String sha256,String scopeExcerpt) {}
     public record DatasetBasis(String groupColumn,String periodColumn,int matchedRows,int ignoredRows,String periodMode,String timeZone) {public DatasetBasis(String groupColumn,String periodColumn,int matchedRows,int ignoredRows){this(groupColumn,periodColumn,matchedRows,ignoredRows,null,null);}}
-    public record Content(String schemaVersion,String businessType,String title,String summary,List<String> analysis,Chart chart,Source source,UUID calculationArtifactId,String calculationSha256,String generatedAt,DatasetCalculationService.Source datasetSource,DatasetBasis datasetBasis,BriefingPresentationPolicy.Presentation presentation,tools.jackson.databind.JsonNode fusion) {
+    public record CalculationReference(UUID artifactId,String sha256,tools.jackson.databind.JsonNode receipt,String unit) {}
+    public record Content(String schemaVersion,String businessType,String title,String summary,List<String> analysis,Chart chart,Source source,UUID calculationArtifactId,String calculationSha256,String generatedAt,DatasetCalculationService.Source datasetSource,DatasetBasis datasetBasis,BriefingPresentationPolicy.Presentation presentation,tools.jackson.databind.JsonNode fusion,@com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_EMPTY) List<CalculationReference> supportingCalculations) {
+        public Content(String schemaVersion,String businessType,String title,String summary,List<String> analysis,Chart chart,Source source,UUID calculationArtifactId,String calculationSha256,String generatedAt,DatasetCalculationService.Source datasetSource,DatasetBasis datasetBasis,BriefingPresentationPolicy.Presentation presentation,tools.jackson.databind.JsonNode fusion){this(schemaVersion,businessType,title,summary,analysis,chart,source,calculationArtifactId,calculationSha256,generatedAt,datasetSource,datasetBasis,presentation,fusion,null);}
         public Content(String schemaVersion,String businessType,String title,String summary,List<String> analysis,Chart chart,Source source,UUID calculationArtifactId,String calculationSha256,String generatedAt,DatasetCalculationService.Source datasetSource,DatasetBasis datasetBasis,BriefingPresentationPolicy.Presentation presentation){this(schemaVersion,businessType,title,summary,analysis,chart,source,calculationArtifactId,calculationSha256,generatedAt,datasetSource,datasetBasis,presentation,null);}
         public Content(String schemaVersion,String businessType,String title,String summary,List<String> analysis,Chart chart,Source source,UUID calculationArtifactId,String calculationSha256,String generatedAt,DatasetCalculationService.Source datasetSource,DatasetBasis datasetBasis){this(schemaVersion,businessType,title,summary,analysis,chart,source,calculationArtifactId,calculationSha256,generatedAt,datasetSource,datasetBasis,null);}
         public Content(String schemaVersion,String businessType,String title,String summary,List<String> analysis,Chart chart,Source source,UUID calculationArtifactId,String calculationSha256,String generatedAt){this(schemaVersion,businessType,title,summary,analysis,chart,source,calculationArtifactId,calculationSha256,generatedAt,null,null);}
@@ -40,6 +43,8 @@ public class BriefingContentService {
        WHERE a.task_id=t.id AND a.attempt_number=t.attempt AND object_is_active('ARTIFACT',a.id)
        AND EXISTS(SELECT 1 FROM identity_audit proof WHERE proof.target_id=a.id AND proof.tenant_id=a.tenant_id AND proof.action='TASK_BRIEFING_CREATED' AND proof.outcome='SUCCESS')
        AND EXISTS(SELECT 1 FROM conversation_tool_receipts tool WHERE tool.task_id=a.task_id AND tool.attempt_number=a.attempt_number AND tool.name='deliver_briefing' AND tool.status='succeeded')
+       AND NOT EXISTS(SELECT 1 FROM jsonb_array_elements(CASE WHEN EXISTS(SELECT 1 FROM identity_audit kind WHERE kind.target_id=a.id AND kind.tenant_id=a.tenant_id AND kind.action='TASK_BRIEFING_CREATED' AND kind.outcome='SUCCESS') THEN CASE WHEN jsonb_typeof(convert_from(a.content,'UTF8')::jsonb->'supportingCalculations')='array' THEN convert_from(a.content,'UTF8')::jsonb->'supportingCalculations' ELSE '[]'::jsonb END ELSE '[]'::jsonb END) auxiliary
+           WHERE NOT EXISTS(SELECT 1 FROM conversation_artifacts proof WHERE proof.id::text=auxiliary->>'artifactId' AND proof.sha256=auxiliary->>'sha256' AND proof.task_id=a.task_id AND proof.tenant_id=a.tenant_id AND proof.attempt_number=a.attempt_number AND object_is_active('ARTIFACT',proof.id)))
        ORDER BY a.id LIMIT 1
        """;
     public static final class NoUsefulData extends RuntimeException {}
@@ -57,6 +62,8 @@ public class BriefingContentService {
     }
     public Document create(ConversationService.Job job,Request request){
         if(request==null)throw IdentityException.invalid();
+        var supporting=request.supportingCalculationArtifactIds();
+        if(supporting!=null&&(supporting.size()>2||supporting.stream().anyMatch(Objects::isNull)||new HashSet<>(supporting).size()!=supporting.size()||supporting.contains(request.calculationArtifactId())||!supporting.isEmpty()&&request.calculationArtifactId()==null))throw IdentityException.invalid();
         if(statusOnly(request))throw new IdentityException(422,"BRIEFING_STATUS_ONLY");
         String type=request.businessType()==null?"DATA":request.businessType();
         if(!Set.of("INFO","DATA","INSIGHT","SUGGESTION","RESULT").contains(type))throw IdentityException.invalid();
@@ -73,11 +80,12 @@ public class BriefingContentService {
         if(type.equals("INFO"))throw new IdentityException(422,"BRIEFING_TYPE_MISMATCH");
         if(request.calculationArtifactId()==null)throw IdentityException.invalid();
         var chain=db.queryForList("SELECT body::text FROM task_reconciliation_receipts WHERE task_id=? AND attempt_number=? AND body->>'calculationArtifactId'=?",String.class,job.id(),attempt,request.calculationArtifactId().toString());
+        if(chain.size()==1&&supporting!=null&&!supporting.isEmpty())throw new IdentityException(422,"BRIEFING_SUPPORTING_UNAVAILABLE");
         if(chain.size()==1)return createChain(job,request,attempt,json.readTree(chain.getFirst()));
         var input=db.queryForList("SELECT a.sha256,a.content FROM conversation_artifacts a WHERE a.id=? AND a.task_id=? AND a.attempt_number=? AND object_is_active('ARTIFACT',a.id) AND EXISTS(SELECT 1 FROM identity_audit p WHERE p.target_id=a.id AND p.action IN ('TASK_TABLE_COMPUTED','TASK_DATASET_COMPUTED') AND p.outcome='SUCCESS' AND p.tenant_id=a.tenant_id) AND EXISTS(SELECT 1 FROM conversation_tool_receipts r WHERE r.task_id=a.task_id AND r.attempt_number=a.attempt_number AND r.name IN ('compare_table','compare_dataset') AND r.status='succeeded')",request.calculationArtifactId(),job.id(),attempt);
         if(input.size()!=1)throw new IdentityException(403,"BRIEFING_CALCULATION_NOT_GRANTED");
         var item=input.getFirst();byte[] bytes=(byte[])item.get("content");if(!hash(bytes).equals(item.get("sha256")))throw new IdentityException(502,"BRIEFING_CALCULATION_INVALID");
-        var receipt=json.readTree(bytes);if(receipt.has("datasetSource"))return createDataset(job,request,attempt,receipt,(String)item.get("sha256"));var calc=receipt.path("calculation");var params=calc.path("request");
+        var receipt=json.readTree(bytes);if(receipt.has("datasetSource"))return createDataset(job,request,attempt,receipt,(String)item.get("sha256"));if(supporting!=null&&!supporting.isEmpty())throw new IdentityException(422,"BRIEFING_SUPPORTING_UNAVAILABLE");var calc=receipt.path("calculation");var params=calc.path("request");
         if(!calc.path("recipeVersion").asText().equals("table-compare-1")||!calc.path("status").asText().equals("COMPUTED")||!calc.path("inputSha256").equals(receipt.path("source").path("sha256")))throw new IdentityException(422,"BRIEFING_CALCULATION_INVALID");
         BriefingEditorialQuality.validate(request,automatic,datasetSample,true);
         var source=json.treeToValue(receipt.path("source"),Source.class);
@@ -87,6 +95,7 @@ public class BriefingContentService {
         String header=calc.path("headers").path(params.path("valueColumn").asText()).asText().split("\\n")[0];
         String unit="原表数值单位";var match=java.util.regex.Pattern.compile("[（(]([^）)]{1,12})[）)]").matcher(header);if(match.find())unit=match.group(1);
         var chart=new Chart("GROUPED_BAR",header,unit,params.path("baseline").asText(),params.path("current").asText(),params.path("range").asText(),List.copyOf(rows),json.treeToValue(calc.path("totals"),Row.class));
+        request=CalculatedBriefingNarrative.table(request,chart,source.scopeExcerpt());
         var presentation=calculationPresentation(request,chart);
         var prior=db.queryForList("SELECT a.id,a.sha256,a.content FROM conversation_artifacts a WHERE task_id=? AND attempt_number=? AND EXISTS(SELECT 1 FROM identity_audit p WHERE p.target_id=a.id AND p.action='TASK_BRIEFING_CREATED' AND p.tenant_id=a.tenant_id)",job.id(),attempt);
         if(!prior.isEmpty()){
@@ -118,6 +127,7 @@ public class BriefingContentService {
         boolean paired="salesAndReceipts".equals(calc.path("metric").asText());
         boolean orders="orderSalesByConfirmationDate".equals(calc.path("metric").asText());
         var chart=new Chart("GROUPED_BAR",paired?"订单销售与确认收款":orders?"已确认订单金额":"系统确认收款","元",paired?"订单销售额":"不适用",paired?"确认收款":"月内累计",calc.path("from").asText()+"—"+calc.path("to").asText()+" · "+rows.size()+"家店",rows,new Row(null,paired?calc.path("orderTotal").asText():null,calc.path("total").asText(),null,null,null,null,null));
+        request=CalculatedBriefingNarrative.chain(request,chart,paired);
         // The verified result shape fixes the chart; authors cannot hide one metric or imply a time comparison.
         var presentation="DATA".equals(type(request))?BriefingPresentationPolicy.fixedChain(request,chart,paired):calculationPresentation(request,chart);
         BriefingEditorialQuality.validate(request,true,true,true);
@@ -128,14 +138,17 @@ public class BriefingContentService {
         byte[] body=json.writeValueAsBytes(content);if(body.length>20000)throw new IdentityException(413,"BRIEFING_CONTENT_LIMIT");UUID id=UUID.randomUUID();String digest=hash(body);
         db.update("INSERT INTO conversation_artifacts(id,tenant_id,workspace_id,task_id,filename,sha256,content,attempt_number) VALUES(?,?,?,?,?,?,?,?)",id,job.tenant(),job.space(),job.id(),"briefing-chain.json",digest,body,attempt);audit.record(job.actor(),job.tenant(),"TASK_BRIEFING_CREATED",id,"SUCCESS");return new Document(id,digest,content);
     }
-    private Document createDataset(ConversationService.Job job,Request request,int attempt,tools.jackson.databind.JsonNode receipt,String calculationHash){
+    private record PreparedDataset(DatasetCalculationService.Source source,DatasetCalculationService.Calculation calculation,boolean summary,boolean composition,Chart chart,Request narrative) {}
+    private PreparedDataset prepareDataset(ConversationService.Job job,Request request,int attempt,tools.jackson.databind.JsonNode receipt){
         var source=json.treeToValue(receipt.path("datasetSource"),DatasetCalculationService.Source.class);
         boolean composition="dataset-composition-1".equals(receipt.path("calculation").path("recipeVersion").asString());
         boolean summary=composition||"dataset-summary-1".equals(receipt.path("calculation").path("recipeVersion").asString());
         Composition shares=null;
+        DatasetCalculationService.Summary verifiedSummary=null;
         DatasetCalculationService.Calculation calc;
         if(summary){
             var total=json.treeToValue(receipt.path("calculation"),DatasetCalculationService.Summary.class);
+            verifiedSummary=total;
             if(composition){validateComposition(total);shares=new Composition(total.rows(),total.total(),6);}
             var rows=total.rows().stream().map(r->new Row(r.group().isEmpty()?"全部记录":String.join(" / ",r.group()),null,r.value(),null,null,null,null,null)).toList();
             calc=new DatasetCalculationService.Calculation(total.recipeVersion(),total.status(),total.request(),total.inputSha256(),total.matchedRows(),total.ignoredRows(),rows,new Row(null,null,total.total(),null,null,null,null,null),total.missingDateRows());
@@ -151,16 +164,39 @@ public class BriefingContentService {
         boolean countRows="COUNT".equals(calc.request().aggregation());
         String metric=countRows?"记录数":calc.request().valueColumn(),unit=countRows?"条":metric.endsWith("_cents")?"分":metric.endsWith("_grams")?"克":"原数据数值单位";var match=java.util.regex.Pattern.compile("[（(]([^）)]{1,12})[）)]").matcher(metric);if(match.find())unit=match.group(1);
         if("CENTS_TO_YUAN".equals(calc.request().conversion()))unit="元";
-        else if(!countRows && nativeGovernance!=null && calc.request().metricId()==null && Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM business_datasets WHERE tenant_id=? AND id=? AND current_snapshot=?)",Boolean.class,job.tenant(),source.datasetId(),source.snapshotId()))) {
-            for(var publication:nativeGovernance.currentFor(job.actor(),job.tenant(),source.datasetId()))
+        else if(!countRows && nativeGovernance!=null && calc.request().metricId()==null) {
+            for(var publication:nativeGovernance.currentForSnapshot(job.actor(),job.tenant(),source.datasetId(),source.snapshotId()))
                 for(var field:publication.fields())if(field.column().equals(calc.request().valueColumn())&&"SOURCE_DOCUMENTED".equals(field.status())&&!field.unit().isBlank())unit=field.unit();
         }
         var chart=new Chart("GROUPED_BAR",metric,unit,summary?"不适用":calc.request().baseline(),summary?"本次汇总":calc.request().current(),calc.request().dateColumn()==null?"全部快照 · "+source.rowCount()+" 行":"日期筛选 · "+calc.matchedRows()+" 行 · 缺日 "+calc.missingDateRows()+" 行",calc.rows(),calc.totals(),shares);
+        if(calc.matchedRows()==0)throw new NoUsefulData();
+        return new PreparedDataset(source,calc,summary,composition,chart,CalculatedBriefingNarrative.dataset(request,source,calc,verifiedSummary,chart));
+    }
+    private Document createDataset(ConversationService.Job job,Request request,int attempt,tools.jackson.databind.JsonNode receipt,String calculationHash){
+        var prepared=prepareDataset(job,request,attempt,receipt);
+        var source=prepared.source();var calc=prepared.calculation();var chart=prepared.chart();
+        boolean summary=prepared.summary(),composition=prepared.composition();
+        var references=new ArrayList<CalculationReference>();var narratives=new ArrayList<Request>();
+        for(UUID id:request.supportingCalculationArtifactIds()==null?List.<UUID>of():request.supportingCalculationArtifactIds()) {
+            var records=db.queryForList("SELECT a.sha256,a.content FROM conversation_artifacts a WHERE a.id=? AND a.task_id=? AND a.tenant_id=? AND a.attempt_number=? AND object_is_active('ARTIFACT',a.id) AND EXISTS(SELECT 1 FROM identity_audit p WHERE p.target_id=a.id AND p.tenant_id=a.tenant_id AND p.action='TASK_DATASET_COMPUTED' AND p.outcome='SUCCESS')",id,job.id(),job.tenant(),attempt);
+            if(records.size()!=1)throw new IdentityException(403,"BRIEFING_CALCULATION_NOT_GRANTED");
+            var evidence=records.getFirst();byte[] bytes=(byte[])evidence.get("content");String sha=(String)evidence.get("sha256");
+            if(!hash(bytes).equals(sha))throw new IdentityException(502,"BRIEFING_CALCULATION_INVALID");
+            var parsed=json.readTree(bytes);if(!parsed.has("datasetSource"))throw new IdentityException(422,"BRIEFING_SUPPORTING_UNAVAILABLE");
+            var auxiliary=new Request(id,request.title(),request.summary(),request.analysis(),request.businessType(),null);
+            var auxiliaryPrepared=prepareDataset(job,auxiliary,attempt,parsed);
+            narratives.add(auxiliaryPrepared.narrative());
+            references.add(new CalculationReference(id,sha,parsed,auxiliaryPrepared.chart().unit()));
+        }
+        request=narratives.isEmpty()?prepared.narrative():CalculatedBriefingNarrative.combine(prepared.narrative(),narratives);
+
         var presentation="DATA".equals(type(request))&&summary&&request.presentation()==null?new BriefingPresentationPolicy.Presentation("briefing-presentation-v1","EDITORIAL","CURRENT_BAR",null,null,List.of()):calculationPresentation(request,chart);
         var prior=db.queryForList("SELECT a.id,a.sha256,a.content FROM conversation_artifacts a WHERE task_id=? AND attempt_number=? AND EXISTS(SELECT 1 FROM identity_audit p WHERE p.target_id=a.id AND p.action='TASK_BRIEFING_CREATED' AND p.tenant_id=a.tenant_id)",job.id(),attempt);
-        if(!prior.isEmpty()){var doc=read(prior.getFirst());var old=doc.content();if(!old.businessType().equals(type(request))||!Objects.equals(old.calculationArtifactId(),request.calculationArtifactId()) || !old.title().equals(request.title().strip()) || !old.summary().equals(request.summary().strip()) || !old.analysis().equals(request.analysis())||!BriefingPresentationPolicy.same(old,presentation))throw new IdentityException(409,"BRIEFING_ALREADY_CREATED");return doc;}
-        if(!hasUsefulData(calc.rows()))throw new NoUsefulData();
-        var content=new Content("DATA".equals(type(request))?"briefing-dataset-v1":"briefing-text-v1",type(request),request.title().strip(),request.summary().strip(),List.copyOf(request.analysis()),"DATA".equals(type(request))?chart:null,null,request.calculationArtifactId(),calculationHash,Instant.now().toString(),source,new DatasetBasis(summary?(calc.request().groupColumns().isEmpty()?"全部记录":String.join(" / ",calc.request().groupColumns())):calc.request().groupColumn(),summary?"不适用":calc.request().periodColumn(),calc.matchedRows(),calc.ignoredRows(),composition?"COMPOSITION":summary?"SUMMARY":calc.request().periodMode()==null?"EXACT":calc.request().periodMode(),calc.request().timeZone()==null?"Asia/Shanghai":calc.request().timeZone()),presentation);
+        if(!prior.isEmpty()){var doc=read(prior.getFirst());var old=doc.content();if(!Objects.equals(old.supportingCalculations()==null?List.of():old.supportingCalculations(),references)||!old.businessType().equals(type(request))||!Objects.equals(old.calculationArtifactId(),request.calculationArtifactId()) || !old.title().equals(request.title().strip()) || !old.summary().equals(request.summary().strip()) || !old.analysis().equals(request.analysis())||!BriefingPresentationPolicy.same(old,presentation))throw new IdentityException(409,"BRIEFING_ALREADY_CREATED");return doc;}
+        // A measured zero (for example registered late fees) is a fact. Only absence of
+        // matching records is no data; NULL/invalid amounts already fail the calculator.
+        if(calc.matchedRows()==0)throw new NoUsefulData();
+        var content=new Content("DATA".equals(type(request))?"briefing-dataset-v1":"briefing-text-v1",type(request),request.title().strip(),request.summary().strip(),List.copyOf(request.analysis()),"DATA".equals(type(request))?chart:null,null,request.calculationArtifactId(),calculationHash,Instant.now().toString(),source,new DatasetBasis(summary?(calc.request().groupColumns().isEmpty()?"全部记录":String.join(" / ",calc.request().groupColumns())):calc.request().groupColumn(),summary?"不适用":calc.request().periodColumn(),calc.matchedRows(),calc.ignoredRows(),composition?"COMPOSITION":summary?"SUMMARY":calc.request().periodMode()==null?"EXACT":calc.request().periodMode(),calc.request().timeZone()==null?"Asia/Shanghai":calc.request().timeZone()),presentation,null,List.copyOf(references));
         if(!reserve(job,content))return null;
         byte[] body=json.writeValueAsBytes(content);var size=db.queryForMap("SELECT count(*) n,coalesce(sum(octet_length(content)),0) bytes FROM conversation_artifacts WHERE task_id=? AND attempt_number=?",job.id(),attempt);
         if(body.length>20000 || ((Number)size.get("n")).intValue()>=8 || ((Number)size.get("bytes")).longValue()+body.length>65536)throw new IdentityException(413,"BRIEFING_CONTENT_LIMIT");
@@ -220,7 +256,19 @@ public class BriefingContentService {
         if(!owner.equals(job.id())&&!"SUCCEEDED".equals(db.queryForObject("SELECT status FROM conversation_tasks WHERE id=?",String.class,owner)))throw new IdentityException(409,"BRIEFING_CONTENT_IN_PROGRESS");
         return owner.equals(job.id());
     }
-    private String contentKey(Content c){return IdentityService.hash(json.writeValueAsString(List.of(c.businessType(),c.datasetSource()!=null?c.datasetSource().sha256():c.source()==null?"PUBLIC":c.source().sha256(),c.chart()!=null?json.writeValueAsString(c.chart()):c.summary().replaceAll("[\\p{P}\\s]", "").toLowerCase(Locale.ROOT))));}
+    private String contentKey(Content c){
+        var basis=new ArrayList<Object>(List.of(c.businessType(),c.datasetSource()!=null?c.datasetSource().sha256():c.source()==null?"PUBLIC":c.source().sha256(),c.chart()!=null?json.writeValueAsString(c.chart()):c.summary().replaceAll("[\\p{P}\\s]", "").toLowerCase(Locale.ROOT)));
+        if(c.supportingCalculations()!=null&&!c.supportingCalculations().isEmpty())basis.add(c.supportingCalculations().stream().map(this::supportingFactKey).sorted().toList());
+        return IdentityService.hash(json.writeValueAsString(basis));
+    }
+    private String supportingFactKey(CalculationReference reference){
+        var calculation=(tools.jackson.databind.node.ObjectNode)reference.receipt().path("calculation").deepCopy();
+        var request=(tools.jackson.databind.node.ObjectNode)calculation.path("request");
+        request.remove("snapshotId");request.remove("metricId");request.remove("metricVersion");
+        // Retain source contents, exact business scope, every result and the confirmed unit;
+        // transport identities, version timestamps and rerun artifacts cannot manufacture novelty.
+        return IdentityService.hash(json.writeValueAsString(List.of(reference.receipt().path("datasetSource").path("sha256").asText(),reference.unit(),calculation)));
+    }
     private RuleTrace ruleTrace(UUID artifact){
         var rows=db.queryForList("SELECT s.rules::text AS rules,EXISTS(SELECT 1 FROM briefing_generation_batches b WHERE b.task_id=a.task_id) AS automatic FROM expression_rule_task_snapshots s JOIN conversation_artifacts a ON a.task_id=s.task_id WHERE a.id=?",artifact);
         if(rows.isEmpty())return new RuleTrace("NOT_RECORDED",List.of());

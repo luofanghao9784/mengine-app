@@ -139,12 +139,35 @@
             "succeeded",
             "failed"
           ]
+        },
+        "rejection": {
+          "const": "CONTEXT_ARGUMENTS",
+          "description": "Negotiated by contextRejectionVersion=1.0. Trusted engine evidence of local task_context argument rejection before dispatch; never derive from a remote code or model text. Failure remains failed. Native generation recovery additionally requires a later successful context read in this attempt and a real terminal delivery proof."
         }
       },
       "required": [
         "sequence",
         "name",
         "status"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "rejection"
+            ]
+          },
+          "then": {
+            "properties": {
+              "name": {
+                "const": "task_context"
+              },
+              "status": {
+                "const": "failed"
+              }
+            }
+          }
+        }
       ]
     }
   }

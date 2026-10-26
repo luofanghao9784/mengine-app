@@ -1,6 +1,7 @@
 package com.dreamcore.workspace.collection;
 
 import com.dreamcore.workspace.governance.GovernanceReferencePolicy;
+import com.dreamcore.workspace.governance.GovernanceSourceEvidence;
 import com.dreamcore.workspace.identity.IdentityAudit;
 import com.dreamcore.workspace.identity.IdentityException;
 import com.dreamcore.workspace.identity.IdentityService;
@@ -36,6 +37,8 @@ public class NativeGovernanceDeployment {
    @Autowired
    private NativeMaterialGovernance materialGovernance;
    private final JsonMapper json = new JsonMapper();
+   @org.springframework.beans.factory.annotation.Value("${dreamcore.governance.source-evidence:}")
+   private String evidencePath = "";
 
    public NativeGovernanceDeployment(
       JdbcTemplate db, TransactionTemplate tx, CollectionService collections, CompanyBackgroundSourceService background, IdentityAudit audit, Environment env
@@ -66,11 +69,20 @@ public class NativeGovernanceDeployment {
       return (NativeGovernanceDeployment.Context)this.tx.execute(t -> this.contextInside(actor, tenant, ids));
    }
 
+   /** Stable definitions can be reused only while the declared source contract is unchanged. */
+   public NativeGovernanceDeployment.Context definitionContext(UUID actor, UUID tenant, List<UUID> ids) {
+      return this.tx.execute(t -> this.contextInside(actor, tenant, ids, null, true));
+   }
+
    private NativeGovernanceDeployment.Context contextInside(UUID actor, UUID tenant, List<UUID> ids) {
       return this.contextInside(actor, tenant, ids, null);
    }
 
    private NativeGovernanceDeployment.Context contextInside(UUID actor, UUID tenant, List<UUID> ids, String knownBackground) {
+      return this.contextInside(actor, tenant, ids, knownBackground, false);
+   }
+
+   private NativeGovernanceDeployment.Context contextInside(UUID actor, UUID tenant, List<UUID> ids, String knownBackground, boolean definitions) {
       this.check(ids != null && !ids.isEmpty() && ids.size() <= 20 && new HashSet<>(ids).size() == ids.size());
       String backgroundVersion = knownBackground;
       if (backgroundVersion == null) {
@@ -88,7 +100,7 @@ public class NativeGovernanceDeployment {
 
          Map<String, Object> row = this.db
             .queryForMap(
-               "SELECT d.workspace_id,d.column_names,d.field_definitions,d.current_snapshot,s.row_count,s.data_rows::text data_content,s.coverage_through FROM business_datasets d JOIN dataset_snapshots s ON s.id=d.current_snapshot AND s.dataset_id=d.id WHERE d.id=? AND d.tenant_id=? AND d.status='ACTIVE'",
+               "SELECT d.workspace_id,d.connection_id,d.dataset_key,d.name,d.description,d.column_names,d.field_definitions,d.current_snapshot,s.row_count,s.data_rows::text data_content,s.coverage_through FROM business_datasets d JOIN dataset_snapshots s ON s.id=d.current_snapshot AND s.dataset_id=d.id WHERE d.id=? AND d.tenant_id=? AND d.status='ACTIVE' AND NOT d.scrubbed AND NOT s.scrubbed",
                new Object[]{id, tenant}
             );
          List<String> columns = (List<String>)this.json
@@ -99,12 +111,12 @@ public class NativeGovernanceDeployment {
             this.json
                .writeValueAsString(
                   List.of(
-                     "CONTENT_V2",
+                     definitions ? "DEFINITION_V1" : "CONTENT_V2",
                      tenant,
                      id,
                      space,
-                     IdentityService.hash(row.get("data_content").toString()),
-                     Objects.toString(row.get("coverage_through"), ""),
+                     definitions ? this.definitionEvidence(tenant, id, row) : IdentityService.hash(row.get("data_content").toString()),
+                     definitions ? "" : Objects.toString(row.get("coverage_through"), ""),
                      row.get("column_names").toString(),
                      row.get("field_definitions").toString(),
                      backgroundVersion
@@ -117,13 +129,42 @@ public class NativeGovernanceDeployment {
       return new NativeGovernanceDeployment.Context(tenant, this.subject(actor, tenant), backgroundVersion, sources);
    }
 
+   private Object canonical(Object value) {
+      if (value instanceof Map<?,?> map) {
+         var result = new java.util.TreeMap<String,Object>();
+         map.forEach((key,item) -> result.put(key.toString(), canonical(item)));
+         return result;
+      }
+      if (value instanceof List<?> list) return list.stream().map(this::canonical).toList();
+      return value;
+   }
+
+   private String definitionEvidence(UUID tenant, UUID dataset, Map<String,Object> row) {
+      String name = row.get("name").toString();
+      boolean unique = this.db.queryForObject("SELECT count(*) FROM business_datasets WHERE tenant_id=? AND name=? AND status='ACTIVE' AND NOT scrubbed", Integer.class, tenant, name) == 1;
+      var entries = GovernanceSourceEvidence.read(evidencePath, tenant, dataset, name, "entries", unique);
+      var schema = GovernanceSourceEvidence.read(evidencePath, tenant, dataset, name, "schema", unique).stream()
+          .filter(item -> !"export-validation".equals(item.get("kind"))).toList();
+      return IdentityService.hash(this.json.writeValueAsString(canonical(List.of(row.get("connection_id"), row.get("dataset_key"), name,
+          Objects.toString(row.get("description"), ""), this.sourceScope(tenant, dataset, row), entries, schema))));
+   }
+
+   private String sourceScope(UUID tenant, UUID dataset, Map<String,Object> row) {
+      var values = this.db.queryForList("SELECT receipt->>'scopeHash' FROM collection_snapshot_receipts WHERE snapshot_id=? AND tenant_id=? AND dataset_id=?", String.class,
+          row.get("current_snapshot"), tenant, dataset);
+      if (!values.isEmpty()) return values.getFirst();
+      // Missing current proof blocks analysis separately; it does not erase the last declared source contract.
+      var prior = this.db.queryForList("SELECT receipt->>'scopeHash' FROM collection_snapshot_receipts WHERE tenant_id=? AND dataset_id=? ORDER BY received_at DESC,snapshot_id DESC LIMIT 1", String.class, tenant, dataset);
+      return prior.isEmpty() ? "UNATTESTED" : prior.getFirst();
+   }
+
    public NativeGovernanceDeployment.Receipt submit(NativeGovernanceDeployment.Package p, boolean publish) {
       return (NativeGovernanceDeployment.Receipt)this.tx
          .execute(
             t -> {
                this.check(
                   p != null
-                     && Set.of("1.0", "1.1").contains(p.contractVersion())
+                     && Set.of("1.0", "1.1", "1.2").contains(p.contractVersion())
                      && p.id() != null
                      && p.tenantId() != null
                      && p.recipientId() != null
@@ -168,7 +209,7 @@ public class NativeGovernanceDeployment {
                   this.db.queryForList("SELECT id FROM business_datasets WHERE id=? AND tenant_id=? FOR UPDATE", new Object[]{id, p.tenantId()});
                }
 
-               NativeGovernanceDeployment.Context ctx = this.contextInside(p.recipientId(), p.tenantId(), ids);
+               NativeGovernanceDeployment.Context ctx = this.contextInside(p.recipientId(), p.tenantId(), ids, null, "1.2".equals(p.contractVersion()));
                this.check(ctx.backgroundVersion().equals(p.backgroundVersion()));
 
                for (int i = 0; i < p.items().size(); i++) {
@@ -224,7 +265,7 @@ public class NativeGovernanceDeployment {
                NativeGovernanceDeployment.Package p = (NativeGovernanceDeployment.Package)this.json
                   .readValue(rows.getFirst().get("package").toString(), NativeGovernanceDeployment.Package.class);
                NativeGovernanceDeployment.Context ctx = this.contextInside(
-                  actor, tenant, p.items().stream().map(NativeGovernanceDeployment.Item::datasetId).toList()
+                  actor, tenant, p.items().stream().map(NativeGovernanceDeployment.Item::datasetId).toList(), null, "1.2".equals(p.contractVersion())
                );
                boolean valid = ctx.backgroundVersion().equals(p.backgroundVersion()) && this.materialsCurrent(actor, tenant, p);
 
@@ -268,14 +309,9 @@ public class NativeGovernanceDeployment {
                ArrayList<NativeGovernanceDeployment.Published> result = new ArrayList<>();
                HashSet<UUID> seen = new HashSet<>();
 
-               for (UUID id : source == null
-                  ? this.list(actor, tenant)
-                  : this.db
-                     .queryForList(
-                        "SELECT id FROM native_governance_releases WHERE tenant_id=? AND recipient_id=headquarters_permission_actor(?,?) AND EXISTS(SELECT 1 FROM jsonb_array_elements(package->'items') i WHERE i->>'datasetId'=?) ORDER BY created_at DESC,id DESC",
-                        UUID.class,
-                        new Object[]{tenant, actor, tenant, source.toString()}
-                     )) {
+               for (UUID id : this.db.queryForList(
+                     "SELECT id FROM native_governance_releases WHERE tenant_id=? AND (recipient_id=headquarters_permission_actor(?,?) OR package->>'contractVersion'='1.2') AND (?::text IS NULL OR EXISTS(SELECT 1 FROM jsonb_array_elements(package->'items') i WHERE i->>'datasetId'=?)) ORDER BY created_at DESC,id DESC",
+                     UUID.class,tenant,actor,tenant,source==null?null:source.toString(),source==null?null:source.toString())) {
                   NativeGovernanceDeployment.Package p = (NativeGovernanceDeployment.Package)this.json
                      .readValue(
                         (String)this.db.queryForObject("SELECT package::text FROM native_governance_releases WHERE id=?", String.class, new Object[]{id}),
@@ -283,7 +319,7 @@ public class NativeGovernanceDeployment {
                      );
                   if (!p.items().stream().anyMatch(ix -> !this.collections.readable(actor, tenant, ix.datasetId()))) {
                      NativeGovernanceDeployment.Context ctx = this.contextInside(
-                        actor, tenant, p.items().stream().map(NativeGovernanceDeployment.Item::datasetId).toList(), backgroundVersion
+                        actor, tenant, p.items().stream().map(NativeGovernanceDeployment.Item::datasetId).toList(), backgroundVersion, "1.2".equals(p.contractVersion())
                      );
                      boolean valid = ctx.backgroundVersion().equals(p.backgroundVersion()) && this.materialsCurrent(actor, tenant, p);
 
@@ -293,7 +329,8 @@ public class NativeGovernanceDeployment {
 
                      for (NativeGovernanceDeployment.Item item : p.items()) {
                         if (seen.add(item.datasetId()) && valid) {
-                           result.add(new NativeGovernanceDeployment.Published(id, item.datasetId(), item.knowledge(), item.evidence(), item.fields()));
+                           boolean owner = p.recipientId().equals(this.subject(actor, tenant));
+                           result.add(new NativeGovernanceDeployment.Published(id, item.datasetId(), owner ? item.knowledge() : "", owner ? item.evidence() : List.of(), item.fields()));
                         }
                      }
                   }
@@ -302,6 +339,22 @@ public class NativeGovernanceDeployment {
                return result;
             }
          );
+   }
+
+   /** A task keeps its accepted snapshot; only 1.2 definitions may survive a later collection. */
+   public List<NativeGovernanceDeployment.Published> currentForSnapshot(UUID actor, UUID tenant, UUID dataset, UUID snapshot) {
+      return this.tx.execute(t -> {
+         this.background.get(actor, tenant);
+         if (!this.collections.readable(actor, tenant, dataset)) return List.of();
+         // Hold the source contract steady while resolving the publication and receipt scope.
+         var rows = this.db.queryForList("SELECT d.current_snapshot FROM business_datasets d JOIN dataset_snapshots s ON s.dataset_id=d.id AND s.id=? WHERE d.id=? AND d.tenant_id=? AND d.status='ACTIVE' AND NOT d.scrubbed AND NOT s.scrubbed FOR SHARE OF d", snapshot, dataset, tenant);
+         if (rows.isEmpty()) return List.of();
+         var publications = this.currentFor(actor, tenant, dataset).stream().filter(p -> p.datasetId().equals(dataset)).toList();
+         if (snapshot.equals(rows.getFirst().get("current_snapshot"))) return publications;
+         var scopes = this.db.queryForList("SELECT receipt->>'scopeHash' FROM collection_snapshot_receipts WHERE snapshot_id=? AND tenant_id=? AND dataset_id=?", String.class, snapshot, tenant, dataset);
+         if (scopes.isEmpty() || !Objects.equals(scopes.getFirst(), this.sourceScope(tenant, dataset, rows.getFirst()))) return List.of();
+         return publications.stream().filter(p -> "1.2".equals(this.db.queryForObject("SELECT package->>'contractVersion' FROM native_governance_releases WHERE id=? AND tenant_id=?", String.class, p.releaseId(), tenant))).toList();
+      });
    }
 
    public int pendingReview(UUID actor, UUID tenant) {

@@ -46,7 +46,7 @@ test('automatic briefing retrieves a metric, selects its topic, calculates and d
  const source={datasetId:id,snapshotId:id,version:1,name:'合成订单登记',description:'登记记录数量',columns:['id'],totalColumns:1,columnOffset:0,nextColumnOffset:null,rowCount:2,coverageThrough:null,collectedAt:'2026-10-16T00:00:00Z',authority:false,governedMetrics:response().result.items[0].governedMetrics};
  const server=createServer(async(req,res)=>{
   if(usageFixture(req,res))return;const input=await body(req);
-  if(req.url.endsWith('/check'))return json(res,{allowed:true,executionClass:'live',briefingGeneration:true,briefingPresentationVersion:'1.0',briefingContentVersion:'1.0',topicStrategyVersion:'1.0',topicSelectionRecorded:selected,contextVersion:'1.0',datasetContextVersion:'1.0',datasetComparisonVersion:'1.0',datasetAnalysisVersion:'1.0',datasetBriefingSummaryVersion:'1.0'});
+  if(req.url.endsWith('/check'))return json(res,{allowed:true,executionClass:'live',briefingGeneration:true,briefingSupportingCalculationsVersion:'1.0',briefingPresentationVersion:'1.0',briefingContentVersion:'1.0',topicStrategyVersion:'1.0',topicSelectionRecorded:selected,contextVersion:'1.0',datasetContextVersion:'1.0',datasetComparisonVersion:'1.0',datasetAnalysisVersion:'1.0',datasetBriefingSummaryVersion:'1.0'});
   if(req.url.endsWith('/execution/open'))return json(res,{accepted:true,policy:'READ_ONLY_PRIVATE_V1'});
   if(req.url.endsWith('/execution/tool'))return json(res,{accepted:true});
   if(req.url.endsWith('/context'))return json(res,{contractVersion:'1.0',action:input.action,referenceOnly:true,result:input.action==='bootstrap'?{}:{items:[source],hasMore:false}});
@@ -86,13 +86,13 @@ test('automatic briefing calculates two verified metrics in one tool turn before
  source.governedMetrics.items.push({metricId:other,version:2,executionRequest:{...plan,metricId:other}});
  const server=createServer(async(req,res)=>{
   if(usageFixture(req,res))return;const input=await body(req);
-  if(req.url.endsWith('/check'))return json(res,{allowed:true,executionClass:'live',briefingGeneration:true,briefingPresentationVersion:'1.0',briefingContentVersion:'1.0',topicStrategyVersion:'1.0',topicSelectionRecorded:selected,contextVersion:'1.0',datasetContextVersion:'1.0',datasetComparisonVersion:'1.0',datasetAnalysisVersion:'1.0',datasetBriefingSummaryVersion:'1.0'});
+  if(req.url.endsWith('/check'))return json(res,{allowed:true,executionClass:'live',briefingGeneration:true,briefingSupportingCalculationsVersion:'1.0',briefingPresentationVersion:'1.0',briefingContentVersion:'1.0',topicStrategyVersion:'1.0',topicSelectionRecorded:selected,contextVersion:'1.0',datasetContextVersion:'1.0',datasetComparisonVersion:'1.0',datasetAnalysisVersion:'1.0',datasetBriefingSummaryVersion:'1.0'});
   if(req.url.endsWith('/execution/open'))return json(res,{accepted:true,policy:'READ_ONLY_PRIVATE_V1'});
   if(req.url.endsWith('/execution/tool'))return json(res,{accepted:true});
   if(req.url.endsWith('/context'))return json(res,{contractVersion:'1.0',action:input.action,referenceOnly:true,result:input.action==='bootstrap'?{}:{items:[source],hasMore:false}});
   if(req.url.endsWith('/select-briefing-topic')){selected=true;steps.push('topic');return json(res,{recorded:true,proposalOnly:true,selectedIndex:0,strategyVersion:'1.0.0'});}
-  if(req.url.endsWith('/compare-dataset')){assert.ok(selected);assert.deepEqual(input,normalizeDatasetArguments({...plan,metricId:steps.filter(x=>x==='calculation').length===0?id:other}));calculated=true;steps.push('calculation');return json(res,receipt(input));}
-  if(req.url.endsWith('/deliver-briefing')){assert.ok(calculated);assert.equal(input.calculationArtifactId,id);delivered=true;steps.push('delivery');return json(res,{contractVersion:'1.0',status:'PREPARED',artifactId:other,title:input.title,visibility:'PRIVATE_AFTER_TASK_SUCCEEDS'});}
+  if(req.url.endsWith('/compare-dataset')){assert.ok(selected);assert.deepEqual(input,normalizeDatasetArguments({...plan,metricId:steps.filter(x=>x==='calculation').length===0?id:other}));calculated=true;steps.push('calculation');const result=receipt(input);result.artifact.id=input.metricId;return json(res,result);}
+  if(req.url.endsWith('/deliver-briefing')){assert.ok(calculated);assert.equal(input.calculationArtifactId,id);assert.deepEqual(input.supportingCalculationArtifactIds,[other]);delivered=true;steps.push('delivery');return json(res,{contractVersion:'1.0',status:'PREPARED',artifactId:other,title:input.title,visibility:'PRIVATE_AFTER_TASK_SUCCEEDS'});}
   return json(res,{},404);
  });
  const url=await listen(server);t.after(()=>close(server));
@@ -100,7 +100,7 @@ test('automatic briefing calculates two verified metrics in one tool turn before
   calls++;
   if(calls===2){assert.equal(request.requiredTool,'select_briefing_topic');assert.ok(!request.tools.some(t=>t.name==='task_context'));}
   if(calls===3)assert.equal(request.requiredTool,'compare_dataset');
-  if(calls===4){const delivery=request.tools.find(t=>t.name==='deliver_briefing');assert.ok(delivery);assert.ok(delivery.parameters.properties.presentation);}const choices=[['task_context',{action:'dataset_search'}],['select_briefing_topic',{candidates:[{question:'订单登记记录数量是多少？',goal:'建立订单登记基线',userValue:'按登记口径核对记录完整性',destination:'BRIEFING',evidenceNeeded:'已发布记录数指标',requiresCalculation:true,difference:'首次按登记记录口径交付',businessType:'DATA'}],selectedIndex:0}],['compare_dataset',{...selection,supportingMetrics:[{...selection,metricId:other}]}],['deliver_briefing',{businessType:'DATA',calculationArtifactId:id,title:'订单登记共有2条记录',summary:'按已发布记录数口径统计，共有2条登记记录。',analysis:['记录数量由固定计划计算得出，共2条。','此数值表示登记记录，不代表有效订单数或客户人数。']}]];
+  if(calls===4){const delivery=request.tools.find(t=>t.name==='deliver_briefing');assert.ok(delivery);assert.ok(delivery.parameters.properties.presentation);assert.equal(delivery.parameters.properties.supportingCalculationArtifactIds,undefined,'only trusted runtime binds supporting evidence');}const choices=[['task_context',{action:'dataset_search'}],['select_briefing_topic',{candidates:[{question:'订单登记记录数量是多少？',goal:'建立订单登记基线',userValue:'按登记口径核对记录完整性',destination:'BRIEFING',evidenceNeeded:'已发布记录数指标',requiresCalculation:true,difference:'首次按登记记录口径交付',businessType:'DATA'}],selectedIndex:0}],['compare_dataset',{...selection,supportingMetrics:[{...selection,metricId:other}]}],['deliver_briefing',{businessType:'DATA',calculationArtifactId:id,title:'订单登记共有2条记录',summary:'按已发布记录数口径统计，共有2条登记记录。',analysis:['记录数量由固定计划计算得出，共2条。','此数值表示登记记录，不代表有效订单数或客户人数。']}]];
   assert.ok(calls<=4);const [name,args]=choices[calls-1];yield {type:'tool_call',id:'step-'+calls,name,arguments:JSON.stringify(args)};yield {type:'finish',reason:'tool_calls'};
  }})});
  const result=await agent.run({contractVersion:'1.5',taskId:randomUUID(),attemptId:randomUUID(),prompt:'按已发布指标生成画报'},new AbortController().signal);
@@ -135,7 +135,7 @@ test('native installed methods unlock automatic briefing calculation without leg
  source.nativeAnalysisPlans={authority:false,items:[id,other].map(metricId=>{const executionRequest=structuredClone(plan);delete executionRequest.metricId;delete executionRequest.metricVersion;return {methodId:metricId,version:2,authority:false,selection:{...selection,metricId},definition:{name:'合成登记数量',unit:'条',grain:'登记记录',scope:'当前固定快照',exclusions:'无',execution:{reviewed:true}},executionRequest};})};
  const server=createServer(async(req,res)=>{
   if(usageFixture(req,res))return;const input=await body(req);
-  if(req.url.endsWith('/check'))return json(res,{allowed:true,executionClass:'live',briefingGeneration:true,briefingPresentationVersion:'1.0',briefingContentVersion:'1.0',topicStrategyVersion:'1.0',topicSelectionRecorded:selected,contextVersion:'1.0',datasetContextVersion:'1.0',datasetComparisonVersion:'1.0',datasetAnalysisVersion:'1.0',datasetBriefingSummaryVersion:'1.0'});
+  if(req.url.endsWith('/check'))return json(res,{allowed:true,executionClass:'live',briefingGeneration:true,briefingSupportingCalculationsVersion:'1.0',briefingPresentationVersion:'1.0',briefingContentVersion:'1.0',topicStrategyVersion:'1.0',topicSelectionRecorded:selected,contextVersion:'1.0',datasetContextVersion:'1.0',datasetComparisonVersion:'1.0',datasetAnalysisVersion:'1.0',datasetBriefingSummaryVersion:'1.0'});
   if(req.url.endsWith('/execution/open'))return json(res,{accepted:true,policy:'READ_ONLY_PRIVATE_V1'});
   if(req.url.endsWith('/execution/tool'))return json(res,{accepted:true});
   if(req.url.endsWith('/context'))return json(res,{contractVersion:'1.0',action:input.action,referenceOnly:true,result:input.action==='bootstrap'?{}:{items:[source],hasMore:false}});
@@ -180,4 +180,15 @@ test('native dimension rollups retain signed decimals beyond floating-point prec
  const tool=datasetComparisonTool({fixedPlanOnly:true,resolveMetricPlan:()=>req,describeMetricPlan:()=>({kind:'NATIVE_SOURCE_METHOD',unit:'人民币元'}),authorize:async()=>{},invoke:async body=>{const r=receipt(body);r.calculation.rows=[{group:['总部店','收'],value:'9007199254740993.0000001',records:1},{group:['甲店','收'],value:'-9007199254740992.0000000',records:1}];r.calculation.total='1.0000001';return r;}});
  const out=await tool.execute(selection,new AbortController().signal);
  assert.equal(out.nativeAnalysisMethod.dimensionTotals[1].rows[0].value,'1.0000001');assert.equal(out.nativeAnalysisMethod.dimensionTotals[1].unit,'人民币元');
+});
+
+
+test('supporting delivery binds only verified runtime identities and cannot silently downgrade to an old platform', async () => {
+ const {bindSupportingCalculations}=await import('../dist/runtime/governed-metric-bundle.js');
+ const request={calculationArtifactId:id,title:'来源核对'}, bindings=new Map([[id,[other]]]);
+ assert.deepEqual(bindSupportingCalculations(request,bindings,true),{...request,supportingCalculationArtifactIds:[other]});
+ assert.throws(()=>bindSupportingCalculations(request,bindings,false),{code:'BRIEFING_SUPPORTING_UNAVAILABLE'});
+ assert.throws(()=>bindSupportingCalculations({...request,supportingCalculationArtifactIds:[other]},bindings,true),{code:'INVALID_TOOL_ARGUMENTS'});
+ assert.deepEqual(bindSupportingCalculations({calculationArtifactId:other},bindings,false),{calculationArtifactId:other});
+ assert.equal(Object.hasOwn(request,'supportingCalculationArtifactIds'),false);
 });

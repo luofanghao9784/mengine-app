@@ -17,6 +17,14 @@ const row = (v: unknown): v is BriefingRow =>
   rank(v.currentRank) &&
   (v.issue === null ||
     ['MISSING_PERIOD', 'NON_POSITIVE_BASELINE', 'UNEQUAL_GROUP_COVERAGE'].includes(String(v.issue)));
+function isSupportingCalculation(value:unknown):boolean {
+  if(!record(value)||!uuid(value.artifactId)||!hash(value.sha256)||!text(value.unit,1,100)||!record(value.receipt))return false;
+  const source=value.receipt.datasetSource, calc=value.receipt.calculation;
+  if(!record(source)||!uuid(source.datasetId)||!uuid(source.snapshotId)||!hash(source.sha256)||!Number.isSafeInteger(source.version)||Number(source.version)<1||!text(source.name,1,160)||!Number.isSafeInteger(source.rowCount)||Number(source.rowCount)<1||Number(source.rowCount)>100000||typeof source.collectedAt!=='string'||!Number.isFinite(Date.parse(source.collectedAt))||(source.coverageThrough!==null&&(typeof source.coverageThrough!=='string'||!Number.isFinite(Date.parse(source.coverageThrough)))))return false;
+  if(!record(calc)||calc.status!=='COMPUTED'||calc.inputSha256!==source.sha256||!record(calc.request)||calc.request.datasetId!==source.datasetId||calc.request.snapshotId!==source.snapshotId||!Number.isSafeInteger(calc.matchedRows)||Number(calc.matchedRows)<1||!Number.isSafeInteger(calc.ignoredRows)||Number(calc.ignoredRows)<0||Number(calc.matchedRows)+Number(calc.ignoredRows)!==source.rowCount||!Array.isArray(calc.rows)||calc.rows.length<1||calc.rows.length>50)return false;
+  if(['dataset-summary-1','dataset-composition-1'].includes(String(calc.recipeVersion)))return calc.total!==null&&decimal(calc.total)&&calc.rows.every(r=>record(r)&&Array.isArray(r.group)&&r.group.length<=3&&r.group.every(g=>typeof g==='string')&&r.value!==null&&decimal(r.value)&&Number.isSafeInteger(r.records)&&Number(r.records)>0);
+  return ['dataset-compare-1','dataset-compare-month-1'].includes(String(calc.recipeVersion))&&calc.rows.every(row)&&row(calc.totals);
+}
 export function isBriefingDocument(v: unknown): v is BriefingDocument {
   if (!record(v) || !uuid(v.artifactId) || !hash(v.sha256) || !record(v.content)) return false;
   if (
@@ -52,6 +60,8 @@ export function isBriefingDocument(v: unknown): v is BriefingDocument {
     s = c.source,
     ds = c.datasetSource,
     basis = c.datasetBasis;
+  if(c.supportingCalculations!==undefined&&(!Array.isArray(c.supportingCalculations)||c.supportingCalculations.length>2||!c.supportingCalculations.every(isSupportingCalculation)||new Set(c.supportingCalculations.map(r=>r.artifactId)).size!==c.supportingCalculations.length||c.supportingCalculations.some(r=>r.artifactId===c.calculationArtifactId)))return false;
+  if(Array.isArray(c.supportingCalculations)&&c.supportingCalculations.length&&(!uuid(c.calculationArtifactId)||!hash(c.calculationSha256)||!record(c.datasetSource)||c.businessType==='INFO'))return false;
   if(c.fusion!=null&&!isFusionEvidence(c.fusion))return false;
   if (c.presentation != null && !isPresentation(c.presentation, c as unknown as BriefingDocument['content']))
     return false;

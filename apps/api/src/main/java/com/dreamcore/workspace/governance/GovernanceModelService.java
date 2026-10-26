@@ -42,6 +42,7 @@ public class GovernanceModelService {
    @Autowired
    private NativeMaterialGovernance materialReleases;
    private final JsonMapper json = new JsonMapper();
+   @Autowired private com.dreamcore.workspace.plans.PlanClock analysisClock;
    @Value("${dreamcore.governance.dispatch-enabled:false}")
    private boolean dispatchEnabled;
 
@@ -63,7 +64,8 @@ public class GovernanceModelService {
          return result;
       }
       var row = rows.getFirst();
-      boolean current = this.current(actor, tenant, row);
+      boolean current = this.releases.currentFor(actor, tenant, source).stream().anyMatch(p -> p.releaseId().equals(row.get("id")))
+          || this.current(actor, tenant, row);
       var job = this.view(row, false);
       String state = !current ? "STALE" : Boolean.TRUE.equals(job.get("published")) ? "PUBLISHED" : row.get("state").toString();
       result.put("state", state);
@@ -109,6 +111,10 @@ public class GovernanceModelService {
    }
 
    private Map<String, Object> source(UUID actor, UUID tenant, String kind, UUID id) {
+      return this.source(actor, tenant, kind, id, null);
+   }
+
+   private Map<String, Object> source(UUID actor, UUID tenant, String kind, UUID id, UUID snapshot) {
       LinkedHashMap<String, Object> out = new LinkedHashMap<>();
       out.put("kind", kind);
       out.put("sourceId", id);
@@ -117,11 +123,11 @@ public class GovernanceModelService {
             throw this.error(404, "DATASET_NOT_FOUND");
          }
 
-         Map<String, Object> r = this.db
-            .queryForMap(
-               "SELECT d.name,d.column_names::text,d.field_definitions::text,s.id snapshot_id,s.version,s.row_count,s.data_rows::text,s.coverage_through FROM business_datasets d JOIN dataset_snapshots s ON s.id=d.current_snapshot AND s.dataset_id=d.id WHERE d.tenant_id=? AND d.id=? AND d.status='ACTIVE' AND NOT d.scrubbed AND NOT s.scrubbed",
-               new Object[]{tenant, id}
-            );
+         var snapshots = this.db.queryForList(
+               "SELECT d.name,d.column_names::text,d.field_definitions::text,s.id snapshot_id,s.version,s.row_count,s.data_rows::text,s.coverage_through FROM business_datasets d JOIN dataset_snapshots s ON s.id=coalesce(?::uuid,d.current_snapshot) AND s.dataset_id=d.id WHERE d.tenant_id=? AND d.id=? AND d.status='ACTIVE' AND NOT d.scrubbed AND NOT s.scrubbed",
+               snapshot, tenant, id);
+         if (snapshots.isEmpty()) throw this.error(404, "DATASET_NOT_FOUND");
+         Map<String, Object> r = snapshots.getFirst();
          List columns = (List)this.json.readValue(r.get("column_names").toString(), List.class);
          List rows = (List)this.json.readValue(r.get("data_rows").toString(), List.class);
          ArrayList<Integer> nulls = new ArrayList<>();
@@ -204,7 +210,14 @@ public class GovernanceModelService {
 
    private Map<String, Object> checks(UUID actor, UUID tenant, UUID dataset, UUID snapshot, String table, List<?> columns, List<?> rows) {
       List<Map<String, Object>> schema = this.sourceEvidence(tenant, dataset, table, "schema");
-      Map<String,Object> export = ExportSnapshotChecks.check(snapshot, columns, rows, schema);
+      // The adapter receipt is bound to this accepted platform snapshot, never a stale deployment sample.
+      var received = this.db.queryForList("SELECT receipt::text FROM collection_snapshot_receipts WHERE snapshot_id=? AND tenant_id=? AND dataset_id=?", String.class, snapshot, tenant, dataset);
+      var exportEvidence = new ArrayList<Map<String,Object>>(schema);
+      if (!received.isEmpty()) {
+         exportEvidence.removeIf(item -> "export-validation".equals(item.get("kind")));
+         exportEvidence.add(this.json.readValue(received.getFirst(), Map.class));
+      }
+      Map<String,Object> export = ExportSnapshotChecks.check(snapshot, columns, rows, exportEvidence);
       Map<String,Object> values = DeclaredValueChecks.check(columns, rows, schema);
       if (schema.stream().noneMatch(e -> Set.of("column", "constraint", "value-rule").contains(e.getOrDefault("kind", "")))) {
          return Map.of("state", "NO_SOURCE_CONSTRAINTS", "exportValidation", export,
@@ -337,6 +350,61 @@ public class GovernanceModelService {
       );
    }
 
+   /** Current deterministic checks are separate from the immutable model input used to publish definitions. */
+   @Transactional(isolation = Isolation.REPEATABLE_READ)
+   public Map<String,Object> currentDatasetSource(UUID actor, UUID tenant, UUID dataset) {
+      this.identities.member(actor, tenant, false);
+      return this.source(actor, tenant, "DATASET", dataset);
+   }
+
+   public record AnalysisReadiness(String key, String reason) { public boolean ready() { return reason == null; } }
+
+   /** Gate configured native governance before any paid automatic task; legacy sources retain their own pipeline. */
+   @Transactional(isolation = Isolation.REPEATABLE_READ)
+   public AnalysisReadiness analysisReadiness(UUID actor, UUID tenant, UUID dataset) {
+      return this.analysisReadiness(actor, tenant, dataset, null);
+   }
+
+   /** The exact selection is checked, even if collection advances between selection and dispatch. */
+   @Transactional(isolation = Isolation.REPEATABLE_READ)
+   public AnalysisReadiness analysisReadiness(UUID actor, UUID tenant, UUID dataset, UUID snapshot) {
+      this.identities.member(actor, tenant, false);
+      if (!this.collections.readable(actor, tenant, dataset)) throw this.error(404, "DATASET_NOT_FOUND");
+      if (Boolean.TRUE.equals(this.db.queryForObject("SELECT EXISTS(SELECT 1 FROM scene_asset_revisions WHERE tenant_id=? AND target_id=? AND kind='TABLE')", Boolean.class, tenant, dataset)))
+         return new AnalysisReadiness("LEGACY_GOVERNANCE", null);
+      var data = this.db.queryForMap("SELECT name FROM business_datasets WHERE id=? AND tenant_id=?", dataset, tenant);
+      boolean configured = !this.sourceEvidence(tenant, dataset, data.get("name").toString(), "schema").isEmpty()
+          || !this.sourceEvidence(tenant, dataset, data.get("name").toString(), "entries").isEmpty()
+          || Boolean.TRUE.equals(this.db.queryForObject("SELECT EXISTS(SELECT 1 FROM governance_model_jobs WHERE tenant_id=? AND kind='DATASET' AND source_id=? UNION ALL SELECT 1 FROM native_governance_releases WHERE tenant_id=? AND EXISTS(SELECT 1 FROM jsonb_array_elements(package->'items') i WHERE i->>'datasetId'=?))", Boolean.class, tenant, dataset, tenant, dataset.toString()));
+      if (!configured) return new AnalysisReadiness("DEPLOYMENT_SOURCE", null);
+      var definitions = snapshot == null ? this.releases.currentFor(actor, tenant, dataset) : this.releases.currentForSnapshot(actor, tenant, dataset, snapshot);
+      if (definitions.isEmpty()) return new AnalysisReadiness("GOVERNANCE_REQUIRED", "SOURCE_GOVERNANCE_REQUIRED");
+      var release = definitions.getFirst();
+      if (release.fields().stream().anyMatch(f -> !"SOURCE_DOCUMENTED".equals(f.status())))
+         return new AnalysisReadiness(release.releaseId()+":FIELDS_UNKNOWN", "SOURCE_FIELDS_UNCONFIRMED");
+      var currentSource = this.source(actor, tenant, "DATASET", dataset, snapshot);
+      var checks = this.json.valueToTree(currentSource.get("checks"));
+      String reason = null;
+      if (!"CHECKED".equals(checks.path("state").asText())) reason = "SOURCE_CONSTRAINTS_REQUIRED";
+      else if (!"CHECKED".equals(checks.path("exportValidation").path("state").asText())) reason = "SOURCE_RECEIPT_REQUIRED";
+      else if (checks.path("duplicatePrimaryKeys").asLong()>0 || checks.path("nonNullViolations").asLong()>0
+          || "VIOLATIONS".equals(checks.path("valueValidation").path("state").asText())) reason = "SOURCE_VALIDATION_FAILED";
+      else for (var relation : checks.path("foreignKeys")) if (!"CHECKED".equals(relation.path("state").asText()) || relation.path("unmatched").asLong()>0) {
+         reason = "SOURCE_RELATION_UNVERIFIED"; break;
+      }
+      if (reason == null) {
+         try {
+            com.dreamcore.workspace.context.NativeAnalysisPlans.load(evidencePath,tenant,dataset,(UUID)currentSource.get("snapshotId"),data.get("name").toString(),
+                (List<String>)currentSource.get("columns"),release.fields(),analysisClock.now());
+         } catch (IdentityException invalid) { reason="SOURCE_ANALYSIS_PLAN_INVALID"; }
+      }
+      boolean rollingMonth = this.sourceEvidence(tenant,dataset,data.get("name").toString(),"schema").stream()
+          .filter(item -> "analysis-plan".equals(item.get("kind")))
+          .anyMatch(item -> item.get("definition") instanceof Map<?,?> definition && Set.of("CURRENT_MONTH","PREVIOUS_MONTH").contains(Objects.toString(definition.get("calendarWindow"),"")));
+      String month = rollingMonth ? ":"+java.time.YearMonth.from(analysisClock.now().atZone(java.time.ZoneId.of("Asia/Shanghai"))) : "";
+      return new AnalysisReadiness(release.releaseId()+":"+Objects.toString(reason,"CHECKED")+month, reason);
+   }
+
    private Object canonical(Object v) {
       if (v instanceof Map<?, ?> m) {
          TreeMap<String, Object> result = new TreeMap<>();
@@ -389,7 +457,11 @@ public class GovernanceModelService {
 
       if (include) {
          out.put("request", this.input(r));
-         out.put("output", r.get("output") == null ? null : this.json.readValue(r.get("output").toString(), Map.class));
+         Map<String,Object> displayed = r.get("output") == null ? null : this.json.readValue(r.get("output").toString(), Map.class);
+         // Keep the original private model output immutable; structural facts come from its frozen input.
+         if (displayed != null && "DATASET".equals(r.get("kind")))
+            displayed.put("summary", this.datasetSummary(this.input(r)));
+         out.put("output", displayed);
       }
 
       if (!include) {
@@ -409,6 +481,28 @@ public class GovernanceModelService {
             )
       );
       return GovernanceReferencePolicy.view(out);
+   }
+
+   private String datasetSummary(Map<String,Object> request) {
+      var source = this.json.valueToTree(request).path("context");
+      long nullableColumns = 0, nullCells = 0;
+      for (var count : source.path("nullCounts")) {
+         if (count.asLong() > 0) nullableColumns++;
+         nullCells += count.asLong();
+      }
+      var checks = source.path("checks");
+      var values = checks.path("valueValidation");
+      String structure = "CHECKED".equals(checks.path("state").asText())
+          ? "已执行声明的结构约束检查：主键重复 " + checks.path("duplicatePrimaryKeys").asLong() + "，必填缺失 " + checks.path("nonNullViolations").asLong() + "。"
+          : "来源结构约束检查范围不完整。";
+      String receipt = "CHECKED".equals(checks.path("exportValidation").path("state").asText())
+          ? "该版导出与接收核验通过。" : "该版导出与接收尚未核验通过。";
+      String rules = values.path("rules").isArray() && !values.path("rules").isEmpty()
+          ? "已检查声明的字段值规则 " + values.path("rules").size() + " 项，异常 " + values.path("violations").asLong() + " 项。"
+          : "未提供字段值规则检查依据。";
+      return "治理输入第 " + source.path("version").asInt() + " 版：共 " + source.path("rowCount").asLong() + " 条记录、" + source.path("columns").size()
+          + " 个字段；" + nullableColumns + " 个字段包含 NULL，合计 " + nullCells + " 个 NULL 单元格。" + receipt + structure + rules
+          + "以上统计仅对应本次冻结输入，当前采集批次另行检查；未声明的业务约束及银行到账未核验。";
    }
 
    @Transactional(isolation = Isolation.REPEATABLE_READ)
@@ -446,7 +540,7 @@ public class GovernanceModelService {
          content = content + "\n\n适用限制：" + this.json.writeValueAsString(out.get("limitations"));
          UUID sourceId = (UUID)r.get("source_id");
          if ("DATASET".equals(r.get("kind"))) {
-            NativeGovernanceDeployment.Context c = this.releases.context(actor, tenant, List.of(sourceId));
+            NativeGovernanceDeployment.Context c = this.releases.definitionContext(actor, tenant, List.of(sourceId));
             List<Map<String, Object>> originals = (List<Map<String, Object>>)ctx.get("fields");
             ArrayList<DatasetField> fs = new ArrayList<>();
             List<Map<String, Object>> sourceSchema = this.sourceEvidence(tenant, sourceId, r.get("source_name").toString(), "schema");
@@ -483,7 +577,7 @@ public class GovernanceModelService {
             this.releases
                .submit(
                   new NativeGovernanceDeployment.Package(
-                     "1.0",
+                     "1.2",
                      id,
                      tenant,
                      actor,

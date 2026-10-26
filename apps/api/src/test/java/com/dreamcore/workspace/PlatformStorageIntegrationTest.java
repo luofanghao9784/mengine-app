@@ -35,8 +35,15 @@ class PlatformStorageIntegrationTest {
  }
  HttpResponse<String> get(HttpClient http)throws Exception{return http.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/api/platform-admin/v1/storage-status")).GET().build(),HttpResponse.BodyHandlers.ofString());}
  @Test void unifiedPlatformRoleNoStoreAndRevocationAreEnforced()throws Exception{
-  assertEquals(401,get(HttpClient.newHttpClient()).statusCode());assertEquals(403,get(login(false)).statusCode());
+  assertEquals(401,get(HttpClient.newHttpClient()).statusCode());
+  var customer=login(false);var denied=get(customer);assertEquals(401,denied.statusCode());
+  assertEquals("AUTHENTICATION_REQUIRED",new JsonMapper().readTree(denied.body()).get("code").asString());
+  assertEquals(200,customer.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/api/v1/me")).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
   var platform=login(true);var r=get(platform);assertEquals(200,r.statusCode());assertEquals("private, no-store",r.headers().firstValue("Cache-Control").orElseThrow());assertFalse(r.body().contains(SECRET));
-  db.update("DELETE FROM platform_roles WHERE account_id=?",operator);assertEquals(403,get(platform).statusCode());assertEquals(403,assertThrows(IdentityException.class,()->service.status(member)).status);
+  db.update("DELETE FROM platform_roles WHERE account_id=?",operator);assertEquals(401,get(platform).statusCode());
+  db.update("INSERT INTO platform_roles(account_id,role) VALUES (?,'PLATFORM_ADMIN')",operator);
+  assertEquals(401,get(platform).statusCode(),"A restored role must not revive the revoked session");
+  assertEquals(200,get(login(true)).statusCode());
+  assertEquals(403,assertThrows(IdentityException.class,()->service.status(member)).status);
  }
 }

@@ -13,6 +13,8 @@ import org.springframework.mock.web.MockMultipartFile;
 import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={"dreamcore.tasks.enabled=true","dreamcore.tasks.agent-mode=verification","dreamcore.tasks.initial-delay-ms=3600000","dreamcore.knowledge.enabled=true","dreamcore.knowledge.initial-delay-ms=3600000"})
 class ClientInputIntegrationTest {
+ @org.springframework.test.context.DynamicPropertySource
+ static void isolateQueue(org.springframework.test.context.DynamicPropertyRegistry registry){IsolatedTestDatabase.register(registry);}
  @Autowired JdbcTemplate db;@Autowired MaterialService materials;@Autowired KnowledgeService knowledge;@Autowired ConversationAttachments attachments;@Autowired ConversationService conversations;@Autowired AgentTaskService agents;@Autowired LiveAnswerService live;
  UUID tenant,actor,reader,personal,shared;
  @BeforeEach void setup(){tenant=UUID.randomUUID();actor=UUID.randomUUID();reader=UUID.randomUUID();personal=UUID.randomUUID();shared=UUID.randomUUID();
