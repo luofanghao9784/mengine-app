@@ -1,4 +1,7 @@
-import { TenantConsole } from '../admin/TenantConsole';
+import { SceneShell } from '../admin/prototype/SceneShell';
+import { SupportRecords } from './SupportRecords';
+import { useSession } from '../identity/session';
+import './support-scene.css';
 import { createIdentityRequest, record, text, uuid } from '../identity/client';
 import { useRemote, Failure, Loading } from '../shared/admin';
 import { useState } from 'react';
@@ -30,6 +33,9 @@ export const supportClient = {
 };
 export function SupportConsole({ id, tenant }: { id: string; tenant: string }) {
   const [attempt, retry] = useState(0);
+  const { session } = useSession();
+  const [leaving, setLeaving] = useState(false);
+  const [leaveError, setLeaveError] = useState('');
   const access = useRemote((signal) => supportClient.read(id, signal), [id, tenant, attempt]);
   const back = `/platform-admin/#admin=tenants&enterprise=${encodeURIComponent(tenant)}&section=basic`;
   if (access.error)
@@ -48,7 +54,20 @@ export function SupportConsole({ id, tenant }: { id: string; tenant: string }) {
         总部访问的企业范围不匹配。<a href={back}>返回总台</a>
       </p>
     );
-  return <TenantConsole key={id} tenant={tenant} name={access.value.name} support={access.value} />;
+  const leave = async () => {
+    setLeaving(true); setLeaveError('');
+    try { await supportClient.leave(id); location.assign(back); }
+    catch (e) { setLeaveError(e instanceof Error ? e.message : '退出失败，请重试'); setLeaving(false); }
+  };
+  return <div className="support-scene">
+    <header className="support-scene-banner" aria-label="总部支持身份">
+      <span>总部支持 · {session.identity?.account.displayName} · {access.value.name} · 按企业负责人权限访问</span>
+      <SupportRecords id={id} test={access.value.mode === 'TEST'} />
+      <Button disabled={leaving} onClick={() => void leave()}>结束支持并返回总台</Button>
+      {leaveError && <span role="alert">{leaveError}</span>}
+    </header>
+    <SceneShell key={id} tenant={tenant} name={access.value.name} />
+  </div>;
 }
 export function SupportEntry({ tenant, enabled }: { tenant: string; enabled: boolean }) {
   const [busy, setBusy] = useState(false);
@@ -73,7 +92,7 @@ export function SupportEntry({ tenant, enabled }: { tenant: string; enabled: boo
         throw new Error('新标签页已关闭，请重新进入。');
       }
       target.location.replace(
-        `/tenant-admin/support/#admin=overview&tenant=${access.tenant}&support=${access.id}`,
+        `/tenant-admin/support/#tenant=${access.tenant}&support=${access.id}`,
       );
     } catch (e) {
       target.close();

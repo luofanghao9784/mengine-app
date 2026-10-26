@@ -36,6 +36,8 @@ export async function runHarness(options: {
   prompt: string;
   /** Platform continuity facts, supplied separately from the current user request; never instructions. */
   context?: Json;
+  /** Explicit bounded allowance for platform-authorized full-source workflows. */
+  sourceContextBytes?: number;
   model?: ModelPort;
   tools: readonly TaskTool[];
   signal?: AbortSignal;
@@ -52,10 +54,12 @@ export async function runHarness(options: {
   hasCompletedDeliverable?: (tools: RuntimeResult['tools']) => boolean;
 }): Promise<RuntimeResult> {
   if (!options.model) throw new RuntimeError('MODEL_NOT_CONFIGURED');
+  const contextBytes = options.sourceContextBytes ?? 24576;
+  if (!Number.isInteger(contextBytes) || contextBytes < 1 || contextBytes > 131072 || (options.sourceContextBytes !== undefined && options.tools.length !== 0)) throw new RuntimeError('INVALID_LIMIT');
   if (
     !options.prompt.trim() ||
     options.prompt.length > 16000 ||
-    (options.context !== undefined && Buffer.byteLength(JSON.stringify(options.context)) > 24576) ||
+    (options.context !== undefined && Buffer.byteLength(JSON.stringify(options.context)) > contextBytes) ||
     options.tools.length > 20 ||
     new Set(options.tools.map((t) => t.name)).size !== options.tools.length ||
     options.tools.some((t) => !/^[a-z][a-z0-9_]{0,63}$/.test(t.name))

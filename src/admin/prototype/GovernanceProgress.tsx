@@ -1,0 +1,24 @@
+import { useEffect, useState } from 'react';
+import { supportPath } from '../../identity/support-request';
+import { sceneTenant } from './scene-route';
+type Job = { id: string; kind: string; source_id: string; source_name?: string; state: string; revision: number; error_code: string | null; updated_at: string; published: boolean };
+type Detail = Job & { sourceCurrent: boolean; output?: { knowledge?: {title:string;body:string;citations:{locator:string;quote:string}[]}[]; title: string; summary: string; limitations: string[]; fields: {column: string; decision: string; meaning: string; unit: string; evidence: string}[]; evidence: {chunkId: string; quote: string}[] } };
+const labels: Record<string,string> = {WAITING_MODEL:'等待模型',VALIDATING:'校验中',DRAFT_READY:'草稿完成',STALE:'来源已变化',FAILED:'校验失败'};
+function latestSources(jobs:Job[]){const latest=new Map<string,Job>();for(const job of jobs)latest.set(`${job.kind}:${job.source_id}`,job);return [...latest.values()];}
+/** Counts persisted jobs, never animation frames, raw row counts or publication guesses. */
+export function GovernanceProgress() {
+ const tenant=sceneTenant();const [jobs,setJobs]=useState<Job[]>();const [error,setError]=useState('');const [checked,setChecked]=useState('');const [detail,setDetail]=useState<Detail>();
+ const read=async(path:string,signal?:AbortSignal)=>{const r=await fetch(supportPath(`/api/v1/tenants/${tenant}/governance-jobs${path}`),{credentials:'same-origin',cache:'no-store',signal});if(!r.ok)throw Error(r.status===403||r.status===404?'当前账号无法查看这批治理任务':'治理状态读取失败，未将旧数据当作实时状态');return r.json();};
+ useEffect(()=>{if(!tenant)return;let disposed=false;let timer:ReturnType<typeof setTimeout>;const abort=new AbortController();const refresh=async()=>{try{const value=await read('',abort.signal);if(!Array.isArray(value))throw Error('治理状态格式错误');if(!disposed){setJobs(latestSources(value));setError('');setChecked(new Date().toLocaleTimeString());}}catch(e){if(!disposed){setJobs(undefined);setDetail(undefined);setError(e instanceof Error?e.message:'读取失败');}}finally{if(!disposed)timer=setTimeout(refresh,3000);}};void refresh();return()=>{disposed=true;abort.abort();clearTimeout(timer);};},[tenant]);
+ if(!tenant)return null;
+ return <article className="card" style={{gridColumn:'1 / -1',height:detail?'70vh':'auto',minHeight:detail?'50vh':undefined,maxHeight:'70vh',overflow:'auto',minWidth:0}} aria-label="首期治理真实进度">
+  <style>{`.cards.home:has([aria-label="首期治理真实进度"]){flex:0 0 auto;height:auto;grid-template-rows:none;grid-auto-rows:minmax(120px,auto);align-content:start}.deck:has([aria-label="首期治理真实进度"]){overflow-y:auto}[aria-label="首期治理真实进度"] button{white-space:normal;text-align:left}[aria-label="首期治理真实进度"] p{overflow-wrap:anywhere}`}</style>
+  <header><h2>治理任务与草稿</h2><span>{checked?`最近读取 ${checked}`:'正在读取'}</span></header>
+  <p>按当前账号每个来源的最新任务统计，旧任务留存。等待模型期间任务已持久保存；服务重启不会把等待任务标成完成。未发布草稿不计为治理后 AI 可用；正式发布仍须遵守来源版本和接收权限。</p>
+  {error?<p role="alert">{error}</p>:jobs?<><p>任务总量 {jobs.length} · 数据表 {jobs.filter(j=>j.kind==='DATASET').length} · 内部资料 {jobs.filter(j=>j.kind==='MATERIAL').length}</p>
+   <div className="row" style={{display:'flex',flexWrap:'wrap',gap:16}}>{Object.entries(labels).map(([state,label])=><span key={state}>{label} <b>{jobs.filter(j=>j.state===state).length}</b></span>)}<span>本批正式发布 <b>{jobs.filter(j=>j.published).length}</b></span></div>
+   <details><summary>查看任务与核对草稿</summary><ul>{jobs.map(j=><li key={j.id}><button type="button" onClick={()=>void read(`/${j.id}`).then(setDetail).catch(e=>{setDetail(undefined);setError(e.message);})}>{j.source_name||`${j.kind==='DATASET'?'数据表':'资料'} ${j.source_id.slice(0,8)}`} · {j.published?"已正式发布":labels[j.state]||j.state}</button>{j.error_code&&<small> {j.error_code}</small>}</li>)}</ul></details>
+  </>:null}
+  {detail&&<section aria-label="治理草稿详情"><button type="button" onClick={()=>setDetail(undefined)}>关闭详情</button><h3>{detail.source_name}</h3><p>{detail.published?"已正式发布":labels[detail.state]} · {detail.sourceCurrent?'来源版本当前有效':'来源已变化，不能用于发布'}</p>{detail.output&&<><h4>{detail.output.title}</h4><p style={{whiteSpace:'pre-wrap'}}>{detail.output.summary}</p><ul>{detail.output.limitations.map((v,i)=><li key={i}>{v}</li>)}</ul>{detail.output.knowledge?.map((k,i)=><section key={i}><h4>{detail.published?"已发布知识：":"知识草稿："}{k.title}</h4><p style={{whiteSpace:'pre-wrap'}}>{k.body}</p><details><summary>知识依据</summary>{k.citations.map((c,n)=><blockquote key={n}>{c.quote}<small> {c.locator}</small></blockquote>)}</details></section>)}<details><summary>字段检查（{detail.output.fields.length}项）</summary>{detail.output.fields.map(f=><p key={f.column}><b>{f.column}</b> · {f.decision} · {f.meaning} {f.unit&&`（${f.unit}）`}<br/><small>{f.evidence}</small></p>)}</details><details><summary>原文依据</summary>{detail.output.evidence.map((e,i)=><blockquote key={i}>{e.quote}<small> {e.chunkId}</small></blockquote>)}</details></>}</section>}
+ </article>;
+}

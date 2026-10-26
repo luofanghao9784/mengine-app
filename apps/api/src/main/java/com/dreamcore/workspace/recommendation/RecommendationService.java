@@ -57,7 +57,7 @@ public class RecommendationService {
   var sql="""
    WITH eligible_tasks AS MATERIALIZED (
     SELECT t.id FROM conversation_tasks t WHERE t.tenant_id=? AND t.requested_by=?
-     AND t.status='SUCCEEDED' AND t.mode='AGENT' AND t.reply IS NOT NULL AND task_audience_current(t.id)
+     AND t.status='SUCCEEDED' AND t.mode='AGENT' AND t.reply IS NOT NULL AND object_is_active('TASK',t.id) AND task_audience_current(t.id)
      AND (NOT ? OR EXISTS (%s))
    ), readable AS MATERIALIZED (
     SELECT id FROM eligible_tasks e WHERE EXISTS(SELECT 1 FROM readable_source_tasks r WHERE r.id=e.id OFFSET 0)
@@ -90,7 +90,7 @@ public class RecommendationService {
    WHERE (NOT ? OR (c.kind='TASK' AND o.opened_at IS NULL))
    ORDER BY c.created_at DESC,c.id LIMIT 1000
    """.formatted(BriefingContentService.ELIGIBLE,BriefingContentService.ELIGIBLE,BriefingContentService.ELIGIBLE,generatedOnly?"":"LIMIT 1",BriefingContentService.ELIGIBLE,generatedOnly?"briefing_card_preferences p ON p.task_id=t.id":"briefing_preferences p ON p.conversation_id=c.id");
-  final long[] total={0};db.execute("SET LOCAL jit=off");db.execute("SET LOCAL statement_timeout='3s'");
+  final long[] total={0};db.execute("SET LOCAL jit=off");db.execute("SET LOCAL statement_timeout='20s'");
   var items=db.query(sql,(r,n)->{total[0]=r.getLong("eligible_total");return new Candidate(r.getObject("id",UUID.class),r.getString("kind"),r.getString("version_key"),r.getObject("workspace_id",UUID.class),r.getString("workspace_name"),r.getString("title"),r.getString("excerpt"),r.getBoolean("truncated"),r.getTimestamp("created_at").toInstant(),r.getString("execution_class"),r.getObject("conversation_id",UUID.class),r.getInt("task_revision"),r.getInt("attempt"),r.getInt("preference_revision"),r.getObject("material_id",UUID.class),r.getInt("material_version"),r.getString("filename"),r.getBoolean("pinned"),r.getTimestamp("opened_at")==null?null:r.getTimestamp("opened_at").toInstant());},tenant,actor,generatedOnly,actor,tenant,workspace,workspace,actor,generatedOnly,generatedOnly,businessType,businessType,tenant,actor,publicationsOnly,focused,actor,actor,businessType,businessType,focused,tenant,actor,unreadOnly);
   return new Pool(items,total[0]);
  }

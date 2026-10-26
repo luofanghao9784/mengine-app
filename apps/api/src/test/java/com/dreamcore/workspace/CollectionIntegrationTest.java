@@ -28,6 +28,44 @@ class CollectionIntegrationTest {
     @Autowired com.dreamcore.workspace.scene.NativeFoundationService nativeFoundation;
     @Autowired com.dreamcore.workspace.scene.SceneService scenes;
     @Autowired com.dreamcore.workspace.scene.FoundationProcessingService processing;
+    @Test void collectedRowsAreNotGovernedOrPublishedAndSummaryMatchesDetail(){
+        var before=nativeFoundation.snapshot(reader,tenant);
+        assertFalse(before.path("items").get(0).path("available").asBoolean());
+        assertEquals("WAITING",before.path("items").get(0).path("stageStates").get(0).asText());
+        start();var claim=service.claim(tenant,connection,Instant.now());
+        assertTrue(service.complete(claim,result("原始记录",null),Instant.now()));
+        var snapshot=nativeFoundation.snapshot(reader,tenant);
+        var asset=snapshot.path("items").get(0);
+        assertFalse(asset.path("available").asBoolean());assertFalse(asset.path("checksPassed").asBoolean());
+        assertTrue(asset.path("needsAttention").asBoolean());assertTrue(asset.path("ready").isNull());
+        assertEquals(2,asset.path("gate").asInt());
+        assertEquals("[1,1,0,0,0]",snapshot.path("passed").toString());
+        assertEquals(1,snapshot.path("governance").path("attention").asInt());
+        var detail=nativeFoundation.detail(reader,tenant,"dataset-"+dataset);
+        assertEquals(asset.path("stageStates"),detail.path("asset").path("stageStates"));
+        assertEquals("waiting",detail.path("dictionary").path("status").asText());
+        assertFalse(detail.path("dictionary").path("current").asBoolean());
+        for(var event:detail.path("events"))assertFalse(List.of("records-checked","published").contains(event.path("event").asText()));
+        var stages=processing.read(reader,tenant,"dataset-"+dataset,0,20,null).stages();
+        assertEquals(List.of("READY","READY","WAITING","WAITING","WAITING"),stages.stream().map(com.dreamcore.workspace.scene.FoundationProcessingService.Stage::state).toList());
+        // Recollection, including an empty snapshot, must not fabricate a governance receipt.
+        start();var next=service.claim(tenant,connection,Instant.now());
+        assertTrue(service.complete(next,new CollectionAdapter.Result("1.0",List.of(new CollectionAdapter.Snapshot(dataset,null,List.of()))),Instant.now()));
+        var empty=nativeFoundation.detail(reader,tenant,"dataset-"+dataset).path("asset");
+        assertEquals(0,empty.path("total").asInt());assertTrue(empty.path("ready").isNull());assertFalse(empty.path("available").asBoolean());
+    }
+    @Test void documentedSourceFieldsStillNeedGovernanceChecks(){
+        var fields=List.of(new DatasetField("门店","text","门店名称","","来源说明","SOURCE_DOCUMENTED"));
+        UUID defined=UUID.randomUUID();
+        deployment.apply(manifest(List.of(new CollectionDeployment.Dataset(defined,space,"defined","来源字段资料","",List.of("门店"),fields))));
+        start();var claim=service.claim(tenant,connection,Instant.now());
+        assertTrue(service.complete(claim,new CollectionAdapter.Result("1.0",List.of(new CollectionAdapter.Snapshot(defined,null,List.of(List.of("合成门店"))))),Instant.now()));
+        var snapshot=nativeFoundation.snapshot(reader,tenant);
+        assertEquals("[1,1,0,0,0]",snapshot.path("passed").toString());
+        assertFalse(snapshot.path("items").get(0).path("available").asBoolean());
+        var detail=nativeFoundation.detail(reader,tenant,"dataset-"+defined);
+        assertEquals("[\"READY\",\"READY\",\"WAITING\",\"WAITING\",\"WAITING\"]",detail.path("asset").path("stageStates").toString());
+    }
     @Test void processingShowsActualColumnsRecordsAndRejectsChangedPaginationSnapshot(){
         start();var claim=service.claim(tenant,connection,Instant.now());
         var rows=java.util.stream.IntStream.range(0,25).mapToObj(i->List.of("合成门店"+i,String.valueOf(i))).toList();
@@ -86,6 +124,59 @@ class CollectionIntegrationTest {
     @Autowired TenantAdminService admins;@Autowired TenantServiceRuntime runtime;@Autowired PasswordEncoder passwords;
     @Autowired org.springframework.transaction.support.TransactionTemplate tx;
     @LocalServerPort int port;
+    @Autowired NativeGovernanceDeployment nativeDeployment;
+    @Autowired com.dreamcore.workspace.profile.CompanyInformationService company;
+    NativeGovernanceDeployment.Package nativePackage(){
+        db.update("INSERT INTO tenant_governance(tenant_id,owner_id) VALUES (?,?) ON CONFLICT(tenant_id) DO UPDATE SET owner_id=excluded.owner_id",tenant,owner);
+        company.change(owner,tenant,new com.dreamcore.workspace.profile.CompanyInformationService.Change(UUID.randomUUID(),com.dreamcore.workspace.profile.CompanyInformationService.Field.NAME,0,"ADD",null,"合成企业",""));
+        start();var claim=service.claim(tenant,connection,Instant.now());assertTrue(service.complete(claim,result("合成",null),Instant.now()));
+        var ctx=nativeDeployment.context(owner,tenant,List.of(dataset));
+        var fields=List.of(new DatasetField("门店","text","合成门店","","合成测试","SOURCE_DOCUMENTED"),new DatasetField("数量","integer","合成数量","个","合成测试","SOURCE_DOCUMENTED"));
+        return new NativeGovernanceDeployment.Package("1.0",UUID.randomUUID(),tenant,owner,ctx.backgroundVersion(),List.of(new NativeGovernanceDeployment.Item(dataset,ctx.sources().getFirst().token(),fields,"",List.of("合成行与固定快照"))));
+    }
+    @Test void nativeGovernanceUnchangedRecollectionRetainsVerifiedContent(){
+      var p=nativePackage();nativeDeployment.submit(p,true);var before=nativeDeployment.context(owner,tenant,List.of(dataset));
+      start();var claim=service.claim(tenant,connection,Instant.now());assertTrue(service.complete(claim,result("合成",null),Instant.now()));
+      var after=nativeDeployment.context(owner,tenant,List.of(dataset));
+      assertNotEquals(before.sources().getFirst().snapshotId(),after.sources().getFirst().snapshotId());
+      assertEquals(before.sources().getFirst().token(),after.sources().getFirst().token());assertEquals(1,nativeDeployment.current(owner,tenant).size());
+      var bad=new NativeGovernanceDeployment.Package("1.1",UUID.randomUUID(),tenant,owner,p.backgroundVersion(),p.items(),List.of(new NativeMaterialGovernance.Reference(UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID(),"fake")));
+      assertThrows(IdentityException.class,()->nativeDeployment.submit(bad,true));
+      var missing=new NativeGovernanceDeployment.Package("1.1",UUID.randomUUID(),tenant,owner,p.backgroundVersion(),p.items(),List.of());
+      assertThrows(IdentityException.class,()->nativeDeployment.submit(missing,true));
+    }
+    @Test void nativeGovernancePreviewIsNonPublishingAndCollectionCompatible(){
+        var p=nativePackage();service.configure(admin,tenant,connection,UUID.randomUUID(),service.detail(admin,tenant,connection).revision(),new CollectionService.Schedule(true,"DAILY","03:00","Asia/Shanghai"));
+        var before=db.queryForMap("SELECT * FROM data_connections WHERE id=?",connection);
+        assertFalse(nativeDeployment.submit(p,false).published());
+        assertEquals(0,db.queryForObject("SELECT count(*) FROM native_governance_releases WHERE tenant_id=?",Integer.class,tenant));
+        var receipt=nativeDeployment.submit(p,true);assertTrue(receipt.published());assertEquals(receipt,nativeDeployment.submit(p,true));
+        assertEquals(1,nativeDeployment.current(owner,tenant).size());assertEquals(List.of(),nativeDeployment.current(reader,tenant));
+        assertThrows(IdentityException.class,()->nativeDeployment.read(reader,tenant,p.id()));
+        assertEquals(before,db.queryForMap("SELECT * FROM data_connections WHERE id=?",connection));
+        assertEquals("[]",db.queryForObject("SELECT field_definitions::text FROM business_datasets WHERE id=?",String.class,dataset));
+        start();var claim=service.claim(tenant,connection,Instant.now());assertTrue(service.complete(claim,result("新数据",null),Instant.now()));
+        assertEquals(List.of(),nativeDeployment.current(owner,tenant));
+        assertEquals("STALE",((Map<?,?>)nativeDeployment.read(owner,tenant,p.id())).get("state"));
+        assertThrows(IdentityException.class,()->nativeDeployment.submit(p,true));
+        assertEquals(before.get("next_due"),db.queryForMap("SELECT next_due FROM data_connections WHERE id=?",connection).get("next_due"));
+    }
+    @Test void nativeGovernanceRejectsChangedBackgroundScopeAndMalformedBatch(){
+        var p=nativePackage();
+        var bad=new NativeGovernanceDeployment.Package("1.0",p.id(),tenant,owner,p.backgroundVersion(),List.of(new NativeGovernanceDeployment.Item(dataset,p.items().getFirst().token(),List.of(),"bad",List.of("synthetic"))));
+        assertThrows(IdentityException.class,()->nativeDeployment.submit(bad,true));
+        assertEquals(0,db.queryForObject("SELECT count(*) FROM native_governance_releases WHERE tenant_id=?",Integer.class,tenant));
+        nativeDeployment.submit(p,true);
+        company.change(owner,tenant,new com.dreamcore.workspace.profile.CompanyInformationService.Change(UUID.randomUUID(),com.dreamcore.workspace.profile.CompanyInformationService.Field.TERM,0,"ADD",null,"新背景","合成变化"));
+        assertEquals(List.of(),nativeDeployment.current(owner,tenant));assertThrows(IdentityException.class,()->nativeDeployment.submit(p,true));
+        assertThrows(IdentityException.class,()->nativeDeployment.context(outside,tenant,List.of(dataset)));
+        assertThrows(IdentityException.class,()->nativeDeployment.read(owner,UUID.randomUUID(),p.id()));
+    }
+    @Test void nativeGovernanceRevocationHidesPublishedContent(){
+        var p=nativePackage();nativeDeployment.submit(p,true);
+        db.update("DELETE FROM workspace_members WHERE tenant_id=? AND workspace_id=? AND account_id=?",tenant,space,owner);
+        assertEquals(List.of(),nativeDeployment.current(owner,tenant));assertThrows(IdentityException.class,()->nativeDeployment.read(owner,tenant,p.id()));
+    }
     UUID tenant,admin,owner,reader,outside,space,connection,dataset;
     private static final JsonMapper JSON=new JsonMapper();
     @BeforeEach void fixture(){
@@ -249,7 +340,7 @@ class CollectionIntegrationTest {
         assertEquals(107,db.queryForObject("SELECT count(*) FROM business_datasets WHERE connection_id=? AND status='ACTIVE'",Integer.class,connection));
         var revision=service.detail(admin,tenant,connection).revision();deployment.apply(manifest(defs));
         assertEquals(revision,service.detail(admin,tenant,connection).revision());
-        var excessive=new ArrayList<>(defs);for(int i=107;i<201;i++)excessive.add(new CollectionDeployment.Dataset(UUID.randomUUID(),space,"table-"+i,"合成表"+i,"",List.of("id")));
+        var excessive=new ArrayList<>(defs);for(int i=107;i<=CollectionDeployment.MAX_DATASETS;i++)excessive.add(new CollectionDeployment.Dataset(UUID.randomUUID(),space,"table-"+i,"合成表"+i,"",List.of("id")));
         assertThrows(IllegalArgumentException.class,()->deployment.apply(manifest(excessive)));
         assertEquals(107,db.queryForObject("SELECT count(*) FROM business_datasets WHERE connection_id=? AND status='ACTIVE'",Integer.class,connection));
     }

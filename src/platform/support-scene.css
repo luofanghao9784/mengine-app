@@ -1,0 +1,5 @@
+.support-scene-banner { position: fixed; inset: 0 0 auto; z-index: 20000; min-height: 48px; display: flex; align-items: center; gap: 12px; padding: 8px 16px; background: #211f1a; color: #f1d6a0; font: 13px/1.4 system-ui; }
+.support-scene-banner > span:first-child { flex: 1; }
+.support-scene-banner button { color: inherit; }
+.support-scene .shell { top: 64px; }
+@media(max-width: 700px) { .support-scene-banner { flex-wrap: wrap; } .support-scene-banner > span:first-child { flex-basis: 100%; } .support-scene .shell { top: 108px; } }

@@ -402,7 +402,12 @@ export function DataWork({
     if (x.nativeGovernance && i === x.gate && !x.available) return x.nativeGovernance.message;
     if (x.nativeGovernance?.state === 'DRAFT_READY' && i === 2) return '草稿已生成，待发布';
     if (state === 'held') return x.label;
-    if (state === 'wait') return i === 4 ? '尚未可用' : '等待上一环';
+    if (x.availabilityKind === 'PUBLISHED_KNOWLEDGE') {
+      if (i === 4) return `${x.availableKnowledgeCount} 篇知识可用`;
+      if (i === 3) return '治理结果校验完成';
+      if (i === 2 && x.kind !== 'table') return '知识口径已生成';
+    }
+    if (state === 'wait') return i === 4 ? '尚未发布可用范围' : i === 3 ? '尚未执行治理检查' : '尚未完成';
     return [
       x.sync ? `每 ${x.sync.intervalMinutes} 分钟取数` : x.kind === 'table' ? '手动拉取' : '上传',
       x.total !== null ? `${x.total} 条 · ${x.fieldCount} 个字段` : '正文已解析',
@@ -899,7 +904,7 @@ export function DataWork({
 
                 {shownStep === 2 &&
                   (a.kind !== 'table' ? (
-                    kv([
+                    a.availabilityKind === 'PUBLISHED_KNOWLEDGE' ? <><p>{a.availableKnowledgeCount} 篇治理知识已发布，来源版本当前有效。</p>{a.limitations?.map((text,i)=><p key={i}>{text.includes('未发布') ? `生成时说明（发布前）：${text}` : text}</p>)}</> : kv([
                       ['业务标签', a.tags.join('、') || '尚未标注'],
                       ['密级', `L${a.classification}`],
                     ])
@@ -977,7 +982,7 @@ export function DataWork({
                 {shownStep === 3 && (
                   <>
                     {detail?.findings.length === 0 && a.issues.length === 0 && (
-                      <p className="none">全部检查通过。</p>
+                      <p className="none">{a.checksPassed && stageState(a, 3) === 'done' ? (a.availabilityKind === 'PUBLISHED_KNOWLEDGE' ? '治理结果引用与格式校验完成；未判定所有原始记录合格。' : '全部检查通过。') : '尚无当前版本的治理检查通过记录。'}</p>
                     )}
                     {detail?.findings.map((f, n) => (
                       <Fold
@@ -1085,9 +1090,9 @@ export function DataWork({
                       </Fold>
                     )}
                     <Fold title="检查规则与处理范围">
-                      <p>资料：手机号、身份证号、邮箱、标签完整性、复核时效、内容信息量。</p>
+                      <p>{a.availabilityKind === 'PUBLISHED_KNOWLEDGE' ? '已核对原生任务输出格式、来源引用与当前发布版本；没有据此新增记录隔离、质量评分或敏感信息扫描。' : '资料：手机号、身份证号、邮箱、标签完整性、复核时效、内容信息量。'}</p>
                       <p>
-                        数据表：必填、格式、唯一性、隔离记录、字段口径、关联匹配、规则冲突、同步状态与新鲜度。
+                        {a.availabilityKind === 'PUBLISHED_KNOWLEDGE' ? '字段未知、解析限制及结构异常继续展示；发布不会修正原始记录。' : '数据表：必填、格式、唯一性、隔离记录、字段口径、关联匹配、规则冲突、同步状态与新鲜度。'}
                       </p>
                       <small>
                         人工校验保留审计，不修改原记录，也不解除记录隔离；来源或口径变化后重新检查。记录维护由来源系统完成。
@@ -1099,7 +1104,7 @@ export function DataWork({
                 {shownStep === 4 && (
                   <>
                     {kv([
-                      ['提供范围', a.kind !== 'table' ? '资料全文' : a.queryableRecords !== undefined
+                      ['提供范围', a.availabilityKind === 'PUBLISHED_KNOWLEDGE' ? a.availabilityScope || '已发布治理知识' : a.kind !== 'table' ? '资料全文' : a.queryableRecords !== undefined
                         ? `按已发布口径可查询 ${a.queryableRecords} 条记录` : a.ready !== null
                         ? `${a.ready} 条合格记录`
                         : a.available ? '按已发布口径查询（合格记录数未核验）' : '尚未提供给 AI'],
@@ -1112,7 +1117,7 @@ export function DataWork({
                     )}
                     {!a.available && (
                       <p className="live-note">
-                        先处理“{GATES[Math.min(a.gate, 3)]}”这一环，通过后自动提供给 AI。
+                        先完成“{GATES[Math.min(a.gate, 3)]}”，并核实当前版本的检查与发布结果。
                       </p>
                     )}
                     <h4>管理操作审计</h4>

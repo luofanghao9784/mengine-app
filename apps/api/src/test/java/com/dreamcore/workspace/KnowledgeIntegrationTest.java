@@ -64,8 +64,9 @@ class KnowledgeIntegrationTest {
     }
     @Test void realTextParseSearchAndImmutableCitation() {
         var file=upload(space,"计划.md","梦核进度\n预算 00123.4500\n<script>alert(1)</script>");finish(file);
-        var state=analysis(reader,space,file);assertEquals("READY",state.status());assertEquals(3,state.chunks().size());assertFalse(state.canMaintain());
-        var found=knowledge.search(reader,tenant,space,"预算 00123.4500",0,20);assertEquals(1,found.items().size());assertEquals("第 2 行",found.items().getFirst().locator());
+        var state=analysis(reader,space,file);assertEquals("READY",state.status());assertEquals(1,state.chunks().size());assertFalse(state.canMaintain());
+        var found=knowledge.search(reader,tenant,space,"预算 00123.4500",0,20);assertEquals(1,found.items().size());assertEquals("第 1–3 行",found.items().getFirst().locator());
+        assertEquals("梦核进度\n预算 00123.4500\n<script>alert(1)</script>",found.items().getFirst().content());
         assertEquals(found.items().getFirst(),knowledge.citation(reader,tenant,found.items().getFirst().id()));
         assertEquals(0,knowledge.search(reader,tenant,space,"预算 %",0,20).items().size());
         assertEquals(0,knowledge.search(reader,tenant,space,"' OR 1=1 --",0,20).items().size());

@@ -83,7 +83,8 @@ export const isItem = (v: unknown): v is RecommendationItem =>
       num(v.feedbackTarget.presentationRevision) &&
       v.feedbackTarget.presentationRevision > 0);
 export function createRecommendationClient(fetcher: typeof fetch = fetch) {
-  const request = createIdentityRequest(fetcher);
+  // Full source-permission checks on a batch may exceed the default login timeout.
+  const request = createIdentityRequest(fetcher, 30_000);
   const root = (tenant: string) => {
     if (!uuid(tenant)) throw new IdentityError('INVALID_REQUEST', 400);
     return `/api/v1/tenants/${tenant}/recommendations`;

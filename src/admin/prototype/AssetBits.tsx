@@ -36,7 +36,7 @@ export function readouts(a: Asset): [string, string | number][] {
   return a.kind === 'table'
     ? [
         ['记录', a.total ?? '—'],
-        ['可用', a.ready ?? '—'],
+        [a.availabilityKind === 'PUBLISHED_KNOWLEDGE' ? '知识' : '可用', a.availabilityKind === 'PUBLISHED_KNOWLEDGE' ? `${a.availableKnowledgeCount} 篇` : a.ready ?? '—'],
         ['隔离', a.isolated ?? '—'],
         ['质量', a.quality ?? '—'],
       ]

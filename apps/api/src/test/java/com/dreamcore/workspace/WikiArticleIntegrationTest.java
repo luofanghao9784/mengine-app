@@ -21,6 +21,7 @@ import tools.jackson.databind.json.JsonMapper;
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={"dreamcore.lifecycle.enabled=false","dreamcore.tasks.enabled=true","dreamcore.tasks.agent-mode=verification","dreamcore.tasks.initial-delay-ms=3600000","dreamcore.knowledge.enabled=true","dreamcore.knowledge.initial-delay-ms=3600000"})
+@org.springframework.context.annotation.Import(CollectionIntegrationTest.Config.class)
 class WikiArticleIntegrationTest {
     @DynamicPropertySource static void paths(DynamicPropertyRegistry registry) {
         Path root=Path.of("").toAbsolutePath();if(root.endsWith("api"))root=root.getParent().getParent();
@@ -38,6 +39,61 @@ class WikiArticleIntegrationTest {
         for(UUID id:List.of(owner,reader,admin))db.update("INSERT INTO tenant_memberships(tenant_id,account_id,role) VALUES (?,?,?)",tenant,id,id.equals(admin)?"TENANT_ADMIN":"MEMBER");
         db.update("INSERT INTO workspaces(id,tenant_id,owner_id,name,kind) VALUES (?,?,?,'共享资料','SHARED'),(?,?,?,'个人资料','PERSONAL')",space,tenant,admin,personal,tenant,owner);
         db.update("INSERT INTO workspace_members(tenant_id,workspace_id,account_id,can_maintain) VALUES (?,?,?,true),(?,?,?,false)",tenant,space,owner,tenant,space,reader);
+    }
+    @Autowired com.dreamcore.workspace.collection.NativeMaterialGovernance external;
+    @Autowired com.dreamcore.workspace.profile.CompanyInformationService company;
+    com.dreamcore.workspace.collection.NativeMaterialGovernance.Package externalPackage(File f){
+      db.update("INSERT INTO tenant_governance(tenant_id,owner_id) VALUES (?,?)",tenant,owner);
+      db.update("UPDATE tenant_memberships SET role='TENANT_ADMIN' WHERE tenant_id=? AND account_id=?",tenant,owner);
+      company.change(owner,tenant,new com.dreamcore.workspace.profile.CompanyInformationService.Change(UUID.randomUUID(),com.dreamcore.workspace.profile.CompanyInformationService.Field.NAME,0,"ADD",null,"合成企业",""));
+      var c=external.context(owner,tenant,List.of(f.material()));
+      UUID chunk=db.queryForObject("SELECT id FROM knowledge_chunks WHERE run_id=? ORDER BY ordinal LIMIT 1",UUID.class,c.materials().getFirst().runId());
+      return new com.dreamcore.workspace.collection.NativeMaterialGovernance.Package("1.0",UUID.randomUUID(),tenant,owner,c.backgroundVersion(),"CODEX_OPERATOR",List.of(new com.dreamcore.workspace.collection.NativeMaterialGovernance.Item(c.materials().getFirst(),"合成制度","合成制度内容",List.of(new com.dreamcore.workspace.collection.NativeMaterialGovernance.Quote(chunk,"合成制度测试原文")))));
+    }
+    @Test void externalMaterialPreviewPublishAndRevocation(){
+      var f=upload(space,"制度.txt","合成制度测试原文，所有内容均为合成测试。");finish(f);var p=externalPackage(f);
+      external.submit(p,false);assertEquals(0,db.queryForObject("SELECT count(*) FROM native_material_releases WHERE tenant_id=?",Integer.class,tenant));
+      assertEquals(external.submit(p,true),external.submit(p,true));assertEquals(1,external.current(owner,tenant).size());assertTrue(external.current(reader,tenant).isEmpty());
+      assertEquals(0,db.queryForObject("SELECT count(*) FROM wiki_learning_drafts WHERE tenant_id=?",Integer.class,tenant));
+      db.update("UPDATE tenant_memberships SET role='MEMBER' WHERE tenant_id=? AND account_id=?",tenant,owner);
+      db.update("DELETE FROM workspace_members WHERE workspace_id=? AND account_id=?",space,owner);
+      assertTrue(external.current(owner,tenant).isEmpty());assertThrows(IdentityException.class,()->external.submit(p,true));
+    }
+    @Test void externalMaterialRejectsFabricatedEvidenceAndReparse(){
+      var f=upload(space,"制度.txt","合成制度测试原文，所有内容均为合成测试。");finish(f);var p=externalPackage(f);var i=p.items().getFirst();
+      var bad=new com.dreamcore.workspace.collection.NativeMaterialGovernance.Package("1.0",UUID.randomUUID(),tenant,owner,p.backgroundVersion(),"CODEX_OPERATOR",List.of(new com.dreamcore.workspace.collection.NativeMaterialGovernance.Item(i.source(),i.title(),i.content(),List.of(new com.dreamcore.workspace.collection.NativeMaterialGovernance.Quote(i.evidence().getFirst().chunkId(),"这里是不存在的原文引用")))));
+      assertThrows(IdentityException.class,()->external.submit(bad,true));external.submit(p,true);
+      knowledge.request(owner,tenant,space,f.material(),f.version(),UUID.randomUUID(),1);
+      assertTrue(external.current(owner,tenant).isEmpty());assertThrows(IdentityException.class,()->external.submit(p,true));
+      assertThrows(IdentityException.class,()->external.reference(owner,other,f.material()));
+    }
+    @Autowired com.dreamcore.workspace.collection.CollectionService collections;
+    @Autowired com.dreamcore.workspace.collection.NativeGovernanceDeployment databaseGovernance;
+    @Test void databaseKnowledgeBindsMaterialParseVersion(){
+      var f=upload(space,"制度.txt","合成制度测试原文，所有内容均为合成测试。");finish(f);var materialPackage=externalPackage(f);
+      UUID connection=UUID.randomUUID(),dataset=UUID.randomUUID();
+      db.update("INSERT INTO data_connections(id,tenant_id,name,route_label,access_summary,status,time_zone) VALUES (?,?,'合成','合成','合成','READY','Asia/Shanghai')",connection,tenant);
+      db.update("INSERT INTO business_datasets(id,tenant_id,connection_id,workspace_id,dataset_key,name,column_names) VALUES (?,?,?,?,'synthetic','合成','[\"值\"]'::jsonb)",dataset,tenant,connection,space);
+      collections.updateNow(owner,tenant,connection,UUID.randomUUID(),collections.detail(owner,tenant,connection).revision());
+      var claim=collections.claim(tenant,connection,java.time.Instant.now());
+      assertTrue(collections.complete(claim,new com.dreamcore.workspace.collection.CollectionAdapter.Result("1.0",List.of(new com.dreamcore.workspace.collection.CollectionAdapter.Snapshot(dataset,null,List.of(List.of("1"))))),java.time.Instant.now()));
+      var ctx=databaseGovernance.context(owner,tenant,List.of(dataset));
+      var item=new com.dreamcore.workspace.collection.NativeGovernanceDeployment.Item(dataset,ctx.sources().getFirst().token(),List.of(new com.dreamcore.workspace.collection.DatasetField("值","text","合成","","合成","SOURCE_DOCUMENTED")),"",List.of("合成制度原文"));
+      var p=new com.dreamcore.workspace.collection.NativeGovernanceDeployment.Package("1.1",UUID.randomUUID(),tenant,owner,ctx.backgroundVersion(),List.of(item),List.of(materialPackage.items().getFirst().source()));
+      databaseGovernance.submit(p,true);assertEquals(1,databaseGovernance.current(owner,tenant).size());
+      knowledge.request(owner,tenant,space,f.material(),f.version(),UUID.randomUUID(),1);
+      assertTrue(databaseGovernance.current(owner,tenant).isEmpty());assertEquals(1,databaseGovernance.pendingReview(owner,tenant));
+      assertThrows(IdentityException.class,()->databaseGovernance.submit(p,true));
+    }
+    @Autowired com.dreamcore.workspace.scene.NativeFoundationService foundation;
+    @Autowired com.dreamcore.workspace.scene.FoundationProcessingService processing;
+    @Test void parsedMaterialIsNotGovernedAiAvailability(){
+      var f=upload(space,"可检索.txt","合成制度测试原文，所有内容均为合成测试。");finish(f);
+      var page=foundation.snapshot(owner,tenant);assertTrue(page.path("auditValid").isNull());assertEquals(0,page.path("passed").get(4).asInt());
+      assertFalse(page.path("items").get(0).path("available").asBoolean());
+      assertTrue(page.path("items").get(0).path("rawSearchReady").asBoolean());
+      assertEquals(2,page.path("items").get(0).path("gate").asInt());
+      assertEquals("WAITING",processing.read(owner,tenant,"material-"+f.material(),0,20,null).stages().get(4).state());
     }
     record File(UUID material,UUID version) {}
     File upload(UUID location,String filename,String text) {

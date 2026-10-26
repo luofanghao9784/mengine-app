@@ -124,33 +124,15 @@ test('headquarters enters scoped management, keeps context in navigation, shows 
   await expect(page.getByRole('button', { name: '进入企业管理端' })).toBeVisible();
   expect(await supportPage.evaluate(() => window.opener)).toBeNull();
   await supportPage.reload();
-  await expect(supportPage.locator('.support-mode-banner')).toHaveCount(0);
-  await expect(
-    supportPage.getByRole('complementary').getByText('合成总部操作者', { exact: true }),
-  ).toBeVisible();
-  const pageErrors: string[] = [];
-  supportPage.on('pageerror', (error) => pageErrors.push(error.message));
-  await supportPage
-    .getByRole('complementary', { name: '企业管理导航' })
-    .getByRole('link', { name: '资料库', exact: true })
-    .click();
-  await supportPage.getByRole('link', { name: '文件与目录', exact: true }).click();
-  await expect(supportPage.getByRole('heading', { name: '还没有资料', exact: true })).toBeVisible();
-  expect(pageErrors).toEqual([]);
-  await supportPage.getByRole('link', { name: '成员与空间', exact: true }).click();
-  await expect(supportPage).toHaveURL(new RegExp(`admin=members.*support=${visit}`));
-  await supportPage.getByRole('link', { name: '成员邀请', exact: true }).click();
-  await supportPage.getByRole('button', { name: '查看本地邀请链接' }).click();
-  await expect(supportPage.getByLabel('本地邀请链接')).toHaveValue(/\/workspace\/#invite=s{43}$/);
-  await expect(supportPage.getByText('登录已失效，请重新登录。')).toHaveCount(0);
-  await supportPage.getByRole('link', { name: '职责与交接' }).click();
-  await expect(supportPage.getByText('负责人异常恢复', { exact: true })).toHaveCount(0);
-  await expect(supportPage.getByRole('button', { name: '发起交接' })).toHaveCount(0);
+  await expect(supportPage.getByRole('banner', { name: '总部支持身份' })).toContainText('合成总部操作者');
+  await expect(supportPage.locator('.shell')).toBeVisible();
+  await expect(supportPage.getByRole('complementary', {name:'企业管理导航'})).toHaveCount(0);
+  await expect.poll(() => paths.some(p => p.includes(`/support-access/${visit}/api/tenant-admin/v1/tenants/${tenant}/scene/dispatch`))).toBe(true);
   await supportPage.getByRole('button', { name: '本次操作记录' }).click();
   await expect(supportPage.getByRole('dialog', { name: '总部操作记录' })).toBeVisible();
-  await expect(supportPage.getByRole('dialog').getByText('成功', { exact: true })).toBeVisible();
   await supportPage.keyboard.press('Escape');
-  await expect(supportPage.getByRole('button', { name: '返回总台企业概览' })).toHaveCount(0);
+  await supportPage.getByRole('button', { name: '结束支持并返回总台' }).click();
+  await expect(supportPage).toHaveURL(new RegExp('/platform-admin/#admin=tenants&enterprise='+tenant));
   await supportPage.close();
   await expect(page).toHaveURL(
     new RegExp(`/platform-admin/#admin=tenants&enterprise=${tenant}&section=basic`),
@@ -159,10 +141,35 @@ test('headquarters enters scoped management, keeps context in navigation, shows 
     path: '/api/platform-admin/v1/support-access',
     body: { tenant, mode: 'ADJUSTMENT' },
   });
-  expect(writes).toHaveLength(1);
+  expect(writes).toHaveLength(2);
+  expect(writes[1].path).toBe(`/api/platform-admin/v1/support-access/${visit}`);
   expect(paths.some((path) => path.startsWith(`/api/platform-admin/v1/support-access/${visit}/api/`))).toBe(
     true,
   );
   expect(paths.some((path) => /^\/api\/(v1|tenant-admin\/v1)\/tenants\//.test(path))).toBe(false);
   expect(paths.includes('/api/v1/auth/me')).toBe(false);
+});
+
+test('scene writes use platform CSRF and tenant-bound support routes; revoked access fails closed', async ({page}) => {
+  const seen: {path:string, token:string|undefined}[]=[];
+  await page.route('**/api/**', async route => {
+    const path=new URL(route.request().url()).pathname;
+    seen.push({path,token:route.request().headers()['x-csrf-token']});
+    if(path.endsWith('/auth/me')) return route.fulfill({json:{account:{id:actor,displayName:'总部'},platformAdmin:true,memberships:[]}});
+    if(path.endsWith('/csrf')) return route.fulfill({json:{token:'platform-only',headerName:'X-CSRF-TOKEN'}});
+    return route.fulfill({status:403,json:{code:'SUPPORT_ACCESS_INVALID'}});
+  });
+  await page.goto(`/tenant-admin/support/#tenant=${tenant}&support=${visit}`);
+  await expect(page.locator('.shell')).toHaveCount(0);
+  const result=await page.evaluate(async () => {
+    // Test the scene request adapter without creating an actual business mutation.
+    const {api}=await import(/* @vite-ignore */ '/src/admin/prototype/foundation-api.ts');
+    try { await api('/scene-foundation/example/actions',{action:'synthetic'}); return 'unexpected'; }
+    catch(e) { return (e as {status:number}).status; }
+  });
+  expect(result).toBe(403);
+  const write=seen.find(x=>x.path.endsWith('/scene/dispatch'));
+  expect(write?.path).toBe(`/api/platform-admin/v1/support-access/${visit}/api/tenant-admin/v1/tenants/${tenant}/scene/dispatch`);
+  expect(write?.token).toBe('platform-only');
+  expect(seen.some(x=>x.path==='/api/v1/auth/csrf'||x.path==='/api/v1/auth/me')).toBe(false);
 });

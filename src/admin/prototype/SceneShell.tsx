@@ -1,3 +1,4 @@
+import { GovernanceProgress } from './GovernanceProgress';
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { EngineStage3D } from '../../operations/engine-stage/EngineStage3D';
 import { busyDemo } from '../../operations/engine-demo';
@@ -84,10 +85,10 @@ function useReduced() {
   return v;
 }
 
-export function SceneShell({ tenant = null }: { tenant?: string | null }) {
+export function SceneShell({ tenant = null, name }: { tenant?: string | null; name?: string }) {
   const { session } = useSession();
   setSceneTenant(tenant);
-  const enterpriseName = session.identity?.memberships.find(m => m.tenantId === tenant)?.tenantName;
+  const enterpriseName = name ?? session.identity?.memberships.find(m => m.tenantId === tenant)?.tenantName;
   const runtime = useSceneRuntime(tenant);
   const reduced = useReduced();
   const foundation = useFoundation();
@@ -377,8 +378,32 @@ export function SceneShell({ tenant = null }: { tenant?: string | null }) {
         setLive(null);
       }, 160);
     };
+    // Touch has an explicit end: pauses while holding must never trigger wheel's idle snap.
+    const touchSheet = (event: Event) => {
+      const e = event as CustomEvent<{ phase: 'move' | 'end'; delta?: number }>;
+      const s = state.current;
+      if (e.detail.phase === 'move' && (s.palette || s.allowed.length < 2)) return;
+      window.clearTimeout(timer);
+      window.clearTimeout(idle);
+      gesture = null;
+      edge = 0;
+      if (e.detail.phase === 'move') {
+        if (!Number.isFinite(e.detail.delta)) return;
+        const cur = at ?? s.live ?? s.stops[s.sheet];
+        at = Math.max(s.stops[s.allowed[0]], Math.min(s.stops[s.allowed[s.allowed.length - 1]], cur - e.detail.delta!));
+        setLive(at);
+        e.preventDefault();
+      } else if (at !== null) {
+        const y = at;
+        at = null;
+        setSheet(s.allowed.reduce((a, b) => Math.abs(s.stops[b] - y) < Math.abs(s.stops[a] - y) ? b : a));
+        setLive(null);
+      }
+    };
+    el.addEventListener('tenant-sheet-touch', touchSheet);
     el.addEventListener('wheel', wheel, { passive: false });
     return () => {
+      el.removeEventListener('tenant-sheet-touch', touchSheet);
       el.removeEventListener('wheel', wheel);
       window.clearTimeout(timer);
       window.clearTimeout(idle);
@@ -817,6 +842,7 @@ function Home({
 
   return (
     <section className="cards home glass" aria-label="待办与常用数据">
+      <GovernanceProgress />
       <article className="card todo">
         <header>
           <h2>需要你处理</h2>

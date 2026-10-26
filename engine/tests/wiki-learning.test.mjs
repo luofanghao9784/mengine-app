@@ -11,7 +11,7 @@ test('learning uses actual Harness with no tools and only bounded source context
 });
 test('fabricated quotes, foreign chunks, prose wrappers and oversize input fail closed',async()=>{
  for(const value of [{...article,evidence:[{chunkId:source.fragments[0].id,quote:'无法在来源匹配的文本'}]},{...article,evidence:[{chunkId:'another-source',quote:article.evidence[0].quote}]},'```json\n{}\n```']) await assert.rejects(()=>learnWiki(source,model(value),new AbortController().signal),/INVALID_WIKI_RESULT/);
- assert.throws(()=>wikiSource({...source,fragments:[{...source.fragments[0],content:'x'.repeat(6001)}]}),/INVALID_WIKI_SOURCE/);
+ assert.throws(()=>wikiSource({...source,fragments:[{...source.fragments[0],content:'x'.repeat(32769)}]}),/INVALID_WIKI_SOURCE/);
 });
 
 import {createServer} from 'node:http';
@@ -39,4 +39,12 @@ test('agent task branch keeps normal metering, empty execution policy and final 
    assert.ok(actions.every(a=>['check','model-usage/open','execution/open','model-usage/start','model-usage/finish'].includes(a.action)));
   }finally{tasks.stop();await close(platform);}
  }
+});
+
+test('source beyond the old 6000-char / 10-chunk cap reaches the real model without truncation',async()=>{
+ const fragments=Array.from({length:15},(_,i)=>({id:`00000000-0000-4000-8000-${String(i+1).padStart(12,'0')}`,locator:`第${i+1}段`,content:'合成正文。'.repeat(300)+(i===14?'末尾证据完整保留。':'')}));
+ const full=wikiSource({filename:'长合成资料.txt',version:1,fragments});
+ const answer={...article,evidence:[{chunkId:fragments[14].id,quote:'末尾证据完整保留'}]};
+ await learnWiki(full,model(answer,request=>{const input=JSON.stringify(request.messages);assert.ok(input.includes('末尾证据完整保留'));assert.ok(input.includes(fragments[14].id));}),new AbortController().signal);
+ assert.throws(()=>wikiSource({...full,fragments:Array.from({length:129},()=>fragments[0])}),/INVALID_WIKI_SOURCE/);
 });

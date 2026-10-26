@@ -74,13 +74,32 @@ class WikiLearningIntegrationTest {
       knowledge.request(owner,tenant,space,file.material(),file.version(),UUID.randomUUID(),1);
       denied(409,()->agents.check(job.id(),job.token()));assertEquals("SOURCE_CHANGED",wiki.detail(owner,tenant,draft.id()).status());assertNull(wiki.detail(owner,tenant,draft.id()).article());
     }
-    @Test void rejectsFabricatedEvidenceAndWrongSourceAndClipsInput(){
+    @Test void rejectsFabricatedEvidenceAndWrongSourceWithoutSilentlyClippingInput(){
       var file=upload(space,"边界.txt","a".repeat(7000));finish(file);var draft=wiki.start(owner,tenant,file.material(),request(file));var job=conversations.claim();
-      var source=(WikiLearningService.Source)agents.check(job.id(),job.token()).get("wikiLearning");assertTrue(source.fragments().stream().mapToInt(c->c.content().length()).sum()<=6000);
+      var source=(WikiLearningService.Source)agents.check(job.id(),job.token()).get("wikiLearning");assertTrue(source.fragments().stream().mapToInt(c->c.content().length()).sum()>6000);
       denied(502,()->wiki.validate(article(source,"不存在的原文依据"),source));
       denied(502,()->wiki.validate("```json {} ```",source));
       var privateFile=upload(personal,"私人.txt","私人内容不能进入 Wiki 来源");finish(privateFile);denied(404,()->wiki.start(owner,tenant,privateFile.material(),request(privateFile)));
       denied(409,()->wiki.start(owner,tenant,file.material(),new WikiLearningService.Start(UUID.randomUUID(),file.version(),2)));
+    }
+
+    @Test void completeLongSourceCanFinishThroughTheActualTaskReceiptGuard(){
+      var file=upload(space,"全量片段.txt",("合成来源需要逐段核对原文。".repeat(100)+"\n\n").repeat(15));finish(file);
+      var draft=wiki.start(owner,tenant,file.material(),request(file));var job=conversations.claim();
+      var source=(WikiLearningService.Source)agents.check(job.id(),job.token()).get("wikiLearning");
+      assertTrue(source.fragments().size()>10);assertTrue(source.fragments().stream().mapToInt(c->c.content().length()).sum()>6000);
+      agents.openExecution(job.id(),job.token(),new AgentTaskService.ExecutionOpen("1.5",List.of()));
+      agents.openUsage(job.id(),job.token());agents.startUsage(job.id(),job.token(),new AgentUsageLedger.Start(1,2048));usage.finish(job.id(),job.token(),new AgentUsageLedger.Receipt(1,"RETURNED",20L,10L));
+      agents.finish(job,result(job,source,article(source,"合成来源需要逐段核对原文。")));
+      assertEquals("SUCCEEDED",wiki.detail(owner,tenant,draft.id()).status());
+      assertEquals(source.fragments().size(),db.queryForObject("SELECT count(*) FROM conversation_sources WHERE task_id=?",Integer.class,job.id()));
+    }
+
+    @Test void oversizedSourcesRequirePartitionInsteadOfPartialSuccess(){
+      var file=upload(space,"过长资料.txt","a".repeat(33000));finish(file);
+      var error=assertThrows(IdentityException.class,()->wiki.start(owner,tenant,file.material(),request(file)));
+      assertEquals("WIKI_SOURCE_PARTITION_REQUIRED",error.code);
+      assertEquals(0,db.queryForObject("SELECT count(*) FROM wiki_learning_drafts WHERE tenant_id=?",Integer.class,tenant));
     }
 
     @Test void explicitFileReadCanLearnWithoutParentAccessAndAdminDoesNotInherit(){

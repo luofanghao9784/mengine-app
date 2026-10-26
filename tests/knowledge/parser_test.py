@@ -17,7 +17,15 @@ class ParserTests(unittest.TestCase):
         for encoding in ('utf-8', 'utf-16', 'gb18030'):
             r = self.parse('金额 123.45\n<script>alert(1)</script>'.encode(encoding), 'md')
             self.assertIn('金额 123.45', self.text(r)); self.assertIn('<script>', self.text(r))
-            self.assertEqual('第 1 行', r['chunks'][0]['locator'])
+            self.assertEqual('第 1–2 行', r['chunks'][0]['locator'])
+    def test_long_markdown_keeps_all_lines_without_exhausting_fragment_limit(self):
+        lines=[f'条款{i:04d}：原始业务说明。' for i in range(1100)]
+        r=self.parse('\n'.join(lines).encode(),'md')
+        self.assertEqual('READY',r['status']);self.assertEqual([],r['warnings'])
+        self.assertEqual(lines,self.text(r).splitlines())
+        self.assertLess(len(r['chunks']),500)
+        self.assertTrue(all(len(c['content'])<=2000 for c in r['chunks']))
+        self.assertTrue(r['chunks'][-1]['locator'].endswith('1100 行'))
     def test_csv_preserves_numeric_strings_and_multiline_cells(self):
         r=self.parse('名称,金额\n"两行\n备注",00123.4500\n'.encode(), 'csv')
         self.assertEqual('READY',r['status']);self.assertIn('00123.4500',self.text(r));self.assertEqual(2,len(r['chunks']))
@@ -128,7 +136,7 @@ class ParserTests(unittest.TestCase):
         self.assertEqual('FAILED',self.parse(b'broken','pdf')['status'])
         self.assertEqual('FAILED',self.parse(b'','txt')['status'])
         self.assertEqual('UNSUPPORTED',self.parse(b'unknown','pptx')['status'])
-        r=self.parse(('中文\n'*600).encode(),'txt');self.assertEqual('PARTIAL',r['status']);self.assertEqual(500,len(r['chunks']))
+        r=self.parse((('中'*2000+'\n')*210).encode(),'txt');self.assertEqual('PARTIAL',r['status']);self.assertIn('CONTENT_LIMIT',r['warnings']);self.assertLessEqual(sum(len(c['content']) for c in r['chunks']),400_000)
         out=io.BytesIO()
         with zipfile.ZipFile(out,'w',zipfile.ZIP_DEFLATED) as z:z.writestr('word/document.xml',b'A'*1_000_000)
         self.assertEqual('FAILED',self.parse(out.getvalue(),'docx')['status'])

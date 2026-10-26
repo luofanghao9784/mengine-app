@@ -1,3 +1,5 @@
+import { DelegatedModel } from './runtime/delegated-model.js';
+import { DelegatedModelFiles } from './runtime/delegated-model-files.js';
 import { configuredObservability } from './runtime/observability.js';
 import { ExecutionReceipts } from './runtime/execution-receipts.js';
 import { PresentationRenderer } from './runtime/presentation-renderer.js';
@@ -41,6 +43,11 @@ const presentationRenderer =
   process.env.AGENT_PPT_RENDERER_ENABLED === 'true' ? new PresentationRenderer() : undefined;
 if (presentationRenderer) await presentationRenderer.check();
 const observability = configuredObservability(process.env);
+const delegatedRoot = process.env.AGENT_CODEX_GOVERNANCE_DIRECTORY;
+const delegatedSources = new Set((process.env.AGENT_CODEX_GOVERNANCE_MATERIALS ?? '').split(',').filter(Boolean));
+if ((!!delegatedRoot) !== (delegatedSources.size > 0) || [...delegatedSources].some(id=>!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(id)))
+  throw new Error('INVALID_CODEX_GOVERNANCE_SCOPE');
+const delegatedExchange = delegatedRoot ? new DelegatedModelFiles(delegatedRoot) : undefined;
 const agent = model
   ? new AgentTasks({
       platformBaseUrl: process.env.AGENT_PLATFORM_URL ?? '',
@@ -48,6 +55,8 @@ const agent = model
       modelName: model.modelName,
       observability,
       routineModel: model.routineModel,
+      governanceModel: delegatedExchange ? scope => scope.workflow === 'wikiLearning' && scope.sourceId && delegatedSources.has(scope.sourceId)
+        ? {modelName:'codex-delegated',createModel:()=>new DelegatedModel(scope.taskId,scope.attemptId,delegatedExchange)} : undefined : undefined,
       briefingUsePrimary: process.env.AGENT_BRIEFING_USE_PRIMARY_MODEL === 'true',
       publicWeb,
       presentationRenderer,

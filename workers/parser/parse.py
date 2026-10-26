@@ -132,7 +132,15 @@ class TablePassages:
 
 def parse(path, extension):
     if extension in ('txt', 'md'):
-        for i, line in enumerate(decode(path).splitlines(), 1): add(f'第 {i} 行', line)
+        pending, start, end, size = [], 1, 1, 0
+        for i, line in enumerate(decode(path).splitlines(), 1):
+            if pending and size + len(line) + 1 > 2000:
+                add(f'第 {start}–{end} 行' if start != end else f'第 {start} 行', '\n'.join(pending))
+                pending, size = [], 0
+            if not pending: start = i
+            pending.append(line); end = i; size += len(line) + 1
+        if pending:
+            add(f'第 {start}–{end} 行' if start != end else f'第 {start} 行', '\n'.join(pending))
     elif extension in ('csv', 'tsv'):
         for i, row in enumerate(csv.reader(io.StringIO(decode(path)), delimiter='\t' if extension == 'tsv' else ','), 1):
             if any(cell.strip() for cell in row):

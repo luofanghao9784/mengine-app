@@ -68,6 +68,9 @@ export interface AgentConfiguration {
   executionClass: 'live' | 'verification';
   modelName: string;
   briefingUsePrimary?: boolean;
+  /** Trusted task-scoped executor selection. Never used by ordinary chat or briefings. */
+  governanceModel?: (scope: {taskId: string; attemptId: string; workflow: 'wikiLearning' | 'wikiGraph' | 'wikiInsight'; sourceId?: string}) =>
+    {modelName: string; createModel(): import('./metered-model.js').UsageModel} | undefined;
   routineModel?: { modelName: string; createModel(): import('./metered-model.js').UsageModel };
   createModel(): import('./metered-model.js').UsageModel;
   /** Only the local verification fixture supplies a sandbox; live code remains disabled. */
@@ -186,12 +189,12 @@ export class AgentTasks {
       const started = performance.now();
       try {
         let response: unknown;
-        try { response = await invoke('check', {}); }
+        try { response = await invoke('check', {}, 131072); }
         catch (error) {
           // This check performs no model/tool execution. Retry only the initial transient
           // transport failure; denials, invalid replies and later checks still fail closed.
           if (!initialAuthorization || signal.aborted || !(error instanceof RuntimeError) || error.code !== 'REMOTE_UNAVAILABLE') throw error;
-          response = await invoke('check', {});
+          response = await invoke('check', {}, 131072);
         }
         initialAuthorization = false;
         if (
@@ -459,13 +462,16 @@ export class AgentTasks {
       ]);
       const activated = new Map<string, SkillReceipt>();
       const publicTools = new Set(['public_search', 'read_public_page']);
-      const selectedModel = useRoutineModel({
+      const standardModel = useRoutineModel({
         wikiLearning: !!wikiLearning, wikiGraph: !!wikiGraph, wikiInsight: !!wikiInsight,
         publicResearch: !!publicQuery, plan: !!planAllowed,
         presentation: !!presentationWorkflow && presentationWorkflow.state !== 'NONE',
         sandbox: !!this.config.sandbox || !!candidatesAllowed,
         briefingUsePrimary: this.config.briefingUsePrimary, briefing: !!briefingGeneration, briefingType: briefingRequestedType ?? '',
       }) ? this.config.routineModel ?? this.config : this.config;
+      const governanceWorkflow = wikiLearning ? 'wikiLearning' : wikiGraph ? 'wikiGraph' : wikiInsight ? 'wikiInsight' : undefined;
+      const selectedModel = (governanceWorkflow ? this.config.governanceModel?.({taskId:task.taskId,
+        attemptId:task.attemptId,workflow:governanceWorkflow, ...(wikiLearning && typeof wikiLearning.materialId === 'string' ? {sourceId:wikiLearning.materialId} : {})}) : undefined) ?? standardModel;
       const backend = selectedModel.createModel();
       const metered = meteredModel(backend, (action, body, receipt) =>
         receipt

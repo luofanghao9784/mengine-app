@@ -1,3 +1,4 @@
+import { supportPath, supportRoute } from '../../identity/support-request';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Tone, Item } from './data';
 import { sceneTenant } from './scene-route';
@@ -14,6 +15,13 @@ export type Asset = {
   gate: number;
   stageStates?: string[];
   available: boolean;
+  availabilityKind?: "PUBLISHED_KNOWLEDGE";
+  availableKnowledgeCount?: number;
+  availabilityScope?: string;
+  unknownFieldCount?: number;
+  unknownFields?: string[];
+  limitations?: string[];
+  publishedAt?: string;
   needsAttention: boolean;
   checksPassed: boolean;
   paused: boolean;
@@ -143,15 +151,15 @@ export const ACTIONS: Record<string, string> = {
   handle: '记录处理措施',
 };
 export async function api<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
-  const tenant = sceneTenant();
+  const tenant = sceneTenant() ?? supportRoute()?.tenant;
   const headers: Record<string,string> = {};
   if (tenant && body !== undefined) {
-    const csrf = await fetch('/api/v1/auth/csrf', { credentials:'same-origin', signal });
+    const csrf = await fetch(supportRoute() ? '/api/platform-admin/v1/auth/csrf' : '/api/v1/auth/csrf', { credentials:'same-origin', signal });
     if (!csrf.ok) throw Object.assign(Error('请重新登录企业管理端'), {status:csrf.status});
     const token = await csrf.json(); headers[token.headerName] = token.token;
   }
   const url = tenant ? `/api/tenant-admin/v1/tenants/${encodeURIComponent(tenant)}/scene/dispatch?path=${encodeURIComponent(path)}` : '/mengine-api' + path;
-  const r = await fetch(url, {
+  const r = await fetch(supportPath(url), {
     credentials: 'same-origin',
     cache: 'no-store',
     signal,

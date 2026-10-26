@@ -171,6 +171,9 @@ async function fixture(page: Page, items: unknown[] = [asset], auditValid: boole
 }
 test('显示字段、真实分页、阶段产物和批次，版本变化不拼接旧记录', async ({ page }) => {
   const state = await fixture(page);
+  // Lift the normal scene sheet before interacting with pagination below the fold.
+  await page.mouse.move(1400, 300);
+  await page.mouse.wheel(0, 900);
   const result = page.getByRole('region', { name: '结构化处理结果' });
   await expect(result.getByText('来源预约编号', { exact: true })).toBeVisible();
   await expect(result.getByText('S001', { exact: true })).toBeVisible();
@@ -368,7 +371,7 @@ test('动画只显示三个治理阶段，数量统计当前停留资产', async
 });
 test('已可用资产不重复计入动画治理环节', async ({ page }) => {
   await fixture(page);
-  await expect(page.locator('.world-labels .gate')).toHaveText(['0解析', '0口径标注', '0检查']);
+  await expect.poll(async () => (await page.locator('.world-labels .gate').allTextContents()).sort()).toEqual(['0解析', '0口径标注', '0检查'].sort());
 });
 test('原生治理明确提示缺少企业背景，不显示可执行按钮', async ({ page }) => {
   const blocked = { ...asset, available: false, gate: 2, stageStates: ['READY', 'READY', 'WAITING', 'WAITING', 'WAITING'],

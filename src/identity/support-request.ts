@@ -17,3 +17,8 @@ export function supportPath(path: string) {
     ? `/api/platform-admin/v1/support-access/${access.id}${path}`
     : path;
 }
+
+/** Support context wins over optional customer query parameters. */
+export function sceneTenant() {
+  return supportRoute()?.tenant ?? new URLSearchParams(location.search).get('tenant');
+}
