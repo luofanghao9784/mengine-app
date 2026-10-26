@@ -118,3 +118,59 @@
     padding-right: 0;
   }
 }
+
+/*
+ * 有实拍照片的资讯卡做成“照片主导”的封面：照片铺满整张卡，自下而上一层深色渐变，
+ * 标题、摘要用白字压在照片下部；类型与时间是半透明的磨砂小胶囊。
+ * 最小一格隐藏封面时（见上方）不适用，仍是浅色文字卡。
+ */
+@container live-briefing-tile ((min-width: 301px) or (min-height: 301px)) {
+  .live-briefing-tile[data-size] .live-briefing-body:has(.news-cover.is-compact img) {
+    isolation: isolate;
+  }
+  .live-briefing-tile[data-size] .news-cover.is-compact:has(img) {
+    height: 0;
+    margin: 0;
+  }
+  .live-briefing-tile[data-size] .news-cover.is-compact .news-cover-layer:has(img) {
+    inset: 0;
+    z-index: -1;
+    height: auto;
+    border-radius: 23px;
+  }
+  .live-briefing-tile[data-size] .news-cover.is-compact .news-cover-layer:has(img)::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      to top,
+      rgb(10 16 28 / 84%),
+      rgb(10 16 28 / 58%) 45%,
+      rgb(10 16 28 / 10%) 80%
+    );
+  }
+  .live-briefing-tile[data-size] .magazine-with-cover:has(.news-cover-layer img) {
+    padding-right: 0;
+  }
+  .live-briefing-tile[data-size] .magazine-with-cover:has(.news-cover-layer img) .magazine-copy {
+    justify-content: flex-end;
+    gap: 4px;
+  }
+  .live-briefing-tile[data-size] .magazine-with-cover:has(.news-cover-layer img) h3 {
+    color: #fff;
+  }
+  .live-briefing-tile[data-size] .magazine-with-cover:has(.news-cover-layer img) .magazine-summary {
+    color: rgb(255 255 255 / 82%);
+  }
+  .live-briefing-tile[data-size] .magazine-with-cover:has(.news-cover-layer img) .magazine-footer {
+    color: rgb(255 255 255 / 70%);
+  }
+  .live-briefing-tile[data-size] .magazine-with-cover:has(.news-cover-layer img) :is(.magazine-type, .magazine-eyebrow time) {
+    padding: 2px 9px;
+    border-radius: 999px;
+    background: rgb(255 255 255 / 22%);
+    color: #fff;
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+  }
+}

@@ -27,6 +27,10 @@
   height: 30px;
   border-radius: 50%;
 }
+.live-deck-heading,
+.live-deck-header-actions {
+  display: none;
+}
 .live-deck-caption {
   color: var(--live-muted);
   font-size: 12px;
@@ -1013,6 +1017,11 @@
     scroll-snap-align: center;
     scroll-snap-stop: always;
   }
+  /* 会话列表和宽屏一样只占一窄列，右边露出对话卡，向左一滑就到。 */
+  .live-demo-deck .deck-card.deck-list {
+    flex-basis: min(280px, 76%);
+    scroll-snap-align: start;
+  }
   .live-demo-deck .deck-card.live-reader-fullscreen {
     display: flex;
     inset: 8px;
@@ -1021,6 +1030,26 @@
 @media (min-width: 1001px) {
   .live-demo-deck .deck-mobile-tabs {
     display: none;
+  }
+}
+/* 手机：对话卡和资料卡铺满屏幕，像翻页一样左右切换；会话列表仍是左边一窄列。 */
+@media (max-width: 800px) {
+  /* 选择器加重：后面还有宽屏用的上下留白规则，手机上一律不要。 */
+  .live-demo-deck .deck-scroller.deck-scroller.live-deck-scroller {
+    gap: 0;
+    padding: 0;
+    scroll-padding-inline: 0;
+  }
+  .live-demo-deck .deck-card:not(.deck-list) {
+    border-width: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .live-demo-deck .deck-card.deck-list {
+    padding-left: 8px;
+  }
+  .live-demo-deck .deck-card.live-reader-fullscreen {
+    inset: 0;
   }
 }
 .live-demo-deck .original-selection > .button {
@@ -1223,11 +1252,16 @@
   overflow-wrap: anywhere;
 }
 @media (max-width: 800px) {
+  /* 手机上资料阅读铺满整屏。 */
   .modal.wide.live-library-deck-modal {
-    width: calc(100vw - 12px);
-    max-width: calc(100vw - 12px);
-    height: calc(100dvh - 20px);
-    max-height: calc(100dvh - 20px);
+    width: 100vw;
+    max-width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+    margin: 0;
+  }
+  .modal.wide.live-library-deck-modal > .modal-content {
+    padding: env(safe-area-inset-top) 0 0;
   }
 }
 

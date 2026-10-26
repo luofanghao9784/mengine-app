@@ -12,7 +12,7 @@ import { BriefingResizeHandle } from '../components/BriefingResize';
 import { useBriefingCardFit } from '../components/useBriefingCardFit';
 import type { BriefingEntry } from '../briefingLayout';
 import type { CardData, CardSize } from '../briefing';
-import { magazineGridMetrics } from '../briefingGrid';
+import { magazineGridMetrics, magazineZoom } from '../briefingGrid';
 import type { MagazineGridItem } from './MagazineGrid';
 import { Button } from '../shared/ui';
 import './follow-grid.css';
@@ -43,7 +43,7 @@ export function FollowGrid({
   useLayoutEffect(() => {
     const element = page.current!;
     const measure = () => {
-      const next = magazineGridMetrics(element.clientWidth);
+      const next = magazineGridMetrics(element.clientWidth, 2);
       if (next.unit > 0)
         setMetrics((old) => (old.columns === next.columns && old.unit === next.unit ? old : next));
     };
@@ -139,7 +139,11 @@ export function FollowGrid({
         className="live-briefing-grid live-magazine-grid live-follow-grid"
         data-group-id="following"
         style={
-          { '--briefing-columns': metrics.columns, '--briefing-unit': `${metrics.unit}px` } as CSSProperties
+          {
+            '--briefing-columns': metrics.columns,
+            '--briefing-unit': `${metrics.unit}px`,
+            '--briefing-zoom': magazineZoom(metrics.unit),
+          } as CSSProperties
         }
       >
         {follow.placements.map((p) => {

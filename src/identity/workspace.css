@@ -236,8 +236,13 @@
     --topbar-row-height: 80px;
     min-height: 80px;
     grid-template-columns: minmax(0, 1fr) auto;
-    padding: 14px 16px;
+    /* 标题与左上角页面图标、右上角按钮同一条中线。 */
+    padding: 17px 16px 14px;
     gap: 5px 8px;
+  }
+  /* 标题左边让出菜单按钮；第二行起（筛选、企业）仍与内容左边对齐。 */
+  .workspace-shell .access-main .topbar > .topbar-heading {
+    padding-left: 46px;
   }
   .workspace-shell .access-main .topbar-meta {
     grid-column: 1 / -1;
@@ -245,14 +250,14 @@
     justify-self: start;
   }
   .workspace-shell .access-content {
-    padding: 0 14px calc(90px + env(safe-area-inset-bottom));
+    padding: 0 14px calc(24px + env(safe-area-inset-bottom));
   }
   .workspace-briefing .access-content {
-    padding-bottom: calc(162px + env(safe-area-inset-bottom));
+    padding-bottom: calc(96px + env(safe-area-inset-bottom));
   }
   .workspace-composer,
   .workspace-composer-status {
-    bottom: calc(86px + env(safe-area-inset-bottom));
+    bottom: calc(16px + env(safe-area-inset-bottom));
     width: calc(100% - 28px);
   }
   .workspace-briefing .topbar-heading {
@@ -261,7 +266,7 @@
     gap: 2px;
   }
   .workspace-conversations .access-content {
-    padding: 0 10px calc(82px + env(safe-area-inset-bottom));
+    padding: 0 10px env(safe-area-inset-bottom);
   }
   .workspace-shell .access-tenant-picker select {
     padding-block: 0;
@@ -276,25 +281,36 @@
     gap: 2px;
   }
 }
-/* 手机窄屏：画报的筛选栏挪到标题下面单独一行，标题旁的日期不再被挤成好几行。 */
-@media (max-width: 400px) {
+/* 手机窄屏：画报的筛选栏挪到标题下面单独一行（按内容宽度，不铺满），标题旁的日期不再被挤成好几行。 */
+@media (max-width: 560px) {
   .workspace-shell.workspace-briefing .access-main .topbar {
     grid-template-columns: minmax(0, 1fr);
+    row-gap: 8px;
   }
+  /* 筛选收成右上角的下拉胶囊：平时只显示当前分类，点开后竖排列出全部。 */
   .workspace-shell.workspace-briefing .access-main .topbar-actions {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    justify-self: stretch;
-    width: 100%;
-    margin-left: 0;
+    position: absolute;
+    /* 不指定网格位置，定位才相对整个标题栏而不是某一格。 */
+    grid-area: auto;
+    top: 10px;
+    right: 16px;
+    z-index: 2;
+    margin: 0;
   }
   .workspace-briefing .access-main .topbar-meta {
-    grid-row: 3;
+    grid-row: 2;
+  }
+  /* 没有企业切换时不占第三行，筛选标签下方不留多余空隙。 */
+  .workspace-briefing .access-main .topbar-meta:empty {
+    display: none;
   }
   .workspace-briefing .topbar-heading {
     flex-direction: row;
     align-items: baseline;
     gap: 10px;
+    /* 右边让出分类胶囊。 */
+    padding-right: 96px;
+    min-width: 0;
   }
   .workspace-briefing .topbar-heading h1 {
     flex: none;
@@ -303,10 +319,27 @@
     white-space: nowrap;
   }
   .workspace-briefing .live-briefing-tabs {
-    width: 100%;
-    justify-content: space-between;
-    gap: 0;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+    width: auto;
+    min-width: 0;
+    border-radius: 18px;
   }
+  .workspace-briefing .live-briefing-tabs:not([data-menu-open]) > button:not([aria-selected='true']) {
+    display: none;
+  }
+  .workspace-briefing .live-briefing-tabs:not([data-menu-open]) > button[aria-selected='true']::after {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    margin: 0 2px 3px 8px;
+    border: solid currentColor;
+    border-width: 0 1.5px 1.5px 0;
+    rotate: 45deg;
+  }
+
 }
 /* The viewport owns a single toolbar, over the entire main canvas like the Demo. */
 .workspace-conversations {
@@ -377,13 +410,73 @@
 @media (max-width: 800px) {
   .workspace-conversation-page,
   .workspace-conversation-overlay {
-    inset: 0 0 calc(74px + env(safe-area-inset-bottom));
-    padding-bottom: 8px;
+    inset: 0;
+    padding-bottom: 0;
   }
-  .workspace-conversation-page .live-deck-toolbar,
-  .workspace-conversation-overlay .live-deck-toolbar {
-    height: 64px;
-    padding-inline: 12px;
+  /* 手机会话页：顶栏与对话卡同为白色连成一页。第一行左菜单（外壳的按钮）、中标题与状态、右新建；
+     有资料卡时第二行是切换气泡。 */
+  .workspace-conversations .live-demo-deck:not(.live-reading-deck) {
+    background: #fff;
+  }
+  .workspace-conversations .live-demo-deck .live-deck-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-areas: 'heading actions arrows' 'tabs tabs tabs';
+    align-items: center;
+    height: auto;
+    min-height: 68px;
+    gap: 6px 4px;
+    padding: 6px 12px 10px 62px;
+    border-bottom: 1px solid transparent;
+    transition: border-color 160ms ease;
+  }
+  .workspace-conversations .live-demo-deck .live-deck-toolbar[data-scrolled] {
+    border-bottom-color: var(--line);
+  }
+  .workspace-conversations .live-deck-heading {
+    grid-area: heading;
+    display: grid;
+    min-width: 0;
+  }
+  .workspace-conversations .live-deck-heading h2 {
+    overflow: hidden;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.4;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .workspace-conversations .live-deck-heading p {
+    overflow: hidden;
+    color: var(--ink-3);
+    font-size: 12px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .workspace-conversations .live-deck-header-actions {
+    grid-area: actions;
+    display: flex;
+  }
+  .workspace-conversations .live-demo-deck .live-deck-arrows {
+    grid-area: arrows;
+  }
+  /* 直接从导航进入的会话页离开靠菜单；从画报点进来的才保留关闭（回画报）。 */
+  .workspace-conversations:not(.workspace-contextual) .live-demo-deck .live-deck-arrows {
+    display: none;
+  }
+  .workspace-conversations .live-demo-deck .live-deck-toolbar .deck-mobile-tabs {
+    grid-area: tabs;
+    margin: 0;
+  }
+  .workspace-conversations .live-demo-deck .live-deck-toolbar[data-single] .deck-mobile-tabs {
+    display: none;
+  }
+  .workspace-conversations .live-demo-deck .conversation-reader > .live-card-heading {
+    display: none;
+  }
+  /* 顶栏右侧已是新建会话；企业切换在其他页面的标题栏里。 */
+  .workspace-conversations .access-main > .topbar > .topbar-meta {
+    display: none;
   }
 }
 

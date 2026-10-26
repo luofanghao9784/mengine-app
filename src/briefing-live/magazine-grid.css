@@ -13,6 +13,10 @@
   min-width: 0;
   container: live-briefing-tile / size;
 }
+/* 手机两列网格的格子比设计尺寸小：整格按比例缩小，格内的尺寸判断仍按设计尺寸进行。 */
+.live-magazine-grid > .live-briefing-tile {
+  zoom: var(--briefing-zoom, 1);
+}
 .live-magazine-grid .live-briefing-card {
   display: flex;
   flex-direction: column;
@@ -65,4 +69,19 @@
   .live-magazine-grid .live-briefing-card:is(:hover, :has(:focus-visible)) {
     translate: none;
   }
+}
+/* 网格空格的占位：一张安静的玻璃卡，中间是梦擎标识。 */
+.live-magazine-grid > .live-briefing-filler {
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--glass-edge, rgb(255 255 255 / 75%));
+  border-radius: 24px;
+  background: rgb(255 255 255 / 38%);
+  -webkit-backdrop-filter: var(--glass-blur, blur(28px) saturate(1.5));
+  backdrop-filter: var(--glass-blur, blur(28px) saturate(1.5));
+}
+.live-magazine-grid > .live-briefing-filler .dreamcore-symbol {
+  width: 44px;
+  height: 44px;
+  opacity: 0.55;
 }

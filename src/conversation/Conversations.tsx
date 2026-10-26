@@ -141,87 +141,138 @@ export function Conversations({ tenant }: { tenant: string }) {
           publicWebEnabled={list.value.publicWebEnabled}
           changed={changed}
           navigation={
-            <nav className="live-conversation-list" aria-label="会话列表">
-              <div className="live-list-tools">
-                <header className="deck-card-header live-card-heading">
-                  <h2>会话列表</h2>
-                  <Button
-                    className="live-new-conversation"
-                    icon={Plus}
-                    disabled={pendingRequest}
-                    onClick={() => {
-                      location.hash = retainConversationContext(conversationHref(tenant), location.hash);
-                    }}
-                  >
-                    新会话
-                  </Button>
-                </header>
-              </div>
-              <div className="live-conversation-links">
-                {context.value.workspaces.map((space) => {
-                  const conversations = list.value!.items.filter((item) => item.workspaceId === space.id);
-                  return conversations.length ? (
-                    <details className="live-conversation-group" key={space.id} open>
-                      <summary>
-                        <Folder size={14} />
-                        {space.kind === 'PERSONAL' ? '个人空间' : space.name}
-                      </summary>
-                      {conversations.map((c) => (
-                        <ConversationRow
-                          key={c.id}
-                          tenant={tenant}
-                          item={c}
-                          selected={selected === c.id}
-                          href={retainConversationContext(conversationHref(tenant, c.id), hash)}
-                          changed={() => {
-                            setRemovedSelection({ tenant, id: c.id });
-                            changed();
-                          }}
-                        />
-                      ))}
-                    </details>
-                  ) : null;
-                })}
-                {list.value.items.some(
-                  (item) => !context.value!.workspaces.some((space) => space.id === item.workspaceId),
-                ) && (
-                  <section className="live-conversation-group">
-                    <h3>其他会话</h3>
-                    {list.value.items
-                      .filter(
-                        (item) => !context.value!.workspaces.some((space) => space.id === item.workspaceId),
-                      )
-                      .map((c) => (
-                        <ConversationRow
-                          key={c.id}
-                          tenant={tenant}
-                          item={c}
-                          selected={selected === c.id}
-                          href={retainConversationContext(conversationHref(tenant, c.id), hash)}
-                          changed={() => {
-                            setRemovedSelection({ tenant, id: c.id });
-                            changed();
-                          }}
-                        />
-                      ))}
-                  </section>
-                )}
-                {!list.value.items.length && (
-                  <p className="live-list-empty">从一件具体的工作开始。发送后，会话会保存在这里。</p>
-                )}
-                <ConversationListTail
-                  hasMore={list.value.hasMore}
-                  loading={list.loading}
-                  error={list.moreError}
-                  blocked={pendingRequest}
-                  loadMore={list.loadMore}
-                />
-              </div>
-            </nav>
+            <ConversationListNav
+              tenant={tenant}
+              hash={hash}
+              selected={selected}
+              workspaces={context.value.workspaces}
+              list={list}
+              pending={pendingRequest}
+              changed={changed}
+              removed={(id) => setRemovedSelection({ tenant, id })}
+            />
           }
         />
       )}
     </>
+  );
+}
+/** 会话列表：会话页左侧卡片；手机上放在左侧导航抽屉里，任何页面都能打开。 */
+export function ConversationListNav({
+  tenant,
+  hash,
+  selected,
+  workspaces,
+  list,
+  pending,
+  changed,
+  removed,
+}: {
+  tenant: string;
+  hash: string;
+  selected?: string;
+  workspaces: TenantContext['workspaces'];
+  list: ReturnType<typeof useConversationList>;
+  pending: boolean;
+  changed: () => void;
+  removed: (id: string) => void;
+}) {
+  const value = list.value!;
+  return (
+    <nav className="live-conversation-list" aria-label="会话列表">
+      <div className="live-list-tools">
+        <header className="deck-card-header live-card-heading">
+          <h2>会话列表</h2>
+          <Button
+            className="live-new-conversation"
+            icon={Plus}
+            disabled={pending}
+            onClick={() => {
+              location.hash = retainConversationContext(conversationHref(tenant), location.hash);
+            }}
+          >
+            新会话
+          </Button>
+        </header>
+      </div>
+      <div className="live-conversation-links">
+        {workspaces.map((space) => {
+          const conversations = value.items.filter((item) => item.workspaceId === space.id);
+          return conversations.length ? (
+            <details className="live-conversation-group" key={space.id} open>
+              <summary>
+                <Folder size={14} />
+                {space.kind === 'PERSONAL' ? '个人空间' : space.name}
+              </summary>
+              {conversations.map((c) => (
+                <ConversationRow
+                  key={c.id}
+                  tenant={tenant}
+                  item={c}
+                  selected={selected === c.id}
+                  href={retainConversationContext(conversationHref(tenant, c.id), hash)}
+                  changed={() => {
+                    removed(c.id);
+                    changed();
+                  }}
+                />
+              ))}
+            </details>
+          ) : null;
+        })}
+        {value.items.some((item) => !workspaces.some((space) => space.id === item.workspaceId)) && (
+          <section className="live-conversation-group">
+            <h3>其他会话</h3>
+            {value.items
+              .filter((item) => !workspaces.some((space) => space.id === item.workspaceId))
+              .map((c) => (
+                <ConversationRow
+                  key={c.id}
+                  tenant={tenant}
+                  item={c}
+                  selected={selected === c.id}
+                  href={retainConversationContext(conversationHref(tenant, c.id), hash)}
+                  changed={() => {
+                    removed(c.id);
+                    changed();
+                  }}
+                />
+              ))}
+          </section>
+        )}
+        {!value.items.length && (
+          <p className="live-list-empty">从一件具体的工作开始。发送后，会话会保存在这里。</p>
+        )}
+        <ConversationListTail
+          hasMore={value.hasMore}
+          loading={list.loading}
+          error={list.moreError}
+          blocked={pending}
+          loadMore={list.loadMore}
+        />
+      </div>
+    </nav>
+  );
+}
+/** 手机抽屉在会话页以外打开时，自己读取会话列表。 */
+export function DrawerConversations({ tenant }: { tenant: string }) {
+  const { session } = useSession();
+  const pendingRequest = useContext(RequestPending);
+  const [attempt, setAttempt] = useState(0);
+  const context = useRemote((signal) => identityClient.context(tenant, signal), [tenant, session.identity]);
+  const list = useConversationList(tenant, attempt);
+  const changed = useCallback(() => setAttempt((x) => x + 1), []);
+  if (!context.value || !list.value) return null;
+  return (
+    <ConversationListNav
+      tenant={tenant}
+      hash={location.hash}
+      workspaces={context.value.workspaces}
+      list={list}
+      pending={pendingRequest}
+      changed={changed}
+      removed={() => {}}
+    />
   );
 }
 function ConversationView({
@@ -425,6 +476,14 @@ function ConversationView({
     data.value?.conversation.title ||
     selectedTitle ||
     (selected ? '会话' : briefingContext ? briefingTitle || '画报讨论' : '新会话');
+  const agentStatus =
+    agentMode === 'live'
+      ? ''
+      : agentMode === 'off'
+        ? '模型暂不可用 · 任务可保存等待'
+        : agentMode === 'verification'
+          ? '联调验证 · 未调用真实模型'
+          : '描述需求，让 AI 协助完成工作';
   return (
     <>
       <LiveConversationDeck
@@ -432,6 +491,22 @@ function ConversationView({
         navigation={navigation}
         persistenceKey={readerKey}
         title={conversationTitle}
+        heading={
+          <>
+            <h2 title={conversationTitle}>{conversationTitle}</h2>
+            {agentStatus && <p>{agentStatus}</p>}
+          </>
+        }
+        headerActions={
+          <IconButton
+            icon={Plus}
+            label="新建会话"
+            onClick={() => {
+              if (!requestNavigationLocked())
+                location.hash = retainConversationContext(conversationHref(tenant), location.hash);
+            }}
+          />
+        }
         reveal={reveal}
         onRefresh={() => {
           if (!requestNavigationLocked()) refresh();
@@ -515,15 +590,7 @@ function ConversationView({
             <div>
               <CardTypeTag type="会话" />
               <h2 title={conversationTitle}>{conversationTitle}</h2>
-              {agentMode !== 'live' && (
-                <p className="muted">
-                  {agentMode === 'off'
-                    ? '模型暂不可用 · 任务可保存等待'
-                    : agentMode === 'verification'
-                      ? '联调验证 · 未调用真实模型'
-                      : '描述需求，让 AI 协助完成工作'}
-                </p>
-              )}
+              {agentStatus && <p className="muted">{agentStatus}</p>}
             </div>
           </header>
           <div
@@ -584,7 +651,11 @@ function ConversationView({
                     <h3>
                       有什么想法？<span>我帮你实现。</span>
                     </h3>
-                    <WorkStarters key={tenant} tenant={tenant} choose={(text) => setSuggestion({ text, sequence: Date.now() })} />
+                    <WorkStarters
+                      key={tenant}
+                      tenant={tenant}
+                      choose={(text) => setSuggestion({ text, sequence: Date.now() })}
+                    />
                   </section>
                 )}
                 {data.value && !focused && (page > 0 || data.value.hasMore) && (
@@ -1056,7 +1127,11 @@ function AttemptHistory({
             <ChevronRight size={15} className="attempt-chevron" aria-hidden="true" />
             <span>第 {a.number} 次执行</span>
             <span className="attempt-status">{labels[a.status]}</span>
-            {a.provenance === 'LEGACY_CURRENT_ONLY' ? ' · 旧记录仅保留当次事实' : a.provenance === 'EXTERNAL_DEPLOYMENT' ? ' · Codex 首轮生成' : ''}
+            {a.provenance === 'LEGACY_CURRENT_ONLY'
+              ? ' · 旧记录仅保留当次事实'
+              : a.provenance === 'EXTERNAL_DEPLOYMENT'
+                ? ' · Codex 首轮生成'
+                : ''}
           </summary>
           <div className="attempt-content">
             <p className="muted">
@@ -1715,14 +1790,14 @@ export function ConversationComposer({
                   : !allowed
                     ? '请先选择工作空间'
                     : busy
-                    ? '提交中…'
-                    : pending
-                      ? '重试上次发送'
-                      : fromBriefing
-                        ? '发送消息'
-                        : mode === 'AGENT'
-                          ? '开始任务'
-                          : '查找资料'
+                      ? '提交中…'
+                      : pending
+                        ? '重试上次发送'
+                        : fromBriefing
+                          ? '发送消息'
+                          : mode === 'AGENT'
+                            ? '开始任务'
+                            : '查找资料'
             }
             disabled={
               busy ||

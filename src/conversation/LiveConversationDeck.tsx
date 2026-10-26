@@ -11,7 +11,9 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react';
+import { createPortal } from 'react-dom';
 import { takeViewportMotion } from './viewport-motion';
+import { usePhoneLayout, useDrawerSlot } from '../identity/drawer-slot';
 import { requestNavigationLocked } from '../shared/request-guard';
 import { IconButton } from '../shared/ui';
 import { CardTypeTag } from './CardTypeTag';
@@ -52,6 +54,8 @@ export function LiveConversationDeck({
   reader = false,
   mainActions,
   titleContent,
+  heading,
+  headerActions,
   beforeClose,
   persistenceKey = 'conversation',
 }: {
@@ -60,6 +64,9 @@ export function LiveConversationDeck({
   reader?: boolean;
   mainActions?: ReactNode;
   titleContent?: ReactNode;
+  /** 手机顶栏：标题与状态、右侧操作（卡片自己的标题行此时隐藏）。 */
+  heading?: ReactNode;
+  headerActions?: ReactNode;
   beforeClose?: () => boolean;
   persistenceKey?: string;
   children: ReactNode;
@@ -73,6 +80,12 @@ export function LiveConversationDeck({
   const propertiesFor = (id: string) =>
     allCards.find((card) => card.kind === 'properties' && (card.parentId || 'conversation') === id);
   const [active, setActive] = useViewState(tenant, persistenceKey + ':active', 'conversation', textState);
+  // 手机上会话列表放进左侧导航抽屉，不再作为一张卡片。
+  const phone = usePhoneLayout(),
+    drawerSlot = useDrawerSlot();
+  const listInDrawer = phone && !!navigation && !!drawerSlot && !reader;
+  const listCard = !!navigation && !listInDrawer;
+  const [scrolled, setScrolled] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   useViewScroll(root, tenant, persistenceKey);
   const close = () => {
@@ -237,6 +250,20 @@ export function LiveConversationDeck({
     );
     return () => cancelAnimationFrame(frame);
   }, [reveal]);
+  useEffect(() => {
+    if (listInDrawer && active === 'list') setActive('conversation');
+  }, [listInDrawer, active]);
+  useEffect(() => {
+    // 手机顶栏和卡片同为白色，内容往上滚后才出现分隔线。
+    const element = root.current;
+    if (!phone || !element) return setScrolled(false);
+    const scroll = (event: Event) => {
+      const target = event.target;
+      if (target instanceof HTMLElement && target !== scroller.current) setScrolled(target.scrollTop > 0);
+    };
+    element.addEventListener('scroll', scroll, { capture: true, passive: true });
+    return () => element.removeEventListener('scroll', scroll, { capture: true });
+  }, [phone]);
   useEffect(() => {
     if (!['list', ...available].includes(active)) setActive('conversation');
     if (fullscreen && !available.includes(fullscreen)) setFullscreen(undefined);
@@ -409,10 +436,16 @@ export function LiveConversationDeck({
       style={{ '--deck-padding': `${deckSpacing.padding}px` } as CSSProperties}
     >
       {!reader && (
-        <header className="live-deck-toolbar">
+        <header
+          className="live-deck-toolbar"
+          data-scrolled={scrolled || undefined}
+          data-single={(!listCard && movableOrder.length < 2) || undefined}
+        >
           <h1 className="live-deck-caption">{reader ? '资料阅读' : '会话视窗'}</h1>
+          {heading && <div className="live-deck-heading">{heading}</div>}
+          {headerActions && <div className="live-deck-header-actions">{headerActions}</div>}
           <div className="deck-mobile-tabs" aria-label="会话卡片切换">
-            {navigation && (
+            {listCard && (
               <button type="button" aria-pressed={active === 'list'} onClick={() => show('list')}>
                 <DeckTabFace icon={List} label="列表" />
               </button>
@@ -459,11 +492,12 @@ export function LiveConversationDeck({
         ref={scroller}
         style={{ '--deck-gap': `${deckSpacing.gap}px` } as CSSProperties}
       >
-        {navigation && (
+        {listCard && (
           <DeckCard {...common('list')} kind="list" label="会话列表卡片" tabLabel="会话列表">
             {navigation}
           </DeckCard>
         )}
+        {listInDrawer && createPortal(navigation, drawerSlot)}
         <OrderedDeckCards order={movableOrder}>
           <DeckCard
             {...common('conversation')}

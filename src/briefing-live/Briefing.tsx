@@ -183,6 +183,24 @@ function BriefingPage({ tenant, onMonthChange }: BriefingProps) {
       }),
   });
   const tabs = ['推荐', '关注', '日期', '类型', '空间'];
+  // 手机窄屏：分类收成右上角的下拉胶囊，平时只显示当前分类，点开后列出全部。
+  const [tabMenu, setTabMenu] = useState(false);
+  const tabList = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!tabMenu) return;
+    const outside = (event: PointerEvent) => {
+      if (!tabList.current?.contains(event.target as Node)) setTabMenu(false);
+    };
+    const key = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setTabMenu(false);
+    };
+    document.addEventListener('pointerdown', outside);
+    document.addEventListener('keydown', key);
+    return () => {
+      document.removeEventListener('pointerdown', outside);
+      document.removeEventListener('keydown', key);
+    };
+  }, [tabMenu]);
   const selectTab = useBriefingTabs({
     page: pageRef,
     index: Math.max(0, tabs.indexOf(tab)),
@@ -218,7 +236,13 @@ function BriefingPage({ tenant, onMonthChange }: BriefingProps) {
   return (
     <>
       <PageActions>
-        <div role="tablist" aria-label="画报分类" className="live-briefing-tabs">
+        <div
+          ref={tabList}
+          role="tablist"
+          aria-label="画报分类"
+          className="live-briefing-tabs"
+          data-menu-open={tabMenu || undefined}
+        >
           {tabs.map((label, index) => (
             <button
               key={label}
@@ -229,7 +253,14 @@ function BriefingPage({ tenant, onMonthChange }: BriefingProps) {
                 (label === '类型' && tab === '类型' && briefingTypeLabels[businessType]) || undefined
               }
               disabled={pendingRequest || pullRefresh.active}
-              onClick={() => selectTab(index)}
+              onClick={() => {
+                if (!tabMenu && tab === label && matchMedia('(max-width: 560px)').matches) {
+                  setTabMenu(true);
+                  return;
+                }
+                setTabMenu(false);
+                selectTab(index);
+              }}
             >
               {label}
             </button>

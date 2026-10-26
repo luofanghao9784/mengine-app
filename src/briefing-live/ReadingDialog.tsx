@@ -2,7 +2,7 @@ import { briefingTime } from '../briefingTypography';
 import '../briefingFeedback.css';
 import { useContext, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { MessageSquare, ThumbsUp, X } from 'lucide-react';
+import { ChevronLeft, MessageSquare, ThumbsUp, X } from 'lucide-react';
 import { useBriefingDetailWidth } from '../components/useBriefingDetailWidth';
 import type { FeedbackTarget } from '../../contracts/public-api/feedback';
 import { FeedbackActions } from './FeedbackActions';
@@ -14,6 +14,7 @@ import { useRequestLock } from '../shared/request-guard';
 import { briefingConversationHref } from '../conversation/briefing-context';
 import { TaskReadingBody, type ReadingTask } from './TaskReadingBody';
 import { RailButton, BriefingStatusMarks } from './Magazine';
+import { usePhoneLayout } from '../identity/drawer-slot';
 
 export function ReadingDialog({
   title,
@@ -51,6 +52,8 @@ export function ReadingDialog({
   const pending = useContext(RequestPending),
     titleId = useId();
   const sizing = useBriefingDetailWidth();
+  // 手机上卡片详情铺满整屏，宽度不再由拖动调整。
+  const phone = usePhoneLayout();
   const discussion = useSubmission<Record<string, never>>();
   useRequestLock(discussion.busy || discussion.uncertain);
   const [destination, setDestination] = useState<string>();
@@ -72,11 +75,12 @@ export function ReadingDialog({
   const close = () => {
     if (!pending) onClose();
   };
+  const edge = useRef<{ x: number; y: number } | null>(null);
   return createPortal(
     <dialog
       ref={ref}
       className="live-reading-dialog"
-      style={{ width: sizing.width + sizing.gutter, paddingRight: sizing.gutter }}
+      style={phone ? undefined : { width: sizing.width + sizing.gutter, paddingRight: sizing.gutter }}
       aria-labelledby={titleId}
       onCancel={(e) => {
         e.preventDefault();
@@ -86,22 +90,53 @@ export function ReadingDialog({
       onClick={(e) => {
         if (e.target === e.currentTarget) close();
       }}
+      onTouchStart={(e) => {
+        const touch = e.touches[0];
+        edge.current =
+          phone && e.touches.length === 1 && touch.clientX <= 24
+            ? { x: touch.clientX, y: touch.clientY }
+            : null;
+      }}
+      onTouchMove={(e) => {
+        if (!edge.current) return;
+        const dx = e.touches[0].clientX - edge.current.x,
+          dy = e.touches[0].clientY - edge.current.y;
+        if (Math.abs(dy) > 24 && Math.abs(dy) > dx) edge.current = null;
+        else if (dx > 60 && dx > Math.abs(dy) * 1.5) {
+          edge.current = null;
+          close();
+        }
+      }}
     >
       <div className="live-reading-card">
         <header className="live-reading-header">
+          {/* 手机全屏时按“返回”理解：返回按钮在左侧，也可从左边缘右滑返回。 */}
+          {phone && (
+            <button
+              type="button"
+              className="live-reading-close is-back"
+              aria-label="关闭卡片详情"
+              disabled={pending}
+              onClick={close}
+            >
+              <ChevronLeft size={22} />
+            </button>
+          )}
           <span title={`${contentLabel || (task ? '会话' : '企业副本')} · ${workspace}`}>
             {contentLabel || (task ? '会话' : '企业副本')} · {workspace}
           </span>
           <BriefingStatusMarks pinned={pinned} discussion={task ? { tenant, source: task } : undefined} />
-          <button
-            type="button"
-            className="live-reading-close"
-            aria-label="关闭卡片详情"
-            disabled={pending}
-            onClick={close}
-          >
-            <X size={20} />
-          </button>
+          {!phone && (
+            <button
+              type="button"
+              className="live-reading-close"
+              aria-label="关闭卡片详情"
+              disabled={pending}
+              onClick={close}
+            >
+              <X size={20} />
+            </button>
+          )}
         </header>
         <div className="live-reading-scroll">
           <article className="live-reading-article">

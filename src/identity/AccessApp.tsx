@@ -8,6 +8,7 @@ import { PhoneAuth } from './PhoneAuth';
 import { uuid } from './client';
 import { entryTenant, rememberedTenant, rememberTenant } from './entry';
 import { WorkspaceNavigation } from './WorkspaceNavigation';
+import { DrawerSlot, usePhoneLayout } from './drawer-slot';
 import { useWorkspaceNotifications } from './workspace-notifications';
 import { WorkspaceComposer } from './WorkspaceComposer';
 import { DepartureStatus } from '../departure/DepartureStatus';
@@ -19,9 +20,17 @@ import { featureEntries } from '../shared/feature-entries';
 import { AccountPanel } from './AccountPanel';
 import { Documents } from '../documents/Documents';
 import { documentsHref } from '../documents/routes';
-import { Conversations, conversationHref } from '../conversation/Conversations';
+import { Conversations, DrawerConversations, conversationHref } from '../conversation/Conversations';
 import { LiveBriefing, briefingHref } from '../briefing-live/Briefing';
-import { MessageSquare, LayoutPanelTop, ExternalLink, Puzzle, ChevronLeft } from 'lucide-react';
+import {
+  MessageSquare,
+  LayoutPanelTop,
+  ExternalLink,
+  Puzzle,
+  ChevronLeft,
+  ChevronRight,
+  Menu,
+} from 'lucide-react';
 import { ManagementHome } from '../governance/ManagementHome';
 import { Profiles } from '../profile/Profiles';
 import { governanceClient } from '../governance/client';
@@ -275,6 +284,68 @@ function GuardedAccessShell({
   }, [surface, view, tenant, legacySpace, pendingRequest]);
   const mainRef = useRef<HTMLElement>(null);
   useViewScroll(mainRef, tenant, surface + ':' + routeHash);
+  // 手机上导航收在左侧抽屉里：点菜单或从左边缘右滑打开；换页即收起，Esc 或向左滑也能收起。
+  const [drawer, setDrawer] = useState(false);
+  const [drawerSlot, setDrawerSlot] = useState<HTMLDivElement | null>(null);
+  // 会话列表在抽屉里常驻：第一次打开抽屉后才开始读取，之后保留。
+  const phone = usePhoneLayout();
+  const [drawerUsed, setDrawerUsed] = useState(false);
+  useEffect(() => {
+    if (drawer) setDrawerUsed(true);
+  }, [drawer]);
+  const swipe = useRef<number | null>(null);
+  useEffect(() => setDrawer(false), [routeHash]);
+  useEffect(() => {
+    // 从屏幕左边缘向右滑打开抽屉。只认左边一窄条起手的手势，确认是横向右滑后，
+    // 不再把这次触摸交给页面（例如画报左右滑动切换分类）。
+    if (surface !== 'workspace' || !phone || drawer) return;
+    let start: { x: number; y: number } | null = null,
+      taken = false;
+    const down = (event: TouchEvent) => {
+      const touch = event.touches[0];
+      start =
+        // 有全屏详情等弹层打开时，左边缘右滑交给弹层（返回），不打开导航。
+        event.touches.length === 1 && touch.clientX <= 24 && !document.querySelector('dialog[open]')
+          ? { x: touch.clientX, y: touch.clientY }
+          : null;
+      taken = false;
+    };
+    const move = (event: TouchEvent) => {
+      if (!start) return;
+      if (taken) return event.stopPropagation();
+      const dx = event.touches[0].clientX - start.x,
+        dy = event.touches[0].clientY - start.y;
+      if (Math.abs(dy) > 24 && Math.abs(dy) > dx) start = null;
+      else if (dx > 40 && dx > Math.abs(dy) * 1.5) {
+        taken = true;
+        event.stopPropagation();
+        setDrawer(true);
+      }
+    };
+    const up = (event: TouchEvent) => {
+      if (taken) event.stopPropagation();
+      start = null;
+      taken = false;
+    };
+    window.addEventListener('touchstart', down, { capture: true, passive: true });
+    window.addEventListener('touchmove', move, { capture: true, passive: true });
+    window.addEventListener('touchend', up, { capture: true, passive: true });
+    window.addEventListener('touchcancel', up, { capture: true, passive: true });
+    return () => {
+      window.removeEventListener('touchstart', down, { capture: true });
+      window.removeEventListener('touchmove', move, { capture: true });
+      window.removeEventListener('touchend', up, { capture: true });
+      window.removeEventListener('touchcancel', up, { capture: true });
+    };
+  }, [surface, phone, drawer]);
+  useEffect(() => {
+    if (!drawer) return;
+    const key = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setDrawer(false);
+    };
+    window.addEventListener('keydown', key);
+    return () => window.removeEventListener('keydown', key);
+  }, [drawer]);
   useEffect(() => {
     const change = () => {
       if (!requestNavigationLocked()) setRouteHash(location.hash);
@@ -352,248 +423,313 @@ function GuardedAccessShell({
     );
   return (
     <UploadShell key={`${identity.account.id}:${tenant}:${allowed}`} actionsTarget={actionsTarget}>
-      <div
-        className={`access-shell ${surface === 'workspace' ? 'workspace-shell' : ''} ${surface === 'workspace' && conversations ? `workspace-conversations ${fromBriefing ? 'workspace-contextual' : ''}` : ''} ${surface === 'workspace' && briefing ? 'workspace-briefing' : ''}`}
-      >
-        <aside className="access-sidebar" aria-label="工作导航">
-          <a href={surfaceHref('workspace')} className="access-brand" aria-label="梦擎工作空间">
-            <DreamcoreLogo />
-          </a>
-          <nav aria-label="主导航" inert={pendingRequest}>
-            {surface === 'workspace' && selected ? (
-              <WorkspaceNavigation
-                routeKey={routeHash}
-                primary={[
-                  {
-                    label: '会话',
-                    icon: MessageSquare,
-                    active: conversations,
-                    href: conversationHref(tenant),
-                    notification: notifications?.conversations ? '会话有待处理内容' : undefined,
-                  },
-                  {
-                    label: '智能画报',
-                    icon: LayoutPanelTop,
-                    active: briefing,
-                    href: briefingHref(tenant),
-                    notification: notifications?.briefing ? '智能画报有未读卡片' : undefined,
-                  },
-                  {
-                    label: '资料库',
-                    icon: LibraryBig,
-                    active: library || documents,
-                    href: libraryHref(tenant),
-                  },
-                  { label: '技能中心', icon: Puzzle, active: skills, href: skillsHref(tenant) },
-                ]}
-              />
-            ) : (
-              links.map((link) => (
-                <div className="nav-item" key={link}>
-                  <NavigationButton
-                    label={labels[link]}
-                    icon={icons[link]}
-                    active={surface === link}
-                    href={surfaceHref(link)}
-                  />
-                </div>
-              ))
-            )}
-          </nav>
-          <button
-            type="button"
-            className="access-avatar"
-            disabled={pendingRequest}
-            onClick={() => setAccountOpen(true)}
-            aria-label="个人设置与账号"
+      <DrawerSlot.Provider value={drawerSlot}>
+        <div
+          className={`access-shell ${surface === 'workspace' ? 'workspace-shell' : ''} ${surface === 'workspace' && conversations ? `workspace-conversations ${fromBriefing ? 'workspace-contextual' : ''}` : ''} ${surface === 'workspace' && briefing ? 'workspace-briefing' : ''}`}
+        >
+          {surface === 'workspace' && (
+            <>
+              <button
+                type="button"
+                className="workspace-menu-button"
+                aria-label="打开导航"
+                aria-expanded={drawer}
+                onClick={() => setDrawer(true)}
+              >
+                {/* 用当前页面的图标当入口，旁边的小箭头提示可以向右滑出导航。 */}
+                {(() => {
+                  const Icon = conversations
+                    ? MessageSquare
+                    : briefing
+                      ? LayoutPanelTop
+                      : library || documents
+                        ? LibraryBig
+                        : skills
+                          ? Puzzle
+                          : Menu;
+                  return <Icon size={20} strokeWidth={1.7} aria-hidden="true" />;
+                })()}
+                <ChevronRight className="workspace-menu-hint" size={12} strokeWidth={2} aria-hidden="true" />
+              </button>
+              {drawer && (
+                <button
+                  type="button"
+                  className="workspace-drawer-scrim"
+                  aria-label="关闭导航"
+                  tabIndex={-1}
+                  onClick={() => setDrawer(false)}
+                />
+              )}
+            </>
+          )}
+          <aside
+            className="access-sidebar"
+            aria-label="工作导航"
+            data-open={drawer || undefined}
+            onClick={(event) => {
+              if ((event.target as HTMLElement).closest('a')) setDrawer(false);
+            }}
+            onTouchStart={(event) => (swipe.current = event.touches[0].clientX)}
+            onTouchEnd={(event) => {
+              if (swipe.current !== null && event.changedTouches[0].clientX - swipe.current < -48)
+                setDrawer(false);
+              swipe.current = null;
+            }}
           >
-            {identity.account.displayName.slice(0, 1)}
-          </button>
-        </aside>
-        <div className="access-main">
-          <PageHeader
-            className={surface === 'workspace' && (library || skills) ? 'material-topbar' : ''}
-            heading={
-              <>
-                <h1>
-                  {surface === 'workspace' && departure
-                    ? '迁出与清理记录'
-                    : surface === 'workspace' && plans
-                      ? '我的计划'
-                      : surface === 'workspace' && experiences
-                        ? '工作空间'
-                        : surface === 'workspace' && profiles
-                          ? '我的档案与偏好'
-                          : surface === 'workspace' && documents
-                            ? '个人文稿'
-                            : surface === 'workspace' && briefing
-                              ? '智能画报'
-                              : surface === 'workspace' && conversations
-                                ? '会话'
-                                : surface === 'workspace' && library
-                                  ? '资料库'
-                                  : skills
-                                    ? '技能中心'
-                                    : labels[surface]}
-                </h1>
-                {surface === 'workspace' && briefing && (
-                  <time
-                    className="workspace-edition"
-                    dateTime={briefingMonth ?? editionDate.toLocaleDateString('en-CA')}
-                  >
-                    {editionLabel}
-                  </time>
-                )}
-              </>
-            }
-            actionsRef={setActionsTarget}
-            actions={
-              surface !== 'workspace' ||
-              library ||
-              skills ||
-              conversations ||
-              briefing ||
-              documents ||
-              plans ||
-              experiences ||
-              profiles ? undefined : (
-                <Button variant="ghost" icon={RefreshCw} onClick={() => void refresh()}>
-                  刷新
-                </Button>
-              )
-            }
-          />
-          <main ref={mainRef} className="access-content" key={`${identity.account.id}:${surface}:${tenant}`}>
-            {surface !== 'workspace' && (
-              <div className="surface-return-actions">
-                <a className="button ghost workspace-return" href={surfaceHref('workspace')}>
-                  {workspaceReturnHash(new URLSearchParams(routeHash.slice(1)).get('back') || '', tenant)
-                    ? '返回原工作'
-                    : '返回工作空间'}
-                </a>
-                <a
-                  className="button ghost"
-                  href={surfaceHref('workspace')}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="在新标签页打开客户端"
-                  title="在新标签页打开客户端"
-                >
-                  <ExternalLink size={16} aria-hidden="true" />
-                  新标签页打开客户端
-                </a>
+            <a href={surfaceHref('workspace')} className="access-brand" aria-label="梦擎工作空间">
+              {/* 手机抽屉够宽，带上中英文字标。 */}
+              <DreamcoreLogo wordmark={surface === 'workspace' && phone} />
+            </a>
+            <nav aria-label="主导航" inert={pendingRequest}>
+              {surface === 'workspace' && selected ? (
+                <WorkspaceNavigation
+                  routeKey={routeHash}
+                  primary={[
+                    {
+                      label: '会话',
+                      icon: MessageSquare,
+                      active: conversations,
+                      href: conversationHref(tenant),
+                      notification: notifications?.conversations ? '会话有待处理内容' : undefined,
+                    },
+                    {
+                      label: '智能画报',
+                      icon: LayoutPanelTop,
+                      active: briefing,
+                      href: briefingHref(tenant),
+                      notification: notifications?.briefing ? '智能画报有未读卡片' : undefined,
+                    },
+                    {
+                      label: '资料库',
+                      icon: LibraryBig,
+                      active: library || documents,
+                      href: libraryHref(tenant),
+                    },
+                    { label: '技能中心', icon: Puzzle, active: skills, href: skillsHref(tenant) },
+                  ]}
+                />
+              ) : (
+                links.map((link) => (
+                  <div className="nav-item" key={link}>
+                    <NavigationButton
+                      label={labels[link]}
+                      icon={icons[link]}
+                      active={surface === link}
+                      href={surfaceHref(link)}
+                    />
+                  </div>
+                ))
+              )}
+            </nav>
+            {surface === 'workspace' && (
+              <div className="workspace-drawer-slot" ref={setDrawerSlot}>
+                {phone && drawerUsed && !conversations && selected && <DrawerConversations tenant={tenant} />}
               </div>
             )}
-            {pendingRequest && !(surface === 'workspace' && view === 'briefing') && (
-              <p className="access-alert" role="status">
-                正在核对本次提交，请在原处完成或重试后再切换页面。
-              </p>
-            )}
-            {notice && (
-              <p className="access-success" role="status">
-                {notice}
-              </p>
-            )}
-            {allowed && surface !== 'platform-admin' && tenant && <DepartureStatus tenant={tenant} />}
-            {!allowed ? (
-              <section className="access-panel">
-                <Empty
-                  icon={ShieldX}
-                  title={
-                    surface === 'workspace' && !identity.memberships.length ? '尚未加入企业' : '没有访问权限'
-                  }
-                  text={
-                    surface === 'workspace' && !identity.memberships.length
-                      ? '使用企业管理员提供的邀请加入工作空间。'
-                      : '请使用已获授权的账号，或切换到你有权访问的企业。'
-                  }
-                >
-                  <Button onClick={onInvite}>接受邀请</Button>
-                  {surface !== 'workspace' && (
-                    <a className="button" href={surfaceHref('workspace')}>
-                      返回工作空间
-                    </a>
+            <button
+              type="button"
+              className="access-avatar"
+              disabled={pendingRequest}
+              onClick={() => {
+                setDrawer(false);
+                setAccountOpen(true);
+              }}
+              aria-label="个人设置与账号"
+            >
+              {identity.account.displayName.slice(0, 1)}
+            </button>
+          </aside>
+          <div className="access-main">
+            <PageHeader
+              className={surface === 'workspace' && (library || skills) ? 'material-topbar' : ''}
+              heading={
+                <>
+                  <h1>
+                    {surface === 'workspace' && departure
+                      ? '迁出与清理记录'
+                      : surface === 'workspace' && plans
+                        ? '我的计划'
+                        : surface === 'workspace' && experiences
+                          ? '工作空间'
+                          : surface === 'workspace' && profiles
+                            ? '我的档案与偏好'
+                            : surface === 'workspace' && documents
+                              ? '个人文稿'
+                              : surface === 'workspace' && briefing
+                                ? '智能画报'
+                                : surface === 'workspace' && conversations
+                                  ? '会话'
+                                  : surface === 'workspace' && library
+                                    ? '资料库'
+                                    : skills
+                                      ? '技能中心'
+                                      : labels[surface]}
+                  </h1>
+                  {surface === 'workspace' && briefing && (
+                    <time
+                      className="workspace-edition"
+                      dateTime={briefingMonth ?? editionDate.toLocaleDateString('en-CA')}
+                    >
+                      {editionLabel}
+                    </time>
                   )}
-                </Empty>
-              </section>
-            ) : surface === 'platform-admin' ? (
-              <PlatformHome />
-            ) : surface === 'tenant-admin' ? (
-              <ManagementHome tenant={tenant} />
-            ) : departure ? (
-              <DeparturePanel tenant={tenant} recordsOnly />
-            ) : plans ? (
-              featureEntries.ongoingPlans ? (
-                <Plans tenant={tenant} />
-              ) : (
+                </>
+              }
+              actionsRef={setActionsTarget}
+              actions={
+                surface !== 'workspace' ||
+                library ||
+                skills ||
+                conversations ||
+                briefing ||
+                documents ||
+                plans ||
+                experiences ||
+                profiles ? undefined : (
+                  <Button variant="ghost" icon={RefreshCw} onClick={() => void refresh()}>
+                    刷新
+                  </Button>
+                )
+              }
+            />
+            <main
+              ref={mainRef}
+              className="access-content"
+              key={`${identity.account.id}:${surface}:${tenant}`}
+            >
+              {surface !== 'workspace' && (
+                <div className="surface-return-actions">
+                  <a className="button ghost workspace-return" href={surfaceHref('workspace')}>
+                    {workspaceReturnHash(new URLSearchParams(routeHash.slice(1)).get('back') || '', tenant)
+                      ? '返回原工作'
+                      : '返回工作空间'}
+                  </a>
+                  <a
+                    className="button ghost"
+                    href={surfaceHref('workspace')}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="在新标签页打开客户端"
+                    title="在新标签页打开客户端"
+                  >
+                    <ExternalLink size={16} aria-hidden="true" />
+                    新标签页打开客户端
+                  </a>
+                </div>
+              )}
+              {pendingRequest && !(surface === 'workspace' && view === 'briefing') && (
+                <p className="access-alert" role="status">
+                  正在核对本次提交，请在原处完成或重试后再切换页面。
+                </p>
+              )}
+              {notice && (
+                <p className="access-success" role="status">
+                  {notice}
+                </p>
+              )}
+              {allowed && surface !== 'platform-admin' && tenant && <DepartureStatus tenant={tenant} />}
+              {!allowed ? (
+                <section className="access-panel">
+                  <Empty
+                    icon={ShieldX}
+                    title={
+                      surface === 'workspace' && !identity.memberships.length
+                        ? '尚未加入企业'
+                        : '没有访问权限'
+                    }
+                    text={
+                      surface === 'workspace' && !identity.memberships.length
+                        ? '使用企业管理员提供的邀请加入工作空间。'
+                        : '请使用已获授权的账号，或切换到你有权访问的企业。'
+                    }
+                  >
+                    <Button onClick={onInvite}>接受邀请</Button>
+                    {surface !== 'workspace' && (
+                      <a className="button" href={surfaceHref('workspace')}>
+                        返回工作空间
+                      </a>
+                    )}
+                  </Empty>
+                </section>
+              ) : surface === 'platform-admin' ? (
+                <PlatformHome />
+              ) : surface === 'tenant-admin' ? (
+                <ManagementHome tenant={tenant} />
+              ) : departure ? (
+                <DeparturePanel tenant={tenant} recordsOnly />
+              ) : plans ? (
+                featureEntries.ongoingPlans ? (
+                  <Plans tenant={tenant} />
+                ) : (
+                  <Empty
+                    icon={CalendarClock}
+                    title="持续计划暂未开放"
+                    text="首期暂不提供持续计划入口，后续完善后开放。你可以继续会话或查看智能画报。"
+                  >
+                    <a className="button primary" href={briefingHref(tenant)}>
+                      返回智能画报
+                    </a>
+                  </Empty>
+                )
+              ) : experiences ? (
                 <Empty
-                  icon={CalendarClock}
-                  title="持续计划暂未开放"
-                  text="首期暂不提供持续计划入口，后续完善后开放。你可以继续会话或查看智能画报。"
+                  icon={FolderOpen}
+                  title="此功能暂未开放"
+                  text="首版客户端暂不提供经验库展示与维护。你可以继续会话或查看智能画报。"
                 >
                   <a className="button primary" href={briefingHref(tenant)}>
                     返回智能画报
                   </a>
                 </Empty>
-              )
-            ) : experiences ? (
-              <Empty
-                icon={FolderOpen}
-                title="此功能暂未开放"
-                text="首版客户端暂不提供经验库展示与维护。你可以继续会话或查看智能画报。"
-              >
-                <a className="button primary" href={briefingHref(tenant)}>
-                  返回智能画报
-                </a>
-              </Empty>
-            ) : profiles ? (
-              <Profiles tenant={tenant} personalOnly />
-            ) : skills ? (
-              <SkillCenter key={tenant} tenant={tenant} />
-            ) : documents ? (
-              <Documents key={tenant} tenant={tenant} />
-            ) : briefing || conversations ? (
-              <WorkspaceConversationPages
-                key={tenant}
+              ) : profiles ? (
+                <Profiles tenant={tenant} personalOnly />
+              ) : skills ? (
+                <SkillCenter key={tenant} tenant={tenant} />
+              ) : documents ? (
+                <Documents key={tenant} tenant={tenant} />
+              ) : briefing || conversations ? (
+                <WorkspaceConversationPages
+                  key={tenant}
+                  tenant={tenant}
+                  briefing={briefing}
+                  conversations={conversations}
+                  overlay={conversations && fromBriefing}
+                  onMonthChange={setBriefingMonth}
+                />
+              ) : view === 'spaces' ? (
+                <Status title="正在打开资料库" detail="请稍候…" />
+              ) : library ? (
+                <LiveLibrary key={tenant} tenant={tenant} />
+              ) : (
+                <LiveLibrary key={tenant} tenant={tenant} />
+              )}
+            </main>
+            {surface === 'workspace' && briefing && allowed && (
+              <WorkspaceComposer
+                key={`${identity.account.id}:${tenant}`}
+                account={identity.account.id}
                 tenant={tenant}
-                briefing={briefing}
-                conversations={conversations}
-                overlay={conversations && fromBriefing}
-                onMonthChange={setBriefingMonth}
               />
-            ) : view === 'spaces' ? (
-              <Status title="正在打开资料库" detail="请稍候…" />
-            ) : library ? (
-              <LiveLibrary key={tenant} tenant={tenant} />
-            ) : (
-              <LiveLibrary key={tenant} tenant={tenant} />
             )}
-          </main>
-          {surface === 'workspace' && briefing && allowed && (
-            <WorkspaceComposer
-              key={`${identity.account.id}:${tenant}`}
-              account={identity.account.id}
+          </div>
+          {accountOpen && (
+            <AccountPanel
+              identity={identity}
               tenant={tenant}
+              memberships={identity.memberships}
+              links={links
+                .filter((link) => link !== surface)
+                .map((link) => ({
+                  label: link === 'workspace' ? '工作空间' : link === 'tenant-admin' ? '企业管理端' : '总台',
+                  href: surfaceHref(link),
+                }))}
+              onChoose={choose}
+              onClose={() => setAccountOpen(false)}
+              onLogout={logout}
             />
           )}
         </div>
-        {accountOpen && (
-          <AccountPanel
-            identity={identity}
-            tenant={tenant}
-            memberships={identity.memberships}
-            links={links
-              .filter((link) => link !== surface)
-              .map((link) => ({
-                label: link === 'workspace' ? '工作空间' : link === 'tenant-admin' ? '企业管理端' : '总台',
-                href: surfaceHref(link),
-              }))}
-            onChoose={choose}
-            onClose={() => setAccountOpen(false)}
-            onLogout={logout}
-          />
-        )}
-      </div>
+      </DrawerSlot.Provider>
     </UploadShell>
   );
 }

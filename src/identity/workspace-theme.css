@@ -63,12 +63,167 @@
   color: var(--accent-hover);
   box-shadow: 0 4px 14px rgb(40 80 170 / 12%);
 }
+.workspace-menu-button,
+.workspace-drawer-scrim,
+.workspace-drawer-slot {
+  display: none;
+}
+/* 手机：没有底部导航栏。宽屏那块玻璃侧栏收在左侧，点左上角菜单按钮滑出，带名称竖排。 */
 @media (max-width: 800px) {
-  :root[data-surface='workspace'] .access-sidebar {
+  :root[data-surface='workspace'] .workspace-menu-button {
+    position: fixed;
+    top: max(10px, env(safe-area-inset-top));
+    left: 12px;
+    z-index: 70;
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    /* 只留图标，不加底框，免得和画报的筛选标签抢眼。 */
+    grid-auto-flow: column;
+    gap: 1px;
+    width: auto;
+    padding: 0 4px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    box-shadow: none;
+    color: var(--text-secondary);
+  }
+  :root[data-surface='workspace'] .workspace-menu-hint {
+    color: var(--ink-3);
+    animation: workspace-menu-hint 2.4s ease-in-out 1s 2;
+  }
+  :root[data-surface='workspace'] .workspace-drawer-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 75;
+    display: block;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    /* 只用来点空白处收起，不压暗页面，免得玻璃抽屉跟着发灰。 */
+    background: transparent;
+  }
+  :root[data-surface='workspace'] .workspace-shell .access-sidebar {
+    top: max(12px, env(safe-area-inset-top));
+    bottom: max(12px, env(safe-area-inset-bottom));
+    left: 12px;
+    right: auto;
+    z-index: 80;
+    width: min(248px, calc(100vw - 72px));
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 0;
     margin: 0;
-    border-radius: 22px 22px 0 0;
-    border-width: 1px 0 0;
-    background: rgb(255 255 255 / 72%);
+    padding: 18px 12px;
+    border-width: 1px;
+    border-radius: 26px;
+    box-shadow: 0 16px 40px rgb(30 50 90 / 10%);
+    transform: translateX(calc(-100% - 24px));
+    visibility: hidden;
+    transition:
+      transform 240ms cubic-bezier(0.2, 0.7, 0.2, 1),
+      visibility 0s 240ms;
+  }
+  :root[data-surface='workspace'] .workspace-shell .access-sidebar[data-open] {
+    transform: none;
+    visibility: visible;
+    transition: transform 240ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  :root[data-surface='workspace'] .workspace-shell .access-brand {
+    display: flex;
+    align-self: flex-start;
+    width: auto;
+    height: auto;
+    margin: 0 0 20px 6px;
+  }
+  :root[data-surface='workspace'] .workspace-shell .access-brand .dreamcore-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  :root[data-surface='workspace'] .workspace-shell .access-brand .dreamcore-symbol {
+    width: 32px;
+    height: 32px;
+  }
+  :root[data-surface='workspace'] .workspace-shell .access-brand .dreamcore-wordmark {
+    font-size: 18px;
+    letter-spacing: -0.4px;
+  }
+  :root[data-surface='workspace'] .workspace-shell .access-brand .dreamcore-wordmark-cn {
+    margin-top: 2px;
+    font-size: 10px;
+    letter-spacing: 2px;
+  }
+  :root[data-surface='workspace'] .workspace-shell .access-sidebar nav {
+    flex: 0 0 auto;
+    flex-direction: column;
+    gap: 6px;
+    overflow: visible;
+  }
+  :root[data-surface='workspace'] .workspace-shell .access-sidebar .nav-item,
+  :root[data-surface='workspace'] .workspace-shell .access-sidebar .nav-link {
+    width: 100%;
+    height: 44px;
+  }
+  :root[data-surface='workspace'] .workspace-shell .access-sidebar .nav-label {
+    position: static;
+    display: block;
+    padding: 0;
+    color: inherit;
+    font-size: 15px;
+    opacity: 1;
+    visibility: inherit;
+    transform: none;
+  }
+  :root[data-surface='workspace'] .workspace-shell .access-sidebar .nav-label::before,
+  :root[data-surface='workspace'] .workspace-shell .access-sidebar .nav-label::after {
+    content: none;
+  }
+  :root[data-surface='workspace'] .workspace-shell .workspace-notification-dot {
+    right: auto;
+    left: 30px;
+  }
+  /* 会话页把会话列表放在导航下面，可单独滚动。 */
+  :root[data-surface='workspace'] .workspace-drawer-slot:not(:empty) {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    margin: 14px -12px 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--line);
+  }
+  :root[data-surface='workspace'] .workspace-drawer-slot .live-list-tools .live-card-heading {
+    padding: 0 12px 6px 14px;
+  }
+  :root[data-surface='workspace'] .workspace-drawer-slot .live-conversation-links {
+    padding-inline: 8px;
+  }
+  :root[data-surface='workspace'] .workspace-shell .access-sidebar .access-avatar {
+    align-self: flex-start;
+    margin: auto 0 0 1px;
+  }
+}
+@keyframes workspace-menu-hint {
+  0%,
+  60%,
+  100% {
+    translate: 0 0;
+  }
+  30% {
+    translate: 3px 0;
+  }
+}
+@media (max-width: 800px) and (prefers-reduced-motion: reduce) {
+  :root[data-surface='workspace'] .workspace-menu-hint {
+    animation: none;
+  }
+  :root[data-surface='workspace'] .workspace-shell .access-sidebar,
+  :root[data-surface='workspace'] .workspace-shell .access-sidebar[data-open] {
+    transition: none;
   }
 }
 
@@ -100,6 +255,89 @@
     padding: 8px 0 0;
   }
 }
+/* 手机窄屏的资料库、技能中心顶部只排一行：菜单、范围切换，右边搜索、上传和“更多操作”。
+   页面名称由抽屉里的当前项表明；路径只在进入文件夹后出现在第二行；搜索点开后盖住这一行。 */
+@media (max-width: 560px) {
+  :root[data-surface='workspace'] .access-main > .material-topbar {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-rows: auto;
+    column-gap: 4px;
+    row-gap: 8px;
+    min-height: 0;
+    height: auto;
+    padding-top: 10px;
+    padding-bottom: 8px;
+  }
+  :root[data-surface='workspace'] .access-main > .material-topbar > .topbar-heading {
+    display: none;
+  }
+  :root[data-surface='workspace'] .access-main > .material-topbar > .topbar-actions {
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: start;
+    width: auto;
+    margin: 0;
+    padding-left: 46px;
+  }
+  :root[data-surface='workspace'] .access-main > .material-topbar > .topbar-meta {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+    flex-wrap: nowrap;
+    gap: 4px;
+  }
+  :root[data-surface='workspace'] .access-main > .material-topbar > .topbar-meta > .button {
+    width: 36px;
+    min-height: 36px;
+    height: 36px;
+    padding: 0;
+    gap: 0;
+    justify-content: center;
+    border-radius: 12px;
+    font-size: 0;
+  }
+  :root[data-surface='workspace'] .access-main > .material-topbar > .library-toolbar {
+    display: contents;
+  }
+  :root[data-surface='workspace'] .access-main > .material-topbar > .library-toolbar > .library-controls {
+    grid-column: 3;
+    grid-row: 1;
+    gap: 2px;
+  }
+  :root[data-surface='workspace'] .access-main > .material-topbar > .library-toolbar > .material-crumbs {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  :root[data-surface='workspace'] .access-main > .material-topbar > .library-toolbar > .material-crumbs:not(:has(> svg, > span)) {
+    display: none;
+  }
+  .library-view-switch[hidden] {
+    display: none;
+  }
+  :root[data-surface='workspace'] .access-main > .material-topbar .library-search[data-collapsed] {
+    flex: none;
+    padding: 0;
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+  }
+  :root[data-surface='workspace'] .access-main > .material-topbar .library-search[data-collapsed] input {
+    display: none;
+  }
+  :root[data-surface='workspace'] .access-main > .material-topbar .library-search[data-collapsed] .icon-button {
+    width: 36px;
+    height: 36px;
+    color: var(--text-secondary);
+  }
+  :root[data-surface='workspace'] .access-main > .material-topbar .library-search[data-open] {
+    position: absolute;
+    top: 8px;
+    left: 62px;
+    right: 16px;
+    z-index: 6;
+    max-width: none;
+  }
+}
 
 /* 画报标题栏只从底部收短 10px，首行仍按原高度排列。 */
 :root[data-surface='workspace'] .workspace-briefing .access-main > .topbar {
@@ -111,6 +349,38 @@
   :root[data-surface='workspace'] .workspace-briefing .access-main > .topbar {
     grid-template-rows: none;
     padding-bottom: 4px;
+  }
+}
+/* 手机上的画报分类下拉：展开后是圆角面板（不是胶囊），每项一行、左对齐。 */
+@media (max-width: 560px) {
+  :root[data-surface='workspace'] .workspace-briefing .live-briefing-tabs[data-menu-open] {
+    min-width: 120px;
+    padding: 6px;
+    border-radius: 16px;
+    background: rgb(255 255 255 / 78%);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    box-shadow: 0 12px 32px rgb(30 50 90 / 12%);
+  }
+  :root[data-surface='workspace'] .workspace-briefing .live-briefing-tabs[data-menu-open] > button {
+    justify-content: flex-start;
+    height: 34px;
+    padding: 0 12px;
+    border-radius: 10px;
+    text-align: left;
+  }
+  /* 收起时整个胶囊就是一个按钮，里面的当前项不再叠一层白底。 */
+  :root[data-surface='workspace'] .workspace-briefing .live-briefing-tabs:not([data-menu-open]) > button[aria-selected='true'] {
+    background: transparent;
+    box-shadow: none;
+  }
+}
+/* 筛选栏换到第二行时，标题栏按两行的实际高度排。 */
+@media (max-width: 560px) {
+  :root[data-surface='workspace'] .workspace-briefing .access-main > .topbar {
+    height: auto;
+    min-height: 0;
+    padding-bottom: 6px;
   }
 }
 
@@ -314,5 +584,94 @@
   }
   :root[data-surface='workspace'] .live-composer-surface::before {
     animation: none;
+  }
+}
+
+/* 手机窄屏：界面文字（标题栏、分类、抽屉、会话顶栏）比宽屏小一档，360 像素以下再小一档；
+   画报卡片内容不受影响。 */
+@media (max-width: 560px) {
+  :root[data-surface='workspace'] .workspace-shell .access-main > .topbar h1 {
+    font-size: 14px;
+  }
+  :root[data-surface='workspace'] .workspace-shell .access-main > .topbar .workspace-edition {
+    font-size: 11px;
+  }
+  :root[data-surface='workspace'] .workspace-shell .access-main > .topbar :is(.live-briefing-tabs, .material-tabs) :is(button, .button) {
+    font-size: 12px;
+  }
+  :root[data-surface='workspace'] .workspace-shell .access-sidebar .nav-label {
+    font-size: 13px;
+  }
+  :root[data-surface='workspace'] .workspace-shell .live-deck-heading h2 {
+    font-size: 14px;
+  }
+  :root[data-surface='workspace'] .workspace-shell .live-deck-heading p {
+    font-size: 11px;
+  }
+  :root[data-surface='workspace'] .workspace-shell .access-sidebar .nav-item,
+  :root[data-surface='workspace'] .workspace-shell .access-sidebar .nav-link {
+    height: 40px;
+  }
+  :root[data-surface='workspace'] .workspace-shell .access-sidebar .nav-symbol svg {
+    width: 18px;
+    height: 18px;
+  }
+  :root[data-surface='workspace'] .workspace-shell .access-brand .dreamcore-wordmark {
+    font-size: 16px;
+  }
+  :root[data-surface='workspace'] .workspace-shell .access-brand .dreamcore-wordmark-cn {
+    font-size: 9px;
+  }
+  :root[data-surface='workspace'] .workspace-shell .workspace-drawer-slot .live-card-heading h2 {
+    font-size: 13px;
+  }
+  :root[data-surface='workspace'] .workspace-shell .workspace-drawer-slot .live-conversation-group a {
+    font-size: 12px;
+  }
+  :root[data-surface='workspace'] .workspace-shell .workspace-drawer-slot .live-conversation-group > summary {
+    font-size: 11px;
+  }
+}
+@media (max-width: 360px) {
+  :root[data-surface='workspace'] .workspace-shell .access-main > .topbar h1 {
+    font-size: 13px;
+  }
+  :root[data-surface='workspace'] .workspace-shell .access-main > .topbar .workspace-edition {
+    font-size: 10px;
+  }
+  :root[data-surface='workspace'] .workspace-shell .access-main > .topbar :is(.live-briefing-tabs, .material-tabs) :is(button, .button) {
+    font-size: 11px;
+  }
+  :root[data-surface='workspace'] .workspace-shell .access-sidebar .nav-label {
+    font-size: 12px;
+  }
+  :root[data-surface='workspace'] .workspace-shell .live-deck-heading h2 {
+    font-size: 13px;
+  }
+  :root[data-surface='workspace'] .workspace-shell .live-deck-heading p {
+    font-size: 10px;
+  }
+  :root[data-surface='workspace'] .workspace-shell .access-sidebar .nav-item,
+  :root[data-surface='workspace'] .workspace-shell .access-sidebar .nav-link {
+    height: 40px;
+  }
+  :root[data-surface='workspace'] .workspace-shell .access-sidebar .nav-symbol svg {
+    width: 18px;
+    height: 18px;
+  }
+  :root[data-surface='workspace'] .workspace-shell .access-brand .dreamcore-wordmark {
+    font-size: 15px;
+  }
+  :root[data-surface='workspace'] .workspace-shell .access-brand .dreamcore-wordmark-cn {
+    font-size: 9px;
+  }
+  :root[data-surface='workspace'] .workspace-shell .workspace-drawer-slot .live-card-heading h2 {
+    font-size: 12px;
+  }
+  :root[data-surface='workspace'] .workspace-shell .workspace-drawer-slot .live-conversation-group a {
+    font-size: 12px;
+  }
+  :root[data-surface='workspace'] .workspace-shell .workspace-drawer-slot .live-conversation-group > summary {
+    font-size: 11px;
   }
 }

@@ -1,10 +1,17 @@
 import type { CardSize } from './briefing';
 
 export const magazineGap = 10;
-export function magazineGridMetrics(width: number) {
-  const columns = width >= 1210 ? 5 : width >= 966 ? 4 : width >= 722 ? 3 : width >= 478 ? 2 : 1;
+/** Narrowest unit the card designs are laid out for (two columns at 478px). */
+export const magazineDesignUnit = 234;
+export function magazineGridMetrics(width: number, minimumColumns = 1) {
+  const columns = Math.max(
+    minimumColumns,
+    width >= 1210 ? 5 : width >= 966 ? 4 : width >= 722 ? 3 : width >= 478 ? 2 : 1,
+  );
   return { columns, unit: (width - (columns - 1) * magazineGap) / columns };
 }
+/** 手机上的画报保持两列网格：格子比设计尺寸小时，卡片内容按比例缩小，而不是把卡片拉长。 */
+export const magazineZoom = (unit: number) => Math.min(1, unit / magazineDesignUnit);
 export type MagazineTile = { id: string; size: CardSize; fixed?: boolean; alternativeSize?: CardSize; rows?: number; atEnd?: boolean };
 export type MagazinePlacement = MagazineTile & { row: number; col: number; width: number; height: number };
 
@@ -73,4 +80,71 @@ export function packMagazineTiles(tiles: MagazineTile[], columns: number, compac
     cursor += (height - 1) * columns + width;
   }
   return placed;
+}
+
+export type MagazineFiller = { id: string; row: number; col: number; width: number; height: number };
+
+/**
+ * 网格中间不留空格：先把相邻的普通卡片撑大填进去（仍是四种标准尺寸之一），
+ * 实在没有可撑大的卡片时，才放一张占位卡片。末尾最后一行之后的空位不算中间空档。
+ */
+export function fillMagazineGaps(
+  placed: MagazinePlacement[],
+  columns: number,
+  locked: (tile: MagazinePlacement) => boolean = () => false,
+): { placements: MagazinePlacement[]; fillers: MagazineFiller[] } {
+  const tiles = placed.map((tile) => ({ ...tile }));
+  const fillers: MagazineFiller[] = [];
+  const growable = (tile: MagazinePlacement) => !tile.atEnd && !locked(tile);
+  const resize = (tile: MagazinePlacement, width: number, height: number) => {
+    tile.width = width;
+    tile.height = height;
+    tile.size = `${width}×${height}` as CardSize;
+  };
+  for (let guard = 0; guard < 200; guard++) {
+    const owner = new Map<number, MagazinePlacement | MagazineFiller>();
+    for (const tile of [...tiles, ...fillers])
+      for (let y = 0; y < tile.height; y++)
+        for (let x = 0; x < tile.width; x++) owner.set((tile.row + y) * columns + tile.col + x, tile);
+    const last = Math.max(-1, ...owner.keys());
+    let hole = -1;
+    for (let index = 0; index < last; index++)
+      if (!owner.has(index)) {
+        hole = index;
+        break;
+      }
+    if (hole < 0) break;
+    const row = Math.floor(hole / columns),
+      col = hole % columns;
+    const at = (r: number, c: number) =>
+      r >= 0 && c >= 0 && c < columns ? (owner.get(r * columns + c) as MagazinePlacement | undefined) : undefined;
+    const free = (r: number, c: number) => c >= 0 && c < columns && r * columns + c <= last && !owner.has(r * columns + c);
+    const isTile = (t: unknown): t is MagazinePlacement => !!t && tiles.includes(t as MagazinePlacement);
+    const above = at(row - 1, col),
+      left = at(row, col - 1),
+      right = at(row, col + 1),
+      below = at(row + 1, col);
+    if (isTile(above) && growable(above) && above.col === col && above.width === 1 && above.height === 1 && above.row + 1 === row) {
+      resize(above, 1, 2);
+      continue;
+    }
+    const side = [left, right].find(
+      (t): t is MagazinePlacement =>
+        isTile(t) && growable(t) && t.row === row && t.width === 1 && (t.height === 1 || (t.height === 2 && free(row + 1, col))),
+    );
+    if (side) {
+      if (side.col > col) side.col = col;
+      resize(side, 2, side.height);
+      continue;
+    }
+    if (isTile(below) && growable(below) && below.col === col && below.row === row + 1 && below.width === 1 && below.height === 1) {
+      below.row = row;
+      resize(below, 1, 2);
+      continue;
+    }
+    const width = free(row, col + 1) ? 2 : 1;
+    const height = free(row + 1, col) && (width === 1 || free(row + 1, col + 1)) ? 2 : 1;
+    fillers.push({ id: `filler:${row}:${col}`, row, col, width, height });
+  }
+  return { placements: tiles, fillers };
 }

@@ -1,7 +1,8 @@
 import { legacyEditorialLayout, verificationEditionSize } from './editorial-policy';
 import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import type { CardSize } from '../briefing';
-import { magazineGap, magazineGridMetrics, packMagazineTiles } from '../briefingGrid';
+import { fillMagazineGaps, magazineGap, magazineGridMetrics, magazineZoom, packMagazineTiles } from '../briefingGrid';
+import { DreamcoreLogo } from '../components/DreamcoreLogo';
 import { useBriefingCardFit } from '../components/useBriefingCardFit';
 import './magazine-grid.css';
 import type { CardPresentation } from './card-presentation';
@@ -75,7 +76,7 @@ export function MagazineGrid({
                 scrollbarWidth,
             )
           : element.clientWidth;
-      const base = magazineGridMetrics(canvasWidth);
+      const base = magazineGridMetrics(canvasWidth, 2);
       const requiredColumns = Math.max(
         minimumColumns,
         ...items.map((item) => Number(item.fixedSize?.[0] || 1)),
@@ -124,7 +125,7 @@ export function MagazineGrid({
     metrics.unit,
     preserveSpans ? { ...selectors, measureFullSummary: true } : selectors,
   );
-  const placements = packMagazineTiles(
+  const packed = packMagazineTiles(
     items.map((item) => {
       // User-selected sizes for the two historical follow-up recommendations.
       const fixedSize = item.fixedSize ?? verificationEditionSize(item.title) ?? legacyEditorialLayout(item.title);
@@ -154,6 +155,17 @@ export function MagazineGrid({
     }),
     metrics.columns,
     !preserveSpans,
+  );
+  // 中间不留空格：先撑大相邻卡片，没有可撑大的才放梦擎占位卡。用户指定尺寸的卡片不改。
+  const userSized = new Set(
+    items
+      .filter((item) => item.fixedSize ?? verificationEditionSize(item.title) ?? legacyEditorialLayout(item.title))
+      .map((item) => item.id),
+  );
+  const { placements, fillers } = fillMagazineGaps(
+    packed,
+    metrics.columns,
+    (tile) => preserveSpans || userSized.has(tile.id),
   );
   const previous = useRef(new Map<string, { x: number; y: number }>());
   const previousIdentity = useRef(identity);
@@ -208,6 +220,7 @@ export function MagazineGrid({
         {
           '--briefing-columns': metrics.columns,
           '--briefing-unit': `${metrics.unit}px`,
+          '--briefing-zoom': magazineZoom(metrics.unit),
           ...(minimumRows ? { minHeight: minimumRows * (metrics.unit + magazineGap) - magazineGap } : {}),
           ...(preserveUnit ? { minWidth: minimumColumns * (metrics.unit + magazineGap) - magazineGap } : {}),
         } as CSSProperties
@@ -248,6 +261,18 @@ export function MagazineGrid({
           )}
         </div>
       ))}
+      {fillers
+        .filter((f) => !preview || f.row + f.height <= preview.rows)
+        .map((f) => (
+          <div
+            key={f.id}
+            className="live-briefing-filler"
+            aria-hidden="true"
+            style={{ gridColumn: `${f.col + 1} / span ${f.width}`, gridRow: `${f.row + 1} / span ${f.height}` }}
+          >
+            <DreamcoreLogo />
+          </div>
+        ))}
     </div>
   );
 }

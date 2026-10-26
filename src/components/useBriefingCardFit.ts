@@ -42,6 +42,11 @@ export function useBriefingCardFit(
         const magazine = card.querySelector<HTMLElement>('.briefing-magazine');
         const button = card.querySelector<HTMLElement>(selectors.button);
         if (!copy || !magazine || !button || !card.getBoundingClientRect().height) continue;
+        // 手机画报会把卡片内容按比例缩小（zoom）：屏幕上量到的高度要换回卡片自身的尺寸，
+        // 才能和内边距、间距这些未缩放的样式数值相加比较。
+        const scale = card.offsetHeight ? card.getBoundingClientRect().height / card.offsetHeight : 1;
+        const height = (element: Element | null | undefined) =>
+          (element?.getBoundingClientRect().height || 0) / scale;
         const blocks = [...copy.children].filter((e) => getComputedStyle(e).display !== 'none');
         const copyHeight =
           blocks.reduce((sum, element) => {
@@ -52,27 +57,27 @@ export function useBriefingCardFit(
                 svg && getComputedStyle(svg).display !== 'none'
                   ? Number(svg.getAttribute('data-min-height') || 60)
                   : 0;
-              return sum + (period?.getBoundingClientRect().height || 0) + chartHeight + 5;
+              return sum + height(period) + chartHeight + 5;
             }
             if (selectors.measureFullSummary && element.matches('.magazine-summary')) {
               // A date preview must not earn a smaller span just because its
               // provisional one-cell summary has already been line-clamped.
               const style = getComputedStyle(element);
               const probe = element.cloneNode(true) as HTMLElement;
-              probe.style.cssText = `position:fixed;visibility:hidden;pointer-events:none;display:block;left:-10000px;top:0;width:${element.getBoundingClientRect().width}px;height:auto;max-height:none;-webkit-line-clamp:unset;font:${style.font};line-height:${style.lineHeight};letter-spacing:${style.letterSpacing};`;
+              probe.style.cssText = `position:fixed;visibility:hidden;pointer-events:none;display:block;left:-10000px;top:0;width:${element.getBoundingClientRect().width / scale}px;height:auto;max-height:none;-webkit-line-clamp:unset;font:${style.font};line-height:${style.lineHeight};letter-spacing:${style.letterSpacing};`;
               element.parentElement!.append(probe);
-              const fullHeight = probe.getBoundingClientRect().height;
+              const fullHeight = height(probe);
               probe.remove();
               return sum + fullHeight;
             }
-            return sum + element.getBoundingClientRect().height;
+            return sum + height(element);
           }, 0) +
           Math.max(0, blocks.length - 1) * parseFloat(getComputedStyle(copy).rowGap);
         const documents = card.querySelector('.magazine-documents');
         const mainHeight = Math.max(
           copyHeight,
           documents && getComputedStyle(documents).display !== 'none'
-            ? documents.getBoundingClientRect().height
+            ? height(documents)
             : 0,
         );
         const padding = getComputedStyle(button);
@@ -82,25 +87,25 @@ export function useBriefingCardFit(
           inlinePhoto +
           parseFloat(padding.paddingTop) +
           parseFloat(padding.paddingBottom) +
-          (card.querySelector('.magazine-eyebrow')?.getBoundingClientRect().height || 0) +
-          (card.querySelector('.magazine-footer')?.getBoundingClientRect().height || 0) +
+          height(card.querySelector('.magazine-eyebrow')) +
+          height(card.querySelector('.magazine-footer')) +
           (inlinePhoto ? 3 : 2) * parseFloat(getComputedStyle(magazine).rowGap) +
           2 +
           (card.querySelector<HTMLElement>('.live-briefing-controls')?.offsetHeight || 0);
-        if (needed <= card.getBoundingClientRect().height + 1) continue;
+        if (needed <= card.getBoundingClientRect().height / scale + 1) continue;
         const id = card.dataset.cardId!;
         const size = card.dataset.size as CardSize;
         const width = Number(size[0]),
-          height = Number(size[2]);
+          rowsSpan = Number(size[2]);
         // Try a wider short card first: extra vertical area should be earned by
         // media or a chart, not introduced just to fit another line of text.
         const wider = !selectors.growVertically && columns > 1 && width === 1;
         // Prefer the four standard sizes. Exceptionally long custom titles may
         // use extra whole grid rows after the largest standard size is exhausted.
-        const next: CardSize = wider ? `2×${height as 1 | 2}` : `${width as 1 | 2}×2`;
+        const next: CardSize = wider ? `2×${rowsSpan as 1 | 2}` : `${width as 1 | 2}×2`;
         updates[id] = {
           size: next,
-          ...(next === size ? { rows: Math.min(selectors.maxRows ?? Infinity, Math.ceil((needed + 10) / (unit + 10))) } : {}),
+          ...(next === size ? { rows: Math.min(selectors.maxRows ?? Infinity, Math.ceil((needed * scale + 10) / (unit + 10))) } : {}),
         };
       }
       if (Object.keys(updates).length)

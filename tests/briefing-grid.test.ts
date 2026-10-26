@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { magazineGridMetrics, packMagazineTiles, type MagazineTile } from '../src/briefingGrid.ts';
+import { fillMagazineGaps, magazineGridMetrics, magazineZoom, packMagazineTiles, type MagazinePlacement, type MagazineTile } from '../src/briefingGrid.ts';
 
 test('Demo breakpoints preserve square units and a ten-pixel gutter', () => {
   for (const [width, columns] of [
@@ -19,6 +19,17 @@ test('Demo breakpoints preserve square units and a ten-pixel gutter', () => {
     assert.equal(metrics.columns, columns);
     assert.equal(metrics.unit * columns + (columns - 1) * 10, width);
   }
+});
+
+test('phone briefing keeps two square columns and scales content instead of stretching cards', () => {
+  for (const width of [320, 347, 477]) {
+    const metrics = magazineGridMetrics(width, 2);
+    assert.equal(metrics.columns, 2);
+    assert.equal(metrics.unit * 2 + 10, width);
+    assert.ok(magazineZoom(metrics.unit) < 1);
+  }
+  assert.equal(magazineGridMetrics(1440, 2).columns, 5);
+  assert.equal(magazineZoom(magazineGridMetrics(478, 2).unit), 1);
 });
 
 test('later cards fill gaps before the next row; keyboard order follows visual order', () => {
@@ -156,4 +167,43 @@ test('compact odd-column packing uses an allowed portrait alternative without sh
   }
   assert.deepEqual(cards, before);
   assert.ok(packMagazineTiles(cards, 5, false).filter(p => p.id.startsWith('text')).every(p => p.size === '2×1'));
+});
+
+const holesIn = (placed: { row: number; col: number; width: number; height: number }[], columns: number) => {
+  const cells = new Set<number>();
+  for (const t of placed) for (let y = 0; y < t.height; y++) for (let x = 0; x < t.width; x++) cells.add((t.row + y) * columns + t.col + x);
+  const last = Math.max(...cells);
+  return Array.from({ length: last }, (_, i) => i).filter((i) => !cells.has(i));
+};
+
+test('gaps in the middle are filled by growing a neighbour to a standard size first', () => {
+  const at = (id: string, row: number, col: number, size: '1×1' | '1×2' | '2×1' | '2×2'): MagazinePlacement => ({
+    id, size, row, col, width: Number(size[0]), height: Number(size[2]),
+  });
+  // 两列：左上 1×1，右侧 1×2，下一行开头是一张 2 宽卡片 → 左侧第二行空着。
+  const placed = [at('a', 0, 0, '1×1'), at('b', 0, 1, '1×2'), at('c', 2, 0, '2×1')];
+  const { placements, fillers } = fillMagazineGaps(placed, 2);
+  assert.equal(fillers.length, 0);
+  assert.deepEqual(holesIn(placements, 2), []);
+  assert.equal(placements.find((t) => t.id === 'a')!.size, '1×2');
+  for (const t of placements) assert.match(t.size, /^[12]×[12]$/);
+});
+
+test('when no neighbour may grow, a single placeholder fills the gap and nothing is duplicated', () => {
+  const at = (id: string, row: number, col: number, size: '1×1' | '1×2' | '2×1' | '2×2'): MagazinePlacement => ({
+    id, size, row, col, width: Number(size[0]), height: Number(size[2]),
+  });
+  const placed = [at('a', 0, 0, '1×1'), at('b', 0, 1, '1×1'), at('c', 1, 1, '1×1'), at('d', 2, 0, '2×2')];
+  const { placements, fillers } = fillMagazineGaps(placed, 2, () => true);
+  assert.equal(fillers.length, 1);
+  assert.deepEqual(holesIn([...placements, ...fillers], 2), []);
+  assert.equal(new Set(placements.map((t) => t.id)).size, placements.length);
+  assert.deepEqual(placements.map((t) => t.size), placed.map((t) => t.size));
+});
+
+test('a trailing gap after the last card is not treated as a middle gap', () => {
+  const placed = packMagazineTiles([{ id: 'a', size: '1×1' }], 3);
+  const { placements, fillers } = fillMagazineGaps(placed, 3);
+  assert.equal(fillers.length, 0);
+  assert.deepEqual(placements, placed);
 });
