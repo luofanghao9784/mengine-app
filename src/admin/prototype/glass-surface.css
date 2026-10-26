@@ -923,6 +923,31 @@
     display: none;
   }
 }
+/* 更窄（手机、竖着的平板）：三张卡上下排列，整组上下滚动。
+   以前单列时整组仍被压在一屏高里，数据来源卡被压没、清单叠在详情下面。 */
+@media (max-width: 800px) {
+  .cards.work.data.glass {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    grid-auto-rows: max-content;
+    align-content: start;
+    overflow-y: auto;
+  }
+  .cards.work.data.glass > .card.sources {
+    min-height: 0;
+    height: auto;
+  }
+  /* 清单固定一个顺手的高度，在框里滚动；详情按内容自然展开。 */
+  .cards.work.data.glass > .card.list {
+    height: min(68vh, 520px);
+    min-height: 320px;
+  }
+  .cards.work.data.glass > .card.asset {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+}
 
 /* ---- 列表卡右上角的小工具：搜索、筛选、刷新 ---- */
 .cards.work.data.glass .list-head .updated {

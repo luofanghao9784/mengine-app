@@ -1363,6 +1363,20 @@
   .card.todo {
     grid-row: auto;
   }
+  /* 宽屏下占两列的卡片在单列里也只占一列，否则会撑出一条很窄的隐形第二列。 */
+  .cards.home .chart,
+  .cards.home .feed,
+  .cards.usage .chart {
+    grid-column: auto;
+  }
+}
+/* 手机：导航栏放不下全部名称时，只有当前板块显示名称，其余只留图标（名称仍供读屏使用）。 */
+@media (max-width: 600px) {
+  .shell-switch button:not([aria-current='page']) {
+    font-size: 0;
+    gap: 0;
+    padding: 0 11px;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .deck,

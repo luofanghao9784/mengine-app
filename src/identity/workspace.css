@@ -276,6 +276,38 @@
     gap: 2px;
   }
 }
+/* 手机窄屏：画报的筛选栏挪到标题下面单独一行，标题旁的日期不再被挤成好几行。 */
+@media (max-width: 400px) {
+  .workspace-shell.workspace-briefing .access-main .topbar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .workspace-shell.workspace-briefing .access-main .topbar-actions {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-self: stretch;
+    width: 100%;
+    margin-left: 0;
+  }
+  .workspace-briefing .access-main .topbar-meta {
+    grid-row: 3;
+  }
+  .workspace-briefing .topbar-heading {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 10px;
+  }
+  .workspace-briefing .topbar-heading h1 {
+    flex: none;
+  }
+  .workspace-briefing .workspace-edition {
+    white-space: nowrap;
+  }
+  .workspace-briefing .live-briefing-tabs {
+    width: 100%;
+    justify-content: space-between;
+    gap: 0;
+  }
+}
 /* The viewport owns a single toolbar, over the entire main canvas like the Demo. */
 .workspace-conversations {
   background: var(--canvas);

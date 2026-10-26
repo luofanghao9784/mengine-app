@@ -1,5 +1,16 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { ArrowLeft, ArrowRight, Maximize2, Minimize2, X } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  File,
+  FileText,
+  List,
+  Maximize2,
+  MessageSquare,
+  Minimize2,
+  X,
+  type LucideIcon,
+} from 'lucide-react';
 import { takeViewportMotion } from './viewport-motion';
 import { requestNavigationLocked } from '../shared/request-guard';
 import { IconButton } from '../shared/ui';
@@ -149,6 +160,23 @@ export function LiveConversationDeck({
   );
   useDeckElasticScroll(scroller, layoutKey, !fullscreen, reflow.bounds, cardSnapRanges);
   useDeckSnap(scroller, layoutKey, !fullscreen, cardSnapRanges);
+  // 窄屏（1000 像素以下）：卡片横排成一行，左右滑动切换；切换 = 把那张卡滑到正中。
+  const narrow = () => matchMedia('(max-width: 1000px)').matches;
+  const activeRef = useRef(active);
+  activeRef.current = active;
+  const centerCard = (id: string, behavior: ScrollBehavior) => {
+    const rail = scroller.current;
+    const element = Array.from(rail?.querySelectorAll<HTMLElement>('[data-deck-id]') || []).find(
+      (c) => c.dataset.deckId === id,
+    );
+    if (!rail || !element) return;
+    const box = rail.getBoundingClientRect(),
+      card = element.getBoundingClientRect();
+    rail.scrollTo({
+      left: rail.scrollLeft + card.left - box.left - (rail.clientWidth - card.width) / 2,
+      behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : behavior,
+    });
+  };
   const show = (id: string, focus = true) => {
     setActive(id);
     const independentList = id === 'list' && !matchMedia('(max-width: 1000px)').matches;
@@ -158,7 +186,11 @@ export function LiveConversationDeck({
       (c) => c.dataset.deckId === id,
     );
     if (focus) element?.focus({ preventScroll: true });
-    if (!scroller.current || matchMedia('(max-width: 1000px)').matches) return;
+    if (!scroller.current) return;
+    if (narrow()) {
+      centerCard(id, focus ? 'smooth' : 'instant');
+      return;
+    }
     // The list is a local conversation navigation surface, not a deck scroll destination.
     if (independentList) {
       scroller.current.scrollTo({ left: scroller.current.scrollLeft, behavior: 'instant' });
@@ -208,7 +240,51 @@ export function LiveConversationDeck({
   useEffect(() => {
     if (!['list', ...available].includes(active)) setActive('conversation');
     if (fullscreen && !available.includes(fullscreen)) setFullscreen(undefined);
+    // 窄屏下卡片增减、调整顺序后，仍停在当前那张卡上。
+    if (!narrow()) return;
+    const frame = requestAnimationFrame(() => centerCard(activeRef.current, 'instant'));
+    return () => cancelAnimationFrame(frame);
   }, [layoutKey]);
+  useEffect(() => {
+    // 窄屏左右滑动停下后，正中那张就是当前卡片（顶部气泡随之切换）。
+    const rail = scroller.current;
+    if (!rail || fullscreen) return;
+    let timer = 0;
+    const settle = () => {
+      if (!narrow()) return;
+      const box = rail.getBoundingClientRect(),
+        middle = box.left + box.width / 2;
+      let best = '',
+        distance = Infinity;
+      rail.querySelectorAll<HTMLElement>('[data-deck-id]').forEach((card) => {
+        const r = card.getBoundingClientRect();
+        const d = Math.abs(r.left + r.width / 2 - middle);
+        if (r.width && d < distance) {
+          distance = d;
+          best = card.dataset.deckId!;
+        }
+      });
+      if (best && best !== activeRef.current) setActive(best);
+    };
+    const scrolled = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(settle, 120);
+    };
+    // 从宽屏缩到窄屏（或转屏）时，回到当前那张卡。
+    let wasNarrow = narrow();
+    const resized = () => {
+      const now = narrow();
+      if (now && !wasNarrow) requestAnimationFrame(() => centerCard(activeRef.current, 'instant'));
+      wasNarrow = now;
+    };
+    rail.addEventListener('scroll', scrolled, { passive: true });
+    window.addEventListener('resize', resized);
+    return () => {
+      window.clearTimeout(timer);
+      rail.removeEventListener('scroll', scrolled);
+      window.removeEventListener('resize', resized);
+    };
+  }, [fullscreen]);
   const restore = (id: string, parentId = 'conversation') => {
     show(parentId, false);
     requestAnimationFrame(() => {
@@ -338,14 +414,28 @@ export function LiveConversationDeck({
           <div className="deck-mobile-tabs" aria-label="会话卡片切换">
             {navigation && (
               <button type="button" aria-pressed={active === 'list'} onClick={() => show('list')}>
-                列表
+                <DeckTabFace icon={List} label="列表" />
               </button>
             )}
-            {movableOrder.map((id) => (
-              <button key={id} type="button" aria-pressed={active === id} onClick={() => show(id)}>
-                {id === 'conversation' ? (reader ? '正文' : '对话') : cards.find((c) => c.id === id)?.label}
-              </button>
-            ))}
+            {movableOrder.map((id) => {
+              const card = cards.find((c) => c.id === id);
+              return (
+                <button key={id} type="button" aria-pressed={active === id} onClick={() => show(id)}>
+                  <DeckTabFace
+                    icon={
+                      id === 'conversation'
+                        ? reader
+                          ? FileText
+                          : MessageSquare
+                        : card?.kind === 'file'
+                          ? File
+                          : FileText
+                    }
+                    label={id === 'conversation' ? (reader ? '正文' : '对话') : card?.label || ''}
+                  />
+                </button>
+              );
+            })}
           </div>
           <div className="live-deck-arrows">
             <IconButton
@@ -503,5 +593,15 @@ function PropertiesPanel({ card }: { card?: CompanionCard }) {
       </header>
       <div className="live-inline-properties-content">{card.content}</div>
     </aside>
+  );
+}
+
+/** 窄屏切换气泡：当前卡片显示图标加名称，其余只显示图标（名称仍保留给读屏与按名称点选）。 */
+function DeckTabFace({ icon: Icon, label }: { icon: LucideIcon; label: string }) {
+  return (
+    <>
+      <Icon className="deck-tab-icon" size={16} strokeWidth={1.8} aria-hidden="true" />
+      <span className="deck-tab-label">{label}</span>
+    </>
   );
 }

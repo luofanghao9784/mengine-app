@@ -156,7 +156,8 @@ export function SceneShell({ tenant = null }: { tenant?: string | null }) {
   const stops: Record<Sheet, number> = {
     // 窄窗口时导航退到第二行，卡片升到顶也要让开它。
     peek: width < 1180 ? 58 : 4,
-    half: Math.round(height * 0.6),
+    // 手机竖屏本来就矮：半屏档少给 3D 一些，下面的卡片多留空间。
+    half: Math.round(height * (width <= 600 && height > width ? 0.42 : 0.6)),
     full: height - 66,
   };
   const top = live ?? stops[sheet];
@@ -525,8 +526,24 @@ export function SceneShell({ tenant = null }: { tenant?: string | null }) {
   }, [world]);
 
   useLayoutEffect(() => {
-    const on = nav.current?.querySelector<HTMLElement>('button[aria-current="page"]');
+    const bar = nav.current;
+    const on = bar?.querySelector<HTMLElement>('button[aria-current="page"]');
     setPill(on ? { x: on.offsetLeft, w: on.offsetWidth } : null);
+    // 窄屏时导航放不下要横向滑动：把当前板块滚到中间，不让它藏在看不见的地方。
+    // 等这一帧排版完成再算（切到没有 3D 的板块时卡片组同时升起，导航会跟着重新排版）。
+    const reveal = (behavior: ScrollBehavior) => {
+      if (!bar || !on || bar.scrollWidth <= bar.clientWidth + 1) return;
+      const visible = on.offsetLeft >= bar.scrollLeft && on.offsetLeft + on.offsetWidth <= bar.scrollLeft + bar.clientWidth;
+      if (behavior === 'auto' && visible) return;
+      bar.scrollTo({ left: on.offsetLeft - (bar.clientWidth - on.offsetWidth) / 2, behavior });
+    };
+    const frame = requestAnimationFrame(() => reveal('smooth'));
+    // 卡片组升降动画（0.3 秒）会打断平滑滚动：动画结束后再补一次，仍没露出来就直接滚到位。
+    const settle = window.setTimeout(() => reveal('auto'), 450);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.clearTimeout(settle);
+    };
   }, [place, width]);
 
   const info = places[place];

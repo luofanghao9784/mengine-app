@@ -952,6 +952,38 @@
   .live-demo-deck .deck-mobile-tabs {
     flex: 1;
   }
+  /* 切换气泡：与宽屏的折叠气泡同一种圆形；当前卡片展开成带名称的胶囊。 */
+  .live-demo-deck .deck-mobile-tabs button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 34px;
+    max-width: 180px;
+    transition:
+      background 0.15s,
+      width 0.2s;
+  }
+  .live-demo-deck .deck-mobile-tabs button:not([aria-pressed='true']) {
+    width: 34px;
+    padding: 0;
+    justify-content: center;
+    border-radius: 50%;
+  }
+  .live-demo-deck .deck-mobile-tabs button:not([aria-pressed='true']) .deck-tab-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .live-demo-deck .deck-mobile-tabs .deck-tab-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .live-demo-deck .deck-tab-icon {
+    flex: none;
+  }
   .live-demo-deck .live-deck-arrows {
     display: flex;
     flex-shrink: 0;
@@ -959,11 +991,27 @@
   .live-demo-deck .live-deck-arrows .icon-button:not(:last-child) {
     display: none;
   }
+  /* 卡片横排成一行，左右滑动切换，停下时吸附到整张卡；两侧露出相邻卡片的一窄条，提示还能滑。 */
   .live-demo-deck .deck-scroller {
-    display: block;
+    display: flex;
+    gap: 8px;
     margin: 0;
-    padding: 0 8px 12px;
-    overflow: visible;
+    padding: 0 20px 12px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: 20px;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+  .live-demo-deck .deck-scroller::-webkit-scrollbar {
+    display: none;
+  }
+  .live-demo-deck .deck-card {
+    display: flex;
+    flex: 0 0 100%;
+    scroll-snap-align: center;
+    scroll-snap-stop: always;
   }
   .live-demo-deck .deck-card.live-reader-fullscreen {
     display: flex;
