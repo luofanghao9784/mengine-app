@@ -25,8 +25,14 @@ export function Stages({ a }: { a: Asset }) {
   );
 }
 
-/** 读数：业务数据看记录、可用、隔离、质量；资料看质量、密级、版本、标签。 */
+/** 读数：原生已发布数据看当前可查询记录和声明规则，旧数据保持既有指标；资料看质量、密级、版本、标签。 */
 export function readouts(a: Asset): [string, string | number][] {
+  if (a.kind === 'table' && a.queryableRecords !== undefined) return [
+    ['记录', a.total ?? '—'],
+    ['可查询', a.queryableRecords],
+    ['规则异常', a.ruleStats?.violations ?? '未检查'],
+    ['规则通过', a.ruleStats ? `${a.ruleStats.passed}/${a.ruleStats.total}` : '未检查'],
+  ];
   return a.kind === 'table'
     ? [
         ['记录', a.total ?? '—'],

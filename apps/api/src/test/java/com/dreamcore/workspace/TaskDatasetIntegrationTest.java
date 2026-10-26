@@ -14,6 +14,26 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.JsonNode;
 import static org.junit.jupiter.api.Assertions.*;
 class TaskDatasetIntegrationTest extends TaskDatasetFixture {
+ @Autowired com.dreamcore.workspace.collection.NativeGovernanceDeployment governance;
+ @Autowired com.dreamcore.workspace.profile.CompanyInformationService company;
+ @Test void ordinaryConversationReceivesOnlyCurrentPublishedDefinitionsAndOldPinnedSnapshotsDoNot() {
+  db.update("INSERT INTO tenant_governance(tenant_id,owner_id) VALUES (?,?)",tenant,owner);
+  company.change(owner,tenant,new com.dreamcore.workspace.profile.CompanyInformationService.Change(UUID.randomUUID(),com.dreamcore.workspace.profile.CompanyInformationService.Field.NAME,0,"ADD",null,"合成数据企业",""));
+  var c=governance.context(owner,tenant,List.of(dataset));
+  var fields=List.of(new com.dreamcore.workspace.collection.DatasetField("门店","text","来源门店名称","","合成负责人确认","SOURCE_DOCUMENTED"),new com.dreamcore.workspace.collection.DatasetField("数量","decimal","来源计数，单位件","件","合成负责人确认","SOURCE_DOCUMENTED"));
+  governance.submit(new com.dreamcore.workspace.collection.NativeGovernanceDeployment.Package("1.0",UUID.randomUUID(),tenant,owner,c.backgroundVersion(),List.of(new com.dreamcore.workspace.collection.NativeGovernanceDeployment.Item(dataset,c.sources().getFirst().token(),fields,"",List.of("合成负责人确认")))),true);
+  var t=task(null,"AUTHORIZED_LIBRARY");var read=call(t,request("dataset_read",dataset,snapshot,0));
+  assertEquals("PUBLISHED_GOVERNANCE",read.at("/source/definitionOrigin").asString());
+  assertEquals("件",read.at("/source/fieldDefinitions/1/unit").asString());
+  assertEquals("件",read.at("/source/publishedFieldUnits/数量").asString());
+  assertEquals("NATIVE_GOVERNANCE_RELEASE",read.at("/source/governedFields/source").asString());
+  assertEquals("件",read.at("/source/governedFields/fields/1/unit").asString());
+  assertEquals("SOURCE_DOCUMENTED",read.at("/source/governedFields/fields/1/status").asString());
+  version(2,"修改来源");
+  assertEquals("NONE",call(t,request("dataset_read",dataset,snapshot,0)).at("/source/governedFields/source").asString());
+  db.update("DELETE FROM workspace_members WHERE tenant_id=? AND workspace_id=? AND account_id=?",tenant,space,owner);
+  denied(()->call(t,request("dataset_read",dataset,snapshot,0)));
+ }
  @Test void searchAndReadPinExactVersionAndClearlyBoundThePage(){
   var t=task(null,"AUTHORIZED_LIBRARY");assertEquals("1.0",agents.check(t.id(),t.token()).get("datasetContextVersion"));var found=call(t,request("dataset_search",null,null,0));assertEquals(1,found.get("items").size());assertFalse(found.toString().contains("部署路径"));assertFalse(found.toString().contains("部署权限说明"));
   UUID next=version(2,"新版本");var read=call(t,request("dataset_read",dataset,snapshot,0));assertEquals(1,read.get("source").get("version").asInt());assertTrue(read.get("source").get("coverageThrough").isNull());assertEquals(5,read.get("rows").size());assertTrue(read.get("hasMore").asBoolean());assertFalse(read.get("completeDataset").asBoolean());assertEquals(5,read.get("nextOffset").asInt());assertEquals("旧版本0",read.get("rows").get(0).get(0).asString());

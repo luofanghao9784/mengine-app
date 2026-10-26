@@ -15,7 +15,7 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * Advisory view of the newest published native governance release for one dataset.
  *
- * <p>Read-only and never authoritative: it only tells the model what a column was confirmed to mean.
+ * <p>Read-only and never authoritative: it only tells the model what a column was confirmed to mean in conversations and briefings.
  * It must not change calculation rules, block a column, or fail a task. Missing, stale-shaped or
  * unparsable releases degrade to an explicit "not governed" marker.
  */
@@ -37,6 +37,14 @@ final class GovernedFieldContext {
 
     /** Latest release visible to this actor that covers the dataset, or an explicit not-governed marker. */
     static Map<String, Object> load(JdbcTemplate db, UUID tenant, UUID actor, UUID dataset, List<String> visibleColumns) {
+        return read(db, tenant, actor, dataset, visibleColumns, null);
+    }
+
+    static Map<String, Object> loadCurrent(JdbcTemplate db, UUID tenant, UUID actor, UUID dataset, List<String> visibleColumns, UUID release) {
+        return release == null ? ungoverned() : read(db, tenant, actor, dataset, visibleColumns, release);
+    }
+
+    private static Map<String, Object> read(JdbcTemplate db, UUID tenant, UUID actor, UUID dataset, List<String> visibleColumns, UUID release) {
         if (db == null || tenant == null || actor == null || dataset == null || visibleColumns == null || visibleColumns.isEmpty()) {
             return ungoverned();
         }
@@ -45,11 +53,11 @@ final class GovernedFieldContext {
                 """
                 SELECT r.package::text AS package,r.created_at
                 FROM native_governance_releases r
-                WHERE r.tenant_id=? AND r.recipient_id=headquarters_permission_actor(?,?)
+                WHERE r.tenant_id=? AND r.recipient_id=headquarters_permission_actor(?,?) AND (?::uuid IS NULL OR r.id=?)
                   AND EXISTS(SELECT 1 FROM jsonb_array_elements(r.package->'items') i WHERE i->>'datasetId'=?)
                 ORDER BY r.created_at DESC,r.id DESC LIMIT 1
                 """,
-                tenant, actor, tenant, dataset.toString());
+                tenant, actor, tenant, release, release, dataset.toString());
             if (rows.isEmpty()) return ungoverned();
             JsonNode items = JSON.readTree((String) rows.getFirst().get("package")).path("items");
             List<Map<String, Object>> fields = new ArrayList<>();

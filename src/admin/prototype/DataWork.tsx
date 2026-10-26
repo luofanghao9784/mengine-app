@@ -781,7 +781,7 @@ export function DataWork({
             {a && (
               <dl className="head-nums">
                 {readouts(a).map(([k, v]) => (
-                  <div key={k} data-alert={(k === '隔离' && Number(v) > 0) || undefined}>
+                  <div key={k} data-alert={(['隔离', '规则异常'].includes(k) && Number(v) > 0) || undefined}>
                     <dt>{k}</dt>
                     <dd className="num">{v}</dd>
                   </div>
@@ -1099,11 +1099,17 @@ export function DataWork({
                 {shownStep === 4 && (
                   <>
                     {kv([
-                      ['提供范围', a.kind !== 'table' ? '资料全文' : a.ready !== null
+                      ['提供范围', a.kind !== 'table' ? '资料全文' : a.queryableRecords !== undefined
+                        ? `按已发布口径可查询 ${a.queryableRecords} 条记录` : a.ready !== null
                         ? `${a.ready} 条合格记录`
                         : a.available ? '按已发布口径查询（合格记录数未核验）' : '尚未提供给 AI'],
                       ['最近更新', date(a.updatedAt)],
                     ])}
+                    {a.queryableRecords !== undefined && (
+                      <p className="live-note">{a.ruleStats
+                        ? `字段规则 ${a.ruleStats.passed}/${a.ruleStats.total} 通过，异常 ${a.ruleStats.violations} 项。${a.ruleStats.scope}`
+                        : '当前快照可查询；尚无已声明字段规则的检查统计。'}</p>
+                    )}
                     {!a.available && (
                       <p className="live-note">
                         先处理“{GATES[Math.min(a.gate, 3)]}”这一环，通过后自动提供给 AI。

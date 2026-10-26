@@ -66,6 +66,11 @@ class NativeGovernanceFlowIntegrationTest {
    jobs.engineAnswer(owner,tenant,id,new GovernanceModelService.Answer(UUID.randomUUID(),1,req.get("inputHash").toString(),"SYSTEM_MODEL",output));
    db.update("UPDATE governance_model_dispatch SET state='SUCCEEDED' WHERE job_id=?",id);jobs.publish(owner,tenant,id,new GovernanceModelService.Publish(2,req.get("inputHash").toString()));
    var detail=foundation.detail(owner,tenant,"dataset-"+dataset);var asset=detail.path("asset");
+   assertEquals(1,asset.path("queryableRecords").asLong());
+   assertEquals(1,asset.path("ruleStats").path("total").asInt());
+   assertEquals(violation?0:1,asset.path("ruleStats").path("passed").asInt());
+   assertEquals(violation?1:0,asset.path("ruleStats").path("violations").asLong());
+   assertTrue(asset.path("isolated").isNull());assertTrue(asset.path("quality").isNull());
    assertEquals(0,asset.path("unknownFieldCount").asInt());assertEquals(violation,asset.path("needsAttention").asBoolean());
    assertEquals(!violation,asset.path("checksPassed").asBoolean());
    assertFalse(detail.path("dictionary").path("usageRules").asText().contains("未知业务含义仍需核实"));
@@ -118,7 +123,7 @@ class NativeGovernanceFlowIntegrationTest {
   assertEquals("WAITING_MODEL",jobs.datasetStatus(owner,tenant,dataset).get("state"));
   assertEquals("RUNNING",foundation.detail(owner,tenant,"dataset-"+dataset).path("asset").path("stageStates").get(2).asText());
   Map<String,Object> req=(Map<String,Object>)job.get("request"),ctx=(Map<String,Object>)req.get("context");
-  assertFalse(ctx.containsKey("rows"));assertFalse(ctx.toString().contains("001"));
+  assertFalse(ctx.containsKey("rows"));assertFalse(new JsonMapper().writeValueAsString(ctx).contains("\"001\""));
   var output=Map.<String,Object>of("title","合成治理草稿","summary","仅核对结构，业务含义未知","limitations",List.of("没有来源约束，未确认业务口径"),"fields",List.of(Map.of("column","编号","decision","UNKNOWN","meaning","待核实业务含义","unit","","evidence","仅有导出列名，缺少业务依据")),"evidence",List.of(),"knowledge",List.of());
   var saved=jobs.engineAnswer(owner,tenant,id,new GovernanceModelService.Answer(UUID.randomUUID(),1,req.get("inputHash").toString(),"SYSTEM_MODEL",output));
   assertEquals("DRAFT_READY",saved.get("state"));

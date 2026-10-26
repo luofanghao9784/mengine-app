@@ -26,6 +26,8 @@ export type Asset = {
   issues: string[];
   tags: string[];
   total: number | null;
+  queryableRecords?: number;
+  ruleStats?: { total: number; passed: number; violations: number; scope: string };
   ready: number | null;
   isolated: number | null;
   fieldCount: number;

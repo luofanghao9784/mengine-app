@@ -8,7 +8,7 @@ import org.springframework.stereotype.Service;
 @Service @Primary
 public class FusionDatasetTaskContext extends DatasetTaskContext {
  private final GovernedFusionService fusion;
- public FusionDatasetTaskContext(JdbcTemplate db,MaterialAccess access,GovernedFusionService fusion){super(db,access);this.fusion=fusion;}
+ public FusionDatasetTaskContext(JdbcTemplate db,MaterialAccess access,GovernedFusionService fusion,com.dreamcore.workspace.collection.NativeGovernanceDeployment governance){super(db,access,governance);this.fusion=fusion;}
  @Override public Object read(UUID task,TaskContextService.Request request){
   Object result=super.read(task,request);Object plan=fusion.context(task);
   if(plan==null)return result;

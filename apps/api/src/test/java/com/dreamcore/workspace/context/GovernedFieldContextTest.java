@@ -12,7 +12,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * Governance wording is advisory context for briefings only. These tests pin three behaviours that
+ * Governance wording is advisory context for authorized conversations and briefings. These tests pin three behaviours that
  * matter operationally: it reaches the model when a release exists, it degrades quietly when it does
  * not, and an UNKNOWN column is still passed through instead of being blocked.
  */

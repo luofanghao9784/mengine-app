@@ -144,7 +144,12 @@ public class FoundationPublicationService {
                         unknown,
                         List.copyOf(warnings),
                         List.copyOf(limitations),
-                        exportSummary
+                        exportSummary,
+                        "DATASET".equals(r.get("kind")) && input.path("rowCount").canConvertToLong() ? input.path("rowCount").asLong() : null,
+                        valueChecks.path("rules").isArray() && valueChecks.path("rules").size() > 0 ? valueChecks.path("rules").size() : null,
+                        valueChecks.path("rules").isArray() && valueChecks.path("rules").size() > 0
+                            ? (int)java.util.stream.StreamSupport.stream(valueChecks.path("rules").spliterator(), false).filter(rule -> "CHECKED".equals(rule.path("state").asText())).count() : null,
+                        valueChecks.path("violations").canConvertToLong() && valueChecks.path("rules").size() > 0 ? valueChecks.path("violations").asLong() : null
                      )
                   );
                }
@@ -173,6 +178,11 @@ public class FoundationPublicationService {
          asset.put("needsAttention", !p.warnings().isEmpty());
          asset.put("checksPassed", p.warnings().isEmpty());
          asset.put("label", "已发布治理知识" + (p.warnings().isEmpty() ? "" : " · 保留待核实项与解析限制"));
+         if (p.queryableRecords() != null) asset.put("queryableRecords", p.queryableRecords());
+         if (p.declaredRules() != null) {
+            asset.putObject("ruleStats").put("total", p.declaredRules()).put("passed", p.passedRules()).put("violations", p.ruleViolations())
+                .put("scope", "当前快照已声明的字段值规则；异常项按单元格与规则计数，不表示记录已隔离或银行到账已核实");
+         }
          asset.putNull("ready");
          asset.putNull("quality");
          asset.putNull("isolated");
@@ -254,7 +264,11 @@ public class FoundationPublicationService {
       List<String> unknown,
       List<String> warnings,
       List<String> limitations,
-      String exportSummary
+      String exportSummary,
+      Long queryableRecords,
+      Integer declaredRules,
+      Integer passedRules,
+      Long ruleViolations
    ) {
       public List<String> stages() {
          return List.of("READY", this.parsing, this.unknown.isEmpty() ? "READY" : "PARTIAL", this.warnings.isEmpty() ? "READY" : "ATTENTION", "READY");
