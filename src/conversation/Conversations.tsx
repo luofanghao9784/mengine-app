@@ -63,6 +63,9 @@ import { TaskReadingBody, type ReadingTask, type ReadingHeader } from '../briefi
 import { briefingConversationHref, readBriefingContext, retainConversationContext } from './briefing-context';
 import { ReadingDialog } from '../briefing-live/ReadingDialog';
 import { LiveConversationDeck } from './LiveConversationDeck';
+import { NativeConversationGroup } from '../native-conversation/NativeConversationGroup';
+import { NativeConversationView } from '../native-conversation/NativeConversationView';
+import { useNativeAvailability, nativeHref } from '../native-conversation/useNativeConversations';
 import type { ReactNode } from 'react';
 import { Failure, Loading, Pager, SubmitError, useRemote, useSubmission } from '../shared/admin';
 import { Citation } from '../material/Knowledge';
@@ -96,6 +99,9 @@ export function Conversations({ tenant }: { tenant: string }) {
       location.hash = conversationHref(tenant);
   }, [removedSelection, pendingRequest, tenant, selected]);
   const focused = new URLSearchParams(hash.slice(1)).get('task') || undefined;
+  // 企业原生会话（试用）与旧会话并列；选中时由原生视图接管右侧，旧会话不受影响。
+  const native = new URLSearchParams(hash.slice(1)).get('native') || undefined;
+  const nativeLegacy = new URLSearchParams(hash.slice(1)).get('legacy') || undefined;
   const context = useRemote(
     (signal) => identityClient.context(tenant, signal),
     [tenant, session.identity, contextAttempt],
@@ -127,6 +133,28 @@ export function Conversations({ tenant }: { tenant: string }) {
         />
       ) : !context.value || !list.value ? (
         <Loading />
+      ) : native ? (
+        <NativeConversationView
+          key={tenant + ':' + native}
+          tenant={tenant}
+          id={native}
+          legacy={nativeLegacy}
+          workspaces={context.value.workspaces}
+          oldConversations={list.value.items}
+          onChanged={changed}
+          navigation={
+            <ConversationListNav
+              tenant={tenant}
+              hash={hash}
+              selected={selected}
+              workspaces={context.value.workspaces}
+              list={list}
+              pending={pendingRequest}
+              changed={changed}
+              removed={(id) => setRemovedSelection({ tenant, id })}
+            />
+          }
+        />
       ) : (
         <ConversationView
           key={tenant}
@@ -196,6 +224,12 @@ export function ConversationListNav({
         </header>
       </div>
       <div className="live-conversation-links">
+        <NativeConversationGroup
+          tenant={tenant}
+          hash={hash}
+          workspaces={workspaces}
+          titles={new Map(value.items.map((item) => [item.id, item.title]))}
+        />
         {workspaces.map((space) => {
           const conversations = value.items.filter((item) => item.workspaceId === space.id);
           return conversations.length ? (
@@ -476,6 +510,18 @@ function ConversationView({
     data.value?.conversation.title ||
     selectedTitle ||
     (selected ? '会话' : briefingContext ? briefingTitle || '画报讨论' : '新会话');
+  // 旧会话可在企业原生会话中接续（试用，部署开启时才显示）；旧会话本身原样保留。
+  const nativeEnabled = useNativeAvailability(tenant);
+  const continueNative =
+    nativeEnabled && selected ? (
+      <IconButton
+        icon={Sparkles}
+        label="在原生会话中接续"
+        onClick={() => {
+          if (!requestNavigationLocked()) location.hash = nativeHref(tenant, 'new', { legacy: selected });
+        }}
+      />
+    ) : null;
   const agentStatus =
     agentMode === 'live'
       ? ''
@@ -498,14 +544,17 @@ function ConversationView({
           </>
         }
         headerActions={
-          <IconButton
-            icon={Plus}
-            label="新建会话"
-            onClick={() => {
-              if (!requestNavigationLocked())
-                location.hash = retainConversationContext(conversationHref(tenant), location.hash);
-            }}
-          />
+          <>
+            {continueNative}
+            <IconButton
+              icon={Plus}
+              label="新建会话"
+              onClick={() => {
+                if (!requestNavigationLocked())
+                  location.hash = retainConversationContext(conversationHref(tenant), location.hash);
+              }}
+            />
+          </>
         }
         reveal={reveal}
         onRefresh={() => {
@@ -592,6 +641,7 @@ function ConversationView({
               <h2 title={conversationTitle}>{conversationTitle}</h2>
               {agentStatus && <p className="muted">{agentStatus}</p>}
             </div>
+            {continueNative && <div className="live-card-actions">{continueNative}</div>}
           </header>
           <div
             className="conversation-messages"

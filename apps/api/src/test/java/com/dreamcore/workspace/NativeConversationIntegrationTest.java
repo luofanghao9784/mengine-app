@@ -55,6 +55,11 @@ class NativeConversationIntegrationTest {
   db.update("UPDATE native_conversation_grants SET expires_at=now()-interval '1 minute' WHERE session_id=?",s.id());assertEquals(403,status.apply(s.id(),g.token()));
  }
  @Test void resumeRetainsRootIdentityAndDoesNotReviveOldCapability(){var s=open();var g=nativeSessions.grant(owner,tenant,s.id());nativeSessions.stop(owner,tenant,s.id());assertEquals(s.id(),nativeSessions.resume(owner,tenant,s.id()).id());denied(()->nativeSessions.check(s.id(),g.token()));var fresh=nativeSessions.grant(owner,tenant,s.id());assertEquals(s.id(),nativeSessions.check(s.id(),fresh.token()).id());}
+ @Test void availabilityIsMemberOnlyAndSessionsCarryTheirOpeningTime(){
+  nativeSessions.requireMember(owner,tenant);denied(()->nativeSessions.requireMember(UUID.randomUUID(),tenant));denied(()->nativeSessions.requireMember(owner,UUID.randomUUID()));
+  var first=open();var second=open();assertNotNull(first.createdAt());
+  assertEquals(List.of(second.id(),first.id()),nativeSessions.list(owner,tenant,space).stream().map(NativeConversationService.Session::id).toList());
+ }
  @Test void simultaneousSaveRetriesCreateOnlyOneArtifact()throws Exception{var s=open();var g=nativeSessions.grant(owner,tenant,s.id());var input=save(UUID.randomUUID(),"same bytes");try(var pool=java.util.concurrent.Executors.newFixedThreadPool(2)){var a=pool.submit(()->nativeSessions.save(s.id(),g.token(),input));var b=pool.submit(()->nativeSessions.save(s.id(),g.token(),input));assertEquals(a.get(10,java.util.concurrent.TimeUnit.SECONDS),b.get(10,java.util.concurrent.TimeUnit.SECONDS));}assertEquals(1,nativeSessions.artifacts(owner,tenant,s.id()).size());}
 
 }

@@ -1,0 +1,348 @@
+/* 原生会话在梦擎会话卡片里的对话视图：沿用旧会话的气泡、回复与输入框样式，新增工具、审批、提问卡片。 */
+.native-chat {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.native-chat-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.native-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 24px 8px;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+.native-run {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--soft);
+  color: var(--ink-2);
+}
+.native-run.is-running {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.native-maintenance {
+  color: var(--ink-3);
+}
+.native-budget {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--soft);
+}
+.native-budget.is-soft {
+  background: #fdf4e3;
+  color: #8a5a12;
+}
+.native-budget.is-hard {
+  background: #fdf1ec;
+  color: #a24a21;
+}
+.native-spin {
+  animation: native-spin 1s linear infinite;
+}
+@keyframes native-spin {
+  to {
+    rotate: 360deg;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .native-spin {
+    animation: none;
+  }
+}
+.native-turn .conversation-result {
+  display: grid;
+  gap: 10px;
+}
+.native-attachments {
+  display: block;
+  margin-top: 4px;
+  opacity: 0.75;
+}
+.native-reasoning {
+  margin-bottom: 6px;
+  color: var(--ink-3);
+  font-size: 13px;
+}
+.native-reasoning summary {
+  cursor: pointer;
+  width: fit-content;
+}
+.native-reasoning p {
+  margin: 6px 0 0;
+  padding-left: 10px;
+  border-left: 2px solid var(--line);
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+.native-muted {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.native-card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  font-size: 13px;
+}
+.native-card > header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px 0;
+  font-weight: 600;
+}
+.native-card > p,
+.native-card > ul,
+.native-card > .native-actions,
+.native-card > fieldset {
+  margin: 8px 12px;
+}
+.native-card > .native-muted:last-child,
+.native-card > .native-actions:last-child {
+  margin-bottom: 12px;
+}
+/* 工具过程：默认收起成一行，展开看参数与结果。 */
+.native-tool {
+  background: var(--soft);
+  border-color: transparent;
+}
+.native-tool summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 12px;
+  cursor: pointer;
+  list-style: none;
+}
+.native-tool summary::-webkit-details-marker {
+  display: none;
+}
+.native-tool-name {
+  flex: none;
+  font-weight: 550;
+}
+.native-tool-summary {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink-3);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.native-tool-status {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  color: var(--ink-3);
+  font-size: 12px;
+}
+.native-tool.is-error .native-tool-status,
+.native-tool.is-interrupted .native-tool-status {
+  color: #a24a21;
+}
+.native-tool.is-running .native-tool-status {
+  color: var(--accent);
+}
+.native-chevron {
+  flex: none;
+  color: var(--ink-3);
+  transition: rotate 0.15s;
+}
+.native-tool[open] .native-chevron {
+  rotate: 90deg;
+}
+.native-tool-detail {
+  padding: 0 12px 12px;
+}
+.native-tool-detail h4 {
+  margin: 8px 0 4px;
+  color: var(--ink-3);
+  font-size: 12px;
+  font-weight: 500;
+}
+.native-tool-detail pre {
+  max-height: 240px;
+  margin: 0;
+  overflow: auto;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #fff;
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+/* 需要员工处理的卡片（审批、提问）用强调边框，处理后变回普通样式。 */
+.native-card.is-pending {
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  box-shadow: 0 4px 16px rgb(40 80 170 / 8%);
+}
+.native-card.is-settled {
+  background: var(--soft);
+  border-color: transparent;
+}
+.native-question fieldset {
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  border: 0;
+}
+.native-question-item p {
+  margin: 2px 0 6px;
+  line-height: 1.6;
+}
+.native-question-header {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 11px;
+}
+.native-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.native-card .native-option input[type] {
+  display: inline-block;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  min-height: 0;
+  padding: 0;
+  margin: 4px 0 0;
+}
+.native-option > span {
+  flex: 1;
+  min-width: 0;
+}
+.native-option:hover {
+  background: var(--soft);
+}
+.native-option small {
+  display: block;
+  color: var(--ink-3);
+}
+.native-custom {
+  width: 100%;
+  margin-top: 4px;
+}
+.native-deliverables ul {
+  display: grid;
+  gap: 4px;
+  padding: 0;
+  list-style: none;
+}
+.native-deliverables li span {
+  font-weight: 550;
+}
+.native-deliverables li small {
+  margin-left: 8px;
+  color: var(--ink-3);
+}
+.native-turn-end {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  color: var(--ink-3);
+  font-size: 12px;
+}
+.native-turn-end.is-error {
+  color: #a24a21;
+}
+.native-feedback {
+  display: flex;
+  gap: 4px;
+}
+.native-feedback button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-3);
+}
+.native-feedback button[aria-pressed='true'] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.native-composer {
+  display: grid;
+  gap: 6px;
+  margin: 8px 16px 16px;
+}
+.native-composer-box {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 8px 8px 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 4px 16px rgb(30 50 90 / 6%);
+}
+.native-composer-box:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+}
+.native-composer textarea {
+  flex: 1;
+  min-width: 0;
+  min-height: 24px;
+  max-height: 160px;
+  padding: 6px 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  line-height: 1.6;
+  resize: none;
+  field-sizing: content;
+  outline: none;
+  box-shadow: none;
+}
+.native-composer-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+}
+.native-send {
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+  justify-content: center;
+  border-radius: 50%;
+}
+@media (max-width: 800px) {
+  .native-status {
+    padding: 6px 16px 8px;
+  }
+  .native-composer {
+    margin: 8px 10px 10px;
+  }
+}

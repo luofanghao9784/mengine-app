@@ -14,7 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 /** Enterprise authority stays in the platform; every native request rechecks it. */
 @Service
 public class NativeConversationService {
- public record Session(UUID id,UUID tenantId,UUID ownerId,UUID workspaceId,UUID legacyConversationId,String state) {}
+ public record Session(UUID id,UUID tenantId,UUID ownerId,UUID workspaceId,UUID legacyConversationId,String state,Instant createdAt) {}
  public record Open(UUID requestId,UUID workspaceId,UUID legacyConversationId) {}
  public record Grant(Session session,String token,Instant expiresAt) {}
  public record Save(UUID requestId,String filename,String contentBase64) {}
@@ -23,13 +23,13 @@ public class NativeConversationService {
  public record Publication(UUID artifactId,UUID materialId,UUID workspaceId) {}
  private final JdbcTemplate db; private final MaterialAccess access; private final MaterialService materials;
  private final ConversationService old; private final KnowledgeService knowledge;
- private final com.dreamcore.workspace.departure.DepartureAccess departure;
- public NativeConversationService(JdbcTemplate db,MaterialAccess access,MaterialService materials,ConversationService old,KnowledgeService knowledge,com.dreamcore.workspace.departure.DepartureAccess departure){
-  this.db=db;this.access=access;this.materials=materials;this.old=old;this.knowledge=knowledge;this.departure=departure;
+ private final com.dreamcore.workspace.departure.DepartureAccess departure; private final IdentityService identities;
+ public NativeConversationService(JdbcTemplate db,MaterialAccess access,MaterialService materials,ConversationService old,KnowledgeService knowledge,com.dreamcore.workspace.departure.DepartureAccess departure,IdentityService identities){
+  this.db=db;this.access=access;this.materials=materials;this.old=old;this.knowledge=knowledge;this.departure=departure;this.identities=identities;
  }
  private IdentityException denied(){return new IdentityException(403,"NATIVE_ACCESS_DENIED");}
  private Session row(UUID id){
-  var rows=db.query("SELECT * FROM native_conversations WHERE id=? FOR UPDATE",(r,n)->new Session(r.getObject("id",UUID.class),r.getObject("tenant_id",UUID.class),r.getObject("owner_id",UUID.class),r.getObject("workspace_id",UUID.class),r.getObject("legacy_conversation_id",UUID.class),r.getString("state")),id);
+  var rows=db.query("SELECT * FROM native_conversations WHERE id=? FOR UPDATE",(r,n)->new Session(r.getObject("id",UUID.class),r.getObject("tenant_id",UUID.class),r.getObject("owner_id",UUID.class),r.getObject("workspace_id",UUID.class),r.getObject("legacy_conversation_id",UUID.class),r.getString("state"),r.getTimestamp("created_at").toInstant()),id);
   if(rows.isEmpty())throw new IdentityException(404,"NATIVE_SESSION_NOT_FOUND");return rows.getFirst();
  }
  private Session authorize(UUID actor,UUID tenant,UUID id,boolean execution){
@@ -71,6 +71,8 @@ public class NativeConversationService {
   }
   return authorize(actor,tenant,id,false);
  }
+ /** Availability is only shown to members who could read their own private sessions. */
+ public void requireMember(UUID actor,UUID tenant){identities.member(actor,tenant,false,false);departure.requirePrivateRead(actor,tenant);}
  @Transactional public List<Session> list(UUID actor,UUID tenant,UUID space){
   access.require(actor,tenant,space,false);departure.requirePrivateRead(actor,tenant);
   return db.queryForList("SELECT id FROM native_conversations WHERE tenant_id=? AND owner_id=? AND workspace_id=? ORDER BY created_at DESC LIMIT 100",UUID.class,tenant,actor,space).stream().map(this::row).toList();

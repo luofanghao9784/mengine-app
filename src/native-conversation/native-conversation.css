@@ -1,1 +1,165 @@
 .native-conversations{max-width:1080px;margin:0 auto;padding:32px 24px;color:#263537;background:#f5f8f7;min-height:100vh;font-family:system-ui,sans-serif}.native-conversations h1{font-size:28px}.native-conversations p{line-height:1.6}.native-conversations fieldset,.native-conversations section{padding:20px;margin:20px 0;border:1px solid #cfdbd7;border-radius:16px;background:white}.native-conversations label{display:inline-flex;align-items:center;gap:8px;margin:8px 16px 8px 0}.native-conversations select,.native-conversations button{padding:10px;border:1px solid #bdcec8;border-radius:8px;background:white}.native-conversations button{cursor:pointer}.native-conversations button:disabled{opacity:.5;cursor:default}.native-session{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin:14px 0}.native-conversations [role=status]{color:#674015;overflow-wrap:anywhere}
+
+/* 会话列表里的“企业原生会话（试用）”分组，与旧会话分组同一样式。 */
+.native-conversation-group .native-badge {
+  margin-left: 4px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 10px;
+  line-height: 18px;
+}
+.native-conversation-group a {
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+.native-conversation-group a .conversation-list-title {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+.native-conversation-group .native-row-meta {
+  color: var(--ink-3);
+  font-size: 11px;
+}
+.native-conversation-group .native-new-link {
+  flex-wrap: nowrap;
+  gap: 6px;
+  color: var(--accent);
+}
+
+/* 原生会话在会话卡片里的内容：分段说明、操作按钮、私人成果与发布。 */
+.native-reader {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+.native-reader-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 4px 24px 32px;
+}
+.native-section {
+  display: grid;
+  gap: 12px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line);
+}
+.native-section:last-child {
+  border-bottom: 0;
+}
+.native-section h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.native-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.native-note,
+.native-empty {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.native-note a {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--accent);
+}
+.native-empty {
+  color: var(--ink-3);
+}
+.native-notice,
+.native-error {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.native-notice {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.native-error {
+  background: #fdf1ec;
+  color: #a24a21;
+}
+.native-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.native-files {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.native-files li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--soft);
+}
+.native-files li > a {
+  display: inline-flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--ink);
+  text-decoration: none;
+}
+.native-files li > a span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.native-files small {
+  color: var(--ink-3);
+}
+.native-publish {
+  display: grid;
+  flex: 1 1 100%;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  background: #fff;
+}
+.native-ack {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+@media (max-width: 800px) {
+  .native-reader-body {
+    padding: 0 16px 24px;
+  }
+}
+.native-preview-banner {
+  margin: 0 24px 4px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: #fdf4e3;
+  color: #8a5a12;
+  font-size: 12px;
+}
+@media (max-width: 800px) {
+  .native-preview-banner {
+    margin: 0 16px 4px;
+  }
+}

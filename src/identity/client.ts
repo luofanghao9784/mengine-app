@@ -34,6 +34,10 @@ export class IdentityError extends Error {
   readonly reason?: FailureReason;
   constructor(code: string, status = 0, reason?: FailureReason) {
     const messages: Record<string, string> = {
+      NATIVE_ACCESS_DENIED: '没有这个原生会话的权限，或会话已停止。',
+      NATIVE_RUNTIME_UNAVAILABLE: '原生会话运行环境尚未开启，请联系部署负责人。',
+      NATIVE_SESSION_NOT_FOUND: '找不到这个原生会话，可能已被删除。',
+      NATIVE_REQUEST_CONFLICT: '这次操作与之前的提交内容不一致，请刷新后重试。',
       SCENE_TENANT_NOT_BOUND: '该企业尚未绑定数据来源，请先完成企业接入配置。',
       SCENE_NOT_CONFIGURED: '企业数据接口尚未配置，请联系部署维护人员。',
       SCENE_UPSTREAM_UNAVAILABLE: '企业数据服务暂不可用，请稍后重试。',

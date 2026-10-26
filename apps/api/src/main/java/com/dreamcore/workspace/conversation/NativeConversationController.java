@@ -15,6 +15,8 @@ public class NativeConversationController {
  private UUID actor(Authentication a){return UUID.fromString(a.getName());}
  private String token(String value){if(value==null||!value.startsWith("Bearer "))throw new IdentityException(403,"NATIVE_ACCESS_DENIED");return value.substring(7);}
  public record Query(String query){} public record Read(UUID materialId,UUID versionId){}
+ /** Whether this deployment runs the native runtime; the UI keeps the entry hidden otherwise. */
+ @GetMapping("/api/v1/tenants/{tenant}/native-conversations/availability") public Object availability(Authentication auth,@PathVariable UUID tenant){service.requireMember(actor(auth),tenant);return Map.of("enabled",!webUrl.isBlank());}
  @GetMapping("/api/v1/tenants/{tenant}/native-conversations") public Object list(Authentication auth,@PathVariable UUID tenant,@RequestParam UUID workspaceId){return service.list(actor(auth),tenant,workspaceId);}
  @PostMapping("/api/v1/tenants/{tenant}/native-conversations") public Object open(Authentication auth,@PathVariable UUID tenant,@RequestBody NativeConversationService.Open body){return service.open(actor(auth),tenant,body);}
  @PostMapping("/api/v1/tenants/{tenant}/native-conversations/{id}/grant") public Object grant(Authentication auth,@PathVariable UUID tenant,@PathVariable UUID id){if(webUrl.isBlank())throw new IdentityException(503,"NATIVE_RUNTIME_UNAVAILABLE");var grant=service.grant(actor(auth),tenant,id);return Map.of("session",grant.session(),"token",grant.token(),"expiresAt",grant.expiresAt(),"launchUrl",webUrl.replaceAll("/+$","")+"/launch");}
