@@ -100,3 +100,40 @@ test('username-only accounts log in through the customer session without platfor
   await assert.rejects(createIdentityClient(async () => json({ ...named, account: { ...named.account, username: 'bad@alias' } })).me(),
     (e) => e instanceof IdentityError && e.code === 'CONTRACT_MISMATCH');
 });
+
+test('failures without a specific code explain what happened and what to do next', async () => {
+  const fail = (fetcher: typeof fetch, timeout?: number) => createIdentityClient(fetcher, timeout).me();
+  const reject = async (p: Promise<unknown>, code: string, text: string) =>
+    assert.rejects(p, (e) => e instanceof IdentityError && e.code === code && e.message.includes(text));
+  await reject(fail(async () => json({}, 503)), 'UNAVAILABLE', '可能正在维护或重启');
+  await reject(fail(async () => json({}, 500)), 'UNAVAILABLE', '服务器处理时出错');
+  await reject(fail(async () => json({}, 429)), 'UNAVAILABLE', '操作太频繁');
+  await reject(
+    fail(async () => {
+      throw new TypeError('connection refused');
+    }),
+    'UNAVAILABLE',
+    '无法连接到服务器',
+  );
+  await reject(
+    fail(
+      (_path, init) =>
+        new Promise((_, no) => init?.signal?.addEventListener('abort', () => no(new DOMException('', 'AbortError')))),
+      20,
+    ),
+    'UNAVAILABLE',
+    '响应超时',
+  );
+  // A write that reached the network but got no answer may have happened: say so, never “please retry” alone.
+  const uncertain = createIdentityClient(async (path) => {
+    if (String(path).endsWith('csrf')) return json({ token: 'test', headerName: 'X-CSRF-TOKEN' });
+    throw new TypeError('reset');
+  });
+  await reject(uncertain.accept({ token: 'test' }), 'UNCERTAIN_RESULT', '操作可能已经生效');
+  // Codes the server does send keep their own messages.
+  await reject(
+    fail(async () => json({ contractVersion: '1.0', code: 'INVITATION_NOT_FOUND' }, 404)),
+    'INVITATION_NOT_FOUND',
+    '重新发送邀请',
+  );
+});

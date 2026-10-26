@@ -18,7 +18,6 @@ export function EntryFrame({ label, home, children }: { label: string; home?: st
       <section className="access-auth-card" aria-label={label}>
         {children}
       </section>
-      <p className="access-auth-note">邀请制使用 · 企业成员身份由所属企业授予</p>
     </main>
   );
 }

@@ -136,7 +136,15 @@ export default function AccessApp({
   if (session.phase === 'loading') return <Status title="正在确认登录状态" detail="请稍候…" />;
   if (session.phase === 'unavailable')
     return (
-      <Status title="暂时无法连接服务" detail="当前状态尚未确认，请重新连接。" retry={() => void refresh()} />
+      <Status
+        title="暂时无法连接服务"
+        detail={
+          typeof navigator !== 'undefined' && navigator.onLine === false
+            ? '网络已断开，恢复网络后点“重新连接”。'
+            : '暂时无法确认登录状态。请检查网络后点“重新连接”；如果网络正常，服务可能正在维护，请稍后再试。'
+        }
+        retry={() => void refresh()}
+      />
     );
   if (
     session.phase === 'authenticated' &&
@@ -147,7 +155,9 @@ export default function AccessApp({
     return (
       <Status
         title="正在确认账号入口"
-        detail={phoneConfiguration.error ? '登录方式暂不可读取，请重新连接。' : '请稍候…'}
+        detail={
+          phoneConfiguration.error ? `登录方式暂时读取失败：${message(phoneConfiguration.error)}` : '请稍候…'
+        }
         retry={phoneConfiguration.error ? () => setPhoneAttempt((n) => n + 1) : undefined}
       />
     );

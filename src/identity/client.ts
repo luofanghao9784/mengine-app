@@ -7,10 +7,32 @@ import type {
   AcceptInvitation,
 } from '../../contracts/public-api/identity.ts';
 
+/** 请求没有拿到明确结果时的具体原因：只影响给用户看的说明，不改变错误码。 */
+export type FailureReason = 'offline' | 'timeout' | 'network';
+/** 没有专门说明的通用错误码：按断网、超时、服务器状态等具体情况说清楚，并告诉用户下一步怎么做。 */
+function genericMessage(code: string, status: number, reason?: FailureReason) {
+  if (code === 'CANCELLED') return '请求已取消。';
+  if (code === 'UNCERTAIN_RESULT')
+    return reason === 'offline'
+      ? '网络在提交过程中断开，操作可能已经生效。请恢复网络后刷新页面确认结果，再决定是否重试。'
+      : '已提交，但没有收到服务器的回复，操作可能已经生效。请刷新页面确认结果，再决定是否重试。';
+  if (code === 'CONTRACT_MISMATCH')
+    return '服务器返回的内容与当前页面版本不一致，请刷新页面后重试；仍有问题请联系管理员。';
+  if (reason === 'offline') return '网络已断开，请检查网络连接后重试。';
+  if (reason === 'timeout') return '服务器响应超时，请稍后重试。';
+  if (reason === 'network')
+    return '无法连接到服务器。请检查网络；如果网络正常，服务可能正在维护，请稍后再试。';
+  if (status === 429) return '操作太频繁，请稍等一会儿再试。';
+  if (status === 502 || status === 503 || status === 504)
+    return '服务暂时不可用（可能正在维护或重启），请稍后再试。';
+  if (status >= 500) return '服务器处理时出错，请稍后重试；持续出现请联系管理员。';
+  return '请求未完成，请稍后重试。';
+}
 export class IdentityError extends Error {
   readonly code: string;
   readonly status: number;
-  constructor(code: string, status = 0) {
+  readonly reason?: FailureReason;
+  constructor(code: string, status = 0, reason?: FailureReason) {
     const messages: Record<string, string> = {
       SCENE_TENANT_NOT_BOUND: '该企业尚未绑定数据来源，请先完成企业接入配置。',
       SCENE_NOT_CONFIGURED: '企业数据接口尚未配置，请联系部署维护人员。',
@@ -50,7 +72,8 @@ export class IdentityError extends Error {
       PLATFORM_INVITE_CREDENTIALS: '请使用受邀平台账号的密码，客户账号密码不能用于总台。',
       INVITATION_CONTEXT_LOST: '邀请上下文已失效，请重新打开原邀请链接。',
       LEGACY_INVITATION: '这是旧邮箱邀请，请联系管理员重新发送手机号邀请。',
-      INVALID_CREDENTIALS: '账号或密码不正确，或账号已停用。',
+      INVALID_CREDENTIALS: '账号或密码不正确，或账号已停用。忘记密码可点“忘记密码”重新设置；账号停用请联系企业管理员。',
+      INVITATION_NOT_FOUND: '这份邀请不存在或已被撤销，请联系企业管理员重新发送邀请。',
       DEPARTURE_BUSINESS_STOPPED: '企业退出或成员离职已生效，当前不能开展新业务。',
       DEPARTURE_PRIVATE_ACCESS_STOPPED: '当前已进入退出或离职流程，私人会话、文稿和偏好已停止读取。',
       DEPARTURE_MEMBER_DISABLED: '正式离职已生效，当前企业内容已停止访问。',
@@ -177,15 +200,12 @@ export class IdentityError extends Error {
       PROFILE_VERSION_CONFLICT: '档案已有新版本，请保留草稿，关闭编辑并刷新后核对。',
       PROFILE_VERSION_NOT_FOUND: '此档案版本不存在或无法访问。',
       STATE_CONFLICT: '当前状态已发生变化，请刷新确认。',
-      CONTRACT_MISMATCH: '服务返回的信息暂时无法读取，请稍后重试。',
-      UNAVAILABLE: '暂时无法连接服务，请稍后重试。',
-      UNCERTAIN_RESULT: '连接中断，操作结果尚未确认。请刷新确认后再试。',
-      CANCELLED: '请求已取消。',
     };
-    super(messages[code] || '请求未完成，请稍后重试。');
+    super(messages[code] || genericMessage(code, status, reason));
     this.name = 'IdentityError';
     this.code = code;
     this.status = status;
+    this.reason = reason;
   }
 }
 export const record = (v: unknown): v is Record<string, unknown> =>
@@ -258,7 +278,11 @@ export function createIdentityRequest(fetcher: typeof fetch = fetch, timeoutMs =
     const cancel = () => controller.abort();
     if (signal?.aborted) cancel();
     else signal?.addEventListener('abort', cancel, { once: true });
-    const timer = setTimeout(cancel, timeoutMs);
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      cancel();
+    }, timeoutMs);
     let sent = false;
     try {
       const headers: Record<string, string> = { Accept: 'application/json' };
@@ -304,7 +328,12 @@ export function createIdentityRequest(fetcher: typeof fetch = fetch, timeoutMs =
     } catch (error) {
       if (signal?.aborted) throw new IdentityError('CANCELLED');
       if (error instanceof IdentityError) throw error;
-      throw new IdentityError(method !== 'GET' && sent ? 'UNCERTAIN_RESULT' : 'UNAVAILABLE');
+      const reason: FailureReason = timedOut
+        ? 'timeout'
+        : typeof navigator !== 'undefined' && navigator.onLine === false
+          ? 'offline'
+          : 'network';
+      throw new IdentityError(method !== 'GET' && sent ? 'UNCERTAIN_RESULT' : 'UNAVAILABLE', 0, reason);
     } finally {
       clearTimeout(timer);
       signal?.removeEventListener('abort', cancel);
