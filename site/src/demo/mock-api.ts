@@ -481,6 +481,9 @@ function answer(method: string, url: URL): unknown {
           { id: ops, name: P.space, kind: 'SHARED' },
         ],
       };
+    else if (path.endsWith('/library-access/status')) json = { enabled: false };
+    else if (path.endsWith('/native-conversations/availability')) json = { enabled: false };
+    else if (path.endsWith('/conversations/presentation-capability')) json = { available: false };
     else if (path.endsWith('/auth/csrf')) json = { headerName: 'X-CSRF-TOKEN', token: 'synthetic-csrf' };
     else if (briefDoc) json = documents[briefDoc];
     else if (path.endsWith('/library')) {

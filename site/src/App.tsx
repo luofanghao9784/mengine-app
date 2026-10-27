@@ -280,7 +280,7 @@ export function App() {
           <a href="#service">落地服务</a>
           <a href="#about">关于我们</a>
         </div>
-        <a className="btn solid" href="./login/index.html">登录</a>
+        <a className="btn solid" href="/workspace/">登录</a>
       </nav>
 
       {/* 引擎只出现这一次：它固定在屏幕上，往下滚只换文字，镜头跟着推近 */}
@@ -495,7 +495,7 @@ export function App() {
             <p>从一份资料、一个问题、一项真实任务开始。</p>
             <a className="btn gold big" href="#top">回到开头</a>
           </div>
-          <p className="legal">© 2026 贵州岚云智能科技有限公司 · Mengine 梦核引擎 · Mengine Workspace 梦擎工作空间<span>联系电话：18586861020 · 暂未备案，仅供内部测试</span></p>
+          <p className="legal">© 2026 贵州岚云智能科技有限公司 · Mengine 梦核引擎 · Mengine Workspace 梦擎工作空间<span>联系电话：18586861020 · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">黔ICP备2026020129号-1</a></span></p>
         </footer>
       </div>
     </>

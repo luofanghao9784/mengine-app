@@ -11,7 +11,7 @@ try{
  await page.evaluate(()=>{sessionStorage.setItem('dreamcore:document:real-synthetic-user:tenant:draft','must-survive');localStorage.setItem('dreamcore:synthetic-guard','must-survive');});
  await page.goto(base+'/demo/index.html',{waitUntil:'networkidle'});
  await page.locator('button.live-briefing-body').first().waitFor();
- assert.equal(await page.locator('button.live-briefing-body').count(),5);
+ assert.equal(await page.locator('button.live-briefing-body').count(),8);
  assert.deepEqual(await page.evaluate(()=>window.__unmocked||[]),[]);
  await page.goto(base+'/',{waitUntil:'networkidle'});
  assert.equal(await page.evaluate(()=>sessionStorage.getItem('dreamcore:document:real-synthetic-user:tenant:draft')),'must-survive');
@@ -35,5 +35,5 @@ try{
   await page.getByRole('button',{name:'登录',exact:true}).waitFor();
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false);
  }
- console.log(JSON.stringify({status:'SITE_SMOKE_VERIFIED',demoCards:5,homeFrames:count,storagePreserved:true,missingMocks:0,apiRequests:0,externalRequests:0,loginWidths:[1440,390]}));
+ console.log(JSON.stringify({status:'SITE_SMOKE_VERIFIED',demoCards:8,homeFrames:count,storagePreserved:true,missingMocks:0,apiRequests:0,externalRequests:0,loginWidths:[1440,390]}));
 }finally{await browser.close();}
