@@ -3,9 +3,12 @@ import type {
   NativeAvailability,
   NativeConversation,
   NativeConversationGrant,
+  NativeConversationHistory,
+  NativeOperationReceipt,
   NativePublication,
 } from '../../contracts/public-api/native-conversations';
 import { createIdentityRequest, record, text, uuid } from '../identity/client.ts';
+import { supportPath } from '../identity/support-request.ts';
 
 const isAvailability = (v: unknown): v is NativeAvailability => record(v) && typeof v.enabled === 'boolean';
 const isSession = (v: unknown): v is NativeConversation =>
@@ -26,8 +29,20 @@ const isArtifacts = (v: unknown): v is NativeArtifact[] =>
 const isPublication = (v: unknown): v is NativePublication =>
   record(v) && uuid(v.materialId) && uuid(v.workspaceId) && uuid(v.artifactId);
 
+const isHistory = (v: unknown): v is NativeConversationHistory =>
+  record(v) && Array.isArray(v.items) && typeof v.hasMore === 'boolean';
+const isReceipt = (v: unknown): v is NativeOperationReceipt => record(v) && v.accepted === true;
+const isRatings = (v: unknown): v is { messageKey: string; value: 'up' | 'down' }[] =>
+  Array.isArray(v) &&
+  v.every((r) => record(r) && text(r.messageKey) && (r.value === 'up' || r.value === 'down'));
+const isRating = (v: unknown): v is { messageKey: string; value: string } => record(v) && text(v.messageKey);
+
 /** Native 0.2.1 sessions: private, rechecked on every call; the runtime never decides enterprise access. */
-export function createNativeConversationClient(request = createIdentityRequest()) {
+export function createNativeConversationClient(
+  request = createIdentityRequest(),
+  // Commands may wait for the runtime to start (the platform allows 60 s), so they get longer.
+  command = createIdentityRequest(fetch, 75_000),
+) {
   const base = (tenant: string) => `/api/v1/tenants/${encodeURIComponent(tenant)}/native-conversations`;
   const session = (tenant: string, id: string) => `${base(tenant)}/${encodeURIComponent(id)}`;
   return {
@@ -54,6 +69,49 @@ export function createNativeConversationClient(request = createIdentityRequest()
       request(`${session(tenant, id)}/artifacts`, 'GET', isArtifacts, undefined, signal),
     artifactHref: (tenant: string, id: string, artifact: string) =>
       `${session(tenant, id)}/artifacts/${encodeURIComponent(artifact)}`,
+    // Appendix C (B1–B3). Every write carries a requestId that the caller keeps for a retry of the
+    // same operation: the server replays the first receipt and never re-dispatches an unknown outcome.
+    history: (tenant: string, id: string, after: number, signal?: AbortSignal) =>
+      request(`${session(tenant, id)}/history?after=${after}&limit=500`, 'GET', isHistory, undefined, signal),
+    eventsHref: (tenant: string, id: string, after: number) =>
+      supportPath(`${session(tenant, id)}/events?after=${after}`),
+    send: (tenant: string, id: string, requestId: string, text: string) =>
+      command(`${session(tenant, id)}/messages`, 'POST', isReceipt, { requestId, text, materials: [] }),
+    stopTurn: (tenant: string, id: string, requestId: string) =>
+      command(`${session(tenant, id)}/turn/stop`, 'POST', isReceipt, { requestId }),
+    answer: (
+      tenant: string,
+      id: string,
+      callId: string,
+      requestId: string,
+      answers: { id: string; selected: string[]; custom?: string }[],
+    ) =>
+      command(`${session(tenant, id)}/questions/${encodeURIComponent(callId)}/answer`, 'POST', isReceipt, {
+        requestId,
+        answers,
+      }),
+    decide: (tenant: string, id: string, approvalId: string, requestId: string, allow: boolean) =>
+      command(`${session(tenant, id)}/approvals/${encodeURIComponent(approvalId)}`, 'POST', isReceipt, {
+        requestId,
+        decision: allow ? 'ALLOW_ONCE' : 'REJECT',
+      }),
+    reviewPlan: (
+      tenant: string,
+      id: string,
+      callId: string,
+      requestId: string,
+      approve: boolean,
+      comment?: string,
+    ) =>
+      command(`${session(tenant, id)}/plans/${encodeURIComponent(callId)}/review`, 'POST', isReceipt, {
+        requestId,
+        decision: approve ? 'APPROVE' : 'REVISE',
+        ...(comment ? { comment } : {}),
+      }),
+    rate: (tenant: string, id: string, requestId: string, messageKey: string, value: 'up' | 'down') =>
+      request(`${session(tenant, id)}/feedback`, 'POST', isRating, { requestId, messageKey, value }),
+    ratings: (tenant: string, id: string, signal?: AbortSignal) =>
+      request(`${session(tenant, id)}/feedback`, 'GET', isRatings, undefined, signal),
     /** `acknowledged` is the employee's own confirmation; the server rejects publication without it. */
     publish: (
       tenant: string,

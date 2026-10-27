@@ -94,7 +94,7 @@ export function NativeConversationView({
   };
   const isNew = id === 'new';
   // 平台接通事件转发（B1）后，会话直接在这张卡片里进行；在此之前保持“执行与成果”的现有布局。
-  const feed = useNativeFeed(tenant, id);
+  const feed = useNativeFeed(tenant, id, { enabled: !isNew, active: session?.state === 'ACTIVE' });
   const transcript = useMemo(() => (feed ? buildTranscript(feed.events) : null), [feed]);
   const work = useMemo(() => (feed ? buildWorkState(feed.events) : null), [feed]);
   useEffect(() => {
@@ -210,6 +210,16 @@ export function NativeConversationView({
               actions={feed.actions}
               summary={work ? workSummary(work) : ''}
               skills={feed.skills}
+              ratings={feed.ratings}
+              loading={feed.loading}
+              notice={feed.notice}
+              unavailable={
+                feed.preview
+                  ? '预览中不可用'
+                  : session?.state === 'ACTIVE'
+                    ? '当前不可操作'
+                    : '会话已停止，在“执行与成果”里恢复后可继续'
+              }
             />
           </>
         ) : (

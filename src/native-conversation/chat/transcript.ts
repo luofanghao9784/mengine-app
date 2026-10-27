@@ -19,7 +19,15 @@ export type ToolItem = {
   error?: string;
 };
 export type Item =
-  | { kind: 'assistant'; key: string; text: string; reasoning: string; interrupted: boolean }
+  | {
+      kind: 'assistant';
+      key: string;
+      /** Platform seq of the `assistant/message`, as the feedback endpoint expects (appendix C). */
+      feedbackKey: string;
+      text: string;
+      reasoning: string;
+      interrupted: boolean;
+    }
   | ToolItem
   | {
       kind: 'approval';
@@ -29,14 +37,23 @@ export type Item =
       reason?: string;
       outcome?: ApprovalOutcome;
     }
-  | { kind: 'question'; callId: string; questions: QuestionItem[]; answered: boolean; answer: string }
+  | {
+      kind: 'question';
+      callId: string;
+      questions: QuestionItem[];
+      answered: boolean;
+      answer: string;
+      /** The wait ended without an answer. Timed-out questions still accept a late answer. */
+      closed?: 'timed-out' | 'cancelled';
+      deadline?: number;
+    }
   | { kind: 'deliverables'; callId: string; files: PresentedFile[] };
 export type Turn = {
   turn: number;
   startedAt: number;
   endedAt?: number;
   end?: TurnEndReason;
-  prompts: { id: string; text: string; attachments: number }[];
+  prompts: { id: string; text: string; attachments: number; references: number }[];
   items: Item[];
 };
 export type Transcript = {
@@ -73,6 +90,18 @@ const parseQuestions = (args: string): QuestionItem[] => {
   } catch {
     return [];
   }
+};
+
+/** The platform appends referenced materials to the prompt for the runtime; the employee did not type it. */
+const REFERENCE_MARK = '\n\n用户引用的企业资料（';
+const splitReferences = (text: string) => {
+  const at = text.indexOf(REFERENCE_MARK);
+  if (at < 0) return { text, references: 0 };
+  const references = text
+    .slice(at)
+    .split('\n')
+    .filter((line) => line.startsWith('{')).length;
+  return { text: text.slice(0, at), references };
 };
 
 /**
@@ -118,11 +147,21 @@ export function buildTranscript(events: readonly NativeEvent[]): Transcript {
         break;
       case 'user/message': {
         const source = record(data.source) ? data.source : {};
-        if (source.kind !== 'user') break; // injected context, skills, question replies: not typed by the employee
+        if (source.kind === 'user-question-reply') {
+          // A late answer to a timed-out question arrives as its own message.
+          const question = questions.get(str(source.callId));
+          if (question) {
+            question.answered = true;
+            question.closed = undefined;
+            question.answer = textOf(blocks(data), 'text');
+          }
+          break;
+        }
+        if (source.kind !== 'user') break; // injected context and skills: not typed by the employee
         const content = blocks(data);
         current(event.time).prompts.push({
-          id: str(data.id),
-          text: textOf(content, 'text'),
+          id: str(data.id) || `seq:${event.seq}`,
+          ...splitReferences(textOf(content, 'text')),
           attachments: content.filter((b) => b.type === 'image' || b.type === 'file').length,
         });
         break;
@@ -135,6 +174,7 @@ export function buildTranscript(events: readonly NativeEvent[]): Transcript {
           current(event.time).items.push({
             kind: 'assistant',
             key: `${data.turn}:${data.step}:${event.seq}`,
+            feedbackKey: String(event.seq),
             text,
             reasoning,
             interrupted: data.interrupted === true,
@@ -148,6 +188,11 @@ export function buildTranscript(events: readonly NativeEvent[]): Transcript {
         const args = str(data.arguments);
         if (!callId) break;
         if (name === ASK_USER_TOOL) {
+          const prior = questions.get(callId);
+          if (prior) {
+            if (!prior.questions.length) prior.questions = parseQuestions(args);
+            break;
+          }
           const item = {
             kind: 'question' as const,
             callId,
@@ -180,8 +225,11 @@ export function buildTranscript(events: readonly NativeEvent[]): Transcript {
           : '';
         const question = questions.get(callId);
         if (question) {
-          question.answered = true;
-          question.answer = text;
+          // A timed-out wait also ends the tool call; only a real answer marks the question answered.
+          if (!question.closed || text) {
+            question.answered = !failure && !message.isError;
+            question.answer = text;
+          }
           break;
         }
         const tool = tools.get(callId);
@@ -189,6 +237,44 @@ export function buildTranscript(events: readonly NativeEvent[]): Transcript {
         tool.result = text;
         tool.status = failure || message.isError ? 'error' : 'done';
         if (failure) tool.error = failure;
+        break;
+      }
+      // Platform notices for `ask_user_question` (appendix C); the tool call itself may come first or later.
+      case 'question/asked': {
+        const callId = str(data.callId);
+        if (!callId) break;
+        const items = Array.isArray(data.questions)
+          ? data.questions.filter(
+              (q): q is QuestionItem =>
+                record(q) && typeof q.id === 'string' && typeof q.question === 'string',
+            )
+          : [];
+        const prior = questions.get(callId);
+        if (prior) {
+          if (items.length) prior.questions = items;
+          break;
+        }
+        const item = { kind: 'question' as const, callId, questions: items, answered: false, answer: '' };
+        questions.set(callId, item);
+        current(event.time).items.push(item);
+        break;
+      }
+      case 'question/deadline': {
+        const question = questions.get(str(data.callId));
+        const deadline = typeof data.deadline === 'string' ? Date.parse(data.deadline) : NaN;
+        if (question && Number.isFinite(deadline)) question.deadline = deadline;
+        break;
+      }
+      case 'question/closed': {
+        const question = questions.get(str(data.callId));
+        if (!question) break;
+        const outcome = str(data.outcome);
+        if (outcome === 'answered') {
+          question.answered = true;
+          question.closed = undefined;
+        } else if (outcome === 'ASK_TIMED_OUT') question.closed = 'timed-out';
+        else question.closed = 'cancelled';
+        question.deadline = undefined;
         break;
       }
       case 'approval/asked': {
@@ -237,7 +323,8 @@ export function buildTranscript(events: readonly NativeEvent[]): Transcript {
     if (turn.end)
       for (const item of turn.items)
         if (item.kind === 'tool' && item.status === 'running') item.status = 'interrupted';
-  const pendingQuestions = [...questions.values()].filter((q) => !q.answered);
+  // A timed-out question can still be answered late, so it stays pending; a cancelled one does not.
+  const pendingQuestions = [...questions.values()].filter((q) => !q.answered && q.closed !== 'cancelled');
   return {
     title,
     turns,

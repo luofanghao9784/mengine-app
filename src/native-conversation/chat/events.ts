@@ -4,7 +4,16 @@
  * every other type is kept in order but not shown. Shapes follow `@deepseek-ai/dsh-session`,
  * `dsh-llm`, `dsh-user-approval`, `dsh-tool-present` and `dsh-user-questions`.
  */
-export type NativeEvent = { type: string; seq: number; time: number; data: unknown; ignorable?: true };
+export type NativeEvent = {
+  type: string;
+  /** Platform cursor (appendix C): one order across the root, sub-tasks, interactions and status. */
+  seq: number;
+  time: number;
+  data: unknown;
+  /** DH session that produced the event; the root session's id is the conversation id. */
+  sessionId?: string;
+  ignorable?: true;
+};
 
 export type ContentBlock =
   | { type: 'text'; text: string }
@@ -57,5 +66,31 @@ export function isNativeEvent(v: unknown): v is NativeEvent {
     record(v) && typeof v.type === 'string' && integer(v.seq) && typeof v.time === 'number' && 'data' in v
   );
 }
+
+/**
+ * Reads one platform envelope. DH keeps millisecond times, platform notices use ISO strings; both
+ * become milliseconds. Returns null for anything malformed.
+ */
+export function toNativeEvent(v: unknown): NativeEvent | null {
+  if (!record(v) || typeof v.type !== 'string' || !integer(v.seq) || !('data' in v)) return null;
+  const time = typeof v.time === 'number' ? v.time : typeof v.time === 'string' ? Date.parse(v.time) : NaN;
+  if (!Number.isFinite(time)) return null;
+  return {
+    type: v.type,
+    seq: v.seq,
+    time,
+    data: v.data,
+    ...(typeof v.sessionId === 'string' ? { sessionId: v.sessionId } : {}),
+    ...(v.ignorable === true ? { ignorable: true as const } : {}),
+  };
+}
+
+/**
+ * The conversation shows the root session only: sub-task events carry their own session id and
+ * would otherwise mix their turns, to-dos and replies into the employee's conversation. Events
+ * without a session id (sub-task start / finish notices) are platform-level and kept.
+ */
+export const isRootEvent = (event: NativeEvent, rootId: string) =>
+  event.sessionId === undefined || event.sessionId === rootId;
 
 export const ASK_USER_TOOL = 'ask_user_question';

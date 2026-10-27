@@ -70,6 +70,11 @@ export function previewFeed(publish: (feed: NativeFeed) => void) {
             { message: { role: 'tool', toolCallId: callId, content: [{ type: 'text', text }] } },
           ]);
         },
+        async review(callId, approve, comment) {
+          await this.answer?.(callId, [
+            { id: 'plan', selected: approve ? ['按计划执行'] : [], custom: comment },
+          ]);
+        },
         async feedback() {
           /* preview only */
         },

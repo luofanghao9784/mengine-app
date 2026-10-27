@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import {
   ArrowUp,
   Check,
@@ -22,10 +22,24 @@ import { toolLabel, toolSummary } from './tools.ts';
 import { maskSecrets } from './secrets.ts';
 import './native-chat.css';
 
-/** Budget and run state come from the platform (B3); absent fields are simply not shown. */
+/**
+ * Run state and budget from the platform (B3). `stale` means no report in the last 10 seconds: the
+ * last figures are kept for reference but the run state falls back to the log. Absent fields are not shown.
+ */
 export type NativeStatus = {
-  running: boolean;
-  budget?: { usedYuan: number; softYuan: number; hardYuan: number; elapsedMinutes?: number };
+  running?: boolean;
+  stale?: boolean;
+  synthetic?: boolean;
+  budget?: {
+    /** Settled cost. */
+    usedYuan: number;
+    /** In-flight and unknown usage held back conservatively; used + reserved counts against limits. */
+    reservedYuan?: number;
+    softYuan: number;
+    hardYuan: number;
+    elapsedMinutes?: number;
+    blocked?: string | null;
+  };
 };
 
 /**
@@ -37,13 +51,15 @@ export type NativeChatActions = {
   stop?: () => Promise<void>;
   answer?: (callId: string, answers: QuestionAnswer[]) => Promise<void>;
   decide?: (approvalId: string, allow: boolean) => Promise<void>;
+  review?: (callId: string, approve: boolean, comment?: string) => Promise<void>;
   feedback?: (messageKey: string, value: 'up' | 'down') => Promise<void>;
 };
 
 /** A skill the employee can call from the composer by typing `/`. */
 export type NativeSkill = { name: string; description?: string };
 
-const unavailable = '运行环境接通后可用';
+/** Why the controls are disabled; the page supplies it (session stopped, runtime off, preview…). */
+const Unavailable = createContext('当前不可操作');
 const failure = (e: unknown) => (e instanceof Error ? e.message : '操作未完成，请稍后重试。');
 
 export function NativeChat({
@@ -52,6 +68,10 @@ export function NativeChat({
   actions,
   summary = '',
   skills = [],
+  ratings,
+  unavailable = '当前不可操作',
+  loading = false,
+  notice,
 }: {
   transcript: Transcript;
   status?: NativeStatus;
@@ -59,8 +79,15 @@ export function NativeChat({
   /** One-line long-task progress, e.g. "待办 1/3 · 后台 1 个进行中". */
   summary?: string;
   skills?: NativeSkill[];
+  /** Ratings the employee already gave, by feedback key. */
+  ratings?: ReadonlyMap<string, 'up' | 'down'>;
+  unavailable?: string;
+  loading?: boolean;
+  /** Connection or load problem worth telling the reader about; the log shown so far stays. */
+  notice?: string;
 }) {
-  const running = status?.running ?? transcript.running;
+  const running =
+    status && !status.stale && status.running !== undefined ? status.running : transcript.running;
   const scroll = useRef<HTMLDivElement>(null);
   useEffect(() => {
     // Follow new content only when the reader is already near the end.
@@ -68,33 +95,46 @@ export function NativeChat({
     if (el && el.scrollHeight - el.scrollTop - el.clientHeight < 160) el.scrollTop = el.scrollHeight;
   }, [transcript.lastSeq]);
   return (
-    <div
-      className="native-chat"
-      onKeyDown={(e) => {
-        // Esc stops the current round, like the official window; it never closes the page.
-        if (e.key === 'Escape' && running && actions.stop && !e.defaultPrevented) {
-          e.preventDefault();
-          void actions.stop().catch(() => undefined);
-        }
-      }}
-    >
-      <NativeStatusBar
-        running={running}
-        status={status}
-        maintenance={transcript.maintenance}
-        pending={transcript.pending}
-        summary={summary}
-      />
-      <div className="native-chat-scroll conversation-messages" ref={scroll} aria-live="polite">
-        {!transcript.turns.length && (
-          <p className="native-empty">在下面输入你想处理的工作，原生会话会在这里展开。</p>
+    <Unavailable.Provider value={unavailable}>
+      <div
+        className="native-chat"
+        onKeyDown={(e) => {
+          // Esc stops the current round, like the official window; it never closes the page.
+          if (e.key === 'Escape' && running && actions.stop && !e.defaultPrevented) {
+            e.preventDefault();
+            void actions.stop().catch(() => undefined);
+          }
+        }}
+      >
+        <NativeStatusBar
+          running={running}
+          status={status}
+          maintenance={transcript.maintenance}
+          pending={transcript.pending}
+          summary={summary}
+        />
+        {notice && (
+          <p className="native-notice" role="status">
+            {notice}
+          </p>
         )}
-        {transcript.turns.map((turn, index) => (
-          <NativeTurn key={`${turn.turn}:${index}`} turn={turn} actions={actions} />
-        ))}
+        <div className="native-chat-scroll conversation-messages" ref={scroll} aria-live="polite">
+          {loading ? (
+            <p className="native-empty" role="status">
+              <Loader2 size={14} className="native-spin" aria-hidden="true" /> 正在载入会话记录…
+            </p>
+          ) : (
+            !transcript.turns.length && (
+              <p className="native-empty">在下面输入你想处理的工作，原生会话会在这里展开。</p>
+            )
+          )}
+          {transcript.turns.map((turn, index) => (
+            <NativeTurn key={`${turn.turn}:${index}`} turn={turn} actions={actions} ratings={ratings} />
+          ))}
+        </div>
+        <NativeComposer running={running} actions={actions} skills={skills} />
       </div>
-      <NativeComposer running={running} actions={actions} skills={skills} />
-    </div>
+    </Unavailable.Provider>
   );
 }
 
@@ -113,10 +153,11 @@ function NativeStatusBar({
 }) {
   const waiting = pending.approvals + pending.questions;
   const budget = status?.budget;
+  const occupied = budget ? budget.usedYuan + (budget.reservedYuan ?? 0) : 0;
   const level = budget
-    ? budget.usedYuan >= budget.hardYuan
+    ? budget.blocked || occupied >= budget.hardYuan
       ? 'hard'
-      : budget.usedYuan >= budget.softYuan
+      : occupied >= budget.softYuan
         ? 'soft'
         : 'ok'
     : null;
@@ -147,16 +188,33 @@ function NativeStatusBar({
         </span>
       )}
       {budget && (
-        <span className={`native-budget is-${level}`} title="本任务已用费用；软阈值提醒，硬上限暂停">
-          已用 ¥{budget.usedYuan.toFixed(2)} · 提醒 ¥{budget.softYuan} · 上限 ¥{budget.hardYuan}
-          {budget.elapsedMinutes !== undefined && ` · ${Math.round(budget.elapsedMinutes)} 分钟`}
+        <span
+          className={`native-budget is-${level} ${status?.stale ? 'is-stale' : ''}`}
+          title="已结算费用；“预留”是进行中和用量未确认的部分，两者合计计入提醒与上限"
+        >
+          {status?.stale && '最后记录 · '}
+          已用 ¥{budget.usedYuan.toFixed(2)}
+          {!!budget.reservedYuan && ` · 预留 ¥${budget.reservedYuan.toFixed(2)}`} · 提醒 ¥{budget.softYuan} ·
+          上限 ¥{budget.hardYuan}
+          {budget.elapsedMinutes !== undefined && ` · 本轮 ${Math.round(budget.elapsedMinutes)} 分钟`}
+          {budget.blocked && ' · 已达上限，暂停执行'}
         </span>
       )}
+      {status?.stale && <span className="native-maintenance">运行状态暂未更新</span>}
+      {status?.synthetic && <span className="native-maintenance">测试模型，不产生费用</span>}
     </div>
   );
 }
 
-function NativeTurn({ turn, actions }: { turn: Turn; actions: NativeChatActions }) {
+function NativeTurn({
+  turn,
+  actions,
+  ratings,
+}: {
+  turn: Turn;
+  actions: NativeChatActions;
+  ratings?: ReadonlyMap<string, 'up' | 'down'>;
+}) {
   const lastAssistant = [...turn.items].reverse().find((i) => i.kind === 'assistant');
   return (
     <article className="conversation-turn native-turn">
@@ -164,6 +222,7 @@ function NativeTurn({ turn, actions }: { turn: Turn; actions: NativeChatActions 
         <p key={p.id} className="conversation-user">
           {maskSecrets(p.text)}
           {p.attachments > 0 && <small className="native-attachments">附件 {p.attachments} 个</small>}
+          {p.references > 0 && <small className="native-attachments">引用资料 {p.references} 份</small>}
         </p>
       ))}
       <div className="conversation-result">
@@ -185,7 +244,12 @@ function NativeTurn({ turn, actions }: { turn: Turn; actions: NativeChatActions 
           </p>
         )}
         {turn.end?.kind === 'completed' && lastAssistant && (
-          <NativeFeedback messageKey={lastAssistant.key} actions={actions} />
+          <NativeFeedback
+            key={lastAssistant.feedbackKey}
+            messageKey={lastAssistant.feedbackKey}
+            initial={ratings?.get(lastAssistant.feedbackKey) ?? null}
+            actions={actions}
+          />
         )}
       </div>
     </article>
@@ -291,6 +355,7 @@ function NativeApprovalCard({
   item: Extract<Item, { kind: 'approval' }>;
   actions: NativeChatActions;
 }) {
+  const unavailable = useContext(Unavailable);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const decided = item.outcome;
@@ -343,7 +408,7 @@ function NativeApprovalCard({
               拒绝
             </Button>
           </div>
-          {!actions.decide && <p className="native-muted">{unavailable}；目前请在官方会话窗口里处理。</p>}
+          {!actions.decide && <p className="native-muted">{unavailable}</p>}
           {error && (
             <p className="native-error" role="alert">
               {error}
@@ -362,6 +427,68 @@ function NativeQuestionCard({
   item: Extract<Item, { kind: 'question' }>;
   actions: NativeChatActions;
 }) {
+  const plan = item.questions.length === 1 && item.questions[0].intent?.kind === 'plan-review';
+  const cancelled = !item.answered && item.closed === 'cancelled';
+  const late = !item.answered && item.closed === 'timed-out';
+  return (
+    <div
+      className={`native-card native-question ${plan ? 'is-plan' : ''} ${item.answered || cancelled ? 'is-settled' : 'is-pending'}`}
+    >
+      <header>
+        {plan ? <ListChecks size={15} aria-hidden="true" /> : <ShieldQuestion size={15} aria-hidden="true" />}
+        {plan
+          ? item.answered
+            ? '计划已审阅'
+            : cancelled
+              ? '计划审阅已取消'
+              : 'AI 拟好了执行计划，等你审阅'
+          : item.answered
+            ? '已回答'
+            : cancelled
+              ? '提问已取消'
+              : 'AI 在等你回答'}
+        {!item.answered && !cancelled && item.deadline && <Countdown deadline={item.deadline} />}
+      </header>
+      {late && (
+        <p className="native-muted">等待已超时，AI 先按自己的判断继续了；现在回答仍会送达，AI 会据此调整。</p>
+      )}
+      {item.answered ? (
+        <p className="native-muted">{item.answer || '已提交。'}</p>
+      ) : cancelled ? (
+        <p className="native-muted">这一轮已结束，这个问题不再需要回答。</p>
+      ) : plan ? (
+        <PlanReview item={item} question={item.questions[0]} actions={actions} />
+      ) : (
+        <QuestionForm item={item} actions={actions} />
+      )}
+    </div>
+  );
+}
+
+/** Remaining time on a timed question; the server decides when it actually times out. */
+function Countdown({ deadline }: { deadline: number }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  const left = Math.max(0, Math.round((deadline - now) / 1000));
+  if (!left) return null;
+  return (
+    <span className="native-countdown">
+      {left >= 60 ? `${Math.floor(left / 60)} 分 ${left % 60} 秒` : `${left} 秒`}内回答
+    </span>
+  );
+}
+
+function QuestionForm({
+  item,
+  actions,
+}: {
+  item: Extract<Item, { kind: 'question' }>;
+  actions: NativeChatActions;
+}) {
+  const unavailable = useContext(Unavailable);
   const [picked, setPicked] = useState<Record<string, string[]>>({});
   const [custom, setCustom] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
@@ -400,86 +527,141 @@ function NativeQuestionCard({
       return { ...p, [q.id]: next };
     });
   const ready = item.questions.every((q) => (picked[q.id]?.length ?? 0) > 0 || custom[q.id]?.trim());
-  const plan = item.questions.some((q) => q.intent?.kind === 'plan-review');
   return (
-    <div
-      className={`native-card native-question ${plan ? 'is-plan' : ''} ${item.answered ? 'is-settled' : 'is-pending'}`}
-    >
-      <header>
-        {plan ? <ListChecks size={15} aria-hidden="true" /> : <ShieldQuestion size={15} aria-hidden="true" />}
-        {plan
-          ? item.answered
-            ? '计划已审阅'
-            : 'AI 拟好了执行计划，等你审阅'
-          : item.answered
-            ? '已回答'
-            : 'AI 在等你回答'}
-      </header>
-      {plan && !item.answered && (
-        <p className="native-muted">选择按计划执行，或写下需要调整的地方；在你确认之前不会开始执行。</p>
-      )}
-      {item.answered ? (
-        <p className="native-muted">{item.answer || '已提交回答。'}</p>
-      ) : (
-        <fieldset disabled={busy || !actions.answer}>
-          {item.questions.map((q) => (
-            <div key={q.id} className="native-question-item">
-              {q.header && <span className="native-question-header">{q.header}</span>}
-              <p>{q.question}</p>
-              {q.detail && <small className="native-muted">{q.detail}</small>}
-              {q.options?.map((o) => (
-                <label key={o.label} className="native-option">
-                  <input
-                    type={q.multiSelect ? 'checkbox' : 'radio'}
-                    name={`${item.callId}:${q.id}`}
-                    checked={(picked[q.id] ?? []).includes(o.label)}
-                    onChange={() => toggle(q, o.label)}
-                  />
-                  <span>
-                    {o.label}
-                    {o.description && <small>{o.description}</small>}
-                  </span>
-                </label>
-              ))}
-              <input
-                className="native-custom"
-                placeholder={q.intent?.kind === 'plan-review' ? '需要调整的地方（可选）' : '其他回答（可选）'}
-                value={custom[q.id] ?? ''}
-                onChange={(e) => setCustom((c) => ({ ...c, [q.id]: e.target.value }))}
-              />
-            </div>
-          ))}
-          <div className="native-actions">
-            <Button
-              variant="primary"
-              disabled={!ready}
-              title={actions.answer ? undefined : unavailable}
-              onClick={() => submit(false)}
-            >
-              {plan ? '提交审阅' : '提交回答'}
-            </Button>
-            {!plan && (
-              <Button variant="ghost" onClick={() => submit(true)}>
-                跳过
-              </Button>
-            )}
+    <>
+      <fieldset disabled={busy || !actions.answer}>
+        {item.questions.map((q) => (
+          <div key={q.id} className="native-question-item">
+            {q.header && <span className="native-question-header">{q.header}</span>}
+            <p>{q.question}</p>
+            {q.detail && <small className="native-muted">{q.detail}</small>}
+            {q.options?.map((o) => (
+              <label key={o.label} className="native-option">
+                <input
+                  type={q.multiSelect ? 'checkbox' : 'radio'}
+                  name={`${item.callId}:${q.id}`}
+                  checked={(picked[q.id] ?? []).includes(o.label)}
+                  onChange={() => toggle(q, o.label)}
+                />
+                <span>
+                  {o.label}
+                  {o.description && <small>{o.description}</small>}
+                </span>
+              </label>
+            ))}
+            <input
+              className="native-custom"
+              placeholder="其他回答（可选）"
+              value={custom[q.id] ?? ''}
+              onChange={(e) => setCustom((c) => ({ ...c, [q.id]: e.target.value }))}
+            />
           </div>
-        </fieldset>
-      )}
-      {!item.answered && !actions.answer && (
-        <p className="native-muted">{unavailable}；目前请在官方会话窗口里回答。</p>
-      )}
+        ))}
+        <div className="native-actions">
+          <Button
+            variant="primary"
+            disabled={!ready}
+            title={actions.answer ? undefined : unavailable}
+            onClick={() => submit(false)}
+          >
+            提交回答
+          </Button>
+          <Button variant="ghost" onClick={() => submit(true)}>
+            跳过
+          </Button>
+        </div>
+      </fieldset>
+      {!actions.answer && <p className="native-muted">{unavailable}</p>}
       {error && (
         <p className="native-error" role="alert">
           {error}
         </p>
       )}
-    </div>
+    </>
   );
 }
 
-function NativeFeedback({ messageKey, actions }: { messageKey: string; actions: NativeChatActions }) {
-  const [sent, setSent] = useState<'up' | 'down' | null>(null);
+/**
+ * Plan review goes through its own endpoint so approval is the runtime's named approve option,
+ * never an ordinary message (appendix C). Revising needs a note on what to change.
+ */
+function PlanReview({
+  item,
+  question,
+  actions,
+}: {
+  item: Extract<Item, { kind: 'question' }>;
+  question: QuestionItem;
+  actions: NativeChatActions;
+}) {
+  const unavailable = useContext(Unavailable);
+  const [comment, setComment] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const review = async (approve: boolean) => {
+    if (!actions.review) return;
+    setBusy(true);
+    setError('');
+    try {
+      await actions.review(item.callId, approve, approve ? undefined : comment.trim());
+    } catch (e) {
+      setError(failure(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <>
+      <p className="native-muted">在你确认之前不会开始执行。</p>
+      <fieldset disabled={busy || !actions.review}>
+        <div className="native-question-item">
+          {question.header && <span className="native-question-header">{question.header}</span>}
+          <ReplyText text={question.question} />
+          {question.detail && <small className="native-muted">{question.detail}</small>}
+          <textarea
+            className="native-custom"
+            rows={2}
+            maxLength={10000}
+            aria-label="需要调整的地方"
+            placeholder="需要调整的地方（退回修改时填写）"
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+          />
+        </div>
+        <div className="native-actions">
+          <Button
+            variant="primary"
+            title={actions.review ? undefined : unavailable}
+            onClick={() => review(true)}
+          >
+            {question.intent?.approve || '按计划执行'}
+          </Button>
+          <Button variant="ghost" disabled={!comment.trim()} onClick={() => review(false)}>
+            退回修改
+          </Button>
+        </div>
+      </fieldset>
+      {!actions.review && <p className="native-muted">{unavailable}</p>}
+      {error && (
+        <p className="native-error" role="alert">
+          {error}
+        </p>
+      )}
+    </>
+  );
+}
+
+function NativeFeedback({
+  messageKey,
+  initial,
+  actions,
+}: {
+  messageKey: string;
+  initial: 'up' | 'down' | null;
+  actions: NativeChatActions;
+}) {
+  const [sent, setSent] = useState<'up' | 'down' | null>(initial);
+  useEffect(() => setSent(initial), [initial]);
   if (!actions.feedback) return null;
   const send = async (value: 'up' | 'down') => {
     try {
@@ -510,6 +692,7 @@ function NativeComposer({
   actions: NativeChatActions;
   skills: NativeSkill[];
 }) {
+  const unavailable = useContext(Unavailable);
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -596,7 +779,7 @@ function NativeComposer({
               ? skills.length
                 ? '告诉我你想处理的工作，输入 / 调用技能'
                 : '告诉我你想处理的工作'
-              : `${unavailable}；目前请在官方会话窗口里发送`
+              : unavailable
           }
           onChange={(e) => {
             setText(e.target.value);

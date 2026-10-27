@@ -151,7 +151,10 @@ export function syntheticNativeEvents(start = Date.UTC(2026, 9, 27, 1, 0, 0)): N
 }
 
 /** Synthetic long-task progress (batch two): goal, to-dos, background job, sub-task, workflow, plan review. */
-export function syntheticWorkEvents(afterSeq: number, start = Date.UTC(2026, 9, 27, 1, 10, 0)): NativeEvent[] {
+export function syntheticWorkEvents(
+  afterSeq: number,
+  start = Date.UTC(2026, 9, 27, 1, 10, 0),
+): NativeEvent[] {
   let seq = afterSeq;
   const e = (type: string, minutes: number, data: unknown): NativeEvent => ({
     type,
@@ -174,7 +177,13 @@ export function syntheticWorkEvents(afterSeq: number, start = Date.UTC(2026, 9, 
         { content: '整理给店长的最终说明', status: 'pending' },
       ],
     }),
-    e('job/registered', 1, { jobId: 'job-1', owner: 's1', kind: 'bash', label: '汇总十月收款明细表', startedAt: start + 60_000 }),
+    e('job/registered', 1, {
+      jobId: 'job-1',
+      owner: 's1',
+      kind: 'bash',
+      label: '汇总十月收款明细表',
+      startedAt: start + 60_000,
+    }),
     e('job/settled', 3, {
       jobId: 'job-1',
       owner: 's1',
@@ -186,8 +195,20 @@ export function syntheticWorkEvents(afterSeq: number, start = Date.UTC(2026, 9, 
       cause: 'exit',
       producerReported: true,
     }),
-    e('job/registered', 4, { jobId: 'job-2', owner: 's1', kind: 'bash', label: '比对财务确认台账', startedAt: start + 240_000 }),
-    e('subagent/catalog', 4, { childId: 'child-1', childCreatedAt: start + 240_000, version: 1, mode: 'continuable', label: '凭证核对助手' }),
+    e('job/registered', 4, {
+      jobId: 'job-2',
+      owner: 's1',
+      kind: 'bash',
+      label: '比对财务确认台账',
+      startedAt: start + 240_000,
+    }),
+    e('subagent/catalog', 4, {
+      childId: 'child-1',
+      childCreatedAt: start + 240_000,
+      version: 1,
+      mode: 'continuable',
+      label: '凭证核对助手',
+    }),
     e('tool-workflow/run-start', 5, { runId: 'wf-1', name: '五店收款对账' }),
     e('tool-workflow/agent-start', 5, { runId: 'wf-1', seq: 1, label: '梵华里店', phase: '对账' }),
     e('tool-workflow/agent-end', 6, { runId: 'wf-1', seq: 1, outcome: 'completed' }),
@@ -203,7 +224,8 @@ export function syntheticWorkEvents(afterSeq: number, start = Date.UTC(2026, 9, 
           {
             id: 'plan',
             header: '计划审阅',
-            question: '计划：1. 先补齐缺失凭证；2. 再请财务复核 3 笔待确认收款；3. 最后更新给店长的说明。是否按此执行？',
+            question:
+              '计划：1. 先补齐缺失凭证；2. 再请财务复核 3 笔待确认收款；3. 最后更新给店长的说明。是否按此执行？',
             options: [{ label: '按计划执行' }, { label: '需要修改' }],
             intent: { kind: 'plan-review', approve: '按计划执行', callId: 'plan-1' },
           },
