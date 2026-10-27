@@ -13,6 +13,7 @@ export const tenantPages = [
   'proposals',
   'catalog',
   'governance',
+  'abilities',
 ] as const;
 export const platformPages = [
   'overview',

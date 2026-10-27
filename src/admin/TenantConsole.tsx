@@ -3,6 +3,7 @@ import { MaterialGovernance } from '../material/MaterialGovernance';
 import { GovernanceProposals } from '../material/GovernanceProposals';
 import { WikiSources } from './WikiSources';
 import { TenantAudit } from '../tenant/TenantAudit';
+import { NativePluginsAdmin } from '../native-conversation/NativePluginsAdmin';
 import { SurfaceLinks } from '../identity/SurfaceAccess';
 import { NewsSources } from '../news/NewsSources';
 import { ExpressionPreferencesPanel } from '../preferences/ExpressionPreferencesPanel';
@@ -164,6 +165,8 @@ export function TenantConsole({
         <GovernanceProposals tenant={tenant} />
       ) : page === 'wiki' ? (
         <WikiSources key={tenant} tenant={tenant} />
+      ) : page === 'abilities' ? (
+        <NativePluginsAdmin key={tenant} tenant={tenant} />
       ) : page === 'audit' ? (
         <TenantAudit key={tenant} tenant={tenant} />
       ) : page === 'overview' ? (

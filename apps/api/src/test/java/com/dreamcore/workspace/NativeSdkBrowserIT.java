@@ -24,6 +24,8 @@ class NativeSdkBrowserIT extends NativeConversationIntegrationTest {
 
  @Test void fullBrowserAcceptance()throws Exception{
   db.update("UPDATE accounts SET username='sdkbrowser',password_hash=? WHERE id=?",passwords.encode("Synthetic-browser-12345"),owner);
+  boolean adminUi="true".equals(System.getenv("NATIVE_ADMIN_UI"));
+  if(adminUi)db.update("UPDATE tenant_memberships SET role='TENANT_ADMIN' WHERE tenant_id=? AND account_id=?",tenant,owner);
   var refs=new ArrayList<Map<String,Object>>();
   for(int i=1;i<=2;i++){
    UUID sourceSpace=i==2?target:space;
@@ -45,8 +47,11 @@ class NativeSdkBrowserIT extends NativeConversationIntegrationTest {
   builder.redirectErrorStream(true).redirectOutput(dir.resolve("host.log").toFile());var host=builder.start();
   try{
    Thread.sleep(1000);assertTrue(host.isAlive());
-   var browser=new ProcessBuilder("node",root.resolve("scripts/review/native-sdk-browser.mjs").toString()).directory(root.toFile()).redirectErrorStream(true).redirectOutput(dir.resolve("browser.log").toFile()).start();
-   try { assertTrue(browser.waitFor(12,java.util.concurrent.TimeUnit.MINUTES));assertEquals(0,browser.exitValue(),Files.readString(dir.resolve("browser.log"))); } finally {browser.destroyForcibly();}
+   var polling=java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
+   if(adminUi)polling.scheduleWithFixedDelay(()->new com.dreamcore.workspace.conversation.NativeScheduleWorker(schedules).tick(),0,500,java.util.concurrent.TimeUnit.MILLISECONDS);
+   var browser=new ProcessBuilder("node",root.resolve(adminUi?"scripts/review/native-schedule-plugins-browser.mjs":"scripts/review/native-sdk-browser.mjs").toString()).directory(root.toFile()).redirectErrorStream(true).redirectOutput(dir.resolve("browser.log").toFile()).start();
+   try { assertTrue(browser.waitFor(12,java.util.concurrent.TimeUnit.MINUTES));assertEquals(0,browser.exitValue(),Files.readString(dir.resolve("browser.log"))); } finally {browser.destroyForcibly();polling.shutdownNow();}
+   if(adminUi){assertTrue(db.queryForObject("SELECT count(*) FROM native_schedule_runs r JOIN native_conversations s ON s.id=r.session_id WHERE s.tenant_id=? AND r.state='SUCCEEDED'",Integer.class,tenant)>0);return;}
    assertTrue(db.queryForObject("SELECT count(*) FROM native_conversation_publications WHERE session_id IN (SELECT id FROM native_conversations WHERE tenant_id=?)",Integer.class,tenant)>0);
    // B4/B5/B7: real platform wakeup -> isolated SDK, private file/image, slash skill, terminal receipt and reclaim.
    db.update("UPDATE tenant_memberships SET role='TENANT_ADMIN' WHERE tenant_id=? AND account_id=?",tenant,owner);

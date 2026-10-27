@@ -39,7 +39,7 @@ export type CompanionCard = {
   title: string;
   label: string;
   /** Type label on the card header; defaults by kind. */
-  tag?: '资料' | '画报' | '进展' | '成果';
+  tag?: '资料' | '画报' | '进展' | '成果' | '定时';
   /** Icon on the phone card switcher; defaults by kind. */
   icon?: LucideIcon;
   content: ReactNode;

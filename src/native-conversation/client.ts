@@ -5,7 +5,11 @@ import type {
   NativeConversationGrant,
   NativeConversationHistory,
   NativeOperationReceipt,
+  NativePluginPolicy,
   NativePublication,
+  NativeSchedule,
+  NativeScheduleConfig,
+  NativeScheduleRun,
 } from '../../contracts/public-api/native-conversations';
 import { createIdentityRequest, record, text, uuid } from '../identity/client.ts';
 import { supportPath } from '../identity/support-request.ts';
@@ -36,6 +40,21 @@ const isRatings = (v: unknown): v is { messageKey: string; value: 'up' | 'down' 
   Array.isArray(v) &&
   v.every((r) => record(r) && text(r.messageKey) && (r.value === 'up' || r.value === 'down'));
 const isRating = (v: unknown): v is { messageKey: string; value: string } => record(v) && text(v.messageKey);
+
+const isSchedule = (v: unknown): v is NativeSchedule =>
+  record(v) && uuid(v.id) && typeof v.state === 'string' && record(v.configuration);
+const isSchedules = (v: unknown): v is NativeSchedule[] => Array.isArray(v) && v.every(isSchedule);
+const isRuns = (v: unknown): v is NativeScheduleRun[] =>
+  Array.isArray(v) && v.every((x) => record(x) && uuid(x.id) && typeof x.state === 'string');
+/** The audited preinstalled modules and this enterprise's switches (appendix H). */
+export type NativePlugins = {
+  manifest: { preinstalled: { id: string; title: string; required: boolean; defaultEnabled: boolean }[] };
+  policy: NativePluginPolicy;
+};
+const isPolicy = (v: unknown): v is NativePluginPolicy =>
+  record(v) && typeof v.revision === 'number' && record(v.enabled);
+const isPlugins = (v: unknown): v is NativePlugins =>
+  record(v) && record(v.manifest) && Array.isArray(v.manifest.preinstalled) && isPolicy(v.policy);
 
 /** Native 0.2.1 sessions: private, rechecked on every call; the runtime never decides enterprise access. */
 export function createNativeConversationClient(
@@ -117,6 +136,48 @@ export function createNativeConversationClient(
       request(`${session(tenant, id)}/feedback`, 'POST', isRating, { requestId, messageKey, value }),
     ratings: (tenant: string, id: string, signal?: AbortSignal) =>
       request(`${session(tenant, id)}/feedback`, 'GET', isRatings, undefined, signal),
+    // Appendix G (B4): the platform wakes the runtime on schedule; every run is a new private session.
+    schedules: (tenant: string, id: string, signal?: AbortSignal) =>
+      request(`${session(tenant, id)}/schedules`, 'GET', isSchedules, undefined, signal),
+    createSchedule: (tenant: string, id: string, requestId: string, configuration: NativeScheduleConfig) =>
+      request(`${session(tenant, id)}/schedules`, 'POST', isSchedule, { requestId, configuration }),
+    editSchedule: (tenant: string, id: string, schedule: string, configuration: NativeScheduleConfig) =>
+      request(
+        `${session(tenant, id)}/schedules/${encodeURIComponent(schedule)}`,
+        'PUT',
+        isSchedule,
+        configuration,
+      ),
+    setSchedule: (tenant: string, id: string, schedule: string, state: 'ACTIVE' | 'PAUSED' | 'STOPPED') =>
+      request(`${session(tenant, id)}/schedules/${encodeURIComponent(schedule)}`, 'PATCH', isSchedule, {
+        state,
+      }),
+    scheduleRuns: (tenant: string, id: string, schedule: string, signal?: AbortSignal) =>
+      request(
+        `${session(tenant, id)}/schedules/${encodeURIComponent(schedule)}/runs`,
+        'GET',
+        isRuns,
+        undefined,
+        signal,
+      ),
+    migratePlan: (tenant: string, id: string, plan: string) =>
+      request(`${session(tenant, id)}/schedules/migrate/${encodeURIComponent(plan)}`, 'POST', isSchedule),
+    // Appendix H (B6): audited preinstalled modules; only enterprise admins may switch them.
+    adminPlugins: (tenant: string, signal?: AbortSignal) =>
+      request(
+        `/api/v1/tenants/${encodeURIComponent(tenant)}/admin/native-plugins`,
+        'GET',
+        isPlugins,
+        undefined,
+        signal,
+      ),
+    togglePlugin: (tenant: string, plugin: string, enabled: boolean, revision: number) =>
+      request(
+        `/api/v1/tenants/${encodeURIComponent(tenant)}/admin/native-plugins/${encodeURIComponent(plugin)}`,
+        'PUT',
+        isPolicy,
+        { enabled, revision },
+      ),
     /** `acknowledged` is the employee's own confirmation; the server rejects publication without it. */
     publish: (
       tenant: string,

@@ -15,6 +15,9 @@ import { useNativeFeed } from './chat/useNativeFeed';
 import { buildTranscript } from './chat/transcript.ts';
 import { buildWorkState } from './chat/work.ts';
 import { NativeWorkPanel, workCount } from './chat/NativeWorkPanel';
+import { NativeSchedules } from './NativeSchedules';
+import { useRemote } from '../shared/admin';
+import { useSession } from '../identity/session';
 import './native-conversation.css';
 
 const oldConversationHref = (tenant: string, id: string) =>
@@ -83,13 +86,29 @@ export function NativeConversationView({
     return () => window.removeEventListener('keydown', onKey);
   }, [tenant, isNew]);
   const [sideOpen, setSideOpen] = useState(true);
-  const [tab, setTab] = useState<'work' | 'results'>('work');
+  const [tab, setTab] = useState<'work' | 'results' | 'schedules'>('work');
+  const { session: identity } = useSession();
+  const [scheduleRevision, setScheduleRevision] = useState(0);
   const chat = !!(feed && transcript && session);
   const space = spaceName(workspaces.find((w) => w.id === session?.workspaceId));
   const title = isNew
     ? '新会话'
     : transcript?.title || (session ? nativeSessionTitle(session, titles) : '会话');
-  const subtitle = isNew ? '' : session?.state === 'STOPPED' ? `${space} · 已停止` : space;
+  const schedules = useRemote(
+    (signal) => (session && !isNew ? api.schedules(tenant, id, signal) : Promise.resolve([])),
+    [tenant, id, !!session, scheduleRevision],
+  );
+  const activeSchedules = (schedules.value ?? []).filter((s) => s.state === 'ACTIVE').length;
+  // The clock mark: a session that wakes on schedule says so under its title.
+  const subtitle = isNew
+    ? ''
+    : [
+        space,
+        session?.state === 'STOPPED' ? '已停止' : '',
+        activeSchedules ? `定时 ${activeSchedules} 项` : '',
+      ]
+        .filter(Boolean)
+        .join(' · ');
   const openResults = () => {
     setTab('results');
     setSideOpen(true);
@@ -121,13 +140,18 @@ export function NativeConversationView({
               {
                 id: 'native-side',
                 kind: 'file' as const,
-                tag: tab === 'work' ? ('进展' as const) : ('成果' as const),
+                tag:
+                  tab === 'work'
+                    ? ('进展' as const)
+                    : tab === 'results'
+                      ? ('成果' as const)
+                      : ('定时' as const),
                 icon: ListChecks,
                 title,
                 label: count ? `进展 ${count}` : '进展',
                 content: (
                   <div className="native-side">
-                    <div className="native-tabs" role="tablist" aria-label="进展与成果">
+                    <div className="native-tabs" role="tablist" aria-label="进展、成果与定时">
                       <button
                         type="button"
                         role="tab"
@@ -144,9 +168,25 @@ export function NativeConversationView({
                       >
                         成果
                       </button>
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-selected={tab === 'schedules'}
+                        onClick={() => setTab('schedules')}
+                      >
+                        定时{activeSchedules > 0 && <span>{activeSchedules}</span>}
+                      </button>
                     </div>
                     {tab === 'work' && work ? (
                       <NativeWorkPanel work={work} />
+                    ) : tab === 'schedules' ? (
+                      <NativeSchedules
+                        tenant={tenant}
+                        session={session}
+                        owner={identity.identity?.account.id ?? ''}
+                        schedules={schedules}
+                        refresh={() => setScheduleRevision((x) => x + 1)}
+                      />
                     ) : (
                       <NativeResults
                         tenant={tenant}

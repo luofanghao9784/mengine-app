@@ -13,6 +13,7 @@ import {
   PanelLeftOpen,
   Settings,
   SlidersHorizontal,
+  Puzzle,
   Users,
   Wallet,
   X,
@@ -36,6 +37,7 @@ const entries: Record<AdminRealm, { id: AdminPage; title: string; icon: LucideIc
     { id: 'governance', title: '数据治理', icon: SlidersHorizontal },
     { id: 'materials', title: '资料库', icon: Archive },
     { id: 'experience', title: '经验库', icon: BookOpen },
+    { id: 'abilities', title: 'AI 能力', icon: Puzzle },
     { id: 'company', title: '企业信息', icon: Building2 },
     { id: 'audit', title: '操作审计', icon: Archive },
     { id: 'wiki', title: 'Wiki 知识', icon: BookOpen },
@@ -268,7 +270,7 @@ export function AdminShell({
                     {
                       label: '梦核引擎',
                       items: nav.filter((item) =>
-                        ['engine', 'database', 'catalog', 'materials', 'experience', 'wiki'].includes(
+                        ['engine', 'database', 'catalog', 'materials', 'experience', 'wiki', 'abilities'].includes(
                           item.id,
                         ),
                       ),
