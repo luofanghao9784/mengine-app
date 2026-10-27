@@ -29,15 +29,15 @@ public class CompanyAnalysisQueue {
    public void discover() {
       this.db
          .update(
-            "INSERT INTO company_analysis_items(chunk_id,tenant_id,state) SELECT c.id,c.tenant_id,'QUEUED' FROM company_analysis_current_chunks c WHERE NOT EXISTS(SELECT 1 FROM company_analysis_items i WHERE i.chunk_id=c.id) ORDER BY c.tenant_id,c.id LIMIT 200 ON CONFLICT DO NOTHING"
+            "INSERT INTO company_analysis_items(chunk_id,tenant_id,state) SELECT c.id,c.tenant_id,'QUEUED' FROM company_analysis_discovery_chunks c WHERE NOT EXISTS(SELECT 1 FROM company_analysis_items i WHERE i.chunk_id=c.id) ORDER BY c.tenant_id,c.id LIMIT 200 ON CONFLICT DO NOTHING"
          );
       this.db
          .update(
-            "UPDATE company_analysis_items i SET state='CANCELLED',error_code='COMPANY_SOURCE_CHANGED',updated_at=now() WHERE state IN ('QUEUED','RETRY_WAIT') AND NOT EXISTS(SELECT 1 FROM company_analysis_current_chunks c WHERE c.id=i.chunk_id)"
+            "UPDATE company_analysis_items i SET state='CANCELLED',error_code='COMPANY_SOURCE_CHANGED',updated_at=now() WHERE state IN ('QUEUED','RETRY_WAIT') AND NOT EXISTS(SELECT 1 FROM company_analysis_discovery_chunks c WHERE c.id=i.chunk_id)"
          );
       this.db
          .update(
-            "UPDATE company_analysis_items i SET state='QUEUED',run_id=NULL,attempts=0,error_code=NULL,next_attempt_at=now()+interval '30 seconds',updated_at=now() WHERE (i.state='CANCELLED' OR i.state='SUCCEEDED' AND EXISTS(SELECT 1 FROM company_inference_runs r WHERE r.id=i.run_id AND r.fenced)) AND EXISTS(SELECT 1 FROM company_analysis_current_chunks c WHERE c.id=i.chunk_id)"
+            "UPDATE company_analysis_items i SET state='QUEUED',run_id=NULL,attempts=0,error_code=NULL,next_attempt_at=now()+interval '30 seconds',updated_at=now() WHERE (i.state='CANCELLED' OR i.state='SUCCEEDED' AND EXISTS(SELECT 1 FROM company_inference_runs r WHERE r.id=i.run_id AND r.fenced)) AND EXISTS(SELECT 1 FROM company_analysis_discovery_chunks c WHERE c.id=i.chunk_id)"
          );
    }
 
