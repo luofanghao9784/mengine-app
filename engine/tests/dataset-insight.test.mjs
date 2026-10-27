@@ -10,3 +10,48 @@ test('business insight meters and reauthorizes before accepting model output',as
  for(const revoke of [false,true]){let generated=false;const actions=[];const platform=createServer(async(req,res)=>{const action=req.url.split('/').slice(5).join('/');await body(req);actions.push(action);if(action==='check')return generated&&revoke?json(res,{},403):json(res,{allowed:true,executionClass:'verification',datasetInsight:c});if(action==='model-usage/open')return json(res,{contractVersion:'1.0',maxModelCalls:8,maxOutputTokens:2048});if(['execution/open','model-usage/start','model-usage/finish'].includes(action))return json(res,{accepted:true});return json(res,{},400);});const url=await listen(platform);const backend={lastUsage:null,usage:null,async *generate(request){assert.deepEqual(request.tools,[]);yield {type:'text',text:JSON.stringify(report)};this.lastUsage={inputTokens:20,outputTokens:10};this.usage=this.lastUsage;generated=true;yield {type:'finish',reason:'stop'};}};const tasks=new AgentTasks({platformBaseUrl:url,executionClass:'verification',modelName:'fixture',createModel:()=>backend});
  try{const req={contractVersion:'1.5',taskId:'00000000-0000-4000-8000-000000000011',attemptId:'00000000-0000-4000-8000-000000000012',prompt:'synthetic'};if(revoke)await assert.rejects(()=>tasks.run(req,new AbortController().signal),/TASK_ACCESS_DENIED/);else assert.equal((await tasks.run(req,new AbortController().signal)).outcome,'COMPLETE');assert.ok(actions.includes('model-usage/finish'));assert.ok(actions.every(a=>['check','execution/open','model-usage/open','model-usage/start','model-usage/finish'].includes(a)));}finally{tasks.stop();await close(platform);}}
 });
+
+test('business insight accepts a full JSON fence without relaxing evidence validation',async()=>{
+ let calls=0;const model={async *generate(){calls++;yield {type:'text',text:'```json\n'+JSON.stringify(report)+'\n```'};yield {type:'finish',reason:'stop'};}};
+ const result=await analyzeDatasetInsight(c,model,new AbortController().signal);
+ assert.deepEqual(JSON.parse(result.text),report);assert.equal(calls,1);
+});
+test('business insight repairs invalid JSON once and reports both model calls',async()=>{
+ let calls=0;const model={async *generate(r){calls++;assert.deepEqual(r.tools,[]);yield {type:'text',text:calls===1?'invalid synthetic JSON':JSON.stringify(report)};yield {type:'finish',reason:'stop'};}};
+ const result=await analyzeDatasetInsight(c,model,new AbortController().signal);
+ assert.equal(calls,2);assert.equal(result.modelCalls,2);assert.deepEqual(JSON.parse(result.text),report);
+});
+test('business insight never accepts fabricated facts after correction and fails explicitly',async()=>{
+ let calls=0;const bad={...report,findings:[{...report.findings[0],factIds:['invented']}]};
+ const model={async *generate(){calls++;yield {type:'text',text:JSON.stringify(bad)};yield {type:'finish',reason:'stop'};}};
+ await assert.rejects(()=>analyzeDatasetInsight(c,model,new AbortController().signal),/TASK_MODEL_FAILED/);assert.equal(calls,2);
+});
+test('business insight retries a fully returned truncated response once with a shorter JSON request',async()=>{
+ let calls=0;const model={async *generate(r){calls++;assert.deepEqual(r.tools,[]);yield {type:'text',text:calls===1?'{"title":"synthetic truncated':JSON.stringify(report)};yield {type:'finish',reason:calls===1?'length':'stop'};}};
+ const result=await analyzeDatasetInsight(c,model,new AbortController().signal);
+ assert.equal(calls,2);assert.equal(result.modelCalls,2);assert.deepEqual(JSON.parse(result.text),report);
+});
+test('business insight does not replay transport or byte-limit failures',async()=>{
+ const {RuntimeError}=await import('../dist/runtime/ports.js');
+ for(const code of ['MODEL_NETWORK_ERROR','MODEL_OUTPUT_LIMIT']){
+  let calls=0;const model={async *generate(){calls++;throw new RuntimeError(code);}};
+  await assert.rejects(()=>analyzeDatasetInsight(c,model,new AbortController().signal),/TASK_MODEL_FAILED/);
+  assert.equal(calls,1);
+ }
+});
+test('business insight batches twelve sources within output and call budgets then validates global coverage',async()=>{
+ const sources=Array.from({length:12},(_,i)=>({datasetId:'s'+i,snapshotId:'v1',releaseId:'r1',name:'合成表'}));
+ const facts=sources.map((s,i)=>({id:'T'+i,datasetId:s.datasetId,text:'合成计算事实'}));
+ const context=datasetInsightContext({sources,facts,boundaries:'合成边界'});
+ let calls=0;const model={async *generate(r){
+  const start=calls++*4;assert.deepEqual(r.tools,[]);
+  yield {type:'text',text:JSON.stringify({...report,findings:[{...report.findings[0],factIds:facts.slice(start,start+4).map(f=>f.id)}]})};yield {type:'finish',reason:'stop'};
+ }};
+ const result=await analyzeDatasetInsight(context,model,new AbortController().signal);
+ assert.equal(calls,3);assert.equal(result.modelCalls,3);assert.equal(JSON.parse(result.text).findings.length,3);
+ validateDatasetInsight(JSON.parse(result.text),context);
+});
+test('business insight preserves pre-dispatch cancellation without model calls',async()=>{
+ let calls=0;const model={async *generate(){calls++;}};const controller=new AbortController();controller.abort();
+ await assert.rejects(()=>analyzeDatasetInsight(c,model,controller.signal),/CANCELLED/);assert.equal(calls,0);
+});
