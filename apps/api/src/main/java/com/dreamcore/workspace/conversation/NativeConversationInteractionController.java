@@ -27,8 +27,16 @@ public class NativeConversationInteractionController {
  private Object dispatch(Authentication auth,UUID tenant,UUID id,String action,Map<String,Object> body){
   UUID actor=actor(auth),key=key(body);sessions.require(actor,tenant,id,true);runtime.available();
   var prior=stream.claim(actor,tenant,id,key,action,body);if(prior!=null)return prior;
-  var grant=sessions.grant(actor,tenant,id);var result=runtime.command(id,grant.token(),action,body);
-  stream.complete(actor,tenant,id,key,result);return result;
+  boolean handedOff=false;
+  try{
+   var grant=sessions.grant(actor,tenant,id);handedOff=true;
+   var result=runtime.command(id,grant.token(),action,body);
+   stream.complete(actor,tenant,id,key,result);return result;
+  }catch(RuntimeException e){
+   if(!handedOff||e instanceof NativeRuntimeClient.NotDispatched)stream.releaseUndispatched(actor,tenant,id,key);
+   if(e instanceof NativeRuntimeClient.NotDispatched)throw new IdentityException(503,"NATIVE_RUNTIME_NOT_DISPATCHED");
+   throw e;
+  }
  }
  @GetMapping("/api/v1/tenants/{tenant}/native-conversations/{id}/history") public Object history(Authentication auth,@PathVariable UUID tenant,@PathVariable UUID id,@RequestParam(defaultValue="0") long after,@RequestParam(defaultValue="200") int limit){var items=stream.history(actor(auth),tenant,id,after,limit);return Map.of("items",items,"hasMore",items.size()==limit);}
  @GetMapping("/api/v1/tenants/{tenant}/native-conversations/{id}/status") public Object status(Authentication auth,@PathVariable UUID tenant,@PathVariable UUID id){return stream.status(actor(auth),tenant,id);}
@@ -43,7 +51,7 @@ public class NativeConversationInteractionController {
   var future=timer.scheduleWithFixedDelay(()->{
    if(closed.get())return;
    try{
-    for(var event:stream.history(actor,tenant,id,position.get(),200)){
+    for(var event:stream.events(actor,tenant,id,position.get(),200)){
      long seq=((Number)event.get("seq")).longValue();emitter.send(SseEmitter.event().id(Long.toString(seq)).name("status".equals(event.get("type"))?"status":"message").data(event));position.set(seq);
     }
     emitter.send(SseEmitter.event().comment("keepalive"));

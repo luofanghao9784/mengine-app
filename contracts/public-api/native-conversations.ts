@@ -35,3 +35,8 @@ export interface NativeFeedbackRequest { requestId: string; messageKey: string; 
 export interface NativeOperationReceipt { accepted: true; messageId?: string }
 /** Deployment switch: false means the native runtime is not configured, so the entry stays hidden. */
 export interface NativeAvailability { enabled: boolean }
+
+/** V179: history excludes disposable status. SSE supplies only the latest snapshot;
+ * platform seq may have gaps. 503 NATIVE_RUNTIME_NOT_DISPATCHED permits retry with
+ * the SAME requestId; unknown outcomes never authorize a fresh ID or redispatch. */
+export type NativeDispatchFailure = 'NATIVE_RUNTIME_NOT_DISPATCHED' | 'NATIVE_OPERATION_OUTCOME_UNKNOWN';

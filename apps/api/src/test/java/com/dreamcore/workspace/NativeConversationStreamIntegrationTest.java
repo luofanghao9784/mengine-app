@@ -53,7 +53,7 @@ class NativeConversationStreamIntegrationTest extends NativeConversationIntegrat
  @Test void budgetUnknownAndStaleAreNotFakeZeroAndSystemInstructionsAreRedacted(){
   var s=open();assertEquals(false,stream.status(owner,tenant,s.id()).get("available"));assertFalse(stream.status(owner,tenant,s.id()).containsKey("budget"));var g=nativeSessions.grant(owner,tenant,s.id());
   stream.append(s.id(),g.token(),new NativeConversationStream.Ingest("status",Map.of("type","status","time",java.time.Instant.now().toString(),"data",Map.of("running",true,"budget",Map.of("usedYuan",1.23,"softYuan",2,"hardYuan",5)))));
-  assertEquals(true,stream.status(owner,tenant,s.id()).get("available"));db.update("UPDATE native_conversation_events SET event=jsonb_set(event,'{time}',to_jsonb((now()-interval '1 minute')::text)) WHERE session_id=?",s.id());assertEquals(false,stream.status(owner,tenant,s.id()).get("available"));
+  assertEquals(true,stream.status(owner,tenant,s.id()).get("available"));db.update("UPDATE native_conversation_status SET event=jsonb_set(event,'{time}',to_jsonb((now()-interval '1 minute')::text)) WHERE session_id=?",s.id());assertEquals(false,stream.status(owner,tenant,s.id()).get("available"));
   stream.append(s.id(),g.token(),new NativeConversationStream.Ingest("system",event("system/message",s.id())));assertEquals(Map.of("redacted",true),stream.history(owner,tenant,s.id(),1,10).getFirst().get("data"));
  }
  @Test void feedbackUsesSharedVersionedLedgerAndExactServerMessage(){
@@ -81,6 +81,30 @@ class NativeConversationStreamIntegrationTest extends NativeConversationIntegrat
   var response=http.send(request.apply(path+"/events?after=0").header("Last-Event-ID","1").GET().build(),java.net.http.HttpResponse.BodyHandlers.ofInputStream());assertEquals(200,response.statusCode());
   try(var reader=new java.io.BufferedReader(new java.io.InputStreamReader(response.body()))){String text="",line;while((line=reader.readLine())!=null){text+=line+"\n";if(line.isEmpty()&&text.contains("data:"))break;}assertTrue(text.contains("id:2"),text);assertFalse(text.contains("id:1"));assertTrue(text.contains("assistant/message"));}
   assertEquals(400,http.send(request.apply(path+"/history?after=-1").GET().build(),java.net.http.HttpResponse.BodyHandlers.ofString()).statusCode());
+ }
+
+ @Test void statusIsBoundedAndColdHistorySkipsItWhileSsePreservesCursor(){
+  var s=open();var g=nativeSessions.grant(owner,tenant,s.id());
+  for(int i=0;i<30;i++)stream.append(s.id(),g.token(),new NativeConversationStream.Ingest("s"+i,Map.of("type","status","time",java.time.Instant.now().plusMillis(i).toString(),"data",Map.of("running",true))));
+  assertTrue(stream.history(owner,tenant,s.id(),0,500).isEmpty());
+  assertEquals(1,db.queryForObject("SELECT count(*) FROM native_conversation_status WHERE session_id=?",Integer.class,s.id()));
+  stream.append(s.id(),g.token(),new NativeConversationStream.Ingest("message",event("assistant/message",s.id())));
+  var events=stream.events(owner,tenant,s.id(),0,500);assertEquals(2,events.size());
+  assertEquals(30L,((Number)events.get(0).get("seq")).longValue());assertEquals(31L,((Number)events.get(1).get("seq")).longValue());
+ }
+ @Test void onlyProvenConnectFailureReleasesClaimForSameRequestRetry(){
+  var s=open();var body=Map.<String,Object>of("requestId",UUID.randomUUID().toString(),"text","hello","materials",List.of());
+  when(runtime.command(eq(s.id()),anyString(),eq("messages"),anyMap())).thenThrow(new NativeRuntimeClient.NotDispatched()).thenReturn(Map.of("accepted",true));
+  denied(()->controller.message(auth(owner),tenant,s.id(),body));
+  assertEquals(Map.of("accepted",true),controller.message(auth(owner),tenant,s.id(),body));
+  assertTrue(NativeRuntimeClient.beforeConnect(new java.net.ConnectException()));
+  assertFalse(NativeRuntimeClient.beforeConnect(new java.net.http.HttpTimeoutException("ambiguous")));
+ }
+
+ @Test void realRefusedSocketIsKnownNotDispatched()throws Exception{
+  int unused;try(var socket=new java.net.ServerSocket(0)){unused=socket.getLocalPort();}
+  var client=new NativeRuntimeClient("http://127.0.0.1:"+unused,"x".repeat(32));
+  assertThrows(NativeRuntimeClient.NotDispatched.class,()->client.command(UUID.randomUUID(),"synthetic","messages",Map.of("text","fixture")));
  }
 
 }

@@ -15,6 +15,11 @@ public class NativeRuntimeClient {
  private final String url,controlToken;private final HttpClient http=HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).connectTimeout(Duration.ofSeconds(5)).build();
  private final JsonMapper json=new JsonMapper();
  public NativeRuntimeClient(@Value("${dreamcore.native.web-url:}") String url,@Value("${dreamcore.native.control-token:}") String controlToken){this.url=url;this.controlToken=controlToken;}
+ public static class NotDispatched extends RuntimeException { public NotDispatched(){super("NATIVE_RUNTIME_NOT_DISPATCHED");} }
+ public static boolean beforeConnect(Throwable error){
+  for(Throwable e=error;e!=null;e=e.getCause())if(e instanceof java.net.ConnectException||e instanceof java.net.http.HttpConnectTimeoutException||e instanceof java.net.UnknownHostException)return true;
+  return false;
+ }
  public void available(){if(url.isBlank()||controlToken.length()<32)throw new IdentityException(503,"NATIVE_RUNTIME_UNAVAILABLE");}
  @SuppressWarnings("unchecked") public Map<String,Object> command(UUID id,String token,String action,Map<String,Object> body){
   available();
@@ -23,6 +28,6 @@ public class NativeRuntimeClient {
    var response=http.send(request,HttpResponse.BodyHandlers.ofString());
    if(response.statusCode()!=200)throw new IdentityException(response.statusCode()==409?409:502,"NATIVE_RUNTIME_REJECTED");
    return json.readValue(response.body(),Map.class);
-  }catch(IdentityException e){throw e;}catch(Exception e){if(e instanceof InterruptedException)Thread.currentThread().interrupt();var failure=new IdentityException(502,"NATIVE_RUNTIME_UNAVAILABLE");failure.initCause(e);throw failure;}
+  }catch(IdentityException e){throw e;}catch(Exception e){if(e instanceof InterruptedException)Thread.currentThread().interrupt();if(beforeConnect(e))throw new NotDispatched();var failure=new IdentityException(502,"NATIVE_RUNTIME_UNAVAILABLE");failure.initCause(e);throw failure;}
  }
 }

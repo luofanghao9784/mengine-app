@@ -4,7 +4,7 @@ import {DatabaseSync} from 'node:sqlite';
 export class NativeStreamStore{
  constructor(path,root){this.root=root;this.db=new DatabaseSync(path);this.db.exec(`PRAGMA busy_timeout=5000;PRAGMA journal_mode=WAL;
  CREATE TABLE IF NOT EXISTS native_outbox(root TEXT,key TEXT,event TEXT,delivered INTEGER DEFAULT 0,PRIMARY KEY(root,key));`);}
- append(key,event){const prior=this.db.prepare('SELECT event FROM native_outbox WHERE root=? AND key=?').get(this.root,key);if(prior&&prior.event!==JSON.stringify(event))throw Error('EVENT_RECEIPT_CONFLICT');this.db.prepare('INSERT OR IGNORE INTO native_outbox(root,key,event) VALUES(?,?,?)').run(this.root,key,JSON.stringify(event));}
+ append(key,event){const prior=this.db.prepare('SELECT event FROM native_outbox WHERE root=? AND key=?').get(this.root,key);if(prior&&prior.event!==JSON.stringify(event))throw Error('EVENT_RECEIPT_CONFLICT');this.db.prepare('INSERT OR IGNORE INTO native_outbox(root,key,event) VALUES(?,?,?)').run(this.root,key,JSON.stringify(event));if(event.type==='status')this.db.prepare("DELETE FROM native_outbox WHERE root=? AND key<>? AND json_extract(event,'$.type')='status'").run(this.root,key);}
  pending(){return this.db.prepare('SELECT key,event FROM native_outbox WHERE root=? AND delivered=0 ORDER BY rowid LIMIT 100').all(this.root).map(r=>({key:r.key,event:JSON.parse(r.event)}));}
  delivered(key){this.db.prepare('UPDATE native_outbox SET delivered=1 WHERE root=? AND key=?').run(this.root,key);}
  close(){this.db.close();}

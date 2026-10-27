@@ -76,3 +76,9 @@ test('real SDK pending approval/question, timeout and late answer', {timeout:900
  assert.ok(notices.some(n=>n.method==='session.status'&&n.params.status==='idle'));
  }finally{await client.close();await rm(dir,{recursive:true,force:true});}
 });
+
+test('disconnected outbox coalesces disposable status without dropping conversation events',async()=>{
+ const dir=await mkdtemp(join(tmpdir(),'dh-status-'));const store=new NativeStreamStore(join(dir,'events.sqlite'),'root');
+ try{store.append('event',{type:'turn/start',data:{}});for(let i=0;i<30;i++)store.append('status-'+i,{type:'status',time:i,data:{running:true}});
+ assert.equal(store.pending().length,2);assert.ok(store.pending().some(x=>x.key==='event'));assert.ok(store.pending().some(x=>x.key==='status-29'));}finally{store.close();await rm(dir,{recursive:true,force:true});}
+});
