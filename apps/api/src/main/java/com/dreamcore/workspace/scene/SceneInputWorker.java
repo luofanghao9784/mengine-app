@@ -16,6 +16,7 @@ public class SceneInputWorker {
  private final JdbcTemplate db;
  private final Clock clock;
  private final Map<UUID,Due> due=new HashMap<>();
+ private long nextPoll;
  private static final class Due {long input,knowledge;}
  @Autowired
  public SceneInputWorker(SceneService scene,SceneBridgeClient bridge,JdbcTemplate db){this(scene,bridge,db,Clock.systemUTC());}
@@ -25,30 +26,36 @@ public class SceneInputWorker {
  // retaining the upstream tenant lock, model admission and fresh authorization.
  @Scheduled(fixedDelay=1000,initialDelay=30000)
  public synchronized void tick(){
-  if(!bridge.available())return;
+  long now=clock.millis();
+  if(now<nextPoll||!bridge.available())return;
   var bindings=db.queryForList("SELECT b.tenant_id,b.maintainer_id FROM scene_bindings b JOIN tenants t ON t.id=b.tenant_id WHERE t.status='ACTIVE'");
   var active=new HashSet<UUID>();
+  long soonest=Long.MAX_VALUE;
   for(var b:bindings){
    var actor=(UUID)b.get("maintainer_id");var tenant=(UUID)b.get("tenant_id");active.add(tenant);
    var next=due.computeIfAbsent(tenant,key->new Due());
    try{
     if(clock.millis()>=next.input){scene.synchronize(actor,tenant,false);next.input=clock.millis()+IDLE_MS;}
-    if(clock.millis()<next.knowledge)continue;
-    var knowledge=scene.dispatch(actor,tenant,false,"GET","/scene-knowledge",null);
-    next.knowledge=clock.millis()+IDLE_MS;
-    if(!knowledge.path("available").asBoolean())continue;
-    if(knowledge.path("busy").asBoolean()){next.knowledge=clock.millis()+BUSY_MS;continue;}
-    if(knowledge.path("pending").asInt()>0||knowledge.path("needsGraph").asBoolean()){
-     scene.dispatch(actor,tenant,false,"POST","/scene-knowledge/sync",Map.of("retry",false));
-     // Successful dispatch already synchronizes its new knowledge to the platform.
-     next.input=clock.millis()+IDLE_MS;
-     next.knowledge=clock.millis()+CONTINUE_MS;
+    if(clock.millis()>=next.knowledge){
+     var knowledge=scene.dispatch(actor,tenant,false,"GET","/scene-knowledge",null);
+     next.knowledge=clock.millis()+IDLE_MS;
+     if(knowledge.path("available").asBoolean()){
+      if(knowledge.path("busy").asBoolean())next.knowledge=clock.millis()+BUSY_MS;
+      else if(knowledge.path("pending").asInt()>0||knowledge.path("needsGraph").asBoolean()){
+       scene.dispatch(actor,tenant,false,"POST","/scene-knowledge/sync",Map.of("retry",false));
+       // Successful dispatch already synchronizes its new knowledge to the platform.
+       next.input=clock.millis()+IDLE_MS;
+       next.knowledge=clock.millis()+CONTINUE_MS;
+      }
+     }
     }
    }catch(RuntimeException ignored){
     // Do not spin on failed models, permission loss or unreachable sources.
     next.input=next.knowledge=clock.millis()+IDLE_MS;
    }
+   soonest=Math.min(soonest,Math.min(next.input,next.knowledge));
   }
   due.keySet().retainAll(active);
+  nextPoll=bindings.isEmpty()?now+IDLE_MS:Math.max(now+CONTINUE_MS,soonest);
  }
 }

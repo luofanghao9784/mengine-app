@@ -8,13 +8,19 @@ import org.springframework.stereotype.Component;
 public class BriefingGenerationWorker {
     private static final org.slf4j.Logger log=org.slf4j.LoggerFactory.getLogger(BriefingGenerationWorker.class);
     private final BriefingGenerationService service;
+    private final com.dreamcore.workspace.scheduling.IdleGate idle=new com.dreamcore.workspace.scheduling.IdleGate();
     public BriefingGenerationWorker(BriefingGenerationService service){this.service=service;}
     @Scheduled(fixedDelayString="${dreamcore.briefing.poll-ms:5000}",initialDelayString="${dreamcore.briefing.initial-delay-ms:10000}")
     public void tick(){
-        for(var due:service.dueDaily())try{service.dispatchDaily(due);}
-        catch(Exception e){log.warn("Daily briefing deferred policy={} cause={}",due,e.getClass().getSimpleName());}
+        long now=System.currentTimeMillis();
+        if(idle.resting(now))return;
+        var due=service.dueDaily();
+        for(var id:due)try{service.dispatchDaily(id);}
+        catch(Exception e){log.warn("Daily briefing deferred policy={} cause={}",id,e.getClass().getSimpleName());}
         service.discover();
         var pending=service.candidates();
+        if(due.isEmpty()&&pending.isEmpty()){idle.rest(now);return;}
+        idle.work();
         // Breadth first: another enterprise gets a turn before this policy gets its next slot.
         for(int slot=0;slot<5&&!pending.isEmpty();slot++){
             var progressed=new java.util.ArrayList<java.util.UUID>();

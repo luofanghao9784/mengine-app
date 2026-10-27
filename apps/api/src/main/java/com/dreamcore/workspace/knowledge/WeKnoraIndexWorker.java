@@ -16,6 +16,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class WeKnoraIndexWorker {
     private final JdbcTemplate db;private final WeKnoraClient client;private final MaterialAccess access;
     private final TransactionTemplate tx;
+    private final com.dreamcore.workspace.scheduling.IdleGate idle=new com.dreamcore.workspace.scheduling.IdleGate();
     record Job(UUID id,UUID chunk,String kb,String remote,String state,UUID token) {}
     public WeKnoraIndexWorker(JdbcTemplate db,WeKnoraClient client,MaterialAccess access,PlatformTransactionManager manager){
         this.db=db;this.client=client;this.access=access;tx=new TransactionTemplate(manager);
@@ -68,7 +69,11 @@ public class WeKnoraIndexWorker {
     }
     @Scheduled(fixedDelayString="${dreamcore.weknora.poll-ms:1000}",initialDelayString="${dreamcore.weknora.initial-delay-ms:1000}")
     public void tick(){
-        Job job=tx.execute(s->claim());if(job==null)return;
+        long now=System.currentTimeMillis();
+        if(idle.resting(now))return;
+        Job job=tx.execute(s->claim());
+        if(job==null){idle.rest(now);return;}
+        idle.work();
         String remote=job.remote();boolean dispatched=false;
         try {
             if(job.state().equals("DELETE_PENDING")){

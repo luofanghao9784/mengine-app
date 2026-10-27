@@ -11,11 +11,19 @@ import org.springframework.stereotype.Component;
 @org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication(type=org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication.Type.SERVLET)
 public class CollectionWorker {
     private final CollectionService service;private final CollectionAdapter adapter;private final boolean enabled;
+    private final com.dreamcore.workspace.scheduling.IdleGate idle=new com.dreamcore.workspace.scheduling.IdleGate();
     private final ExecutorService executor=Executors.newVirtualThreadPerTaskExecutor();private final Semaphore capacity;
     public CollectionWorker(CollectionService service,CollectionAdapter adapter,@Value("${dreamcore.collection.enabled:true}") boolean enabled,
         @Value("${dreamcore.collection.concurrency:2}") int concurrency){this.service=service;this.adapter=adapter;this.enabled=enabled;capacity=new Semaphore(Math.max(1,Math.min(16,concurrency)));}
     @Scheduled(fixedDelayString="${dreamcore.collection.poll-ms:3000}",initialDelayString="${dreamcore.collection.initial-delay-ms:10000}")
-    public void tick(){if(enabled&&adapter.available())runOnce();}
+    public void tick(){
+        if(!enabled||!adapter.available())return;
+        long now=System.currentTimeMillis();
+        if(idle.resting(now))return;
+        if(service.candidates().isEmpty()){idle.rest(now);return;}
+        idle.work();
+        runOnce();
+    }
     public void runOnce(){
         for(var candidate:service.candidates()){
             UUID tenant=(UUID)candidate.get("tenant_id"),connection=(UUID)candidate.get("id");

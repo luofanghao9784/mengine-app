@@ -10,9 +10,20 @@ import org.springframework.beans.factory.annotation.Value;import org.springframe
 public class CompanyAnalysisWorker {
  private final CompanyAnalysisQueue queue;private final CompanyInferenceService inference;private final CompanyAnalysisRuntime runtime;private final boolean enabled;
  private final ExecutorService pool=Executors.newVirtualThreadPerTaskExecutor();private final Semaphore capacity=new Semaphore(2);private volatile boolean stopping;private final Set<UUID> local=ConcurrentHashMap.newKeySet();
+ private long chunkWatermark;private long nextDiscover;
  public CompanyAnalysisWorker(CompanyAnalysisQueue queue,CompanyInferenceService inference,CompanyAnalysisRuntime runtime,@Value("${dreamcore.company-analysis.enabled:false}") boolean enabled){this.queue=queue;this.inference=inference;this.runtime=runtime;this.enabled=enabled;}
  @Scheduled(fixedDelayString="${dreamcore.company-analysis.poll-ms:3000}",initialDelayString="${dreamcore.company-analysis.initial-delay-ms:30000}")
- public void tick(){if(enabled&&runtime.configured())runOnce();}
+ public void tick(){
+  if(!enabled||!runtime.configured()||stopping)return;
+  long now=System.currentTimeMillis();
+  boolean actionable=queue.hasActionableWork();
+  long mark=queue.knowledgeWatermark();
+  boolean changed=mark>chunkWatermark;
+  if(!actionable&&!changed&&now<nextDiscover)return;
+  runOnce();
+  chunkWatermark=mark;
+  if(!actionable)nextDiscover=now+60_000L;
+ }
  public synchronized void runOnce(){
   if(stopping)return;
   for(var recovery:queue.recoveries())if(!local.contains(recovery.id()))recover(recovery);

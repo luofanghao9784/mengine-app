@@ -14,6 +14,7 @@ public class ConversationWorker {
     @org.springframework.beans.factory.annotation.Autowired private AgentReceiptRecovery receiptRecovery;
     @jakarta.annotation.PreDestroy public void stop(){stopping=true;executor.shutdownNow();}
     private final ConversationService service;private final TaskRuntime runtime;private final AgentTaskService agents;
+    private final com.dreamcore.workspace.scheduling.IdleGate idle=new com.dreamcore.workspace.scheduling.IdleGate();
     public ConversationWorker(ConversationService service,TaskRuntime runtime,AgentTaskService agents,
         @org.springframework.beans.factory.annotation.Value("${dreamcore.tasks.concurrency:20}") int concurrency){
         if(concurrency<1 || concurrency>20)throw new IllegalArgumentException("Task concurrency must be between 1 and 20");
@@ -22,14 +23,20 @@ public class ConversationWorker {
     @Scheduled(fixedDelayString="${dreamcore.tasks.poll-ms:500}",initialDelayString="${dreamcore.tasks.initial-delay-ms:1000}")
     public void tick(){
         if(stopping)return;
+        // Recover before IdleGate so RESULT_UNKNOWN is not deferred by empty-queue backoff.
         try{if(receiptRecovery!=null)receiptRecovery.recover();}catch(Exception unavailable){return;}
+        long now=System.currentTimeMillis();
+        if(idle.resting(now))return;
+        boolean worked=false;
         for(int i=0;i<concurrency && slots.tryAcquire();i++){
             ConversationService.Job job;
             try{job=service.claim();}catch(Exception error){slots.release();return;}
-            if(job==null){slots.release();return;}
+            if(job==null){slots.release();if(worked)idle.work();else idle.rest(now);return;}
+            worked=true;
             try{executor.execute(()->{try{execute(job);}finally{slots.release();}});}
             catch(java.util.concurrent.RejectedExecutionException error){slots.release();service.fail(job,"TASK_RUNTIME_UNAVAILABLE");return;}
         }
+        if(worked)idle.work();
     }
     private void execute(ConversationService.Job job){
         try{if("AGENT".equals(job.mode()))agents.finish(job,runtime.executeAgent(job.id(),job.token(),job.prompt(),()->agents.active(job)));

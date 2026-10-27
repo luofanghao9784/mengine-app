@@ -41,10 +41,28 @@ public class ExperienceIntakeService {
     AND NOT EXISTS(SELECT 1 FROM experience_intake_sources i WHERE i.kind='FEEDBACK' AND i.source_id=f.id AND i.source_revision=f.revision AND i.source_attempt=f.attempt)
    ORDER BY v.created_at,f.id LIMIT 100 ON CONFLICT DO NOTHING
    """);
-  for(UUID id:db.queryForList("SELECT id FROM experience_intake_sources WHERE state='PENDING' ORDER BY checked_at NULLS FIRST,created_at,id LIMIT 300",UUID.class)){
-   boolean valid=available(id);
-   db.update("UPDATE experience_intake_sources SET checked_at=now(),state=CASE WHEN ? THEN state ELSE 'SOURCE_UNAVAILABLE' END,reason=CASE WHEN ? THEN reason ELSE 'SOURCE_CHANGED' END,invalidated_at=CASE WHEN ? THEN invalidated_at ELSE now() END WHERE id=?",valid,valid,valid,id);
-  }
+  // One availability call per due row. Unchanged pending rows wait 10 minutes; a changed task, feedback, or lifecycle is still checked on this pass.
+  db.update("""
+   WITH due AS MATERIALIZED (
+    SELECT s.id FROM experience_intake_sources s
+    WHERE s.state='PENDING' AND (
+     s.checked_at IS NULL OR s.checked_at<now()-interval '10 minutes'
+     OR (s.kind='TASK' AND NOT EXISTS(SELECT 1 FROM conversation_tasks t WHERE t.id=s.task_id AND t.tenant_id=s.tenant_id
+      AND t.revision=s.source_revision AND t.attempt=s.source_attempt AND t.status='SUCCEEDED' AND t.execution_class='live'))
+     OR (s.kind='FEEDBACK' AND NOT EXISTS(SELECT 1 FROM feedback_entries f JOIN feedback_versions v ON v.feedback_id=f.id AND v.revision=f.revision
+      WHERE f.id=s.feedback_id AND f.revision=s.source_revision AND f.attempt=s.source_attempt AND v.status='ACTIVE' AND NOT f.scrubbed))
+     OR EXISTS(SELECT 1 FROM object_lifecycle l WHERE l.state<>'ACTIVE' AND l.kind='TASK' AND l.object_id=s.task_id)
+    )
+    ORDER BY s.checked_at NULLS FIRST,s.created_at,s.id LIMIT 50
+   )
+   UPDATE experience_intake_sources AS i
+   SET checked_at=now(),
+    state=CASE WHEN checked.ok THEN i.state ELSE 'SOURCE_UNAVAILABLE' END,
+    reason=CASE WHEN checked.ok THEN i.reason ELSE 'SOURCE_CHANGED' END,
+    invalidated_at=CASE WHEN checked.ok THEN i.invalidated_at ELSE now() END
+   FROM (SELECT id,experience_intake_available(id) AS ok FROM due) checked
+   WHERE i.id=checked.id
+   """);
  }
  /** Called again by a future extractor at claim and commit, never a customer source-read endpoint. */
  @Transactional public boolean available(UUID id){return Boolean.TRUE.equals(db.queryForObject("SELECT experience_intake_available(?)",Boolean.class,id));}

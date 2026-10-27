@@ -25,6 +25,33 @@ public class CompanyAnalysisQueue {
       this.identities = identities;
    }
 
+   @Transactional(readOnly = true)
+   public boolean hasActionableWork() {
+      return Boolean.TRUE
+         .equals(
+            this.db
+               .queryForObject(
+                  """
+                  SELECT EXISTS(SELECT 1 FROM company_analysis_items WHERE state IN ('QUEUED','RETRY_WAIT') AND next_attempt_at<=clock_timestamp())
+                      OR EXISTS(
+                        SELECT 1 FROM company_analysis_attempts a JOIN company_inference_runs r ON r.id=a.run_id
+                        WHERE a.state='DISPATCHED' AND a.created_at<clock_timestamp()-interval '5 seconds'
+                           OR a.state='CLAIMED' AND r.lease_until<clock_timestamp()
+                      )
+                  """,
+                  Boolean.class
+               )
+         );
+   }
+
+   /** Latest finished knowledge run. Discovery uses this instead of scanning company_analysis_discovery_chunks while idle. */
+   @Transactional(readOnly = true)
+   public long knowledgeWatermark() {
+      java.sql.Timestamp latest = this.db
+         .queryForObject("SELECT max(finished_at) FROM knowledge_runs WHERE status IN ('READY','PARTIAL')", java.sql.Timestamp.class);
+      return latest == null ? 0L : latest.getTime();
+   }
+
    @Transactional
    public void discover() {
       this.db
