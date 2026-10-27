@@ -89,6 +89,8 @@ export function buildWorkState(
   let goal: Goal | null = null;
   const jobs = new Map<string, Job>();
   const subtasks = new Map<string, Subtask>();
+  /** Final output from each `subagent.finished`, applied after the child logs are read. */
+  const finalOutputs = new Map<string, string>();
   const workflows = new Map<string, WorkflowRun>();
   for (const event of [...events].sort((a, b) => a.seq - b.seq)) {
     const d = event.data;
@@ -165,7 +167,8 @@ export function buildWorkState(
         const task = subtasks.get(str(d.childSessionId));
         if (task) {
           task.state = d.status === 'ok' ? 'done' : 'failed';
-          task.output = text(d.lastAssistantMessage) || task.output;
+          const output = text(d.lastAssistantMessage);
+          if (output.trim()) finalOutputs.set(task.id, output);
         }
         break;
       }
@@ -198,7 +201,7 @@ export function buildWorkState(
       }
     }
   }
-  for (const task of subtasks.values()) progress(task, childEvents);
+  for (const task of subtasks.values()) progress(task, childEvents, finalOutputs.get(task.id));
   return {
     todos,
     planMode,
@@ -210,14 +213,17 @@ export function buildWorkState(
 }
 
 /** Fills a sub-task's live state from its own session log; a finish notice already read wins. */
-function progress(task: Subtask, childEvents: readonly NativeEvent[]) {
+function progress(task: Subtask, childEvents: readonly NativeEvent[], finalOutput?: string) {
+  // The output the runtime selected when the sub-task finished outranks its history; the latest
+  // reply in its own log is only the fallback when the finish notice carries no usable text.
+  if (finalOutput) task.output = finalOutput;
   const own = childEvents.filter((e) => e.sessionId === task.id);
   if (!own.length) return;
   const log = buildTranscript(own);
   const items = log.turns.flatMap((t) => t.items);
   task.steps = items.filter((i) => i.kind === 'tool').length;
   const reply = [...items].reverse().find((i) => i.kind === 'assistant' && i.text);
-  if (reply?.kind === 'assistant') task.output = reply.text;
+  if (!finalOutput && reply?.kind === 'assistant') task.output = reply.text;
   if (task.state === 'done' || task.state === 'failed') return;
   // `session.status` is the runtime's whole-agent state for that session; otherwise the log decides.
   const status = [...own].reverse().find((e) => e.type === 'session.status');

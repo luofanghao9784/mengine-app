@@ -122,3 +122,54 @@ test('the finish notice decides the outcome and carries the final output', () =>
     { label: '子任务', state: 'failed', output: '资料读取失败' },
   );
 });
+
+const reply = (seq: number, value: string, sessionId = 'child'): NativeEvent =>
+  child(
+    seq,
+    'assistant/message',
+    { turn: 1, step: 1, message: { content: [{ type: 'text', text: value }] } },
+    sessionId,
+  );
+const finished = (seq: number, data: Record<string, unknown>) =>
+  ev(seq, 'subagent.finished', { childSessionId: 'child', status: 'ok', stopReason: 'completed', ...data });
+
+test('the output selected at finish outranks a different earlier reply from the child', () => {
+  const w = buildWorkState(
+    [
+      ev(1, 'subagent.started', { parentSessionId: 'root', childSessionId: 'child' }),
+      finished(3, { lastAssistantMessage: [{ type: 'text', text: 'selected final output' }] }),
+    ],
+    [reply(2, 'previous child reply')],
+  );
+  assert.equal(w.subtasks[0].state, 'done');
+  assert.equal(w.subtasks[0].output, 'selected final output');
+});
+
+test('without usable final output the child history reply is the fallback', () => {
+  for (const data of [
+    {},
+    { lastAssistantMessage: [] },
+    { lastAssistantMessage: [{ type: 'text', text: '  ' }] },
+  ]) {
+    const w = buildWorkState(
+      [ev(1, 'subagent.started', { parentSessionId: 'root', childSessionId: 'child' }), finished(3, data)],
+      [reply(2, 'previous child reply')],
+    );
+    assert.equal(w.subtasks[0].output, 'previous child reply');
+    assert.equal(w.subtasks[0].state, 'done');
+  }
+});
+
+test('a failed finish keeps its outcome, and other sessions do not leak into the sub-task', () => {
+  const w = buildWorkState(
+    [
+      ev(1, 'subagent.started', { parentSessionId: 'root', childSessionId: 'child' }),
+      finished(4, { status: 'error', lastAssistantMessage: [{ type: 'text', text: '读取失败' }] }),
+    ],
+    [child(2, 'session.status', { status: 'running' }), reply(3, '另一个子任务的话', 'other-child')],
+  );
+  assert.deepEqual(
+    { state: w.subtasks[0].state, output: w.subtasks[0].output, current: w.subtasks[0].current },
+    { state: 'failed', output: '读取失败', current: undefined },
+  );
+});
