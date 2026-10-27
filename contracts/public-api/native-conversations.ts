@@ -50,3 +50,11 @@ export interface NativeConversationListItem extends NativeConversation {
 }
 /** PATCH .../{id}/metadata. Null title restores automatic title. */
 export interface NativeMetadataUpdate { title?: string | null; pinned?: boolean }
+
+/** B5: GET tenants/{t}/native-skills for the employee slash menu. */
+export interface NativeSkillSummary { name: string; description: string }
+/** GET/PUT tenants/{t}/admin/native-skills[/{name}], tenant admins only.
+ * PUT itself records the admin review; markdown is instruction-only SKILL.md
+ * with name and description YAML frontmatter. Empty audience = all members. */
+export interface NativeSkillPut { markdown: string; published: boolean; audience: string[] }
+export interface NativeSkillAdmin extends NativeSkillPut, NativeSkillSummary { revision: number }

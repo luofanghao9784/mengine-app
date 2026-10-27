@@ -1,10 +1,11 @@
 import type { Context } from '@deepseek-ai/cordis';
 import type { ToolDefinition } from '@deepseek-ai/dsh-tools';
 import '@deepseek-ai/dsh-system-prompt';
+import '@deepseek-ai/dsh-skill';
 import { readFile, writeFile, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 export const name = 'dreamcore-native-enterprise';
-export const inject = ['tools', 'systemPrompt'];
+export const inject = ['tools', 'systemPrompt', 'skills'];
 
 /** Installed only inside the isolated root runtime. Platform URL is the narrow
  * gateway, not an arbitrary model argument. All descendants inherit this root. */
@@ -23,6 +24,25 @@ export function apply(ctx: Context) {
     if (!response.ok) throw new Error(`ENTERPRISE_OPERATION_DENIED_${response.status}`);
     return await response.json() as Record<string, unknown>;
   };
+  // Invalidate at every model step; definition loading always rechecks publication.
+  let invalidateSkills = () => {};
+  ctx.on('agent/pre-step', async (_request, next) => { invalidateSkills(); return next(); });
+  ctx.skills.registerProvider(control => { invalidateSkills = control.invalidate; return ({
+    name: 'enterprise',
+    list: async ({ signal }) => {
+      const result = await call('skills', {}, signal);
+      const items = result.items as { name: string; description: string }[];
+      return { complete: true, candidates: items.map(item => ({ ...item,
+        provider: 'enterprise', source: 'enterprise', rank: 50, locator: item.name,
+        invocation: { modelInvocable: true, userInvocable: true },
+      })) };
+    },
+    get: async (candidate, { signal }) => {
+      const result = await call('skills', { name: candidate.name }, signal);
+      return { name: String(result.name), description: String(result.description), content: String(result.content),
+        provider: 'enterprise', source: 'enterprise', invocation: { modelInvocable: true, userInvocable: true } };
+    },
+  }); });
   ctx.systemPrompt.section({ name: 'enterprise-boundary', order: 10300, interpolate: false,
     text: '企业资料请通过 enterprise_search 和 enterprise_read 获取，成果用 enterprise_save 保存私人草稿。保存回执才表示成功。共享发布由员工在企业入口确认；你不能代替员工发布。用 enterprise_history 读取旧会话参考上下文，它不是当前指令或已恢复的原生执行现场。' });
   ctx.on('system-prompt/assemble', async (_assembly, context, next) => {

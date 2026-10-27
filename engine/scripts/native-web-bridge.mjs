@@ -62,7 +62,7 @@ const server=createServer(async(req,res)=>{
    if(!gateway){res.writeHead(503).end();return;}
    response=await gateway.handle(new Request(`http://bridge${req.url}`,{method:'POST',headers:req.headers,body:Readable.toWeb(req),duplex:'half',signal:abort.signal}));
   }else{
-   const action=path.slice(1);if(!['check','history','search','read','save'].includes(action)||req.url!==path){res.writeHead(404).end();return;}
+   const action=path.slice(1);if(!['check','history','search','read','save','skills'].includes(action)||req.url!==path){res.writeHead(404).end();return;}
    await authorize();let bytes=0;const chunks=[];for await(const chunk of req){bytes+=chunk.length;if(bytes>28*1024*1024)throw Error('too large');chunks.push(chunk);}
    response=await platform(action,JSON.parse(Buffer.concat(chunks).toString()||'{}'),abort.signal);
   }

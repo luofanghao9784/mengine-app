@@ -201,3 +201,12 @@ SDK 0.2.1-rc.2 原生协议不包含回答/审批/停止方法。适配器使用
 - `lastActivityAt` 是平台接收根会话事件的时间，不信任运行时上报的时钟。每会话维护递增投影游标，只增量计算；子会话内容不参与标题与检索。
 - query 最多 200 字符，匹配标题或根会话员工/AI 文本，不区分大小写。每次请求重新检查企业、本人、空间、资料及旧会话依赖；撤权会话从列表/搜索中省略，不能通过缓存读到标题。停止会话仍可读取获权历史。
 - 此批仅提供后端及契约，列表界面接线由前端后续 PR 完成；不表示客户端功能已交付。
+
+## 附录 E：B5 企业技能定稿（2026-10-27）
+
+- 员工 `GET /api/v1/tenants/{t}/native-skills`：`[{name,description}]`，仅返回当前企业已上架且员工可见的技能，用于 `/` 菜单。
+- 管理员 `GET …/admin/native-skills` 返回 `{name,description,markdown,published,audience,revision}[]`；`PUT …/admin/native-skills/{name}` 接受 `{markdown,published,audience}`，管理员提交视为该版本审核，上/下架用 published。audience 是员工 UUID 数组，空数组为全企业；跨企业账号不能加入。
+- 本批采用纯说明书 SKILL.md：YAML 头包含 name、description，正文非空，上限 64 KiB 字符；名称为 DH kebab-case，最大 64 字符。脚本附件包与额外 frontmatter 尚未支持，明确拒绝而不静默忽略。管理端接入是后续界面任务。
+- 引擎通过 DH 0.2.1-rc.2 的 `ctx.skills.registerProvider` 加入企业目录；每个模型 step 前失效目录缓存，正文加载再次向平台核对当前员工及上架状态。原生 `skill` 工具和 `/技能名` 使用同一 provider。技能正文不落到可读本地目录，企业凭据不进入 SDK。
+- 下架从下一次目录发现/正文加载生效，不会抹去模型已看到的历史正文；企业工具、预算和发布权限仍独立强制执行，技能不是授权来源。
+- 内部 `POST …/{id}/skills` 接受 `{}` 列目录，`{name}` 读正文；只允许该会话当前有效 capability。未配置运行环境时不启动任何模型。
