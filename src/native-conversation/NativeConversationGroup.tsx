@@ -1,26 +1,16 @@
-import { Plus, Sparkles } from 'lucide-react';
+import { Plus } from 'lucide-react';
+import type { NativeConversation } from '../../contracts/public-api/native-conversations';
 import type { Workspace } from '../../contracts/public-api/identity';
 import { useNativeAvailability, useNativeSessions, nativeHref } from './useNativeConversations';
 import { nativeSessionTitle } from './labels';
 import './native-conversation.css';
 
 /**
- * 企业原生会话（试用）：只有部署开启了原生运行环境才出现，旧会话列表保持不变。
- * 列表与状态都来自服务端；这里不做任何权限判断。
+ * Native sessions for the conversation list. They appear only when the deployment enables the
+ * native runtime, and sit in the same space groups as the other conversations. The server decides
+ * what is listed; nothing here checks access.
  */
-export function NativeConversationGroup({
-  tenant,
-  hash,
-  workspaces,
-  titles,
-  revision,
-}: {
-  tenant: string;
-  hash: string;
-  workspaces: Workspace[];
-  titles: Map<string, string>;
-  revision?: number;
-}) {
+export function useNativeList(tenant: string, workspaces: Workspace[], revision?: number) {
   const enabled = useNativeAvailability(tenant);
   const sessions = useNativeSessions(
     tenant,
@@ -28,38 +18,54 @@ export function NativeConversationGroup({
     enabled,
     revision,
   );
-  if (!enabled) return null;
-  const selected = new URLSearchParams(hash.slice(1)).get('native');
-  const spaceName = new Map(workspaces.map((w) => [w.id, w.kind === 'PERSONAL' ? '个人空间' : w.name]));
+  return { enabled, items: sessions.items, error: !!sessions.error };
+}
+
+export function NativeNewLink({ tenant, hash }: { tenant: string; hash: string }) {
+  const selected = new URLSearchParams(hash.slice(1)).get('native') === 'new';
   return (
-    <details className="live-conversation-group native-conversation-group" open>
-      <summary>
-        <Sparkles size={14} />
-        企业原生会话
-        <span className="native-badge">试用</span>
-      </summary>
-      <a
-        className={`native-new-link ${selected === 'new' ? 'selected' : ''}`}
-        href={nativeHref(tenant, 'new')}
-        aria-current={selected === 'new' ? 'page' : undefined}
-      >
-        <Plus size={14} />
-        <span>新建原生会话</span>
-      </a>
-      {sessions.error ? <p className="live-list-empty">原生会话列表暂时无法读取。</p> : null}
-      {sessions.items.map((s) => (
-        <a
-          key={s.id}
-          className={selected === s.id ? 'selected' : ''}
-          href={nativeHref(tenant, s.id)}
-          aria-current={selected === s.id ? 'page' : undefined}
-        >
-          <span className="conversation-list-title">{nativeSessionTitle(s, titles)}</span>
-          <small className="native-row-meta">
-            {spaceName.get(s.workspaceId) ?? '空间'} · {s.state === 'ACTIVE' ? '可继续' : '已停止'}
-          </small>
-        </a>
-      ))}
-    </details>
+    <a
+      className={`native-new-link ${selected ? 'selected' : ''}`}
+      href={nativeHref(tenant, 'new')}
+      aria-current={selected ? 'page' : undefined}
+    >
+      <Plus size={14} aria-hidden="true" />
+      新建原生会话
+    </a>
+  );
+}
+
+export function NativeRows({
+  tenant,
+  hash,
+  items,
+  titles,
+}: {
+  tenant: string;
+  hash: string;
+  items: NativeConversation[];
+  titles: Map<string, string>;
+}) {
+  const selected = new URLSearchParams(hash.slice(1)).get('native');
+  return (
+    <>
+      {items.map((s) => {
+        const title = nativeSessionTitle(s, titles);
+        return (
+          <div className="live-conversation-row" key={s.id}>
+            <a
+              className={selected === s.id ? 'selected' : ''}
+              href={nativeHref(tenant, s.id)}
+              aria-current={selected === s.id ? 'page' : undefined}
+            >
+              <span className="conversation-list-title" title={title}>
+                {title}
+              </span>
+              {s.state === 'STOPPED' && <small className="native-row-meta">已停止</small>}
+            </a>
+          </div>
+        );
+      })}
+    </>
   );
 }

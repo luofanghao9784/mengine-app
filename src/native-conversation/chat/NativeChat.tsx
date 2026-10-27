@@ -1,18 +1,15 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import {
   ArrowUp,
-  Check,
   ChevronRight,
   CircleAlert,
-  CircleStop,
   FileText,
-  ListChecks,
+  Folder,
   Loader2,
-  ShieldQuestion,
   Sparkles,
+  Square,
   ThumbsDown,
   ThumbsUp,
-  Wrench,
 } from 'lucide-react';
 import { Button } from '../../shared/ui';
 import { ReplyText } from '../../conversation/ReplyText';
@@ -60,24 +57,25 @@ export type NativeSkill = { name: string; description?: string };
 
 /** Why the controls are disabled; the page supplies it (session stopped, runtime off, preview…). */
 const Unavailable = createContext('当前不可操作');
+/** Opens the results tab beside the conversation, where delivered files are downloaded and published. */
+const OpenResults = createContext<(() => void) | undefined>(undefined);
 const failure = (e: unknown) => (e instanceof Error ? e.message : '操作未完成，请稍后重试。');
 
 export function NativeChat({
   transcript,
   status,
   actions,
-  summary = '',
   skills = [],
   ratings,
   unavailable = '当前不可操作',
   loading = false,
   notice,
+  workspace,
+  onOpenResults,
 }: {
   transcript: Transcript;
   status?: NativeStatus;
   actions: NativeChatActions;
-  /** One-line long-task progress, e.g. "待办 1/3 · 后台 1 个进行中". */
-  summary?: string;
   skills?: NativeSkill[];
   /** Ratings the employee already gave, by feedback key. */
   ratings?: ReadonlyMap<string, 'up' | 'down'>;
@@ -85,6 +83,9 @@ export function NativeChat({
   loading?: boolean;
   /** Connection or load problem worth telling the reader about; the log shown so far stays. */
   notice?: string;
+  /** The space the session belongs to, shown in the composer like the 梦擎 composer does. */
+  workspace?: string;
+  onOpenResults?: () => void;
 }) {
   const running =
     status && !status.stale && status.running !== undefined ? status.running : transcript.running;
@@ -94,114 +95,96 @@ export function NativeChat({
     const el = scroll.current;
     if (el && el.scrollHeight - el.scrollTop - el.clientHeight < 160) el.scrollTop = el.scrollHeight;
   }, [transcript.lastSeq]);
+  const lastDone = transcript.turns.findLastIndex((t) => t.end?.kind === 'completed');
   return (
     <Unavailable.Provider value={unavailable}>
-      <div
-        className="native-chat"
-        onKeyDown={(e) => {
-          // Esc stops the current round, like the official window; it never closes the page.
-          if (e.key === 'Escape' && running && actions.stop && !e.defaultPrevented) {
-            e.preventDefault();
-            void actions.stop().catch(() => undefined);
-          }
-        }}
-      >
-        <NativeStatusBar
-          running={running}
-          status={status}
-          maintenance={transcript.maintenance}
-          pending={transcript.pending}
-          summary={summary}
-        />
-        {notice && (
-          <p className="native-notice" role="status">
-            {notice}
-          </p>
-        )}
-        <div className="native-chat-scroll conversation-messages" ref={scroll} aria-live="polite">
-          {loading ? (
-            <p className="native-empty" role="status">
-              <Loader2 size={14} className="native-spin" aria-hidden="true" /> 正在载入会话记录…
-            </p>
-          ) : (
-            !transcript.turns.length && (
-              <p className="native-empty">在下面输入你想处理的工作，原生会话会在这里展开。</p>
-            )
-          )}
-          {transcript.turns.map((turn, index) => (
-            <NativeTurn key={`${turn.turn}:${index}`} turn={turn} actions={actions} ratings={ratings} />
-          ))}
+      <OpenResults.Provider value={onOpenResults}>
+        <div
+          className="native-chat"
+          onKeyDown={(e) => {
+            // Esc stops the current round, like the official window; it never closes the page.
+            if (e.key === 'Escape' && running && actions.stop && !e.defaultPrevented) {
+              e.preventDefault();
+              void actions.stop().catch(() => undefined);
+            }
+          }}
+        >
+          <NativeStatusLine transcript={transcript} status={status} notice={notice} />
+          <div className="native-chat-scroll conversation-messages" ref={scroll} aria-live="polite">
+            {loading ? (
+              <p className="native-empty" role="status">
+                <Loader2 size={14} className="native-spin" aria-hidden="true" /> 正在载入会话记录…
+              </p>
+            ) : (
+              !transcript.turns.length && (
+                <p className="native-empty">在下面输入你想处理的工作，会话会在这里展开。</p>
+              )
+            )}
+            {transcript.turns.map((turn, index) => (
+              <NativeTurn
+                key={`${turn.turn}:${index}`}
+                turn={turn}
+                actions={actions}
+                rating={index === lastDone ? ratings : undefined}
+                rateable={index === lastDone}
+              />
+            ))}
+          </div>
+          <NativeComposer running={running} actions={actions} skills={skills} workspace={workspace} />
         </div>
-        <NativeComposer running={running} actions={actions} skills={skills} />
-      </div>
+      </OpenResults.Provider>
     </Unavailable.Provider>
   );
 }
 
-function NativeStatusBar({
-  running,
+/**
+ * One line, only when something needs the employee: a pending decision, a budget limit, a load
+ * problem. Run state lives in the reply itself and in the stop button.
+ */
+function NativeStatusLine({
+  transcript,
   status,
-  maintenance,
-  pending,
-  summary,
+  notice,
 }: {
-  running: boolean;
+  transcript: Transcript;
   status?: NativeStatus;
-  maintenance: Transcript['maintenance'];
-  pending: Transcript['pending'];
-  summary: string;
+  notice?: string;
 }) {
-  const waiting = pending.approvals + pending.questions;
+  const { approvals, questions, planReview } = transcript.pending;
+  const waiting = approvals + questions;
   const budget = status?.budget;
   const occupied = budget ? budget.usedYuan + (budget.reservedYuan ?? 0) : 0;
-  const level = budget
-    ? budget.blocked || occupied >= budget.hardYuan
-      ? 'hard'
-      : occupied >= budget.softYuan
-        ? 'soft'
-        : 'ok'
-    : null;
+  const goTo = () =>
+    document
+      .querySelector('.native-chat [data-pending]')
+      ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  const [text, tone, action] = notice
+    ? [notice, 'warn', null]
+    : planReview
+      ? ['AI 拟好了执行计划，等你审阅后开始', 'warn', '去审阅']
+      : waiting
+        ? [
+            waiting > 1 ? `AI 暂停了，有 ${waiting} 件事等你处理` : 'AI 暂停了，等你确认一件事',
+            'warn',
+            '去处理',
+          ]
+        : budget?.blocked || (budget && occupied >= budget.hardYuan)
+          ? [`本次费用已到上限 ¥${budget.hardYuan}，已暂停执行`, 'error', null]
+          : budget && occupied >= budget.softYuan
+            ? [`本次费用 ¥${occupied.toFixed(2)}，已超过提醒线 ¥${budget.softYuan}`, 'warn', null]
+            : transcript.maintenance
+              ? [transcript.maintenance === 'compacting' ? '正在整理上下文…' : '模型重试中…', 'info', null]
+              : [null, null, null];
+  if (!text) return null;
   return (
-    <div className="native-status" role="status">
-      <span className={`native-run ${running ? 'is-running' : ''}`}>
-        {running ? (
-          <Loader2 size={13} className="native-spin" aria-hidden="true" />
-        ) : (
-          <Check size={13} aria-hidden="true" />
-        )}
-        {running ? '运行中' : '空闲'}
-      </span>
-      {maintenance && (
-        <span className="native-maintenance">
-          {maintenance === 'compacting' ? '正在整理上下文…' : '模型重试中…'}
-        </span>
+    <div className={`native-status-line is-${tone}`} role="status">
+      <span className="native-dot" aria-hidden="true" />
+      <span className="native-status-text">{text}</span>
+      {action && (
+        <button type="button" className="native-link" onClick={goTo}>
+          {action}
+        </button>
       )}
-      {waiting > 0 && (
-        <span className="native-waiting">
-          {pending.planReview ? '计划等你审阅' : `${waiting} 项等你处理`}
-        </span>
-      )}
-      {summary && (
-        <span className="native-progress">
-          <ListChecks size={13} aria-hidden="true" />
-          {summary}
-        </span>
-      )}
-      {budget && (
-        <span
-          className={`native-budget is-${level} ${status?.stale ? 'is-stale' : ''}`}
-          title="已结算费用；“预留”是进行中和用量未确认的部分，两者合计计入提醒与上限"
-        >
-          {status?.stale && '最后记录 · '}
-          已用 ¥{budget.usedYuan.toFixed(2)}
-          {!!budget.reservedYuan && ` · 预留 ¥${budget.reservedYuan.toFixed(2)}`} · 提醒 ¥{budget.softYuan} ·
-          上限 ¥{budget.hardYuan}
-          {budget.elapsedMinutes !== undefined && ` · 本轮 ${Math.round(budget.elapsedMinutes)} 分钟`}
-          {budget.blocked && ' · 已达上限，暂停执行'}
-        </span>
-      )}
-      {status?.stale && <span className="native-maintenance">运行状态暂未更新</span>}
-      {status?.synthetic && <span className="native-maintenance">测试模型，不产生费用</span>}
     </div>
   );
 }
@@ -209,26 +192,68 @@ function NativeStatusBar({
 function NativeTurn({
   turn,
   actions,
-  ratings,
+  rating,
+  rateable,
 }: {
   turn: Turn;
   actions: NativeChatActions;
-  ratings?: ReadonlyMap<string, 'up' | 'down'>;
+  rating?: ReadonlyMap<string, 'up' | 'down'>;
+  rateable: boolean;
 }) {
-  const lastAssistant = [...turn.items].reverse().find((i) => i.kind === 'assistant');
+  const assistants = turn.items.filter((i) => i.kind === 'assistant');
+  const last = turn.items.at(-1);
+  // The reply is the turn's closing text; earlier text is narration and goes with the process.
+  const reply =
+    assistants.at(-1) && (turn.end || last?.kind === 'assistant') && assistants.at(-1)!.text
+      ? assistants.at(-1)!
+      : undefined;
+  const process = turn.items.filter(
+    (i): i is Extract<Item, { kind: 'assistant' }> | ToolItem =>
+      i.kind === 'tool' || (i.kind === 'assistant' && (i !== reply || !!i.reasoning)),
+  );
+  const current = !turn.end
+    ? [...turn.items].reverse().find((i) => i.kind === 'tool' && i.status === 'running')
+    : undefined;
+  const asks = turn.items.filter((i) => i.kind === 'approval' || i.kind === 'question');
+  const files = turn.items.filter((i) => i.kind === 'deliverables');
   return (
     <article className="conversation-turn native-turn">
       {turn.prompts.map((p) => (
         <p key={p.id} className="conversation-user">
           {maskSecrets(p.text)}
-          {p.attachments > 0 && <small className="native-attachments">附件 {p.attachments} 个</small>}
-          {p.references > 0 && <small className="native-attachments">引用资料 {p.references} 份</small>}
+          {(p.attachments > 0 || p.references > 0) && (
+            <small className="native-attachments">
+              {[p.attachments && `附件 ${p.attachments} 个`, p.references && `引用资料 ${p.references} 份`]
+                .filter(Boolean)
+                .join(' · ')}
+            </small>
+          )}
         </p>
       ))}
-      <div className="conversation-result">
-        {turn.items.map((item) => (
-          <NativeItem key={key(item)} item={item} actions={actions} />
-        ))}
+      <div className="conversation-result native-result">
+        {!turn.end && (
+          <p className="native-now">
+            <Loader2 size={13} className="native-spin" aria-hidden="true" />
+            {current?.kind === 'tool' ? `正在${toolLabel(current.name)}…` : '正在处理…'}
+          </p>
+        )}
+        {reply && (
+          <div className="conversation-reply">
+            <ReplyText text={reply.text} />
+            {reply.interrupted && <small className="native-muted">（回复被中断）</small>}
+          </div>
+        )}
+        {process.length > 0 && <NativeProcess items={process} reply={reply} />}
+        {files.map((f) =>
+          f.kind === 'deliverables' ? <NativeFiles key={`files:${f.callId}`} item={f} /> : null,
+        )}
+        {asks.map((item) =>
+          item.kind === 'approval' ? (
+            <NativeApprovalCard key={`approval:${item.id}`} item={item} actions={actions} />
+          ) : item.kind === 'question' ? (
+            <NativeQuestionCard key={`question:${item.callId}`} item={item} actions={actions} />
+          ) : null,
+        )}
         {turn.end?.kind === 'aborted' && <p className="native-turn-end">本轮已停止。</p>}
         {turn.end?.kind === 'blocked' && <p className="native-turn-end">本轮被拦下，未继续执行。</p>}
         {turn.end?.kind === 'error' && (
@@ -243,11 +268,11 @@ function NativeTurn({
               : '。'}
           </p>
         )}
-        {turn.end?.kind === 'completed' && lastAssistant && (
+        {rateable && reply && (
           <NativeFeedback
-            key={lastAssistant.feedbackKey}
-            messageKey={lastAssistant.feedbackKey}
-            initial={ratings?.get(lastAssistant.feedbackKey) ?? null}
+            key={reply.feedbackKey}
+            messageKey={reply.feedbackKey}
+            initial={rating?.get(reply.feedbackKey) ?? null}
             actions={actions}
           />
         )}
@@ -256,85 +281,56 @@ function NativeTurn({
   );
 }
 
-const key = (item: Item) =>
-  item.kind === 'assistant'
-    ? item.key
-    : item.kind === 'approval'
-      ? `approval:${item.id}`
-      : item.kind === 'deliverables'
-        ? `deliverables:${item.callId}`
-        : `${item.kind}:${item.callId}`;
-
-function NativeItem({ item, actions }: { item: Item; actions: NativeChatActions }) {
-  switch (item.kind) {
-    case 'assistant':
-      return (
-        <div className="native-assistant">
-          {item.reasoning && (
-            <details className="native-reasoning">
-              <summary>思考过程</summary>
-              <p>{item.reasoning}</p>
-            </details>
-          )}
-          {item.text && (
-            <div className="conversation-reply">
-              <ReplyText text={item.text} />
-            </div>
-          )}
-          {item.interrupted && <small className="native-muted">（回复被中断）</small>}
-        </div>
-      );
-    case 'tool':
-      return <NativeToolCard tool={item} />;
-    case 'approval':
-      return <NativeApprovalCard item={item} actions={actions} />;
-    case 'question':
-      return <NativeQuestionCard item={item} actions={actions} />;
-    case 'deliverables':
-      return (
-        <div className="native-card native-deliverables">
-          <header>
-            <FileText size={15} aria-hidden="true" />
-            交付了 {item.files.length} 个文件
-          </header>
-          <ul>
-            {item.files.map((f) => (
-              <li key={f.path}>
-                <span>{f.path.split('/').pop()}</span>
-                {f.description && <small>{f.description}</small>}
-              </li>
-            ))}
-          </ul>
-          <p className="native-muted">
-            AI 保存为私人成果后，可在下方“私人成果”中下载，并经你确认发布到共享空间。
-          </p>
-        </div>
-      );
-  }
-}
-
 const statusText: Record<ToolItem['status'], string> = {
   running: '进行中',
-  done: '完成',
+  done: '已完成',
   error: '失败',
   interrupted: '未完成',
 };
 
-function NativeToolCard({ tool }: { tool: ToolItem }) {
+/** The 梦擎 pattern: the whole process folds into one line under the reply. */
+function NativeProcess({
+  items,
+  reply,
+}: {
+  items: (Extract<Item, { kind: 'assistant' }> | ToolItem)[];
+  reply?: Extract<Item, { kind: 'assistant' }>;
+}) {
+  const tools = items.filter((i): i is ToolItem => i.kind === 'tool');
+  const failed = tools.filter((t) => t.status === 'error').length;
+  return (
+    <details className="native-process">
+      <summary>
+        <ChevronRight size={14} className="native-chevron" aria-hidden="true" />
+        处理过程{tools.length ? ` · ${tools.length} 步` : ''}
+        {failed > 0 && <span className="native-failed">，{failed} 步失败</span>}
+      </summary>
+      <div className="native-process-body">
+        {items.map((item) =>
+          item.kind === 'tool' ? (
+            <NativeToolLine key={item.callId} tool={item} />
+          ) : (
+            <div key={item.key} className="native-narration">
+              {item.reasoning && <p className="native-reasoning">{item.reasoning}</p>}
+              {item !== reply && item.text && <ReplyText text={item.text} />}
+            </div>
+          ),
+        )}
+      </div>
+    </details>
+  );
+}
+
+function NativeToolLine({ tool }: { tool: ToolItem }) {
   const summary = toolSummary(tool.name, tool.arguments);
   return (
-    <details className={`native-card native-tool is-${tool.status}`}>
+    <details className={`native-tool is-${tool.status}`}>
       <summary>
-        <Wrench size={14} aria-hidden="true" />
         <span className="native-tool-name">{toolLabel(tool.name)}</span>
-        {summary && <span className="native-tool-summary">{summary}</span>}
-        <span className="native-tool-status">
-          {tool.status === 'running' && <Loader2 size={12} className="native-spin" aria-hidden="true" />}
-          {statusText[tool.status]}
-        </span>
-        <ChevronRight size={14} className="native-chevron" aria-hidden="true" />
+        <span className="native-tool-status">{statusText[tool.status]}</span>
       </summary>
       <div className="native-tool-detail">
+        {summary && <p>{summary}</p>}
         <h4>调用参数</h4>
         <pre>{tool.arguments || '（无）'}</pre>
         {(tool.result || tool.error) && (
@@ -348,6 +344,37 @@ function NativeToolCard({ tool }: { tool: ToolItem }) {
   );
 }
 
+function NativeFiles({ item }: { item: Extract<Item, { kind: 'deliverables' }> }) {
+  const open = useContext(OpenResults);
+  return (
+    <ul className="native-files-inline">
+      {item.files.map((f) => (
+        <li key={f.path} className="native-file">
+          <span className="native-file-icon">
+            <FileText size={16} aria-hidden="true" />
+          </span>
+          <span className="native-file-name">
+            <strong>{f.path.split('/').pop()}</strong>
+            <small>{f.description || '交付文件'}</small>
+          </span>
+          {open && (
+            <button type="button" className="native-link" onClick={open}>
+              在成果中查看
+            </button>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+const approvalText: Record<string, string> = {
+  'allowed-once': '已允许',
+  rejected: '已拒绝',
+  cancelled: '已取消',
+  unavailable: '未能处理',
+};
+
 function NativeApprovalCard({
   item,
   actions,
@@ -358,7 +385,12 @@ function NativeApprovalCard({
   const unavailable = useContext(Unavailable);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const decided = item.outcome;
+  if (item.outcome)
+    return (
+      <p className="native-ask-settled">
+        {approvalText[item.outcome] ?? '已处理'}：{toolLabel(item.toolName)}
+      </p>
+    );
   const decide = async (allow: boolean) => {
     if (!actions.decide) return;
     setBusy(true);
@@ -372,49 +404,30 @@ function NativeApprovalCard({
     }
   };
   return (
-    <div className={`native-card native-approval ${decided ? 'is-settled' : 'is-pending'}`}>
-      <header>
-        <ShieldQuestion size={15} aria-hidden="true" />
-        {decided ? '审批已处理' : '需要你确认'}
-      </header>
+    <div className="native-ask" data-pending>
+      <span className="native-ask-label">等你确认</span>
       <p>
-        AI 想要<strong>{toolLabel(item.toolName)}</strong>
+        AI 想{toolLabel(item.toolName)}
         {item.reason ? `：${item.reason}` : '。'}
       </p>
-      {decided ? (
-        <p className="native-muted">
-          {decided === 'allowed-once'
-            ? '已允许本次执行。'
-            : decided === 'rejected'
-              ? '已拒绝。'
-              : '审批已失效。'}
+      <div className="native-actions">
+        <Button
+          variant="primary"
+          disabled={busy || !actions.decide}
+          title={actions.decide ? undefined : unavailable}
+          onClick={() => decide(true)}
+        >
+          允许
+        </Button>
+        <Button disabled={busy || !actions.decide} onClick={() => decide(false)}>
+          拒绝
+        </Button>
+      </div>
+      {!actions.decide && <p className="native-muted">{unavailable}</p>}
+      {error && (
+        <p className="native-error" role="alert">
+          {error}
         </p>
-      ) : (
-        <>
-          <div className="native-actions">
-            <Button
-              variant="primary"
-              disabled={busy || !actions.decide}
-              title={actions.decide ? undefined : unavailable}
-              onClick={() => decide(true)}
-            >
-              允许本次
-            </Button>
-            <Button
-              disabled={busy || !actions.decide}
-              title={actions.decide ? undefined : unavailable}
-              onClick={() => decide(false)}
-            >
-              拒绝
-            </Button>
-          </div>
-          {!actions.decide && <p className="native-muted">{unavailable}</p>}
-          {error && (
-            <p className="native-error" role="alert">
-              {error}
-            </p>
-          )}
-        </>
       )}
     </div>
   );
@@ -428,35 +441,25 @@ function NativeQuestionCard({
   actions: NativeChatActions;
 }) {
   const plan = item.questions.length === 1 && item.questions[0].intent?.kind === 'plan-review';
-  const cancelled = !item.answered && item.closed === 'cancelled';
-  const late = !item.answered && item.closed === 'timed-out';
+  if (item.answered)
+    return (
+      <p className="native-ask-settled">
+        {plan ? '计划已审阅' : '已回答'}
+        {item.answer ? `：${item.answer}` : ''}
+      </p>
+    );
+  if (item.closed === 'cancelled')
+    return <p className="native-ask-settled">{plan ? '计划审阅已取消' : '提问已取消'}，这一轮已结束。</p>;
   return (
-    <div
-      className={`native-card native-question ${plan ? 'is-plan' : ''} ${item.answered || cancelled ? 'is-settled' : 'is-pending'}`}
-    >
-      <header>
-        {plan ? <ListChecks size={15} aria-hidden="true" /> : <ShieldQuestion size={15} aria-hidden="true" />}
-        {plan
-          ? item.answered
-            ? '计划已审阅'
-            : cancelled
-              ? '计划审阅已取消'
-              : 'AI 拟好了执行计划，等你审阅'
-          : item.answered
-            ? '已回答'
-            : cancelled
-              ? '提问已取消'
-              : 'AI 在等你回答'}
-        {!item.answered && !cancelled && item.deadline && <Countdown deadline={item.deadline} />}
-      </header>
-      {late && (
+    <div className="native-ask" data-pending>
+      <span className="native-ask-label">
+        {plan ? '执行计划 · 等你审阅' : 'AI 在等你回答'}
+        {item.deadline && <Countdown deadline={item.deadline} />}
+      </span>
+      {item.closed === 'timed-out' && (
         <p className="native-muted">等待已超时，AI 先按自己的判断继续了；现在回答仍会送达，AI 会据此调整。</p>
       )}
-      {item.answered ? (
-        <p className="native-muted">{item.answer || '已提交。'}</p>
-      ) : cancelled ? (
-        <p className="native-muted">这一轮已结束，这个问题不再需要回答。</p>
-      ) : plan ? (
+      {plan ? (
         <PlanReview item={item} question={item.questions[0]} actions={actions} />
       ) : (
         <QuestionForm item={item} actions={actions} />
@@ -476,7 +479,7 @@ function Countdown({ deadline }: { deadline: number }) {
   if (!left) return null;
   return (
     <span className="native-countdown">
-      {left >= 60 ? `${Math.floor(left / 60)} 分 ${left % 60} 秒` : `${left} 秒`}内回答
+      · {left >= 60 ? `${Math.floor(left / 60)} 分 ${left % 60} 秒` : `${left} 秒`}内回答
     </span>
   );
 }
@@ -523,7 +526,9 @@ function QuestionForm({
         ? current.includes(label)
           ? current.filter((x) => x !== label)
           : [...current, label]
-        : [label];
+        : current.includes(label)
+          ? []
+          : [label];
       return { ...p, [q.id]: next };
     });
   const ready = item.questions.every((q) => (picked[q.id]?.length ?? 0) > 0 || custom[q.id]?.trim());
@@ -532,26 +537,30 @@ function QuestionForm({
       <fieldset disabled={busy || !actions.answer}>
         {item.questions.map((q) => (
           <div key={q.id} className="native-question-item">
-            {q.header && <span className="native-question-header">{q.header}</span>}
-            <p>{q.question}</p>
+            <p>
+              {q.header && <span className="native-question-header">{q.header} · </span>}
+              {q.question}
+            </p>
             {q.detail && <small className="native-muted">{q.detail}</small>}
-            {q.options?.map((o) => (
-              <label key={o.label} className="native-option">
-                <input
-                  type={q.multiSelect ? 'checkbox' : 'radio'}
-                  name={`${item.callId}:${q.id}`}
-                  checked={(picked[q.id] ?? []).includes(o.label)}
-                  onChange={() => toggle(q, o.label)}
-                />
-                <span>
-                  {o.label}
-                  {o.description && <small>{o.description}</small>}
-                </span>
-              </label>
-            ))}
-            <input
+            {!!q.options?.length && (
+              <div className="native-options" role="group" aria-label={q.question}>
+                {q.options.map((o) => (
+                  <Button
+                    key={o.label}
+                    aria-pressed={(picked[q.id] ?? []).includes(o.label)}
+                    title={o.description}
+                    onClick={() => toggle(q, o.label)}
+                  >
+                    {o.label}
+                  </Button>
+                ))}
+              </div>
+            )}
+            <textarea
               className="native-custom"
-              placeholder="其他回答（可选）"
+              rows={1}
+              aria-label={`补充回答：${q.question}`}
+              placeholder="补充说明（可选）"
               value={custom[q.id] ?? ''}
               onChange={(e) => setCustom((c) => ({ ...c, [q.id]: e.target.value }))}
             />
@@ -612,10 +621,8 @@ function PlanReview({
   };
   return (
     <>
-      <p className="native-muted">在你确认之前不会开始执行。</p>
       <fieldset disabled={busy || !actions.review}>
         <div className="native-question-item">
-          {question.header && <span className="native-question-header">{question.header}</span>}
           <ReplyText text={question.question} />
           {question.detail && <small className="native-muted">{question.detail}</small>}
           <textarea
@@ -636,7 +643,7 @@ function PlanReview({
           >
             {question.intent?.approve || '按计划执行'}
           </Button>
-          <Button variant="ghost" disabled={!comment.trim()} onClick={() => review(false)}>
+          <Button disabled={!comment.trim()} onClick={() => review(false)}>
             退回修改
           </Button>
         </div>
@@ -651,6 +658,7 @@ function PlanReview({
   );
 }
 
+/** Shown on the last finished reply only; on pointer devices it appears when the reply is hovered. */
 function NativeFeedback({
   messageKey,
   initial,
@@ -672,7 +680,7 @@ function NativeFeedback({
     }
   };
   return (
-    <div className="native-feedback">
+    <div className={`native-feedback ${sent ? 'is-rated' : ''}`}>
       <button type="button" aria-label="有用" aria-pressed={sent === 'up'} onClick={() => send('up')}>
         <ThumbsUp size={14} />
       </button>
@@ -683,14 +691,17 @@ function NativeFeedback({
   );
 }
 
+/** Uses the 梦擎 composer's own classes so both conversation pages share one input. */
 function NativeComposer({
   running,
   actions,
   skills,
+  workspace,
 }: {
   running: boolean;
   actions: NativeChatActions;
   skills: NativeSkill[];
+  workspace?: string;
 }) {
   const unavailable = useContext(Unavailable);
   const [text, setText] = useState('');
@@ -724,19 +735,23 @@ function NativeComposer({
       setBusy(false);
     }
   };
+  const stop = async () => {
+    try {
+      await actions.stop?.();
+    } catch (e) {
+      setError(failure(e));
+    }
+  };
+  // While a round runs with nothing typed, the send button becomes the stop button.
+  const stopping = running && !text.trim();
   return (
     <form
-      className="native-composer"
+      className="conversation-composer is-expanded native-composer"
       onSubmit={(e) => {
         e.preventDefault();
         void send();
       }}
     >
-      {error && (
-        <p className="native-error" role="alert">
-          {error}
-        </p>
-      )}
       {menu && (
         <ul className="native-skill-menu" role="listbox" id="native-skill-menu" aria-label="技能">
           {matches.length ? (
@@ -764,83 +779,97 @@ function NativeComposer({
           )}
         </ul>
       )}
-      <div className="native-composer-box">
-        <textarea
-          ref={input}
-          aria-label="工作要求"
-          aria-controls={menu ? 'native-skill-menu' : undefined}
-          aria-activedescendant={menu && matches.length ? `native-skill-${active}` : undefined}
-          rows={1}
-          maxLength={8000}
-          value={text}
-          disabled={!actions.send}
-          placeholder={
-            actions.send
-              ? skills.length
-                ? '告诉我你想处理的工作，输入 / 调用技能'
-                : '告诉我你想处理的工作'
-              : unavailable
-          }
-          onChange={(e) => {
-            setText(e.target.value);
-            setActive(0);
-            setDismissed(false);
-          }}
-          onCompositionStart={() => (composing.current = true)}
-          onCompositionEnd={() => (composing.current = false)}
-          onKeyDown={(e) => {
-            if (menu && !composing.current && !e.nativeEvent.isComposing) {
-              if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-                e.preventDefault();
-                if (matches.length)
-                  setActive((i) => (i + (e.key === 'ArrowDown' ? 1 : matches.length - 1)) % matches.length);
-                return;
-              }
-              if ((e.key === 'Enter' || e.key === 'Tab') && matches[active]) {
-                e.preventDefault();
-                pick(matches[active]);
-                return;
-              }
-              if (e.key === 'Escape') {
-                // Close the list only; Esc to stop the round applies when no list is open.
-                e.preventDefault();
-                setDismissed(true);
-                return;
-              }
+      <div className="live-composer-surface">
+        {error && (
+          <div className="composer-notices">
+            <p className="native-error" role="alert">
+              {error}
+            </p>
+          </div>
+        )}
+        <div className="live-composer-input">
+          <textarea
+            ref={input}
+            aria-label="工作要求"
+            aria-controls={menu ? 'native-skill-menu' : undefined}
+            aria-activedescendant={menu && matches.length ? `native-skill-${active}` : undefined}
+            rows={2}
+            maxLength={8000}
+            value={text}
+            disabled={!actions.send}
+            placeholder={
+              actions.send
+                ? skills.length
+                  ? '告诉我你想处理的工作，输入 / 调用技能'
+                  : '告诉我你想处理的工作'
+                : unavailable
             }
-            if (e.key === 'Enter' && !e.shiftKey && !composing.current && !e.nativeEvent.isComposing) {
-              e.preventDefault();
-              void send();
-            }
-          }}
-        />
-        <div className="native-composer-actions">
-          {running && (
-            <Button
-              variant="ghost"
-              icon={CircleStop}
-              disabled={!actions.stop}
-              title={actions.stop ? '停止本轮' : unavailable}
-              onClick={async () => {
-                try {
-                  await actions.stop?.();
-                } catch (e) {
-                  setError(failure(e));
+            onChange={(e) => {
+              setText(e.target.value);
+              setActive(0);
+              setDismissed(false);
+            }}
+            onCompositionStart={() => (composing.current = true)}
+            onCompositionEnd={() => (composing.current = false)}
+            onKeyDown={(e) => {
+              if (menu && !composing.current && !e.nativeEvent.isComposing) {
+                if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                  e.preventDefault();
+                  if (matches.length)
+                    setActive((i) => (i + (e.key === 'ArrowDown' ? 1 : matches.length - 1)) % matches.length);
+                  return;
                 }
-              }}
-            >
-              停止
-            </Button>
-          )}
+                if ((e.key === 'Enter' || e.key === 'Tab') && matches[active]) {
+                  e.preventDefault();
+                  pick(matches[active]);
+                  return;
+                }
+                if (e.key === 'Escape') {
+                  // Close the list only; Esc to stop the round applies when no list is open.
+                  e.preventDefault();
+                  setDismissed(true);
+                  return;
+                }
+              }
+              if (e.key === 'Enter' && !e.shiftKey && !composing.current && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                void send();
+              }
+            }}
+          />
+        </div>
+        <div className="live-composer-controls">
+          <div className="live-composer-controls-content">
+            <div className="live-composer-tools">
+              {workspace && (
+                <span className="button live-workspace-label" title="会话工作空间">
+                  <Folder size={16} aria-hidden="true" />
+                  {workspace}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+        {stopping ? (
+          <Button
+            icon={Square}
+            className="live-composer-submit native-stop"
+            variant="primary"
+            aria-label="停止本轮"
+            title={actions.stop ? '停止本轮（Esc）' : unavailable}
+            disabled={!actions.stop}
+            onClick={() => void stop()}
+          />
+        ) : (
           <Button
             icon={ArrowUp}
-            className="native-send"
+            className="live-composer-submit"
             type="submit"
             variant="primary"
             aria-label="发送"
             disabled={!actions.send || !text.trim() || busy}
           />
-        </div>
+        )}
       </div>
     </form>
   );

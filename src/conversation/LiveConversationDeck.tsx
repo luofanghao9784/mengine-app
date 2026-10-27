@@ -40,6 +40,8 @@ export type CompanionCard = {
   label: string;
   /** Type label on the card header; defaults by kind. */
   tag?: '资料' | '画报' | '进展' | '成果';
+  /** Icon on the phone card switcher; defaults by kind. */
+  icon?: LucideIcon;
   content: ReactNode;
   close: () => void;
 };
@@ -462,9 +464,10 @@ export function LiveConversationDeck({
                         ? reader
                           ? FileText
                           : MessageSquare
-                        : card?.kind === 'file'
-                          ? File
-                          : FileText
+                        : (card?.icon ??
+                          (card?.kind === 'file'
+                            ? File
+                            : FileText))
                     }
                     label={id === 'conversation' ? (reader ? '正文' : '对话') : card?.label || ''}
                   />

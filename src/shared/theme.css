@@ -45,6 +45,12 @@
   --surface-raised: #fff;
   --glass-blur: none;
   --glass-edge: var(--card-edge);
+  /* 状态色：只用在需要提醒的地方（等你处理、超出提醒线、失败、完成）。 */
+  --state-warn: #9a5b10;
+  --state-warn-soft: rgb(196 128 32 / 12%);
+  --state-error: #a14e4e;
+  --state-error-soft: rgb(161 78 78 / 9%);
+  --state-ok: #2f7a4f;
 }
 /* DEC-130 客户端 D 克制版：冷色柔光、毛玻璃、单一靛蓝强调色。 */
 :root[data-surface='workspace'] {

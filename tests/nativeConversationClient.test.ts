@@ -84,5 +84,5 @@ test('sessions are named by what they continue, or by when they began', () => {
     nativeSessionTitle({ ...session, legacyConversationId: legacy } as never, new Map()),
     '接续旧会话',
   );
-  assert.match(nativeSessionTitle(session as never, titles), /^原生会话 · 10\/26 15:26$/);
+  assert.match(nativeSessionTitle(session as never, titles), /^新会话 · 10\/26 15:26$/);
 });

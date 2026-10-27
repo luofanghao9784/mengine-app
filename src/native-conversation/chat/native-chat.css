@@ -1,4 +1,7 @@
-/* 原生会话在梦擎会话卡片里的对话视图：沿用旧会话的气泡、回复与输入框样式，新增工具、审批、提问卡片。 */
+/*
+ * 原生会话的对话视图。气泡、回复、输入框直接用梦擎会话页的样式（conversation.css）；
+ * 这里只补原生会话特有的部分：状态提示、处理过程、等你处理的卡片、进展与成果。颜色只用主题变量。
+ */
 .native-chat {
   display: flex;
   flex-direction: column;
@@ -10,43 +13,24 @@
   min-height: 0;
   overflow: auto;
 }
-.native-status {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 24px 8px;
+.native-muted {
+  margin: 0;
+  color: var(--ink-3);
   font-size: 12px;
-  color: var(--ink-3);
+  line-height: 1.6;
 }
-.native-run {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: var(--soft);
-  color: var(--ink-2);
-}
-.native-run.is-running {
-  background: var(--accent-soft);
+.native-link {
+  padding: 0;
+  border: 0;
+  background: none;
   color: var(--accent);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
 }
-.native-maintenance {
-  color: var(--ink-3);
-}
-.native-budget {
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: var(--soft);
-}
-.native-budget.is-soft {
-  background: #fdf4e3;
-  color: #8a5a12;
-}
-.native-budget.is-hard {
-  background: #fdf1ec;
-  color: #a24a21;
+.native-link:hover {
+  color: var(--accent-hover);
 }
 .native-spin {
   animation: native-spin 1s linear infinite;
@@ -61,7 +45,46 @@
     animation: none;
   }
 }
-.native-turn .conversation-result {
+
+/* 顶部只在需要员工时出现一行。 */
+.native-status-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 20px 6px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--soft);
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.native-status-text {
+  flex: 1;
+  min-width: 0;
+}
+.native-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ink-3);
+}
+.native-status-line.is-warn .native-dot {
+  background: var(--state-warn);
+}
+.native-status-line.is-error .native-dot {
+  background: var(--state-error);
+}
+.native-status-line.is-error {
+  color: var(--state-error);
+}
+.native-status-line.is-info .native-dot {
+  background: var(--accent);
+}
+
+/* 每轮：结论在前，处理过程收成一行。 */
+.native-result {
   display: grid;
   gap: 10px;
 }
@@ -70,208 +93,239 @@
   margin-top: 4px;
   opacity: 0.75;
 }
-.native-reasoning {
-  margin-bottom: 6px;
+.native-now {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--accent);
+  font-size: 12px;
+}
+.native-process > summary,
+.native-tool > summary {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  list-style: none;
+  cursor: pointer;
+}
+.native-process > summary::-webkit-details-marker,
+.native-tool > summary::-webkit-details-marker {
+  display: none;
+}
+.native-process > summary {
   color: var(--ink-3);
+  font-size: 12px;
+}
+.native-process > summary:hover {
+  color: var(--ink-2);
+}
+.native-failed {
+  color: var(--state-error);
+}
+.native-chevron {
+  transition: rotate 0.15s;
+}
+.native-process[open] > summary .native-chevron {
+  rotate: 90deg;
+}
+.native-process-body {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 0 6px;
+  padding-left: 12px;
+  border-left: 1px solid var(--line);
   font-size: 13px;
 }
-.native-reasoning summary {
-  cursor: pointer;
-  width: fit-content;
+.native-narration {
+  color: var(--ink-2);
 }
-.native-reasoning p {
-  margin: 6px 0 0;
-  padding-left: 10px;
-  border-left: 2px solid var(--line);
+.native-reasoning {
+  margin: 0 0 4px;
+  color: var(--ink-3);
   line-height: 1.7;
   white-space: pre-wrap;
 }
-.native-muted {
-  margin: 0;
-  color: var(--ink-3);
-  font-size: 12px;
-  line-height: 1.6;
-}
-.native-card {
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: #fff;
-  font-size: 13px;
-}
-.native-card > header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 12px 0;
-  font-weight: 600;
-}
-.native-card > p,
-.native-card > ul,
-.native-card > .native-actions,
-.native-card > fieldset {
-  margin: 8px 12px;
-}
-.native-card > .native-muted:last-child,
-.native-card > .native-actions:last-child {
-  margin-bottom: 12px;
-}
-/* 工具过程：默认收起成一行，展开看参数与结果。 */
-.native-tool {
-  background: var(--soft);
-  border-color: transparent;
-}
-.native-tool summary {
-  display: flex;
-  align-items: center;
+.native-tool > summary {
   gap: 8px;
-  min-width: 0;
-  padding: 8px 12px;
-  cursor: pointer;
-  list-style: none;
-}
-.native-tool summary::-webkit-details-marker {
-  display: none;
-}
-.native-tool-name {
-  flex: none;
-  font-weight: 550;
-}
-.native-tool-summary {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  color: var(--ink-3);
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  color: var(--ink-2);
 }
 .native-tool-status {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  gap: 4px;
-  margin-left: auto;
   color: var(--ink-3);
   font-size: 12px;
 }
-.native-tool.is-error .native-tool-status,
-.native-tool.is-interrupted .native-tool-status {
-  color: #a24a21;
+.native-tool.is-error .native-tool-status {
+  color: var(--state-error);
 }
 .native-tool.is-running .native-tool-status {
   color: var(--accent);
 }
-.native-chevron {
-  flex: none;
-  color: var(--ink-3);
-  transition: rotate 0.15s;
-}
-.native-tool[open] .native-chevron {
-  rotate: 90deg;
-}
 .native-tool-detail {
-  padding: 0 12px 12px;
+  margin: 6px 0 4px;
+}
+.native-tool-detail p {
+  margin: 0 0 6px;
+  color: var(--ink-2);
 }
 .native-tool-detail h4 {
-  margin: 8px 0 4px;
+  margin: 6px 0 4px;
   color: var(--ink-3);
   font-size: 12px;
   font-weight: 500;
 }
 .native-tool-detail pre {
-  max-height: 240px;
+  max-height: 220px;
   margin: 0;
   overflow: auto;
   padding: 8px 10px;
-  border-radius: 10px;
-  background: #fff;
+  border-radius: 8px;
+  background: var(--soft);
   font-size: 12px;
   line-height: 1.6;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-/* 需要员工处理的卡片（审批、提问）用强调边框，处理后变回普通样式。 */
-.native-card.is-pending {
-  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
-  box-shadow: 0 4px 16px rgb(40 80 170 / 8%);
-}
-.native-card.is-settled {
-  background: var(--soft);
-  border-color: transparent;
-}
-.native-question fieldset {
+
+/* 交付文件：和梦擎的成果文件同一种行。 */
+.native-files-inline {
   display: grid;
-  gap: 12px;
-  padding: 0;
-  border: 0;
-}
-.native-question-item p {
-  margin: 2px 0 6px;
-  line-height: 1.6;
-}
-.native-question-header {
-  display: inline-block;
-  padding: 0 6px;
-  border-radius: 6px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-size: 11px;
-}
-.native-option {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 6px 8px;
-  border-radius: 10px;
-  cursor: pointer;
-}
-.native-card .native-option input[type] {
-  display: inline-block;
-  flex: none;
-  width: 16px;
-  height: 16px;
-  min-height: 0;
-  padding: 0;
-  margin: 4px 0 0;
-}
-.native-option > span {
-  flex: 1;
-  min-width: 0;
-}
-.native-option:hover {
-  background: var(--soft);
-}
-.native-option small {
-  display: block;
-  color: var(--ink-3);
-}
-.native-custom {
-  width: 100%;
-  margin-top: 4px;
-}
-.native-deliverables ul {
-  display: grid;
-  gap: 4px;
+  gap: 6px;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
-.native-deliverables li span {
-  font-weight: 550;
+.native-file {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 400px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
 }
-.native-deliverables li small {
-  margin-left: 8px;
+.native-file-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.native-file-name {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+.native-file-name strong {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.native-file-name small {
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
+/* 等你处理：审批、提问、计划审阅共用一种卡片；处理完收成一行。 */
+.native-ask {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--soft);
+  font-size: 14px;
+}
+.native-ask > p {
+  margin: 0;
+  line-height: 1.6;
+}
+.native-ask-label {
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 500;
+}
+.native-countdown {
+  color: var(--ink-3);
+  font-weight: 400;
+}
+.native-ask-settled {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: 13px;
+}
+.native-ask fieldset {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.native-question-item {
+  display: grid;
+  gap: 8px;
+}
+.native-question-item > p {
+  margin: 0;
+  line-height: 1.6;
+}
+.native-question-header {
   color: var(--ink-3);
 }
+.native-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.native-options .button[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.native-ask .native-custom {
+  width: 100%;
+  min-height: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-raised);
+  font: inherit;
+  font-size: 13px;
+  resize: vertical;
+}
+.native-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.native-error {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--state-error-soft);
+  color: var(--state-error);
+  font-size: 13px;
+  line-height: 1.6;
+}
 .native-turn-end {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   margin: 0;
   color: var(--ink-3);
   font-size: 12px;
 }
 .native-turn-end.is-error {
-  color: #a24a21;
+  color: var(--state-error);
 }
+
+/* 评价：只在最后一轮；有鼠标的设备上移到回复上才出现。 */
 .native-feedback {
   display: flex;
   gap: 4px;
@@ -281,96 +335,46 @@
   place-items: center;
   width: 28px;
   height: 28px;
-  padding: 0;
   border: 0;
   border-radius: 8px;
-  background: transparent;
+  background: none;
   color: var(--ink-3);
+  cursor: pointer;
+}
+.native-feedback button:hover {
+  background: var(--soft);
 }
 .native-feedback button[aria-pressed='true'] {
-  background: var(--accent-soft);
   color: var(--accent);
 }
-.native-composer {
-  display: grid;
-  gap: 6px;
-  margin: 8px 16px 16px;
-}
-.native-composer-box {
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
-  padding: 8px 8px 8px 14px;
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  background: #fff;
-  box-shadow: 0 4px 16px rgb(30 50 90 / 6%);
-}
-.native-composer-box:focus-within {
-  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
-}
-.native-composer textarea {
-  flex: 1;
-  min-width: 0;
-  min-height: 24px;
-  max-height: 160px;
-  padding: 6px 0;
-  border: 0;
-  background: transparent;
-  font: inherit;
-  line-height: 1.6;
-  resize: none;
-  field-sizing: content;
-  outline: none;
-  box-shadow: none;
-}
-.native-composer-actions {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: 6px;
-}
-.native-send {
-  width: 36px;
-  height: 36px;
-  min-height: 36px;
-  padding: 0;
-  justify-content: center;
-  border-radius: 50%;
-}
-@media (max-width: 800px) {
-  .native-status {
-    padding: 6px 16px 8px;
+@media (hover: hover) {
+  .native-feedback:not(.is-rated) {
+    opacity: 0;
+    transition: opacity 0.15s;
   }
-  .native-composer {
-    margin: 8px 10px 10px;
+  .native-turn:hover .native-feedback,
+  .native-feedback:focus-within {
+    opacity: 1;
   }
 }
 
-/* 第二批：状态栏摘要、计划审阅、技能菜单、任务进展卡 */
-.native-waiting {
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: #fdf4e3;
-  color: #8a5a12;
-}
-.native-progress {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--ink-2);
-}
-.native-question.is-plan.is-pending {
-  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
-}
+/* 输入框沿用梦擎的；停止键占发送键的位置。 */
 .native-composer {
   position: relative;
 }
+.native-composer .native-stop svg {
+  width: 13px;
+  height: 13px;
+  fill: currentColor;
+}
+.native-composer .composer-notices {
+  padding: 10px 12px 0;
+}
 .native-skill-menu {
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: calc(100% - 4px);
+  left: 18px;
+  right: 18px;
+  bottom: calc(100% - 6px);
   z-index: 5;
   max-height: 260px;
   overflow: auto;
@@ -379,7 +383,7 @@
   list-style: none;
   border: 1px solid var(--line);
   border-radius: 14px;
-  background: #fff;
+  background: var(--surface-raised);
   box-shadow: 0 10px 30px rgb(30 50 90 / 12%);
 }
 .native-skill-menu li {
@@ -404,17 +408,50 @@
 .native-skill-menu small {
   color: var(--ink-3);
 }
-.native-work {
+
+/* 进展与成果：一张卡，两个分页。 */
+.native-side {
   display: grid;
   gap: 18px;
-  padding: 4px 2px 12px;
+  align-content: start;
+  padding: 0 20px 24px;
 }
-.native-plan-chip {
-  margin: 0;
-  padding: 8px 12px;
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
+.native-tabs {
+  display: flex;
+  gap: 2px;
+  width: fit-content;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--soft);
+}
+.native-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
   color: var(--ink-2);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.native-tabs button[aria-selected='true'] {
+  background: var(--surface-raised);
+  box-shadow: 0 1px 4px rgb(30 50 90 / 8%);
+  color: var(--ink);
+  font-weight: 500;
+}
+.native-tabs button span {
+  color: var(--ink-3);
+  font-size: 12px;
+  font-weight: 400;
+}
+.native-work,
+.native-results {
+  display: grid;
+  gap: 24px;
 }
 .native-work-section {
   display: grid;
@@ -423,31 +460,34 @@
 .native-work-section h3 {
   display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: space-between;
+  gap: 8px;
   margin: 0;
-  font-size: 14px;
-}
-.native-work-section h3 .native-chip,
-.native-work-section h3 .native-muted {
-  margin-left: auto;
+  color: var(--ink-3);
+  font-size: 12px;
   font-weight: 400;
 }
 .native-goal {
   margin: 0;
-  line-height: 1.6;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.55;
 }
 .native-todos,
 .native-rows {
   display: grid;
-  gap: 6px;
   margin: 0;
   padding: 0;
   list-style: none;
+}
+.native-todos {
+  gap: 8px;
 }
 .native-todos li {
   display: flex;
   align-items: flex-start;
   gap: 8px;
+  font-size: 14px;
   line-height: 1.5;
 }
 .native-todos li svg {
@@ -461,46 +501,73 @@
 .native-todos li.is-completed span {
   text-decoration: line-through;
 }
+.native-todos li.is-completed svg {
+  color: var(--state-ok);
+}
 .native-todos li.is-in_progress svg {
   color: var(--accent);
 }
 .native-rows li {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 4px 8px;
-  padding: 8px 10px;
-  border-radius: 10px;
-  background: var(--soft);
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+}
+.native-rows li:last-child {
+  border-bottom: 0;
 }
 .native-row-title {
   flex: 1;
   min-width: 0;
 }
-.native-rows li small {
-  flex-basis: 100%;
-}
-.native-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 1px 8px;
-  border-radius: 999px;
-  background: #fff;
+.native-row-state {
+  color: var(--ink-3);
   font-size: 12px;
-  color: var(--ink-2);
 }
-.native-chip.is-running,
-.native-chip.is-active {
+.native-row-state.is-running {
   color: var(--accent);
 }
-.native-chip.is-completed,
-.native-chip.is-complete {
-  color: #2f7a4f;
+.native-row-state.is-done {
+  color: var(--state-ok);
 }
-.native-chip.is-failed,
-.native-chip.is-killed,
-.native-chip.is-error,
-.native-chip.is-blocked {
-  color: #a24a21;
+.native-row-state.is-failed {
+  color: var(--state-error);
+}
+.native-cost {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  margin: 0;
+}
+.native-cost strong {
+  font-size: 22px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.native-cost small {
+  color: var(--ink-3);
+  font-size: 12px;
+}
+.native-meter {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--soft);
+}
+.native-meter span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+}
+@media (max-width: 800px) {
+  .native-status-line {
+    margin: 0 16px 6px;
+  }
+  .native-side {
+    padding: 0 16px 24px;
+  }
 }

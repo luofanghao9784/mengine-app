@@ -1,50 +1,23 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import {
-  ArrowUpRight,
-  Download,
-  ExternalLink,
-  FolderCog,
-  ListChecks,
-  Pause,
-  Play,
-  RefreshCw,
-  Share2,
-} from 'lucide-react';
+import { ArrowUpRight, Download, ListChecks, Pause, Play, RefreshCw, Share2 } from 'lucide-react';
 import type { Workspace } from '../../contracts/public-api/identity';
-import type {
-  NativeArtifact,
-  NativeConversation,
-  NativeConversationGrant,
-} from '../../contracts/public-api/native-conversations';
+import type { NativeArtifact, NativeConversation } from '../../contracts/public-api/native-conversations';
 import { LiveConversationDeck } from '../conversation/LiveConversationDeck';
 import { CardTypeTag } from '../conversation/CardTypeTag';
 import { Button, Field, IconButton } from '../shared/ui';
 import { IdentityError } from '../identity/client';
-import { nativeConversationClient as api, openNativeWindow, reserveNativeWindow } from './client';
+import { nativeConversationClient as api } from './client';
 import { useNativeSessions, nativeHref } from './useNativeConversations';
 import { nativeSessionTitle } from './labels';
-import { NativeChat } from './chat/NativeChat';
+import { NativeChat, type NativeStatus } from './chat/NativeChat';
 import { useNativeFeed } from './chat/useNativeFeed';
 import { buildTranscript } from './chat/transcript.ts';
-import { buildWorkState, hasWork } from './chat/work.ts';
-import { NativeWorkPanel, workSummary } from './chat/NativeWorkPanel';
+import { buildWorkState } from './chat/work.ts';
+import { NativeWorkPanel, workCount } from './chat/NativeWorkPanel';
 import './native-conversation.css';
 
 const oldConversationHref = (tenant: string, id: string) =>
   '#' + new URLSearchParams({ tenant, view: 'conversations', conversation: id });
-/**
- * 在点击的同一时刻先占好新窗口（浏览器只允许这时弹出），拿到一次性授权后再把官方会话载入其中；
- * 请求失败就关掉这个空窗口。
- */
-async function launchInto(grant: () => Promise<NativeConversationGrant>) {
-  const target = reserveNativeWindow();
-  try {
-    openNativeWindow(await grant(), target.name);
-  } catch (error) {
-    target.close();
-    throw error;
-  }
-}
 const message = (error: unknown) =>
   error instanceof IdentityError
     ? error.message
@@ -57,10 +30,11 @@ const size = (bytes: number) =>
     : bytes < 1024 * 1024
       ? `${(bytes / 1024).toFixed(1)} KB`
       : `${(bytes / 1048576).toFixed(1)} MB`;
+const spaceName = (w?: Workspace) => (w ? (w.kind === 'PERSONAL' ? '个人空间' : w.name) : '');
 
 /**
- * 原生会话在梦擎会话页里的视图。执行在官方 DH 会话窗口里进行（关掉本页不影响任务）；
- * 这里负责开启 / 停止 / 继续、私人成果与员工确认发布。所有状态都来自服务端回执。
+ * 原生会话在梦擎会话页里的视图：对话在这张卡片里进行，旁边一张“进展 / 成果”卡。
+ * 所有状态都来自服务端回执与会话记录。
  */
 export function NativeConversationView({
   tenant,
@@ -93,7 +67,6 @@ export function NativeConversationView({
     onChanged();
   };
   const isNew = id === 'new';
-  // 平台接通事件转发（B1）后，会话直接在这张卡片里进行；在此之前保持“执行与成果”的现有布局。
   const feed = useNativeFeed(tenant, id, { enabled: !isNew, active: session?.state === 'ACTIVE' });
   const transcript = useMemo(() => (feed ? buildTranscript(feed.events) : null), [feed]);
   const work = useMemo(() => (feed ? buildWorkState(feed.events) : null), [feed]);
@@ -108,31 +81,19 @@ export function NativeConversationView({
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [tenant, isNew]);
-  const [manageOpen, setManageOpen] = useState(true);
-  const [workOpen, setWorkOpen] = useState(true);
+  const [sideOpen, setSideOpen] = useState(true);
+  const [tab, setTab] = useState<'work' | 'results'>('work');
   const chat = !!(feed && transcript && session);
-  const showWork = chat && !!work && hasWork(work);
+  const space = spaceName(workspaces.find((w) => w.id === session?.workspaceId));
   const title = isNew
-    ? '新建原生会话'
-    : transcript?.title || (session ? nativeSessionTitle(session, titles) : '原生会话');
-  const status = isNew
-    ? '企业资料与权限沿用梦擎；执行在官方会话窗口中进行'
-    : session
-      ? session.state === 'ACTIVE'
-        ? chat
-          ? '可继续'
-          : '可继续 · 执行在官方会话窗口中进行'
-        : '已停止 · 执行授权已撤销'
-      : '';
-  const detail = session && (
-    <NativeSessionDetail
-      tenant={tenant}
-      session={session}
-      workspaces={workspaces}
-      legacyTitle={session.legacyConversationId ? titles.get(session.legacyConversationId) : undefined}
-      onChanged={refresh}
-    />
-  );
+    ? '新会话'
+    : transcript?.title || (session ? nativeSessionTitle(session, titles) : '会话');
+  const subtitle = isNew ? '' : session?.state === 'STOPPED' ? `${space} · 已停止` : space;
+  const openResults = () => {
+    setTab('results');
+    setSideOpen(true);
+  };
+  const count = work ? workCount(work) : '';
   return (
     <LiveConversationDeck
       tenant={tenant}
@@ -142,59 +103,75 @@ export function NativeConversationView({
       heading={
         <>
           <h2 title={title}>{title}</h2>
-          {status && <p>{status}</p>}
+          {subtitle && <p>{subtitle}</p>}
         </>
       }
       headerActions={
-        chat && (!manageOpen || (showWork && !workOpen)) ? (
-          <>
-            {showWork && !workOpen && (
-              <IconButton icon={ListChecks} label="任务进展" onClick={() => setWorkOpen(true)} />
-            )}
-            {!manageOpen && (
-              <IconButton icon={FolderCog} label="执行与成果" onClick={() => setManageOpen(true)} />
-            )}
-          </>
+        chat && !sideOpen ? (
+          <IconButton icon={ListChecks} label="进展与成果" onClick={() => setSideOpen(true)} />
         ) : undefined
       }
       onClose={() => {
         location.hash = '#tenant=' + tenant + '&view=briefing';
       }}
-      cards={[
-        ...(showWork && workOpen && work
+      cards={
+        chat && session && sideOpen
           ? [
               {
-                id: 'native-work',
+                id: 'native-side',
                 kind: 'file' as const,
-                tag: '进展' as const,
-                title: '任务进展',
-                label: '任务进展',
-                content: <NativeWorkPanel work={work} />,
-                close: () => setWorkOpen(false),
+                tag: tab === 'work' ? ('进展' as const) : ('成果' as const),
+                icon: ListChecks,
+                title,
+                label: count ? `进展 ${count}` : '进展',
+                content: (
+                  <div className="native-side">
+                    <div className="native-tabs" role="tablist" aria-label="进展与成果">
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-selected={tab === 'work'}
+                        onClick={() => setTab('work')}
+                      >
+                        进展{count && <span>{count}</span>}
+                      </button>
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-selected={tab === 'results'}
+                        onClick={() => setTab('results')}
+                      >
+                        成果
+                      </button>
+                    </div>
+                    {tab === 'work' && work ? (
+                      <NativeWorkPanel work={work} />
+                    ) : (
+                      <NativeResults
+                        tenant={tenant}
+                        session={session}
+                        workspaces={workspaces}
+                        status={feed?.status}
+                        legacyTitle={
+                          session.legacyConversationId ? titles.get(session.legacyConversationId) : undefined
+                        }
+                        onChanged={refresh}
+                      />
+                    )}
+                  </div>
+                ),
+                close: () => setSideOpen(false),
               },
             ]
-          : []),
-        ...(chat && manageOpen
-          ? [
-              {
-                id: 'native-manage',
-                kind: 'file' as const,
-                tag: '成果' as const,
-                title: '执行与成果',
-                label: '执行与成果',
-                content: <div className="native-reader-body">{detail}</div>,
-                close: () => setManageOpen(false),
-              },
-            ]
-          : []),
-      ]}
+          : []
+      }
     >
       <section className="conversation-reader native-reader">
         <header className="deck-card-header live-card-heading">
           <div>
             <CardTypeTag type="会话" />
             <h2 title={title}>{title}</h2>
-            {status && <p className="muted">{status}</p>}
+            {subtitle && <p className="muted">{subtitle}</p>}
           </div>
         </header>
         {chat && feed && transcript ? (
@@ -208,8 +185,9 @@ export function NativeConversationView({
               transcript={transcript}
               status={feed.status}
               actions={feed.actions}
-              summary={work ? workSummary(work) : ''}
               skills={feed.skills}
+              workspace={space}
+              onOpenResults={openResults}
               ratings={feed.ratings}
               loading={feed.loading}
               notice={feed.notice}
@@ -218,7 +196,7 @@ export function NativeConversationView({
                   ? '预览中不可用'
                   : session?.state === 'ACTIVE'
                     ? '当前不可操作'
-                    : '会话已停止，在“执行与成果”里恢复后可继续'
+                    : '会话已停止，在“成果”里恢复后可继续'
               }
             />
           </>
@@ -239,10 +217,8 @@ export function NativeConversationView({
               <p className="platform-loading" role="status">
                 正在读取…
               </p>
-            ) : !session ? (
-              <p className="native-note">找不到这个原生会话，或你已没有它所在空间的访问权限。</p>
             ) : (
-              detail
+              <p className="native-note">找不到这个会话，或你已没有它所在空间的访问权限。</p>
             )}
           </div>
         )}
@@ -280,8 +256,7 @@ function NativeCreate({
   return (
     <div className="native-section">
       <p className="native-note">
-        原生会话使用完整的官方 DH
-        能力：长任务、工具过程、停止后继续和成果文件。企业资料仍按你在梦擎的权限读取，生成的文件先保存在你的私人成果里，经你确认才会发布到共享空间。
+        企业资料按你在梦擎的权限读取；AI 生成的文件先存为你的私人成果，经你确认才会发布到共享空间。
       </p>
       <Field label="工作空间">
         <select value={space} disabled={busy} onChange={(e) => setSpace(e.target.value)}>
@@ -313,17 +288,12 @@ function NativeCreate({
       <div className="native-actions">
         <Button
           variant="primary"
-          icon={ExternalLink}
           disabled={busy || !space}
           onClick={async () => {
             setBusy(true);
             setError('');
             try {
-              await launchInto(async () => {
-                const created = await api.open(tenant, space, previous || null, requestId);
-                onCreated(created);
-                return api.grant(tenant, created.id);
-              });
+              onCreated(await api.open(tenant, space, previous || null, requestId));
             } catch (e) {
               setError(message(e));
             } finally {
@@ -331,36 +301,37 @@ function NativeCreate({
             }
           }}
         >
-          {busy ? '正在创建…' : '创建并打开官方会话'}
+          {busy ? '正在创建…' : '开始'}
         </Button>
       </div>
     </div>
   );
 }
 
-function NativeSessionDetail({
+/** 成果：私人成果文件、本次费用，以及停止 / 恢复会话。 */
+function NativeResults({
   tenant,
   session,
   workspaces,
+  status,
   legacyTitle,
   onChanged,
 }: {
   tenant: string;
   session: NativeConversation;
   workspaces: Workspace[];
+  status?: NativeStatus;
   legacyTitle?: string;
   onChanged: () => void;
 }) {
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
-  const run = async (work: () => Promise<string | void>) => {
+  const run = async (work: () => Promise<unknown>) => {
     setBusy(true);
     setError('');
-    setNotice('');
     try {
-      const done = await work();
-      if (done) setNotice(done);
+      await work();
+      onChanged();
     } catch (e) {
       setError(message(e));
     } finally {
@@ -368,88 +339,73 @@ function NativeSessionDetail({
     }
   };
   const active = session.state === 'ACTIVE';
+  const budget = status?.budget;
+  const occupied = budget ? budget.usedYuan + (budget.reservedYuan ?? 0) : 0;
   return (
-    <>
-      <div className="native-section">
-        <h3>会话执行</h3>
+    <div className="native-results">
+      <NativeArtifacts tenant={tenant} session={session} workspaces={workspaces} />
+      {budget && (
+        <section className="native-work-section">
+          <h3>本次费用</h3>
+          <p className="native-cost">
+            <strong>¥{occupied.toFixed(2)}</strong>
+            <small>
+              {budget.reservedYuan ? `含预留 ¥${budget.reservedYuan.toFixed(2)} · ` : ''}提醒线 ¥
+              {budget.softYuan} · 上限 ¥{budget.hardYuan}
+            </small>
+          </p>
+          <div className="native-meter" aria-hidden="true">
+            <span style={{ width: `${Math.min(100, (occupied / budget.hardYuan) * 100)}%` }} />
+          </div>
+          <small className="native-muted">
+            {status?.stale
+              ? '最后一次记录'
+              : budget.elapsedMinutes !== undefined
+                ? `本轮已运行 ${Math.round(budget.elapsedMinutes)} 分钟`
+                : ''}
+            {status?.synthetic ? ' · 测试模型，不产生费用' : ''}
+          </small>
+        </section>
+      )}
+      <section className="native-work-section">
+        <h3>会话</h3>
         <p className="native-note">
           {active
-            ? '对话、工具过程和长任务都在官方会话窗口里进行。关掉梦擎页面不会中断正在执行的任务；重复打开也不会结束它。'
-            : '这个会话已停止，执行授权已撤销。继续后会沿用原来的会话记录、预算和工作文件。'}
+            ? '企业资料与权限沿用梦擎。停止后执行授权会撤销，之后可随时恢复。'
+            : '这个会话已停止。恢复后沿用原来的记录、预算和工作文件。'}
         </p>
+        {session.legacyConversationId && (
+          <p className="native-note">
+            接续自
+            <a href={oldConversationHref(tenant, session.legacyConversationId)}>
+              {legacyTitle ? `「${legacyTitle}」` : '旧会话'}
+              <ArrowUpRight size={13} aria-hidden="true" />
+            </a>
+          </p>
+        )}
         <div className="native-actions">
           {active ? (
-            <>
-              <Button
-                variant="primary"
-                icon={ExternalLink}
-                disabled={busy}
-                onClick={() =>
-                  run(async () => {
-                    await launchInto(() => api.grant(tenant, session.id));
-                    return '已在新窗口打开官方会话。';
-                  })
-                }
-              >
-                打开官方会话
-              </Button>
-              <Button
-                icon={Pause}
-                disabled={busy}
-                onClick={() =>
-                  run(async () => {
-                    await api.stop(tenant, session.id);
-                    onChanged();
-                    return '已停止：执行授权已撤销，运行环境会在下一次权限检查时关闭。';
-                  })
-                }
-              >
-                停止
-              </Button>
-            </>
+            <Button icon={Pause} disabled={busy} onClick={() => run(() => api.stop(tenant, session.id))}>
+              停止会话
+            </Button>
           ) : (
             <Button
               variant="primary"
               icon={Play}
               disabled={busy}
-              onClick={() =>
-                run(async () => {
-                  await launchInto(async () => {
-                    const resumed = await api.resume(tenant, session.id);
-                    onChanged();
-                    return api.grant(tenant, resumed.id);
-                  });
-                  return '已继续原会话，并在新窗口打开。';
-                })
-              }
+              onClick={() => run(() => api.resume(tenant, session.id))}
             >
-              继续原会话
+              恢复会话
             </Button>
           )}
         </div>
-        {session.legacyConversationId && (
-          <p className="native-note">
-            接续自旧会话
-            <a href={oldConversationHref(tenant, session.legacyConversationId)}>
-              {legacyTitle ? `「${legacyTitle}」` : '（查看旧会话）'}
-              <ArrowUpRight size={13} aria-hidden="true" />
-            </a>
-            ，旧会话仍可在原处打开。
-          </p>
-        )}
-        {notice && (
-          <p className="native-notice" role="status">
-            {notice}
-          </p>
-        )}
         {error && (
           <p className="native-error" role="alert">
             {error}
           </p>
         )}
-      </div>
-      <NativeArtifacts tenant={tenant} session={session} workspaces={workspaces} />
-    </>
+      </section>
+    </div>
   );
 }
 
@@ -476,14 +432,11 @@ function NativeArtifacts({
   }, [tenant, session.id, attempt]);
   const shared = workspaces.filter((w) => w.kind === 'SHARED');
   return (
-    <div className="native-section">
-      <div className="native-section-head">
-        <h3>私人成果</h3>
-        <Button variant="ghost" icon={RefreshCw} onClick={() => setAttempt((x) => x + 1)}>
-          刷新
-        </Button>
-      </div>
-      <p className="native-note">只有保存成功并拿到平台回执的文件才会出现在这里，只有你能看到。</p>
+    <section className="native-work-section">
+      <h3>
+        私人成果 · 只有你看得到
+        <IconButton icon={RefreshCw} label="刷新私人成果" onClick={() => setAttempt((x) => x + 1)} />
+      </h3>
       {loadError ? (
         <p className="native-error" role="alert">
           {loadError}
@@ -493,7 +446,7 @@ function NativeArtifacts({
           正在读取…
         </p>
       ) : !files.length ? (
-        <p className="native-empty">还没有成果文件。会话里生成并保存的文件会出现在这里。</p>
+        <p className="native-muted">还没有成果文件。AI 保存的文件会出现在这里。</p>
       ) : (
         <ul className="native-files">
           {files.map((f) => (
@@ -525,7 +478,7 @@ function NativeArtifacts({
           ))}
         </ul>
       )}
-    </div>
+    </section>
   );
 }
 

@@ -63,7 +63,7 @@ import { TaskReadingBody, type ReadingTask, type ReadingHeader } from '../briefi
 import { briefingConversationHref, readBriefingContext, retainConversationContext } from './briefing-context';
 import { ReadingDialog } from '../briefing-live/ReadingDialog';
 import { LiveConversationDeck } from './LiveConversationDeck';
-import { NativeConversationGroup } from '../native-conversation/NativeConversationGroup';
+import { NativeNewLink, NativeRows, useNativeList } from '../native-conversation/NativeConversationGroup';
 import { NativeConversationView } from '../native-conversation/NativeConversationView';
 import { useNativeAvailability, nativeHref } from '../native-conversation/useNativeConversations';
 import type { ReactNode } from 'react';
@@ -206,6 +206,8 @@ export function ConversationListNav({
   removed: (id: string) => void;
 }) {
   const value = list.value!;
+  const native = useNativeList(tenant, workspaces);
+  const titles = new Map(value.items.map((item) => [item.id, item.title]));
   return (
     <nav className="live-conversation-list" aria-label="会话列表">
       <div className="live-list-tools">
@@ -224,20 +226,18 @@ export function ConversationListNav({
         </header>
       </div>
       <div className="live-conversation-links">
-        <NativeConversationGroup
-          tenant={tenant}
-          hash={hash}
-          workspaces={workspaces}
-          titles={new Map(value.items.map((item) => [item.id, item.title]))}
-        />
+        {native.enabled && <NativeNewLink tenant={tenant} hash={hash} />}
+        {native.error && <p className="live-list-empty">部分会话暂时无法读取。</p>}
         {workspaces.map((space) => {
           const conversations = value.items.filter((item) => item.workspaceId === space.id);
-          return conversations.length ? (
+          const sessions = native.items.filter((item) => item.workspaceId === space.id);
+          return conversations.length || sessions.length ? (
             <details className="live-conversation-group" key={space.id} open>
               <summary>
                 <Folder size={14} />
                 {space.kind === 'PERSONAL' ? '个人空间' : space.name}
               </summary>
+              <NativeRows tenant={tenant} hash={hash} items={sessions} titles={titles} />
               {conversations.map((c) => (
                 <ConversationRow
                   key={c.id}
@@ -274,7 +274,7 @@ export function ConversationListNav({
               ))}
           </section>
         )}
-        {!value.items.length && (
+        {!value.items.length && !native.items.length && (
           <p className="live-list-empty">从一件具体的工作开始。发送后，会话会保存在这里。</p>
         )}
         <ConversationListTail

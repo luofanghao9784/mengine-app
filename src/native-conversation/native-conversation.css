@@ -1,31 +1,24 @@
 .native-conversations{max-width:1080px;margin:0 auto;padding:32px 24px;color:#263537;background:#f5f8f7;min-height:100vh;font-family:system-ui,sans-serif}.native-conversations h1{font-size:28px}.native-conversations p{line-height:1.6}.native-conversations fieldset,.native-conversations section{padding:20px;margin:20px 0;border:1px solid #cfdbd7;border-radius:16px;background:white}.native-conversations label{display:inline-flex;align-items:center;gap:8px;margin:8px 16px 8px 0}.native-conversations select,.native-conversations button{padding:10px;border:1px solid #bdcec8;border-radius:8px;background:white}.native-conversations button{cursor:pointer}.native-conversations button:disabled{opacity:.5;cursor:default}.native-session{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin:14px 0}.native-conversations [role=status]{color:#674015;overflow-wrap:anywhere}
 
-/* 会话列表里的“企业原生会话（试用）”分组，与旧会话分组同一样式。 */
-.native-conversation-group .native-badge {
-  margin-left: 4px;
-  padding: 0 6px;
-  border-radius: 999px;
-  background: var(--accent-soft);
+/* 会话列表：原生会话与其他会话同在空间分组里，行样式沿用梦擎。 */
+.live-conversation-links .native-new-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 6px;
+  padding: 6px 12px;
+  color: var(--ink-3);
+  font-size: 12px;
+  text-decoration: none;
+}
+.live-conversation-links .native-new-link:hover,
+.live-conversation-links .native-new-link.selected {
   color: var(--accent);
-  font-size: 10px;
-  line-height: 18px;
 }
-.native-conversation-group a {
-  flex-wrap: wrap;
-  row-gap: 2px;
-}
-.native-conversation-group a .conversation-list-title {
-  flex: 1 1 100%;
-  min-width: 0;
-}
-.native-conversation-group .native-row-meta {
+.live-conversation-row .native-row-meta {
+  flex: none;
   color: var(--ink-3);
   font-size: 11px;
-}
-.native-conversation-group .native-new-link {
-  flex-wrap: nowrap;
-  gap: 6px;
-  color: var(--accent);
 }
 
 /* 原生会话在会话卡片里的内容：分段说明、操作按钮、私人成果与发布。 */
@@ -89,8 +82,8 @@
   color: var(--accent);
 }
 .native-error {
-  background: #fdf1ec;
-  color: #a24a21;
+  background: var(--state-error-soft);
+  color: var(--state-error);
 }
 .native-actions {
   display: flex;
@@ -136,7 +129,7 @@
   gap: 10px;
   padding: 12px;
   border-radius: 12px;
-  background: #fff;
+  background: var(--surface-raised);
 }
 .native-ack {
   display: flex;
@@ -154,8 +147,8 @@
   margin: 0 24px 4px;
   padding: 6px 10px;
   border-radius: 10px;
-  background: #fdf4e3;
-  color: #8a5a12;
+  background: var(--state-warn-soft);
+  color: var(--state-warn);
   font-size: 12px;
 }
 @media (max-width: 800px) {
