@@ -40,3 +40,13 @@ export interface NativeAvailability { enabled: boolean }
  * platform seq may have gaps. 503 NATIVE_RUNTIME_NOT_DISPATCHED permits retry with
  * the SAME requestId; unknown outcomes never authorize a fresh ID or redispatch. */
 export type NativeDispatchFailure = 'NATIVE_RUNTIME_NOT_DISPATCHED' | 'NATIVE_OPERATION_OUTCOME_UNKNOWN';
+
+/** B8: GET native-conversations?workspaceId=...&query=... returns these rows.
+ * query <=200 chars, case-insensitive title/root user+assistant text matching.
+ * Authorized rows sorted pinned first then lastActivityAt descending. */
+export interface NativeConversationListItem extends NativeConversation {
+ title: string; pinned: boolean; lastActivityAt: string;
+ pending: ('approval' | 'question' | 'plan')[];
+}
+/** PATCH .../{id}/metadata. Null title restores automatic title. */
+export interface NativeMetadataUpdate { title?: string | null; pinned?: boolean }

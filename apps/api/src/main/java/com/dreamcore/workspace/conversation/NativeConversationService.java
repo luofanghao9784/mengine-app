@@ -86,7 +86,7 @@ public class NativeConversationService {
  public void requireMember(UUID actor,UUID tenant){identities.member(actor,tenant,false,false);departure.requirePrivateRead(actor,tenant);}
  @Transactional public List<Session> list(UUID actor,UUID tenant,UUID space){
   access.require(actor,tenant,space,false);departure.requirePrivateRead(actor,tenant);
-  return db.queryForList("SELECT id FROM native_conversations WHERE tenant_id=? AND owner_id=? AND workspace_id=? ORDER BY created_at DESC LIMIT 100",UUID.class,tenant,actor,space).stream().map(this::row).toList();
+  return db.queryForList("SELECT id FROM native_conversations WHERE tenant_id=? AND owner_id=? AND workspace_id=? ORDER BY created_at DESC",UUID.class,tenant,actor,space).stream().map(this::row).toList();
  }
  @Transactional public Grant grant(UUID actor,UUID tenant,UUID id){
   var s=authorize(actor,tenant,id,true);byte[] random=new byte[32];new SecureRandom().nextBytes(random);

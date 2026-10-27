@@ -10,14 +10,19 @@ import com.dreamcore.workspace.identity.IdentityException;
 @RestController
 @ConditionalOnWebApplication(type=ConditionalOnWebApplication.Type.SERVLET)
 public class NativeConversationController {
- private final NativeConversationService service; private final String webUrl;
- public NativeConversationController(NativeConversationService service,@org.springframework.beans.factory.annotation.Value("${dreamcore.native.web-url:}") String webUrl){this.service=service;this.webUrl=webUrl;}
+ private final NativeConversationService service; private final String webUrl; private final NativeConversationMetadata metadata;
+ public NativeConversationController(NativeConversationService service,NativeConversationMetadata metadata,@org.springframework.beans.factory.annotation.Value("${dreamcore.native.web-url:}") String webUrl){this.service=service;this.webUrl=webUrl;this.metadata=metadata;}
  private UUID actor(Authentication a){return UUID.fromString(a.getName());}
  private String token(String value){if(value==null||!value.startsWith("Bearer "))throw new IdentityException(403,"NATIVE_ACCESS_DENIED");return value.substring(7);}
  public record Query(String query){} public record Read(UUID materialId,UUID versionId){}
  /** Whether this deployment runs the native runtime; the UI keeps the entry hidden otherwise. */
  @GetMapping("/api/v1/tenants/{tenant}/native-conversations/availability") public Object availability(Authentication auth,@PathVariable UUID tenant){service.requireMember(actor(auth),tenant);return Map.of("enabled",!webUrl.isBlank());}
- @GetMapping("/api/v1/tenants/{tenant}/native-conversations") public Object list(Authentication auth,@PathVariable UUID tenant,@RequestParam UUID workspaceId){return service.list(actor(auth),tenant,workspaceId);}
+ @GetMapping("/api/v1/tenants/{tenant}/native-conversations") public Object list(Authentication auth,@PathVariable UUID tenant,@RequestParam UUID workspaceId,@RequestParam(defaultValue="") String query){
+  if(query.length()>200)throw IdentityException.invalid();var result=new ArrayList<Map<String,Object>>();
+  for(var session:service.list(actor(auth),tenant,workspaceId))try{var view=metadata.describe(actor(auth),tenant,session.id(),query);if(view!=null)result.add(view);}catch(IdentityException e){if(e.status!=403&&e.status!=404)throw e;}
+  result.sort(Comparator.<Map<String,Object>,Boolean>comparing(v->(Boolean)v.get("pinned")).reversed().thenComparing(v->v.get("lastActivityAt").toString(),Comparator.reverseOrder()));return result;
+ }
+ @PatchMapping("/api/v1/tenants/{tenant}/native-conversations/{id}/metadata") public Object metadata(Authentication auth,@PathVariable UUID tenant,@PathVariable UUID id,@RequestBody Map<String,Object> body){return metadata.update(actor(auth),tenant,id,body);}
  @PostMapping("/api/v1/tenants/{tenant}/native-conversations") public Object open(Authentication auth,@PathVariable UUID tenant,@RequestBody NativeConversationService.Open body){return service.open(actor(auth),tenant,body);}
  @PostMapping("/api/v1/tenants/{tenant}/native-conversations/{id}/grant") public Object grant(Authentication auth,@PathVariable UUID tenant,@PathVariable UUID id){if(webUrl.isBlank())throw new IdentityException(503,"NATIVE_RUNTIME_UNAVAILABLE");var grant=service.grant(actor(auth),tenant,id);return Map.of("session",grant.session(),"token",grant.token(),"expiresAt",grant.expiresAt(),"launchUrl",webUrl.replaceAll("/+$","")+"/launch");}
  @PostMapping("/api/v1/tenants/{tenant}/native-conversations/{id}/stop") public Object stop(Authentication auth,@PathVariable UUID tenant,@PathVariable UUID id){return service.stop(actor(auth),tenant,id);}
