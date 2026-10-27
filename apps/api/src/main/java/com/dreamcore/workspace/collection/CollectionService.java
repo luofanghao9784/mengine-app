@@ -208,10 +208,14 @@ public class CollectionService {
         return db.queryForObject(query,(r,n)->new Summary(r.getLong(1),r.getLong(2),r.getLong(3),r.getLong(4)),actor,tenant,actor);
     }
     @Transactional public DataPage datasets(UUID actor,UUID tenant,String query,int offset,int limit){return datasets(actor,tenant,query,"",offset,limit);}
-    @Transactional public DataPage datasets(UUID actor,UUID tenant,String query,String state,int offset,int limit){
+    @Transactional public DataPage datasets(UUID actor,UUID tenant,String query,String state,int offset,int limit){return datasets(actor,tenant,query,state,offset,limit,null);}
+    @Transactional public DataPage datasets(UUID actor,UUID tenant,String query,String state,int offset,int limit,UUID target){
         member(actor,tenant);bounds(offset,limit);if(query==null||query.length()>160||!Set.of("","AVAILABLE","UPDATING","FAILED","EMPTY").contains(state))throw IdentityException.invalid();
         String filter=switch(state){case "AVAILABLE"->" AND s.id IS NOT NULL";case "UPDATING"->" AND latest_run.status IN ('QUEUED','RUNNING')";case "FAILED"->" AND latest_run.status IN ('FAILED','INTERRUPTED')";case "EMPTY"->" AND s.id IS NULL";default->"";};
-        var rows=db.queryForList(DATASETS+filter+" AND (?='' OR strpos(lower(d.name),lower(?))>0) ORDER BY d.name,d.id LIMIT ? OFFSET ?",actor,tenant,actor,query,query,limit+1,offset);
+        var args=new ArrayList<Object>(List.of(actor,tenant,actor,query,query));
+        if(target!=null){filter+=" AND d.id=?";args.add(target);}
+        args.add(limit+1);args.add(offset);
+        var rows=db.queryForList(DATASETS+" AND (?='' OR strpos(lower(d.name),lower(?))>0)"+filter+" ORDER BY d.name,d.id LIMIT ? OFFSET ?",args.toArray());
         return new DataPage(rows.stream().limit(limit).map(this::dataset).toList(),rows.size()>limit);
     }
     /** Catalog probing must not swallow a transactional access exception and poison the caller transaction. */

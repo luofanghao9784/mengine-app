@@ -16,10 +16,10 @@ import org.springframework.transaction.annotation.Transactional;
 @Service @Primary
 public class FusionBriefingGenerationService extends BriefingGenerationService {
  private final GovernedFusionService fusion;
- public FusionBriefingGenerationService(JdbcTemplate db,ConversationService tasks,BriefingContentService contents,IdentityService identities,MaterialAccess access,DepartureAccess departure,AgentSettings agents,PlanClock clock,
+ public FusionBriefingGenerationService(JdbcTemplate db,ConversationService tasks,BriefingContentService contents,com.dreamcore.workspace.collection.DatasetContentFingerprint fingerprints,IdentityService identities,MaterialAccess access,DepartureAccess departure,AgentSettings agents,PlanClock clock,
   @Value("${dreamcore.tasks.enabled:false}") boolean enabled,@Value("${dreamcore.briefing.news-source:}") String news,
   @Value("${dreamcore.briefing.merge-seconds:60}") int merge,@Value("${dreamcore.briefing.max-runs-per-day:6}") int limit,GovernedFusionService fusion){
-  super(db,tasks,contents,identities,access,departure,agents,clock,enabled,news,merge,limit);this.fusion=fusion;
+  super(db,tasks,contents,fingerprints,identities,access,departure,agents,clock,enabled,news,merge,limit);this.fusion=fusion;
  }
  @Override @Transactional public void tick(UUID policy){super.tick(policy);fusion.prepareQueued(policy);}
 }

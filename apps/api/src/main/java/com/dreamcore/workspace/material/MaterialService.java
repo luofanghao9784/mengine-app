@@ -163,6 +163,12 @@ public class MaterialService {
 
    @Transactional
    public MaterialService.Page list(UUID actor, UUID tenant, UUID workspace, UUID folder, String q, int offset, int limit, boolean includeUploads) {
+      return this.list(actor, tenant, workspace, folder, q, offset, limit, includeUploads, null);
+   }
+
+   /** Same catalog permissions, with the target filtered before row projection and pagination. */
+   @Transactional
+   public MaterialService.Page list(UUID actor, UUID tenant, UUID workspace, UUID folder, String q, int offset, int limit, boolean includeUploads, UUID target) {
       this.paging(offset, limit);
       if (q.length() <= 180 && (workspace != null || folder == null)) {
          this.identities.member(actor, tenant, false);
@@ -210,6 +216,10 @@ public class MaterialService {
                args.add(query);
             }
 
+            if (target != null) {
+               filter += " AND e.id=?";
+               args.add(target);
+            }
             args.add(limit + 1);
             args.add(offset);
             List<MaterialService.Entry> items = this.db

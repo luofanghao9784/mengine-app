@@ -17,12 +17,21 @@ public class VersionedDatasetEvidence {
  public VersionedDatasetEvidence(JdbcTemplate db){this.db=db;}
  @Transactional
  public Map<String,Object> get(UUID tenant,UUID dataset,UUID snapshot,String kind,Object input,Supplier<Map<String,Object>> calculate){
-  if(!Set.of("CHECKS","PREFLIGHT","INSIGHT_FACTS").contains(kind))throw new IllegalArgumentException("Evidence kind");
+  if(!Set.of("CHECKS","PREFLIGHT","INSIGHT_FACTS","CONTENT_FINGERPRINT").contains(kind))throw new IllegalArgumentException("Evidence kind");
   // Keep the snapshot stable through insertion. Scrub waits, then deletes this receipt too.
   if(db.queryForList("SELECT s.id FROM business_datasets d JOIN dataset_snapshots s ON s.dataset_id=d.id AND s.tenant_id=d.tenant_id WHERE d.tenant_id=? AND d.id=? AND s.id=? AND d.status='ACTIVE' AND NOT d.scrubbed AND NOT s.scrubbed FOR SHARE OF s",UUID.class,tenant,dataset,snapshot).isEmpty())throw new IdentityException(404,"DATASET_NOT_FOUND");
   String hash=IdentityService.hash(json.writeValueAsString(input));
   var cached=db.queryForList("SELECT payload::text FROM dataset_evidence_receipts WHERE tenant_id=? AND dataset_id=? AND snapshot_id=? AND kind=? AND input_hash=?",String.class,tenant,dataset,snapshot,kind,hash);
   if(!cached.isEmpty())return json.readValue(cached.getFirst(),Map.class);
+  if("CONTENT_FINGERPRINT".equals(kind)){
+   int isolation=db.execute((org.springframework.jdbc.core.ConnectionCallback<Integer>)java.sql.Connection::getTransactionIsolation);
+   // A repeatable-read snapshot cannot observe a receipt committed while it waited.
+   // Preserve that snapshot and compute without memo insertion, avoiding a 40001 conflict.
+   if(isolation>=java.sql.Connection.TRANSACTION_REPEATABLE_READ)return calculate.get();
+   db.queryForList("SELECT pg_advisory_xact_lock(hashtextextended(?,0))","dataset-evidence:"+tenant+":"+dataset+":"+snapshot+":"+kind+":"+hash);
+   cached=db.queryForList("SELECT payload::text FROM dataset_evidence_receipts WHERE tenant_id=? AND dataset_id=? AND snapshot_id=? AND kind=? AND input_hash=?",String.class,tenant,dataset,snapshot,kind,hash);
+   if(!cached.isEmpty())return json.readValue(cached.getFirst(),Map.class);
+  }
   var value=calculate.get();
   db.update("INSERT INTO dataset_evidence_receipts(tenant_id,dataset_id,snapshot_id,kind,input_hash,payload) VALUES (?,?,?,?,?,?::jsonb) ON CONFLICT DO NOTHING",tenant,dataset,snapshot,kind,hash,json.writeValueAsString(value));
   return value;

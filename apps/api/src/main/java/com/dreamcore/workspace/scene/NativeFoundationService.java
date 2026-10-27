@@ -154,6 +154,8 @@ public class NativeFoundationService {
 
    private JsonNode snapshotInside(UUID actor, UUID tenant, String target) {
       this.identities.member(actor, tenant, false);
+      UUID targetDataset = target != null && target.startsWith("dataset-") ? UUID.fromString(target.substring(8)) : null;
+      UUID targetMaterial = target != null && target.startsWith("material-") ? UUID.fromString(target.substring(9)) : null;
       Map<String, FoundationPublicationService.Entry> published = this.publications.current(actor, tenant, target);
       ArrayNode items = this.json.createArrayNode();
       ArrayList<UUID> visibleMaterials = new ArrayList<>();
@@ -167,7 +169,9 @@ public class NativeFoundationService {
       Map<UUID, String> connectionNames = new java.util.HashMap<>();
 
       while (true) {
-         CollectionService.DataPage page = this.collections.datasets(actor, tenant, "", offset, 100);
+         CollectionService.DataPage page = target != null && targetDataset == null
+            ? new CollectionService.DataPage(List.of(), false)
+            : this.collections.datasets(actor, tenant, "", "", offset, 100, targetDataset);
 
          for (CollectionService.Dataset d : page.items()) {
             if (target == null || target.equals("dataset-" + d.id())) {
@@ -239,9 +243,18 @@ public class NativeFoundationService {
             int offsetx = 0;
 
             while (true) {
-               MaterialService.Page pagex = this.materials.list(actor, tenant, null, null, "", offsetx, 100);
+               List<MaterialService.Entry> materialItems;
+               boolean moreMaterials;
+               if (target != null && targetMaterial == null) {
+                  materialItems = List.of();
+                  moreMaterials = false;
+               } else {
+                  MaterialService.Page pagex = this.materials.list(actor, tenant, null, null, "", offsetx, 100, false, targetMaterial);
+                  materialItems = pagex.items();
+                  moreMaterials = pagex.hasMore();
+               }
 
-               for (MaterialService.Entry d : pagex.items()) {
+               for (MaterialService.Entry d : materialItems) {
                   if ("DOCUMENT".equals(d.kind()) && (target == null || target.equals("material-" + d.id()))) {
                      visibleMaterials.add(d.id());
                      ObjectNode a = this.base("material-" + d.id(), d.name(), d.workspaceName(), "document", 1, d.version(), d.updatedAt().toString());
@@ -302,7 +315,7 @@ public class NativeFoundationService {
                   }
                }
 
-               if (!pagex.hasMore()) {
+               if (!moreMaterials) {
                   parsed = 0;
                   annotated = 0;
                   checked = 0;

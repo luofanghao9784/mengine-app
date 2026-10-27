@@ -36,6 +36,25 @@ class SceneDispatchConcurrencyTest {
         }
     }
 
+    @Test void blockedTenantWriteDoesNotBlockOtherTenantReadOrWrite() throws Exception {
+        var entered=new CountDownLatch(1);var release=new CountDownLatch(1);
+        UUID other=UUID.randomUUID();
+        when(db.queryForObject(anyString(),eq(Boolean.class),any(UUID.class))).thenReturn(true);
+        when(db.queryForList(anyString(),any(UUID.class))).thenAnswer(i->List.of(Map.of("tenant_id",i.getArgument(1))));
+        when(bridge.call(any(UUID.class),anyString(),eq("GET"),anyString(),isNull())).thenReturn(new JsonMapper().createObjectNode());
+        when(bridge.call(eq(tenant),anyString(),eq("POST"),eq("/scene-knowledge/sync"),isNull())).thenAnswer(i->{entered.countDown();assertTrue(release.await(5,TimeUnit.SECONDS));return new JsonMapper().createObjectNode();});
+        when(bridge.call(eq(other),anyString(),eq("POST"),eq("/scene-knowledge/sync"),isNull())).thenReturn(new JsonMapper().createObjectNode().put("enterprise",other.toString()));
+        try(var pool=Executors.newFixedThreadPool(3)){
+            try{
+                var slow=pool.submit(()->scenes.dispatch(actor,tenant,false,"POST","/scene-knowledge/sync",null));
+                assertTrue(entered.await(2,TimeUnit.SECONDS));
+                assertNotNull(pool.submit(()->scenes.dispatch(actor,other,false,"GET","/scene-access",null)).get(1,TimeUnit.SECONDS));
+                assertEquals(other.toString(),pool.submit(()->scenes.dispatch(actor,other,false,"POST","/scene-knowledge/sync",null)).get(1,TimeUnit.SECONDS).path("enterprise").asText());
+                release.countDown();slow.get(2,TimeUnit.SECONDS);
+            }finally{release.countDown();}
+        }
+    }
+
     @Test void writesExcludeReadsAndOtherWrites() throws Exception {
         var entered = new CountDownLatch(1); var release = new CountDownLatch(1);
         when(db.queryForObject(anyString(),eq(Boolean.class),eq(tenant))).thenReturn(true);
@@ -86,6 +105,17 @@ class SceneDispatchConcurrencyTest {
                 release.countDown(); read.get(2,TimeUnit.SECONDS); revoke.get(2,TimeUnit.SECONDS);
                 assertEquals(403,assertThrows(IdentityException.class,() -> service.dispatch(actor,tenant,false,"GET","/scene-knowledge",null)).status);
             } finally { release.countDown(); }
+        }
+    }
+
+    @Test void failedWriteReleasesEnterpriseGate() throws Exception {
+        when(db.queryForObject(anyString(),eq(Boolean.class),eq(tenant))).thenReturn(true);
+        when(db.queryForList(anyString(),eq(tenant))).thenReturn(List.of(Map.of("tenant_id",tenant)));
+        when(bridge.call(eq(tenant),anyString(),eq("POST"),eq("/scene-knowledge/sync"),isNull())).thenThrow(new IdentityException(502,"SCENE_UPSTREAM_UNAVAILABLE"));
+        assertThrows(IdentityException.class,()->scenes.dispatch(actor,tenant,false,"POST","/scene-knowledge/sync",null));
+        when(bridge.call(eq(tenant),anyString(),eq("GET"),eq("/scene-access"),isNull())).thenReturn(new JsonMapper().createObjectNode());
+        try(var pool=Executors.newSingleThreadExecutor()){
+            assertNotNull(pool.submit(()->scenes.dispatch(actor,tenant,false,"GET","/scene-access",null)).get(1,TimeUnit.SECONDS));
         }
     }
 

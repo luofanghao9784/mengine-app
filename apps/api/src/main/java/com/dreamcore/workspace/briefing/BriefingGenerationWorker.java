@@ -10,5 +10,17 @@ public class BriefingGenerationWorker {
     private final BriefingGenerationService service;
     public BriefingGenerationWorker(BriefingGenerationService service){this.service=service;}
     @Scheduled(fixedDelayString="${dreamcore.briefing.poll-ms:5000}",initialDelayString="${dreamcore.briefing.initial-delay-ms:10000}")
-    public void tick(){for(var due:service.dueDaily())try{service.dispatchDaily(due);}catch(Exception e){log.warn("Daily briefing deferred policy={} cause={}",due,e.getClass().getSimpleName());}service.discover();for(var id:service.candidates())try{for(int slot=0;slot<5;slot++)service.tick(id);}catch(Exception e){log.warn("Briefing generation deferred policy={} cause={}",id,e.getClass().getSimpleName());}}
+    public void tick(){
+        for(var due:service.dueDaily())try{service.dispatchDaily(due);}
+        catch(Exception e){log.warn("Daily briefing deferred policy={} cause={}",due,e.getClass().getSimpleName());}
+        service.discover();
+        var pending=service.candidates();
+        // Breadth first: another enterprise gets a turn before this policy gets its next slot.
+        for(int slot=0;slot<5&&!pending.isEmpty();slot++){
+            var progressed=new java.util.ArrayList<java.util.UUID>();
+            for(var id:pending)try{if(service.advance(id))progressed.add(id);}
+            catch(Exception e){log.warn("Briefing generation deferred policy={} cause={}",id,e.getClass().getSimpleName());}
+            pending=progressed;
+        }
+    }
 }

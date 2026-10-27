@@ -13,10 +13,16 @@ import tools.jackson.databind.json.JsonMapper;
 @Service
 public class SceneService {
  private static final JsonMapper JSON=new JsonMapper();
- private final java.util.concurrent.locks.ReentrantReadWriteLock sceneLock=new java.util.concurrent.locks.ReentrantReadWriteLock(true);
- private <T> T locked(boolean read,java.util.function.Supplier<T> action){
-  java.util.concurrent.locks.Lock lock=read?sceneLock.readLock():sceneLock.writeLock();
-  lock.lock();try{return action.get();}finally{lock.unlock();}
+ private static final class TenantGate {
+  final java.util.concurrent.locks.ReentrantReadWriteLock lock=new java.util.concurrent.locks.ReentrantReadWriteLock(true);
+  int references; // Includes waiting callers, so a live gate can never be replaced.
+ }
+ private final java.util.concurrent.ConcurrentHashMap<UUID,TenantGate> tenantGates=new java.util.concurrent.ConcurrentHashMap<>();
+ private <T> T locked(UUID tenant,boolean read,java.util.function.Supplier<T> action){
+  TenantGate gate=tenantGates.compute(tenant,(id,current)->{if(current==null)current=new TenantGate();current.references++;return current;});
+  java.util.concurrent.locks.Lock lock=read?gate.lock.readLock():gate.lock.writeLock();
+  try{lock.lock();try{return action.get();}finally{lock.unlock();}}
+  finally{tenantGates.compute(tenant,(id,current)->{if(current!=gate)throw new IllegalStateException("Scene lock ownership");return --current.references==0?null:current;});}
  }
  @org.springframework.beans.factory.annotation.Autowired private NativeFoundationService nativeFoundation;
  @org.springframework.beans.factory.annotation.Autowired private NativeKnowledgeService nativeKnowledge;
@@ -67,7 +73,7 @@ public class SceneService {
   return Map.of("revision",config.isNull()?0:config.path("revision").asInt(),"routes",config.isNull()?JSON.createArrayNode():config.path("routes"),"sources",sources,
    "members",db.queryForList("SELECT a.id,a.display_name AS name FROM accounts a JOIN tenant_memberships m ON m.account_id=a.id WHERE m.tenant_id=? AND m.status='ACTIVE' AND a.status='ACTIVE' ORDER BY a.display_name",tenant));
  }
- public Object routes(UUID actor,UUID tenant,SceneRouting.Change change){return locked(false,()->{access(actor,tenant,false);requireSceneAdmin(actor,tenant);return routing.replace(actor,tenant,change);});}
+ public Object routes(UUID actor,UUID tenant,SceneRouting.Change change){return locked(tenant,false,()->{access(actor,tenant,false);requireSceneAdmin(actor,tenant);return routing.replace(actor,tenant,change);});}
  public Object binding(UUID actor,UUID tenant){
   access(actor,tenant,false);requireSceneAdmin(actor,tenant);
   return Map.of("bindings",db.queryForList("SELECT workspace_id,maintainer_id FROM scene_bindings WHERE tenant_id=?",tenant),"workspaces",db.queryForList("SELECT id,name FROM workspaces WHERE tenant_id=? AND kind='SHARED' AND NOT archived AND ((library_mask(?,tenant_id,'WORKSPACE',id)&3)=3 OR EXISTS(SELECT 1 FROM scene_publication_configs p WHERE p.tenant_id=workspaces.tenant_id AND jsonb_exists(p.workspaces,CAST(workspaces.id AS text)))) ORDER BY name,id",tenant,actor));
@@ -94,7 +100,7 @@ public class SceneService {
   // Reads may proceed together, but must not overlap bridge policy mutations:
   // bridge permissions can change independently of Java tenant membership.
   // Fair locking also prevents continuous readers from starving a queued writer.
-  return locked("GET".equals(method),()->dispatchInside(actor,tenant,platform,method,path,body));
+  return locked(tenant,"GET".equals(method),()->dispatchInside(actor,tenant,platform,method,path,body));
  }
  private JsonNode dispatchInside(UUID actor,UUID tenant,boolean platform,String method,String path,Object body){
   if(platform)access(actor,tenant,true);else identities.member(actor,tenant,false);
@@ -124,7 +130,7 @@ public class SceneService {
  private UUID start(UUID actor,UUID tenant,String op){UUID run=UUID.randomUUID();if(db.queryForList("SELECT tenant_id FROM scene_bindings WHERE tenant_id=?",tenant).isEmpty())throw new IdentityException(404,"SCENE_TENANT_NOT_BOUND");db.update("INSERT INTO scene_processing_runs(id,tenant_id,actor_id,operation,state) VALUES (?,?,?,?,'RUNNING')",run,tenant,actor,op);return run;}
  private void finish(UUID run,String error){db.update("UPDATE scene_processing_runs SET state=?,finished_at=now(),error_code=? WHERE id=?",error==null?"SUCCEEDED":"FAILED",error,run);}
  private void requireSceneAdmin(UUID actor,UUID tenant){if(!"admin".equals(bridge.call(tenant,"customer:"+actor,"GET","/scene-access",null).path("user").path("role").asText()))throw new IdentityException(403,"SCENE_OPERATION_FORBIDDEN");}
- public Object synchronize(UUID actor,UUID tenant,boolean platform){return locked(false,()->synchronizeInside(actor,tenant,platform));}
+ public Object synchronize(UUID actor,UUID tenant,boolean platform){return locked(tenant,false,()->synchronizeInside(actor,tenant,platform));}
  private Object synchronizeInside(UUID actor,UUID tenant,boolean platform){
   access(actor,tenant,platform);if(!platform)requireSceneAdmin(actor,tenant);UUID run=start(actor,tenant,"SYNC_INPUTS");
   try{
