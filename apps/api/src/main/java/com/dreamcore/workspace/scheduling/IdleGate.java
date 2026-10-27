@@ -11,8 +11,13 @@ public final class IdleGate {
 
     /** First empty pass waits 15 seconds. The next empty pass waits 60 seconds. */
     public void rest(long now) {
+        restEscalating(now, 15_000L, 60_000L);
+    }
+
+    /** Empty-pass backoff that escalates from firstMs to nextMs after the first quiet pass. */
+    public void restEscalating(long now, long firstMs, long nextMs) {
         idleStreak++;
-        resumeAt = now + (idleStreak >= 2 ? 60_000L : 15_000L);
+        resumeAt = now + Math.max(0L, idleStreak >= 2 ? nextMs : firstMs);
     }
 
     public void work() {

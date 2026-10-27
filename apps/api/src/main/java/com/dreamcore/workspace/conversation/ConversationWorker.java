@@ -15,6 +15,7 @@ public class ConversationWorker {
     @jakarta.annotation.PreDestroy public void stop(){stopping=true;executor.shutdownNow();}
     private final ConversationService service;private final TaskRuntime runtime;private final AgentTaskService agents;
     private final com.dreamcore.workspace.scheduling.IdleGate idle=new com.dreamcore.workspace.scheduling.IdleGate();
+    private long nextRecover;
     public ConversationWorker(ConversationService service,TaskRuntime runtime,AgentTaskService agents,
         @org.springframework.beans.factory.annotation.Value("${dreamcore.tasks.concurrency:20}") int concurrency){
         if(concurrency<1 || concurrency>20)throw new IllegalArgumentException("Task concurrency must be between 1 and 20");
@@ -23,9 +24,12 @@ public class ConversationWorker {
     @Scheduled(fixedDelayString="${dreamcore.tasks.poll-ms:500}",initialDelayString="${dreamcore.tasks.initial-delay-ms:1000}")
     public void tick(){
         if(stopping)return;
-        // Recover before IdleGate so RESULT_UNKNOWN is not deferred by empty-queue backoff.
-        try{if(receiptRecovery!=null)receiptRecovery.recover();}catch(Exception unavailable){return;}
         long now=System.currentTimeMillis();
+        // Receipts already wait 5s after completion; scanning every 15s keeps RESULT_UNKNOWN recoverable without a 500ms DB hit.
+        if(now>=nextRecover){
+            try{if(receiptRecovery!=null)receiptRecovery.recover();}catch(Exception unavailable){return;}
+            nextRecover=now+15_000L;
+        }
         if(idle.resting(now))return;
         boolean worked=false;
         for(int i=0;i<concurrency && slots.tryAcquire();i++){

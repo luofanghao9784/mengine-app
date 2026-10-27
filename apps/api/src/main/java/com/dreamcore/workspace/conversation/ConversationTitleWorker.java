@@ -12,11 +12,18 @@ public class ConversationTitleWorker {
     private final ConversationTitles titles;private final EngineTaskRuntime runtime;
     private final ScheduledExecutorService executor=Executors.newSingleThreadScheduledExecutor(r->{Thread t=new Thread(r,"conversation-title");t.setDaemon(true);return t;});
     private final java.util.concurrent.atomic.AtomicBoolean busy=new java.util.concurrent.atomic.AtomicBoolean();
+    private final com.dreamcore.workspace.scheduling.IdleGate idle=new com.dreamcore.workspace.scheduling.IdleGate();
     public ConversationTitleWorker(ConversationTitles titles,EngineTaskRuntime runtime){this.titles=titles;this.runtime=runtime;}
     @Scheduled(fixedDelay=1000,initialDelayString="${dreamcore.tasks.initial-delay-ms:1000}")
     public void tick(){
-        if(!busy.compareAndSet(false,true))return;
-        executor.execute(()->{try{var job=titles.claim();if(job!=null){try{titles.finish(job,runtime.executeTitle(job,()->titles.active(job)));}catch(Exception error){titles.fail(job);}}}finally{busy.set(false);}});
+        long now=System.currentTimeMillis();
+        if(idle.resting(now)||!busy.compareAndSet(false,true))return;
+        executor.execute(()->{try{
+            var job=titles.claim();
+            if(job==null){idle.rest(now);return;}
+            idle.work();
+            try{titles.finish(job,runtime.executeTitle(job,()->titles.active(job)));}catch(Exception error){titles.fail(job);}
+        }finally{busy.set(false);}});
     }
     @PreDestroy public void stop(){executor.shutdownNow();}
 }

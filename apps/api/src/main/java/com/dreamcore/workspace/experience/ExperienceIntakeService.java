@@ -10,10 +10,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class ExperienceIntakeService {
  private final JdbcTemplate db;
  public ExperienceIntakeService(JdbcTemplate db){this.db=db;}
- @Transactional public void discover(){
+ /** @return rows inserted or rechecked; zero means the worker may back off without changing product rules. */
+ @Transactional public int discover(){
   // Serialize bounded discovery without calling models or holding source bodies in this queue.
   db.queryForList("SELECT pg_advisory_xact_lock(hashtextextended('experience-intake-discovery',0))");
-  db.update("""
+  int inserted=db.update("""
    INSERT INTO experience_intake_sources(id,tenant_id,owner_id,workspace_id,kind,source_id,source_revision,source_attempt,task_id)
    SELECT gen_random_uuid(),t.tenant_id,t.requested_by,t.workspace_id,'TASK',t.id,t.revision,t.attempt,t.id
    FROM conversation_tasks t JOIN tenants tenant ON tenant.id=t.tenant_id AND tenant.status='ACTIVE'
@@ -26,7 +27,7 @@ public class ExperienceIntakeService {
     AND NOT EXISTS(SELECT 1 FROM experience_intake_sources i WHERE i.kind='TASK' AND i.source_id=t.id AND i.source_revision=t.revision AND i.source_attempt=t.attempt)
    ORDER BY t.finished_at,t.id LIMIT 100 ON CONFLICT DO NOTHING
    """);
-  db.update("""
+  inserted+=db.update("""
    INSERT INTO experience_intake_sources(id,tenant_id,owner_id,workspace_id,kind,source_id,source_revision,source_attempt,task_id,feedback_id)
    SELECT gen_random_uuid(),f.tenant_id,f.actor_id,f.workspace_id,'FEEDBACK',f.id,f.revision,f.attempt,f.task_id,f.id
    FROM feedback_entries f JOIN feedback_versions v ON v.feedback_id=f.id AND v.revision=f.revision
@@ -42,7 +43,7 @@ public class ExperienceIntakeService {
    ORDER BY v.created_at,f.id LIMIT 100 ON CONFLICT DO NOTHING
    """);
   // One availability call per due row. Unchanged pending rows wait 10 minutes; a changed task, feedback, or lifecycle is still checked on this pass.
-  db.update("""
+  int rechecked=db.update("""
    WITH due AS MATERIALIZED (
     SELECT s.id FROM experience_intake_sources s
     WHERE s.state='PENDING' AND (
@@ -63,6 +64,7 @@ public class ExperienceIntakeService {
    FROM (SELECT id,experience_intake_available(id) AS ok FROM due) checked
    WHERE i.id=checked.id
    """);
+  return inserted+rechecked;
  }
  /** Called again by a future extractor at claim and commit, never a customer source-read endpoint. */
  @Transactional public boolean available(UUID id){return Boolean.TRUE.equals(db.queryForObject("SELECT experience_intake_available(?)",Boolean.class,id));}

@@ -17,6 +17,7 @@ public class WeKnoraIndexWorker {
     private final JdbcTemplate db;private final WeKnoraClient client;private final MaterialAccess access;
     private final TransactionTemplate tx;
     private final com.dreamcore.workspace.scheduling.IdleGate idle=new com.dreamcore.workspace.scheduling.IdleGate();
+    private long nextMaintain;
     record Job(UUID id,UUID chunk,String kb,String remote,String state,UUID token) {}
     public WeKnoraIndexWorker(JdbcTemplate db,WeKnoraClient client,MaterialAccess access,PlatformTransactionManager manager){
         this.db=db;this.client=client;this.access=access;tx=new TransactionTemplate(manager);
@@ -27,7 +28,7 @@ public class WeKnoraIndexWorker {
         WHERE c.id=i.chunk_id AND c.tenant_id=i.tenant_id
         """;
     private boolean active(UUID id){return Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM knowledge_remote_index i WHERE i.id=? AND EXISTS("+ACTIVE+"))",Boolean.class,id));}
-    private Job claim(){
+    private void maintain(){
         // A timed-out create has unknown side effects: never blindly repeat it.
         db.update("UPDATE knowledge_remote_index SET state='UNKNOWN',error_code='CREATE_RESULT_UNKNOWN',updated_at=now() WHERE state='UPLOADING' AND lease_until<now()");
         db.update("UPDATE knowledge_remote_index SET state='DELETE_PENDING',lease_token=NULL WHERE state='DELETING' AND lease_until<now()");
@@ -45,6 +46,20 @@ public class WeKnoraIndexWorker {
                 remote_id=NULL,error_code=NULL,lease_token=NULL,next_attempt_at=now(),updated_at=now()
             WHERE knowledge_remote_index.state='DELETED'
             """);
+    }
+    private Job claim(){
+        long now=System.currentTimeMillis();
+        boolean claimable=Boolean.TRUE.equals(db.queryForObject(
+            "SELECT EXISTS(SELECT 1 FROM knowledge_remote_index WHERE state IN ('QUEUED','INDEXING','DELETE_PENDING') AND next_attempt_at<=now() AND (lease_until IS NULL OR lease_until<now()))",
+            Boolean.class));
+        boolean leaseExpired=Boolean.TRUE.equals(db.queryForObject(
+            "SELECT EXISTS(SELECT 1 FROM knowledge_remote_index WHERE state IN ('UPLOADING','DELETING') AND lease_until<now())",
+            Boolean.class));
+        // Quiet queues skip the heavy INSERT/UPDATE maintenance for up to 60s; leases and claimable rows still force it.
+        if(claimable||leaseExpired||now>=nextMaintain){
+            maintain();
+            nextMaintain=now+60_000L;
+        }
         var rows=db.queryForList("SELECT * FROM knowledge_remote_index WHERE state IN ('QUEUED','INDEXING','DELETE_PENDING') AND next_attempt_at<=now() AND (lease_until IS NULL OR lease_until<now()) ORDER BY CASE WHEN state='DELETE_PENDING' THEN 0 ELSE 1 END,created_at FOR UPDATE SKIP LOCKED LIMIT 1");
         if(rows.isEmpty())return null;var row=rows.getFirst();String state=(String)row.get("state");UUID token=UUID.randomUUID(),id=(UUID)row.get("id");
         db.update("UPDATE knowledge_remote_index SET state=?,lease_token=?,lease_until=now()+interval '30 seconds',updated_at=now() WHERE id=?",state.equals("QUEUED")?"UPLOADING":state.equals("DELETE_PENDING")?"DELETING":state,token,id);

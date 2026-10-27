@@ -22,7 +22,8 @@ public class CompanyAnalysisWorker {
   if(!actionable&&!changed&&now<nextDiscover)return;
   runOnce();
   chunkWatermark=mark;
-  if(!actionable)nextDiscover=now+60_000L;
+  // Quiet tenants wait two minutes between discovery scans; queued work still uses the 3s poll.
+  if(!actionable)nextDiscover=now+120_000L;
  }
  public synchronized void runOnce(){
   if(stopping)return;

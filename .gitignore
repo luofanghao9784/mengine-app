@@ -39,6 +39,9 @@ playwright-report/
 test-results/
 .pytest_cache/
 
+# 本地代码理解分析产物（Understand Anything），不入仓
+.ua/
+
 # 本地运行文件与客户原始数据
 *.log
 logs/
