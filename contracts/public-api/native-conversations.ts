@@ -72,6 +72,9 @@ export type NativeScheduleRule =
  | {kind:'daily';daily:{time:string;time_zone:string}}
  | {kind:'weekly';weekly:{time:string;time_zone:string;weekdays:number[]}}
  | {kind:'cron';cron:{expression:string;time_zone:string}};
+/** Per-run task budget; no plan-wide monetary cap. Same-tenant employee daily
+ * budget spans all runs and keeps unknown reservations. Count limits use rolling
+ * 24h (plan <=24, employee <=48), maxTotalRuns, expiry and concurrency <=2. */
 export interface NativeScheduleConfig {
  title:string; prompt:string; rule:NativeScheduleRule|null; materialEvents:boolean;
  minIntervalSeconds:number; maxRunsPerDay:number; maxTotalRuns:number; expiresAt:string;
@@ -90,9 +93,24 @@ export interface NativeScheduleRun {
 
 /** B6: GET tenants/{t}/native-plugins (employee) or admin/native-plugins.
  * Only audited preinstalled modules appear. No install URL or package input. */
+/** enterprise-data gates search/read/save/history together, including NEW private
+ * artifact persistence. Existing artifacts remain subject to owner download and
+ * explicit publication authorization. Policy changes interrupt the old runtime. */
 export interface NativePluginPolicy { revision:number; enabled:Record<'native-core'|'enterprise-data'|'enterprise-skills'|'office',boolean> }
 /** PUT tenants/{t}/admin/native-plugins/{id}; optimistic current revision required. */
 export interface NativePluginToggle { enabled:boolean; revision:number }
 
 /** Scheduler diagnostics are server-side only: schedule ID + safe reason category.
  * UNKNOWN dispatch receipts are never retried because of polling errors. */
+
+/** Enabled native schedules fail startup preflight if API-host Node/script/modules
+ * are absent. Runtime dependency failures use 503 NATIVE_SCHEDULE_RULES_UNAVAILABLE;
+ * an evaluated invalid rule uses 400 NATIVE_SCHEDULE_RULE_INVALID. */
+
+/** enterprise_read accepts an exact material/version accessible to the current
+ * employee anywhere in the SAME tenant, not only pre-attached or session-space
+ * versions. Current download authorization is rechecked, and read versions become
+ * source dependencies. enterprise_search remains scoped to the session workspace. */
+
+/** Test tooling only: NATIVE_TEST_ENGINE_NOT_BUILT is a local precondition failure,
+ * never an HTTP business error. Build engine/dist before native integration tests. */

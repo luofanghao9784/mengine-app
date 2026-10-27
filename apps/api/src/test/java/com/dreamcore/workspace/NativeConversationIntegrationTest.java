@@ -12,6 +12,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={"dreamcore.knowledge.enabled=true","dreamcore.tasks.enabled=true"})
 class NativeConversationIntegrationTest {
+ @BeforeAll static void requireBuiltEngine(){NativeEnginePrerequisites.verify(NativeEnginePrerequisites.root());}
  @Autowired NativeConversationService nativeSessions;@Autowired MaterialService materials;@Autowired ConversationService conversations;@Autowired JdbcTemplate db;
  @org.springframework.boot.test.web.server.LocalServerPort int port;
  UUID tenant,owner,other,space,target,personal;
