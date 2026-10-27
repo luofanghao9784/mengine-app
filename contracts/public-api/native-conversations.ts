@@ -93,3 +93,6 @@ export interface NativeScheduleRun {
 export interface NativePluginPolicy { revision:number; enabled:Record<'native-core'|'enterprise-data'|'enterprise-skills'|'office',boolean> }
 /** PUT tenants/{t}/admin/native-plugins/{id}; optimistic current revision required. */
 export interface NativePluginToggle { enabled:boolean; revision:number }
+
+/** Scheduler diagnostics are server-side only: schedule ID + safe reason category.
+ * UNKNOWN dispatch receipts are never retried because of polling errors. */

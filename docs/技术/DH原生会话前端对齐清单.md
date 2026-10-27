@@ -231,6 +231,8 @@ SDK 0.2.1-rc.2 原生协议不包含回答/审批/停止方法。适配器使用
 - 未配置 native.web-url 时不启动调度 worker；配置后默认启用，可用 native.schedules-enabled=false 暂停后台调度。平台需 Node 及当前 engine 依赖，schedule-rules 路径可由 dreamcore.native.schedule-rules 指定。容器内自主 schedule 服务关闭，唤醒统一经平台。
 - 本批提供后端与运行链路，定时界面、时钟标记与提醒展示由前端接线；不代表这些界面已交付。
 
+- 运维诊断：定时轮询异常记录 scheduleId 与安全原因分类，不记录异常正文/堆栈，避免泄漏提示词或凭据。扫描失败独立记录；日志不改变 UNKNOWN 不重派规则。
+
 ## 附录 H：B6 审核预装与企业开关定稿（2026-10-27）
 
 - 镜像内 `engine/native/preinstalled-plugins.json` 是部署方维护的唯一清单，含 DH market format 1 索引（已用官方 validator 验证）与本产品可切换模块。索引仅用于审核展示，不开放在线安装。
