@@ -1,7 +1,7 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';
 import {datasetInsightContext,validateDatasetInsight,analyzeDatasetInsight} from '../dist/runtime/dataset-insight.js';
 const c=datasetInsightContext({sources:['a','b'].map(datasetId=>({datasetId,snapshotId:'v1',releaseId:'r1',name:'合成表'})),facts:[{id:'F1',datasetId:'a',text:'甲表共 2 条记录'},{id:'F2',datasetId:'b',text:'乙表共 3 条记录'}],boundaries:'不能把跨表记录数相加当人数'});
-const report={title:'先核对覆盖范围',findings:[{title:'两表粒度不同',observation:'两张表记录范围不同',interpretation:'可能需要先核对关联',action:'检查主键和来源范围',factIds:['F1','F2']}],limitations:'不推断利润或到账'};
+const report={title:'先核对覆盖范围',findings:[{title:'两表粒度不同',interpretation:'可能需要先核对关联',action:'检查主键和来源范围',factIds:['F1','F2']}],limitations:'不推断利润或到账'};
 test('business insight must cover every source and reject invented evidence',()=>{assert.deepEqual(validateDatasetInsight(report,c),report);for(const ids of [['F1'],['F1','F99']])assert.throws(()=>validateDatasetInsight({...report,findings:[{...report.findings[0],factIds:ids}]},c),/INVALID_DATASET_INSIGHT/);});
 test('business insight uses one model call and no executable tools',async()=>{let calls=0;const model={async *generate(r){calls++;assert.deepEqual(r.tools,[]);assert.ok(JSON.stringify(r.messages).includes('甲表共 2 条记录'));yield {type:'text',text:JSON.stringify(report)};yield {type:'finish',reason:'stop'};}};await analyzeDatasetInsight(c,model,new AbortController().signal);assert.equal(calls,1);});
 
@@ -45,13 +45,33 @@ test('business insight batches twelve sources within output and call budgets the
  const context=datasetInsightContext({sources,facts,boundaries:'合成边界'});
  let calls=0;const model={async *generate(r){
   const start=calls++*4;assert.deepEqual(r.tools,[]);
-  yield {type:'text',text:JSON.stringify({...report,findings:[{...report.findings[0],factIds:facts.slice(start,start+4).map(f=>f.id)}]})};yield {type:'finish',reason:'stop'};
+  if(calls===4){assert.match(JSON.stringify(r.messages),/candidates/);assert.match(JSON.stringify(r.messages),/T11/);}
+  yield {type:'text',text:JSON.stringify({...report,findings:[{...report.findings[0],factIds:(calls===4?facts:facts.slice(start,start+4)).map(f=>f.id)}]})};yield {type:'finish',reason:'stop'};
  }};
  const result=await analyzeDatasetInsight(context,model,new AbortController().signal);
- assert.equal(calls,3);assert.equal(result.modelCalls,3);assert.equal(JSON.parse(result.text).findings.length,3);
+ assert.equal(calls,4);assert.equal(result.modelCalls,4);assert.equal(JSON.parse(result.text).findings.length,1);
  validateDatasetInsight(JSON.parse(result.text),context);
 });
 test('business insight preserves pre-dispatch cancellation without model calls',async()=>{
  let calls=0;const model={async *generate(){calls++;}};const controller=new AbortController();controller.abort();
  await assert.rejects(()=>analyzeDatasetInsight(c,model,controller.signal),/CANCELLED/);assert.equal(calls,0);
+});
+
+test('model cannot add factual prose even when its numbers occur in evidence',()=>{
+ for(const observation of ['甲表利润 2 万元','甲表共 -2 条记录','两表共五条记录'])
+  assert.throws(()=>validateDatasetInsight({...report,findings:[{...report.findings[0],observation}]},c),/INVALID_DATASET_INSIGHT/);
+});
+
+test('forty sources reserve final synthesis and corrections within eight calls',async()=>{
+ const sources=Array.from({length:40},(_,i)=>({datasetId:'s'+i,snapshotId:'v',releaseId:'r',name:'合成表'}));
+ const facts=sources.map((s,i)=>({id:'K'+i,datasetId:s.datasetId,text:'合成事实'}));
+ const context=datasetInsightContext({sources,facts,boundaries:'不得跨表求和'});let calls=0;
+ const model={async *generate(request){const step=Math.floor(calls++/2);if(calls%2){yield {type:'text',text:'invalid'};}else {const selected=step<3?facts.slice(step*14,step*14+14):facts;if(step===3){assert.match(JSON.stringify(request.messages),/candidates/);assert.match(JSON.stringify(request.messages),/K39/);}
+ const findings=[];for(let i=0;i<selected.length;i+=20)findings.push({...report.findings[0],factIds:selected.slice(i,i+20).map(f=>f.id)});yield {type:'text',text:JSON.stringify({...report,findings})};}yield {type:'finish',reason:'stop'};}};
+ const result=await analyzeDatasetInsight(context,model,new AbortController().signal);assert.equal(calls,8);assert.equal(result.modelCalls,8);validateDatasetInsight(JSON.parse(result.text),context);
+});
+test('failed synthesis never returns concatenated group reports',async()=>{
+ const sources=Array.from({length:8},(_,i)=>({datasetId:'s'+i,snapshotId:'v',releaseId:'r',name:'合成表'})),facts=sources.map((s,i)=>({id:'K'+i,datasetId:s.datasetId,text:'合成事实'}));let calls=0;
+ const model={async *generate(){const step=calls++;yield {type:'text',text:step<2?JSON.stringify({...report,findings:[{...report.findings[0],factIds:facts.slice(step*4,step*4+4).map(f=>f.id)}]}):'invalid'};yield {type:'finish',reason:'stop'};}};
+ await assert.rejects(()=>analyzeDatasetInsight(datasetInsightContext({sources,facts,boundaries:'合成'}),model,new AbortController().signal),/TASK_MODEL_FAILED/);assert.equal(calls,4);
 });

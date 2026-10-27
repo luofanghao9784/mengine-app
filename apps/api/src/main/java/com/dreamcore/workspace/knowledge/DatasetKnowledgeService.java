@@ -18,6 +18,7 @@ public class DatasetKnowledgeService {
     private final NativeGovernanceDeployment releases;
     private final GovernanceModelService governance;
     private final IdentityService identities;
+    @org.springframework.beans.factory.annotation.Autowired private KnowledgePipelineProgress progress;
     private final JsonMapper json = new JsonMapper();
 
     public DatasetKnowledgeService(JdbcTemplate db, NativeGovernanceDeployment releases,
@@ -27,7 +28,10 @@ public class DatasetKnowledgeService {
 
     public record Article(UUID id, UUID datasetId, String title, String content, UUID releaseId) {}
 
+    public boolean due(UUID tenant,UUID dataset){return progress.due(tenant,dataset,"KNOWLEDGE");}
+    public void failed(UUID tenant,UUID dataset){progress.record(tenant,dataset,"KNOWLEDGE","FAILED","REVALIDATION_FAILED");}
     private void stale(UUID tenant, UUID dataset, String reason) {
+        progress.record(tenant,dataset,"KNOWLEDGE","WAITING",reason);
         db.update("UPDATE dataset_knowledge_publications SET state='STALE',reason=?,checked_at=now() WHERE tenant_id=? AND dataset_id=? AND state<>'STALE'",reason,tenant,dataset);
     }
 
@@ -63,6 +67,7 @@ public class DatasetKnowledgeService {
         // Existing immutable draft must exactly match recompilation; never overwrite an old body.
         int count=db.update("UPDATE dataset_knowledge_publications SET state='PUBLISHED',reason=NULL,checked_at=now(),published_at=coalesce(published_at,now()) WHERE tenant_id=? AND dataset_id=? AND release_id=? AND content_hash=? AND document=?::jsonb",tenant,dataset,release.releaseId(),hash,document);
         if(count!=1) throw new IdentityException(409,"DATASET_KNOWLEDGE_DRAFT_CONFLICT");
+        progress.record(tenant,dataset,"KNOWLEDGE","SUCCEEDED","PUBLISHED");
     }
 
     /** Access and current evidence are checked on every read, even before the worker notices changes. */

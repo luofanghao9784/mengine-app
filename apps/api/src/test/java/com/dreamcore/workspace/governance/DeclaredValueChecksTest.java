@@ -21,10 +21,11 @@ class DeclaredValueChecksTest {
         var result=DeclaredValueChecks.check(columns,bad,List.of(number,date,category,status,ordinal));
         assertEquals("VIOLATIONS",result.get("state"));assertEquals(5L,result.get("violations"));
     }
-    @Test void nullableIsExplicitAndMissingColumnsOrProofCannotBecomePassed() {
+    @Test void nullableAndColumnPresenceRemainMandatoryWithoutReintroducingProofGate() {
         var text=rule("TEXT","编号");text.put("nullable",false);
         assertEquals(2L,DeclaredValueChecks.check(List.of("编号"),List.of(Arrays.asList((String)null),List.of(" ")),List.of(text)).get("violations"));
         assertThrows(IdentityException.class,()->DeclaredValueChecks.check(List.of("其他"),List.of(List.of("1")),List.of(text)));
-        text.remove("evidence");assertThrows(IdentityException.class,()->DeclaredValueChecks.check(List.of("编号"),List.of(),List.of(text)));
+        // Source evidence authority is tracked separately; MODEL_DETERMINED rules can still execute.
+        text.remove("evidence");assertEquals("CHECKED",DeclaredValueChecks.check(List.of("编号"),List.of(List.of("A")),List.of(text)).get("state"));
     }
 }

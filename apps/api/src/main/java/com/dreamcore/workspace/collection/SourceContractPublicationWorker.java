@@ -24,8 +24,9 @@ public class SourceContractPublicationWorker {
             var owners=db.queryForList("SELECT owner_id FROM tenant_governance WHERE tenant_id=?",UUID.class,tenant);
             if(owners.isEmpty()) continue;
             for(UUID dataset:db.queryForList("SELECT id FROM business_datasets WHERE tenant_id=? AND status='ACTIVE' AND NOT scrubbed AND current_snapshot IS NOT NULL ORDER BY id LIMIT 1000",UUID.class,tenant)) {
-                try { service.reconcile(owners.getFirst(),tenant,dataset); }
+                try { if(!service.due(tenant,dataset))continue; service.reconcile(owners.getFirst(),tenant,dataset); }
                 catch(RuntimeException failure) {
+                    service.failed(tenant,dataset);
                     // Never expose source content; a failed validation cannot publish a release.
                     org.slf4j.LoggerFactory.getLogger(getClass()).warn("Approved source publication deferred: tenant={} dataset={} error={}",tenant,dataset,failure.getClass().getSimpleName());
                 }

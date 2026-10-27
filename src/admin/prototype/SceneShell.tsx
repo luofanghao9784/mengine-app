@@ -1122,6 +1122,9 @@ function Work({
               只看卡在“{GATES[gate]}”的 ×
             </button>
           )}
+          {place === 'knowledge' && knowledge.data?.pipeline?.steps.map((step, i) => (
+            <p role="status" key={`${step.stage}-${step.source}-${i}`}><strong>{step.source}</strong>：{step.message}</p>
+          ))}
           {place === 'knowledge' && knowledge.backgroundError != null && <p role="status">企业背景暂不可用，未计入知识数量。<button onClick={knowledge.refreshBackground}>重试背景读取</button></p>}
           {place === 'knowledge' && <KnowledgeSync knowledge={knowledge} />}
           {groups.length === 0 && <p className="none">这一栏里没有符合条件的记录。</p>}

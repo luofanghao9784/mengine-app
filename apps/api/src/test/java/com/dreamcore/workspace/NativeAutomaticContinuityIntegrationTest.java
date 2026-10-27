@@ -20,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @TestPropertySource(properties="dreamcore.briefing.merge-seconds=0")
 class NativeAutomaticContinuityIntegrationTest extends TaskDatasetFixture {
     @Autowired GovernanceModelService governance;
+    @org.springframework.test.context.bean.override.mockito.MockitoSpyBean org.springframework.jdbc.core.JdbcTemplate observedDb;
     @Autowired com.dreamcore.workspace.collection.SourceContractPublicationService sourcePublication;
     @Autowired NativeGovernanceDeployment releases;
     @Autowired CompanyInformationService company;
@@ -27,6 +28,9 @@ class NativeAutomaticContinuityIntegrationTest extends TaskDatasetFixture {
     @Autowired BriefingGenerationService generation;
     @Autowired com.dreamcore.workspace.context.DatasetTaskContext datasetContext;
     @Autowired com.dreamcore.workspace.knowledge.DatasetKnowledgeService datasetKnowledge;
+    @Autowired com.dreamcore.workspace.knowledge.KnowledgePipelineProgress pipeline;
+    @Autowired com.dreamcore.workspace.collection.VersionedDatasetEvidence receipts;
+    @Autowired org.springframework.transaction.PlatformTransactionManager transactions;
     @Autowired com.dreamcore.workspace.scene.NativeKnowledgeService knowledgeScene;
     @Autowired com.dreamcore.workspace.knowledge.DatasetBusinessKnowledgeService businessKnowledge;
     @TempDir Path directory;
@@ -50,6 +54,7 @@ class NativeAutomaticContinuityIntegrationTest extends TaskDatasetFixture {
         ReflectionTestUtils.setField(governance,"evidencePath",evidence.toString());
         ReflectionTestUtils.setField(releases,"evidencePath",evidence.toString());
         ReflectionTestUtils.setField(datasetContext,"evidencePath",evidence.toString());
+        ReflectionTestUtils.setField(businessKnowledge,"evidencePath",evidence.toString());
         ReflectionTestUtils.setField(governance,"dispatchEnabled",true);
         receipt(snapshot,"a".repeat(64));
     }
@@ -59,6 +64,7 @@ class NativeAutomaticContinuityIntegrationTest extends TaskDatasetFixture {
     @AfterEach void reset() {
         ReflectionTestUtils.setField(governance,"evidencePath","");ReflectionTestUtils.setField(releases,"evidencePath","");
         ReflectionTestUtils.setField(datasetContext,"evidencePath","");
+        ReflectionTestUtils.setField(businessKnowledge,"evidencePath","");
         ReflectionTestUtils.setField(governance,"dispatchEnabled",false);
         db.update("UPDATE governance_model_dispatch SET state='FAILED' WHERE job_id IN(SELECT id FROM governance_model_jobs WHERE tenant_id=?) AND state<>'SUCCEEDED'",tenant);
         db.update("UPDATE briefing_generation_policies SET enabled=false WHERE tenant_id=?",tenant);
@@ -145,12 +151,76 @@ class NativeAutomaticContinuityIntegrationTest extends TaskDatasetFixture {
         assertEquals(0,knowledgeScene.snapshot(owner,tenant).path("items").size());
     }
 
+    @Test void cleanupCannotRacePastInFlightEvidenceInsertion() throws Exception {
+        var entered=new java.util.concurrent.CountDownLatch(1);var resume=new java.util.concurrent.CountDownLatch(1);
+        try(var pool=java.util.concurrent.Executors.newSingleThreadExecutor()) {
+            var calculation=pool.submit(()->receipts.get(tenant,dataset,snapshot,"INSIGHT_FACTS",List.of("race-test"),()->{
+                entered.countDown();try{if(!resume.await(5,java.util.concurrent.TimeUnit.SECONDS))throw new IllegalStateException("test timeout");}catch(InterruptedException e){throw new RuntimeException(e);}return Map.of("facts",List.of("synthetic"));
+            }));
+            assertTrue(entered.await(5,java.util.concurrent.TimeUnit.SECONDS));
+            try {
+                var blocked=assertThrows(org.springframework.dao.DataAccessException.class,()->new org.springframework.transaction.support.TransactionTemplate(transactions).execute(status->{db.execute("SET LOCAL lock_timeout='200ms'");db.update("UPDATE dataset_snapshots SET scrubbed=true,data_rows='[]'::jsonb WHERE id=?",snapshot);return null;}));
+                assertEquals("55P03",((java.sql.SQLException)blocked.getMostSpecificCause()).getSQLState());
+            } finally {resume.countDown();}
+            calculation.get(5,java.util.concurrent.TimeUnit.SECONDS);
+            db.update("UPDATE dataset_snapshots SET scrubbed=true,data_rows='[]'::jsonb WHERE id=?",snapshot);
+            assertEquals(0,db.queryForObject("SELECT count(*) FROM dataset_evidence_receipts WHERE snapshot_id=?",Integer.class,snapshot));
+            assertThrows(IdentityException.class,()->receipts.get(tenant,dataset,snapshot,"INSIGHT_FACTS",List.of("race-test"),()->Map.of()));
+        }
+    }
+    @Test void pipelineWaitIsAuthorizedAndSuccessfulReconciliationIsBounded() {
+        pipeline.record(tenant,dataset,"KNOWLEDGE","WAITING","SOURCE_DEFINITION_REQUIRED");
+        assertEquals(1,pipeline.view(owner,tenant).waiting());
+        assertTrue(pipeline.due(tenant,dataset,"KNOWLEDGE"));
+        pipeline.record(tenant,dataset,"KNOWLEDGE","SUCCEEDED","PUBLISHED");
+        assertFalse(pipeline.due(tenant,dataset,"KNOWLEDGE"));
+        version(2,List.of(List.of("甲","2")));
+        assertTrue(pipeline.due(tenant,dataset,"KNOWLEDGE"));
+        pipeline.record(tenant,dataset,"KNOWLEDGE","WAITING","SOURCE_DEFINITION_REQUIRED");
+        db.update("DELETE FROM workspace_members WHERE tenant_id=? AND workspace_id=? AND account_id=?",tenant,space,owner);
+        assertTrue(pipeline.view(owner,tenant).steps().isEmpty());
+    }
+    @Test void declaredStatisticalPlanWorksWithoutFinanceTableName() throws Exception {
+        var plan=new LinkedHashMap<String,Object>(Map.of("name","已核对登记总量","meaning","来源数量登记合计","unit","件","grain","来源记录","scope","当前完整快照","exclusions","无","evidence","合成计划","aggregation","SUM","valueField","数量"));
+        plan.put("execution",Map.of("groupColumns",List.of("门店"),"dateColumn","","dateFrom","","dateTo","","timeZone","Asia/Shanghai","reviewed",true));
+        var items=new ArrayList<>(schema);items.add(Map.of("kind","analysis-plan","datasetId",dataset.toString(),"definition",plan));writeEvidence(items);
+        publish();var context=businessKnowledge.capture(owner,tenant);
+        assertTrue(context.facts().stream().anyMatch(f->f.text().contains("已核对登记总量")),"Explicit plan must be used for a non-finance source");
+    }
+
+    @Test void knowledgeProjectionShowsRealQueuedAndFailedTasks() {
+        publish();UUID article=businessKnowledge.start(owner,tenant);
+        assertTrue(knowledgeScene.snapshot(owner,tenant).path("busy").asBoolean());
+        db.update("UPDATE conversation_tasks SET status='FAILED' WHERE id=(SELECT task_id FROM dataset_business_knowledge WHERE id=?)",article);
+        var page=knowledgeScene.snapshot(owner,tenant);
+        assertFalse(page.path("busy").asBoolean());assertEquals(1,page.path("failed").asInt());
+        assertTrue(page.path("status").asText().contains("失败"));
+    }
+
+    @Test void irreversibleSourceCleanupRemovesCachedEvidence() {
+        publish();businessKnowledge.capture(owner,tenant);
+        assertTrue(db.queryForObject("SELECT count(*) FROM dataset_evidence_receipts WHERE tenant_id=?",Integer.class,tenant)>0);
+        db.update("UPDATE dataset_snapshots SET data_rows='[]'::jsonb,scrubbed=true WHERE id=?",snapshot);
+        assertEquals(0,db.queryForObject("SELECT count(*) FROM dataset_evidence_receipts WHERE tenant_id=?",Integer.class,tenant));
+        assertTrue(businessKnowledge.current(owner,tenant).isEmpty());
+    }
+
+    @Test void unchangedKnowledgeReadDoesNotReloadSnapshotRows() {
+        publish();businessKnowledge.capture(owner,tenant);
+        org.mockito.Mockito.clearInvocations(observedDb);
+        businessKnowledge.capture(owner,tenant);
+        var rowReads=org.mockito.Mockito.mockingDetails(observedDb).getInvocations().stream()
+            .filter(call->call.getArguments().length>0 && call.getArguments()[0] instanceof String sql
+                && sql.startsWith("SELECT") && sql.contains("data_rows")).toList();
+        assertTrue(rowReads.isEmpty(),"Repeated full-row reads: "+rowReads.size());
+    }
+
     @Test void businessKnowledgeCoversFullSnapshotAndRejectsInventedEvidence() {
         publish();var context=businessKnowledge.capture(owner,tenant);
         assertEquals(1,context.sources().size());assertTrue(context.facts().getFirst().text().contains("6 条"));
-        String report=json.writeValueAsString(Map.of("title","合成经营观察","findings",List.of(Map.of("title","记录范围","observation","来源有 6 条记录","interpretation","需要先核对业务范围","action","核对源记录口径","factIds",List.of("F1"))),"limitations","不能推断实际到账"));
+        String report=json.writeValueAsString(Map.of("title","合成经营观察","findings",List.of(Map.of("title","记录范围","interpretation","需要先核对业务范围","action","核对源记录口径","factIds",List.of("F1"))),"limitations","不能推断实际到账"));
         assertEquals(1,businessKnowledge.validate(report,context).findings().size());
-        assertThrows(IdentityException.class,()->businessKnowledge.validate(report.replace("6 条","999 条"),context));
+        assertThrows(IdentityException.class,()->businessKnowledge.validate(report.replace("\"interpretation\"","\"observation\":\"利润 6 万元\",\"interpretation\""),context));
         assertThrows(IdentityException.class,()->businessKnowledge.validate(report.replace("F1","F999"),context));
         UUID first=businessKnowledge.start(owner,tenant);assertEquals(first,businessKnowledge.start(owner,tenant));
         db.update("UPDATE business_datasets SET status='WITHDRAWN' WHERE id=?",dataset);

@@ -20,7 +20,10 @@ public final class NativeAnalysisPlans {
     }
     /** A task's persisted creation time anchors rolling calendar windows across retries and month changes. */
     public static Map<String,Object> load(String path,UUID tenant,UUID dataset,UUID snapshot,String name,List<String> columns,List<DatasetField> fields,Instant taskCreatedAt) {
-        var records=GovernanceSourceEvidence.read(path,tenant,dataset,name,"schema",false).stream()
+        return fromSchema(GovernanceSourceEvidence.read(path,tenant,dataset,name,"schema",false),tenant,dataset,snapshot,columns,fields,taskCreatedAt);
+    }
+    public static Map<String,Object> fromSchema(List<Map<String,Object>> schema,UUID tenant,UUID dataset,UUID snapshot,List<String> columns,List<DatasetField> fields,Instant taskCreatedAt) {
+        var records=schema.stream()
             .filter(r->"analysis-plan".equals(r.get("kind"))).toList();
         if(records.size()>8)throw new IdentityException(503,"NATIVE_ANALYSIS_PLANS_INVALID");
         var metadata=JSON.createObjectNode();var fs=metadata.putArray("fields");

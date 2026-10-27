@@ -1,0 +1,1996 @@
+{
+  "version": "1.0",
+  "maxRules": 100,
+  "cases": [
+    {
+      "id": "text",
+      "columns": [
+        "值"
+      ],
+      "entries": [
+        {
+          "column": "值",
+          "declaredUnit": "",
+          "definitionScope": "BUSINESS_DEFINITION",
+          "sourceMetadata": {
+            "definition": "合成字段含义"
+          }
+        }
+      ],
+      "schema": [
+        {
+          "kind": "value-rule",
+          "id": "r",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        }
+      ],
+      "rows": [
+        [
+          "合成"
+        ]
+      ],
+      "expected": "READY"
+    },
+    {
+      "id": "blank",
+      "columns": [
+        "值"
+      ],
+      "entries": [
+        {
+          "column": "值",
+          "declaredUnit": "",
+          "definitionScope": "BUSINESS_DEFINITION",
+          "sourceMetadata": {
+            "definition": "合成字段含义"
+          }
+        }
+      ],
+      "schema": [
+        {
+          "kind": "value-rule",
+          "id": "r",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        }
+      ],
+      "rows": [
+        [
+          " "
+        ]
+      ],
+      "expected": "SOURCE_DATA_REQUIRES_REVIEW"
+    },
+    {
+      "id": "null",
+      "columns": [
+        "值"
+      ],
+      "entries": [
+        {
+          "column": "值",
+          "declaredUnit": "",
+          "definitionScope": "BUSINESS_DEFINITION",
+          "sourceMetadata": {
+            "definition": "合成字段含义"
+          }
+        }
+      ],
+      "schema": [
+        {
+          "kind": "value-rule",
+          "id": "r",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        }
+      ],
+      "rows": [
+        [
+          null
+        ]
+      ],
+      "expected": "SOURCE_DATA_REQUIRES_REVIEW"
+    },
+    {
+      "id": "nullable",
+      "columns": [
+        "值"
+      ],
+      "entries": [
+        {
+          "column": "值",
+          "declaredUnit": "",
+          "definitionScope": "BUSINESS_DEFINITION",
+          "sourceMetadata": {
+            "definition": "合成字段含义"
+          }
+        }
+      ],
+      "schema": [
+        {
+          "kind": "value-rule",
+          "id": "r",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": true
+        }
+      ],
+      "rows": [
+        [
+          null
+        ]
+      ],
+      "expected": "READY"
+    },
+    {
+      "id": "money",
+      "columns": [
+        "值"
+      ],
+      "entries": [
+        {
+          "column": "值",
+          "declaredUnit": "元",
+          "definitionScope": "BUSINESS_DEFINITION",
+          "sourceMetadata": {
+            "definition": "合成字段含义"
+          }
+        }
+      ],
+      "schema": [
+        {
+          "kind": "value-rule",
+          "id": "r",
+          "column": "值",
+          "type": "DECIMAL",
+          "nullable": false
+        }
+      ],
+      "rows": [
+        [
+          "-9007199254740993.00001"
+        ]
+      ],
+      "expected": "READY"
+    },
+    {
+      "id": "exponent",
+      "columns": [
+        "值"
+      ],
+      "entries": [
+        {
+          "column": "值",
+          "declaredUnit": "元",
+          "definitionScope": "BUSINESS_DEFINITION",
+          "sourceMetadata": {
+            "definition": "合成字段含义"
+          }
+        }
+      ],
+      "schema": [
+        {
+          "kind": "value-rule",
+          "id": "r",
+          "column": "值",
+          "type": "DECIMAL",
+          "nullable": false
+        }
+      ],
+      "rows": [
+        [
+          "+1.2e-2"
+        ]
+      ],
+      "expected": "READY"
+    },
+    {
+      "id": "nan",
+      "columns": [
+        "值"
+      ],
+      "entries": [
+        {
+          "column": "值",
+          "declaredUnit": "元",
+          "definitionScope": "BUSINESS_DEFINITION",
+          "sourceMetadata": {
+            "definition": "合成字段含义"
+          }
+        }
+      ],
+      "schema": [
+        {
+          "kind": "value-rule",
+          "id": "r",
+          "column": "值",
+          "type": "DECIMAL",
+          "nullable": false
+        }
+      ],
+      "rows": [
+        [
+          "NaN"
+        ]
+      ],
+      "expected": "SOURCE_DATA_REQUIRES_REVIEW"
+    },
+    {
+      "id": "unicode-digits",
+      "columns": [
+        "值"
+      ],
+      "entries": [
+        {
+          "column": "值",
+          "declaredUnit": "元",
+          "definitionScope": "BUSINESS_DEFINITION",
+          "sourceMetadata": {
+            "definition": "合成字段含义"
+          }
+        }
+      ],
+      "schema": [
+        {
+          "kind": "value-rule",
+          "id": "r",
+          "column": "值",
+          "type": "DECIMAL",
+          "nullable": false
+        }
+      ],
+      "rows": [
+        [
+          "１２"
+        ]
+      ],
+      "expected": "SOURCE_DATA_REQUIRES_REVIEW"
+    },
+    {
+      "id": "date",
+      "columns": [
+        "值"
+      ],
+      "entries": [
+        {
+          "column": "值",
+          "declaredUnit": "",
+          "definitionScope": "BUSINESS_DEFINITION",
+          "sourceMetadata": {
+            "definition": "合成字段含义"
+          }
+        }
+      ],
+      "schema": [
+        {
+          "kind": "value-rule",
+          "id": "r",
+          "column": "值",
+          "type": "DATE",
+          "nullable": false
+        }
+      ],
+      "rows": [
+        [
+          "2026-10-27"
+        ]
+      ],
+      "expected": "READY"
+    },
+    {
+      "id": "invalid-date",
+      "columns": [
+        "值"
+      ],
+      "entries": [
+        {
+          "column": "值",
+          "declaredUnit": "",
+          "definitionScope": "BUSINESS_DEFINITION",
+          "sourceMetadata": {
+            "definition": "合成字段含义"
+          }
+        }
+      ],
+      "schema": [
+        {
+          "kind": "value-rule",
+          "id": "r",
+          "column": "值",
+          "type": "DATE",
+          "nullable": false
+        }
+      ],
+      "rows": [
+        [
+          "2026-02-30"
+        ]
+      ],
+      "expected": "SOURCE_DATA_REQUIRES_REVIEW"
+    },
+    {
+      "id": "extended-date",
+      "columns": [
+        "值"
+      ],
+      "entries": [
+        {
+          "column": "值",
+          "declaredUnit": "",
+          "definitionScope": "BUSINESS_DEFINITION",
+          "sourceMetadata": {
+            "definition": "合成字段含义"
+          }
+        }
+      ],
+      "schema": [
+        {
+          "kind": "value-rule",
+          "id": "r",
+          "column": "值",
+          "type": "DATE",
+          "nullable": false
+        }
+      ],
+      "rows": [
+        [
+          "+10000-01-01"
+        ]
+      ],
+      "expected": "SOURCE_DATA_REQUIRES_REVIEW"
+    },
+    {
+      "id": "enum",
+      "columns": [
+        "值"
+      ],
+      "entries": [
+        {
+          "column": "值",
+          "declaredUnit": "",
+          "definitionScope": "BUSINESS_DEFINITION",
+          "sourceMetadata": {
+            "definition": "合成字段含义"
+          }
+        }
+      ],
+      "schema": [
+        {
+          "kind": "value-rule",
+          "id": "r",
+          "column": "值",
+          "type": "ENUM",
+          "nullable": false,
+          "values": [
+            "收",
+            "付"
+          ]
+        }
+      ],
+      "rows": [
+        [
+          "收"
+        ]
+      ],
+      "expected": "READY"
+    },
+    {
+      "id": "bad-enum",
+      "columns": [
+        "值"
+      ],
+      "entries": [
+        {
+          "column": "值",
+          "declaredUnit": "",
+          "definitionScope": "BUSINESS_DEFINITION",
+          "sourceMetadata": {
+            "definition": "合成字段含义"
+          }
+        }
+      ],
+      "schema": [
+        {
+          "kind": "value-rule",
+          "id": "r",
+          "column": "值",
+          "type": "ENUM",
+          "nullable": false,
+          "values": [
+            "收",
+            "付"
+          ]
+        }
+      ],
+      "rows": [
+        [
+          "退"
+        ]
+      ],
+      "expected": "SOURCE_DATA_REQUIRES_REVIEW"
+    },
+    {
+      "id": "unknown-rule",
+      "columns": [
+        "值"
+      ],
+      "entries": [
+        {
+          "column": "值",
+          "declaredUnit": "",
+          "definitionScope": "BUSINESS_DEFINITION",
+          "sourceMetadata": {
+            "definition": "合成字段含义"
+          }
+        }
+      ],
+      "schema": [
+        {
+          "kind": "value-rule",
+          "id": "r",
+          "column": "值",
+          "type": "UNSUPPORTED",
+          "nullable": false
+        }
+      ],
+      "rows": [
+        [
+          "x"
+        ]
+      ],
+      "expected": "WAITING_SOURCE_DEFINITION"
+    },
+    {
+      "id": "rules-100",
+      "columns": [
+        "值"
+      ],
+      "entries": [
+        {
+          "column": "值",
+          "declaredUnit": "",
+          "definitionScope": "BUSINESS_DEFINITION",
+          "sourceMetadata": {
+            "definition": "合成字段含义"
+          }
+        }
+      ],
+      "schema": [
+        {
+          "kind": "value-rule",
+          "id": "r0",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r1",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r2",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r3",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r4",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r5",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r6",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r7",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r8",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r9",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r10",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r11",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r12",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r13",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r14",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r15",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r16",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r17",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r18",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r19",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r20",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r21",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r22",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r23",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r24",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r25",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r26",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r27",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r28",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r29",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r30",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r31",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r32",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r33",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r34",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r35",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r36",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r37",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r38",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r39",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r40",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r41",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r42",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r43",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r44",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r45",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r46",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r47",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r48",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r49",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r50",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r51",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r52",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r53",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r54",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r55",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r56",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r57",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r58",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r59",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r60",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r61",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r62",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r63",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r64",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r65",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r66",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r67",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r68",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r69",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r70",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r71",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r72",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r73",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r74",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r75",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r76",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r77",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r78",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r79",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r80",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r81",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r82",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r83",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r84",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r85",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r86",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r87",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r88",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r89",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r90",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r91",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r92",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r93",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r94",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r95",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r96",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r97",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r98",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r99",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        }
+      ],
+      "rows": [
+        [
+          "合成"
+        ]
+      ],
+      "expected": "READY"
+    },
+    {
+      "id": "rules-101",
+      "columns": [
+        "值"
+      ],
+      "entries": [
+        {
+          "column": "值",
+          "declaredUnit": "",
+          "definitionScope": "BUSINESS_DEFINITION",
+          "sourceMetadata": {
+            "definition": "合成字段含义"
+          }
+        }
+      ],
+      "schema": [
+        {
+          "kind": "value-rule",
+          "id": "r0",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r1",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r2",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r3",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r4",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r5",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r6",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r7",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r8",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r9",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r10",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r11",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r12",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r13",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r14",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r15",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r16",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r17",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r18",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r19",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r20",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r21",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r22",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r23",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r24",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r25",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r26",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r27",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r28",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r29",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r30",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r31",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r32",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r33",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r34",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r35",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r36",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r37",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r38",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r39",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r40",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r41",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r42",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r43",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r44",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r45",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r46",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r47",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r48",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r49",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r50",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r51",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r52",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r53",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r54",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r55",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r56",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r57",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r58",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r59",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r60",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r61",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r62",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r63",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r64",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r65",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r66",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r67",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r68",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r69",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r70",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r71",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r72",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r73",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r74",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r75",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r76",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r77",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r78",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r79",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r80",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r81",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r82",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r83",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r84",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r85",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r86",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r87",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r88",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r89",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r90",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r91",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r92",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r93",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r94",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r95",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r96",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r97",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r98",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r99",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "kind": "value-rule",
+          "id": "r100",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        }
+      ],
+      "rows": [
+        [
+          "合成"
+        ]
+      ],
+      "expected": "WAITING_SOURCE_DEFINITION"
+    },
+    {
+      "id": "nbsp",
+      "columns": [
+        "值"
+      ],
+      "entries": [
+        {
+          "column": "值",
+          "declaredUnit": "",
+          "definitionScope": "BUSINESS_DEFINITION",
+          "sourceMetadata": {
+            "definition": "合成字段含义"
+          }
+        }
+      ],
+      "schema": [
+        {
+          "kind": "value-rule",
+          "id": "r",
+          "column": "值",
+          "type": "TEXT",
+          "nullable": false
+        }
+      ],
+      "rows": [
+        [
+          " "
+        ]
+      ],
+      "expected": "SOURCE_DATA_REQUIRES_REVIEW"
+    },
+    {
+      "id": "zero-year",
+      "columns": [
+        "值"
+      ],
+      "entries": [
+        {
+          "column": "值",
+          "declaredUnit": "",
+          "definitionScope": "BUSINESS_DEFINITION",
+          "sourceMetadata": {
+            "definition": "合成字段含义"
+          }
+        }
+      ],
+      "schema": [
+        {
+          "kind": "value-rule",
+          "id": "r",
+          "column": "值",
+          "type": "DATE",
+          "nullable": false
+        }
+      ],
+      "rows": [
+        [
+          "0000-01-01"
+        ]
+      ],
+      "expected": "SOURCE_DATA_REQUIRES_REVIEW"
+    },
+    {
+      "id": "huge-exponent",
+      "columns": [
+        "值"
+      ],
+      "entries": [
+        {
+          "column": "值",
+          "declaredUnit": "",
+          "definitionScope": "BUSINESS_DEFINITION",
+          "sourceMetadata": {
+            "definition": "合成字段含义"
+          }
+        }
+      ],
+      "schema": [
+        {
+          "kind": "value-rule",
+          "id": "r",
+          "column": "值",
+          "type": "DECIMAL",
+          "nullable": false
+        }
+      ],
+      "rows": [
+        [
+          "1e2147483648"
+        ]
+      ],
+      "expected": "SOURCE_DATA_REQUIRES_REVIEW"
+    }
+  ]
+}

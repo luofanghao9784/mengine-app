@@ -41,6 +41,7 @@ public class GovernanceModelService {
    private NativeGovernanceDeployment releases;
    @Autowired
    private NativeMaterialGovernance materialReleases;
+   @Autowired private com.dreamcore.workspace.collection.VersionedDatasetEvidence evidenceReceipts;
    private final JsonMapper json = new JsonMapper();
    @Autowired private com.dreamcore.workspace.plans.PlanClock analysisClock;
    @Autowired private com.dreamcore.workspace.collection.CollectionSourceContracts sourceContracts;
@@ -125,37 +126,36 @@ public class GovernanceModelService {
          }
 
          var snapshots = this.db.queryForList(
-               "SELECT d.name,d.column_names::text,d.field_definitions::text,s.id snapshot_id,s.version,s.row_count,s.data_rows::text,s.coverage_through FROM business_datasets d JOIN dataset_snapshots s ON s.id=coalesce(?::uuid,d.current_snapshot) AND s.dataset_id=d.id WHERE d.tenant_id=? AND d.id=? AND d.status='ACTIVE' AND NOT d.scrubbed AND NOT s.scrubbed",
+               "SELECT d.name,d.column_names::text,d.field_definitions::text,s.id snapshot_id,s.version,s.row_count,s.coverage_through FROM business_datasets d JOIN dataset_snapshots s ON s.id=coalesce(?::uuid,d.current_snapshot) AND s.dataset_id=d.id WHERE d.tenant_id=? AND d.id=? AND d.status='ACTIVE' AND NOT d.scrubbed AND NOT s.scrubbed",
                snapshot, tenant, id);
          if (snapshots.isEmpty()) throw this.error(404, "DATASET_NOT_FOUND");
          Map<String, Object> r = snapshots.getFirst();
          List columns = (List)this.json.readValue(r.get("column_names").toString(), List.class);
-         List rows = (List)this.json.readValue(r.get("data_rows").toString(), List.class);
-         ArrayList<Integer> nulls = new ArrayList<>();
-
-         for (int i = 0; i < columns.size(); i++) {
-            int n = 0;
-
-            for (Object row : rows) {
-               if (((List)row).get(i) == null) {
-                  n++;
-               }
-            }
-
-            nulls.add(n);
-         }
-
+         UUID selected=(UUID)r.get("snapshot_id");
+         var schema=this.sourceContracts.section(evidencePath,tenant,id,selected,"schema");
+         var entries=this.sourceContracts.section(evidencePath,tenant,id,selected,"entries");
+         var receipt=this.db.queryForList("SELECT receipt::text,source_contract::text FROM collection_snapshot_receipts WHERE tenant_id=? AND dataset_id=? AND snapshot_id=?",tenant,id,selected);
+         java.util.function.Supplier<Map<String,Object>> calculate=()->{
+            String data=this.db.queryForObject("SELECT data_rows::text FROM dataset_snapshots WHERE tenant_id=? AND dataset_id=? AND id=? AND NOT scrubbed",String.class,tenant,id,selected);
+            List rows=this.json.readValue(data,List.class);
+            var nulls=new ArrayList<Integer>();
+            for(int i=0;i<columns.size();i++){int n=0;for(Object row:rows)if(((List)row).get(i)==null)n++;nulls.add(n);}
+            return Map.of("nullCounts",nulls,"contentHash",IdentityService.hash(data),"checks",this.checks(actor,tenant,id,selected,r.get("name").toString(),columns,rows));
+         };
+         // Foreign-key checks depend on OTHER sources and their current ACL; never memoize them by this snapshot alone.
+         boolean relational=schema.stream().anyMatch(rule->"constraint".equals(rule.get("kind")) && rule.get("referencedTable")!=null);
+         var statistics=relational?calculate.get():evidenceReceipts.get(tenant,id,selected,"CHECKS",List.of("checks-v3",r,entries,schema,receipt),calculate);
          out.put("name", r.get("name"));
          out.put("snapshotId", r.get("snapshot_id"));
          out.put("version", r.get("version"));
          out.put("rowCount", r.get("row_count"));
          out.put("columns", columns);
          out.put("fields", DatasetField.read(r.get("field_definitions")));
-         out.put("nullCounts", nulls);
-         out.put("contentHash", IdentityService.hash(r.get("data_rows").toString()));
+         out.put("nullCounts", statistics.get("nullCounts"));
+         out.put("contentHash", statistics.get("contentHash"));
          out.put("coverageThrough", Objects.toString(r.get("coverage_through"), ""));
-         out.put("sourceEvidence", this.sourceContracts.section(evidencePath, tenant, id, (UUID)r.get("snapshot_id"), "entries"));
-         out.put("checks", this.checks(actor, tenant, id, (UUID)r.get("snapshot_id"), r.get("name").toString(), columns, rows));
+         out.put("sourceEvidence", entries);
+         out.put("checks", statistics.get("checks"));
          out.put("coverage", "完整当前快照的行数和逐列NULL计数；仅元数据送入模型，不包含原始个人数据。结构检查不是业务正确性或发布证明。");
       } else {
          if (!"MATERIAL".equals(kind)) {

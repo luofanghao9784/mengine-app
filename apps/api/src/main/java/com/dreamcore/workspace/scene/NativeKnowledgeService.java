@@ -30,6 +30,7 @@ public class NativeKnowledgeService {
    private com.dreamcore.workspace.knowledge.DatasetKnowledgeService datasetKnowledge;
    @Autowired
    private com.dreamcore.workspace.knowledge.DatasetBusinessKnowledgeService businessKnowledge;
+   @Autowired private com.dreamcore.workspace.knowledge.KnowledgePipelineProgress pipeline;
    private final MaterialService materials;
    private final WikiArticleService articles;
    private final IdentityService identities;
@@ -198,8 +199,10 @@ public class NativeKnowledgeService {
       out.set("sourceKind", this.json.valueToTree(kinds));
       int pendingReview = this.governance.pendingReview(actor, tenant);
       out.put("pending", pendingReview);
-      out.put("failed", 0);
-      out.put("busy", false);
+      var progress=pipeline.view(actor,tenant);
+      out.set("pipeline",this.json.valueToTree(progress));
+      out.put("failed", progress.failed());
+      out.put("busy", progress.busy());
       out.put("available", true);
       out.put("needsGraph", false);
       out.put("scopeRevision", IdentityService.hash(this.json.writeValueAsString(List.of(items, waiting))));
@@ -240,7 +243,7 @@ public class NativeKnowledgeService {
          "aside",
          this.json.valueToTree(Map.of("title", "当前服务", "rows", List.<List<String>>of(List.of("数据来源", "平台原生资料、已发布知识与已确认数据口径"), List.of("核验", "已启用企业由后台自动整理数据口径知识；本页刷新权限和版本"))))
       );
-      out.put("status", items.size() + " 条已发布知识 · " + waiting.size() + " 份资料待发布 · " + pendingReview + " 项数据成果待复核");
+      out.put("status", items.size() + " 条已发布知识 · " + waiting.size() + " 份资料待发布 · " + pendingReview + " 项数据成果待复核 · " + progress.waiting()+" 项等待 · "+progress.failed()+" 项失败");
       return out;
    }
 

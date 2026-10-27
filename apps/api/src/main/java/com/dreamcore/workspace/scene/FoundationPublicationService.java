@@ -93,8 +93,8 @@ public class FoundationPublicationService {
                if ("DATASET".equals(r.get("kind")) && !"CHECKED".equals(checks.path("state").asText())) {
                   warnings.add(switch(checks.path("state").asText()) {
                       case "SOURCE_CONTRACT_REQUIRED" -> "MISMATCH".equals(checks.path("sourceContract").path("state").asText())
-                          ? "来源定义版本与部署认可版本不一致；需重新核对并采集，自动分析暂停"
-                          : "当前批次未附带已认可的来源定义；等待采集端补齐后重新采集";
+                          ? "当前来源定义与本批身份、字段、范围或摘要不一致；需重新采集，自动分析暂停"
+                          : "当前批次缺少有效来源定义；等待采集端补齐后重新采集";
                       case "NO_SOURCE_CONSTRAINTS" -> "CHECKED".equals(checks.path("exportValidation").path("state").asText())
                           ? "导出与接收已核验；尚无已确认业务规则，待补充来源声明后逐批检查"
                           : "尚无已确认业务规则；导出接收依据也待补齐";

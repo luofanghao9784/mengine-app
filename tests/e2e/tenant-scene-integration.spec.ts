@@ -508,3 +508,13 @@ test('共享空间列表在深色管理页中保持可读的普通、悬停与�
   await expect(row).toBeVisible();
   expect(await page.locator('.management-content').evaluate(el => el.scrollWidth <= el.clientWidth + 2)).toBeTruthy();
 });
+
+test('知识自动链路显示等待和失败原因而不是空白完成状态', async ({page}) => {
+ await fixture(page);
+ await page.route('**/scene/dispatch?path=%2Fscene-knowledge',r=>r.fulfill({json:{items:[],relations:[],sourceKind:{},tabs:[],stats:{title:'知识构成',rows:[]},aside:{title:'最近入库',rows:[]},pending:0,failed:1,busy:false,available:false,needsGraph:false,scopeRevision:'progress',status:'等待 1 项 · 失败 1 项',pipeline:{waiting:1,failed:1,busy:false,steps:[{stage:'DEFINITION',source:'合成新表',state:'WAITING',reason:'SOURCE_DEFINITION_REQUIRED',message:'等待完整字段口径与规则，补齐后自动继续'},{stage:'INSIGHT',source:'企业经营知识',state:'FAILED',reason:'FAILED',message:'经营知识生成失败，保留执行记录；核对失败原因后再重试'}]}}}));
+ await page.goto(`/tenant-admin/prototype/?tenant=${tenant}`);
+ await page.locator('.shell-switch button').filter({hasText:/^知识星链$/}).click();
+ await expect(page.getByRole('status').filter({hasText:'等待完整字段口径'})).toBeVisible();
+ await expect(page.getByRole('status').filter({hasText:'经营知识生成失败'})).toBeVisible();
+ await page.screenshot({path:'.local/architecture/knowledge-pipeline.png',fullPage:true});
+});

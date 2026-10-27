@@ -12,6 +12,7 @@ export type KnowledgeSnapshot = {
   stats: { title: string; rows: [string, string, string?][] };
   aside: { title: string; rows: [string, string][] };
   business?: { pending: number; failed: number; learned: number; withoutFindings: number };
+  pipeline?: { steps: {stage: string; source: string; state: string; reason: string; message: string}[]; waiting: number; failed: number; busy: boolean };
   pending: number;
   failed: number;
   busy: boolean;

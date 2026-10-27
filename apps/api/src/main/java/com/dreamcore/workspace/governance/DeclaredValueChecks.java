@@ -8,6 +8,10 @@ import java.util.*;
 /** Deployment-declared value domains, checked against every currently readable row. */
 public final class DeclaredValueChecks {
     private DeclaredValueChecks() {}
+    public static boolean decimal(String text) {
+        if(text.length()>4096||!text.matches("[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?")) return false;
+        try {var number=new BigDecimal(text);return Math.abs((long)number.scale())<=4096 && Math.abs((long)number.precision()-number.scale())<=4096;}catch(NumberFormatException invalid){return false;}
+    }
     public static Map<String,Object> check(List<?> columns, List<?> rows, List<Map<String,Object>> schema) {
         var rules=schema.stream().filter(r->"value-rule".equals(r.get("kind"))).toList();
         if(rules.isEmpty()) return Map.of("state","NOT_PROVIDED","rules",List.of(),"violations",0L);
@@ -30,11 +34,11 @@ public final class DeclaredValueChecks {
                 examined++;String text=cell.toString();boolean valid=true;
                 try {
                     switch(type) {
-                        case "TEXT" -> valid=!text.isBlank();
-                        case "DECIMAL" -> new BigDecimal(text);
-                        case "DATE" -> LocalDate.parse(text);
+                        case "TEXT" -> valid=!text.codePoints().allMatch(c->Character.isWhitespace(c)||Character.isSpaceChar(c)||c==0x85);
+                        case "DECIMAL" -> valid=decimal(text);
+                        case "DATE" -> {valid=text.matches("[0-9]{4}-[0-9]{2}-[0-9]{2}");if(valid)valid=LocalDate.parse(text).getYear()>=1;}
                         case "ENUM" -> valid=allowed.contains(text);
-                        case "PREFIX_DECIMAL" -> { if(!allowed.contains(text)) {valid=text.startsWith(prefix);if(valid)new BigDecimal(text.substring(prefix.length()));} }
+                        case "PREFIX_DECIMAL" -> { if(!allowed.contains(text)) {valid=text.startsWith(prefix);if(valid)valid=decimal(text.substring(prefix.length()));} }
                         case "ORDINAL" -> {if(!allowed.contains(text)) {valid=text.startsWith(prefix)&&text.endsWith(suffix)&&text.length()>prefix.length()+suffix.length();if(valid){String number=text.substring(prefix.length(),text.length()-suffix.length());valid=number.matches("[0-9]{1,9}")&&Long.parseLong(number)>0;}}}
                     }
                 } catch(RuntimeException invalid) {valid=false;}

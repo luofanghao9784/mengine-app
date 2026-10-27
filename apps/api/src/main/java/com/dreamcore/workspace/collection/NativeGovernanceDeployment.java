@@ -101,7 +101,7 @@ public class NativeGovernanceDeployment {
 
          Map<String, Object> row = this.db
             .queryForMap(
-               "SELECT d.workspace_id,d.connection_id,d.dataset_key,d.name,d.description,d.column_names,d.field_definitions,d.current_snapshot,s.row_count,s.data_rows::text data_content,s.coverage_through FROM business_datasets d JOIN dataset_snapshots s ON s.id=d.current_snapshot AND s.dataset_id=d.id WHERE d.id=? AND d.tenant_id=? AND d.status='ACTIVE' AND NOT d.scrubbed AND NOT s.scrubbed",
+               "SELECT d.workspace_id,d.connection_id,d.dataset_key,d.name,d.description,d.column_names,d.field_definitions,d.current_snapshot,s.row_count,"+(definitions?"NULL::text":"s.data_rows::text")+" data_content,s.coverage_through FROM business_datasets d JOIN dataset_snapshots s ON s.id=d.current_snapshot AND s.dataset_id=d.id WHERE d.id=? AND d.tenant_id=? AND d.status='ACTIVE' AND NOT d.scrubbed AND NOT s.scrubbed",
                new Object[]{id, tenant}
             );
          List<String> columns = (List<String>)this.json

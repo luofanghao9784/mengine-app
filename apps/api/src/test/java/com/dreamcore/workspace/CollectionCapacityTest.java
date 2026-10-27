@@ -7,6 +7,8 @@ import static org.junit.jupiter.api.Assertions.*;
 class CollectionCapacityTest {
  @Test void boundedCompleteSnapshotAcceptsCurrentFullScopeAndRejectsOverflow() throws Exception {
   var service=new CollectionService(null,null,null,null,null,null,null);
+  // The production ceiling is configurable; this test fixes the boundary it exercises.
+  org.springframework.test.util.ReflectionTestUtils.setField(service,"maxCells",2000000);
   var id=UUID.randomUUID();var cols=new ArrayList<String>();for(int i=0;i<20;i++)cols.add("field"+i);
   var request=new CollectionAdapter.Request("1.0",id,id,id,List.of(new CollectionAdapter.Dataset(id,"full",cols)));
   var claim=new CollectionService.Claim(id,id,id,id,1,request);

@@ -25,8 +25,9 @@ public class DatasetKnowledgeWorker {
             var owners=db.queryForList("SELECT owner_id FROM tenant_governance WHERE tenant_id=?",UUID.class,tenant);
             if(owners.isEmpty()) continue;
             for(UUID dataset:db.queryForList("SELECT id FROM business_datasets WHERE tenant_id=? ORDER BY id LIMIT 1000",UUID.class,tenant)) {
-                try { service.reconcile(owners.getFirst(),tenant,dataset); }
+                try { if(!service.due(tenant,dataset))continue; service.reconcile(owners.getFirst(),tenant,dataset); }
                 catch(RuntimeException failed) {
+                    service.failed(tenant,dataset);
                     db.update("UPDATE dataset_knowledge_publications SET state='STALE',reason='REVALIDATION_FAILED',checked_at=now() WHERE tenant_id=? AND dataset_id=? AND state<>'STALE'",tenant,dataset);
                 }
             }
