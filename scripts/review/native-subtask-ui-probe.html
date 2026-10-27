@@ -1,0 +1,9 @@
+<!doctype html><html lang="zh"><meta charset="utf-8"><title>子任务最终输出优先级复现</title><body style="padding:32px;max-width:800px;margin:auto;font-family:sans-serif;background:#f7f8fb"><h1>子任务最终输出优先级复现</h1><p>这是投影边界的合成数据复现，不是真实 SDK 输出不一致的证据。</p><p>历史回复：<code>previous child reply</code></p><p>结束通知选定输出：<code>selected final output</code></p><div id="probe"></div><script type="module">
+import React from 'react';import {createRoot} from 'react-dom/client';
+import {NativeWorkPanel} from '/src/native-conversation/chat/NativeWorkPanel.tsx';
+import {buildWorkState} from '/src/native-conversation/chat/work.ts';
+import '/src/shared/theme.css';
+const event=(seq,type,data,sessionId)=>({seq,time:seq,type,data,...(sessionId?{sessionId}:{})});
+const work=buildWorkState([event(1,'subagent.started',{parentSessionId:'root',childSessionId:'child'}),event(3,'subagent.finished',{childSessionId:'child',status:'ok',lastAssistantMessage:[{type:'text',text:'selected final output'}]})],[event(2,'assistant/message',{message:{content:[{type:'text',text:'previous child reply'}]}},'child')]);
+createRoot(document.querySelector('#probe')).render(React.createElement(NativeWorkPanel,{work}));
+</script></body></html>

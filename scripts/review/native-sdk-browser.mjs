@@ -27,8 +27,23 @@ try{
  await send('BROWSER_RATING');await idle();await page.getByRole('button',{name:'有用',exact:true}).click();await expect(page.getByRole('button',{name:'有用',exact:true})).toHaveAttribute('aria-pressed','true');await page.reload();await expect(page.getByRole('button',{name:'有用',exact:true})).toHaveAttribute('aria-pressed','true');console.log('step',passed.length);passed.push('rating-refresh');
  const before=await page.locator('.conversation-user').count();await context.setOffline(true);await page.waitForTimeout(1000);await context.setOffline(false);await page.waitForTimeout(6000);expect(await page.locator('.conversation-user').count()).toBe(before);console.log('step',passed.length);passed.push('offline-reconnect-no-duplicate');
  // Real file picker; only the platform API determines which versions can be read.
- await page.getByRole('button',{name:'添加资料',exact:true}).click();for(let i=1;i<=2;i++)await page.getByRole('checkbox',{name:new RegExp('browser-source-'+i+'\\.txt')}).check();await page.getByRole('button',{name:'添加 2 份',exact:true}).click();
- await send('BROWSER_READ');await idle();await expect(page.locator('.native-chat')).toContainText('BROWSER_EVIDENCE_1');await expect(page.locator('.native-chat')).toContainText('BROWSER_EVIDENCE_2');console.log('step',passed.length);passed.push('two-materials-read');
+ await page.getByRole('button',{name:'添加资料',exact:true}).click();
+ await expect(page.getByRole('button',{name:'从电脑上传',exact:true})).toBeDisabled();
+ await expect(page.locator('.native-picker')).toContainText('上传');
+ await page.getByRole('textbox',{name:'搜索资料',exact:true}).fill('browser-source-');
+ for(let i=1;i<=2;i++)await page.getByRole('checkbox',{name:new RegExp('browser-source-'+i+'\\.txt')}).check();
+ await page.getByRole('combobox',{name:'browser-source-1.txt 的版本',exact:true}).selectOption(f.refs[0].versionId);
+ await page.screenshot({path:dir+'/picker-old-version.png',fullPage:true});
+ await page.getByRole('button',{name:'添加 2 份',exact:true}).click();
+ await send('BROWSER_READ');await idle();await expect(page.locator('.native-chat')).toContainText('BROWSER_EVIDENCE_1');await expect(page.locator('.native-chat')).toContainText('BROWSER_EVIDENCE_2');await expect(page.locator('.native-chat')).not.toContainText('NEW_VERSION_MUST_NOT_BE_READ');console.log('step',passed.length);passed.push('cross-space-two-materials-old-version-read');
+ await send('BROWSER_CHILD');await page.getByRole('tab',{name:'进展',exact:true}).click();
+ await expect(page.locator('.native-work')).toContainText('正在',{timeout:15000});await page.screenshot({path:dir+'/child-running.png',fullPage:true});
+ await expect(page.locator('.native-work .native-row-state.is-done')).toContainText('完成',{timeout:45000});
+ await page.locator('.native-row-expandable summary').last().click();await expect(page.locator('.native-subtask')).toContainText('CHILD_ONLY_OUTPUT');await expect(page.locator('.native-subtask')).toContainText('已做 1 步');await page.screenshot({path:dir+'/child-finished.png',fullPage:true});
+ await idle();await expect(page.locator('.native-chat')).toContainText('ROOT_CHILD_COMPLETED');expect((await page.locator('.conversation-reply').allTextContents()).join('\n')).not.toContain('CHILD_ONLY_OUTPUT');
+ const childHistory=await page.evaluate(async({base,id})=>fetch(`${base}/${id}/history?limit=500`).then(r=>r.json()),{base,id});const started=childHistory.items.find(e=>e.type==='subagent.started');expect(started.data.parentSessionId).toBe(id);expect(childHistory.items.some(e=>e.sessionId===started.data.childSessionId&&e.type==='assistant/message')).toBeTruthy();expect(childHistory.items.some(e=>e.type==='subagent.finished'&&e.data.childSessionId===started.data.childSessionId&&e.data.status==='ok')).toBeTruthy();await writeFile(dir+'/subtask-events.json',JSON.stringify(childHistory.items.filter(e=>e.type.startsWith('subagent')||e.sessionId===started.data.childSessionId),null,2));
+ console.log('step',passed.length);passed.push('real-child-progress-output-root-isolation');
+
  const denied=await page.evaluate(async({base,id,ref})=>{const c=await fetch('/api/v1/auth/csrf').then(r=>r.json());return (await fetch(`${base}/${id}/messages`,{method:'POST',headers:{'content-type':'application/json',[c.headerName]:c.token},body:JSON.stringify({requestId:crypto.randomUUID(),text:'BROWSER_READ',materials:[ref]})})).status;},{base,id,ref:f.forbidden});expect([403,404]).toContain(denied);console.log('step',passed.length);passed.push('forbidden-material-rejected');
  await send('BROWSER_SAVE');await idle();await page.getByRole('tab',{name:'成果',exact:true}).click();await page.getByRole('button',{name:'刷新私人成果'}).click();await page.getByRole('link',{name:'browser-result.txt',exact:true}).waitFor();
  const download=page.waitForEvent('download');await page.getByRole('link',{name:'browser-result.txt',exact:true}).click();await(await download).saveAs(dir+'/browser-result.txt');expect(await readFile(dir+'/browser-result.txt','utf8')).toBe('Synthetic browser artifact');console.log('step',passed.length);passed.push('artifact-download');

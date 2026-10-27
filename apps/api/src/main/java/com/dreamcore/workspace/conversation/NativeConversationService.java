@@ -121,7 +121,7 @@ public class NativeConversationService {
  }
  private void remember(UUID id,UUID version,boolean download){db.update("INSERT INTO native_conversation_sources(session_id,version_id,requires_download) VALUES (?,?,?) ON CONFLICT(session_id,version_id) DO UPDATE SET requires_download=native_conversation_sources.requires_download OR excluded.requires_download",id,version,download);}
  @Transactional public MaterialService.Download read(UUID id,String token,UUID material,UUID version){
-  var s=check(id,token);plugins.require(s.tenantId(),"enterprise-data");var result=materials.download(s.ownerId(),s.tenantId(),s.workspaceId(),material,version);remember(id,version,true);return result;
+  var s=check(id,token);plugins.require(s.tenantId(),"enterprise-data");var spaces=db.queryForList("SELECT workspace_id FROM material_versions WHERE tenant_id=? AND material_id=? AND id=?",UUID.class,s.tenantId(),material,version);if(spaces.isEmpty())throw new IdentityException(404,"NATIVE_SOURCE_NOT_FOUND");var result=materials.download(s.ownerId(),s.tenantId(),spaces.getFirst(),material,version);remember(id,version,true);return result;
  }
  @Transactional public Artifact save(UUID id,String token,Save input){
   var scope=check(id,token);plugins.require(scope.tenantId(),"enterprise-data");if(input==null||input.requestId()==null||input.filename()==null||input.contentBase64()==null||input.contentBase64().length()>27962028)throw IdentityException.invalid();

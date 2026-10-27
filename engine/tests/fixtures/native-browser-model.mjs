@@ -5,6 +5,7 @@ export function apply(ctx){
  const output={schema:{type:'object',additionalProperties:true},render:(_,v)=>[{type:'text',text:JSON.stringify(v)}]};
  ctx.tools.register({name:'fixture_approval',description:'Synthetic approval boundary',parameters:{},output,execute:async(_,exec)=>({outcome:await ctx.approval.request({agent:exec.agent,toolName:'fixture_approval',callId:exec.callId,signal:exec.signal})})});
  ctx.tools.register({name:'fixture_plan',description:'Synthetic plan review',parameters:{},output,execute:async(_,exec)=>ctx.userQuestions.ask({agent:exec.agent,signal:exec.signal,wait:{callId:exec.callId},questions:[{id:'plan',question:'Review plan',detail:'Synthetic plan',options:[{label:'Proceed'},{label:'Change'}],intent:{kind:'plan-review',approve:'Proceed',callId:exec.callId}}]})});
+ ctx.tools.register({name:'fixture_child_step',description:'Synthetic child progress check',parameters:{},output,execute:async()=>{await new Promise(r=>setTimeout(r,4000));return {verified:true};}});
  class Model extends LlmAdapter{
   async listModels(provider){return [await this.resolveModel(provider,'fixture')];}
   async resolveModel(provider,id){return {provider,id,name:id,defaultMaxTokens:1024,context:{contextWindow:128000}};}
@@ -15,7 +16,10 @@ export function apply(ctx){
    const count=results.length;
    let block={type:'text',text:'browser-completed '+JSON.stringify(results)};
    let action;
-   if(!count && text.includes('BROWSER_APPROVAL'))action=['fixture_approval',{}];
+   const child=request.messages.filter(m=>m.role==='user').some(m=>JSON.stringify(m.content).includes('CHILD_FIXTURE_ONLY'));
+   if(child){if(!count)action=['fixture_child_step',{}];else block={type:'text',text:'CHILD_ONLY_OUTPUT'};}
+   else if(text.includes('BROWSER_CHILD')){if(!count)action=['subagent',{description:'合成子任务验收',prompt:'CHILD_FIXTURE_ONLY: run fixture_child_step and return CHILD_ONLY_OUTPUT.'}];else block={type:'text',text:'ROOT_CHILD_COMPLETED'};}
+   else if(!count && text.includes('BROWSER_APPROVAL'))action=['fixture_approval',{}];
    else if(!count && text.includes('BROWSER_PLAN'))action=['fixture_plan',{}];
    else if(!count && text.includes('BROWSER_QUESTION'))action=['ask_user_question',{questions:[{id:'choice',question:'Choose',options:[{label:'Yes'},{label:'No'}]}],timeout:text.includes('TIMEOUT')?2:120}];
    else if(text.includes('BROWSER_SAVE'))action=[['write',{file_path:'/work/browser-result.txt',content:'Synthetic browser artifact'}],['enterprise_save',{requestId:'55555555-5555-4555-8555-555555555555',path:'/work/browser-result.txt',filename:'browser-result.txt'}]][count];

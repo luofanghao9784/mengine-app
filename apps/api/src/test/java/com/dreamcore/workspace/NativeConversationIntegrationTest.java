@@ -62,4 +62,15 @@ class NativeConversationIntegrationTest {
  }
  @Test void simultaneousSaveRetriesCreateOnlyOneArtifact()throws Exception{var s=open();var g=nativeSessions.grant(owner,tenant,s.id());var input=save(UUID.randomUUID(),"same bytes");try(var pool=java.util.concurrent.Executors.newFixedThreadPool(2)){var a=pool.submit(()->nativeSessions.save(s.id(),g.token(),input));var b=pool.submit(()->nativeSessions.save(s.id(),g.token(),input));assertEquals(a.get(10,java.util.concurrent.TimeUnit.SECONDS),b.get(10,java.util.concurrent.TimeUnit.SECONDS));}assertEquals(1,nativeSessions.artifacts(owner,tenant,s.id()).size());}
 
+ @Test void crossSpaceReferenceReadsBoundVersionAndStillEnforcesOwnerPermissions(){
+  var s=open();var g=nativeSessions.grant(owner,tenant,s.id());
+  var f=materials.upload(owner,tenant,target,null,null,null,UUID.randomUUID(),new MockMultipartFile("file","cross-space.txt","text/plain","old-authorized".getBytes()));
+  UUID v=materials.detail(owner,tenant,target,f.id(),0,20).versions().getFirst().id();
+  materials.upload(owner,tenant,target,null,f.id(),1,UUID.randomUUID(),new MockMultipartFile("file","cross-space.txt","text/plain","new-version".getBytes()));
+  nativeSessions.references(owner,tenant,s.id(),List.of(new NativeConversationService.Reference(f.id(),v)));
+  assertArrayEquals("old-authorized".getBytes(),nativeSessions.read(s.id(),g.token(),f.id(),v).bytes());
+  denied(()->nativeSessions.read(s.id(),g.token(),UUID.randomUUID(),v));
+  db.update("DELETE FROM workspace_members WHERE workspace_id=? AND account_id=?",target,owner);denied(()->nativeSessions.read(s.id(),g.token(),f.id(),v));
+ }
+
 }

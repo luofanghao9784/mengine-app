@@ -26,8 +26,11 @@ class NativeSdkBrowserIT extends NativeConversationIntegrationTest {
   db.update("UPDATE accounts SET username='sdkbrowser',password_hash=? WHERE id=?",passwords.encode("Synthetic-browser-12345"),owner);
   var refs=new ArrayList<Map<String,Object>>();
   for(int i=1;i<=2;i++){
-   var f=materials.upload(owner,tenant,space,null,null,null,UUID.randomUUID(),new MockMultipartFile("file","browser-source-"+i+".txt","text/plain",("BROWSER_EVIDENCE_"+i).getBytes()));
-   var version=materials.detail(owner,tenant,space,f.id(),0,20).versions().getFirst();refs.add(Map.of("materialId",f.id(),"versionId",version.id()));
+   UUID sourceSpace=i==2?target:space;
+   var f=materials.upload(owner,tenant,sourceSpace,null,null,null,UUID.randomUUID(),new MockMultipartFile("file","browser-source-"+i+".txt","text/plain",("BROWSER_EVIDENCE_"+i).getBytes()));
+   var version=materials.detail(owner,tenant,sourceSpace,f.id(),0,20).versions().getFirst();
+   if(i==1)materials.upload(owner,tenant,sourceSpace,null,f.id(),1,UUID.randomUUID(),new MockMultipartFile("file","browser-source-1.txt","text/plain","NEW_VERSION_MUST_NOT_BE_READ".getBytes()));
+   refs.add(Map.of("materialId",f.id(),"versionId",version.id()));
   }
   UUID forbiddenSpace=UUID.randomUUID();
   db.update("INSERT INTO workspaces(id,tenant_id,owner_id,name,kind) VALUES (?,?,?,'其他员工私人','PERSONAL')",forbiddenSpace,tenant,other);
