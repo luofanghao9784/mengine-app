@@ -14,11 +14,11 @@ import tools.jackson.databind.json.JsonMapper;
 @ConditionalOnWebApplication(type=ConditionalOnWebApplication.Type.SERVLET)
 public class NativeConversationInteractionController {
  private final NativeConversationService sessions;private final NativeConversationStream stream;private final NativeRuntimeClient runtime;
- private final NativeConversationFeedback feedback;private final String controlToken;
+ private final NativeAttachments attachments;private final NativeConversationFeedback feedback;private final String controlToken;
  private final JsonMapper json=new JsonMapper();
  private final ScheduledExecutorService timer=Executors.newScheduledThreadPool(2);
  private final ConcurrentHashMap<UUID,AtomicInteger> connections=new ConcurrentHashMap<>();
- public NativeConversationInteractionController(NativeConversationService sessions,NativeConversationStream stream,NativeRuntimeClient runtime,NativeConversationFeedback feedback,@org.springframework.beans.factory.annotation.Value("${dreamcore.native.control-token:}") String controlToken){this.controlToken=controlToken;this.feedback=feedback;this.sessions=sessions;this.stream=stream;this.runtime=runtime;}
+ public NativeConversationInteractionController(NativeConversationService sessions,NativeConversationStream stream,NativeRuntimeClient runtime,NativeConversationFeedback feedback,NativeAttachments attachments,@org.springframework.beans.factory.annotation.Value("${dreamcore.native.control-token:}") String controlToken){this.attachments=attachments;this.controlToken=controlToken;this.feedback=feedback;this.sessions=sessions;this.stream=stream;this.runtime=runtime;}
  @jakarta.annotation.PreDestroy void close(){timer.shutdownNow();}
  private UUID actor(Authentication a){return UUID.fromString(a.getName());}
  private UUID key(Map<String,Object> body){try{return UUID.fromString((String)body.get("requestId"));}catch(Exception e){throw IdentityException.invalid();}}
@@ -59,9 +59,11 @@ public class NativeConversationInteractionController {
   },0,1,TimeUnit.SECONDS);scheduled.set(future);if(closed.get())future.cancel(false);return emitter;
  }
  @PostMapping("/api/v1/tenants/{tenant}/native-conversations/{id}/messages") public Object message(Authentication auth,@PathVariable UUID tenant,@PathVariable UUID id,@RequestBody Map<String,Object> body){
-  fields(body,"requestId","text","materials");value(body,"text",100000);
+  fields(body,"requestId","text","materials","attachments");value(body,"text",100000);
   var refs=new ArrayList<NativeConversationService.Reference>();
   try{Object raw=body.getOrDefault("materials",List.of());if(!(raw instanceof List<?> list)||list.size()>20)throw IdentityException.invalid();for(Object r:list)refs.add(json.convertValue(r,NativeConversationService.Reference.class));}catch(Exception e){throw IdentityException.invalid();}
+  var fileIds=new ArrayList<UUID>();try{Object raw=body.getOrDefault("attachments",List.of());if(!(raw instanceof List<?> list))throw IdentityException.invalid();for(Object v:list)fileIds.add(UUID.fromString((String)v));}catch(Exception e){throw IdentityException.invalid();}
+  attachments.validate(actor(auth),tenant,id,fileIds);
   sessions.references(actor(auth),tenant,id,refs);return dispatch(auth,tenant,id,"messages",body);
  }
  @PostMapping("/api/v1/tenants/{tenant}/native-conversations/{id}/turn/stop") public Object stop(Authentication auth,@PathVariable UUID tenant,@PathVariable UUID id,@RequestBody Map<String,Object> body){fields(body,"requestId");return dispatch(auth,tenant,id,"turn-stop",body);}

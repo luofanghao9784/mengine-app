@@ -210,3 +210,12 @@ SDK 0.2.1-rc.2 原生协议不包含回答/审批/停止方法。适配器使用
 - 引擎通过 DH 0.2.1-rc.2 的 `ctx.skills.registerProvider` 加入企业目录；每个模型 step 前失效目录缓存，正文加载再次向平台核对当前员工及上架状态。原生 `skill` 工具和 `/技能名` 使用同一 provider。技能正文不落到可读本地目录，企业凭据不进入 SDK。
 - 下架从下一次目录发现/正文加载生效，不会抹去模型已看到的历史正文；企业工具、预算和发布权限仍独立强制执行，技能不是授权来源。
 - 内部 `POST …/{id}/skills` 接受 `{}` 列目录，`{name}` 读正文；只允许该会话当前有效 capability。未配置运行环境时不启动任何模型。
+
+## 附录 F：B7 私人附件定稿（2026-10-27）
+
+- `POST …/{id}/attachments`：multipart `file` + `requestId` UUID，返回 `{id,filename,mediaType,sha256,bytes}`。同 ID 同内容返回同回执，不同内容 409。单文件最多 20 MiB、会话总量 100 MiB。
+- `GET …/{id}/attachments` 列出私人附件；`GET …/{id}/attachments/{attachmentId}` 下载，始终 attachment/octet-stream，不以内联 HTML 执行上传内容。
+- messages 增加可选 `attachments: UUID[]`，每次最多 10 个、不可重复；平台检查均属于当前私人会话后才派发。无 attachments 时保持既有行为。
+- 上传先进入平台私人存储，发送时窄桥接 `attachment-read` 再次鉴权，并校验 SHA256 后写入该会话隔离工作目录的随机新目录；员工无法指定路径。文件名作为 JSON 数据提供，不能变成路径。
+- PNG/JPEG/GIF/WebP 由字节签名识别而非信任客户端 MIME，并交给官方 SDK 图片准入验证。其他文件保留字节并提供隔离路径。图片是否参与模型视觉理解仍取决于部署模型能力；本次证明 SDK 图片准入与持久引用，不宣称合成模型有视觉理解能力。
+- 附件不自动进入企业资料库或发布；产生的成果仍使用既有私人成果与员工确认发布流程。前端上传入口尚待接线。

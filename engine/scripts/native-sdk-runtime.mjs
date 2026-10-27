@@ -1,3 +1,4 @@
+import {attachmentBlocks} from './native-attachments.mjs';
 import {HarnessClient} from '@deepseek-ai/dsh-sdk-client';
 import {createServer} from 'node:http';
 import {readFile,writeFile} from 'node:fs/promises';
@@ -37,7 +38,8 @@ export async function serveSdk({patch,root,port=18191,host='0.0.0.0',home='/work
    if(req.url==='/command/messages'){
     const refs=p.materials||[];
     const text=p.text+(refs.length?'\n\n用户引用的企业资料（须经 enterprise_read/search 按当前权限读取）：\n'+refs.map(r=>JSON.stringify({materialId:r.materialId,versionId:r.versionId})).join('\n'):'');
-    result={accepted:true,messageId:await client.prompt(root,[{type:'text',text}])};
+    const attachments=await attachmentBlocks({ids:p.attachments||[],bridge,capability,cwd});
+    result={accepted:true,messageId:await client.prompt(root,[{type:'text',text},...attachments])};
    }else{
     const operation={'/command/turn-stop':'stop','/command/approval':'approval','/command/answer':'answer','/command/plan-review':'plan-review'}[req.url];
     if(!operation){res.writeHead(404).end();return;}

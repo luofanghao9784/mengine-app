@@ -58,3 +58,9 @@ export interface NativeSkillSummary { name: string; description: string }
  * with name and description YAML frontmatter. Empty audience = all members. */
 export interface NativeSkillPut { markdown: string; published: boolean; audience: string[] }
 export interface NativeSkillAdmin extends NativeSkillPut, NativeSkillSummary { revision: number }
+
+/** B7: POST .../{id}/attachments multipart file + requestId UUID. Same ID/content
+ * replays receipt; changed content conflicts. GET collection/list and /{attachmentId}
+ * download are private to the current owner and recheck session permissions. */
+export interface NativeAttachment { id: string; filename: string; mediaType: string; sha256: string; bytes: number }
+export interface NativeMessageWithAttachments extends NativeMessageRequest { attachments?: string[] }
