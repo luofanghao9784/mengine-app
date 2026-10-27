@@ -58,7 +58,7 @@ export type NativeChatActions = {
 /** The page's file-version picker; the composer only keeps what was chosen. */
 export type MaterialPicker = (props: {
   selected: TaskOriginal[];
-  onSelect: (file: TaskOriginal) => void;
+  onConfirm: (files: TaskOriginal[]) => void;
   onClose: () => void;
 }) => ReactNode;
 /** The platform accepts up to 20 referenced materials per message (appendix C). */
@@ -781,11 +781,9 @@ function NativeComposer({
       {picking &&
         pickMaterial?.({
           selected: materials,
-          // One version per material: choosing another version replaces the earlier one.
-          onSelect: (file) => {
-            setMaterials((list) =>
-              [...list.filter((m) => m.materialId !== file.materialId), file].slice(0, MAX_MATERIALS),
-            );
+          // The picker starts from what is already chosen and returns the whole new choice.
+          onConfirm: (files) => {
+            setMaterials(files.slice(0, MAX_MATERIALS));
             setPicking(false);
             input.current?.focus();
           },
@@ -825,6 +823,22 @@ function NativeComposer({
               {error}
             </p>
           </div>
+        )}
+        {materials.length > 0 && (
+          <ul className="native-chips" aria-label="这次引用的资料">
+            {materials.map((file) => (
+              <li key={file.versionId} className="native-chip-file">
+                <FileText size={15} aria-hidden="true" />
+                <span title={file.filename}>{file.filename}</span>
+                <small>v{file.version}</small>
+                <IconButton
+                  icon={X}
+                  label={'移除 ' + file.filename}
+                  onClick={() => setMaterials(materials.filter((m) => m.versionId !== file.versionId))}
+                />
+              </li>
+            ))}
+          </ul>
         )}
         <div className="live-composer-input">
           <textarea
@@ -890,30 +904,14 @@ function NativeComposer({
                 <Button
                   variant="ghost"
                   icon={Paperclip}
-                  disabled={!actions.send || materials.length >= MAX_MATERIALS}
-                  title={
-                    materials.length >= MAX_MATERIALS
-                      ? `一次最多引用 ${MAX_MATERIALS} 份资料`
-                      : '引用你有权阅读的梦擎资料'
-                  }
+                  disabled={!actions.send}
+                  title="引用你有权阅读的梦擎资料"
                   onClick={() => setPicking(true)}
                 >
-                  添加资料
+                  {materials.length ? `添加资料 · ${materials.length}` : '添加资料'}
                 </Button>
               )}
             </div>
-            {materials.map((file) => (
-              <div className="attachment-chip" key={file.versionId}>
-                <span>
-                  {file.filename} · v{file.version}
-                </span>
-                <IconButton
-                  icon={X}
-                  label={'移除 ' + file.filename}
-                  onClick={() => setMaterials(materials.filter((m) => m.versionId !== file.versionId))}
-                />
-              </div>
-            ))}
           </div>
         </div>
         {stopping ? (

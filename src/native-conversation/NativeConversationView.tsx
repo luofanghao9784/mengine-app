@@ -10,7 +10,7 @@ import { nativeConversationClient as api } from './client';
 import { useNativeSessions, nativeHref } from './useNativeConversations';
 import { nativeSessionTitle } from './labels';
 import { MAX_MATERIALS, NativeChat, type NativeStatus } from './chat/NativeChat';
-import { OriginalPicker } from '../conversation/OriginalPicker';
+import { MaterialPicker } from './MaterialPicker';
 import { useNativeFeed } from './chat/useNativeFeed';
 import { buildTranscript } from './chat/transcript.ts';
 import { buildWorkState } from './chat/work.ts';
@@ -192,13 +192,16 @@ export function NativeConversationView({
               pickMaterial={
                 session
                   ? (picker) => (
-                      <OriginalPicker
+                      <MaterialPicker
                         tenant={tenant}
-                        space={session.workspaceId}
-                        spaces={workspaces.map((w) => ({ id: w.id, name: spaceName(w) }))}
-                        note={`一次最多引用 ${MAX_MATERIALS} 份资料。AI 按你当前的阅读权限读取所选版本；引用不会给 AI 下载权限。`}
+                        spaces={[...workspaces]
+                          .sort((a, b) => Number(b.kind === 'PERSONAL') - Number(a.kind === 'PERSONAL'))
+                          .map((w) => ({ id: w.id, name: spaceName(w) }))}
+                        initialSpace={session.workspaceId}
                         selected={picker.selected}
-                        onSelect={picker.onSelect}
+                        max={MAX_MATERIALS}
+                        uploadUnavailable="从电脑上传会在平台开放会话附件后提供，现在可以先把文件传到资料库再选用。"
+                        onConfirm={picker.onConfirm}
                         onClose={picker.onClose}
                       />
                     )

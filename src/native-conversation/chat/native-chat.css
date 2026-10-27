@@ -600,3 +600,42 @@
   color: var(--ink-2);
   font-size: 13px;
 }
+
+/* 输入框里已选的资料。 */
+.native-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 12px 12px 0;
+  list-style: none;
+}
+.native-chip-file {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  height: 34px;
+  padding: 0 4px 0 10px;
+  border-radius: 10px;
+  background: var(--soft);
+  font-size: 13px;
+}
+.native-chip-file > svg {
+  flex: none;
+  color: var(--accent);
+}
+.native-chip-file > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.native-chip-file > small {
+  flex: none;
+  color: var(--ink-3);
+  font-size: 12px;
+}
+.native-chip-file .icon-button {
+  width: 24px;
+  height: 24px;
+}
