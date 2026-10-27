@@ -9,7 +9,8 @@ import { IdentityError } from '../identity/client';
 import { nativeConversationClient as api } from './client';
 import { useNativeSessions, nativeHref } from './useNativeConversations';
 import { nativeSessionTitle } from './labels';
-import { NativeChat, type NativeStatus } from './chat/NativeChat';
+import { MAX_MATERIALS, NativeChat, type NativeStatus } from './chat/NativeChat';
+import { OriginalPicker } from '../conversation/OriginalPicker';
 import { useNativeFeed } from './chat/useNativeFeed';
 import { buildTranscript } from './chat/transcript.ts';
 import { buildWorkState } from './chat/work.ts';
@@ -188,6 +189,21 @@ export function NativeConversationView({
               skills={feed.skills}
               workspace={space}
               onOpenResults={openResults}
+              pickMaterial={
+                session
+                  ? (picker) => (
+                      <OriginalPicker
+                        tenant={tenant}
+                        space={session.workspaceId}
+                        spaces={workspaces.map((w) => ({ id: w.id, name: spaceName(w) }))}
+                        note={`一次最多引用 ${MAX_MATERIALS} 份资料。AI 按你当前的阅读权限读取所选版本；引用不会给 AI 下载权限。`}
+                        selected={picker.selected}
+                        onSelect={picker.onSelect}
+                        onClose={picker.onClose}
+                      />
+                    )
+                  : undefined
+              }
               ratings={feed.ratings}
               loading={feed.loading}
               notice={feed.notice}

@@ -34,11 +34,23 @@ export function previewFeed(publish: (feed: NativeFeed) => void) {
       ],
       status: { running: running(), budget: { usedYuan: 0.42, softYuan: 2, hardYuan: 5, elapsedMinutes: 9 } },
       actions: {
-        async send(text) {
+        async send(text, materials = []) {
           const next = turn() + 1;
+          // Same note the runtime appends for referenced materials (engine/scripts/native-sdk-runtime.mjs).
+          const full =
+            text +
+            (materials.length
+              ? '\n\n用户引用的企业资料（须经 enterprise_read/search 按当前权限读取）：\n' +
+                materials
+                  .map((m) => JSON.stringify({ materialId: m.materialId, versionId: m.versionId }))
+                  .join('\n')
+              : '');
           push(
             ['turn/start', { turn: next }],
-            ['user/message', { id: `pu${seq}`, source: { kind: 'user' }, content: [{ type: 'text', text }] }],
+            [
+              'user/message',
+              { id: `pu${seq}`, source: { kind: 'user' }, content: [{ type: 'text', text: full }] },
+            ],
             [
               'assistant/message',
               {

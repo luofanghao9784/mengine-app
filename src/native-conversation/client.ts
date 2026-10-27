@@ -75,8 +75,13 @@ export function createNativeConversationClient(
       request(`${session(tenant, id)}/history?after=${after}&limit=500`, 'GET', isHistory, undefined, signal),
     eventsHref: (tenant: string, id: string, after: number) =>
       supportPath(`${session(tenant, id)}/events?after=${after}`),
-    send: (tenant: string, id: string, requestId: string, text: string) =>
-      command(`${session(tenant, id)}/messages`, 'POST', isReceipt, { requestId, text, materials: [] }),
+    send: (
+      tenant: string,
+      id: string,
+      requestId: string,
+      text: string,
+      materials: { materialId: string; versionId: string }[] = [],
+    ) => command(`${session(tenant, id)}/messages`, 'POST', isReceipt, { requestId, text, materials }),
     stopTurn: (tenant: string, id: string, requestId: string) =>
       command(`${session(tenant, id)}/turn/stop`, 'POST', isReceipt, { requestId }),
     answer: (

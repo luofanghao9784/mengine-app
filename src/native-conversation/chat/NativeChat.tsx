@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   ArrowUp,
   ChevronRight,
@@ -6,12 +6,15 @@ import {
   FileText,
   Folder,
   Loader2,
+  Paperclip,
   Sparkles,
   Square,
   ThumbsDown,
   ThumbsUp,
+  X,
 } from 'lucide-react';
-import { Button } from '../../shared/ui';
+import type { TaskOriginal } from '../../../contracts/public-api/conversation';
+import { Button, IconButton } from '../../shared/ui';
 import { ReplyText } from '../../conversation/ReplyText';
 import type { QuestionAnswer, QuestionItem } from './events.ts';
 import type { Item, ToolItem, Transcript, Turn } from './transcript.ts';
@@ -44,13 +47,22 @@ export type NativeStatus = {
  * keeps its control visible but disabled with the reason, so nothing looks available that is not.
  */
 export type NativeChatActions = {
-  send?: (text: string) => Promise<void>;
+  send?: (text: string, materials?: TaskOriginal[]) => Promise<void>;
   stop?: () => Promise<void>;
   answer?: (callId: string, answers: QuestionAnswer[]) => Promise<void>;
   decide?: (approvalId: string, allow: boolean) => Promise<void>;
   review?: (callId: string, approve: boolean, comment?: string) => Promise<void>;
   feedback?: (messageKey: string, value: 'up' | 'down') => Promise<void>;
 };
+
+/** The page's file-version picker; the composer only keeps what was chosen. */
+export type MaterialPicker = (props: {
+  selected: TaskOriginal[];
+  onSelect: (file: TaskOriginal) => void;
+  onClose: () => void;
+}) => ReactNode;
+/** The platform accepts up to 20 referenced materials per message (appendix C). */
+export const MAX_MATERIALS = 20;
 
 /** A skill the employee can call from the composer by typing `/`. */
 export type NativeSkill = { name: string; description?: string };
@@ -72,6 +84,7 @@ export function NativeChat({
   notice,
   workspace,
   onOpenResults,
+  pickMaterial,
 }: {
   transcript: Transcript;
   status?: NativeStatus;
@@ -86,6 +99,8 @@ export function NativeChat({
   /** The space the session belongs to, shown in the composer like the 梦擎 composer does. */
   workspace?: string;
   onOpenResults?: () => void;
+  /** Lets the employee reference 梦擎 materials they can read; absent means no button. */
+  pickMaterial?: MaterialPicker;
 }) {
   const running =
     status && !status.stale && status.running !== undefined ? status.running : transcript.running;
@@ -130,7 +145,13 @@ export function NativeChat({
               />
             ))}
           </div>
-          <NativeComposer running={running} actions={actions} skills={skills} workspace={workspace} />
+          <NativeComposer
+            running={running}
+            actions={actions}
+            skills={skills}
+            workspace={workspace}
+            pickMaterial={pickMaterial}
+          />
         </div>
       </OpenResults.Provider>
     </Unavailable.Provider>
@@ -697,11 +718,13 @@ function NativeComposer({
   actions,
   skills,
   workspace,
+  pickMaterial,
 }: {
   running: boolean;
   actions: NativeChatActions;
   skills: NativeSkill[];
   workspace?: string;
+  pickMaterial?: MaterialPicker;
 }) {
   const unavailable = useContext(Unavailable);
   const [text, setText] = useState('');
@@ -709,6 +732,8 @@ function NativeComposer({
   const [error, setError] = useState('');
   const [active, setActive] = useState(0);
   const [dismissed, setDismissed] = useState(false);
+  const [materials, setMaterials] = useState<TaskOriginal[]>([]);
+  const [picking, setPicking] = useState(false);
   const composing = useRef(false);
   const input = useRef<HTMLTextAreaElement>(null);
   // `/` at the start of the box opens the skill list; the typed word filters it.
@@ -727,8 +752,9 @@ function NativeComposer({
     setBusy(true);
     setError('');
     try {
-      await actions.send(text.trim());
+      await actions.send(text.trim(), materials);
       setText('');
+      setMaterials([]);
     } catch (e) {
       setError(failure(e));
     } finally {
@@ -752,6 +778,19 @@ function NativeComposer({
         void send();
       }}
     >
+      {picking &&
+        pickMaterial?.({
+          selected: materials,
+          // One version per material: choosing another version replaces the earlier one.
+          onSelect: (file) => {
+            setMaterials((list) =>
+              [...list.filter((m) => m.materialId !== file.materialId), file].slice(0, MAX_MATERIALS),
+            );
+            setPicking(false);
+            input.current?.focus();
+          },
+          onClose: () => setPicking(false),
+        })}
       {menu && (
         <ul className="native-skill-menu" role="listbox" id="native-skill-menu" aria-label="技能">
           {matches.length ? (
@@ -847,7 +886,34 @@ function NativeComposer({
                   {workspace}
                 </span>
               )}
+              {pickMaterial && (
+                <Button
+                  variant="ghost"
+                  icon={Paperclip}
+                  disabled={!actions.send || materials.length >= MAX_MATERIALS}
+                  title={
+                    materials.length >= MAX_MATERIALS
+                      ? `一次最多引用 ${MAX_MATERIALS} 份资料`
+                      : '引用你有权阅读的梦擎资料'
+                  }
+                  onClick={() => setPicking(true)}
+                >
+                  添加资料
+                </Button>
+              )}
             </div>
+            {materials.map((file) => (
+              <div className="attachment-chip" key={file.versionId}>
+                <span>
+                  {file.filename} · v{file.version}
+                </span>
+                <IconButton
+                  icon={X}
+                  label={'移除 ' + file.filename}
+                  onClick={() => setMaterials(materials.filter((m) => m.versionId !== file.versionId))}
+                />
+              </div>
+            ))}
           </div>
         </div>
         {stopping ? (

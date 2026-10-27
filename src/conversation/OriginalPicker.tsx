@@ -9,6 +9,7 @@ export function OriginalPicker({
   space: initialSpace,
   spaces,
   verification=false,
+  note,
   selected,
   onSelect,
   onClose,
@@ -17,6 +18,8 @@ export function OriginalPicker({
   space: string;
   spaces?: {id:string;name:string}[];
   verification?: boolean;
+  /** Replaces the default limits line when the caller has different limits. */
+  note?: string;
   selected: TaskOriginal[];
   onSelect: (file: TaskOriginal) => void;
   onClose: () => void;
@@ -45,7 +48,7 @@ export function OriginalPicker({
   return (
     <Modal title="选择文件版本" onClose={onClose}>
       <p className="muted">
-        本次最多 3 份文件，{verification?'单份 256 KiB、合计 512 KiB':'单份 20 MiB、合计 60 MiB'}。所选版本固定用于本次任务。
+        {note ?? <>本次最多 3 份文件，{verification?'单份 256 KiB、合计 512 KiB':'单份 20 MiB、合计 60 MiB'}。所选版本固定用于本次任务。</>}
       </p>
       {spaces&&<Field label="资料位置"><select aria-label="资料位置" value={space} onChange={e=>{setSpace(e.target.value);setFolder(null);setPage(0);setDocument(undefined);setQuery('');}}>{spaces.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></Field>}
       {document ? (

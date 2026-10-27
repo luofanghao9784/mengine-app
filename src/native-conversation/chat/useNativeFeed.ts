@@ -205,8 +205,9 @@ function useOperations(
     const once = <T>(op: string, run: (requestId: string) => Promise<T>) =>
       pendingOperation(tenant, id, op, run);
     return {
-      async send(text) {
-        await once(`send:${text}`, (r) => api.send(tenant, id, r, text));
+      async send(text, materials = []) {
+        const refs = materials.map(({ materialId, versionId }) => ({ materialId, versionId }));
+        await once(`send:${text}:${JSON.stringify(refs)}`, (r) => api.send(tenant, id, r, text, refs));
       },
       async stop() {
         // A stop is for the round running now; a later stop is a new operation.
