@@ -333,55 +333,59 @@ test('新版背景来源、知识与方法状态衔接，维护留在新版且�
   await page.locator('.src-pick').filter({hasText:/^内部资料库/}).click();
   await expect(page.getByRole('button',{name:'企业背景来源'})).toContainText('1 项背景');
   await page.getByRole('button',{name:'企业背景来源'}).click();
+  await page.mouse.move(1400, 300);
+  await page.mouse.wheel(0, 900);
   const source=page.locator('.background-detail');
   await expect(source.getByText('可读取 1 条背景',{exact:false})).toBeVisible();
-  await expect(source.getByRole('heading',{name:'企业背景知识',exact:true})).toBeVisible();
+  await expect(source.getByRole('heading',{name:'企业背景参考',exact:true})).toBeVisible();
   await source.getByText('来源与关联指标',{exact:false}).click();
   await expect(source.getByText('合成收款汇总 · v1 · 背景依据有效')).toBeVisible();
   changed=true;
-  await source.getByRole('button',{name:'刷新背景知识'}).click();
+  await source.getByRole('button',{name:'刷新背景参考'}).click();
   await source.getByText('来源与关联指标',{exact:false}).click();
   await expect(source.getByText('背景已变化，需核对并发布新方法版本',{exact:false})).toBeVisible();
   await page.screenshot({path:'.local/background-integration-desktop.png'});
   await page.setViewportSize({width:980,height:800});
   await source.getByRole('button',{name:'维护企业背景 →'}).click();
-  await expect(page.getByRole('region',{name:'业务管理',exact:true})).toBeVisible();
-  await expect(page).toHaveURL(/admin=company/);
+  await expect(page.getByRole('region',{name:'企业信息',exact:true})).toBeVisible();
+  await expect(page).toHaveURL(/#place=company/);
   expect(new URL(page.url()).searchParams.get('view')).not.toBe('business');
   await page.locator('.shell-switch button').filter({hasText:/^知识星链$/}).click();
-  await expect(page.getByRole('tab',{name:'全部 1',exact:true})).toBeVisible();
-  await expect(page.getByRole('button',{name:'企业背景知识',exact:true})).toHaveCount(0);
-  await page.locator('.card.list .row').filter({hasText:'企业背景'}).click();
-  await expect(page.getByRole('heading',{name:'企业背景知识',exact:true})).toBeVisible();
+  await expect(page.getByRole('tab',{name:'全部 0',exact:true})).toBeVisible();
+  await expect(page.locator('.card.list .row')).toHaveCount(0);
+  await expect(page.getByRole('heading',{name:'企业背景参考',exact:true})).toHaveCount(0);
   await page.screenshot({path:'.local/background-integration-knowledge.png'});
   revoked=true;
-  await page.getByRole('button',{name:'刷新背景知识'}).click();
+  await page.reload();
+  await page.locator('.shell-switch button').filter({hasText:/^知识星链$/}).click();
   await expect(page.getByText('企业背景暂不可用，未计入知识数量。',{exact:false})).toBeVisible();
   await expect(page.getByRole('tab',{name:'全部 0',exact:true})).toBeVisible();
   await expect(page.getByText('只读合成背景')).toHaveCount(0);
 });
 
-test('四项背景合计一条知识，空背景不计数', async ({page}) => {
+test('四项背景作为来源参考，不计入已发布知识', async ({page}) => {
   await fixture(page);
-  let populated = true;
-  const items = ['NAME','INDUSTRY','BUSINESS','TERM'].map((field,i)=>({id:`background:${i}`,sourceEntryId:actor,sourceVersionId:actor,revision:1,field,title:`合成背景${i}`,content:'合成内容',origin:'HUMAN',status:'REFERENCE_READY',methods:[]}));
-  await page.route('**/company-information/source/knowledge', r=>r.fulfill({json:{tenantId:tenant,mode:'STRUCTURED_REFERENCE',items:populated?items:[]}}));
+  const fields = ['NAME','INDUSTRY','BUSINESS','TERM'];
+  const items = fields.map((field,i)=>({id:`background:${i}`,sourceEntryId:actor,sourceVersionId:actor,revision:1,field,title:`合成背景${i}`,content:'合成内容',origin:'HUMAN',status:'REFERENCE_READY',methods:[]}));
+  await page.route('**/company-information/source/knowledge', r=>r.fulfill({json:{tenantId:tenant,mode:'STRUCTURED_REFERENCE',items}}));
+  await page.route('**/company-information/source', r=>r.fulfill({json:{tenantId:tenant,sourceId:`company-background:${tenant}`,type:'COMPANY_BACKGROUND',state:'AVAILABLE',version:'a'.repeat(64),knowledgeIntegration:'REFERENCE_READY',entries:fields.map((field,i)=>({id:`00000000-0000-4000-8000-00000000000${i+3}`,versionId:actor,revision:1,field,label:`合成背景${i}`,meaning:'',origin:'HUMAN',humanProtected:true,provenance:'人工维护',updatedAt:'2026-10-18T00:00:00Z'}))}}));
   await page.goto(`/tenant-admin/prototype/?tenant=${tenant}`);
   await page.locator('.shell-switch button').filter({hasText:/^知识星链$/}).click();
-  await expect(page.getByRole('tab',{name:'全部 1',exact:true})).toBeVisible();
-  await expect(page.locator('.card.list .row')).toHaveCount(1);
-  await expect(page.locator('.card.list .row')).toContainText('4 项背景');
-  await expect(page.getByRole('heading',{name:'企业背景知识',exact:true})).toBeVisible();
+  await expect(page.getByRole('tab',{name:'全部 0',exact:true})).toBeVisible();
+  await expect(page.locator('.card.list .row')).toHaveCount(0);
+  await page.locator('.shell-switch button').filter({hasText:/^数据基座$/}).click();
+  await page.locator('.src-pick').filter({hasText:/^内部资料库/}).click();
+  await page.getByRole('button',{name:'企业背景来源'}).click();
+  await page.mouse.move(1400, 300);
+  await page.mouse.wheel(0, 900);
+  await expect(page.getByRole('heading',{name:'企业背景参考',exact:true})).toBeVisible();
+  await expect(page.getByText('治理上下文，未计入已发布知识',{exact:false})).toBeVisible();
   const categories = page.getByRole('group', {name:'背景分类'});
   await categories.getByRole('button', {name:'业务术语 1', exact:true}).click();
   await expect(page.locator('.background-reading-group article')).toHaveCount(1);
   await expect(page.locator('.background-reading-group')).toContainText('合成背景3');
   await categories.getByRole('button', {name:'全部 4', exact:true}).click();
   await expect(page.locator('.background-reading-group article')).toHaveCount(4);
-  populated=false;
-  await page.getByRole('button',{name:'刷新背景知识'}).click();
-  await expect(page.getByRole('tab',{name:'全部 0',exact:true})).toBeVisible();
-  await expect(page.locator('.card.list .row')).toHaveCount(0);
 });
 
 test('知识星链标题等待镜头到位，快速往返后仍重新等待', async ({ page }) => {
@@ -391,6 +395,8 @@ test('知识星链标题等待镜头到位，快速往返后仍重新等待', as
       sourceVersionId: actor, revision: 1, field: 'BUSINESS', title: '合成背景', content: '合成内容',
       origin: 'HUMAN', status: 'REFERENCE_READY', methods: []}],
   }}));
+  const processed={id:'processed-knowledge',name:'合成已处理知识',group:'资料知识',why:'完整处理后发布',side:'共享空间上传',sourceCategory:'SHARED_UPLOAD',tone:'plain',verdict:'合成已发布内容',kvHead:[],kv:[],actions:[]};
+  await page.route('**/scene/dispatch?path=%2Fscene-knowledge', r=>r.fulfill({json:{items:[processed],relations:[],sourceKind:{'processed-knowledge':1},tabs:[{label:'全部 1',items:[processed]}],stats:{title:'知识构成',rows:[]},aside:{title:'最近入库',rows:[]},pending:0,failed:0,busy:false,available:true,needsGraph:false,scopeRevision:'processed',status:'1 条已发布知识'}}));
   await page.goto(`/tenant-admin/prototype/?tenant=${tenant}`);
   const data = page.locator('.shell-switch button').filter({hasText:/^数据基座$/});
   const knowledge = page.locator('.shell-switch button').filter({hasText:/^知识星链$/});
@@ -412,24 +418,24 @@ test('知识星链标题等待镜头到位，快速往返后仍重新等待', as
 
 test('知识列表按真实来源折叠，待处理来源不混入知识总数', async ({page}) => {
   await fixture(page);
-  const items = [0, 1, 2].map(kind => ({id:`k${kind}`,name:`合成知识${kind}`, group:'企业管理',why:'合成摘要',side:'企业管理',tone:'ok',verdict:'合成内容',kvHead:[],kv:[],actions:[]}));
+  const items = [0, 1, 2].map(kind => ({id:`k${kind}`,name:`合成知识${kind}`, sourceCategory:['STRUCTURED','UNSTRUCTURED','SHARED_UPLOAD'][kind],group:'企业管理',why:'合成摘要',side:'企业管理',tone:'ok',verdict:'合成内容',kvHead:[],kv:[],actions:[]}));
   const pending = {...items[0], id:'pending',name:'合成待整理资料',tone:'warn'};
   await page.route('**/scene/dispatch?path=%2Fscene-knowledge', r => r.fulfill({json:{items, relations:[], sourceKind:{k0:0,k1:1,k2:2},
-    tabs:[{label:'全部 3',items},{label:'需要留意 1',items:[pending]},{label:'来自业务数据 1',items:[items[0]]}],
+    tabs:[{label:'全部 3',items},{label:'来源待处理 1',items:[pending]},...['结构化数据','非结构化资料','共享空间上传'].map((label,i)=>({label:label+' 1',items:[items[i]]}))],
     stats:{title:'知识构成',rows:[]},aside:{title:'最近入库',rows:[]}, pending:0,failed:0,busy:false,available:false,needsGraph:false,status:'已读取',scopeRevision:'1'}}));
   await page.goto(`/tenant-admin/prototype/?tenant=${tenant}`);
   await page.locator('.shell-switch button').filter({hasText:/^知识星链$/}).click();
-  await expect(page.getByRole('tab')).toHaveCount(2);
+  await expect(page.getByRole('tab')).toHaveCount(5);
   await expect(page.getByRole('tab',{name:'全部 3',exact:true})).toBeVisible();
-  for (const name of ['业务数据知识 1','资料知识 1','会话知识 1']) await expect(page.getByRole('button',{name,exact:true})).toBeVisible();
-  const group = page.getByRole('button',{name:'业务数据知识 1',exact:true});
+  for (const name of ['结构化数据 1','非结构化资料 1','共享空间上传 1']) await expect(page.getByRole('button',{name,exact:true})).toBeVisible();
+  const group = page.getByRole('button',{name:'结构化数据 1',exact:true});
   await group.click();
   await expect(group).toHaveAttribute('aria-expanded','false');
   await expect(page.locator('.card.list .row').filter({hasText:'合成知识0'})).toHaveCount(0);
   await group.click();
   await page.locator('.card.list .row').filter({hasText:'合成知识0'}).click();
   await expect(page.locator('.card.detail')).toContainText('合成内容');
-  await page.getByRole('tab',{name:'需处理 1',exact:true}).click();
+  await page.getByRole('tab',{name:'来源待处理 1',exact:true}).click();
   await expect(page.getByRole('button',{name:'待处理来源 1',exact:true})).toBeVisible();
   await expect(page.locator('.card.list .row')).toHaveCount(1);
   await page.getByRole('tab',{name:'全部 3',exact:true}).click();

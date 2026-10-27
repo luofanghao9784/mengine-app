@@ -99,7 +99,7 @@ public class NativeMaterialGovernance {
                      && p.items() != null
                      && !p.items().isEmpty()
                      && p.items().size() <= 20
-                     && "CODEX_OPERATOR".equals(p.producer())
+                     && java.util.Set.of("CODEX_OPERATOR","SYSTEM_MODEL").contains(p.producer())
                );
                this.check(!this.db.queryForList("SELECT id FROM tenants WHERE id=? AND status='ACTIVE' FOR UPDATE", new Object[]{p.tenantId()}).isEmpty());
                this.check(

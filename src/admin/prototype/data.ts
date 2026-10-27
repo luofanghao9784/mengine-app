@@ -15,6 +15,7 @@ export interface Item {
   kvHead: [string, string, string];
   kv: [string, string, string, Tone][];
   actions: string[];
+  sourceCategory?: 'STRUCTURED' | 'UNSTRUCTURED' | 'SHARED_UPLOAD';
 }
 export interface PlaceInfo {
   name: string;

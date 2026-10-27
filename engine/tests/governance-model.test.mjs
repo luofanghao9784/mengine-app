@@ -8,6 +8,7 @@ const canonical = v => Array.isArray(v) ? v.map(canonical) : v && typeof v === '
   ? Object.fromEntries(Object.keys(v).sort().map(k => [k, canonical(v[k])])) : v;
 const input = (extra = {}) => {
   const context = { kind: 'DATASET', columns: ['编号'], rowCount: 1, ...extra };
+  if (context.kind === 'MATERIAL') { delete context.columns; delete context.rowCount; }
   const prompt = '合成元数据治理测试';
   const messages = [{ role: 'system', content: [{ type: 'text', text: prompt }] },
     { role: 'user', content: [{ type: 'text', text: JSON.stringify(canonical(context)) }] }];
@@ -44,6 +45,8 @@ test('malformed or truncated model responses never become successful drafts; exp
   } }) });
   const req = input();
   for (let i = 0; i < 2; i++) await assert.rejects(runtime.run(req), { code: 'GOVERNANCE_OUTPUT_INVALID' });
+  assert.equal(calls, 1);
+  await assert.rejects(runtime.run({...req,attempt:2}), { code: 'GOVERNANCE_OUTPUT_INVALID' });
   assert.equal(calls, 2);
 });
 test('governance transport requires authentication and a live configured runtime', async t => {
@@ -56,4 +59,17 @@ test('governance transport requires authentication and a live configured runtime
   } }) } } }); const url = await listen(live); t.after(() => close(live));
   const result = await fetch(url + '/internal/v1/governance-model', { method: 'POST', headers: { authorization: 'Bearer ' + token, 'content-type': 'application/json' }, body: JSON.stringify(input()) });
   assert.equal(result.status, 200); assert.deepEqual((await result.json()).output, output);
+});
+test('bounded fully parsed material fragments execute without tools; partial or injected rows are rejected', async () => {
+  let calls = 0;
+  const runtime = new GovernanceModel({ modelName: 'fixture', createModel: () => ({ async *generate(r) {
+    calls++; assert.deepEqual(r.tools, []); assert.match(r.messages[1].content[0].text, /合成资料原文/);
+    yield { type: 'text', text: JSON.stringify(output) }; yield { type: 'finish', reason: 'stop' };
+  } }) });
+  const fragments = [{ id: randomUUID(), locator: '第1段', content: '合成资料原文，需要对当前版本进行语义检查。' }];
+  await runtime.run(input({ columns: undefined, rowCount: undefined, kind: 'MATERIAL', parserStatus: 'READY', fragments }));
+  assert.equal(calls, 1);
+  await assert.rejects(runtime.run(input({ columns: undefined, rowCount: undefined, kind: 'MATERIAL', parserStatus: 'PARTIAL', fragments })), { code: 'INVALID_GOVERNANCE_REQUEST' });
+  await assert.rejects(runtime.run(input({ columns: undefined, rowCount: undefined, kind: 'MATERIAL', parserStatus: 'READY', fragments, rows: [['secret']] })), { code: 'INVALID_GOVERNANCE_REQUEST' });
+  await assert.rejects(runtime.run(input({ columns: undefined, rowCount: undefined, kind: 'MATERIAL', parserStatus: 'READY', fragments: [{...fragments[0],content:'x'.repeat(32769)}] })), { code: 'INVALID_GOVERNANCE_REQUEST' });
 });

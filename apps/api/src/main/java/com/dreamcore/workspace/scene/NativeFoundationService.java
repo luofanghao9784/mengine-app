@@ -74,6 +74,8 @@ public class NativeFoundationService {
          a.set("stageStates", this.json.valueToTree(result.stages().stream().limit(5L).map(FoundationProcessingService.Stage::state).toList()));
          this.governanceStages(a);
       }
+      // Reuse the ACL-checked snapshot result after processing replaced its stage array.
+      FoundationModelReviewProjection.apply(a, a.path("modelChecksPassed").asBoolean());
       ObjectNode out = this.json.createObjectNode();
       out.set("asset", a);
       out.putNull("analysis");
@@ -331,6 +333,7 @@ public class NativeFoundationService {
                         ObjectNode status=(ObjectNode)a.path("nativeGovernance");status.put("state","PUBLISHED");
                         status.put("message",a.path("checksPassed").asBoolean()?"字段口径已发布，当前快照检查通过":"字段口径已发布；当前快照检查尚需处理");
                      }
+                     a.put("deterministicChecksPassed", a.path("checksPassed").asBoolean());
                      JsonNode stages = a.path("stageStates");
                      if(a.path("id").asText().startsWith("dataset-")) {
                         var holds=this.db.queryForList("SELECT reason FROM collection_delivery_waits WHERE tenant_id=? AND dataset_id=?",String.class,tenant,UUID.fromString(a.path("id").asText().substring(8)));
@@ -348,6 +351,8 @@ public class NativeFoundationService {
                            stages=a.path("stageStates");
                         }
                      }
+                     this.modelReviewStages(actor, tenant, a);
+                     stages = a.path("stageStates");
                      if ("READY".equals(stages.path(1).asText())) {
                         parsed++;
                      }
@@ -433,6 +438,25 @@ public class NativeFoundationService {
 
          offset += 100;
       }
+   }
+
+   private void modelReviewStages(UUID actor, UUID tenant, ObjectNode asset) {
+      boolean ready = false;
+      // A current publication and program pass are prerequisites; skip rescanning known waiting sources.
+      if (!asset.has("sourceDelivery") && asset.has("publicationId")
+          && asset.path("deterministicChecksPassed").asBoolean()
+          && "READY".equals(asset.path("stageStates").path(1).asText())) {
+         String id = asset.path("id").asText();
+         try {
+            ready = id.startsWith("dataset-")
+                ? this.governanceJobs.datasetKnowledgeReady(actor, tenant, UUID.fromString(id.substring(8)))
+                : this.governanceJobs.materialAnalysisReady(actor, tenant, UUID.fromString(id.substring(9)));
+         } catch (IdentityException unavailable) {
+            // Expected ACL/version/parser rejection means this source cannot be advertised as ready.
+            if (unavailable.status != 403 && unavailable.status != 404 && unavailable.status != 409) throw unavailable;
+         }
+      }
+      FoundationModelReviewProjection.apply(asset, ready);
    }
 
    private void governanceStages(ObjectNode a) {

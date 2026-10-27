@@ -6,7 +6,6 @@ import { OutputWork } from './BusinessWork';
 import { useSceneRuntime, disconnectedTelemetry, type SceneRuntime } from './runtime';
 import { requestNavigationLocked } from '../../shared/request-guard';
 import type { EngineScene, Focus } from '../../operations/engine-stage/scene';
-import { BackgroundKnowledge } from '../../profile/BackgroundKnowledge';
 import { DataWork } from './DataWork';
 import { revealInList, useProgressive } from './AssetBits';
 import { KnowledgeListRow } from './KnowledgeListRow';
@@ -742,7 +741,6 @@ export function SceneShell({ tenant = null, name }: { tenant?: string | null; na
         ) : work ? (
           <MemoWork
             tenant={tenant}
-            onBackgroundSource={toCompany}
             key={place}
             knowledge={knowledge}
             place={place}
@@ -999,7 +997,6 @@ const toneClass = (t: Tone) => `tone-${t}`;
 
 function Work({
   tenant,
-  onBackgroundSource,
   knowledge,
   place,
   picked,
@@ -1010,7 +1007,6 @@ function Work({
   setGate,
 }: {
   tenant?: string | null;
-  onBackgroundSource?: () => void;
   knowledge: Knowledge;
   place: Place;
   picked: string;
@@ -1020,14 +1016,12 @@ function Work({
   gate: number | null;
   setGate: (gate: number | null) => void;
 }) {
-  const workTabs = place === 'knowledge' ? knowledge.tabs.filter((t, i) => i === 0 || /^(需要留意|需处理)\s/.test(t.label)).map(t => ({
-    ...t, label: t.label.replace('需要留意', '需处理'),
-  })) : tabs[place];
+  const workTabs = place === 'knowledge' ? knowledge.tabs : tabs[place];
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   useEffect(() => setCollapsedGroups(new Set()), [tenant, place, filter]);
   const groupName = (x: Item) => place !== 'knowledge' ? x.group
-    : x.id.startsWith('company-background:') ? '企业背景'
     : !knowledge.ids.has(x.id) ? '待处理来源'
+    : x.sourceCategory ? ({ STRUCTURED: '结构化数据', UNSTRUCTURED: '非结构化资料', SHARED_UPLOAD: '共享空间上传' })[x.sourceCategory]
     : ['业务数据知识', '资料知识', '会话知识'][knowledge.data?.sourceKind[x.id] ?? -1] || '其他知识';
   const [source, setSource] = useState<Item | null>(null),
     [actionError, setActionError] = useState('');
@@ -1129,7 +1123,6 @@ function Work({
           {place === 'knowledge' && <KnowledgeSync knowledge={knowledge} />}
           {groups.length === 0 && <p className="none">这一栏里没有符合条件的记录。</p>}
           {groups.map(([name, items], index) => {
-            const background = place === 'knowledge' && name === '企业背景';
             const collapsed = collapsedGroups.has(name);
             // 分段渲染：这一段的行数用完后，后面的组等滚到底部再画。
             const before = groups
@@ -1137,8 +1130,8 @@ function Work({
               .reduce((n, [g, list]) => n + (collapsedGroups.has(g) ? 0 : list.length), 0);
             if (index > 0 && before >= shownRows && shownRows < visibleItems.length) return null;
             const rows = items.slice(0, Math.max(0, shownRows - before));
-            return <div key={name} className={background ? 'knowledge-background-overview' : 'knowledge-group'}>
-              {place === 'knowledge' ? !background && (
+            return <div key={name} className="knowledge-group">
+              {place === 'knowledge' ? (
                 <button type="button" className="asset-source-toggle" aria-expanded={!collapsed}
                   aria-label={`${name} ${items.length}`} onClick={() => setCollapsedGroups(old => {
                     const next = new Set(old);
@@ -1163,101 +1156,93 @@ function Work({
         </div>
       </article>
 
-      {place === 'knowledge' && tenant && current.id === `company-background:${tenant}` ? (
-        <article className="card detail background-detail">
-          <div className="card-scroll">
-            <BackgroundKnowledge tenant={tenant} onSource={onBackgroundSource} onRefresh={knowledge.refreshBackground} />
-          </div>
-        </article>
-      ) : (
-        <article className="card detail" aria-live="polite">
-          <header>
-            <h2>{current.name}</h2>
-            <span>
-              {current.group}
-              {current.side && ` · ${current.side}`}
-            </span>
-          </header>
-          <div className="card-scroll">
-            <p className={`verdict ${toneClass(current.tone)}`}>
-              {actionError ||
-                (place === 'knowledge' &&
-                  (knowledge.error || (knowledge.busy ? '正在同步知识与关联…' : ''))) ||
-                current.verdict}
-            </p>
-            {flow && (
-              <ol className="flow">
-                {flow.map(([text, state], i) => (
-                  <li key={i} data-state={state}>
-                    <b>{STEP_NAMES[i]}</b>
-                    <span>{text}</span>
-                  </li>
-                ))}
-              </ol>
-            )}
-            {current.kv.length > 0 && (
-              <table>
-                <thead>
-                  <tr>
-                    {current.kvHead.map((h) => (
-                      <th key={h}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {current.kv.map(([a, b, c, tone]) => (
-                    <tr key={a}>
-                      <th>{a}</th>
-                      <td>{b}</td>
-                      <td className={`${toneClass(tone)}-text`}>{c}</td>
-                    </tr>
+      <article className="card detail" aria-live="polite">
+        <header>
+          <h2>{current.name}</h2>
+          <span>
+            {current.group}
+            {current.side && ` · ${current.side}`}
+          </span>
+        </header>
+        <div className="card-scroll">
+          <p className={`verdict ${toneClass(current.tone)}`}>
+            {actionError ||
+              (place === 'knowledge' &&
+                (knowledge.error || (knowledge.busy ? '正在同步知识与关联…' : ''))) ||
+              current.verdict}
+          </p>
+          {flow && (
+            <ol className="flow">
+              {flow.map(([text, state], i) => (
+                <li key={i} data-state={state}>
+                  <b>{STEP_NAMES[i]}</b>
+                  <span>{text}</span>
+                </li>
+              ))}
+            </ol>
+          )}
+          {current.kv.length > 0 && (
+            <table>
+              <thead>
+                <tr>
+                  {current.kvHead.map((h) => (
+                    <th key={h}>{h}</th>
                   ))}
-                </tbody>
-              </table>
-            )}
-            {place === 'knowledge' && (
-              <div className="related">
-                <h3>关联知识 {links.length}</h3>
-                {links.map((r) => (
-                  <button
-                    key={r.id}
-                    type="button"
-                    onClick={() => {
-                      setFilter(0);
-                      pick(r.id);
-                    }}
-                  >
-                    <b>{r.name}</b>
-                    <span>{r.why}</span>
-                  </button>
+                </tr>
+              </thead>
+              <tbody>
+                {current.kv.map(([a, b, c, tone], i) => (
+                  <tr key={`${a}-${i}`}>
+                    <th>{a}</th>
+                    <td>{b}</td>
+                    <td className={`${toneClass(tone)}-text`}>{c}</td>
+                  </tr>
                 ))}
-                {links.length === 0 && (
-                  <p>
-                    {knowledge.data?.needsGraph
-                      ? '关联待模型分析确认，星图暂以独立节点呈现。'
-                      : '这条知识目前没有已验证关联。'}
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-          {current.actions.length > 0 && (
-            <footer>
-              {current.actions.map((a, i) => (
+              </tbody>
+            </table>
+          )}
+          {place === 'knowledge' && (
+            <div className="related">
+              <h3>关联知识 {links.length}</h3>
+              {links.map((r) => (
                 <button
-                  key={a}
+                  key={r.id}
                   type="button"
-                  disabled={place === 'knowledge' && knowledge.busy}
-                  onClick={place === 'knowledge' ? () => void act(a) : undefined}
-                  className={i === 0 ? 'primary' : undefined}
+                  onClick={() => {
+                    setFilter(0);
+                    pick(r.id);
+                  }}
                 >
-                  {a}
+                  <b>{r.name}</b>
+                  <span>{r.why}</span>
                 </button>
               ))}
-            </footer>
+              {links.length === 0 && (
+                <p>
+                  {knowledge.data?.needsGraph
+                    ? '关联待模型分析确认，星图暂以独立节点呈现。'
+                    : '这条知识目前没有已验证关联。'}
+                </p>
+              )}
+            </div>
           )}
-        </article>
-      )}
+        </div>
+        {current.actions.length > 0 && (
+          <footer>
+            {current.actions.map((a, i) => (
+              <button
+                key={a}
+                type="button"
+                disabled={place === 'knowledge' && knowledge.busy}
+                onClick={place === 'knowledge' ? () => void act(a) : undefined}
+                className={i === 0 ? 'primary' : undefined}
+              >
+                {a}
+              </button>
+            ))}
+          </footer>
+        )}
+      </article>
 
       <div className="side">
         <article className="card facts">

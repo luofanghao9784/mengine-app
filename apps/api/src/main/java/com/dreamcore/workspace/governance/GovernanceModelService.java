@@ -47,6 +47,8 @@ public class GovernanceModelService {
    @Autowired private com.dreamcore.workspace.collection.CollectionSourceContracts sourceContracts;
    @Value("${dreamcore.governance.dispatch-enabled:false}")
    private boolean dispatchEnabled;
+   @Value("${dreamcore.knowledge.automatic-tenants:}") private String automaticTenants="";
+   private boolean automaticTenant(UUID tenant) { return java.util.Arrays.stream(automaticTenants.split(",")).map(String::trim).anyMatch(tenant.toString()::equals); }
 
    /** Only the caller's private draft is exposed; source access is rechecked before any job metadata. */
    @Transactional(isolation = Isolation.REPEATABLE_READ)
@@ -367,25 +369,27 @@ public class GovernanceModelService {
    public record AnalysisReadiness(String key, String reason) { public boolean ready() { return reason == null; } }
 
    /** Gate configured native governance before any paid automatic task; legacy sources retain their own pipeline. */
-   @Transactional(isolation = Isolation.REPEATABLE_READ)
+   @Transactional(isolation = Isolation.REPEATABLE_READ, noRollbackFor = IdentityException.class)
    public AnalysisReadiness analysisReadiness(UUID actor, UUID tenant, UUID dataset) {
       return this.analysisReadiness(actor, tenant, dataset, null);
    }
 
    /** The exact selection is checked, even if collection advances between selection and dispatch. */
-   @Transactional(isolation = Isolation.REPEATABLE_READ)
+   @Transactional(isolation = Isolation.REPEATABLE_READ, noRollbackFor = IdentityException.class)
    public AnalysisReadiness analysisReadiness(UUID actor, UUID tenant, UUID dataset, UUID snapshot) {
       this.identities.member(actor, tenant, false);
       if (!this.collections.readable(actor, tenant, dataset)) throw this.error(404, "DATASET_NOT_FOUND");
       var deliveryWait = this.db.queryForList("SELECT reason FROM collection_delivery_waits WHERE tenant_id=? AND dataset_id=?",String.class,tenant,dataset);
       if(!deliveryWait.isEmpty()) return new AnalysisReadiness("SOURCE_DELIVERY_WAITING",deliveryWait.getFirst());
-      if (Boolean.TRUE.equals(this.db.queryForObject("SELECT EXISTS(SELECT 1 FROM scene_asset_revisions WHERE tenant_id=? AND target_id=? AND kind='TABLE')", Boolean.class, tenant, dataset)))
+      boolean modelPolicy=this.automaticTenant(tenant) || Boolean.TRUE.equals(this.db.queryForObject("SELECT EXISTS(SELECT 1 FROM governance_model_jobs WHERE tenant_id=? AND kind='DATASET' AND source_id=? AND jsonb_exists(output,'qualityReview'))",Boolean.class,tenant,dataset));
+      if (!modelPolicy && Boolean.TRUE.equals(this.db.queryForObject("SELECT EXISTS(SELECT 1 FROM scene_asset_revisions WHERE tenant_id=? AND target_id=? AND kind='TABLE')", Boolean.class, tenant, dataset)))
          return new AnalysisReadiness("LEGACY_GOVERNANCE", null);
       var data = this.db.queryForMap("SELECT name FROM business_datasets WHERE id=? AND tenant_id=?", dataset, tenant);
       boolean configured = !this.sourceEvidence(tenant, dataset, data.get("name").toString(), "schema").isEmpty()
           || !this.sourceEvidence(tenant, dataset, data.get("name").toString(), "entries").isEmpty()
           || Boolean.TRUE.equals(this.db.queryForObject("SELECT EXISTS(SELECT 1 FROM governance_model_jobs WHERE tenant_id=? AND kind='DATASET' AND source_id=? UNION ALL SELECT 1 FROM native_governance_releases WHERE tenant_id=? AND EXISTS(SELECT 1 FROM jsonb_array_elements(package->'items') i WHERE i->>'datasetId'=?))", Boolean.class, tenant, dataset, tenant, dataset.toString()));
       configured = configured || Boolean.TRUE.equals(this.db.queryForObject("SELECT EXISTS(SELECT 1 FROM collection_snapshot_receipts WHERE tenant_id=? AND dataset_id=? AND source_contract IS NOT NULL)", Boolean.class, tenant, dataset));
+      configured = configured || this.automaticTenant(tenant);
       if (!configured) return new AnalysisReadiness("DEPLOYMENT_SOURCE", null);
       var definitions = snapshot == null ? this.releases.currentFor(actor, tenant, dataset) : this.releases.currentForSnapshot(actor, tenant, dataset, snapshot);
       if (definitions.isEmpty()) return new AnalysisReadiness("GOVERNANCE_REQUIRED", "SOURCE_GOVERNANCE_REQUIRED");
@@ -409,11 +413,83 @@ public class GovernanceModelService {
                 (List<String>)currentSource.get("columns"),release.fields(),analysisClock.now());
          } catch (IdentityException invalid) { reason="SOURCE_ANALYSIS_PLAN_INVALID"; }
       }
+      if (reason == null && modelPolicy && !this.currentModelReview(tenant,"DATASET",dataset,currentSource,definitions.stream().map(NativeGovernanceDeployment.Published::releaseId).collect(Collectors.toSet()))) reason="SOURCE_MODEL_REVIEW_REQUIRED";
       boolean rollingMonth = this.sourceEvidence(tenant,dataset,data.get("name").toString(),"schema").stream()
           .filter(item -> "analysis-plan".equals(item.get("kind")))
           .anyMatch(item -> item.get("definition") instanceof Map<?,?> definition && Set.of("CURRENT_MONTH","PREVIOUS_MONTH").contains(Objects.toString(definition.get("calendarWindow"),"")));
       String month = rollingMonth ? ":"+java.time.YearMonth.from(analysisClock.now().atZone(java.time.ZoneId.of("Asia/Shanghai"))) : "";
       return new AnalysisReadiness(release.releaseId()+":"+Objects.toString(reason,"CHECKED")+month, reason);
+   }
+
+   Map<String,Object> automaticSource(UUID actor,UUID tenant,String kind,UUID source) {
+      this.actor(actor,tenant);
+      return this.source(actor,tenant,kind,source);
+   }
+   String sourceHash(Map<String,Object> context) { return this.hash(this.plain(context)); }
+
+   /** Knowledge projections always require a current semantic review, including legacy sources. */
+   @Transactional(isolation = Isolation.REPEATABLE_READ, noRollbackFor = IdentityException.class)
+   public boolean datasetKnowledgeReady(UUID actor,UUID tenant,UUID dataset) {
+      if (!this.analysisReadiness(actor,tenant,dataset).ready()) return false;
+      var context=this.source(actor,tenant,"DATASET",dataset);
+      var published=this.releases.currentFor(actor,tenant,dataset).stream().map(NativeGovernanceDeployment.Published::releaseId).collect(Collectors.toSet());
+      return this.currentModelReview(tenant,"DATASET",dataset,context,published);
+   }
+
+   /** Full current parse + reviewed native publication; maintenance permission never grants source reads. */
+   @Transactional(isolation = Isolation.REPEATABLE_READ, noRollbackFor = IdentityException.class)
+   public boolean materialAnalysisReady(UUID actor, UUID tenant, UUID material) {
+      this.identities.member(actor, tenant, false);
+      var locations=this.db.queryForList("SELECT m.workspace_id FROM active_materials m JOIN workspaces w ON w.id=m.workspace_id AND w.tenant_id=m.tenant_id WHERE m.tenant_id=? AND m.id=? AND m.in_library AND w.kind='SHARED' AND NOT w.archived",tenant,material);
+      if(locations.isEmpty()) throw this.error(404,"MATERIAL_NOT_FOUND");
+      this.materials.requireObject(actor,tenant,(UUID)locations.getFirst().get("workspace_id"),"MATERIAL",material,false);
+      Map<String,Object> context;
+      try { context=this.source(actor,tenant,"MATERIAL",material); }
+      catch(IdentityException waiting) { if(waiting.status==409 || waiting.status==404)return false;throw waiting; }
+      if (!"READY".equals(context.get("parserStatus"))) return false;
+      Set<UUID> published = this.materialReleases.currentFor(actor,tenant,material).stream()
+          .map(NativeMaterialGovernance.Published::releaseId).collect(Collectors.toSet());
+      return this.currentModelReview(tenant,"MATERIAL",material,context,published);
+   }
+
+   private boolean currentModelReview(UUID tenant,String kind,UUID source,Map<String,Object> context,Set<UUID> published) {
+      if (published.isEmpty()) return false;
+      String basis = this.hash(this.plain(context));
+      for (var job : this.db.queryForList("SELECT j.id,j.output::text FROM governance_model_jobs j JOIN governance_model_dispatch d ON d.job_id=j.id WHERE j.tenant_id=? AND j.kind=? AND j.source_id=? AND j.basis_hash=? AND j.state='DRAFT_READY' AND d.state='SUCCEEDED' ORDER BY j.created_at DESC,j.id DESC",tenant,kind,source,basis)) {
+         if (!published.contains(job.get("id"))) continue;
+         Map<String,Object> output=this.json.readValue(job.get("output").toString(),Map.class);
+         try { this.validateQualityReview(output,context); }
+         catch (IdentityException invalid) { continue; }
+         if ("USABLE".equals(((Map<?,?>)output.get("qualityReview")).get("state"))) return true;
+      }
+      return false;
+   }
+
+   /** A semantic assessment is distinct from deterministic checks and bound to quoted authorized evidence. */
+   public void validateQualityReview(Map<String,Object> output,Map<String,Object> context) {
+      if (!(output.get("qualityReview") instanceof Map<?,?> review)) throw this.error(422,"GOVERNANCE_QUALITY_REQUIRED");
+      this.keys(review,"state","summary","citations");
+      if (!Set.of("USABLE","VERIFY_REQUIRED","BLOCKED").contains(Objects.toString(review.get("state"),""))) throw this.error(422,"GOVERNANCE_QUALITY_INVALID");
+      this.text(review.get("summary"),2000);
+      if (!(review.get("citations") instanceof List<?> citations) || citations.isEmpty() || citations.size()>8) throw this.error(422,"GOVERNANCE_QUALITY_INVALID");
+      boolean dataset="DATASET".equals(context.get("kind"));
+      for (Object item : citations) {
+         if (!(item instanceof Map<?,?> ref)) throw this.error(422,"GOVERNANCE_QUALITY_INVALID");
+         this.keys(ref,"locator","quote");this.text(ref.get("locator"),200);this.text(ref.get("quote"),300);
+         String quote=ref.get("quote").toString();
+         List<Map<String,Object>> refs=(List<Map<String,Object>>)context.getOrDefault(dataset?"sourceEvidence":"fragments",List.of());
+         if (quote.length()<6 || refs.stream().noneMatch(f -> Objects.toString(f.get(dataset?"column":"id"),"").equals(ref.get("locator")) && (dataset ? this.proofQuote(f,quote) : Objects.toString(f.get("content"),"").contains(quote)))) throw this.error(422,"GOVERNANCE_EVIDENCE_INVALID");
+      }
+      if ("USABLE".equals(review.get("state"))) {
+         if (dataset) {
+            var checks=this.json.valueToTree(context.get("checks"));
+            if (!"CHECKED".equals(checks.path("state").asText()) || !"CHECKED".equals(checks.path("exportValidation").path("state").asText())
+                || checks.path("duplicatePrimaryKeys").asLong()>0 || checks.path("nonNullViolations").asLong()>0
+                || "VIOLATIONS".equals(checks.path("valueValidation").path("state").asText()) || "SOURCE_CONTRACT_REQUIRED".equals(checks.path("state").asText())) throw this.error(422,"GOVERNANCE_HARD_CHECK_FAILED");
+            for (var fk: checks.path("foreignKeys")) if (!"CHECKED".equals(fk.path("state").asText()) || fk.path("unmatched").asLong()>0) throw this.error(422,"GOVERNANCE_HARD_CHECK_FAILED");
+            if (!(output.get("fields") instanceof List<?> fields) || fields.stream().anyMatch(f -> !(f instanceof Map<?,?> field) || "UNKNOWN".equals(field.get("decision")))) throw this.error(422,"GOVERNANCE_FIELDS_UNCONFIRMED");
+         } else if (!"READY".equals(context.get("parserStatus"))) throw this.error(422,"GOVERNANCE_PARSE_INCOMPLETE");
+      }
    }
 
    private void requireSourceContract(Map<String,Object> source) {
@@ -584,7 +660,7 @@ public class GovernanceModelService {
                      f.get("meaning").toString(),
                      f.get("unit").toString(),
                      evidence.length() > 300 ? evidence.substring(0, 297) + "…" : evidence,
-                     "UNKNOWN".equals(f.get("decision")) ? "UNKNOWN" : "SOURCE_DOCUMENTED"
+                     "UNKNOWN".equals(f.get("decision")) ? "UNKNOWN" : "KEEP_SOURCE".equals(f.get("decision")) ? original.get("status").toString() : "MODEL_DETERMINED"
                   )
                );
             }
@@ -622,7 +698,7 @@ public class GovernanceModelService {
                      tenant,
                      actor,
                      c.backgroundVersion(),
-                     "CODEX_OPERATOR",
+                     "SYSTEM_MODEL".equals(r.get("executor")) ? "SYSTEM_MODEL" : "CODEX_OPERATOR",
                      List.of(new NativeMaterialGovernance.Item(c.materials().getFirst(), out.get("title").toString(), content, quotes))
                   ),
                   true
@@ -736,6 +812,7 @@ public class GovernanceModelService {
                + " 本轮执行统一治理与知识生成。此前preparationDraft仅作待复核的来源补证，不视为已执行模型工作。输出额外包含knowledge数组，1至4篇私人知识草稿，每篇仅title、body、citations。body应整理来源支持的业务规则或表使用边界，避免只复述字段列表；区分事实、推断、限制，不能把结构检查当资金或经营正确性。citations为1至8项，每项仅locator、quote；资料locator为chunkId，表locator为column，quote须逐字引用对应原文片段或sourceEvidence的连续10至300字。所有内容均为私人待核对知识，不发布。",
             b.kind()
          );
+         instructions += " 额外必须返回qualityReview对象，仅state、summary、citations。state为USABLE、VERIFY_REQUIRED或BLOCKED；summary解释字段/文档语义一致性、异常及适用限制；citations为1-8项，仅locator、quote；表locator必须为sourceEvidence对应column，资料locator必须为fragments对应id；quote为该来源连续原文6-300字，不加来源标签或改写。USABLE仅允许完整READY解析或本批确定性检查通过且字段无UNKNOWN；硬检查失败必须BLOCKED，证据不足必须VERIFY_REQUIRED。模型解释与来源事实分别标注，REVISE保留模型推断性质，不能冒充来源已证明。USABLE只表示在本批已声明并检查的适用范围内可用，不等于资金真实、所有业务规则均已核实，也不授予模型发布权限。未声明的无关指标应写入limitations，不得仅因没有额外规则、企业背景条目meaning为空或这是私人草稿而判VERIFY_REQUIRED；当前字段本身缺证、冲突或UNKNOWN才保留VERIFY_REQUIRED。字段decision严格只允许KEEP_SOURCE、REVISE、UNKNOWN三个原样字符串，禁止KEEP_SOURCE_DOCUMENTED等自造状态。";
          request.put("contractVersion", "2.0");
          request.put("executor", b.executor());
          request.put("context", context);
@@ -1104,6 +1181,8 @@ public class GovernanceModelService {
                      candidate.remove("knowledge");
                   }
 
+                  if (candidate.containsKey("qualityReview")) this.validateQualityReview(candidate,(Map<String,Object>)req.get("context"));
+                  candidate.remove("qualityReview");
                   this.validate(candidate, (Map<String, Object>)req.get("context"));
                } catch (IdentityException invalid) {
                   this.db

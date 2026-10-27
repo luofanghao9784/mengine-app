@@ -24,7 +24,11 @@ import static org.junit.jupiter.api.Assertions.*;
 class WikiLearningIntegrationTest {
     @DynamicPropertySource static void paths(DynamicPropertyRegistry registry) {
         Path root=Path.of("").toAbsolutePath();if(root.endsWith("api"))root=root.getParent().getParent();
-        String parser=root.resolve("workers/parser").toString();registry.add("dreamcore.knowledge.parser-root",()->parser);
+        Path parserRoot=root.resolve("workers/parser");
+        // Isolated clones may share the installed venv; the parser sandbox needs its real root.
+        try {if(Files.isSymbolicLink(parserRoot.resolve(".venv")))parserRoot=parserRoot.resolve(".venv").toRealPath().getParent();}
+        catch(java.io.IOException failure){throw new IllegalStateException(failure);}
+        String parser=parserRoot.toString();registry.add("dreamcore.knowledge.parser-root",()->parser);
     }
     @Autowired JdbcTemplate db;@Autowired MaterialService materials;@Autowired KnowledgeService knowledge;@Autowired DocumentParser parser;@Autowired PasswordEncoder passwords;
     @LocalServerPort int port;

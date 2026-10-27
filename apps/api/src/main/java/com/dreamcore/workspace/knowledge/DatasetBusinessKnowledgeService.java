@@ -37,7 +37,7 @@ public class DatasetBusinessKnowledgeService {
  }
  public record Finding(String title,String interpretation,String action,List<String> factIds) {}
  public record Report(String title,List<Finding> findings,String limitations) {}
- public record Article(UUID id,String title,String content) {}
+ public record Article(UUID id,String title,String content,List<Source> sources) {}
  private IdentityException unavailable(){return new IdentityException(409,"DATASET_INSIGHT_SOURCE_CHANGED");}
  private void owner(UUID actor,UUID tenant){identities.member(actor,tenant,false);if(!Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM tenant_governance WHERE tenant_id=? AND owner_id=?)",Boolean.class,tenant,actor)))throw new IdentityException(403,"DATASET_INSIGHT_OWNER_REQUIRED");}
  private void fact(List<Fact> facts,UUID dataset,String text){facts.add(new Fact("F"+(facts.size()+1),dataset,text));}
@@ -113,7 +113,7 @@ public class DatasetBusinessKnowledgeService {
   for(var r:db.queryForList("SELECT k.id,k.report::text report FROM dataset_business_knowledge k JOIN conversation_tasks t ON t.id=k.task_id JOIN tenant_governance g ON g.tenant_id=k.tenant_id AND g.owner_id=k.actor_id WHERE k.tenant_id=? AND k.input_hash=? AND k.published_at IS NOT NULL AND t.status='SUCCEEDED' AND t.execution_class='live' ORDER BY k.published_at DESC LIMIT 1",tenant,hash)){
    Report report=validate(r.get("report").toString(),current);StringBuilder content=new StringBuilder();
    for(var f:report.findings()){content.append(f.title()).append("\n程序核验的事实：\n");for(String id:f.factIds())current.facts().stream().filter(x->x.id().equals(id)).forEach(x->content.append(x.id()).append(" · ").append(x.text()).append("\n"));content.append("AI 解读（待核实）：").append(f.interpretation()).append("\n建议行动：").append(f.action()).append("\n\n");}
-   content.append("分析边界：").append(report.limitations()).append("\n").append(current.boundaries());articles.add(new Article((UUID)r.get("id"),report.title(),content.toString()));
+   content.append("分析边界：").append(report.limitations()).append("\n").append(current.boundaries());articles.add(new Article((UUID)r.get("id"),report.title(),content.toString(),List.copyOf(current.sources())));
   }return articles;
  }
 }

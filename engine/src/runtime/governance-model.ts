@@ -16,15 +16,25 @@ export class GovernanceModel {
 
   async run(input: unknown) {
     if (!isRecord(input) || input.contractVersion !== '2.0' || !uuid(input.jobId)
-      || input.executor !== 'SYSTEM_MODEL' || !isRecord(input.context) || input.context.kind !== 'DATASET'
+      || input.executor !== 'SYSTEM_MODEL' || !isRecord(input.context) || !['DATASET', 'MATERIAL'].includes(String(input.context.kind))
       || typeof input.prompt !== 'string' || input.prompt.length > 16000
       || typeof input.inputHash !== 'string' || !Array.isArray(input.messages) || input.messages.length !== 2
       || !Number.isSafeInteger(input.attempt) || Number(input.attempt) < 1
       || Object.keys(input).some(k => !['contractVersion', 'jobId', 'executor', 'context', 'prompt', 'messages', 'inputHash', 'attempt'].includes(k)))
       throw new RuntimeError('INVALID_GOVERNANCE_REQUEST');
     // The platform builds this metadata contract from authorized source snapshots. No raw rows are accepted.
-    if (Object.keys(input.context).some(k => !['kind', 'sourceId', 'name', 'snapshotId', 'version', 'rowCount', 'columns', 'fields', 'nullCounts', 'contentHash', 'coverageThrough', 'sourceEvidence', 'checks', 'coverage', 'background', 'preparationDraft'].includes(k)))
+    if (input.context.kind === 'DATASET' && Object.keys(input.context).some(k => !['kind', 'sourceId', 'name', 'snapshotId', 'version', 'rowCount', 'columns', 'fields', 'nullCounts', 'contentHash', 'coverageThrough', 'sourceEvidence', 'checks', 'coverage', 'background', 'preparationDraft'].includes(k)))
       throw new RuntimeError('INVALID_GOVERNANCE_REQUEST');
+    if (input.context.kind === 'MATERIAL') {
+      const allowed = ['kind','sourceId','name','versionId','runId','generation','parserStatus','parserWarnings','fragments','coverage','background','preparationDraft'];
+      const fragments = input.context.fragments;
+      if (Object.keys(input.context).some(k => !allowed.includes(k)) || input.context.parserStatus !== 'READY'
+        || !Array.isArray(fragments) || fragments.length < 1 || fragments.length > 128
+        || fragments.some(f => !isRecord(f) || !uuid(f.id) || typeof f.locator !== 'string' || typeof f.content !== 'string'
+          || Object.keys(f).some(k => !['id','locator','content'].includes(k)))
+        || fragments.reduce((n, f) => n + String(f.content).length, 0) > 32768)
+        throw new RuntimeError('INVALID_GOVERNANCE_REQUEST');
+    }
     const messages: { role: 'system' | 'user'; content: ModelBlock[] }[] = [
       { role: 'system', content: [{ type: 'text', text: input.prompt }] },
       { role: 'user', content: [{ type: 'text', text: JSON.stringify(canonical(input.context)) }] },
@@ -68,6 +78,6 @@ export class GovernanceModel {
     })();
     this.entries.set(key, { hash: inputHash, at: Date.now(), result });
     try { return await result; }
-    catch (error) { this.entries.delete(key); throw error; }
+    catch (error) { throw error; }
   }
 }

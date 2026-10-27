@@ -75,7 +75,8 @@ class NativeGovernanceFlowIntegrationTest {
    assertEquals(violation?1:0,asset.path("ruleStats").path("violations").asLong());
    assertTrue(asset.path("isolated").isNull());assertTrue(asset.path("quality").isNull());
    assertEquals(0,asset.path("unknownFieldCount").asInt());assertEquals(violation,asset.path("needsAttention").asBoolean());
-   assertEquals(!violation,asset.path("checksPassed").asBoolean());
+   assertEquals(!violation,asset.path("deterministicChecksPassed").asBoolean());
+   assertFalse(asset.path("modelChecksPassed").asBoolean());assertFalse(asset.path("checksPassed").asBoolean());
    assertFalse(detail.path("dictionary").path("usageRules").asText().contains("未知业务含义仍需核实"));
   } finally {ReflectionTestUtils.setField(jobs,"evidencePath","");}
  }
@@ -109,7 +110,7 @@ class NativeGovernanceFlowIntegrationTest {
    db.update("UPDATE governance_model_dispatch SET state='SUCCEEDED' WHERE job_id=?",id);
    jobs.publish(owner,tenant,id,new GovernanceModelService.Publish(3,req.get("inputHash").toString()));
    var asset=foundation.detail(owner,tenant,"dataset-"+dataset).path("asset");
-   assertTrue(asset.path("available").asBoolean());assertTrue(asset.path("needsAttention").asBoolean());
+   assertFalse(asset.path("available").asBoolean());assertTrue(asset.path("needsAttention").asBoolean());
    assertTrue(asset.path("issues").toString().contains("导出与接收已核验"));
    assertTrue(asset.path("limitations").toString().contains("1 条、1 列逐值摘要一致"));
   } finally { ReflectionTestUtils.setField(jobs,"evidencePath",""); }
@@ -138,7 +139,7 @@ class NativeGovernanceFlowIntegrationTest {
   db.update("UPDATE governance_model_dispatch SET state='SUCCEEDED' WHERE job_id=?",id);
   assertEquals(true,jobs.publish(owner,tenant,id,publish).get("published"));
   assertEquals("PUBLISHED",jobs.datasetStatus(owner,tenant,dataset).get("state"));
-  assertTrue(foundation.detail(owner,tenant,"dataset-"+dataset).path("asset").path("available").asBoolean());
+  assertFalse(foundation.detail(owner,tenant,"dataset-"+dataset).path("asset").path("available").asBoolean());
   assertEquals("UNKNOWN",db.queryForObject("SELECT package->'items'->0->'fields'->0->>'status' FROM native_governance_releases WHERE id=?",String.class,id));
   company.change(owner,tenant,new CompanyInformationService.Change(UUID.randomUUID(),CompanyInformationService.Field.INDUSTRY,0,"ADD",null,"合成行业",""));
   assertEquals("STALE",jobs.datasetStatus(owner,tenant,dataset).get("state"));
