@@ -25,3 +25,8 @@
   disabled: true
 - id: ui-settings-account
   disabled: true
+# Platform owns wakeup and delegation. No autonomous in-container scheduler.
+- id: schedule
+  disabled: true
+- id: ui-schedule
+  disabled: true

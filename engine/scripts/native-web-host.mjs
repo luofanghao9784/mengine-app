@@ -83,6 +83,15 @@ const server=createServer(async(req,res)=>{
  res.setHeader('cache-control','no-store');res.setHeader('referrer-policy','no-referrer');
  try{
   const url=new URL(req.url,publicURL);
+  const reclaim=url.pathname.match(/^\/sdk\/([0-9a-f-]{36})\/reclaim$/);
+  if(reclaim&&req.method==='POST'){
+   if(!controlToken||controlToken.length<32||req.headers['x-dreamcore-control']!==controlToken){res.writeHead(403).end();return;}
+   const starting=pending.get(reclaim[1]);if(starting)await starting.catch(()=>{});
+   const short=reclaim[1].replaceAll('-','');
+   const instance=instances.get(reclaim[1])||{id:reclaim[1],runtime:`dh120-web-${short}`,bridge:`dh120-bridge-${short}`,network:`dh120-net-${short}`};await stop(instance);
+   for(const name of [instance.runtime,instance.bridge])if(await docker(['ps','-aq','--filter',`name=^/${name}$`]))throw Error('reclaim incomplete');
+   res.writeHead(200,{'content-type':'application/json'}).end(JSON.stringify({accepted:true}));return;
+  }
   const sdk=url.pathname.match(/^\/sdk\/([0-9a-f-]{36})\/(messages|turn-stop|answer|approval|plan-review)$/);
   if(sdk&&req.method==='POST'){
    if(!controlToken||controlToken.length<32||req.headers['x-dreamcore-control']!==controlToken){res.writeHead(403).end();return;}

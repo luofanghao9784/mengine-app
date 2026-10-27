@@ -20,6 +20,7 @@ public class NativeRuntimeClient {
   for(Throwable e=error;e!=null;e=e.getCause())if(e instanceof java.net.ConnectException||e instanceof java.net.http.HttpConnectTimeoutException||e instanceof java.net.UnknownHostException)return true;
   return false;
  }
+ public void reclaim(UUID id){command(id,"","reclaim",Map.of());}
  public void available(){if(url.isBlank()||controlToken.length()<32)throw new IdentityException(503,"NATIVE_RUNTIME_UNAVAILABLE");}
  @SuppressWarnings("unchecked") public Map<String,Object> command(UUID id,String token,String action,Map<String,Object> body){
   available();

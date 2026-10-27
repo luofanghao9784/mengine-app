@@ -64,3 +64,26 @@ export interface NativeSkillAdmin extends NativeSkillPut, NativeSkillSummary { r
  * download are private to the current owner and recheck session permissions. */
 export interface NativeAttachment { id: string; filename: string; mediaType: string; sha256: string; bytes: number }
 export interface NativeMessageWithAttachments extends NativeMessageRequest { attachments?: string[] }
+
+/** B4 uses DH 0.2.1-rc.2 calendar rules, evaluated by the platform. */
+export type NativeScheduleRule =
+ | {kind:'at';at:string|{date:string;time:string;time_zone:string}}
+ | {kind:'after';afterSeconds:number} | {kind:'every';everySeconds:number}
+ | {kind:'daily';daily:{time:string;time_zone:string}}
+ | {kind:'weekly';weekly:{time:string;time_zone:string;weekdays:number[]}}
+ | {kind:'cron';cron:{expression:string;time_zone:string}};
+export interface NativeScheduleConfig {
+ title:string; prompt:string; rule:NativeScheduleRule|null; materialEvents:boolean;
+ minIntervalSeconds:number; maxRunsPerDay:number; maxTotalRuns:number; expiresAt:string;
+}
+/** GET/POST .../{id}/schedules, POST {requestId,configuration}.
+ * PUT .../schedules/{scheduleId}: config while paused; PATCH {state:ACTIVE|PAUSED|STOPPED}.
+ * GET .../schedules/{scheduleId}/runs. POST .../schedules/migrate/{legacyPlanId}. */
+export interface NativeSchedule {
+ id:string;session_id:string;state:'ACTIVE'|'PAUSED'|'STOPPED'|'COMPLETED';reason:string|null;
+ next_due:string|null;legacy_plan_id:string|null;configuration:NativeScheduleConfig;
+}
+export interface NativeScheduleRun {
+ id:string;session_id:string;state:'READY'|'DISPATCHING'|'RUNNING'|'SUCCEEDED'|'FAILED'|'UNKNOWN'|'CANCELLED'|'NEEDS_ATTENTION';
+ reason:string|null;created_at:string;dispatched_at:string|null;finished_at:string|null;
+}
