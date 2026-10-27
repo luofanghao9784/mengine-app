@@ -226,7 +226,13 @@ export function buildTranscript(events: readonly NativeEvent[]): Transcript {
         const question = questions.get(callId);
         if (question) {
           // A timed-out wait also ends the tool call; only a real answer marks the question answered.
-          if (!question.closed || text) {
+          let result: unknown;
+          try { result = JSON.parse(text); } catch { /* older tool results may be plain text */ }
+          if (record(result) && result.pending === true && result.callId === callId) {
+            question.answered = false;
+            question.closed = 'timed-out';
+            question.deadline = undefined;
+          } else if (!question.closed || (record(result) && Array.isArray(result.answers))) {
             question.answered = !failure && !message.isError;
             question.answer = text;
           }
@@ -321,8 +327,13 @@ export function buildTranscript(events: readonly NativeEvent[]): Transcript {
   // A tool still running when its turn closed did not finish; show it as interrupted, not running.
   for (const turn of turns)
     if (turn.end)
-      for (const item of turn.items)
+      for (const item of turn.items) {
         if (item.kind === 'tool' && item.status === 'running') item.status = 'interrupted';
+        if (turn.end.kind === 'aborted') {
+          if (item.kind === 'question' && !item.answered && item.closed !== 'timed-out') item.closed = 'cancelled';
+          if (item.kind === 'approval' && !item.outcome) item.outcome = 'cancelled';
+        }
+      }
   // A timed-out question can still be answered late, so it stays pending; a cancelled one does not.
   const pendingQuestions = [...questions.values()].filter((q) => !q.answered && q.closed !== 'cancelled');
   return {

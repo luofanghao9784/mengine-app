@@ -123,3 +123,26 @@ test('status reports go stale after 10 seconds and count reservations', () => {
   assert.equal(toStatus(report, 11_000)?.stale, true);
   assert.equal(toStatus(null, 0), undefined);
 });
+
+ test('real timed ask success payload is pending, never an answer or permission', () => {
+  const events = [ev(1, 'turn/start', {turn:1}), ask(2),
+    ev(3, 'question/closed', {callId:'q1', outcome:'ASK_TIMED_OUT'}),
+    ev(4, 'tool/result', {message:{toolCallId:'q1',isError:false,content:[{type:'text',text:JSON.stringify({pending:true,callId:'q1',message:'No answer yet'})}]}})];
+  const transcript=buildTranscript(events);
+  assert.equal(transcript.pending.questions,1);
+  const question=transcript.turns[0].items.find(i=>i.kind==='question');
+  assert.equal(question?.kind==='question' && question.answered,false);
+  assert.equal(question?.kind==='question' && question.closed,'timed-out');
+  assert.equal(buildTranscript([...events,ev(5,'user/message',{source:{kind:'user-question-reply',callId:'q1'},content:[{type:'text',text:'Yes'}]})]).pending.questions,0);
+ });
+
+ test('a fresh but older idle observation cannot override a newer turn-start',()=>{
+ assert.equal(toStatus({time:1000,data:{running:false}},1500,1200)?.running,undefined);
+ assert.equal(toStatus({time:1400,data:{running:true}},1500,1200)?.running,true);
+ });
+
+test('an aborted turn closes its unanswered foreground question without a close notice',()=>{
+ const t=buildTranscript([ev(1,'turn/start',{turn:1}),ask(2),ev(3,'turn/end',{reason:{kind:'aborted'}})]);
+ assert.equal(t.pending.questions,0);
+ const q=t.turns[0].items[0];assert.equal(q.kind==='question'&&q.closed,'cancelled');
+});

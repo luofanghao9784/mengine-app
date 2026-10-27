@@ -184,7 +184,8 @@ function useLiveFeed(tenant: string, id: string, enabled: boolean, active: boole
         ? {
             events,
             childEvents,
-            status: toStatus(status, now),
+            status: toStatus(status, now, events.reduce((latest, e) =>
+              ['turn/start', 'turn/end', 'session.status'].includes(e.type) ? Math.max(latest, e.time) : latest, 0)),
             actions,
             ratings,
             loading,

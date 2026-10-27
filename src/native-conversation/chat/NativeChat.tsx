@@ -118,9 +118,10 @@ export function NativeChat({
           className="native-chat"
           onKeyDown={(e) => {
             // Esc stops the current round, like the official window; it never closes the page.
-            if (e.key === 'Escape' && running && actions.stop && !e.defaultPrevented) {
+            if (e.key === 'Escape' && !e.defaultPrevented) {
               e.preventDefault();
-              void actions.stop().catch(() => undefined);
+              e.stopPropagation();
+              if (running && actions.stop) void actions.stop().catch(() => undefined);
             }
           }}
         >
