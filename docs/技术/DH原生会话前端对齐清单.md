@@ -230,3 +230,16 @@ SDK 0.2.1-rc.2 原生协议不包含回答/审批/停止方法。适配器使用
 - `POST …/schedules/migrate/{legacyPlanId}`：只能迁移本人同空间且没有未完成执行的持续计划；保留用途、规则、预算侧次数限制、来源更新游标及已执行次数，原子停用旧计划。原计划需处理时迁移后仍暂停。迁移不删除历史；画报自动生成不参与。
 - 未配置 native.web-url 时不启动调度 worker；配置后默认启用，可用 native.schedules-enabled=false 暂停后台调度。平台需 Node 及当前 engine 依赖，schedule-rules 路径可由 dreamcore.native.schedule-rules 指定。容器内自主 schedule 服务关闭，唤醒统一经平台。
 - 本批提供后端与运行链路，定时界面、时钟标记与提醒展示由前端接线；不代表这些界面已交付。
+
+## 附录 H：B6 审核预装与企业开关定稿（2026-10-27）
+
+- 镜像内 `engine/native/preinstalled-plugins.json` 是部署方维护的唯一清单，含 DH market format 1 索引（已用官方 validator 验证）与本产品可切换模块。索引仅用于审核展示，不开放在线安装。
+- 可切换 `enterprise-data`（四个企业资料工具）、`enterprise-skills`（企业技能 provider）、`office`（原生 Office 说明书）。`native-core` 的隔离、身份、预算、事件、上行与文件工具为必需基础，不能关闭。公网工具不在可开启清单。
+- 员工 `GET /api/v1/tenants/{t}/native-plugins`；管理员 `GET …/admin/native-plugins`；返回 `{manifest,policy:{revision,enabled}}`。管理员 `PUT …/admin/native-plugins/{id}` 接受 `{enabled,revision}`，版本冲突 409；未知模块和关闭基础保护拒绝。每家企业独立配置。
+- 启动前平台给出插件配置；运行时核对镜像清单，关闭的企业工具不注册、技能 provider 不注册，Office 模块不加载。平台内部资料/技能端点也检查开关，旧 capability 不能绕过。
+- 每次桥接请求及每 2 秒监测配置版本，变化即拒绝旧策略并回收旧实例；下一次操作按新配置重建同一根会话，保留历史。切换可能中断正在运行的轮次，界面应明确提示；不会把中断自动标成成功。
+- 本次不新增企业插件，也不实现员工/AI 安装。关闭某能力不会抹除历史中已呈现的正文或已下载的文件；始终保留资料/发布的独立权限检查。
+
+### B4–B8 后端交付状态
+
+2026-10-27：B8 #172、B5 #173、B7 #174 已合入主线；B4 #177 已提交，B6 随本附录实现提交。全部具备公共契约和可重复验证；后端实现与前端接线、部署、客户验收分别记账。旧附录 C 的“B4–B8 未完成”保留当时切片含义，当前以后续附录 D–H 为准。

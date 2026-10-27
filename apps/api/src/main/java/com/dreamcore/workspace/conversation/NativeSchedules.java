@@ -29,7 +29,7 @@ public class NativeSchedules {
  }
  private long event(UUID session){return db.queryForObject("SELECT coalesce(max(e.sequence),0) FROM ongoing_plan_material_events e JOIN native_conversations s ON e.tenant_id=s.tenant_id AND e.workspace_id=s.workspace_id WHERE s.id=?",Long.class,session);}
  @Transactional public Object list(UUID actor,UUID tenant,UUID session){sessions.require(actor,tenant,session,false);return db.queryForList("SELECT * FROM native_schedules WHERE session_id=? ORDER BY created_at",session).stream().map(this::view).toList();}
- @Transactional public Object action(UUID actor,UUID tenant,UUID session,UUID id,String state){sessions.require(actor,tenant,session,false);var r=row(id);if(!session.equals(r.get("session_id"))||!Set.of("ACTIVE","PAUSED","STOPPED").contains(state))throw IdentityException.invalid();if(state.equals("ACTIVE")){runtime.available();sessions.require(actor,tenant,session,true);if(!config(r).expiresAt().isAfter(Instant.now())||Set.of("STOPPED","UNKNOWN").contains(r.get("state"))||"OUTCOME_UNKNOWN".equals(r.get("reason")))throw new IdentityException(409,"NATIVE_SCHEDULE_NOT_RESUMABLE");}db.update("UPDATE native_schedules SET state=?,reason=NULL WHERE id=?",state,id);return view(row(id));}
+ @Transactional public Object action(UUID actor,UUID tenant,UUID session,UUID id,String state){sessions.require(actor,tenant,session,false);var r=row(id);if(!session.equals(r.get("session_id"))||!Set.of("ACTIVE","PAUSED","STOPPED").contains(state))throw IdentityException.invalid();if(Set.of("STOPPED","COMPLETED").contains(r.get("state"))&&!state.equals(r.get("state")))throw new IdentityException(409,"NATIVE_SCHEDULE_NOT_RESUMABLE");if(state.equals("ACTIVE")){if(db.queryForObject("SELECT count(*) FROM native_schedule_runs WHERE schedule_id=? AND state='UNKNOWN'",Integer.class,id)>0)throw new IdentityException(409,"NATIVE_SCHEDULE_NOT_RESUMABLE");runtime.available();sessions.require(actor,tenant,session,true);if(!config(r).expiresAt().isAfter(Instant.now())||Set.of("STOPPED","UNKNOWN").contains(r.get("state"))||"OUTCOME_UNKNOWN".equals(r.get("reason")))throw new IdentityException(409,"NATIVE_SCHEDULE_NOT_RESUMABLE");}db.update("UPDATE native_schedules SET state=?,reason=CASE WHEN ?='ACTIVE' THEN NULL ELSE reason END WHERE id=?",state,state,id);return view(row(id));}
  @Transactional public Object runs(UUID actor,UUID tenant,UUID session,UUID id){sessions.require(actor,tenant,session,false);if(!session.equals(row(id).get("session_id")))throw IdentityException.invalid();return db.queryForList("SELECT id,session_id,state,reason,created_at,dispatched_at,finished_at FROM native_schedule_runs WHERE schedule_id=? ORDER BY created_at DESC LIMIT 100",id);}
  @Transactional public Object edit(UUID actor,UUID tenant,UUID session,UUID id,Config c){
   sessions.require(actor,tenant,session,true);db.queryForList("SELECT id FROM native_schedules WHERE id=? FOR UPDATE",id);var r=row(id);
@@ -37,7 +37,7 @@ public class NativeSchedules {
   if(config(r).equals(c))return view(r);var record=validate(c,id);
   db.update("UPDATE native_schedules SET configuration=?::jsonb,record=?::jsonb,next_due=?,reason=NULL WHERE id=?",json.writeValueAsString(c),record==null?null:json.writeValueAsString(record),record==null?null:ts(Instant.parse((String)record.get("scheduledAt"))),id);return view(row(id));
  }
- public List<UUID> candidates(){return db.queryForList("SELECT id FROM native_schedules WHERE state='ACTIVE' OR EXISTS(SELECT 1 FROM native_schedule_runs r WHERE r.schedule_id=native_schedules.id AND r.finished_at IS NULL) ORDER BY next_due NULLS FIRST LIMIT 100",UUID.class);}
+ public List<UUID> candidates(){return db.queryForList("SELECT id FROM native_schedules WHERE state='ACTIVE' OR EXISTS(SELECT 1 FROM native_schedule_runs r WHERE r.schedule_id=native_schedules.id AND NOT r.reclaimed) ORDER BY next_due NULLS FIRST LIMIT 100",UUID.class);}
  private void attention(UUID id,String reason){db.update("UPDATE native_schedules SET state='PAUSED',reason=? WHERE id=?",reason,id);}
  public void tick(UUID id){
   runtime.available();var r=row(id);UUID parent=(UUID)r.get("session_id");var scope=db.queryForMap("SELECT tenant_id,owner_id FROM native_conversations WHERE id=?",parent);UUID owner=(UUID)scope.get("owner_id"),tenant=(UUID)scope.get("tenant_id");
@@ -55,8 +55,8 @@ public class NativeSchedules {
    db.update("UPDATE native_schedule_runs SET state='RUNNING',receipt=?::jsonb WHERE id=? AND state='DISPATCHING'",json.writeValueAsString(receipt),run);
   }catch(RuntimeException e){
    if(e instanceof NativeRuntimeClient.NotDispatched){db.update("UPDATE native_schedule_runs SET state='READY',reason='NOT_DISPATCHED' WHERE id=?",run);}
-   else if(!handedOff){db.update("UPDATE native_schedule_runs SET state='FAILED',reason='AUTHORIZATION_REVOKED',finished_at=now() WHERE id=?",run);attention(id,"AUTHORIZATION_REVOKED");runtime.reclaim(session);}
-   else{db.update("UPDATE native_schedule_runs SET state='UNKNOWN',reason='OUTCOME_UNKNOWN',finished_at=now() WHERE id=?",run);attention(id,"OUTCOME_UNKNOWN");runtime.reclaim(session);}
+   else if(!handedOff){db.update("UPDATE native_schedule_runs SET state='FAILED',reason='AUTHORIZATION_REVOKED',finished_at=now() WHERE id=?",run);attention(id,"AUTHORIZATION_REVOKED");runtime.reclaim(session);db.update("UPDATE native_schedule_runs SET reclaimed=true WHERE id=?",run);}
+   else{db.update("UPDATE native_schedule_runs SET state='UNKNOWN',reason='OUTCOME_UNKNOWN',finished_at=now() WHERE id=?",run);attention(id,"OUTCOME_UNKNOWN");runtime.reclaim(session);db.update("UPDATE native_schedule_runs SET reclaimed=true WHERE id=?",run);}
   }
  }
  private UUID reserve(UUID id,UUID owner,UUID tenant){
@@ -77,6 +77,7 @@ public class NativeSchedules {
   Map<String,Object> next=null;String trigger="material:"+ev;
   if(due){var record=json.readValue(r.get("record").toString(),Map.class);next=rules.evaluate(Map.of("operation","due","record",record,"now",now.toEpochMilli()));trigger="time:"+next.get("occurrenceAt");record.put("scheduledAt",next.getOrDefault("nextScheduledAt",record.get("scheduledAt")));db.update("UPDATE native_schedules SET record=?::jsonb,next_due=? WHERE id=?",json.writeValueAsString(record),next.get("nextScheduledAt")==null?null:ts(Instant.parse((String)next.get("nextScheduledAt"))),id);}
   UUID run=UUID.randomUUID();var s=sessions.open(owner,tenant,new NativeConversationService.Open(run,sessions.require(owner,tenant,parent,true).workspaceId(),null));
+  db.update("UPDATE native_conversations SET legacy_conversation_id=(SELECT legacy_conversation_id FROM native_conversations WHERE id=?) WHERE id=?",parent,s.id());
   db.update("INSERT INTO native_conversation_sources SELECT ?,version_id,requires_download FROM native_conversation_sources WHERE session_id=?",s.id(),parent);
   db.update("INSERT INTO native_conversation_history SELECT ?,task_id,revision,attempt FROM native_conversation_history WHERE session_id=?",s.id(),parent);
   if(db.queryForObject("SELECT count(*) FROM native_conversation_attachments WHERE session_id=?",Integer.class,parent)>10)throw new IdentityException(409,"NATIVE_SCHEDULE_ATTACHMENT_LIMIT");
@@ -87,14 +88,14 @@ public class NativeSchedules {
  private void settle(UUID id,UUID owner,UUID tenant){
   for(var run:db.queryForList("SELECT * FROM native_schedule_runs WHERE schedule_id=? AND finished_at IS NULL",id)){
    UUID sid=(UUID)run.get("session_id"),rid=(UUID)run.get("id");String state=run.get("state").toString();
-   if(state.equals("DISPATCHING")&&((Timestamp)run.get("dispatched_at")).toInstant().plusSeconds(120).isBefore(Instant.now())){db.update("UPDATE native_schedule_runs SET state='UNKNOWN',reason='DISPATCH_INTERRUPTED',finished_at=now() WHERE id=? AND state='DISPATCHING'",rid);attention(id,"OUTCOME_UNKNOWN");runtime.reclaim(sid);continue;}
+   if(state.equals("DISPATCHING")&&((Timestamp)run.get("dispatched_at")).toInstant().plusSeconds(120).isBefore(Instant.now())){db.update("UPDATE native_schedule_runs SET state='UNKNOWN',reason='DISPATCH_INTERRUPTED',finished_at=now() WHERE id=? AND state='DISPATCHING'",rid);attention(id,"OUTCOME_UNKNOWN");runtime.reclaim(sid);db.update("UPDATE native_schedule_runs SET reclaimed=true WHERE id=?",rid);continue;}
    if(!state.equals("RUNNING"))continue;
    try{sessions.require(owner,tenant,sid,true);}catch(IdentityException e){attention(id,"AUTHORIZATION_REVOKED");cancelRuns(id);return;}
    var ends=db.queryForList("SELECT event->'data'->'reason'->>'kind' FROM native_conversation_events WHERE session_id=? AND event->>'sessionId'=? AND event->>'type'='turn/end' ORDER BY seq DESC LIMIT 1",String.class,sid,sid.toString());
    boolean timed=((Timestamp)run.get("created_at")).toInstant().plusSeconds(1800).isBefore(Instant.now());if(ends.isEmpty()&&!timed)continue;
    String result=!ends.isEmpty()&&"completed".equals(ends.getFirst())?"SUCCEEDED":"NEEDS_ATTENTION";
    // Reclaim first; a failed host cleanup is retried, never called a completed run.
-   runtime.reclaim(sid);sessions.stop(owner,tenant,sid);db.update("UPDATE native_schedule_runs SET state=?,reason=?,finished_at=now() WHERE id=? AND state='RUNNING'",result,timed?"TIME_LIMIT":result.equals("SUCCEEDED")?null:"TURN_NEEDS_ATTENTION",rid);if(!result.equals("SUCCEEDED"))attention(id,"RUN_NEEDS_ATTENTION");else db.update("UPDATE native_schedules SET state='COMPLETED' WHERE id=? AND next_due IS NULL AND NOT (configuration->>'materialEvents')::boolean",id);
+   runtime.reclaim(sid);sessions.stop(owner,tenant,sid);db.update("UPDATE native_schedule_runs SET state=?,reason=?,finished_at=now(),reclaimed=true WHERE id=? AND state='RUNNING'",result,timed?"TIME_LIMIT":result.equals("SUCCEEDED")?null:"TURN_NEEDS_ATTENTION",rid);if(!result.equals("SUCCEEDED"))attention(id,"RUN_NEEDS_ATTENTION");else db.update("UPDATE native_schedules SET state='COMPLETED' WHERE id=? AND next_due IS NULL AND NOT (configuration->>'materialEvents')::boolean",id);
   }
  }
  @Transactional public Object migrate(UUID actor,UUID tenant,UUID session,UUID plan){
@@ -113,5 +114,5 @@ public class NativeSchedules {
   if("NEEDS_ATTENTION".equals(old.get("runtime_state")))attention(id,"LEGACY_NEEDS_ATTENTION");
   db.update("UPDATE ongoing_plans SET status='STOPPED',runtime_state='IDLE',reason='MIGRATED_NATIVE',execution_epoch=execution_epoch+1,revision=revision+1 WHERE id=?",plan);return view(row(id));
  }
- private void cancelRuns(UUID id){for(var r:db.queryForList("SELECT id,session_id FROM native_schedule_runs WHERE schedule_id=? AND finished_at IS NULL",id)){runtime.reclaim((UUID)r.get("session_id"));db.update("UPDATE native_conversation_grants SET revoked=true WHERE session_id=?",r.get("session_id"));db.update("UPDATE native_schedule_runs SET state='CANCELLED',reason='SCHEDULE_STOPPED',finished_at=now() WHERE id=?",r.get("id"));}}
+ private void cancelRuns(UUID id){for(var r:db.queryForList("SELECT id,session_id FROM native_schedule_runs WHERE schedule_id=? AND NOT reclaimed",id)){runtime.reclaim((UUID)r.get("session_id"));db.update("UPDATE native_conversation_grants SET revoked=true WHERE session_id=?",r.get("session_id"));db.update("UPDATE native_schedule_runs SET state=CASE WHEN state IN ('UNKNOWN','FAILED') THEN state ELSE 'CANCELLED' END,reason=coalesce(reason,'SCHEDULE_STOPPED'),finished_at=coalesce(finished_at,now()),reclaimed=true WHERE id=?",r.get("id"));}}
 }

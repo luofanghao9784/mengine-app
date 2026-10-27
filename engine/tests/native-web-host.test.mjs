@@ -10,7 +10,7 @@ const listen=async server=>{server.listen(0,'127.0.0.1');await once(server,'list
 test('reopening with a new grant preserves the running root; concurrent invalid grants cannot piggyback',async()=>{
  const dir=await mkdtemp(join(tmpdir(),'native-host-test-'));
  const id='11111111-1111-4111-8111-111111111111';
- const platform=createServer((req,res)=>{if(!['Bearer first','Bearer second'].includes(req.headers.authorization)){res.writeHead(403).end();return;}res.setHeader('content-type','application/json');res.end(JSON.stringify({id}));});
+ const platform=createServer((req,res)=>{if(!['Bearer first','Bearer second'].includes(req.headers.authorization)){res.writeHead(403).end();return;}res.setHeader('content-type','application/json');res.end(JSON.stringify({scope:{id},plugins:{revision:0,enabled:{'native-core':true,'enterprise-data':true,'enterprise-skills':true,office:true}}}));});
  const upstream=createServer((req,res)=>{res.setHeader('set-cookie','owner=synthetic');res.end('native');});
  let child;
  try{

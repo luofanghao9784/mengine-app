@@ -22,8 +22,8 @@ const docker=(args,input)=>new Promise((resolve,reject)=>{
  child.stdout.on('data',b=>out+=b);child.stderr.on('data',b=>err+=b);child.on('error',reject);child.on('exit',code=>code===0?resolve((out+(args[0]==='logs'?err:'')).trim()):reject(Error(`docker ${args[0]} failed: ${err.slice(0,500)}`)));child.stdin.end(input);
 });
 async function check(id,token){
- const r=await fetch(`${platform}/internal/v1/native-conversations/${id}/check`,{method:'POST',headers:{authorization:`Bearer ${token}`},signal:AbortSignal.timeout(5000),redirect:'error'});
- if(!r.ok)throw Error('enterprise access denied');const scope=await r.json();if(scope.id!==id)throw Error('scope mismatch');return scope;
+ const r=await fetch(`${platform}/internal/v1/native-conversations/${id}/runtime-config`,{method:'POST',headers:{authorization:`Bearer ${token}`},signal:AbortSignal.timeout(5000),redirect:'error'});
+ if(!r.ok)throw Error('enterprise access denied');const result=await r.json();if(result.scope?.id!==id||!result.plugins?.enabled)throw Error('scope mismatch');return result;
 }
 const limits=['--read-only','--cap-drop','ALL','--security-opt','no-new-privileges','--pids-limit','256','--memory','1g','--cpus','2','--tmpfs','/tmp:rw,nosuid,nodev,size=256m,uid=1000,gid=1000','--user','1000:1000'];
 async function stop(i){
@@ -37,14 +37,14 @@ async function stop(i){
  return i.stopping;
 }
 async function start(id,token,mode='web'){
- await check(id,token);
+ const policy=await check(id,token);
  if(instances.has(id)){
   const i=instances.get(id);
   if(i.mode!==mode)throw Error('runtime mode conflict');
-  if(!i.stopping){try{await check(id,i.token);return i;}catch{/* expired grant: replace only after cleanup */}}
+  if(!i.stopping){try{const current=await check(id,i.token);if(current.plugins.revision!==i.policyVersion)throw Error('policy changed');return i;}catch{/* expired grant: replace only after cleanup */}}
   await stop(i);
  }
- const short=id.replaceAll('-','');const i={id,token,mode,cookie:randomBytes(32).toString('base64url'),network:`dh120-net-${short}`,runtime:`dh120-web-${short}`,bridge:`dh120-bridge-${short}`};
+ const short=id.replaceAll('-','');const i={id,token,mode,policyVersion:policy.plugins.revision,cookie:randomBytes(32).toString('base64url'),network:`dh120-net-${short}`,runtime:`dh120-web-${short}`,bridge:`dh120-bridge-${short}`};
  const volume=`dh120-data-${short}`,ledger=process.env.DREAMCORE_NATIVE_LEDGER_VOLUME||'dh120-native-budget';
  try{
   // Named volumes contain only runtime data / host-side accounting respectively.
@@ -57,13 +57,13 @@ async function start(id,token,mode='web'){
   await docker(['create','--name',i.bridge,...limits,'--network','bridge','--publish','127.0.0.1::18190','--mount',`type=volume,src=${ledger},dst=/ledger`,'-i',image,'scripts/native-web-bridge.mjs']);
   await docker(['network','connect','--alias','enterprise-bridge',i.network,i.bridge]);
   const bridge=spawn('docker',['--context',context,'start','-ai',i.bridge],{stdio:['pipe','ignore','ignore']});
-  bridge.stdin.end(JSON.stringify({platform:process.env.DREAMCORE_NATIVE_PLATFORM_CONTAINER_URL||platform,id,token,capability,controlCapability,controlToken,route,mode,synthetic,publicAuthority:publicURL.host}));
+  bridge.stdin.end(JSON.stringify({platform:process.env.DREAMCORE_NATIVE_PLATFORM_CONTAINER_URL||platform,id,token,capability,controlCapability,controlToken,route,mode,synthetic,policyVersion:policy.plugins.revision,publicAuthority:publicURL.host}));
   await docker(['create','-i','--name',i.runtime,...limits,'--network',i.network,'--network-alias','native-runtime','--mount',`type=volume,src=${volume},dst=/work`,
    '-e',`DREAMCORE_NATIVE_MODE=${mode}`,'-e',`DREAMCORE_NATIVE_ROOT=${id}`,'-e','HOME=/work/home','-e','DSH_HOME=/work/home','-e','NARB_DISABLE_NATIVE_CACHE=1','-e',`DREAMCORE_NATIVE_BRIDGE=http://enterprise-bridge:18190/`,'-e',`DREAMCORE_NATIVE_CAPABILITY=${capability}`,
    '-e',`DREAMCORE_NATIVE_PUBLIC_URL=${publicURL.origin}/s/${id}/`,'-e',`DREAMCORE_NATIVE_SYNTHETIC=${synthetic}`,
    '-e','DH_TEST_LEDGER=/work/synthetic-budget.sqlite','-e',`DREAMCORE_NATIVE_MODEL=${route?JSON.stringify({model:route.model,maxInputTokens:route.maxInputTokens,maxOutputTokens:route.maxOutputTokens}):''}`,image,'scripts/native-web-runtime.mjs']);
   const runtime=spawn('docker',['--context',context,'start','-ai',i.runtime],{stdio:['pipe','ignore','ignore']});
-  runtime.stdin.end(JSON.stringify({controlCapability}));
+  runtime.stdin.end(JSON.stringify({controlCapability,plugins:policy.plugins.enabled}));
   let port;for(let n=0;n<20;n++){port=await docker(['port',i.bridge,'18190/tcp']).catch(()=>null);if(port)break;await new Promise(r=>setTimeout(r,100));}if(!port)throw Error('native port missing');i.upstream=`http://${port}/runtime`;i.capability=controlCapability;
   let owner;
   for(let n=0;n<60;n++){
@@ -75,7 +75,7 @@ async function start(id,token,mode='web'){
   const exchange=await fetch(`${i.upstream}/?token=${owner}`,{redirect:'manual',headers:{'x-dreamcore-bridge':controlCapability},signal:AbortSignal.timeout(5000)});
   i.ownerCookie=exchange.headers.get('set-cookie')?.split(';')[0];if(!i.ownerCookie)throw Error('native owner exchange failed');
   }
-  i.timer=setInterval(()=>check(id,token).catch(()=>stop(i)),2000);instances.set(id,i);return i;
+  i.timer=setInterval(()=>check(id,token).then(current=>{if(current.plugins.revision!==i.policyVersion)return stop(i);}).catch(()=>stop(i)),2000);instances.set(id,i);return i;
  }catch(error){console.error('Native runtime start failed; inspect the dedicated container locally.');await stop(i);throw error;}
 }
 const server=createServer(async(req,res)=>{

@@ -1,10 +1,14 @@
 import {networkInterfaces} from 'node:os';
-import {writeFile,mkdir} from 'node:fs/promises';
+import {writeFile,mkdir,readFile} from 'node:fs/promises';
 import {spawn} from 'node:child_process';
 const address=Object.values(networkInterfaces()).flat().find(a=>a.family==='IPv4'&&!a.internal)?.address;
 if(!address)throw Error('isolated interface required');
 await mkdir('/work/home',{recursive:true});
-let patch='- insert:\n    - id: dreamcore-enterprise\n      name: /app/dist/native/enterprise-plugin.js\n';
+let raw='';for await(const chunk of process.stdin)raw+=chunk;const {controlCapability,plugins}=JSON.parse(raw);raw='';
+const manifest=JSON.parse(await readFile('/app/native/preinstalled-plugins.json','utf8'));
+if(!plugins||plugins['native-core']!==true||Object.keys(plugins).length!==manifest.preinstalled.length||manifest.preinstalled.some(p=>typeof plugins[p.id]!=='boolean'))throw Error('PLUGIN_POLICY_REQUIRED');
+let patch='- insert:\n    - id: dreamcore-enterprise\n      name: /app/dist/native/enterprise-plugin.js\n      config: '+JSON.stringify({data:plugins['enterprise-data']===true,skills:plugins['enterprise-skills']===true})+'\n';
+if(!plugins.office)patch+='- id: skill-office\n  disabled: true\n';
 if(process.env.DREAMCORE_NATIVE_SYNTHETIC==='true')patch+='    - id: native-test-model\n      name: /app/tests/fixtures/native-model.mjs\n- id: llm-deepseek\n  disabled: true\n- id: llm-pi-ai\n  disabled: true\n';
 if(process.env.DREAMCORE_NATIVE_MODEL){
  const model=JSON.parse(process.env.DREAMCORE_NATIVE_MODEL);
@@ -15,11 +19,10 @@ if(process.env.DREAMCORE_NATIVE_SYNTHETIC==='true')patch+='- id: agent-default-m
 if(process.env.DREAMCORE_NATIVE_MODE==='sdk')patch+='- id: sdk-jsonrpc-server\n  disabled: true\n- insert:\n    - id: enterprise-sdk-server\n      name: /app/scripts/native-sdk-plugin.mjs\n';
 await writeFile('/tmp/enterprise.patch.yml',patch);
 if(process.env.DREAMCORE_NATIVE_MODE==='sdk'){
- let raw='';for await(const chunk of process.stdin)raw+=chunk;const {controlCapability}=JSON.parse(raw);raw='';
+
 
  const {serveSdk}=await import('./native-sdk-runtime.mjs');
  const combined='/tmp/enterprise-sdk.patch.yml';
- const {readFile}=await import('node:fs/promises');
  await writeFile(combined,(await readFile('/app/profiles/enterprise-web.patch.yml','utf8'))+'\n'+patch);
  const close=await serveSdk({controlCapability,patch:combined,root:process.env.DREAMCORE_NATIVE_ROOT,host:address,bridge:process.env.DREAMCORE_NATIVE_BRIDGE,capability:process.env.DREAMCORE_NATIVE_CAPABILITY,model:process.env.DREAMCORE_NATIVE_MODEL?JSON.parse(process.env.DREAMCORE_NATIVE_MODEL):null,synthetic:process.env.DREAMCORE_NATIVE_SYNTHETIC==='true'});
  for(const signal of ['SIGINT','SIGTERM'])process.once(signal,async()=>{await close();process.exit();});

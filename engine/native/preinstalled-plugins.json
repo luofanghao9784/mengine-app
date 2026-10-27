@@ -1,0 +1,13 @@
+{
+ "format":1,"title":"梦擎审核预装目录",
+ "plugins":[
+  {"name":"dreamcore-engine","title":"梦擎企业工具与技能","versions":[{"version":"0.19.0","publishTimestamp":1793059200,"source":{"type":"git","url":"https://github.com/dimmm1125-coder/dreamcore-workspace.git","commit":"7ddaecc5d56b9c6b4a226c77437da3dcb4fff09f","path":"engine"},"engines":{"dsh":"0.2.1-rc.2"}}]},
+  {"name":"@deepseek-ai/dsh-skill-office","title":"Office 说明书","versions":[{"version":"0.2.1-rc.2","publishTimestamp":1793059200,"source":{"type":"npm"},"engines":{"dsh":"0.2.1-rc.2"}}]}
+ ],
+ "preinstalled":[
+  {"id":"native-core","title":"原生运行与企业保护","required":true,"defaultEnabled":true},
+  {"id":"enterprise-data","title":"企业资料工具","package":"dreamcore-engine","required":false,"defaultEnabled":true},
+  {"id":"enterprise-skills","title":"企业技能目录","package":"dreamcore-engine","required":false,"defaultEnabled":true},
+  {"id":"office","title":"Office 说明书","package":"@deepseek-ai/dsh-skill-office","required":false,"defaultEnabled":true}
+ ]
+}

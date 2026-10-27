@@ -87,3 +87,9 @@ export interface NativeScheduleRun {
  id:string;session_id:string;state:'READY'|'DISPATCHING'|'RUNNING'|'SUCCEEDED'|'FAILED'|'UNKNOWN'|'CANCELLED'|'NEEDS_ATTENTION';
  reason:string|null;created_at:string;dispatched_at:string|null;finished_at:string|null;
 }
+
+/** B6: GET tenants/{t}/native-plugins (employee) or admin/native-plugins.
+ * Only audited preinstalled modules appear. No install URL or package input. */
+export interface NativePluginPolicy { revision:number; enabled:Record<'native-core'|'enterprise-data'|'enterprise-skills'|'office',boolean> }
+/** PUT tenants/{t}/admin/native-plugins/{id}; optimistic current revision required. */
+export interface NativePluginToggle { enabled:boolean; revision:number }

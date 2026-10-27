@@ -23,7 +23,7 @@ class NativeSchedulesIntegrationTest extends NativeConversationIntegrationTest {
   var p=open();UUID id=create(p.id(),config(Map.of("kind","every","everySeconds",60),false));due(id);
   when(runtime.command(any(),anyString(),eq("messages"),anyMap())).thenThrow(new NativeRuntimeClient.NotDispatched()).thenThrow(new RuntimeException("unknown"));
   schedules.tick(id);assertEquals("READY",db.queryForObject("SELECT state FROM native_schedule_runs WHERE schedule_id=?",String.class,id));schedules.tick(id);schedules.tick(id);
-  assertEquals(1,db.queryForObject("SELECT count(*) FROM native_schedule_runs WHERE schedule_id=?",Integer.class,id));assertEquals("UNKNOWN",db.queryForObject("SELECT state FROM native_schedule_runs WHERE schedule_id=?",String.class,id));verify(runtime,times(2)).command(any(),anyString(),eq("messages"),anyMap());denied(()->schedules.action(owner,tenant,p.id(),id,"ACTIVE"));
+  assertEquals(1,db.queryForObject("SELECT count(*) FROM native_schedule_runs WHERE schedule_id=?",Integer.class,id));assertEquals("UNKNOWN",db.queryForObject("SELECT state FROM native_schedule_runs WHERE schedule_id=?",String.class,id));verify(runtime,times(2)).command(any(),anyString(),eq("messages"),anyMap());denied(()->schedules.action(owner,tenant,p.id(),id,"ACTIVE"));schedules.action(owner,tenant,p.id(),id,"PAUSED");denied(()->schedules.action(owner,tenant,p.id(),id,"ACTIVE"));
  }
  @Test void materialTriggerQuotaAndRevocationUseCurrentAuthority(){
   var p=open();UUID id=create(p.id(),config(null,true));schedules.tick(id);verify(runtime,never()).command(any(),anyString(),eq("messages"),anyMap());
@@ -36,6 +36,19 @@ class NativeSchedulesIntegrationTest extends NativeConversationIntegrationTest {
   Object first=schedules.migrate(owner,tenant,p.id(),old);assertEquals(first,schedules.migrate(owner,tenant,p.id(),old));assertEquals("STOPPED",db.queryForObject("SELECT status FROM ongoing_plans WHERE id=?",String.class,old));
   UUID id=db.queryForObject("SELECT id FROM native_schedules WHERE legacy_plan_id=?",UUID.class,old);denied(()->schedules.edit(owner,tenant,p.id(),id,config(null,true)));
   schedules.action(owner,tenant,p.id(),id,"PAUSED");assertNotNull(schedules.edit(owner,tenant,p.id(),id,config(null,true)));denied(()->schedules.list(other,tenant,p.id()));
+ }
+
+ @Test void cleanupFailureRetriesOnlyCleanupAndPreservesUnknown(){
+  UUID id=create(open().id(),config(Map.of("kind","every","everySeconds",60),false));due(id);
+  when(runtime.command(any(),anyString(),eq("messages"),anyMap())).thenThrow(new RuntimeException("unknown"));doThrow(new RuntimeException("host unavailable")).doNothing().when(runtime).reclaim(any());
+  assertThrows(RuntimeException.class,()->schedules.tick(id));assertTrue(schedules.candidates().contains(id));schedules.tick(id);
+  assertEquals("UNKNOWN",db.queryForObject("SELECT state FROM native_schedule_runs WHERE schedule_id=?",String.class,id));assertEquals(true,db.queryForObject("SELECT reclaimed FROM native_schedule_runs WHERE schedule_id=?",Boolean.class,id));verify(runtime,times(1)).command(any(),anyString(),eq("messages"),anyMap());verify(runtime,times(2)).reclaim(any());
+ }
+ @Test void copiedLegacyDependenciesStillProtectRunHistory(){
+  var legacy=conversations.submit(owner,tenant,null,space,UUID.randomUUID(),"旧来源","SOURCE_LOOKUP");UUID cid=legacy.conversation().id();db.update("UPDATE conversation_tasks SET status='SUCCEEDED',reply='旧结果' WHERE conversation_id=?",cid);
+  var parent=nativeSessions.open(owner,tenant,new NativeConversationService.Open(UUID.randomUUID(),space,cid));UUID id=create(parent.id(),config(Map.of("kind","every","everySeconds",60),false));due(id);
+  when(runtime.command(any(),anyString(),eq("messages"),anyMap())).thenReturn(Map.of("accepted",true));schedules.tick(id);UUID runSession=db.queryForObject("SELECT session_id FROM native_schedule_runs WHERE schedule_id=?",UUID.class,id);
+  assertEquals(cid,nativeSessions.require(owner,tenant,runSession,false).legacyConversationId());db.update("UPDATE conversation_tasks SET revision=revision+1 WHERE conversation_id=?",cid);denied(()->nativeSessions.require(owner,tenant,runSession,false));
  }
 
 }

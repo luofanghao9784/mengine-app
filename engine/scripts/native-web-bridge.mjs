@@ -16,7 +16,7 @@ const lifetime=new AbortController();const sockets=new Set();lifetime.signal.add
 const platform=async(action,body,signal)=>fetch(`${config.platform}/internal/v1/native-conversations/${config.id}/${action}`,{
  method:'POST',headers:{authorization:`Bearer ${config.token}`,'content-type':'application/json',...(action==='events-write'?{'x-dreamcore-control':config.controlToken}:{})},body:JSON.stringify(body),redirect:'error',signal,
 });
-const authorize=async()=>{const r=await platform('check',{},AbortSignal.timeout(5000));if(!r.ok)throw Error('access denied');return r.json();};
+const authorize=async()=>{const r=await platform('runtime-config',{},AbortSignal.timeout(5000));if(!r.ok)throw Error('access denied');const result=await r.json();if(result.plugins?.revision!==config.policyVersion)throw Error('plugin policy changed');return result.scope;};
 async function flush(){
  if(flushing)return;flushing=true;
  try{for(const row of outbox.pending()){const r=await platform('events-write',row,AbortSignal.timeout(5000));if(!r.ok)break;outbox.delivered(row.key);}}catch{}finally{flushing=false;}

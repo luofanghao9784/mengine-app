@@ -20,7 +20,7 @@ public class NativeConversationController {
  @GetMapping("/api/v1/tenants/{tenant}/native-conversations") public Object list(Authentication auth,@PathVariable UUID tenant,@RequestParam UUID workspaceId,@RequestParam(defaultValue="") String query){
   if(query.length()>200)throw IdentityException.invalid();var result=new ArrayList<Map<String,Object>>();
   for(var session:service.list(actor(auth),tenant,workspaceId))try{var view=metadata.describe(actor(auth),tenant,session.id(),query);if(view!=null)result.add(view);}catch(IdentityException e){if(e.status!=403&&e.status!=404)throw e;}
-  result.sort(Comparator.<Map<String,Object>,Boolean>comparing(v->(Boolean)v.get("pinned")).reversed().thenComparing(v->v.get("lastActivityAt").toString(),Comparator.reverseOrder()));return result;
+  result.sort(Comparator.<Map<String,Object>,Boolean>comparing(v->(Boolean)v.get("pinned")).reversed().thenComparing(v->java.time.Instant.parse(v.get("lastActivityAt").toString()),Comparator.reverseOrder()));return result;
  }
  @PatchMapping("/api/v1/tenants/{tenant}/native-conversations/{id}/metadata") public Object metadata(Authentication auth,@PathVariable UUID tenant,@PathVariable UUID id,@RequestBody Map<String,Object> body){return metadata.update(actor(auth),tenant,id,body);}
  @PostMapping("/api/v1/tenants/{tenant}/native-conversations") public Object open(Authentication auth,@PathVariable UUID tenant,@RequestBody NativeConversationService.Open body){return service.open(actor(auth),tenant,body);}

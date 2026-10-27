@@ -25,6 +25,7 @@ export function apply(ctx){
     const actions=refs.flatMap((r,i)=>[['enterprise_read',{materialId:r[1],versionId:r[2],path:'/work/input-'+i+'.txt'}],['read',{file_path:'/work/input-'+i+'.txt'}]]);
     action=actions[count];
    }
+   if(JSON.stringify(request.messages).includes('BROWSER_CAPABILITIES'))block={type:'text',text:'CAPABILITIES:'+JSON.stringify(request.tools?.map(t=>t.name))};
    if(action)block={type:'tool-call',id:'browser-'+request.messages.length+'-'+count,name:action[0],arguments:JSON.stringify(action[1])};
    yield {type:'block-start',index:0,blockType:block.type};yield {type:'block-end',index:0,block};yield {type:'usage',usage:{inputTokens:100,outputTokens:20,cacheReadTokens:0,reasoningTokens:0}};yield {type:'finish',reason:{kind:action?'tool-calls':'stop'}};
   }

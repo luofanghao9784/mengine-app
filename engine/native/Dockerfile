@@ -7,6 +7,7 @@ RUN npm ci --ignore-scripts --no-fund --no-audit && npm cache clean --force
 COPY tsconfig.json ./
 COPY src/native/ ./src/native/
 COPY profiles/ ./profiles/
+COPY native/preinstalled-plugins.json ./native/preinstalled-plugins.json
 COPY tests/native-wire-usage.test.mjs tests/native-model-gateway.test.mjs tests/native-budget.test.mjs tests/native-budget-stream.test.mjs tests/native-runtime.test.mjs tests/native-profile.test.mjs ./tests/
 COPY tests/fixtures/native-model.mjs ./tests/fixtures/
 COPY tests/integration/native-shell.mjs ./tests/integration/

@@ -118,3 +118,14 @@ npm run test:trial-safety      # 本地启动与恢复安全检查
 每位维护者使用独立克隆、独立 `.local/` 和自己的模型凭据。提交前按明确路径暂存，不提交密钥、Cookie、业务原始数据、数据库备份或运行日志。生产上线与回退按独立授权和部署交接执行，代码合并不自动部署。
 
 备份与恢复命令见[本地启动指南](docs/交接/本地启动指南.md)及历史说明；生产恢复需保留新产生的业务数据，不使用旧备份直接覆盖。开发资料与 Obsidian 知识库分开维护。
+
+### 原生会话后端切片验证（B4–B8）
+
+在已安装 engine 依赖的本地开发目录执行：
+
+```sh
+npm --prefix engine run test:native
+python3 scripts/with-test-postgres.py ./apps/api/mvnw -B -f apps/api/pom.xml -Dtest=NativeMetadataIntegrationTest,NativeSkillsIntegrationTest,NativeAttachmentsIntegrationTest,NativeSchedulesIntegrationTest,NativePluginsIntegrationTest test
+```
+
+真实浏览器 + Colima + 合成模型命令与证据见[原生验收记录](docs/变更记录/2026-10-27-原生会话真实SDK浏览器验收.md)。B4 调度在配置 `dreamcore.native.web-url` 后启用；平台必须能执行 Node 与 `engine/scripts/native-schedule-rules.mjs`，可用 `dreamcore.native.schedule-rules` 指定绝对路径。后台只使用当前已配置运行环境；不配置原生环境时不启动模型或调度。B4–B8 新增接口见[清单附录 D–H](docs/技术/DH原生会话前端对齐清单.md)，这些后端接口不等于对应前端已经接线。

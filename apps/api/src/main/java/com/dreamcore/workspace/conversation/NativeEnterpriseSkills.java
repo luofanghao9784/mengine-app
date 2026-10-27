@@ -9,8 +9,8 @@ import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
 @Service
 public class NativeEnterpriseSkills {
- private final NativeConversationService sessions;private final IdentityService identities;private final JdbcTemplate db;
- public NativeEnterpriseSkills(NativeConversationService s,IdentityService i,JdbcTemplate d){sessions=s;identities=i;db=d;}
+ private final NativePluginPolicy plugins;private final NativeConversationService sessions;private final IdentityService identities;private final JdbcTemplate db;
+ public NativeEnterpriseSkills(NativeConversationService s,IdentityService i,JdbcTemplate d,NativePluginPolicy plugins){this.plugins=plugins;sessions=s;identities=i;db=d;}
  public record Put(String markdown,boolean published,List<UUID> audience){}
  @Transactional public Object put(UUID actor,UUID tenant,String name,Put input){
   identities.member(actor,tenant,true);db.queryForList("SELECT id FROM tenants WHERE id=? FOR UPDATE",tenant);
@@ -25,9 +25,9 @@ public class NativeEnterpriseSkills {
   return Map.of("name",name,"published",input.published());
  }
  @Transactional public List<Map<String,Object>> admin(UUID actor,UUID tenant){identities.member(actor,tenant,true);return db.query("SELECT name,description,markdown,published,audience,revision FROM native_enterprise_skills WHERE tenant_id=? ORDER BY name",(rs,n)->Map.<String,Object>of("name",rs.getString("name"),"description",rs.getString("description"),"markdown",rs.getString("markdown"),"published",rs.getBoolean("published"),"audience",Arrays.asList((UUID[])rs.getArray("audience").getArray()),"revision",rs.getLong("revision")),tenant);}
- @Transactional public List<Map<String,Object>> list(UUID actor,UUID tenant){sessions.requireMember(actor,tenant);return db.queryForList("SELECT name,description FROM native_enterprise_skills WHERE tenant_id=? AND published AND (cardinality(audience)=0 OR ?=ANY(audience)) ORDER BY name",tenant,actor);}
+ @Transactional public List<Map<String,Object>> list(UUID actor,UUID tenant){sessions.requireMember(actor,tenant);plugins.require(tenant,"enterprise-skills");return db.queryForList("SELECT name,description FROM native_enterprise_skills WHERE tenant_id=? AND published AND (cardinality(audience)=0 OR ?=ANY(audience)) ORDER BY name",tenant,actor);}
  @Transactional public Object runtime(UUID id,String token,String name){
-  var s=sessions.check(id,token);if(name==null)return Map.of("items",list(s.ownerId(),s.tenantId()));
+  var s=sessions.check(id,token);plugins.require(s.tenantId(),"enterprise-skills");if(name==null)return Map.of("items",list(s.ownerId(),s.tenantId()));
   var rows=db.queryForList("SELECT name,description,content FROM native_enterprise_skills WHERE tenant_id=? AND name=? AND published AND (cardinality(audience)=0 OR ?=ANY(audience))",s.tenantId(),name,s.ownerId());if(rows.isEmpty())throw new IdentityException(404,"NATIVE_SKILL_UNAVAILABLE");return rows.getFirst();
  }
 }
