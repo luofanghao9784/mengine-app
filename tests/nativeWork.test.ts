@@ -69,3 +69,56 @@ test('a pending plan review is flagged for the status bar', () => {
   const t = buildTranscript([...base, ...syntheticWorkEvents(base.at(-1)!.seq)]);
   assert.equal(t.pending.planReview, true);
 });
+
+const child = (seq: number, type: string, data: unknown, sessionId = 'child-1'): NativeEvent => ({
+  type,
+  seq,
+  time: seq * 1000,
+  data,
+  sessionId,
+});
+
+test('a sub-task shows what its own session is doing right now', () => {
+  const catalog = ev(1, 'subagent/catalog', {
+    childId: 'child-1',
+    label: '凭证核对助手',
+    mode: 'continuable',
+  });
+  const w = buildWorkState(
+    [catalog],
+    [
+      child(2, 'session.status', { status: 'running' }),
+      child(3, 'turn/start', { turn: 1 }),
+      child(4, 'tool/call', { callId: 'c1', name: 'enterprise_search', arguments: '{}' }),
+      child(5, 'tool/result', { message: { toolCallId: 'c1', content: [{ type: 'text', text: 'ok' }] } }),
+      child(6, 'assistant/message', {
+        turn: 1,
+        step: 1,
+        message: { content: [{ type: 'text', text: '找到一笔' }] },
+      }),
+      child(7, 'tool/call', { callId: 'c2', name: 'enterprise_read', arguments: '{}' }),
+      child(8, 'turn/start', { turn: 1 }, 'someone-else'),
+    ],
+  );
+  const s = w.subtasks[0];
+  assert.equal(s.state, 'running');
+  assert.equal(s.current, '正在读取企业资料…');
+  assert.equal(s.steps, 2);
+  assert.equal(s.output, '找到一笔');
+});
+
+test('the finish notice decides the outcome and carries the final output', () => {
+  const w = buildWorkState([
+    ev(1, 'subagent.started', { parentSessionId: 'root', childSessionId: 'child-2' }),
+    ev(2, 'subagent.finished', {
+      childSessionId: 'child-2',
+      status: 'error',
+      stopReason: 'error',
+      lastAssistantMessage: [{ type: 'text', text: '资料读取失败' }],
+    }),
+  ]);
+  assert.deepEqual(
+    { label: w.subtasks[0].label, state: w.subtasks[0].state, output: w.subtasks[0].output },
+    { label: '子任务', state: 'failed', output: '资料读取失败' },
+  );
+});

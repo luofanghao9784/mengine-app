@@ -571,3 +571,32 @@
     padding: 0 16px 24px;
   }
 }
+
+/* 子任务：一行显示当前在做什么，展开看步数和最近的输出。 */
+.native-row-expandable {
+  display: block;
+}
+.native-row-expandable summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  list-style: none;
+  cursor: pointer;
+}
+.native-row-expandable summary::-webkit-details-marker {
+  display: none;
+}
+.native-row-expandable .native-chevron {
+  flex: none;
+  color: var(--ink-3);
+}
+.native-row-expandable details[open] > summary .native-chevron {
+  rotate: 90deg;
+}
+.native-subtask {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 2px 20px;
+  color: var(--ink-2);
+  font-size: 13px;
+}

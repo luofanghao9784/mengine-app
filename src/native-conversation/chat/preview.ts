@@ -1,5 +1,5 @@
 import type { NativeEvent } from './events.ts';
-import { syntheticNativeEvents, syntheticWorkEvents } from './fixture.ts';
+import { syntheticChildEvents, syntheticNativeEvents, syntheticWorkEvents } from './fixture.ts';
 import type { NativeFeed } from './useNativeFeed';
 
 /**
@@ -9,7 +9,8 @@ import type { NativeFeed } from './useNativeFeed';
 export function previewFeed(publish: (feed: NativeFeed) => void) {
   const base = syntheticNativeEvents();
   let events: NativeEvent[] = [...base, ...syntheticWorkEvents(base.at(-1)!.seq)];
-  let seq = events.at(-1)!.seq;
+  const childEvents = syntheticChildEvents(events.at(-1)!.seq);
+  let seq = childEvents.at(-1)!.seq;
   const push = (...items: [string, unknown][]) => {
     events = [...events, ...items.map(([type, data]) => ({ type, seq: ++seq, time: Date.now(), data }))];
     emit();
@@ -26,6 +27,7 @@ export function previewFeed(publish: (feed: NativeFeed) => void) {
   const emit = () =>
     publish({
       events,
+      childEvents,
       preview: true,
       skills: [
         { name: '月度对账', description: '按门店核对收款与账单差异' },

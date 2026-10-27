@@ -1,5 +1,6 @@
-import { Check, Circle, CircleDot } from 'lucide-react';
-import type { Job, WorkState } from './work.ts';
+import { Check, ChevronRight, Circle, CircleDot } from 'lucide-react';
+import { ReplyText } from '../../conversation/ReplyText';
+import type { Job, Subtask, WorkState } from './work.ts';
 import './native-chat.css';
 
 const goalPhase = { active: '进行中', paused: '已暂停', blocked: '受阻', complete: '已完成' } as const;
@@ -8,7 +9,35 @@ const minutes = (from: number, to: number) => {
   return m < 1 ? '不到 1 分钟' : `${m} 分钟`;
 };
 
-type Row = { key: string; label: string; state: string; tone: 'running' | 'done' | 'failed' | 'muted' };
+type Row = {
+  key: string;
+  label: string;
+  state: string;
+  tone: 'running' | 'done' | 'failed' | 'muted';
+  /** Sub-tasks open to show their steps and latest output. */
+  subtask?: Subtask;
+};
+const subtaskRow = (s: Subtask): Row => ({
+  key: `sub:${s.id}`,
+  label: s.label,
+  subtask: s,
+  state:
+    s.state === 'running'
+      ? s.current || '进行中'
+      : s.state === 'done'
+        ? '完成'
+        : s.state === 'failed'
+          ? '失败'
+          : '等待中',
+  tone:
+    s.state === 'running'
+      ? 'running'
+      : s.state === 'done'
+        ? 'done'
+        : s.state === 'failed'
+          ? 'failed'
+          : 'muted',
+});
 const jobRow = (j: Job): Row => ({
   key: `job:${j.id}`,
   label: j.label,
@@ -23,6 +52,9 @@ const jobRow = (j: Job): Row => ({
   tone: j.status === 'running' ? 'running' : j.status === 'completed' ? 'done' : 'failed',
 });
 
+/** A sub-task's output can be long; the panel shows the start, the conversation has the rest. */
+const clip = (text: string) => (text.length > 600 ? text.slice(0, 600).trimEnd() + '…' : text);
+
 /**
  * 进展：目标、待办，以及“同时在做”的后台任务、子任务和工作流（对员工来说是同一类事）。
  * 只显示 DH 记录里有的，不估算进度或时间。
@@ -31,12 +63,7 @@ export function NativeWorkPanel({ work }: { work: WorkState }) {
   const done = work.todos.filter((t) => t.status === 'completed').length;
   const rows: Row[] = [
     ...work.jobs.map(jobRow),
-    ...work.subtasks.map((s) => ({
-      key: `sub:${s.id}`,
-      label: s.label,
-      state: '子任务',
-      tone: 'muted' as const,
-    })),
+    ...work.subtasks.map(subtaskRow),
     ...work.workflows.map((run): Row => {
       const finished = run.agents.filter((a) => a.outcome === 'completed').length;
       return {
@@ -95,12 +122,30 @@ export function NativeWorkPanel({ work }: { work: WorkState }) {
         <section className="native-work-section">
           <h3>同时在做</h3>
           <ul className="native-rows">
-            {rows.map((r) => (
-              <li key={r.key}>
-                <span className="native-row-title">{r.label}</span>
-                <span className={`native-row-state is-${r.tone}`}>{r.state}</span>
-              </li>
-            ))}
+            {rows.map((r) =>
+              r.subtask && (r.subtask.steps || r.subtask.output) ? (
+                <li key={r.key} className="native-row-expandable">
+                  <details>
+                    <summary>
+                      <ChevronRight size={14} className="native-chevron" aria-hidden="true" />
+                      <span className="native-row-title">{r.label}</span>
+                      <span className={`native-row-state is-${r.tone}`}>{r.state}</span>
+                    </summary>
+                    <div className="native-subtask">
+                      {r.subtask.steps > 0 && (
+                        <small className="native-muted">已做 {r.subtask.steps} 步</small>
+                      )}
+                      {r.subtask.output && <ReplyText text={clip(r.subtask.output)} />}
+                    </div>
+                  </details>
+                </li>
+              ) : (
+                <li key={r.key}>
+                  <span className="native-row-title">{r.label}</span>
+                  <span className={`native-row-state is-${r.tone}`}>{r.state}</span>
+                </li>
+              ),
+            )}
           </ul>
         </section>
       )}

@@ -234,3 +234,51 @@ export function syntheticWorkEvents(
     }),
   ];
 }
+
+/** Synthetic log of the delegated "凭证核对助手" session: one finished check, one still running. */
+export function syntheticChildEvents(
+  afterSeq: number,
+  start = Date.UTC(2026, 9, 27, 1, 14, 0),
+): NativeEvent[] {
+  let seq = afterSeq;
+  const e = (type: string, seconds: number, data: unknown): NativeEvent => ({
+    type,
+    seq: ++seq,
+    time: start + seconds * 1000,
+    data,
+    sessionId: 'child-1',
+  });
+  return [
+    e('session.status', 0, { status: 'running' }),
+    e('turn/start', 1, { turn: 1 }),
+    e('tool/call', 2, {
+      callId: 'c-1',
+      name: 'enterprise_search',
+      arguments: JSON.stringify({ query: '荔星中心店 10月19日 800 元 凭证' }),
+    }),
+    e('tool/result', 6, {
+      message: {
+        role: 'tool',
+        toolCallId: 'c-1',
+        content: [{ type: 'text', text: '找到 1 条收款记录，无凭证附件。' }],
+      },
+    }),
+    e('assistant/message', 8, {
+      turn: 1,
+      step: 1,
+      message: {
+        content: [
+          {
+            type: 'text',
+            text: '10月19日这笔 800 元收款没有凭证，经手人是郑西。接下来核对同日其他门店有没有类似情况。',
+          },
+        ],
+      },
+    }),
+    e('tool/call', 9, {
+      callId: 'c-2',
+      name: 'enterprise_read',
+      arguments: JSON.stringify({ materialId: 'm-ledger' }),
+    }),
+  ];
+}

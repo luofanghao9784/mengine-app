@@ -1,4 +1,6 @@
 import type { NativeEvent } from './events.ts';
+import { buildTranscript } from './transcript.ts';
+import { toolLabel } from './tools.ts';
 
 /**
  * Long-task progress from the DH log (batch two of the alignment checklist): the agent's to-do
@@ -23,7 +25,23 @@ export type Job = {
   status: 'running' | 'completed' | 'killed' | 'failed';
   detail?: string;
 };
-export type Subtask = { id: string; label: string; mode: string; createdAt: number };
+/**
+ * A sub-task the agent delegated. Progress comes from the child session's own log (forwarded by the
+ * platform with its session id) and the runtime's `subagent.finished` notice.
+ */
+export type Subtask = {
+  id: string;
+  label: string;
+  mode: string;
+  createdAt: number;
+  state: 'running' | 'idle' | 'done' | 'failed';
+  /** What it is doing now, while running. */
+  current?: string;
+  /** Tool steps taken so far. */
+  steps: number;
+  /** Its latest reply, or the output it finished with. */
+  output?: string;
+};
 export type WorkflowRun = {
   id: string;
   name: string;
@@ -47,7 +65,25 @@ const todoStates = new Set(['pending', 'in_progress', 'completed']);
 const goalPhases = new Set(['active', 'paused', 'blocked', 'complete']);
 const jobStates = new Set(['completed', 'killed', 'failed']);
 
-export function buildWorkState(events: readonly NativeEvent[]): WorkState {
+const text = (blocks: unknown) =>
+  Array.isArray(blocks)
+    ? blocks
+        .filter(
+          (b): b is { type: 'text'; text: string } =>
+            record(b) && b.type === 'text' && typeof b.text === 'string',
+        )
+        .map((b) => b.text)
+        .join('')
+    : '';
+
+/**
+ * @param events the conversation's own events plus platform notices (no session id)
+ * @param childEvents events of delegated sessions, each carrying its child session id
+ */
+export function buildWorkState(
+  events: readonly NativeEvent[],
+  childEvents: readonly NativeEvent[] = [],
+): WorkState {
   let todos: Todo[] = [];
   let planMode = false;
   let goal: Goal | null = null;
@@ -104,11 +140,33 @@ export function buildWorkState(events: readonly NativeEvent[]): WorkState {
         const id = str(d.childId);
         if (id)
           subtasks.set(id, {
+            ...(subtasks.get(id) ?? { state: 'running', steps: 0 }),
             id,
             label: str(d.label) || '子任务',
             mode: str(d.mode),
             createdAt: num(d.childCreatedAt) || event.time,
           });
+        break;
+      }
+      case 'subagent.started': {
+        const id = str(d.childSessionId);
+        if (id && !subtasks.has(id))
+          subtasks.set(id, {
+            id,
+            label: '子任务',
+            mode: '',
+            createdAt: event.time,
+            state: 'running',
+            steps: 0,
+          });
+        break;
+      }
+      case 'subagent.finished': {
+        const task = subtasks.get(str(d.childSessionId));
+        if (task) {
+          task.state = d.status === 'ok' ? 'done' : 'failed';
+          task.output = text(d.lastAssistantMessage) || task.output;
+        }
         break;
       }
       case 'tool-workflow/run-start': {
@@ -140,6 +198,7 @@ export function buildWorkState(events: readonly NativeEvent[]): WorkState {
       }
     }
   }
+  for (const task of subtasks.values()) progress(task, childEvents);
   return {
     todos,
     planMode,
@@ -148,6 +207,24 @@ export function buildWorkState(events: readonly NativeEvent[]): WorkState {
     subtasks: [...subtasks.values()],
     workflows: [...workflows.values()],
   };
+}
+
+/** Fills a sub-task's live state from its own session log; a finish notice already read wins. */
+function progress(task: Subtask, childEvents: readonly NativeEvent[]) {
+  const own = childEvents.filter((e) => e.sessionId === task.id);
+  if (!own.length) return;
+  const log = buildTranscript(own);
+  const items = log.turns.flatMap((t) => t.items);
+  task.steps = items.filter((i) => i.kind === 'tool').length;
+  const reply = [...items].reverse().find((i) => i.kind === 'assistant' && i.text);
+  if (reply?.kind === 'assistant') task.output = reply.text;
+  if (task.state === 'done' || task.state === 'failed') return;
+  // `session.status` is the runtime's whole-agent state for that session; otherwise the log decides.
+  const status = [...own].reverse().find((e) => e.type === 'session.status');
+  const running = status && record(status.data) ? status.data.status === 'running' : log.running;
+  const tool = [...items].reverse().find((i) => i.kind === 'tool' && i.status === 'running');
+  task.state = running ? 'running' : 'idle';
+  task.current = running ? (tool?.kind === 'tool' ? `正在${toolLabel(tool.name)}…` : '正在处理…') : undefined;
 }
 
 /** True when there is any long-task progress worth a panel of its own. */

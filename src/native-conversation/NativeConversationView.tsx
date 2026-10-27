@@ -70,7 +70,7 @@ export function NativeConversationView({
   const isNew = id === 'new';
   const feed = useNativeFeed(tenant, id, { enabled: !isNew, active: session?.state === 'ACTIVE' });
   const transcript = useMemo(() => (feed ? buildTranscript(feed.events) : null), [feed]);
-  const work = useMemo(() => (feed ? buildWorkState(feed.events) : null), [feed]);
+  const work = useMemo(() => (feed ? buildWorkState(feed.events, feed.childEvents) : null), [feed]);
   useEffect(() => {
     // ⌘/Ctrl + Shift + O opens a new native session (one of the four agreed shortcuts).
     const onKey = (e: KeyboardEvent) => {

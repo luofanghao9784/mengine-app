@@ -8,6 +8,7 @@ import { pendingOperation } from './pendingOperations.ts';
 
 export type NativeFeed = {
   events: NativeEvent[];
+  childEvents?: NativeEvent[];
   status?: NativeStatus;
   actions: NativeChatActions;
   /** Skills the employee may call with `/`; supplied by the platform's skill list (B5). */
@@ -58,6 +59,7 @@ export function useNativeFeed(
 
 function useLiveFeed(tenant: string, id: string, enabled: boolean, active: boolean): NativeFeed | null {
   const [events, setEvents] = useState<NativeEvent[]>([]);
+  const [childEvents, setChildEvents] = useState<NativeEvent[]>([]);
   const [status, setStatus] = useState<StatusEnvelope | null>(null);
   const [ratings, setRatings] = useState<Map<string, 'up' | 'down'>>(new Map());
   const [loading, setLoading] = useState(true);
@@ -67,6 +69,7 @@ function useLiveFeed(tenant: string, id: string, enabled: boolean, active: boole
 
   useEffect(() => {
     setEvents([]);
+    setChildEvents([]);
     setStatus(null);
     setRatings(new Map());
     setNotice('');
@@ -77,6 +80,7 @@ function useLiveFeed(tenant: string, id: string, enabled: boolean, active: boole
     let source: EventSource | null = null;
     let retry: ReturnType<typeof setTimeout> | undefined;
     let pending: NativeEvent[] = [];
+    let pendingChildren: NativeEvent[] = [];
     let flush: ReturnType<typeof setTimeout> | undefined;
     // Each platform envelope is either a status report or a conversation event; drop the rest.
     const take = (raw: unknown) => {
@@ -88,14 +92,16 @@ function useLiveFeed(tenant: string, id: string, enabled: boolean, active: boole
           setStatus({ time: event.time, data: event.data as Record<string, unknown> });
         return;
       }
-      if (!isRootEvent(event, id)) return;
-      pending.push(event);
+      (isRootEvent(event, id) ? pending : pendingChildren).push(event);
       // A reconnect can deliver 200 events at once; render them together.
       flush ??= setTimeout(() => {
         const batch = pending;
+        const children = pendingChildren;
         pending = [];
+        pendingChildren = [];
         flush = undefined;
-        setEvents((prior) => [...prior, ...batch]);
+        if(batch.length) setEvents((prior) => [...prior, ...batch]);
+        if(children.length) setChildEvents((prior) => [...prior, ...children]);
       }, 50);
     };
     const connect = () => {
@@ -177,6 +183,7 @@ function useLiveFeed(tenant: string, id: string, enabled: boolean, active: boole
       enabled
         ? {
             events,
+            childEvents,
             status: toStatus(status, now),
             actions,
             ratings,
@@ -185,7 +192,7 @@ function useLiveFeed(tenant: string, id: string, enabled: boolean, active: boole
             preview: false,
           }
         : null,
-    [enabled, events, status, now, actions, ratings, loading, notice],
+    [enabled, events, childEvents, status, now, actions, ratings, loading, notice],
   );
 }
 
