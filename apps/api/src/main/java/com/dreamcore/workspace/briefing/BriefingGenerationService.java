@@ -37,6 +37,12 @@ public class BriefingGenerationService {
     private void requireNews(UUID tenant,String type){if("INFO".equals(type)&&!newsCapability(tenant).available())throw new IdentityException(409,"BRIEFING_INFO_UNAVAILABLE");}
     private static final Set<String> TYPES=Set.of("INFO","DATA","INSIGHT","SUGGESTION","RESULT");
     private static final Set<String> OPEN=Set.of("QUEUED","RUNNING","WAITING_DATA","WAITING_RESOURCE","WAITING_CAPABILITY");
+    /** Person-side data waits that should fail a manual request instead of reserving forever. */
+    private static final Set<String> MANUAL_TERMINAL_DATA=Set.of(
+        "NO_MATERIALS","MATERIALS_NOT_READY","WORK_GOAL_REQUIRED","RESULT_NOT_READY","SOURCE_COVERAGE_TOO_OLD",
+        "SOURCE_GOVERNANCE_REQUIRED","SOURCE_FIELDS_UNCONFIRMED","SOURCE_DEFINITION_REQUIRED","SOURCE_CONSTRAINTS_REQUIRED",
+        "SOURCE_RECEIPT_REQUIRED","SOURCE_VALIDATION_FAILED","SOURCE_RELATION_UNVERIFIED","SOURCE_ANALYSIS_PLAN_INVALID",
+        "SOURCE_MODEL_REVIEW_REQUIRED","SOURCE_DELIVERY_WAITING");
     private final com.dreamcore.workspace.collection.DatasetContentFingerprint fingerprints;
     private final JdbcTemplate db;private final ConversationService tasks;private final BriefingContentService contents;
     @org.springframework.beans.factory.annotation.Autowired private com.dreamcore.workspace.governance.GovernanceModelService governance;
@@ -76,17 +82,48 @@ public class BriefingGenerationService {
           ORDER BY (SELECT max(b.created_at) FROM briefing_generation_batches b WHERE b.tenant_id=w.tenant_id AND b.workspace_id=w.id AND b.owner_id=?) ASC NULLS FIRST,w.kind='PERSONAL' DESC,w.id
           """,UUID.class,tenant,actor,actor,actor);
         if(spaces.isEmpty())throw new IdentityException(409,"BRIEFING_WORKSPACE_REQUIRED");
-        // A scope is never widened: rotate independent tasks among authorized spaces.
-        // Reservations count immediately, so a multi-card request also covers different spaces.
+        // Rotate among authorized spaces; prefer usable evidence. Empty/unready spaces are skipped so a
+        // multi-card manual request can land on a ready space; if every space fails, caller fails that card.
         UUID chosen=spaces.getFirst(),pending=null;
         for(UUID candidate:spaces){
             var available=sources(actor,tenant,candidate);
-            if(available.isEmpty())continue;
+            if(available.stream().noneMatch(s->Set.of("READY","PARTIAL").contains(s.parseStatus())))continue;
             if(pending==null)pending=candidate;
             if(available.stream().allMatch(s->Set.of("READY","PARTIAL").contains(s.parseStatus()))){chosen=candidate;authority(actor,tenant,chosen);return chosen;}
         }
         if(pending!=null)chosen=pending;
         authority(actor,tenant,chosen);return chosen;
+    }
+    private String manualGoalBlock(UUID actor,UUID tenant){
+        var audience=workAudience.current(actor,tenant);
+        if(audience.responsibilities().isBlank()&&audience.goals().governance().isBlank()&&audience.goals().stage().isBlank())return "WORK_GOAL_REQUIRED";
+        return null;
+    }
+    /** Immediate fail reason for a manual card on this space; null means it may proceed to scheduling. */
+    private String manualDataBlock(UUID actor,UUID tenant,UUID space,String type){
+        if("INFO".equals(type))return null;
+        var available=sources(actor,tenant,space);
+        if(available.isEmpty())return "NO_MATERIALS";
+        if(available.stream().noneMatch(s->Set.of("READY","PARTIAL").contains(s.parseStatus())))return "MATERIALS_NOT_READY";
+        if(available.stream().anyMatch(s->!s.dataset()&&Set.of("READY","PARTIAL").contains(s.parseStatus())))return null;
+        for(var source:available){
+            if(!source.dataset()||!Set.of("READY","PARTIAL").contains(source.parseStatus()))continue;
+            var ready=governance.analysisReadiness(actor,tenant,source.materialId(),source.versionId());
+            if(!ready.ready())return ready.reason();
+        }
+        return null;
+    }
+    private void failManualIfBlocked(UUID actor,UUID tenant,UUID batch,UUID space,String type){
+        if(Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM briefing_generation_batches WHERE id=? AND task_id IS NOT NULL)",Boolean.class,batch)))return;
+        if(!Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM briefing_generation_batches WHERE id=? AND status IN ('QUEUED','WAITING_DATA','WAITING_RESOURCE','WAITING_CAPABILITY'))",Boolean.class,batch)))return;
+        String goal=manualGoalBlock(actor,tenant);
+        if(goal!=null){finish(batch,"FAILED",goal);return;}
+        String data=manualDataBlock(actor,tenant,space,type);
+        if(data!=null)finish(batch,"FAILED",data);
+    }
+    private void hold(UUID batch,boolean manual,String status,String reason){
+        if(manual&&"WAITING_DATA".equals(status)&&MANUAL_TERMINAL_DATA.contains(reason))finish(batch,"FAILED",reason);
+        else waiting(batch,status,reason);
     }
     @Transactional public Batch generate(UUID actor,UUID tenant,UUID request,UUID space,String type){
         authority(actor,tenant,null);if(request==null||type!=null&&!TYPES.contains(type))throw IdentityException.invalid();lock(actor,tenant);
@@ -97,6 +134,7 @@ public class BriefingGenerationService {
         UUID chosen=chooseSpace(actor,tenant,space),p=policy(actor,tenant,chosen);
         var active=db.queryForList("SELECT id FROM briefing_generation_batches WHERE tenant_id=? AND owner_id=? AND workspace_id=? AND coalesce(business_type,'AUTO')=coalesce(?,'AUTO') AND status IN ('QUEUED','RUNNING','WAITING_DATA','WAITING_RESOURCE','WAITING_CAPABILITY') ORDER BY created_at LIMIT 1",UUID.class,tenant,actor,chosen,type);
         UUID id=active.isEmpty()?enqueue(p,"GENERATE_MORE",type,null):active.getFirst();
+        failManualIfBlocked(actor,tenant,id,chosen,type);
         db.update("INSERT INTO briefing_generation_requests VALUES(?,?,?,?,?)",tenant,actor,request,fingerprint,id);
         return get(actor,tenant,id);
     }
@@ -123,6 +161,7 @@ public class BriefingGenerationService {
             if(!active.isEmpty())id=active.getFirst();
             else
             db.update("INSERT INTO briefing_generation_batches(id,tenant_id,owner_id,workspace_id,policy_id,policy_epoch,trigger_kind,business_type,status,selection_id,selection_index,created_at) SELECT ?,tenant_id,owner_id,workspace_id,id,epoch,'GENERATE_MORE',?,'QUEUED',?,?,? FROM briefing_generation_policies WHERE id=?",id,type,request,i,time(clock.now().plusMillis(i)),p);
+            failManualIfBlocked(actor,tenant,id,chosen,type);
             db.update("INSERT INTO briefing_generation_requests VALUES(?,?,?,?,?)",tenant,actor,selectionRequest(request,i),fingerprint,id);result.add(get(actor,tenant,id));
         }
         db.update("INSERT INTO briefing_generation_requests VALUES(?,?,?,?,?)",tenant,actor,request,fingerprint,result.getFirst().id());return result;
@@ -364,26 +403,30 @@ public class BriefingGenerationService {
             active=db.queryForList("SELECT * FROM briefing_generation_batches WHERE policy_id=? AND status='QUEUED' ORDER BY created_at DESC LIMIT 1",id);
         }
         var b=active.getFirst();UUID batch=(UUID)b.get("id");String type=(String)b.get("business_type");boolean info="INFO".equals(type);
+        boolean manualBatch="GENERATE_MORE".equals(b.get("trigger_kind"))||Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM briefing_generation_requests WHERE batch_id=?)",Boolean.class,batch));
+        // Stock manual waits that cannot self-heal: fail and release the selection slot.
+        if(manualBatch&&"WAITING_DATA".equals(b.get("status"))&&MANUAL_TERMINAL_DATA.contains(Objects.toString(b.get("reason"),""))){
+            finish(batch,"FAILED",Objects.toString(b.get("reason"),"NO_MATERIALS"));return;
+        }
         // Reserve the semantic source key before event merging, so another workspace cannot queue the same work.
         if(!info)db.update("UPDATE briefing_generation_batches SET source_key=?,context_key=? WHERE id=? AND task_id IS NULL",key,contextKey,batch);
         if(info&&newsCatalog!=null&&(newsSearch==null||!newsSearch.enabled()))newsSource=newsCatalog.sourceFor(tenant,batch);
         if(!p.get("epoch").equals(b.get("policy_epoch"))){finish(batch,"AUTHORITY_REVOKED","AUTHORITY_CHANGED");return;}
-        if(info&&(newsSource.isBlank()||!agents.publicWebEnabled())){waiting(batch,"WAITING_DATA","NEWS_SOURCE_UNAVAILABLE");return;}
+        if(info&&(newsSource.isBlank()||!agents.publicWebEnabled())){hold(batch,manualBatch,"WAITING_DATA","NEWS_SOURCE_UNAVAILABLE");return;}
         if(!info){
-            if(sources.isEmpty()){waiting(batch,"WAITING_DATA","NO_MATERIALS");return;}
+            if(sources.isEmpty()){hold(batch,manualBatch,"WAITING_DATA","NO_MATERIALS");return;}
             if(sources.size()>1000){waiting(batch,"WAITING_RESOURCE","SOURCE_COUNT_LIMIT");return;}
-            if(sources.stream().noneMatch(s->Set.of("READY","PARTIAL").contains(s.parseStatus()))){waiting(batch,"WAITING_DATA","MATERIALS_NOT_READY");return;}
+            if(sources.stream().noneMatch(s->Set.of("READY","PARTIAL").contains(s.parseStatus()))){hold(batch,manualBatch,"WAITING_DATA","MATERIALS_NOT_READY");return;}
             if(sources.stream().filter(s->Set.of("READY","PARTIAL").contains(s.parseStatus())).anyMatch(s->s.changedAt().plusSeconds(mergeSeconds).isAfter(now))){waiting(batch,"WAITING_DATA","MERGING_DATA_EVENTS");return;}
         }
         if(!tasksEnabled||!agents.enabled()){waiting(batch,"WAITING_CAPABILITY","MODEL_NOT_CONFIGURED");return;}
         var audience=workAudience.current(actor,tenant);
         if(audience.responsibilities().isBlank()&&audience.goals().governance().isBlank()&&audience.goals().stage().isBlank()){
-            waiting(batch,"WAITING_DATA","WORK_GOAL_REQUIRED");return;
+            hold(batch,manualBatch,"WAITING_DATA","WORK_GOAL_REQUIRED");return;
         }
         Instant day=now.atZone(ZoneOffset.UTC).toLocalDate().atStartOfDay(ZoneOffset.UTC).toInstant();
         // The latest reset within this UTC day starts a new owner budget without rewriting history.
         Instant ownerSince=db.queryForObject("SELECT coalesce(max(reset_at),?) FROM briefing_quota_resets WHERE tenant_id=? AND owner_id=? AND reset_at>=? AND reset_at<=?",Timestamp.class,time(day),tenant,actor,time(day),time(now)).toInstant();
-        boolean manualBatch="GENERATE_MORE".equals(b.get("trigger_kind"))||Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM briefing_generation_requests WHERE batch_id=?)",Boolean.class,batch));
         if(!manualBatch&&!enrolled&&!info&&equivalentAutomaticAnalysis(tenant,actor,id,key,space)){
             finish(batch,"CANCELLED","EQUIVALENT_ANALYSIS_EXISTS");return;
         }
@@ -420,13 +463,13 @@ public class BriefingGenerationService {
         }
         if(enrolled&&!info)for(var source:selected)if(source.dataset()){
             Timestamp coverage=db.queryForObject("SELECT coverage_through FROM dataset_snapshots WHERE id=?",Timestamp.class,source.versionId());
-            if(coverage==null||coverage.toInstant().isBefore(now.minusSeconds(7200))){waiting(batch,"WAITING_DATA","SOURCE_COVERAGE_TOO_OLD");return;}
+            if(coverage==null||coverage.toInstant().isBefore(now.minusSeconds(7200))){hold(batch,manualBatch,"WAITING_DATA","SOURCE_COVERAGE_TOO_OLD");return;}
         }
-        if(selected.isEmpty()&&!info){waiting(batch,"WAITING_DATA","RESULT_NOT_READY");return;}
+        if(selected.isEmpty()&&!info){hold(batch,manualBatch,"WAITING_DATA","RESULT_NOT_READY");return;}
         if(!info)for(var source:selected)if(source.dataset()) {
             var ready=readiness.get(source.materialId());
             if(ready!=null&&!ready.ready()) {
-                waiting(batch,"WAITING_DATA",ready.reason());
+                hold(batch,manualBatch,"WAITING_DATA",ready.reason());
                 db.update("UPDATE briefing_generation_policies SET reason=? WHERE id=?",ready.reason(),id);
                 return;
             }

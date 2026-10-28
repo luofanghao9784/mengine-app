@@ -426,11 +426,46 @@ class BriefingGenerationIntegrationTest {
   var j=conversations.claim();assertEquals(b.taskId(),j.id());deliver(j,"第一份有合成来源支持的新经营洞察。");generation.tick(policy);
   assertEquals("SUCCEEDED",generation.get(actor,tenant,b.id()).status());generation.tick(policy);assertTrue(generation.state(actor,tenant).batches().stream().anyMatch(x->"SUGGESTION".equals(x.businessType())));
  }
- @Test void missingDataWaitsAndLaterReadyDataContinuesWithoutNewRequest(){
-  var b=manual();UUID p=policy();generation.tick(p);assertEquals("WAITING_DATA",generation.get(actor,tenant,b.id()).status());
-  var f=upload("marker 资料稍后到达。",false);generation.tick(p);assertEquals("MATERIALS_NOT_READY",generation.get(actor,tenant,b.id()).reason());
+ @Test void manualMissingDataFailsImmediatelyAndDoesNotReserveQuota(){
+  var b=manual();
+  assertEquals("FAILED",b.status());
+  assertEquals("NO_MATERIALS",b.reason());
+  assertNotNull(b.finishedAt());
+  assertEquals(0,generation.state(actor,tenant).quota().reserved());
+ }
+ @Test void automaticMissingDataWaitsAndLaterReadyDataContinuesWithoutNewRequest(){
+  UUID p=policy();UUID batch=UUID.randomUUID();
+  db.update("INSERT INTO briefing_generation_batches(id,tenant_id,owner_id,workspace_id,policy_id,policy_epoch,trigger_kind,business_type,status) SELECT ?,tenant_id,owner_id,workspace_id,id,epoch,'INITIALIZATION','INSIGHT','QUEUED' FROM briefing_generation_policies WHERE id=?",batch,p);
+  generation.tick(p);assertEquals("WAITING_DATA",generation.get(actor,tenant,batch).status());assertEquals("NO_MATERIALS",generation.get(actor,tenant,batch).reason());
+  var f=upload("marker 资料稍后到达。",false);generation.tick(p);assertEquals("MATERIALS_NOT_READY",generation.get(actor,tenant,batch).reason());
   var j=knowledge.claim();assertEquals(f.acceptedVersion().id(),j.version());knowledge.finish(j,new DocumentParser.Result("synthetic","READY",List.of(),List.of(new DocumentParser.Fragment("L1","marker 资料就绪。","TEXT"))));
-  generation.tick(p);assertEquals("RUNNING",generation.get(actor,tenant,b.id()).status());
+  generation.tick(p);assertEquals("RUNNING",generation.get(actor,tenant,batch).status());
+ }
+ @Test void manualWorkGoalRequiredFailsImmediately(){
+  db.update("UPDATE work_role_profiles SET responsibilities='' WHERE tenant_id=? AND account_id=?",tenant,actor);
+  upload("marker 有资料但岗位为空。",true);
+  var b=manual();
+  assertEquals("FAILED",b.status());
+  assertEquals("WORK_GOAL_REQUIRED",b.reason());
+ }
+ @Test void failedManualSelectionCardReleasesLaterReadyCard(){
+  upload("marker 已就绪可放行资料",true);UUID ready=space,empty=UUID.randomUUID();
+  db.update("INSERT INTO workspaces(id,tenant_id,owner_id,name,kind) VALUES (?,?,?,'空空间','SHARED')",empty,tenant,actor);
+  db.update("INSERT INTO workspace_members(tenant_id,workspace_id,account_id,can_maintain) VALUES (?,?,?,true)",tenant,empty,actor);
+  for(UUID workspace:List.of(ready,empty))db.update("INSERT INTO briefing_generation_policies(id,tenant_id,owner_id,workspace_id) VALUES (?,?,?,?) ON CONFLICT(tenant_id,owner_id,workspace_id) DO NOTHING",UUID.randomUUID(),tenant,actor,workspace);
+  UUID readyPolicy=db.queryForObject("SELECT id FROM briefing_generation_policies WHERE tenant_id=? AND owner_id=? AND workspace_id=?",UUID.class,tenant,actor,ready);
+  UUID emptyPolicy=db.queryForObject("SELECT id FROM briefing_generation_policies WHERE tenant_id=? AND owner_id=? AND workspace_id=?",UUID.class,tenant,actor,empty);
+  UUID selection=UUID.randomUUID(),failedId=UUID.randomUUID(),readyId=UUID.randomUUID();
+  db.update("INSERT INTO briefing_generation_batches(id,tenant_id,owner_id,workspace_id,policy_id,policy_epoch,trigger_kind,business_type,status,reason,selection_id,selection_index,created_at) SELECT ?,tenant_id,owner_id,workspace_id,id,epoch,'GENERATE_MORE','INSIGHT','WAITING_DATA','NO_MATERIALS',?,0,now() FROM briefing_generation_policies WHERE id=?",failedId,selection,emptyPolicy);
+  db.update("INSERT INTO briefing_generation_batches(id,tenant_id,owner_id,workspace_id,policy_id,policy_epoch,trigger_kind,business_type,status,selection_id,selection_index,created_at) SELECT ?,tenant_id,owner_id,workspace_id,id,epoch,'GENERATE_MORE','DATA','QUEUED',?,1,now() FROM briefing_generation_policies WHERE id=?",readyId,selection,readyPolicy);
+  db.update("INSERT INTO briefing_generation_requests VALUES(?,?,?,?,?)",tenant,actor,UUID.randomUUID(),"synthetic-fail-forward-0",failedId);
+  db.update("INSERT INTO briefing_generation_requests VALUES(?,?,?,?,?)",tenant,actor,UUID.randomUUID(),"synthetic-fail-forward-1",readyId);
+  generation.tick(emptyPolicy);
+  assertEquals("FAILED",generation.get(actor,tenant,failedId).status());
+  assertEquals("NO_MATERIALS",generation.get(actor,tenant,failedId).reason());
+  generation.tick(readyPolicy);
+  assertNotNull(generation.get(actor,tenant,readyId).taskId());
+  assertEquals("RUNNING",generation.get(actor,tenant,readyId).status());
  }
  @Test void repeatedAndConcurrentClicksShareBatchAndMismatchedRequestConflicts() throws Exception {
   upload("marker 合成来源。",true);UUID key=UUID.randomUUID();var first=generation.generate(actor,tenant,key,space,"INSIGHT");
