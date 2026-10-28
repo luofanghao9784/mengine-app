@@ -72,10 +72,18 @@ public class BriefingGenerationService {
         db.update("INSERT INTO briefing_generation_policies(id,tenant_id,owner_id,workspace_id) VALUES(?,?,?,?) ON CONFLICT(tenant_id,owner_id,workspace_id) DO NOTHING",UUID.randomUUID(),tenant,actor,space);
         return db.queryForObject("SELECT id FROM briefing_generation_policies WHERE tenant_id=? AND owner_id=? AND workspace_id=?",UUID.class,tenant,actor,space);
     }
+    private boolean spaceUsable(UUID actor,UUID tenant,UUID space){
+        return manualDataBlock(actor,tenant,space,null)==null;
+    }
     private UUID chooseSpace(UUID actor,UUID tenant,UUID requested){
-        if(requested!=null){authority(actor,tenant,requested);return requested;}
+        // An explicit space is only a preference. If it has no readable READY/PARTIAL evidence, land on
+        // another authorized ready space instead of creating an immediate FAILED card.
+        if(requested!=null){
+            authority(actor,tenant,requested);
+            if(spaceUsable(actor,tenant,requested))return requested;
+        }
         var enrolled=db.queryForList("SELECT p.workspace_id FROM briefing_daily_schedules s JOIN briefing_generation_policies p ON p.id=s.policy_id JOIN tenant_governance g ON g.tenant_id=p.tenant_id AND g.owner_id=p.owner_id WHERE p.tenant_id=? AND p.owner_id=? AND s.enabled ORDER BY p.id",UUID.class,tenant,actor);
-        if(!enrolled.isEmpty()){authority(actor,tenant,enrolled.getFirst());return enrolled.getFirst();}
+        if(!enrolled.isEmpty()&&(requested==null||spaceUsable(actor,tenant,enrolled.getFirst()))){authority(actor,tenant,enrolled.getFirst());return enrolled.getFirst();}
         var spaces=db.queryForList("""
           SELECT w.id FROM workspaces w WHERE w.tenant_id=? AND ((w.kind='PERSONAL' AND w.owner_id=?) OR EXISTS(
           SELECT 1 FROM workspace_members g WHERE g.workspace_id=w.id AND g.tenant_id=w.tenant_id AND g.account_id=?))
@@ -84,7 +92,7 @@ public class BriefingGenerationService {
         if(spaces.isEmpty())throw new IdentityException(409,"BRIEFING_WORKSPACE_REQUIRED");
         // Rotate among authorized spaces; prefer usable evidence. Empty/unready spaces are skipped so a
         // multi-card manual request can land on a ready space; if every space fails, caller fails that card.
-        UUID chosen=spaces.getFirst(),pending=null;
+        UUID chosen=requested!=null?requested:spaces.getFirst(),pending=null;
         for(UUID candidate:spaces){
             var available=sources(actor,tenant,candidate);
             if(available.stream().noneMatch(s->Set.of("READY","PARTIAL").contains(s.parseStatus())))continue;

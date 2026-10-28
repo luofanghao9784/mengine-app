@@ -150,6 +150,15 @@ class BriefingGenerationIntegrationTest {
   generation.generateSelection(actor,tenant,UUID.randomUUID(),ready,1,List.of("INSIGHT"));
   assertEquals(ready,generation.generate(actor,tenant,UUID.randomUUID(),null,"INSIGHT").workspaceId());
  }
+ @Test void explicitEmptySpaceFallsBackToReadyAuthorizedSpaceInsteadOfFailing(){
+  upload("marker 就绪空间可承接生成",true);UUID ready=space,empty=UUID.randomUUID();
+  db.update("INSERT INTO workspaces(id,tenant_id,owner_id,name,kind) VALUES (?,?,?,'空筛选空间','SHARED')",empty,tenant,actor);
+  db.update("INSERT INTO workspace_members(tenant_id,workspace_id,account_id,can_maintain) VALUES (?,?,?,true)",tenant,empty,actor);
+  var selected=generation.generateSelection(actor,tenant,UUID.randomUUID(),empty,2,List.of("INSIGHT","DATA"));
+  assertTrue(selected.stream().allMatch(b->ready.equals(b.workspaceId())));
+  assertTrue(selected.stream().noneMatch(b->"FAILED".equals(b.status())));
+  assertEquals(ready,generation.generate(actor,tenant,UUID.randomUUID(),empty,"INSIGHT").workspaceId());
+ }
  @Test void navigationBriefingSignalUsesUnreadAuthorizedCardVersions(){
   upload("marker 合成画报导航资料。",true);
   assertFalse(recommendations.hasUnreadBriefing(actor,tenant));
