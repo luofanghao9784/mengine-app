@@ -159,6 +159,18 @@ class BriefingGenerationIntegrationTest {
   assertTrue(selected.stream().noneMatch(b->"FAILED".equals(b.status())));
   assertEquals(ready,generation.generate(actor,tenant,UUID.randomUUID(),empty,"INSIGHT").workspaceId());
  }
+ @Test void enrolledEmptyDailySpaceDoesNotPinManualGeneration(){
+  upload("marker 全房通就绪资料",true);UUID ready=space,empty=UUID.randomUUID();
+  db.update("INSERT INTO workspaces(id,tenant_id,owner_id,name,kind) VALUES (?,?,?,'空日报空间','SHARED')",empty,tenant,actor);
+  db.update("INSERT INTO workspace_members(tenant_id,workspace_id,account_id,can_maintain) VALUES (?,?,?,true)",tenant,empty,actor);
+  db.update("INSERT INTO tenant_governance(tenant_id,owner_id) VALUES (?,?)",tenant,actor);
+  UUID emptyPolicy=UUID.randomUUID();
+  db.update("INSERT INTO briefing_generation_policies(id,tenant_id,owner_id,workspace_id) VALUES (?,?,?,?)",emptyPolicy,tenant,actor,empty);
+  db.update("INSERT INTO briefing_daily_schedules(policy_id,enabled,next_due) VALUES (?,true,now()+interval '1 day')",emptyPolicy);
+  var selected=generation.generateSelection(actor,tenant,UUID.randomUUID(),null,1,List.of("INSIGHT"));
+  assertEquals(ready,selected.getFirst().workspaceId());
+  assertNotEquals("FAILED",selected.getFirst().status());
+ }
  @Test void navigationBriefingSignalUsesUnreadAuthorizedCardVersions(){
   upload("marker 合成画报导航资料。",true);
   assertFalse(recommendations.hasUnreadBriefing(actor,tenant));

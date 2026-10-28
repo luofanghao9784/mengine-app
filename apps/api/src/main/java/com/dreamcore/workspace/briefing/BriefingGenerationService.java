@@ -76,30 +76,32 @@ public class BriefingGenerationService {
         return manualDataBlock(actor,tenant,space,null)==null;
     }
     private UUID chooseSpace(UUID actor,UUID tenant,UUID requested){
-        // An explicit space is only a preference. If it has no readable READY/PARTIAL evidence, land on
-        // another authorized ready space instead of creating an immediate FAILED card.
+        // Explicit space is a preference only when it can actually run. Daily-enrollment order must not
+        // pin manual generation onto an empty/unreadable space (e.g. 集团财务 with no readable datasets).
         if(requested!=null){
             authority(actor,tenant,requested);
             if(spaceUsable(actor,tenant,requested))return requested;
         }
         var enrolled=db.queryForList("SELECT p.workspace_id FROM briefing_daily_schedules s JOIN briefing_generation_policies p ON p.id=s.policy_id JOIN tenant_governance g ON g.tenant_id=p.tenant_id AND g.owner_id=p.owner_id WHERE p.tenant_id=? AND p.owner_id=? AND s.enabled ORDER BY p.id",UUID.class,tenant,actor);
-        if(!enrolled.isEmpty()&&(requested==null||spaceUsable(actor,tenant,enrolled.getFirst()))){authority(actor,tenant,enrolled.getFirst());return enrolled.getFirst();}
+        for(UUID enrolledSpace:enrolled){
+            if(spaceUsable(actor,tenant,enrolledSpace)){authority(actor,tenant,enrolledSpace);return enrolledSpace;}
+        }
         var spaces=db.queryForList("""
           SELECT w.id FROM workspaces w WHERE w.tenant_id=? AND ((w.kind='PERSONAL' AND w.owner_id=?) OR EXISTS(
           SELECT 1 FROM workspace_members g WHERE g.workspace_id=w.id AND g.tenant_id=w.tenant_id AND g.account_id=?))
           ORDER BY (SELECT max(b.created_at) FROM briefing_generation_batches b WHERE b.tenant_id=w.tenant_id AND b.workspace_id=w.id AND b.owner_id=?) ASC NULLS FIRST,w.kind='PERSONAL' DESC,w.id
           """,UUID.class,tenant,actor,actor,actor);
         if(spaces.isEmpty())throw new IdentityException(409,"BRIEFING_WORKSPACE_REQUIRED");
-        // Rotate among authorized spaces; prefer usable evidence. Empty/unready spaces are skipped so a
-        // multi-card manual request can land on a ready space; if every space fails, caller fails that card.
-        UUID chosen=requested!=null?requested:spaces.getFirst(),pending=null;
+        UUID chosen=null,pending=null;
         for(UUID candidate:spaces){
+            if(!spaceUsable(actor,tenant,candidate))continue;
             var available=sources(actor,tenant,candidate);
-            if(available.stream().noneMatch(s->Set.of("READY","PARTIAL").contains(s.parseStatus())))continue;
             if(pending==null)pending=candidate;
             if(available.stream().allMatch(s->Set.of("READY","PARTIAL").contains(s.parseStatus()))){chosen=candidate;authority(actor,tenant,chosen);return chosen;}
         }
-        if(pending!=null)chosen=pending;
+        if(pending!=null){authority(actor,tenant,pending);return pending;}
+        // No usable space: keep the request target (or first authorized) so preflight can record the reason.
+        chosen=requested!=null?requested:spaces.getFirst();
         authority(actor,tenant,chosen);return chosen;
     }
     private String manualGoalBlock(UUID actor,UUID tenant){
