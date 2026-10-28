@@ -42,7 +42,7 @@ public class BriefingGenerationService {
         "NO_MATERIALS","MATERIALS_NOT_READY","WORK_GOAL_REQUIRED","RESULT_NOT_READY","SOURCE_COVERAGE_TOO_OLD",
         "SOURCE_GOVERNANCE_REQUIRED","SOURCE_FIELDS_UNCONFIRMED","SOURCE_DEFINITION_REQUIRED","SOURCE_CONSTRAINTS_REQUIRED",
         "SOURCE_RECEIPT_REQUIRED","SOURCE_VALIDATION_FAILED","SOURCE_RELATION_UNVERIFIED","SOURCE_ANALYSIS_PLAN_INVALID",
-        "SOURCE_MODEL_REVIEW_REQUIRED","SOURCE_DELIVERY_WAITING");
+        "SOURCE_MODEL_REVIEW_REQUIRED","SOURCE_DELIVERY_WAITING","SOURCE_COLLECTION_PENDING");
     private final com.dreamcore.workspace.collection.DatasetContentFingerprint fingerprints;
     private final JdbcTemplate db;private final ConversationService tasks;private final BriefingContentService contents;
     @org.springframework.beans.factory.annotation.Autowired private com.dreamcore.workspace.governance.GovernanceModelService governance;
@@ -115,13 +115,16 @@ public class BriefingGenerationService {
         var available=sources(actor,tenant,space);
         if(available.isEmpty())return "NO_MATERIALS";
         if(available.stream().noneMatch(s->Set.of("READY","PARTIAL").contains(s.parseStatus())))return "MATERIALS_NOT_READY";
+        // Document evidence alone is enough; do not make unfinished sibling datasets block the space.
         if(available.stream().anyMatch(s->!s.dataset()&&Set.of("READY","PARTIAL").contains(s.parseStatus())))return null;
+        String block=null;
         for(var source:available){
             if(!source.dataset()||!Set.of("READY","PARTIAL").contains(source.parseStatus()))continue;
             var ready=governance.analysisReadiness(actor,tenant,source.materialId(),source.versionId());
-            if(!ready.ready())return ready.reason();
+            if(ready.ready())return null;
+            if(block==null)block=ready.reason();
         }
-        return null;
+        return block;
     }
     private void failManualIfBlocked(UUID actor,UUID tenant,UUID batch,UUID space,String type){
         if(Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM briefing_generation_batches WHERE id=? AND task_id IS NOT NULL)",Boolean.class,batch)))return;
@@ -449,7 +452,7 @@ public class BriefingGenerationService {
         if(used+categoryExecuting>=executionLimit||concurrent>=5||tenantUsed>=48||tenantConcurrent>=20){waiting(batch,"WAITING_RESOURCE",used+categoryExecuting>=executionLimit?(manualBatch?"DAILY_RUN_LIMIT":"AUTOMATIC_DAILY_LIMIT"):tenantUsed>=48?"TENANT_DAILY_LIMIT":tenantConcurrent>=20?"TENANT_CONCURRENCY_LIMIT":"OWNER_CONCURRENCY_LIMIT");return;}
         // One complete topic per batch. Explicit bounded source selection is visible to the model and reader.
         var order=Comparator.comparingInt((Source s)->workAudience.sourceScore(audience,s.filename())).reversed().thenComparing(Source::changedAt,Comparator.reverseOrder()).thenComparing(Source::filename);
-        List<Source> selected=selectSources((info||unseen.isEmpty()?sources:unseen).stream().filter(s->Set.of("READY","PARTIAL").contains(s.parseStatus())).filter(s->!"RESULT".equals(type)||!s.dataset()&&completedPublication(s.versionId())).sorted(order).toList(),space);
+        List<Source> selected=selectSources((info||unseen.isEmpty()?sources:unseen).stream().filter(s->Set.of("READY","PARTIAL").contains(s.parseStatus())).filter(s->!s.dataset()||Boolean.TRUE.equals(Optional.ofNullable(readiness.get(s.materialId())).map(r->r.ready()).orElse(false))).filter(s->!"RESULT".equals(type)||!s.dataset()&&completedPublication(s.versionId())).sorted(order).toList(),space);
         // Qualitative briefings can use document evidence without selecting unrelated stale datasets.
         if("INSIGHT".equals(type)||"SUGGESTION".equals(type)){
             var documents=sources.stream().filter(s->!s.dataset()&&Set.of("READY","PARTIAL").contains(s.parseStatus())).sorted(Comparator.comparing((Source s)->seenContent.contains(s.materialId()+":"+contentKeys.get(s.materialId()))).thenComparing(order)).toList();

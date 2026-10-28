@@ -478,7 +478,11 @@ public class GovernanceModelService {
          this.keys(ref,"locator","quote");this.text(ref.get("locator"),200);this.text(ref.get("quote"),300);
          String quote=ref.get("quote").toString();
          List<Map<String,Object>> refs=(List<Map<String,Object>>)context.getOrDefault(dataset?"sourceEvidence":"fragments",List.of());
-         if (quote.length()<6 || refs.stream().noneMatch(f -> Objects.toString(f.get(dataset?"column":"id"),"").equals(ref.get("locator")) && (dataset ? this.proofQuote(f,quote) : Objects.toString(f.get("content"),"").contains(quote)))) throw this.error(422,"GOVERNANCE_EVIDENCE_INVALID");
+         if (quote.length()<6 || refs.stream().noneMatch(f -> {
+            String locator = Objects.toString(f.get(dataset ? "column" : "id"), "");
+            return !locator.isBlank() && locator.equals(ref.get("locator"))
+                && (dataset ? this.proofQuote(f, quote) : Objects.toString(f.get("content"), "").contains(quote));
+         })) throw this.error(422,"GOVERNANCE_EVIDENCE_INVALID");
       }
       if ("USABLE".equals(review.get("state"))) {
          if (dataset) {
@@ -1072,7 +1076,7 @@ public class GovernanceModelService {
                }
 
                this.keys(f, "column", "decision", "meaning", "unit", "evidence");
-               if (!columns.get(i).equals(f.get("column"))) {
+               if (!Objects.equals(columns.get(i), f.get("column"))) {
                   throw this.error(422, "GOVERNANCE_FIELD_COVERAGE");
                }
 
@@ -1082,7 +1086,10 @@ public class GovernanceModelService {
                   throw this.error(422, "GOVERNANCE_OUTPUT_INVALID");
                }
 
-               Map<String, Object> ref = defs.stream().filter(d -> d.get("column").equals(f.get("column"))).findFirst().orElse(Map.of());
+               Map<String, Object> ref = defs.stream()
+                  .filter(d -> Objects.equals(d.get("column"), f.get("column")))
+                  .findFirst()
+                  .orElse(Map.of());
                if ("KEEP_SOURCE".equals(f.get("decision"))) {
                   if (!"SOURCE_DOCUMENTED".equals(ref.get("status"))
                      || !Objects.equals(ref.get("meaning"), f.get("meaning"))
@@ -1094,8 +1101,13 @@ public class GovernanceModelService {
                   String quote = f.get("evidence").toString();
                   List<Map<String, Object>> proofs = (List<Map<String, Object>>)context.getOrDefault("sourceEvidence", List.of());
                   if (quote.length() < 10
-                     || proofs.stream().noneMatch(p -> p.get("column").equals(f.get("column"))
-                         && !"TECHNICAL_ONLY".equals(p.get("definitionScope")) && this.proofQuote((Map<String, Object>)p, quote))) {
+                     || proofs.stream().noneMatch(p -> {
+                        String column = Objects.toString(p.get("column"), "");
+                        return !column.isBlank()
+                           && column.equals(f.get("column"))
+                           && !"TECHNICAL_ONLY".equals(p.get("definitionScope"))
+                           && this.proofQuote((Map<String, Object>)p, quote);
+                     })) {
                      throw this.error(422, "GOVERNANCE_EVIDENCE_INVALID");
                   }
                } else if (!"UNKNOWN".equals(f.get("decision")) || !"".equals(f.get("unit"))) {
