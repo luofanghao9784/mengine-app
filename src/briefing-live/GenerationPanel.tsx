@@ -9,7 +9,7 @@ import { Button } from '../shared/ui';
 import type { MagazineGridItem } from './MagazineGrid';
 import { generationOpen, type BriefingGeneration, type GenerationSlot } from './useBriefingGeneration';
 import './generation.css';
-import { businessReadinessReasons } from './generation-reasons';
+import { businessReadinessReasons, generationBlocked } from './generation-reasons';
 
 const label: Record<string, string> = {
   QUEUED: '正在准备新画报',
@@ -33,8 +33,8 @@ const reasons: Record<string, string> = {
   PUBLIC_SEARCH_NOT_CONFIGURED: '资讯联网搜索尚未配置，请选择其他类型。',
   NEWS_CONTEXT_UNAVAILABLE: '请先在资料库准备企业或项目资料。',
   RESULT_NOT_READY: '尚无已完成并保存到资料库的成果。',
-  NO_MATERIALS: '先将资料加入资料库，资料就绪后会自动继续。',
-  MATERIALS_NOT_READY: '资料仍在解析，或需要处理解析问题。',
+  NO_MATERIALS: '当前空间没有可用资料。请换到有资料的空间再生成，或先把资料加入资料库并完成解析。',
+  MATERIALS_NOT_READY: '资料仍在解析，或需要处理解析问题后再生成。',
   MERGING_DATA_EVENTS: '正在等待本批资料完成更新。',
   DAILY_RUN_LIMIT: '今天的手动生成额度已用完，额度恢复后会继续。',
   AUTOMATIC_DAILY_LIMIT: '今天的自动生成额度已用完，明天继续。',
@@ -44,29 +44,60 @@ const reasons: Record<string, string> = {
 const typeLabel = (value: string | null) =>
   generationChoices.find((choice) => choice.value === (value || ''))?.label || '默认';
 
+function explain(batch: GenerationBatch) {
+  return (batch.reason && reasons[batch.reason]) || label[batch.status] || batch.status;
+}
+
 /** One card being written: each requested card holds its own place until it arrives. */
 function GenerationPlaceholder({
   batch,
   index,
   total,
+  queuedBehindBlock,
 }: {
   batch: GenerationBatch;
   index: number;
   total: number;
+  queuedBehindBlock?: boolean;
 }) {
   const Icon =
     (batch.businessType && briefingTypeIcons[batch.businessType as keyof typeof briefingTypeIcons]) ||
     Sparkles;
   const running = batch.status === 'RUNNING';
+  const blocked = generationBlocked(batch.status);
   const completed = batch.status === 'SUCCEEDED';
+  const statusTitle = completed
+    ? '正在读取新画报'
+    : blocked
+      ? label[batch.status]
+      : batch.status === 'QUEUED'
+        ? queuedBehindBlock
+          ? '排队等待前序条件'
+          : '排队中'
+        : label[batch.status];
+  const detail =
+    blocked && batch.reason && reasons[batch.reason]
+      ? reasons[batch.reason]
+      : batch.status === 'QUEUED' && queuedBehindBlock
+        ? '前一张画报还在等资料或确认，条件满足后才会开始这一张。'
+        : batch.reason && reasons[batch.reason]
+          ? reasons[batch.reason]
+          : undefined;
   return (
     <article
       className={
         'live-briefing-card generation-pending generation-placeholder' +
-        (running ? ' is-writing' : '') +
-        (running || batch.status === 'QUEUED' ? ' is-generating' : '')
+        (running ? ' is-writing is-generating' : '') +
+        (batch.status === 'QUEUED' && !queuedBehindBlock ? ' is-generating' : '') +
+        (blocked || queuedBehindBlock ? ' is-blocked' : '')
       }
-      aria-label={`正在生成第 ${index + 1} 张画报`}
+      aria-label={
+        blocked
+          ? `第 ${index + 1} 张画报等待条件`
+          : running
+            ? `正在生成第 ${index + 1} 张画报`
+            : `第 ${index + 1} 张画报${statusTitle}`
+      }
       aria-busy={running}
       data-batch-id={batch.id}
       data-status={batch.status}
@@ -88,8 +119,8 @@ function GenerationPlaceholder({
         <i />
       </div>
       <p role="status">
-        <b>{completed ? '正在读取新画报' : batch.status === 'QUEUED' ? '排队中' : label[batch.status]}</b>
-        {batch.reason && reasons[batch.reason] && <span>{reasons[batch.reason]}</span>}
+        <b>{statusTitle}</b>
+        {detail && <span>{detail}</span>}
       </p>
     </article>
   );
@@ -118,6 +149,43 @@ export function GenerationPanel({ generation }: { generation: BriefingGeneration
   const busy = !!active || waiting.length > 0 || submission.busy || submission.uncertain;
   const open = active || waiting.find((slot) => generationOpen(slot.batch))?.batch;
   const unreadable = waiting.some((slot) => slot.batch.status === 'SUCCEEDED' && !slot.reading);
+  const blockedSlots = waiting.filter((slot) => generationBlocked(slot.batch.status));
+  const runningNow =
+    active?.status === 'RUNNING' || waiting.some((slot) => slot.batch.status === 'RUNNING');
+  const queuedNow = waiting.some((slot) => slot.batch.status === 'QUEUED');
+  const primaryBlock = blockedSlots[0]?.batch;
+  const faceWorking = runningNow || (queuedNow && !blockedSlots.length) || submission.busy || submission.uncertain;
+  const faceTitle =
+    submission.uncertain && !open
+      ? '正在确认生成请求'
+      : !open && !unreadable
+        ? '正在准备新画报'
+        : runningNow
+          ? generation.progress.total > 1
+            ? `正在生成 ${Math.min(generation.progress.done + 1, generation.progress.total)} / ${generation.progress.total}`
+            : '正在生成新画报'
+          : blockedSlots.length && !queuedNow
+            ? blockedSlots.length > 1
+              ? `${blockedSlots.length} 张画报在等待条件`
+              : '生成暂停，需要处理前置条件'
+            : blockedSlots.length
+              ? '部分画报在等待条件'
+              : queuedNow
+                ? generation.progress.total > 1
+                  ? `排队中 ${Math.min(generation.progress.done + 1, generation.progress.total)} / ${generation.progress.total}`
+                  : '排队等待开始生成'
+                : generation.progress.total > 1
+                  ? `正在生成 ${Math.min(generation.progress.done + 1, generation.progress.total)} / ${generation.progress.total}`
+                  : '正在生成新画报';
+  const faceCaption = unreadable
+    ? '资料或权限变化可能导致无法读取。'
+    : primaryBlock
+      ? explain(primaryBlock)
+      : runningNow
+        ? '模型正在分析；完成后会出现在上方。'
+        : queuedNow
+          ? '已进入队列，轮到时会自动开始，无需反复点击。'
+          : '做好的画报会依次出现在这里。';
   const start = () => {
     generation.dismissOutcome();
     generation.setComposing(true);
@@ -126,23 +194,15 @@ export function GenerationPanel({ generation }: { generation: BriefingGeneration
     <article
       className={'live-briefing-card briefing-generation' + (composing && !busy ? ' is-composing' : '')}
       aria-label="生成新画报"
-      aria-busy={busy}
+      aria-busy={busy && faceWorking}
     >
       {busy ? (
         <div className="generation-face" role="status">
-          <span className="generation-symbol is-working">
+          <span className={'generation-symbol' + (faceWorking ? ' is-working' : ' is-blocked')}>
             <Sparkles size={22} strokeWidth={1.5} />
           </span>
-          <h3>
-            {submission.uncertain && !open
-              ? '正在确认生成请求'
-              : !open && !unreadable
-                ? '正在准备新画报'
-                : generation.progress.total > 1
-                  ? `正在生成 ${Math.min(generation.progress.done + 1, generation.progress.total)} / ${generation.progress.total}`
-                  : '正在生成新画报'}
-          </h3>
-          <p>{unreadable ? '资料或权限变化可能导致无法读取。' : '做好的画报会依次出现在这里。'}</p>
+          <h3>{faceTitle}</h3>
+          <p>{faceCaption}</p>
           <SubmitError error={submission.error || generation.error} uncertain={submission.uncertain} />
           {!open && submission.uncertain && (
             <Button icon={RotateCw} disabled={submission.busy} onClick={() => generation.generate()}>
@@ -156,7 +216,7 @@ export function GenerationPanel({ generation }: { generation: BriefingGeneration
               disabled={!!generation.cancelBusy}
               onClick={() => void generation.cancel(open.id)}
             >
-              取消本次生成
+              {primaryBlock ? '取消并停止等待' : '取消本次生成'}
             </Button>
           )}
           {unreadable && !open && (
@@ -346,6 +406,7 @@ export function generationTiles(
       render: <div className="generation-arrived">{render(slot.item!)}</div>,
     }));
   const total = Math.max(generation.progress.total, generation.pending.length);
+  const anyBlocked = generation.pending.some((slot) => generationBlocked(slot.batch.status));
   generation.pending.forEach((slot, index) =>
     items.push({
       id: 'generation:pending:' + slot.batch.id,
@@ -358,6 +419,7 @@ export function generationTiles(
           batch={slot.batch}
           index={total - generation.pending.length + index}
           total={total}
+          queuedBehindBlock={slot.batch.status === 'QUEUED' && anyBlocked}
         />
       ),
     }),

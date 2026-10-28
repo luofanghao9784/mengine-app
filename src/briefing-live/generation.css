@@ -80,6 +80,20 @@
 .generation-symbol.is-working svg {
   animation: generation-twinkle 1.8s ease-in-out infinite;
 }
+.generation-symbol.is-blocked {
+  background: color-mix(in srgb, var(--warn, #c47b2b) 16%, var(--soft, #f3f1ec));
+  color: var(--warn, #a35d12);
+}
+.generation-pending.is-blocked {
+  background: color-mix(in srgb, var(--warn, #c47b2b) 6%, var(--card, #fff));
+}
+.generation-pending.is-blocked .generation-pending-lines i {
+  opacity: 0.35;
+  animation: none;
+}
+.generation-pending.is-blocked p b {
+  color: var(--warn, #a35d12);
+}
 .generation-back {
   display: grid;
   place-items: center;

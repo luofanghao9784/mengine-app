@@ -169,9 +169,11 @@ export function useBriefingGeneration(tenant: string, workspace?: string, busine
         for (const batch of next) if (!tracked.current.includes(batch.id)) tracked.current.push(batch.id);
         const ids = new Set(next.map((batch) => batch.id));
         setBatches((old) => [...next, ...old.filter((b) => !ids.has(b.id))]);
-        setSlots((old) => [...old.filter((s) => !ids.has(s.batch.id)), ...next.map((batch) => ({ batch }))]);
+        // Terminal failures belong in the outcome face, not a vanishing "generating" slot.
+        const keep = next.filter((batch) => generationOpen(batch) || batch.status === 'SUCCEEDED');
+        setSlots((old) => [...old.filter((s) => !ids.has(s.batch.id)), ...keep.map((batch) => ({ batch }))]);
         setComposing(false);
-        refresh();
+        if (keep.length) refresh();
       },
     );
   };
