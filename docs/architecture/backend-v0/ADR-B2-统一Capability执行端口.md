@@ -2,7 +2,7 @@
 
 | 字段 | 内容 |
 | --- | --- |
-| 状态 | **Proposed（本地草稿）**。供总负责人批纯文档 PR；合并前决策仍可微调。 |
+| 状态 | **Proposed（follow-up 修订 · 本地）**。相对已合 PR #12；并入架构逻辑 + 质量性能必改；仍不推仓。 |
 | 日期 | 2026-10-30（Asia/Shanghai） |
 | 作者 | 梦擎·系统架构 |
 | 审阅 | 梦擎重构总监（提纲已通过；正文待总负责人批） |
@@ -29,7 +29,7 @@
 
 ## 决策（Decision）
 
-引入统一 **`CapabilityExecutionPort`**。编排与业务代码只提交 `ExecutionRequest`；由端口按登记结果路由到适配器。首版启用 `LocalProcessAdapter` 与 `InProcessRuleAdapter`；**预留** `model-agent`（可与 `engine-http` 合并为同一适配器族，首版**不启用**引擎/模型运行时）。
+引入统一 **`CapabilityExecutionPort`**。编排与业务代码只提交 `ExecutionRequest`；由端口**先按企业端业务功能（及五维约束）解析登记，再按 `runtimeKind` 选适配器**（**禁止**「仅按 `moduleVersionId` 路由」）。首版启用 `LocalProcessAdapter` 与 `InProcessRuleAdapter`；**预留** `model-agent` 与 `engine-http`——二者首版为**同一适配器实现**（建议名 `ModelAgentOrEngineHttpAdapter`，或同一适配器族/同一类；首版**不启用**真实调度）。
 
 ### 端口与路由
 
@@ -38,27 +38,31 @@ interface CapabilityExecutionPort {
   ExecutionResult execute(ExecutionRequest req);
 }
 
-// 路由：先按企业端业务功能解析登记，再按 runtimeKind 选适配器
+// 路由（禁止「仅按 moduleVersionId 路由」）：
+// 1) 先按企业端业务功能（enterpriseFunction）及五维约束解析登记
+//    → 得到/确认 moduleVersionId（请求可已带已解析值；空则端口解析）
+// 2) 再按 ModuleVersion.runtimeKind 选适配器
 // runtimeKind ∈ { in-process, local-process, model-agent, engine-http }
-// 首版：model-agent / engine-http 可注册但不调度（或显式 NotEnabled）
+// 首版：model-agent 与 engine-http → 同一适配器实现，可注册但不调度（或显式 NotEnabled）
 ```
 
 | `runtimeKind` | 适配器 | 首版 |
 | --- | --- | --- |
 | `local-process` | `LocalProcessAdapter` | **启用**（搬入现有 ProcessBuilder） |
 | `in-process` | `InProcessRuleAdapter` | **启用**（如 `pii-regex/v1`） |
-| `model-agent` | `ModelAgentAdapter`（或与 `EngineHttpAdapter` 合并） | **预留，不启用** |
-| `engine-http` | `EngineHttpAdapter` | **预留，不启用** |
+| `model-agent` | **同一适配器**：建议名 `ModelAgentOrEngineHttpAdapter`（或同一适配器族/同一类） | **预留，不启用** |
+| `engine-http` | **同上**（与 `model-agent` 首版非两个并行实现） | **预留，不启用** |
 
 ### 五维登记与路由（与 B1 对齐）
 
 能力登记是**多维索引**，不是单键。调度时：
 
-1. **触发维**：企业端业务功能（例：解析、表格比对、质检、修复建议、语义标注）。`ExecutionRequest` 必须带该维度（字段名建议 `enterpriseFunction` 或契约定稿之等价名；**待契约五分片定稿**），**禁止**只传厂商/模型名发起执行。
-2. **约束维**（可组合）：模型/厂商 · 运行时类型 · 版本 · 租户/企业。解析出唯一（或默认策略下的）`moduleVersionId` 后，再按该版本的 `runtimeKind` 选适配器。
+1. **触发维**：企业端业务功能（例：解析、表格比对、质检、修复建议、语义标注）。`ExecutionRequest` **必须显式**带该维度（字段名 **`enterpriseFunction`**，或契约定稿之等价名；**待契约五分片定稿**），**禁止**只传厂商/模型名发起执行，**禁止**「仅按 `moduleVersionId` 路由」。
+2. **约束维**（可组合）：模型/厂商 · 运行时类型 · 版本 · 租户/企业。先按功能 + 约束解析登记，得到唯一（或默认策略下的）`moduleVersionId` 后，**再**按该版本的 `runtimeKind` 选适配器。
 3. **厂商是维度之二，不是唯一主键**；不得以厂商名冒充企业端功能。
+4. **`moduleVersionId`**：可为调用方已解析结果；若空则由端口/注册表按五维解析。不得把「已带 moduleVersionId」理解成可跳过企业端功能维校验——请求仍须带 `enterpriseFunction`，且与该版本所属功能一致（不一致则失败）。
 
-`Capability` / `ModuleVersion` 记录挂在企业端业务功能之下；实现可替换而不改触发维。
+`Capability` = 某企业端功能下的**实现族**（≠ 功能码）；`ModuleVersion` 挂在 Capability 下。功能码独立列见 ADR-B1。
 
 ### ExecutionRequest / ExecutionResult（关键字段草案）
 
@@ -105,15 +109,57 @@ interface CapabilityExecutionPort {
 
 ### DocumentParser 兼容外观
 
-- `LocalDocumentParser` 改为委托 `CapabilityExecutionPort`（预置企业端功能如「文档解析」、`moduleVersionId` 对应 `parse/local-3` 等种子）。
+- `LocalDocumentParser` 改为委托 `CapabilityExecutionPort`（预置企业端功能如「文档解析」、`moduleVersionId` 可对应 `parse/local-3` 等种子或留空由端口解析）。
 - `DocumentParser` 接口保留，供 `KnowledgeWorker` 无感；lease/attempt 语义不变。
 - `LocalTableCalculator` 同样委托（企业端功能如「表格比对」）。
+
+### 进行中 attempt 锁定 `moduleVersionId`
+
+- 调度创建 attempt 时写入并**锁定**当时的 `moduleVersionId`（及解析所用企业端功能 / 关键五维快照，以契约定稿为准）。
+- 能力替换、新版本准入、默认策略变更——**只影响新调度**的 attempt；**禁止**改写进行中（queued 已绑定、running、awaiting_human）attempt 的实现绑定。
+- 与 ADR-B1 同条；兼容外观路径（KnowledgeWorker）同等适用。
+
+### LocalProcessAdapter / 端口资源硬限（首版）
+
+正式条文见 [`FOLLOWUP-B1B2-质量性能硬约束-20261030.md`](./FOLLOWUP-B1B2-质量性能硬约束-20261030.md) §1；下列为决策级写入，语义不得弱于附录。
+
+**`CapabilityExecutionPort` 经 `LocalProcessAdapter`（及首版 in-process 以外、会占 OS 进程/临时目录的适配器）必须满足下列首版硬限；禁止无界排队。**
+
+1. **有界队列**  
+   - 端口（或适配器）维护**有界**等待队列；队列容量为显式配置常量（种子默认值由实现 ADR/配置定稿，**本文不编造具体数字**，但合入 PR 必须写出默认值与配置键）。  
+   - **禁止**无界 `BlockingQueue` / 无界线程池 / 无限 `CompletableFuture` 堆积作为默认。  
+   - 入队前已满：立即失败，**不得**阻塞调用方直到资源出现（除非契约显式约定同步背压且有超时；首版默认「满则失败」）。
+
+2. **信号量 / 并发上限**  
+   - 同时处于「进程已拉起、尚未回收」的 `local-process` 执行数 ≤ 配置上限（信号量或等价物）。  
+   - in-process 规则执行可另设更高上限，但仍须有界；不得与 local-process 共用无界池。  
+   - 超限与队列满使用**稳定失败码**（见下），不得静默丢弃、不得改写为成功/PARTIAL 伪绿。
+
+3. **超限失败码（稳定、可断言）**  
+   - 建议语义码（契约定稿可改名，**不得删语义**）：  
+     - `EXECUTION_QUEUE_FULL` — 等待队列已满  
+     - `EXECUTION_CONCURRENCY_LIMIT` — 并发信号量耗尽  
+     - `EXECUTION_TIMEOUT` — 步骤/适配器超时（与现有解析 85s、table-compare 10s 对齐，首迁数值不变）  
+     - `EXECUTION_OUTPUT_LIMIT` — 输出超限（与现有限额对齐）  
+     - `EXECUTION_JOB_CLEANUP_FAILED` — 临时 job 目录清理失败（可降为 warning + 指标，但不得掩盖主结果失败态）  
+   - 失败时 `ExecutionResult.status` 映射为失败态；**禁止**用空 warnings 或成功态掩盖。
+
+4. **超时叠加策略**  
+   - 单步 `limits.timeout`（或 ModuleVersion 默认）为**硬上限**；端口不得在适配器外再无限等待。  
+   - 队列等待时间计入总时限或单独配置 `queueWaitTimeout`；二者任一触达即失败并返回 `EXECUTION_TIMEOUT`（或拆分 `EXECUTION_QUEUE_WAIT_TIMEOUT`，契约定一即可）。  
+   - **禁止**「队列等待无超时 + 进程超时」叠加导致调用方挂死。  
+   - 首迁：解析 85s、table-compare 10s 的**进程内**超时数值不变；本条约束的是端口调度层，不得借机改 sandbox 数值。
+
+5. **job 目录清理**  
+   - 每次 local-process 执行使用独立临时目录（或既有 job 目录约定）；**成功与失败路径均须**尝试清理。  
+   - 清理失败不得把主结果从失败改成成功；须可观测（日志/指标）。  
+   - 禁止依赖「进程退出后 OS 偶然回收」作为唯一清理手段。
 
 ### 迁移步骤 S1–S4
 
 | 步 | 内容 | 验收标准 | 估计 |
 | --- | --- | --- | --- |
-| **S1** | 抽 `CapabilityExecutionPort` + `LocalProcessAdapter`；`LocalDocumentParser` 改委托 | 既有解析集成/验收用例通过；业务路径无第二处 parser ProcessBuilder；请求含企业端功能维 | 1–2 人日 |
+| **S1** | 抽 `CapabilityExecutionPort` + `LocalProcessAdapter`；`LocalDocumentParser` 改委托 | 既有解析集成/验收用例通过；业务路径无第二处 parser ProcessBuilder；请求含企业端功能维；**资源硬限验收清单同期勾选**（不得只跑 golden 即合端口） | 1–2 人日 |
 | **S2** | `LocalTableCalculator` 同样委托 | `TableCalculation*` 相关用例通过；计算器内无裸 ProcessBuilder | 0.5 人日 |
 | **S3** | parserVersion 白名单 → 预置 `ModuleVersion` 种子（`migration-common` V190+ 相关表，属 B1 表族） | 种子中的 version 字符串与现白名单**值不变**；五维可查（至少功能+版本+运行时；厂商/租户可先占位） | 1 人日 |
 | **S4** | golden 回归 + 超时/限额用例 | 同输入 golden 输出一致；超时与超限仍失败且码稳定 | 1–2 人日 |
@@ -130,7 +176,7 @@ interface CapabilityExecutionPort {
 
 - **R3**：`warnings` 枚举与 `parserVersion` 是隐式契约；S3/S4 必须值不变，否则 knowledge 下游断裂。
 - 沙箱路径 macOS/Linux 分裂：集中代码时禁止「顺手重构」隔离策略。
-- `model-agent` 预留若过早被业务直接 HTTP 调引擎，会绕过端口——须靠代码评审 / 后续 ArchUnit 禁止业务包直依赖引擎客户端（候选，不锁定）。
+- `model-agent` / `engine-http`（同一适配器）预留若过早被业务直接 HTTP 调引擎，会绕过端口——须靠代码评审 / 后续 ArchUnit 禁止业务包直依赖引擎客户端（候选，不锁定）。
 
 ---
 
@@ -155,7 +201,7 @@ interface CapabilityExecutionPort {
 
 ## 明确不做（Out of scope）
 
-- 不启用 `model-agent` / `engine-http` 真实调度（只预留路由与登记字段）。
+- 不启用 `model-agent` / `engine-http` 真实调度（只预留路由与登记字段；二者首版同一适配器实现，非两个并行首版实现）。
 - 不收编 `ProcessCollectionAdapter`、`NativeScheduleRules` 等非 parser ProcessBuilder。
 - 不改 sandbox.py 行为与超时/限额数值（迁移期）。
 - 不写 B3–B6 正文；不 commit / push；不改业务代码（本文仅为文档）。
@@ -174,16 +220,26 @@ interface CapabilityExecutionPort {
 ### 勾选清单
 
 - [ ] 两调用点（`LocalDocumentParser`、`LocalTableCalculator`）均经端口，无业务侧裸 ProcessBuilder 调 parser。
-- [ ] `runtimeKind` 含 `local-process` / `in-process`，并**预留** `model-agent`（或并入 `engine-http`）。
-- [ ] **登记/路由是五维索引**（企业端业务功能 · 模型/厂商 · 运行时类型 · 版本 · 租户/企业；**不含环境**）；触发维为企业端业务功能。
+- [ ] `runtimeKind` 含 `local-process` / `in-process`，并**预留** `model-agent` 与 `engine-http`（**同一适配器实现**）。
+- [ ] **登记/路由是五维索引**（企业端业务功能 · 模型/厂商 · 运行时类型 · 版本 · 租户/企业；**不含环境**）；触发维为企业端业务功能；**禁止**「仅按 moduleVersionId 路由」。
 - [ ] **禁止**以厂商名/模型名作为唯一触发键；厂商仅为约束维。
 - [ ] S1–S4 验收标准在实现 PR 中可勾选；parserVersion 种子值不变。
-- [ ] `ExecutionRequest` 带企业端功能维度（及可选约束维），而非 vendor 主键。
+- [ ] `ExecutionRequest` **显式**含 `enterpriseFunction`（及可选约束维）；`moduleVersionId` 可已解析或空；而非 vendor 主键。
+- [ ] 进行中 attempt **锁定** `moduleVersionId`；替换只影响新调度。
+
+### 资源硬限验收（实现 PR 必勾 · 质量性能 §1）
+
+- [ ] 存在配置化的**有界**队列容量与并发上限（信号量或等价）；默认值写在 PR 说明与配置样例中；**禁止**无界排队。
+- [ ] 单测/集成：填满队列或打满并发时返回稳定失败码（`EXECUTION_QUEUE_FULL` / `EXECUTION_CONCURRENCY_LIMIT` 等），且无成功伪绿。
+- [ ] 超时用例：队列等待或执行超时均失败且码稳定（`EXECUTION_TIMEOUT` 或拆分码）。
+- [ ] 成功与失败路径均覆盖 job 目录清理断言（目录不存在或为空）。
+- [ ] 无 `continue-on-error`；无「跳过资源限制」的测试后门进入默认 CI。
 
 ---
 
 ## 参考
 
-- [`ADR-B1-首版边界-新包与只读上游.md`](./ADR-B1-首版边界-新包与只读上游.md)（只读上游、五维登记原则、`simulated` 默认）
+- [`ADR-B1-首版边界-新包与只读上游.md`](./ADR-B1-首版边界-新包与只读上游.md)（只读上游=`UpstreamReadPort`、五维、attempt 锁定、`simulated` 默认）
+- [`FOLLOWUP-B1B2-质量性能硬约束-20261030.md`](./FOLLOWUP-B1B2-质量性能硬约束-20261030.md)（§1 资源硬限原文）
 - [`02-目标分层.md`](./02-目标分层.md) §2 · [`01-现状盘点.md`](./01-现状盘点.md) §1.3
 - 仓内：`apps/api/.../knowledge/DocumentParser.java`、`LocalDocumentParser.java`、`LocalTableCalculator.java`

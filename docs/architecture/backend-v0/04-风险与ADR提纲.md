@@ -15,12 +15,12 @@
 **ADR-B1 首版边界：新包/新路径/新表，material 与 knowledge 只作只读上游 —— 立场：修正后采纳**
 - 采纳理由：旧体系里没有一套同时具备可替换模块、三态分列和配置版本（见 01 §3b）。在旧体系上改，迁移和语义成本都会更高。
 - 修正 1：parse 不是纯只读。过渡期内解析仍写 `knowledge_runs/chunks`，只是改由 CapabilityExecutionPort 执行。所以应该说「knowledge 的**数据**对 qualityops 只读，knowledge 的**执行路径**进入槽位」。
-- 修正 2：只读必须走 `MaterialKnowledgeReadFacade`（查询接口），禁止跨包直接 SQL，禁止引用内部类。
+- 修正 2：应用层只依赖 `UpstreamReadPort`；`MaterialKnowledgeReadFacade` = 该端口适配器；禁止跨包直接 SQL，禁止引用内部类。
 - 修正 3：MaterialGovernance 的规则可以**复制**成首个 in-process 模块，但不能调用旧服务。
 - 边界条件：(a) qualityops 不写 material/knowledge 表；(b) 新路由、新表、新包名都不含 governance；(c) 当 Foundation 需要读新结果时，由 Foundation 读 qo_*，而不是 qo 回写旧表；(d) 如果上游版本模型变了（inputVersionId 语义变化），要重开本 ADR。
 - 推翻条件：如果证明旧 knowledge_runs 必须承载 quality-check 步（同一个队列），就改为扩展队列。
 
-**ADR-B2 统一 Capability 执行端口**：ProcessBuilder 收敛进适配器；按 moduleVersionId 路由；engine-http 预留。（首个建议落地的 ADR）
+**ADR-B2 统一 Capability 执行端口**：ProcessBuilder 收敛进适配器；先按企业端功能+五维再按 runtimeKind 路由（禁仅按 moduleVersionId）；model-agent/engine-http 同一适配器预留；有界队列+信号量硬限。（首个建议落地的 ADR）
 
 **ADR-B3 「检查·发布·问题」语义收敛**：qualityops 是唯一规范语义；旧四套冻结并标注用途；methods 是否演进成 capability-registry 留到二期评估（判据：字段同构度、准入测试是否可复用）。
 

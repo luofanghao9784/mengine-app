@@ -2,7 +2,7 @@
 
 | 字段 | 内容 |
 | --- | --- |
-| 状态 | **Proposed（本地草稿）**。供总负责人批纯文档 PR；合并前决策仍可微调。 |
+| 状态 | **Proposed（follow-up 修订 · 本地）**。相对已合 PR #12；并入架构逻辑 + 质量性能必改；仍不推仓。 |
 | 日期 | 2026-10-30（Asia/Shanghai） |
 | 作者 | 梦擎·系统架构 |
 | 审阅 | 梦擎重构总监（提纲「修正后采纳」已通过；正文待总负责人批） |
@@ -44,11 +44,12 @@
 - 对 qualityops 而言：`knowledge` 的**数据**只读；`knowledge` 的**执行路径**进入 `CapabilityExecutionPort`（见 ADR-B2）。
 - 禁止把「只读上游」理解成「解析也不走槽位」。
 
-**修正 2 — 只读必须经 Facade**
+**修正 2 — 只读必须经 `UpstreamReadPort`（Facade = 适配器）**
 
-- 上游读取一律经 `MaterialKnowledgeReadFacade`（查询接口）。
+- 应用层**只依赖**端口 **`UpstreamReadPort`**（建议名；契约/包路径定稿可改名，语义不变）。
+- `MaterialKnowledgeReadFacade` 是该端口的**适配器实现**，不是应用层可直接当作「端口契约类名」去依赖的边界；编排与应用服务面向 `UpstreamReadPort` 编程。
 - 禁止 qualityops 跨包直接 SQL 读 `material` / `knowledge` 表。
-- 禁止引用 `material.*` / `knowledge.*` 的内部类（可用 ArchUnit 等架构断言固化；本轮只登记候选，不锁定工具）。
+- 禁止引用 `material.*` / `knowledge.*` 的内部类（可用 ArchUnit 等架构断言固化；首个代码 PR 前须有可执行自动断言，见下文「可测性」）。
 
 **修正 3 — 规则可复制，不可调用旧服务**
 
@@ -71,7 +72,13 @@
 
 - `qo_debug_run` 默认 **`executionMode = simulated`**。
 - 选择 `real` 必须显式指定，并受权限约束（原则：仅具备相应运维/调试权限的身份可发起；具体权限码与审计字段由契约与身份 ADR/实现定稿，本文不编造码名）。
-- 与已合三态 ADR 一致：`simulated` 时质量与发布不得呈现为生产可用。
+- 与已合三态 ADR 一致：`simulated` 时质量与发布不得呈现为生产可用（可勾选用例见下文「simulated 验收用例名」）。
+
+### 进行中 attempt 锁定 `moduleVersionId`
+
+- 任一已进入执行（或已绑定实现）的 **attempt**（含 `qo_check_attempt`、调试跑等价记录、以及经兼容外观委托的 knowledge attempt）在创建/调度时**锁定**当时解析得到的 `moduleVersionId`。
+- 能力替换、新版本准入、五维默认策略变更——**只影响之后新调度**的 attempt；**禁止**改写进行中（含排队已出队、running、awaiting_human）attempt 上已绑定的实现版本。
+- 取消后重试 = 新 attempt，可按最新登记解析；不得原地覆盖旧 attempt 的 `moduleVersionId`。
 
 ### 模型能力与企业端功能登记原则（五维）
 
@@ -92,7 +99,17 @@
    - **实时替换**按「企业端业务功能」触发（编排只说「跑质检」，不说「跑某厂商模型」）。
    - 选用哪套实现时，可叠加厂商、运行时、版本、租户等约束做筛选。
    - 与「禁止以厂商名作**唯一**登记键」不矛盾：**厂商是维度之二，不是唯一主键**；主键/触发维仍是企业端业务功能。禁止以厂商名、模型名或平台内部技术分类冒充主维度。
-   - `Capability` / `ModuleVersion` **挂在企业端业务功能之下**；实现（规则 / 进程 / 模型 agent）可替换。对齐 `CapabilityExecutionPort`（ADR-B2）。
+   - **功能码独立列（触发维）**：表设计 / 登记模型中 `enterpriseFunctionCode`（或契约定稿等价名）为**独立列**，不得与 Capability 主键混写。
+   - **`Capability` ≠ 功能码**：`Capability` = 某企业端业务功能下的**实现族**（一族可替换实现的集合），**不等同于**功能码本身。一层功能码之下可挂多个 Capability；每个 Capability 下再挂多个 `ModuleVersion`。
+   - 分层示意（建议名）：
+
+     | 层 | 标识（建议） | 含义 |
+     | --- | --- | --- |
+     | 企业端业务功能 | `enterpriseFunctionCode` | 触发维独立列（质检、解析增强、修复建议、语义标注…） |
+     | Capability | `capabilityId` | 该功能下的**实现族**（≠ 功能码） |
+     | ModuleVersion | `moduleVersionId` | 某实现族的具体版本（含 `runtimeKind`、限额等） |
+
+   - 实现对齐 `CapabilityExecutionPort`（ADR-B2）。
 
 3. **开源框架 + 模型须可论证。** 探索开源框架与模型能力结合时，须在后续选型或实现 ADR/评审中写明：可靠性（失败语义、超时、输出校验）、可维护性（升级与供应链）、可替换性（换实现不改编排契约、不改企业端功能触发维）。具体框架名本轮 backlog，不在本文锁定。
 
@@ -105,14 +122,33 @@
 - **(c)** 当 Foundation 等投影需要读新结果时，由 Foundation **读** `qo_*`，而不是 qualityops 回写旧表。
 - **(d)** 若上游版本模型变化导致 `inputVersionId` 语义变化，须**重开本 ADR**，不得静默改含义。
 
-### 可测性与合入约束（边界补充 · 测试审查）
+### 可测性与合入约束（边界补充 · 测试审查 · 质量性能硬约束）
 
-下列约束与边界条件同等效力；未满足不得宣称 qualityops / 纵切「通过」。
+下列约束与边界条件同等效力；未满足不得宣称 qualityops / 纵切 / admission「通过」或可合入主干。正式条文见同目录 [`FOLLOWUP-B1B2-质量性能硬约束-20261030.md`](./FOLLOWUP-B1B2-质量性能硬约束-20261030.md)（§2–§4）；此处写入决策级摘要，语义不得弱于附录。
 
 1. **契约硬门禁**：五个契约分片（`capability-registry` / `quality-check-run` / `check-flow-config` / `check-run-log` / `data-version-readonly`）**必须先入仓**；未入仓不得将 qualityops 相关实现标为通过或可合入主干。
-2. **首版 PR 审查清单（必勾）**：① `qualityops` **禁止**跨包 import `material.*` / `knowledge.*` 内部类（只经 Facade）；② 指向 parser 的 `ProcessBuilder` **仅允许**出现在执行适配器内。ArchUnit 等自动化可 backlog，**不能**代替本清单勾选。
-3. **三态与 executionMode 契约断言**：`runStatus` / `qualityVerdict` / `publishStatus` 分列存储与契约字段必须有断言覆盖；`executionMode` 仅 `simulated` | `real`。字段合并、枚举模糊或同义混用——**一律否决**。
-4. **纵切逐片绿**：最小纵切五步（契约 → V190 → 端口 → `pii-regex/v1` → 只读 data-version）须**逐片**通过后再进下一片；`admissionTestVerdict` 相关 CI **禁止**依赖 live/model（对齐首版调试默认 `simulated`）。
+
+2. **首版 PR 审查清单（必勾）+ 首个代码 PR 前可执行自动断言**：① `qualityops` **禁止**跨包 import `material.*` / `knowledge.*` 内部类（应用层只经 **`UpstreamReadPort`**；Facade 仅为适配器）；② 指向 parser 的 `ProcessBuilder` **仅允许**出现在执行适配器内。清单仍须人工勾选。**此外**：合并**任一** `com.dreamcore.workspace.qualityops`（或等价包根）业务/适配器代码进主干之前，必须已合入**至少一条**在默认 CI 中执行的自动断言，满足下列之一（可并存）：
+   - **A. 包依赖测试**：ArchUnit（或等价）——`qualityops` 不得依赖 `material` / `knowledge` 内部实现包；只允许经 `UpstreamReadPort` / 只读端口包（适配器实现可放白名单路径）。
+   - **B. CI grep / 结构检查**：门禁 job 中失败即红——禁止 `qualityops` 源码出现对 `material.` / `knowledge.` 内部类的 import；禁止业务包（非执行适配器包）出现指向 parser 的 `ProcessBuilder`。
+   - ArchUnit「可 backlog」**仅适用于文档期**；**首个 qualityops 代码 PR 的前置条件**是 A 或 B 已绿。适配器包白名单扩大须过质量性能 + 测试审查，并报总监。手工清单与自动化**同时生效**。
+
+3. **三态与 executionMode 契约断言 + `simulated` 不得呈生产可用**：`runStatus` / `qualityVerdict` / `publishStatus` 分列存储与契约字段必须有断言覆盖；`executionMode` 仅 `simulated` | `real`。字段合并、枚举模糊或同义混用——**一律否决**。字段「存在」类弱断言**不算**满足；必须覆盖 **simulated → 非生产可用表面**。可勾选用例名（建议 ID，可改名不可删语义；与质量性能附录 §3 一致）：
+
+   | 用例 ID | 断言要点 |
+   | --- | --- |
+   | `debug_run_simulated_rejects_production_publish_surface` | `executionMode=simulated` 时，对外契约/API **不得**将 `publishStatus` 表示为可生产发布（如 `published` / 等价）；若返回，须为明确非生产态或 4xx 业务拒绝。 |
+   | `debug_run_simulated_quality_not_production_ready` | `executionMode=simulated` 时，`qualityVerdict` **不得**单独被解释为「已通过可上线」而不展示 simulated；响应中须能区分模拟与真实（字段或并列 `executionMode`）。 |
+   | `debug_run_real_requires_explicit_mode_and_authz` | 选择 `real` 必须显式传参；缺省 `simulated`；无相应权限时拒绝（权限码由身份/契约 ADR 定稿，本文不编造码名）。 |
+   | `three_state_columns_not_merged` | 存储与契约中三态分列；合并单一 `status` 或同义混用——测试失败。 |
+   | `execution_mode_enum_closed` | `executionMode` 仅 `simulated` | `real`；其它值契约校验失败。 |
+   | `simulated_debug_run_not_publishable` | （交叉别名/补充勾选）模拟调试跑不得进入可发布表面。 |
+   | `simulated_verdict_not_production_ready` | （交叉别名/补充勾选）模拟结论不得呈现为生产就绪。 |
+
+4. **纵切逐片绿 + CI / workflow 硬约束**：最小纵切五步（契约 → V190 → 端口 → `pii-regex/v1` → 只读 data-version）须**逐片**通过后再进下一片。**首个（及后续）`qualityops` / platform `admission` / `admissionTestVerdict` 相关 GitHub Actions workflow**：
+   - **禁止** `continue-on-error: true`（job 级与 step 级均禁）；禁止用 `|| true`、吞非零退出码、或把失败步骤标为 success 的包装进入默认 PR 门禁。
+   - **admission 默认禁 live/model**：默认 PR / 默认 branch 门禁不得设置真实模型密钥，不得跑 live/model smoke；`admissionTestVerdict` 相关用例必须在 **simulated / 夹具** 下可绿；依赖 live 的用例须环境变量门闩，且默认 CI **不设置**这些变量（对齐不跑 `model:smoke` / `test:model-smoke` / live 类测试）。live 验证只允许手工/受控 workflow，且不得作为合入主干的唯一绿灯。
+   - 任一片红不得宣称整链通过。
 
 ### 推翻条件
 
@@ -139,7 +175,7 @@
 ### 正向
 
 - 新闭环不与七套旧语义缠死；命名与表前缀干净。
-- 只读 Facade + 单向依赖降低 material↔knowledge 环被加深的风险（R2）。
+- `UpstreamReadPort` + 单向依赖（Facade 仅适配器）降低 material↔knowledge 环被加深的风险（R2）；进行中 attempt 锁定版本，避免热替换抖动。
 - 槽位与「企业端功能主维 + 五维索引」为后续模型 agent 替换留出同一套契约面。
 - 调试默认 `simulated`，降低误当生产发布的产品风险。
 
@@ -163,7 +199,7 @@
 - 不改 `MaterialGovernance` / `evaluation` / `methods` / `GovernanceModel*` 的既有行为。
 - 不把 qualityops 回写旧 governance / material_governance / evaluation 表。
 - 不在本 ADR 锁定开源框架、模型厂商或生成工具。
-- 不启用 `engine-http` / 模型 agent 运行时（接口与登记原则在 B2 预留；实现另派）。
+- 不启用 `model-agent` / `engine-http` 真实调度（二者首版为**同一适配器实现**，见 B2；接口与登记原则预留，实现另派）。
 - 不做 Foundation 投影切换（二期：Foundation 改读 `qo_*`）。
 - 不写 ADR-B3–B6 正文（仍见 [`04-风险与ADR提纲.md`](./04-风险与ADR提纲.md)）。
 - 不 commit / push；不改业务代码。
@@ -174,7 +210,8 @@
 
 - [x] 总监批准「修正后采纳」立场与边界/推翻条件方向
 - [x] 本文本地正文（含命名对照、`simulated` 默认、模型能力与企业端功能登记原则（五维））
-- [ ] 总负责人批纯文档 PR（01–04 + B1 + B2）
+- [x] follow-up：功能码独立列、Capability≠功能码、attempt 锁定、UpstreamReadPort、首代码 PR 前自动断言、simulated 用例名、workflow 禁 continue-on-error（相对 #12）
+- [ ] 总负责人批 follow-up 纯文档 PR
 - [ ] 合并后：契约五分片 → V190 → 端口 → `pii-regex/v1` → 只读 data-version
 - [ ] 后续：质检/标注/修复建议等企业端功能优先换模型 agent（按企业端功能准入）
 
