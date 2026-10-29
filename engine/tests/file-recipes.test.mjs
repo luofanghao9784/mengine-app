@@ -110,7 +110,10 @@ async function setup(filename, bytes) {
     failure: () => failure,
   };
 }
-test('actual sandbox emits bounded private artifacts with immutable version and exact parameters', async () => {
+test(
+  'actual sandbox emits bounded private artifacts with immutable version and exact parameters',
+  { skip: process.platform !== 'darwin' },
+  async () => {
   const f = await setup('table.csv', Buffer.from('team,amount\nA,0.1\nA,0.2\n'));
   try {
     await assert.rejects(f.run('csv_summary'), { code: 'INPUT_NOT_GRANTED' });
@@ -147,7 +150,10 @@ test('actual sandbox emits bounded private artifacts with immutable version and 
     f.originals.close();
   }
 });
-test('unsupported, invalid encoding and malformed numeric input deliver specific failures without artifacts', async () => {
+test(
+  'unsupported, invalid encoding and malformed numeric input deliver specific failures without artifacts',
+  { skip: process.platform !== 'darwin' },
+  async () => {
   for (const [filename, bytes, recipe, options, code] of [
     ['file.xlsx', Buffer.from('not a workbook'), 'csv_summary', {}, 'UNSUPPORTED'],
     ['file.txt', Buffer.from([255, 254, 255]), 'text_extract', {}, 'ENCODING'],

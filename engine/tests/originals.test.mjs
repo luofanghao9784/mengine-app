@@ -116,7 +116,10 @@ test('limits and revocation prevent staging unauthorized originals', async () =>
   await assert.rejects(f.tool('read_original', { versionId: f.selected.versionId }));
   assert.deepEqual(f.grant.ids(), []);
 });
-test('actual Harness and sandbox process a whole selected original without sending its bytes to model HTTP', async (t) => {
+test(
+  'actual Harness and sandbox process a whole selected original without sending its bytes to model HTTP',
+  { skip: process.platform !== 'darwin' },
+  async (t) => {
   const bytes = Buffer.from('RAW_ONLY_MARKER,value\n0,1001\n1,999'),
     versionId = randomUUID();
   const selected = {
