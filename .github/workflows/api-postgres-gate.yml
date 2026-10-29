@@ -8,8 +8,9 @@ on:
   pull_request:
     branches: [main]
 
-# contents:read 供 checkout；actions:write 供 setup-java 的 Maven 缓存。
+# contents:read 供 checkout；actions:write 供 setup-java 的 Maven 缓存与 setup-node 的 npm 缓存。
 # 显式 permissions 会覆盖默认令牌权限，少了 actions:write 时缓存步骤会 403 并挡住门禁。
+# test:api 之前安装 Node 24.20.x 与 engine/node_modules，供 NativeScheduleRules / Preflight。无 live/model。
 permissions:
   contents: read
   actions: write
@@ -334,6 +335,45 @@ jobs:
             fi
             exit "${probe_status}"
           fi
+
+      # 供 NativeScheduleRules / Preflight。无 live/model。
+      # Node 读仓库根 .node-version（24.20.x），与 NATIVE_SCHEDULE_RULES_UNAVAILABLE 的要求一致。
+      # 不改 working-directory：checkout 后仓库根即可找到 engine/scripts/native-schedule-rules.mjs。
+      - name: Setup Node from .node-version
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: engine/package-lock.json
+
+      - name: Check Node matches .node-version
+        run: |
+          set -euo pipefail
+          # 供 NativeScheduleRules / Preflight。无 live/model。
+          expected=$(tr -d '[:space:]' < .node-version)
+          expected=${expected#v}
+          actual=$(node -v)
+          echo "node-version file: ${expected}"
+          echo "node -v:           ${actual}"
+          echo "npm -v:            $(npm -v)"
+          echo "node path:         $(command -v node)"
+          [ "${actual}" = "v${expected}" ]
+          case "${actual}" in
+            v24.20.*) ;;
+            *)
+              echo "NativeScheduleRules / Preflight requires Node 24.20.x"
+              exit 1
+              ;;
+          esac
+
+      # 供 NativeScheduleRules / Preflight：按锁文件安装 engine/node_modules。无 live/model。
+      - name: Install engine dependencies
+        run: |
+          set -euo pipefail
+          test -f engine/scripts/native-schedule-rules.mjs
+          npm --prefix engine ci
+          test -d engine/node_modules
+          test -d engine/node_modules/@deepseek-ai/dsh-schedule
 
       - name: test:api
         run: python3 scripts/with-test-postgres.py ./apps/api/mvnw -B -f apps/api/pom.xml test package
