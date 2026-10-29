@@ -111,6 +111,73 @@ jobs:
           chmod 700 "${jobs}"
           # 用户服务看不到 runner 的 PrivateTmp。把 Java 临时目录放到家目录，解析任务目录才能被 systemd-run 读到。
           echo "JAVA_TOOL_OPTIONS=-Djava.io.tmpdir=${jobs}" >> "${GITHUB_ENV}"
+          # 诊断 A：本步内 GITHUB_ENV 尚未生效，systemctl --user 需要当前 shell 里的总线变量。
+          export XDG_RUNTIME_DIR="${runtime}"
+          export DBUS_SESSION_BUS_ADDRESS="unix:path=${runtime}/bus"
+          echo "===== dreamcore-delegate.conf ====="
+          cat -A /etc/systemd/system/user@.service.d/dreamcore-delegate.conf
+          if ! grep -qx '\[Service\]' /etc/systemd/system/user@.service.d/dreamcore-delegate.conf; then
+            echo "delegate drop-in is missing an exact [Service] line (indent or whitespace pollution)"
+            exit 1
+          fi
+          if ! grep -qx 'Delegate=cpu cpuset io memory pids' /etc/systemd/system/user@.service.d/dreamcore-delegate.conf; then
+            echo "delegate drop-in is missing an exact Delegate=cpu cpuset io memory pids line (indent or whitespace pollution)"
+            exit 1
+          fi
+          test -S "${runtime}/bus"
+          echo "user bus: ${runtime}/bus"
+          if ! manager_version="$(systemctl --user show -p Version --value)"; then
+            echo "systemctl --user cannot connect to the user manager"
+            exit 1
+          fi
+          echo "systemctl --user Version=${manager_version}"
+          dbus_service="$(systemctl --user is-active dbus.service || true)"
+          dbus_socket="$(systemctl --user is-active dbus.socket || true)"
+          echo "dbus.service=${dbus_service}"
+          echo "dbus.socket=${dbus_socket}"
+          if [ "${dbus_service}" != "active" ] && [ "${dbus_socket}" != "active" ]; then
+            echo "user bus unit is not active; need dbus.service or dbus.socket"
+            exit 1
+          fi
+          uid="$(id -u)"
+          cg_rel="$(systemctl show -p ControlGroup --value "user@${uid}.service" || true)"
+          echo "systemctl ControlGroup user@${uid}.service=${cg_rel:-<empty>}"
+          cg_path=""
+          if [ -n "${cg_rel}" ] && [ -f "/sys/fs/cgroup${cg_rel}/cgroup.controllers" ]; then
+            cg_path="/sys/fs/cgroup${cg_rel}"
+          else
+            fallback="/sys/fs/cgroup/user.slice/user-${uid}.slice/user@${uid}.service"
+            echo "fallback cgroup path: ${fallback}"
+            if [ -f "${fallback}/cgroup.controllers" ]; then
+              cg_path="${fallback}"
+            fi
+          fi
+          if [ -z "${cg_path}" ] || [ ! -f "${cg_path}/cgroup.controllers" ]; then
+            echo "could not read cgroup.controllers for user@${uid}.service"
+            find /sys/fs/cgroup/user.slice -name cgroup.controllers -print || true
+            exit 1
+          fi
+          echo "cgroup path: ${cg_path}"
+          echo "cgroup.controllers:"
+          cat "${cg_path}/cgroup.controllers"
+          echo
+          if [ -f "${cg_path}/cgroup.subtree_control" ]; then
+            echo "cgroup.subtree_control:"
+            cat "${cg_path}/cgroup.subtree_control"
+            echo
+          fi
+          controllers="$(cat "${cg_path}/cgroup.controllers")"
+          missing=""
+          for need in cpu memory; do
+            if ! printf '%s\n' "${controllers}" | grep -qw "${need}"; then
+              missing="${missing} ${need}"
+            fi
+          done
+          if [ -n "${missing}" ]; then
+            echo "user@${uid}.service cgroup.controllers is missing:${missing}"
+            exit 1
+          fi
+          echo "delegated controllers present: cpu memory"
 
       - name: Install parser virtualenv and OCR data
         run: python3 scripts/knowledge/setup.py
@@ -136,6 +203,7 @@ jobs:
       - name: Probe Linux parser sandbox
         run: |
           set -euo pipefail
+          set +e
           python3 - <<'PY'
           import json, os, pathlib, subprocess, sys
           root = pathlib.Path("workers/parser").resolve()
@@ -159,6 +227,46 @@ jobs:
               raise SystemExit("parser probe failed: " + json.dumps(data, ensure_ascii=False))
           print("parser probe ok", data.get("parserVersion"))
           PY
+          probe_status=$?
+          set -e
+          if [ "${probe_status}" -ne 0 ]; then
+            probe="${HOME}/parser-jobs/probe"
+            echo "===== ${probe}/errors ====="
+            if [ -f "${probe}/errors" ]; then
+              cat "${probe}/errors"
+            else
+              echo "missing: ${probe}/errors"
+            fi
+            echo "===== ${probe}/result ====="
+            if [ -f "${probe}/result" ]; then
+              cat "${probe}/result"
+            else
+              echo "missing: ${probe}/result"
+            fi
+            echo "===== journalctl --user (dreamcore-parser / systemd-run) ====="
+            journal_out="$(mktemp)"
+            journal_err="$(mktemp)"
+            if journalctl --user -n 200 --no-pager >"${journal_out}" 2>"${journal_err}"; then
+              if grep -E 'dreamcore-parser|systemd-run' "${journal_out}"; then
+                true
+              else
+                echo "journalctl --user succeeded but no lines matched dreamcore-parser or systemd-run"
+                echo "----- journalctl stderr -----"
+                cat "${journal_err}"
+                echo "----- last 40 user journal lines -----"
+                tail -n 40 "${journal_out}"
+              fi
+            else
+              echo "journalctl --user failed with exit $?"
+              echo "----- journalctl stderr -----"
+              cat "${journal_err}"
+              if [ -s "${journal_out}" ]; then
+                echo "----- journalctl stdout -----"
+                cat "${journal_out}"
+              fi
+            fi
+            exit "${probe_status}"
+          fi
 
       - name: test:api
         run: python3 scripts/with-test-postgres.py ./apps/api/mvnw -B -f apps/api/pom.xml test package
