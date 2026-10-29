@@ -220,20 +220,26 @@ jobs:
           else
             echo "${userns_key} is absent; continuing"
           fi
-          # C3. --unshare-all 含 --unshare-net，bwrap 会在新 netns 里 RTM_NEWADDR 配置 loopback。
+          # C3. 挂载与 workers/parser/linux_worker.py 一致，仍用 --unshare-all 触发 loopback。
           bwrap_err="$(mktemp)"
-          if ! /usr/bin/bwrap \
-            --unshare-all \
-            --unshare-user \
-            --unshare-cgroup \
-            --die-with-parent \
-            --new-session \
-            --cap-drop ALL \
-            --ro-bind /usr /usr \
-            --proc /proc \
-            --dev /dev \
-            /usr/bin/true \
-            >/dev/null 2>"${bwrap_err}"; then
+          bwrap_args=(
+            --unshare-all
+            --unshare-user
+            --unshare-cgroup
+            --die-with-parent
+            --new-session
+            --cap-drop ALL
+          )
+          for directory in /usr /lib /lib64; do
+            if [ -d "${directory}" ]; then
+              bwrap_args+=(--ro-bind "${directory}" "${directory}")
+            fi
+          done
+          if [ -e /etc/ld.so.cache ]; then
+            bwrap_args+=(--ro-bind /etc/ld.so.cache /etc/ld.so.cache)
+          fi
+          bwrap_args+=(--proc /proc --dev /dev /usr/bin/true)
+          if ! /usr/bin/bwrap "${bwrap_args[@]}" >/dev/null 2>"${bwrap_err}"; then
             echo "===== bwrap stderr ====="
             cat "${bwrap_err}"
             echo "===== sysctl ====="
