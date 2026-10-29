@@ -11,6 +11,7 @@
     "build": "tsc --noEmit && vite build && node scripts/verify-built-entries.mjs",
     "preview": "vite preview --host 127.0.0.1",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "depcruise": "node --experimental-strip-types --test tests/frontend-boundaries.test.ts",
     "test:e2e": "playwright test",
     "test:e2e:konggu": "playwright test tests/e2e/konggu.spec.ts",
     "format": "prettier --write src tests vite.config.ts playwright.config.ts",
@@ -90,11 +91,13 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
+    "@swc/core": "^1.16.20",
     "@types/node": "24.13.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
     "ajv": "8.20.0",
+    "dependency-cruiser": "^18.7.0",
     "prettier": "^3.9.7",
     "typescript": "^7.0.2",
     "vite": "^8.3.0"

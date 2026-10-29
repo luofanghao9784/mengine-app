@@ -103,7 +103,7 @@ demo         种子、store、pages、仅 Demo 使用的对话框
    - `shared` 不得 import `identity`、`platform`、`features` 或 `demo`。
    - 一个 feature 不得 import 另一个 feature 的页面文件。跨功能只走路由参数，或走 `shared` 里的纯类型。
 2. **允许清单**记录盘点时已经存在的环与违规边。`npm test` 拒绝清单以外的新边。某条边从源码中消失后，同一变更必须从清单删除该条。
-3. **挂载点：** 检查文件放在 `tests/` 下，文件名匹配 `*.test.ts`，由现有 `npm test` 执行。本 ADR 不新增门禁名称。脚本尚未入库时，评审按本文执行，仓库还不会自动拒绝新的违规边。
+3. **挂载点：** 检查文件放在 `tests/` 下，文件名匹配 `*.test.ts`，由现有 `npm test` 执行。本 ADR 不新增门禁名称。命令、允许清单和复现方式见 [`dependency-cruiser.md`](./dependency-cruiser.md)。
 
 本 ADR 不要求同一步修改业务行为。第一刀是本文，加上随后的检查脚本与允许清单。
 
@@ -157,7 +157,7 @@ demo         种子、store、pages、仅 Demo 使用的对话框
 - [x] 总监同意 D1–D5 倾向。本 PR 供审阅；合并前决策仍可微调
 - [x] 本文随本 PR 进入审阅
 - [ ] 审阅通过后合并本 ADR
-- [ ] 下一份变更新增 `tests/*.test.ts` 导入检查与允许清单，使 `npm test` 拒绝清单外的边。该变更不改业务代码
+- [x] 导入检查与允许清单已入库（`tests/frontend-boundaries.test.ts`、`config/frontend-boundary-allowlist.cjs`）。`npm test` 拒绝清单外的边。操作说明见 [`dependency-cruiser.md`](./dependency-cruiser.md)。该变更不改业务代码
 - [ ] `docs/产品/界面设计/梦擎UI规范-v0.1.md` 入库后，核对本文交叉引用仍指向该路径
 
 ---
