@@ -1,0 +1,63 @@
+# 指向 main 的 pull request 只跑前端硬门禁 A/B/C。
+# 全量 npm run test:e2e 与选跑脚本不在本 workflow。
+# 选跑触发条件：docs/验收/_模板-前端合入验收清单.md
+name: Frontend gate
+
+on:
+  pull_request:
+    branches: [main]
+
+# contents:read 供 checkout；actions:write 供 setup-node 的 npm 缓存。
+# 显式 permissions 会覆盖默认令牌权限，少了 actions:write 时缓存步骤会 403 并挡住门禁。
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: frontend-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  abc:
+    name: A build · B unit · C e2e frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CI: "true"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node from .node-version
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Check Node matches .node-version
+        run: |
+          expected=$(tr -d '[:space:]' < .node-version)
+          expected=${expected#v}
+          actual=$(node -v)
+          echo "node-version file: ${expected}"
+          echo "node -v:           ${actual}"
+          echo "npm -v:            $(npm -v)"
+          [ "${actual}" = "v${expected}" ]
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: A · npm run build
+        run: npm run build
+
+      - name: B · npm test
+        run: npm test
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: C · npm run test:e2e:frontend
+        run: npm run test:e2e:frontend
+        env:
+          CI: "true"
