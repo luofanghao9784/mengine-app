@@ -48,16 +48,22 @@ async function rest(page: Page) {
 }
 
 // Explicitly model the OS wheel tail, including browsers without momentum metadata.
+// Each sample stays on the existing 16ms grid, but the offset is read from a painted
+// frame at or after that mark. A bare timer can resolve before the spring's RAF, so
+// the early-tail index still shows the pre-paint peak.
 async function wheelSequence(page: Page, samples: { delta: number; momentum?: boolean }[]) {
   return page.evaluate(async (samples) => {
     const rail = document.querySelector<HTMLElement>('.deck-scroller')!;
     const card = Array.from(rail.querySelectorAll<HTMLElement>('[data-deck-id]')).at(-1)!;
     const frames = [];
+    const painted = () => new Promise<number>((resolve) => requestAnimationFrame((now) => resolve(now)));
     for (const sample of samples) {
       const event = new WheelEvent('wheel', { deltaX: sample.delta, bubbles: true, cancelable: true });
       Object.defineProperty(event, 'momentum', { value: sample.momentum });
+      const dispatchedAt = performance.now();
       document.querySelector('.deck-toolbar')!.dispatchEvent(event);
-      await new Promise((resolve) => setTimeout(resolve, 16));
+      let now = await painted();
+      while (now - dispatchedAt < 16) now = await painted();
       frames.push({
         offset: Math.abs(parseFloat(card.style.getPropertyValue('--deck-elastic-x')) || 0),
         scroll: rail.scrollLeft,

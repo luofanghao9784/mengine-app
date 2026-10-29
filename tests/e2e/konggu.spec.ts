@@ -3,12 +3,23 @@ const key = 'enterprise-ai-demo-konggu-v1';
 const state = (page: Page) => page.evaluate((key) => JSON.parse(localStorage.getItem(key)!), key);
 const card = (page: Page, id: string) =>
   page.locator(`.briefing-grid .briefing-card[data-card-id="konggu:${id}"]`);
+// Same pixels for every publisher host. The card still points at the original URL;
+// only the response body is local, so decode does not depend on gzw-img / gywb / sinaimg.
+const newsPhoto = 'tests/e2e/fixtures/konggu-photo.png';
+async function useLocalNewsPhotos(page: Page) {
+  await page.route(
+    /https:\/\/(?:gzw-img\.sjw\.net\/|www\.gywb\.cn\/upload\/news\/image\/|k\.sinaimg\.cn\/)/,
+    (route) => route.fulfill({ status: 200, contentType: 'image/png', path: newsPhoto }),
+  );
+}
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('enterprise-ai-demo-v1', '{"legacy":"keep me"}'));
   await page.goto('/#/briefing');
 });
 
 test('默认空谷40张内容卡，原文配图、独立存储与四期内容分组', async ({ page }) => {
+  await useLocalNewsPhotos(page);
+  await page.reload();
   await expect(page).toHaveTitle('空谷无界 · 梦擎工作空间 · Mengine');
   await expect(page.locator('.briefing-grid .briefing-card')).toHaveCount(40);
   await expect(page.locator('.briefing-grid .template-conversation')).toHaveCount(0);
@@ -21,9 +32,15 @@ test('默认空谷40张内容卡，原文配图、独立存储与四期内容分
   expect(await page.evaluate(() => localStorage.getItem('enterprise-ai-demo-v1'))).toBe(
     '{"legacy":"keep me"}',
   );
+  const photoHost: Record<string, RegExp> = {
+    C30: /gzw-img\.sjw\.net/,
+    C21: /k\.sinaimg\.cn/,
+    C23: /gywb\.cn/,
+  };
   for (const id of ['C30', 'C21', 'C23']) {
     const image = card(page, id).locator('img').first();
     await image.scrollIntoViewIfNeeded();
+    await expect(image).toHaveAttribute('src', photoHost[id]);
     await expect
       .poll(() => image.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0), {
         timeout: 15000,
