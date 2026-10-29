@@ -200,6 +200,67 @@ jobs:
           test -f workers/parser/.local/tessdata/chi_sim.traineddata
           test -f workers/parser/.local/tessdata/eng.traineddata
 
+      # C1+C3：第二跑 errors 为 bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted。
+      # 只改本 workflow。C1 在该 sysctl 存在时必须写成 0；C3 用与 linux_worker 相同的 --unshare-all 触发 loopback。
+      - name: Relax userns and self-check bwrap loopback
+        run: |
+          set -euo pipefail
+          # C1. Ubuntu/GHA 上这条限制会让 bwrap 在新 netns 里配置 loopback 时收到 EPERM。
+          # key 不存在就提示并继续；存在则必须为 0，设不成即红。
+          userns_key=kernel.apparmor_restrict_unprivileged_userns
+          userns_proc="/proc/sys/${userns_key//./\/}"
+          if [ -e "${userns_proc}" ]; then
+            sudo sysctl -w "${userns_key}=0"
+            userns_value="$(sysctl -n "${userns_key}")"
+            echo "${userns_key}=${userns_value}"
+            if [ "${userns_value}" != "0" ]; then
+              echo "failed to set ${userns_key} to 0"
+              exit 1
+            fi
+          else
+            echo "${userns_key} is absent; continuing"
+          fi
+          # C3. --unshare-all 含 --unshare-net，bwrap 会在新 netns 里 RTM_NEWADDR 配置 loopback。
+          bwrap_err="$(mktemp)"
+          if ! /usr/bin/bwrap \
+            --unshare-all \
+            --unshare-user \
+            --unshare-cgroup \
+            --die-with-parent \
+            --new-session \
+            --cap-drop ALL \
+            --ro-bind /usr /usr \
+            --proc /proc \
+            --dev /dev \
+            /usr/bin/true \
+            >/dev/null 2>"${bwrap_err}"; then
+            echo "===== bwrap stderr ====="
+            cat "${bwrap_err}"
+            echo "===== sysctl ====="
+            for key in kernel.apparmor_restrict_unprivileged_userns kernel.unprivileged_userns_clone; do
+              proc="/proc/sys/${key//./\/}"
+              if [ -r "${proc}" ]; then
+                echo "${key}=$(cat "${proc}")"
+              else
+                echo "${key}: absent"
+              fi
+            done
+            echo "===== apparmor ====="
+            if [ -r /sys/module/apparmor/parameters/enabled ]; then
+              echo -n "apparmor enabled="
+              cat /sys/module/apparmor/parameters/enabled
+            else
+              echo "apparmor enabled parameter: absent"
+            fi
+            if command -v aa-status >/dev/null 2>&1; then
+              aa-status || sudo aa-status || echo "aa-status failed"
+            else
+              echo "aa-status: not installed"
+            fi
+            exit 1
+          fi
+          echo "bwrap loopback self-check ok"
+
       - name: Probe Linux parser sandbox
         run: |
           set -euo pipefail
