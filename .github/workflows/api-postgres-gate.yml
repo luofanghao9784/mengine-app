@@ -1,0 +1,164 @@
+# 指向 main 的 pull request 只跑 API 与一次性 PostgreSQL 门禁。
+# 命令与 package.json 的 test:api 相同：scripts/with-test-postgres.py 自己 initdb/start/stop。
+# 不使用服务容器里的常驻 Postgres，也不跑 model:smoke、test:model-smoke、test:ppt:live
+# 或任何需要真实模型密钥的步骤。
+name: API · Postgres gate
+
+on:
+  pull_request:
+    branches: [main]
+
+# contents:read 供 checkout；actions:write 供 setup-java 的 Maven 缓存。
+# 显式 permissions 会覆盖默认令牌权限，少了 actions:write 时缓存步骤会 403 并挡住门禁。
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: api-postgres-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: with-test-postgres · test:api
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      CI: "true"
+      POSTGRES_BIN: /usr/lib/postgresql/18/bin
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Temurin 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: apps/api/pom.xml
+
+      - name: Install PostgreSQL 18 and parser packages
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y curl ca-certificates
+          if ! apt-cache show postgresql-18 >/dev/null 2>&1; then
+            sudo install -d /usr/share/postgresql-common/pgdg
+            sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+              https://www.postgresql.org/media/keys/ACCC4CF8.asc
+            codename="$(awk -F= '$1=="VERSION_CODENAME" { print $2 }' /etc/os-release)"
+            echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt ${codename}-pgdg main" \
+              | sudo tee /etc/apt/sources.list.d/pgdg.list
+            sudo apt-get update
+          fi
+          # bubblewrap 用发行版包，带上 Ubuntu 的 AppArmor profile。
+          # poppler-utils 提供 /usr/bin/{pdfinfo,pdftotext,pdftoppm}；tesseract-ocr 提供 /usr/bin/tesseract。
+          # 解析器实际读取的 chi_sim/eng 在下一步 setup.py 写入的 TESSDATA_PREFIX，不读发行版 tessdata。
+          sudo apt-get install -y \
+            postgresql-18 \
+            bubblewrap \
+            poppler-utils \
+            tesseract-ocr \
+            tesseract-ocr-eng \
+            tesseract-ocr-chi-sim \
+            python3-venv \
+            python3-pip \
+            dbus-user-session
+          test -x "${POSTGRES_BIN}/initdb"
+          test -x "${POSTGRES_BIN}/pg_ctl"
+          test -x "${POSTGRES_BIN}/psql"
+          "${POSTGRES_BIN}/initdb" --version
+          "${POSTGRES_BIN}/psql" --version
+          # 包脚本可能会拉起本机 5432 集群。测试脚本用独立数据目录和随机端口，这里停掉以免占内存。
+          if pg_lsclusters --no-header 2>/dev/null | grep -q '^18 .* online'; then
+            sudo pg_ctlcluster 18 main stop
+          fi
+          if [ -f /lib/systemd/system/postgresql.service ] || [ -f /usr/lib/systemd/system/postgresql.service ]; then
+            sudo systemctl disable --now postgresql.service
+          fi
+          test -x /usr/bin/bwrap
+          test -x /usr/bin/pdfinfo
+          test -x /usr/bin/pdftotext
+          test -x /usr/bin/pdftoppm
+          test -x /usr/bin/tesseract
+
+      - name: Enable systemd user manager for the parser
+        run: |
+          set -euo pipefail
+          # 与部署记录一致：普通用户 manager 默认没有 CPU delegation 时，linux_worker 会拒绝执行。
+          sudo mkdir -p /etc/systemd/system/user@.service.d
+          sudo tee /etc/systemd/system/user@.service.d/dreamcore-delegate.conf >/dev/null <<'EOF'
+          [Service]
+          Delegate=cpu cpuset io memory pids
+          EOF
+          sudo systemctl daemon-reload
+          sudo loginctl enable-linger "$(id -un)"
+          sudo systemctl restart "user@$(id -u).service"
+          runtime="/run/user/$(id -u)"
+          for _ in $(seq 1 50); do
+            if [ -S "${runtime}/bus" ]; then
+              break
+            fi
+            sleep 0.2
+          done
+          test -S "${runtime}/bus"
+          # Java 启动解析器前会清空环境。linux_sandbox.py 按 /run/user/$UID/bus 找用户总线，不依赖继承变量。
+          echo "XDG_RUNTIME_DIR=${runtime}" >> "${GITHUB_ENV}"
+          echo "DBUS_SESSION_BUS_ADDRESS=unix:path=${runtime}/bus" >> "${GITHUB_ENV}"
+          jobs="${HOME}/parser-jobs"
+          mkdir -p "${jobs}"
+          chmod 700 "${jobs}"
+          # 用户服务看不到 runner 的 PrivateTmp。把 Java 临时目录放到家目录，解析任务目录才能被 systemd-run 读到。
+          echo "JAVA_TOOL_OPTIONS=-Djava.io.tmpdir=${jobs}" >> "${GITHUB_ENV}"
+
+      - name: Install parser virtualenv and OCR data
+        run: python3 scripts/knowledge/setup.py
+
+      - name: Satisfy LocalTableCalculator sandbox-exec check
+        run: |
+          set -euo pipefail
+          # available() 只检查 /usr/bin/sandbox-exec 可执行。计算进程启动的是 sandbox.py；
+          # Linux 上 sandbox.py 走 linux_sandbox.py，不会执行这个文件。误调用时直接失败。
+          if [ ! -x /usr/bin/sandbox-exec ]; then
+            sudo tee /usr/bin/sandbox-exec >/dev/null <<'EOF'
+          #!/bin/sh
+          echo "sandbox-exec is macOS-only; Linux isolation is workers/parser/linux_sandbox.py" >&2
+          exit 127
+          EOF
+            sudo chmod 755 /usr/bin/sandbox-exec
+          fi
+          test -x /usr/bin/sandbox-exec
+          test -x workers/parser/.venv/bin/python
+          test -f workers/parser/.local/tessdata/chi_sim.traineddata
+          test -f workers/parser/.local/tessdata/eng.traineddata
+
+      - name: Probe Linux parser sandbox
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, pathlib, subprocess, sys
+          root = pathlib.Path("workers/parser").resolve()
+          job = pathlib.Path.home() / "parser-jobs" / "probe"
+          job.mkdir(parents=True, mode=0o700)
+          (job / "input").write_text("梦核进度\n预算 00123.4500\n", encoding="utf-8")
+          os.chmod(job / "input", 0o400)
+          proc = subprocess.run(
+              [str(root / ".venv/bin/python"), "-I", "-B", str(root / "sandbox.py"), str(job), "txt"],
+              capture_output=True,
+              text=True,
+              env={"PATH": "/opt/homebrew/bin:/usr/bin:/bin"},
+          )
+          sys.stdout.write(proc.stdout)
+          sys.stderr.write(proc.stderr)
+          if proc.returncode != 0:
+              raise SystemExit(proc.returncode)
+          data = json.loads(proc.stdout)
+          chunks = data.get("chunks") or []
+          if data.get("status") != "READY" or not any("预算" in c.get("content", "") for c in chunks):
+              raise SystemExit("parser probe failed: " + json.dumps(data, ensure_ascii=False))
+          print("parser probe ok", data.get("parserVersion"))
+          PY
+
+      - name: test:api
+        run: python3 scripts/with-test-postgres.py ./apps/api/mvnw -B -f apps/api/pom.xml test package
