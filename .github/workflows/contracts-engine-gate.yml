@@ -1,0 +1,59 @@
+# 指向 main 的 pull request 只跑契约与引擎门禁。
+# 不含 model:smoke、test:model-smoke、test:ppt:live，也不跑需要真实模型密钥的步骤。
+name: Contracts · Engine gate
+
+on:
+  pull_request:
+    branches: [main]
+
+# contents:read 供 checkout；actions:write 供 setup-node 的 npm 缓存。
+# 显式 permissions 会覆盖默认令牌权限，少了 actions:write 时缓存步骤会 403 并挡住门禁。
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: contracts-engine-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  contracts-engine:
+    name: contracts · engine
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CI: "true"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node from .node-version
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            engine/package-lock.json
+
+      - name: Check Node matches .node-version
+        run: |
+          expected=$(tr -d '[:space:]' < .node-version)
+          expected=${expected#v}
+          actual=$(node -v)
+          echo "node-version file: ${expected}"
+          echo "node -v:           ${actual}"
+          echo "npm -v:            $(npm -v)"
+          [ "${actual}" = "v${expected}" ]
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install engine dependencies
+        run: npm ci --prefix engine
+
+      - name: test:contracts
+        run: npm run test:contracts
+
+      - name: test:engine
+        run: npm run test:engine
