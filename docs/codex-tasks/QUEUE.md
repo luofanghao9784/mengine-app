@@ -30,7 +30,7 @@
 3. **日可见预览**：每个前端日切片结束须在 Mac `127.0.0.1` **可点开**看到增量（写清 URL）。
 4. **Codex 自跑**：前端片由正式岗前端开发在老板 Mac 用 Codex 自跑落地（总负责人不代跑）；开跑前暂停令自查。
 5. **机审 + 人审 / 非作者 1203**：合入前 Codex 机审第一道；人审第二道；审查号 `luofanghao1203` Approve（暂挂时该号 Comment；**同账号方案 A 已废**）。
-6. **四端 UI 文案人话（老板硬性 2026-10-30）**：四端界面可见文案一律**易懂中文白话**；**禁止**在 UI 上裸用 `seed` / `capability` / `Capability` / `Grant` / `admission` 等术语。须用中文白话，或「中文（英文术语）」括号解释。规范由**产品 + UX**落 Notion。**主规范**：[《全端文案规范》](https://www.notion.so/40966c386fbf8120aaefc0290f9dedb8)；对照补充：[体验落部 · UX](https://app.notion.com/p/40966c386fbf8142b0bbcb16d1876e8f)、[Agent管理去黑话 · 可演示口径](https://app.notion.com/p/40966c386fbf81f3a2e3e1822ae6a9b9)。前端执行单须**同时引用主规范 + 对照页**。agent-admin 人话替换片：**暂缓**开写/开跑（老板 Codex 打磨 5 句过后再定口径）；CT-003 迁仓仍按原时点。
+6. **四端 UI 文案人话（老板硬性 2026-10-30）**：四端界面可见文案一律**易懂中文白话**；**禁止**在 UI 上裸用 `seed` / `capability` / `Capability` / `Grant` / `admission` 等术语。须用中文白话，或「中文（英文术语）」括号解释。规范由**产品 + UX**落 Notion。**主规范**：[《全端文案规范》](https://www.notion.so/40966c386fbf8120aaefc0290f9dedb8)；对照补充：[体验落部 · UX](https://app.notion.com/p/40966c386fbf8142b0bbcb16d1876e8f)、[Agent管理去黑话 · 可演示口径](https://app.notion.com/p/40966c386fbf81f3a2e3e1822ae6a9b9)。前端执行单须**同时引用主规范 + 对照页**。agent-admin 人话替换：**明日可开写执行单**（口径=总负责人定稿「**AI 功能**」，非本事/花名册；引《全端文案规范》+ 去黑话对照）；**今晚不开跑实现**；与 CT-003 迁仓并行。
 
 审查配人（前端可见改动）：**发布验收 + 质量性能**；触及 agent-admin 边界/五维登记时加 **架构逻辑**；登录/会话/cookie 加 **安全审查**。
 
