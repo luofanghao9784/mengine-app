@@ -1,8 +1,11 @@
 import { ClipboardCheck } from 'lucide-react';
 import { Empty } from '../shared/ui';
+import { Loading } from '../shared/admin';
+import { qualityCheckHref } from '../identity/QualityCheck';
+import { openedCapabilitiesFailureTitle, useOpenedCapabilities } from './openedCapabilities';
 
-/** 接线位：企业已开通读模型落地后再接入，当前不读取或推断开通状态。 */
-export function OpenedFunctions() {
+export function OpenedFunctions({ tenant }: { tenant: string }) {
+  const { items, error } = useOpenedCapabilities(tenant);
   return (
     <section className="admin-section" aria-labelledby="tenant-opened-heading">
       <div className="admin-section-heading">
@@ -11,11 +14,33 @@ export function OpenedFunctions() {
           <p className="admin-note">总部开通给本企业的 AI 功能会出现在这里。</p>
         </div>
       </div>
-      <Empty
-        icon={ClipboardCheck}
-        title="暂时不能查看已开通功能（后台开通中）"
-        text="开通信息暂时无法查看，请等待后台开通。"
-      />
+      {error ? (
+        <Empty
+          icon={ClipboardCheck}
+          title={openedCapabilitiesFailureTitle(error)}
+          text="开通信息暂时无法读取，请稍后刷新重试。"
+        />
+      ) : !items ? (
+        <Loading />
+      ) : items.length === 0 ? (
+        <Empty
+          icon={ClipboardCheck}
+          title="还没有已开通的 AI 功能"
+          text="总部开通给本企业后，功能会显示在这里。"
+        />
+      ) : (
+        <ul>
+          {items.map((item) => (
+            <li key={item.enterpriseFunction}>
+              {item.enterpriseFunction === 'quality-check' ? (
+                <a href={`/workspace/${qualityCheckHref(tenant)}`}>{item.displayName}</a>
+              ) : (
+                item.displayName
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }
