@@ -10,6 +10,7 @@
 |---|---|---|---|---|---|
 | CT-000 | [PR #7 补 build:engine 步骤](CT-000-pr7-build-engine-workflow.md) | PR #7（workflow，老板账号推，因组内令牌无 workflow 权限） | 测试审查（CI 门禁） | 待执行 | 第 1 |
 | CT-004 | [PR #7 API·Postgres 作业分 4 片 + 上传 surefire 报告](CT-004-pr7-api-shards-surefire-upload.md) | PR #7 整套 90 分钟超时、无报告产物（workflow，老板账号推） | 测试审查 | 待执行 | 第 2 |
+| CT-005 | [Mac 本机预览脚本 + smoke workflow + 账号种子](CT-005-mac-preview.md) | Mac 预览首版（DQ 裁定 v0.2；workflow 老板推） | 安全审查（涉及密钥/认证） | 待执行 | CT-004 合入后 |
 | CT-001 | [简报生成：全部来源未就绪时写回具体等待原因（#230 回归，:340）](CT-001-pr7-native-continuity-340-fix.md) | #230（3a29ed3）回归 | 架构逻辑 | 待执行 | 第 3（与 CT-002 可并行） |
 | CT-002 | [生命周期时间戳对齐 Postgres 微秒精度](CT-002-api-lifecycle-micros-truncation.md) | ProfileMethodLifecycle 3 例 + FeedbackAdjustment 1 例 | 测试审查 | 待执行 | 第 3（与 CT-001 可并行） |
 | CT-003 | [NativeAutomaticContinuity 测试契约按 #208 修订（只改测试）](CT-003-native-continuity-208-test-contract.md) | #208（865ccdc）漏改测试 | 测试审查 | 待执行 | 第 6（#7 合入后） |
@@ -39,13 +40,19 @@
 - 仓库目前未开启 Issues，所以以上各项暂记在 #7 描述里；Issues 开启后再逐条转成 issue。
 - **循环问题（已定）**：选方案 (a)。#7 带上述已知红合入，workflow 暂不设为必需检查，CT-003 在 #7 合入后到 CI 上验收。
 
+
+### 1.3 部署预览
+| 编号 | 说明 |
+|---|---|
+| CT-005 | 老板 Mac（Apple Silicon /opt/homebrew）本机预览脚本、`trial.py --parser`、账号种子；`macos-preview-smoke.yml` **由老板账号推**（Codex 不推 workflow）。依赖：CT-004 已合入。审查：安全审查。 |
+
 ## 2. 状态取值
 `待执行`（已交老板）→ `执行中`（老板在跑 Codex）→ `PR 已开`（写上 PR 号）→ `已合入` ；异常：`卡住`（已把输出发 DQ）、`待定`（有外部阻塞，写明原因）、`作废`。
 
 ## 3. 审查流程（单审，老板降档令）
 写执行单 → 直接交老板 → 老板跑 Codex（CT-000 不用）→ 老板本地测试 → 老板开 PR → **单审人**审查 → 合入 → 本索引更新状态。
 - 每个 PR 只有一位最对口的审查人，写在各单抬头「审查人」栏，指老板开 PR 后的单审人。
-- 安全审查只在改动涉及认证、租户隔离、密钥、执行端口时介入；本批四单都不涉及。
+- 安全审查只在改动涉及认证、租户隔离、密钥、执行端口时介入；CT-000～CT-004 都不涉及。**CT-005 涉及密钥/认证，PR 后由安全审查单审。**
 - 只拦 P0（会造成错误结果、数据损坏、安全问题或违反执行单硬约束）；P1/P2 记待办，不挡合入。
 - 能交给 CI 自动检查的不靠人审。
 
