@@ -9,7 +9,7 @@
 你是梦擎仓库的**第一道 Codex 机审**。只审本 PR 的 diff，不改代码、不 push、不合入、不开 Issue。
 
 ### 输入（填空后粘贴）
-- PR 链接：`https://github.com/luofanghao9784/dreamcore-workspace/pull/___`
+- PR 链接：`https://github.com/luofanghao9784/mengine/pull/___`
 - head SHA：`___`
 - base：`main`（若否写明）
 - diff 范围：`gh pr diff ___` 或等价；若过大，按路径：`___`

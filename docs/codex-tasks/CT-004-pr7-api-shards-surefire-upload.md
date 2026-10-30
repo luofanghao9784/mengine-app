@@ -1,6 +1,6 @@
 # CT-004 PR #7 API·Postgres 作业分片 + 上传 surefire 报告（workflow，老板账号推）
 
-状态：待执行（**紧接 CT-000**）　｜　分支：已有的 #7 分支 `cursor/api-postgres-gate-1c11`　｜　**审查人（2026-10-30 起按 CT-007 两人审口径）：质量性能 + 架构逻辑**（历史：当时为测试审查单审，已停用）　｜　PR：<https://github.com/luofanghao9784/dreamcore-workspace/pull/7>
+状态：待执行（**紧接 CT-000**）　｜　分支：已有的 #7 分支 `cursor/api-postgres-gate-1c11`　｜　**审查人（2026-10-30 起按 CT-007 两人审口径）：质量性能 + 架构逻辑**（历史：当时为测试审查单审，已停用）　｜　PR：<https://github.com/luofanghao9784/mengine/pull/7>
 
 ## ① 目标与范围
 - **目标**：改 `.github/workflows/api-postgres-gate.yml`，把单个 `api` 作业改成 4 个并行分片（matrix），每片结束后**无论成败**（`if: always()`）都把 `apps/api/target/surefire-reports` 上传成产物 `surefire-reports-<分片>`。
@@ -25,7 +25,7 @@
 - 与 CT-000 相同：老板本人账号，需有 `workflow` 权限；不需要 JDK、Postgres。
 ```bash
 # ① 进仓库
-cd ~/dreamcore-workspace
+cd ~/mengine
 # ② 确认干净：应显示 "nothing to commit, working tree clean"
 git status
 # ③ 拉取远端
@@ -113,7 +113,7 @@ diff --git a/.github/workflows/api-postgres-gate.yml b/.github/workflows/api-pos
 PATCH
 ```
 ```bash
-cd ~/dreamcore-workspace
+cd ~/mengine
 git apply --check ~/Desktop/ct-004.patch && echo 可以应用
 git apply ~/Desktop/ct-004.patch
 # YAML 语法自检（macOS 自带 python3；若提示无 yaml 模块，先 python3 -m pip install --user pyyaml）
@@ -148,7 +148,7 @@ python3 -c "import yaml;yaml.safe_load(open('.github/workflows/api-postgres-gate
 
 ## ⑥ 提交与验收
 ```bash
-cd ~/dreamcore-workspace
+cd ~/mengine
 # ⑤ 核对：只改 1 个文件，约 48 行新增、2 行删除
 git diff --stat
 git diff
@@ -158,7 +158,7 @@ git commit -m "ci(api): test:api 分 4 片并上传 surefire 报告（不调大�
 # ⑦ 普通推送
 git push
 ```
-⑧ **PR 已存在，推完即自动重跑**：<https://github.com/luofanghao9784/dreamcore-workspace/pull/7>
+⑧ **PR 已存在，推完即自动重跑**：<https://github.com/luofanghao9784/mengine/pull/7>
 
 **验收（四条都满足才算通过）**：
 1. Actions 出现 **4 个**分片作业：adjust / context / general / rest。

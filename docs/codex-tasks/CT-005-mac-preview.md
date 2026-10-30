@@ -28,7 +28,7 @@
 - 本单涉及密钥与认证、预览体验 → PR 后由**安全审查 + 发布验收 + 质量性能**审（CT-007 两人及以上，P0/P1 都拦；发布验收做体验走查）。
 ```bash
 # ① 进仓库
-cd ~/dreamcore-workspace
+cd ~/mengine
 # ② 确认干净
 git status
 # ③ 回到 main 并更新
@@ -138,7 +138,7 @@ git status; git diff --stat
 ## ⑥ 跑完如何提交
 
 ```bash
-cd ~/dreamcore-workspace
+cd ~/mengine
 # 确认无 workflow
 git status
 git diff --stat | grep -i workflow && echo 'ERROR: 不得改 workflow' && exit 1
@@ -172,12 +172,12 @@ Mac=Apple Silicon `/opt/homebrew`；`dreamcore_ro`；不上钥匙串；无手机
 EOF
 )"
 ```
-网页备用：https://github.com/luofanghao9784/dreamcore-workspace/compare/main...codex/ct-005-mac-preview
+网页备用：https://github.com/luofanghao9784/mengine/compare/main...codex/ct-005-mac-preview
 
 **老板推 workflow（Codex 不做）**：
 ```bash
 # 老板本人账号，且 gh auth refresh -s workflow
-cd ~/dreamcore-workspace
+cd ~/mengine
 git switch main && git pull
 git switch -c boss/macos-preview-smoke
 # 将附录 B 存为 .github/workflows/macos-preview-smoke.yml

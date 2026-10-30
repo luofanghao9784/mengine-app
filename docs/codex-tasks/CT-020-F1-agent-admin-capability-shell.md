@@ -31,7 +31,7 @@
   - 不整页复制 tenant-admin 的**业务导航条目**（成员/资料/引擎等）；仿的是**壳与风格/交互**，路由跟 ADR-B8 / 本单 F1 URL
   - 不做 versions/grants 可写 UI（F3）；catalog 有种子 API 前只做空态（F2 再接列表）
   - 不修改 `docs/codex-tasks/QUEUE.md` 排队状态（本单为纯前端壳；QUEUE 现行硬性已对齐）
-  - 禁止 gh issue create/comment；只允许 `gh pr create -R luofanghao9784/dreamcore-workspace`
+  - 禁止 gh issue create/comment；只允许 `gh pr create -R luofanghao9784/mengine`
   - 禁止假 Live：空列表不得填演示用假 ModuleVersion 冒充已从 API 加载成功
 
 ### 风格约束（老板原口径 · 强制）
@@ -56,15 +56,15 @@
 
 - **⓪ 暂停令自查（第一步，优先级最高）**：开 Codex 前确认 DQ/总负责人**没有暂停令**；有或拿不准 → **立刻停**，问 DQ。暂停期间禁止任何 Codex。
 - **依赖**：CT-006 预览脚本宜已可用（本机可起 web/api）；**不**阻塞于 CT-018。口径对齐 QUEUE 现行硬性（`794bac4` 起）。
-- 正确仓：`~/Desktop/dreamcore-luofanghao9784`（origin=`luofanghao9784/dreamcore-workspace`）。禁止写上游。
+- 正确仓：`~/Desktop/mengine-luofanghao9784`（origin=`luofanghao9784/mengine`）。禁止写上游。
 - Codex 绝对路径见下。
 
 ```bash
 # ⓪ 暂停令自查：无暂停令再继续
 CODEX="/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex"
-REPO="$HOME/Desktop/dreamcore-luofanghao9784"
+REPO="$HOME/Desktop/mengine-luofanghao9784"
 cd "$REPO"
-git remote get-url origin | grep -q 'luofanghao9784/dreamcore-workspace' || { echo 'ERROR: 错误 remote，停'; exit 1; }
+git remote get-url origin | grep -q 'luofanghao9784/mengine' || { echo 'ERROR: 错误 remote，停'; exit 1; }
 git status   # 应 clean；否则 stash 见 README 固定步骤
 git switch main && git pull
 git switch -c codex/ct-020-f1-agent-admin-capability-shell
@@ -137,9 +137,9 @@ export PREVIEW_HOME="$HOME/Library/Application Support/DreamcorePreview-ct006"
 
 ```bash
 CODEX="/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex"
-REPO="$HOME/Desktop/dreamcore-luofanghao9784"
+REPO="$HOME/Desktop/mengine-luofanghao9784"
 cd "$REPO"
-git remote get-url origin | grep -q 'luofanghao9784/dreamcore-workspace' || exit 1
+git remote get-url origin | grep -q 'luofanghao9784/mengine' || exit 1
 # 按实际改动暂存（勿 add 口令/.local）
 git add agent-admin vite.config.ts src/identity src/features/agent-admin
 git add src/features/capability-admission 2>/dev/null || true
@@ -152,7 +152,7 @@ feat(agent-admin): CT-020-F1 第四端壳与能力登记空态可演示
 EOM
 )"
 git push -u origin codex/ct-020-f1-agent-admin-capability-shell
-gh pr create -R luofanghao9784/dreamcore-workspace --base main --head codex/ct-020-f1-agent-admin-capability-shell \
+gh pr create -R luofanghao9784/mengine --base main --head codex/ct-020-f1-agent-admin-capability-shell \
   --title "feat(agent-admin): CT-020-F1 能力注册壳可演示增量" \
   --body "## 摘要
 agent-admin 入口 + functions / capability-registry 空态（仿 tenant-admin）。日切片可点开。
@@ -171,7 +171,7 @@ agent-admin 入口 + functions / capability-registry 空态（仿 tenant-admin�
 CT-018 登录写入、假 Live 数据、QUEUE 修改"
 ```
 
-网页备用：https://github.com/luofanghao9784/dreamcore-workspace/compare/main...codex/ct-020-f1-agent-admin-capability-shell
+网页备用：https://github.com/luofanghao9784/mengine/compare/main...codex/ct-020-f1-agent-admin-capability-shell
 
 ## ⑦ 失败/卡住时怎么办
 
