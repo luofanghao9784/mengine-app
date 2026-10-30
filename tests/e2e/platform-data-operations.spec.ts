@@ -199,7 +199,7 @@ test('system running opens an independent data subpage; list search and paging s
   await expect(page).toHaveURL(/view=enterprises/);
   await expect(page.getByText('第 2 页', { exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: '合成企业 21', exact: true })).toBeVisible();
-  await page.getByRole('link', { name: '引擎仪表盘', exact: true }).click();
+  await page.getByRole('link', { name: '运行看板', exact: true }).click();
   await expect(page.locator('.engine-wall')).toBeVisible();
   expect(f.paths.every((p) => new URL(p).pathname.startsWith('/api/platform-admin/'))).toBe(true);
   expect(f.mutations).toEqual([]);

@@ -30,14 +30,14 @@ const entries: Record<AdminRealm, { id: AdminPage; title: string; icon: LucideIc
   tenant: [
     { id: 'overview', title: '知识工作台', icon: LayoutDashboard },
     { id: 'usage', title: '运行与用量', icon: Wallet },
-    { id: 'engine', title: '引擎仪表盘', icon: Activity },
+    { id: 'engine', title: '运行看板', icon: Activity },
     { id: 'members', title: '成员与空间', icon: Users },
-    { id: 'database', title: '数据基座', icon: Database },
+    { id: 'database', title: '数据底座', icon: Database },
     { id: 'catalog', title: '企业资料列表', icon: BookOpen },
     { id: 'governance', title: '数据治理', icon: SlidersHorizontal },
     { id: 'materials', title: '资料库', icon: Archive },
     { id: 'experience', title: '经验库', icon: BookOpen },
-    { id: 'abilities', title: 'AI 能力', icon: Puzzle },
+    { id: 'abilities', title: '智能服务', icon: Puzzle },
     { id: 'company', title: '企业信息', icon: Building2 },
     { id: 'audit', title: '操作审计', icon: Archive },
     { id: 'wiki', title: 'Wiki 知识', icon: BookOpen },
@@ -45,9 +45,9 @@ const entries: Record<AdminRealm, { id: AdminPage; title: string; icon: LucideIc
   ],
   platform: [
     { id: 'overview', title: '概览', icon: LayoutDashboard },
-    { id: 'tenants', title: '企业管理', icon: Building2 },
+    { id: 'tenants', title: '企业列表', icon: Building2 },
     { id: 'usage', title: '用量与成本', icon: Wallet },
-    { id: 'engine', title: '引擎仪表盘', icon: Activity },
+    { id: 'engine', title: '运行看板', icon: Activity },
     { id: 'database', title: '数据库', icon: Database },
     { id: 'materials', title: '资料库', icon: Archive },
     { id: 'experience', title: '经验库', icon: BookOpen },
@@ -167,7 +167,7 @@ export function AdminShell({
     };
   }, [mobileOpen]);
   useLayoutEffect(() => {
-    document.title = `${title} · ${realm === 'platform' ? '梦核引擎 Mengine 总台' : name + '企业管理'}`;
+    document.title = `${title} · ${realm === 'platform' ? '总台 · 梦擎工作空间' : name + '企业管理'}`;
     setMobileOpen(false);
     const element = main.current;
     if (!element) return;
@@ -237,7 +237,7 @@ export function AdminShell({
               <div className="admin-brand">
                 <DreamcoreLogo />
                 <div className="admin-brand-label">
-                  <strong>梦核引擎</strong>
+                  <strong>梦擎引擎</strong>
                   <span className="admin-brand-english">Mengine</span>
                 </div>
                 <Button
@@ -256,7 +256,7 @@ export function AdminShell({
               {(realm === 'platform'
                 ? [
                     {
-                      label: '梦核引擎',
+                      label: '梦擎引擎',
                       items: nav.filter((item) =>
                         ['engine', 'database', 'materials', 'experience', 'capabilities'].includes(item.id),
                       ),
@@ -268,7 +268,7 @@ export function AdminShell({
                   ]
                 : [
                     {
-                      label: '梦核引擎',
+                      label: '梦擎引擎',
                       items: nav.filter((item) =>
                         ['engine', 'database', 'catalog', 'materials', 'experience', 'wiki', 'abilities'].includes(
                           item.id,

@@ -313,7 +313,7 @@ export function UsageFacts({
         <>
           <dl className="usage-metrics">
             <div>
-              <dt>日常模型登记请求</dt>
+              <dt>今日模型请求</dt>
               <dd>{numbers(work?.modelCalls ?? 0)}</dd>
               <small>正式执行 · 包含失败与重试</small>
             </div>

@@ -239,7 +239,7 @@ test('stage keys push into a stage, panel lists its channels, Esc steps back', a
   await expect(panel.locator('.det')).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(page.locator('.eng3d-panel')).not.toHaveAttribute('data-open');
-  await expect(page.getByRole('button', { name: '引擎仪表盘', exact: true })).toBeFocused();
+  await expect(page.getByRole('button', { name: '运行看板', exact: true })).toBeFocused();
   await page.keyboard.press('4');
   const evo = page.getByRole('complementary', { name: '自进化详情' });
   await expect(evo.locator('.row')).toHaveCount(4);

@@ -77,12 +77,12 @@ export function TenantDatabase({ tenant, hash }: { tenant: string; hash: string 
     <div className="admin-dashboard tenant-database-page">
       <section className="admin-section input-foundation-intro">
         <div>
-          <h2>梦擎数据基座</h2>
+          <h2>梦擎数据底座</h2>
           <p className="admin-note">查看已接入的业务来源与获权数据，为梦擎提供可追溯的输入。</p>
         </div>
         <span className="input-foundation-label">外部只读采集 · 内部企业背景</span>
       </section>
-      <nav className="platform-detail-nav" aria-label="数据基座栏目">
+      <nav className="platform-detail-nav" aria-label="数据底座栏目">
         {(
           [
             ['data', '数据资产'],

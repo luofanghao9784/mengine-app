@@ -54,12 +54,12 @@ export function PlatformOverviewPage({ hash }: { hash: string }) {
             </a>
           </div>
           <div>
-            <dt>登记执行中</dt>
+            <dt>执行中</dt>
             <dd>{running === undefined ? '—' : running}</dd>
             <a href={runtimeHref}>查看已接入的运行记录</a>
           </div>
           <div>
-            <dt>登记排队</dt>
+            <dt>排队中</dt>
             <dd>{queued === undefined ? '—' : queued}</dd>
             <span>按运行记录统计，非物理并发</span>
           </div>
@@ -168,7 +168,7 @@ export function PlatformOverviewPage({ hash }: { hash: string }) {
             <>
               <dl className="platform-monthly-values">
                 <div>
-                  <dt>日常模型登记请求</dt>
+                  <dt>今日模型请求</dt>
                   <dd>{(work?.modelCalls ?? 0).toLocaleString('zh-CN')}</dd>
                   <small>正式执行 · 包含失败与重试</small>
                 </div>

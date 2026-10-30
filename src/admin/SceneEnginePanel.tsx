@@ -14,7 +14,7 @@ export function SceneEnginePanel(){
   const next=await request<State>(`/api/platform-admin/v1/tenants/${id}/scene/synchronize`,'POST',valid,{});setState(next);
  }catch(e){setError((e as Error).message);}finally{setBusy(false);}}
  return <section className="scene-engine-panel">
-  <h2>企业数据基座接入</h2><p>按企业接收数据表、资料、标签与业务口径，交由引擎处理。</p>
+  <h2>企业数据底座接入</h2><p>按企业接收数据表、资料、标签与业务口径，交由引擎处理。</p>
   {error&&<p role="alert">{error}</p>}
   <label>企业 <select aria-label="引擎接入企业" value={tenant} disabled={busy} onChange={e=>setTenant(e.target.value)}>{enterprises.map(e=><option key={e.tenant_id} value={e.tenant_id}>{e.name}</option>)}</select></label>
   <button disabled={!tenant||busy} onClick={()=>void run(false)}>{busy?'正在处理…':'同步企业输入'}</button>

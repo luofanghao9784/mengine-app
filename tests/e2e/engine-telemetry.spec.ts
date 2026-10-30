@@ -175,6 +175,6 @@ test('enterprise usage has its own navigation and retains the enterprise scope',
   await page.getByRole('complementary').getByRole('link', { name: '运行与用量', exact: true }).click();
   await expect(page.getByRole('heading', { name: '运行与用量', exact: true })).toBeVisible();
   expect(new URLSearchParams(new URL(page.url()).hash.slice(1)).get('tenant')).toBe(tenant);
-  await page.getByRole('complementary').getByRole('link', { name: '引擎仪表盘', exact: true }).click();
+  await page.getByRole('complementary').getByRole('link', { name: '运行看板', exact: true }).click();
   await expect(page.locator('.engine-wall')).toBeVisible();
 });

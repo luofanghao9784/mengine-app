@@ -119,8 +119,8 @@ function ScopedOverview({
               />
             </>
           )}
-          <Stat title="登记执行中" value={totals?.running} note="当前运行记录，与引擎运行页同口径" />
-          <Stat title="登记排队" value={totals?.queued} note="含输入、处理与输出，不代表物理并发" />
+          <Stat title="执行中" value={totals?.running} note="当前运行记录，与引擎运行页同口径" />
+          <Stat title="排队中" value={totals?.queued} note="含输入、处理与输出，不代表物理并发" />
         </div>
       )}
       <section className="admin-section">
@@ -166,7 +166,7 @@ function ScopedOverview({
         ) : (
           <>
             <div className="admin-stats">
-              <Stat title="日常模型登记请求" value={work?.modelCalls ?? 0} note="正式执行 · 包含失败与重试" />
+              <Stat title="今日模型请求" value={work?.modelCalls ?? 0} note="正式执行 · 包含失败与重试" />
               <Stat
                 title="维护模型回执调用"
                 value={maintenance?.modelCalls ?? undefined}

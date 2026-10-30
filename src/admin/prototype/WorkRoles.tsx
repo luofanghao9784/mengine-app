@@ -112,7 +112,7 @@ export function WorkRoles({ tenant, account }: { tenant: string; account?: strin
               <input
                 value={draft.jobTitle}
                 maxLength={100}
-                placeholder="例如：美容师、店长、财务"
+                placeholder="例如：美容师、前台、财务"
                 onChange={(e) => setDraft({ ...draft, jobTitle: e.target.value })}
               />
             </label>

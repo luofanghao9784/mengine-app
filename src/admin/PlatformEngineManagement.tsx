@@ -13,7 +13,7 @@ const modules = [
     id: 'versions',
     title: '方法版本',
     icon: SlidersHorizontal,
-    category: '能力维护',
+    category: '功能维护',
     description: '维护固定排序方法，查看候选、版本与验证依据。',
     features: ['方法候选与权重', '同组样例比较', '验证后发布版本'],
     action: '管理方法版本',
@@ -111,7 +111,7 @@ export function PlatformEngineManagement({ hash }: { hash: string }) {
           <header className="em-page-heading">
             <div>
               <span className="em-eyebrow">引擎管理 / {active ? active.category : '管理概览'}</span>
-              <h2>{active?.title || '维护引擎的能力与内容'}</h2>
+              <h2>{active?.title || '维护引擎的方法与内容'}</h2>
               <p>{active?.description || '方法、运行维护与内容设置集中管理，运行状态在仪表盘查看。'}</p>
             </div>
             <a className="em-dashboard-link" href={dashboard} inert={pending || undefined}>
@@ -140,7 +140,7 @@ export function PlatformEngineManagement({ hash }: { hash: string }) {
               <details className="em-boundary">
                 <summary>管理范围与操作说明</summary>
                 <p>
-                  总部维护已接入的方法、默认内容规则和公开来源。模型凭据、工具安装及原始规则修改由工程维护完成；运行记录在引擎仪表盘查看。方法发布不自动代表范围采用或业务效果，管理操作继续遵循原有权限。
+                  总部维护已接入的方法、默认内容规则和公开来源。模型凭据、工具安装及原始规则修改由工程维护完成；运行记录在运行看板查看。方法发布不自动代表范围采用或业务效果，管理操作继续遵循原有权限。
                 </p>
               </details>
             </>

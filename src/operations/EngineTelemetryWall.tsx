@@ -233,7 +233,7 @@ function Snapshot({
         <div>
           <small>ENGINE</small>
           <strong>{n(running)}</strong>
-          <span>{compact ? '全链路执行中' : '登记执行中'}</span>
+          <span>{compact ? '全链路执行中' : '执行中'}</span>
         </div>
       </div>
       {!compact && <p>输入 · 处理 · 输出</p>}
@@ -258,7 +258,7 @@ function Snapshot({
       {!compact && (
         <dl className="engine-totals">
           {[
-            ['登记执行中', running],
+            ['执行中', running],
             ['排队', sum(rows, 'queued')],
             ['等待 / 部分完成', sum(rows, 'waiting')],
             ['结果待核对', sum(rows, 'unknown')],
@@ -355,7 +355,7 @@ function Snapshot({
                 </div>
                 <strong>
                   {n(count)}
-                  <small>登记执行中</small>
+                  <small>执行中</small>
                 </strong>
               </div>
               {compact ? (
@@ -523,12 +523,12 @@ function Snapshot({
             <details className="engine-details">
               <summary>查看执行口径</summary>
               <p>
-                登记执行中包含真实与验证运行，不等于模型请求数。会话流式输出期间仅计入输出区，避免重复计数。
+                执行中包含真实与验证运行，不等于模型请求数。会话流式输出期间仅计入输出区，避免重复计数。
               </p>
             </details>
           ) : (
             <p>
-              登记执行中包含真实与验证运行，不等于模型请求数。会话流式输出期间仅计入输出区，避免重复计数。
+              执行中包含真实与验证运行，不等于模型请求数。会话流式输出期间仅计入输出区，避免重复计数。
             </p>
           )}
         </section>
@@ -659,7 +659,7 @@ function Trend({ samples, maxGap }: { samples: Sample[]; maxGap: number }) {
       <svg
         viewBox="0 0 500 110"
         role="img"
-        aria-label={`已采样 ${samples.length} 次，当前登记执行中 ${samples.at(-1)!.running}`}
+        aria-label={`已采样 ${samples.length} 次，当前执行中 ${samples.at(-1)!.running}`}
       >
         <path d="M20 20H480M20 85H480" className="engine-trend-grid" />
         {lines.map((p, i) => (

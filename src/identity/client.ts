@@ -42,7 +42,7 @@ export class IdentityError extends Error {
       NATIVE_RUNTIME_REJECTED: '运行环境没有接受这次操作（可能已经处理过或已结束），请看对话里的最新状态。',
       NATIVE_STREAM_LIMIT: '同时打开的原生会话页面太多，请关闭一些页面后再试。',
       FEEDBACK_TARGET_UNAVAILABLE: '这条回复暂时不能评价。',
-      NATIVE_PLUGIN_DISABLED: '企业已关闭这项 AI 能力，如需使用请联系企业管理员。',
+      NATIVE_PLUGIN_DISABLED: '企业已关闭这项智能服务，如需使用请联系企业管理员。',
       NATIVE_PLUGIN_REQUIRED: '这是基础保护，不能关闭。',
       NATIVE_PLUGIN_REVISION_CONFLICT: '刚有其他管理员改过这些开关，已刷新为最新设置，请再确认一次。',
       NATIVE_SCHEDULE_NOT_RESUMABLE: '这个定时任务不能直接恢复：可能已过期、已停止或上次结果未确认。',
