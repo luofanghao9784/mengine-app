@@ -36,3 +36,7 @@
 ## 4. 依据
 
 仓内 workflows、CT-008 文档、`gh run list` 近样；质量 #40 打回意见。
+
+## 5. 后续
+
+- **CT-032** spending 限额/告警文档：[`ci-spending-limits-20261030.md`](ci-spending-limits-20261030.md)（硬停 `TBD_BY_OWNER`；自托管→CT-033）。
