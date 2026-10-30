@@ -25,7 +25,7 @@ codex -m gpt-6.1-sol
 
 ## ③ Codex 提示词（整段复制）
 ```text
-你在 dreamcore-workspace 仓库（Java 21 / Spring / Postgres 18）。请修复一个生产回归，严格按以下约束，只做这一件事。
+你在 mengine 仓库（Java 21 / Spring / Postgres 18）。请修复一个生产回归，严格按以下约束，只做这一件事。
 
 【背景与根因】
 - 回归来自提交 3a29ed3（#230「手动画报不被同空间未交付表拖死」）：BriefingGenerationService 现在只把“已就绪”的数据来源放进 selected。

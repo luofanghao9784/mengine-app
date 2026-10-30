@@ -31,7 +31,7 @@ codex -m gpt-6.1-sol
 
 ## ③ Codex 提示词（整段复制）
 ```text
-你在 dreamcore-workspace 仓库（Java 21 / Spring / Postgres 18）。修复一类时间精度问题，只做这一件事。
+你在 mengine 仓库（Java 21 / Spring / Postgres 18）。修复一类时间精度问题，只做这一件事。
 
 【根因】
 Linux 上 Instant.now() 是纳秒精度，Postgres timestamptz 只存微秒，读回后舍入。macOS 的 Instant.now() 只到微秒，所以 Mac 本地不会复现，Linux CI 必红。生产时钟 RetentionClock.now() 是 SELECT clock_timestamp()，本身是微秒；纳秒只来自测试夹具，以及将来可能传入纳秒 Instant 的调用方。

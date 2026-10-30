@@ -47,7 +47,7 @@ git switch -c codex/ct-008-docs-path-filter
 
 ## ③ Codex 提示词（整段复制）
 ```text
-你在 dreamcore-workspace 仓库。任务：给三道 PR 门禁加上 docs 类 paths-ignore，使「只改文档」的 PR 跳过重门禁。本单是门禁 workflow 变更。
+你在 mengine 仓库。任务：给三道 PR 门禁加上 docs 类 paths-ignore，使「只改文档」的 PR 跳过重门禁。本单是门禁 workflow 变更。
 
 【硬约束】
 1. 只改下面 3 个文件，禁止碰其他任何路径：

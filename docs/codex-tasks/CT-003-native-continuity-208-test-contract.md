@@ -35,7 +35,7 @@ codex -m gpt-6.1-sol
 
 ## ③ Codex 提示词（整段复制）
 ```text
-你在 dreamcore-workspace 仓库。任务：只修改测试文件 apps/api/src/test/java/com/dreamcore/workspace/NativeAutomaticContinuityIntegrationTest.java，使其符合 #208（865ccdc）确立的产品规则。不得修改任何 src/main 代码。
+你在 mengine 仓库。任务：只修改测试文件 apps/api/src/test/java/com/dreamcore/workspace/NativeAutomaticContinuityIntegrationTest.java，使其符合 #208（865ccdc）确立的产品规则。不得修改任何 src/main 代码。
 
 【规则来源】
 - docs/技术/模型治理与知识星链统一来源设计-2026-10-27.md 第 11 行：每个当前数据快照/资料版本均需要当前模型审阅依据；稳定字段定义可以复用，但不能用旧批次模型审阅冒充新批次。

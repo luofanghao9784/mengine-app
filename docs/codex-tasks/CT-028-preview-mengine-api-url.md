@@ -48,7 +48,7 @@ git switch -c codex/ct-028-preview-mengine-api-url
 ## ③ 完整 Codex 提示词（整段复制）
 
 ```text
-你在 dreamcore-workspace（老板 fork）。任务：试用预览启动 scene 后，让 vite preview 的 /mengine-api 代理打到该次动态 scene 端口。
+你在 mengine（老板 fork）。任务：试用预览启动 scene 后，让 vite preview 的 /mengine-api 代理打到该次动态 scene 端口。
 
 【硬约束】
 1. 主要只改 scripts/local/trial.py。可选：scripts/preview/preview-start.sh 或 preview-health.sh 加一行中文注释；可选 docs/codex-tasks/CT-006-mac-preview-land.md 文末「已知运维注意」短节指向 CT-028。禁止改 vite.config.ts、Java、前端业务、mengine 源码。

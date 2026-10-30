@@ -7,7 +7,7 @@
 > - **B** 索引：CT-005 标「已文档（附录规格）；落地改走 CT-006」。  
 > - **C** 无 brew（写死）：Darwin 无 Homebrew 时，`preview-doctor.sh` **不得**因缺 brew 失败；只检查 `java`（21）、`node`（与 `.node-version` 主版本一致）、`initdb`/`pg_ctl`/`psql`（经 `POSTGRES_BIN`，版本 18）、`python3`≥3.9、`curl`、磁盘、sandbox-exec（Darwin）可用。允许 `JAVA_HOME` / `POSTGRES_BIN` 指向仓库内或 `Desktop` 下已有 `.local/tools`。**禁止安装 Homebrew**，禁止脚本 `brew install`。  
 > - **D** 审查人=**质量性能 + 发布验收**（纯文档两人审，CT-007）；本纯文档 PR 不另开安全审。落地 PR 若含密钥/认证种子，按 CT-007 配人（脚本/CI=质量性能+架构逻辑；涉密钥另加安全审查），由 DQ 在开跑前确认。  
-> - 正确仓仅 `~/Desktop/mengine-luofanghao9784`（origin=`luofanghao9784/mengine`）。禁止写上游 `dimmm1125-coder`，禁止碰 `~/Desktop/dreamcore-workspace` 的 git。  
+> - 正确仓仅 `~/Desktop/mengine-luofanghao9784`（origin=`luofanghao9784/mengine`）。禁止写上游 `dimmm1125-coder`，禁止碰 `~/Desktop/mengine` 的 git。  
 > - Codex 使用绝对路径（见下）。总负责人不代跑；质量性能 + 发布验收两人审通过后由**交付运维本人**上 Mac 落地。  
 > - 继承 CT-005 DQ 裁定 v0.2：Apple Silicon；`dreamcore_ro`；密钥 600 不上钥匙串；parser 默认 off；不做手机访问；`/` 归 PR 7a；`version.json` 现状；`QUALITY_OPS_REAL_ENABLED=false` 占位。
 
@@ -59,8 +59,8 @@ fi
 
 ```bash
 export DREAMCORE_REPO="$HOME/Desktop/mengine-luofanghao9784"
-export JAVA_HOME="${JAVA_HOME:-$HOME/Desktop/dreamcore-workspace/.local/tools/java/Contents/Home}"
-export POSTGRES_BIN="${POSTGRES_BIN:-$HOME/Desktop/dreamcore-workspace/.local/tools/postgres/bin}"
+export JAVA_HOME="${JAVA_HOME:-$HOME/Desktop/mengine/.local/tools/java/Contents/Home}"
+export POSTGRES_BIN="${POSTGRES_BIN:-$HOME/Desktop/mengine/.local/tools/postgres/bin}"
 export PATH="$JAVA_HOME/bin:$POSTGRES_BIN:$PATH"
 ```
 
