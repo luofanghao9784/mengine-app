@@ -3,7 +3,7 @@
   "info": {
     "title": "能力登记与准入（capability-registry）",
     "version": "0.0.0-skeleton",
-    "description": "【骨架 · 后端未实现 · 勿当 Live】CT-031 OpenAPI 提纲占位（表面 agent-admin）。字段/枚举对齐 docs/architecture/契约分片-检查与能力.md 与 ADR-B8 D8-5；响应以 501 占位；禁止当作已实现 API 或假 Live 业务数据。CT-034-P1：写口表面=agent-admin，不用 platform-admin；须第四端会话与 CSRF，未登录 401，已认证且 CSRF 通过后有效请求返回 501。CT-034：stub；仅 POST /api/agent-admin/v1/capabilities 已挂真实路由并返回中文 501，无持久化。错误体沿用 error.schema.json 形状，agent-admin 扩展 code=CAPABILITY_REGISTRATION_NOT_IMPLEMENTED；其余端点仍为骨架。"
+    "description": "CT-034-A：平台目录已落库。仅 POST /api/agent-admin/v1/capabilities 已实现：须第四端会话与 CSRF，合法请求落库返回 201；未登录 401，CSRF 无效 403，非法字段 400，重复登记 409。错误体沿用 error.schema.json 四字段形状，登记域扩展 code。GET list、模块、准入与 grants 仍为骨架 · 未实现。"
   },
   "paths": {
     "/api/agent-admin/v1/capabilities": {
@@ -61,7 +61,7 @@
       },
       "post": {
         "operationId": "registerCapability",
-        "summary": "登记能力（骨架）",
+        "summary": "登记能力（CT-034-A 平台目录已落库）",
         "tags": [
           "capability-admission"
         ],
@@ -77,7 +77,7 @@
         },
         "responses": {
           "201": {
-            "description": "骨架占位 · 未实现",
+            "description": "CT-034-A：平台目录已落库",
             "content": {
               "application/json": {
                 "schema": {

@@ -8,13 +8,19 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import tools.jackson.databind.JsonNode;
 
-/** CT-034 C 档：仅挂登记入口；未持久化，不返回保存成功。 */
+/** CT-034-A：通过会话与 CSRF 门禁后登记平台目录。 */
 @RestController
 public class CapabilityRegistryController {
     static final String PATH = "/api/agent-admin/v1/capabilities";
 
+    private final CapabilityRegistryStore store;
+
+    public CapabilityRegistryController(CapabilityRegistryStore store) {
+        this.store = store;
+    }
+
     @PostMapping(PATH)
-    public ResponseEntity<RegistryError> registerCapability(@RequestBody JsonNode request) {
+    public ResponseEntity<?> registerCapability(@RequestBody JsonNode request) {
         if (!request.isObject()) return invalid("请按要求填写登记内容");
         if (!Set.of("capabilityId", "name", "kind", "enterpriseFunction").containsAll(request.propertyNames())) {
             return invalid("有无法识别的字段，请检查后再提交");
@@ -28,10 +34,19 @@ public class CapabilityRegistryController {
                         .contains(request.get("enterpriseFunction").asString())))) {
             return invalid("请按要求填写登记内容");
         }
-        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED)
-                .header("Cache-Control", "no-store")
-                .body(new RegistryError("1.0", "CAPABILITY_REGISTRATION_NOT_IMPLEMENTED",
-                        "登记保存还在开通中，请稍后再试", false));
+        if (request.get("capabilityId").asString().trim().isEmpty()
+                || request.get("name").asString().trim().isEmpty()) {
+            return invalid("请按要求填写登记内容");
+        }
+        boolean inserted = store.insert(request.get("capabilityId").asString(), request.get("name").asString(),
+                request.has("kind") ? request.get("kind").asString() : null,
+                request.has("enterpriseFunction") ? request.get("enterpriseFunction").asString() : null);
+        if (!inserted) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).header("Cache-Control", "no-store")
+                    .body(new RegistryError("1.0", "CAPABILITY_ALREADY_REGISTERED",
+                            "已经登记过了，请勿重复提交", false));
+        }
+        return ResponseEntity.status(HttpStatus.CREATED).header("Cache-Control", "no-store").body(request);
     }
 
     private ResponseEntity<RegistryError> invalid(String message) {
