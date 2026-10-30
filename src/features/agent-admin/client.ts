@@ -1,15 +1,56 @@
-// Read-only connectivity probe. Until the list contract lands, never infer ModuleVersions.
-export async function probeCapabilities(signal: AbortSignal): Promise<boolean> {
+const enterpriseFunctions = [
+  'document-parse',
+  'table-compare',
+  'quality-check',
+  'semantic-annotation',
+  'repair-suggestion',
+] as const;
+
+export type Capability = {
+  capabilityId: string;
+  name: string;
+  enterpriseFunction?: (typeof enterpriseFunctions)[number];
+  kind?: 'quality_check';
+};
+
+export type CapabilityListResult =
+  | { status: 'ok'; items: Capability[] }
+  | { status: 'empty' }
+  | { status: 'unauthenticated' }
+  | { status: 'failed' };
+
+function isCapability(value: unknown): value is Capability {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const item = value as Record<string, unknown>;
+  return (
+    nonemptyString(item.capabilityId) &&
+    nonemptyString(item.name) &&
+    (!('enterpriseFunction' in item) ||
+      enterpriseFunctions.some((name) => name === item.enterpriseFunction)) &&
+    (!('kind' in item) || item.kind === 'quality_check')
+  );
+}
+
+export async function listCapabilities(signal: AbortSignal): Promise<CapabilityListResult> {
+  const requestSignal = AbortSignal.any([signal, AbortSignal.timeout(10_000)]);
   try {
     const response = await fetch('/api/agent-admin/v1/capabilities', {
       method: 'GET',
       credentials: 'same-origin',
       headers: { Accept: 'application/json' },
-      signal,
+      cache: 'no-store',
+      signal: requestSignal,
     });
-    return response.ok && (response.headers.get('content-type') || '').includes('application/json');
+    if (requestSignal.aborted) return { status: 'failed' };
+    if (response.status === 401) return { status: 'unauthenticated' };
+    if (response.status !== 200) return { status: 'failed' };
+    const body: unknown = await response.json();
+    if (requestSignal.aborted || !Array.isArray(body) || !body.every(isCapability)) {
+      return { status: 'failed' };
+    }
+    return body.length ? { status: 'ok', items: body } : { status: 'empty' };
   } catch {
-    return false;
+    return { status: 'failed' };
   }
 }
 

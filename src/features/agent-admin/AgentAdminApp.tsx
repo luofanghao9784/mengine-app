@@ -4,7 +4,8 @@ import { DreamcoreLogo } from '../../components/DreamcoreLogo';
 import '../../admin/admin.css';
 import './agent-admin.css';
 import { agentRoute } from './routes';
-import { createCapabilityTenantGrant, probeCapabilities } from './client';
+import { createCapabilityTenantGrant, listCapabilities } from './client';
+import type { CapabilityListResult } from './client';
 import { RegisterDialog } from './RegisterDialog';
 
 const functions = [
@@ -18,7 +19,14 @@ const functions = [
 export function AgentAdminApp() {
   const [hash, setHash] = useState(location.hash);
   const [collapsed, setCollapsed] = useState(false);
-  const [connected, setConnected] = useState<boolean | null>(null);
+  const [capabilities, setCapabilities] = useState<CapabilityListResult | { status: 'loading' }>({
+    status: 'loading',
+  });
+  const [listAttempt, setListAttempt] = useState(0);
+  const connected =
+    capabilities.status === 'loading'
+      ? null
+      : capabilities.status === 'ok' || capabilities.status === 'empty';
   const route = agentRoute(hash);
   const [registerOpen, setRegisterOpen] = useState(false);
   const [enterprise, setEnterprise] = useState('');
@@ -46,15 +54,17 @@ export function AgentAdminApp() {
   useEffect(() => {
     const changed = () => setHash(location.hash);
     window.addEventListener('hashchange', changed);
-    const controller = new AbortController();
-    void probeCapabilities(controller.signal).then((value) => {
-      if (!controller.signal.aborted) setConnected(value);
-    });
-    return () => {
-      window.removeEventListener('hashchange', changed);
-      controller.abort();
-    };
+    return () => window.removeEventListener('hashchange', changed);
   }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setCapabilities({ status: 'loading' });
+    void listCapabilities(controller.signal).then((value) => {
+      if (!controller.signal.aborted) setCapabilities(value);
+    });
+    return () => controller.abort();
+  }, [listAttempt]);
   return (
     <div className={`admin-shell admin-control agent-admin ${collapsed ? 'admin-navigation-collapsed' : ''}`}>
       <aside className="admin-sidebar" aria-label="AI 功能管理导航">
@@ -109,11 +119,7 @@ export function AgentAdminApp() {
         </header>
         <main className="admin-content" id="agent-main">
           <p className="agent-connection" role="status">
-            {connected === null
-              ? '正在检查后台连接…'
-              : connected
-                ? '已连接后台；AI 功能列表暂未接入，当前无法展示。'
-                : '尚未连接后台或未登录'}
+            {connected === null ? '正在检查后台连接…' : connected ? '已连接后台' : '尚未连接后台或未登录'}
           </p>
           {route.view === 'functions' ? (
             <>
@@ -188,20 +194,49 @@ export function AgentAdminApp() {
                   </section>
                   <section className="agent-catalog-section" aria-labelledby="agent-live-title">
                     <h2 id="agent-live-title">已上架</h2>
-                    <div className="admin-panel agent-empty">
-                      <Boxes size={40} aria-hidden="true" />
-                      <h3>暂时无法展示已上架的实现</h3>
-                      <p>
-                        {connected === null
-                          ? '正在检查后台连接，尚未加载已上架列表。'
-                          : connected
-                            ? '已连接后台；AI 功能列表暂未接入，当前无法展示已上架的实现。'
-                            : '尚未连接后台或未登录，当前未加载已上架列表。'}
-                      </p>
-                      <button className="button primary" onClick={() => setRegisterOpen(true)}>
-                        登记实现方案
-                      </button>
-                      <p>仅预览 AI 功能登记表，暂不能保存或上架（后台开通中）</p>
+                    <div
+                      key={capabilities.status}
+                      className="agent-live-content"
+                      aria-busy={capabilities.status === 'loading'}
+                    >
+                      {capabilities.status === 'ok' ? (
+                        <div className="agent-functions">
+                          {capabilities.items.map((item) => (
+                            <section className="admin-panel agent-function" key={item.capabilityId}>
+                              <h3>{item.name}</h3>
+                              <code>编号：{item.capabilityId}</code>
+                              <p>
+                                企业功能：
+                                {functions.find(([id]) => id === item.enterpriseFunction)?.[1] ?? '未指定'}
+                              </p>
+                            </section>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="admin-panel agent-empty">
+                          <Boxes size={40} aria-hidden="true" />
+                          <p role="status">
+                            {capabilities.status === 'loading'
+                              ? '正在加载已上架的功能…'
+                              : capabilities.status === 'empty'
+                                ? '还没有已上架的功能。在上方登记实现方案并上架后会出现在这里。'
+                                : capabilities.status === 'unauthenticated'
+                                  ? '还没有登录，请先登录后再试'
+                                  : '暂时无法读取已上架的功能，请稍后重试'}
+                          </p>
+                          {capabilities.status === 'failed' && (
+                            <button
+                              className="button primary"
+                              onClick={() => {
+                                setCapabilities({ status: 'loading' });
+                                setListAttempt((attempt) => attempt + 1);
+                              }}
+                            >
+                              重试
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </section>
                   <RegisterDialog open={registerOpen} onClose={() => setRegisterOpen(false)} />
