@@ -54,7 +54,7 @@ export function QualityCheck({ opened }: { opened: OpenedCapabilitiesState }) {
     );
   if (!opened.items) return <Loading />;
   if (!opened.items.some((item) => item.enterpriseFunction === 'quality-check'))
-    return <Empty icon={ClipboardCheck} title={qualityCheckNotOpened} text="开通后可在这里提交检查材料。" />;
+    return <Empty icon={ClipboardCheck} title={qualityCheckNotOpened} text="请联系企业管理员确认，开通后可以在这里提交检查材料。" />;
   return (
     <div className="quality-check">
       <section className="access-panel" aria-labelledby="quality-check-intro">
@@ -64,7 +64,7 @@ export function QualityCheck({ opened }: { opened: OpenedCapabilitiesState }) {
       <section className="access-panel" aria-labelledby="quality-check-submit">
         <h2 id="quality-check-submit">② 提交检查材料</h2>
         <form onSubmit={submit} aria-busy={submitting}>
-          <Field label="标题（选填）" hint={`${title.length} / 200 字符`}>
+          <Field label="标题（选填）" hint={`${title.length} / 200 字`}>
             <input value={title} onChange={(event) => setTitle(event.target.value)} disabled={submitting} />
           </Field>
           <Field label="检查材料">
@@ -77,9 +77,9 @@ export function QualityCheck({ opened }: { opened: OpenedCapabilitiesState }) {
               aria-invalid={materialText.length > 20_000}
             />
           </Field>
-          <p id="quality-check-count">{materialText.length} / 20000 字符</p>
-          {materialText.length > 20_000 && <p role="alert">检查材料不能超过 20000 字符</p>}
-          {title.length > 200 && <p role="alert">标题不能超过 200 字符</p>}
+          <p id="quality-check-count">{materialText.length} / 20000 字</p>
+          {materialText.length > 20_000 && <p role="alert">检查材料不能超过 20000 字</p>}
+          {title.length > 200 && <p role="alert">标题不能超过 200 字</p>}
           <Button type="submit" disabled={!valid || submitting}>
             {submitting ? '提交中…' : '提交检查材料'}
           </Button>

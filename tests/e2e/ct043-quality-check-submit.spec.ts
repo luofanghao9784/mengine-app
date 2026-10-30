@@ -7,7 +7,7 @@ const account = '00000000-0000-4000-8000-000000000038';
 const href = (id = tenant) => `/workspace/#tenant=${id}&view=quality-check`;
 
 const submitPath = '/api/tenant-admin/v1/quality-ops/check-tasks';
-const notOpened = '贵企业还没开通「质量检查」，请联系平台管理员开通';
+const notOpened = '本企业还没有开通质量检查';
 const unavailable = '质量检查暂时不可用，请稍后再试';
 const noIssues = {
   taskId: '00000000-0000-4000-8000-000000000044',
@@ -149,7 +149,7 @@ test('空白、长度和可选标题控制提交；无效输入不发请求', as
     await material(page).press('Control+Enter');
   }
   await material(page).fill('文'.repeat(20_000));
-  await expect(page.getByText('20000 / 20000 字符', { exact: true })).toBeVisible();
+  await expect(page.getByText('20000 / 20000 字', { exact: true })).toBeVisible();
   await expect(submitButton(page)).toBeEnabled();
   const title = page.getByRole('textbox', { name: '标题（选填）' });
   await title.fill('题'.repeat(201));
@@ -281,11 +281,11 @@ for (const status of [200, 202, 204]) {
 }
 
 for (const [status, code, message] of [
-  [400, 'INVALID_REQUEST', '内容不符合要求'],
+  [400, 'INVALID_REQUEST', '检查材料不符合要求，请修改后再提交'],
   [401, 'AUTHENTICATION_REQUIRED', '请重新登录后再试'],
   [403, 'CAPABILITY_NOT_OPENED', notOpened],
   [403, 'ACCESS_DENIED', '请刷新页面后再试'],
-  [404, 'TENANT_NOT_FOUND', '暂时不能查看已开通功能'],
+  [404, 'TENANT_NOT_FOUND', '暂时不能提交检查材料，请刷新页面后再试'],
   [503, 'SERVICE_UNAVAILABLE', unavailable],
 ] as const) {
   test(`${status} ${code} 显示人话且删除旧结论`, async ({ page }) => {

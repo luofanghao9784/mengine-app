@@ -57,15 +57,15 @@ export function submitQualityCheck(
   );
 }
 
-export const qualityCheckNotOpened = '贵企业还没开通「质量检查」，请联系平台管理员开通';
+export const qualityCheckNotOpened = '本企业还没有开通质量检查';
 
 export function qualityCheckFailureMessage(error: unknown): string {
   if (error instanceof IdentityError) {
-    if (error.status === 400) return '内容不符合要求';
+    if (error.status === 400) return '检查材料不符合要求，请修改后再提交';
     if (error.status === 401) return '请重新登录后再试';
     if (error.status === 403)
       return error.code === 'CAPABILITY_NOT_OPENED' ? qualityCheckNotOpened : '请刷新页面后再试';
-    if (error.status === 404) return '暂时不能查看已开通功能';
+    if (error.status === 404) return '暂时不能提交检查材料，请刷新页面后再试';
   }
   return '质量检查暂时不可用，请稍后再试';
 }
