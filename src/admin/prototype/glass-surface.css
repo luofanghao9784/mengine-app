@@ -246,6 +246,70 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* 线索漏斗主视觉（老板拍板） */
+.cards.work.data.glass .lead-funnel {
+  margin: 0 10px 10px;
+  padding: 10px 10px 8px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgb(236 201 138 / 16%), rgb(255 255 255 / 4%));
+  box-shadow: 0 0 0 1px rgb(236 201 138 / 28%) inset;
+}
+.cards.work.data.glass .lead-funnel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.cards.work.data.glass .lead-funnel-head strong {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pearl);
+}
+.cards.work.data.glass .lead-funnel-head span {
+  font-size: 10px;
+  color: var(--dim);
+}
+.cards.work.data.glass .lead-funnel-stages {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+.cards.work.data.glass .lead-funnel-stage {
+  text-align: center;
+  padding: 8px 2px 6px;
+  border-radius: 10px;
+  background: rgb(255 255 255 / 6%);
+}
+.cards.work.data.glass .lead-funnel-stage b {
+  display: block;
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.15;
+  color: rgb(236 201 138);
+}
+.cards.work.data.glass .lead-funnel-stage em {
+  display: block;
+  margin-top: 2px;
+  font-style: normal;
+  font-size: 11px;
+  color: var(--pearl);
+}
+.cards.work.data.glass .src-gates-secondary {
+  opacity: 0.72;
+  transform: scale(0.96);
+  transform-origin: top center;
+}
+.cards.work.data.glass .src-gates-secondary::before {
+  content: '治理环节（次要）';
+  display: block;
+  grid-column: 1 / -1;
+  font-size: 10px;
+  color: var(--dim);
+  padding: 0 2px 2px;
+}
+
 .cards.work.data.glass .src-gates {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));

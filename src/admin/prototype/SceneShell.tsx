@@ -143,7 +143,7 @@ export function SceneShell({ tenant = null, name }: { tenant?: string | null; na
   useEffect(() => {
     world.setFoundation(
       (foundation.data?.items || []).map((a) => ({ ...asItem(a), gate: a.gate, sourceKind: a.sourceKind })),
-      foundation.data ? GATES.map((_, stage) => foundation.data!.items.filter(a => a.gate === stage).length) : null,
+      foundation.data ? GATES.map((_, stage) => foundation.data!.items.filter(a => (stage === 4 ? !!a.available : a.gate >= stage)).length) : null,
       foundation.data?.sources || [],
     );
   }, [world, foundation.data]);

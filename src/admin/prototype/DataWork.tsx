@@ -45,6 +45,23 @@ function dictionaryNotice(warning: string, fields: { name: string; label: string
     : warning;
 }
 
+
+function parseLeadFunnel(text: string): { name: string; count: number }[] | null {
+  const m = text.match(/线索\s*(\d+)\s*[→\->]+\s*跟进[^\d]*(\d+)\s*[→\->]+\s*方案[^\d]*(\d+)\s*[→\->]+\s*成交\s*(\d+)/);
+  if (!m) return null;
+  return [
+    { name: '线索进入', count: Number(m[1]) },
+    { name: '跟进中', count: Number(m[2]) },
+    { name: '方案沟通', count: Number(m[3]) },
+    { name: '成交', count: Number(m[4]) },
+  ];
+}
+
+function leadFunnelFromAssets(items: Asset[] | undefined): { name: string; count: number }[] | null {
+  const hit = (items || []).find((a) => a.leadFunnel && a.leadFunnel.length >= 2);
+  return hit?.leadFunnel || null;
+}
+
 export function DataWork({
   picked,
   pick,
@@ -67,6 +84,33 @@ export function DataWork({
   onMaintainBackground?: () => void;
 }) {
   const { data, error, unauthorized, loading, refresh } = foundation;
+  const [leadFunnel, setLeadFunnel] = useState<{ name: string; count: number }[] | null>(null);
+  useEffect(() => {
+    const fromAssets = leadFunnelFromAssets(data?.items);
+    if (fromAssets) {
+      setLeadFunnel(fromAssets);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const kn = await api<{ items?: { name?: string; verdict?: string; why?: string }[] }>('/scene-knowledge');
+        if (cancelled) return;
+        for (const it of kn.items || []) {
+          const parsed = parseLeadFunnel(`${it.verdict || ''} ${it.why || ''} ${it.name || ''}`);
+          if (parsed && parsed.every((s) => s.count > 0)) {
+            setLeadFunnel(parsed);
+            return;
+          }
+        }
+      } catch {
+        /* 主视觉可暂缺，不阻断数据基座 */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [data]);
   const [background, setBackground] = useState(false);
   const [collapsedSources, setCollapsedSources] = useState<Set<string>>(new Set());
   useEffect(() => setCollapsedSources(new Set()), [tenant]);
@@ -124,7 +168,7 @@ export function DataWork({
       (kind === 'all' || a.sourceKind === SOURCE_IDS.indexOf(kind)) &&
       (!department || a.department === department) &&
       (!needle || `${a.title} ${a.source} ${a.department}`.toLocaleLowerCase().includes(needle)) &&
-      (gate === null || (gate === 4 ? a.available : a.gate === gate)),
+      (gate === null || (gate === 4 ? a.available : a.gate >= gate)),
   );
   const showBackground = !!tenant && (kind === 'all' || kind === 'document') && tab === 2 && gate === null && !department && collection === 'all' && '企业背景 企业信息维护 内部来源'.includes(q.trim());
   useEffect(() => { if (!showBackground) setBackground(false); }, [showBackground, tenant]);
@@ -389,7 +433,7 @@ export function DataWork({
       items: available.filter((x) => x.sourceKind === i),
     })),
   ];
-  const atGate = (x: Asset, i: number) => (i === 4 ? x.available : x.gate === i);
+  const atGate = (x: Asset, i: number) => (i === 4 ? !!x.available : x.gate >= i);
   // 每一环最近一次发生的时间，来自处理记录。
   const stepAt: (string | undefined)[] = GATES.map((_, i) =>
     detail?.events
@@ -433,6 +477,22 @@ export function DataWork({
         <header className="list-head">
           <h2>数据来源</h2>
         </header>
+        {leadFunnel && leadFunnel.length > 0 && (
+          <div className="lead-funnel" aria-label="线索转化漏斗（合成演示）">
+            <div className="lead-funnel-head">
+              <strong>线索转化漏斗</strong>
+              <span>合成演示 · 非真实经营</span>
+            </div>
+            <div className="lead-funnel-stages">
+              {leadFunnel.map((s) => (
+                <div key={s.name} className="lead-funnel-stage">
+                  <b className="num">{s.count}</b>
+                  <em>{s.name}</em>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="src-list">
           {sourceCards.map((c) => {
             const attention = c.items.filter((x) => x.needsAttention).length;
@@ -455,7 +515,7 @@ export function DataWork({
                   {c.id !== 'all' && <span className="src-note">{c.note}</span>}
                 </button>
                 {/* 阶段统计仅在全部来源显示，点击数字筛选对应阶段。 */}
-                {c.id === 'all' && <div className="src-gates">
+                {c.id === 'all' && <div className="src-gates src-gates-secondary" title="治理环节（次要）">
                   {GATES.map((g, i) => {
                     const n = c.items.filter((x) => atGate(x, i)).length,
                       on = kind === c.id && gate === i;
@@ -464,7 +524,7 @@ export function DataWork({
                         key={g}
                         aria-pressed={on}
                         disabled={n === 0}
-                        title={`${c.name}：${i === 4 ? '已到' : '停在'}“${g}”`}
+                        title={`${c.name}：${i === 4 ? '已到' : '已达'}“${g}”`}
                         onClick={() => {
                           setBackground(false);
                           setKind(c.id);
@@ -531,7 +591,7 @@ export function DataWork({
                 reset();
               }}
             >
-              {gate === 4 ? '已到' : '停在'}“{GATES[gate]}” ×
+              {gate === 4 ? '已到' : '已达'}“{GATES[gate]}” ×
             </button>
           )}
           <span className="head-tools">

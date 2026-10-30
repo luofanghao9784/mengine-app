@@ -279,6 +279,27 @@ export function registerSceneFoundation(
       if (sync?.enabled && sync.state !== "running" && canGovernResource(u, d))
         actions.push("sync");
     }
+    let leadFunnel: { name: string; count: number }[] | undefined;
+    if (set && (set as any).provenance?.table === 'funnel_stage') {
+      const raw = store.db
+        .prepare(
+          "SELECT data FROM data_rows WHERE tenant_id=? AND dataset_id=? AND status='ready' ORDER BY id",
+        )
+        .all(u.tenantId, d.id) as { data: string }[];
+      const stages = raw
+        .map((r) => {
+          const values = JSON.parse(r.data).values || {};
+          return {
+            name: String(values.stage_name || ''),
+            count: Number(values.lead_count),
+            order: Number(values.stage_order || 0),
+          };
+        })
+        .filter((s) => s.name && Number.isFinite(s.count))
+        .sort((a, b) => a.order - b.order)
+        .map(({ name, count }) => ({ name: safe(name), count }));
+      if (stages.length) leadFunnel = stages;
+    }
     return {
       id: d.id,
       title: safe(d.title),
@@ -287,6 +308,7 @@ export function registerSceneFoundation(
       kind: set ? "table" : "document",
       sourceKind: set ? 0 : 1,
       source: safe(set?.source || "内部资料库"),
+      ...(leadFunnel ? { leadFunnel } : {}),
       status: d.status,
       label,
       gate,

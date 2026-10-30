@@ -14,6 +14,8 @@ export type Asset = {
   status: string;
   label: string;
   gate: number;
+  /** 线索漏斗主视觉：来自 funnel_stage 行投影或知识口径 */
+  leadFunnel?: { name: string; count: number }[];
   stageStates?: string[];
   available: boolean;
   availabilityKind?: "PUBLISHED_KNOWLEDGE" | "PUBLISHED_GOVERNANCE";
