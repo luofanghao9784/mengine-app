@@ -6,6 +6,7 @@ import type {
   SaveDocument,
 } from '../../contracts/public-api/document';
 import { createIdentityRequest, IdentityError, record, text, uuid } from '../identity/client.ts';
+import { withTimeout } from '../shared/abort-timeout.ts';
 const positive = (v: unknown): v is number => Number.isSafeInteger(v) && Number(v) > 0;
 const date = (v: unknown) => text(v) && Number.isFinite(Date.parse(v));
 const document = (v: unknown): v is PrivateDocument =>
@@ -101,7 +102,7 @@ export function createDocumentClient(fetcher: typeof fetch = fetch) {
           credentials: 'same-origin',
           cache: 'no-store',
           redirect: 'error',
-          signal: AbortSignal.any([AbortSignal.timeout(30000), ...(signal ? [signal] : [])]),
+          signal: withTimeout(signal, 30000),
         });
         if (!response.ok) {
           const v: unknown = await response.json().catch(() => null);

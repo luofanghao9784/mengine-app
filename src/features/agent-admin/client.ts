@@ -1,3 +1,4 @@
+import { withTimeout } from '../../shared/abort-timeout';
 const enterpriseFunctions = [
   'document-parse',
   'table-compare',
@@ -29,22 +30,6 @@ function isCapability(value: unknown): value is Capability {
       enterpriseFunctions.some((name) => name === item.enterpriseFunction)) &&
     (!('kind' in item) || item.kind === 'quality_check')
   );
-}
-
-/** 旧浏览器没有 AbortSignal.any / timeout 时降级为手动超时，避免卡在加载中。 */
-function withTimeout(signal: AbortSignal, ms: number): AbortSignal {
-  if (typeof AbortSignal.any === 'function' && typeof AbortSignal.timeout === 'function') {
-    return AbortSignal.any([signal, AbortSignal.timeout(ms)]);
-  }
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), ms);
-  const stop = () => {
-    clearTimeout(timer);
-    controller.abort();
-  };
-  if (signal.aborted) stop();
-  else signal.addEventListener('abort', stop, { once: true });
-  return controller.signal;
 }
 
 export async function listCapabilities(signal: AbortSignal): Promise<CapabilityListResult> {
