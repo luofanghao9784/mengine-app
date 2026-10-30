@@ -56,8 +56,8 @@ git switch -c codex/ct-005-mac-preview
 - set -euo pipefail；兼容 macOS bash 3.2（无关联数组/mapfile/${x,,}）。
 - PREVIEW_HOME：Mac 为 ~/Library/Application Support/DreamcorePreview；目录 0700、密钥文件 0600。
 - doctor 只读预检，不自动 brew install；告警穿透工具（ngrok/cloudflared/frpc/zrok/bore/localtunnel/ssh -R/tailscale funnel）。
-- start：拒绝 --live/--enable-live/--automatic-work；默认 --parser off；PREVIEW_PARSER=1 才 --parser on；PREVIEW_PHONE_LOCAL=1 才 --phone-local；就绪后 check_listen，非回环自动 stop；幂等建 dreamcore_ro。
-- health：三端 200、actuator/health 200、敏感 actuator 非 200、agentMode=off、check_listen、check_perms；第四端入口不存在则 SKIP。
+- start：拒绝 --live/--enable-live/--automatic-work；默认 --parser off；PREVIEW_PARSER=1 才 --parser on；PREVIEW_PHONE_LOCAL=1 才 --phone-local；**启动前复跑穿透检测，命中即 die**（doctor 仍仅告警）；就绪后 check_listen，非回环自动 stop；幂等建 dreamcore_ro。
+- health：四端 200、actuator/health 200、敏感 actuator 非 200、agentMode=off、check_listen、check_perms；第四端入口不存在则 SKIP。
 - uninstall：先 backup（可 --no-backup）、无 --yes 不删；不 brew uninstall、不删仓库。
 
 【B. trial.py --parser】
@@ -221,7 +221,7 @@ DRY_RUN=0
 for _a in "$@"; do [ "$_a" = "--dry-run" ] && DRY_RUN=1; done
 
 OS_NAME="$(uname -s)"
-REPO="${DREAMCORE_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." 2>/dev/null && pwd)/dreamcore}"
+REPO="${DREAMCORE_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." 2>/dev/null && pwd)}"
 [ -d "${DREAMCORE_REPO:-}" ] && REPO="$DREAMCORE_REPO"
 if [ "$OS_NAME" = "Darwin" ]; then
   # DQ 裁定：老板 Mac = Apple Silicon；Homebrew 以 /opt/homebrew 为主。系统版本由 uname 自动探测，不为 Intel 另开一套脚本。
@@ -388,8 +388,8 @@ fi
 if [ "$WITH_PARSER" = 1 ]; then
   run bash -c "cd '$REPO' && python3 scripts/knowledge/setup.py"
 else
-  log "未安装 parser venv：trial.py 据 workers/parser/.venv 是否存在决定 KNOWLEDGE_ENABLED；不存在即 false（fail closed）"
-  [ -e "$REPO/workers/parser/.venv" ] && log "警告：该工作树已有 workers/parser/.venv，KNOWLEDGE_ENABLED 将为 true（见方案 ⑧ 待定项）"
+  log "未安装 parser venv：start 默认 --parser off，与本机 .venv 无关（fail closed）"
+  [ -e "$REPO/workers/parser/.venv" ] && log "提示：工作树已有 workers/parser/.venv；start 仍默认 --parser off，与本机 .venv 无关"
 fi
 log "安装完成。下一步：preview-start.sh"
 ```
@@ -403,6 +403,9 @@ log "安装完成。下一步：preview-start.sh"
 set -euo pipefail
 . "$(dirname "$0")/preview-common.sh" "$@"
 for a in "$@"; do case "$a" in --live|--enable-live|--automatic-work) die "预览禁止真实模型参数 $a（签字条件③）";; esac; done
+# 签字条件②：start 前复跑穿透检测（doctor 仅告警）；命中即 die——穿透可将 127.0.0.1 转出
+tun="$(ps -axo args= 2>/dev/null | grep -Ei '^([^ ]*/)?(ngrok|cloudflared|frpc|frps|zrok|bore|localtunnel|lt|inlets|sshuttle)( |$)|^([^ ]*/)?ssh .*-R ' | grep -v grep || true)"
+[ -z "$tun" ] || die "发现穿透/转发进程（签字条件②），请关闭后再 start"
 detect_java || die "无 Java 21"; detect_pg_bin || die "无 PostgreSQL 18"
 mkpriv "$PREVIEW_HOME"; mkpriv "$LOGS"; mkpriv "$SECRETS"
 if [ -d "$INSTANCE" ] && trial status 2>/dev/null | grep -q '"running": true'; then log "预览已在运行，未重复启动"; exit 0; fi
@@ -863,7 +866,7 @@ if __name__ == '__main__': main()
 ## 安全红线（七条，DQ 签字条件，必须满足）
 
 1. **S1** API/引擎/PG/前端只听 `127.0.0.1`；start/health 用 lsof/ss 留证；非回环 → 失败并自动 stop。
-2. **S2** 禁止内网穿透与对外共享（ngrok/cloudflared/frpc/zrok/bore/localtunnel/ssh -R/tailscale funnel 等）；doctor 告警。
+2. **S2** 禁止内网穿透与对外共享（ngrok/cloudflared/frpc/zrok/bore/localtunnel/ssh -R/tailscale funnel 等）；doctor 告警；**start 前复跑穿透检测，命中即 die**。
 3. **S3** 模型关、real 关：`AGENT_TASK_MODE=off`；拒绝 `--live`；占位 `QUALITY_OPS_REAL_ENABLED=false`（正式键名待 PR4a）。
 4. **S4** 只上传自己提供、可信的文件；parser 仅有 macOS sandbox-exec 基础隔离。
 5. **S5** 种子口令随机；账号/口令/密钥文件 **600**、目录 **700**；health 校验。
