@@ -112,7 +112,7 @@ const submitButton = (page: Page) => page.getByRole('button', { name: '提交检
 const material = (page: Page) => page.getByRole('textbox', { name: '检查材料', exact: true });
 const results = (page: Page) => page.getByRole('region', { name: '③ 处理结果', exact: true });
 async function noConclusion(page: Page) {
-  await expect(results(page)).not.toContainText('没有发现需要注意的地方');
+  await expect(results(page)).not.toContainText('本次未提取到符合约定规则的问题行，不代表全文没有质量问题');
   await expect(results(page)).not.toContainText(/发现 \d+ 处需要注意/);
   await expect(results(page).getByRole('listitem')).toHaveCount(0);
 }
@@ -160,7 +160,7 @@ test('空白、长度和可选标题控制提交；无效输入不发请求', as
   await title.fill('题'.repeat(200));
   await expect(submitButton(page)).toBeEnabled();
   await submitButton(page).click();
-  await expect(results(page)).toContainText('没有发现需要注意的地方');
+  await expect(results(page)).toContainText('本次未提取到符合约定规则的问题行，不代表全文没有质量问题');
   expect(posts[0].body).toEqual({ materialText: '文'.repeat(20_000), title: '题'.repeat(200) });
 });
 
@@ -175,7 +175,7 @@ for (const width of [1440, 390]) {
     await submit(page, '问题：尺寸超差');
     await expect(results(page)).toContainText('发现 1 处需要注意');
     await expect(results(page).getByRole('listitem')).toHaveText(['尺寸超差']);
-    await expect(results(page)).not.toContainText('没有发现需要注意的地方');
+    await expect(results(page)).not.toContainText('本次未提取到符合约定规则的问题行，不代表全文没有质量问题');
     expect(posts).toHaveLength(1);
     expect(posts[0].body).toEqual({ materialText: '问题：尺寸超差' });
     expect(posts[0].headers['content-type']).toBe('application/json');
@@ -203,12 +203,20 @@ for (const width of [1440, 390]) {
   });
 }
 
-test('没有问题；刷新不留结果且不重发提交', async ({ page }) => {
+test('未提取问题行仅表示规则范围内结果；刷新不留结果且不重发提交', async ({ page }) => {
   const { posts } = await fixture(page);
   await page.goto(href());
   await submit(page);
-  await expect(results(page)).toContainText('没有发现需要注意的地方');
+  await expect(results(page)).toContainText('本次未提取到符合约定规则的问题行，不代表全文没有质量问题');
   await expect(page.getByText('发现 1 处需要注意', { exact: true })).toHaveCount(0);
+  await expect(page.locator('#quality-check-scope')).toContainText(
+    '仅识别以“问题：”或“问题:”开头且冒号后有非空内容的行',
+  );
+  await expect(page.locator('#quality-check-scope')).toContainText('例如：问题：尺寸超差');
+  await expect(material(page)).toHaveAttribute(
+    'aria-describedby',
+    'quality-check-scope quality-check-count quality-check-count-rule',
+  );
   expect(posts[0].body).toEqual({ materialText: '本批记录完整。' });
   await page.reload();
   await expect(submitButton(page)).toBeDisabled();
@@ -257,7 +265,10 @@ const invalidBodies: [string, unknown][] = [
     '无问题却非空列表',
     { ...noIssues, result: foundIssues.result && { ...foundIssues.result, verdict: 'NO_ISSUES' } },
   ],
-  ['只有非合同字段', { summary: '没有发现需要注意的地方', conclusion: '发现 1 处需要注意' }],
+  [
+    '只有非合同字段',
+    { summary: '本次未提取到符合约定规则的问题行，不代表全文没有质量问题', conclusion: '发现 1 处需要注意' },
+  ],
   ['响应为空', null],
 ];
 for (const [name, body] of invalidBodies) {
@@ -292,7 +303,7 @@ for (const [status, code, message] of [
     const { setReply, posts } = await fixture(page);
     await page.goto(href());
     await submit(page);
-    await expect(results(page)).toContainText('没有发现需要注意的地方');
+    await expect(results(page)).toContainText('本次未提取到符合约定规则的问题行，不代表全文没有质量问题');
     setReply({ status, body: { contractVersion: '1.0', code, result: foundIssues.result } });
     await submitButton(page).click();
     await expect(page.getByRole('alert')).toHaveText(message);
@@ -329,7 +340,7 @@ test('提交中无旧结论且阻止重复提交；重试只保留当前结果',
   const { setReply, posts } = await fixture(page);
   await page.goto(href());
   await submit(page);
-  await expect(results(page)).toContainText('没有发现需要注意的地方');
+  await expect(results(page)).toContainText('本次未提取到符合约定规则的问题行，不代表全文没有质量问题');
   setReply({ status: 201, body: foundIssues, wait });
   await submitButton(page).click();
   await expect(page.getByRole('button', { name: '提交中…', exact: true })).toBeDisabled();
@@ -339,12 +350,12 @@ test('提交中无旧结论且阻止重复提交；重试只保留当前结果',
   await expect.poll(() => posts.length).toBe(2);
   release();
   await expect(results(page).getByRole('listitem')).toHaveText(['尺寸超差']);
-  await expect(results(page)).not.toContainText('没有发现需要注意的地方');
+  await expect(results(page)).not.toContainText('本次未提取到符合约定规则的问题行，不代表全文没有质量问题');
   expect(posts).toHaveLength(2);
 });
 
 for (const kind of ['网络错误', '10 秒超时'] as const) {
-  test(`${kind}显示暂不可用，无结论`, async ({ page }) => {
+  test(`${kind}提示结果不确定，无结论`, async ({ page }) => {
     let release!: () => void;
     const wait = new Promise<void>((resolve) => {
       release = resolve;
@@ -357,7 +368,10 @@ for (const kind of ['网络错误', '10 秒超时'] as const) {
     );
     await page.goto(href());
     await submit(page);
-    await expect(page.getByRole('alert')).toHaveText(unavailable, { timeout: 15_000 });
+    await expect(page.getByRole('alert')).toHaveText(
+      '未收到确定的检查结果，结果尚不确定；重试可能再次提交材料，请谨慎操作',
+      { timeout: 15_000 },
+    );
     await noConclusion(page);
     await expect(submitButton(page)).toBeEnabled();
     expect(posts).toHaveLength(1);
@@ -373,7 +387,7 @@ test('切企业丢弃旧结果和输入，在途响应也不能写入新企业�
   const { setReply, posts } = await fixture(page);
   await page.goto(href());
   await submit(page);
-  await expect(results(page)).toContainText('没有发现需要注意的地方');
+  await expect(results(page)).toContainText('本次未提取到符合约定规则的问题行，不代表全文没有质量问题');
   setReply({ status: 201, body: foundIssues, wait });
   await submitButton(page).click();
   await expect.poll(() => posts.length).toBe(2);
@@ -384,4 +398,43 @@ test('切企业丢弃旧结果和输入，在途响应也不能写入新企业�
   await expect(material(page)).toHaveValue('');
   release();
   await noConclusion(page);
+});
+
+for (const [name, text, heading, count] of [
+  ['首尾空白不占材料上限', ' \n' + '文'.repeat(20_000) + '\n ', '  ' + '题'.repeat(200) + '  ', 20_000],
+  ['补充字符按码点计数', '😀'.repeat(20_000), '😀'.repeat(200), 20_000],
+  ['Java额外控制空白为空', '\u001c\u001d\u001e\u001f', '', 0],
+  ['不换行空格不是空材料', '\u00a0', '', 1],
+] as const) {
+  test(`材料和标题计数规则：${name}`, async ({ page }) => {
+    const { posts } = await fixture(page);
+    await page.goto(href());
+    await material(page).fill(text);
+    await page.getByRole('textbox', { name: '标题（选填）' }).fill(heading);
+    await expect(page.locator('#quality-check-count')).toHaveText(`${count} / 20000 字`);
+    if (count === 0) {
+      await expect(submitButton(page)).toBeDisabled();
+      expect(posts).toHaveLength(0);
+    } else {
+      await expect(submitButton(page)).toBeEnabled();
+      await submitButton(page).click();
+      await expect(results(page)).toContainText('本次未提取到符合约定规则的问题行');
+      expect(posts[0].body).toEqual({ materialText: text, ...(heading ? { title: heading } : {}) });
+    }
+  });
+}
+
+test('补充字符材料和标题超限仍禁用，修正到边界后恢复', async ({ page }) => {
+  const { posts } = await fixture(page);
+  await page.goto(href());
+  const title = page.getByRole('textbox', { name: '标题（选填）' });
+  await material(page).fill('😀'.repeat(20_001));
+  await expect(page.locator('#quality-check-count')).toHaveText('20001 / 20000 字');
+  await expect(submitButton(page)).toBeDisabled();
+  await material(page).fill('😀'.repeat(20_000));
+  await title.fill('😀'.repeat(201));
+  await expect(submitButton(page)).toBeDisabled();
+  expect(posts).toHaveLength(0);
+  await title.fill('😀'.repeat(200));
+  await expect(submitButton(page)).toBeEnabled();
 });

@@ -1,4 +1,5 @@
 import { createIdentityRequest, IdentityError } from './client.ts';
+import { qualityCheckInputState } from './quality-check-input.ts';
 import { withTimeout } from '../shared/abort-timeout.ts';
 
 export type QualityCheckResult = {
@@ -41,26 +42,34 @@ const request = createIdentityRequest(async (input, init) => {
   return response;
 });
 
-export function submitQualityCheck(
+export async function submitQualityCheck(
   materialText: string,
   title?: string,
   signal?: AbortSignal,
 ): Promise<QualityCheckResult> {
-  if (!materialText.trim() || materialText.length > 20_000 || (title?.length ?? 0) > 200)
+  if (!qualityCheckInputState(materialText, title).valid)
     return Promise.reject(new IdentityError('INVALID_REQUEST', 400));
-  return request(
-    '/api/tenant-admin/v1/quality-ops/check-tasks',
-    'POST',
-    isQualityCheckResult,
-    { materialText, ...(title ? { title } : {}) },
-    withTimeout(signal, 10_000),
-  );
+  const requestSignal = withTimeout(signal, 10_000);
+  try {
+    return await request(
+      '/api/tenant-admin/v1/quality-ops/check-tasks',
+      'POST',
+      isQualityCheckResult,
+      { materialText, ...(title ? { title } : {}) },
+      requestSignal,
+    );
+  } catch (error) {
+    if (requestSignal.aborted && !signal?.aborted) throw new IdentityError('UNCERTAIN_RESULT', 0, 'timeout');
+    throw error;
+  }
 }
 
 export const qualityCheckNotOpened = '本企业还没有开通质量检查';
 
 export function qualityCheckFailureMessage(error: unknown): string {
   if (error instanceof IdentityError) {
+    if (error.code === 'UNCERTAIN_RESULT' || error.reason === 'timeout')
+      return '未收到确定的检查结果，结果尚不确定；重试可能再次提交材料，请谨慎操作';
     if (error.status === 400) return '检查材料不符合要求，请修改后再提交';
     if (error.status === 401) return '请重新登录后再试';
     if (error.status === 403)
