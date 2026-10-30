@@ -160,6 +160,7 @@
 | CT-032 | CI spending 限额/告警（并行轨③） | **落地文档本 PR** → [`ci-spending-limits-20261030.md`](ci-spending-limits-20261030.md)；Billing 待老板点按；自托管→CT-033 |
 | CT-035 | 第四端正式登录 + 租户隔离（D4～D5 · L1–L4） | **已合** main `bd06caf` / #21 → [`CT-035-agent-admin-login-tenant-isolation.md`](CT-035-agent-admin-login-tenant-isolation.md) |
 | CT-034-P1 | 替换登记 Stub 开放链（鉴权+CSRF） | **已合** main `022768b` / #22 → [`CT-034-P1-stub-security-replace-auth-csrf.md`](CT-034-P1-stub-security-replace-auth-csrf.md)；不再挡住 A 档 |
-| CT-034-A | 登记目录落库并 201（平台全局；验收句 W1 起步） | **执行单本 PR** → [`CT-034-A-register-persist-201.md`](CT-034-A-register-persist-201.md)；P1 已合，**可开跑**。企业读归 CT-039；迁移 V191+ |
-| CT-036 | 企业侧/工作台消费已开通（两周 D6～D8 · 验收句 E1–E4） | **骨架已出** → [`CT-036-enterprise-consume-opened-capability.md`](CT-036-enterprise-consume-opened-capability.md)；实现细节随 CT-035 / CT-034-P1 合入后补裁 |
+| CT-034-A | 登记目录落库并 201（平台全局；验收句 W1 起步） | **执行单已合** main `fdc22fe` / #28 → [`CT-034-A-register-persist-201.md`](CT-034-A-register-persist-201.md)；实现未开跑。企业读归 CT-039；迁移 **V191+** |
+| CT-036 | 企业侧/工作台消费已开通（两周 D6～D8 · 验收句 E1–E4） | **骨架已出** → [`CT-036-enterprise-consume-opened-capability.md`](CT-036-enterprise-consume-opened-capability.md)；诚实空态壳 `#25`/`7e21bc0` 已合。读口不在本骨架里改，挂靠 **CT-039** |
+| CT-039 | 企业侧「本租户已开通」只读（钉死 CT-036【待补-读口】） | **执行单本 PR** → [`CT-039-tenant-opened-capabilities-readonly.md`](CT-039-tenant-opened-capabilities-readonly.md)；另裁企业读口，禁第四端 grants；契约 GET 未实现；投影迁移 **V192+**（避 A 档 V191）。A 档执行单已合；实现未开跑则生产读空+测种子 |
 
