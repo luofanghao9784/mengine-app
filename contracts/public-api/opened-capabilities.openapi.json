@@ -3,7 +3,7 @@
   "info": {
     "title": "企业已开通功能",
     "version": "1.0.0",
-    "description": "企业会话只读接口；生产数据源未接入时返回空列表。无任何企业选择请求字段。【待补-会话】唯一 ACTIVE 企业不能确定时返回 404。"
+    "description": "企业会话只读接口；按本企业授权行返回名单，没有授权行时 items 为空。无任何企业选择请求字段。【待补-会话】唯一 ACTIVE 企业不能确定时返回 404。"
   },
   "paths": {
     "/api/tenant-admin/v1/opened-capabilities": {
