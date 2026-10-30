@@ -19,7 +19,7 @@ export default defineConfig({
     command: isCi
       ? `npm run preview -- --port ${port}`
       : `npm run dev -- --port ${port}`,
-    url: `http://127.0.0.1:${port}`,
+    url: `http://127.0.0.1:${port}/workspace/`, // root / has no index after Demo cleanup; entries live under /workspace/ etc.
     reuseExistingServer: !isCi,
     timeout: 180_000,
     stdout: 'pipe',
