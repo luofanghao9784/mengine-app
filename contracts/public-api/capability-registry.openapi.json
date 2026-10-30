@@ -1,0 +1,821 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "能力登记与准入（capability-registry）",
+    "version": "0.0.0-skeleton",
+    "description": "【骨架 · 后端未实现 · 勿当 Live】CT-031 OpenAPI 提纲占位（表面 agent-admin）。字段/枚举对齐 docs/architecture/契约分片-检查与能力.md 与 ADR-B8 D8-5；响应以 501 占位；禁止当作已实现 API 或假 Live 业务数据。"
+  },
+  "paths": {
+    "/api/agent-admin/v1/capabilities": {
+      "get": {
+        "operationId": "listCapabilities",
+        "summary": "列出能力目录（骨架）",
+        "tags": [
+          "capability-admission"
+        ],
+        "responses": {
+          "200": {
+            "description": "骨架占位 · 未实现；勿当 Live",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Capability"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "会话无效（骨架占位）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "资格或 CSRF 不符合（骨架占位）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "骨架未实现（Not Implemented）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "registerCapability",
+        "summary": "登记能力（骨架）",
+        "tags": [
+          "capability-admission"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Capability"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "骨架占位 · 未实现",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Capability"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "会话无效（骨架占位）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "资格或 CSRF 不符合（骨架占位）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "骨架未实现（Not Implemented）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/agent-admin/v1/capabilities/{capabilityId}/modules": {
+      "get": {
+        "operationId": "listCapabilityModules",
+        "summary": "列出模块版本（骨架）",
+        "tags": [
+          "capability-admission"
+        ],
+        "parameters": [
+          {
+            "name": "capabilityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "骨架占位 · 未实现",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CapabilityModuleVersion"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "会话无效（骨架占位）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "资格或 CSRF 不符合（骨架占位）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "骨架未实现（Not Implemented）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "registerCapabilityModule",
+        "summary": "登记模块版本（骨架）",
+        "tags": [
+          "capability-admission"
+        ],
+        "parameters": [
+          {
+            "name": "capabilityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CapabilityModuleVersion"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "骨架占位 · 未实现",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapabilityModuleVersion"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "会话无效（骨架占位）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "资格或 CSRF 不符合（骨架占位）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "骨架未实现（Not Implemented）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/agent-admin/v1/modules/{moduleVersionId}/admission-tests": {
+      "get": {
+        "operationId": "listAdmissionTests",
+        "summary": "列出准入测试记录（骨架）",
+        "tags": [
+          "capability-admission"
+        ],
+        "parameters": [
+          {
+            "name": "moduleVersionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "骨架占位 · 未实现",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AdmissionTestRecord"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "会话无效（骨架占位）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "资格或 CSRF 不符合（骨架占位）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "骨架未实现（Not Implemented）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createAdmissionTest",
+        "summary": "发起准入测试（骨架）",
+        "tags": [
+          "capability-admission"
+        ],
+        "parameters": [
+          {
+            "name": "moduleVersionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "骨架占位 · 未实现",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdmissionTestRecord"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "会话无效（骨架占位）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "资格或 CSRF 不符合（骨架占位）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "骨架未实现（Not Implemented）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/agent-admin/v1/modules/{moduleVersionId}/admission": {
+      "patch": {
+        "operationId": "patchModuleAdmissionStatus",
+        "summary": "变更准入状态 candidate→admitted/deprecated（骨架）",
+        "tags": [
+          "capability-admission"
+        ],
+        "parameters": [
+          {
+            "name": "moduleVersionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "admissionStatus"
+                ],
+                "properties": {
+                  "admissionStatus": {
+                    "$ref": "#/components/schemas/AdmissionStatus"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "骨架占位 · 未实现",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapabilityModuleVersion"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "会话无效（骨架占位）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "资格或 CSRF 不符合（骨架占位）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "骨架未实现（Not Implemented）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/agent-admin/v1/tenants/{tenantId}/grants": {
+      "get": {
+        "operationId": "listCapabilityTenantGrants",
+        "summary": "列出租户能力授权（骨架）",
+        "tags": [
+          "capability-admission"
+        ],
+        "parameters": [
+          {
+            "name": "tenantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "被授权租户（路径参数；非执行作用域）"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "骨架占位 · 未实现",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CapabilityTenantGrant"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "会话无效（骨架占位）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "资格或 CSRF 不符合（骨架占位）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "骨架未实现（Not Implemented）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createCapabilityTenantGrant",
+        "summary": "授予租户模块版本（骨架）",
+        "tags": [
+          "capability-admission"
+        ],
+        "parameters": [
+          {
+            "name": "tenantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CapabilityTenantGrantCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "骨架占位 · 未实现",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapabilityTenantGrant"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "会话无效（骨架占位）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "资格或 CSRF 不符合（骨架占位）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "骨架未实现（Not Implemented）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "EnterpriseFunction": {
+        "type": "string",
+        "enum": [
+          "document-parse",
+          "table-compare",
+          "quality-check",
+          "semantic-annotation",
+          "repair-suggestion"
+        ],
+        "description": "ADR-B8 闭集；首版演示登记闭环仅 quality-check；预留值登记返回 ENTERPRISE_FUNCTION_NOT_ENABLED"
+      },
+      "RuntimeKind": {
+        "type": "string",
+        "enum": [
+          "in-process",
+          "local-process",
+          "model-agent"
+        ],
+        "description": "对外闭集三值；engine-http 不暴露"
+      },
+      "AdmissionStatus": {
+        "type": "string",
+        "enum": [
+          "candidate",
+          "admitted",
+          "deprecated"
+        ],
+        "description": "模块版本准入状态（≠ admissionTestVerdict）"
+      },
+      "AdmissionTestVerdict": {
+        "type": "string",
+        "enum": [
+          "passed",
+          "failed",
+          "pending"
+        ],
+        "description": "准入测试结论；独立字段，勿复用 qualityVerdict"
+      },
+      "RunStatus": {
+        "type": "string",
+        "enum": [
+          "queued",
+          "running",
+          "awaiting_human",
+          "succeeded",
+          "failed",
+          "cancelled"
+        ]
+      },
+      "Capability": {
+        "type": "object",
+        "required": [
+          "capabilityId",
+          "name"
+        ],
+        "properties": {
+          "capabilityId": {
+            "type": "string",
+            "description": "如 quality-check；≠ enterpriseFunction"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "quality_check"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "CapabilityModuleVersion": {
+        "type": "object",
+        "required": [
+          "capabilityId",
+          "moduleVersionId",
+          "enterpriseFunction",
+          "runtimeKind",
+          "admissionStatus"
+        ],
+        "properties": {
+          "capabilityId": {
+            "type": "string"
+          },
+          "moduleVersionId": {
+            "type": "string"
+          },
+          "moduleVersion": {
+            "type": "string"
+          },
+          "interfaceVersion": {
+            "type": "string"
+          },
+          "enterpriseFunction": {
+            "$ref": "#/components/schemas/EnterpriseFunction"
+          },
+          "modelVendor": {
+            "type": "string",
+            "description": "runtimeKind=model-agent 时必填；无密钥"
+          },
+          "runtimeKind": {
+            "$ref": "#/components/schemas/RuntimeKind"
+          },
+          "supportedFormats": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "ioSchemaRef": {
+            "type": "string"
+          },
+          "permissionsRequired": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "timeoutMs": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "costClass": {
+            "type": "string"
+          },
+          "admissionStatus": {
+            "$ref": "#/components/schemas/AdmissionStatus"
+          },
+          "lastTestRecordId": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AdmissionTestRecord": {
+        "type": "object",
+        "required": [
+          "testRecordId",
+          "moduleVersionId",
+          "runStatus",
+          "admissionTestVerdict"
+        ],
+        "properties": {
+          "testRecordId": {
+            "type": "string"
+          },
+          "moduleVersionId": {
+            "type": "string"
+          },
+          "runStatus": {
+            "$ref": "#/components/schemas/RunStatus"
+          },
+          "admissionTestVerdict": {
+            "$ref": "#/components/schemas/AdmissionTestVerdict"
+          },
+          "sampleSetId": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "finishedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CapabilityTenantGrant": {
+        "type": "object",
+        "required": [
+          "moduleVersionId",
+          "tenantId",
+          "isDefault",
+          "grantedAt"
+        ],
+        "properties": {
+          "moduleVersionId": {
+            "type": "string"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "被授权对象；非执行作用域"
+          },
+          "enterpriseFunction": {
+            "$ref": "#/components/schemas/EnterpriseFunction"
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "grantedBy": {
+            "type": "string"
+          },
+          "grantedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CapabilityTenantGrantCreate": {
+        "type": "object",
+        "required": [
+          "moduleVersionId",
+          "isDefault"
+        ],
+        "properties": {
+          "moduleVersionId": {
+            "type": "string"
+          },
+          "isDefault": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  }
+}
