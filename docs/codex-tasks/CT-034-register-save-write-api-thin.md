@@ -25,6 +25,7 @@
    - **C（底线）**：控制器/路由存在，无会话也稳定返回 `401` 或 `501` 人话 JSON；`curl -i` 可证路径非 404
 3. **不做登录签发**（CT-035）；可复用现有会话/鉴权钩子做 401。
 4. **不做前端大改**（人话属 CT-038；接真名单属后续日）。
+5. **硬门禁（落库 / A 档前）**：**落库 / A 档持久化之前，必须删除（或彻底替换）`CapabilityRegistryStubSecurity` 中对登记 POST 的 `permitAll` + `csrf.disable()`；换成正式身份鉴权 + CSRF（及既有会话门闸）。禁止在保留 StubSecurity 开放链的情况下落库或返回 201。** 该开放链只许留在无副作用 C 档 stub。
 
 ## ① 目标与范围
 
@@ -186,7 +187,7 @@ CT-035 登录、前端大改、上架/开通完整态机、假成功 toast"
 | V1 | 路径真实 | 上列 `curl -si -X POST …/capabilities` **不是**「无此路由」404 |
 | V2 | 诚实态 | 无落库时不得 201/200 成功体；须 401 或 501（或业务 4xx）+ JSON |
 | V3 | 人话错误 | 错误 JSON 含可读中文 `message`（非仅英文堆栈） |
-| V4 | 档 A 加码（若宣称落库） | POST 201 后，同租户 GET/名单可查 ≥1 条真记录 |
+| V4 | 档 A 加码（若宣称落库） | POST 201 后，同租户 GET/名单可查 ≥1 条真记录。合入 A 档 PR 前审查人须确认 StubSecurity 开放链已移除 |
 | V5 | 测试 | 本单相关测试绿；未用 skip 掩盖 |
 | V6 | 边界 | 未改前端大段；未改包名 / `/mengine-api` / `MENGINE_*`；未做 CT-035 |
 
@@ -198,6 +199,7 @@ CT-035 登录、前端大改、上架/开通完整态机、假成功 toast"
 | 有暂停令 | 不开 Codex；问 DQ |
 | curl 404 无路由 | 未完成；补控制器映射后再交 |
 | 返回 201 但无落库 | **打回**；改为 501 或补持久化 |
+| 落库或返回 201 仍走 StubSecurity 开放链（`permitAll` + `csrf.disable()`） | **打回**；先删除或彻底替换为正式身份鉴权 + CSRF（及既有会话门闸），再落库 |
 | 错误体无中文 | 补人话 message |
 | 误改前端 / 包名 / mengine-api | `git restore`；报 DQ |
 | 测试红 | 修到绿；禁止 `-DskipTests` 掩盖本单 |
@@ -207,6 +209,7 @@ CT-035 登录、前端大改、上架/开通完整态机、假成功 toast"
 
 - `git push --force` / `-f` / `--force-with-lease`、`git reset --hard`、直推 `main`
 - **假成功**（无落库 201/200 + 前端成功暗示）
+- **保留 StubSecurity 开放链却落库或返回 201**：落库 / A 档持久化之前，必须删除（或彻底替换）`CapabilityRegistryStubSecurity` 中对登记 POST 的 `permitAll` + `csrf.disable()`；换成正式身份鉴权 + CSRF（及既有会话门闸）
 - 完整登录实现（CT-035）、前端人话大改（CT-038）、假 Live 列表
 - 改 `com.dreamcore.*` 包名、`/mengine-api`、`MENGINE_*`
 - `gh issue create/comment`；含口令提交
