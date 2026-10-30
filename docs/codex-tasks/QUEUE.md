@@ -8,7 +8,7 @@
 >
 > **并行日切片（旧三轨 · 2026-10-30，契约/CI 仍可对照）**：四端演示 \| 能力契约 \| CI → [`并行日切片计划-20261030.md`](并行日切片计划-20261030.md) · [Notion](https://app.notion.com/p/40966c386fbf8198989ec102a22ae8b0)
 >
-> **两周指针（补）**：**CT-034-P1 已合** main `022768b`（#22），**CT-035 已合** `bd06caf`（#21）。**A 档可开跑** = **CT-034-A** → [`CT-034-A-register-persist-201.md`](CT-034-A-register-persist-201.md)（平台全局目录落库并 201；企业读归 CT-039；迁移 V191+）。D4～D5 登录隔离执行单仍是 [`CT-035-agent-admin-login-tenant-isolation.md`](CT-035-agent-admin-login-tenant-isolation.md)。后端四裁仍有效：写口 `/api/agent-admin`；`DREAMCORE_AGENT` 独立链；未登录写 401 人话；不得恢复 permitAll。OpenAPI `enterpriseFunction` 闭集、`additionalProperties:false`，未知字段 400。
+> **两周指针（补）**：**CT-034-P1 已合** main `022768b`（#22），**CT-035 已合** `bd06caf`（#21）。**CT-034-A 实现已合** main `75ab17a` / #30（执行单 #28；平台全局目录落库并 201）。**CT-039 实现已合** main `701c3ca` / #31（`GET /api/tenant-admin/v1/opened-capabilities`；生产 Empty adapter 空列表；真名单与前端接线仍归 CT-036）。D4～D5 登录隔离执行单仍是 [`CT-035-agent-admin-login-tenant-isolation.md`](CT-035-agent-admin-login-tenant-isolation.md)。后端四裁仍有效：写口 `/api/agent-admin`；`DREAMCORE_AGENT` 独立链；未登录写 401 人话；不得恢复 permitAll。OpenAPI `enterpriseFunction` 闭集、`additionalProperties:false`，未知字段 400。**M4 执行单**：**CT-037** → [`CT-037-prod-mount-desktop-mobile-smoke.md`](CT-037-prod-mount-desktop-mobile-smoke.md)（D9～D14；**执行单本 PR**）。
 
 
 **每日目标**：当天结束时，老板 Mac 上须有**可运行、可点开**的预览增量（本机 `127.0.0.1` 可访问的新能力或修复），而不是只合文档/只绿 CI。
@@ -40,7 +40,7 @@
 
 与上方前端硬性 1–6 分列，编号从 1 起，不并入、不改写那六条。
 
-1. **CT-034 类 stub：`CapabilityRegistryStubSecurity`（或等价）permitAll+csrf disable 仅允许无副作用 stub；任何落库/A 档前必须删除并换正式鉴权+CSRF，否则架构/安全 P0 打回。** **CT-034-P1 已合** main `022768b`（#22）：开放链已删；未登录写 **401 人话**；有会话无 CSRF **403**；已登录未落库时曾是 501。口径仍见 [`CT-034-register-save-write-api-thin.md`](CT-034-register-save-write-api-thin.md)「架构已裁」第 5 条与 [`CT-034-P1-stub-security-replace-auth-csrf.md`](CT-034-P1-stub-security-replace-auth-csrf.md)。**A 档现可开跑**：[`CT-034-A-register-persist-201.md`](CT-034-A-register-persist-201.md)。落库后禁止恢复 `permitAll`。
+1. **CT-034 类 stub：`CapabilityRegistryStubSecurity`（或等价）permitAll+csrf disable 仅允许无副作用 stub；任何落库/A 档前必须删除并换正式鉴权+CSRF，否则架构/安全 P0 打回。** **CT-034-P1 已合** main `022768b`（#22）：开放链已删；未登录写 **401 人话**；有会话无 CSRF **403**；已登录未落库时曾是 501。口径仍见 [`CT-034-register-save-write-api-thin.md`](CT-034-register-save-write-api-thin.md)「架构已裁」第 5 条与 [`CT-034-P1-stub-security-replace-auth-csrf.md`](CT-034-P1-stub-security-replace-auth-csrf.md)。**A 档实现已合** main `75ab17a` / #30 → [`CT-034-A-register-persist-201.md`](CT-034-A-register-persist-201.md)。落库后禁止恢复 `permitAll`。
 
 审查配人（前端可见改动）：**发布验收 + 质量性能**；触及 agent-admin 边界/五维登记时加 **架构逻辑**；登录/会话/cookie 加 **安全审查**。
 
@@ -160,7 +160,8 @@
 | CT-032 | CI spending 限额/告警（并行轨③） | **落地文档本 PR** → [`ci-spending-limits-20261030.md`](ci-spending-limits-20261030.md)；Billing 待老板点按；自托管→CT-033 |
 | CT-035 | 第四端正式登录 + 租户隔离（D4～D5 · L1–L4） | **已合** main `bd06caf` / #21 → [`CT-035-agent-admin-login-tenant-isolation.md`](CT-035-agent-admin-login-tenant-isolation.md) |
 | CT-034-P1 | 替换登记 Stub 开放链（鉴权+CSRF） | **已合** main `022768b` / #22 → [`CT-034-P1-stub-security-replace-auth-csrf.md`](CT-034-P1-stub-security-replace-auth-csrf.md)；不再挡住 A 档 |
-| CT-034-A | 登记目录落库并 201（平台全局；验收句 W1 起步） | **执行单已合** main `fdc22fe` / #28 → [`CT-034-A-register-persist-201.md`](CT-034-A-register-persist-201.md)；实现未开跑。企业读归 CT-039；迁移 **V191+** |
-| CT-036 | 企业侧/工作台消费已开通（两周 D6～D8 · 验收句 E1–E4） | **骨架已出** → [`CT-036-enterprise-consume-opened-capability.md`](CT-036-enterprise-consume-opened-capability.md)；诚实空态壳 `#25`/`7e21bc0` 已合。读口不在本骨架里改，挂靠 **CT-039** |
-| CT-039 | 企业侧「本租户已开通」只读（钉死 CT-036【待补-读口】） | **执行单本 PR** → [`CT-039-tenant-opened-capabilities-readonly.md`](CT-039-tenant-opened-capabilities-readonly.md)；另裁企业读口，禁第四端 grants；契约 GET 未实现；投影迁移 **V192+**（避 A 档 V191）。A 档执行单已合；实现未开跑则生产读空+测种子 |
+| CT-034-A | 登记目录落库并 201（平台全局；验收句 W1 起步） | **实现已合** main `75ab17a` / #30（执行单 `fdc22fe` / #28）。企业读已由 CT-039 `#31` 合入（生产空列表；真名单仍归 CT-036） |
+| CT-036 | 企业侧/工作台消费已开通（两周 D6～D8 · 验收句 E1–E4） | **骨架已出** → [`CT-036-enterprise-consume-opened-capability.md`](CT-036-enterprise-consume-opened-capability.md)；诚实空态壳 `#25`/`7e21bc0` 已合。读口已由 CT-039 `#31` 合入，前端未接。完整消费（真名单、前端接线、提交出结果）未合 |
+| CT-039 | 企业侧「本租户已开通」只读（钉死 CT-036【待补-读口】） | **实现已合** main `701c3ca` / #31（执行单 #29 → [`CT-039-tenant-opened-capabilities-readonly.md`](CT-039-tenant-opened-capabilities-readonly.md)）。`GET /api/tenant-admin/v1/opened-capabilities`；生产 Empty adapter 恒空列表。真名单与前端接线仍归 CT-036。禁第四端 grants |
+| CT-037 | 现网挂载 + 桌面/手机冒烟（两周 M4 · D9～D14 · 轨 C） | **执行单本 PR** → [`CT-037-prod-mount-desktop-mobile-smoke.md`](CT-037-prod-mount-desktop-mobile-smoke.md)。对照 `701c3ca`。CT-034-A / CT-035 / CT-034-P1 / CT-039 实现已合（M3-b 接口空列表可勾）；CT-040、CT-036 完整消费（真名单与前端接线）、页面保存按钮未合则清单【待合】 |
 
