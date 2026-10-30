@@ -1,0 +1,171 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "企业已开通功能",
+    "version": "1.0.0",
+    "description": "企业会话只读接口；生产数据源未接入时返回空列表。无任何企业选择请求字段。【待补-会话】唯一 ACTIVE 企业不能确定时返回 404。"
+  },
+  "paths": {
+    "/api/tenant-admin/v1/opened-capabilities": {
+      "get": {
+        "operationId": "listOpenedCapabilities",
+        "summary": "查看本企业已开通功能",
+        "security": [
+          {
+            "customerSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "本企业已开通功能；未开通时 items 为空",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenedCapabilityList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "有无法识别的字段，请检查后再提交",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "请求未获授权。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "暂时不能查看已开通功能",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "customerSession": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "DREAMCORE_SESSION"
+      }
+    },
+    "schemas": {
+      "OpenedCapabilityList": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OpenedCapability"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "OpenedCapability": {
+        "type": "object",
+        "required": [
+          "enterpriseFunction",
+          "displayName"
+        ],
+        "properties": {
+          "enterpriseFunction": {
+            "type": "string",
+            "enum": [
+              "document-parse",
+              "table-compare",
+              "quality-check",
+              "semantic-annotation",
+              "repair-suggestion"
+            ]
+          },
+          "displayName": {
+            "type": "string",
+            "enum": [
+              "文档解析",
+              "表格对比",
+              "质量检查",
+              "语义标注",
+              "修复建议"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "oneOf": [
+          {
+            "properties": {
+              "enterpriseFunction": {
+                "const": "document-parse"
+              },
+              "displayName": {
+                "const": "文档解析"
+              }
+            }
+          },
+          {
+            "properties": {
+              "enterpriseFunction": {
+                "const": "table-compare"
+              },
+              "displayName": {
+                "const": "表格对比"
+              }
+            }
+          },
+          {
+            "properties": {
+              "enterpriseFunction": {
+                "const": "quality-check"
+              },
+              "displayName": {
+                "const": "质量检查"
+              }
+            }
+          },
+          {
+            "properties": {
+              "enterpriseFunction": {
+                "const": "semantic-annotation"
+              },
+              "displayName": {
+                "const": "语义标注"
+              }
+            }
+          },
+          {
+            "properties": {
+              "enterpriseFunction": {
+                "const": "repair-suggestion"
+              },
+              "displayName": {
+                "const": "修复建议"
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}
