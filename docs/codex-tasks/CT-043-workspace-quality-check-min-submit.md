@@ -39,7 +39,7 @@
    - `POST /api/agent-admin/v1/capabilities`
    - 任何新的 `/api/v1/**`、`/api/tenant-admin/**`、`/api/workspace/**` 质量检查提交
    不新增文件选择，不 `FormData`，不把材料写入 `localStorage` / 内存名单。按钮保持 `disabled`。已开通时可见句保持：「暂时不能提交检查材料（执行服务尚未接通）」「暂时不能查看处理结果（执行服务尚未接通）」。说明句保持：「材料提交与结果读取尚未接通。」
-3. **前门闸只走读口。** 未登录沿用现登录墙。读口失败沿用 `openedCapabilitiesFailureTitle`。`items` 不含 `quality-check`（含 `[]`、只有别的功能）→ 现句「本企业尚未开通此 AI 功能」与「请联系企业管理员确认，开通后再进入。」不渲染提交按钮，不落材料。`items` 含 `quality-check` 只表示可以**看见**这三步。#41 已合 348cafc，生产 CapabilityCatalogPort=GrantCatalogAdapter，Empty 已删。第四端开通后工作台会显示三步。A/B 合入前按钮保持灰色，禁假提交、禁假结果。
+3. **前门闸只走读口。** 未登录沿用现登录墙。读口失败沿用 `openedCapabilitiesFailureTitle`。`items` 不含 `quality-check`（含 `[]`、只有别的功能）→ 现句「本企业尚未开通此 AI 功能」与「请联系企业管理员确认，开通后再进入。」不渲染提交按钮，不落材料。`items` 含 `quality-check` 只表示可以**看见**这三步。#41 已合 348cafc，生产 CapabilityCatalogPort=GrantCatalogAdapter，Empty 已删。第四端开通后工作台会显示三步。A/B 合入前按钮保持灰色，禁假提交、禁假结果。已开通时按钮是否可点、未开通标题，以 B 为准。
 4. **R-B8-2。** 本单不新增 `qualityops` 类。若 diff 碰到该包：只许经已有 `CapabilityCatalogPort`，禁止 `import` `agentadmin` / `agentregistry`，禁止 SQL `qo_capability`、`qo_capability_tenant_grant`、`qo_module_version`、`qo_admission_test_record`。禁止把授权表读进工作台。
 5. **禁假成功。** 界面不得出现「检查通过」「已提交」「处理完成」「Live」。不得把骨架 501、空列表、开通 POST 的 201 说成检查完成。不得 toast。结果区保持诚实空态，不插入结果行。
 6. **非范围。** 开通写（CT-040，已合，勿改）、开通按钮（CT-042）、CT-041 换 adapter、grants GET、登记 POST、parser / engine 大改、模块版本、假演示包上传、精致结果页。

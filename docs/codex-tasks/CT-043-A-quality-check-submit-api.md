@@ -6,13 +6,13 @@
 > **挂靠**：两周日切片·轨 A。父单 [`CT-043-workspace-quality-check-min-submit.md`](CT-043-workspace-quality-check-min-submit.md) 仍禁碰后端。**后端由本子单放开，只许白名单。** 前端 [`CT-043-B-workspace-submit-result.md`](CT-043-B-workspace-submit-result.md) 可按下面「契约钉死」并行开发，**本单先合，B 再合**。两单在同一个文档 PR 里。不单列 C。  
 > 模型 `gpt-6.1-sol`，思考强度 **high**（本机 `gpt-5.1-codex` 亦可）。仓 `luofanghao9784/mengine-app`。
 
-> **脚注**：#41 已合 348cafc，生产 CapabilityCatalogPort=GrantCatalogAdapter，Empty 已删。本单不改 `GrantCatalogAdapter`。规则与人话标「待产品确认」，不阻塞。
+> **脚注**：#41 已合 348cafc，生产 CapabilityCatalogPort=GrantCatalogAdapter，Empty 已删。本单不改 `GrantCatalogAdapter`。人话已由产品定稿。
 
 ### 契约钉死（A/B 共用）
 
 1. **提交口。** 实现现有 `POST /api/tenant-admin/v1/quality-ops/check-tasks`，operationId 仍是 `createCheckTask`。不另开 path。骨架里的 `inputVersionId` / `configVersionId` / `executionMode` **本片不实现**。请求体改为 `additionalProperties: false`：`materialText` 字符串必填，trim 后 1～20000 字符；`title` 字符串可选，trim 后 ≤200，缺省或 trim 后空则不存。未知字段（含 `tenantId`）**400**。QUEUE 记债：「版本化材料/配置（inputVersionId/configVersionId）后移」。
 2. **材料传法。** 只收纯文本 JSON。不做文件上传，不做 multipart，不复用 material 上传。**文件约束本片 = 无文件。** 文件上传、进度条、取消记债后移。
-3. **成功判定。** HTTP **201**。必须字段：`taskId`（uuid）、`status` 等于 `"COMPLETED"`、`result.verdict` 为 `"NO_ISSUES"` 或 `"ISSUES_FOUND"`、`result.issues` 为 `[{message}]`。`ISSUES_FOUND` 时 `issues` 非空；`NO_ISSUES` 时 `issues` 为 `[]`。缺任一字段不是成功。人话由前端映射，标待产品确认：`NO_ISSUES`「没有发现需要修改的地方」；`ISSUES_FOUND`「发现 N 处需要注意」并列出 `message`。禁用词样「检查通过」。
+3. **成功判定。** HTTP **201**。必须字段：`taskId`（uuid）、`status` 等于 `"COMPLETED"`、`result.verdict` 为 `"NO_ISSUES"` 或 `"ISSUES_FOUND"`、`result.issues` 为 `[{message}]`。`ISSUES_FOUND` 时 `issues` 非空；`NO_ISSUES` 时 `issues` 为 `[]`。缺任一字段不是成功。人话由前端映射：`NO_ISSUES`「没有发现需要注意的地方」；`ISSUES_FOUND`「发现 N 处需要注意」，其下按 `issues` 原文顺序逐条列出 `message`，不改写、不截断。N 为 `issues.length` 的阿拉伯数字。禁用词样「检查通过」。
 4. **结果读法。** 结论只在这一次 201 响应体里。本片无 GET、无轮询、无事件流。刷新页面后不保留历史（记债）。
 5. **失败态（都不写库，响应与页面都不带结论）。** 400 校验 →「内容不符合要求」。401 → 页面「请重新登录后再试」（接口体仍是客户域现文案「请求未获授权。」，`code=AUTHENTICATION_REQUIRED`）。403 `CAPABILITY_NOT_OPENED` →「贵企业还没开通「质量检查」，请联系平台管理员开通」。403 CSRF（`ACCESS_DENIED`）→ 页面「请刷新页面后再试」。404 多企业或定不出唯一 ACTIVE 企业：沿用 `OpenedCapabilitiesController` 今日 404。503 或超时 →「质量检查暂时不可用，请稍后再试」。未开通不得用 501、409 或 503。
 6. **会话。** 只认 `DREAMCORE_SESSION`。租户由会话 membership 决定，算法照 `OpenedCapabilitiesController`。前端不传 `tenantId`。提交带 CSRF。前端走 `createIdentityRequest`（`src/identity/client.ts`），超时用 #46 `withTimeout`（`src/shared/abort-timeout.ts`）。
@@ -38,7 +38,7 @@
 
 ### 架构已裁
 
-1. **规则（待产品确认）。** 必须阅读 `materialText`。一行 trim 后以「问题：」开头且后面有文字 → 一条 `message`（冒号后的文字）。有至少一条 → `verdict=ISSUES_FOUND`。没有 → `verdict=NO_ISSUES` 且 `issues=[]`。禁止不读材料就返回 `NO_ISSUES`。禁止结论或 `message` 使用「检查通过」。
+1. **规则。** 必须阅读 `materialText`。逐行 trim 后，以全角「问题：」或半角「问题:」开头，且冒号后再 trim 仍有非空白文字 → 一条 `message`（冒号后文字再 trim）。冒号后为空或只剩空白，不算问题。有至少一条 → `verdict=ISSUES_FOUND`。没有 → `verdict=NO_ISSUES` 且 `issues=[]`。禁止不读材料就返回 `NO_ISSUES`。禁止结论或 `message` 使用「检查通过」。
 2. **fail closed。** 端口抛错或超时、引擎抛错 → 503，不写库，body 无 `verdict`。先引擎成功再 INSERT。
 3. **表列。** `id`、`tenant_id`（会话）、`created_by`（会话账号）、`title`、`material_text`、`status`、`result_json`、`created_at`。成功时 `status=COMPLETED`。`result_json` 存 `result`。无登记表外键。
 4. **401 先于 CSRF。** 无会话 POST（无 CSRF 或乱 CSRF）→ 401。有会话无 CSRF → 403 `ACCESS_DENIED`。禁止 StubSecurity、`permitAll`、`csrf.disable()`。`IdentitySecurity` 不在白名单。匿名 POST 若现有链先 403，停，问 DQ，不要改 `IdentitySecurity`。
@@ -90,10 +90,10 @@ git diff --name-only origin/main 只能落在白名单 9 个路径。
 400 一律「内容不符合要求」，含未知字段和 body 里的 tenantId。
 租户只从会话来，照 OpenedCapabilitiesController。多企业 404 沿用现控制器，不写库。
 无会话 POST → 401，先于 CSRF 403。有会话无 CSRF → 403 ACCESS_DENIED。禁止改 IdentitySecurity。做不到就停问 DQ。
-RuleQualityCheckEngine 必须读 materialText。行「问题：尺寸超差」→ ISSUES_FOUND 且 message 含「尺寸超差」。无「问题：」行 → NO_ISSUES 且 issues 为空。禁止不读材料就 NO_ISSUES。禁止「检查通过」。
+RuleQualityCheckEngine 必须读 materialText。全角「问题：尺寸超差」与半角「问题:尺寸超差」都是 ISSUES_FOUND，message 为「尺寸超差」。冒号后为空或只有空白（「问题：」「问题:   」）不算问题，verdict 为 NO_ISSUES 且 issues 为空。无问题行的「本批记录完整。」同样是 NO_ISSUES。禁止不读材料就 NO_ISSUES。禁止「检查通过」。
 表 qo_check_task 只列 id, tenant_id, created_by, title, material_text, status, result_json, created_at。迁移 V194（若 main 最大号已大于 193，用最大号+1，禁止 V192，禁止改 V190–V193）。
 QualityOpsBoundaryArchTest：qualityops 主源码无 agentadmin import，无 qo_capability 与 qo_capability_tenant_grant 字面量。
-CheckTaskIntegrationTest 覆盖：401、CSRF 403、未开通 403 且无行、已开通 201 且 tenant_id=会话租户、问题材料 ISSUES_FOUND、普通材料 NO_ISSUES、A 开通 B 未开通则 B 403、多企业 404、未知字段 400、body tenantId 400、端口抛错 503 无行、引擎抛错 503 无行。
+CheckTaskIntegrationTest 覆盖：401、CSRF 403、未开通 403 且无行、已开通 201 且 tenant_id=会话租户、「问题：尺寸超差」与「问题:尺寸超差」都是 ISSUES_FOUND 且 message 为「尺寸超差」、「问题：」与「问题:   」以及「本批记录完整。」都是 NO_ISSUES 且 issues 为空、A 开通 B 未开通则 B 403、多企业 404、未知字段 400、body tenantId 400、端口抛错 503 无行、引擎抛错 503 无行。
 命令：python3 scripts/with-test-postgres.py ./apps/api/mvnw -B -f apps/api/pom.xml test -Dtest=CheckTaskIntegrationTest,QualityOpsBoundaryArchTest,OpenedCapabilitiesIntegrationTest
 禁止 -DskipTests。禁止 StubSecurity。禁止第四端 grants。禁止企业自助开通。禁止改 src/**。
 
@@ -140,8 +140,8 @@ git -c http.proxy= -c https.proxy= push origin codex/ct-043-a-quality-check-subm
 | A0 | `git diff --name-only origin/main` 仅落在白名单 |
 | A1 | 未开通 403 `CAPABILITY_NOT_OPENED`，指定人话，无新行 |
 | A2 | 已开通 201，`tenant_id` 为会话租户，字段齐全 |
-| A3 | 「问题：尺寸超差」→ `ISSUES_FOUND`，`issues` 非空且含该句 |
-| A4 | 无问题行 → `NO_ISSUES` 且 `issues=[]`。两条 verdict 不同。源码不是不读材料就返回 |
+| A3 | 「问题：尺寸超差」与「问题:尺寸超差」都 → `ISSUES_FOUND`，`message` 为「尺寸超差」 |
+| A4 | 「本批记录完整。」「问题：」「问题:   」都 → `NO_ISSUES` 且 `issues=[]`。与 A3 的 verdict 不同。源码不是不读材料就返回 |
 | A5 | 端口抛错、引擎抛错各自 503，无行，无 verdict |
 | A6 | 无会话 401 先于 CSRF 403。`IdentitySecurity` 无 diff |
 | A7 | 未知字段与 body `tenantId` 均为 400「内容不符合要求」，不写库 |

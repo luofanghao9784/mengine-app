@@ -12,7 +12,7 @@
 
 1. **提交口。** `POST /api/tenant-admin/v1/quality-ops/check-tasks`，operationId `createCheckTask`。body 只有 `materialText`（必填，1～20000）和可选 `title`（≤200）。`additionalProperties: false`。不传 `inputVersionId` / `configVersionId`。不传 `tenantId`。
 2. **材料传法。** 纯文本 JSON。文本框要计字，超长或空白则禁提交、不发请求。不做文件上传、multipart、进度条、取消。文件约束本片 = 无文件。
-3. **成功判定。** 只认 HTTP 201，且同时有 `taskId`（uuid 字符串）、`status==="COMPLETED"`、`result.verdict` 为 `NO_ISSUES` 或 `ISSUES_FOUND`、`result.issues` 为数组且每项有非空 `message`。`ISSUES_FOUND` 必须 `issues.length>0`；`NO_ISSUES` 必须 `issues.length===0`。缺任一按失败处理，不显示结论。人话（待产品确认）：`NO_ISSUES`「没有发现需要修改的地方」；`ISSUES_FOUND`「发现 N 处需要注意」并列出各 `message`。N 等于 `issues.length`。禁用「检查通过」。
+3. **成功判定。** 只认 HTTP 201，且同时有 `taskId`（uuid 字符串）、`status==="COMPLETED"`、`result.verdict` 为 `NO_ISSUES` 或 `ISSUES_FOUND`、`result.issues` 为数组且每项有非空 `message`。`ISSUES_FOUND` 必须 `issues.length>0`；`NO_ISSUES` 必须 `issues.length===0`。缺任一按失败处理，不显示结论。人话：`NO_ISSUES`「没有发现需要注意的地方」；`ISSUES_FOUND`「发现 N 处需要注意」，其下按 `issues` 原文顺序逐条列出 `message`，不改写、不截断。N 等于 `issues.length`，用阿拉伯数字。禁用「检查通过」。
 4. **结果读法。** 只使用这一次 201。不 GET，不轮询，不听事件流。不写入 `localStorage`。刷新后结果区回到未提交，不保留历史。
 5. **失败态（均不显示任何结论）。** 400 →「内容不符合要求」。401 →「请重新登录后再试」。403 且 `code===CAPABILITY_NOT_OPENED` →「贵企业还没开通「质量检查」，请联系平台管理员开通」。403 且 `code===ACCESS_DENIED` →「请刷新页面后再试」。404 → 不显示结论（多企业沿用读口失败的现有人话，不新造「检查通过」）。503、超时或网络失败 →「质量检查暂时不可用，请稍后再试」。
 6. **会话。** 只认 `DREAMCORE_SESSION`。前端不传 `tenantId`。CSRF 由 `createIdentityRequest` 自己带。超时把 `withTimeout(signal, 10_000)` 传进 `createIdentityRequest` 的 signal（#46，`src/shared/abort-timeout.ts`）。不要 `FormData`。
@@ -27,7 +27,18 @@
   - 新建 `src/identity/quality-check-client.ts`
   - `src/identity/AccessApp.tsx` 只透传已有的 `tenant` 或 `opened`，**不改路由**、不改 `view=quality-check` 分支
   - 新建 `tests/e2e/ct043-quality-check-submit.spec.ts`（名匹配 `tests/e2e/ct043-*.spec.ts`）。可复用 `tests/e2e/ct036-empty-shell.spec.ts` 的夹具
+  - 同一 PR 同步改 `tests/e2e/ct036-empty-shell.spec.ts`，只改下面两类断言，其余断言保留，不得删弱
 - **e2e 覆盖**：未开通无按钮；成功只认合同字段；失败人话且无结论；全文不出现「检查通过」
+
+### ct036 只改这两类断言
+
+文件：`tests/e2e/ct036-empty-shell.spec.ts`。
+
+(a) 已开通时按钮禁用，以及「执行服务尚未接通」。只动第 83–85、92、121、193、230 行。读口含 `quality-check` 时，`toBeDisabled()` 改为 `toBeEnabled()`。第 84–85 行不再要求「暂时不能提交检查材料（执行服务尚未接通）」和「暂时不能查看处理结果（执行服务尚未接通）」可见，改为这两句 `toHaveCount(0)`。第 86 行「检查通过」数量为 0 不在此列，不得改。
+
+(b) 未开通标题。只动第 169、201、234 行里的「本企业尚未开通此 AI 功能」，改为「贵企业还没开通「质量检查」，请联系平台管理员开通」。第 169 行三元表达式里 404/500 的标题不要改。
+
+其余行一律保留：深链无「② 提交检查材料」、登录墙、请求必须是 GET 且不打 `/agent-admin/`、导航 href、三步标题、读取中的「正在读取」、切企业后无质量检查链接。不得为了变绿删掉这些断言。
 - **不做什么**：`apps/api/**`、契约、迁移、文件上传、第四端 grants、企业自助开通
 
 ## ② 前置条件与分支名
@@ -66,10 +77,10 @@ git switch -c codex/ct-043-b-workspace-submit-result
 2. 新文件 src/identity/quality-check-client.ts。用 createIdentityRequest 发 POST /api/tenant-admin/v1/quality-ops/check-tasks。signal 用 withTimeout(signal, 10_000)。body 只有 materialText 与可选 title。禁止 tenantId，禁止 FormData。
 3. AccessApp.tsx 只把已有 tenant 或 opened 透传给 QualityCheck。不改 hash 路由，不改 view 分支。
 4. 201 缺 taskId、status!==COMPLETED、verdict 不是那两个、issues 形状不对、或 ISSUES_FOUND 但 issues 为空：当失败，不显示结论。
-5. NO_ISSUES 显示「没有发现需要修改的地方」。ISSUES_FOUND 显示「发现 N 处需要注意」并列出 message。N 为条数。
+5. NO_ISSUES 显示「没有发现需要注意的地方」。ISSUES_FOUND 显示「发现 N 处需要注意」，下面按 issues 原文顺序逐条列出 message，不改写、不截断。N 为条数，阿拉伯数字。
 6. 400「内容不符合要求」。401「请重新登录后再试」。403 CAPABILITY_NOT_OPENED 用未开通那句。403 ACCESS_DENIED「请刷新页面后再试」。503 或超时「质量检查暂时不可用，请稍后再试」。这些都不显示结论。
 7. 不 localStorage。刷新后不留上一次结论。
-8. e2e：tests/e2e/ct043-quality-check-submit.spec.ts，可复用 ct036 夹具。覆盖未开通无按钮、成功只认合同字段、失败人话、全文无「检查通过」。拦截若把某字段拿掉，页面不得显示结论。
+8. e2e：tests/e2e/ct043-quality-check-submit.spec.ts，可复用 ct036 夹具。覆盖未开通无按钮、成功只认合同字段、失败人话、全文无「检查通过」。拦截若把某字段拿掉，页面不得显示结论。发现问题一例：输入「问题：尺寸超差」，201 为 ISSUES_FOUND 且 message 为「尺寸超差」，页面显示「发现 1 处需要注意」，其下原文「尺寸超差」。没有问题一例：输入「本批记录完整。」，201 为 NO_ISSUES 且 issues 为空，页面显示「没有发现需要注意的地方」，不出现「发现 1 处需要注意」。同一 PR 只按执行单「ct036 只改这两类断言」改 tests/e2e/ct036-empty-shell.spec.ts。
 
 【要做成】
 npm run build。npx playwright test tests/e2e/ct043-quality-check-submit.spec.ts tests/e2e/ct036-empty-shell.spec.ts。禁止 -DskipTests。
@@ -94,7 +105,8 @@ git add \
   src/identity/QualityCheck.tsx \
   src/identity/quality-check-client.ts \
   src/identity/AccessApp.tsx \
-  tests/e2e/ct043-quality-check-submit.spec.ts
+  tests/e2e/ct043-quality-check-submit.spec.ts \
+  tests/e2e/ct036-empty-shell.spec.ts
 git diff --cached --stat | grep -E 'apps/api|contracts/|engine/|workers/parser|V19' && echo 'ERROR: 禁区' && exit 1
 git commit -m "$(cat <<'EOM'
 feat(workspace): CT-043-B 质量检查提交与结果接线
@@ -114,14 +126,14 @@ git -c http.proxy= -c https.proxy= push origin codex/ct-043-b-workspace-submit-r
 |---|---|
 | B1 | 未开通无按钮，人话为指定未开通句，无 POST |
 | B2 | 已开通按钮可点。超长禁提交。body 无 `tenantId`，无文件 |
-| B3 | 201 合同齐全且 `ISSUES_FOUND` →「发现 N 处需要注意」并列出 message |
-| B4 | `NO_ISSUES` →「没有发现需要修改的地方」 |
+| B3 | 201 合同齐全且 `ISSUES_FOUND` →「发现 N 处需要注意」，其下按原文顺序逐条列出 `message`，不改写、不截断 |
+| B4 | `NO_ISSUES` →「没有发现需要注意的地方」 |
 | B5 | 缺任一合同字段 → 失败，无结论 |
 | B6 | 400/401/403/404/503 各自人话，无结论 |
 | B7 | 全文无「检查通过」，无裸 `capability` / `Grant` / `seed` / `admission` |
 | B8 | 刷新不留历史。AccessApp 路由未改 |
 | B9 | 客户端用了 `createIdentityRequest` 与 `withTimeout` |
-| B10 | e2e 与 ct036 通过 |
+| B10 | ct036 更新后通过。新 ct043 e2e 同时全绿。ct036 只改上述两类断言，其余不得删弱 |
 | B11 | A 已合之后才合本单 |
 
 ## ⑦ 禁止操作
